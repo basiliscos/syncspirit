@@ -6,10 +6,9 @@
 
 namespace syncspirit::model {
 
-void assign(bu::uuid &uuid, std::string_view source) noexcept {
+void assign(bu::uuid &uuid, utils::bytes_view_t source) noexcept {
     assert(source.size() == uuid.size());
-    auto data = (const uint8_t *)source.data();
-    std::copy(data, data + source.size(), &uuid.data[0]);
+    std::copy(source.begin(), source.end(), &uuid.data[0]);
 }
 
 } // namespace syncspirit::model

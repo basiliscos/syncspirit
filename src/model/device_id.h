@@ -26,7 +26,7 @@ struct SYNCSPIRIT_API device_id_t {
 
     static std::optional<device_id_t> from_string(std::string_view value) noexcept;
     static std::optional<device_id_t> from_sha256(utils::bytes_view_t sha_256) noexcept;
-    static std::optional<device_id_t> from_cert(const utils::cert_data_t &cert) noexcept;
+    static std::optional<device_id_t> from_cert(utils::cert_data_view_t cert) noexcept;
     static std::optional<device_id_t> from_uuid(std::string_view value) noexcept;
     static std::string make_short(std::uint64_t value) noexcept;
 
@@ -42,7 +42,7 @@ struct SYNCSPIRIT_API device_id_t {
     operator bool() const noexcept { return !value.empty(); }
 
     const std::string &get_value() const noexcept { return value; }
-    const std::string &serialize() const noexcept { return value; }
+    // const std::string &serialize() const noexcept { return value; }
 
     std::string_view get_short() const noexcept;
     utils::bytes_view_t get_sha256() const noexcept { return utils::bytes_view_t(hash + 1, digest_length); }
@@ -53,7 +53,7 @@ struct SYNCSPIRIT_API device_id_t {
 
   private:
     device_id_t(const utils::cert_data_t &) noexcept;
-    device_id_t(std::string_view value_, std::string_view sha256_) noexcept;
+    device_id_t(std::string_view value_, utils::bytes_view_t sha256_) noexcept;
 
     std::string value;
     unsigned char hash[data_length];

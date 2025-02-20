@@ -43,8 +43,8 @@ struct SYNCSPIRIT_API folder_t final : augmentable_t<folder_t>, folder_data_t {
 
     folder_info_ptr_t is_shared_with(const device_t &device) const noexcept;
 
-    std::string_view get_key() const noexcept { return std::string_view(key, data_length); }
-    std::string_view get_uuid() const noexcept;
+    utils::bytes_view_t get_key() const noexcept { return utils::bytes_view_t(key, data_length); }
+    utils::bytes_view_t get_uuid() const noexcept;
     inline auto &get_folder_infos() noexcept { return folder_infos; }
     inline auto &get_folder_infos() const noexcept { return folder_infos; }
     inline cluster_t *&get_cluster() noexcept { return cluster; }
@@ -76,7 +76,7 @@ struct SYNCSPIRIT_API folder_t final : augmentable_t<folder_t>, folder_data_t {
     device_ptr_t device;
     folder_infos_map_t folder_infos;
     cluster_t *cluster = nullptr;
-    char key[data_length];
+    unsigned char key[data_length];
     std::int_fast32_t synchronizing = 0;
     bool suspended;
 };

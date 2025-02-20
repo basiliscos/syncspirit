@@ -58,7 +58,7 @@ const std::int32_t base32::out_alphabet[] = {
 const constexpr std::uint32_t in_mask = 0b00011111;
 const constexpr std::uint32_t out_mask = 0b11111111;
 
-std::string base32::encode(std::string_view input) noexcept {
+std::string base32::encode(bytes_view_t input) noexcept {
     auto encoded_sz = encoded_size(input.size());
     std::string encoded(encoded_sz, 0);
     std::uint32_t in = 0;
@@ -96,7 +96,7 @@ std::string base32::encode(std::string_view input) noexcept {
     return encoded;
 }
 
-outcome::result<std::string> base32::decode(std::string_view input) noexcept {
+outcome::result<bytes_t> base32::decode(std::string_view input) noexcept {
     auto decoded_sz = decoded_size(input.size());
     std::string decoded(decoded_sz, 0);
 

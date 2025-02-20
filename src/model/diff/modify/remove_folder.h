@@ -19,7 +19,7 @@ struct SYNCSPIRIT_API remove_folder_t final : cluster_diff_t {
     outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;
 
     std::string folder_id;
-    std::string folder_key;
+    utils::bytes_t folder_key;
 };
 
 } // namespace syncspirit::model::diff::modify

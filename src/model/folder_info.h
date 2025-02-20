@@ -48,7 +48,7 @@ struct SYNCSPIRIT_API folder_info_t final : augmentable_t<folder_info_t> {
     static outcome::result<folder_info_ptr_t> create(const bu::uuid &uuid, const db::FolderInfo &data,
                                                      const device_ptr_t &device_, const folder_ptr_t &folder_) noexcept;
     utils::bytes_view_t get_key() const noexcept;
-    std::string_view get_uuid() const noexcept;
+    utils::bytes_view_t get_uuid() const noexcept;
 
     bool operator==(const folder_info_t &other) const noexcept;
     bool operator!=(const folder_info_t &other) const noexcept { return !(*this == other); }

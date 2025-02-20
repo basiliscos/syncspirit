@@ -10,6 +10,8 @@
 
 namespace syncspirit::proto::impl {
 
+using bytes_backend_t = std::vector<std::vector<unsigned char>>;
+
 namespace changeable {
 
 template<typename T>
@@ -94,14 +96,6 @@ struct Folder {
     inline void paused(bool value) noexcept {
         using namespace pp;
         (*impl)["_paused"_f] = value;
-    }
-    inline void scheduled(bool value) noexcept {
-        using namespace pp;
-        (*impl)["_scheduled"_f] = value;
-    }
-    inline void path(std::string_view value) noexcept {
-        using namespace pp;
-        (*impl)["_path"_f] = std::string(value);
     }
     inline void max_sequence(std::uint32_t value) noexcept {
         using namespace pp;
@@ -397,7 +391,7 @@ struct SYNCSPIRIT_API FileInfo {
         }
         return 0;
     }
-    inline std::uint32_t permissions() noexcept {
+    inline std::uint32_t permissions() const noexcept {
         using namespace pp;
         if (impl) {
             auto& opt = (*impl)["_permissions"_f];
@@ -407,7 +401,7 @@ struct SYNCSPIRIT_API FileInfo {
         }
         return 0;
     }
-    inline std::int64_t modified_s() noexcept {
+    inline std::int64_t modified_s() const noexcept {
         using namespace pp;
         using namespace pp;
         if (impl) {
@@ -418,7 +412,7 @@ struct SYNCSPIRIT_API FileInfo {
         }
         return 0;
     }
-    inline std::int32_t modified_ns() noexcept {
+    inline std::int32_t modified_ns() const noexcept {
         using namespace pp;
         using namespace pp;
         if (impl) {
@@ -429,7 +423,7 @@ struct SYNCSPIRIT_API FileInfo {
         }
         return 0;
     }
-    inline std::uint64_t modified_by() noexcept {
+    inline std::uint64_t modified_by() const noexcept {
         using namespace pp;
         using namespace pp;
         if (impl) {
@@ -470,8 +464,7 @@ struct SYNCSPIRIT_API FileInfo {
         }
         return false;
     }
-    inline std::int64_t sequence() noexcept {
-        using namespace pp;
+    inline std::int64_t sequence() const noexcept {
         using namespace pp;
         if (impl) {
             auto& opt = (*impl)["_sequence"_f];
@@ -498,7 +491,7 @@ struct SYNCSPIRIT_API FileInfo {
         }
         return 0;
     }
-    inline std::string_view symlink_target() noexcept {
+    inline std::string_view symlink_target() const noexcept {
         using namespace pp;
         if (impl) {
             auto& opt = (*impl)["_symlink_target"_f];

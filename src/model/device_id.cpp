@@ -18,7 +18,7 @@ using namespace syncspirit::utils;
 
 static const constexpr char prefix = (char)(syncspirit::db::prefix::device);
 
-device_id_t::device_id_t(std::string_view value_, std::string_view sha256_) noexcept : value{value_} {
+device_id_t::device_id_t(std::string_view value_, bytes_view_t sha256_) noexcept : value{value_} {
     assert(sha256_.size() == digest_length);
     hash[0] = prefix;
     std::copy(sha256_.begin(), sha256_.end(), hash + 1);
@@ -100,9 +100,9 @@ std::optional<device_id_t> device_id_t::from_string(std::string_view value) noex
     return result_t{};
 }
 
-std::optional<device_id_t> device_id_t::from_sha256(bytes_view_t sha_256) noexcept {
+std::optional<device_id_t> device_id_t::from_sha256(bytes_view_t sha256) noexcept {
     using result_t = std::optional<device_id_t>;
-    auto sha256_enc = base32::encode(sha_256);
+    auto sha256_enc = base32::encode(sha256);
     if (sha256_enc.size() != SHA256_B32_SIZE) {
         return result_t{};
     }
@@ -131,7 +131,7 @@ std::optional<device_id_t> device_id_t::from_sha256(bytes_view_t sha_256) noexce
         }
     }
     auto str = std::string_view(dashed, DASHED_SIZE);
-    return device_id_t{str, sha_256};
+    return device_id_t{str, sha256};
 }
 
 std::string device_id_t::make_short(std::uint64_t value) noexcept {
@@ -139,14 +139,14 @@ std::string device_id_t::make_short(std::uint64_t value) noexcept {
         return {};
     }
     auto be = be::native_to_big(value);
-    auto view = std::string_view(reinterpret_cast<const char *>(&be), sizeof(value));
-    auto encoded = base32::encode(view.substr(0, 5)); // it is enought to encode just first 5 bytes
+    auto view = utils::bytes_view_t(reinterpret_cast<const unsigned char *>(&be), sizeof(value));
+    auto encoded = base32::encode(view.subspan(0, 5)); // it is enought to encode just first 5 bytes
     return encoded.substr(0, DASH_INT);
 }
 
-std::optional<device_id_t> device_id_t::from_cert(const cert_data_t &data) noexcept {
+std::optional<device_id_t> device_id_t::from_cert(cert_data_view_t data) noexcept {
     using result_t = std::optional<device_id_t>;
-    auto sha_result = sha256_digest(data.bytes);
+    auto sha_result = sha256_digest(data);
     if (!sha_result) {
         return result_t{};
     }
@@ -156,8 +156,7 @@ std::optional<device_id_t> device_id_t::from_cert(const cert_data_t &data) noexc
 namespace syncspirit::model {
 
 static const unsigned char local_device_sha265[SHA256_DIGEST_LENGTH] = {0xFF};
-
-const device_id_t local_device_id =
-    device_id_t::from_cert(cert_data_t{std::string((char *)local_device_sha265, SHA256_DIGEST_LENGTH)}).value();
+static const cert_data_view_t local_device_cert(local_device_sha265, SHA256_DIGEST_LENGTH);
+const device_id_t local_device_id = device_id_t::from_cert(local_device_cert).value();
 
 } // namespace syncspirit::model

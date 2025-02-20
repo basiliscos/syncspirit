@@ -48,7 +48,9 @@ auto remove_files_t::apply_impl(cluster_t &cluster, apply_controller_t &controll
         auto folder_info = folder_infos.by_device_id(device_id);
         auto &file_infos = folder_info->get_file_infos();
         auto decomposed = file_info_t::decompose_key(keys[i]);
-        auto file = file_infos.get(decomposed.file_id);
+        auto ptr = (const char*) decomposed.file_id.data();
+        auto file_id = std::string_view(ptr, decomposed.file_id.size());
+        auto file = file_infos.get(file_id);
         file_infos.remove(file);
     }
     return applicator_t::apply_sibling(cluster, controller);

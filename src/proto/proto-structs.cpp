@@ -34,10 +34,6 @@ template<typename B, typename T> utils::bytes_t generic_encode(T& item) noexcept
     return storage;
 }
 
-utils::bytes_t Device::encode() noexcept {
-    return generic_encode<details::Device>(*this);
-}
-
 auto BlockInfo::encode() noexcept -> utils::bytes_t {
     return generic_encode<details::BlockInfo>(*this);
 }
@@ -48,6 +44,14 @@ auto BlockInfo::decode(utils::bytes_view_t bytes) noexcept -> std::optional<Bloc
 
 auto Device::decode(utils::bytes_view_t bytes) noexcept -> std::optional<Device> {
     return generic_decode<Device, details::Device>(bytes);
+}
+
+utils::bytes_t Device::encode() noexcept {
+    return generic_encode<details::Device>(*this);
+}
+
+utils::bytes_t FileInfo::encode() noexcept {
+    return generic_encode<details::FileInfo>(*this);
 }
 
 auto Folder::decode(utils::bytes_view_t bytes) noexcept -> std::optional<Folder> {
@@ -65,4 +69,3 @@ auto PendingFolder::decode(utils::bytes_view_t bytes) noexcept -> std::optional<
 auto SomeDevice::decode(utils::bytes_view_t bytes) noexcept -> std::optional<SomeDevice> {
     return generic_decode<SomeDevice, details::SomeDevice>(bytes);
 }
-

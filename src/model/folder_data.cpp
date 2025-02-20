@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "folder_data.h"
-#include "proto/proto-fwd.hpp"
+#include "proto/proto-structs.h"
 
 #include <boost/nowide/convert.hpp>
 
@@ -24,16 +24,16 @@ void folder_data_t::assign_fields(const db::Folder &item) noexcept {
 }
 
 void folder_data_t::serialize(db::Folder &r) const noexcept {
-    r.set_id(id);
-    r.set_label(label);
-    r.set_read_only(read_only);
-    r.set_ignore_permissions(ignore_permissions);
-    r.set_ignore_delete(ignore_delete);
-    r.set_disable_temp_indexes(disable_temp_indixes);
-    r.set_paused(paused);
-    r.set_scheduled(scheduled);
-    r.set_path(path.string());
-    r.set_folder_type((db::FolderType)folder_type);
-    r.set_pull_order((db::PullOrder)pull_order);
-    r.set_rescan_interval(rescan_interval);
+    r.id(id);
+    r.label(label);
+    r.read_only(read_only);
+    r.ignore_permissions(ignore_permissions);
+    r.ignore_delete(ignore_delete);
+    r.disable_temp_indexes(disable_temp_indixes);
+    r.paused(paused);
+    r.scheduled(scheduled);
+    r.path(path.string());
+    r.folder_type((db::FolderType)folder_type);
+    r.pull_order((db::PullOrder)pull_order);
+    r.rescan_interval(rescan_interval);
 }

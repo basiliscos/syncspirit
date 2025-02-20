@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #pragma once
 
@@ -50,8 +50,8 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t<file_info_t> {
     using blocks_t = std::vector<block_info_ptr_t>;
 
     struct decomposed_key_t {
-        std::string_view folder_info_id;
-        std::string_view file_id;
+        utils::bytes_view_t folder_info_id;
+        utils::bytes_view_t file_id;
     };
 
     struct guard_t : arc_base_t<guard_t> {
@@ -62,23 +62,23 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t<file_info_t> {
     };
     using guard_ptr_t = intrusive_ptr_t<guard_t>;
 
-    static outcome::result<file_info_ptr_t> create(std::string_view key, const db::FileInfo &data,
+    static outcome::result<file_info_ptr_t> create(utils::bytes_view_t key, const db::FileInfo &data,
                                                    const folder_info_ptr_t &folder_info_) noexcept;
     static outcome::result<file_info_ptr_t> create(const bu::uuid &uuid, const proto::FileInfo &info_,
                                                    const folder_info_ptr_t &folder_info_) noexcept;
-    static std::string create_key(const bu::uuid &uuid, const folder_info_ptr_t &folder_info_) noexcept;
+    static utils::bytes_t create_key(const bu::uuid &uuid, const folder_info_ptr_t &folder_info_) noexcept;
 
     static decomposed_key_t decompose_key(utils::bytes_view_t key);
 
     ~file_info_t();
 
     utils::bytes_view_t get_key() const noexcept { return utils::bytes_view_t(key, data_length); }
-    std::string_view get_uuid() const noexcept;
+    utils::bytes_view_t get_uuid() const noexcept;
     bool operator==(const file_info_t &other) const noexcept { return get_uuid() == other.get_uuid(); }
 
     proto::FileInfo as_proto(bool include_blocks = true) const noexcept;
     db::FileInfo as_db(bool include_blocks = true) const noexcept;
-    std::string serialize(bool include_blocks = true) const noexcept;
+    utils::bytes_t serialize(bool include_blocks = true) const noexcept;
 
     void update(const file_info_t &updated) noexcept;
 
@@ -162,7 +162,7 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t<file_info_t> {
     template <typename Source> outcome::result<void> fields_update(const Source &s, size_t block_count) noexcept;
     template <typename T> T as() const noexcept;
 
-    file_info_t(std::string_view key, const folder_info_ptr_t &folder_info_) noexcept;
+    file_info_t(utils::bytes_view_t key, const folder_info_ptr_t &folder_info_) noexcept;
     file_info_t(const bu::uuid &uuid, const folder_info_ptr_t &folder_info_) noexcept;
     outcome::result<void> reserve_blocks(size_t block_count) noexcept;
 

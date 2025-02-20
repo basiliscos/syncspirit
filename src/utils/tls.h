@@ -3,12 +3,13 @@
 
 #pragma once
 
-#include <string>
 #include <memory>
+#include <string>
 #include <boost/outcome.hpp>
 #include <openssl/x509v3.h>
 #include <openssl/evp.h>
 #include "syncspirit-export.h"
+#include "bytes.h"
 
 namespace syncspirit {
 namespace utils {
@@ -17,8 +18,12 @@ namespace outcome = boost::outcome_v2;
 
 template <typename T> using guard_t = std::unique_ptr<T, std::function<void(T *)>>;
 
-struct cert_data_t {
-    std::string bytes; /* in DER-format */
+/* in DER-format */
+struct cert_data_view_t: bytes_view_t {
+    using bytes_view_t::bytes_view_t;
+};
+struct cert_data_t: bytes_t {
+    using bytes_t::bytes_t;
 };
 
 struct SYNCSPIRIT_API key_pair_t {
@@ -47,9 +52,9 @@ SYNCSPIRIT_API outcome::result<key_pair_t> generate_pair(const char *issuer_name
 
 SYNCSPIRIT_API outcome::result<key_pair_t> load_pair(const char *cert, const char *priv_key);
 
-SYNCSPIRIT_API outcome::result<std::string> sha256_digest(const std::string &data) noexcept;
+SYNCSPIRIT_API outcome::result<bytes_t> sha256_digest(utils::bytes_view_t data) noexcept;
 
-SYNCSPIRIT_API outcome::result<std::string> as_serialized_der(X509 *cert) noexcept;
+SYNCSPIRIT_API outcome::result<bytes_t> as_serialized_der(X509 *cert) noexcept;
 
 SYNCSPIRIT_API outcome::result<std::string> get_common_name(X509 *cert) noexcept;
 

@@ -58,21 +58,21 @@ using PendingFolder = pp::message<
 >;
 
 using FileInfo = pp::message<
-    pp::string_field    <"_name",            1                         >,
-    pp::enum_field      <"_type",            2, proto::FileInfoType    >,
-    pp::int64_field     <"_size",            3                         >,
-    pp::uint32_field    <"_permissions",     4                         >,
-    pp::int64_field     <"_modified_s",      5                         >,
-    pp::int32_field     <"_modified_ns",     11                        >,
-    pp::uint64_field    <"_modified_by",     12                        >,
-    pp::bool_field      <"_deleted",         6                         >,
-    pp::bool_field      <"_invalid",         7                         >,
-    pp::bool_field      <"_no_permissions",  8                         >,
-    pp::message_field   <"_version",         9, proto::details::Vector >,
-    pp::int64_field     <"_sequence",        10                        >,
-    pp::int32_field     <"_block_size",      13                        >,
-    pp::string_field    <"_symlink_target",  16                        >,
-    pp::bytes_field     <"_blocks",          17, pp::repeated          >
+    pp::string_field    <"_name",            1                                            >,
+    pp::enum_field      <"_type",            2, proto::FileInfoType                       >,
+    pp::int64_field     <"_size",            3                                            >,
+    pp::uint32_field    <"_permissions",     4                                            >,
+    pp::int64_field     <"_modified_s",      5                                            >,
+    pp::int32_field     <"_modified_ns",     11                                           >,
+    pp::uint64_field    <"_modified_by",     12                                           >,
+    pp::bool_field      <"_deleted",         6                                            >,
+    pp::bool_field      <"_invalid",         7                                            >,
+    pp::bool_field      <"_no_permissions",  8                                            >,
+    pp::message_field   <"_version",         9, proto::details::Vector                    >,
+    pp::int64_field     <"_sequence",        10                                           >,
+    pp::int32_field     <"_block_size",      13                                           >,
+    pp::string_field    <"_symlink_target",  16                                           >,
+    pp::bytes_field     <"_blocks",          17, pp::repeated, proto::impl::bytes_backend_t>
 >;
 
 using IngoredFolder = pp::message<
@@ -119,9 +119,36 @@ struct SYNCSPIRIT_API Device: proto::impl::changeable::Device<details::Device> {
     }
 };
 
+struct SYNCSPIRIT_API FileInfo: proto::impl::changeable::FileInfo<details::FileInfo> {
+    using parent_t = proto::impl::changeable::FileInfo<details::FileInfo>;
+    using parent_t::parent_t;
+
+    inline void add_block(utils::bytes_view_t hash) noexcept {
+        using namespace pp;
+        auto bytes = utils::bytes_t(hash.begin(), hash.end());
+        (*impl)["_blocks"_f].emplace_back(std::move(bytes));
+    }
+    inline proto::changeable::Vector mutable_version() noexcept {
+        using namespace pp;
+        return proto::changeable::Vector(&(*impl)["_version"_f].value());
+    }
+};
+
 struct SYNCSPIRIT_API Folder: proto::impl::changeable::Folder<details::Folder> {
     using parent_t = proto::impl::changeable::Folder<details::Folder>;
     using parent_t::parent_t;
+    inline void rescan_interval(std::uint32_t value) noexcept {
+        using namespace pp;
+        (*impl)["_rescan_interval"_f] = value;
+    }
+    inline void scheduled(bool value) noexcept {
+        using namespace pp;
+        (*impl)["_scheduled"_f] = value;
+    }
+    inline void path(std::string_view value) noexcept {
+        using namespace pp;
+        (*impl)["_path"_f] = std::string(value);
+    }
     inline void folder_type(FolderType value) noexcept {
         using namespace pp;
         (*impl)["_folder_type"_f] = value;
@@ -212,71 +239,67 @@ struct SYNCSPIRIT_API FolderInfo {
     const details::FolderInfo* impl;
 };
 
+
 struct SYNCSPIRIT_API Folder: proto::impl::view::Folder<details::Folder> {
     using parent_t = proto::impl::view::Folder<details::Folder>;
     using parent_t::parent_t;
+
+    inline bool scheduled() const noexcept {
+        using namespace pp;
+        if (impl) {
+            auto& opt = (*impl)["_scheduled"_f];
+            if (opt) {
+                return opt.value();
+            }
+        }
+        return {};
+    }
+    inline std::string_view path() const noexcept {
+        using namespace pp;
+        if (impl) {
+            auto& opt = (*impl)["_path"_f];
+            if (opt) {
+                return opt.value();
+            }
+        }
+        return {};
+    }
+    inline FolderType folder_type() const noexcept {
+        using namespace pp;
+        if (impl) {
+            auto& opt = (*impl)["_folder_type"_f];
+            if (opt) {
+                return opt.value();
+            }
+        }
+        return {};
+    }
+    inline PullOrder pull_order() const noexcept {
+        using namespace pp;
+        if (impl) {
+            auto& opt = (*impl)["_pull_order"_f];
+            if (opt) {
+                return opt.value();
+            }
+        }
+        return {};
+    }
+    inline std::uint32_t rescan_interval() const noexcept {
+        using namespace pp;
+        if (impl) {
+            auto& opt = (*impl)["_rescan_interval"_f];
+            if (opt) {
+                return opt.value();
+            }
+        }
+        return {};
+    }
 };
 
-struct SYNCSPIRIT_API FileInfo {
-    FileInfo(const details::FileInfo* impl_= nullptr): impl{impl_} {}
+struct SYNCSPIRIT_API FileInfo: proto::impl::view::FileInfo<details::FileInfo> {
+    using parent_t = proto::impl::view::FileInfo<details::FileInfo>;
+    using parent_t::parent_t;
 
-    inline std::string_view name() const noexcept {
-        using namespace pp;
-        if (impl) {
-            auto& opt = (*impl)["_name"_f];
-            if (opt) {
-                return opt.value();
-            }
-        }
-        return "";
-    }
-    inline auto type() const noexcept {
-        using namespace pp;
-        if (impl) {
-            auto& opt = (*impl)["_type"_f];
-            if (opt) {
-                return opt.value();
-            }
-        }
-        return proto::FileInfoType::FILE;
-    }
-    inline int64_t size() const noexcept {
-        using namespace pp;
-        if (impl) {
-            auto& opt = (*impl)["_size"_f];
-            if (opt) {
-                return opt.value();
-            }
-        }
-        return 0;
-    }
-    inline int32_t block_size() const noexcept {
-        using namespace pp;
-        if (impl) {
-            auto& opt = (*impl)["_block_size"_f];
-            if (opt) {
-                return opt.value();
-            }
-        }
-        return 0;
-    }
-    inline size_t blocks_size() const noexcept {
-        using namespace pp;
-        if (impl) {
-            return (*impl)["_blocks"_f].size();
-        }
-        return 0;
-    }
-    inline bool deleted() const noexcept {
-        using namespace pp;
-        if (impl) {
-            auto& opt = (*impl)["_deleted"_f];
-            if (opt) {
-                return opt.value();
-            }
-        }
-        return false;
-    }
     inline utils::bytes_view_t block(size_t i) const noexcept {
         using namespace pp;
         if (impl) {
@@ -286,6 +309,18 @@ struct SYNCSPIRIT_API FileInfo {
         }
         return utils::bytes_view_t{};
     }
+    inline proto::view::Vector version() const noexcept {
+        using namespace pp;
+        auto v_impl = (const proto::details::Vector*){nullptr};
+        if (impl) {
+            auto& opt = (*impl)["_version"_f];
+            if (opt) {
+                v_impl = &opt.value();
+            }
+        }
+        return proto::view::Vector(v_impl);
+    }
+
     const details::FileInfo* impl;
 };
 
@@ -346,6 +381,11 @@ struct SYNCSPIRIT_API Folder: view::Folder, changeable::Folder, private details:
     using view::Folder::ignore_delete;
     using view::Folder::disable_temp_indexes;
     using view::Folder::paused;
+    using view::Folder::scheduled;
+    using view::Folder::path;
+    using view::Folder::folder_type;
+    using view::Folder::pull_order;
+    using view::Folder::rescan_interval;
 
     using changeable::Folder::id;
     using changeable::Folder::label;
@@ -354,6 +394,11 @@ struct SYNCSPIRIT_API Folder: view::Folder, changeable::Folder, private details:
     using changeable::Folder::ignore_delete;
     using changeable::Folder::disable_temp_indexes;
     using changeable::Folder::paused;
+    using changeable::Folder::scheduled;
+    using changeable::Folder::path;
+    using changeable::Folder::folder_type;
+    using changeable::Folder::pull_order;
+    using changeable::Folder::rescan_interval;
 
     static std::optional<Folder> decode(utils::bytes_view_t bytes) noexcept;
 };
@@ -375,16 +420,41 @@ struct SYNCSPIRIT_API PendingFolder: view::PendingFolder, changeable::PendingFol
     static std::optional<PendingFolder> decode(utils::bytes_view_t bytes) noexcept;
 };
 
-struct SYNCSPIRIT_API FileInfo: view::FileInfo, private details::FileInfo {
+struct SYNCSPIRIT_API FileInfo: view::FileInfo, changeable::FileInfo, private details::FileInfo {
     template<typename... T>
-    FileInfo(T&&... args): view::FileInfo(this), details::FileInfo(std::forward<T>(args)...) {}
+    FileInfo(T&&... args): view::FileInfo(this), changeable::FileInfo(this), details::FileInfo(std::forward<T>(args)...) {}
 
     using view::FileInfo::size;
     using view::FileInfo::name;
     using view::FileInfo::type;
     using view::FileInfo::block_size;
-    using view::FileInfo::blocks_size;
     using view::FileInfo::deleted;
+    using view::FileInfo::invalid;
+    using view::FileInfo::no_permissions;
+    using view::FileInfo::permissions;
+    using view::FileInfo::symlink_target;
+    using view::FileInfo::modified_s;
+    using view::FileInfo::modified_ns;
+    using view::FileInfo::modified_by;
+    using view::FileInfo::sequence;
+    using view::FileInfo::blocks_size;
+
+    using changeable::FileInfo::size;
+    using changeable::FileInfo::name;
+    using changeable::FileInfo::type;
+    using changeable::FileInfo::block_size;
+    using changeable::FileInfo::deleted;
+    using changeable::FileInfo::invalid;
+    using changeable::FileInfo::no_permissions;
+    using changeable::FileInfo::permissions;
+    using changeable::FileInfo::symlink_target;
+    using changeable::FileInfo::modified_s;
+    using changeable::FileInfo::modified_ns;
+    using changeable::FileInfo::modified_by;
+    using changeable::FileInfo::sequence;
+
+    inline details::FileInfo& expose() noexcept { return *this; }
+    utils::bytes_t encode() noexcept;
 };
 
 struct SYNCSPIRIT_API IngoredFolder: private details::IngoredFolder {

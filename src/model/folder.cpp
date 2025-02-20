@@ -43,7 +43,7 @@ folder_t::folder_t(const bu::uuid &uuid) noexcept : synchronizing{false}, suspen
     std::copy(uuid.begin(), uuid.end(), key + 1);
 }
 
-std::string_view folder_t::get_uuid() const noexcept { return std::string_view(key + 1, uuid_length); }
+utils::bytes_view_t folder_t::get_uuid() const noexcept { return utils::bytes_view_t(key + 1, uuid_length); }
 
 void folder_t::add(const folder_info_ptr_t &folder_info) noexcept { folder_infos.put(folder_info); }
 

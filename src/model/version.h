@@ -13,7 +13,7 @@ namespace syncspirit::model {
 struct device_t;
 
 struct SYNCSPIRIT_API version_t final : arc_base_t<version_t> {
-    version_t(const proto::Vector &) noexcept;
+    version_t(const proto::view::Vector &) noexcept;
     version_t(const device_t &) noexcept;
 
     proto::Vector as_proto() const noexcept;

@@ -15,7 +15,7 @@ auto file_infos_t::apply_forward(cluster_t &cluster, apply_controller_t &control
 
 auto file_infos_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
     -> outcome::result<void> {
-    using folder_info_by_id_t = std::unordered_map<std::string_view, folder_info_ptr_t>;
+    using folder_info_by_id_t = std::unordered_map<utils::bytes_view_t, folder_info_ptr_t>;
     auto all_fi = folder_info_by_id_t{};
     auto &folders = cluster.get_folders();
     for (auto f : folders) {
@@ -28,7 +28,7 @@ auto file_infos_t::apply_impl(cluster_t &cluster, apply_controller_t &controller
     for (auto &pair : container) {
         auto key = pair.first;
         auto &db = pair.second;
-        auto folder_info_uuid = key.substr(1, uuid_length);
+        auto folder_info_uuid = key.subspan(1, uuid_length);
         auto folder_info = all_fi[folder_info_uuid];
         if (!folder_info) {
             LOG_WARN(log, "cannot restore file '{}', missing folder, corrupted db?", db.name());

@@ -162,6 +162,7 @@ struct SYNCSPIRIT_API BlockInfo: proto::impl::changeable::BlockInfo<details::Blo
 
 struct SYNCSPIRIT_API Vector {
     Vector(details::Vector* impl_): impl{impl_}{};
+    inline details::Vector& expose() noexcept { return *impl; }
     details::Vector* impl;
 };
 
@@ -538,17 +539,28 @@ struct SYNCSPIRIT_API FileInfo: view::FileInfo, changeable::FileInfo, private de
     using view::FileInfo::name;
     using view::FileInfo::type;
     using view::FileInfo::block_size;
-    using view::FileInfo::blocks_size;
     using view::FileInfo::deleted;
+    using view::FileInfo::invalid;
+    using view::FileInfo::no_permissions;
+    using view::FileInfo::permissions;
+    using view::FileInfo::symlink_target;
+    using view::FileInfo::modified_s;
+    using view::FileInfo::modified_ns;
+    using view::FileInfo::modified_by;
+    using view::FileInfo::sequence;
+    using view::FileInfo::blocks_size;
 
     using changeable::FileInfo::size;
     using changeable::FileInfo::name;
     using changeable::FileInfo::type;
     using changeable::FileInfo::block_size;
     using changeable::FileInfo::deleted;
+    using changeable::FileInfo::invalid;
+    using changeable::FileInfo::no_permissions;
     using changeable::FileInfo::permissions;
     using changeable::FileInfo::symlink_target;
     using changeable::FileInfo::modified_s;
+    using changeable::FileInfo::modified_ns;
     using changeable::FileInfo::modified_by;
     using changeable::FileInfo::sequence;
 };
