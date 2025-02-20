@@ -400,6 +400,8 @@ struct SYNCSPIRIT_API Folder: view::Folder, changeable::Folder, private details:
     using changeable::Folder::pull_order;
     using changeable::Folder::rescan_interval;
 
+    inline details::Folder& expose() noexcept { return *this; }
+    utils::bytes_t encode() noexcept;
     static std::optional<Folder> decode(utils::bytes_view_t bytes) noexcept;
 };
 

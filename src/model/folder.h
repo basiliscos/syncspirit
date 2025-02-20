@@ -36,7 +36,7 @@ struct SYNCSPIRIT_API folder_t final : augmentable_t<folder_t>, folder_data_t {
 
     void assign_cluster(const cluster_ptr_t &cluster) noexcept;
     void add(const folder_info_ptr_t &folder_info) noexcept;
-    std::string serialize() noexcept;
+    utils::bytes_t serialize() noexcept;
 
     bool operator==(const folder_t &other) const noexcept { return get_id() == other.get_id(); }
     bool operator!=(const folder_t &other) const noexcept { return !(*this == other); }
@@ -68,7 +68,7 @@ struct SYNCSPIRIT_API folder_t final : augmentable_t<folder_t>, folder_data_t {
     static const constexpr size_t data_length = uuid_length + 1;
 
   private:
-    folder_t(std::string_view key) noexcept;
+    folder_t(utils::bytes_view_t key) noexcept;
     folder_t(const bu::uuid &uuid) noexcept;
 
     pt::ptime scan_start;

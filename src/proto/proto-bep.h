@@ -181,9 +181,25 @@ struct SYNCSPIRIT_API FileInfo: proto::impl::changeable::FileInfo<details::FileI
     void add_block(proto::BlockInfo value) noexcept;
 };
 
-struct SYNCSPIRIT_API Device {
-    Device(details::Device* impl_): impl{impl_} {}
-    details::Device* impl;
+struct SYNCSPIRIT_API Device: proto::impl::changeable::Device<details::Device> {
+    using parent_t = proto::impl::changeable::Device<details::Device>;
+    using parent_t::parent_t;
+
+    inline void id(utils::bytes_view_t value) noexcept {
+        using namespace pp;
+        auto ptr = (std::byte*)(value.data());
+        auto bytes = utils::bytes_t(value.begin(), value.end());
+        (*impl)["_id"_f] = std::move(bytes);
+    }
+
+    inline void max_sequence(std::int64_t value) noexcept {
+        using namespace pp;
+        (*impl)["_max_sequence"_f] = value;
+    }
+    inline void index_id(std::uint64_t value) noexcept {
+        using namespace pp;
+        (*impl)["_index_id"_f] = value;
+    }
 };
 
 struct SYNCSPIRIT_API Folder: proto::impl::changeable::Folder<details::Folder> {
@@ -510,8 +526,23 @@ struct SYNCSPIRIT_API Counter: view::Counter, private details::Counter {
 struct SYNCSPIRIT_API Device: view::Device, changeable::Device, private details::Device {
     template<typename... T>
     Device(T&&... args): view::Device(this), changeable::Device(this), details::Device(std::forward<T>(args)...) {}
-    // using view::Counter::id;
-    // using view::Counter::value;
+    using view::Device::id;
+    using view::Device::name;
+    using view::Device::addresses;
+    using view::Device::compression;
+    using view::Device::cert_name;
+    using view::Device::max_sequence;
+    using view::Device::introducer;
+    using view::Device::index_id;
+    using view::Device::skip_introduction_removals;
+    using changeable::Device::id;
+    using changeable::Device::name;
+    using changeable::Device::compression;
+    using changeable::Device::cert_name;
+    using changeable::Device::introducer;
+    using changeable::Device::index_id;
+    using changeable::Device::max_sequence;
+    using changeable::Device::skip_introduction_removals;
 };
 
 struct SYNCSPIRIT_API BlockInfo: view::BlockInfo, changeable::BlockInfo, private details::BlockInfo {

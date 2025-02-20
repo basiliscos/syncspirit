@@ -58,6 +58,10 @@ auto Folder::decode(utils::bytes_view_t bytes) noexcept -> std::optional<Folder>
     return generic_decode<Folder, details::Folder>(bytes);
 }
 
+utils::bytes_t Folder::encode() noexcept {
+    return generic_encode<details::Folder>(*this);
+}
+
 auto FolderInfo::decode(utils::bytes_view_t bytes) noexcept -> std::optional<FolderInfo> {
     return generic_decode<FolderInfo, details::FolderInfo>(bytes);
 }
