@@ -8,6 +8,7 @@ set(CMAKE_VISIBILITY_INLINES_HIDDEN 1)
 
 cmake_policy(SET CMP0063 NEW)
 cmake_policy(SET CMP0077 NEW)
+cmake_policy(SET CMP0091 NEW)
 cmake_policy(SET CMP0135 NEW)
 
 include(GenerateExportHeader)
@@ -89,7 +90,7 @@ protobuf_generate_cpp(
     src/protobuf/bep.proto
     src/protobuf/structs.proto
 )
-add_library(syncspirit_core SHARED
+add_library(syncspirit_core
     ${PROTO_SRCS}
     src/constants.cpp
     src/config/utils.cpp
@@ -253,11 +254,9 @@ FetchContent_Declare(MDBX
     URL https://libmdbx.dqdkfa.ru/release/libmdbx-amalgamated-0.13.4.tar.xz
     URL_HASH SHA256=86df30ca2231c9b3ad71424bb829dca9041947f5539d4295030c653d4982c1be
 )
-    set(BUILD_SHARED_LIBS true CACHE BOOL "BUILD_SHARED_LIBS")
     set(MDBX_BUILD_TOOLS false  CACHE BOOL "MDBX_BUILD_TOOLS")
     set(MDBX_ENABLE_TESTS false CACHE BOOL "MDBX_ENABLE_TESTS")
     set(MDBX_BUILD_CXX false CACHE BOOL "MDBX_BUILD_CXX")
-    set(MDBX_BUILD_SHARED_LIBRARY true CACHE BOOL "MDBX_BUILD_SHARED_LIBRARY")
     set(MDBX_ALLOY_BUILD_DEFAULT true CACHE BOOL "MDBX_ALLOY_BUILD_DEFAULT")
     set(MDBX_ALLOY_BUILD true CACHE BOOL "MDBX_ALLOY_BUILD")
 FetchContent_MakeAvailable(MDBX)

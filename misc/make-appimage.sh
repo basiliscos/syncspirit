@@ -5,7 +5,6 @@ if [ -z "$1" ]; then
     exit 1
 fi
 
-
 APP_PATH=$1
 APP=$(basename $APP_PATH)
 APP_DIR="AppDir-$APP/usr/bin"
