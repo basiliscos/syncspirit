@@ -340,11 +340,11 @@ Go to `syncspirit` dir and then make a build
 cd syncspirit
 mkdir build.release && cd build.release
 conan install --build=missing --output-folder . -s build_type=Release \
-    --profile:build=default --profile:host=xp ..
+    --profile:build=default --profile:host=xp -o '&:shared=False' .. ..
 source ./conanbuild.sh
 cmake .. -G "Unix Makefiles" -DCMAKE_TOOLCHAIN_FILE=$PWD/conan_toolchain.cmake \
-  -DCMAKE_POLICY_DEFAULT_CMP0091=NEW -DCMAKE_BUILD_TYPE=Release \
-  -DCMAKE_CXX_FLAGS="-D_WIN32_WINNT=0x0501" -DBOOST_ASIO_ENABLE_CANCELIO=1
+  -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_CXX_FLAGS="-DBOOST_ASIO_ENABLE_CANCELIO=1"
 make -j`nproc`
 ```
 
@@ -391,7 +391,6 @@ CC=gcc-10
 CXX=g++-10
 
 [options]
-[options]
 shared=True
 */*:shared=True
 fltk/*:with_xft=True
@@ -421,7 +420,7 @@ git checkout v0.4.0-dev
 git submodule update --init
 mkdir build.chroot
 cd build.chroot
-conan install --build=missing --output-folder . -s build_type=Release ..
+conan install --build=missing --output-folder . -s build_type=Release  -o '&:shared=True' ..
 source ./conanbuild.sh
 cmake .. -G "Unix Makefiles" -DCMAKE_TOOLCHAIN_FILE=conan_toolchain.cmake  -DCMAKE_POLICY_DEFAULT_CMP0091=NEW -DCMAKE_BUILD_TYPE=Release
 make -j`nproc`
