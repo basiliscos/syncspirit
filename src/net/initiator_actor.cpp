@@ -414,7 +414,8 @@ void initiator_actor_t::request_relay_connection() noexcept {
     transport->async_recv(asio::buffer(rx_buff), read_fn, read_err_fn);
     resources->acquire(resource::read);
 
-    auto msg = proto::relay::connect_request_t{std::string(peer_device_id.get_sha256())};
+    auto sha256 = peer_device_id.get_sha256();
+    auto msg = proto::relay::connect_request_t(utils::bytes_t(sha256.begin(), sha256.end()));
     proto::relay::serialize(msg, relay_tx);
     transport::error_fn_t write_err_fn([&](auto arg) { on_io_error(arg, resource::write); });
     transport::io_fn_t write_fn = [this](size_t bytes) { on_write(bytes); };

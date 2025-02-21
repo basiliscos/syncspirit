@@ -21,6 +21,8 @@
 #include "model/diff/modify/upsert_folder_info.h"
 #include "model/diff/peer/cluster_update.h"
 #include "model/diff/peer/update_folder.h"
+#include "proto/proto-structs.h"
+#include "proto/proto-bep.h"
 #include "proto/bep_support.h"
 #include "utils/error_code.h"
 #include "utils/format.hpp"
@@ -69,7 +71,7 @@ void C::folder_synchronization_t::start_fetching(model::block_info_t *block) noe
     blocks[block->get_hash()] = model::block_info_ptr_t(block);
 }
 
-void C::folder_synchronization_t::finish_fetching(std::string_view hash) noexcept {
+void C::folder_synchronization_t::finish_fetching(utils::bytes_view_t hash) noexcept {
     auto it = blocks.find(hash);
     it->second->unlock();
     blocks.erase(it);
@@ -188,7 +190,7 @@ void controller_actor_t::send_new_indices() noexcept {
                 if (remote_folder && remote_folder->get_index() != local_folder->get_index()) {
                     LOG_DEBUG(log, "sending new index for folder '{}' ({})", folder.get_label(), folder.get_id());
                     proto::Index index;
-                    index.set_folder(std::string(folder.get_id()));
+                    index.folder(folder.get_id());
                     fmt::memory_buffer data;
                     proto::serialize(data, index);
                     outgoing_buffer += static_cast<uint32_t>(data.size());
@@ -241,7 +243,7 @@ void controller_actor_t::push_pending() noexcept {
         }
         indices.emplace_back(folder_info, proto::IndexUpdate());
         auto &index = indices.back().second;
-        index.set_folder(std::string(folder_info->get_folder()->get_id()));
+        index.folder(folder_info->get_folder()->get_id());
         return index;
     };
 
@@ -250,7 +252,7 @@ void controller_actor_t::push_pending() noexcept {
         if (auto file_info = updates_streamer->next(); file_info) {
             expected_sz += file_info->expected_meta_size();
             auto &index = get_index(*file_info);
-            *index.add_files() = file_info->as_proto(true);
+            index.add_file(file_info->as_proto(true));
             LOG_TRACE(log, "pushing index update for: {}, seq = {}", file_info->get_full_name(),
                       file_info->get_sequence());
         } else {
@@ -698,8 +700,8 @@ void controller_actor_t::on_message(proto::message::Request &req) noexcept {
     }
 
     if (code != proto::ErrorCode::NO_BEP_ERROR) {
-        res.set_id(req->id());
-        res.set_code(code);
+        res.id(req->id());
+        res.code(code);
         proto::serialize(data, res);
         outgoing_buffer += static_cast<uint32_t>(data.size());
         send<payload::transfer_data_t>(peer_addr, std::move(data));
@@ -717,11 +719,11 @@ void controller_actor_t::on_block_response(fs::message::block_response_t &messag
     --tx_blocks_requested;
     auto &p = message.payload;
     proto::Response res;
-    res.set_id(p.remote_request->id());
+    res.id(p.remote_request->id());
     if (p.ec) {
-        res.set_code(proto::ErrorCode::GENERIC);
+        res.code(proto::ErrorCode::GENERIC);
     } else {
-        res.set_data(std::move(p.data));
+        res.data(std::move(p.data));
     }
 
     fmt::memory_buffer data;
@@ -762,10 +764,11 @@ void controller_actor_t::on_block(message::block_response_t &message) noexcept {
             }
         } else {
             auto &data = message.payload.res.data;
-            auto hash = std::string(file_block.block()->get_hash());
+            auto hash = file_block.block()->get_hash();
+            auto hash_bytes = utils::bytes_t(hash.begin(), hash.end());
             request_pool += block.get_size();
 
-            request<hasher::payload::validation_request_t>(hasher_proxy, data, hash, &message).send(init_timeout);
+            request<hasher::payload::validation_request_t>(hasher_proxy, data, std::move(hash_bytes), &message).send(init_timeout);
             resources->acquire(resource::hash);
         }
     }
@@ -878,7 +881,7 @@ void controller_actor_t::acquire_block(const model::file_block_t &file_block) no
     get_sync_info(folder)->start_fetching(block);
 }
 
-void controller_actor_t::release_block(std::string_view folder_id, std::string_view hash) noexcept {
+void controller_actor_t::release_block(std::string_view folder_id, utils::bytes_view_t hash) noexcept {
     get_sync_info(folder_id)->finish_fetching(hash);
 }
 

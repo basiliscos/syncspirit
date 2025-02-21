@@ -50,6 +50,10 @@ utils::bytes_t Device::encode() noexcept {
     return generic_encode<details::Device>(*this);
 }
 
+auto FileInfo::decode(utils::bytes_view_t bytes) noexcept -> std::optional<FileInfo> {
+    return generic_decode<FileInfo, details::FileInfo>(bytes);
+}
+
 utils::bytes_t FileInfo::encode() noexcept {
     return generic_encode<details::FileInfo>(*this);
 }

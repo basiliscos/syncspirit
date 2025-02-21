@@ -133,7 +133,7 @@ static auto construct(sequencer_t &sequencer, folder_info_ptr_t &folder_info, sy
 }
 
 static auto instantiate(const cluster_t &cluster, sequencer_t &sequencer, const device_t &source,
-                        const syncspirit::proto::Index &message) noexcept -> outcome::result<diff_t> {
+                        const syncspirit::proto::IndexBase &message) noexcept -> outcome::result<diff_t> {
     auto folder = cluster.get_folders().by_id(message.folder());
     if (!folder) {
         return make_error_code(error_code_t::folder_does_not_exist);
@@ -184,6 +184,6 @@ static auto instantiate(const cluster_t &cluster, sequencer_t &sequencer, const 
 }
 
 auto update_folder_t::create(const cluster_t &cluster, sequencer_t &sequencer, const model::device_t &source,
-                             const proto::Index &message) noexcept -> outcome::result<cluster_diff_ptr_t> {
+                             const proto::IndexBase &message) noexcept -> outcome::result<cluster_diff_ptr_t> {
     return instantiate(cluster, sequencer, source, message);
 }

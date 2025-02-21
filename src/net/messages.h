@@ -126,7 +126,7 @@ using forwarded_message_t =
                  proto::message::Request, proto::message::DownloadProgress>;
 
 struct block_response_t {
-    std::string data;
+    utils::bytes_t data;
 };
 
 struct block_request_t {
@@ -137,7 +137,7 @@ struct block_request_t {
     size_t block_index;
     std::int64_t block_offset;
     std::uint32_t block_size;
-    std::string block_hash;
+    utils::bytes_t block_hash;
     block_request_t(const model::file_info_ptr_t &file, size_t block_index) noexcept;
 
     model::file_block_t get_block(model::cluster_t &, model::device_t &peer) noexcept;

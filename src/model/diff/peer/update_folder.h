@@ -18,7 +18,8 @@ struct SYNCSPIRIT_API update_folder_t final : cluster_diff_t {
 
     static outcome::result<cluster_diff_ptr_t> create(const cluster_t &cluster, sequencer_t &sequencer,
                                                       const model::device_t &source,
-                                                      const proto::Index &message) noexcept;
+                                                      const proto::IndexBase &message) noexcept;
+
     outcome::result<void> apply_impl(cluster_t &, apply_controller_t &) const noexcept override;
     outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;
 

@@ -124,13 +124,13 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     using block_write_queue_t = std::deque<model::diff::cluster_diff_ptr_t>;
 
     struct folder_synchronization_t : model::arc_base_t<folder_synchronization_t> {
-        using block_set_t = std::unordered_map<std::string_view, model::block_info_ptr_t>;
+        using block_set_t = std::unordered_map<utils::bytes_view_t, model::block_info_ptr_t>;
         folder_synchronization_t(controller_actor_t &controller, model::folder_t &folder) noexcept;
         ~folder_synchronization_t();
         void reset() noexcept;
 
         void start_fetching(model::block_info_t *) noexcept;
-        void finish_fetching(std::string_view hash) noexcept;
+        void finish_fetching(utils::bytes_view_t hash) noexcept;
 
         void start_sync() noexcept;
         void finish_sync() noexcept;
@@ -143,7 +143,7 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     };
     using folder_synchronization_ptr_t = model::intrusive_ptr_t<folder_synchronization_t>;
     using synchronizing_folders_t = std::unordered_map<model::folder_ptr_t, folder_synchronization_ptr_t>;
-    using synchronizing_files_t = std::unordered_map<std::string_view, model::file_info_t::guard_ptr_t>;
+    using synchronizing_files_t = std::unordered_map<utils::bytes_view_t, model::file_info_t::guard_ptr_t>;
     using updates_streamer_ptr_t = std::unique_ptr<model::updates_streamer_t>;
 
     void on_termination(message::termination_signal_t &message) noexcept;
@@ -177,7 +177,7 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     void push(model::diff::cluster_diff_ptr_t diff) noexcept;
     void send_diff() noexcept;
     void acquire_block(const model::file_block_t &block) noexcept;
-    void release_block(std::string_view folder_id, std::string_view hash) noexcept;
+    void release_block(std::string_view folder_id, utils::bytes_view_t hash) noexcept;
     folder_synchronization_ptr_t get_sync_info(model::folder_t *folder) noexcept;
     folder_synchronization_ptr_t get_sync_info(std::string_view folder_id) noexcept;
     void cancel_sync(model::file_info_t *) noexcept;

@@ -579,6 +579,7 @@ struct SYNCSPIRIT_API FileInfo: view::FileInfo, changeable::FileInfo, private de
     using changeable::FileInfo::modified_by;
     using changeable::FileInfo::sequence;
 
+    static std::optional<FileInfo> decode(utils::bytes_view_t bytes) noexcept;
     inline details::FileInfo& expose() noexcept { return *this; }
     utils::bytes_t encode() noexcept;
 };
@@ -590,9 +591,9 @@ struct SYNCSPIRIT_API IgnoredFolder: view::IgnoredFolder, changeable::IgnoredFol
     using view::IgnoredFolder::label;
     using changeable::IgnoredFolder::label;
 
+    static std::optional<IgnoredFolder> decode(utils::bytes_view_t bytes) noexcept;
     inline details::IgnoredFolder& expose() noexcept { return *this; }
     utils::bytes_t encode() noexcept;
-    static std::optional<IgnoredFolder> decode(utils::bytes_view_t bytes) noexcept;
 };
 
 struct SYNCSPIRIT_API BlockInfo: view::BlockInfo, changeable::BlockInfo, private details::BlockInfo {

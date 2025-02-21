@@ -12,14 +12,14 @@ using namespace syncspirit::model;
 
 // auto now = r::pt::second_clock::local_time();
 
-version_t::version_t(const proto::Vector &v) noexcept {
+version_t::version_t(proto::view::Vector v) noexcept {
     assert(v.counters_size());
     counters.resize(v.counters_size());
     auto best = v.counters(0);
     best_index = 0;
     for (int i = 0; i < v.counters_size(); ++i) {
-        auto &c = v.counters(i);
-        counters[i] = c;
+        auto c = v.counters(i);
+        counters[i] = c.expose();
         if (c.value() > best.value()) {
             best = c;
             best_index = i;
@@ -38,10 +38,10 @@ auto version_t::as_proto() const noexcept -> proto::Vector {
     return v;
 }
 
-void version_t::to_proto(proto::Vector &v) const noexcept {
-    v.Clear();
+void version_t::to_proto(proto::changeable::Vector v) const noexcept {
+    v.clear_counters();
     for (auto &c : counters) {
-        *v.add_counters() = c;
+        v.add_counter(c);
     }
 }
 
@@ -64,10 +64,10 @@ void version_t::update(const device_t &device) noexcept {
     if (best_index == undef) {
         counters.emplace_back(proto::Counter());
         counter = &counters.back();
-        counter->set_id(id);
+        counter->id(id);
         best_index = &counters.back() - counters.data();
     }
-    counter->set_value(v);
+    counter->value(v);
 }
 
 auto version_t::get_best() noexcept -> proto::view::Counter & {

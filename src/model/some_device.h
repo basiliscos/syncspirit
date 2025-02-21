@@ -26,7 +26,7 @@ struct SYNCSPIRIT_API some_device_base_t {
 
     some_device_base_t(const some_device_base_t &other) = delete;
     void assign(const db::SomeDevice &db) noexcept;
-    std::string_view get_key() const noexcept { return std::string_view(hash, data_length); }
+    utils::bytes_view_t get_key() const noexcept { return utils::bytes_view_t(hash, data_length); }
     const device_id_t &get_device_id() const noexcept { return device_id; }
 
     std::string_view get_name() const noexcept;
@@ -48,7 +48,7 @@ struct SYNCSPIRIT_API some_device_base_t {
     std::string address;
     pt::ptime last_seen;
     device_id_t device_id;
-    char hash[data_length];
+    unsigned char hash[data_length];
 };
 
 template <char prefix>

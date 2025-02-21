@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2022-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2022-2025 Ivan Baidakou
 
 #pragma once
 
@@ -41,11 +41,11 @@ struct response_t {
 };
 
 struct connect_request_t {
-    std::string device_id;
+    utils::bytes_t device_id;
 };
 
 struct session_invitation_t {
-    std::string from;
+    utils::bytes_t from;
     std::string key;
     ipv4_option_t address;
     std::uint32_t port;

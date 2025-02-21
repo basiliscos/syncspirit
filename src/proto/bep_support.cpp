@@ -207,7 +207,7 @@ outcome::result<message::wrapped_message_t> parse_bep(const asio::const_buffer &
     }
 }
 
-std::size_t make_announce_message(fmt::memory_buffer &buff, std::string_view device_name, const payload::URIs &uris,
+std::size_t make_announce_message(fmt::memory_buffer &buff, std::string_view devic]e_name, const payload::URIs &uris,
                                   std::int64_t instance) noexcept {
 
     assert(buff.size() > 4);

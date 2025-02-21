@@ -160,9 +160,28 @@ struct SYNCSPIRIT_API BlockInfo: proto::impl::changeable::BlockInfo<details::Blo
     }
 };
 
+struct SYNCSPIRIT_API Counter {
+    Counter(details::Counter* impl_= nullptr): impl{impl_} {}
+    inline void id(std::uint64_t value) noexcept {
+        using namespace pp;
+        (*impl)["_id"_f] = value;
+    }
+    inline void value(std::uint64_t value) noexcept {
+        using namespace pp;
+        (*impl)["_value"_f] = value;
+    }
+    details::Counter* impl;
+};
+
 struct SYNCSPIRIT_API Vector {
     Vector(details::Vector* impl_): impl{impl_}{};
     inline details::Vector& expose() noexcept { return *impl; }
+    inline void clear_counters() noexcept {
+        using namespace pp;
+        (*impl)["_counters"_f].clear();
+    }
+    void add_counter(proto::Counter value) noexcept;
+
     details::Vector* impl;
 };
 
@@ -191,7 +210,6 @@ struct SYNCSPIRIT_API Device: proto::impl::changeable::Device<details::Device> {
         auto bytes = utils::bytes_t(value.begin(), value.end());
         (*impl)["_id"_f] = std::move(bytes);
     }
-
     inline void max_sequence(std::int64_t value) noexcept {
         using namespace pp;
         (*impl)["_max_sequence"_f] = value;
@@ -215,7 +233,32 @@ struct SYNCSPIRIT_API ClusterConfig {
 
 struct SYNCSPIRIT_API IndexBase {
     IndexBase(details::Index* impl_= nullptr): impl{impl_} {}
+    inline void folder(std::string_view value) noexcept {
+        using namespace pp;
+        (*impl)["_folder"_f] = std::string(value);
+    }
+    void add_file(proto::FileInfo file) noexcept;
     details::Index* impl;
+};
+
+struct SYNCSPIRIT_API Response {
+    Response(details::Response* impl_): impl{impl_} {}
+    details::Response* impl;
+
+    inline void id(std::int32_t value) noexcept {
+        using namespace pp;
+        (*impl)["_id"_f] = value;
+    }
+    inline void data(utils::bytes_view_t value) noexcept {
+        using namespace pp;
+        auto ptr = (std::byte*)(value.data());
+        auto bytes = utils::bytes_t(value.begin(), value.end());
+        (*impl)["_data"_f] = std::move(bytes);
+    }
+    inline void code(ErrorCode value) noexcept {
+        using namespace pp;
+        (*impl)["_code"_f] = value;
+    }
 };
 
 }
@@ -332,6 +375,7 @@ struct SYNCSPIRIT_API Counter {
         }
         return 0;
     }
+    inline const details::Counter& expose() noexcept { return *impl; }
     const details::Counter* impl;
 };
 
@@ -441,6 +485,16 @@ struct SYNCSPIRIT_API IndexBase {
 struct SYNCSPIRIT_API Request {
     Request(const details::Request* impl_): impl{impl_} {}
 
+    inline std::int32_t id() const noexcept {
+        using namespace pp;
+        if (impl) {
+            auto& opt = (*impl)["_id"_f];
+            if (opt) {
+                return opt.value();
+            }
+        }
+        return 0;
+    }
     inline std::string_view folder() const noexcept {
         using namespace pp;
         if (impl) {
@@ -484,9 +538,9 @@ struct SYNCSPIRIT_API Request {
     const details::Request* impl;
 };
 
-struct SYNCSPIRIT_API Response: private details::Response {
-    using parent_t = details::Response;
-    using parent_t::parent_t;
+struct SYNCSPIRIT_API Response {
+    Response(const details::Response* impl_): impl{impl_} {}
+    const details::Response* impl;
 };
 
 struct SYNCSPIRIT_API FileDownloadProgressUpdate: private details::FileDownloadProgressUpdate {
@@ -516,11 +570,14 @@ struct SYNCSPIRIT_API ClusterConfig: view::ClusterConfig, changeable::ClusterCon
     ClusterConfig(T&&... args): view::ClusterConfig(this), changeable::ClusterConfig(this), details::ClusterConfig(std::forward<T>(args)...) {}
 };
 
-struct SYNCSPIRIT_API Counter: view::Counter, private details::Counter {
+struct SYNCSPIRIT_API Counter: view::Counter, changeable::Counter, private details::Counter {
     template<typename... T>
-    Counter(T&&... args): view::Counter(this), details::Counter(std::forward<T>(args)...) {}
+    Counter(T&&... args): view::Counter(this),changeable::Counter(this), details::Counter(std::forward<T>(args)...) {}
     using view::Counter::id;
     using view::Counter::value;
+    using changeable::Counter::id;
+    using changeable::Counter::value;
+    inline details::Counter& expose() noexcept { return *this; }
 };
 
 struct SYNCSPIRIT_API Device: view::Device, changeable::Device, private details::Device {
@@ -594,6 +651,8 @@ struct SYNCSPIRIT_API FileInfo: view::FileInfo, changeable::FileInfo, private de
     using changeable::FileInfo::modified_ns;
     using changeable::FileInfo::modified_by;
     using changeable::FileInfo::sequence;
+
+    inline details::FileInfo& expose() noexcept { return *this; }
 };
 
 struct SYNCSPIRIT_API Folder: view::Folder, changeable::Folder, private details::Folder {
@@ -636,9 +695,17 @@ struct SYNCSPIRIT_API Vector: view::Vector, changeable::Vector, private details:
 struct SYNCSPIRIT_API IndexBase: view::IndexBase, changeable::IndexBase, private details::Index {
     template<typename... T>
     IndexBase(T&&... args): view::IndexBase(this), changeable::IndexBase(this), details::Index(std::forward<T>(args)...) {}
+
+    using view::IndexBase::folder;
+    using changeable::IndexBase::folder;
 };
 
 struct SYNCSPIRIT_API Index: IndexBase {};
 struct SYNCSPIRIT_API IndexUpdate: IndexBase {};
+
+struct SYNCSPIRIT_API Response: view::Response, changeable::Response, private details::Response {
+    template<typename... T>
+    Response(T&&... args): view::Response(this), changeable::Response(this), details::Response(std::forward<T>(args)...) {}
+};
 
 }

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #pragma once
 
@@ -7,7 +7,7 @@
 #include "model/messages.h"
 #include "model/diff/cluster_visitor.h"
 #include "utils/log.h"
-#include "utils/string_comparator.hpp"
+#include "utils/bytes_comparator.hpp"
 #include <boost/asio.hpp>
 #include <optional>
 #include <set>
@@ -81,7 +81,7 @@ struct SYNCSPIRIT_API global_discovery_actor_t : public r::actor_base_t, private
 
   private:
     using rx_buff_t = payload::http_request_t::rx_buff_ptr_t;
-    using discovering_devices_t = std::set<std::string, utils::string_comparator_t>;
+    using discovering_devices_t = std::set<utils::bytes_t, utils::bytes_comparator_t>;
     using uris_t = std::unordered_set<std::string>;
     using custom_msg_ptr_t = r::intrusive_ptr_t<model::message::model_update_t>;
 
