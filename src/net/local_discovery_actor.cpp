@@ -158,12 +158,12 @@ void local_discovery_actor_t::on_read(size_t bytes) noexcept {
                   result.error().message());
     } else {
         auto &msg = result.value();
-        auto &sha = msg->id();
+        auto sha = msg->id();
         auto device_id = model::device_id_t::from_sha256(sha);
         if (device_id) {
             utils::uri_container_t uris;
             for (int i = 0; i < msg->addresses_size(); ++i) {
-                auto uri = utils::parse(msg->addresses(i).c_str());
+                auto uri = utils::parse(msg->addresses(i));
                 if (uri && uri->has_port()) {
                     uris.emplace_back(std::move(uri));
                 }
@@ -202,8 +202,8 @@ struct filler_t {
     template <typename T> static auto fill(T &peer, const std::string &uris_str) -> db::SomeDevice {
         db::SomeDevice db;
         peer->serialize(db);
-        db.set_address(uris_str);
-        db.set_last_seen(utils::as_seconds(pt::microsec_clock::local_time()));
+        db.address(uris_str);
+        db.last_seen(utils::as_seconds(pt::microsec_clock::local_time()));
         return db;
     }
 };
@@ -235,9 +235,9 @@ void local_discovery_actor_t::handle(const model::device_id_t &device_id, utils:
         diff = new contact::unknown_connected_t(*cluster, device_id, std::move(db));
     } else {
         db::SomeDevice db;
-        db.set_name(std::string(device_id.get_short()));
-        db.set_address(uris_str);
-        db.set_last_seen(utils::as_seconds(pt::microsec_clock::local_time()));
+        db.name(std::string(device_id.get_short()));
+        db.address(uris_str);
+        db.last_seen(utils::as_seconds(pt::microsec_clock::local_time()));
         diff = new model::diff::modify::add_pending_device_t(device_id, db);
         diff->assign_sibling(new contact::unknown_connected_t(*cluster, device_id, std::move(db)));
     }

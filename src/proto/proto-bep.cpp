@@ -19,6 +19,11 @@ proto::FileInfo FileInfo::clone() const noexcept {
 
 namespace changeable {
 
+void Announce::add_address(std::string value) noexcept {
+    using namespace pp;
+    (*impl)["_addresses"_f].emplace_back(std::move(value));
+}
+
 void Vector::add_counter(proto::Counter value) noexcept {
     using namespace pp;
     (*impl)["_counters"_f].emplace_back(std::move(value.expose()));

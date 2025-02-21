@@ -143,6 +143,39 @@ using Close = pp::message<
 
 namespace changeable {
 
+struct SYNCSPIRIT_API Announce {
+    Announce(details::Announce* impl_= nullptr): impl{impl_} {}
+    inline void id(utils::bytes_view_t value) noexcept {
+        using namespace pp;
+        auto ptr = (std::byte*)(value.data());
+        auto bytes = utils::bytes_t(value.begin(), value.end());
+        (*impl)["_id"_f] = std::move(bytes);
+    }
+    inline void instance_id(std::int64_t value) noexcept {
+        using namespace pp;
+        (*impl)["_instance_id"_f] = value;
+    }
+    void add_address(std::string value) noexcept;
+    details::Announce* impl;
+};
+
+struct SYNCSPIRIT_API Hello {
+    Hello(details::Hello* impl_= nullptr): impl{impl_} {}
+    inline void device_name(std::string_view value) noexcept {
+        using namespace pp;
+        (*impl)["_device_name"_f] = std::string(value);
+    }
+    inline void client_name(std::string_view value) noexcept {
+        using namespace pp;
+        (*impl)["_client_name"_f] = std::string(value);
+    }
+    inline void client_version(std::string_view value) noexcept {
+        using namespace pp;
+        (*impl)["_client_version"_f] = std::string(value);
+    }
+    details::Hello* impl;
+};
+
 struct SYNCSPIRIT_API BlockInfo: proto::impl::changeable::BlockInfo<details::BlockInfo> {
     using parent_t = proto::impl::changeable::BlockInfo<details::BlockInfo>;
     using parent_t::parent_t;
@@ -241,10 +274,47 @@ struct SYNCSPIRIT_API IndexBase {
     details::Index* impl;
 };
 
+struct SYNCSPIRIT_API Request {
+    Request(details::Request* impl_): impl{impl_} {}
+    details::Request* impl;
+    inline void id(std::int32_t value) noexcept {
+        using namespace pp;
+        (*impl)["_id"_f] = value;
+    }
+    inline void folder(std::string_view value) noexcept {
+        using namespace pp;
+        (*impl)["_folder"_f] = std::string(value);
+    }
+    inline void name(std::string_view value) noexcept {
+        using namespace pp;
+        (*impl)["_name"_f] = std::string(value);
+    }
+    inline void offset(std::int64_t value) noexcept {
+        using namespace pp;
+        (*impl)["_offset"_f] = value;
+    }
+    inline void size(std::int32_t value) noexcept {
+        using namespace pp;
+        (*impl)["_size"_f] = value;
+    }
+    inline void hash(utils::bytes_view_t value) noexcept {
+        using namespace pp;
+        auto ptr = (std::byte*)(value.data());
+        auto bytes = utils::bytes_t(value.begin(), value.end());
+        (*impl)["_hash"_f] = std::move(bytes);
+    }
+    inline void from_temporary(bool value) noexcept {
+        using namespace pp;
+        (*impl)["_from_temporary"_f] = value;
+    }
+    inline void weak_hash(std::uint32_t value) noexcept {
+        using namespace pp;
+        (*impl)["_weak_hash"_f] = value;
+    }
+};
+
 struct SYNCSPIRIT_API Response {
     Response(details::Response* impl_): impl{impl_} {}
-    details::Response* impl;
-
     inline void id(std::int32_t value) noexcept {
         using namespace pp;
         (*impl)["_id"_f] = value;
@@ -259,20 +329,95 @@ struct SYNCSPIRIT_API Response {
         using namespace pp;
         (*impl)["_code"_f] = value;
     }
+    details::Response* impl;
+};
+
+struct SYNCSPIRIT_API Close {
+    Close(details::Close* impl_): impl{impl_} {}
+    details::Close* impl;
+    inline void reason(std::string_view value) noexcept {
+        using namespace pp;
+        (*impl)["_reason"_f] = std::string(value);
+    }
 };
 
 }
 
 namespace view {
 
-struct SYNCSPIRIT_API Announce: private details::Announce {
-    using parent_t = details::Announce;
-    using parent_t::parent_t;
+struct SYNCSPIRIT_API Announce {
+    Announce(const details::Announce* impl_= nullptr): impl{impl_} {}
+    inline bytes_view_t id() const noexcept {
+        using namespace pp;
+        if (impl) {
+            auto& opt = (*impl)["_id"_f];
+            if (opt) {
+                auto& value = opt.value();
+                return bytes_view_t(value.begin(), value.end());
+            }
+        }
+        return bytes_view_t{};
+    }
+    inline std::int64_t instance_id() const noexcept {
+        using namespace pp;
+        if (impl) {
+            auto& opt = (*impl)["_instance_id"_f];
+            if (opt) {
+                return opt.value();
+            }
+        }
+        return 0;
+    }
+    inline size_t addresses_size() const noexcept {
+        using namespace pp;
+        if (impl) {
+            return (*impl)["_addresses"_f].size();
+        }
+        return 0;
+    }
+    inline std::string_view addresses(size_t i) const noexcept {
+        using namespace pp;
+        if (impl) {
+            return (*impl)["_addresses"_f][i];
+        }
+        return {};
+    }
+    const details::Announce* impl;
 };
 
-struct SYNCSPIRIT_API Hello: private details::Hello {
-    using parent_t = details::Hello;
-    using parent_t::parent_t;
+struct SYNCSPIRIT_API Hello {
+    Hello(const details::Hello* impl_= nullptr): impl{impl_} {}
+    inline std::string_view device_name() const noexcept {
+        using namespace pp;
+        if (impl) {
+            auto& opt = (*impl)["_device_name"_f];
+            if (opt) {
+                return opt.value();
+            }
+        }
+        return {};
+    }
+    inline std::string_view client_name() const noexcept {
+        using namespace pp;
+        if (impl) {
+            auto& opt = (*impl)["_client_name"_f];
+            if (opt) {
+                return opt.value();
+            }
+        }
+        return {};
+    }
+    inline std::string_view client_version() const noexcept {
+        using namespace pp;
+        if (impl) {
+            auto& opt = (*impl)["_client_version"_f];
+            if (opt) {
+                return opt.value();
+            }
+        }
+        return {};
+    }
+    const details::Hello* impl;
 };
 
 struct SYNCSPIRIT_API Header: private details::Header {
@@ -535,12 +680,74 @@ struct SYNCSPIRIT_API Request {
         }
         return 0;
     }
+    inline bytes_view_t hash() const noexcept {
+        using namespace pp;
+        if (impl) {
+            auto& opt = (*impl)["_hash"_f];
+            if (opt) {
+                auto& value = opt.value();
+                return bytes_view_t(value.begin(), value.end());
+            }
+        }
+        return bytes_view_t{};
+    }
+    inline bool from_temporary() const noexcept {
+        using namespace pp;
+        if (impl) {
+            auto& opt = (*impl)["_from_temporary"_f];
+            if (opt) {
+                return opt.value();
+            }
+        }
+        return {};
+    }
+    inline std::uint32_t weak_hash() const noexcept {
+        using namespace pp;
+        if (impl) {
+            auto& opt = (*impl)["_weak_hash"_f];
+            if (opt) {
+                return opt.value();
+            }
+        }
+        return 0;
+    }
     const details::Request* impl;
 };
 
 struct SYNCSPIRIT_API Response {
     Response(const details::Response* impl_): impl{impl_} {}
     const details::Response* impl;
+    inline std::int32_t id() const noexcept {
+        using namespace pp;
+        if (impl) {
+            auto& opt = (*impl)["_id"_f];
+            if (opt) {
+                return opt.value();
+            }
+        }
+        return 0;
+    }
+    inline bytes_view_t data() const noexcept {
+        using namespace pp;
+        if (impl) {
+            auto& opt = (*impl)["_data"_f];
+            if (opt) {
+                auto& value = opt.value();
+                return bytes_view_t(value.begin(), value.end());
+            }
+        }
+        return bytes_view_t{};
+    }
+    inline ErrorCode code() const noexcept {
+        using namespace pp;
+        if (impl) {
+            auto& opt = (*impl)["_code"_f];
+            if (opt) {
+                return opt.value();
+            }
+        }
+        return {};
+    }
 };
 
 struct SYNCSPIRIT_API FileDownloadProgressUpdate: private details::FileDownloadProgressUpdate {
@@ -553,17 +760,43 @@ struct SYNCSPIRIT_API DownloadProgress: private details::DownloadProgress {
     using parent_t::parent_t;
 };
 
-struct SYNCSPIRIT_API Ping: private details::Ping {
-    using parent_t = details::Ping;
-    using parent_t::parent_t;
-};
-
-struct SYNCSPIRIT_API Close: private details::Close {
-    using parent_t = details::Close;
-    using parent_t::parent_t;
+struct SYNCSPIRIT_API Close {
+    Close(const details::Close* impl_): impl{impl_} {}
+    inline std::string_view reason() const noexcept {
+        using namespace pp;
+        if (impl) {
+            auto& opt = (*impl)["_reason"_f];
+            if (opt) {
+                return opt.value();
+            }
+        }
+        return "";
+    }
+    const details::Close* impl;
 };
 
 }
+
+struct SYNCSPIRIT_API Announce: view::Announce, changeable::Announce, private details::Announce {
+    template<typename... T>
+    Announce(T&&... args): view::Announce(this), changeable::Announce(this), details::Announce(std::forward<T>(args)...) {}
+    using view::Announce::id;
+    using view::Announce::instance_id;
+    using changeable::Announce::id;
+    using changeable::Announce::instance_id;
+};
+
+struct SYNCSPIRIT_API Hello: view::Hello, changeable::Hello, private details::Hello {
+    template<typename... T>
+    Hello(T&&... args): view::Hello(this), changeable::Hello(this), details::Hello(std::forward<T>(args)...) {}
+    using view::Hello::device_name;
+    using view::Hello::client_name;
+    using view::Hello::client_version;
+    using changeable::Hello::device_name;
+    using changeable::Hello::client_name;
+    using changeable::Hello::client_version;
+};
+
 
 struct SYNCSPIRIT_API ClusterConfig: view::ClusterConfig, changeable::ClusterConfig, private details::ClusterConfig {
     template<typename... T>
@@ -656,7 +889,6 @@ struct SYNCSPIRIT_API FileInfo: view::FileInfo, changeable::FileInfo, private de
 };
 
 struct SYNCSPIRIT_API Folder: view::Folder, changeable::Folder, private details::Folder {
-    // Folder(Folder&& other): view::Folder(this), changeable::Folder(this), details::Folder(std::move((details::Folder&&)other)) {}
     template<typename... T>
     Folder(T&&... args): view::Folder(this), changeable::Folder(this), details::Folder(std::forward<T>(args)...) {}
 
@@ -679,14 +911,6 @@ struct SYNCSPIRIT_API Folder: view::Folder, changeable::Folder, private details:
     inline details::Folder& expose() noexcept { return *this; }
 };
 
-struct SYNCSPIRIT_API Request: view::Request, private details::Request {
-    template<typename... T>
-    Request(T&&... args): view::Request(this), details::Request(std::forward<T>(args)...) {}
-
-    using view::Request::size;
-    using view::Request::name;
-};
-
 struct SYNCSPIRIT_API Vector: view::Vector, changeable::Vector, private details::Vector {
     template<typename... T>
     Vector(T&&... args): view::Vector(this), changeable::Vector(this), details::Vector(std::forward<T>(args)...) {}
@@ -703,9 +927,52 @@ struct SYNCSPIRIT_API IndexBase: view::IndexBase, changeable::IndexBase, private
 struct SYNCSPIRIT_API Index: IndexBase {};
 struct SYNCSPIRIT_API IndexUpdate: IndexBase {};
 
+
+struct SYNCSPIRIT_API Request: view::Request, changeable::Request, private details::Request {
+    template<typename... T>
+    Request(T&&... args): view::Request(this), changeable::Request(this), details::Request(std::forward<T>(args)...) {}
+
+    using view::Request::id;
+    using view::Request::folder;
+    using view::Request::name;
+    using view::Request::offset;
+    using view::Request::size;
+    using view::Request::hash;
+    using view::Request::from_temporary;
+    using view::Request::weak_hash;
+    using changeable::Request::id;
+    using changeable::Request::folder;
+    using changeable::Request::name;
+    using changeable::Request::offset;
+    using changeable::Request::size;
+    using changeable::Request::hash;
+    using changeable::Request::from_temporary;
+    using changeable::Request::weak_hash;
+};
+
 struct SYNCSPIRIT_API Response: view::Response, changeable::Response, private details::Response {
     template<typename... T>
     Response(T&&... args): view::Response(this), changeable::Response(this), details::Response(std::forward<T>(args)...) {}
+
+    using view::Response::id;
+    using view::Response::data;
+    using view::Response::code;
+    using changeable::Response::id;
+    using changeable::Response::data;
+    using changeable::Response::code;
+};
+
+struct SYNCSPIRIT_API Close: view::Close, changeable::Close, private details::Close {
+    template<typename... T>
+    Close(T&&... args): view::Close(this), changeable::Close(this), details::Close(std::forward<T>(args)...) {}
+
+    using view::Close::reason;
+    using changeable::Close::reason;
+};
+
+struct SYNCSPIRIT_API Ping: details::Ping {
+    template<typename... T>
+    Ping(T&&... args): details::Ping(std::forward<T>(args)...) {}
 };
 
 }

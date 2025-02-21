@@ -220,7 +220,7 @@ void peer_actor_t::shutdown_start() noexcept {
 
     fmt::memory_buffer buff;
     proto::Close close;
-    close.set_reason(shutdown_reason->message());
+    close.reason(shutdown_reason->message());
     proto::serialize(buff, close);
     tx_queue.clear();
     push_write(std::move(buff), true, true);
@@ -293,15 +293,14 @@ void peer_actor_t::on_termination(message::termination_signal_t &message) noexce
 
 void peer_actor_t::on_block_request(message::block_request_t &message) noexcept {
     auto req_id = (std::int32_t)message.payload.id;
-    proto::Request req;
     auto &p = message.payload.request_payload;
-    req.set_id(req_id);
-    *req.mutable_folder() = p.folder_id;
-    *req.mutable_name() = p.file_name;
-
-    req.set_offset(p.block_offset);
-    req.set_size(p.block_size);
-    *req.mutable_hash() = p.block_hash;
+    proto::Request req;
+    req.id(req_id);
+    req.folder(p.folder_id);
+    req.name(p.file_name);
+    req.offset(p.block_offset);
+    req.size(p.block_size);
+    req.hash(p.block_hash);
 
     fmt::memory_buffer buff;
     proto::serialize(buff, req);
@@ -367,20 +366,20 @@ void peer_actor_t::read_controlled(proto::message::message_t &&msg) noexcept {
 
 void peer_actor_t::handle_hello(proto::message::Hello &&msg) noexcept {
     using namespace model::diff;
-    auto &device_name = msg->device_name();
-    auto &client_name = msg->client_name();
-    auto &client_version = msg->client_version();
+    auto device_name = msg->device_name();
+    auto client_name = msg->client_name();
+    auto client_version = msg->client_version();
     auto sha_s256 = peer_device_id.get_sha256();
     LOG_DEBUG(log, "read_hello, from {} ({} {})", device_name, client_name, client_version);
     auto diff = cluster_diff_ptr_t();
     auto db = db::SomeDevice();
     auto fill_db_and_shutdown = [&]() {
         auto address = fmt::format("{}://{}", peer_proto, peer_endpoint);
-        db.set_name(device_name);
-        db.set_client_name(client_name);
-        db.set_client_version(client_version);
-        db.set_address(std::move(address));
-        db.set_last_seen(utils::as_seconds(pt::microsec_clock::local_time()));
+        db.name(device_name);
+        db.client_name(client_name);
+        db.client_version(client_version);
+        db.address(std::move(address));
+        db.last_seen(utils::as_seconds(pt::microsec_clock::local_time()));
         LOG_INFO(log, "device {} is unknown/ignored, shutting down", device_name);
         do_shutdown();
     };
@@ -416,8 +415,8 @@ void peer_actor_t::handle_hello(proto::message::Hello &&msg) noexcept {
 void peer_actor_t::handle_ping(proto::message::Ping &&) noexcept { log->trace("handle_ping"); }
 
 void peer_actor_t::handle_close(proto::message::Close &&message) noexcept {
-    auto &reason = message->reason();
-    const char *str = reason.c_str();
+    auto reason = message->reason();
+    const char *str = reason.data();
     LOG_TRACE(log, "handle_close, reason = {}", reason);
     if (reason.size() == 0) {
         str = "no reason specified";
@@ -442,19 +441,20 @@ void peer_actor_t::handle_response(proto::message::Response &&message) noexcept 
     auto error = message->code();
     auto &block_request = *it;
     if (!shutdown_reason) {
-        if (error) {
+        if (error != proto::ErrorCode::NO_BEP_ERROR) {
             auto ec = utils::make_error_code((utils::request_error_code_t)error);
             LOG_WARN(log, "block request error: {}", ec.message());
             reply_with_error(*block_request, make_error(ec));
         } else {
-            auto &data = message->data();
+            auto data = message->data();
             auto request_sz = block_request->payload.request_payload.block_size;
             if (data.size() != request_sz) {
                 LOG_WARN(log, "got {} bytes, but requested {}", data.size(), request_sz);
                 auto ec = utils::make_error_code(utils::bep_error_code_t::response_missize);
                 return do_shutdown(make_error(ec));
             }
-            reply_to(*block_request, std::move(data));
+            auto bytes = utils::bytes_t(data.begin(), data.end());
+            reply_to(*block_request, std::move(bytes));
         }
     }
     block_requests.erase(it);
