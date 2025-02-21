@@ -10,11 +10,9 @@ auto ignored_folders_t::apply_impl(cluster_t &cluster, apply_controller_t &contr
     -> outcome::result<void> {
     auto &map = cluster.get_ignored_folders();
     for (auto &pair : folders) {
-        auto key_ptr = reinterpret_cast<const char*>(pair.key.data());
         auto label_ptr = reinterpret_cast<const char*>(pair.value.data());
-        auto folder_id = std::string_view(key_ptr, pair.key.size());
         auto label = std::string_view(label_ptr, pair.value.size());
-        auto option = ignored_folder_t::create(folder_id, label);
+        auto option = ignored_folder_t::create(pair.key, label);
         if (!option) {
             return option.assume_error();
         }

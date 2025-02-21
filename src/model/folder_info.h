@@ -27,18 +27,18 @@ struct SYNCSPIRIT_API folder_info_t final : augmentable_t<folder_info_t> {
     struct decomposed_key_t {
         static constexpr size_t folder_data_length = uuid_length + 1;
 
-        decomposed_key_t(std::string_view reduced_key, std::string_view folder_uuid, std::string_view folder_info_id);
+        decomposed_key_t(utils::bytes_view_t reduced_key, utils::bytes_view_t folder_uuid, utils::bytes_view_t folder_info_id);
         decomposed_key_t(const decomposed_key_t &) = default;
         decomposed_key_t(decomposed_key_t &&) = default;
 
         inline utils::bytes_view_t const device_key() {
             return utils::bytes_view_t(device_key_raw, device_id_t::data_length);
         }
-        inline std::string_view const folder_key() { return std::string_view(folder_key_raw, folder_data_length); }
+        inline utils::bytes_view_t const folder_key() { return utils::bytes_view_t(folder_key_raw, folder_data_length); }
 
-        std::string_view folder_info_id;
+        utils::bytes_view_t folder_info_id;
         unsigned char device_key_raw[device_id_t::data_length];
-        char folder_key_raw[folder_data_length];
+        unsigned char folder_key_raw[folder_data_length];
     };
 
     static decomposed_key_t decompose_key(utils::bytes_view_t key);
@@ -56,7 +56,7 @@ struct SYNCSPIRIT_API folder_info_t final : augmentable_t<folder_info_t> {
     void add_relaxed(const file_info_ptr_t &file_info) noexcept;
     bool add_strict(const file_info_ptr_t &file_info) noexcept;
     void serialize(db::FolderInfo &storage) const noexcept;
-    std::string serialize() const noexcept;
+    utils::bytes_t serialize() const noexcept;
 
     inline std::uint64_t get_index() const noexcept { return index; }
     void set_index(std::uint64_t value) noexcept;
@@ -68,7 +68,7 @@ struct SYNCSPIRIT_API folder_info_t final : augmentable_t<folder_info_t> {
     inline const file_infos_map_t &get_file_infos() const noexcept { return file_infos; }
 
   private:
-    folder_info_t(std::string_view key, const device_ptr_t &device_, const folder_ptr_t &folder_) noexcept;
+    folder_info_t(utils::bytes_view_t key, const device_ptr_t &device_, const folder_ptr_t &folder_) noexcept;
     folder_info_t(const bu::uuid &uuid, const device_ptr_t &device_, const folder_ptr_t &folder_) noexcept;
     void assign_fields(const db::FolderInfo &data) noexcept;
 

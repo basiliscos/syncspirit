@@ -30,7 +30,7 @@ auto remove_folder_infos_t::apply_impl(cluster_t &cluster, apply_controller_t &c
     }
     for (auto &key : keys) {
         auto decomposed = folder_info_t::decompose_key(key);
-        auto folder = cluster.get_folders().get(decomposed.folder_key());
+        auto folder = cluster.get_folders().by_key(decomposed.folder_key());
         auto &folder_infos = folder->get_folder_infos();
         auto device_key = decomposed.device_key();
         auto folder_info = folder_infos.by_device_key(device_key);

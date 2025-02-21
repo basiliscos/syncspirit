@@ -2,6 +2,8 @@
 // SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
 
 #include "some_device.h"
+#include "proto/proto-structs.h"
+#include "utils/time.h"
 
 using namespace syncspirit::model;
 
@@ -21,18 +23,18 @@ void some_device_base_t::assign(const db::SomeDevice &db) noexcept {
     last_seen = pt::from_time_t(db.last_seen());
 }
 
-std::string some_device_base_t::serialize() noexcept {
+syncspirit::utils::bytes_t some_device_base_t::serialize() noexcept {
     db::SomeDevice db;
     serialize(db);
-    return db.SerializeAsString();
+    return db.encode();
 }
 
 void some_device_base_t::serialize(db::SomeDevice &db) const noexcept {
-    db.set_name(name);
-    db.set_client_name(client_name);
-    db.set_client_version(client_version);
-    db.set_address(address);
-    db.set_last_seen(utils::as_seconds(last_seen));
+    db.name(name);
+    db.client_name(client_name);
+    db.client_version(client_version);
+    db.address(address);
+    db.last_seen(utils::as_seconds(last_seen));
 }
 
 std::string_view some_device_base_t::get_name() const noexcept { return name; }

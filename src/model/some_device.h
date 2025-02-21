@@ -36,7 +36,7 @@ struct SYNCSPIRIT_API some_device_base_t {
     const pt::ptime &get_last_seen() const noexcept;
     void set_last_seen(const pt::ptime &value) noexcept;
 
-    std::string serialize() noexcept;
+    utils::bytes_t serialize() noexcept;
     void serialize(db::SomeDevice &db) const noexcept;
 
   protected:

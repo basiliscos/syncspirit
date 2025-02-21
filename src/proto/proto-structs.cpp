@@ -66,10 +66,30 @@ auto FolderInfo::decode(utils::bytes_view_t bytes) noexcept -> std::optional<Fol
     return generic_decode<FolderInfo, details::FolderInfo>(bytes);
 }
 
+utils::bytes_t FolderInfo::encode() noexcept {
+    return generic_encode<details::FolderInfo>(*this);
+}
+
+auto IgnoredFolder::decode(utils::bytes_view_t bytes) noexcept -> std::optional<IgnoredFolder> {
+    return generic_decode<IgnoredFolder, details::IgnoredFolder>(bytes);
+}
+
+utils::bytes_t IgnoredFolder::encode() noexcept {
+    return generic_encode<details::IgnoredFolder>(*this);
+}
+
 auto PendingFolder::decode(utils::bytes_view_t bytes) noexcept -> std::optional<PendingFolder> {
     return generic_decode<PendingFolder, details::PendingFolder>(bytes);
 }
 
+utils::bytes_t PendingFolder::encode() noexcept {
+    return generic_encode<details::PendingFolder>(*this);
+}
+
 auto SomeDevice::decode(utils::bytes_view_t bytes) noexcept -> std::optional<SomeDevice> {
     return generic_decode<SomeDevice, details::SomeDevice>(bytes);
+}
+
+utils::bytes_t SomeDevice::encode() noexcept {
+    return generic_encode<details::SomeDevice>(*this);
 }

@@ -16,8 +16,7 @@ namespace syncspirit::db {
 namespace details {
 
 using IgnoredFolder = pp::message<
-    pp::string_field    <"_id",      1>,
-    pp::string_field    <"_label",   2>
+    pp::string_field    <"_label",   1>
 >;
 
 using Device = pp::message<
@@ -75,17 +74,13 @@ using FileInfo = pp::message<
     pp::bytes_field     <"_blocks",          17, pp::repeated, proto::impl::bytes_backend_t>
 >;
 
-using IngoredFolder = pp::message<
-    pp::string_field <"_label", 1>
->;
-
 using BlockInfo = pp::message<
     pp::uint32_field   <"_weak_hash", 1>,
     pp::int32_field    <"_size",      2>
 >;
 
 using SomeDevice = pp::message<
-    pp::string_field <"_label",          1>,
+    pp::string_field <"_name",           1>,
     pp::string_field <"_client_name",    2>,
     pp::string_field <"_client_version", 3>,
     pp::string_field <"_address",        4>,
@@ -174,9 +169,6 @@ struct SYNCSPIRIT_API FolderInfo {
 
 struct SYNCSPIRIT_API PendingFolder {
     PendingFolder(details::PendingFolder* impl_): impl{impl_}{ assert(impl); }
-
-    details::PendingFolder* impl;
-
     inline Folder mutable_folder() noexcept {
         using namespace pp;
         return Folder(&(*impl)["_folder"_f].value());
@@ -186,6 +178,41 @@ struct SYNCSPIRIT_API PendingFolder {
         using namespace pp;
         return FolderInfo(&(*impl)["_folder_info"_f].value());
     }
+    details::PendingFolder* impl;
+};
+
+struct SYNCSPIRIT_API IgnoredFolder {
+    IgnoredFolder(details::IgnoredFolder* impl_): impl{impl_}{ assert(impl); }
+    inline void label(std::string_view value) noexcept {
+        using namespace pp;
+        (*impl)["_label"_f] = std::string(value);
+    }
+    details::IgnoredFolder* impl;
+};
+
+struct SYNCSPIRIT_API SomeDevice {
+    SomeDevice(details::SomeDevice* impl_): impl{impl_}{ assert(impl); }
+    inline void name(std::string_view value) noexcept {
+        using namespace pp;
+        (*impl)["_name"_f] = std::string(value);
+    }
+    inline void client_name(std::string_view value) noexcept {
+        using namespace pp;
+        (*impl)["_client_name"_f] = std::string(value);
+    }
+    inline void client_version(std::string_view value) noexcept {
+        using namespace pp;
+        (*impl)["_client_version"_f] = std::string(value);
+    }
+    inline void address(std::string_view value) noexcept {
+        using namespace pp;
+        (*impl)["_address"_f] = std::string(value);
+    }
+    inline void last_seen(std::uint64_t value) noexcept {
+        using namespace pp;
+        (*impl)["_last_seen"_f] = value;
+    }
+    details::SomeDevice* impl;
 };
 
 };
@@ -235,7 +262,26 @@ struct SYNCSPIRIT_API Device: proto::impl::view::Device<details::Device> {
 
 struct SYNCSPIRIT_API FolderInfo {
     FolderInfo(const details::FolderInfo* impl_): impl{impl_}{}
-
+    inline std::uint64_t index_id() const noexcept {
+        using namespace pp;
+        if (impl) {
+            auto& opt = (*impl)["_index_id"_f];
+            if (opt) {
+                return opt.value();
+            }
+        }
+        return {};
+    }
+    inline std::int64_t max_sequence() const noexcept {
+        using namespace pp;
+        if (impl) {
+            auto& opt = (*impl)["_max_sequence"_f];
+            if (opt) {
+                return opt.value();
+            }
+        }
+        return {};
+    }
     const details::FolderInfo* impl;
 };
 
@@ -324,24 +370,105 @@ struct SYNCSPIRIT_API FileInfo: proto::impl::view::FileInfo<details::FileInfo> {
     const details::FileInfo* impl;
 };
 
+struct SYNCSPIRIT_API PendingFolder {
+    PendingFolder(const details::PendingFolder* impl_): impl{impl_}{}
+    const details::PendingFolder* impl;
+    inline Folder folder() const {
+        using namespace pp;
+        auto f_impl = (const details::Folder*){nullptr};
+        if (impl) {
+            auto& opt = (*impl)["_folder"_f];
+            if (opt) {
+                f_impl = &opt.value();
+            }
+        }
+        return view::Folder(f_impl);
+    }
+    inline FolderInfo folder_info() const {
+        using namespace pp;
+        auto f_impl = (const details::FolderInfo*){nullptr};
+        if (impl) {
+            auto& opt = (*impl)["_folder_info"_f];
+            if (opt) {
+                f_impl = &opt.value();
+            }
+        }
+        return view::FolderInfo(f_impl);
+    }
+};
+
+struct SYNCSPIRIT_API IgnoredFolder {
+    IgnoredFolder(const details::IgnoredFolder* impl_): impl{impl_}{}
+    inline std::string_view label() const noexcept {
+        using namespace pp;
+        if (impl) {
+            auto& opt = (*impl)["_label"_f];
+            if (opt) {
+                return opt.value();
+            }
+        }
+        return {};
+    }
+    const details::IgnoredFolder* impl;
+};
+
 struct SYNCSPIRIT_API SomeDevice {
     SomeDevice(const details::SomeDevice* impl_): impl{impl_}{}
+    inline std::string_view name() const noexcept {
+        using namespace pp;
+        if (impl) {
+            auto& opt = (*impl)["_name"_f];
+            if (opt) {
+                return opt.value();
+            }
+        }
+        return {};
+    }
+    inline std::string_view client_name() const noexcept {
+        using namespace pp;
+        if (impl) {
+            auto& opt = (*impl)["_client_name"_f];
+            if (opt) {
+                return opt.value();
+            }
+        }
+        return {};
+    }
+    inline std::string_view client_version() const noexcept {
+        using namespace pp;
+        if (impl) {
+            auto& opt = (*impl)["_client_version"_f];
+            if (opt) {
+                return opt.value();
+            }
+        }
+        return {};
+    }
+    inline std::string_view address() const noexcept {
+        using namespace pp;
+        if (impl) {
+            auto& opt = (*impl)["_address"_f];
+            if (opt) {
+                return opt.value();
+            }
+        }
+        return {};
+    }
+    inline std::uint64_t last_seen() const noexcept {
+        using namespace pp;
+        if (impl) {
+            auto& opt = (*impl)["_last_seen"_f];
+            if (opt) {
+                return opt.value();
+            }
+        }
+        return {};
+    }
 
     const details::SomeDevice* impl;
 };
 
-struct SYNCSPIRIT_API PendingFolder {
-    PendingFolder(const details::PendingFolder* impl_): impl{impl_}{}
-
-    const details::PendingFolder* impl;
-};
-
 }
-
-struct SYNCSPIRIT_API IgnoredFolder: private details::IgnoredFolder {
-    using parent_t = details::IgnoredFolder;
-    using parent_t::parent_t;
-};
 
 struct SYNCSPIRIT_API Device: view::Device, changeable::Device, private details::Device {
     template<typename... T>
@@ -409,17 +536,14 @@ struct SYNCSPIRIT_API FolderInfo: view::FolderInfo, changeable::FolderInfo, priv
     template<typename... T>
     FolderInfo(T&&... args): view::FolderInfo(this), changeable::FolderInfo(this), details::FolderInfo(std::forward<T>(args)...) {}
 
+    using view::FolderInfo::index_id;
+    using view::FolderInfo::max_sequence;
     using changeable::FolderInfo::index_id;
     using changeable::FolderInfo::max_sequence;
 
+    inline details::FolderInfo& expose() noexcept { return *this; }
+    utils::bytes_t encode() noexcept;
     static std::optional<FolderInfo> decode(utils::bytes_view_t bytes) noexcept;
-};
-
-struct SYNCSPIRIT_API PendingFolder: view::PendingFolder, changeable::PendingFolder, private details::PendingFolder {
-    template<typename... T>
-    PendingFolder(T&&... args): view::PendingFolder(this), changeable::PendingFolder(this), details::PendingFolder(std::forward<T>(args)...) {}
-
-    static std::optional<PendingFolder> decode(utils::bytes_view_t bytes) noexcept;
 };
 
 struct SYNCSPIRIT_API FileInfo: view::FileInfo, changeable::FileInfo, private details::FileInfo {
@@ -459,9 +583,16 @@ struct SYNCSPIRIT_API FileInfo: view::FileInfo, changeable::FileInfo, private de
     utils::bytes_t encode() noexcept;
 };
 
-struct SYNCSPIRIT_API IngoredFolder: private details::IngoredFolder {
-    using parent_t = details::IngoredFolder;
-    using parent_t::parent_t;
+struct SYNCSPIRIT_API IgnoredFolder: view::IgnoredFolder, changeable::IgnoredFolder, private details::IgnoredFolder {
+    template<typename... T>
+    IgnoredFolder(T&&... args): view::IgnoredFolder(this), changeable::IgnoredFolder(this), details::IgnoredFolder(std::forward<T>(args)...) {}
+
+    using view::IgnoredFolder::label;
+    using changeable::IgnoredFolder::label;
+
+    inline details::IgnoredFolder& expose() noexcept { return *this; }
+    utils::bytes_t encode() noexcept;
+    static std::optional<IgnoredFolder> decode(utils::bytes_view_t bytes) noexcept;
 };
 
 struct SYNCSPIRIT_API BlockInfo: view::BlockInfo, changeable::BlockInfo, private details::BlockInfo {
@@ -479,10 +610,33 @@ struct SYNCSPIRIT_API BlockInfo: view::BlockInfo, changeable::BlockInfo, private
     static std::optional<BlockInfo> decode(utils::bytes_view_t bytes) noexcept;
 };
 
-struct SYNCSPIRIT_API SomeDevice: view::SomeDevice, private details::SomeDevice {
+struct SYNCSPIRIT_API PendingFolder: view::PendingFolder, changeable::PendingFolder, private details::PendingFolder {
     template<typename... T>
-    SomeDevice(T&&... args): view::SomeDevice(this), details::SomeDevice(std::forward<T>(args)...) {}
+    PendingFolder(T&&... args): view::PendingFolder(this), changeable::PendingFolder(this), details::PendingFolder(std::forward<T>(args)...) {}
 
+    inline details::PendingFolder& expose() noexcept { return *this; }
+    utils::bytes_t encode() noexcept;
+    static std::optional<PendingFolder> decode(utils::bytes_view_t bytes) noexcept;
+};
+
+struct SYNCSPIRIT_API SomeDevice: view::SomeDevice, changeable::SomeDevice, private details::SomeDevice {
+    template<typename... T>
+    SomeDevice(T&&... args): view::SomeDevice(this), changeable::SomeDevice(this), details::SomeDevice(std::forward<T>(args)...) {}
+
+    using view::SomeDevice::name;
+    using view::SomeDevice::client_name;
+    using view::SomeDevice::client_version;
+    using view::SomeDevice::address;
+    using view::SomeDevice::last_seen;
+
+    using changeable::SomeDevice::name;
+    using changeable::SomeDevice::client_name;
+    using changeable::SomeDevice::client_version;
+    using changeable::SomeDevice::address;
+    using changeable::SomeDevice::last_seen;
+
+    inline details::SomeDevice& expose() noexcept { return *this; }
+    utils::bytes_t encode() noexcept;
     static std::optional<SomeDevice> decode(utils::bytes_view_t bytes) noexcept;
 };
 

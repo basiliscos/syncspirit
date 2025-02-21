@@ -22,7 +22,7 @@ auto folder_infos_t::apply_impl(cluster_t &cluster, apply_controller_t &controll
         }
 
         auto folder_key = decomposed.folder_key();
-        auto folder = folders.get(folder_key);
+        auto folder = folders.by_key(folder_key);
         if (!folder) {
             return make_error_code(error_code_t::no_such_folder);
         }

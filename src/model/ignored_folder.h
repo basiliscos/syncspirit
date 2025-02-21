@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #pragma once
 
+#include "utils/bytes.h"
 #include "misc/augmentation.hpp"
 #include "misc/map.hpp"
 #include "syncspirit-export.h"
@@ -17,21 +18,21 @@ struct ignored_folder_t;
 using ignored_folder_ptr_t = intrusive_ptr_t<ignored_folder_t>;
 
 struct SYNCSPIRIT_API ignored_folder_t final : augmentable_t<ignored_folder_t> {
-    static outcome::result<ignored_folder_ptr_t> create(std::string folder_id, std::string_view label) noexcept;
-    static outcome::result<ignored_folder_ptr_t> create(std::string_view key, std::string_view data) noexcept;
+    static outcome::result<ignored_folder_ptr_t> create(utils::bytes_view_t key, std::string_view label) noexcept;
+    static outcome::result<ignored_folder_ptr_t> create(utils::bytes_view_t key, utils::bytes_view_t data) noexcept;
 
-    std::string_view get_key() const noexcept;
-    std::string_view get_id() const noexcept;
+    utils::bytes_view_t get_key() const noexcept;
+    utils::bytes_view_t get_id() const noexcept;
     std::string_view get_label() const noexcept;
-    std::string serialize() noexcept;
+    utils::bytes_t serialize() noexcept;
 
   private:
-    ignored_folder_t(std::string_view folder_id, std::string_view label) noexcept;
-    ignored_folder_t(std::string_view key) noexcept;
-    outcome::result<void> assign_fields(std::string_view data) noexcept;
+    ignored_folder_t(utils::bytes_view_t folder_id, std::string_view label) noexcept;
+    ignored_folder_t(utils::bytes_view_t key) noexcept;
+    outcome::result<void> assign_fields(utils::bytes_view_t data) noexcept;
 
     std::string label;
-    std::string key;
+    utils::bytes_t key;
 };
 
 using ignored_folders_map_t = generic_map_t<ignored_folder_ptr_t, 1>;

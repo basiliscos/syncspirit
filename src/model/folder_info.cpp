@@ -4,7 +4,7 @@
 #include "folder_info.h"
 #include "folder.h"
 #include "cluster.h"
-#include "proto/proto-fwd.hpp"
+#include "proto/proto-structs.h"
 #include "../db/prefix.h"
 #include "misc/error_code.h"
 #include <spdlog/spdlog.h>
@@ -14,8 +14,8 @@ namespace syncspirit::model {
 
 static const constexpr char prefix = (char)(db::prefix::folder_info);
 
-folder_info_t::decomposed_key_t::decomposed_key_t(std::string_view reduced_key, std::string_view folder_uuid,
-                                                  std::string_view folder_info_id_)
+folder_info_t::decomposed_key_t::decomposed_key_t(utils::bytes_view_t reduced_key, utils::bytes_view_t folder_uuid,
+                                                  utils::bytes_view_t folder_info_id_)
     : folder_info_id{folder_info_id_} {
     assert(reduced_key.size() == device_id_t::digest_length);
     assert(folder_uuid.size() == uuid_length);
@@ -27,13 +27,13 @@ folder_info_t::decomposed_key_t::decomposed_key_t(std::string_view reduced_key, 
 
 auto folder_info_t::decompose_key(utils::bytes_view_t key) -> decomposed_key_t {
     assert(key.size() == folder_info_t::data_length);
-    auto device_key = key.substr(1, device_id_t::digest_length);
-    auto folder_id = key.substr(1 + device_key.size(), uuid_length);
-    auto folder_info_id = key.substr(1 + device_key.size() + folder_id.size(), uuid_length);
+    auto device_key = key.subspan(1, device_id_t::digest_length);
+    auto folder_id = key.subspan(1 + device_key.size(), uuid_length);
+    auto folder_info_id = key.subspan(1 + device_key.size() + folder_id.size(), uuid_length);
     return decomposed_key_t(device_key, folder_id, folder_info_id);
 }
 
-outcome::result<folder_info_ptr_t> folder_info_t::create(std::string_view key, const db::FolderInfo &data,
+outcome::result<folder_info_ptr_t> folder_info_t::create(utils::bytes_view_t key, const db::FolderInfo &data,
                                                          const device_ptr_t &device_,
                                                          const folder_ptr_t &folder_) noexcept {
     if (key.size() != data_length) {
@@ -62,17 +62,17 @@ outcome::result<folder_info_ptr_t> folder_info_t::create(const bu::uuid &uuid, c
     return outcome::success(std::move(ptr));
 }
 
-folder_info_t::folder_info_t(std::string_view key_, const device_ptr_t &device_, const folder_ptr_t &folder_) noexcept
+folder_info_t::folder_info_t(utils::bytes_view_t key_, const device_ptr_t &device_, const folder_ptr_t &folder_) noexcept
     : device{device_.get()}, folder{folder_.get()} {
-    assert(key_.substr(1, device_id_t::digest_length) == device->get_key().substr(1));
-    assert(key_.substr(device_id_t::digest_length + 1, uuid_length) == folder->get_key().substr(1));
+    assert(key_.subspan(1, device_id_t::digest_length) == device->get_key().subspan(1));
+    assert(key_.subspan(device_id_t::digest_length + 1, uuid_length) == folder->get_key().subspan(1));
     std::copy(key_.begin(), key_.end(), key);
 }
 
 folder_info_t::folder_info_t(const bu::uuid &uuid, const device_ptr_t &device_, const folder_ptr_t &folder_) noexcept
     : device{device_.get()}, folder{folder_.get()} {
-    auto device_key = device->get_key().substr(1);
-    auto folder_key = folder->get_key().substr(1);
+    auto device_key = device->get_key().subspan(1);
+    auto folder_key = folder->get_key().subspan(1);
     key[0] = prefix;
     std::copy(device_key.begin(), device_key.end(), key + 1);
     std::copy(folder_key.begin(), folder_key.end(), key + 1 + device_key.size());
@@ -86,8 +86,8 @@ void folder_info_t::assign_fields(const db::FolderInfo &fi) noexcept {
 
 utils::bytes_view_t folder_info_t::get_key() const noexcept { return utils::bytes_view_t(key, data_length); }
 
-std::string_view folder_info_t::get_uuid() const noexcept {
-    return std::string_view(key + 1 + device_id_t::digest_length + uuid_length, uuid_length);
+utils::bytes_view_t folder_info_t::get_uuid() const noexcept {
+    return utils::bytes_view_t(key + 1 + device_id_t::digest_length + uuid_length, uuid_length);
 }
 
 bool folder_info_t::operator==(const folder_info_t &other) const noexcept {
@@ -112,14 +112,14 @@ bool folder_info_t::add_strict(const file_info_ptr_t &file_info) noexcept {
 }
 
 void folder_info_t::serialize(db::FolderInfo &storage) const noexcept {
-    storage.set_index_id(index);
-    storage.set_max_sequence(max_sequence);
+    storage.index_id(index);
+    storage.max_sequence(max_sequence);
 }
 
-std::string folder_info_t::serialize() const noexcept {
+utils::bytes_t folder_info_t::serialize() const noexcept {
     db::FolderInfo r;
     serialize(r);
-    return r.SerializeAsString();
+    return r.encode();
 }
 
 void folder_info_t::set_index(std::uint64_t value) noexcept {
@@ -131,27 +131,37 @@ void folder_info_t::set_index(std::uint64_t value) noexcept {
 }
 
 folder_info_ptr_t folder_infos_map_t::by_device(const device_t &device) const noexcept {
-    return get<1>(device.device_id().get_sha256());
+    auto sha256 = device.device_id().get_sha256();
+    auto ptr = (const char*)sha256.data();
+    return get<1>(std::string_view{ptr, sha256.size()});
 }
 
 folder_info_ptr_t folder_infos_map_t::by_device_id(utils::bytes_view_t device_id) const noexcept {
-    return get<1>(device_id);
+    auto ptr = (const char*)device_id.data();
+    return get<1>(std::string_view{ptr, device_id.size()});
 }
 
 folder_info_ptr_t folder_infos_map_t::by_device_key(utils::bytes_view_t device_key) const noexcept {
-    return get<2>(device_key);
+    auto ptr = (const char*)device_key.data();
+    return get<2>(std::string_view{ptr, device_key.size()});
 }
 
 template <> SYNCSPIRIT_API std::string_view get_index<0>(const folder_info_ptr_t &item) noexcept {
-    return item->get_uuid();
+    auto uuid = item->get_uuid();
+    auto ptr = (const char*)uuid.data();
+    return {ptr, uuid.size()};
 }
 
 template <> SYNCSPIRIT_API std::string_view get_index<1>(const folder_info_ptr_t &item) noexcept {
-    return item->get_device()->device_id().get_sha256();
+    auto sha256 = item->get_device()->device_id().get_sha256();
+    auto ptr = (const char*)sha256.data();
+    return {ptr, sha256.size()};
 }
 
 template <> SYNCSPIRIT_API std::string_view get_index<2>(const folder_info_ptr_t &item) noexcept {
-    return item->get_device()->get_key();
+    auto key = item->get_device()->get_key();
+    auto ptr = (const char*)key.data();
+    return {ptr, key.size()};
 }
 
 } // namespace syncspirit::model

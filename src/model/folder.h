@@ -82,6 +82,7 @@ struct SYNCSPIRIT_API folder_t final : augmentable_t<folder_t>, folder_data_t {
 };
 
 struct SYNCSPIRIT_API folders_map_t : generic_map_t<folder_ptr_t, 2> {
+    folder_ptr_t by_key(utils::bytes_view_t id) const noexcept;
     folder_ptr_t by_id(std::string_view id) const noexcept;
 };
 

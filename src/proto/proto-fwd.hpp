@@ -108,6 +108,14 @@ struct SYNCSPIRIT_API IngoredFolder;
 struct SYNCSPIRIT_API BlockInfo;
 struct SYNCSPIRIT_API SomeDevice;
 
+namespace view {
+struct SYNCSPIRIT_API Folder;
+}
+
+namespace changeable {
+struct SYNCSPIRIT_API Folder;
+}
+
 }
 
 }

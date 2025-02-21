@@ -8,7 +8,7 @@
 
 using namespace syncspirit::model;
 
-void folder_data_t::assign_fields(const db::Folder &item) noexcept {
+void folder_data_t::assign_fields(const db::view::Folder &item) noexcept {
     id = item.id();
     label = item.label();
     path = boost::nowide::widen(item.path());
@@ -23,7 +23,7 @@ void folder_data_t::assign_fields(const db::Folder &item) noexcept {
     paused = item.paused();
 }
 
-void folder_data_t::serialize(db::Folder &r) const noexcept {
+void folder_data_t::serialize(db::changeable::Folder &r) const noexcept {
     r.id(id);
     r.label(label);
     r.read_only(read_only);
