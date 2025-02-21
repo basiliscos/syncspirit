@@ -78,35 +78,34 @@ and modify accordingly.
 
 ```
 mkdir build.release && cd build.release
-conan install --build=missing --output-folder . -s build_type=Release ..
+conan install --build=missing --output-folder . -o '&:shared=True' -s build_type=Release ..
 cmake .. -G "Unix Makefiles" \
   -DCMAKE_TOOLCHAIN_FILE=$PWD/conan_toolchain.cmake \
   -DCMAKE_BUILD_TYPE=Release
 make -j`nproc`
 ```
 
-
+(for shared build it should contain '&:shared=True' here too)
 
 To have locally installed binaries with all dependencies `cmake` command
 should be:
 
 ```
-cmake .. -G "Unix Makefiles" -o '&:shared=True' \
+cmake .. -G "Unix Makefiles" \
   -DCMAKE_TOOLCHAIN_FILE=$PWD/conan_toolchain.cmake \
   -DCMAKE_POLICY_DEFAULT_CMP0091=NEW \
   -DCMAKE_BUILD_TYPE=Release
 ```
 
-(for shared build it should contain '&:shared=True')
 
 ```
-make -j`nproc` deploy_syncspirit-fltk
+make -j`nproc`
 ```
 
 For win32 to gater `dll`s it should be
 
 ```
-make -j`nproc` install deploy_deps
+make -j`nproc` deploy_deps
 ```
 
 ## cross building on linux for windows
@@ -345,7 +344,7 @@ source ./conanbuild.sh
 cmake .. -G "Unix Makefiles" -DCMAKE_TOOLCHAIN_FILE=$PWD/conan_toolchain.cmake \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_CXX_FLAGS="-DBOOST_ASIO_ENABLE_CANCELIO=1"
-make -j`nproc`
+make -j`nproc` deploy_deps
 ```
 
 
