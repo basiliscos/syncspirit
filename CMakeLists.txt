@@ -64,14 +64,15 @@ function(install_executable target)
         add_custom_target("deploy_${target}")
         add_dependencies("deploy" "deploy_${target}")
         if (WIN32)
-            add_custom_command(TARGET deploy_${target} POST_BUILD
-                COMMAND ${CMAKE_COMMAND} -E
-                    copy
-                        $<TARGET_FILE:${target}>
-                        "${dist_dir}/$<TARGET_FILE_NAME:${target}>"
-#                COMMAND ${CMAKE_COMMAND} -E copy -t ${dist_dir} $<TARGET_RUNTIME_DLLS:${target}>
-#                    COMMAND_EXPAND_LISTS
-            )
+            get_target_property(target_type ${target} TYPE)
+            if (target_type STREQUAL "EXECUTABLE")
+                add_custom_command(TARGET deploy_${target} POST_BUILD
+                    COMMAND ${CMAKE_COMMAND} -E
+                        copy
+                            $<TARGET_FILE:${target}>
+                            "${dist_dir}/$<TARGET_FILE_NAME:${target}>"
+                )
+            endif ()
         else()
             add_custom_command(TARGET deploy_${target} POST_BUILD
                 COMMAND
