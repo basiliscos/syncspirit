@@ -1,5 +1,5 @@
 cmake_minimum_required (VERSION 3.19)
-project (syncspirit)
+project (syncspirit VERSION 0.4.0)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -40,7 +40,7 @@ find_package(tomlplusplus REQUIRED)
 find_package(nlohmann_json REQUIRED)
 #find_package(c-ares REQUIRED)
 
-set(SYNCSPIRIT_VERSION "v0.4.0")
+set(SYNCSPIRIT_VERSION "v${CMAKE_PROJECT_VERSION}")
 
 option(SYNCSPIRIT_BUILD_TESTS "Enable building tests [default: OFF]"  OFF)
 

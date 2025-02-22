@@ -6,7 +6,7 @@ if(MINGW)
     enable_language(RC)
 endif()
 
-add_executable(syncspirit-fltk WIN32
+add_executable(syncspirit-fltk WIN32 MACOSX_BUNDLE
     app_supervisor.cpp
     augmentation.cpp
     content.cpp
@@ -56,6 +56,7 @@ add_executable(syncspirit-fltk WIN32
     tree_item/self_device.cpp
     tree_item/settings.cpp
     $<$<PLATFORM_ID:Windows>:app.rc>
+    $<$<PLATFORM_ID:Darwin>:${syncspirit_SOURCE_DIR}/misc/SyncSpiritIcon.icns>
 )
 
 target_link_libraries(syncspirit-fltk
@@ -89,3 +90,13 @@ endif()
 if (CMAKE_BUILD_TYPE MATCHES "^([Rr]elease)|(MinSizeRel)")
     set_target_properties(syncspirit-fltk PROPERTIES LINK_FLAGS -s)
 endif()
+
+set_target_properties(syncspirit-fltk PROPERTIES
+    MACOSX_BUNDLE_BUNDLE_NAME    syncspirit
+    MACOSX_BUNDLE_GUI_IDENTIFIER "com.example.syncspirit-fltk"
+    MACOSX_BUNDLE_BUNDLE_VERSION "${CMAKE_PROJECT_VERSION}"
+    MACOSX_BUNDLE_SHORT_VERSION_STRING "${CMAKE_PROJECT_VERSION}"
+    MACOSX_BUNDLE_ICON_FILE "SyncSpiritIcon.icns"
+    XCODE_EMBED_FRAMEWORKS_CODE_SIGN_ON_COPY TRUE
+)
+set_source_files_properties(${syncspirit_SOURCE_DIR}/misc/SyncSpiritIcon.icns PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
