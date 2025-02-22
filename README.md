@@ -127,9 +127,8 @@ distributions on it)
 # changes
 
 ## 0.4.0 (xx-xxx-2025)
-
+ - [feature] new [fltk-fronted](docs/ui-fltk.md)
  - major app refactoring
-
  
 ## 0.3.3 (12-May-2024)
 - [bugfix, win32] governor actor, fix parsing folder path
