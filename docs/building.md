@@ -31,15 +31,61 @@ shared library; otherwise applications will not work correctly.
 
 ## generic build
 
+Make sure that the default conan profile has proper options:
+
+```
+cat ~/.conan2/profiles/default 
+[settings]
+arch=x86_64
+build_type=Release
+compiler=gcc
+compiler.cppstd=20
+compiler.libcxx=libstdc++11
+compiler.version=11
+os=Linux
+
+[options]
+*/*:shared=True
+fltk/*:with_xft=True
+fltk/*:with_gl=False
+boost/*:magic_autolink=False
+boost/*:visibility=hidden
+boost/*:header_only=False
+boost/*:without_serialization=True
+boost/*:without_graph=True
+boost/*:without_fiber=True
+boost/*:without_log=True
+boost/*:without_math=True
+boost/*:without_process=True
+boost/*:without_stacktrace=True
+boost/*:without_test=True
+boost/*:without_wave=True
+pugixml/*:no_exceptions=True
+rotor/*:enable_asio=True
+rotor/*:enable_thread=True
+rotor/*:enable_fltk=True
+```
+
+
+If static build is planned, than `*/*:shared=True` should be `False`.
+
+If the defult conan profile is missing, than create it via:
+```
+conan profile detect
+```
+
+and modify accordingly.
+
 ```
 mkdir build.release && cd build.release
-conan install --build=missing --output-folder . -s build_type=Release ..
+conan install --build=missing --output-folder . -o '&:shared=True' -s build_type=Release ..
 cmake .. -G "Unix Makefiles" \
   -DCMAKE_TOOLCHAIN_FILE=$PWD/conan_toolchain.cmake \
-  -DCMAKE_POLICY_DEFAULT_CMP0091=NEW \
   -DCMAKE_BUILD_TYPE=Release
 make -j`nproc`
 ```
+
+(for shared build it should contain '&:shared=True' here too)
 
 To have locally installed binaries with all dependencies `cmake` command
 should be:
@@ -51,14 +97,15 @@ cmake .. -G "Unix Makefiles" \
   -DCMAKE_BUILD_TYPE=Release
 ```
 
+
 ```
-make -j`nproc` deploy_syncspirit-fltk
+make -j`nproc`
 ```
 
 For win32 to gater `dll`s it should be
 
 ```
-make -j`nproc` install deploy_deps
+make -j`nproc` deploy_deps
 ```
 
 ## cross building on linux for windows
@@ -87,6 +134,27 @@ CC=x86_64-w64-mingw32-gcc
 CXX=x86_64-w64-mingw32-g++
 LD=ix86_64-w64-mingw32-ld
 RC=x86_64-w64-mingw32-windres
+
+[options]
+*/*:shared=False
+fltk/*:with_xft=True
+fltk/*:with_gl=False
+boost/*:magic_autolink=False
+boost/*:visibility=hidden
+boost/*:header_only=False
+boost/*:without_serialization=True
+boost/*:without_graph=True
+boost/*:without_fiber=True
+boost/*:without_log=True
+boost/*:without_math=True
+boost/*:without_process=True
+boost/*:without_stacktrace=True
+boost/*:without_test=True
+boost/*:without_wave=True
+pugixml/*:no_exceptions=True
+rotor/*:enable_asio=True
+rotor/*:enable_thread=True
+rotor/*:enable_fltk=True
 ```
 
 Then make a build
@@ -94,10 +162,10 @@ Then make a build
 ```
 mkdir build.release && cd build.release
 conan install --build=missing --output-folder . -s build_type=Release \
-    --profile:build=default --profile:host=mingw
+    --profile:build=default --profile:host=mingw -o '&:shared=False'  ..
 source ./conanbuild.sh
 cmake .. -G "Unix Makefiles" -DCMAKE_TOOLCHAIN_FILE=$PWD/conan_toolchain.cmake \
-  -DCMAKE_POLICY_DEFAULT_CMP0091=NEW -DCMAKE_BUILD_TYPE=Release
+   -DCMAKE_BUILD_TYPE=Release
 make -j`nproc`
 ```
 
@@ -144,6 +212,29 @@ CC=x86_64-w64-mingw32.shared-gcc
 CXX=x86_64-w64-mingw32.shared-g++
 LD=x86_64-w64-mingw32.shared-ld
 RC=x86_64-w64-mingw32.shared-windres
+
+[options]
+shared=False
+*/*:shared=True
+fltk/*:with_xft=True
+fltk/*:with_gl=False
+boost/*:magic_autolink=False
+boost/*:visibility=hidden
+boost/*:header_only=False
+boost/*:without_serialization=True
+boost/*:without_graph=True
+boost/*:without_fiber=True
+boost/*:without_log=True
+boost/*:without_math=True
+boost/*:without_process=True
+boost/*:without_stacktrace=True
+boost/*:without_test=True
+boost/*:without_wave=True
+protobuf/*:with_zlib=False
+pugixml/*:no_exceptions=True
+rotor/*:enable_asio=True
+rotor/*:enable_thread=True
+rotor/*:enable_fltk=True
 ```
 
 Go to `syncspirit` dir and then make a build
@@ -153,10 +244,10 @@ Go to `syncspirit` dir and then make a build
 cd syncspirit
 mkdir build.release && cd build.release
 conan install --build=missing --output-folder . -s build_type=Release \
-    --profile:build=default --profile:host=mxe ..
+    --profile:build=default --profile:host=mxe -o '&:shared=False' ..
 source ./conanbuild.sh
 cmake .. -G "Unix Makefiles" -DCMAKE_TOOLCHAIN_FILE=$PWD/conan_toolchain.cmake \
-  -DCMAKE_POLICY_DEFAULT_CMP0091=NEW -DCMAKE_BUILD_TYPE=Release
+  -DCMAKE_BUILD_TYPE=Release
 make -j`nproc`
 ```
 
@@ -208,6 +299,28 @@ CXX=i686-w64-mingw32.shared-g++
 LD=i686-w64-mingw32.shared-ld
 RC=i686-w64-mingw32.shared-windres
 
+[options]
+*/*:shared=False
+fltk/*:with_xft=True
+fltk/*:with_gl=False
+boost/*:magic_autolink=False
+boost/*:visibility=hidden
+boost/*:header_only=False
+boost/*:without_serialization=True
+boost/*:without_graph=True
+boost/*:without_fiber=True
+boost/*:without_log=True
+boost/*:without_math=True
+boost/*:without_process=True
+boost/*:without_stacktrace=True
+boost/*:without_test=True
+boost/*:without_wave=True
+protobuf/*:with_zlib=False
+pugixml/*:no_exceptions=True
+rotor/*:enable_asio=True
+rotor/*:enable_thread=True
+rotor/*:enable_fltk=True
+
 [conf]
 tools.build:cflags=["-D_WIN32_WINNT=0x0501"]
 tools.build:cxxflags=["-D_WIN32_WINNT=0x0501", "-DBOOST_ASIO_ENABLE_CANCELIO=1"]
@@ -226,12 +339,12 @@ Go to `syncspirit` dir and then make a build
 cd syncspirit
 mkdir build.release && cd build.release
 conan install --build=missing --output-folder . -s build_type=Release \
-    --profile:build=default --profile:host=xp ..
+    --profile:build=default --profile:host=xp -o '&:shared=False' .. ..
 source ./conanbuild.sh
 cmake .. -G "Unix Makefiles" -DCMAKE_TOOLCHAIN_FILE=$PWD/conan_toolchain.cmake \
-  -DCMAKE_POLICY_DEFAULT_CMP0091=NEW -DCMAKE_BUILD_TYPE=Release \
-  -DCMAKE_CXX_FLAGS="-D_WIN32_WINNT=0x0501" -DBOOST_ASIO_ENABLE_CANCELIO=1
-make -j`nproc`
+  -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_CXX_FLAGS="-DBOOST_ASIO_ENABLE_CANCELIO=1"
+make -j`nproc` deploy_deps
 ```
 
 
@@ -253,7 +366,7 @@ apt update
 apt install -y g++-9 gcc-9
 
 apt install -y g++-10 gcc-10
-apt-get install -y wget libxft-dev build-essential python3-pip make git fuse libfuse2 libx11-dev libx11-xcb-dev libfontenc-dev libice-dev libsm-dev libxau-dev libxaw7-dev libxcomposite-dev libxcursor-dev libxdamage-dev libxfixes-dev libxi-dev libxinerama-dev libxkbfile-dev libxmuu-dev libxrandr-dev libxrender-dev libxres-dev libxss-dev libxtst-dev libxv-dev libxxf86vm-dev libxcb-glx0-dev libxcb-render0-dev libxcb-render-util0-dev libxcb-xkb-dev libxcb-icccm4-dev libxcb-image0-dev libxcb-keysyms1-dev libxcb-randr0-dev libxcb-shape0-dev libxcb-sync-dev libxcb-xfixes0-dev libxcb-xinerama0-dev libxcb-dri3-dev uuid-dev libxcb-cursor-dev libxcb-dri2-0-dev libxcb-dri3-dev libxcb-present-dev libxcb-composite0-dev libxcb-ewmh-dev libxcb-res0-dev libxcb-util0-dev libxcb-util-dev libglu1-mesa-dev pkgconf
+apt-get install -y wget libxft-dev build-essential python3-pip make cmake git fuse libfuse2 libx11-dev libx11-xcb-dev libfontenc-dev libice-dev libsm-dev libxau-dev libxaw7-dev libxcomposite-dev libxcursor-dev libxdamage-dev libxfixes-dev libxi-dev libxinerama-dev libxkbfile-dev libxmuu-dev libxrandr-dev libxrender-dev libxres-dev libxss-dev libxtst-dev libxv-dev libxxf86vm-dev libxcb-glx0-dev libxcb-render0-dev libxcb-render-util0-dev libxcb-xkb-dev libxcb-icccm4-dev libxcb-image0-dev libxcb-keysyms1-dev libxcb-randr0-dev libxcb-shape0-dev libxcb-sync-dev libxcb-xfixes0-dev libxcb-xinerama0-dev libxcb-dri3-dev uuid-dev libxcb-cursor-dev libxcb-dri2-0-dev libxcb-dri3-dev libxcb-present-dev libxcb-composite0-dev libxcb-ewmh-dev libxcb-res0-dev libxcb-util0-dev libxcb-util-dev libglu1-mesa-dev pkgconf
 
 adduser --quiet --disabled-password c
 
@@ -277,7 +390,27 @@ CC=gcc-10
 CXX=g++-10
 
 [options]
+shared=True
+*/*:shared=True
+fltk/*:with_xft=True
+fltk/*:with_gl=False
+boost/*:magic_autolink=False
+boost/*:visibility=hidden
+boost/*:header_only=False
+boost/*:without_serialization=True
+boost/*:without_graph=True
+boost/*:without_fiber=True
+boost/*:without_log=True
+boost/*:without_math=True
+boost/*:without_process=True
+boost/*:without_stacktrace=True
+boost/*:without_test=True
+boost/*:without_wave=True
 protobuf/*:with_zlib=False
+pugixml/*:no_exceptions=True
+rotor/*:enable_asio=True
+rotor/*:enable_thread=True
+rotor/*:enable_fltk=True
 EOF
 
 git clone https://notabug.org/basiliscos/syncspirit.git
@@ -286,9 +419,19 @@ git checkout v0.4.0-dev
 git submodule update --init
 mkdir build.chroot
 cd build.chroot
-conan install --build=missing --output-folder . -s build_type=Release ..
+conan install --build=missing --output-folder . -s build_type=Release  -o '&:shared=True' ..
 source ./conanbuild.sh
 cmake .. -G "Unix Makefiles" -DCMAKE_TOOLCHAIN_FILE=conan_toolchain.cmake  -DCMAKE_POLICY_DEFAULT_CMP0091=NEW -DCMAKE_BUILD_TYPE=Release
 make -j`nproc`
 make deploy_syncspirit-fltk
 ```
+
+
+### Development build
+
+conan install --build=missing --output-folder . -s build_type=Debug \
+    -o '&:shared=True' ..
+
+cmake  .. -G "Unix Makefiles" -DCMAKE_TOOLCHAIN_FILE=conan_toolchain.cmake \
+    -DCMAKE_BUILD_TYPE=Debug -DSYNCSPIRIT_BUILD_TESTS=on \
+    -DCMAKE_CXX_FLAGS="-fuse-ld=mold"

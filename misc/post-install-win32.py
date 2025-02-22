@@ -39,14 +39,21 @@ parser.add_argument('--dirs', nargs='*', help='additional dirs for looking up de
 bitness = None
 args = parser.parse_args()
 
-scan_queue = args.binaries.copy()
+scan_queue = []
+for file_name in args.binaries.copy():
+    file_ext = os.path.splitext(file_name)[1]
+    if (file_ext == ".dll" or file_ext == ".exe"):
+        scan_queue.append(file_name)
+
 for file_name in scan_queue:
-    pe = pefile.PE(file_name, fast_load = True)
-    pe_bitness = pe.OPTIONAL_HEADER.Magic
-    if bitness is None:
-        bitness = pe_bitness
-    elif bitness != pe_bitness:
-        raise("binaries has different bitness")
+    file_ext = os.path.splitext(file_name)[1]
+    if (file_ext == ".dll" or file_ext == ".exe"):
+        pe = pefile.PE(file_name, fast_load = True)
+        pe_bitness = pe.OPTIONAL_HEADER.Magic
+        if bitness is None:
+            bitness = pe_bitness
+        elif bitness != pe_bitness:
+            raise("binaries has different bitness")
 
 available_dlls = dict()
 for d in args.dirs:

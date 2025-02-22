@@ -1,5 +1,5 @@
 cmake_minimum_required (VERSION 3.19)
-project (syncspirit)
+project (syncspirit VERSION 0.4.0)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -8,6 +8,7 @@ set(CMAKE_VISIBILITY_INLINES_HIDDEN 1)
 
 cmake_policy(SET CMP0063 NEW)
 cmake_policy(SET CMP0077 NEW)
+cmake_policy(SET CMP0091 NEW)
 cmake_policy(SET CMP0135 NEW)
 
 include(GenerateExportHeader)
@@ -40,7 +41,7 @@ find_package(tomlplusplus REQUIRED)
 find_package(nlohmann_json REQUIRED)
 #find_package(c-ares REQUIRED)
 
-set(SYNCSPIRIT_VERSION "v0.4.0")
+set(SYNCSPIRIT_VERSION "v${CMAKE_PROJECT_VERSION}")
 
 option(SYNCSPIRIT_BUILD_TESTS "Enable building tests [default: OFF]"  OFF)
 
@@ -64,14 +65,15 @@ function(install_executable target)
         add_custom_target("deploy_${target}")
         add_dependencies("deploy" "deploy_${target}")
         if (WIN32)
-            add_custom_command(TARGET deploy_${target} POST_BUILD
-                COMMAND ${CMAKE_COMMAND} -E
-                    copy
-                        $<TARGET_FILE:${target}>
-                        "${dist_dir}/$<TARGET_FILE_NAME:${target}>"
-#                COMMAND ${CMAKE_COMMAND} -E copy -t ${dist_dir} $<TARGET_RUNTIME_DLLS:${target}>
-#                    COMMAND_EXPAND_LISTS
-            )
+            get_target_property(target_type ${target} TYPE)
+            if (target_type STREQUAL "EXECUTABLE")
+                add_custom_command(TARGET deploy_${target} POST_BUILD
+                    COMMAND ${CMAKE_COMMAND} -E
+                        copy
+                            $<TARGET_FILE:${target}>
+                            "${dist_dir}/$<TARGET_FILE_NAME:${target}>"
+                )
+            endif ()
         else()
             add_custom_command(TARGET deploy_${target} POST_BUILD
                 COMMAND
@@ -83,8 +85,8 @@ function(install_executable target)
 endfunction()
 
 configure_file(misc/syncspirit-config.h.in include/syncspirit-config.h @ONLY)
-add_library(syncspirit_core SHARED
-    ${PROTO_SRCS}
+
+add_library(syncspirit_core
     src/constants.cpp
     src/config/utils.cpp
     src/db/cursor.cpp
@@ -250,11 +252,16 @@ FetchContent_Declare(MDBX
     URL https://libmdbx.dqdkfa.ru/release/libmdbx-amalgamated-0.13.4.tar.xz
     URL_HASH SHA256=86df30ca2231c9b3ad71424bb829dca9041947f5539d4295030c653d4982c1be
 )
-    set(BUILD_SHARED_LIBS true CACHE BOOL "BUILD_SHARED_LIBS")
+    if (WIN32)
+        set(BUILD_SHARED_LIBS true CACHE BOOL "BUILD_SHARED_LIBS")
+        set(MDBX_BUILD_SHARED_LIBRARY true CACHE BOOL "MDBX_BUILD_SHARED_LIBRARY")
+    else()
+        set(BUILD_SHARED_LIBS false CACHE BOOL "BUILD_SHARED_LIBS")
+        set(MDBX_BUILD_SHARED_LIBRARY false CACHE BOOL "MDBX_BUILD_SHARED_LIBRARY")
+    endif()
     set(MDBX_BUILD_TOOLS false  CACHE BOOL "MDBX_BUILD_TOOLS")
     set(MDBX_ENABLE_TESTS false CACHE BOOL "MDBX_ENABLE_TESTS")
     set(MDBX_BUILD_CXX false CACHE BOOL "MDBX_BUILD_CXX")
-    set(MDBX_BUILD_SHARED_LIBRARY true CACHE BOOL "MDBX_BUILD_SHARED_LIBRARY")
     set(MDBX_ALLOY_BUILD_DEFAULT true CACHE BOOL "MDBX_ALLOY_BUILD_DEFAULT")
     set(MDBX_ALLOY_BUILD true CACHE BOOL "MDBX_ALLOY_BUILD")
 FetchContent_MakeAvailable(MDBX)

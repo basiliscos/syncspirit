@@ -3,8 +3,7 @@
 
 #pragma once
 
-#include "mdbx.h"
-#include "error_code.h"
+#include <mdbx.h>
 #include "syncspirit-export.h"
 #include <boost/outcome.hpp>
 #include <span>
