@@ -6,6 +6,7 @@
 #include "constants.h"
 #include "utils/error_code.h"
 #include "utils/beast_support.h"
+#include "utils/time.h"
 #include "model/messages.h"
 #include "model/diff/contact/update_contact.h"
 #include "model/diff/contact/relay_connect_request.h"
@@ -388,8 +389,8 @@ bool relay_actor_t::on(proto::relay::session_invitation_t &msg) noexcept {
                                                                  std::move(relay_ep));
     } else {
         db::SomeDevice db;
-        db.set_name(std::string(device_id.get_short()));
-        db.set_last_seen(utils::as_seconds(pt::microsec_clock::local_time()));
+        db.name(std::string(device_id.get_short()));
+        db.last_seen(utils::as_seconds(pt::microsec_clock::local_time()));
         diff = new model::diff::modify::add_pending_device_t(device_id, db);
         diff->assign_sibling(new model::diff::contact::unknown_connected_t(*cluster, device_id, std::move(db)));
     }

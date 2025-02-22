@@ -975,4 +975,7 @@ struct SYNCSPIRIT_API Ping: details::Ping {
     Ping(T&&... args): details::Ping(std::forward<T>(args)...) {}
 };
 
+struct SYNCSPIRIT_API DownloadProgress {
+};
+
 }
