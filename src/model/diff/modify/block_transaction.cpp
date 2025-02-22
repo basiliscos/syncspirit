@@ -2,14 +2,18 @@
 // SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "block_transaction.h"
+#include "block_ack.h"
+#include "block_rej.h"
 
 using namespace syncspirit::model::diff::modify;
 
-block_transaction_t::block_transaction_t(const file_info_t &file, size_t block_index, dispose_callback_t callback_)
-    : parent_t(file, block_index), callback(std::move(callback_)) {}
+block_transaction_t::block_transaction_t(const file_info_t &file, size_t block_index) : parent_t(file, block_index) {}
 
-block_transaction_t::~block_transaction_t() { callback(*this); }
-
-auto block_transaction_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
-    return outcome::success();
+auto block_transaction_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
+    -> outcome::result<void> {
+    return applicator_t::apply_sibling(cluster, controller);
 }
+
+auto block_transaction_t::ack() const -> cluster_diff_ptr_t { return new block_ack_t(*this); }
+
+auto block_transaction_t::rej() const -> cluster_diff_ptr_t { return new block_rej_t(*this); }

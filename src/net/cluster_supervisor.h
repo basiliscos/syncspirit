@@ -8,6 +8,7 @@
 #include "model/folder.h"
 #include "model/messages.h"
 #include "model/diff/cluster_visitor.h"
+#include "model/misc/sequencer.h"
 #include "utils/log.h"
 #include <boost/asio.hpp>
 #include <rotor/asio.hpp>
@@ -17,13 +18,14 @@ namespace net {
 
 namespace r = rotor;
 namespace ra = r::asio;
-namespace bfs = boost::filesystem;
+namespace bfs = std::filesystem;
 namespace outcome = boost::outcome_v2;
 
 struct cluster_supervisor_config_t : ra::supervisor_config_asio_t {
     config::bep_config_t bep_config;
     std::uint32_t hasher_threads;
     model::cluster_ptr_t cluster;
+    model::sequencer_ptr_t sequencer;
 };
 
 template <typename Supervisor>
@@ -46,6 +48,11 @@ struct cluster_supervisor_config_builder_t : ra::supervisor_config_asio_builder_
         parent_t::config.cluster = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
+
+    builder_t &&sequencer(model::sequencer_ptr_t value) && noexcept {
+        parent_t::config.sequencer = std::move(value);
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
 };
 
 struct SYNCSPIRIT_API cluster_supervisor_t : public ra::supervisor_asio_t, private model::diff::cluster_visitor_t {
@@ -62,13 +69,14 @@ struct SYNCSPIRIT_API cluster_supervisor_t : public ra::supervisor_asio_t, priva
   private:
     void on_model_update(model::message::model_update_t &message) noexcept;
 
-    outcome::result<void> operator()(const model::diff::peer::peer_state_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::contact::peer_state_t &, void *) noexcept override;
 
     utils::logger_t log;
     r::address_ptr_t coordinator;
     config::bep_config_t bep_config;
     std::uint32_t hasher_threads;
     model::cluster_ptr_t cluster;
+    model::sequencer_ptr_t sequencer;
 };
 
 } // namespace net

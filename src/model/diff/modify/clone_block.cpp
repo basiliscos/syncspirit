@@ -2,14 +2,13 @@
 // SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "clone_block.h"
-#include "../block_visitor.h"
-#include "../../cluster.h"
-#include "../../misc/error_code.h"
+#include "model/diff/cluster_visitor.h"
+#include "model/cluster.h"
 
 using namespace syncspirit::model::diff::modify;
 
-clone_block_t::clone_block_t(const file_block_t &file_block, dispose_callback_t callback) noexcept
-    : block_transaction_t{*file_block.file(), file_block.block_index(), std::move(callback)} {
+clone_block_t::clone_block_t(const file_block_t &file_block) noexcept
+    : block_transaction_t{*file_block.file(), file_block.block_index()} {
     const file_info_t *source_file = nullptr;
     auto &block_pieces = file_block.block()->get_file_blocks();
     for (auto &b : block_pieces) {
@@ -36,9 +35,11 @@ clone_block_t::clone_block_t(const file_block_t &file_block, dispose_callback_t 
     source_device_id = source_fi->get_device()->device_id().get_sha256();
     source_folder_id = source_fi->get_folder()->get_id();
     source_file_name = source_file->get_name();
+
+    LOG_DEBUG(log, "clone_block_t, file = {}, folder = {}, block = {}", file_name, folder_id, block_index);
 }
 
-auto clone_block_t::visit(block_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {
+auto clone_block_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {
     LOG_TRACE(log, "visiting clone_block_t");
     return visitor(*this, custom);
 }

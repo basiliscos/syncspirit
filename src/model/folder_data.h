@@ -1,37 +1,49 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #pragma once
 
 #include <string>
-#include <boost/filesystem.hpp>
+#include <filesystem>
 #include "syncspirit-export.h"
 #include "structs.pb.h"
 
 namespace syncspirit::model {
 
-namespace bfs = boost::filesystem;
+namespace bfs = std::filesystem;
 
 struct SYNCSPIRIT_API folder_data_t {
-    enum class foldet_type_t { send = 0, receive, send_and_receive };
-    enum class pull_order_t { random = 0, alphabetic, largest, oldest, newest };
+    enum class folder_type_t { send = 0, receive, send_and_receive };
+    enum class pull_order_t { random = 0, alphabetic, smallest, largest, oldest, newest };
 
-    const std::string &get_label() noexcept { return label; }
-    std::string_view get_id() const noexcept { return id; }
+    inline const std::string &get_label() const noexcept { return label; }
+    inline std::string_view get_id() const noexcept { return id; }
+    inline void set_id(std::string_view value) noexcept { id = value; }
+    inline bool is_read_only() const noexcept { return read_only; }
+    inline bool is_deletion_ignored() const noexcept { return ignore_delete; }
+    inline bool are_permissions_ignored() const noexcept { return ignore_permissions; }
+    inline bool are_temp_indixes_disabled() const noexcept { return disable_temp_indixes; }
+    inline bool is_paused() const noexcept { return paused; }
+    inline bool is_scheduled() const noexcept { return scheduled; }
+    inline folder_type_t get_folder_type() const noexcept { return folder_type; }
+    inline pull_order_t get_pull_order() const noexcept { return pull_order; }
+    inline const bfs::path &get_path() noexcept { return path; }
+    inline void set_path(const bfs::path &value) noexcept { path = value; }
+    inline std::uint32_t get_rescan_interval() const noexcept { return rescan_interval; };
+    inline void set_rescan_interval(std::uint32_t value) noexcept { rescan_interval = value; };
+
+    void serialize(db::Folder &dest) const noexcept;
 
   protected:
-    inline const bfs::path &get_path() noexcept { return path; }
-    void set_path(const bfs::path &value) noexcept { path = value; }
     void assign_fields(const db::Folder &item) noexcept;
-    void serialize(db::Folder &dest) const noexcept;
 
     std::string id;
     std::string label;
     bfs::path path;
-    foldet_type_t folder_type;
+    folder_type_t folder_type;
     std::uint32_t rescan_interval;
     pull_order_t pull_order;
-    bool watched;
+    bool scheduled;
     bool read_only;
     bool ignore_permissions;
     bool ignore_delete;

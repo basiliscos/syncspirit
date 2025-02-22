@@ -1,0 +1,27 @@
+[settings]
+os=Windows
+arch=x86
+compiler=gcc
+build_type=Release
+compiler.cppstd=gnu17
+compiler.libcxx=libstdc++11
+compiler.version=11
+[buildenv]
+CC=i686-w64-mingw32.shared-gcc
+CXX=i686-w64-mingw32.shared-g++
+LD=i686-w64-mingw32.shared-ld
+RC=i686-w64-mingw32.shared-windres
+
+[options]
+boost/*:without_fiber=True
+boost/*:without_graph=True
+boost/*:without_log=True
+boost/*:without_stacktrace=True
+boost/*:without_test=True
+boost/*:without_wave=True
+
+[conf]
+tools.build:cflags=["-DHAVE_NOTIFYIPINTERFACECHANGE=False", "-DHAVE_CONVERTINTERFACELUIDTONAMEA=False", "-DHAVE_CONVERTINTERFACEINDEXTOLUID=false"]
+#tools.build:cflags=["-D_WIN32_WINNT=0x0501"]
+#tools.build:cxxflags=["-D_WIN32_WINNT=0x0501"]
+

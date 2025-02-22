@@ -108,12 +108,12 @@ struct SYNCSPIRIT_API initiator_actor_t : r::actor_base_t {
     void initiate_passive() noexcept;
     void initiate_active() noexcept;
     void initiate_relay_passive() noexcept;
-    void initiate_active_tls(const utils::URI &uri) noexcept;
-    void initiate_active_relay(const utils::URI &uri) noexcept;
+    void initiate_active_tls(const utils::uri_ptr_t &uri) noexcept;
+    void initiate_active_relay(const utils::uri_ptr_t &uri) noexcept;
     void initiate_handshake() noexcept;
     void join_session() noexcept;
     void request_relay_connection() noexcept;
-    void resolve(const utils::URI &uri) noexcept;
+    void resolve(const utils::uri_ptr_t &uri) noexcept;
 
     void on_resolve(message::resolve_response_t &res) noexcept;
     void on_connect(const tcp::endpoint &) noexcept;
@@ -137,7 +137,7 @@ struct SYNCSPIRIT_API initiator_actor_t : r::actor_base_t {
     r::supervisor_t &router;
     std::string_view alpn;
 
-    const utils::URI *active_uri = nullptr;
+    utils::uri_ptr_t active_uri;
     transport::stream_sp_t transport;
     r::address_ptr_t resolver;
     r::address_ptr_t coordinator;

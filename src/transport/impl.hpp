@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #pragma once
 
 #include "base.h"
 #include "utils/platform.h"
+#include "utils/log.h"
 #include "stream.h"
-#include <spdlog/spdlog.h>
 #include <boost/asio/ssl.hpp>
 
 #ifdef WIN32_LEAN_AND_MEAN
@@ -78,11 +78,9 @@ template <> struct base_impl_t<tcp_socket_t> {
 
     static tcp_socket_t mk_sock(transport_config_t &config, strand_t &strand) noexcept {
         if (config.sock) {
-            tcp::socket sock(std::move(config.sock.value()));
-            return {std::move(sock)};
+            return tcp::socket(std::move(config.sock.value()));
         } else {
-            tcp::socket sock(strand.context());
-            return {std::move(sock)};
+            return tcp::socket(strand.context());
         }
     }
 
@@ -104,6 +102,7 @@ template <> struct base_impl_t<ssl_socket_t> {
     ssl::context ctx;
     ssl::stream_base::handshake_type role;
     ssl_socket_t sock;
+    utils::logger_t log;
     bool validation_passed = false;
     bool cancelling = false;
     bool active;
@@ -148,11 +147,12 @@ template <> struct base_impl_t<ssl_socket_t> {
           me(config.ssl_junction->me), ctx(get_context(*this, config.ssl_junction->alpn)),
           role(!config.active ? ssl::stream_base::server : ssl::stream_base::client),
           sock(mk_sock(config, ctx, strand)) {
+        log = utils::get_logger("transport.tls");
         if (config.ssl_junction->sni_extension) {
-            auto &host = config.uri.host;
+            auto host = config.uri->host();
             if (!SSL_set_tlsext_host_name(sock.native_handle(), host.c_str())) {
                 sys::error_code ec{static_cast<int>(::ERR_get_error()), asio::error::get_ssl_category()};
-                spdlog::error("http_actor_t:: Set SNI Hostname : {}", ec.message());
+                log->error("http_actor_t:: Set SNI Hostname : {}", ec.message());
             }
         }
         if (me) {
@@ -163,32 +163,32 @@ template <> struct base_impl_t<ssl_socket_t> {
                 auto native = peer_ctx.native_handle();
                 auto peer_cert = X509_STORE_CTX_get_current_cert(native);
                 if (!peer_cert) {
-                    spdlog::warn("no peer certificate");
+                    log->warn("no peer certificate");
                     return false;
                 }
                 auto der_option = utils::as_serialized_der(peer_cert);
                 if (!der_option) {
-                    spdlog::warn("peer certificate cannot be serialized as der : {}", der_option.error().message());
+                    log->warn("peer certificate cannot be serialized as der : {}", der_option.error().message());
                     return false;
                 }
 
                 utils::cert_data_t cert_data{std::move(der_option.value())};
                 auto peer_option = model::device_id_t::from_cert(cert_data);
                 if (!peer_option) {
-                    spdlog::warn("cannot get device_id from peer");
+                    log->warn("cannot get device_id from peer");
                     return false;
                 }
 
                 auto peer = std::move(peer_option.value());
                 if (!actual_peer) {
                     actual_peer = std::move(peer);
-                    spdlog::trace("tls, peer device_id = {}", actual_peer);
+                    log->trace("peer device_id = {}", actual_peer);
                 }
 
                 if (role == ssl::stream_base::handshake_type::client) {
                     if (actual_peer != expected_peer) {
-                        spdlog::warn("unexpected peer device_id. Got: {}, expected: {}", actual_peer.get_value(),
-                                     expected_peer.get_value());
+                        log->warn("unexpected peer device_id. Got: {}, expected: {}", actual_peer.get_value(),
+                                  expected_peer.get_value());
                         return false;
                     }
                 }
@@ -243,9 +243,9 @@ template <typename T> struct impl;
 template <> struct impl<tcp_socket_t> {
     using socket_t = tcp_socket_t;
 
-    template <typename Owner> inline static void async_connect(Owner owner, const resolved_hosts_t &hosts) noexcept {
+    template <typename Owner> inline static void async_connect(Owner owner, resolved_hosts_t hosts) noexcept {
         auto &sock = owner->backend->get_physical_layer();
-        asio::async_connect(sock, hosts.begin(), hosts.end(), [owner](auto ec, auto it) mutable {
+        asio::async_connect(sock, hosts->begin(), hosts->end(), [owner, hosts](auto ec, auto it) mutable {
             auto &strand = owner->backend->strand;
             if (ec) {
                 strand.post([ec = ec, owner = std::move(owner)]() mutable {
@@ -256,12 +256,15 @@ template <> struct impl<tcp_socket_t> {
                 });
                 return;
             }
-            // dirty hack?
             using T = std::remove_cv_t<decltype(it)>;
             if constexpr (std::is_same_v<T, tcp::endpoint>) {
-                strand.post([addr = it, owner = std::move(owner)]() mutable { owner->success(addr); });
+                strand.post([addr = it, owner = std::move(owner), hosts = std::move(hosts)]() mutable {
+                    owner->success(addr);
+                });
             } else {
-                strand.post([addr = *it, owner = std::move(owner)]() mutable { owner->success(addr); });
+                strand.post([addr = *it, owner = std::move(owner), hosts = std::move(hosts)]() mutable {
+                    owner->success(addr);
+                });
             }
         });
     }
@@ -295,7 +298,7 @@ template <> struct impl<tcp_socket_t> {
             sys::error_code ec;
             sock.cancel(ec);
             if (ec) {
-                spdlog::error("impl<tcp::socket>::cancel() :: {}", ec.message());
+                utils::get_logger("transport.sock")->error("impl<tcp::socket>::cancel() :: {}", ec.message());
             }
         }
     }
@@ -304,8 +307,8 @@ template <> struct impl<tcp_socket_t> {
 template <> struct impl<ssl_socket_t> {
     using socket_t = ssl_socket_t;
 
-    template <typename Owner> inline static void async_connect(Owner owner, const resolved_hosts_t &hosts) noexcept {
-        impl<tcp_socket_t>::async_connect<Owner>(std::move(owner), hosts);
+    template <typename Owner> inline static void async_connect(Owner owner, resolved_hosts_t hosts) noexcept {
+        impl<tcp_socket_t>::async_connect<Owner>(std::move(owner), std::move(hosts));
     }
 
     template <typename Owner> inline static void async_handshake(Owner owner) noexcept {
@@ -357,10 +360,9 @@ template <typename T, typename Sock, typename P> struct interface_t : P {
 
     inline self_t &get_self() noexcept { return static_cast<self_t &>(*this); }
 
-    void async_connect(const resolved_hosts_t &hosts, connect_fn_t &on_connect,
-                       error_fn_t &on_error) noexcept override {
+    void async_connect(resolved_hosts_t hosts, connect_fn_t &on_connect, error_fn_t &on_error) noexcept override {
         auto curry = curry_connect<self_t>(get_self(), on_connect, on_error);
-        impl<Sock>::async_connect(std::move(curry), hosts);
+        impl<Sock>::async_connect(std::move(curry), std::move(hosts));
     }
 
     void async_handshake(handshake_fn_t &on_handshake, error_fn_t &on_error) noexcept override {

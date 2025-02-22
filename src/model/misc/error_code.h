@@ -3,7 +3,6 @@
 
 #pragma once
 
-#include <system_error>
 #include <boost/system/error_code.hpp>
 #include "syncspirit-export.h"
 
@@ -13,6 +12,7 @@ enum class error_code_t {
     success = 0,
     unknown_device,
     no_such_device,
+    device_already_exists,
     no_such_folder,
     invalid_block_prefix,
     invalid_block_key_length,
@@ -22,29 +22,30 @@ enum class error_code_t {
     device_deserialization_failure,
     invalid_folder_key_length,
     invalid_folder_prefix,
-    invalid_unknown_folder_length,
+    invalid_pending_folder_length,
     folder_deserialization_failure,
-    unknown_folder_deserialization_failure,
+    pending_folder_deserialization_failure,
     file_info_deserialization_failure,
     invalid_file_info_key_length,
     invalid_file_info_prefix,
     invalid_folder_info_key_length,
     invalid_folder_info_prefix,
     folder_info_deserialization_failure,
-    invalid_ignored_device_key_length,
-    invalid_ignored_device_prefix,
-    ignored_device_deserialization_failure,
+    invalid_some_device_key_length,
+    invalid_some_device_prefix,
+    some_device_deserialization_failure,
     invalid_ignored_folder_prefix,
     ignored_folder_deserialization_failure,
-    folder_already_exists,
+    cannot_remove_self,
     source_device_not_exists,
     folder_does_not_exist,
-    device_does_not_exist,
     folder_is_already_shared,
     malformed_deviceid,
     folder_is_not_shared,
     invalid_block_size,
-    unexpected_blocks
+    unexpected_blocks,
+    missing_version,
+    invalid_sequence,
 };
 
 namespace detail {

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "folder_info.h"
 #include "folder.h"
@@ -8,14 +8,30 @@
 #include "../db/prefix.h"
 #include "misc/error_code.h"
 #include <spdlog/spdlog.h>
-
-#ifdef uuid_t
-#undef uuid_t
-#endif
+#include <algorithm>
 
 namespace syncspirit::model {
 
 static const constexpr char prefix = (char)(db::prefix::folder_info);
+
+folder_info_t::decomposed_key_t::decomposed_key_t(std::string_view reduced_key, std::string_view folder_uuid,
+                                                  std::string_view folder_info_id_)
+    : folder_info_id{folder_info_id_} {
+    assert(reduced_key.size() == device_id_t::digest_length);
+    assert(folder_uuid.size() == uuid_length);
+    device_key_raw[0] = (char)(db::prefix::device);
+    folder_key_raw[0] = (char)(db::prefix::folder);
+    std::copy(begin(reduced_key), end(reduced_key), device_key_raw + 1);
+    std::copy(begin(folder_uuid), end(folder_uuid), folder_key_raw + 1);
+}
+
+auto folder_info_t::decompose_key(std::string_view key) -> decomposed_key_t {
+    assert(key.size() == folder_info_t::data_length);
+    auto device_key = key.substr(1, device_id_t::digest_length);
+    auto folder_id = key.substr(1 + device_key.size(), uuid_length);
+    auto folder_info_id = key.substr(1 + device_key.size() + folder_id.size(), uuid_length);
+    return decomposed_key_t(device_key, folder_id, folder_info_id);
+}
 
 outcome::result<folder_info_ptr_t> folder_info_t::create(std::string_view key, const db::FolderInfo &data,
                                                          const device_ptr_t &device_,
@@ -35,7 +51,7 @@ outcome::result<folder_info_ptr_t> folder_info_t::create(std::string_view key, c
     return outcome::success(std::move(ptr));
 }
 
-outcome::result<folder_info_ptr_t> folder_info_t::create(const uuid_t &uuid, const db::FolderInfo &data,
+outcome::result<folder_info_ptr_t> folder_info_t::create(const bu::uuid &uuid, const db::FolderInfo &data,
                                                          const device_ptr_t &device_,
                                                          const folder_ptr_t &folder_) noexcept {
     auto ptr = folder_info_ptr_t();
@@ -53,7 +69,7 @@ folder_info_t::folder_info_t(std::string_view key_, const device_ptr_t &device_,
     std::copy(key_.begin(), key_.end(), key);
 }
 
-folder_info_t::folder_info_t(const uuid_t &uuid, const device_ptr_t &device_, const folder_ptr_t &folder_) noexcept
+folder_info_t::folder_info_t(const bu::uuid &uuid, const device_ptr_t &device_, const folder_ptr_t &folder_) noexcept
     : device{device_.get()}, folder{folder_.get()} {
     auto device_key = device->get_key().substr(1);
     auto folder_key = folder->get_key().substr(1);
@@ -66,12 +82,11 @@ folder_info_t::folder_info_t(const uuid_t &uuid, const device_ptr_t &device_, co
 void folder_info_t::assign_fields(const db::FolderInfo &fi) noexcept {
     index = fi.index_id();
     max_sequence = fi.max_sequence();
-    actualized = max_sequence == 0;
 }
 
-std::string_view folder_info_t::get_key() noexcept { return std::string_view(key, data_length); }
+std::string_view folder_info_t::get_key() const noexcept { return std::string_view(key, data_length); }
 
-std::string_view folder_info_t::get_uuid() noexcept {
+std::string_view folder_info_t::get_uuid() const noexcept {
     return std::string_view(key + 1 + device_id_t::digest_length + uuid_length, uuid_length);
 }
 
@@ -80,48 +95,39 @@ bool folder_info_t::operator==(const folder_info_t &other) const noexcept {
     return r.first == key + data_length;
 }
 
-void folder_info_t::add(const file_info_ptr_t &file_info, bool inc_max_sequence) noexcept {
+void folder_info_t::add_relaxed(const file_info_ptr_t &file_info) noexcept {
     file_infos.put(file_info);
     auto seq = file_info->get_sequence();
-    if (inc_max_sequence && seq > max_sequence) {
-        max_sequence = seq;
-        actualized = true;
-    } else {
-        assert(seq <= max_sequence);
-        actualized = actualized || (seq == max_sequence);
-    }
+    max_sequence = std::max(max_sequence, seq);
 }
 
-std::string folder_info_t::serialize() noexcept {
+bool folder_info_t::add_strict(const file_info_ptr_t &file_info) noexcept {
+    auto seq = file_info->get_sequence();
+    if (seq > max_sequence) {
+        max_sequence = seq;
+        file_infos.put(file_info);
+        return true;
+    }
+    return false;
+}
+
+void folder_info_t::serialize(db::FolderInfo &storage) const noexcept {
+    storage.set_index_id(index);
+    storage.set_max_sequence(max_sequence);
+}
+
+std::string folder_info_t::serialize() const noexcept {
     db::FolderInfo r;
-    r.set_index_id(index);
-    r.set_max_sequence(max_sequence);
+    serialize(r);
     return r.SerializeAsString();
 }
 
-bool folder_info_t::is_actual() noexcept { return actualized; }
-
-void folder_info_t::set_max_sequence(std::int64_t value) noexcept {
-    actualized = false;
-    max_sequence = value;
-}
-
-std::optional<proto::Index> folder_info_t::generate() noexcept {
-    auto &folder_infos = folder->get_folder_infos();
-    auto &remote_folders = device->get_remote_folder_infos();
-    auto remote_folder = remote_folders.by_folder(*folder);
-    if (remote_folder) {
-        auto &rf = *remote_folder;
-        auto &local_device = *folder->get_cluster()->get_device();
-        auto local_folder = folder_infos.by_device(local_device);
-        bool need_initiate = (rf.get_index() != local_folder->index) || (!rf.get_max_sequence());
-        if (need_initiate) {
-            proto::Index r;
-            r.set_folder(std::string(folder->get_id()));
-            return r;
-        }
+void folder_info_t::set_index(std::uint64_t value) noexcept {
+    if (value != this->index) {
+        index = value;
+        max_sequence = 0;
+        file_infos.clear();
     }
-    return {};
 }
 
 folder_info_ptr_t folder_infos_map_t::by_device(const device_t &device) const noexcept {
@@ -132,11 +138,20 @@ folder_info_ptr_t folder_infos_map_t::by_device_id(std::string_view device_id) c
     return get<1>(device_id);
 }
 
+folder_info_ptr_t folder_infos_map_t::by_device_key(std::string_view device_key) const noexcept {
+    return get<2>(device_key);
+}
+
 template <> SYNCSPIRIT_API std::string_view get_index<0>(const folder_info_ptr_t &item) noexcept {
     return item->get_uuid();
 }
+
 template <> SYNCSPIRIT_API std::string_view get_index<1>(const folder_info_ptr_t &item) noexcept {
     return item->get_device()->device_id().get_sha256();
+}
+
+template <> SYNCSPIRIT_API std::string_view get_index<2>(const folder_info_ptr_t &item) noexcept {
+    return item->get_device()->get_key();
 }
 
 } // namespace syncspirit::model

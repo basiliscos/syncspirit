@@ -3,18 +3,16 @@
 
 #pragma once
 
+#include <boost/asio.hpp>
 #include "model/device.h"
 #include "model/device_id.h"
 #include "utils/platform.h"
-
-#include <boost/asio.hpp>
-#include <boost/asio/ip/basic_endpoint.hpp>
-#include <boost/filesystem/path.hpp>
+#include <filesystem>
 
 #include <fmt/format.h>
 
-template <> struct fmt::formatter<boost::filesystem::path> {
-    using Path = boost::filesystem::path;
+template <> struct fmt::formatter<std::filesystem::path> {
+    using Path = std::filesystem::path;
 
     constexpr auto parse(format_parse_context &ctx) -> decltype(ctx.begin()) { return ctx.end(); }
 
@@ -52,6 +50,26 @@ template <> struct fmt::formatter<syncspirit::model::device_id_t> {
 
     auto format(const device_id_t &device_id, format_context &ctx) -> format_context::iterator {
         return fmt::format_to(ctx.out(), "{}", device_id.get_short());
+    }
+};
+
+template <> struct fmt::formatter<syncspirit::utils::uri_t> {
+    using object_t = syncspirit::utils::uri_t;
+
+    constexpr auto parse(format_parse_context &ctx) -> format_parse_context::iterator { return ctx.begin(); }
+
+    auto format(const object_t &url, format_context &ctx) -> format_context::iterator {
+        return fmt::format_to(ctx.out(), "{}", std::string_view(url.buffer()));
+    }
+};
+
+template <> struct fmt::formatter<syncspirit::utils::uri_ptr_t> {
+    using object_t = syncspirit::utils::uri_ptr_t;
+
+    constexpr auto parse(format_parse_context &ctx) -> format_parse_context::iterator { return ctx.begin(); }
+
+    auto format(const object_t &url, format_context &ctx) const -> format_context::iterator {
+        return fmt::format_to(ctx.out(), "{}", *url);
     }
 };
 

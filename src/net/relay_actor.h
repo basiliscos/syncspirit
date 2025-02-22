@@ -7,7 +7,7 @@
 #include "utils/log.h"
 #include "config/relay.h"
 #include "proto/relay_support.h"
-#include "transport/stream.h"
+#include "model/cluster.h"
 #include <boost/asio.hpp>
 #include <boost/optional.hpp>
 #include <boost/smart_ptr/local_shared_ptr.hpp>

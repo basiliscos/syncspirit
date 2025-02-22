@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #pragma once
 
-#include <string>
 #include "utils/tls.h"
 #include "syncspirit-export.h"
-#include "misc/arc.hpp"
+#include <string>
+#include <cstdint>
 #include <optional>
 
 namespace syncspirit::model {
@@ -27,10 +27,11 @@ struct SYNCSPIRIT_API device_id_t {
     static std::optional<device_id_t> from_sha256(std::string_view sha_256) noexcept;
     static std::optional<device_id_t> from_cert(const utils::cert_data_t &cert) noexcept;
     static std::optional<device_id_t> from_uuid(std::string_view value) noexcept;
+    static std::string make_short(std::uint64_t value) noexcept;
 
     device_id_t() noexcept {};
     device_id_t(device_id_t &&other) noexcept;
-    device_id_t(const device_id_t &other) = default;
+    device_id_t(const device_id_t &other) noexcept;
 
     device_id_t &operator=(device_id_t &&other) noexcept;
     device_id_t &operator=(const device_id_t &other) noexcept;
@@ -45,6 +46,9 @@ struct SYNCSPIRIT_API device_id_t {
     std::string_view get_short() const noexcept;
     std::string_view get_sha256() const noexcept { return std::string_view(hash + 1, digest_length); }
     std::string_view get_key() const noexcept { return std::string_view(hash, data_length); }
+    std::uint64_t get_uint() const noexcept;
+
+    bool matches(uint64_t) const noexcept;
 
   private:
     device_id_t(const utils::cert_data_t &) noexcept;

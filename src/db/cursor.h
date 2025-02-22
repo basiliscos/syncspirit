@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "mdbx.h"
+#include <mdbx.h>
 #include "string_view"
 #include "error_code.h"
 #include "syncspirit-export.h"

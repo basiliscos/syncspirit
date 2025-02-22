@@ -1,0 +1,9 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-FileCopyrightText: 2025 Ivan Baidakou
+
+#include <windows.h>    // RT_MANIFEST
+#include "app.h"
+// CREATEPROCESS_MANIFEST_RESOURCE_ID is defined as 1 cast to `char*`; not directly usable here.
+
+1                    RT_MANIFEST    "app-manifest.xml"
+ID_SYNCSPIRIT_ICON   ICON           "syncspirit-fltk.ico"

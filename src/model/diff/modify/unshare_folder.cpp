@@ -1,74 +1,45 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "unshare_folder.h"
-#include "../cluster_visitor.h"
-#include "../../cluster.h"
-#include "../../misc/error_code.h"
-#include "../../../utils/format.hpp"
-#include "structs.pb.h"
+#include "remove_blocks.h"
+#include "remove_folder_infos.h"
+#include "model/diff/cluster_visitor.h"
+#include "model/cluster.h"
+#include "utils/format.hpp"
 
 using namespace syncspirit::model::diff::modify;
 
-unshare_folder_t::unshare_folder_t(const model::cluster_t &cluster, std::string_view peer_device_,
-                                   std::string_view folder_id_) noexcept
-    : peer_id{peer_device_}, folder_id{folder_id_} {
+unshare_folder_t::unshare_folder_t(const model::cluster_t &, model::folder_info_t &folder_info,
+                                   orphaned_blocks_t *orphaned_blocks_) noexcept {
+    LOG_DEBUG(log, "unshare_folder_t folder = {}, peer = {}", folder_info.get_folder()->get_id(),
+              folder_info.get_device()->device_id());
 
-    auto &folders = cluster.get_folders();
-    auto &devices = cluster.get_devices();
-    auto &blocks = cluster.get_blocks();
+    auto &peer = *folder_info.get_device();
+    peer_id = peer.device_id().get_sha256();
+    auto local_orphaned_blocks = orphaned_blocks_t();
+    auto &orphaned_blocks = orphaned_blocks_ ? *orphaned_blocks_ : local_orphaned_blocks;
 
-    auto folder = folders.by_id(folder_id);
-    auto peer = devices.by_sha256(peer_id);
+    auto remove_folders_map = model::folder_infos_map_t{};
+    remove_folders_map.put(&folder_info);
+    auto current = assign_child(new remove_folder_infos_t(std::move(remove_folders_map), &orphaned_blocks));
 
-    auto &folder_infos = folder->get_folder_infos();
-    auto folder_info = folder_infos.by_device_id(peer_id);
-    folder_info_key = folder_info->get_key();
-
-    auto &file_infos = folder_info->get_file_infos();
-    for (auto &fi : file_infos) {
-        auto &file_info = *fi.item;
-        removed_files.emplace(std::string(file_info.get_key()));
-        for (auto &b : file_info.get_blocks()) {
-            bool remove_block = true;
-            for (auto &fb : b->get_file_blocks()) {
-                if (*fb.file()->get_folder_info()->get_device() != *peer) {
-                    remove_block = false;
-                    break;
-                }
-            }
-            if (remove_block) {
-                removed_blocks.emplace(std::string(b->get_key()));
-            }
+    if (!orphaned_blocks_) {
+        auto block_keys = local_orphaned_blocks.deduce();
+        if (block_keys.size()) {
+            current = current->assign_sibling(new remove_blocks_t(std::move(block_keys)));
         }
     }
 }
 
-auto unshare_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
-    auto &folders = cluster.get_folders();
-    auto folder = folders.by_id(folder_id);
-    if (!folder) {
-        return make_error_code(error_code_t::folder_does_not_exist);
+auto unshare_folder_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
+    -> outcome::result<void> {
+    auto r = applicator_t::apply_child(cluster, controller);
+    if (!r) {
+        return r;
     }
-
-    auto &devices = cluster.get_devices();
-
-    auto peer = devices.by_sha256(peer_id);
-    if (!peer) {
-        return make_error_code(error_code_t::device_does_not_exist);
-    }
-
-    auto &folder_infos = folder->get_folder_infos();
-    auto folder_info = folder_infos.by_device_id(peer_id);
-    if (!folder_info) {
-        return make_error_code(error_code_t::folder_is_not_shared);
-    }
-
-    folder_infos.remove(folder_info);
-
-    LOG_TRACE(log, "applyging unshare_folder_t, folder {} with device {}", folder_id, peer->device_id());
-
-    return outcome::success();
+    LOG_TRACE(log, "applying unshare_folder_t");
+    return applicator_t::apply_sibling(cluster, controller);
 }
 
 auto unshare_folder_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

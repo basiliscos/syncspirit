@@ -6,6 +6,7 @@
 #include "config/dialer.h"
 #include "config/bep.h"
 #include "utils/log.h"
+#include "model/cluster.h"
 #include "model/messages.h"
 #include "model/diff/cluster_visitor.h"
 #include "messages.h"
@@ -55,25 +56,30 @@ struct SYNCSPIRIT_API dialer_actor_t : public r::actor_base_t, private model::di
     struct redial_info_t {
         clock_t::time_point last_attempt;
         timer_option_t timer_id;
+        std::size_t skip_discovers;
     };
     using redial_map_t = std::unordered_map<model::device_ptr_t, redial_info_t>;
 
     void on_announce(message::announce_notification_t &message) noexcept;
     void on_model_update(model::message::model_update_t &) noexcept;
 
-    void discover(const model::device_ptr_t &device) noexcept;
+    void discover_or_dial(const model::device_ptr_t &device) noexcept;
     void remove(const model::device_ptr_t &device) noexcept;
     void schedule_redial(const model::device_ptr_t &device) noexcept;
     void on_timer(r::request_id_t request_id, bool cancelled) noexcept;
 
-    outcome::result<void> operator()(const model::diff::peer::peer_state_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::contact::peer_state_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::contact::update_contact_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::modify::remove_peer_t &, void *) noexcept override;
 
     utils::logger_t log;
     model::cluster_ptr_t cluster;
     pt::time_duration redial_timeout;
+    std::uint32_t skip_discovers;
 
     r::address_ptr_t coordinator;
     redial_map_t redial_map;
+    bool announced;
 };
 
 } // namespace net

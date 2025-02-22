@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "test-utils.h"
 #include "config/utils.h"
 #include "utils/uri.h"
 #include "utils/location.h"
-#include <boost/filesystem.hpp>
+#include <filesystem>
 #include <sstream>
 
 namespace syncspirit::config {
@@ -19,21 +19,26 @@ bool operator==(const bep_config_t &lhs, const bep_config_t &rhs) noexcept {
 }
 
 bool operator==(const dialer_config_t &lhs, const dialer_config_t &rhs) noexcept {
-    return lhs.enabled == rhs.enabled && lhs.redial_timeout == rhs.redial_timeout;
+    return lhs.enabled == rhs.enabled && lhs.redial_timeout == rhs.redial_timeout &&
+           lhs.skip_discovers == rhs.skip_discovers;
 }
 
 bool operator==(const fs_config_t &lhs, const fs_config_t &rhs) noexcept {
-    return lhs.temporally_timeout == rhs.temporally_timeout && lhs.mru_size == rhs.mru_size;
+    return lhs.temporally_timeout == rhs.temporally_timeout && lhs.mru_size == rhs.mru_size &&
+           lhs.bytes_scan_iteration_limit == rhs.bytes_scan_iteration_limit &&
+           lhs.files_scan_iteration_limit == rhs.files_scan_iteration_limit;
 }
 
 bool operator==(const db_config_t &lhs, const db_config_t &rhs) noexcept {
-    return lhs.upper_limit == rhs.upper_limit && lhs.uncommitted_threshold == rhs.uncommitted_threshold;
+    return lhs.upper_limit == rhs.upper_limit && lhs.uncommitted_threshold == rhs.uncommitted_threshold &&
+           lhs.max_blocks_per_diff == rhs.max_blocks_per_diff && lhs.max_files_per_diff == rhs.max_files_per_diff;
 }
 
 bool operator==(const global_announce_config_t &lhs, const global_announce_config_t &rhs) noexcept {
-    return lhs.enabled == rhs.enabled && lhs.announce_url == rhs.announce_url && lhs.device_id == rhs.device_id &&
-           lhs.cert_file == rhs.cert_file && lhs.key_file == rhs.key_file && lhs.rx_buff_size == rhs.rx_buff_size &&
-           lhs.timeout == rhs.timeout && lhs.reannounce_after == rhs.reannounce_after;
+    return lhs.enabled == rhs.enabled && lhs.debug == rhs.debug && *lhs.announce_url == *rhs.announce_url &&
+           lhs.device_id == rhs.device_id && lhs.cert_file == rhs.cert_file && lhs.key_file == rhs.key_file &&
+           lhs.rx_buff_size == rhs.rx_buff_size && lhs.timeout == rhs.timeout &&
+           lhs.reannounce_after == rhs.reannounce_after;
 }
 
 bool operator==(const local_announce_config_t &lhs, const local_announce_config_t &rhs) noexcept {
@@ -50,7 +55,8 @@ bool operator==(const upnp_config_t &lhs, const upnp_config_t &rhs) noexcept {
 }
 
 bool operator==(const relay_config_t &lhs, const relay_config_t &rhs) noexcept {
-    return lhs.enabled == rhs.enabled && lhs.discovery_url == rhs.discovery_url && lhs.rx_buff_size == rhs.rx_buff_size;
+    return lhs.enabled == rhs.enabled && lhs.debug == rhs.debug && *lhs.discovery_url == *rhs.discovery_url &&
+           lhs.rx_buff_size == rhs.rx_buff_size;
 }
 
 bool operator==(const main_t &lhs, const main_t &rhs) noexcept {
@@ -64,7 +70,7 @@ bool operator==(const main_t &lhs, const main_t &rhs) noexcept {
 } // namespace syncspirit::config
 
 namespace sys = boost::system;
-namespace fs = boost::filesystem;
+namespace fs = std::filesystem;
 namespace st = syncspirit::test;
 
 using namespace syncspirit;
@@ -85,7 +91,7 @@ TEST_CASE("expand_home", "[config]") {
 }
 
 TEST_CASE("default config is OK", "[config]") {
-    auto dir = fs::current_path() / fs::unique_path();
+    auto dir = st::unique_path();
     fs::create_directory(dir);
     auto dir_guard = st::path_guard_t(dir);
     auto cfg_path = dir / "syncspirit.toml";

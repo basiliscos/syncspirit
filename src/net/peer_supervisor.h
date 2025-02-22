@@ -8,11 +8,9 @@
 #include "messages.h"
 #include "model/messages.h"
 #include "model/diff/cluster_visitor.h"
-#include "model/diff/contact_visitor.h"
 #include "utils/log.h"
 #include <boost/asio.hpp>
 #include <rotor/asio.hpp>
-#include <map>
 
 namespace syncspirit {
 namespace net {
@@ -67,9 +65,7 @@ struct peer_supervisor_config_builder_t : ra::supervisor_config_asio_builder_t<S
     }
 };
 
-struct SYNCSPIRIT_API peer_supervisor_t : public ra::supervisor_asio_t,
-                                          private model::diff::cluster_visitor_t,
-                                          private model::diff::contact_visitor_t {
+struct SYNCSPIRIT_API peer_supervisor_t : public ra::supervisor_asio_t, private model::diff::cluster_visitor_t {
     using parent_t = ra::supervisor_asio_t;
     using config_t = peer_supervisor_config_t;
     template <typename Actor> using config_builder_t = peer_supervisor_config_builder_t<Actor>;
@@ -82,14 +78,12 @@ struct SYNCSPIRIT_API peer_supervisor_t : public ra::supervisor_asio_t,
   private:
     void on_connect(message::connect_request_t &) noexcept;
     void on_model_update(model::message::model_update_t &) noexcept;
-    void on_contact_update(model::message::contact_update_t &) noexcept;
     void on_peer_ready(message::peer_connected_t &) noexcept;
     void on_connected(message::peer_connected_t &) noexcept;
 
-    outcome::result<void> operator()(const model::diff::peer::peer_state_t &, void *) noexcept override;
-    outcome::result<void> operator()(const model::diff::modify::update_contact_t &, void *) noexcept override;
-    outcome::result<void> operator()(const model::diff::modify::connect_request_t &, void *) noexcept override;
-    outcome::result<void> operator()(const model::diff::modify::relay_connect_request_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::contact::dial_request_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::contact::connect_request_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::contact::relay_connect_request_t &, void *) noexcept override;
 
     model::cluster_ptr_t cluster;
     utils::logger_t log;

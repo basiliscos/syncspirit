@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "test_supervisor.h"
+#include "model/diff/modify/clone_block.h"
+#include "model/diff/modify/append_block.h"
 #include "model/diff/modify/finish_file.h"
-#include "model/diff/modify/finish_file_ack.h"
+#include "model/diff/advance/remote_copy.h"
 #include "net/names.h"
 
 namespace to {
@@ -27,19 +29,25 @@ using namespace syncspirit::net;
 using namespace syncspirit::test;
 
 supervisor_t::supervisor_t(config_t &cfg) : parent_t(cfg) {
-    log = utils::get_logger("net.test_supervisor");
     auto_finish = cfg.auto_finish;
+    auto_ack_blocks = cfg.auto_ack_blocks;
+    sequencer = model::make_sequencer(1234);
 }
 
 void supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     parent_t::configure(plugin);
-    plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) { p.set_identity(names::coordinator, false); });
-    plugin.with_casted<r::plugin::registry_plugin_t>(
-        [&](auto &p) { p.register_name(names::coordinator, get_address()); });
+    plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
+        p.set_identity(std::string(names::coordinator) + ".test", false);
+        log = utils::get_logger(identity);
+        sink = p.create_address();
+    });
+    plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
+        p.register_name(names::coordinator, get_address());
+        p.register_name(names::sink, get_address());
+    });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&supervisor_t::on_model_update);
-        p.subscribe_actor(&supervisor_t::on_block_update);
-        p.subscribe_actor(&supervisor_t::on_contact_update);
+        p.subscribe_actor(&supervisor_t::on_model_sink, sink);
     });
     if (configure_callback) {
         configure_callback(plugin);
@@ -88,7 +96,7 @@ void supervisor_t::enqueue(r::message_ptr_t message) noexcept {
 void supervisor_t::on_model_update(model::message::model_update_t &msg) noexcept {
     LOG_TRACE(log, "{}, updating model", identity);
     auto &diff = msg.payload.diff;
-    auto r = diff->apply(*cluster);
+    auto r = diff->apply(*cluster, *this);
     if (!r) {
         LOG_ERROR(log, "{}, error updating model: {}", identity, r.assume_error().message());
         do_shutdown(make_error(r.assume_error()));
@@ -101,35 +109,57 @@ void supervisor_t::on_model_update(model::message::model_update_t &msg) noexcept
     }
 }
 
-void supervisor_t::on_block_update(model::message::block_update_t &msg) noexcept {
-    LOG_TRACE(log, "{}, updating block", identity);
-    auto &diff = msg.payload.diff;
-    auto r = diff->apply(*cluster);
-    if (!r) {
-        LOG_ERROR(log, "{}, error updating block: {}", identity, r.assume_error().message());
-        do_shutdown(make_error(r.assume_error()));
+void supervisor_t::on_model_sink(model::message::model_update_t &message) noexcept {
+    LOG_TRACE(log, "on_model_sink");
+    auto custom = const_cast<void *>(message.payload.custom);
+    auto diff_ptr = reinterpret_cast<model::diff::cluster_diff_t *>(custom);
+    if (diff_ptr) {
+        auto diff = model::diff::cluster_diff_ptr_t(diff_ptr, false);
+        send<model::payload::model_update_t>(get_address(), std::move(diff));
     }
 }
 
-void supervisor_t::on_contact_update(model::message::contact_update_t &msg) noexcept {
-    LOG_TRACE(log, "{}, updating contact", identity);
-    auto &diff = msg.payload.diff;
-    auto r = diff->apply(*cluster);
-    if (!r) {
-        LOG_ERROR(log, "{}, error updating contact: {}", identity, r.assume_error().message());
-        do_shutdown(make_error(r.assume_error()));
-    }
+auto supervisor_t::consume_errors() noexcept -> io_errors_t { return std::move(io_errors); }
+
+auto supervisor_t::operator()(const model::diff::local::io_failure_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    auto &errs = diff.errors;
+    std::copy(errs.begin(), errs.end(), std::back_inserter(io_errors));
+    return diff.visit_next(*this, custom);
 }
 
 auto supervisor_t::operator()(const model::diff::modify::finish_file_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     if (auto_finish) {
         auto folder = cluster->get_folders().by_id(diff.folder_id);
-        auto file_info = folder->get_folder_infos().by_device(*cluster->get_device());
+        auto file_info = folder->get_folder_infos().by_device_id(diff.peer_id);
         auto file = file_info->get_file_infos().by_name(diff.file_name);
-        auto ack = model::diff::cluster_diff_ptr_t{};
-        ack = new model::diff::modify::finish_file_ack_t(*file);
+        auto ack = model::diff::advance::advance_t::create(diff.action, *file, *sequencer);
         send<model::payload::model_update_t>(get_address(), std::move(ack), this);
     }
-    return outcome::success();
+    return diff.visit_next(*this, custom);
+}
+
+auto supervisor_t::operator()(const model::diff::modify::append_block_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    auto ack_diff = diff.ack();
+    if (auto_ack_blocks) {
+        send<model::payload::model_update_t>(address, diff.ack(), this);
+    } else {
+        if (delayed_ack_holder) {
+            delayed_ack_current = delayed_ack_current->assign_sibling(ack_diff.get());
+        } else {
+            delayed_ack_holder = ack_diff;
+            delayed_ack_current = ack_diff.get();
+        }
+    }
+    return diff.visit_next(*this, custom);
+}
+
+auto supervisor_t::operator()(const model::diff::modify::clone_block_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    if (auto_ack_blocks) {
+        send<model::payload::model_update_t>(address, diff.ack(), this);
+    }
+    return diff.visit_next(*this, custom);
 }

@@ -21,6 +21,9 @@ std::string error_code_category_t::message(int c) const {
     case error_code_t::no_such_device:
         r = "no such device";
         break;
+    case error_code_t::device_already_exists:
+        r = "device already exists";
+        break;
     case error_code_t::no_such_folder:
         r = "no such folder";
         break;
@@ -48,14 +51,14 @@ std::string error_code_category_t::message(int c) const {
     case error_code_t::invalid_folder_prefix:
         r = "invalid folder prefix";
         break;
-    case error_code_t::invalid_unknown_folder_length:
-        r = "invalid unknown folder prefix";
+    case error_code_t::invalid_pending_folder_length:
+        r = "invalid pending folder prefix";
         break;
     case error_code_t::folder_deserialization_failure:
         r = "folder deserialization failure";
         break;
-    case error_code_t::unknown_folder_deserialization_failure:
-        r = "unknown folder deserialization failure";
+    case error_code_t::pending_folder_deserialization_failure:
+        r = "pending folder deserialization failure";
         break;
     case error_code_t::file_info_deserialization_failure:
         r = "file info deserialization failure";
@@ -75,14 +78,14 @@ std::string error_code_category_t::message(int c) const {
     case error_code_t::folder_info_deserialization_failure:
         r = "folder info deserialization failure";
         break;
-    case error_code_t::invalid_ignored_device_key_length:
-        r = "invalid ignored device key length";
+    case error_code_t::invalid_some_device_key_length:
+        r = "invalid some device key length";
         break;
-    case error_code_t::invalid_ignored_device_prefix:
-        r = "invalid ignored device prefix";
+    case error_code_t::invalid_some_device_prefix:
+        r = "invalid some device prefix";
         break;
-    case error_code_t::ignored_device_deserialization_failure:
-        r = "ignored device deserialization failure";
+    case error_code_t::some_device_deserialization_failure:
+        r = "some device deserialization failure";
         break;
     case error_code_t::invalid_ignored_folder_prefix:
         r = "invalid ignored folder prefix";
@@ -90,17 +93,14 @@ std::string error_code_category_t::message(int c) const {
     case error_code_t::ignored_folder_deserialization_failure:
         r = "ignored folder deserialization failure";
         break;
-    case error_code_t::folder_already_exists:
-        r = "folder already exists";
+    case error_code_t::cannot_remove_self:
+        r = "cannot remove self";
         break;
     case error_code_t::source_device_not_exists:
         r = "source device does not exist";
         break;
     case error_code_t::folder_does_not_exist:
         r = "folder does not exist";
-        break;
-    case error_code_t::device_does_not_exist:
-        r = "device does not exist";
         break;
     case error_code_t::folder_is_already_shared:
         r = "folder is already shared";
@@ -116,6 +116,12 @@ std::string error_code_category_t::message(int c) const {
         break;
     case error_code_t::unexpected_blocks:
         r = "blocks are not expected (e.g. in deleted file)";
+        break;
+    case error_code_t::missing_version:
+        r = "file version is missing";
+        break;
+    case error_code_t::invalid_sequence:
+        r = "file sequence is invalid";
         break;
     default:
         r = "unknown";

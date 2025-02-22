@@ -29,7 +29,7 @@ struct tcp_stream_impl_t final : generic_steam_impl_t<tcp_socket_t, upgradeable_
         return new ssl_stream_impl_t(cfg);
     }
 
-    utils::URI uri;
+    utils::uri_ptr_t uri;
 };
 
 stream_sp_t initiate_tls_passive(ra::supervisor_asio_t &sup, const utils::key_pair_t &my_keys, tcp::socket peer_sock,
@@ -40,7 +40,7 @@ stream_sp_t initiate_tls_passive(ra::supervisor_asio_t &sup, const utils::key_pa
 }
 
 stream_sp_t initiate_tls_active(ra::supervisor_asio_t &sup, const utils::key_pair_t &my_keys,
-                                const model::device_id_t &expected_peer, const utils::URI &uri, bool sni,
+                                const model::device_id_t &expected_peer, const utils::uri_ptr_t &uri, bool sni,
                                 std::string_view alpn) noexcept {
     ssl_junction_t ssl{expected_peer, &my_keys, sni, alpn};
     transport_config_t cfg{ssl_option_t(ssl), uri, sup, {}, true};
@@ -48,7 +48,7 @@ stream_sp_t initiate_tls_active(ra::supervisor_asio_t &sup, const utils::key_pai
 }
 
 stream_sp_t initiate_stream(transport_config_t &config) noexcept {
-    assert(config.uri.proto == "tcp");
+    assert(config.uri->scheme() == "tcp");
     if (config.ssl_junction) {
         return new ssl_stream_impl_t(config);
     } else {

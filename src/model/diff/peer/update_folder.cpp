@@ -2,80 +2,88 @@
 // SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "update_folder.h"
+#include "model/misc/file_iterator.h"
+#include "model/diff/modify/add_blocks.h"
+#include "model/diff/modify/remove_blocks.h"
 #include "model/diff/cluster_visitor.h"
 #include "model/misc/error_code.h"
 
 using namespace syncspirit::model;
 using namespace syncspirit::model::diff::peer;
 
-update_folder_t::update_folder_t(std::string_view folder_id_, std::string_view peer_id_, files_t files_,
-                                 blocks_t blocks_) noexcept
+update_folder_t::update_folder_t(std::string_view folder_id_, std::string_view peer_id_, files_t files_, uuids_t uuids,
+                                 blocks_t blocks, orphaned_blocks_t::set_t removed_blocks) noexcept
     : folder_id{std::string(folder_id_)}, peer_id{std::string(peer_id_)}, files{std::move(files_)},
-      blocks{std::move(blocks_)} {}
-
-auto update_folder_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
-    auto folder = cluster.get_folders().by_id(folder_id);
-    auto folder_info = folder->get_folder_infos().by_device_id(peer_id);
-
-    auto &bm = cluster.get_blocks();
-    auto blocks_map = block_infos_map_t();
-    for (const auto &b : blocks) {
-        auto opt = block_info_t::create(b);
-        if (!opt) {
-            return opt.assume_error();
+      uuids{std::move(uuids)} {
+    LOG_DEBUG(log, "update_folder_t, folder = {}", folder_id);
+    auto current = (cluster_diff_t *)(nullptr);
+    if (!blocks.empty()) {
+        current = assign_child(new modify::add_blocks_t(std::move(blocks)));
+    }
+    if (!removed_blocks.empty()) {
+        auto ptr = new modify::remove_blocks_t(std::move(removed_blocks));
+        if (current) {
+            current->assign_sibling(ptr);
+        } else {
+            assign_sibling(ptr);
         }
-        auto block = std::move(opt.assume_value());
-        blocks_map.put(block);
+    }
+}
+
+auto update_folder_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
+    -> outcome::result<void> {
+    auto r = applicator_t::apply_child(cluster, controller);
+    if (!r) {
+        return r;
     }
 
+    auto folder = cluster.get_folders().by_id(folder_id);
+    auto folder_info = folder->get_folder_infos().by_device_id(peer_id);
+    auto &bm = cluster.get_blocks();
+
     auto max_seq = folder_info->get_max_sequence();
-    auto files_map = file_infos_map_t();
     auto &fm = folder_info->get_file_infos();
-    for (const auto &f : files) {
+
+    for (std::size_t i = 0; i < files.size(); ++i) {
+        auto &f = files[i];
+
+        auto &uuid = uuids[i];
         auto file = file_info_ptr_t{};
-        uuid_t file_uuid;
-        auto prev_file = fm.by_name(f.name());
-        if (prev_file) {
-            assign(file_uuid, prev_file->get_uuid());
-        } else {
-            file_uuid = cluster.next_uuid();
-        }
-        auto opt = file_info_t::create(file_uuid, f, folder_info);
+        auto opt = file_info_t::create(uuid, f, folder_info);
         if (!opt) {
             return opt.assume_error();
         }
         file = std::move(opt.assume_value());
-        files_map.put(file);
 
         if (f.size()) {
             for (int i = 0; i < f.blocks_size(); ++i) {
                 auto &b = f.blocks(i);
-                auto block = blocks_map.get(b.hash());
-                if (!block) {
-                    block = bm.get(b.hash());
-                }
-                if (!block) {
-                    auto opt = block_info_t::create(b);
-                    if (!opt) {
-                        return opt.assume_error();
-                    }
-                    block = std::move(opt.value());
-                }
+                auto strict_hash = block_info_t::make_strict_hash(b.hash());
+                auto block = bm.get(strict_hash.get_hash());
+                assert(block);
                 file->assign_block(block, (size_t)i);
             }
         }
+        if (auto prev_file = fm.by_name(file->get_name()); prev_file) {
+            fm.remove(prev_file);
+            prev_file->update(*file);
+            file = std::move(prev_file);
+            file->notify_update();
+        }
+
+        folder_info->add_strict(file);
     }
 
-    // all ok, commit
-    for (auto &it : blocks_map) {
-        bm.put(it.item);
-    }
-    for (auto &it : files_map) {
-        folder_info->add(it.item, true);
-    }
     LOG_TRACE(log, "update_folder_t, apply(); max seq: {} -> {}", max_seq, folder_info->get_max_sequence());
 
-    return outcome::success();
+    r = applicator_t::apply_sibling(cluster, controller);
+
+    if (auto iterator = folder_info->get_device()->get_iterator(); iterator) {
+        iterator->on_upsert(folder_info);
+    }
+
+    folder_info->notify_update();
+    return r;
 }
 
 auto update_folder_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {
@@ -85,9 +93,46 @@ auto update_folder_t::visit(cluster_visitor_t &visitor, void *custom) const noex
 
 using diff_t = diff::cluster_diff_ptr_t;
 
+static auto construct(sequencer_t &sequencer, folder_info_ptr_t &folder_info, std::string_view peer_id,
+                      update_folder_t::files_t files, update_folder_t::blocks_t new_blocks) -> outcome::result<diff_t> {
+    auto folder = folder_info->get_folder();
+
+    auto uuids = update_folder_t::uuids_t{};
+    uuids.reserve(files.size());
+    auto &fm = folder_info->get_file_infos();
+    auto orphaned_candidates = orphaned_blocks_t{};
+    for (const auto &f : files) {
+        auto file = file_info_ptr_t{};
+        bu::uuid file_uuid;
+        auto prev_file = fm.by_name(f.name());
+        if (prev_file) {
+            assign(file_uuid, prev_file->get_uuid());
+            orphaned_candidates.record(*prev_file);
+        } else {
+            file_uuid = sequencer.next_uuid();
+        }
+        uuids.emplace_back(file_uuid);
+    }
+
+    auto orphaned_blocks = orphaned_candidates.deduce();
+    if (!orphaned_blocks.empty()) {
+        for (auto &b : new_blocks) {
+            auto strict_hash = block_info_t::make_strict_hash(b.hash());
+            auto it = orphaned_blocks.find(strict_hash.get_key());
+            if (it != orphaned_blocks.end()) {
+                orphaned_blocks.erase(it);
+            }
+        }
+    }
+
+    auto diff = diff_t(new update_folder_t(folder->get_id(), peer_id, std::move(files), std::move(uuids),
+                                           std::move(new_blocks), std::move(orphaned_blocks)));
+    return outcome::success(std::move(diff));
+}
+
 template <typename T>
-static auto instantiate(const cluster_t &cluster, const device_t &source, const T &message) noexcept
-    -> outcome::result<diff_t> {
+static auto instantiate(const cluster_t &cluster, sequencer_t &sequencer, const device_t &source,
+                        const T &message) noexcept -> outcome::result<diff_t> {
     auto folder = cluster.get_folders().by_id(message.folder());
     if (!folder) {
         return make_error_code(error_code_t::folder_does_not_exist);
@@ -99,37 +144,50 @@ static auto instantiate(const cluster_t &cluster, const device_t &source, const 
         return make_error_code(error_code_t::folder_is_not_shared);
     }
 
-    auto max_seq = fi->get_max_sequence();
+    auto log = update_folder_t::get_log();
     auto &blocks = cluster.get_blocks();
     update_folder_t::files_t files;
     update_folder_t::blocks_t new_blocks;
+    auto prev_sequence = fi->get_max_sequence();
     files.reserve(static_cast<size_t>(message.files_size()));
     for (int i = 0; i < message.files_size(); ++i) {
         auto &f = message.files(i);
         if (f.deleted() && f.blocks_size()) {
-            auto log = update_folder_t::get_log();
-            LOG_WARN(log, "file {}, should not have blocks", f.name());
+            LOG_WARN(log, "file {} should not have blocks", f.name());
             return make_error_code(error_code_t::unexpected_blocks);
+        }
+        auto sequence = f.sequence();
+        if (sequence <= prev_sequence) {
+            LOG_WARN(log, "file '{}' has incorrect sequence", f.name(), f.sequence());
+            return make_error_code(error_code_t::invalid_sequence);
+        }
+
+        if (f.sequence() <= 0) {
+            LOG_WARN(log, "file '{}' has wrong sequence", f.name(), f.sequence());
+            return make_error_code(error_code_t::invalid_sequence);
         }
         for (int j = 0; j < f.blocks_size(); ++j) {
             auto &b = f.blocks(j);
-            if (!blocks.get(b.hash())) {
+            auto strict_hash = block_info_t::make_strict_hash(b.hash());
+            if (!blocks.get(strict_hash.get_hash())) {
                 new_blocks.emplace_back(std::move(b));
             }
+        }
+        if (!f.version().counters_size()) {
+            return make_error_code(error_code_t::missing_version);
         }
         files.emplace_back(std::move(message.files(i)));
     }
 
-    auto diff = diff_t(new update_folder_t(message.folder(), device_id, std::move(files), std::move(new_blocks)));
-    return outcome::success(std::move(diff));
+    return construct(sequencer, fi, device_id, std::move(files), std::move(new_blocks));
 }
 
-auto update_folder_t::create(const cluster_t &cluster, const model::device_t &source,
+auto update_folder_t::create(const cluster_t &cluster, sequencer_t &sequencer, const model::device_t &source,
                              const proto::Index &message) noexcept -> outcome::result<cluster_diff_ptr_t> {
-    return instantiate(cluster, source, message);
+    return instantiate(cluster, sequencer, source, message);
 }
 
-auto update_folder_t::create(const cluster_t &cluster, const model::device_t &source,
+auto update_folder_t::create(const cluster_t &cluster, sequencer_t &sequencer, const model::device_t &source,
                              const proto::IndexUpdate &message) noexcept -> outcome::result<cluster_diff_ptr_t> {
-    return instantiate(cluster, source, message);
+    return instantiate(cluster, sequencer, source, message);
 }

@@ -1,24 +1,32 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
-#include "folder_info.h"
-#include "file_info.h"
 #include "cluster.h"
-#include "misc/error_code.h"
-#include "misc/version_utils.h"
+#include "file_info.h"
+#include "folder_info.h"
+#include "device.h"
 #include "db/prefix.h"
 #include "fs/utils.h"
+#include "misc/error_code.h"
+#include "misc/file_iterator.h"
+#include "utils/string_comparator.hpp"
 #include <zlib.h>
 #include <spdlog/spdlog.h>
+#include <boost/date_time/c_local_time_adjustor.hpp>
+#include <boost/nowide/convert.hpp>
 #include <algorithm>
-
-#ifdef uuid_t
-#undef uuid_t
-#endif
+#include <set>
 
 namespace syncspirit::model {
 
 static const constexpr char prefix = (char)(db::prefix::file_info);
+
+auto file_info_t::decompose_key(std::string_view key) -> decomposed_key_t {
+    assert(key.size() == file_info_t::data_length);
+    auto fi_key = key.substr(1, uuid_length);
+    auto file_id = key.substr(1 + uuid_length);
+    return {fi_key, file_id};
+}
 
 outcome::result<file_info_ptr_t> file_info_t::create(std::string_view key, const db::FileInfo &data,
                                                      const folder_info_ptr_t &folder_info_) noexcept {
@@ -40,7 +48,7 @@ outcome::result<file_info_ptr_t> file_info_t::create(std::string_view key, const
     return outcome::success(std::move(ptr));
 }
 
-auto file_info_t::create(const uuid_t &uuid_, const proto::FileInfo &info_,
+auto file_info_t::create(const bu::uuid &uuid_, const proto::FileInfo &info_,
                          const folder_info_ptr_t &folder_info_) noexcept -> outcome::result<file_info_ptr_t> {
     auto ptr = file_info_ptr_t();
     ptr = new file_info_t(uuid_, folder_info_);
@@ -53,27 +61,24 @@ auto file_info_t::create(const uuid_t &uuid_, const proto::FileInfo &info_,
     return outcome::success(std::move(ptr));
 }
 
-file_info_t::file_info_t(std::string_view key_, const folder_info_ptr_t &folder_info_) noexcept
-    : folder_info{folder_info_.get()} {
-    assert(key_.substr(1, uuid_length) == folder_info->get_uuid());
-    std::copy(key_.begin(), key_.end(), key);
-}
-
-static void fill(char *key, const uuid_t &uuid, const folder_info_ptr_t &folder_info_) noexcept {
+static void fill(char *key, const bu::uuid &uuid, const folder_info_ptr_t &folder_info_) noexcept {
     key[0] = prefix;
     auto fi_key = folder_info_->get_uuid();
     std::copy(fi_key.begin(), fi_key.end(), key + 1);
     std::copy(uuid.begin(), uuid.end(), key + 1 + fi_key.size());
 }
 
-std::string file_info_t::create_key(const uuid_t &uuid, const folder_info_ptr_t &folder_info_) noexcept {
-    std::string key;
-    key.resize(data_length);
-    fill(key.data(), uuid, folder_info_);
-    return key;
+file_info_t::guard_t::guard_t(file_info_t &file_) noexcept : file{&file_} { file_.synchronizing_lock(); }
+
+file_info_t::guard_t::~guard_t() { file->synchronizing_unlock(); }
+
+file_info_t::file_info_t(std::string_view key_, const folder_info_ptr_t &folder_info_) noexcept
+    : folder_info{folder_info_.get()} {
+    assert(key_.substr(1, uuid_length) == folder_info->get_uuid());
+    std::copy(key_.begin(), key_.end(), key);
 }
 
-file_info_t::file_info_t(const uuid_t &uuid, const folder_info_ptr_t &folder_info_) noexcept
+file_info_t::file_info_t(const bu::uuid &uuid, const folder_info_ptr_t &folder_info_) noexcept
     : folder_info{folder_info_.get()} {
     fill(key, uuid, folder_info_);
 }
@@ -88,6 +93,13 @@ file_info_t::~file_info_t() {
             blocks[i].reset();
         }
     }
+}
+
+std::string file_info_t::create_key(const bu::uuid &uuid, const folder_info_ptr_t &folder_info_) noexcept {
+    std::string key;
+    key.resize(data_length);
+    fill(key.data(), uuid, folder_info_);
+    return key;
 }
 
 std::string_view file_info_t::get_name() const noexcept { return name; }
@@ -117,12 +129,8 @@ outcome::result<void> file_info_t::fields_update(const Source &s, size_t block_c
         flags |= flags_t::f_no_permissions;
     }
     symlink_target = s.symlink_target();
-    version = s.version();
+    version.reset(new version_t(s.version()));
     full_name = fmt::format("{}/{}", folder_info->get_folder()->get_label(), get_name());
-    if constexpr (std::is_same_v<Source, db::FileInfo>) {
-        source_device = s.source_device();
-        source_version = s.source_version();
-    }
     block_size = size ? s.block_size() : 0;
     return reserve_blocks(size ? block_count : 0);
 }
@@ -149,7 +157,7 @@ template <typename T> T file_info_t::as() const noexcept {
     r.set_deleted(flags & f_deleted);
     r.set_invalid(flags & f_invalid);
     r.set_no_permissions(flags & f_no_permissions);
-    *r.mutable_version() = version;
+    *r.mutable_version() = version->as_proto();
     r.set_block_size(block_size);
     r.set_symlink_target(symlink_target);
     return r;
@@ -167,8 +175,6 @@ db::FileInfo file_info_t::as_db(bool include_blocks) const noexcept {
             r.mutable_blocks()->Add(std::string(db_key));
         }
     }
-    r.set_source_device(source_device);
-    (*r.mutable_source_version()) = source_version;
     return r;
 }
 
@@ -181,7 +187,7 @@ proto::FileInfo file_info_t::as_proto(bool include_blocks) const noexcept {
             *r.add_blocks() = block.as_bep(offset);
             offset += block.get_size();
         }
-        if (blocks.empty() && is_file()) {
+        if (blocks.empty() && is_file() && !is_deleted()) {
             auto emtpy_block = r.add_blocks();
             auto data = std::string();
             auto weak_hash = adler32(0L, Z_NULL, 0);
@@ -233,9 +239,29 @@ void file_info_t::mark_unreachable(bool value) noexcept {
     }
 }
 
+void file_info_t::mark_local() noexcept {
+    flags = flags | f_local;
+    auto self = folder_info->get_device();
+    auto folder = folder_info->get_folder();
+    for (auto it : folder->get_folder_infos()) {
+        auto fi = it.item.get();
+        auto peer = fi->get_device();
+        if (peer != self) {
+            auto fit = peer->get_iterator();
+            if (fit) {
+                auto peer_file = fi->get_file_infos().by_name(name);
+                if (peer_file) {
+                    fit->recheck(*peer_file);
+                }
+            }
+        }
+    }
+}
+
 void file_info_t::mark_local_available(size_t block_index) noexcept {
     assert(block_index < blocks.size());
     assert(!marks[block_index]);
+    assert(missing_blocks);
     blocks[block_index]->mark_local_available(this);
     marks[block_index] = true;
     --missing_blocks;
@@ -250,70 +276,26 @@ bool file_info_t::is_locally_available() const noexcept { return missing_blocks 
 
 bool file_info_t::is_partly_available() const noexcept { return missing_blocks < blocks.size(); }
 
-void file_info_t::set_source(const file_info_ptr_t &peer_file) noexcept {
-    if (peer_file) {
-        auto &version = peer_file->get_version();
-        auto sz = version.counters_size();
-        assert(sz && "source file should have some version");
-        auto &counter = version.counters(sz - 1);
-        assert(counter.id());
-        auto peer = peer_file->get_folder_info()->get_device();
-        source_device = peer->device_id().get_sha256();
-        source_version = peer_file->get_version();
-
-    } else {
-        source_device = {};
-        source_version = {};
-    }
-}
-
-file_info_ptr_t file_info_t::get_source() const noexcept {
-    if (!source_device.empty()) {
-        auto folder = get_folder_info()->get_folder();
-        auto peer_folder = folder->get_folder_infos().by_device_id(source_device);
-        if (!peer_folder) {
-            return {};
-        }
-        auto peer_file = peer_folder->get_file_infos().by_name(get_name());
-        if (!peer_file) {
-            return {};
-        }
-        if (compare(peer_file->version, source_version) != version_relation_t::identity) {
-            return {};
-        }
-        return peer_file;
-    }
-    return {};
-}
-
-const boost::filesystem::path &file_info_t::get_path() const noexcept {
+const std::filesystem::path &file_info_t::get_path() const noexcept {
     if (!path) {
-        path = folder_info->get_folder()->get_path() / std::string(get_name());
+        path = folder_info->get_folder()->get_path() / boost::nowide::widen(name);
     }
     return path.value();
 }
 
-auto file_info_t::local_file() noexcept -> file_info_ptr_t {
+auto file_info_t::local_file() const noexcept -> file_info_ptr_t {
     auto device = folder_info->get_device();
     auto cluster = folder_info->get_folder()->get_cluster();
     auto &my_device = *cluster->get_device();
     assert(*device != my_device);
+    (void)device;
     auto my_folder_info = folder_info->get_folder()->get_folder_infos().by_device(my_device);
     if (!my_folder_info) {
         return {};
     }
 
     auto local_file = my_folder_info->get_file_infos().by_name(get_name());
-    if (!local_file) {
-        return {};
-    }
-
-    auto source = local_file->get_source();
-    if (source.get() == this) {
-        return local_file;
-    }
-
-    return {};
+    return local_file;
 }
 
 void file_info_t::unlock() noexcept { flags = flags & ~flags_t::f_locked; }
@@ -322,11 +304,11 @@ void file_info_t::lock() noexcept { flags |= flags_t::f_locked; }
 
 bool file_info_t::is_locked() const noexcept { return flags & flags_t::f_locked; }
 
-void file_info_t::locally_unlock() noexcept { flags = flags & ~flags_t::f_local_locked; }
+void file_info_t::synchronizing_unlock() noexcept { flags = flags & ~flags_t::f_synchronizing; }
 
-void file_info_t::locally_lock() noexcept { flags |= flags_t::f_local_locked; }
+void file_info_t::synchronizing_lock() noexcept { flags |= flags_t::f_synchronizing; }
 
-bool file_info_t::is_locally_locked() const noexcept { return flags & flags_t::f_local_locked; }
+bool file_info_t::is_synchronizing() const noexcept { return flags & flags_t::f_synchronizing; }
 
 bool file_info_t::is_unlocking() const noexcept { return flags & flags_t::f_unlocking; }
 
@@ -373,51 +355,103 @@ std::int64_t file_info_t::get_size() const noexcept {
     return 0;
 }
 
-bool file_info_t::need_download(const file_info_t &other) noexcept {
-    assert(folder_info->get_device() == folder_info->get_folder()->get_cluster()->get_device().get());
-    assert(other.folder_info->get_device() != folder_info->get_folder()->get_cluster()->get_device().get());
-    assert(name == other.name);
-    if (is_locked()) {
-        return false;
-    }
-    auto r = compare(version, other.version);
-    if (r == version_relation_t::identity) {
-        return !is_locally_available();
-    } else if (r == version_relation_t::older) {
-        return true;
-    } else if (r == version_relation_t::newer) {
-        return false;
-    } else {
-        assert(r == version_relation_t::conflict);
-        auto log = utils::get_logger("model");
-        auto stringify = [](const proto::Vector &vector) -> std::string {
-            auto r = std::string();
-            for (int i = 0; i < vector.counters_size(); ++i) {
-                auto &c = vector.counters(i);
-                r += fmt::format("{:x}:{}", c.id(), c.value());
-                if (i + 1 < vector.counters_size()) {
-                    r += ", ";
-                }
-            }
-            return r;
-        };
-        auto my_version = stringify(version);
-        auto other_version = stringify(other.version);
-
-        LOG_CRITICAL(log, "conflict handling is not available for = {}, '{}' vs '{}'", get_full_name(), my_version,
-                     other_version);
-        return false;
-    }
-}
-
 std::size_t file_info_t::expected_meta_size() const noexcept {
     auto r = name.size() + 1 + 8 + 4 + 8 + 4 + 8 + 3 + 8 + 4 + symlink_target.size();
-    r += version.counters_size() * 16;
+    r += version->counters_size() * 16;
     r += blocks.size() * (8 + 4 + 4 + 32);
     return r;
 }
 
-file_info_ptr_t file_info_t::actualize() const noexcept { return folder_info->get_file_infos().get(get_uuid()); }
+std::uint32_t file_info_t::get_permissions() const noexcept { return permissions; }
+
+bool file_info_t::has_no_permissions() const noexcept { return flags & f_no_permissions; }
+
+void file_info_t::update(const file_info_t &other) noexcept {
+    using hashes_t = std::set<std::string, utils::string_comparator_t>;
+    assert(this->get_key() == other.get_key());
+    assert(this->name == other.name);
+    type = other.type;
+    size = other.size;
+    permissions = other.permissions;
+    modified_s = other.modified_s;
+    modified_ns = other.modified_ns;
+    modified_by = other.modified_by;
+    flags = (other.flags & 0b111) | (flags & ~0b111); // local flags are preserved
+    version = other.version;
+    sequence = other.sequence;
+    block_size = other.block_size;
+    symlink_target = other.symlink_target;
+
+    auto local_block_hashes = hashes_t{};
+    for (auto &b : blocks) {
+        if (b) {
+            for (auto &fb : b->get_file_blocks()) {
+                if (fb.is_locally_available() && fb.file() == this) {
+                    local_block_hashes.insert(std::string(b->get_hash()));
+                    break;
+                }
+            }
+        }
+    }
+    remove_blocks();
+
+    marks = other.marks;
+    blocks.resize(other.blocks.size());
+    missing_blocks = blocks.size();
+    for (size_t i = 0; i < other.blocks.size(); ++i) {
+        auto &b = other.blocks[i];
+        if (b) {
+            assign_block(b, i);
+            auto already_local = marks[i];
+            if (already_local) {
+                --missing_blocks;
+            } else if (local_block_hashes.contains(b->get_hash())) {
+                mark_local_available(i);
+            }
+        }
+    }
+}
+
+bool file_info_t::is_global() const noexcept {
+    auto self = folder_info->get_device();
+    auto folder = folder_info->get_folder();
+    for (auto &it : folder->get_folder_infos()) {
+        if (it.item->get_device() == self) {
+            continue;
+        }
+        auto &files = it.item->get_file_infos();
+        auto file = files.by_name(name);
+        if (!file) {
+            continue;
+        }
+        auto other = file->get_version();
+        if (!version->contains(*other)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+std::string file_info_t::make_conflicting_name() const noexcept {
+    using adjustor_t = boost::date_time::c_local_adjustor<utils::pt::ptime>;
+    auto path = bfs::path(name);
+    auto file_name = path.filename();
+    auto stem = file_name.stem().string();
+    auto ext = file_name.extension().string();
+    auto utc = pt::from_time_t(modified_s);
+    auto local = adjustor_t::utc_to_local(utc);
+    auto ymd = local.date().year_month_day();
+    auto time = local.time_of_day();
+    auto &counter = version->get_best();
+    auto device_short = device_id_t::make_short(counter.id());
+    auto conflicted_name =
+        fmt::format("{}.sync-conflict-{:04}{:02}{:02}-{:02}{:02}{:02}-{}{}", stem, (int)ymd.year, ymd.month.as_number(),
+                    ymd.day.as_number(), time.hours(), time.minutes(), time.seconds(), device_short, ext);
+    auto full_name = path.parent_path() / conflicted_name;
+    return full_name.string();
+}
+
+auto file_info_t::guard() noexcept -> guard_ptr_t { return new guard_t(*this); }
 
 template <> SYNCSPIRIT_API std::string_view get_index<0>(const file_info_ptr_t &item) noexcept {
     return item->get_uuid();
@@ -426,6 +460,21 @@ template <> SYNCSPIRIT_API std::string_view get_index<1>(const file_info_ptr_t &
     return item->get_name();
 }
 
+template <> SYNCSPIRIT_API std::int64_t get_index<2>(const file_info_ptr_t &item) noexcept {
+    return item->get_sequence();
+}
+
+auto file_infos_map_t::sequence_projection() noexcept -> seq_projection_t { return key2item.template get<2>(); }
+
 file_info_ptr_t file_infos_map_t::by_name(std::string_view name) noexcept { return get<1>(name); }
+
+file_info_ptr_t file_infos_map_t::by_sequence(std::int64_t value) noexcept { return get<2>(value); }
+
+auto file_infos_map_t::range(std::int64_t lower, std::int64_t upper) noexcept -> range_t {
+    auto &proj = sequence_projection();
+    auto begin = proj.lower_bound(lower);
+    auto end = proj.upper_bound(upper);
+    return std::make_pair(begin, end);
+}
 
 } // namespace syncspirit::model

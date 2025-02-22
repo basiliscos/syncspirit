@@ -1,19 +1,20 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #pragma once
 
-#include <cstdio>
 #include <string>
+#include <filesystem>
+#include <memory>
 #include <boost/outcome.hpp>
-#include <boost/filesystem.hpp>
 #include "model/file_info.h"
+#include "utils/io.h"
 #include "syncspirit-export.h"
 
 namespace syncspirit::fs {
 
 namespace outcome = boost::outcome_v2;
-namespace bfs = boost::filesystem;
+namespace bfs = std::filesystem;
 
 namespace details {
 struct chunk_t {
@@ -33,7 +34,7 @@ struct SYNCSPIRIT_API file_t : model::arc_base_t<file_t> {
     std::string_view get_path_view() const noexcept;
     const bfs::path &get_path() const noexcept;
 
-    outcome::result<void> close(bool remove_temporal) noexcept;
+    outcome::result<void> close(bool remove_temporal, const bfs::path &local_name = {}) noexcept;
     outcome::result<void> remove() noexcept;
     outcome::result<void> write(size_t offset, std::string_view data) noexcept;
     outcome::result<void> copy(size_t my_offset, const file_t &from, size_t source_offset, size_t size) noexcept;
@@ -43,17 +44,14 @@ struct SYNCSPIRIT_API file_t : model::arc_base_t<file_t> {
     static outcome::result<file_t> open_read(const bfs::path &path) noexcept;
 
   private:
-    file_t(FILE *backend, model::file_info_ptr_t model, bfs::path path, bool temporal) noexcept;
-    file_t(FILE *backend, bfs::path path) noexcept;
+    using backend_ptr_t = std::unique_ptr<utils::fstream_t>;
+    file_t(utils::fstream_t backend, model::file_info_ptr_t model, bfs::path path, bool temporal) noexcept;
+    file_t(utils::fstream_t backend, bfs::path path) noexcept;
 
-    enum last_op_t { r, w };
-
-    FILE *backend;
+    backend_ptr_t backend;
     model::file_info_ptr_t model;
     bfs::path path;
     std::string path_str;
-    mutable size_t pos = 0;
-    mutable last_op_t last_op{last_op_t::r};
     bool temporal{false};
 };
 

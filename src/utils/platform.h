@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #pragma once
 
@@ -16,9 +16,10 @@
 
 namespace syncspirit::utils {
 
-struct platform_t {
-    SYNCSPIRIT_API static void startup();
-    SYNCSPIRIT_API static void shutdown() noexcept;
+struct SYNCSPIRIT_API platform_t {
+    static void startup();
+    static void shutdown() noexcept;
+    static bool symlinks_supported() noexcept;
 };
 
 } // namespace syncspirit::utils

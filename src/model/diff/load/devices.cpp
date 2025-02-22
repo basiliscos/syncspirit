@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "devices.h"
-#include "../../cluster.h"
-#include "../../misc/error_code.h"
+#include "model/cluster.h"
+#include "model/misc/error_code.h"
+#include "model/diff/cluster_visitor.h"
 
 using namespace syncspirit::model::diff::load;
 
-auto devices_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result<void> {
+auto devices_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept -> outcome::result<void> {
     auto &device_map = cluster.get_devices();
     auto &local_device = cluster.get_device();
     for (auto &pair : devices) {
@@ -30,5 +31,9 @@ auto devices_t::apply_impl(cluster_t &cluster) const noexcept -> outcome::result
         device_map.put(device);
     }
     assert(device_map.by_sha256(local_device->device_id().get_sha256()));
-    return outcome::success();
+    return applicator_t::apply_sibling(cluster, controller);
+}
+
+auto devices_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {
+    return visitor(*this, custom);
 }

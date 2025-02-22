@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "folder.h"
 #include "db/utils.h"
@@ -8,10 +8,6 @@
 #include "misc/error_code.h"
 #include "utils/format.hpp"
 #include <spdlog/spdlog.h>
-
-#ifdef uuid_t
-#undef uuid_t
-#endif
 
 namespace syncspirit::model {
 
@@ -31,19 +27,23 @@ outcome::result<folder_ptr_t> folder_t::create(std::string_view key, const db::F
     return outcome::success(std::move(ptr));
 }
 
-outcome::result<folder_ptr_t> folder_t::create(const uuid_t &uuid, const db::Folder &folder) noexcept {
+outcome::result<folder_ptr_t> folder_t::create(const bu::uuid &uuid, const db::Folder &folder) noexcept {
     auto ptr = folder_ptr_t();
     ptr = new folder_t(uuid);
     ptr->assign_fields(folder);
     return outcome::success(std::move(ptr));
 }
 
-folder_t::folder_t(std::string_view key_) noexcept { std::copy(key_.begin(), key_.end(), key); }
+folder_t::folder_t(std::string_view key_) noexcept : synchronizing{false}, suspended{false} {
+    std::copy(key_.begin(), key_.end(), key);
+}
 
-folder_t::folder_t(const uuid_t &uuid) noexcept {
+folder_t::folder_t(const bu::uuid &uuid) noexcept : synchronizing{false}, suspended{false} {
     key[0] = prefix;
     std::copy(uuid.begin(), uuid.end(), key + 1);
 }
+
+std::string_view folder_t::get_uuid() const noexcept { return std::string_view(key + 1, uuid_length); }
 
 void folder_t::add(const folder_info_ptr_t &folder_info) noexcept { folder_infos.put(folder_info); }
 
@@ -87,11 +87,40 @@ std::optional<proto::Folder> folder_t::generate(const model::device_t &device) c
         pd.set_index_id(fi.get_index());
         pd.set_introducer(d.is_introducer());
         pd.set_skip_introduction_removals(d.get_skip_introduction_removals());
-        spdlog::trace("folder_t::generate (==>), folder = {} (index = {}), device = {}, max_seq = {}", label,
+        spdlog::trace("folder_t::generate (==>), folder = {} (index = 0x{:x}), device = {}, max_seq = {}", label,
                       fi.get_index(), d.device_id(), max_seq);
     }
     return r;
 }
+
+const pt::ptime &folder_t::get_scan_start() const noexcept { return scan_start; }
+void folder_t::set_scan_start(const pt::ptime &value) noexcept { scan_start = value; }
+const pt::ptime &folder_t::get_scan_finish() noexcept { return scan_finish; }
+void folder_t::set_scan_finish(const pt::ptime &value) noexcept {
+    assert(!scan_start.is_not_a_date_time());
+    assert(scan_start <= value);
+    scan_finish = value;
+}
+
+bool folder_t::is_scanning() const noexcept {
+    if (scan_start.is_not_a_date_time()) {
+        return false;
+    }
+    if (scan_finish.is_not_a_date_time()) {
+        return true;
+    }
+    return scan_start > scan_finish;
+}
+
+bool folder_t::is_synchronizing() const noexcept { return synchronizing > 0; }
+
+void folder_t::adjust_synchronization(std::int_fast32_t delta) noexcept {
+    synchronizing += delta;
+    assert(synchronizing >= 0);
+}
+
+void folder_t::mark_suspended(bool value) noexcept { suspended = value; }
+bool folder_t::is_suspended() const noexcept { return suspended; }
 
 template <> SYNCSPIRIT_API std::string_view get_index<0>(const folder_ptr_t &item) noexcept { return item->get_key(); }
 template <> SYNCSPIRIT_API std::string_view get_index<1>(const folder_ptr_t &item) noexcept { return item->get_id(); }

@@ -1,18 +1,30 @@
 # syncspirit
 
-sites: [github](https://github.com/basiliscos/syncspirit), [abf](https://github.com/basiliscos/syncspirit),
+Sites:
+[github](https://github.com/basiliscos/syncspirit),
+[notabug](https://notabug.org/basiliscos/syncspirit)
 [gitflic](https://gitflic.ru/project/basiliscos/syncspirit)
 
 `syncspirit` is a continuous file synchronization program, which synchronizes files between devices.
 It is built using the C++ [rotor](https://github.com/basiliscos/cpp-rotor) actor framework. It implements
 the [BEP-protocol](https://docs.syncthing.net/specs/bep-v1.html) for files synchronization, or, 
 simplistically speaking, it is a [syncthing](https://syncthing.net)-compatible synchronization
-program, which uses the [syncthing](https://syncthing.net) infrastructure (for global discovery
+program at protocol level, which uses the [syncthing](https://syncthing.net) infrastructure (for global discovery
 and relaying).
 
 Despite being functional, `syncspirit` is much less feature-rich than [syncthing](https://syncthing.net)
-and is still in heavy development.
+and is still in heavy development
 
+
+# front-ends (aka UIs)
+
+![different UIs](docs/different-uis.gif)
+
+- [fltk](https://www.fltk.org/)-based gui [app](docs/ui-fltk.md)
+
+- headless [daemon](docs/ui-daemon.md)
+
+All front-ends share the same configuration and database when running on same host.
 
 # status
 
@@ -28,13 +40,15 @@ and is still in heavy development.
 
 - [x] relay transport
 
+- [x] conflict resolution
+
 # missing features
 
 This list is probably incomplete. Here are the most important changes:
 
-- [ ] conflict resolution
+- [ ] inotify support (aka realtime files watching)
 
-- [ ] ignoring files
+- [ ] ignoring pattern files
 
 - [ ] [QUIC transport](https://en.wikipedia.org/wiki/QUIC)
 
@@ -43,6 +57,8 @@ This list is probably incomplete. Here are the most important changes:
 - [ ] outgoing messages compression
 
 - [ ] [untrusted devices encryption](https://docs.syncthing.net/specs/untrusted.html)
+
+- [ ] send only/receive only dirs
 
 - [ ] ...
 
@@ -101,21 +117,20 @@ flash-sticks, user-defined files ordering and filtering for synchronization, may
 sync, like in [resilio](https://www.resilio.com/). This, however, still needs to be researched,
 after the core completion.
 
-# UI
-
-- [daemon](docs/ui-daemon.md)
-- [wx-widgets](https://www.wxwidgets.org/) (planned)
-- ...
-
-# plaforms
+# platforms
 
 - linux
 - windows
-- (maybe) *nix
-- (maybe) mac os x
+- mac os x (it is know that it can be build and run on that platform, but I don't know to make
+distributions on it)
 
 # changes
 
+## 0.4.0 (xx-xxx-2025)
+
+ - major app refactoring
+
+ 
 ## 0.3.3 (12-May-2024)
 - [bugfix, win32] governor actor, fix parsing folder path
 

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "share_folder.h"
 #include "pair_iterator.h"
@@ -84,9 +84,13 @@ bool share_folder_t::execute(governor_actor_t &actor) noexcept {
         return false;
     }
 
-    auto diff = cluster_diff_ptr_t(new modify::share_folder_t(device->device_id().get_sha256(), folder->get_id()));
-    actor.send<model::payload::model_update_t>(actor.coordinator, std::move(diff), &actor);
-    return false;
+    auto opt = modify::share_folder_t::create(*actor.cluster, *actor.sequencer, *device, *folder);
+    if (!opt) {
+        log->warn("{}, cannot share: ", actor.get_identity(), opt.assume_error().message());
+        return false;
+    }
+    actor.send_command(std::move(opt.value()), *this);
+    return true;
 }
 
 } // namespace syncspirit::daemon::command

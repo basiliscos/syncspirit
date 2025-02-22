@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "test-db.h"
+#include "test-utils.h"
 
 namespace syncspirit::test {
 
@@ -14,11 +15,13 @@ env_t::~env_t() {
 }
 
 env_t mk_env() {
-    auto path = bfs::unique_path();
+    auto path = unique_path();
     MDBX_env *env;
     auto r = mdbx_env_create(&env);
     assert(r == MDBX_SUCCESS);
-    MDBX_env_flags_t flags = MDBX_EXCLUSIVE | MDBX_SAFE_NOSYNC | MDBX_WRITEMAP | MDBX_COALESCE | MDBX_LIFORECLAIM;
+    (void)r;
+    MDBX_env_flags_t flags =
+        MDBX_EXCLUSIVE | MDBX_SAFE_NOSYNC | MDBX_WRITEMAP | MDBX_NOSTICKYTHREADS | MDBX_LIFORECLAIM;
     r = mdbx_env_open(env, path.string().c_str(), flags, 0664);
     assert(r == MDBX_SUCCESS);
     // std::cout << path.c_str() << "\n";

@@ -5,13 +5,13 @@
 
 #include "model/cluster.h"
 #include "model/messages.h"
-#include "config/main.h"
+#include "model/misc/sequencer.h"
+#include "model/diff/cluster_visitor.h"
 #include "utils/log.h"
 #include "hasher/messages.h"
 #include "messages.h"
 #include "scan_task.h"
 #include <rotor.hpp>
-#include <deque>
 
 namespace syncspirit {
 namespace fs {
@@ -22,6 +22,7 @@ namespace outcome = boost::outcome_v2;
 struct SYNCSPIRIT_API scan_actor_config_t : r::actor_config_t {
     config::fs_config_t fs_config;
     model::cluster_ptr_t cluster;
+    model::sequencer_ptr_t sequencer;
     uint32_t requested_hashes_limit;
 };
 
@@ -44,9 +45,14 @@ template <typename Actor> struct scan_actor_config_builder_t : r::actor_config_b
         parent_t::config.cluster = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
+
+    builder_t &&sequencer(model::sequencer_ptr_t value) && noexcept {
+        parent_t::config.sequencer = std::move(value);
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
 };
 
-struct SYNCSPIRIT_API scan_actor_t : public r::actor_base_t {
+struct SYNCSPIRIT_API scan_actor_t : public r::actor_base_t, private model::diff::cluster_visitor_t {
     using config_t = scan_actor_config_t;
     template <typename Actor> using config_builder_t = scan_actor_config_builder_t<Actor>;
 
@@ -57,25 +63,24 @@ struct SYNCSPIRIT_API scan_actor_t : public r::actor_base_t {
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
 
   private:
-    using scan_request_t = r::intrusive_ptr_t<message::scan_folder_t>;
-    using scan_queue_t = std::list<scan_request_t>;
+    using clock_t = r::pt::microsec_clock;
 
-    void initiate_scan(std::string_view folder_id) noexcept;
-    model::io_errors_t initiate_hash(scan_task_ptr_t task, const bfs::path &path, proto::FileInfo &metadata) noexcept;
-    void process_queue() noexcept;
+    scan_errors_t initiate_hash(scan_task_ptr_t task, const bfs::path &path, proto::FileInfo &metadata) noexcept;
     void commit_new_file(new_chunk_iterator_t &info) noexcept;
 
-    void on_initiate_scan(message::scan_folder_t &message) noexcept;
+    void on_model_update(model::message::model_update_t &message) noexcept;
     void on_scan(message::scan_progress_t &message) noexcept;
     void on_hash(hasher::message::digest_response_t &res) noexcept;
     void on_rehash(message::rehash_needed_t &message) noexcept;
     void on_hash_anew(message::hash_anew_t &message) noexcept;
     void on_hash_new(hasher::message::digest_response_t &res) noexcept;
-    void on_remove(const model::file_info_t &file) noexcept;
+
+    outcome::result<void> operator()(const model::diff::local::scan_start_t &, void *custom) noexcept override;
 
     template <typename Message> void hash_next(Message &m, const r::address_ptr_t &reply_addr) noexcept;
 
     model::cluster_ptr_t cluster;
+    model::sequencer_ptr_t sequencer;
     config::fs_config_t fs_config;
     r::address_ptr_t hasher_proxy;
     r::address_ptr_t new_files; /* for routing */
@@ -84,7 +89,6 @@ struct SYNCSPIRIT_API scan_actor_t : public r::actor_base_t {
     uint32_t requested_hashes_limit;
     uint32_t requested_hashes = 0;
     uint32_t progress = 0;
-    scan_queue_t queue;
 };
 
 } // namespace fs

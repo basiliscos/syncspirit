@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #pragma once
 
 #include <string>
 #include <memory>
-#include <vector>
 #include <boost/outcome.hpp>
 #include <openssl/x509v3.h>
 #include <openssl/evp.h>

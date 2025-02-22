@@ -1,18 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "test-utils.h"
 #include "utils/base32.h"
 #include "utils/tls.h"
 #include <openssl/pem.h>
-#include <boost/filesystem.hpp>
-#include <memory>
+#include <filesystem>
 #include <cstdio>
 
 using namespace syncspirit::utils;
 using namespace syncspirit::test;
 
-namespace bfs = boost::filesystem;
+namespace bfs = std::filesystem;
 
 TEST_CASE("generate cert/key pair, save & load", "[support][tls]") {
     auto pair = generate_pair("sample");
@@ -27,11 +26,11 @@ TEST_CASE("generate cert/key pair, save & load", "[support][tls]") {
     PEM_write_X509(stdout, value.cert.get());
     X509_print_fp(stdout, value.cert.get());
 
-    auto cert_file = bfs::unique_path();
+    auto cert_file = unique_path();
     auto cert_file_path = cert_file.string();
     auto cert_file_guard = path_guard_t(cert_file);
 
-    auto key_file = bfs::unique_path();
+    auto key_file = unique_path();
     auto key_file_path = key_file.string();
     auto key_file_guard = path_guard_t(key_file);
     auto save_result = value.save(cert_file_path.c_str(), key_file_path.c_str());
@@ -57,13 +56,11 @@ TEST_CASE("sha256 for certificate", "[support][tls]") {
     auto &sha = sha_result.value();
     REQUIRE(1 == 1);
     std::string expected = "b1b48b580b78b47c975a138b4aaa2988fc621795c95a2868e24d93b327e8858c";
-    char got[128];
-    std::memset(got, 0, sizeof(got));
+    std::string got_str;
 
     for (std::size_t i = 0; i < sha.size(); i++) {
-        sprintf(got + (i * 2), "%02x", (unsigned char)sha[i]);
+        got_str += fmt::format("{:02x}", (unsigned char)sha[i]);
     }
-    std::string got_str(got, expected.size());
     REQUIRE(got_str == expected);
 
     auto enc = base32::encode(sha);

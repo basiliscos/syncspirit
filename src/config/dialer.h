@@ -10,6 +10,7 @@ namespace syncspirit::config {
 struct dialer_config_t {
     bool enabled;
     std::uint32_t redial_timeout;
+    std::uint32_t skip_discovers;
 };
 
 } // namespace syncspirit::config

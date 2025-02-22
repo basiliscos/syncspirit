@@ -13,7 +13,7 @@ message Device {
     bool            skip_introduction_removals  = 7;
     bool            auto_accept                 = 8;
     bool            paused                      = 9;
-    // last_seen?
+    int64           last_seen                   = 10;
 }
 
 message IgnoredFolder {
@@ -29,7 +29,7 @@ message Folder {
     bool        ignore_delete            = 5;
     bool        disable_temp_indexes     = 6;
     bool        paused                   = 7;
-    bool        watched                  = 8;
+    bool        scheduled                = 8;
     string      path                     = 9;
     FolderType  folder_type              = 10;
     PullOrder   pull_order               = 11;
@@ -56,7 +56,7 @@ message FolderInfo {
     int64  max_sequence = 2;
 }
 
-message UnknownFolder {
+message PendingFolder {
     Folder folder          = 1;
     FolderInfo folder_info = 2;
 }
@@ -77,8 +77,6 @@ message FileInfo {
     int32                           block_size     = 13;
     string                          symlink_target = 16;
     repeated                        bytes blocks   = 17;
-    syncspirit.proto.Vector         source_version = 18;
-    bytes                           source_device  = 19;
 }
 
 message IngoredFolder {
@@ -88,4 +86,12 @@ message IngoredFolder {
 message BlockInfo {
     uint32          weak_hash   = 1;
     int32           size        = 2;
+}
+
+message SomeDevice {
+    string name           = 1;
+    string client_name    = 2;
+    string client_version = 3;
+    string address        = 4;
+    int64 last_seen       = 5;
 }

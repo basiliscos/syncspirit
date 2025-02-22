@@ -1,12 +1,14 @@
-- update docs
-- fix year of changes
+log:
+  copy/paste rows, add "export" button"
 
-сборка:
- - linux/ubuntu https://www.simplified.guide/ubuntu/build-chroot-environment
- - windows
-
+ local state: files, folders, size
 
 - conflict handling is not available
+
+core:
+  - remove folder for controller test
+  - remove folder for fs-scanner test
+
 
 ===========
 5. разобраться с лог-левелами?
@@ -70,13 +72,6 @@
 
 3. use wxWidgets
 
-- config & tui
- - игнорированные девайсы: показать, удалить
- - добавить/удалить/изменить директорию
- - удалить/добавить/изменить девайс
- - config versioning
- - next activity
-
 https://en.wikipedia.org/wiki/ANSI_escape_code#CSI_sequences
 https://stackoverflow.com/questions/64035952/how-to-key-press-detection-on-a-linux-terminal-low-level-style-in-python
 
@@ -131,12 +126,3 @@ https://forum.syncthing.net/t/a-few-questions-about-quic-hole-punching-and-stun/
  OnBegin(diff&) -> outcome::result;
  OnCommit(diff&) -> void;
  OnRevert(diff&) -> void;
-
-4. Diff
-  Apply()
-  Revert()
-  Commit() -> true/false. true если к-во ack'ов  == то, что в регистраторе
-
-  Diff::Ack
-
-5. По-умолчанию 1 подтверждение высылает сам источник, Commit ничего не делает

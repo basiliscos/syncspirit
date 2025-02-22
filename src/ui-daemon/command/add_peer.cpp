@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "add_peer.h"
 #include "../governor_actor.h"
@@ -26,19 +26,19 @@ outcome::result<command_ptr_t> add_peer_t::construct(std::string_view in) noexce
 bool add_peer_t::execute(governor_actor_t &actor) noexcept {
     using namespace model::diff;
     log = actor.log;
-    auto &devices = actor.cluster->get_devices();
+    auto &cluster = *actor.cluster;
+    auto &devices = cluster.get_devices();
     auto found = devices.by_sha256(peer.get_sha256());
     if (found) {
-        log->warn("{}, device {} is already added, skipping", actor.get_identity(), peer);
+        log->warn("device {} is already added, skipping", peer);
         return false;
     }
 
     db::Device db_dev;
     db_dev.set_name(label);
 
-    auto diff = cluster_diff_ptr_t(new modify::update_peer_t(std::move(db_dev), peer.get_sha256()));
-    actor.send<model::payload::model_update_t>(actor.coordinator, std::move(diff), &actor);
-
+    auto diff = cluster_diff_ptr_t(new modify::update_peer_t(std::move(db_dev), peer, cluster));
+    actor.send_command(std::move(diff), *this);
     return true;
 }
 

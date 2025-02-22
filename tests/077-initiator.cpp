@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "test-utils.h"
 #include "access.h"
@@ -66,7 +66,7 @@ struct fixture_t {
     using diff_msgs_t = std::vector<diff_ptr_t>;
 
     fixture_t() noexcept : ctx(io_ctx), acceptor(io_ctx), peer_sock(io_ctx) {
-        utils::set_default("trace");
+        test::init_logging();
         log = utils::get_logger("fixture");
     }
 
@@ -114,11 +114,11 @@ struct fixture_t {
         acceptor.bind(ep);
         acceptor.listen();
         listening_ep = acceptor.local_endpoint();
-        peer_uri = utils::parse(get_uri(listening_ep)).value();
-        log->debug("listening on {}", peer_uri.full);
+        peer_uri = utils::parse(get_uri(listening_ep));
+        log->debug("listening on {}", peer_uri);
         initiate_accept();
 
-        cluster = new cluster_t(my_device, 1, 1);
+        cluster = new cluster_t(my_device, 1);
 
         cluster->get_devices().put(my_device);
         cluster->get_devices().put(peer_device);
@@ -153,8 +153,10 @@ struct fixture_t {
     virtual void on_peer_handshake() noexcept { LOG_INFO(log, "peer handshake"); }
 
     void initiate_active() noexcept {
-        tcp::resolver resolver(io_ctx);
-        auto addresses = resolver.resolve(host, std::to_string(listening_ep.port()));
+        auto ip = asio::ip::make_address(host);
+        auto ep = tcp::endpoint(ip, listening_ep.port());
+        auto addresses = std::vector<tcp::endpoint>{ep};
+        auto addresses_ptr = std::make_shared<decltype(addresses)>(addresses);
         peer_trans = transport::initiate_tls_active(*sup, peer_keys, my_device->device_id(), peer_uri);
 
         transport::error_fn_t on_error = [&](auto &ec) {
@@ -165,7 +167,7 @@ struct fixture_t {
             active_connect();
         };
 
-        peer_trans->async_connect(addresses, on_connect, on_error);
+        peer_trans->async_connect(addresses_ptr, on_connect, on_error);
     }
 
     virtual void active_connect() {
@@ -189,7 +191,7 @@ struct fixture_t {
             .peer_device_id(peer_device->device_id())
             .relay_session(relay_session)
             .relay_enabled(true)
-            .uris({peer_uri})
+            .uris(utils::uri_container_t{peer_uri})
             .cluster(use_model ? cluster : nullptr)
             .sink(sup->get_address())
             .ssl_pair(&my_keys)
@@ -221,7 +223,7 @@ struct fixture_t {
     config::bep_config_t bep_config;
     utils::key_pair_t my_keys;
     utils::key_pair_t peer_keys;
-    utils::URI peer_uri;
+    utils::uri_ptr_t peer_uri;
     model::device_ptr_t my_device;
     model::device_ptr_t peer_device;
     transport::stream_sp_t peer_trans;
@@ -272,9 +274,9 @@ void test_handshake_timeout() {
             CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
             CHECK(!connected_message);
             REQUIRE(diff_msgs.size() == 2);
-            CHECK(diff_msgs[0]->payload.diff->apply(*cluster));
-            CHECK(peer_device->get_state() == device_state_t::dialing);
-            CHECK(diff_msgs[1]->payload.diff->apply(*cluster));
+            CHECK(diff_msgs[0]->payload.diff->apply(*cluster, get_apply_controller()));
+            CHECK(peer_device->get_state() == device_state_t::connecting);
+            CHECK(diff_msgs[1]->payload.diff->apply(*cluster, get_apply_controller()));
             CHECK(peer_device->get_state() == device_state_t::offline);
         }
     };
@@ -295,9 +297,9 @@ void test_handshake_garbage() {
             CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
             CHECK(!connected_message);
             REQUIRE(diff_msgs.size() == 2);
-            CHECK(diff_msgs[0]->payload.diff->apply(*cluster));
-            CHECK(peer_device->get_state() == device_state_t::dialing);
-            CHECK(diff_msgs[1]->payload.diff->apply(*cluster));
+            CHECK(diff_msgs[0]->payload.diff->apply(*cluster, get_apply_controller()));
+            CHECK(peer_device->get_state() == device_state_t::connecting);
+            CHECK(diff_msgs[1]->payload.diff->apply(*cluster, get_apply_controller()));
             CHECK(peer_device->get_state() == device_state_t::offline);
         }
     };
@@ -368,8 +370,8 @@ void test_success() {
             sup->do_process();
             CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
             REQUIRE(diff_msgs.size() == 1);
-            CHECK(diff_msgs[0]->payload.diff->apply(*cluster));
-            CHECK(peer_device->get_state() == device_state_t::dialing);
+            CHECK(diff_msgs[0]->payload.diff->apply(*cluster, get_apply_controller()));
+            CHECK(peer_device->get_state() == device_state_t::connecting);
         }
     };
     F().run();
@@ -519,7 +521,7 @@ struct passive_relay_fixture_t : fixture_t {
 
     void accept(const sys::error_code &ec) noexcept override {
         LOG_INFO(log, "accept (relay/passive), ec: {}", ec.message());
-        auto uri = utils::parse("tcp://127.0.0.1:0/").value();
+        auto uri = utils::parse("tcp://127.0.0.1:0/");
         auto cfg = transport::transport_config_t{{}, uri, *sup, std::move(peer_sock), false};
         peer_trans = transport::initiate_stream(cfg);
 
@@ -690,7 +692,7 @@ struct active_relay_fixture_t : fixture_t {
             relay_trans->async_handshake(handshake_fn, on_error);
             return;
         }
-        auto uri = utils::parse("tcp://127.0.0.1:0/").value();
+        auto uri = utils::parse("tcp://127.0.0.1:0/");
         auto cfg = transport::transport_config_t{{}, uri, *sup, std::move(peer_sock), false};
         peer_trans = transport::initiate_stream(cfg);
 
@@ -706,8 +708,9 @@ struct active_relay_fixture_t : fixture_t {
     }
 
     virtual void relay_reply() noexcept {
-        write(relay_trans, proto::relay::session_invitation_t{std::string(peer_device->device_id().get_sha256()),
-                                                              session_key, "", listening_ep.port(), false});
+        write(relay_trans,
+              proto::relay::session_invitation_t{std::string(peer_device->device_id().get_sha256()), session_key,
+                                                 asio::ip::address_v4(0), listening_ep.port(), false});
     }
 
     virtual void session_reply() noexcept { write(peer_trans, proto::relay::response_t{0, "ok"}); }
@@ -765,8 +768,8 @@ void test_relay_active_success() {
             sup->do_process();
             CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
             REQUIRE(diff_msgs.size() == 1);
-            CHECK(diff_msgs[0]->payload.diff->apply(*cluster));
-            CHECK(peer_device->get_state() == device_state_t::dialing);
+            CHECK(diff_msgs[0]->payload.diff->apply(*cluster, get_apply_controller()));
+            CHECK(peer_device->get_state() == device_state_t::connecting);
         }
     };
     F().run();
@@ -807,7 +810,7 @@ void test_relay_wrong_device() {
 
         void relay_reply() noexcept override {
             write(relay_trans, proto::relay::session_invitation_t{std::string(relay_device.get_sha256()), session_key,
-                                                                  "", listening_ep.port(), false});
+                                                                  asio::ip::address_v4(0), listening_ep.port(), false});
         }
         void on_write(size_t) override {}
 
@@ -830,30 +833,9 @@ void test_relay_non_connectable() {
     struct F : active_relay_fixture_t {
 
         void relay_reply() noexcept override {
-            write(relay_trans, proto::relay::session_invitation_t{std::string(peer_device->device_id().get_sha256()),
-                                                                  session_key, "", 0, false});
-        }
-
-        void main() noexcept override {
-            auto act = create_actor();
-            io_ctx.run();
-            CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
-            CHECK(!connected_message);
-            sup->do_shutdown();
-            sup->do_process();
-            CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
-            CHECK(diff_msgs.size() == 2);
-        }
-    };
-    F().run();
-}
-
-void test_relay_malformed_address() {
-    struct F : active_relay_fixture_t {
-
-        void relay_reply() noexcept override {
-            write(relay_trans, proto::relay::session_invitation_t{std::string(peer_device->device_id().get_sha256()),
-                                                                  session_key, "8.8.8.8z", listening_ep.port(), false});
+            write(relay_trans,
+                  proto::relay::session_invitation_t{std::string(peer_device->device_id().get_sha256()), session_key,
+                                                     boost::asio::ip::address_v4(0), 0, false});
         }
 
         void main() noexcept override {
@@ -940,7 +922,6 @@ int _init() {
     REGISTER_TEST_CASE(test_relay_active_not_enabled, "test_relay_active_not_enabled", "[initiator]");
     REGISTER_TEST_CASE(test_relay_wrong_device, "test_relay_wrong_device", "[initiator]");
     REGISTER_TEST_CASE(test_relay_non_connectable, "test_relay_non_connectable", "[initiator]");
-    REGISTER_TEST_CASE(test_relay_malformed_address, "test_relay_malformed_address", "[initiator]");
     REGISTER_TEST_CASE(test_relay_garbage_reply, "test_relay_garbage_reply", "[initiator]");
     REGISTER_TEST_CASE(test_relay_non_invitation_reply, "test_relay_non_invitation_reply", "[initiator]");
 

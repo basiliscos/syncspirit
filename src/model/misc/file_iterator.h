@@ -1,46 +1,59 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #pragma once
 
-#include "../device.h"
-#include "../file_info.h"
-#include "../folder_info.h"
-#include "../folder.h"
+#include "resolver.h"
+#include "model/device.h"
+#include "model/file_info.h"
+#include "model/folder_info.h"
+#include "model/folder.h"
 #include "syncspirit-export.h"
-#include <deque>
+#include <vector>
+#include <set>
+#include <memory>
+#include <utility>
 
 namespace syncspirit::model {
 
-struct cluster_t;
-struct blocks_iterator_t;
-
 struct SYNCSPIRIT_API file_iterator_t : arc_base_t<file_iterator_t> {
+    using files_list_t = std::vector<file_info_ptr_t>;
+    using result_t = std::pair<file_info_t *, advance_action_t>;
+
     file_iterator_t(cluster_t &cluster, const device_ptr_t &peer) noexcept;
     file_iterator_t(const file_iterator_t &) = delete;
 
-    operator bool() const noexcept;
+    result_t next() noexcept;
 
-    file_info_ptr_t next() noexcept;
-    void reset() noexcept;
-    void renew(file_info_t &file) noexcept;
+    void on_upsert(folder_info_ptr_t peer_folder) noexcept;
+    void on_remove(folder_info_ptr_t peer_folder) noexcept;
+    void recheck(file_info_t &file) noexcept;
 
   private:
-    using queue_t = std::deque<file_info_ptr_t>;
-    using set_t = std::unordered_set<file_info_ptr_t>;
+    struct file_comparator_t {
+        bool operator()(const file_info_t *l, const file_info_t *r) const;
+    };
+    using file_comparator_ptr_t = std::unique_ptr<file_comparator_t>;
+    using queue_t = std::set<file_info_t *, file_comparator_t>;
+    using queue_ptr_t = std::unique_ptr<queue_t>;
 
-    void prepare() noexcept;
-    void append(file_info_t &file) noexcept;
+    struct folder_iterator_t {
+        using it_t = typename queue_t::iterator;
+        model::folder_info_ptr_t peer_folder;
+        queue_ptr_t files_queue;
+        std::int64_t seen_sequence;
+        it_t it;
+    };
+    using folder_iterators_t = std::vector<folder_iterator_t>;
+
+    folder_iterator_t &prepare_folder(folder_info_ptr_t peer_folder) noexcept;
+    folder_iterator_t &find_folder(folder_t *folder) noexcept;
 
     cluster_t &cluster;
-    device_ptr_t peer;
-    file_info_ptr_t file;
-    queue_t missing;
-    queue_t incomplete;
-    queue_t needed;
-    set_t missing_done;
-    set_t incomplete_done;
-    set_t needed_done;
+    device_t *peer;
+    std::size_t folder_index;
+    file_comparator_ptr_t comparator;
+    folder_iterators_t folders_list;
 };
 
 using file_iterator_ptr_t = intrusive_ptr_t<file_iterator_t>;

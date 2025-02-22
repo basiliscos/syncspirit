@@ -9,7 +9,7 @@ tx_buff_limit = 8388608
 tx_timeout = 90000
 
 [db]
-uncommited_threshold = 150
+uncommitted_threshold = 150
 upper_limit = 17179869184
 
 [dialer]

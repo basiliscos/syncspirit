@@ -1,17 +1,20 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2022-2024 Ivan Baidakou
 
 #pragma once
+
+#include "model/misc/arc.hpp"
+#include "model/device_id.h"
+#include "utils/uri.h"
+#include "syncspirit-export.h"
 
 #include <string>
 #include <cstdint>
 #include <variant>
 #include <vector>
 #include <optional>
-#include <model/misc/arc.hpp>
-#include <model/device_id.h>
-#include "utils/uri.h"
-#include "syncspirit-export.h"
+
+#include <boost/asio/ip/address_v4.hpp>
 #include <boost/outcome.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 
@@ -19,6 +22,8 @@ namespace syncspirit::proto::relay {
 
 namespace outcome = boost::outcome_v2;
 namespace pt = boost::posix_time;
+
+using ipv4_option_t = std::optional<boost::asio::ip::address_v4>;
 
 struct ping_t {};
 
@@ -42,7 +47,7 @@ struct connect_request_t {
 struct session_invitation_t {
     std::string from;
     std::string key;
-    std::string address;
+    ipv4_option_t address;
     std::uint32_t port;
     bool server_socket;
 };
@@ -72,10 +77,10 @@ struct location_t {
 };
 
 struct relay_info_t : model::arc_base_t<relay_info_t> {
-    inline relay_info_t(utils::URI uri_, const model::device_id_t &device_id_, location_t location_,
+    inline relay_info_t(utils::uri_ptr_t uri_, const model::device_id_t &device_id_, location_t location_,
                         const pt::time_duration &ping_interval_) noexcept
         : uri(std::move(uri_)), device_id{device_id_}, location{std::move(location_)}, ping_interval{ping_interval_} {}
-    utils::URI uri;
+    utils::uri_ptr_t uri;
     model::device_id_t device_id;
     location_t location;
     pt::time_duration ping_interval;
@@ -84,7 +89,7 @@ struct relay_info_t : model::arc_base_t<relay_info_t> {
 using relay_info_ptr_t = model::intrusive_ptr_t<relay_info_t>;
 using relay_infos_t = std::vector<relay_info_ptr_t>;
 
-SYNCSPIRIT_API std::optional<model::device_id_t> parse_device(const utils::URI &uri) noexcept;
+SYNCSPIRIT_API std::optional<model::device_id_t> parse_device(const utils::uri_ptr_t &uri) noexcept;
 SYNCSPIRIT_API outcome::result<relay_infos_t> parse_endpoint(std::string_view data) noexcept;
 
 } // namespace syncspirit::proto::relay

@@ -1,31 +1,22 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #pragma once
 
 #include <memory>
-#include <string>
 #include <string_view>
-#include <mutex>
-#include <boost/outcome.hpp>
 #include <spdlog/spdlog.h>
-#include "config/log.h"
+#include <optional>
 #include "syncspirit-export.h"
 
 namespace syncspirit::utils {
 
-namespace outcome = boost::outcome_v2;
-
 using logger_t = std::shared_ptr<spdlog::logger>;
-
-SYNCSPIRIT_API spdlog::level::level_enum get_log_level(const std::string &log_level) noexcept;
-
-SYNCSPIRIT_API void set_default(const std::string &level) noexcept;
-
-SYNCSPIRIT_API outcome::result<void> init_loggers(const config::log_configs_t &configs,
-                                                  bool overwrite_default) noexcept;
+using level_opt_t = std::optional<spdlog::level::level_enum>;
 
 SYNCSPIRIT_API logger_t get_logger(std::string_view name) noexcept;
+SYNCSPIRIT_API level_opt_t get_log_level(const std::string &log_level) noexcept;
+SYNCSPIRIT_API std::string_view get_level_string(spdlog::level::level_enum) noexcept;
 
 #define LOG_GENERIC(LOGGER, LEVEL, ...)                                                                                \
     if (LEVEL >= LOGGER->level())                                                                                      \

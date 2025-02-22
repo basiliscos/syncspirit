@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "peer_actor.h"
 #include "names.h"
@@ -7,11 +7,14 @@
 #include "utils/tls.h"
 #include "utils/error_code.h"
 #include "utils/format.hpp"
+#include "utils/time.h"
 #include "proto/bep_support.h"
 #include "model/messages.h"
-#include "model/diff/peer/peer_state.h"
+#include "model/diff/contact/peer_state.h"
+#include "model/diff/contact/ignored_connected.h"
+#include "model/diff/contact/unknown_connected.h"
+#include "model/diff/modify/add_pending_device.h"
 #include <boost/core/demangle.hpp>
-#include <sstream>
 
 using namespace syncspirit::net;
 using namespace syncspirit;
@@ -32,16 +35,15 @@ peer_actor_t::peer_actor_t(config_t &config)
       coordinator{config.coordinator}, peer_device_id{config.peer_device_id}, transport(std::move(config.transport)),
       peer_endpoint{config.peer_endpoint}, peer_proto(std::move(config.peer_proto)) {
     rx_buff.resize(config.bep_config.rx_buff_size);
-    log = utils::get_logger("net.peer_actor");
 }
 
 void peer_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
 
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
-        std::stringstream ss;
-        ss << peer_device_id.get_short() << "/" << peer_proto << "/" << peer_endpoint;
-        p.set_identity(ss.str(), false);
+        auto id = fmt::format("{}/{}/{}", peer_device_id.get_short(), peer_proto, peer_endpoint);
+        p.set_identity(id, false);
+        log = utils::get_logger(identity);
     });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&peer_actor_t::on_start_reading);
@@ -53,7 +55,7 @@ void peer_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 
 void peer_actor_t::on_start() noexcept {
     r::actor_base_t::on_start();
-    LOG_TRACE(log, "{}, on_start", identity);
+    LOG_TRACE(log, "on_start");
 
     fmt::memory_buffer buff;
     proto::make_hello_message(buff, device_name);
@@ -65,10 +67,10 @@ void peer_actor_t::on_start() noexcept {
 }
 
 void peer_actor_t::on_io_error(const sys::error_code &ec, rotor::plugin::resource_id_t resource) noexcept {
-    LOG_TRACE(log, "{}, on_io_error: {}", identity, ec.message());
+    LOG_TRACE(log, "on_io_error: {}", ec.message());
     resources->release(resource);
     if (ec != asio::error::operation_aborted) {
-        LOG_WARN(log, "{}, on_io_error: {}", identity, ec.message());
+        LOG_WARN(log, "on_io_error: {}", ec.message());
     }
     cancel_timer();
     cancel_io();
@@ -130,7 +132,7 @@ void peer_actor_t::read_more() noexcept {
         return;
     }
     if (rx_idx >= rx_buff.size()) {
-        LOG_WARN(log, "{}, read_more, rx buffer limit reached, {}", identity, rx_buff.size());
+        LOG_WARN(log, "read_more, rx buffer limit reached, {}", rx_buff.size());
         auto ec = utils::make_error_code(utils::error_code_t::rx_limit_reached);
         return do_shutdown(make_error(ec));
     }
@@ -139,19 +141,19 @@ void peer_actor_t::read_more() noexcept {
     transport::error_fn_t on_error = [&](auto arg) { this->on_io_error(arg, resource::io_read); };
     resources->acquire(resource::io_read);
     auto buff = asio::buffer(rx_buff.data() + rx_idx, rx_buff.size() - rx_idx);
-    LOG_TRACE(log, "{}, read_more", identity);
+    LOG_TRACE(log, "read_more");
     transport->async_recv(buff, on_read, on_error);
 }
 
 void peer_actor_t::on_write(std::size_t sz) noexcept {
     resources->release(resource::io_write);
-    LOG_TRACE(log, "{}, on_write, {} bytes", identity, sz);
+    LOG_TRACE(log, "on_write, {} bytes", sz);
     if (controller) {
         send<payload::transfer_pop_t>(controller, (uint32_t)sz);
     }
     assert(tx_item);
     if (tx_item->final) {
-        LOG_TRACE(log, "{}, process_tx_queue, final message has been sent, shutting down", identity);
+        LOG_TRACE(log, "process_tx_queue, final message has been sent, shutting down");
         if (resources->has(resource::finalization)) {
             resources->release(resource::finalization);
         }
@@ -166,17 +168,17 @@ void peer_actor_t::on_read(std::size_t bytes) noexcept {
     assert(read_action);
     resources->release(resource::io_read);
     rx_idx += bytes;
-    LOG_TRACE(log, "{}, on_read, {} bytes, total = {}", identity, bytes, rx_idx);
+    LOG_TRACE(log, "on_read, {} bytes, total = {}", bytes, rx_idx);
     auto buff = asio::buffer(rx_buff.data(), rx_idx);
     auto result = proto::parse_bep(buff);
     if (result.has_error()) {
         auto &ec = result.error();
-        LOG_WARN(log, "{}, on_read, error parsing message: {}", identity, ec.message());
+        LOG_WARN(log, "on_read, error parsing message: {}", ec.message());
         return do_shutdown(make_error(ec));
     }
     auto &value = result.value();
     if (!value.consumed) {
-        // log->trace("{}, on_read :: incomplete message", identity);
+        // log->trace("on_read :: incomplete message");
         return read_more();
     }
 
@@ -188,12 +190,12 @@ void peer_actor_t::on_read(std::size_t bytes) noexcept {
         std::memcpy(ptr, ptr + value.consumed, rx_idx);
     }
     (this->*read_action)(std::move(value.message));
-    LOG_TRACE(log, "{}, on_read, rx_idx = {} ", identity, rx_idx);
+    LOG_TRACE(log, "on_read, rx_idx = {} ", rx_idx);
 }
 
 void peer_actor_t::on_timer(r::request_id_t, bool cancelled) noexcept {
     resources->release(resource::io_timer);
-    LOG_TRACE(log, "{}, on_timer_trigger, cancelled = {}", identity, cancelled);
+    LOG_TRACE(log, "on_timer_trigger, cancelled = {}", cancelled);
     if (!cancelled) {
         cancel_io();
         auto ec = r::make_error_code(r::shutdown_code_t::normal);
@@ -202,7 +204,7 @@ void peer_actor_t::on_timer(r::request_id_t, bool cancelled) noexcept {
 }
 
 void peer_actor_t::shutdown_start() noexcept {
-    LOG_TRACE(log, "{}, shutdown_start", identity);
+    LOG_TRACE(log, "shutdown_start");
     if (resources->has(resource::io_timer)) {
         cancel_timer();
     }
@@ -222,13 +224,13 @@ void peer_actor_t::shutdown_start() noexcept {
     proto::serialize(buff, close);
     tx_queue.clear();
     push_write(std::move(buff), true, true);
-    LOG_TRACE(log, "{}, going to send close message", identity);
+    LOG_TRACE(log, "going to send close message");
 
     r::actor_base_t::shutdown_start();
 }
 
 void peer_actor_t::shutdown_finish() noexcept {
-    LOG_TRACE(log, "{}, shutdown_finish", identity);
+    LOG_TRACE(log, "shutdown_finish");
     for (auto &it : block_requests) {
         auto ec = r::make_error_code(r::error_code_t::cancelled);
         reply_with_error(*it, make_error(ec));
@@ -240,12 +242,13 @@ void peer_actor_t::shutdown_finish() noexcept {
     r::actor_base_t::shutdown_finish();
     auto sha256 = peer_device_id.get_sha256();
     auto device = cluster->get_devices().by_sha256(sha256);
-    auto state = device->get_state();
-    if (state != model::device_state_t::offline) {
-        auto diff = model::diff::cluster_diff_ptr_t();
+    if (device && device->get_state() != model::device_state_t::offline) {
         auto state = model::device_state_t::offline;
-        diff = new model::diff::peer::peer_state_t(*cluster, sha256, address, state);
-        send<model::payload::model_update_t>(coordinator, std::move(diff));
+        auto connection_id = fmt::format("{}://{}", peer_proto, peer_endpoint);
+        auto diff = model::diff::contact::peer_state_t::create(*cluster, sha256, address, state, connection_id);
+        if (diff) {
+            send<model::payload::model_update_t>(coordinator, std::move(diff));
+        }
     }
 }
 
@@ -258,12 +261,12 @@ void peer_actor_t::cancel_timer() noexcept {
 
 void peer_actor_t::cancel_io() noexcept {
     if (resources->has(resource::io_read)) {
-        LOG_TRACE(log, "{}, cancelling I/O (read)", identity);
+        LOG_TRACE(log, "cancelling I/O (read)");
         transport->cancel();
         return;
     }
     if (resources->has(resource::io_write)) {
-        LOG_TRACE(log, "{}, cancelling I/O (write)", identity);
+        LOG_TRACE(log, "cancelling I/O (write)");
         transport->cancel();
         return;
     }
@@ -271,7 +274,7 @@ void peer_actor_t::cancel_io() noexcept {
 
 void peer_actor_t::on_start_reading(message::start_reading_t &message) noexcept {
     bool start = message.payload.start;
-    LOG_TRACE(log, "{}, on_start_reading, start = ", identity, start);
+    LOG_TRACE(log, "on_start_reading, start = ", start);
     controller = message.payload.controller;
     if (start) {
         read_action = &peer_actor_t::read_controlled;
@@ -283,7 +286,7 @@ void peer_actor_t::on_termination(message::termination_signal_t &message) noexce
     if (!shutdown_reason) {
         auto &ee = message.payload.ee;
         auto reason = ee->message();
-        LOG_DEBUG(log, "{}, on_termination: {}", identity, reason);
+        LOG_DEBUG(log, "on_termination: {}", reason);
         do_shutdown(ee);
     }
 }
@@ -292,16 +295,13 @@ void peer_actor_t::on_block_request(message::block_request_t &message) noexcept 
     auto req_id = (std::int32_t)message.payload.id;
     proto::Request req;
     auto &p = message.payload.request_payload;
-    auto &file = p.file;
-    auto &file_block = p.block;
-    auto &block = *file_block.block();
     req.set_id(req_id);
-    *req.mutable_folder() = file->get_folder_info()->get_folder()->get_id();
-    *req.mutable_name() = file->get_name();
+    *req.mutable_folder() = p.folder_id;
+    *req.mutable_name() = p.file_name;
 
-    req.set_offset(file_block.get_offset());
-    req.set_size(block.get_size());
-    *req.mutable_hash() = block.get_hash();
+    req.set_offset(p.block_offset);
+    req.set_size(p.block_size);
+    *req.mutable_hash() = p.block_hash;
 
     fmt::memory_buffer buff;
     proto::serialize(buff, req);
@@ -310,32 +310,20 @@ void peer_actor_t::on_block_request(message::block_request_t &message) noexcept 
 }
 
 void peer_actor_t::on_transfer(message::transfer_data_t &message) noexcept {
-    LOG_TRACE(log, "{}, on_transfer", identity);
+    LOG_TRACE(log, "on_transfer");
 
     push_write(std::move(message.payload.data), false, false);
 }
 
 void peer_actor_t::read_hello(proto::message::message_t &&msg) noexcept {
-    using namespace model::diff;
-    LOG_TRACE(log, "{}, read_hello", identity);
+    LOG_TRACE(log, "read_hello");
     std::visit(
         [&](auto &&msg) {
             using T = std::decay_t<decltype(msg)>;
             if constexpr (std::is_same_v<T, proto::message::Hello>) {
-                LOG_TRACE(log, "{}, read_hello, from {} ({} {})", identity, msg->device_name(), msg->client_name(),
-                          msg->client_version());
-                auto peer = cluster->get_devices().by_sha256(peer_device_id.get_sha256());
-                if (peer && peer->get_state() == model::device_state_t::online) {
-                    auto ec = utils::make_error_code(utils::error_code_t::already_connected);
-                    return do_shutdown(make_error(ec));
-                }
-                auto diff = cluster_diff_ptr_t();
-                auto state = model::device_state_t::online;
-                diff = new peer::peer_state_t(*cluster, peer_device_id.get_sha256(), get_address(), state, cert_name,
-                                              peer_endpoint, msg->client_name());
-                send<model::payload::model_update_t>(coordinator, std::move(diff));
+                return handle_hello(std::move(msg));
             } else {
-                LOG_WARN(log, "{}, read_hello, unexpected_message", identity);
+                LOG_WARN(log, "read_hello, unexpected_message");
                 auto ec = utils::make_error_code(utils::bep_error_code_t::unexpected_message);
                 return do_shutdown(make_error(ec));
             }
@@ -344,17 +332,17 @@ void peer_actor_t::read_hello(proto::message::message_t &&msg) noexcept {
 }
 
 void peer_actor_t::read_controlled(proto::message::message_t &&msg) noexcept {
-    LOG_TRACE(log, "{}, read_controlled", identity);
+    LOG_TRACE(log, "read_controlled");
     bool continue_reading = true;
     std::visit(
         [&](auto &&msg) {
             using T = std::decay_t<decltype(msg)>;
             using boost::core::demangle;
             namespace m = proto::message;
-            LOG_DEBUG(log, "{}, read_controlled, {}", identity, demangle(typeid(T).name()));
+            LOG_DEBUG(log, "read_controlled, {}", demangle(typeid(T).name()));
             const constexpr bool unexpected = std::is_same_v<T, m::Hello>;
             if constexpr (unexpected) {
-                LOG_WARN(log, "{}, hello, unexpected_message", identity);
+                LOG_WARN(log, "hello, unexpected_message");
                 auto ec = utils::make_error_code(utils::bep_error_code_t::unexpected_message);
                 do_shutdown(make_error(ec));
             } else if constexpr (std::is_same_v<T, m::Ping>) {
@@ -377,12 +365,60 @@ void peer_actor_t::read_controlled(proto::message::message_t &&msg) noexcept {
     }
 }
 
-void peer_actor_t::handle_ping(proto::message::Ping &&) noexcept { log->trace("{}, handle_ping", identity); }
+void peer_actor_t::handle_hello(proto::message::Hello &&msg) noexcept {
+    using namespace model::diff;
+    auto &device_name = msg->device_name();
+    auto &client_name = msg->client_name();
+    auto &client_version = msg->client_version();
+    auto sha_s256 = peer_device_id.get_sha256();
+    LOG_DEBUG(log, "read_hello, from {} ({} {})", device_name, client_name, client_version);
+    auto diff = cluster_diff_ptr_t();
+    auto db = db::SomeDevice();
+    auto fill_db_and_shutdown = [&]() {
+        auto address = fmt::format("{}://{}", peer_proto, peer_endpoint);
+        db.set_name(device_name);
+        db.set_client_name(client_name);
+        db.set_client_version(client_version);
+        db.set_address(std::move(address));
+        db.set_last_seen(utils::as_seconds(pt::microsec_clock::local_time()));
+        LOG_INFO(log, "device {} is unknown/ignored, shutting down", device_name);
+        do_shutdown();
+    };
+
+    if (auto known_peer = cluster->get_devices().by_sha256(sha_s256); known_peer) {
+        if (known_peer->get_state() == model::device_state_t::online) {
+            auto ec = utils::make_error_code(utils::error_code_t::already_connected);
+            return do_shutdown(make_error(ec));
+        }
+        auto state = model::device_state_t::online;
+        auto connection_id = fmt::format("{}://{}", peer_proto, peer_endpoint);
+        diff = contact::peer_state_t::create(*cluster, sha_s256, get_address(), state, std::move(connection_id),
+                                             cert_name, peer_endpoint, client_name, client_version);
+    } else if (auto peer = cluster->get_ignored_devices().by_sha256(sha_s256)) {
+        fill_db_and_shutdown();
+        diff = new model::diff::contact::ignored_connected_t(*cluster, peer_device_id, std::move(db));
+    } else {
+        fill_db_and_shutdown();
+        if (auto peer = cluster->get_pending_devices().by_sha256(sha_s256); !peer) {
+            auto cluster_diff = cluster_diff_ptr_t{};
+            cluster_diff = new model::diff::modify::add_pending_device_t(peer_device_id, db);
+            send<model::payload::model_update_t>(coordinator, std::move(cluster_diff));
+        }
+        // send add unknown device diff
+        diff = new model::diff::contact::unknown_connected_t(*cluster, peer_device_id, std::move(db));
+    }
+
+    if (diff) {
+        send<model::payload::model_update_t>(coordinator, std::move(diff));
+    }
+}
+
+void peer_actor_t::handle_ping(proto::message::Ping &&) noexcept { log->trace("handle_ping"); }
 
 void peer_actor_t::handle_close(proto::message::Close &&message) noexcept {
     auto &reason = message->reason();
     const char *str = reason.c_str();
-    LOG_TRACE(log, "{}, handle_close, reason = {}", identity, reason);
+    LOG_TRACE(log, "handle_close, reason = {}", reason);
     if (reason.size() == 0) {
         str = "no reason specified";
     }
@@ -392,12 +428,12 @@ void peer_actor_t::handle_close(proto::message::Close &&message) noexcept {
 
 void peer_actor_t::handle_response(proto::message::Response &&message) noexcept {
     auto id = message->id();
-    LOG_TRACE(log, "{}, handle_response, message id = {}", identity, id);
+    LOG_TRACE(log, "handle_response, message id = {}", id);
     auto predicate = [id = id](const block_request_ptr_t &it) { return ((std::int32_t)it->payload.id) == id; };
     auto it = std::find_if(block_requests.begin(), block_requests.end(), predicate);
     if (it == block_requests.end()) {
         if (!shutdown_reason) {
-            LOG_WARN(log, "{}, response for unexpected request id {}", identity, id);
+            LOG_WARN(log, "response for unexpected request id {}", id);
             auto ec = utils::make_error_code(utils::bep_error_code_t::response_mismatch);
             do_shutdown(make_error(ec));
         }
@@ -408,13 +444,13 @@ void peer_actor_t::handle_response(proto::message::Response &&message) noexcept 
     if (!shutdown_reason) {
         if (error) {
             auto ec = utils::make_error_code((utils::request_error_code_t)error);
-            LOG_WARN(log, "{}, block request error: {}", identity, ec.message());
+            LOG_WARN(log, "block request error: {}", ec.message());
             reply_with_error(*block_request, make_error(ec));
         } else {
             auto &data = message->data();
-            auto request_sz = block_request->payload.request_payload.block.block()->get_size();
+            auto request_sz = block_request->payload.request_payload.block_size;
             if (data.size() != request_sz) {
-                LOG_WARN(log, "{}, got {} bytes, but requested {}", identity, data.size(), request_sz);
+                LOG_WARN(log, "got {} bytes, but requested {}", data.size(), request_sz);
                 auto ec = utils::make_error_code(utils::bep_error_code_t::response_missize);
                 return do_shutdown(make_error(ec));
             }

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "utils.h"
 
@@ -7,15 +7,14 @@
 #include <boost/tokenizer.hpp>
 #include <boost/regex.hpp>
 #include <boost/algorithm/string.hpp>
+#include <boost/nowide/convert.hpp>
 #include <spdlog/spdlog.h>
-#include "model/device_id.h"
 #include "utils/log.h"
 #include "utils/location.h"
 
 #define TOML_EXCEPTIONS 0
 #include <toml++/toml.h>
 
-namespace bfs = boost::filesystem;
 namespace sys = boost::system;
 
 #if defined(__unix__)
@@ -26,19 +25,28 @@ static const std::string home_path = "~/syncspirit";
 
 namespace syncspirit::config {
 
-using device_name_t = outcome::result<std::string>;
+using level_t = spdlog::level::level_enum;
+
 using home_option_t = outcome::result<bfs::path>;
 
-static device_name_t get_device_name() noexcept {
+static std::string get_device_name() noexcept {
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+    wchar_t device_name[MAX_COMPUTERNAME_LENGTH + 1] = {0};
+    DWORD device_name_sz = sizeof(device_name) / sizeof(wchar_t);
+    if (GetComputerNameW(device_name, &device_name_sz)) {
+        return boost::nowide::narrow(device_name, static_cast<size_t>(device_name_sz));
+#else
     sys::error_code ec;
     auto device_name = boost::asio::ip::host_name(ec);
-    if (ec) {
-        return ec;
+    if (!ec) {
+        return device_name;
+#endif
+    } else {
+        return "localhost";
     }
-    return device_name;
 }
 
-config_result_t get_config(std::istream &config, const boost::filesystem::path &config_path) {
+config_result_t get_config(std::istream &config, const bfs::path &config_path) {
     main_t cfg;
     cfg.config_path = config_path;
 
@@ -61,10 +69,7 @@ config_result_t get_config(std::istream &config, const boost::filesystem::path &
 
         auto device_name = t["device_name"].value<std::string>();
         if (!device_name) {
-            auto option = get_device_name();
-            if (!option)
-                return option.error().message();
-            device_name = option.value();
+            device_name = get_device_name();
         }
         c.device_name = device_name.value();
 
@@ -72,7 +77,8 @@ config_result_t get_config(std::istream &config, const boost::filesystem::path &
         if (!default_location) {
             return "main/default_location is incorrect or missing";
         }
-        c.default_location = default_location.value();
+        // otherwise it will be corrupted somehow
+        c.default_location = boost::nowide::widen(default_location.value());
 
         auto hasher_threads = t["hasher_threads"].value<std::uint32_t>();
         if (!hasher_threads) {
@@ -100,7 +106,7 @@ config_result_t get_config(std::istream &config, const boost::filesystem::path &
                         return "log/name is incorrect or missing (" + std::to_string(i + 1) + ")";
                     }
                     log_config_t log_config;
-                    log_config.level = utils::get_log_level(level.value());
+                    log_config.level = utils::get_log_level(level.value()).value_or(level_t::debug);
                     log_config.name = name.value();
 
                     auto sinks = t["sinks"];
@@ -156,6 +162,12 @@ config_result_t get_config(std::istream &config, const boost::filesystem::path &
         }
         c.enabled = enabled.value();
 
+        auto debug = t["debug"].value<bool>();
+        if (!debug) {
+            return "global_discovery/debug is incorrect or missing";
+        }
+        c.debug = debug.value();
+
         auto url = t["announce_url"].value<std::string>();
         if (!url) {
             return "global_discovery/announce_url is incorrect or missing";
@@ -164,7 +176,7 @@ config_result_t get_config(std::istream &config, const boost::filesystem::path &
         if (!announce_url) {
             return "global_discovery/announce_url is not url";
         }
-        c.announce_url = announce_url.value();
+        c.announce_url = announce_url;
 
         auto device_id = t["device_id"].value<std::string>();
         if (!device_id) {
@@ -208,6 +220,12 @@ config_result_t get_config(std::istream &config, const boost::filesystem::path &
         }
         c.enabled = enabled.value();
 
+        auto debug = t["debug"].value<bool>();
+        if (!debug) {
+            return "upnp/debug is incorrect or missing";
+        }
+        c.debug = debug.value();
+
         auto max_wait = t["max_wait"].value<std::uint32_t>();
         if (!max_wait) {
             return "upnp/max_wait is incorrect or missing";
@@ -225,12 +243,6 @@ config_result_t get_config(std::istream &config, const boost::filesystem::path &
             return "upnp/rx_buff_size is incorrect or missing";
         }
         c.rx_buff_size = rx_buff_size.value();
-
-        auto debug = t["debug"].value<bool>();
-        if (!debug) {
-            return "upnp/debug is incorrect or missing";
-        }
-        c.debug = debug.value();
     };
 
     // relay
@@ -244,11 +256,21 @@ config_result_t get_config(std::istream &config, const boost::filesystem::path &
         }
         c.enabled = enabled.value();
 
-        auto discovery_url = t["discovery_url"].value<std::string>();
-        if (!discovery_url) {
+        auto debug = t["debug"].value<bool>();
+        if (!debug) {
+            return "relay/debug is incorrect or missing";
+        }
+        c.debug = debug.value();
+
+        auto discovery_url_str = t["discovery_url"].value<std::string>();
+        if (!discovery_url_str) {
             return "upnp/discovery_url is incorrect or missing";
         }
-        c.discovery_url = discovery_url.value();
+        auto discovery_url = utils::parse(discovery_url_str.value());
+        if (!discovery_url_str) {
+            return "upnp/discovery_url is non a valid url";
+        }
+        c.discovery_url = discovery_url;
 
         auto rx_buff_size = t["rx_buff_size"].value<std::uint32_t>();
         if (!rx_buff_size) {
@@ -266,7 +288,6 @@ config_result_t get_config(std::istream &config, const boost::filesystem::path &
             return "bep/rx_buff_size is incorrect or missing";
         }
         c.rx_buff_size = rx_buff_size.value();
-
         auto tx_buff_limit = t["tx_buff_limit"].value<std::uint32_t>();
         if (!tx_buff_limit) {
             return "bep/tx_buff_limit is incorrect or missing";
@@ -308,6 +329,12 @@ config_result_t get_config(std::istream &config, const boost::filesystem::path &
             return "bep/blocks_simultaneous_write is incorrect or missing";
         }
         c.blocks_simultaneous_write = blocks_simultaneous_write.value();
+
+        auto advances_per_iteration = t["advances_per_iteration"].value<std::uint32_t>();
+        if (!advances_per_iteration) {
+            return "bep/advances_per_iteration is incorrect or missing";
+        }
+        c.advances_per_iteration = advances_per_iteration.value();
     }
 
     // dialer
@@ -326,6 +353,12 @@ config_result_t get_config(std::istream &config, const boost::filesystem::path &
             return "dialer/redial_timeout is incorrect or missing";
         }
         c.redial_timeout = redial_timeout.value();
+
+        auto skip_discovers = t["skip_discovers"].value<std::uint32_t>();
+        if (!skip_discovers) {
+            return "dialer/skip_discovers is incorrect or missing";
+        }
+        c.skip_discovers = skip_discovers.value();
     }
 
     // fs
@@ -344,6 +377,24 @@ config_result_t get_config(std::istream &config, const boost::filesystem::path &
             return "fs/mru_size is incorrect or missing";
         }
         c.mru_size = mru_size.value();
+
+        auto bytes_scan_iteration_limit = t["bytes_scan_iteration_limit"].value<std::int64_t>();
+        if (!bytes_scan_iteration_limit) {
+            return "fs/bytes_scan_iteration_limit is incorrect or missing";
+        }
+        if (bytes_scan_iteration_limit.value() <= 0) {
+            return "fs/bytes_scan_iteration_limit should be >= 0";
+        }
+        c.bytes_scan_iteration_limit = bytes_scan_iteration_limit.value();
+
+        auto files_scan_iteration_limit = t["files_scan_iteration_limit"].value<std::int64_t>();
+        if (!files_scan_iteration_limit) {
+            return "fs/files_scan_iteration_limit is incorrect or missing";
+        }
+        if (files_scan_iteration_limit.value() <= 0) {
+            return "fs/files_scan_iteration_limit should be >= 0";
+        }
+        c.files_scan_iteration_limit = files_scan_iteration_limit.value();
     }
 
     // db
@@ -362,6 +413,81 @@ config_result_t get_config(std::istream &config, const boost::filesystem::path &
             return "db/uncommitted_threshold is incorrect or missing";
         }
         c.uncommitted_threshold = uncommitted_threshold.value();
+
+        auto max_blocks_per_diff = t["max_blocks_per_diff"].value<std::uint32_t>();
+        if (!max_blocks_per_diff) {
+            return "db/max_blocks_per_diff is incorrect or missing";
+        }
+        if (max_blocks_per_diff.value() <= 10) {
+            return "db/max_blocks_per_diff should be > 10";
+        }
+        c.max_blocks_per_diff = max_blocks_per_diff.value();
+
+        auto max_files_per_diff = t["max_files_per_diff"].value<std::uint32_t>();
+        if (!max_files_per_diff) {
+            return "db/max_files_per_diff is incorrect or missing";
+        }
+        if (max_files_per_diff.value() <= 10) {
+            return "db/max_files_per_diff should be > 10";
+        }
+        c.max_files_per_diff = max_files_per_diff.value();
+    }
+
+    // fltk
+    {
+        auto t = root_tbl["fltk"];
+        auto &c = cfg.fltk_config;
+
+        auto level = t["level"].value<std::string>();
+        if (!level) {
+            return "fltk/level is incorrect or missing";
+        }
+        c.level = utils::get_log_level(level.value()).value_or(level_t::debug);
+
+        auto display_deleted = t["display_deleted"].value<bool>();
+        if (!display_deleted) {
+            return "fltk/display_deleted is incorrect or missing";
+        }
+        c.display_deleted = display_deleted.value();
+
+        auto display_colorized = t["display_colorized"].value<bool>();
+        if (!display_colorized) {
+            return "fltk/display_colorized is incorrect or missing";
+        }
+        c.display_colorized = display_colorized.value();
+
+        auto main_window_width = t["main_window_width"].value<std::int64_t>();
+        if (!main_window_width) {
+            return "fltk/main_window_width is incorrect or missing";
+        }
+        c.main_window_width = main_window_width.value();
+
+        auto main_window_height = t["main_window_height"].value<std::int64_t>();
+        if (!main_window_height) {
+            return "fltk/main_window_height is incorrect or missing";
+        }
+        c.main_window_height = main_window_height.value();
+
+        auto left_panel_share = t["left_panel_share"].value<double>();
+        if (!left_panel_share) {
+            return "fltk/left_panel_share is incorrect or missing";
+        }
+        c.left_panel_share = left_panel_share.value();
+
+        auto bottom_panel_share = t["bottom_panel_share"].value<double>();
+        if (!bottom_panel_share) {
+            return "fltk/bottom_panel_share is incorrect or missing";
+        }
+        c.bottom_panel_share = bottom_panel_share.value();
+
+        auto log_records_buffer = t["log_records_buffer"].value<std::uint32_t>();
+        if (!log_records_buffer) {
+            return "fltk/log_records_buffer is incorrect or missing";
+        }
+        if (log_records_buffer.value() < 100) {
+            return "fltk/log_records_buffer should be >= 0";
+        }
+        c.log_records_buffer = log_records_buffer.value();
     }
 
     return cfg;
@@ -410,7 +536,7 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
                      {"hasher_threads", cfg.hasher_threads},
                      {"timeout", cfg.timeout},
                      {"device_name", cfg.device_name},
-                     {"default_location", cfg.default_location.c_str()},
+                     {"default_location", cfg.default_location.string()},
                  }}},
         {"log", logs},
         {"local_discovery", toml::table{{
@@ -420,7 +546,8 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
                             }}},
         {"global_discovery", toml::table{{
                                  {"enabled", cfg.global_announce_config.enabled},
-                                 {"announce_url", cfg.global_announce_config.announce_url.full},
+                                 {"debug", cfg.global_announce_config.debug},
+                                 {"announce_url", cfg.global_announce_config.announce_url->buffer().data()},
                                  {"device_id", cfg.global_announce_config.device_id},
                                  {"cert_file", cfg.global_announce_config.cert_file},
                                  {"key_file", cfg.global_announce_config.key_file},
@@ -429,45 +556,62 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
                              }}},
         {"upnp", toml::table{{
                      {"enabled", cfg.upnp_config.enabled},
+                     {"debug", cfg.upnp_config.debug},
                      {"max_wait", cfg.upnp_config.max_wait},
                      {"external_port", cfg.upnp_config.external_port},
                      {"rx_buff_size", cfg.upnp_config.rx_buff_size},
-                     {"debug", cfg.upnp_config.debug},
                  }}},
         {"bep", toml::table{{
-                    {"rx_buff_size", cfg.bep_config.rx_buff_size},
-                    {"tx_buff_limit", cfg.bep_config.tx_buff_limit},
-                    {"connect_timeout", cfg.bep_config.connect_timeout},
-                    {"request_timeout", cfg.bep_config.request_timeout},
-                    {"tx_timeout", cfg.bep_config.tx_timeout},
-                    {"rx_timeout", cfg.bep_config.rx_timeout},
+                    {"advances_per_iteration", cfg.bep_config.advances_per_iteration},
                     {"blocks_max_requested", cfg.bep_config.blocks_max_requested},
                     {"blocks_simultaneous_write", cfg.bep_config.blocks_simultaneous_write},
+                    {"connect_timeout", cfg.bep_config.connect_timeout},
+                    {"request_timeout", cfg.bep_config.request_timeout},
+                    {"rx_buff_size", cfg.bep_config.rx_buff_size},
+                    {"rx_timeout", cfg.bep_config.rx_timeout},
+                    {"tx_buff_limit", cfg.bep_config.tx_buff_limit},
+                    {"tx_timeout", cfg.bep_config.tx_timeout},
                 }}},
         {"dialer", toml::table{{
                        {"enabled", cfg.dialer_config.enabled},
                        {"redial_timeout", cfg.dialer_config.redial_timeout},
+                       {"skip_discovers", cfg.dialer_config.skip_discovers},
                    }}},
         {"fs", toml::table{{
                    {"temporally_timeout", cfg.fs_config.temporally_timeout},
                    {"mru_size", cfg.fs_config.mru_size},
+                   {"bytes_scan_iteration_limit", cfg.fs_config.bytes_scan_iteration_limit},
+                   {"files_scan_iteration_limit", cfg.fs_config.files_scan_iteration_limit},
                }}},
         {"db", toml::table{{
                    {"upper_limit", cfg.db_config.upper_limit},
                    {"uncommitted_threshold", cfg.db_config.uncommitted_threshold},
+                   {"max_blocks_per_diff", cfg.db_config.max_blocks_per_diff},
+                   {"max_files_per_diff", cfg.db_config.max_files_per_diff},
                }}},
         {"relay", toml::table{{
                       {"enabled", cfg.relay_config.enabled},
-                      {"discovery_url", cfg.relay_config.discovery_url},
+                      {"debug", cfg.relay_config.debug},
+                      {"discovery_url", cfg.relay_config.discovery_url->buffer().data()},
                       {"rx_buff_size", cfg.relay_config.rx_buff_size},
                   }}},
+        {"fltk", toml::table{{
+                     {"level", get_level(cfg.fltk_config.level)},
+                     {"display_deleted", cfg.fltk_config.display_deleted},
+                     {"display_colorized", cfg.fltk_config.display_colorized},
+                     {"main_window_width", cfg.fltk_config.main_window_width},
+                     {"main_window_height", cfg.fltk_config.main_window_height},
+                     {"left_panel_share", cfg.fltk_config.left_panel_share},
+                     {"bottom_panel_share", cfg.fltk_config.bottom_panel_share},
+                     {"log_records_buffer", cfg.fltk_config.log_records_buffer},
+                 }}},
     }};
     // clang-format on
     out << tbl;
     return outcome::success();
 }
 
-outcome::result<main_t> generate_config(const boost::filesystem::path &config_path) {
+outcome::result<main_t> generate_config(const bfs::path &config_path) {
     auto dir = config_path.parent_path();
     sys::error_code ec;
     bool exists = bfs::exists(dir, ec);
@@ -497,8 +641,7 @@ outcome::result<main_t> generate_config(const boost::filesystem::path &config_pa
         key_file = replace_all_copy(key_file, home_path, dir.string());
     }
 
-    auto device_name = get_device_name();
-    auto device = std::string(device_name ? device_name.value() : "localhost");
+    auto device = get_device_name();
 
     // clang-format off
     main_t cfg;
@@ -508,9 +651,9 @@ outcome::result<main_t> generate_config(const boost::filesystem::path &config_pa
     cfg.device_name = device;
     cfg.hasher_threads = 3;
     cfg.log_configs = {
-        log_config_t {
-            "default", spdlog::level::level_enum::info, {"stdout"}
-        }
+        // log_config_t {
+        //     "default", spdlog::level::level_enum::trace, {"stdout"}
+        // }
     };
     cfg.local_announce_config = local_announce_config_t {
         true,   /* enabled */
@@ -518,8 +661,9 @@ outcome::result<main_t> generate_config(const boost::filesystem::path &config_pa
         30000   /* frequency */
     };
     cfg.global_announce_config = global_announce_config_t{
-        true,
-        utils::parse("https://discovery.syncthing.net/").value(),
+        true,                                                   /* enabled */
+        false,                                                  /* debug */
+        utils::parse("https://discovery.syncthing.net/v2/"),    /* announce_url */
         "LYXKCHX-VI3NYZR-ALCJBHF-WMZYSPK-QG6QJA3-MPFYMSO-U56GTUK-NA2MIAW",
         cert_file,
         key_file,
@@ -529,10 +673,10 @@ outcome::result<main_t> generate_config(const boost::filesystem::path &config_pa
     };
     cfg.upnp_config = upnp_config_t {
         true,       /* enabled */
+        false,      /* debug */
         1,          /* max_wait */
         22001,      /* external port */
-        64 * 1024,  /* rx_buff */
-        false,      /* debug */
+        64 * 1024   /* rx_buff */
     };
     cfg.bep_config = bep_config_t {
         16 * 1024 * 1024,   /* rx_buff_size */
@@ -543,23 +687,42 @@ outcome::result<main_t> generate_config(const boost::filesystem::path &config_pa
         300000,             /* rx_timeout */
         16,                 /* blocks_max_requested */
         32,                 /* blocks_simultaneous_write */
+        10,                 /* advances_per_iteration */
     };
     cfg.dialer_config = dialer_config_t {
         true,       /* enabled */
-        5 * 60000   /* redial timeout */
+        5 * 60000,  /* redial timeout */
+        10          /* skip_discovers */
     };
     cfg.fs_config = fs_config_t {
         86400000,   /* temporally_timeout, 24h default */
         128,        /* mru_size max number of open files for reading and writing */
+        1024*1024,  /* bytes_scan_iteration_limit max number of bytes before emitting scan events */
+        128,        /* files_scan_iteration_limit max number processed files before emitting scan events */
     };
     cfg.db_config = db_config_t {
-        0x400000000,   /* upper_limit, 16Gb */
+        0x0,           /* upper_limit, auto-adjust */
         150,           /* uncommitted_threshold */
+        8192,          /* max blocks per diff */
+        1024,          /* max files per diff */
     };
+
     cfg.relay_config = relay_config_t {
-        true,                                       /* enabled */
-        "https://relays.syncthing.net/endpoint",    /* discovery url */
-        1024 * 1024,                                /* rx buff size */
+        true,                                                   /* enabled */
+        false,                                                  /* debug */
+        utils::parse("https://relays.syncthing.net/endpoint"),  /* discovery url */
+        1024 * 1024,                                            /* rx buff size */
+    };
+
+    cfg.fltk_config = fltk_config_t {
+        spdlog::level::level_enum::info,    /* level */
+        false,                              /* display_deleted */
+        true,                               /* display_colorized */
+        700,                                /* main_window_width */
+        480,                                /* main_window_height */
+        0.5,                                /* left_panel_share */
+        0.3,                                /* bottom_panel_share */
+        99'999,                             /* log_records_buffer */
     };
     return cfg;
 }

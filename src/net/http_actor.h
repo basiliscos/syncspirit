@@ -103,7 +103,7 @@ struct SYNCSPIRIT_API http_actor_t : public r::actor_base_t {
     http::request<http::empty_body> http_request;
     http::response<http::string_body> http_response;
     size_t response_size = 0;
-    utils::URI resolved_url;
+    utils::uri_ptr_t resolved_url;
     request_option_t resolve_request;
     request_option_t timer_request;
     request_option_t shutdown_request;

@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "test-utils.h"
 #include "proto/discovery_support.h"
 #include "utils/error_code.h"
-#include <boost/filesystem.hpp>
-#include <iostream>
+#include <filesystem>
 
 namespace sys = boost::system;
-namespace fs = boost::filesystem;
+namespace fs = std::filesystem;
 
 using namespace syncspirit::proto;
 using namespace syncspirit::utils;
@@ -37,7 +36,7 @@ TEST_CASE("parse valid announce sample 1", "[support]") {
 
     auto &o = r.value();
     CHECK(o.size() == 9);
-    CHECK(o[0].full == "quic://192.168.100.15:22000");
+    CHECK(o[0]->buffer() == "quic://192.168.100.15:22000");
 }
 
 TEST_CASE("parse valid announce sample 2", "[support]") {
@@ -59,7 +58,8 @@ TEST_CASE("parse valid announce sample 2", "[support]") {
 
     auto &o = r.value();
     CHECK(o.size() == 1);
-    CHECK(o[0].full == "relay://93.31.21.95:443/?id=QUJWY5Q-YUKKWZF-OWOJ66C-NWAPXYC-LWU4IPC-TO6UBKB-67R5JV5-BILNNA7");
+    CHECK(o[0]->buffer() ==
+          "relay://93.31.21.95:443/?id=QUJWY5Q-YUKKWZF-OWOJ66C-NWAPXYC-LWU4IPC-TO6UBKB-67R5JV5-BILNNA7");
 }
 
 TEST_CASE("malformed url", "[support]") {

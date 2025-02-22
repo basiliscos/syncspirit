@@ -116,6 +116,12 @@ std::string error_code_category::message(int c) const {
     case error_code_t::invalid_deviceid:
         r = "invalid device id";
         break;
+    case error_code_t::cares_failure:
+        r = "cares failure";
+        break;
+    case error_code_t::peer_has_been_removed:
+        r = "peer has been removed";
+        break;
     default:
         r = "unknown";
     }

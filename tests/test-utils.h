@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #pragma once
 
 #include <catch2/catch_all.hpp>
-#include <boost/filesystem.hpp>
+#include <filesystem>
 
 #include "model/device.h"
+#include "model/diff/apply_controller.h"
 #include "model/diff/cluster_diff.h"
 #include "syncspirit-test-export.h"
 
@@ -16,7 +17,7 @@
 
 namespace syncspirit::test {
 
-namespace bfs = boost::filesystem;
+namespace bfs = std::filesystem;
 namespace sys = boost::system;
 
 struct SYNCSPIRIT_TEST_API path_guard_t {
@@ -41,6 +42,9 @@ struct SYNCSPIRIT_TEST_API path_guard_t {
     }
 };
 
+SYNCSPIRIT_TEST_API bfs::path unique_path();
+SYNCSPIRIT_TEST_API model::diff::apply_controller_t &get_apply_controller();
+SYNCSPIRIT_TEST_API void init_logging();
 SYNCSPIRIT_TEST_API bfs::path locate_path(const char *test_file);
 SYNCSPIRIT_TEST_API std::string read_file(const bfs::path &path);
 SYNCSPIRIT_TEST_API void write_file(const bfs::path &path, std::string_view content);

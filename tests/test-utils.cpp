@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "test-utils.h"
 #include "model/device_id.h"
-#include "structs.pb.h"
-#include "db/prefix.h"
+#include "utils/base32.h"
+#include "utils/log-setup.h"
+#include <random>
+#include <cstdint>
+#include <spdlog/sinks/stdout_color_sinks.h>
 
 int main(int argc, char *argv[]) { return Catch::Session().run(argc, argv); }
 
@@ -26,7 +29,6 @@ bfs::path locate_path(const char *test_file) {
 
 std::string read_file(const bfs::path &path) {
     sys::error_code ec;
-    auto filesize = bfs::file_size(path, ec);
     auto file_path = path.string();
     auto file_path_c = file_path.c_str();
     auto in = fopen(file_path_c, "rb");
@@ -35,10 +37,14 @@ std::string read_file(const bfs::path &path) {
         std::cout << "can't open " << file_path_c << " : " << ec.message() << "\n";
         return "";
     }
-    assert(in);
+
+    fseek(in, 0L, SEEK_END);
+    auto filesize = ftell(in);
+    fseek(in, 0L, SEEK_SET);
     std::vector<char> buffer(filesize, 0);
     auto r = fread(buffer.data(), filesize, 1, in);
     assert(r == 1);
+    (void)r;
     fclose(in);
     return std::string(buffer.data(), filesize);
 }
@@ -55,6 +61,7 @@ void write_file(const bfs::path &path, std::string_view content) {
     if (content.size()) {
         auto r = fwrite(content.data(), content.size(), 1, out);
         assert(r);
+        (void)r;
     }
     fclose(out);
 }
@@ -72,11 +79,32 @@ std::string hash_string(const std::string_view &hash) noexcept {
     auto r = std::string();
     r.reserve(hash.size() * 2);
     for (size_t i = 0; i < hash.size(); ++i) {
-        char buff[3];
-        sprintf(buff, "%02x", (unsigned char)hash[i]);
-        r += std::string_view(buff, 2);
+        r += fmt::format("{:02x}", (unsigned char)hash[i]);
     }
     return r;
+}
+
+static model::diff::apply_controller_t apply_controller;
+
+model::diff::apply_controller_t &get_apply_controller() { return apply_controller; }
+
+void init_logging() {
+    auto dist_sink = utils::create_root_logger();
+    auto console_sink = std::make_shared<spdlog::sinks::stderr_color_sink_mt>();
+    dist_sink->add_sink(console_sink);
+}
+
+static std::random_device rd;
+static std::uniform_int_distribution<std::uint64_t> dist;
+
+bfs::path unique_path() {
+    auto n = dist(rd);
+    auto view = std::string_view(reinterpret_cast<const char *>(&n), sizeof(n));
+    auto random_name = utils::base32::encode(view);
+    std::transform(random_name.begin(), random_name.end(), random_name.begin(),
+                   [](unsigned char c) { return std::tolower(c); });
+    auto name = std::string("tmp-") + random_name;
+    return bfs::path(name);
 }
 
 } // namespace syncspirit::test

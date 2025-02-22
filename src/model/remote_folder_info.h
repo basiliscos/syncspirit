@@ -7,7 +7,7 @@
 #include "syncspirit-export.h"
 #include "bep.pb.h"
 #include <boost/outcome.hpp>
-#include "misc/arc.hpp"
+#include "misc/augmentation.hpp"
 #include "misc/map.hpp"
 
 namespace syncspirit::model {
@@ -26,10 +26,10 @@ using remote_folder_info_t_ptr_t = intrusive_ptr_t<remote_folder_info_t>;
 struct folder_info_t;
 using folder_info_ptr_t = intrusive_ptr_t<folder_info_t>;
 
-struct SYNCSPIRIT_API remote_folder_info_t final : arc_base_t<remote_folder_info_t> {
+struct SYNCSPIRIT_API remote_folder_info_t final : augmentable_t<remote_folder_info_t> {
 
-    static outcome::result<remote_folder_info_t_ptr_t> create(const proto::Device &folder, const device_ptr_t &device_,
-                                                              const folder_ptr_t &folder_) noexcept;
+    static outcome::result<remote_folder_info_t_ptr_t> create(std::uint64_t index_id, std::int64_t max_sequence,
+                                                              device_t &device_, folder_t &folder_) noexcept;
 
     std::string_view get_key() const noexcept;
 
@@ -40,8 +40,8 @@ struct SYNCSPIRIT_API remote_folder_info_t final : arc_base_t<remote_folder_info
     folder_info_ptr_t get_local() const noexcept;
 
   private:
-    remote_folder_info_t(const proto::Device &folder, const device_ptr_t &device_,
-                         const folder_ptr_t &folder_) noexcept;
+    remote_folder_info_t(std::uint64_t index_id, std::int64_t max_sequence, device_t &device_,
+                         folder_t &folder_) noexcept;
 
     std::uint64_t index_id;
     std::int64_t max_sequence;

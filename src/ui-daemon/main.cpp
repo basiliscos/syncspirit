@@ -1,22 +1,23 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include <google/protobuf/stubs/common.h>
 #include <lz4.h>
 #include <openssl/crypto.h>
-#include <boost/filesystem.hpp>
+#include <filesystem>
 #include <boost/program_options.hpp>
 #include <rotor/asio.hpp>
 #include <rotor/thread.hpp>
 #include <spdlog/spdlog.h>
-#include <fstream>
+#include <spdlog/sinks/stdout_color_sinks.h>
 #include <exception>
 
 #include "syncspirit-config.h"
 #include "constants.h"
 #include "config/utils.h"
+#include "utils/io.h"
 #include "utils/location.h"
-#include "utils/log.h"
+#include "utils/log-setup.h"
 #include "utils/platform.h"
 #include "net/net_supervisor.h"
 #include "fs/fs_supervisor.h"
@@ -24,16 +25,20 @@
 #include "command.h"
 #include "governor_actor.h"
 
+#if defined(__unix__)
+#include <signal.h>
+#endif
+
 #if defined(__linux__)
 #include <pthread.h>
-#include <signal.h>
 #endif
 
 #ifdef _WIN32
 #include <windows.h>
+#include <winnls.h>
 #endif
 
-namespace bfs = boost::filesystem;
+namespace bfs = std::filesystem;
 namespace po = boost::program_options;
 namespace pt = boost::posix_time;
 namespace r = rotor;
@@ -78,9 +83,10 @@ BOOL WINAPI consoleHandler(DWORD signal) {
 #endif
 
 int main(int argc, char **argv) {
+    auto bootstrap_guard = utils::bootstrap_guard_ptr_t();
     GOOGLE_PROTOBUF_VERIFY_VERSION;
 
-#if defined(__linux__)
+#if defined(__unix__) || defined(__APPLE__) || defined(__MACH__)
     struct sigaction act;
     memset(&act, 0, sizeof(act));
     act.sa_handler = [](int) { shutdown_flag = true; };
@@ -96,11 +102,15 @@ int main(int argc, char **argv) {
     }
 #endif
     try {
+#ifdef _WIN32
+#endif
         utils::platform_t::startup();
 
 #if defined(__linux__)
         pthread_setname_np(pthread_self(), "ss/main");
 #endif
+        auto dist_sink = utils::create_root_logger();
+        dist_sink->add_sink(std::make_shared<spdlog::sinks::stdout_color_sink_mt>());
 
         // clang-format off
         /* parse command-line & config options */
@@ -132,7 +142,6 @@ int main(int argc, char **argv) {
                     " the first part is 'XBOWTOU';\n"
                 "  inactivate:${seconds} shut down daemon after ${seconds}"
                     " of inactivity;\n"
-                "  rescan_dirs:${seconds} rescan all folders every ${seconds};\n"
             );
         // clang-format on
 
@@ -146,7 +155,7 @@ int main(int argc, char **argv) {
             return 1;
         }
 
-        utils::set_default(vm["log_level"].as<std::string>());
+        auto log_level = utils::get_log_level(vm["log_level"].as<std::string>());
 
         bfs::path config_file_path;
         if (vm.count("config_dir")) {
@@ -161,8 +170,10 @@ int main(int argc, char **argv) {
                 return 1;
             }
         }
+        bootstrap_guard = utils::bootstrap(dist_sink, config_file_path);
 
         config_file_path.append("syncspirit.toml");
+        auto config_file_path_str = config_file_path.string();
         bool populate = !bfs::exists(config_file_path);
         if (populate) {
             spdlog::info("Config {} seems does not exit, creating default one...", config_file_path.string());
@@ -172,15 +183,15 @@ int main(int argc, char **argv) {
                 return 1;
             }
             auto &cfg = cfg_opt.value();
-            std::fstream f_cfg(config_file_path.string(), f_cfg.binary | f_cfg.trunc | f_cfg.in | f_cfg.out);
+            using F = utils::fstream_t;
+            auto f_cfg = utils::fstream_t(config_file_path, F::binary | F::trunc | F::in | F::out);
             auto r = config::serialize(cfg, f_cfg);
             if (!r) {
-                spdlog::error("cannot save default config at :: {}", r.error().message());
+                spdlog::error("cannot save default config at {}: {}", config_file_path_str, r.error().message());
                 return 1;
             }
         }
-        auto config_file_path_str = config_file_path.string();
-        std::ifstream config_file(config_file_path_str);
+        auto config_file = utils::ifstream_t(config_file_path);
         if (!config_file) {
             spdlog::error("Cannot open config file {}", config_file_path_str);
             return 1;
@@ -194,8 +205,18 @@ int main(int argc, char **argv) {
         auto &cfg = cfg_option.value();
         spdlog::trace("configuration seems OK");
 
-        bool overwrite_default = vm.count("log_level");
-        auto init_result = utils::init_loggers(cfg.log_configs, overwrite_default);
+        // override default
+        if (log_level) {
+            if (cfg.log_configs.size()) {
+                auto &first_cfg = cfg.log_configs.front();
+                if (first_cfg.name == "default") {
+                    auto level = log_level.value();
+                    first_cfg.level = level;
+                    spdlog::trace("overriding default log level to {}", int(level));
+                }
+            }
+        }
+        auto init_result = utils::init_loggers(cfg.log_configs);
         if (!init_result) {
             spdlog::error("Loggers initialization failed :: {}", init_result.error().message());
             return 1;
@@ -243,6 +264,8 @@ int main(int argc, char **argv) {
         auto timeout = pt::milliseconds{cfg.timeout};
 
         auto cluster_copies = 1ul;
+        auto seed = (size_t)std::time(nullptr);
+        auto sequencer = model::make_sequencer(seed);
 
         auto sup_net = sys_context->create_supervisor<net::net_supervisor_t>()
                            .app_config(cfg)
@@ -250,6 +273,7 @@ int main(int argc, char **argv) {
                            .timeout(timeout)
                            .create_registry()
                            .guard_context(true)
+                           .sequencer(sequencer)
                            .cluster_copies(cluster_copies)
                            .shutdown_flag(shutdown_flag, r::pt::millisec{50})
                            .finish();
@@ -263,6 +287,7 @@ int main(int argc, char **argv) {
                           .registry_address(sup_net->get_registry_address())
                           .fs_config(cfg.fs_config)
                           .hasher_threads(cfg.hasher_threads)
+                          .sequencer(sequencer)
                           .finish();
 
         // auxiliary payload
@@ -270,6 +295,7 @@ int main(int argc, char **argv) {
             fs_sup->create_actor<governor_actor_t>()
                 .commands(std::move(commands))
                 .cluster(cluster)
+                .sequencer(sequencer)
                 .timeout(timeout)
                 .autoshutdown_supervisor()
                 .finish();
@@ -331,9 +357,14 @@ int main(int argc, char **argv) {
             thread.join();
         }
         spdlog::trace("everything has been terminated");
+    } catch (const po::error &ex) {
+        spdlog::critical("program options exception: {}", ex.what());
+        return 1;
+    } catch (std::exception &ex) {
+        spdlog::critical("std::exception: {}", ex.what());
+        return 1;
     } catch (...) {
         spdlog::critical("unknown exception");
-        // spdlog::critical("Starting failure : {}", ex.what());
         return 1;
     }
 
@@ -342,6 +373,7 @@ int main(int argc, char **argv) {
     /* exit */
 
     spdlog::info("normal exit");
+    bootstrap_guard.reset();
     spdlog::drop_all();
     return 0;
 }

@@ -73,6 +73,8 @@ enum class error_code_t {
     protocol_error,
     relay_failure,
     invalid_deviceid,
+    cares_failure,
+    peer_has_been_removed,
 };
 
 enum class bep_error_code_t {

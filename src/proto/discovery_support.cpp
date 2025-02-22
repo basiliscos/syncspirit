@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "discovery_support.h"
 #include "utils/beast_support.h"
@@ -8,8 +8,6 @@
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <nlohmann/json.hpp>
 #include <charconv>
-#include <sstream>
-#include <iomanip>
 #include <cctype>
 
 using namespace syncspirit::utils;
@@ -19,46 +17,47 @@ namespace syncspirit::proto {
 namespace http = boost::beast::http;
 using json = nlohmann::json;
 
-outcome::result<URI> make_announce_request(fmt::memory_buffer &buff, const URI &announce_uri,
-                                           const utils::uri_container_t &listening_uris) noexcept {
+outcome::result<uri_ptr_t> make_announce_request(fmt::memory_buffer &buff, const uri_ptr_t &announce_uri,
+                                                 const utils::uri_container_t &listening_uris) noexcept {
     json payload = json::object();
     json addresses = json::array();
     for (auto &uri : listening_uris) {
-        addresses.push_back(uri.full);
+        addresses.push_back(uri->buffer());
     }
     payload["addresses"] = addresses;
 
-    utils::URI uri(announce_uri);
-    uri.set_path("/v2");
+    auto uri = announce_uri->clone();
+    uri->set_path("/v2/");
     http::request<http::string_body> req;
     req.method(http::verb::post);
     req.version(11);
     req.keep_alive(true);
-    req.target(uri.relative());
-    req.set(http::field::host, uri.host);
+    req.target(uri->encoded_target());
+    req.set(http::field::host, uri->host());
     req.set(http::field::content_type, "application/json");
 
     req.body() = payload.dump();
     req.prepare_payload();
 
     auto ok = serialize(req, buff);
-    if (!ok)
+    if (!ok) {
         return ok.error();
+    }
     return uri;
 }
 
-outcome::result<URI> make_discovery_request(fmt::memory_buffer &buff, const URI &announce_uri,
-                                            const model::device_id_t device_id) noexcept {
-    auto target = fmt::format("?device={}", device_id.get_value());
-    utils::URI uri = announce_uri;
-    uri.set_query(target);
+outcome::result<uri_ptr_t> make_discovery_request(fmt::memory_buffer &buff, const uri_ptr_t &announce_uri,
+                                                  const model::device_id_t device_id) noexcept {
+    auto target = fmt::format("device={}", device_id.get_value());
+    auto uri = announce_uri->clone();
+    uri->set_query(target);
 
     http::request<http::empty_body> req;
     req.method(http::verb::get);
     req.version(11);
     req.keep_alive(true);
-    req.target(uri.relative());
-    req.set(http::field::host, uri.host);
+    req.target(uri->encoded_target());
+    req.set(http::field::host, uri->host());
 
     fmt::memory_buffer tx_buff;
     auto ok = serialize(req, buff);
@@ -128,11 +127,11 @@ outcome::result<utils::uri_container_t> parse_contact(http::response<http::strin
             return make_error_code(error_code_t::incorrect_json);
         }
         auto uri_str = it.get<std::string>();
-        auto uri_option = utils::parse(uri_str.c_str());
-        if (!uri_option) {
+        auto uri = utils::parse(uri_str.c_str());
+        if (!uri) {
             continue;
         }
-        urls.emplace_back(std::move(uri_option.value()));
+        urls.emplace_back(std::move(uri));
     }
     if (urls.empty()) {
         return make_error_code(error_code_t::malformed_url);

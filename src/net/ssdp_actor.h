@@ -4,6 +4,7 @@
 #pragma once
 
 #include "messages.h"
+#include "model/cluster.h"
 #include "config/upnp.h"
 #include "utils/log.h"
 #include <boost/asio.hpp>
@@ -51,7 +52,7 @@ struct SYNCSPIRIT_API ssdp_actor_t : public r::actor_base_t {
     void on_discovery_received(std::size_t bytes) noexcept;
     void on_timer(r::request_id_t, bool cancelled) noexcept;
     void timer_cancel() noexcept;
-    void launch_upnp(const utils::URI &igd_uri) noexcept;
+    void launch_upnp(const utils::uri_ptr_t &igd_uri) noexcept;
 
     model::cluster_ptr_t cluster;
     utils::logger_t log;

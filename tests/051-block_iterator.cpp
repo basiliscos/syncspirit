@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "test-utils.h"
 #include "model/cluster.h"
@@ -15,7 +15,8 @@ TEST_CASE("block iterator", "[model]") {
     auto my_device = device_t::create(my_id, "my-device").value();
     auto peer_id = device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
 
-    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1, 1));
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
+    auto sequencer = make_sequencer(4);
     cluster->get_devices().put(my_device);
 
     auto block_iterator = block_iterator_ptr_t();
@@ -25,7 +26,7 @@ TEST_CASE("block iterator", "[model]") {
                 block_iterator = new blocks_iterator_t(*source);
             }
             if (block_iterator && *block_iterator) {
-                return block_iterator->next(!reset);
+                return block_iterator->next();
             }
         }
         return {};
@@ -33,7 +34,7 @@ TEST_CASE("block iterator", "[model]") {
 
     auto &folders = cluster->get_folders();
     auto builder = diff_builder_t(*cluster);
-    builder.create_folder("1234-5678", "some/path", "my-label");
+    builder.upsert_folder("1234-5678", "some/path", "my-label");
     REQUIRE(builder.apply());
 
     auto folder = folders.by_id("1234-5678");
@@ -68,6 +69,7 @@ TEST_CASE("block iterator", "[model]") {
         p_file.set_block_size(5ul);
 
         SECTION("no iteration upon deleted file") {
+            p_file.clear_blocks();
             p_file.set_deleted(true);
 
             REQUIRE(builder.local_update(folder->get_id(), p_file).apply());
@@ -91,12 +93,6 @@ TEST_CASE("block iterator", "[model]") {
             CHECK(fb1.block()->get_hash() == b1_hash);
             CHECK(fb1.block_index() == 0);
             CHECK(fb1.file() == my_file.get());
-
-            auto fb1_1 = next(my_file);
-            REQUIRE(fb1_1);
-            CHECK(fb1_1.block()->get_hash() == b1_hash);
-            CHECK(fb1_1.block_index() == 0);
-            CHECK(fb1_1.file() == my_file.get());
 
             auto fb2 = next(my_file);
             REQUIRE(fb2);
@@ -148,28 +144,5 @@ TEST_CASE("block iterator", "[model]") {
         CHECK(fb1.block()->get_hash() == b1_hash);
         CHECK(fb1.block_index() == 0);
         CHECK(fb1.file() == my_file.get());
-    }
-
-    SECTION("locked/unlock blocks") {
-        p_file.set_size(5ul);
-        p_file.set_block_size(5ul);
-
-        REQUIRE(builder.local_update(folder->get_id(), p_file).apply());
-        auto my_file = my_folder->get_file_infos().by_name(p_file.name());
-
-        auto bi1 = cluster->get_blocks().get(b1_hash);
-        my_file->remove_blocks();
-        my_file->assign_block(bi1, 0);
-        REQUIRE(!my_file->is_locally_available());
-
-        auto fb = next(my_file, true);
-        REQUIRE(fb);
-        auto block = fb.block();
-
-        block->lock();
-        REQUIRE(!next(my_file, true));
-
-        block->unlock();
-        REQUIRE(next(my_file, true));
     }
 }

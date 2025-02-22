@@ -9,9 +9,9 @@
 namespace syncspirit::model::diff::modify {
 
 struct SYNCSPIRIT_API clone_block_t final : block_transaction_t {
-    clone_block_t(const file_block_t &file_block, dispose_callback_t callback) noexcept;
+    clone_block_t(const file_block_t &file_block) noexcept;
 
-    outcome::result<void> visit(block_visitor_t &, void *) const noexcept override;
+    outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;
 
     std::string source_device_id;
     std::string source_folder_id;

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #pragma once
 
@@ -9,7 +9,7 @@
 namespace syncspirit::model {
 
 struct discovery_result {
-    utils::URI location;
+    utils::uri_ptr_t location;
     std::string search_target;
     std::string usn;
 };

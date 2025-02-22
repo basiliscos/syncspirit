@@ -43,7 +43,6 @@ struct SYNCSPIRIT_API hasher_actor_t : public r::actor_base_t {
 
     utils::logger_t log;
     uint32_t index;
-    r::address_ptr_t coordinator;
 };
 
 } // namespace hasher

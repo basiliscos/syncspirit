@@ -5,21 +5,22 @@
 #include "controller_actor.h"
 #include "names.h"
 #include "utils/error_code.h"
+#include "utils/format.hpp"
 #include "hasher/hasher_proxy_actor.h"
-#include "model/diff/peer/peer_state.h"
-#include "../utils/format.hpp"
+#include "model/diff/contact/peer_state.h"
 
 using namespace syncspirit::net;
 
 cluster_supervisor_t::cluster_supervisor_t(cluster_supervisor_config_t &config)
     : ra::supervisor_asio_t{config}, bep_config{config.bep_config}, hasher_threads{config.hasher_threads},
-      cluster{config.cluster} {
-    log = utils::get_logger("net.cluster");
-}
+      cluster{config.cluster}, sequencer{config.sequencer} {}
 
 void cluster_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     ra::supervisor_asio_t::configure(plugin);
-    plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) { p.set_identity("net::cluster", false); });
+    plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
+        p.set_identity("net.cluster", false);
+        log = utils::get_logger(identity);
+    });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
         p.discover_name(names::coordinator, coordinator, false).link(false).callback([&](auto phase, auto &ee) {
             if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {
@@ -39,17 +40,17 @@ void cluster_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept 
 }
 
 void cluster_supervisor_t::on_start() noexcept {
-    log->trace("{}, on_start", identity);
+    log->trace("on_start");
     ra::supervisor_asio_t::on_start();
 }
 
 void cluster_supervisor_t::shutdown_start() noexcept {
-    log->trace("{}, shutdown_start", identity);
+    log->trace("shutdown_start");
     ra::supervisor_asio_t::shutdown_start();
 }
 
 void cluster_supervisor_t::on_model_update(model::message::model_update_t &message) noexcept {
-    LOG_TRACE(log, "{}, on_model_update", identity);
+    LOG_TRACE(log, "on_model_update");
     auto &diff = *message.payload.diff;
     auto r = diff.visit(*this, nullptr);
     if (!r) {
@@ -58,34 +59,37 @@ void cluster_supervisor_t::on_model_update(model::message::model_update_t &messa
     }
 }
 
-auto cluster_supervisor_t::operator()(const model::diff::peer::peer_state_t &diff, void *) noexcept
+auto cluster_supervisor_t::operator()(const model::diff::contact::peer_state_t &diff, void *custom) noexcept
     -> outcome::result<void> {
-    if (!cluster->is_tainted() && diff.known) {
+    if (!cluster->is_tainted()) {
         auto peer = cluster->get_devices().by_sha256(diff.peer_id);
-        LOG_TRACE(log, "{}, visiting peer_state_t, {}, state: {}", identity, peer->device_id(), (int)diff.state);
+        LOG_TRACE(log, "visiting peer_state_t, {}, state: {}, has been online: {}", peer->device_id(), (int)diff.state,
+                  diff.has_been_online);
         if (diff.state == model::device_state_t::online) {
             /* auto addr = */
             create_actor<controller_actor_t>()
-                .request_pool(bep_config.rx_buff_size)
-                .outgoing_buffer_max(bep_config.tx_buff_limit)
-                .blocks_max_requested(bep_config.blocks_max_requested)
+                .cluster(cluster)
+                .sequencer(sequencer)
                 .timeout(init_timeout * 7 / 9)
                 .peer(peer)
                 .peer_addr(diff.peer_addr)
+                .connection_id(diff.connection_id)
+                .blocks_max_requested(bep_config.blocks_max_requested)
+                .advances_per_iteration(bep_config.advances_per_iteration)
+                .outgoing_buffer_max(bep_config.tx_buff_limit)
+                .request_pool(bep_config.rx_buff_size)
                 .request_timeout(pt::milliseconds(bep_config.request_timeout))
-                .cluster(cluster)
                 .finish();
         }
     }
-    return outcome::success();
+    return diff.visit_next(*this, custom);
 }
 
 void cluster_supervisor_t::on_child_shutdown(actor_base_t *actor) noexcept {
-    LOG_TRACE(log, "{}, on_child_shutdown: {}({})", identity, actor->get_identity(), actor->use_count());
+    LOG_TRACE(log, "on_child_shutdown: {}({})", actor->get_identity(), actor->use_count());
     ra::supervisor_asio_t::on_child_shutdown(actor);
     auto &reason = actor->get_shutdown_reason();
     if (state == r::state_t::OPERATIONAL) {
-        log->debug("{}, on_child_shutdown, child {} termination: {}", identity, actor->get_identity(),
-                   reason->message());
+        log->debug("on_child_shutdown, child {} termination: {}", actor->get_identity(), reason->message());
     }
 }

@@ -3,11 +3,11 @@
 
 #include "test-utils.h"
 #include "proto/upnp_support.h"
-#include <boost/filesystem.hpp>
+#include <filesystem>
 #include <iostream>
 
 namespace sys = boost::system;
-namespace bfs = boost::filesystem;
+namespace bfs = std::filesystem;
 
 using namespace syncspirit::proto;
 using namespace syncspirit::test;

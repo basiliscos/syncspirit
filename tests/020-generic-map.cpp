@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include "test-utils.h"
 #include "access.h"
@@ -11,7 +11,7 @@ using namespace syncspirit::model;
 using namespace syncspirit::proto;
 using namespace syncspirit::test;
 
-namespace bfs = boost::filesystem;
+namespace bfs = std::filesystem;
 
 TEST_CASE("generic map", "[model]") {
     auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
@@ -24,6 +24,7 @@ TEST_CASE("generic map", "[model]") {
     map.remove(my_device);
     REQUIRE(!map.by_sha256(my_id.get_sha256()));
     REQUIRE(!map.get(my_device->get_key()));
+    REQUIRE(map == map);
 }
 
 namespace syncspirit::model::details {

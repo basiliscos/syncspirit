@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #pragma once
 
@@ -14,10 +14,12 @@
 #include <optional>
 
 #include <fmt/core.h>
-#include "model/misc/upnp.h"
-#include "model/cluster.h"
+#include "model/diff/cluster_diff.h"
+#include "model/file_info.h"
+#include "model/folder_info.h"
 #include "transport/base.h"
 #include "proto/bep_support.h"
+#include "utils/dns.h"
 
 namespace syncspirit {
 namespace net {
@@ -41,17 +43,18 @@ namespace payload {
 using cluster_config_ptr_t = std::unique_ptr<proto::ClusterConfig>;
 
 struct address_response_t : public r::arc_base_t<address_response_t> {
-    using resolve_results_t = tcp::resolver::results_type;
+    using resolve_results_t = std::vector<asio::ip::address>;
 
     explicit address_response_t(resolve_results_t results_) : results{results_} {};
     resolve_results_t results;
 };
 
-struct address_request_t : public r::arc_base_t<address_request_t> {
+struct address_request_t : r::arc_base_t<address_request_t>, utils::dns_query_t {
     using response_t = r::intrusive_ptr_t<address_response_t>;
-    std::string host;
-    std::string port;
-    address_request_t(const std::string &host_, std::string &port_) : host{host_}, port{port_} {}
+    address_request_t(std::string_view host_, std::uint16_t port_ = 0)
+        : utils::dns_query_t{std::string(host_)}, port{port_} {}
+
+    std::uint16_t port;
 };
 
 struct http_response_t : public r::arc_base_t<http_response_t> {
@@ -72,24 +75,25 @@ struct http_request_t : r::arc_base_t<http_request_t> {
     using ssl_option_t = transport::ssl_option_t;
     using response_t = r::intrusive_ptr_t<http_response_t>;
 
-    utils::URI url;
+    utils::uri_ptr_t url;
     fmt::memory_buffer data;
     rx_buff_ptr_t rx_buff;
     std::size_t rx_buff_size;
     ssl_option_t ssl_context;
     bool local_ip = false;
+    bool debug = false;
     r::message_ptr_t custom;
 
     template <typename URI>
     http_request_t(URI &&url_, fmt::memory_buffer &&data_, rx_buff_ptr_t rx_buff_, std::size_t rx_buff_size_,
-                   bool local_ip_, const r::message_ptr_t &custom_ = {})
+                   bool local_ip_, bool debug_ = false, const r::message_ptr_t &custom_ = {})
         : url{std::forward<URI>(url_)}, data{std::move(data_)}, rx_buff{rx_buff_}, rx_buff_size{rx_buff_size_},
-          local_ip{local_ip_}, custom{custom_} {}
+          local_ip{local_ip_}, debug{debug_}, custom{custom_} {}
 
     template <typename URI>
     http_request_t(URI &&url_, fmt::memory_buffer &&data_, rx_buff_ptr_t rx_buff_, std::size_t rx_buff_size_,
-                   transport::ssl_junction_t &&ssl_, const r::message_ptr_t &custom_ = {})
-        : http_request_t(std::forward<URI>(url_), std::move(data_), rx_buff_, rx_buff_size_, {}, custom_) {
+                   transport::ssl_junction_t &&ssl_, bool debug = false, const r::message_ptr_t &custom_ = {})
+        : http_request_t(std::forward<URI>(url_), std::move(data_), rx_buff_, rx_buff_size_, {}, debug, custom_) {
         ssl_context = ssl_option_t(std::move(ssl_));
     }
 };
@@ -98,10 +102,6 @@ struct http_close_connection_t {};
 
 struct announce_notification_t {
     r::address_ptr_t source;
-};
-
-struct discovery_notification_t {
-    model::device_id_t device_id;
 };
 
 struct load_cluster_response_t {
@@ -131,10 +131,16 @@ struct block_response_t {
 
 struct block_request_t {
     using response_t = block_response_t;
-    model::file_info_ptr_t file;
-    model::file_block_t block;
-    block_request_t(const model::file_info_ptr_t &file, const model::file_block_t &block) noexcept;
-    ~block_request_t();
+    std::string folder_id;
+    std::string file_name;
+    std::int64_t sequence;
+    size_t block_index;
+    std::int64_t block_offset;
+    std::uint32_t block_size;
+    std::string block_hash;
+    block_request_t(const model::file_info_ptr_t &file, size_t block_index) noexcept;
+
+    model::file_block_t get_block(model::cluster_t &, model::device_t &peer) noexcept;
 };
 
 struct connect_response_t {
@@ -145,7 +151,7 @@ struct connect_response_t {
 struct connect_request_t {
     using response_t = connect_response_t;
     model::device_id_t device_id;
-    utils::URI uri;
+    utils::uri_ptr_t uri;
     std::string_view alpn;
 };
 
@@ -159,6 +165,19 @@ struct transfer_push_t {
 
 struct transfer_pop_t {
     uint32_t bytes;
+};
+
+struct db_info_response_t {
+    uint32_t page_size = 0;
+    uint32_t tree_depth = 0;
+    uint64_t leaf_pages = 0;
+    uint64_t overflow_pages = 0;
+    uint64_t ms_branch_pages = 0;
+    uint64_t entries = 0;
+};
+
+struct db_info_request_t {
+    using response_t = db_info_response_t;
 };
 
 } // end of namespace payload
@@ -176,8 +195,6 @@ using http_response_t = r::request_traits_t<payload::http_request_t>::response::
 using http_cancel_t = r::request_traits_t<payload::http_request_t>::cancel::message_t;
 using http_close_connection_t = r::message_t<payload::http_close_connection_t>;
 
-using discovery_notify_t = r::message_t<payload::discovery_notification_t>;
-
 using load_cluster_request_t = r::request_traits_t<payload::load_cluster_request_t>::request::message_t;
 using load_cluster_response_t = r::request_traits_t<payload::load_cluster_request_t>::response::message_t;
 
@@ -193,6 +210,9 @@ using block_response_t = r::request_traits_t<payload::block_request_t>::response
 
 using connect_request_t = r::request_traits_t<payload::connect_request_t>::request::message_t;
 using connect_response_t = r::request_traits_t<payload::connect_request_t>::response::message_t;
+
+using db_info_request_t = r::request_traits_t<payload::db_info_request_t>::request::message_t;
+using db_info_response_t = r::request_traits_t<payload::db_info_request_t>::response::message_t;
 
 } // end of namespace message
 

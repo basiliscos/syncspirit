@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "ssdp_actor.h"
 #include "upnp_actor.h"
 #include "proto/upnp_support.h"
+#include "utils/format.hpp"
 #include "names.h"
 
 using namespace syncspirit::net;
@@ -24,31 +25,53 @@ ssdp_actor_t::ssdp_actor_t(ssdp_actor_config_t &cfg)
     : r::actor_base_t::actor_base_t(cfg), cluster{cfg.cluster},
       strand{static_cast<ra::supervisor_asio_t *>(cfg.supervisor)->get_strand()}, upnp_config{cfg.upnp_config},
       upnp_endpoint(v4::from_string(upnp_addr), upnp_port) {
-    log = utils::get_logger("net.ssdp");
     rx_buff.resize(RX_BUFF_SIZE);
 }
 
 void ssdp_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
-    plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) { p.set_identity("ssdp", false); });
+    plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
+        p.set_identity("net.ssdp", false);
+        log = utils::get_logger(identity);
+    });
     plugin.with_casted<r::plugin::registry_plugin_t>(
         [&](auto &p) { p.discover_name(names::coordinator, coordinator, true).link(false); });
 }
 
 void ssdp_actor_t::on_start() noexcept {
-    LOG_TRACE(log, "{}, on_start", identity);
-    sock = std::make_unique<udp_socket_t>(strand.context(), udp::endpoint(udp::v4(), 0));
+    LOG_TRACE(log, "on_start");
+    sock = std::make_unique<udp_socket_t>(strand.context());
+
+    auto endpoint = udp::endpoint(udp::v4(), 1234);
+    auto ec = sys::error_code{};
+    sock->open(endpoint.protocol(), ec);
+    if (ec) {
+        LOG_WARN(log, "init, can't open socket :: {}", ec.message());
+        return do_shutdown(make_error(ec));
+    }
+
+    sock->set_option(udp_socket_t::broadcast(true), ec);
+    if (ec) {
+        LOG_WARN(log, "init, can't set broadcast option :: {}", ec.message());
+        return do_shutdown(make_error(ec));
+    }
+
+    sock->bind(endpoint, ec);
+    if (ec) {
+        LOG_WARN(log, "init, can't bind socket {}: {}", endpoint, ec.message());
+        return do_shutdown(make_error(ec));
+    }
 
     /* broadcast discovery */
     auto max_wait = upnp_config.max_wait;
     auto request_result = make_discovery_request(tx_buff, max_wait);
     if (!request_result) {
         auto &ec = request_result.error();
-        LOG_ERROR(log, "{},  cannot serialize discovery request: {}", identity, ec.message());
+        LOG_ERROR(log, "cannot serialize discovery request: {}", ec.message());
         return do_shutdown(make_error(ec));
     }
 
-    LOG_TRACE(log, "{}, sending multicast request to {}:{} ({} bytes)", identity, upnp_addr, upnp_port, tx_buff.size());
+    LOG_TRACE(log, "sending multicast request to {}:{} ({} bytes)", upnp_addr, upnp_port, tx_buff.size());
 
     auto fwd_receive = ra::forwarder_t(*this, &ssdp_actor_t::on_discovery_received, &ssdp_actor_t::on_udp_recv_error);
     auto buff_rx = asio::buffer(rx_buff.data(), RX_BUFF_SIZE);
@@ -66,12 +89,12 @@ void ssdp_actor_t::on_start() noexcept {
 }
 
 void ssdp_actor_t::shutdown_start() noexcept {
-    LOG_TRACE(log, "{}, shutdown_start", identity);
+    LOG_TRACE(log, "shutdown_start");
     sys::error_code ec;
     if (resources->has(resource::send) || resources->has(resource::recv)) {
         sock->cancel(ec);
         if (ec) {
-            LOG_ERROR(log, "{},  udp socket cancellation : {}", identity, ec.message());
+            LOG_ERROR(log, "udp socket cancellation : {}", ec.message());
         }
     }
     timer_cancel();
@@ -79,16 +102,15 @@ void ssdp_actor_t::shutdown_start() noexcept {
 }
 
 void ssdp_actor_t::on_discovery_sent(std::size_t bytes) noexcept {
-    LOG_TRACE(log, "{}, on_discovery_sent ({} bytes)", identity, bytes);
+    LOG_TRACE(log, "on_discovery_sent ({} bytes)", bytes);
     resources->release(resource::send);
 
     auto endpoint = sock->local_endpoint();
-    LOG_TRACE(log, "{}, will wait discovery reply via {}:{}", identity, endpoint.address().to_string(),
-              endpoint.port());
+    LOG_TRACE(log, "will wait discovery reply via {}:{}", endpoint.address().to_string(), endpoint.port());
 }
 
 void ssdp_actor_t::on_discovery_received(std::size_t bytes) noexcept {
-    LOG_TRACE(log, "{}, on_discovery_received ({} bytes)", identity, bytes);
+    LOG_TRACE(log, "on_discovery_received ({} bytes)", bytes);
     resources->release(resource::recv);
 
     if (!bytes || !resources->has(resource::timer)) {
@@ -100,7 +122,7 @@ void ssdp_actor_t::on_discovery_received(std::size_t bytes) noexcept {
     auto discovery_result = parse(buff, bytes);
     if (!discovery_result) {
         auto &ec = discovery_result.error();
-        LOG_WARN(log, "{},  can't get discovery result: {}", identity, ec.message());
+        LOG_WARN(log, "can't get discovery result: {}", ec.message());
         return do_shutdown(make_error(ec));
     }
 
@@ -115,7 +137,7 @@ void ssdp_actor_t::on_discovery_received(std::size_t bytes) noexcept {
 void ssdp_actor_t::on_udp_send_error(const sys::error_code &ec) noexcept {
     resources->release(resource::send);
     if (ec != asio::error::operation_aborted) {
-        LOG_WARN(log, "{}, on_udp_send_error :: {}", identity, ec.message());
+        LOG_WARN(log, "on_udp_send_error :: {}", ec.message());
         do_shutdown(make_error(ec));
     }
     timer_cancel();
@@ -124,7 +146,7 @@ void ssdp_actor_t::on_udp_send_error(const sys::error_code &ec) noexcept {
 void ssdp_actor_t::on_udp_recv_error(const sys::error_code &ec) noexcept {
     resources->release(resource::recv);
     if (ec != asio::error::operation_aborted) {
-        LOG_WARN(log, "{}, on_udp_recv_error :: {}", identity, ec.message());
+        LOG_WARN(log, "on_udp_recv_error :: {}", ec.message());
         do_shutdown(make_error(ec));
     }
     timer_cancel();
@@ -133,7 +155,7 @@ void ssdp_actor_t::on_udp_recv_error(const sys::error_code &ec) noexcept {
 void ssdp_actor_t::on_timer(r::request_id_t, bool cancelled) noexcept {
     resources->release(resource::timer);
     if (!cancelled) {
-        LOG_DEBUG(log, "{}, on_timer_trigger", identity);
+        LOG_DEBUG(log, "on_timer_trigger");
     }
     auto ec = r::make_error_code(r::shutdown_code_t::normal);
     return do_shutdown(make_error(ec));
@@ -145,8 +167,8 @@ void ssdp_actor_t::timer_cancel() noexcept {
     }
 }
 
-void ssdp_actor_t::launch_upnp(const URI &igd_uri) noexcept {
-    LOG_DEBUG(log, "{}, launching upnp", identity);
+void ssdp_actor_t::launch_upnp(const uri_ptr_t &igd_uri) noexcept {
+    LOG_DEBUG(log, "launching upnp");
     auto timeout = shutdown_timeout * 9 / 10;
 
     auto &sup = get_supervisor();

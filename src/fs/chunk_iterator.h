@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2023-2024 Ivan Baidakou
 
 #pragma once
 
 #include <string_view>
 #include <boost/outcome.hpp>
 #include <rotor/address.hpp>
+#include <vector>
 
 #include "model/file_info.h"
 #include "file.h"
@@ -15,25 +16,23 @@
 namespace syncspirit::fs {
 
 namespace outcome = boost::outcome_v2;
-namespace bfs = boost::filesystem;
+namespace bfs = std::filesystem;
 
 struct SYNCSPIRIT_API chunk_iterator_t {
+    using valid_blocks_map_t = std::vector<bool>;
 
-    chunk_iterator_t(scan_task_ptr_t task, model::file_info_ptr_t file, model::file_info_ptr_t source_file,
-                     file_ptr_t backend) noexcept;
+    chunk_iterator_t(scan_task_ptr_t task, model::file_info_ptr_t file, file_ptr_t backend) noexcept;
 
     bool has_more_chunks() const noexcept;
     inline bool is_complete() const noexcept { return unhashed_blocks == 0; }
-    inline bool is_valid() const noexcept { return !invalid; }
-    inline int64_t has_valid_blocks() const noexcept { return valid_blocks; }
-    inline size_t get_queue_size() const noexcept { return queue_size; }
+    inline bool has_valid_blocks() const noexcept { return valid_blocks_count > 0; }
+    inline const valid_blocks_map_t &valid_blocks() const noexcept { return valid_blocks_map; }
 
     void ack_hashing() noexcept;
-    bool ack_block(std::string_view digest, size_t block_index) noexcept;
+    void ack_block(std::string_view digest, size_t block_index) noexcept;
     outcome::result<details::chunk_t> read() noexcept;
 
-    inline model::file_info_ptr_t get_source() { return source_file; }
-    inline model::file_info_ptr_t get_file() { return file; }
+    inline model::file_info_ptr_t get_file() { return peer_file; }
 
     inline bfs::path get_path() noexcept { return backend->get_path(); }
     inline outcome::result<void> remove() noexcept { return backend->remove(); }
@@ -42,16 +41,13 @@ struct SYNCSPIRIT_API chunk_iterator_t {
 
   private:
     scan_task_ptr_t task;
-    model::file_info_ptr_t file;
-    model::file_info_ptr_t source_file;
+    model::file_info_ptr_t peer_file;
     file_ptr_t backend;
     int64_t last_queued_block;
-    int64_t valid_blocks;
-    size_t queue_size;
     size_t unhashed_blocks;
-    std::set<std::int64_t> out_of_order;
+    valid_blocks_map_t valid_blocks_map;
+    std::uint_fast32_t valid_blocks_count;
     bool abandoned;
-    bool invalid;
 };
 
 } // namespace syncspirit::fs

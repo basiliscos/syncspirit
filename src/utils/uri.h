@@ -4,45 +4,25 @@
 #pragma once
 
 #include "syncspirit-export.h"
-#include <boost/optional.hpp>
 #include <boost/utility/string_view.hpp>
-#include <string>
-#include <vector>
-#include <utility>
-#include <cstdint>
+#include <boost/url.hpp>
+#include <boost/intrusive_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ref_counter.hpp>
 
 namespace syncspirit::utils {
 
-struct SYNCSPIRIT_API URI {
-    using StringPair = std::pair<std::string, std::string>;
-    using StringPairs = std::vector<StringPair>;
+struct uri_t;
+using uri_ptr_t = boost::intrusive_ptr<uri_t>;
 
-    std::string full;
-    std::string host;
-    std::uint16_t port;
-    std::string proto;
-    std::string service;
-    std::string path;
-    std::string query;
-    std::string fragment;
+struct SYNCSPIRIT_API uri_t : boost::intrusive_ref_counter<uri_t, boost::thread_unsafe_counter>, boost::urls::url {
+    using parent_t = boost::urls::url;
+    uri_t(boost::urls::url_view view);
 
-    void set_path(const std::string &value) noexcept;
-    void set_query(const std::string &value) noexcept;
-    std::string relative() const noexcept;
-
-    StringPairs decompose_query() const noexcept;
-
-    inline bool operator==(const URI &other) const noexcept { return full == other.full; }
-    bool operator<(const URI &other) const noexcept;
-    inline operator bool() const noexcept { return !full.empty(); }
-
-  private:
-    void reconstruct() noexcept;
+    uri_ptr_t clone() const;
 };
 
-SYNCSPIRIT_API boost::optional<URI> parse(const char *uri);
-SYNCSPIRIT_API boost::optional<URI> parse(const boost::string_view &uri);
+using uri_container_t = std::vector<uri_ptr_t>;
 
-using uri_container_t = std::vector<URI>;
+SYNCSPIRIT_API uri_ptr_t parse(std::string_view string);
 
 } // namespace syncspirit::utils

@@ -4,11 +4,11 @@
 #pragma once
 
 #include "db/utils.h"
-#include <boost/filesystem.hpp>
+#include <filesystem>
 
 namespace syncspirit::test {
 
-namespace bfs = boost::filesystem;
+namespace bfs = std::filesystem;
 namespace db = syncspirit::db;
 
 struct env_t {

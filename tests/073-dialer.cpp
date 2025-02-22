@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "test-utils.h"
 #include "access.h"
 #include "model/cluster.h"
-#include "model/diff/peer/peer_state.h"
-#include "utils/error_code.h"
+#include "model/diff/contact/dial_request.h"
+#include "diff-builder.h"
 
 #include "net/dialer_actor.h"
-#include "net/names.h"
 #include "access.h"
 #include "test_supervisor.h"
 
@@ -17,13 +16,16 @@ using namespace syncspirit::test;
 using namespace syncspirit::model;
 using namespace syncspirit::net;
 
+using state_t = model::device_state_t;
+
 namespace {
 
-struct fixture_t {
-    using discovery_msg_t = net::message::discovery_notify_t;
-    using discovery_ptr_t = r::intrusive_ptr_t<discovery_msg_t>;
+struct fixture_t : private model::diff::cluster_visitor_t {
+    using msg_t = model::message::model_update_t;
+    using msg_ptr_t = r::intrusive_ptr_t<msg_t>;
+    using messages_t = std::vector<msg_ptr_t>;
 
-    fixture_t() noexcept { utils::set_default("trace"); }
+    fixture_t(bool start_dialer_) noexcept : start_dialer{start_dialer_} { test::init_logging(); }
 
     virtual void run() noexcept {
         auto peer_id =
@@ -33,7 +35,7 @@ struct fixture_t {
         auto my_id =
             device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
         auto my_device = device_t::create(my_id, "my-device").value();
-        cluster = new cluster_t(my_device, 1, 1);
+        cluster = new cluster_t(my_device, 1);
 
         cluster->get_devices().put(my_device);
         cluster->get_devices().put(peer_device);
@@ -43,7 +45,10 @@ struct fixture_t {
         sup->cluster = cluster;
         sup->configure_callback = [&](r::plugin::plugin_base_t &plugin) {
             plugin.template with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
-                p.subscribe_actor(r::lambda<discovery_msg_t>([&](discovery_msg_t &msg) { discovery = &msg; }));
+                p.subscribe_actor(r::lambda<msg_t>([&](msg_t &msg) {
+                    std::ignore = msg.payload.diff->apply(*cluster, get_apply_controller());
+                    messages.emplace_back(&msg);
+                }));
             });
         };
 
@@ -55,12 +60,13 @@ struct fixture_t {
         auto global_device_id =
             model::device_id_t::from_string("LYXKCHX-VI3NYZR-ALCJBHF-WMZYSPK-QG6QJA3-MPFYMSO-U56GTUK-NA2MIAW");
 
-        auto cfg = config::dialer_config_t{true, 500};
+        auto cfg = config::dialer_config_t{true, 500, 1};
         auto dialer = sup->create_actor<dialer_actor_t>().cluster(cluster).dialer_config(cfg).timeout(timeout).finish();
-        sup->do_process();
-
-        CHECK(static_cast<r::actor_base_t *>(dialer.get())->access<to::state>() == r::state_t::OPERATIONAL);
         target_addr = dialer->get_address();
+        if (start_dialer) {
+            sup->do_process();
+            CHECK(static_cast<r::actor_base_t *>(dialer.get())->access<to::state>() == r::state_t::OPERATIONAL);
+        }
         main();
 
         sup->shutdown();
@@ -71,64 +77,152 @@ struct fixture_t {
 
     virtual void main() noexcept {}
 
+    bool start_dialer;
     r::address_ptr_t target_addr;
     r::pt::time_duration timeout = r::pt::millisec{10};
     cluster_ptr_t cluster;
     device_ptr_t peer_device;
     r::intrusive_ptr_t<supervisor_t> sup;
     r::system_context_t ctx;
-    discovery_ptr_t discovery;
+    messages_t messages;
 };
 
 } // namespace
 
 void test_dialer() {
     struct F : fixture_t {
+        using fixture_t::fixture_t;
         void main() noexcept override {
+            auto builder = diff_builder_t(*cluster);
+
+            REQUIRE(messages.empty());
+            REQUIRE(peer_device->get_state() == state_t::offline);
+
             sup->send<net::payload::announce_notification_t>(sup->get_address());
             sup->do_process();
-            CHECK(discovery);
-
-            discovery.reset();
-            REQUIRE(sup->timers.size() == 1);
 
             SECTION("peer is not online => discover it on timeout") {
-                sup->do_invoke_timer((*sup->timers.begin())->request_id);
-                sup->do_process();
-                CHECK(discovery);
-                CHECK(sup->timers.size() == 1);
+                REQUIRE(messages.size() == 1);
+                REQUIRE(peer_device->get_state() == state_t::discovering);
             }
 
             SECTION("peer online & offline") {
-                auto diff = model::diff::cluster_diff_ptr_t{};
-                auto sample_addr = sup->get_address();
-                auto peer_id = peer_device->device_id().get_sha256();
-                diff = new model::diff::peer::peer_state_t(*cluster, peer_id, sample_addr, device_state_t::online);
-                sup->send<model::payload::model_update_t>(sup->get_address(), diff);
+                messages.clear();
+                auto connection_id = std::string("tcp://127.0.0.1:1234");
+                builder.update_state(*peer_device, {}, model::device_state_t::online, connection_id).apply(*sup);
+                CHECK(messages.size() == 1);
 
-                sup->do_process();
-                CHECK(!discovery);
-                CHECK(sup->timers.size() == 0);
-
-                diff = new model::diff::peer::peer_state_t(*cluster, peer_id, sample_addr, device_state_t::offline);
-                sup->send<model::payload::model_update_t>(sup->get_address(), diff);
-
-                sup->do_process();
-                CHECK(!discovery);
+                builder.update_state(*peer_device, {}, model::device_state_t::offline, connection_id).apply(*sup);
+                CHECK(messages.size() == 2);
                 CHECK(sup->timers.size() == 1);
 
                 sup->do_invoke_timer((*sup->timers.begin())->request_id);
                 sup->do_process();
-                CHECK(discovery);
+                CHECK(messages.size() == 3);
+                CHECK(peer_device->get_state() == state_t::discovering);
+                CHECK(sup->timers.size() == 0);
+
+                auto uri = utils::parse("tcp://127.0.0.1");
+                builder.update_contact(peer_device->device_id(), {uri}).apply(*sup);
+                REQUIRE(messages.size() == 5);
+                CHECK(peer_device->get_state() == state_t::discovering);
+                CHECK(sup->timers.size() == 0);
+                auto diff = messages.back()->payload.diff;
+                REQUIRE(dynamic_cast<diff::contact::dial_request_t *>(diff.get()));
+
+                builder.update_state(*peer_device, {}, model::device_state_t::offline).apply(*sup);
                 CHECK(sup->timers.size() == 1);
+                sup->do_invoke_timer((*sup->timers.begin())->request_id);
+                sup->do_process();
+                REQUIRE(messages.size() == 7);
+                CHECK(peer_device->get_state() == state_t::offline);
+                CHECK(sup->timers.size() == 0);
+                diff = messages.back()->payload.diff;
+                REQUIRE(dynamic_cast<diff::contact::dial_request_t *>(diff.get()));
+            }
+
+            SECTION("remove peer") {
+                SECTION("start discover") {
+                    builder.update_state(*peer_device, {}, model::device_state_t::offline).apply(*sup);
+                    CHECK(messages.size() == 2);
+                    CHECK(sup->timers.size() == 1);
+                }
+
+                builder.remove_peer(*peer_device).apply(*sup);
+                CHECK(sup->timers.size() == 0);
             }
         }
     };
-    F().run();
+    F(true).run();
+}
+
+void test_static_address() {
+    struct F : fixture_t {
+        using fixture_t::fixture_t;
+        void main() noexcept override {
+            auto builder = diff_builder_t(*cluster);
+
+            REQUIRE(messages.empty());
+            REQUIRE(peer_device->get_state() == state_t::offline);
+            auto uri = utils::parse("tcp://127.0.0.1");
+            peer_device->set_static_uris({uri});
+
+            sup->do_process();
+            REQUIRE(peer_device->get_state() == state_t::offline);
+            REQUIRE(messages.size() == 2);
+            auto diff = messages.back()->payload.diff;
+            REQUIRE(dynamic_cast<diff::contact::dial_request_t *>(diff.get()));
+
+            builder.update_state(*peer_device, {}, model::device_state_t::offline).apply(*sup);
+            CHECK(sup->timers.size() == 1);
+
+            SECTION("remove") {
+                builder.remove_peer(*peer_device).apply(*sup);
+                CHECK(sup->timers.size() == 0);
+                REQUIRE(messages.size() == 4);
+            }
+
+            SECTION("invoke") {
+                sup->do_invoke_timer((*sup->timers.begin())->request_id);
+                sup->do_process();
+                REQUIRE(messages.size() == 4);
+
+                auto diff = messages.back()->payload.diff;
+                REQUIRE(dynamic_cast<diff::contact::dial_request_t *>(diff.get()));
+            }
+        }
+    };
+    F(false).run();
+}
+
+void test_peer_removal() {
+    struct F : fixture_t {
+        using fixture_t::fixture_t;
+        void main() noexcept override {
+            REQUIRE(messages.empty());
+            REQUIRE(peer_device->get_state() == state_t::offline);
+
+            SECTION("with announce") {
+                sup->send<net::payload::announce_notification_t>(sup->get_address());
+                sup->do_process();
+
+                diff_builder_t(*cluster).remove_peer(*peer_device).apply(*sup);
+                REQUIRE(sup->timers.size() == 0);
+            }
+
+            SECTION("without announce") {
+                diff_builder_t(*cluster).remove_peer(*peer_device).apply(*sup);
+                REQUIRE(sup->timers.size() == 0);
+            }
+        }
+    };
+    F(true).run();
 }
 
 int _init() {
     REGISTER_TEST_CASE(test_dialer, "test_dialer", "[net]");
+    REGISTER_TEST_CASE(test_static_address, "test_static_address", "[net]");
+    REGISTER_TEST_CASE(test_peer_removal, "test_peer_removal", "[net]");
     return 1;
 }
 

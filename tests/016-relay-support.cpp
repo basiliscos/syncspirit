@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2023-2024 Ivan Baidakou
 
 #include "test-utils.h"
 #include "proto/relay_support.h"
@@ -84,7 +84,8 @@ TEST_CASE("relay proto", "[relay]") {
         }
 
         SECTION("session_invitation") {
-            auto source = session_invitation_t{"lorem", "impsum", "dolor", 1234, true};
+            auto ip = boost::asio::ip::address_v4::from_string("127.0.0.1");
+            auto source = session_invitation_t{"lorem", "impsum", ip, 1234, true};
             auto sz = serialize(source, buff);
             REQUIRE(sz);
             auto r = parse(buff);
@@ -95,13 +96,13 @@ TEST_CASE("relay proto", "[relay]") {
             REQUIRE(target);
             CHECK(target->from == source.from);
             CHECK(target->key == source.key);
-            CHECK(target->address == source.address);
+            CHECK(target->address.value() == ip);
             CHECK(target->server_socket == source.server_socket);
         }
 
         SECTION("session_invitation (host of zeroes)") {
-            auto zeros = std::string("\0\0\0\0", 4);
-            auto source = session_invitation_t{"lorem", "impsum", zeros, 1234, true};
+            auto ip = boost::asio::ip::address_v4(0);
+            auto source = session_invitation_t{"lorem", "impsum", ip, 1234, true};
             auto sz = serialize(source, buff);
             REQUIRE(sz);
             auto r = parse(buff);
@@ -112,7 +113,7 @@ TEST_CASE("relay proto", "[relay]") {
             REQUIRE(target);
             CHECK(target->from == source.from);
             CHECK(target->key == source.key);
-            CHECK(target->address.empty());
+            CHECK(!target->address.has_value());
             CHECK(target->server_socket == source.server_socket);
         }
 
@@ -166,7 +167,7 @@ TEST_CASE("relay proto", "[relay]") {
             REQUIRE(target);
             CHECK(target->from.size() == 32);
             CHECK(target->key == "lorem-imspum-dolor");
-            CHECK(target->address == "");
+            CHECK(!target->address.has_value());
             CHECK(target->port == 12345);
             CHECK(target->server_socket);
         }
@@ -262,9 +263,10 @@ TEST_CASE("endpoing parsing", "[relay]") {
     REQUIRE(r);
     REQUIRE(r.value().size() == 1);
     auto relay = r.value()[0];
-    CHECK(relay->uri.full == "relay://130.61.176.206:22067/"
-                             "?id=OAKAXEX-7HE764M-5EWVN7U-SZCQU4D-ZPXF2TY-SNTL2LL-Y5RVGVM-U7WBRA3&pingInterval=1m30s&"
-                             "networkTimeout=2m0s&sessionLimitBps=0&globalLimitBps=0&statusAddr=:22070&providedBy=ina");
+    CHECK(relay->uri->buffer() ==
+          "relay://130.61.176.206:22067/"
+          "?id=OAKAXEX-7HE764M-5EWVN7U-SZCQU4D-ZPXF2TY-SNTL2LL-Y5RVGVM-U7WBRA3&pingInterval=1m30s&"
+          "networkTimeout=2m0s&sessionLimitBps=0&globalLimitBps=0&statusAddr=:22070&providedBy=ina");
     CHECK(relay->device_id.get_short() == "OAKAXEX");
     auto &l = relay->location;
     CHECK(abs(l.latitude - 50.1049) < 0.0001);

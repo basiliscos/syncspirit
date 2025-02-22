@@ -2,13 +2,11 @@
 // SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
 
 #include <boost/beast/http.hpp>
-#include <string_view>
-#include <sstream>
 #include <pugixml.hpp>
 #include <spdlog/spdlog.h>
 #include "upnp_support.h"
-#include "../utils/error_code.h"
-#include "../utils/beast_support.h"
+#include "utils/error_code.h"
+#include "utils/beast_support.h"
 
 using namespace syncspirit::utils;
 using namespace syncspirit::model;
@@ -101,18 +99,18 @@ outcome::result<discovery_result> parse(const char *data, std::size_t bytes) noe
 
     auto usn = it_usn->value();
     return discovery_result{
-        *location_option,
+        std::move(location_option),
         std::string(st.begin(), st.end()),
         std::string(usn.begin(), usn.end()),
     };
 }
 
-outcome::result<void> make_description_request(fmt::memory_buffer &buff, const URI &uri) noexcept {
+outcome::result<void> make_description_request(fmt::memory_buffer &buff, const uri_ptr_t &uri) noexcept {
     http::request<http::empty_body> req;
     req.method(http::verb::get);
     req.version(http_version);
-    req.target(uri.relative());
-    req.set(http::field::host, uri.host);
+    req.target(uri->encoded_target());
+    req.set(http::field::host, uri->host());
     req.set(http::field::connection, "close");
 
     return serialize(req, buff);
@@ -137,14 +135,14 @@ outcome::result<igd_result> parse_igd(const char *data, std::size_t bytes) noexc
     return error_code_t::wan_notfound;
 }
 
-outcome::result<void> make_external_ip_request(fmt::memory_buffer &buff, const URI &uri) noexcept {
+outcome::result<void> make_external_ip_request(fmt::memory_buffer &buff, const uri_ptr_t &uri) noexcept {
     http::request<http::string_body> req;
     std::string soap_action = fmt::format("\"{0}#{1}\"", igd_wan_service, soap_GetExternalIPAddress);
     req.method(http::verb::post);
     req.version(http_version);
-    req.target(uri.relative());
+    req.target(uri->encoded_target());
     req.set(http::field::connection, "close");
-    req.set(http::field::host, uri.host);
+    req.set(http::field::host, uri->host());
     req.set(http::field::soapaction, soap_action);
     req.set(http::field::pragma, "no-cache");
     req.set(http::field::cache_control, "no-cache");
@@ -174,14 +172,14 @@ outcome::result<std::string> parse_external_ip(const char *data, std::size_t byt
     return node.node().child_value();
 }
 
-outcome::result<void> make_mapping_request(fmt::memory_buffer &buff, const URI &uri, std::uint16_t external_port,
+outcome::result<void> make_mapping_request(fmt::memory_buffer &buff, const uri_ptr_t &uri, std::uint16_t external_port,
                                            const std::string &internal_ip, std::uint16_t internal_port) noexcept {
     http::request<http::string_body> req;
     std::string soap_action = fmt::format("\"{0}#{1}\"", igd_wan_service, soap_AddPortMapping);
     req.method(http::verb::post);
     req.version(http_version);
-    req.target(uri.relative());
-    req.set(http::field::host, uri.host);
+    req.target(uri->encoded_target());
+    req.set(http::field::host, uri->host());
     req.set(http::field::connection, "close");
     req.set(http::field::soapaction, soap_action);
     req.set(http::field::pragma, "no-cache");
@@ -208,14 +206,14 @@ outcome::result<void> make_mapping_request(fmt::memory_buffer &buff, const URI &
     return serialize(req, buff);
 }
 
-outcome::result<void> make_unmapping_request(fmt::memory_buffer &buff, const URI &uri,
+outcome::result<void> make_unmapping_request(fmt::memory_buffer &buff, const uri_ptr_t &uri,
                                              std::uint16_t external_port) noexcept {
     http::request<http::string_body> req;
     std::string soap_action = fmt::format("\"{0}#{1}\"", igd_wan_service, soap_DeletePortMapping);
     req.method(http::verb::post);
     req.version(http_version);
-    req.target(uri.relative());
-    req.set(http::field::host, uri.host);
+    req.target(uri->encoded_target());
+    req.set(http::field::host, uri->host());
     req.set(http::field::connection, "close");
     req.set(http::field::soapaction, soap_action);
     req.set(http::field::pragma, "no-cache");
@@ -237,14 +235,14 @@ outcome::result<void> make_unmapping_request(fmt::memory_buffer &buff, const URI
     return serialize(req, buff);
 }
 
-outcome::result<void> make_mapping_validation_request(fmt::memory_buffer &buff, const URI &uri,
+outcome::result<void> make_mapping_validation_request(fmt::memory_buffer &buff, const uri_ptr_t &uri,
                                                       std::uint16_t external_port) noexcept {
     http::request<http::string_body> req;
     std::string soap_action = fmt::format("\"{0}#{1}\"", igd_wan_service, soap_GetSpecificPortMappingEntry);
     req.method(http::verb::post);
     req.version(http_version);
-    req.target(uri.relative());
-    req.set(http::field::host, uri.host);
+    req.target(uri->encoded_target());
+    req.set(http::field::host, uri->host());
     req.set(http::field::connection, "close");
     req.set(http::field::soapaction, soap_action);
     req.set(http::field::pragma, "no-cache");
