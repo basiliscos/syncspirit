@@ -19,11 +19,11 @@ TEST_CASE("generic map", "[model]") {
     auto map = devices_map_t();
     map.put(my_device);
     REQUIRE(map.by_sha256(my_id.get_sha256()));
-    REQUIRE(map.get(my_device->get_key()));
+    REQUIRE(map.by_key(my_device->get_key()));
 
     map.remove(my_device);
     REQUIRE(!map.by_sha256(my_id.get_sha256()));
-    REQUIRE(!map.get(my_device->get_key()));
+    REQUIRE(!map.by_key(my_device->get_key()));
     REQUIRE(map == map);
 }
 

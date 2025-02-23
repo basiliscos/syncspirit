@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "base32.h"
-#include <numeric>
 #include "error_code.h"
 
 using namespace syncspirit::utils;
@@ -98,7 +97,7 @@ std::string base32::encode(bytes_view_t input) noexcept {
 
 outcome::result<bytes_t> base32::decode(std::string_view input) noexcept {
     auto decoded_sz = decoded_size(input.size());
-    std::string decoded(decoded_sz, 0);
+    utils::bytes_t decoded(decoded_sz, 0);
 
     std::size_t out_idx = 0;
     std::uint32_t out = 0;

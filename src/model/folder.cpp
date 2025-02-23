@@ -13,7 +13,7 @@ namespace syncspirit::model {
 
 static const constexpr char prefix = (char)(db::prefix::folder);
 
-outcome::result<folder_ptr_t> folder_t::create(bytes_view_t key, const db::Folder &folder) noexcept {
+outcome::result<folder_ptr_t> folder_t::create(utils::bytes_view_t key, const db::Folder &folder) noexcept {
     if (key.size() != data_length) {
         return make_error_code(error_code_t::invalid_folder_key_length);
     }

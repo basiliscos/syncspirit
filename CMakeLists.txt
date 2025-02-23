@@ -225,6 +225,7 @@ add_library(syncspirit_core
     src/transport/http.cpp
     src/utils/base32.cpp
     src/utils/beast_support.cpp
+    src/utils/bytes.cpp
     src/utils/dns.cpp
     src/utils/error_code.cpp
     src/utils/location.cpp

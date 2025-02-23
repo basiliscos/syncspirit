@@ -5,12 +5,12 @@
 
 #include "proto-fwd.hpp"
 #include "proto-impl.h"
+#include "utils/bytes.h"
 #include <cstdint>
-#include <span>
 
 namespace syncspirit::proto {
 
-using bytes_view_t = std::span<const unsigned char>;
+using bytes_view_t = utils::bytes_view_t;
 
 namespace details {
 
@@ -155,7 +155,7 @@ struct SYNCSPIRIT_API Announce {
         using namespace pp;
         (*impl)["_instance_id"_f] = value;
     }
-    void add_address(std::string value) noexcept;
+    void add_addresses(std::string value) noexcept;
     details::Announce* impl;
 };
 
@@ -174,6 +174,19 @@ struct SYNCSPIRIT_API Hello {
         (*impl)["_client_version"_f] = std::string(value);
     }
     details::Hello* impl;
+};
+
+struct SYNCSPIRIT_API Header {
+    Header(details::Header* impl_= nullptr): impl{impl_} {}
+    inline void type(MessageType value) noexcept {
+        using namespace pp;
+        (*impl)["_type"_f] = value;
+    }
+    inline void compression(MessageCompression value) noexcept {
+        using namespace pp;
+        (*impl)["_compression"_f] = value;
+    }
+    details::Header* impl;
 };
 
 struct SYNCSPIRIT_API BlockInfo: proto::impl::changeable::BlockInfo<details::BlockInfo> {
@@ -214,6 +227,7 @@ struct SYNCSPIRIT_API Vector {
         (*impl)["_counters"_f].clear();
     }
     void add_counter(proto::Counter value) noexcept;
+    Counter add_new_counter() noexcept;
 
     details::Vector* impl;
 };
@@ -226,10 +240,7 @@ struct SYNCSPIRIT_API FileInfo: proto::impl::changeable::FileInfo<details::FileI
         using namespace pp;
         (*impl)["_blocks"_f].clear();
     }
-    inline Vector mutable_version() noexcept {
-        using namespace pp;
-        return Vector(&(*impl)["_version"_f].value());
-    }
+    Vector mutable_version() noexcept;
     void add_block(proto::BlockInfo value) noexcept;
 };
 
@@ -256,6 +267,7 @@ struct SYNCSPIRIT_API Device: proto::impl::changeable::Device<details::Device> {
 struct SYNCSPIRIT_API Folder: proto::impl::changeable::Folder<details::Folder> {
     using parent_t = proto::impl::changeable::Folder<details::Folder>;
     using parent_t::parent_t;
+    void add_device(proto::Device value) noexcept;
 };
 
 struct SYNCSPIRIT_API ClusterConfig {
@@ -420,9 +432,29 @@ struct SYNCSPIRIT_API Hello {
     const details::Hello* impl;
 };
 
-struct SYNCSPIRIT_API Header: private details::Header {
-    using parent_t = details::Header;
-    using parent_t::parent_t;
+struct SYNCSPIRIT_API Header {
+    Header(const details::Header* impl_= nullptr): impl{impl_} {}
+    MessageType type() const noexcept {
+        using namespace pp;
+        if (impl) {
+            auto& opt = (*impl)["_type"_f];
+            if (opt) {
+                return opt.value();
+            }
+        }
+        return {};
+    }
+    MessageCompression compression() const noexcept {
+        using namespace pp;
+        if (impl) {
+            auto& opt = (*impl)["_compression"_f];
+            if (opt) {
+                return opt.value();
+            }
+        }
+        return {};
+    }
+    const details::Header* impl;
 };
 
 struct SYNCSPIRIT_API Device: proto::impl::view::Device<details::Device> {
@@ -784,6 +816,10 @@ struct SYNCSPIRIT_API Announce: view::Announce, changeable::Announce, private de
     using view::Announce::instance_id;
     using changeable::Announce::id;
     using changeable::Announce::instance_id;
+
+    static std::optional<Announce> decode(utils::bytes_view_t bytes) noexcept;
+    inline details::Announce& expose() noexcept { return *this; }
+    utils::bytes_t encode() const noexcept;
 };
 
 struct SYNCSPIRIT_API Hello: view::Hello, changeable::Hello, private details::Hello {
@@ -795,22 +831,52 @@ struct SYNCSPIRIT_API Hello: view::Hello, changeable::Hello, private details::He
     using changeable::Hello::device_name;
     using changeable::Hello::client_name;
     using changeable::Hello::client_version;
+
+    static std::optional<Hello> decode(utils::bytes_view_t bytes) noexcept;
+    inline details::Hello& expose() noexcept { return *this; }
+    utils::bytes_t encode() const noexcept;
 };
 
+struct SYNCSPIRIT_API Header: view::Header, changeable::Header, private details::Header {
+    template<typename... T>
+    Header(T&&... args): view::Header(this), changeable::Header(this), details::Header(std::forward<T>(args)...) {}
+
+    using view::Header::type;
+    using view::Header::compression;
+    using changeable::Header::type;
+    using changeable::Header::compression;
+
+    static std::optional<Header> decode(utils::bytes_view_t bytes) noexcept;
+    inline details::Header& expose() noexcept { return *this; }
+    utils::bytes_t encode() const noexcept;
+};
 
 struct SYNCSPIRIT_API ClusterConfig: view::ClusterConfig, changeable::ClusterConfig, private details::ClusterConfig {
     template<typename... T>
     ClusterConfig(T&&... args): view::ClusterConfig(this), changeable::ClusterConfig(this), details::ClusterConfig(std::forward<T>(args)...) {}
+
+    static std::optional<ClusterConfig> decode(utils::bytes_view_t bytes) noexcept;
+    inline details::ClusterConfig& expose() noexcept { return *this; }
+    utils::bytes_t encode() const noexcept;
 };
 
 struct SYNCSPIRIT_API Counter: view::Counter, changeable::Counter, private details::Counter {
     template<typename... T>
     Counter(T&&... args): view::Counter(this),changeable::Counter(this), details::Counter(std::forward<T>(args)...) {}
+    Counter(Counter&& other): view::Counter(this),changeable::Counter(this), details::Counter(std::move(other.expose())) {}
+
+    Counter& operator=(Counter&& other) noexcept { expose() = std::move(other.expose()); return *this; }
+    Counter clone() const noexcept { return Counter(*this); }
+
     using view::Counter::id;
     using view::Counter::value;
     using changeable::Counter::id;
     using changeable::Counter::value;
+
     inline details::Counter& expose() noexcept { return *this; }
+    inline const details::Counter& expose() const noexcept { return *this; }
+    private:
+    Counter(const Counter& other): view::Counter(this),changeable::Counter(this), details::Counter(other.expose()) {}
 };
 
 struct SYNCSPIRIT_API Device: view::Device, changeable::Device, private details::Device {
@@ -838,6 +904,10 @@ struct SYNCSPIRIT_API Device: view::Device, changeable::Device, private details:
 struct SYNCSPIRIT_API BlockInfo: view::BlockInfo, changeable::BlockInfo, private details::BlockInfo {
     template<typename... T>
     BlockInfo(T&&... args): view::BlockInfo(this), changeable::BlockInfo(this), details::BlockInfo(std::forward<T>(args)...) {}
+    BlockInfo(BlockInfo&& other): view::BlockInfo(this),changeable::BlockInfo(this), details::BlockInfo(std::move(other.expose())) {}
+
+    BlockInfo& operator=(BlockInfo&& other) noexcept { expose() = std::move(other.expose()); return *this; }
+    BlockInfo clone() const noexcept { return BlockInfo(*this); }
 
     using view::BlockInfo::offset;
     using view::BlockInfo::size;
@@ -850,6 +920,9 @@ struct SYNCSPIRIT_API BlockInfo: view::BlockInfo, changeable::BlockInfo, private
     using changeable::BlockInfo::weak_hash;
 
     inline details::BlockInfo& expose() noexcept { return *this; }
+    inline const details::BlockInfo& expose() const noexcept { return *this; }
+    private:
+    BlockInfo(const BlockInfo& other): view::BlockInfo(this),changeable::BlockInfo(this), details::BlockInfo(other.expose()) {}
 };
 
 struct SYNCSPIRIT_API FileInfo: view::FileInfo, changeable::FileInfo, private details::FileInfo {
@@ -922,6 +995,10 @@ struct SYNCSPIRIT_API IndexBase: view::IndexBase, changeable::IndexBase, private
 
     using view::IndexBase::folder;
     using changeable::IndexBase::folder;
+
+    static std::optional<IndexBase> decode(utils::bytes_view_t bytes) noexcept;
+    inline details::Index& expose() noexcept { return *this; }
+    utils::bytes_t encode() const noexcept;
 };
 
 struct SYNCSPIRIT_API Index: IndexBase {};
@@ -948,6 +1025,10 @@ struct SYNCSPIRIT_API Request: view::Request, changeable::Request, private detai
     using changeable::Request::hash;
     using changeable::Request::from_temporary;
     using changeable::Request::weak_hash;
+
+    static std::optional<Request> decode(utils::bytes_view_t bytes) noexcept;
+    inline details::Request& expose() noexcept { return *this; }
+    utils::bytes_t encode() const noexcept;
 };
 
 struct SYNCSPIRIT_API Response: view::Response, changeable::Response, private details::Response {
@@ -960,6 +1041,10 @@ struct SYNCSPIRIT_API Response: view::Response, changeable::Response, private de
     using changeable::Response::id;
     using changeable::Response::data;
     using changeable::Response::code;
+
+    static std::optional<Response> decode(utils::bytes_view_t bytes) noexcept;
+    inline details::Response& expose() noexcept { return *this; }
+    utils::bytes_t encode() const noexcept;
 };
 
 struct SYNCSPIRIT_API Close: view::Close, changeable::Close, private details::Close {
@@ -968,14 +1053,22 @@ struct SYNCSPIRIT_API Close: view::Close, changeable::Close, private details::Cl
 
     using view::Close::reason;
     using changeable::Close::reason;
+
+    static std::optional<Close> decode(utils::bytes_view_t bytes) noexcept;
+    inline details::Close& expose() noexcept { return *this; }
+    utils::bytes_t encode() const noexcept;
 };
 
 struct SYNCSPIRIT_API Ping: details::Ping {
     template<typename... T>
     Ping(T&&... args): details::Ping(std::forward<T>(args)...) {}
+    static std::optional<Ping> decode(utils::bytes_view_t bytes) noexcept;
+    utils::bytes_t encode() const noexcept;
 };
 
 struct SYNCSPIRIT_API DownloadProgress {
+    static std::optional<DownloadProgress> decode(utils::bytes_view_t bytes) noexcept;
+    utils::bytes_t encode() const noexcept;
 };
 
 }

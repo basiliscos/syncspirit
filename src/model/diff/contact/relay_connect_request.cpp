@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "relay_connect_request.h"
 #include "../cluster_visitor.h"
@@ -7,7 +7,7 @@
 
 using namespace syncspirit::model::diff::contact;
 
-relay_connect_request_t::relay_connect_request_t(model::device_id_t peer_, std::string session_key_,
+relay_connect_request_t::relay_connect_request_t(model::device_id_t peer_, utils::bytes_t session_key_,
                                                  tcp::endpoint relay_) noexcept
     : peer{std::move(peer_)}, session_key{std::move(session_key_)}, relay{std::move(relay_)} {
     LOG_DEBUG(log, "relay_connect_request_t, device = {}, relay = {}", peer.get_short(), relay);

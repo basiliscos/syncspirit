@@ -88,7 +88,6 @@ using folder_info_ptr_t = intrusive_ptr_t<folder_info_t>;
 struct SYNCSPIRIT_API folder_infos_map_t : public generic_map_t<folder_info_ptr_t, 3> {
     folder_info_ptr_t by_device(const device_t &device) const noexcept;
     folder_info_ptr_t by_device_id(utils::bytes_view_t device_id) const noexcept;
-    folder_info_ptr_t by_device_id(const utils::bytes_t& device_id) const noexcept;
     folder_info_ptr_t by_device_key(utils::bytes_view_t device_id) const noexcept;
 };
 

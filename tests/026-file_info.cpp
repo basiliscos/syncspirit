@@ -18,25 +18,25 @@ TEST_CASE("file-info", "[model]") {
     auto my_device = device_t::create(my_id, "my-device").value();
 
     db::Folder db_folder;
-    db_folder.set_id("1234-5678");
-    db_folder.set_label("my-label");
-    db_folder.set_path("/my/path");
+    db_folder.id("1234-5678");
+    db_folder.label("my-label");
+    db_folder.path("/my/path");
     auto folder = folder_t::create(sequencer->next_uuid(), db_folder).value();
 
     db::FolderInfo db_folder_info;
-    db_folder_info.set_index_id(2);
-    db_folder_info.set_max_sequence(3);
+    db_folder_info.index_id(2);
+    db_folder_info.max_sequence(3);
     auto folder_info = folder_info_t::create(sequencer->next_uuid(), db_folder_info, my_device, folder).value();
 
     proto::FileInfo pr_fi;
-    pr_fi.set_name("a/b.txt");
-    pr_fi.set_size(55ul);
-    pr_fi.set_block_size(5ul);
-    pr_fi.set_sequence(6);
-    pr_fi.set_modified_s(1734680712);
-    auto &c = *pr_fi.mutable_version()->add_counters();
-    c.set_id(my_device->device_id().get_uint());
-    c.set_value(0);
+    pr_fi.name("a/b.txt");
+    pr_fi.size(55ul);
+    pr_fi.block_size(5ul);
+    pr_fi.sequence(6);
+    pr_fi.modified_s(1734680712);
+    auto c = pr_fi.mutable_version().add_new_counter();
+    c.id(my_device->device_id().get_uint());
+    c.value(0);
 
     auto fi = file_info_t::create(sequencer->next_uuid(), pr_fi, folder_info).value();
     auto map = file_infos_map_t{};

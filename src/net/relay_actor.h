@@ -52,7 +52,7 @@ struct SYNCSPIRIT_API relay_actor_t : public r::actor_base_t {
     using http_rx_buff_t = payload::http_request_t::rx_buff_ptr_t;
     using request_option_t = std::optional<r::request_id_t>;
     using relays_t = proto::relay::relay_infos_t;
-    using tx_item_t = boost::local_shared_ptr<std::string>;
+    using tx_item_t = boost::local_shared_ptr<utils::bytes_t>;
     using tx_queue_t = std::deque<tx_item_t>;
 
     enum rx_state_t : std::uint32_t {
@@ -64,7 +64,7 @@ struct SYNCSPIRIT_API relay_actor_t : public r::actor_base_t {
 
     void request_relay_list() noexcept;
     void connect_to_relay() noexcept;
-    void push_master(std::string data) noexcept;
+    void push_master(utils::bytes_t) noexcept;
     void write_master() noexcept;
     void read_master() noexcept;
     void respawn_ping_timer() noexcept;

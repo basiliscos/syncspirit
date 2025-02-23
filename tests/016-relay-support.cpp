@@ -5,9 +5,10 @@
 #include "proto/relay_support.h"
 
 using namespace syncspirit::proto::relay;
+using namespace syncspirit::utils;
 
 TEST_CASE("relay proto", "[relay]") {
-    std::string buff;
+    bytes_t buff;
 
     SECTION("successful cases") {
         SECTION("ping") {
@@ -44,7 +45,9 @@ TEST_CASE("relay proto", "[relay]") {
         }
 
         SECTION("join_session_request") {
-            auto source = join_session_request_t{"lorem impsum dolor"};
+            auto key = std::string_view("lorem impsum dolor");
+            auto ptr = (unsigned char*)key.data();
+            auto source = join_session_request_t(bytes_t(ptr, ptr + key.size()));
             auto sz = serialize(source, buff);
             REQUIRE(sz);
             auto r = parse(buff);
@@ -71,7 +74,9 @@ TEST_CASE("relay proto", "[relay]") {
         }
 
         SECTION("connect_request") {
-            auto source = connect_request_t{"lorem impsum dolor"};
+            auto device_id = std::string_view("lorem impsum dolor");
+            auto ptr = (unsigned char*)device_id.data();
+            auto source = connect_request_t(bytes_t(ptr, ptr+device_id.size()));
             auto sz = serialize(source, buff);
             REQUIRE(sz);
             auto r = parse(buff);
@@ -84,8 +89,14 @@ TEST_CASE("relay proto", "[relay]") {
         }
 
         SECTION("session_invitation") {
+            auto device_id = std::string_view("lorem");
+            auto ptr = (unsigned char*)device_id.data();
+            auto device_id_bytes = bytes_t(ptr, ptr + device_id.size());
+            auto key = std::string_view("impsum dolor");
+            ptr = (unsigned char*)key.data();
+            auto key_bytes = bytes_t(ptr, ptr + key.size());
             auto ip = boost::asio::ip::address_v4::from_string("127.0.0.1");
-            auto source = session_invitation_t{"lorem", "impsum", ip, 1234, true};
+            auto source = session_invitation_t(device_id_bytes, key_bytes, ip, 1234, true);
             auto sz = serialize(source, buff);
             REQUIRE(sz);
             auto r = parse(buff);
@@ -101,8 +112,14 @@ TEST_CASE("relay proto", "[relay]") {
         }
 
         SECTION("session_invitation (host of zeroes)") {
+            auto device_id = std::string_view("lorem");
+            auto ptr = (unsigned char*)device_id.data();
+            auto device_id_bytes = bytes_t(ptr, ptr + device_id.size());
+            auto key = std::string_view("impsum dolor");
+            ptr = (unsigned char*)key.data();
+            auto key_bytes = bytes_t(ptr, ptr + key.size());
             auto ip = boost::asio::ip::address_v4(0);
-            auto source = session_invitation_t{"lorem", "impsum", ip, 1234, true};
+            auto source = session_invitation_t(device_id_bytes, key_bytes, ip, 1234, true);
             auto sz = serialize(source, buff);
             REQUIRE(sz);
             auto r = parse(buff);
@@ -121,8 +138,7 @@ TEST_CASE("relay proto", "[relay]") {
             const unsigned char data[] = {0x9e, 0x79, 0xbc, 0x40, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00,
                                           0x00, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x07,
                                           0x73, 0x75, 0x63, 0x63, 0x65, 0x73, 0x73, 0x00};
-            auto ptr = reinterpret_cast<const char *>(data);
-            auto r = parse({ptr, sizeof(data)});
+            auto r = parse({data, sizeof(data)});
             auto msg = std::get_if<wrapped_message_t>(&r);
             REQUIRE(msg);
             CHECK(msg->length == 28);
@@ -137,8 +153,7 @@ TEST_CASE("relay proto", "[relay]") {
             const unsigned char data[] = {0x9e, 0x79, 0xbc, 0x40, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00,
                                           0x14, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x09, 0x6e, 0x6f,
                                           0x74, 0x20, 0x66, 0x6f, 0x75, 0x6e, 0x64, 0x00, 0x00, 0x00};
-            auto ptr = reinterpret_cast<const char *>(data);
-            auto r = parse({ptr, sizeof(data)});
+            auto r = parse({data, sizeof(data)});
             auto msg = std::get_if<wrapped_message_t>(&r);
             REQUIRE(msg);
             CHECK(msg->length == 32);
@@ -157,16 +172,16 @@ TEST_CASE("relay proto", "[relay]") {
                                           0x6c, 0x6f, 0x72, 0x65, 0x6d, 0x2d, 0x69, 0x6d, 0x73, 0x70, 0x75, 0x6d, 0x2d,
                                           0x64, 0x6f, 0x6c, 0x6f, 0x72, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x30, 0x39,
                                           0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00};
-            auto ptr = reinterpret_cast<const char *>(data);
-            auto str = std::string_view(ptr, sizeof(data));
-            auto r = parse(str);
+            auto bytes = bytes_view_t(data, sizeof(data));
+            auto r = parse(bytes);
             auto msg = std::get_if<wrapped_message_t>(&r);
             REQUIRE(msg);
-            CHECK(msg->length == str.size());
+            CHECK(msg->length == bytes.size());
             auto target = std::get_if<session_invitation_t>(&msg->message);
             REQUIRE(target);
             CHECK(target->from.size() == 32);
-            CHECK(target->key == "lorem-imspum-dolor");
+            auto ptr = (const char*)(target->key.data());
+            CHECK(std::string_view(ptr, target->key.size()) == "lorem-imspum-dolor");
             CHECK(!target->address.has_value());
             CHECK(target->port == 12345);
             CHECK(target->server_socket);
@@ -178,7 +193,8 @@ TEST_CASE("relay proto", "[relay]") {
         auto msg = std::get_if<incomplete_t>(&r);
         REQUIRE(msg);
         serialize(ping_t{}, buff);
-        r = parse(std::string_view(buff.data(), buff.size() - 1));
+        auto view = bytes_view_t(buff);
+        r = parse(view.subspan(1));
         msg = std::get_if<incomplete_t>(&r);
         REQUIRE(msg);
     }

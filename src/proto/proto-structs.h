@@ -493,13 +493,18 @@ struct SYNCSPIRIT_API Device: view::Device, changeable::Device, private details:
     using changeable::Device::last_seen;
 
     inline details::Device& expose() noexcept { return *this; }
-    utils::bytes_t encode() noexcept;
+    inline const details::Device& expose() const noexcept { return *this; }
+    utils::bytes_t encode() const noexcept;
     static std::optional<Device> decode(utils::bytes_view_t bytes) noexcept;
 };
 
 struct SYNCSPIRIT_API Folder: view::Folder, changeable::Folder, private details::Folder {
     template<typename... T>
     Folder(T&&... args): view::Folder(this), changeable::Folder(this), details::Folder(std::forward<T>(args)...) {}
+    Folder(Folder&& other): view::Folder(this), changeable::Folder(this), details::Folder(std::move(other.expose())) {}
+
+    Folder& operator=(Folder&& other) noexcept { expose() = std::move(other.expose()); return *this; }
+    Folder clone() const noexcept { return Folder(*this); }
 
     using view::Folder::id;
     using view::Folder::label;
@@ -528,8 +533,11 @@ struct SYNCSPIRIT_API Folder: view::Folder, changeable::Folder, private details:
     using changeable::Folder::rescan_interval;
 
     inline details::Folder& expose() noexcept { return *this; }
-    utils::bytes_t encode() noexcept;
+    inline const details::Folder& expose() const noexcept { return *this; }
+    utils::bytes_t encode() const noexcept;
     static std::optional<Folder> decode(utils::bytes_view_t bytes) noexcept;
+    private:
+    Folder(const Folder& other): view::Folder(this), changeable::Folder(this), details::Folder(other.expose()) {}
 };
 
 struct SYNCSPIRIT_API FolderInfo: view::FolderInfo, changeable::FolderInfo, private details::FolderInfo {
@@ -542,7 +550,8 @@ struct SYNCSPIRIT_API FolderInfo: view::FolderInfo, changeable::FolderInfo, priv
     using changeable::FolderInfo::max_sequence;
 
     inline details::FolderInfo& expose() noexcept { return *this; }
-    utils::bytes_t encode() noexcept;
+    inline const details::FolderInfo& expose() const noexcept { return *this; }
+    utils::bytes_t encode() const noexcept;
     static std::optional<FolderInfo> decode(utils::bytes_view_t bytes) noexcept;
 };
 
@@ -579,9 +588,10 @@ struct SYNCSPIRIT_API FileInfo: view::FileInfo, changeable::FileInfo, private de
     using changeable::FileInfo::modified_by;
     using changeable::FileInfo::sequence;
 
-    static std::optional<FileInfo> decode(utils::bytes_view_t bytes) noexcept;
     inline details::FileInfo& expose() noexcept { return *this; }
-    utils::bytes_t encode() noexcept;
+    inline const details::FileInfo& expose() const noexcept { return *this; }
+    static std::optional<FileInfo> decode(utils::bytes_view_t bytes) noexcept;
+    utils::bytes_t encode() const noexcept;
 };
 
 struct SYNCSPIRIT_API IgnoredFolder: view::IgnoredFolder, changeable::IgnoredFolder, private details::IgnoredFolder {
@@ -591,9 +601,10 @@ struct SYNCSPIRIT_API IgnoredFolder: view::IgnoredFolder, changeable::IgnoredFol
     using view::IgnoredFolder::label;
     using changeable::IgnoredFolder::label;
 
-    static std::optional<IgnoredFolder> decode(utils::bytes_view_t bytes) noexcept;
     inline details::IgnoredFolder& expose() noexcept { return *this; }
-    utils::bytes_t encode() noexcept;
+    inline const details::IgnoredFolder& expose() const noexcept { return *this; }
+    static std::optional<IgnoredFolder> decode(utils::bytes_view_t bytes) noexcept;
+    utils::bytes_t encode() const noexcept;
 };
 
 struct SYNCSPIRIT_API BlockInfo: view::BlockInfo, changeable::BlockInfo, private details::BlockInfo {
@@ -607,7 +618,8 @@ struct SYNCSPIRIT_API BlockInfo: view::BlockInfo, changeable::BlockInfo, private
     using changeable::BlockInfo::weak_hash;
 
     inline details::BlockInfo& expose() noexcept { return *this; }
-    utils::bytes_t encode() noexcept;
+    inline const details::BlockInfo& expose() const noexcept { return *this; }
+    utils::bytes_t encode() const noexcept;
     static std::optional<BlockInfo> decode(utils::bytes_view_t bytes) noexcept;
 };
 
@@ -616,7 +628,8 @@ struct SYNCSPIRIT_API PendingFolder: view::PendingFolder, changeable::PendingFol
     PendingFolder(T&&... args): view::PendingFolder(this), changeable::PendingFolder(this), details::PendingFolder(std::forward<T>(args)...) {}
 
     inline details::PendingFolder& expose() noexcept { return *this; }
-    utils::bytes_t encode() noexcept;
+    inline const details::PendingFolder& expose() const noexcept { return *this; }
+    utils::bytes_t encode() const noexcept;
     static std::optional<PendingFolder> decode(utils::bytes_view_t bytes) noexcept;
 };
 
@@ -637,7 +650,8 @@ struct SYNCSPIRIT_API SomeDevice: view::SomeDevice, changeable::SomeDevice, priv
     using changeable::SomeDevice::last_seen;
 
     inline details::SomeDevice& expose() noexcept { return *this; }
-    utils::bytes_t encode() noexcept;
+    inline const details::SomeDevice& expose() const noexcept { return *this; }
+    utils::bytes_t encode() const noexcept;
     static std::optional<SomeDevice> decode(utils::bytes_view_t bytes) noexcept;
 };
 

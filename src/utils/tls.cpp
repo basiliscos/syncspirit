@@ -21,6 +21,13 @@ namespace sys = boost::system;
 
 namespace syncspirit::utils {
 
+
+bool cert_data_t::operator==(const cert_data_t& other) const noexcept {
+    auto view_mine = bytes_view_t(*this);
+    auto view_other = bytes_view_t(other);
+    return view_mine == view_other;
+}
+
 x509_t::~x509_t() {
     if (cert) {
         X509_free(cert);
@@ -43,7 +50,7 @@ static bool add_extension(X509V3_CTX &ctx, X509 *cert, int NID_EXT, const char *
     return true;
 }
 
-template <typename Key, typename Fn> static outcome::result<std::string> as_der_impl(Key *cert, Fn &&fn) noexcept {
+template <typename Key, typename Fn> static outcome::result<utils::bytes_t> as_der_impl(Key *cert, Fn &&fn) noexcept {
     BIO *bio = BIO_new(BIO_s_mem());
     auto bio_guard = make_guard(bio, [](auto *ptr) { BIO_free(ptr); });
     if (fn(bio, cert) < 0) {
@@ -54,22 +61,22 @@ template <typename Key, typename Fn> static outcome::result<std::string> as_der_
     if (cert_sz < 0) {
         return error_code_t::tls_cert_save_failure;
     }
-    std::string cert_container(static_cast<std::size_t>(cert_sz), 0);
+    auto cert_container = utils::bytes_t(static_cast<std::size_t>(cert_sz));
     std::memcpy(cert_container.data(), cert_buff, cert_container.size());
     return cert_container;
 }
 
-static outcome::result<std::string> as_der(X509 *cert) noexcept {
+static outcome::result<utils::bytes_t> as_der(X509 *cert) noexcept {
     return as_der_impl(cert, [](BIO *bio, auto *cert) { return i2d_X509_bio(bio, cert); });
 }
 
-static outcome::result<std::string> as_der(EVP_PKEY *key) noexcept {
+static outcome::result<utils::bytes_t> as_der(EVP_PKEY *key) noexcept {
     auto pkc8 = EVP_PKEY2PKCS8(key);
     auto pkc8_guard = make_guard(pkc8, [](auto *ptr) { PKCS8_PRIV_KEY_INFO_free(ptr); });
     return as_der_impl(pkc8, [](BIO *bio, auto *key) { return i2d_PKCS8_PRIV_KEY_INFO_bio(bio, key); });
 }
 
-outcome::result<std::string> as_serialized_der(X509 *cert) noexcept { return as_der(cert); }
+outcome::result<utils::bytes_t> as_serialized_der(X509 *cert) noexcept { return as_der(cert); }
 
 outcome::result<key_pair_t> generate_pair(const char *issuer_name) noexcept {
     auto ev_ctx = EVP_PKEY_CTX_new_id(EVP_PKEY_EC, nullptr);
@@ -290,7 +297,7 @@ outcome::result<key_pair_t> load_pair(const char *cert_path, const char *priv_ke
                       cert_data_t{std::move(key_container.value())}};
 }
 
-outcome::result<std::string> sha256_digest(const std::string &data) noexcept {
+outcome::result<bytes_t> sha256_digest(utils::bytes_view_t data) noexcept {
     unsigned char buff[SHA256_DIGEST_LENGTH];
     auto ctx = EVP_MD_CTX_create();
     auto ctx_guard = make_guard(ctx, [](auto *ptr) { EVP_MD_CTX_free(ptr); });
@@ -302,11 +309,11 @@ outcome::result<std::string> sha256_digest(const std::string &data) noexcept {
     if (1 != EVP_DigestInit_ex(ctx, digester, NULL)) {
         return error_code_t::tls_sha256_failure;
     }
-    if (1 != EVP_DigestUpdate(ctx, data.c_str(), data.size())) {
+    if (1 != EVP_DigestUpdate(ctx, data.data(), data.size())) {
         return error_code_t::tls_sha256_failure;
     }
     EVP_DigestFinal_ex(ctx, buff, NULL);
-    return std::string(buff, buff + SHA256_DIGEST_LENGTH);
+    return {buff, buff + SHA256_DIGEST_LENGTH};
 }
 
 outcome::result<std::string> get_common_name(X509 *cert) noexcept {

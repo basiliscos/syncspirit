@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
 
 #include "test-utils.h"
 #include "access.h"
@@ -27,27 +27,29 @@ TEST_CASE("orphaned blocks, all removed for single file", "[model]") {
 
     REQUIRE(builder.upsert_folder("fid", "/some/path").apply());
 
-    auto b1_hash = utils::sha256_digest("12345").value();
-    auto b2_hash = utils::sha256_digest("56789").value();
-    auto b3_hash = utils::sha256_digest("00000").value();
+    auto b1_hash = utils::sha256_digest(as_bytes("12345")).value();
+    auto b2_hash = utils::sha256_digest(as_bytes("56789")).value();
+    auto b3_hash = utils::sha256_digest(as_bytes("00000")).value();
 
     SECTION("1 file with 2 different blocsk erased") {
         proto::FileInfo pr_file;
-        pr_file.set_name("a.txt");
-        pr_file.set_block_size(5ul);
-        pr_file.set_size(10ul);
-        auto b1 = pr_file.add_blocks();
-        b1->set_hash(b1_hash);
-        b1->set_offset(0);
-        b1->set_size(5);
+        pr_file.name("a.txt");
+        pr_file.block_size(5ul);
+        pr_file.size(10ul);
+        auto b1 = proto::BlockInfo();
+        b1.hash(b1_hash);
+        b1.offset(0);
+        b1.size(5);
+        pr_file.add_block(b1);
 
-        auto b2 = pr_file.add_blocks();
-        b2->set_hash(b2_hash);
-        b2->set_offset(5ul);
-        b2->set_size(5);
+        auto b2 = proto::BlockInfo();
+        b2.hash(b2_hash);
+        b2.offset(5ul);
+        b2.size(5);
+        pr_file.add_block(b2);
 
-        auto bi1 = model::block_info_t::create(*b1).value();
-        auto bi2 = model::block_info_t::create(*b2).value();
+        auto bi1 = model::block_info_t::create(b1).value();
+        auto bi2 = model::block_info_t::create(b2).value();
 
         REQUIRE(builder.local_update("fid", pr_file).apply());
         auto &folder_infos = cluster->get_folders().by_id("fid")->get_folder_infos();
@@ -66,20 +68,23 @@ TEST_CASE("orphaned blocks, all removed for single file", "[model]") {
 
     SECTION("1 file with 2 same blocks erased") {
         proto::FileInfo pr_file;
-        pr_file.set_name("a.txt");
-        pr_file.set_block_size(5ul);
-        pr_file.set_size(10ul);
-        auto b1 = pr_file.add_blocks();
-        b1->set_hash(b1_hash);
-        b1->set_offset(0);
-        b1->set_size(5);
+        pr_file.name("a.txt");
+        pr_file.block_size(5ul);
+        pr_file.size(10ul);
 
-        auto b2 = pr_file.add_blocks();
-        b2->set_hash(b1_hash);
-        b2->set_offset(5ul);
-        b2->set_size(5);
+        auto b1 = proto::BlockInfo();
+        b1.hash(b1_hash);
+        b1.offset(0);
+        b1.size(5);
+        pr_file.add_block(b1);
 
-        auto bi = model::block_info_t::create(*b1).value();
+        auto b2 = proto::BlockInfo();
+        b2.hash(b1_hash);
+        b2.offset(5ul);
+        b2.size(5);
+        pr_file.add_block(b2);
+
+        auto bi = model::block_info_t::create(b1).value();
 
         REQUIRE(builder.local_update("fid", pr_file).apply());
         auto &folder_infos = cluster->get_folders().by_id("fid")->get_folder_infos();
@@ -97,37 +102,42 @@ TEST_CASE("orphaned blocks, all removed for single file", "[model]") {
 
     SECTION("2 file with 1 shared erased") {
         proto::FileInfo pr_file_1;
-        pr_file_1.set_name("a.txt");
-        pr_file_1.set_block_size(5ul);
-        pr_file_1.set_size(10ul);
-        auto b_1_1 = pr_file_1.add_blocks();
-        b_1_1->set_hash(b1_hash);
-        b_1_1->set_offset(0);
-        b_1_1->set_size(5);
+        pr_file_1.name("a.txt");
+        pr_file_1.block_size(5ul);
+        pr_file_1.size(10ul);
 
-        auto b_1_2 = pr_file_1.add_blocks();
-        b_1_2->set_hash(b2_hash);
-        b_1_2->set_offset(5ul);
-        b_1_2->set_size(5);
+        auto b_1_1 = proto::BlockInfo();
+        b_1_1.hash(b1_hash);
+        b_1_1.offset(0);
+        b_1_1.size(5);
+        pr_file_1.add_block(b_1_1);
+
+        auto b_1_2 = proto::BlockInfo();
+        b_1_2.hash(b2_hash);
+        b_1_2.offset(5ul);
+        b_1_2.size(5);
+        pr_file_1.add_block(b_1_2);
 
         proto::FileInfo pr_file_2;
-        pr_file_2.set_name("b.txt");
-        pr_file_2.set_block_size(5ul);
-        pr_file_2.set_size(10ul);
+        pr_file_2.name("b.txt");
+        pr_file_2.block_size(5ul);
+        pr_file_2.size(10ul);
 
-        auto b_2_1 = pr_file_2.add_blocks();
-        b_2_1->set_hash(b1_hash);
-        b_2_1->set_offset(0);
-        b_2_1->set_size(5);
+        auto b_2_1 = proto::BlockInfo();
+        b_2_1.hash(b1_hash);
+        b_2_1.offset(0);
+        b_2_1.size(5);
+        pr_file_2.add_block(b_2_1);
 
-        auto b_2_2 = pr_file_2.add_blocks();
-        b_2_2->set_hash(b3_hash);
-        b_2_2->set_offset(5ul);
-        b_2_2->set_size(5);
+        auto b_2_2 = proto::BlockInfo();
+        b_2_2.hash(b3_hash);
+        b_2_2.offset(5ul);
+        b_2_2.size(5);
+        pr_file_2.add_block(b_2_2);
 
-        auto bi_1 = model::block_info_t::create(*b_1_1).value();
-        auto bi_2 = model::block_info_t::create(*b_1_2).value();
-        auto bi_3 = model::block_info_t::create(*b_2_2).value();
+        auto bi_1 = model::block_info_t::create(b_1_1).value();
+        auto bi_2 = model::block_info_t::create(b_1_2).value();
+        auto bi_3 = model::block_info_t::create(b_2_2).value();
 
         REQUIRE(builder.local_update("fid", pr_file_1).apply());
         REQUIRE(builder.local_update("fid", pr_file_2).apply());

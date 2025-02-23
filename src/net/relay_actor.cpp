@@ -189,8 +189,8 @@ void relay_actor_t::read_master() noexcept {
     master->async_recv(buff, on_read, on_error);
 }
 
-void relay_actor_t::push_master(std::string data) noexcept {
-    tx_queue.emplace_back(tx_item_t(new std::string(std::move(data))));
+void relay_actor_t::push_master(utils::bytes_t data) noexcept {
+    tx_queue.emplace_back(tx_item_t(new utils::bytes_t(std::move(data))));
     if (!resources->has(resource::io_write)) {
         write_master();
     }
@@ -240,7 +240,7 @@ void relay_actor_t::on_connect(message::connect_response_t &res) noexcept {
     rx_state |= rx_state_t::response;
     respawn_rx_timer();
 
-    auto tx = std::string{};
+    auto tx = utils::bytes_t{};
     proto::relay::serialize(proto::relay::join_relay_request_t{}, tx);
     push_master(tx);
 }
@@ -265,7 +265,7 @@ void relay_actor_t::on_read(std::size_t bytes) noexcept {
     size_t from = 0;
     auto process_op = process_t::more;
     while (process_op == process_t::more && from < rx_idx) {
-        auto start = rx_buff.data() + from;
+        auto start = (unsigned char*)(rx_buff.data() + from);
         auto sz = rx_idx - from;
         auto r = proto::relay::parse({start, sz});
         process_op = std::visit(
@@ -311,7 +311,7 @@ bool relay_actor_t::on(proto::relay::message_t &msg) noexcept {
                     err = true;
                 }
             } else if constexpr (std::is_same_v<T, proto::relay::ping_t>) {
-                auto tx = std::string{};
+                auto tx = utils::bytes_t{};
                 proto::relay::serialize(proto::relay::pong_t{}, tx);
                 push_master(tx);
             } else if constexpr (std::is_same_v<T, proto::relay::response_t>) {
@@ -457,7 +457,7 @@ void relay_actor_t::send_ping() noexcept {
         return;
     }
 
-    auto buff = std::string{};
+    auto buff = utils::bytes_t{};
     proto::relay::serialize(proto::relay::ping_t{}, buff);
     push_master(std::move(buff));
     rx_state |= rx_state_t::pong;

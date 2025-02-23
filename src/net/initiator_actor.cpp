@@ -377,7 +377,7 @@ void initiator_actor_t::on_read_relay(size_t bytes) noexcept {
         return;
     }
 
-    auto buff = std::string_view(rx_buff.data(), bytes);
+    auto buff = utils::bytes_view_t(rx_buff.data(), bytes);
     auto r = proto::relay::parse(buff);
     auto wrapped = std::get_if<proto::relay::wrapped_message_t>(&r);
     if (!wrapped) {
@@ -426,7 +426,7 @@ void initiator_actor_t::request_relay_connection() noexcept {
 void initiator_actor_t::on_read_relay_active(size_t bytes) noexcept {
     LOG_TRACE(log, "on_read_relay_active, {} bytes", bytes);
     resources->release(resource::read);
-    auto buff = std::string_view(rx_buff.data(), bytes);
+    auto buff = utils::bytes_view_t(rx_buff.data(), bytes);
     auto r = proto::relay::parse(buff);
     auto wrapped = std::get_if<proto::relay::wrapped_message_t>(&r);
     if (!wrapped) {

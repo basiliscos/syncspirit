@@ -114,7 +114,7 @@ void device_t::update_contact(const tcp::endpoint &endpoint_, std::string_view c
     client_version = client_version_;
 }
 
-auto device_t::get_key() const noexcept -> bytes_view_t{ return id.get_key(); }
+auto device_t::get_key() const noexcept -> utils::bytes_view_t { return id.get_key(); }
 
 void device_t::set_static_uris(uris_t uris) noexcept { static_uris = std::move(uris); }
 
@@ -158,6 +158,11 @@ template <> SYNCSPIRIT_API std::string_view get_index<1>(const device_ptr_t &ite
 device_ptr_t devices_map_t::by_sha256(utils::bytes_view_t device_id) const noexcept {
     auto ptr = (const char*)device_id.data();
     return get<1>(std::string_view(ptr, device_id.size()));
+}
+
+device_ptr_t devices_map_t::by_key(utils::bytes_view_t key) const noexcept {
+    auto ptr = (const char*)key.data();
+    return get<0>(std::string_view(ptr, key.size()));
 }
 
 } // namespace syncspirit::model

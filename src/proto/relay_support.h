@@ -32,7 +32,7 @@ struct pong_t {};
 struct join_relay_request_t {};
 
 struct join_session_request_t {
-    std::string key;
+    utils::bytes_t key;
 };
 
 struct response_t {
@@ -46,7 +46,7 @@ struct connect_request_t {
 
 struct session_invitation_t {
     utils::bytes_t from;
-    std::string key;
+    utils::bytes_t key;
     ipv4_option_t address;
     std::uint32_t port;
     bool server_socket;
@@ -65,8 +65,8 @@ struct wrapped_message_t {
 
 using parse_result_t = std::variant<incomplete_t, protocol_error_t, wrapped_message_t>;
 
-SYNCSPIRIT_API size_t serialize(const relay::message_t &, std::string &out) noexcept;
-SYNCSPIRIT_API parse_result_t parse(std::string_view data) noexcept;
+SYNCSPIRIT_API size_t serialize(const relay::message_t &, utils::bytes_t &out) noexcept;
+SYNCSPIRIT_API parse_result_t parse(utils::bytes_view_t data) noexcept;
 
 struct location_t {
     float latitude;

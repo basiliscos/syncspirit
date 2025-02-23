@@ -10,6 +10,29 @@
 
 namespace syncspirit::proto::impl {
 
+template<typename T, typename B> std::optional<T> generic_decode(utils::bytes_view_t bytes) noexcept {
+    using coder_t = pp::message_coder<B>;
+    auto ptr = (std::byte*)bytes.data();
+    auto span = std::span<std::byte>(ptr, bytes.size());
+    auto opt = coder_t::decode(span);
+    if (opt) {
+        auto& impl = opt.value().first;
+        return T(std::move(impl));
+    }
+    return {};
+}
+
+template<typename B, typename T> utils::bytes_t generic_encode(const T& item) noexcept {
+    using coder_t = pp::message_coder<B>;
+    using skipper_t = pp::skipper<coder_t>;
+    auto &message = item.expose();
+    auto size = skipper_t::encode_skip(message);
+    auto storage = utils::bytes_t(size);
+    auto bytes = pp::bytes((std::byte*)storage.data(), size);
+    coder_t::template encode<pp::unsafe_mode>(message, bytes);
+    return storage;
+}
+
 using bytes_backend_t = std::vector<std::vector<unsigned char>>;
 
 namespace changeable {

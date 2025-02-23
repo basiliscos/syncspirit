@@ -27,7 +27,6 @@ struct file_iterator_t;
 struct cluster_t;
 using device_ptr_t = intrusive_ptr_t<device_t>;
 using file_iterator_ptr_t = intrusive_ptr_t<file_iterator_t>;
-using bytes_view_t = std::span<const unsigned char>;
 
 enum class device_state_t { offline, discovering, connecting, online };
 
@@ -41,7 +40,7 @@ struct SYNCSPIRIT_API device_t : augmentable_t<device_t> {
                                                 std::string_view cert_name = "") noexcept;
     virtual ~device_t();
 
-    virtual bytes_view_t get_key() const noexcept;
+    virtual utils::bytes_view_t get_key() const noexcept;
     bool operator==(const device_t &other) const noexcept { return other.id == id; }
     bool operator!=(const device_t &other) const noexcept { return other.id != id; }
 
@@ -109,12 +108,12 @@ struct SYNCSPIRIT_API device_t : augmentable_t<device_t> {
 struct SYNCSPIRIT_API local_device_t final : device_t {
   public:
     local_device_t(const device_id_t &device_id, std::string_view name, std::string_view cert_name) noexcept;
-    bytes_view_t get_key() const noexcept override;
+    utils::bytes_view_t get_key() const noexcept override;
 };
 
 struct SYNCSPIRIT_API devices_map_t : public generic_map_t<device_ptr_t, 2> {
     device_ptr_t by_sha256(utils::bytes_view_t device_id) const noexcept;
-    device_ptr_t by_sha256(const utils::bytes_t& device_id) const noexcept;
+    device_ptr_t by_key(utils::bytes_view_t key) const noexcept;
 };
 
 } // namespace syncspirit::model

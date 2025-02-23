@@ -7,93 +7,66 @@
 using namespace syncspirit;
 using namespace syncspirit::db;
 
-inline static auto as_bytes(utils::bytes_view_t bytes) noexcept -> std::span<std::byte> {
-    auto ptr = (std::byte*)bytes.data();
-    return std::span<std::byte>(ptr, bytes.size());
-}
-
-template<typename T, typename B> std::optional<T> generic_decode(utils::bytes_view_t bytes) noexcept {
-    using coder_t = pp::message_coder<B>;
-    auto span = as_bytes(bytes);
-    auto opt = coder_t::decode(span);
-    if (opt) {
-        auto& impl = opt.value().first;
-        return T(std::move(impl));
-    }
-    return {};
-}
-
-template<typename B, typename T> utils::bytes_t generic_encode(T& item) noexcept {
-    using coder_t = pp::message_coder<B>;
-    using skipper_t = pp::skipper<coder_t>;
-    auto &message = item.expose();
-    auto size = skipper_t::encode_skip(message);
-    auto storage = utils::bytes_t(size);
-    auto bytes = pp::bytes((std::byte*)storage.data(), size);
-    coder_t::template encode<pp::unsafe_mode>(message, bytes);
-    return storage;
-}
-
-auto BlockInfo::encode() noexcept -> utils::bytes_t {
-    return generic_encode<details::BlockInfo>(*this);
+auto BlockInfo::encode() const noexcept -> utils::bytes_t {
+    return proto::impl::generic_encode<details::BlockInfo>(*this);
 }
 
 auto BlockInfo::decode(utils::bytes_view_t bytes) noexcept -> std::optional<BlockInfo> {
-    return generic_decode<BlockInfo, details::BlockInfo>(bytes);
+    return proto::impl::generic_decode<BlockInfo, details::BlockInfo>(bytes);
 }
 
 auto Device::decode(utils::bytes_view_t bytes) noexcept -> std::optional<Device> {
-    return generic_decode<Device, details::Device>(bytes);
+    return proto::impl::generic_decode<Device, details::Device>(bytes);
 }
 
-utils::bytes_t Device::encode() noexcept {
-    return generic_encode<details::Device>(*this);
+utils::bytes_t Device::encode() const noexcept {
+    return proto::impl::generic_encode<details::Device>(*this);
 }
 
 auto FileInfo::decode(utils::bytes_view_t bytes) noexcept -> std::optional<FileInfo> {
-    return generic_decode<FileInfo, details::FileInfo>(bytes);
+    return proto::impl::generic_decode<FileInfo, details::FileInfo>(bytes);
 }
 
-utils::bytes_t FileInfo::encode() noexcept {
-    return generic_encode<details::FileInfo>(*this);
+utils::bytes_t FileInfo::encode() const noexcept {
+    return proto::impl::generic_encode<details::FileInfo>(*this);
 }
 
 auto Folder::decode(utils::bytes_view_t bytes) noexcept -> std::optional<Folder> {
-    return generic_decode<Folder, details::Folder>(bytes);
+    return proto::impl::generic_decode<Folder, details::Folder>(bytes);
 }
 
-utils::bytes_t Folder::encode() noexcept {
-    return generic_encode<details::Folder>(*this);
+utils::bytes_t Folder::encode() const noexcept {
+    return proto::impl::generic_encode<details::Folder>(*this);
 }
 
 auto FolderInfo::decode(utils::bytes_view_t bytes) noexcept -> std::optional<FolderInfo> {
-    return generic_decode<FolderInfo, details::FolderInfo>(bytes);
+    return proto::impl::generic_decode<FolderInfo, details::FolderInfo>(bytes);
 }
 
-utils::bytes_t FolderInfo::encode() noexcept {
-    return generic_encode<details::FolderInfo>(*this);
+utils::bytes_t FolderInfo::encode() const noexcept {
+    return proto::impl::generic_encode<details::FolderInfo>(*this);
 }
 
 auto IgnoredFolder::decode(utils::bytes_view_t bytes) noexcept -> std::optional<IgnoredFolder> {
-    return generic_decode<IgnoredFolder, details::IgnoredFolder>(bytes);
+    return proto::impl::generic_decode<IgnoredFolder, details::IgnoredFolder>(bytes);
 }
 
-utils::bytes_t IgnoredFolder::encode() noexcept {
-    return generic_encode<details::IgnoredFolder>(*this);
+utils::bytes_t IgnoredFolder::encode() const noexcept {
+    return proto::impl::generic_encode<details::IgnoredFolder>(*this);
 }
 
 auto PendingFolder::decode(utils::bytes_view_t bytes) noexcept -> std::optional<PendingFolder> {
-    return generic_decode<PendingFolder, details::PendingFolder>(bytes);
+    return proto::impl::generic_decode<PendingFolder, details::PendingFolder>(bytes);
 }
 
-utils::bytes_t PendingFolder::encode() noexcept {
-    return generic_encode<details::PendingFolder>(*this);
+utils::bytes_t PendingFolder::encode() const noexcept {
+    return proto::impl::generic_encode<details::PendingFolder>(*this);
 }
 
 auto SomeDevice::decode(utils::bytes_view_t bytes) noexcept -> std::optional<SomeDevice> {
-    return generic_decode<SomeDevice, details::SomeDevice>(bytes);
+    return proto::impl::generic_decode<SomeDevice, details::SomeDevice>(bytes);
 }
 
-utils::bytes_t SomeDevice::encode() noexcept {
-    return generic_encode<details::SomeDevice>(*this);
+utils::bytes_t SomeDevice::encode() const noexcept {
+    return proto::impl::generic_encode<details::SomeDevice>(*this);
 }
