@@ -66,7 +66,7 @@ index_maker_t::index_maker_t(diff_builder_t &builder_, utils::bytes_view_t sha25
 
 index_maker_t &&index_maker_t::add(const proto::FileInfo &file, const model::device_ptr_t &peer,
                                    bool add_version) noexcept {
-    auto f = file;
+    auto f = file.clone();
     if (add_version && f.version().counters_size() == 0) {
         auto c = proto::Counter();
         c.id(peer->device_id().get_uint());
@@ -74,6 +74,7 @@ index_maker_t &&index_maker_t::add(const proto::FileInfo &file, const model::dev
         auto v = f.mutable_version();
         v.add_counter(std::move(c));
     }
+    index.add_file(std::move(f));
     return std::move(*this);
 }
 
@@ -198,7 +199,7 @@ diff_builder_t &diff_builder_t::finish_file(const model::file_info_t &file) noex
 }
 
 diff_builder_t &diff_builder_t::local_update(std::string_view folder_id, const proto::FileInfo &file_) noexcept {
-    return assign(new diff::advance::local_update_t(cluster, *sequencer, file_, folder_id));
+    return assign(new diff::advance::local_update_t(cluster, *sequencer, file_.clone(), folder_id));
 }
 
 diff_builder_t &diff_builder_t::remove_peer(const model::device_t &peer) noexcept {

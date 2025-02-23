@@ -56,6 +56,12 @@ void IndexBase::add_file(proto::FileInfo file) noexcept {
     (*impl)["_files"_f].push_back(std::move(file.expose()));
 }
 
+FileInfo IndexBase::add_new_file() noexcept {
+    auto& files = (*impl)["_files"_f];
+    files.emplace_back(details::FileInfo());
+    return FileInfo(&files.back());
+}
+
 }
 
 }

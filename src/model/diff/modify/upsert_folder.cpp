@@ -11,7 +11,6 @@ using namespace syncspirit::model::diff::modify;
 
 auto upsert_folder_t::create(const cluster_t &cluster, sequencer_t &sequencer, db::Folder db,
                              std::uint64_t index_id) noexcept -> outcome::result<cluster_diff_ptr_t> {
-    auto zzz = db.label();
     auto &folders = cluster.get_folders();
     auto &device = *cluster.get_device();
     auto prev_folder = folders.by_id(db.id());

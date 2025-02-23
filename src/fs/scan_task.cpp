@@ -261,7 +261,7 @@ scan_result_t scan_task_t::advance_symlink_file(const file_info_t &file) noexcep
 
 scan_result_t scan_task_t::advance_unknown_file(const unknown_file_t &file) noexcept {
     if (!is_temporal(file.path.filename())) {
-        return file;
+        return unknown_file_t{file.path, file.metadata.clone()};
     }
 
     auto &path = file.path;

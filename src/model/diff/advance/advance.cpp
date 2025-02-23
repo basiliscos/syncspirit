@@ -62,7 +62,7 @@ void advance_t::initialize(const cluster_t &cluster, sequencer_t &sequencer, pro
     auto local_file = local_files.by_name(local_file_name_);
 
     auto orphans = orphaned_blocks_t::set_t();
-    proto_local = proto_source;
+    proto_local = proto_source.clone();
     proto_local.sequence(0);
     proto_local.name(local_file_name_);
 
