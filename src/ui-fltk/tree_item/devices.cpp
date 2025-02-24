@@ -109,7 +109,7 @@ struct my_table_t : static_table_t {
         }
 
         db::Device db_dev;
-        db_dev.set_name(std::string(ctx.label));
+        db_dev.name(ctx.label);
 
         auto diff = cluster_diff_ptr_t(new modify::update_peer_t(std::move(db_dev), peer, cluster));
         supervisor.send_model<model::payload::model_update_t>(std::move(diff), this);

@@ -311,7 +311,7 @@ callback_ptr_t app_supervisor_t::call_select_folder(std::string_view folder_id) 
     return cb;
 }
 
-callback_ptr_t app_supervisor_t::call_share_folders(std::string folder_id, std::vector<std::string> devices) {
+callback_ptr_t app_supervisor_t::call_share_folders(std::string folder_id, std::vector<utils::bytes_t> devices) {
     assert(devices.size());
     auto fn = callback_fn_t([this, folder_id = std::move(folder_id), devices = std::move(devices)]() {
         auto diff = model::diff::cluster_diff_ptr_t{};
