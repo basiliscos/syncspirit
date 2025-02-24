@@ -18,7 +18,7 @@ struct ignored_folder_t;
 using ignored_folder_ptr_t = intrusive_ptr_t<ignored_folder_t>;
 
 struct SYNCSPIRIT_API ignored_folder_t final : augmentable_t<ignored_folder_t> {
-    static outcome::result<ignored_folder_ptr_t> create(utils::bytes_view_t key, std::string_view label) noexcept;
+    static outcome::result<ignored_folder_ptr_t> create(std::string_view id, std::string_view label) noexcept;
     static outcome::result<ignored_folder_ptr_t> create(utils::bytes_view_t key, utils::bytes_view_t data) noexcept;
 
     utils::bytes_view_t get_key() const noexcept;
@@ -27,7 +27,7 @@ struct SYNCSPIRIT_API ignored_folder_t final : augmentable_t<ignored_folder_t> {
     utils::bytes_t serialize() noexcept;
 
   private:
-    ignored_folder_t(utils::bytes_view_t folder_id, std::string_view label) noexcept;
+    ignored_folder_t(std::string_view folder_id, std::string_view label) noexcept;
     ignored_folder_t(utils::bytes_view_t key) noexcept;
     outcome::result<void> assign_fields(utils::bytes_view_t data) noexcept;
 
@@ -35,6 +35,9 @@ struct SYNCSPIRIT_API ignored_folder_t final : augmentable_t<ignored_folder_t> {
     utils::bytes_t key;
 };
 
-using ignored_folders_map_t = generic_map_t<ignored_folder_ptr_t, 1>;
+struct SYNCSPIRIT_API ignored_folders_map_t: generic_map_t<ignored_folder_ptr_t, 1>
+{
+    ignored_folder_ptr_t by_key(utils::bytes_view_t key) const noexcept;
+};
 
 } // namespace syncspirit::model

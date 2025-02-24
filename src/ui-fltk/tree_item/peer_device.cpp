@@ -95,12 +95,10 @@ struct my_table_t : static_table_t {
 
     void on_apply() {
         auto data = container.peer.serialize();
-        auto device = db::Device();
-        auto ok = device.ParseFromArray(data.data(), data.size());
-        assert(ok);
-        (void)ok;
-
-        auto valid = store(&device);
+        auto opt = db::Device::decode(data);
+        assert(opt);
+        auto& device = opt.value();
+        auto valid = store(&opt.value());
         if (valid) {
             auto &supervisor = container.supervisor;
             auto &device_id = container.peer.device_id();

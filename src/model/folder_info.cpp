@@ -130,6 +130,11 @@ void folder_info_t::set_index(std::uint64_t value) noexcept {
     }
 }
 
+folder_info_ptr_t folder_infos_map_t::by_uuid(utils::bytes_view_t uuid) const noexcept {
+    auto ptr = (const char*)uuid.data();
+    return get<0>(std::string_view{ptr, uuid.size()});
+}
+
 folder_info_ptr_t folder_infos_map_t::by_device(const device_t &device) const noexcept {
     auto sha256 = device.device_id().get_sha256();
     auto ptr = (const char*)sha256.data();

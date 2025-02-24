@@ -6,6 +6,7 @@
 #include <cassert>
 #include <protopuf/message.h>
 #include "proto-fwd.hpp"
+#include "syncspirit-export.h"
 #include "utils/bytes.h"
 
 namespace syncspirit::proto::impl {
@@ -39,7 +40,7 @@ namespace changeable {
 
 template<typename T>
 struct BlockInfo {
-    BlockInfo(T* impl_= nullptr): impl{impl_} {}
+    BlockInfo(T* impl_): impl{impl_} {}
     inline void weak_hash(std::uint32_t value) noexcept {
         using namespace pp;
         (*impl)["_weak_hash"_f] = value;
@@ -54,7 +55,7 @@ struct BlockInfo {
 
 template<typename T>
 struct Device {
-    Device(T* impl_= nullptr): impl{impl_} {}
+    Device(T* impl_): impl{impl_} {}
 
     inline void name(std::string_view value) noexcept {
         using namespace pp;
@@ -192,7 +193,7 @@ namespace view {
 
 template<typename T>
 struct BlockInfo {
-    BlockInfo(const T* impl_= nullptr): impl{impl_} {}
+    BlockInfo(const T* impl_): impl{impl_} {}
     inline std::int32_t size() const noexcept {
         using namespace pp;
         if (impl) {
@@ -218,7 +219,7 @@ struct BlockInfo {
 
 template<typename T>
 struct Device {
-    Device(const T* impl_= nullptr): impl{impl_} {}
+    Device(const T* impl_): impl{impl_} {}
     inline utils::bytes_view_t id() const noexcept {
         using namespace pp;
         if (impl) {
@@ -301,7 +302,7 @@ struct Device {
 
 template<typename T>
 struct Folder {
-    Folder(const T* impl_= nullptr): impl{impl_} {}
+    Folder(const T* impl_): impl{impl_} {}
     // Folder(const Folder& other): impl{other.impl} { }
     // Folder(Folder&& other): impl{nullptr} { (*this) = std::move(other); }
     // Folder& operator=(Folder&& other) noexcept { std::swap(impl, other.impl); return *this; }
@@ -382,7 +383,7 @@ struct Folder {
 
 template<typename T>
 struct SYNCSPIRIT_API FileInfo {
-    FileInfo(const T* impl_= nullptr): impl{impl_} {}
+    FileInfo(const T* impl_): impl{impl_} {assert(impl_);}
 
     inline std::string_view name() const noexcept {
         using namespace pp;

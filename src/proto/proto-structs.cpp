@@ -6,6 +6,19 @@
 
 using namespace syncspirit;
 using namespace syncspirit::db;
+using namespace pp;
+
+namespace syncspirit::db::changeable {
+
+proto::changeable::Vector FileInfo::mutable_version() noexcept {
+    auto& opt = (*impl)["_version"_f];
+    if (!opt.has_value()) {
+        opt = proto::details::Vector();
+    }
+    return proto::changeable::Vector(&(*impl)["_version"_f].value());
+}
+
+}
 
 auto BlockInfo::encode() const noexcept -> utils::bytes_t {
     return proto::impl::generic_encode<details::BlockInfo>(*this);

@@ -204,7 +204,7 @@ TEST_CASE("loading cluster (base)", "[model]") {
         db::IgnoredFolder db_folder;
         db_folder.label("my-label");
 
-        auto folder = ignored_folder_t::create(as_bytes("folder-id"), "my-label").value();
+        auto folder = ignored_folder_t::create("folder-id", "my-label").value();
         auto key = folder->get_key();
         auto data = folder->serialize();
 
@@ -219,7 +219,7 @@ TEST_CASE("loading cluster (base)", "[model]") {
             REQUIRE(diff->apply(*cluster, get_apply_controller()));
             auto &map = cluster->get_ignored_folders();
             REQUIRE(map.size() == 1);
-            target = map.get(folder->get_id());
+            target = map.by_key(folder->get_id());
         }
 
         REQUIRE(target);
@@ -265,7 +265,7 @@ TEST_CASE("loading cluster (folder info)", "[model]") {
         REQUIRE(diff->apply(*cluster, get_apply_controller()));
         auto &map = folder->get_folder_infos();
         REQUIRE(map.size() == 1);
-        target = map.get(fi->get_uuid());
+        target = map.by_uuid(fi->get_uuid());
         REQUIRE(map.by_device(*my_device));
     }
 
@@ -329,9 +329,9 @@ TEST_CASE("loading cluster (file info + block)", "[model]") {
 
     SECTION("directly") {
         auto data = fi->serialize(true);
-        db::FileInfo file_info_db;
-        file_info_db.ParseFromArray(data.data(), data.size());
-        target = file_info_t::create(fi->get_key(), file_info_db, folder_info).value();
+        auto file_info_db = db::FileInfo::decode(data).value().clone();
+        auto v = file_info_db.version();
+        target = file_info_t::create(fi->get_key(), file_info_db, std::move(folder_info)).value();
         REQUIRE(target);
         CHECK(target->get_size() == 55ul);
         CHECK(target->get_block_size() == 5ul);
@@ -348,7 +348,7 @@ TEST_CASE("loading cluster (file info + block)", "[model]") {
         REQUIRE(diff->apply(*cluster, get_apply_controller()));
         auto &map = folder_info->get_file_infos();
         REQUIRE(map.size() == 1);
-        target = map.get(fi->get_uuid());
+        target = map.by_uuid(fi->get_uuid());
         REQUIRE(target);
         REQUIRE(map.by_name(fi->get_name()));
         REQUIRE(target->get_blocks().size() == 11);

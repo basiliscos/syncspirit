@@ -5,6 +5,7 @@
 
 #include "proto-fwd.hpp"
 #include "proto-impl.h"
+#include "syncspirit-export.h"
 #include "utils/bytes.h"
 #include <cstdint>
 
@@ -220,7 +221,10 @@ struct SYNCSPIRIT_API Counter {
 };
 
 struct SYNCSPIRIT_API Vector {
-    Vector(details::Vector* impl_): impl{impl_}{};
+    Vector(details::Vector* impl_): impl{impl_}{ assert(impl); };
+    Vector(const Vector&) = delete;
+    Vector(Vector&&) = delete;
+
     inline details::Vector& expose() noexcept { return *impl; }
     inline void clear_counters() noexcept {
         using namespace pp;
@@ -229,6 +233,7 @@ struct SYNCSPIRIT_API Vector {
     void add_counter(proto::Counter value) noexcept;
     Counter add_new_counter() noexcept;
 
+    private:
     details::Vector* impl;
 };
 
@@ -498,10 +503,7 @@ struct SYNCSPIRIT_API Folder: proto::impl::view::Folder<details::Folder> {
     }
     inline Device devices(size_t i) const noexcept {
         using namespace pp;
-        if (impl) {
-            return Device(&(*impl)["_devices"_f][i]);
-        }
-        return {};
+        return Device(&(*impl)["_devices"_f].at(i));
     }
 };
 
@@ -520,7 +522,7 @@ struct SYNCSPIRIT_API ClusterConfig {
         if (impl) {
             return Folder(&(*impl)["_folders"_f][i]);
         }
-        return {};
+        return Folder(nullptr);
     }
 
     const details::ClusterConfig* impl;
@@ -653,10 +655,7 @@ struct SYNCSPIRIT_API IndexBase {
     }
     inline FileInfo files(size_t i) const noexcept {
         using namespace pp;
-        if (impl) {
-            return FileInfo(&(*impl)["_files"_f][i]);
-        }
-        return {};
+        return FileInfo(&(*impl)["_files"_f].at(i));
     }
     details::Index* impl;
 };

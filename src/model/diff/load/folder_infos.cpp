@@ -16,7 +16,7 @@ auto folder_infos_t::apply_impl(cluster_t &cluster, apply_controller_t &controll
         auto &key = pair.key;
         auto decomposed = folder_info_t::decompose_key(key);
         auto device_key = decomposed.device_key();
-        auto device = devices.by_sha256(device_key);
+        auto device = devices.by_key(device_key);
         if (!device) {
             return make_error_code(error_code_t::no_such_device);
         }

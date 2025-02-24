@@ -131,4 +131,9 @@ template <> SYNCSPIRIT_API std::string_view get_index<1>(const folder_ptr_t &ite
 
 folder_ptr_t folders_map_t::by_id(std::string_view id) const noexcept { return get<1>(id); }
 
+folder_ptr_t folders_map_t::by_key(utils::bytes_view_t key) const noexcept {
+    auto ptr = (const char* )key.data();
+    return get<0>({ptr, key.size()});
+}
+
 } // namespace syncspirit::model

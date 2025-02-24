@@ -38,7 +38,7 @@ auto version_t::as_proto() const noexcept -> proto::Vector {
     return v;
 }
 
-void version_t::to_proto(proto::changeable::Vector v) const noexcept {
+void version_t::to_proto(proto::changeable::Vector &v) const noexcept {
     v.clear_counters();
     for (auto &c : counters) {
         v.add_counter(c.clone());

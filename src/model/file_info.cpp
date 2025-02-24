@@ -477,6 +477,11 @@ template <> SYNCSPIRIT_API std::int64_t get_index<2>(const file_info_ptr_t &item
 
 auto file_infos_map_t::sequence_projection() noexcept -> seq_projection_t { return key2item.template get<2>(); }
 
+file_info_ptr_t file_infos_map_t::by_uuid(utils::bytes_view_t uuid) noexcept {
+    auto ptr = (const char*)uuid.data();
+    return get<0>({ptr, uuid.size()});
+}
+
 file_info_ptr_t file_infos_map_t::by_name(std::string_view name) noexcept { return get<1>(name); }
 
 file_info_ptr_t file_infos_map_t::by_sequence(std::int64_t value) noexcept { return get<2>(value); }

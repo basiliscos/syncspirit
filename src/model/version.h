@@ -17,7 +17,7 @@ struct SYNCSPIRIT_API version_t final : arc_base_t<version_t> {
     version_t(const device_t &) noexcept;
 
     proto::Vector as_proto() const noexcept;
-    void to_proto(proto::changeable::Vector) const noexcept;
+    void to_proto(proto::changeable::Vector&) const noexcept;
 
     proto::view::Counter &get_best() noexcept;
     const proto::Counter &get_best() const noexcept;
