@@ -48,7 +48,7 @@ outcome::result<command_ptr_t> add_folder_t::construct(std::string_view in) noex
         std::uniform_int_distribution<std::uint64_t> distribution;
         std::mt19937 generator(rd());
         auto intId = distribution(generator);
-        auto id_view = std::string((char *)&intId, sizeof(intId));
+        auto id_view = utils::bytes_view_t((const unsigned char *)&intId, sizeof(intId));
         auto raw = utils::base32::encode(id_view);
         id = raw.substr(0, raw.size() / 2);
         id += "-";
@@ -56,18 +56,18 @@ outcome::result<command_ptr_t> add_folder_t::construct(std::string_view in) noex
     }
 
     db::Folder f;
-    f.set_path(std::string(path));
-    f.set_id(id);
-    f.set_label(std::string(label));
-    f.set_read_only(false);
-    f.set_ignore_permissions(true);
-    f.set_ignore_delete(false);
-    f.set_disable_temp_indexes(true);
-    f.set_paused(false);
-    f.set_scheduled(false);
-    f.set_folder_type(db::FolderType::send_and_receive);
-    f.set_pull_order(db::PullOrder::random);
-    f.set_rescan_interval(3600);
+    f.path(path);
+    f.id(id);
+    f.label(label);
+    f.read_only(false);
+    f.ignore_permissions(true);
+    f.ignore_delete(false);
+    f.disable_temp_indexes(true);
+    f.paused(false);
+    f.scheduled(false);
+    f.folder_type(db::FolderType::send_and_receive);
+    f.pull_order(db::PullOrder::random);
+    f.rescan_interval(3600);
     return command_ptr_t(new add_folder_t(std::move(f)));
 }
 

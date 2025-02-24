@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
-#include <google/protobuf/stubs/common.h>
 #include <lz4.h>
 #include <openssl/crypto.h>
 #include <filesystem>
@@ -84,7 +83,6 @@ BOOL WINAPI consoleHandler(DWORD signal) {
 
 int main(int argc, char **argv) {
     auto bootstrap_guard = utils::bootstrap_guard_ptr_t();
-    GOOGLE_PROTOBUF_VERIFY_VERSION;
 
 #if defined(__unix__) || defined(__APPLE__) || defined(__MACH__)
     struct sigaction act;
@@ -253,9 +251,8 @@ int main(int argc, char **argv) {
             }
         }
 
-        spdlog::info("starting {} {}, libraries: protobuf v{}, lz4: v{}, OpenSSL {}", constants::client_name,
-                     SYNCSPIRIT_VERSION, google::protobuf::internal::VersionString(GOOGLE_PROTOBUF_VERSION),
-                     LZ4_versionString(), OpenSSL_version(0));
+        spdlog::info("starting {} {}, libraries: lz4: v{}, OpenSSL {}", constants::client_name,
+                     SYNCSPIRIT_VERSION, LZ4_versionString(), OpenSSL_version(0));
 
         /* pre-init actors */
         asio::io_context io_context;
@@ -369,7 +366,6 @@ int main(int argc, char **argv) {
     }
 
     utils::platform_t::shutdown();
-    google::protobuf::ShutdownProtobufLibrary();
     /* exit */
 
     spdlog::info("normal exit");

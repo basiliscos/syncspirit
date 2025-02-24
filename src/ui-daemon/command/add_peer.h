@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #pragma once
 
 #include "../command.h"
 #include "model/device_id.h"
+#include "proto/proto-bep.h"
 
 namespace syncspirit::daemon::command {
 
