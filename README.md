@@ -126,7 +126,7 @@ distributions on it)
 
 # changes
 
-## 0.4.0 (xx-xxx-2025)
+## 0.4.0 (22-Feb-2025)
  - [feature] new [fltk-fronted](docs/ui-fltk.md)
  - major app refactoring
  
