@@ -9,8 +9,8 @@
 #include "fs/utils.h"
 #include "misc/error_code.h"
 #include "misc/file_iterator.h"
-#include "proto/proto-bep.h"
-#include "proto/proto-structs.h"
+#include "proto/proto-helpers.h"
+#include "proto/proto-helpers.h"
 #include "utils/bytes_comparator.hpp"
 #include <zlib.h>
 #include <spdlog/spdlog.h>

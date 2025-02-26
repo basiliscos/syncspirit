@@ -217,8 +217,8 @@ add_library(syncspirit_core
     src/proto/bep_support.cpp
     src/proto/discovery_support.cpp
     src/proto/luhn32.cpp
-    # src/proto/proto-bep.cpp
-    # src/proto/proto-structs.cpp
+    src/proto/proto-helpers-bep.cpp
+    src/proto/proto-helpers-db.cpp
     src/proto/relay_support.cpp
     src/proto/upnp_support.cpp
     src/transport/stream.cpp

@@ -9,7 +9,7 @@
 #include "model/device.h"
 #include "model/diff/apply_controller.h"
 #include "model/diff/cluster_diff.h"
-#include "proto/proto-structs.h"
+#include "proto/proto-helpers.h"
 #include "syncspirit-test-export.h"
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)

@@ -4,7 +4,7 @@
 #include "folder_info.h"
 #include "folder.h"
 #include "cluster.h"
-#include "proto/proto-structs.h"
+#include "proto/proto-helpers.h"
 #include "../db/prefix.h"
 #include "misc/error_code.h"
 #include <spdlog/spdlog.h>

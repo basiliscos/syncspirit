@@ -3,8 +3,8 @@
 
 #include "block_info.h"
 #include "file_info.h"
-#include "proto/proto-bep.h"
-#include "proto/proto-structs.h"
+#include "proto/proto-helpers.h"
+#include "proto/proto-helpers.h"
 #include "db/prefix.h"
 #include "misc/error_code.h"
 #include <spdlog/spdlog.h>

@@ -5,7 +5,7 @@
 
 #include "model/device_id.h"
 #include "model/misc/error_code.h"
-#include "proto/proto-structs.h"
+#include "proto/proto-helpers.h"
 #include "common.h"
 
 #include <boost/outcome.hpp>

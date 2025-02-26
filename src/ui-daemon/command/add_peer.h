@@ -5,7 +5,7 @@
 
 #include "../command.h"
 #include "model/device_id.h"
-#include "proto/proto-bep.h"
+#include "proto/proto-helpers.h"
 
 namespace syncspirit::daemon::command {
 

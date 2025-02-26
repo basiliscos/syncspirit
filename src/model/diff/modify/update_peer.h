@@ -4,7 +4,7 @@
 #pragma once
 
 #include "../cluster_diff.h"
-#include "proto/proto-structs.h"
+#include "proto/proto-helpers.h"
 #include "model/device_id.h"
 
 namespace syncspirit::model::diff::modify {

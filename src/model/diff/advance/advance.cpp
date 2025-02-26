@@ -4,6 +4,7 @@
 #include "advance.h"
 #include "remote_copy.h"
 #include "remote_win.h"
+#include "proto/proto-helpers.h"
 #include "model/cluster.h"
 #include "model/diff/modify/add_blocks.h"
 #include "model/diff/modify/remove_blocks.h"

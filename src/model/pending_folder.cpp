@@ -4,7 +4,7 @@
 #include "pending_folder.h"
 #include "db/prefix.h"
 #include "misc/error_code.h"
-#include "proto/proto-structs.h"
+#include "proto/proto-helpers.h"
 
 namespace syncspirit::model {
 

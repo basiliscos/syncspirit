@@ -5,7 +5,7 @@
 
 #include "../static_table.h"
 #include "../tree_item.h"
-#include "proto/proto-structs.h"
+#include "proto/proto-helpers.h"
 
 #include <boost/smart_ptr/local_shared_ptr.hpp>
 

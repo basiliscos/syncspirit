@@ -8,7 +8,7 @@
 #include "model/misc/error_code.h"
 #include "model/misc/file_iterator.h"
 #include "utils/format.hpp"
-#include "proto/proto-structs.h"
+#include "proto/proto-helpers.h"
 
 using namespace syncspirit::model::diff::modify;
 

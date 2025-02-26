@@ -9,7 +9,7 @@
 #include "config/fs.h"
 #include "utils/log.h"
 #include "file.h"
-#include "proto/proto-bep.h"
+#include "proto/proto-helpers.h"
 #include <rotor.hpp>
 #include <boost/intrusive_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ref_counter.hpp>

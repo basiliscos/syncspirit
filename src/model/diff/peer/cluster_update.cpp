@@ -12,8 +12,8 @@
 #include "model/diff/cluster_visitor.h"
 #include "model/cluster.h"
 #include "model/misc/orphaned_blocks.h"
-#include "proto/proto-bep.h"
-#include "proto/proto-structs.h"
+#include "proto/proto-helpers.h"
+#include "proto/proto-helpers.h"
 #include "utils/format.hpp"
 #include <spdlog/fmt/bin_to_hex.h>
 #include <spdlog/spdlog.h>

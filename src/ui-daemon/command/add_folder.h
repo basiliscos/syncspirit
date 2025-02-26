@@ -4,7 +4,7 @@
 #pragma once
 
 #include "../command.h"
-#include "proto/proto-structs.h"
+#include "proto/proto-helpers.h"
 #include "model/folder.h"
 
 namespace syncspirit::daemon::command {

@@ -4,7 +4,7 @@
 #include "folder_infos.h"
 #include "model/misc/error_code.h"
 #include "model/cluster.h"
-#include "proto/proto-structs.h"
+#include "proto/proto-helpers.h"
 
 using namespace syncspirit::model::diff::load;
 

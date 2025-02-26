@@ -6,7 +6,7 @@
 #include "../cluster_diff.h"
 #include "model/device.h"
 #include "model/misc/sequencer.h"
-#include "proto/proto-structs.h"
+#include "proto/proto-helpers.h"
 
 namespace syncspirit::model::diff::modify {
 

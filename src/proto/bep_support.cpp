@@ -4,7 +4,7 @@
 #include "bep_support.h"
 #include "constants.h"
 #include "utils/error_code.h"
-#include "proto-bep.h"
+#include "proto/proto-helpers.h"
 #include "syncspirit-config.h"
 #include <boost/endian/arithmetic.hpp>
 #include <boost/endian/conversion.hpp>

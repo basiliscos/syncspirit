@@ -5,7 +5,7 @@
 
 #include "../cluster_diff.h"
 #include "model/device_id.h"
-#include "proto/proto-structs.h"
+#include "proto/proto-helpers.h"
 
 namespace syncspirit::model::diff::contact {
 

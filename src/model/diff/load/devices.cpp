@@ -5,6 +5,7 @@
 #include "model/cluster.h"
 #include "model/misc/error_code.h"
 #include "model/diff/cluster_visitor.h"
+#include "proto/proto-helpers.h"
 
 using namespace syncspirit::model::diff::load;
 

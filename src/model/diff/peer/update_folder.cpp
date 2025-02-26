@@ -7,6 +7,7 @@
 #include "model/diff/modify/remove_blocks.h"
 #include "model/diff/cluster_visitor.h"
 #include "model/misc/error_code.h"
+#include "proto/proto-helpers.h"
 
 using namespace syncspirit;
 using namespace syncspirit::model;

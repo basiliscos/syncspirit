@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
 
 #include "some_device.h"
-#include "proto/proto-structs.h"
+#include "proto/proto-helpers.h"
 #include "utils/time.h"
 
 using namespace syncspirit::model;

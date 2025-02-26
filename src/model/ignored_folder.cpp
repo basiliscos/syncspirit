@@ -4,7 +4,7 @@
 #include "folder.h"
 #include "ignored_folder.h"
 #include "db/prefix.h"
-#include "proto/proto-structs.h"
+#include "proto/proto-helpers.h"
 #include "misc/error_code.h"
 
 namespace syncspirit::model {

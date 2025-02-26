@@ -4,6 +4,7 @@
 #include "remote_copy.h"
 #include "../cluster_visitor.h"
 #include "model/cluster.h"
+#include "proto/proto-helpers.h"
 
 using namespace syncspirit::model::diff::advance;
 

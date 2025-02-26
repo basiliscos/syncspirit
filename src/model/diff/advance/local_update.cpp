@@ -4,6 +4,7 @@
 #include "local_update.h"
 #include "model/cluster.h"
 #include "../cluster_visitor.h"
+#include "proto/proto-helpers.h"
 
 using namespace syncspirit::model::diff::advance;
 

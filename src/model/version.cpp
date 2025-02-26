@@ -3,6 +3,7 @@
 
 #include "version.h"
 #include "device.h"
+#include "proto/proto-helpers.h"
 #include "utils/time.h"
 #include <limits>
 

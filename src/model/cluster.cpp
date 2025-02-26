@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "cluster.h"
+#include "proto/proto-helpers.h"
 #include <spdlog/spdlog.h>
 
 using namespace syncspirit;

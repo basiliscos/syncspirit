@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // SPDX-FileCopyrightText: 2025 Ivan Baidakou
 
-#include "proto-bep.h"
+#include "proto/proto-helpers.h"
 
 using namespace pp;
 

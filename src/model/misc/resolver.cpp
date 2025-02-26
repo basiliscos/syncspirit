@@ -4,6 +4,7 @@
 #include "resolver.h"
 #include "model/cluster.h"
 #include "model/folder_info.h"
+#include "proto/proto-helpers.h"
 
 namespace syncspirit::model {
 
