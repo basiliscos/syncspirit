@@ -17,11 +17,11 @@ auto blocks_t::apply_forward(cluster_t &cluster, apply_controller_t &controller)
 auto blocks_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept -> outcome::result<void> {
     auto &blocks_map = cluster.get_blocks();
     for (auto &pair : blocks) {
-        auto opt  = db::decode::block_info(pair.value);
-        if (!opt) {
+        auto db_block = db::BlockInfo();
+        if (auto ok = db::decode::decode(pair.value, db_block); !ok) {
             return make_error_code(error_code_t::block_deserialization_failure);
         }
-        auto block = block_info_t::create(pair.key, opt.value());
+        auto block = block_info_t::create(pair.key, db_block);
         if (block.has_error()) {
             return block.assume_error();
         }

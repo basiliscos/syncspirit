@@ -27,14 +27,13 @@ auto folder_infos_t::apply_impl(cluster_t &cluster, apply_controller_t &controll
             return make_error_code(error_code_t::no_such_folder);
         }
 
-        auto opt = db::decode::folder_info(pair.value);
-        if (!opt) {
+        auto db_fi = db::FolderInfo();
+        if (auto ok = db::decode::decode(pair.value, db_fi); !ok) {
             return make_error_code(error_code_t::folder_info_deserialization_failure);
         }
-        auto& db = opt.value();
 
         auto &map = folder->get_folder_infos();
-        auto option = folder_info_t::create(key, db, device, folder);
+        auto option = folder_info_t::create(key, db_fi, device, folder);
         if (!option) {
             return option.assume_error();
         }

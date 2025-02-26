@@ -16,11 +16,11 @@ auto devices_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) c
         if (pair.key == local_device->get_key()) {
             device = local_device;
         } else {
-            auto opt  = db::decode::device(pair.value);
-            if (!opt) {
+            auto db_device = db::Device();
+            if (auto ok = db::decode::decode(pair.value, db_device); !ok) {
                 return make_error_code(error_code_t::device_deserialization_failure);
             }
-            auto option = device_t::create(pair.key, opt.value());
+            auto option = device_t::create(pair.key, db_device);
             if (!option) {
                 return option.assume_error();
             }

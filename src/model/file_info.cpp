@@ -265,7 +265,7 @@ outcome::result<void> file_info_t::reserve_blocks(size_t block_count) noexcept {
 }
 
 utils::bytes_t file_info_t::serialize(bool include_blocks) const noexcept {
-    return db::encode::file_info(as_db(include_blocks));
+    return db::encode::encode(as_db(include_blocks));
 }
 
 void file_info_t::mark_unreachable(bool value) noexcept {

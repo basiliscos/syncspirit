@@ -324,13 +324,12 @@ void db_actor_t::on_cluster_load(message::load_cluster_request_t &request) noexc
                 using item_t = decltype(items)::value_type;
                 auto key = ptr->key;
                 auto data = ptr->value;
-                auto opt = db::decode::file_info(ptr->value);
-                if (!opt) {
+                auto db_fi = db::FileInfo();
+                if (!db::decode::decode(ptr->value, db_fi)) {
                     auto ec = make_error_code(model::error_code_t::file_info_deserialization_failure);
                     return reply_with_error(request, make_error(ec));
                 }
-                auto& db = opt.value();
-                items.emplace_back(item_t{key, std::move(db)});
+                items.emplace_back(item_t{key, std::move(db_fi)});
                 ++ptr;
             }
             current = current->assign_sibling(new load::file_infos_t(std::move(items)));

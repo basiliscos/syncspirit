@@ -337,66 +337,45 @@ std::string_view    SYNCSPIRIT_API get_reason(const Close&);
 void                SYNCSPIRIT_API set_reason(Close&, std::string_view value);
 void                SYNCSPIRIT_API set_reason(Close&, std::string value);
 
-#if 0
-struct SYNCSPIRIT_API Announce;
-struct SYNCSPIRIT_API Hello;
-struct SYNCSPIRIT_API Header;
-struct SYNCSPIRIT_API Device;
-struct SYNCSPIRIT_API Folder;
-struct SYNCSPIRIT_API ClusterConfig;
-struct SYNCSPIRIT_API Counter;
-struct SYNCSPIRIT_API Vector;
-struct SYNCSPIRIT_API BlockInfo;
-struct SYNCSPIRIT_API FileInfo;
-struct SYNCSPIRIT_API Index;
-struct SYNCSPIRIT_API IndexUpdate;
-struct SYNCSPIRIT_API Request;
-struct SYNCSPIRIT_API Response;
-struct SYNCSPIRIT_API FileDownloadProgressUpdate;
-struct SYNCSPIRIT_API DownloadProgress;
-struct SYNCSPIRIT_API Ping;
-struct SYNCSPIRIT_API Close;
-#endif
-
 
 namespace encode {
 
 utils::bytes_t encode(const Announce&);
-std::size_t    encode(const Hello&, fmt::memory_buffer&);
-utils::bytes_t encode(const Hello&);
-utils::bytes_t encode(const Header&);
 utils::bytes_t encode(const BlockInfo&);
-utils::bytes_t encode(const Device&);
-utils::bytes_t encode(const FileInfo&);
-utils::bytes_t encode(const Folder&);
-utils::bytes_t encode(const IndexBase&);
-utils::bytes_t encode(const Request&);
-utils::bytes_t encode(const Response&);
-utils::bytes_t encode(const Ping&);
 utils::bytes_t encode(const Close&);
 utils::bytes_t encode(const ClusterConfig&);
-utils::bytes_t encode(const FileDownloadProgressUpdate&);
+utils::bytes_t encode(const Device&);
 utils::bytes_t encode(const DownloadProgress&);
+utils::bytes_t encode(const FileDownloadProgressUpdate&);
+utils::bytes_t encode(const FileInfo&);
+utils::bytes_t encode(const Folder&);
+utils::bytes_t encode(const Header&);
+utils::bytes_t encode(const Hello&);
+std::size_t    encode(const Hello&, fmt::memory_buffer&);
+utils::bytes_t encode(const IndexBase&);
+utils::bytes_t encode(const Ping&);
+utils::bytes_t encode(const Request&);
+utils::bytes_t encode(const Response&);
 
 }
 
 namespace decode {
 
 bool decode(utils::bytes_view_t, Announce&);
-bool decode(utils::bytes_view_t, Hello&);
-bool decode(utils::bytes_view_t, Header&);
 bool decode(utils::bytes_view_t, BlockInfo&);
-bool decode(utils::bytes_view_t, Device&);
-bool decode(utils::bytes_view_t, FileInfo&);
-bool decode(utils::bytes_view_t, Folder&);
-bool decode(utils::bytes_view_t, IndexBase&);
-bool decode(utils::bytes_view_t, Request&);
-bool decode(utils::bytes_view_t, Response&);
-bool decode(utils::bytes_view_t, Ping&);
 bool decode(utils::bytes_view_t, Close&);
 bool decode(utils::bytes_view_t, ClusterConfig&);
-bool decode(utils::bytes_view_t, FileDownloadProgressUpdate&);
+bool decode(utils::bytes_view_t, Device&);
 bool decode(utils::bytes_view_t, DownloadProgress&);
+bool decode(utils::bytes_view_t, FileDownloadProgressUpdate&);
+bool decode(utils::bytes_view_t, FileInfo&);
+bool decode(utils::bytes_view_t, Folder&);
+bool decode(utils::bytes_view_t, Header&);
+bool decode(utils::bytes_view_t, Hello&);
+bool decode(utils::bytes_view_t, IndexBase&);
+bool decode(utils::bytes_view_t, Ping&);
+bool decode(utils::bytes_view_t, Request&);
+bool decode(utils::bytes_view_t, Response&);
 
 }
 
@@ -424,19 +403,6 @@ enum class PullOrder {
 using FileInfoType = proto::FileInfoType;
 using Vector = proto::Vector;
 using Compression = proto::Compression;
-
-#if 0
-
-struct SYNCSPIRIT_API IgnoredFolder;
-struct SYNCSPIRIT_API Device;
-struct SYNCSPIRIT_API Folder;
-struct SYNCSPIRIT_API FolderInfo;
-struct SYNCSPIRIT_API PendingFolder;
-struct SYNCSPIRIT_API FileInfo;
-struct SYNCSPIRIT_API IngoredFolder;
-struct SYNCSPIRIT_API BlockInfo;
-struct SYNCSPIRIT_API SomeDevice;
-#endif
 
 using IgnoredFolder = pp::message<
     pp::string_field    <"label",   1>
@@ -618,27 +584,27 @@ void                SYNCSPIRIT_API set_last_seen(SomeDevice&, std::int64_t value
 
 namespace encode {
 
-utils::bytes_t device        (const Device&);
-utils::bytes_t block_info    (const BlockInfo&);
-utils::bytes_t file_info     (const FileInfo&);
-utils::bytes_t folder        (const Folder&);
-utils::bytes_t folder_info   (const FolderInfo&);
-utils::bytes_t ignored_folder(const IgnoredFolder&);
-utils::bytes_t pending_folder(const PendingFolder&);
-utils::bytes_t some_device   (const SomeDevice&);
+utils::bytes_t encode(const BlockInfo&);
+utils::bytes_t encode(const Device&);
+utils::bytes_t encode(const FileInfo&);
+utils::bytes_t encode(const Folder&);
+utils::bytes_t encode(const FolderInfo&);
+utils::bytes_t encode(const IgnoredFolder&);
+utils::bytes_t encode(const PendingFolder&);
+utils::bytes_t encode(const SomeDevice&);
 
 }
 
 namespace decode {
 
-std::optional<BlockInfo>     block_info     (utils::bytes_view_t);
-std::optional<Device>        device         (utils::bytes_view_t);
-std::optional<FileInfo>      file_info      (utils::bytes_view_t);
-std::optional<FolderInfo>    folder_info    (utils::bytes_view_t);
-std::optional<Folder>        folder         (utils::bytes_view_t);
-std::optional<PendingFolder> pending_folder (utils::bytes_view_t);
-std::optional<SomeDevice>    some_device    (utils::bytes_view_t);
-std::optional<IgnoredFolder> ignored_folder (utils::bytes_view_t);
+bool decode(utils::bytes_view_t, BlockInfo&);
+bool decode(utils::bytes_view_t, Device&);
+bool decode(utils::bytes_view_t, FileInfo&);
+bool decode(utils::bytes_view_t, Folder&);
+bool decode(utils::bytes_view_t, FolderInfo&);
+bool decode(utils::bytes_view_t, IgnoredFolder&);
+bool decode(utils::bytes_view_t, PendingFolder&);
+bool decode(utils::bytes_view_t, SomeDevice&);
 
 }
 

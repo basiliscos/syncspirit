@@ -12,11 +12,11 @@ auto folders_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) c
     auto &map = cluster.get_folders();
     for (auto &pair : folders) {
 
-        auto opt = db::decode::folder(pair.value);
-        if (!opt) {
+        auto db_folder = db::Folder();
+        if (auto ok = db::decode::decode(pair.value, db_folder); !ok) {
             return make_error_code(error_code_t::folder_deserialization_failure);
         }
-        auto option = folder_t::create(pair.key, opt.value());
+        auto option = folder_t::create(pair.key, db_folder);
         if (!option) {
             return option.assume_error();
         }
