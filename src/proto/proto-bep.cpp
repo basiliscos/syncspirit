@@ -5,64 +5,50 @@
 
 using namespace pp;
 
-namespace syncspirit::proto {
-
-namespace view {
-
-proto::BlockInfo BlockInfo::clone() const noexcept {
-    return proto::BlockInfo(*impl);
+template<typename Field>
+void assign_default(Field& f) {
+    using value_t = std::remove_reference_t<std::remove_cv_t<decltype(f.value())>>;
+    f = value_t();
 }
 
-proto::FileInfo FileInfo::clone() const noexcept {
-    return proto::FileInfo(*impl);
-}
+namespace syncspirit::proto::details {
 
-}
-
-namespace changeable {
-
-void Announce::add_addresses(std::string value) noexcept {
-    (*impl)["_addresses"_f].emplace_back(std::move(value));
-}
-
-void Vector::add_counter(proto::Counter value) noexcept {
-    (*impl)["_counters"_f].emplace_back(std::move(value.expose()));
-}
-
-Counter Vector::add_new_counter() noexcept {
-    auto& counters = (*impl)["_counters"_f];
-    counters.emplace_back(details::Counter());
-    return Counter(&counters.back());
-}
-
-Vector FileInfo::mutable_version() noexcept {
-    auto& f = (*impl)["_version"_f];
+utils::bytes_view_t id(Announce& data) noexcept {
+    auto& f = data["id"_f];
     if (!f.has_value()) {
-        f = proto::Vector().expose();
+        assign_default(f);
     }
-    return Vector(&f.value());
+    return f.value();
 }
 
-void FileInfo::add_block(proto::BlockInfo value) noexcept {
-   (*impl)["_blocks"_f].emplace_back(std::move(value.expose()));
+void id(Announce& data, utils::bytes_view_t value) noexcept {
+    data["id"_f] = std::vector<unsigned char>(value.begin(), value.end());
 }
 
-void ClusterConfig::add_folder(proto::Folder value) noexcept {
-    (*impl)["_folders"_f].emplace_back(std::move(value.expose()));
+std::size_t addresses_size(Announce& data) noexcept {
+    return data["addresses"_f].size();
 }
 
-
-void IndexBase::add_file(proto::FileInfo file) noexcept {
-    (*impl)["_files"_f].push_back(std::move(file.expose()));
+std::string_view addresses(Announce& data, std::size_t i) noexcept {
+    return data["addresses"_f][i];
 }
 
-FileInfo IndexBase::add_new_file() noexcept {
-    auto& files = (*impl)["_files"_f];
-    files.emplace_back(details::FileInfo());
-    return FileInfo(&files.back());
+void addresses(Announce& data, std::size_t i, std::string_view value) noexcept {
+    data["addresses"_f][i] = value;
+}
+
+std::uint64_t instance_id(Announce& data) noexcept {
+    auto& f = data["instance_id"_f];
+    if (!f.has_value()) {
+        assign_default(f);
+    }
+    return f.value();
+}
+
+void instance_id(Announce& data, std::uint64_t value) noexcept {
+    data["instance_id"_f] = value;
 }
 
 }
 
-}
-
+// void                SYNCSPIRIT_API instance_id(Announce&, std::uint64_t value) noexcept;

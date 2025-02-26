@@ -79,7 +79,7 @@ scan_result_t scan_task_t::advance() noexcept {
     return false;
 }
 
-scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
+scan_result_t scan_task_t::advance_dir(std::filesystem::__cxx11::path &dir) noexcept {
     sys::error_code ec;
 
     bool exists = bfs::exists(dir, ec);
@@ -127,24 +127,24 @@ scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
             }
 
             proto::FileInfo metadata;
-            metadata.name(rp);
+            proto::set_name(metadata, rp);
             if (status.type() == bfs::file_type::regular) {
-                metadata.type(proto::FileInfoType::FILE);
+                proto::set_type(metadata,proto::FileInfoType::FILE);
                 auto sz = bfs::file_size(child, ec);
                 if (ec) {
                     errors.push_back(scan_error_t{dir, ec});
                     continue;
                 }
-                metadata.size(sz);
+                proto::set_size(metadata, sz);
 
                 auto modification_time = bfs::last_write_time(child, ec);
                 if (ec) {
                     errors.push_back(scan_error_t{dir, ec});
                     continue;
                 }
-                metadata.modified_s(to_unix(modification_time));
+                proto::set_modified_s(metadata, to_unix(modification_time));
             } else if (status.type() == bfs::file_type::directory) {
-                metadata.type(proto::FileInfoType::DIRECTORY);
+                proto::set_type(metadata,proto::FileInfoType::DIRECTORY);
                 dirs_queue.push_back(child);
             } else if (status.type() == bfs::file_type::symlink) {
                 auto target = bfs::read_symlink(child, ec);
@@ -152,15 +152,15 @@ scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
                     errors.push_back(scan_error_t{dir, ec});
                     continue;
                 }
-                metadata.symlink_target(target.string());
-                metadata.type(proto::FileInfoType::SYMLINK);
+                proto::set_symlink_target(metadata, target.string());
+                proto::set_type(metadata,proto::FileInfoType::SYMLINK);
             } else {
                 LOG_WARN(log, "unknown/unimplemented file type {} : {}", (int)status.type(), bfs::path(child).string());
                 continue;
             }
 
             auto permissions = static_cast<uint32_t>(status.permissions());
-            metadata.permissions(permissions);
+            proto::set_permissions(metadata, permissions);
             unknown_files_queue.push_back(unknown_file_t{child, std::move(metadata)});
         }
     }
@@ -174,7 +174,7 @@ scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
     return true;
 }
 
-scan_result_t scan_task_t::advance_file(const file_info_t &file) noexcept {
+scan_result_t scan_task_t::advance_file(file_info_t &file) noexcept {
     if (file->is_file()) {
         return advance_regular_file(file);
     } else if (file->is_dir()) {
@@ -185,7 +185,7 @@ scan_result_t scan_task_t::advance_file(const file_info_t &file) noexcept {
     }
 }
 
-scan_result_t scan_task_t::advance_regular_file(const file_info_t &file) noexcept {
+scan_result_t scan_task_t::advance_regular_file(file_info_t &file) noexcept {
     sys::error_code ec;
 
     auto path = file->get_path();
@@ -197,7 +197,7 @@ scan_result_t scan_task_t::advance_regular_file(const file_info_t &file) noexcep
         return file_error_t{path, ec};
     }
 
-    meta.size(sz);
+    proto::set_size(meta, sz);
     if (sz != (size_t)file->get_size()) {
         changed = true;
     }
@@ -207,7 +207,7 @@ scan_result_t scan_task_t::advance_regular_file(const file_info_t &file) noexcep
         return file_error_t{path, ec};
     }
     auto modified_s = to_unix(modified);
-    meta.modified_s(modified_s);
+    proto::set_modified_s(meta, modified_s);
     if (modified_s != file->get_modified_s()) {
         changed = true;
     }
@@ -217,22 +217,22 @@ scan_result_t scan_task_t::advance_regular_file(const file_info_t &file) noexcep
         return file_error_t{path, ec};
     }
     auto permissions = static_cast<uint32_t>(status.permissions());
-    meta.permissions(permissions);
+    proto::set_permissions(meta, permissions);
     if (permissions != file->get_permissions()) {
         changed = true;
     }
 
     if (changed) {
         using FT = proto::FileInfoType;
-        meta.name(file->get_name());
-        meta.type(FT::FILE);
+        proto::set_name(meta, file->get_name());
+        proto::set_type(meta, FT::FILE);
         return changed_meta_t{file, std::move(meta)};
     }
 
     return unchanged_meta_t{file};
 }
 
-scan_result_t scan_task_t::advance_symlink_file(const file_info_t &file) noexcept {
+scan_result_t scan_task_t::advance_symlink_file(file_info_t &file) noexcept {
     auto path = file->get_path();
 
     if (!bfs::is_symlink(path)) {
@@ -252,21 +252,21 @@ scan_result_t scan_task_t::advance_symlink_file(const file_info_t &file) noexcep
     } else {
         using FT = proto::FileInfoType;
         auto meta = proto::FileInfo();
-        meta.name(file->get_name());
-        meta.type(FT::SYMLINK);
-        meta.symlink_target(target_str);
+        proto::set_name(meta, file->get_name());
+        proto::set_type(meta, FT::SYMLINK);
+        proto::set_symlink_target(meta, std::move(target_str));
         return changed_meta_t{file, std::move(meta)};
     }
 }
 
-scan_result_t scan_task_t::advance_unknown_file(const unknown_file_t &file) noexcept {
+scan_result_t scan_task_t::advance_unknown_file(unknown_file_t &file) noexcept {
     if (!is_temporal(file.path.filename())) {
-        return unknown_file_t{file.path, file.metadata.clone()};
+        return unknown_file_t{file.path, std::move(file.metadata)};
     }
 
     auto &path = file.path;
     auto peer_file = model::file_info_ptr_t{};
-    auto peer_counter = proto::view::Counter();
+    auto peer_counter = proto::Counter();
     auto relative_path = [&]() -> std::string {
         auto rp = relativize(path, root);
         auto name = path.filename();
@@ -288,7 +288,7 @@ scan_result_t scan_task_t::advance_unknown_file(const unknown_file_t &file) noex
                 peer_counter = peer_file->get_version()->get_best();
             } else {
                 auto &c = f->get_version()->get_best();
-                if (peer_counter.value() < c.value()) {
+                if (proto::get_value(peer_counter) < proto::get_value(c)) {
                     peer_counter = c;
                     peer_file = std::move(f);
                     break;
@@ -322,7 +322,7 @@ scan_result_t scan_task_t::advance_unknown_file(const unknown_file_t &file) noex
         return incomplete_removed_t{peer_file};
     }
 
-    auto actual_size = file.metadata.size();
+    auto actual_size = proto::get_size(file.metadata);
     bool size_matches = static_cast<std::int64_t>(peer_file->get_size()) == actual_size;
 
     if (!size_matches) {

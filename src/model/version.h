@@ -5,7 +5,7 @@
 
 #include "misc/arc.hpp"
 #include "syncspirit-export.h"
-#include "proto/proto-bep.h"
+#include "proto/proto-fwd.hpp"
 #include <vector>
 
 namespace syncspirit::model {
@@ -13,13 +13,13 @@ namespace syncspirit::model {
 struct device_t;
 
 struct SYNCSPIRIT_API version_t final : arc_base_t<version_t> {
-    version_t(proto::view::Vector) noexcept;
+    version_t(const proto::Vector&) noexcept;
     version_t(const device_t &) noexcept;
 
     proto::Vector as_proto() const noexcept;
-    void to_proto(proto::changeable::Vector&) const noexcept;
+    void to_proto(proto::Vector&) const noexcept;
 
-    proto::view::Counter &get_best() noexcept;
+    proto::Counter &get_best() noexcept;
     const proto::Counter &get_best() const noexcept;
     void update(const device_t &) noexcept;
     const proto::Counter &get_counter(size_t) noexcept;

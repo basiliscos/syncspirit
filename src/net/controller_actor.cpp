@@ -190,7 +190,7 @@ void controller_actor_t::send_new_indices() noexcept {
                 if (remote_folder && remote_folder->get_index() != local_folder->get_index()) {
                     LOG_DEBUG(log, "sending new index for folder '{}' ({})", folder.get_label(), folder.get_id());
                     proto::Index index;
-                    index.folder(folder.get_id());
+                    proto::set_folder(index, folder.get_id());
                     fmt::memory_buffer data;
                     proto::serialize(data, index);
                     outgoing_buffer += static_cast<uint32_t>(data.size());
@@ -243,7 +243,7 @@ void controller_actor_t::push_pending() noexcept {
         }
         indices.emplace_back(folder_info, proto::IndexUpdate());
         auto &index = indices.back().second;
-        index.folder(folder_info->get_folder()->get_id());
+        proto::set_folder(index, folder_info->get_folder()->get_id());
         return index;
     };
 
@@ -252,7 +252,7 @@ void controller_actor_t::push_pending() noexcept {
         if (auto file_info = updates_streamer->next(); file_info) {
             expected_sz += file_info->expected_meta_size();
             auto &index = get_index(*file_info);
-            index.add_file(file_info->as_proto(true));
+            proto::add_files(index, file_info->as_proto(true));
             LOG_TRACE(log, "pushing index update for: {}, seq = {}", file_info->get_full_name(),
                       file_info->get_sequence());
         } else {
@@ -263,7 +263,7 @@ void controller_actor_t::push_pending() noexcept {
     fmt::memory_buffer data;
     for (auto &p : indices) {
         auto &index = p.second;
-        if (index.files_size() > 0) {
+        if (proto::get_files_size(index) > 0) {
             proto::serialize(data, index);
             outgoing_buffer += static_cast<uint32_t>(data.size());
             send<payload::transfer_data_t>(peer_addr, std::move(data));
@@ -438,7 +438,7 @@ auto controller_actor_t::operator()(const model::diff::peer::update_folder_t &di
         auto folder = cluster->get_folders().by_id(diff.folder_id);
         auto &files_map = folder->get_folder_infos().by_device(*peer)->get_file_infos();
         for (auto &f : diff.files) {
-            auto file = files_map.by_name(f.name());
+            auto file = files_map.by_name(proto::get_name(f));
             cancel_sync(file.get());
         }
         pull_ready();
@@ -455,7 +455,8 @@ auto controller_actor_t::operator()(const model::diff::advance::advance_t &diff,
         auto peer_folder = folder_infos.by_device_id(diff.peer_id);
         auto local_file = model::file_info_ptr_t();
         if (peer_folder) {
-            auto file = peer_folder->get_file_infos().by_name(diff.proto_source.name());
+            auto name = proto::get_name(diff.proto_source);
+            auto file = peer_folder->get_file_infos().by_name(name);
             assert(file);
             if (diff.peer_id == peer->device_id().get_sha256()) {
                 local_file = file->local_file();
@@ -466,7 +467,8 @@ auto controller_actor_t::operator()(const model::diff::advance::advance_t &diff,
         }
         if (diff.peer_id == self.device_id().get_sha256()) {
             auto local_folder = folder_infos.by_device(self);
-            local_file = local_folder->get_file_infos().by_name(diff.proto_local.name());
+            auto name = proto::get_name(diff.proto_local);
+            local_file = local_folder->get_file_infos().by_name(name);
             assert(local_file);
         }
         if (local_file) {
@@ -638,8 +640,9 @@ void controller_actor_t::on_message(proto::message::Index &message) noexcept {
         return do_shutdown(make_error(ec));
     }
     auto &diff = diff_opt.assume_value();
-    auto folder = cluster->get_folders().by_id(msg.folder());
-    LOG_DEBUG(log, "on_message (Index), folder = {}, files = {}", folder->get_label(), msg.files_size());
+    auto folder = cluster->get_folders().by_id(proto::get_folder(msg));
+    auto file_count = proto::get_files_size(msg);
+    LOG_DEBUG(log, "on_message (Index), folder = {}, files = {}", folder->get_label(),file_count);
     push(diff.get());
     pull_ready();
     send_diff();
@@ -655,8 +658,9 @@ void controller_actor_t::on_message(proto::message::IndexUpdate &message) noexce
         return do_shutdown(make_error(ec));
     }
     auto &diff = diff_opt.assume_value();
-    auto folder = cluster->get_folders().by_id(msg.folder());
-    LOG_DEBUG(log, "on_message (IndexUpdate), folder = {}, files = {}", folder->get_label(), msg.files_size());
+    auto folder = cluster->get_folders().by_id(proto::get_folder(msg));
+    auto file_count = proto::get_files_size(msg);
+    LOG_DEBUG(log, "on_message (IndexUpdate), folder = {}, files = {}", folder->get_label(), file_count);
     push(diff.get());
     pull_ready();
     send_diff();
@@ -671,7 +675,8 @@ void controller_actor_t::on_message(proto::message::Request &req) noexcept {
         LOG_WARN(log, "peer requesting too many blocks ({}), rejecting current request", tx_blocks_requested);
         code = proto::ErrorCode::GENERIC;
     } else {
-        auto folder = cluster->get_folders().by_id(req->folder());
+        auto folder_id = proto::get_folder(*req);
+        auto folder = cluster->get_folders().by_id(folder_id);
         if (!folder) {
             code = proto::ErrorCode::NO_SUCH_FILE;
         } else {
@@ -685,7 +690,8 @@ void controller_actor_t::on_message(proto::message::Request &req) noexcept {
                     code = proto::ErrorCode::NO_SUCH_FILE;
                 } else {
                     auto my_folder = folder_infos.by_device(*cluster->get_device());
-                    auto file = my_folder->get_file_infos().by_name(req->name());
+                    auto name = proto::get_name(*req);
+                    auto file = my_folder->get_file_infos().by_name(name);
                     if (!file) {
                         code = proto::ErrorCode::NO_SUCH_FILE;
                     } else {
@@ -700,8 +706,8 @@ void controller_actor_t::on_message(proto::message::Request &req) noexcept {
     }
 
     if (code != proto::ErrorCode::NO_BEP_ERROR) {
-        res.id(req->id());
-        res.code(code);
+        proto::set_id(res, proto::get_id(*req));
+        proto::set_code(res, code);
         proto::serialize(data, res);
         outgoing_buffer += static_cast<uint32_t>(data.size());
         send<payload::transfer_data_t>(peer_addr, std::move(data));
@@ -719,11 +725,11 @@ void controller_actor_t::on_block_response(fs::message::block_response_t &messag
     --tx_blocks_requested;
     auto &p = message.payload;
     proto::Response res;
-    res.id(p.remote_request->id());
+    proto::set_id(res, proto::get_id(*p.remote_request));
     if (p.ec) {
-        res.code(proto::ErrorCode::GENERIC);
+        proto::set_code(res, proto::ErrorCode::GENERIC);
     } else {
-        res.data(std::move(p.data));
+        proto::set_data(res, std::move(p.data));
     }
 
     fmt::memory_buffer data;

@@ -13,7 +13,7 @@ auto upsert_folder_t::create(const cluster_t &cluster, sequencer_t &sequencer, d
                              std::uint64_t index_id) noexcept -> outcome::result<cluster_diff_ptr_t> {
     auto &folders = cluster.get_folders();
     auto &device = *cluster.get_device();
-    auto prev_folder = folders.by_id(db.id());
+    auto prev_folder = folders.by_id(db::get_id(db));
     auto folder_info = prev_folder ? prev_folder->get_folder_infos().by_device(device) : nullptr;
     auto uuid = bu::uuid{};
     if (prev_folder) {
@@ -35,19 +35,21 @@ upsert_folder_t::upsert_folder_t(sequencer_t &sequencer, bu::uuid uuid_, db::Fol
                                  model::folder_info_ptr_t folder_info, const model::device_t &device,
                                  std::uint64_t index_id) noexcept
     : uuid{uuid_}, db{std::move(db_)} {
-    LOG_DEBUG(log, "upsert_folder_t, folder_id = {}, device = {}", db.id(), device.device_id());
+    auto folder_id = db::get_id(db);
+    LOG_DEBUG(log, "upsert_folder_t, folder_id = {}, device = {}", folder_id, device.device_id());
 
     if (!folder_info) {
         auto fi_uuid = sequencer.next_uuid();
         auto diff = cluster_diff_ptr_t{};
-        diff = new upsert_folder_info_t(fi_uuid, device.device_id().get_sha256(), db.id(), index_id);
+        diff = new upsert_folder_info_t(fi_uuid, device.device_id().get_sha256(), folder_id, index_id);
         assign_child(diff);
     }
 }
 
 auto upsert_folder_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
     -> outcome::result<void> {
-    LOG_TRACE(log, "applying upsert_folder_t, folder_id: {}", db.id());
+    auto folder_id = db::get_id(db);
+    LOG_TRACE(log, "applying upsert_folder_t, folder_id: {}", folder_id);
     auto folder_opt = folder_t::create(uuid, db);
     if (!folder_opt) {
         return folder_opt.assume_error();
@@ -55,7 +57,7 @@ auto upsert_folder_t::apply_impl(cluster_t &cluster, apply_controller_t &control
     auto &folder = folder_opt.value();
 
     auto &folders = cluster.get_folders();
-    auto prev_folder = folders.by_id(db.id());
+    auto prev_folder = folders.by_id(folder_id);
     if (!prev_folder) {
         folder->assign_cluster(&cluster);
         folders.put(folder);

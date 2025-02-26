@@ -31,7 +31,8 @@ auto file_infos_t::apply_impl(cluster_t &cluster, apply_controller_t &controller
         auto folder_info_uuid = key.subspan(1, uuid_length);
         auto folder_info = all_fi[folder_info_uuid];
         if (!folder_info) {
-            LOG_WARN(log, "cannot restore file '{}', missing folder, corrupted db?", db.name());
+            auto name = db::get_name(db);
+            LOG_WARN(log, "cannot restore file '{}', missing folder, corrupted db?", name);
             continue;
         }
 
@@ -42,8 +43,9 @@ auto file_infos_t::apply_impl(cluster_t &cluster, apply_controller_t &controller
         auto &fi = option.assume_value();
         folder_info->add_relaxed(fi);
 
-        for (int i = 0; i < db.blocks_size(); ++i) {
-            auto block_hash = db.block(i);
+        auto blocks_count = db::get_blocks_size(db);
+        for (int i = 0; i < blocks_count; ++i) {
+            auto block_hash = db::get_blocks(db, i);
             auto block = blocks.by_hash(block_hash);
             assert(block);
             fi->assign_block(std::move(block), (size_t)i);

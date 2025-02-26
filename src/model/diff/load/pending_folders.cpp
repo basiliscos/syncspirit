@@ -12,7 +12,7 @@ auto pending_folders_t::apply_impl(cluster_t &cluster, apply_controller_t &contr
     -> outcome::result<void> {
     auto &items = cluster.get_pending_folders();
     for (auto &pair : folders) {
-        auto opt  = db::PendingFolder::decode(pair.value);
+        auto opt  = db::decode::pending_folder(pair.value);
         if (!opt) {
             return make_error_code(error_code_t::pending_folder_deserialization_failure);
         }

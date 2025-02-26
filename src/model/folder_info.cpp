@@ -80,8 +80,8 @@ folder_info_t::folder_info_t(const bu::uuid &uuid, const device_ptr_t &device_, 
 }
 
 void folder_info_t::assign_fields(const db::FolderInfo &fi) noexcept {
-    index = fi.index_id();
-    max_sequence = fi.max_sequence();
+    index = db::get_index_id(fi);
+    max_sequence = db::get_max_sequence(fi);
 }
 
 utils::bytes_view_t folder_info_t::get_key() const noexcept { return utils::bytes_view_t(key, data_length); }
@@ -112,14 +112,14 @@ bool folder_info_t::add_strict(const file_info_ptr_t &file_info) noexcept {
 }
 
 void folder_info_t::serialize(db::FolderInfo &storage) const noexcept {
-    storage.index_id(index);
-    storage.max_sequence(max_sequence);
+    db::set_index_id(storage, index);
+    db::set_max_sequence(storage, max_sequence);
 }
 
 utils::bytes_t folder_info_t::serialize() const noexcept {
     db::FolderInfo r;
     serialize(r);
-    return r.encode();
+    return db::encode::folder_info(r);
 }
 
 void folder_info_t::set_index(std::uint64_t value) noexcept {

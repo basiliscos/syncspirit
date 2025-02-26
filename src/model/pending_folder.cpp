@@ -52,25 +52,26 @@ pending_folder_t::pending_folder_t(utils::bytes_view_t key_, const device_id_t &
 }
 
 void pending_folder_t::assign_fields(const db::PendingFolder &data) noexcept {
-    folder_data_t::assign_fields(data.folder());
-    auto fi = data.folder_info();
-    index = fi.index_id();
-    max_sequence = fi.max_sequence();
-    id = data.folder().id();
+    auto& f = db::get_folder(data);
+    id = db::get_id(f);
+    folder_data_t::assign_fields(f);
+    auto& fi = db::get_folder_info(data);
+    index = db::get_index_id(fi);
+    max_sequence = db::get_max_sequence(fi);
 }
 
 void pending_folder_t::serialize(db::PendingFolder &data) const noexcept {
-    auto folder = data.mutable_folder();
+    auto& folder = db::get_folder(data);
     folder_data_t::serialize(folder);
-    auto fi = data.mutable_folder_info();
-    fi.index_id(index);
-    fi.max_sequence(max_sequence);
+    auto& fi = db::get_folder_info(data);
+    db::set_index_id(fi, index);
+    db::set_max_sequence(fi, max_sequence);
 }
 
 utils::bytes_t pending_folder_t::serialize() const noexcept {
     db::PendingFolder r;
     serialize(r);
-    return r.encode();
+    return db::encode::pending_folder(r);
 }
 
 template <> SYNCSPIRIT_API std::string_view get_index<0>(const pending_folder_ptr_t &item) noexcept {

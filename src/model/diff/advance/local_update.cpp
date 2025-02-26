@@ -19,9 +19,9 @@ local_update_t::local_update_t(const cluster_t &cluster, sequencer_t &sequencer,
     auto &local_folder_infos = folder->get_folder_infos();
     auto local_folder_info = local_folder_infos.by_device_id(self_id);
     auto &local_files = local_folder_info->get_file_infos();
-    auto name = proto_file_.name();
+    auto name = proto::get_name(proto_file_);
     auto local_file = local_files.by_name(name);
-    proto_file_.modified_by(self.device_id().get_uint());
+    proto::set_modified_by(proto_file_, self.device_id().get_uint());
 
     initialize(cluster, sequencer, std::move(proto_file_), name);
 
@@ -32,7 +32,7 @@ local_update_t::local_update_t(const cluster_t &cluster, sequencer_t &sequencer,
     } else {
         version.reset(new version_t(device));
     }
-    auto proto_version = proto_local.mutable_version();
+    auto& proto_version = proto::get_version(proto_local);
     version->to_proto(proto_version);
 }
 
@@ -41,10 +41,10 @@ auto local_update_t::apply_impl(cluster_t &cluster, apply_controller_t &controll
     auto folder = cluster.get_folders().by_id(folder_id);
     if (!folder) {
         LOG_DEBUG(log, "remote_copy_t, folder = {}, name = {}, folder is not available, ignoring", folder_id,
-                  proto_source.name());
+                  proto::get_name(proto_source));
     } else if (folder->is_suspended()) {
         LOG_DEBUG(log, "remote_copy_t, folder = {}, name = {}, folder is suspended, ignoring", folder_id,
-                  proto_source.name());
+                  proto::get_name(proto_source));
     } else {
         return advance_t::apply_impl(cluster, controller);
     }
@@ -52,6 +52,6 @@ auto local_update_t::apply_impl(cluster_t &cluster, apply_controller_t &controll
 }
 
 auto local_update_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {
-    LOG_TRACE(log, "visiting local_update_t, folder = {}, file = {}", folder_id, proto_local.name());
+    LOG_TRACE(log, "visiting local_update_t, folder = {}, file = {}", folder_id, proto::get_name(proto_local));
     return visitor(*this, custom);
 }

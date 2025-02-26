@@ -51,44 +51,49 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
     auto folder_update_diff = diff::cluster_diff_ptr_t{};
     auto folder_update = (diff::cluster_diff_t *){nullptr};
 
-    auto add_pending = [&](const proto::view::Folder& f, const proto::view::Device& d) noexcept {
+    auto add_pending = [&](const proto::Folder& f, const proto::Device& d) noexcept {
         using item_t = decltype(new_pending_folders)::value_type;
-        LOG_TRACE(log, "cluster_update_t, (add/update) pending folder = {}", f.label());
+        auto label = proto::get_label(f);
+        LOG_TRACE(log, "cluster_update_t, (add/update) pending folder = {}", label);
         db::PendingFolder db;
-        auto fi = db.mutable_folder_info();
-        auto db_f = db.mutable_folder();
-        fi.index_id(d.index_id());
-        fi.max_sequence(d.max_sequence());
-        db_f.id(f.id());
-        db_f.label(f.label());
-        db_f.read_only(f.read_only());
-        db_f.ignore_permissions(f.ignore_permissions());
-        db_f.ignore_delete(f.ignore_delete());
-        db_f.disable_temp_indexes(f.disable_temp_indexes());
-        db_f.paused(f.paused());
+        auto& db_fi = db::get_folder_info(db);
+        auto& db_f =  db::get_folder(db);
+        db::set_index_id(db_fi, proto::get_index_id(d));
+        db::set_max_sequence(db_fi, proto::get_max_sequence(d));
+        db::set_id(db_f, proto::get_id(f));
+        db::set_label(db_f, label);
+        db::set_read_only(db_f, proto::get_read_only(f));
+        db::set_ignore_permissions(db_f, proto::get_ignore_permissions(f));
+        db::set_ignore_delete(db_f, proto::get_ignore_delete(f));
+        db::set_disable_temp_indexes(db_f, proto::get_disable_temp_indexes(f));
+        db::set_paused(db_f, proto::get_paused(f));
 
         auto sha256 = source.device_id().get_sha256();
         auto id = utils::bytes_t(sha256.begin(), sha256.end());
         new_pending_folders.push_back(item_t{std::move(db), std::move(id), sequencer.next_uuid()});
     };
 
-    for (int i = 0; i < message.folders_size(); ++i) {
-        auto f = message.folders(i);
-        auto folder_id = f.id();
+    auto folders_count = proto::get_folders_size(message);
+    for (size_t i = 0; i < folders_count ; ++i) {
+        auto& f = proto::get_folders(message, i);
+        auto folder_id = proto::get_id(f);
+        auto folder_label = proto::get_label(f);
         auto folder = folders.by_id(folder_id);
-        LOG_TRACE(log, "cluster_update_t, folder label = '{}', id = '{}'", f.label(), folder_id);
+        LOG_TRACE(log, "cluster_update_t, folder label = '{}', id = '{}'", folder_label, folder_id);
+        auto devices_count = proto::get_devices_size(f);
         if (!folder) {
-            for (int i = 0; i < f.devices_size(); ++i) {
-                auto d = f.devices(i);
-                if (d.id() == source.device_id().get_sha256()) {
+            for (int j = 0; j < devices_count; ++j) {
+                auto& d = proto::get_devices(f, j);
+                if (proto::get_id(d) == source.device_id().get_sha256()) {
                     for (auto &it : known_pending_folders) {
                         auto &uf = it.item;
-                        auto match = uf->device_id() == source.device_id() && uf->get_id() == f.id();
+                        auto match = uf->device_id() == source.device_id() && uf->get_id() == folder_id;
                         if (match) {
+                            auto index_id = proto::get_index_id(d);
                             auto key = uf->get_key();
                             auto uf_key = utils::bytes_t(key.begin(), key.end());
                             confirmed_pending_folders.emplace(uf_key);
-                            bool actual = uf->get_index() == d.index_id() && uf->get_max_sequence() == d.max_sequence();
+                            bool actual = uf->get_index() == index_id && uf->get_max_sequence() == proto::get_max_sequence(d);
                             if (!actual) {
                                 removed_pending_folders.emplace(std::move(uf_key));
                                 add_pending(f, d);
@@ -104,9 +109,9 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
             continue;
         }
 
-        for (int j = 0; j < f.devices_size(); ++j) {
-            auto d = f.devices(j);
-            auto device_sha = d.id();
+        for (int j = 0; j < devices_count; ++j) {
+            auto& d = proto::get_devices(f, j);
+            auto device_sha = proto::get_id(d);
             auto device = devices.by_sha256(device_sha);
             auto device_opt = model::device_id_t::from_sha256(device_sha);
             if (!device_opt) {
@@ -114,46 +119,48 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
                 LOG_WARN(log, "cluster_update_t, malformed device id: {}", device_hex);
                 continue;
             }
+            auto index_id = proto::get_index_id(d);
             auto &device_id = *device_opt;
+            auto max_sequence = proto::get_max_sequence(d);
             LOG_TRACE(log, "cluster_update_t, shared with device = '{}', index = {:#x}, max seq. = {}", device_id,
-                      d.index_id(), d.max_sequence());
+                      index_id, max_sequence);
 
             if (!device) {
                 LOG_TRACE(log, "cluster_update_t, unknown device, ignoring");
                 continue;
             }
             if (*device != source) {
-                remote_folders.emplace_back(std::string(f.id()), d.index_id(), d.max_sequence());
-                LOG_TRACE(log, "cluster_update_t, remote folder = {}, device = {}, max seq. = {}", f.label(),
-                          device_id.get_short(), d.max_sequence());
+                remote_folders.emplace_back(std::string(folder_id), index_id, max_sequence);
+                LOG_TRACE(log, "cluster_update_t, remote folder = {}, device = {}, max seq. = {}", folder_label,
+                          device_id.get_short(), max_sequence);
                 continue;
             }
 
             auto &folder_infos = folder->get_folder_infos();
             auto folder_info = folder_infos.by_device(*device);
             if (!folder_info) {
-                LOG_TRACE(log, "cluster_update_t, adding pending folder {} non-shared with {}", f.label(),
+                LOG_TRACE(log, "cluster_update_t, adding pending folder {} non-shared with {}", folder_label,
                           device->device_id());
                 add_pending(f, d);
                 continue;
             }
 
             bool do_update = false;
-            if (d.index_id() != folder_info->get_index()) {
+            if (index_id != folder_info->get_index()) {
                 do_update = true;
-                LOG_TRACE(log, "cluster_update_t, reseting folder: {}, new index = {:#x}, max_seq = {}", f.label(),
-                          d.index_id(), d.max_sequence());
+                LOG_TRACE(log, "cluster_update_t, reseting folder: {}, new index = {:#x}, max_seq = {}", folder_label,
+                          index_id, max_sequence);
                 reset_folders.put(folder_info);
-            } else if (d.max_sequence() > folder_info->get_max_sequence()) {
+            } else if (max_sequence > folder_info->get_max_sequence()) {
                 LOG_TRACE(log, "cluster_update_t, updating folder = {}, index = {:#x}, max seq = {} -> {}",
                           folder->get_label(), folder_info->get_index(), folder_info->get_max_sequence(),
-                          d.max_sequence());
+                          max_sequence);
             }
             if (do_update) {
                 auto uuid = bu::uuid{};
                 assign(uuid, folder_info->get_uuid());
                 auto ptr = cluster_diff_ptr_t{};
-                ptr = new modify::upsert_folder_info_t(uuid, peer_id, f.id(), d.index_id());
+                ptr = new modify::upsert_folder_info_t(uuid, peer_id, folder_id, index_id);
                 if (folder_update) {
                     folder_update = folder_update->assign_sibling(ptr.get());
                 } else {

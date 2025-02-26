@@ -145,6 +145,7 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t<file_info_t> {
     static const constexpr auto data_length = 1 + uuid_length * 2;
 
     outcome::result<void> fields_update(const db::FileInfo &) noexcept;
+    outcome::result<void> fields_update(const proto::FileInfo &) noexcept;
 
     proto::Index generate() noexcept;
     std::size_t expected_meta_size() const noexcept;
@@ -158,9 +159,6 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t<file_info_t> {
 
   private:
     using marks_vector_t = std::vector<bool>;
-
-    template <typename Source> outcome::result<void> fields_update(const Source &s, size_t block_count) noexcept;
-    template <typename T> T as() const noexcept;
 
     file_info_t(utils::bytes_view_t key, const folder_info_ptr_t &folder_info_) noexcept;
     file_info_t(const bu::uuid &uuid, const folder_info_ptr_t &folder_info_) noexcept;

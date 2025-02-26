@@ -220,7 +220,7 @@ void peer_actor_t::shutdown_start() noexcept {
 
     fmt::memory_buffer buff;
     proto::Close close;
-    close.reason(shutdown_reason->message());
+    proto::set_reason(close, shutdown_reason->message());
     proto::serialize(buff, close);
     tx_queue.clear();
     push_write(std::move(buff), true, true);
@@ -295,12 +295,12 @@ void peer_actor_t::on_block_request(message::block_request_t &message) noexcept 
     auto req_id = (std::int32_t)message.payload.id;
     auto &p = message.payload.request_payload;
     proto::Request req;
-    req.id(req_id);
-    req.folder(p.folder_id);
-    req.name(p.file_name);
-    req.offset(p.block_offset);
-    req.size(p.block_size);
-    req.hash(p.block_hash);
+    proto::set_id(req, req_id);
+    proto::set_folder(req, p.folder_id);
+    proto::set_name(req, p.file_name);
+    proto::set_offset(req, p.block_offset);
+    proto::set_size(req, p.block_size);
+    proto::set_hash(req, p.block_hash);
 
     fmt::memory_buffer buff;
     proto::serialize(buff, req);
@@ -366,20 +366,20 @@ void peer_actor_t::read_controlled(proto::message::message_t &&msg) noexcept {
 
 void peer_actor_t::handle_hello(proto::message::Hello &&msg) noexcept {
     using namespace model::diff;
-    auto device_name = msg->device_name();
-    auto client_name = msg->client_name();
-    auto client_version = msg->client_version();
+    auto device_name = proto::get_device_name(*msg);
+    auto client_name = proto::get_client_name(*msg);
+    auto client_version = proto::get_client_version(*msg);
     auto sha_s256 = peer_device_id.get_sha256();
     LOG_DEBUG(log, "read_hello, from {} ({} {})", device_name, client_name, client_version);
     auto diff = cluster_diff_ptr_t();
     auto db = db::SomeDevice();
     auto fill_db_and_shutdown = [&]() {
         auto address = fmt::format("{}://{}", peer_proto, peer_endpoint);
-        db.name(device_name);
-        db.client_name(client_name);
-        db.client_version(client_version);
-        db.address(std::move(address));
-        db.last_seen(utils::as_seconds(pt::microsec_clock::local_time()));
+        db::set_name(db, device_name);
+        db::set_client_name(db, client_name);
+        db::set_client_version(db, client_version);
+        db::set_address(db, std::move(address));
+        db::set_last_seen(db, utils::as_seconds(pt::microsec_clock::local_time()));
         LOG_INFO(log, "device {} is unknown/ignored, shutting down", device_name);
         do_shutdown();
     };
@@ -415,7 +415,7 @@ void peer_actor_t::handle_hello(proto::message::Hello &&msg) noexcept {
 void peer_actor_t::handle_ping(proto::message::Ping &&) noexcept { log->trace("handle_ping"); }
 
 void peer_actor_t::handle_close(proto::message::Close &&message) noexcept {
-    auto reason = message->reason();
+    auto reason = proto::get_reason(*message);
     const char *str = reason.data();
     LOG_TRACE(log, "handle_close, reason = {}", reason);
     if (reason.size() == 0) {
@@ -426,7 +426,7 @@ void peer_actor_t::handle_close(proto::message::Close &&message) noexcept {
 }
 
 void peer_actor_t::handle_response(proto::message::Response &&message) noexcept {
-    auto id = message->id();
+    auto id = proto::get_id(*message);
     LOG_TRACE(log, "handle_response, message id = {}", id);
     auto predicate = [id = id](const block_request_ptr_t &it) { return ((std::int32_t)it->payload.id) == id; };
     auto it = std::find_if(block_requests.begin(), block_requests.end(), predicate);
@@ -438,7 +438,7 @@ void peer_actor_t::handle_response(proto::message::Response &&message) noexcept 
         }
     }
 
-    auto error = message->code();
+    auto error = proto::get_code(*message);
     auto &block_request = *it;
     if (!shutdown_reason) {
         if (error != proto::ErrorCode::NO_BEP_ERROR) {
@@ -446,7 +446,7 @@ void peer_actor_t::handle_response(proto::message::Response &&message) noexcept 
             LOG_WARN(log, "block request error: {}", ec.message());
             reply_with_error(*block_request, make_error(ec));
         } else {
-            auto data = message->data();
+            auto data = proto::get_data(*message);
             auto request_sz = block_request->payload.request_payload.block_size;
             if (data.size() != request_sz) {
                 LOG_WARN(log, "got {} bytes, but requested {}", data.size(), request_sz);

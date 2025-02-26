@@ -40,7 +40,7 @@ auto upsert_folder_info_t::apply_impl(cluster_t &cluster, apply_controller_t &co
         LOG_TRACE(log, "applying upsert_folder_info_t (create), folder = {} ({}), device = {}, index = {:x}",
                   folder->get_label(), folder_id, device->device_id(), index_id);
         db::FolderInfo db;
-        db.index_id(index_id);
+        db::set_index_id(db, index_id);
 
         auto opt = folder_info_t::create(uuid, db, device, folder);
         if (!opt) {

@@ -3,6 +3,9 @@
 
 #pragma once
 
+#include "proto-fwd.hpp"
+
+#if 0
 #include "proto-bep.h"
 #include "proto-impl.h"
 #include "utils/bytes.h"
@@ -700,3 +703,4 @@ struct SYNCSPIRIT_API SomeDevice: view::SomeDevice, changeable::SomeDevice, priv
 // clang-format on
 
 }
+#endif

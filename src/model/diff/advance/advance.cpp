@@ -50,7 +50,7 @@ advance_t::advance_t(std::string_view folder_id_, utils::bytes_view_t peer_id_, 
 void advance_t::initialize(const cluster_t &cluster, sequencer_t &sequencer, proto::FileInfo proto_source_,
                            std::string_view local_file_name_) noexcept {
     proto_source = std::move(proto_source_);
-    assert(!(proto_source.block_size() && proto_source.deleted()));
+    assert(!(proto::get_block_size(proto_source) && proto::get_deleted(proto_source)));
     auto folder = cluster.get_folders().by_id(folder_id);
     auto folder_id = folder->get_id();
     auto &self = *cluster.get_device();
@@ -62,9 +62,9 @@ void advance_t::initialize(const cluster_t &cluster, sequencer_t &sequencer, pro
     auto local_file = local_files.by_name(local_file_name_);
 
     auto orphans = orphaned_blocks_t::set_t();
-    proto_local = proto_source.clone();
-    proto_local.sequence(0);
-    proto_local.name(local_file_name_);
+    proto_local = proto_source;
+    proto::set_sequence(proto_local, 0);
+    proto::set_name(proto_local, local_file_name_);
 
     if (!local_file) {
         uuid = sequencer.next_uuid();
@@ -77,15 +77,15 @@ void advance_t::initialize(const cluster_t &cluster, sequencer_t &sequencer, pro
 
     auto new_blocks = modify::add_blocks_t::blocks_t{};
     auto &blocks_map = cluster.get_blocks();
-    if (proto_local.size()) {
-        auto blocks_size = proto_local.blocks_size();
+    if (proto::get_size(proto_local)) {
+        auto blocks_size = proto::get_blocks_size(proto_local);
         for (int i = 0; i < blocks_size; ++i) {
-            auto block_view = proto_local.blocks(i);
-            auto h = block_view.hash();
+            auto& proto_block = proto::get_blocks(proto_local, i);
+            auto h = proto::get_hash(proto_block);
             auto strict_hash = block_info_t::make_strict_hash(h);
             auto block = blocks_map.by_hash(strict_hash.get_hash());
             if (!block) {
-                new_blocks.push_back(block_view.clone());
+                new_blocks.push_back(proto_block);
             } else {
                 auto it = orphans.find(strict_hash.get_key());
                 if (it != orphans.end()) {
@@ -96,7 +96,7 @@ void advance_t::initialize(const cluster_t &cluster, sequencer_t &sequencer, pro
     }
 
     LOG_DEBUG(log, "advance_t ({}), folder = {}, name = {} ( -> {}), blocks = {}, removed blocks = {}, new blocks = {}",
-              stringify(action), folder_id, proto_source.name(), proto_local.name(), proto_local.blocks_size(),
+              stringify(action), folder_id, proto::get_name(proto_source), proto::get_name(proto_local), proto::get_blocks_size(proto_local),
               orphans.size(), new_blocks.size());
 
     auto current = (cluster_diff_t *){};
@@ -125,7 +125,7 @@ auto advance_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) c
     auto local_folder = folder->get_folder_infos().by_device(*my_device);
     auto peer_folder = folder->get_folder_infos().by_device_id(peer_id);
 
-    auto prev_file = local_folder->get_file_infos().by_name(proto_local.name());
+    auto prev_file = local_folder->get_file_infos().by_name(proto::get_name(proto_local));
     auto local_file_opt = file_info_t::create(uuid, proto_local, local_folder);
     if (!local_file_opt) {
         return local_file_opt.assume_error();
@@ -137,11 +137,12 @@ auto advance_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) c
         local_file = std::move(prev_file);
     }
 
-    if (proto_local.size()) {
+    if (proto::get_size(proto_local)) {
         auto &blocks_map = cluster.get_blocks();
-        for (int i = 0; i < proto_local.blocks_size(); ++i) {
-            auto block = proto_local.blocks(i);
-            auto hash = block.hash();
+        auto blocks_count = proto::get_blocks_size(proto_local);
+        for (size_t i = 0; i < blocks_count; ++i) {
+            auto& block =  proto::get_blocks(proto_local, i);
+            auto hash = proto::get_hash(block);
             auto strict_hash = block_info_t::make_strict_hash(hash);
             auto block_info = blocks_map.by_hash(strict_hash.get_hash());
             assert(block_info);
@@ -156,7 +157,7 @@ auto advance_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) c
     local_folder->add_strict(local_file);
 
     LOG_TRACE(log, "advance_t ({}), folder = {}, name = {}, blocks = {}, seq. = {}", stringify(action), folder_id,
-              local_file->get_name(), proto_local.blocks_size(), sequence);
+              local_file->get_name(), proto::get_blocks_size(proto_local), sequence);
 
     local_file->notify_update();
     local_folder->notify_update();

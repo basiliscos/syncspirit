@@ -52,7 +52,7 @@ void folder_t::assign_cluster(const cluster_ptr_t &cluster_) noexcept { cluster 
 utils::bytes_t folder_t::serialize() noexcept {
     auto r = db::Folder();
     folder_data_t::serialize(r);
-    return r.encode();
+    return db::encode::folder(r);
 }
 
 auto folder_t::is_shared_with(const model::device_t &device) const noexcept -> folder_info_ptr_t {
@@ -65,28 +65,28 @@ std::optional<proto::Folder> folder_t::generate(const model::device_t &device) c
     }
 
     proto::Folder r;
-    r.id(id);
-    r.label(label);
-    r.read_only(read_only);
-    r.ignore_permissions(ignore_permissions);
-    r.ignore_delete(ignore_delete);
-    r.disable_temp_indexes(disable_temp_indixes);
-    r.paused(paused);
+    proto::set_id(r, id);
+    proto::set_label(r, label);
+    proto::set_read_only(r, read_only);
+    proto::set_ignore_permissions(r, ignore_permissions);
+    proto::set_ignore_delete(r, ignore_delete);
+    proto::set_disable_temp_indexes(r, disable_temp_indixes);
+    proto::set_paused(r, paused);
     for (auto &it : folder_infos) {
         auto &fi = *it.item;
         auto &d = *fi.get_device();
         auto pd = proto::Device();
-        pd.id(d.device_id().get_sha256());
-        pd.name(d.get_name());
-        pd.compression(d.get_compression());
+        proto::set_id(pd, d.device_id().get_sha256());
+        proto::set_name(pd, d.get_name());
+        proto::set_compression(pd, d.get_compression());
         if (auto cn = d.get_cert_name(); cn) {
-            pd.cert_name(cn.value());
+            proto::set_cert_name(pd, cn.value());
         }
         std::int64_t max_seq = fi.get_max_sequence();
-        pd.max_sequence(max_seq);
-        pd.index_id(fi.get_index());
-        pd.introducer(d.is_introducer());
-        pd.skip_introduction_removals(d.get_skip_introduction_removals());
+        proto::set_max_sequence(pd, max_seq);
+        proto::set_index_id(pd, fi.get_index());
+        proto::set_introducer(pd, d.is_introducer());
+        proto::set_skip_introduction_removals(pd, d.get_skip_introduction_removals());
         spdlog::trace("folder_t::generate (==>), folder = {} (index = 0x{:x}), device = {}, max_seq = {}", label,
                       fi.get_index(), d.device_id(), max_seq);
     }

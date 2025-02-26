@@ -27,7 +27,7 @@ auto folder_infos_t::apply_impl(cluster_t &cluster, apply_controller_t &controll
             return make_error_code(error_code_t::no_such_folder);
         }
 
-        auto opt = db::FolderInfo::decode(pair.value);
+        auto opt = db::decode::folder_info(pair.value);
         if (!opt) {
             return make_error_code(error_code_t::folder_info_deserialization_failure);
         }

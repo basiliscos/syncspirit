@@ -5,7 +5,6 @@
 #include "model/cluster.h"
 #include "model/misc/error_code.h"
 #include "model/diff/cluster_visitor.h"
-#include "proto/proto-structs.h"
 
 using namespace syncspirit::model::diff::load;
 
@@ -17,7 +16,7 @@ auto devices_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) c
         if (pair.key == local_device->get_key()) {
             device = local_device;
         } else {
-            auto opt  = db::Device::decode(pair.value);
+            auto opt  = db::decode::device(pair.value);
             if (!opt) {
                 return make_error_code(error_code_t::device_deserialization_failure);
             }

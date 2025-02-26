@@ -28,13 +28,13 @@ auto block_info_t::strict_hash_t::get_key() noexcept -> utils::bytes_view_t { re
 
 block_info_t::block_info_t(utils::bytes_view_t key) noexcept { std::copy(key.begin(), key.end(), hash); }
 
-block_info_t::block_info_t(const proto::BlockInfo &block) noexcept : weak_hash{block.weak_hash()}, size{block.size()} {
+block_info_t::block_info_t(const proto::BlockInfo &block) noexcept : weak_hash{proto::get_weak_hash(block)}, size{proto::get_size(block)} {
     hash[0] = prefix;
 }
 
-template <> void block_info_t::assign<db::BlockInfo>(const db::BlockInfo &item) noexcept {
-    weak_hash = item.weak_hash();
-    size = item.size();
+template <> void block_info_t::assign<db::BlockInfo>(const db::BlockInfo &block) noexcept {
+    weak_hash = db::get_weak_hash(block);
+    size =  db::get_size(block);
 }
 
 outcome::result<block_info_ptr_t> block_info_t::create(utils::bytes_view_t key, const db::BlockInfo &data) noexcept {
@@ -51,7 +51,7 @@ outcome::result<block_info_ptr_t> block_info_t::create(utils::bytes_view_t key, 
 }
 
 outcome::result<block_info_ptr_t> block_info_t::create(const proto::BlockInfo &block) noexcept {
-    auto h = block.hash();
+    auto h = proto::get_hash(block);
     if (h.size() > digest_length) {
         return make_error_code(error_code_t::invalid_block_key_length);
     }
@@ -68,20 +68,15 @@ outcome::result<block_info_ptr_t> block_info_t::create(const proto::BlockInfo &b
 
 proto::BlockInfo block_info_t::as_bep(size_t offset) const noexcept {
     proto::BlockInfo r;
-    r.size(size);
-    r.weak_hash(weak_hash);
-    r.hash(get_hash());
-    r.offset(offset);
+    proto::set_size(r, size);
+    proto::set_weak_hash(r, weak_hash);
+    proto::set_hash(r, get_hash());
+    proto::set_offset(r, offset);
     return r;
 }
 
 utils::bytes_t block_info_t::serialize() const noexcept {
-    db::BlockInfo r{weak_hash, size};
-
-    // r.weak_hash(weak_hash);
-    // r.size(size);
-
-    return r.encode();
+    return db::encode::block_info(db::BlockInfo{weak_hash, size});
 }
 
 void block_info_t::link(file_info_t *file_info, size_t block_index) noexcept {

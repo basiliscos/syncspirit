@@ -58,14 +58,10 @@ auto file_info_t::create(const bu::uuid &uuid_, const proto::FileInfo &info_,
     auto ptr = file_info_ptr_t();
     ptr = new file_info_t(uuid_, folder_info_);
 
-    auto r = ptr->fields_update(info_, info_.blocks_size());
+    auto r = ptr->fields_update(info_);
     if (!r) {
         return r.assume_error();
     }
-
-    auto v = const_cast<proto::FileInfo&>(info_).mutable_version();
-    v.expose() = v.expose();
-    // info_.mutable_version().expose() = r.mutable_version().expose();
 
     return outcome::success(std::move(ptr));
 }
@@ -118,82 +114,114 @@ std::uint64_t file_info_t::get_block_offset(size_t block_index) const noexcept {
     return block_size * block_index;
 }
 
-template <typename Source>
-outcome::result<void> file_info_t::fields_update(const Source &s, size_t block_count) noexcept {
-    name = s.name();
-    sequence = s.sequence();
-    type = s.type();
-    set_size(s.size());
-    permissions = s.permissions();
-    modified_s = s.modified_s();
-    modified_ns = s.modified_ns();
-    modified_by = s.modified_by();
-    if (s.deleted()) {
+auto file_info_t::fields_update(const db::FileInfo &source) noexcept -> outcome::result<void> {
+    name = db::get_name(source);
+    sequence = db::get_sequence(source);
+    type = db::get_type(source);
+    set_size(db::get_size(source));
+    permissions = db::get_permissions(source);
+    modified_s = db::get_modified_s(source);
+    modified_ns = db::get_modified_ns(source);
+    modified_by = db::get_modified_by(source);
+    if (db::get_deleted(source)) {
         flags |= flags_t::f_deleted;
     }
-    if (s.invalid()) {
+    if (db::get_invalid(source)) {
         flags |= flags_t::f_invalid;
     }
-    if (s.no_permissions()) {
+    if (db::get_no_permissions(source)) {
         flags |= flags_t::f_no_permissions;
     }
-    symlink_target = s.symlink_target();
 
-    version.reset(new version_t(s.version()));
+    symlink_target = db::get_symlink_target(source);
+
+    version.reset(new version_t(db::get_version(source)));
 
     full_name = fmt::format("{}/{}", folder_info->get_folder()->get_label(), get_name());
-    block_size = size ? s.block_size() : 0;
-    return reserve_blocks(size ? block_count : 0);
+    block_size = size ? db::get_blocks_size(source) : 0;
+    return reserve_blocks(size ? block_size : 0);
 }
 
-auto file_info_t::fields_update(const db::FileInfo &source) noexcept -> outcome::result<void> {
-    return fields_update<db::FileInfo>(source, source.blocks_size());
+auto file_info_t::fields_update(const proto::FileInfo &source) noexcept -> outcome::result<void> {
+    name = proto::get_name(source);
+    sequence = proto::get_sequence(source);
+    type = proto::get_type(source);
+    set_size(proto::get_size(source));
+    permissions = proto::get_permissions(source);
+    modified_s = proto::get_modified_s(source);
+    modified_ns = proto::get_modified_ns(source);
+    modified_by = proto::get_modified_by(source);
+    if (proto::get_deleted(source)) {
+        flags |= flags_t::f_deleted;
+    }
+    if (proto::get_invalid(source)) {
+        flags |= flags_t::f_invalid;
+    }
+    if (proto::get_no_permissions(source)) {
+        flags |= flags_t::f_no_permissions;
+    }
+
+    symlink_target = proto::get_symlink_target(source);
+
+    version.reset(new version_t(proto::get_version(source)));
+
+    full_name = fmt::format("{}/{}", folder_info->get_folder()->get_label(), get_name());
+    block_size = size ? proto::get_blocks_size(source) : 0;
+    return reserve_blocks(size ? block_size : 0);
 }
 
 utils::bytes_view_t file_info_t::get_uuid() const noexcept { return {key + 1 + uuid_length, uuid_length}; }
 
 void file_info_t::set_sequence(std::int64_t value) noexcept { sequence = value; }
 
-template <typename T> T file_info_t::as() const noexcept {
-    T r;
-    r.name(name);
-    r.sequence(sequence);
-    r.type(type);
-    r.size(size);
-    r.permissions(permissions);
-    r.modified_s(modified_s);
-    r.modified_ns(modified_ns);
-    r.modified_by(modified_by);
-    r.deleted(flags & f_deleted);
-    r.invalid(flags & f_invalid);
-    r.no_permissions(flags & f_no_permissions);
-    r.mutable_version().expose() = version->as_proto().expose();
-    r.block_size(block_size);
-    r.symlink_target(symlink_target);
-    return r;
-}
-
 db::FileInfo file_info_t::as_db(bool include_blocks) const noexcept {
-    auto r = as<db::FileInfo>();
-
+    auto r = db::FileInfo();
+    db::set_name(r, name);
+    db::set_sequence(r, sequence);
+    db::set_type(r, type);
+    db::set_size(r, size);
+    db::set_permissions(r, permissions);
+    db::set_modified_s(r, modified_s);
+    db::set_modified_ns(r, modified_ns);
+    db::set_modified_by(r, modified_by);
+    db::set_deleted(r, flags & f_deleted);
+    db::set_invalid(r, flags & f_invalid);
+    db::set_no_permissions(r, flags & f_no_permissions);
+    db::set_version(r, version->as_proto());
+    db::set_block_size(r, block_size);
+    db::set_symlink_target(r, symlink_target);
     if (include_blocks) {
         for (auto &block : blocks) {
             if (!block) {
                 continue;
             }
-            r.add_block(block->get_hash());
+            db::add_blocks(r, block->get_hash());
         }
     }
     return r;
 }
 
 proto::FileInfo file_info_t::as_proto(bool include_blocks) const noexcept {
-    auto r = as<proto::FileInfo>();
+    auto r = proto::FileInfo();
+    proto::set_name(r, name);
+    proto::set_sequence(r, sequence);
+    proto::set_type(r, type);
+    proto::set_size(r, size);
+    proto::set_permissions(r, permissions);
+    proto::set_modified_s(r, modified_s);
+    proto::set_modified_ns(r, modified_ns);
+    proto::set_modified_by(r, modified_by);
+    proto::set_deleted(r, flags & f_deleted);
+    proto::set_invalid(r, flags & f_invalid);
+    proto::set_no_permissions(r, flags & f_no_permissions);
+    proto::set_version(r, version->as_proto());
+    proto::set_block_size(r, block_size);
+    proto::set_symlink_target(r, symlink_target);
     if (include_blocks) {
         size_t offset = 0;
         for (auto &b : blocks) {
             auto &block = *b;
-            r.add_block(block.as_bep(offset));
+            proto::add_blocks(r, block.as_bep(offset));
             offset += block.get_size();
         }
         if (blocks.empty() && is_file() && !is_deleted()) {
@@ -202,10 +230,10 @@ proto::FileInfo file_info_t::as_proto(bool include_blocks) const noexcept {
             auto emtpy_block = proto::BlockInfo();
             auto weak_hash = adler32(0L, Z_NULL, 0);
             weak_hash = adler32(weak_hash, empty_data, 0);
-            emtpy_block.weak_hash(weak_hash);
+            proto::set_weak_hash(emtpy_block, weak_hash);
             utils::digest(empty_data, 0, digest);
             auto digets_bytes = utils::bytes_view_t(digest, SHA256_DIGEST_LENGTH);
-            emtpy_block.hash(digets_bytes);
+            proto::set_hash(emtpy_block, digets_bytes);
         }
     }
     return r;
@@ -237,7 +265,7 @@ outcome::result<void> file_info_t::reserve_blocks(size_t block_count) noexcept {
 }
 
 utils::bytes_t file_info_t::serialize(bool include_blocks) const noexcept {
-    return as_db(include_blocks).encode();
+    return db::encode::file_info(as_db(include_blocks));
 }
 
 void file_info_t::mark_unreachable(bool value) noexcept {
@@ -452,7 +480,7 @@ std::string file_info_t::make_conflicting_name() const noexcept {
     auto ymd = local.date().year_month_day();
     auto time = local.time_of_day();
     auto &counter = version->get_best();
-    auto device_short = device_id_t::make_short(counter.id());
+    auto device_short = device_id_t::make_short(proto::get_id(counter));
     auto conflicted_name =
         fmt::format("{}.sync-conflict-{:04}{:02}{:02}-{:02}{:02}{:02}-{}{}", stem, (int)ymd.year, ymd.month.as_number(),
                     ymd.day.as_number(), time.hours(), time.minutes(), time.seconds(), device_short, ext);

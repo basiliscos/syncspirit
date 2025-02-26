@@ -388,9 +388,10 @@ bool relay_actor_t::on(proto::relay::session_invitation_t &msg) noexcept {
         diff = new model::diff::contact::relay_connect_request_t(std::move(device_id), std::move(msg.key),
                                                                  std::move(relay_ep));
     } else {
+        auto last_seen = utils::as_seconds(pt::microsec_clock::local_time());
         db::SomeDevice db;
-        db.name(std::string(device_id.get_short()));
-        db.last_seen(utils::as_seconds(pt::microsec_clock::local_time()));
+        db::set_name(db, device_id.get_short());
+        db::set_last_seen(db, last_seen);
         diff = new model::diff::modify::add_pending_device_t(device_id, db);
         diff->assign_sibling(new model::diff::contact::unknown_connected_t(*cluster, device_id, std::move(db)));
     }

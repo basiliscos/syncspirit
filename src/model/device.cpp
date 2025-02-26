@@ -15,20 +15,21 @@ namespace syncspirit::model {
 static const constexpr char prefix = (char)(db::prefix::device);
 
 template <> void device_t::assign(const db::Device &d) noexcept {
-    name = d.name();
-    compression = d.compression();
-    cert_name = d.cert_name();
-    introducer = d.introducer();
-    auto_accept = d.auto_accept();
-    paused = d.paused();
-    skip_introduction_removals = d.skip_introduction_removals();
+    name = db::get_name(d);
+    compression = db::get_compression(d);
+    cert_name = db::get_cert_name(d);
+    introducer = db::get_introducer(d);
+    auto_accept = db::get_auto_accept(d);
+    paused = db::get_paused(d);
+    skip_introduction_removals = db::get_skip_introduction_removals(d);
     static_uris.clear();
     uris.clear();
-    last_seen = pt::from_time_t(d.last_seen());
+    last_seen = pt::from_time_t(db::get_last_seen(d));
 
     auto uris = uris_t{};
-    for (int i = 0; i < d.addresses_size(); ++i) {
-        auto uri = utils::parse(d.addresses(i));
+    auto addresses_count = db::get_addresses_size(d);
+    for (size_t i = 0; i < addresses_count; ++i) {
+        auto uri = utils::parse(db::get_addresses(d, i));
         assert(uri);
         uris.emplace_back(uri);
     }
@@ -45,7 +46,9 @@ outcome::result<device_ptr_t> device_t::create(utils::bytes_view_t key, const db
         return make_error_code(error_code_t::invalid_device_sha256_digest);
     }
 
-    auto ptr = device_ptr_t(new device_t(id.value(), data.name(), data.cert_name()));
+    auto name = db::get_name(data);
+    auto cert_name = db::get_cert_name(data);
+    auto ptr = device_ptr_t(new device_t(id.value(), name, cert_name));
     ptr->assign(data);
     return outcome::success(std::move(ptr));
 }
@@ -66,23 +69,23 @@ device_t::~device_t() {}
 void device_t::update(const db::Device &source) noexcept { assign(source); }
 
 auto device_t::serialize(db::Device &r) const noexcept -> utils::bytes_t {
-    r.name(name);
-    r.compression(compression);
+    db::set_name(r, name);
+    db::set_compression(r, compression);
     if (cert_name.has_value()) {
         auto cn = std::string_view(cert_name.value());
-        r.cert_name(cn);
+        db::set_cert_name(r, cn);
     }
-    r.introducer(introducer);
-    r.skip_introduction_removals(skip_introduction_removals);
-    r.auto_accept(auto_accept);
-    r.paused(paused);
-    r.last_seen(utils::as_seconds(last_seen));
+    db::set_introducer(r, introducer);
+    db::set_skip_introduction_removals(r, skip_introduction_removals);
+    db::set_auto_accept(r, auto_accept);
+    db::set_paused(r, paused);
+    db::set_last_seen(r, utils::as_seconds(last_seen));
 
-    for (auto &address : static_uris) {
-       r.add_addresses(address->buffer());
+    for (size_t i = 0; i < static_uris.size(); ++i) {
+        auto buff = static_uris[i]->buffer();
+        db::set_addresses(r, i, buff);
     }
-
-    return r.encode();
+    return db::encode::device(r);
 }
 
 auto device_t::serialize() const noexcept -> utils::bytes_t {

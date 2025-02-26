@@ -8,32 +8,32 @@
 
 using namespace syncspirit::model;
 
-void folder_data_t::assign_fields(const db::view::Folder &item) noexcept {
-    id = item.id();
-    label = item.label();
-    path = boost::nowide::widen(item.path());
-    folder_type = (folder_type_t)item.folder_type();
-    rescan_interval = item.rescan_interval();
-    pull_order = (pull_order_t)item.pull_order();
-    scheduled = item.scheduled();
-    read_only = item.read_only();
-    ignore_permissions = item.ignore_permissions();
-    ignore_delete = item.ignore_delete();
-    disable_temp_indixes = item.disable_temp_indexes();
-    paused = item.paused();
+void folder_data_t::assign_fields(const db::Folder &item) noexcept {
+    id = db::get_id(item);
+    label = db::get_label(item);
+    path = boost::nowide::widen(db::get_path(item));
+    folder_type =  db::get_folder_type(item);
+    rescan_interval = db::get_rescan_interval(item);
+    pull_order = db::get_pull_order(item);
+    scheduled = db::get_scheduled(item);
+    read_only = db::get_read_only(item);
+    ignore_permissions = db::get_ignore_permissions(item);
+    ignore_delete = db::get_ignore_delete(item);
+    disable_temp_indixes = db::get_disable_temp_indexes(item);
+    paused = db::get_paused(item);
 }
 
-void folder_data_t::serialize(db::changeable::Folder &r) const noexcept {
-    r.id(id);
-    r.label(label);
-    r.read_only(read_only);
-    r.ignore_permissions(ignore_permissions);
-    r.ignore_delete(ignore_delete);
-    r.disable_temp_indexes(disable_temp_indixes);
-    r.paused(paused);
-    r.scheduled(scheduled);
-    r.path(path.string());
-    r.folder_type((db::FolderType)folder_type);
-    r.pull_order((db::PullOrder)pull_order);
-    r.rescan_interval(rescan_interval);
+void folder_data_t::serialize(db::Folder &r) const noexcept {
+    db::set_id(r, id);
+    db::set_label(r, label);
+    db::set_read_only(r, read_only);
+    db::set_ignore_permissions(r, ignore_permissions);
+    db::set_ignore_delete(r, ignore_delete);
+    db::set_disable_temp_indexes(r, disable_temp_indixes);
+    db::set_paused(r, paused);
+    db::set_scheduled(r, scheduled);
+    db::set_path(r, path.string());
+    db::set_folder_type(r, folder_type);
+    db::set_pull_order(r, pull_order);
+    db::set_rescan_interval(r, rescan_interval);
 }
