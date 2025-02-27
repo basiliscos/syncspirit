@@ -48,13 +48,13 @@ struct wrapped_message_t {
 
 } // namespace message
 
-SYNCSPIRIT_API void make_hello_message(fmt::memory_buffer &buff, std::string_view device_name) noexcept;
+SYNCSPIRIT_API utils::bytes_t make_hello_message(std::string_view device_name) noexcept;
 
-SYNCSPIRIT_API std::size_t make_announce_message(fmt::memory_buffer &buff, utils::bytes_view_t device_id,
+SYNCSPIRIT_API std::size_t make_announce_message(utils::bytes_view_t storage, utils::bytes_view_t device_id,
                                                  const payload::URIs &uris, std::int64_t instance) noexcept;
 
 template <typename Message>
-void serialize(fmt::memory_buffer &buff, const Message &message,
+utils::bytes_t serialize(const Message &message,
                proto::MessageCompression compression = proto::MessageCompression::NONE) noexcept;
 
 SYNCSPIRIT_API outcome::result<message::wrapped_message_t> parse_bep(const asio::const_buffer &buff) noexcept;

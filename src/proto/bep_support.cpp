@@ -17,21 +17,18 @@ namespace be = boost::endian;
 
 namespace syncspirit::proto {
 
-void make_hello_message(fmt::memory_buffer &buff, std::string_view device_name) noexcept {
+utils::bytes_t make_hello_message(std::string_view device_name) noexcept {
     proto::Hello msg;
     proto::set_device_name(msg, device_name);
     proto::set_client_name(msg, constants::client_name);
     proto::set_client_version(msg, SYNCSPIRIT_VERSION);
-    auto bytes = proto::encode::encode(msg, buff);
-    auto sz = static_cast<std::uint16_t>(bytes);
-    buff.resize(sz + 4 + 2);
+    auto bytes = proto::encode::encode(msg, 4 + 2);
 
-    std::uint32_t *ptr_32 = reinterpret_cast<std::uint32_t *>(buff.begin());
+    std::uint32_t *ptr_32 = reinterpret_cast<std::uint32_t *>(bytes.data());
     *ptr_32++ = be::native_to_big(constants::bep_magic);
     std::uint16_t *ptr_16 = reinterpret_cast<std::uint16_t *>(ptr_32);
-    *ptr_16++ = be::native_to_big(sz);
-    auto ptr = reinterpret_cast<unsigned char *>(ptr_16);
-    std::copy(buff.begin(), buff.end(), ptr);
+    *ptr_16++ = be::native_to_big(bytes.size() - (4 + 6));
+    return bytes;
 }
 
 // void parse hello
@@ -255,43 +252,46 @@ outcome::result<message::Announce> parse_announce(const asio::const_buffer &buff
 }
 
 template <typename Message>
-SYNCSPIRIT_API void serialize(fmt::memory_buffer &buff, const Message &message,
-                              proto::MessageCompression compression) noexcept {
+SYNCSPIRIT_API utils::bytes_t serialize(const Message &message,
+                                        proto::MessageCompression compression) noexcept {
     using type = typename M2T<Message>::type;
+    auto message_sz = proto::estimate(message);
     proto::Header header(type::value, compression);
+    auto header_sz = proto::estimate(header);
+    auto header_sz_16 = be::native_to_big(static_cast<std::uint16_t>(header_sz));
+    auto src = reinterpret_cast<const std::uint8_t*>(&header_sz_16);
+    auto bytes = utils::bytes_t(2 + header_sz + 4 + message_sz);
+    auto *ptr = reinterpret_cast<std::uint8_t *>(bytes.data());
+    *ptr++ = *src++;
+    *ptr++ = *src++;
+    proto::encode::encode(header, ptr);
+    ptr += header_sz;
 
-    auto header_bytes = proto::encode::encode(header);
-    auto message_bytes = proto::encode::encode(message);
-    std::uint16_t header_sz = header_bytes.size();
-    std::uint32_t message_sz = message_bytes.size();
-    buff.resize(2 + header_sz + 4 + message_sz);
-    std::uint16_t *ptr_16 = reinterpret_cast<std::uint16_t *>(buff.data());
-
-    *ptr_16++ = be::native_to_big(header_sz);
-    std::copy(header_bytes.begin(), header_bytes.end(), (unsigned char*)ptr_16);
-    auto ptr = reinterpret_cast<unsigned char *>(ptr_16) + header_sz;
-
-    std::uint32_t big_message_sz = be::native_to_big(message_sz);
-    std::memcpy(ptr, &big_message_sz, sizeof(big_message_sz));
-    ptr += sizeof(big_message_sz);
-    std::copy(message_bytes.begin(), message_bytes.end(), ptr);
+    auto message_sz_32 = be::native_to_big(static_cast<std::uint32_t>(header_sz));
+    src = reinterpret_cast<const std::uint8_t*>(&message_sz_32);
+    *ptr++ = *src++;
+    *ptr++ = *src++;
+    *ptr++ = *src++;
+    *ptr++ = *src++;
+    proto::encode::encode(message, ptr);
+    return bytes;
 }
 
-template void SYNCSPIRIT_API serialize(fmt::memory_buffer &buff, const proto::ClusterConfig &message,
+template utils::bytes_t SYNCSPIRIT_API serialize(const proto::ClusterConfig &message,
                                        proto::MessageCompression compression) noexcept;
-template void SYNCSPIRIT_API serialize(fmt::memory_buffer &buff, const proto::Index &message,
+template utils::bytes_t SYNCSPIRIT_API serialize(const proto::Index &message,
                                        proto::MessageCompression compression) noexcept;
-template void SYNCSPIRIT_API serialize(fmt::memory_buffer &buff, const proto::IndexUpdate &message,
+template utils::bytes_t SYNCSPIRIT_API serialize(const proto::IndexUpdate &message,
                                        proto::MessageCompression compression) noexcept;
-template void SYNCSPIRIT_API serialize(fmt::memory_buffer &buff, const proto::Request &message,
+template utils::bytes_t SYNCSPIRIT_API serialize(const proto::Request &message,
                                        proto::MessageCompression compression) noexcept;
-template void SYNCSPIRIT_API serialize(fmt::memory_buffer &buff, const proto::Response &message,
+template utils::bytes_t SYNCSPIRIT_API serialize(const proto::Response &message,
                                        proto::MessageCompression compression) noexcept;
-template void SYNCSPIRIT_API serialize(fmt::memory_buffer &buff, const proto::DownloadProgress &message,
+template utils::bytes_t SYNCSPIRIT_API serialize(const proto::DownloadProgress &message,
                                        proto::MessageCompression compression) noexcept;
-template void SYNCSPIRIT_API serialize(fmt::memory_buffer &buff, const proto::Ping &message,
+template utils::bytes_t SYNCSPIRIT_API serialize(const proto::Ping &message,
                                        proto::MessageCompression compression) noexcept;
-template void SYNCSPIRIT_API serialize(fmt::memory_buffer &buff, const proto::Close &message,
+template utils::bytes_t SYNCSPIRIT_API serialize(const proto::Close &message,
                                        proto::MessageCompression compression) noexcept;
 
 } // namespace syncspirit::proto

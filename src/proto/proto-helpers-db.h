@@ -1,3 +1,8 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-FileCopyrightText: 2025 Ivan Baidakou
+
+#pragma once
+
 #include "syncspirit-export.h"
 #include "proto-fwd.hpp"
 

@@ -33,20 +33,21 @@ TEST_CASE("orphaned blocks, all removed for single file", "[model]") {
 
     SECTION("1 file with 2 different blocsk erased") {
         proto::FileInfo pr_file;
-        pr_file.name("a.txt");
-        pr_file.block_size(5ul);
-        pr_file.size(10ul);
+        proto::set_name(pr_file, "a.txt");
+        proto::set_block_size(pr_file, 5ul);
+        proto::set_size(pr_file, 10ul);
+
         auto b1 = proto::BlockInfo();
-        b1.hash(b1_hash);
-        b1.offset(0);
-        b1.size(5);
-        pr_file.add_block(b1);
+        proto::set_hash(b1, b1_hash);
+        proto::set_offset(b1, 5u);
+        proto::set_size(b1, 5);
+        proto::add_blocks(pr_file, b1);
 
         auto b2 = proto::BlockInfo();
-        b2.hash(b2_hash);
-        b2.offset(5ul);
-        b2.size(5);
-        pr_file.add_block(b2);
+        proto::set_hash(b2, b2_hash);
+        proto::set_offset(b2, 5u);
+        proto::set_size(b2, 5);
+        proto::add_blocks(pr_file, b2);
 
         auto bi1 = model::block_info_t::create(b1).value();
         auto bi2 = model::block_info_t::create(b2).value();
@@ -68,21 +69,21 @@ TEST_CASE("orphaned blocks, all removed for single file", "[model]") {
 
     SECTION("1 file with 2 same blocks erased") {
         proto::FileInfo pr_file;
-        pr_file.name("a.txt");
-        pr_file.block_size(5ul);
-        pr_file.size(10ul);
+        proto::set_name(pr_file, "a.txt");
+        proto::set_block_size(pr_file, 5ul);
+        proto::set_size(pr_file, 10ul);
 
         auto b1 = proto::BlockInfo();
-        b1.hash(b1_hash);
-        b1.offset(0);
-        b1.size(5);
-        pr_file.add_block(b1);
+        proto::set_hash(b1, b1_hash);
+        proto::set_offset(b1, 5u);
+        proto::set_size(b1, 5);
+        proto::add_blocks(pr_file, b1);
 
         auto b2 = proto::BlockInfo();
-        b2.hash(b1_hash);
-        b2.offset(5ul);
-        b2.size(5);
-        pr_file.add_block(b2);
+        proto::set_hash(b2, b1_hash);
+        proto::set_offset(b2, 5u);
+        proto::set_size(b2, 5);
+        proto::add_blocks(pr_file, b2);
 
         auto bi = model::block_info_t::create(b1).value();
 
@@ -102,38 +103,50 @@ TEST_CASE("orphaned blocks, all removed for single file", "[model]") {
 
     SECTION("2 file with 1 shared erased") {
         proto::FileInfo pr_file_1;
-        pr_file_1.name("a.txt");
-        pr_file_1.block_size(5ul);
-        pr_file_1.size(10ul);
+        proto::set_name(pr_file_1, "a.txt");
+        proto::set_block_size(pr_file_1, 5ul);
+        proto::set_size(pr_file_1, 10ul);
 
-        auto b_1_1 = proto::BlockInfo();
-        b_1_1.hash(b1_hash);
-        b_1_1.offset(0);
-        b_1_1.size(5);
-        pr_file_1.add_block(b_1_1);
+        auto b_1_1 = [&]() {
+            auto b = proto::BlockInfo();
+            proto::set_hash(b, b1_hash);
+            proto::set_offset(b, 0);
+            proto::set_size(b, 5);
+            proto::add_blocks(pr_file_1, b);
+            return b;
+        }();
 
-        auto b_1_2 = proto::BlockInfo();
-        b_1_2.hash(b2_hash);
-        b_1_2.offset(5ul);
-        b_1_2.size(5);
-        pr_file_1.add_block(b_1_2);
+        auto b_1_2 = [&]() {
+            auto b = proto::BlockInfo();
+            proto::set_hash(b, b2_hash);
+            proto::set_offset(b, 5);
+            proto::set_size(b, 5);
+            proto::add_blocks(pr_file_1, b);
+            return b;
+        }();
 
         proto::FileInfo pr_file_2;
-        pr_file_2.name("b.txt");
-        pr_file_2.block_size(5ul);
-        pr_file_2.size(10ul);
+        proto::set_name(pr_file_2, "b.txt");
+        proto::set_block_size(pr_file_2, 5ul);
+        proto::set_size(pr_file_2, 10ul);
 
-        auto b_2_1 = proto::BlockInfo();
-        b_2_1.hash(b1_hash);
-        b_2_1.offset(0);
-        b_2_1.size(5);
-        pr_file_2.add_block(b_2_1);
+        auto b_2_1 = [&]() {
+            auto b = proto::BlockInfo();
+            proto::set_hash(b, b1_hash);
+            proto::set_offset(b, 0);
+            proto::set_size(b, 5);
+            proto::add_blocks(pr_file_2, b);
+            return b;
+        }();
 
-        auto b_2_2 = proto::BlockInfo();
-        b_2_2.hash(b3_hash);
-        b_2_2.offset(5ul);
-        b_2_2.size(5);
-        pr_file_2.add_block(b_2_2);
+        auto b_2_2 = [&]() {
+            auto b = proto::BlockInfo();
+            proto::set_hash(b, b3_hash);
+            proto::set_offset(b, 5);
+            proto::set_size(b, 5);
+            proto::add_blocks(pr_file_2, b);
+            return b;
+        }();
 
         auto bi_1 = model::block_info_t::create(b_1_1).value();
         auto bi_2 = model::block_info_t::create(b_1_2).value();

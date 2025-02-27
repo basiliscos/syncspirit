@@ -13,12 +13,12 @@
 #include <memory>
 #include <optional>
 
-#include <fmt/core.h>
 #include "model/diff/cluster_diff.h"
 #include "model/file_info.h"
 #include "model/folder_info.h"
 #include "transport/base.h"
 #include "proto/bep_support.h"
+#include "utils/bytes.h"
 #include "utils/dns.h"
 
 namespace syncspirit {
@@ -156,7 +156,7 @@ struct connect_request_t {
 };
 
 struct transfer_data_t {
-    fmt::memory_buffer data;
+    utils::bytes_t data;
 };
 
 struct transfer_push_t {

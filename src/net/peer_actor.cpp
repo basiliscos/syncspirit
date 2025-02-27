@@ -57,8 +57,7 @@ void peer_actor_t::on_start() noexcept {
     r::actor_base_t::on_start();
     LOG_TRACE(log, "on_start");
 
-    fmt::memory_buffer buff;
-    proto::make_hello_message(buff, device_name);
+    auto buff = proto::make_hello_message(device_name);
     push_write(std::move(buff), true, false);
 
     read_more();
@@ -110,7 +109,7 @@ void peer_actor_t::process_tx_queue() noexcept {
     }
 }
 
-void peer_actor_t::push_write(fmt::memory_buffer &&buff, bool signal, bool final) noexcept {
+void peer_actor_t::push_write(utils::bytes_t buff, bool signal, bool final) noexcept {
     if (io_error) {
         return;
     }
@@ -218,10 +217,9 @@ void peer_actor_t::shutdown_start() noexcept {
         send<payload::termination_t>(controller, shutdown_reason);
     }
 
-    fmt::memory_buffer buff;
     proto::Close close;
     proto::set_reason(close, shutdown_reason->message());
-    proto::serialize(buff, close);
+    auto buff = proto::serialize( close);
     tx_queue.clear();
     push_write(std::move(buff), true, true);
     LOG_TRACE(log, "going to send close message");
@@ -302,8 +300,7 @@ void peer_actor_t::on_block_request(message::block_request_t &message) noexcept 
     proto::set_size(req, p.block_size);
     proto::set_hash(req, p.block_hash);
 
-    fmt::memory_buffer buff;
-    proto::serialize(buff, req);
+    auto buff = proto::serialize(req);
     push_write(std::move(buff), true, false);
     block_requests.emplace_back(&message);
 }
@@ -475,9 +472,8 @@ void peer_actor_t::on_tx_timeout(r::request_id_t, bool cancelled) noexcept {
     resources->release(resource::tx_timer);
     tx_timer_request.reset();
     if (!cancelled) {
-        fmt::memory_buffer buff;
         proto::Ping ping;
-        proto::serialize(buff, ping);
+        auto buff = proto::serialize(ping);
         push_write(std::move(buff), true, false);
         reset_tx_timer();
     }

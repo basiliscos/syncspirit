@@ -112,7 +112,7 @@ void local_discovery_actor_t::announce() noexcept {
     if (!uris.empty()) {
         auto digest = device->device_id().get_sha256();
         auto sz = proto::make_announce_message(tx_buff, digest, uris, instance);
-        auto buff = asio::buffer(tx_buff.data(), sz);
+        auto buff = asio::const_buffer(tx_buff.data(), sz);
         auto fwd_send =
             ra::forwarder_t(*this, &local_discovery_actor_t::on_write, &local_discovery_actor_t::on_write_error);
         auto bc_endpoint = udp::endpoint(asio::ip::address_v4::broadcast(), port);

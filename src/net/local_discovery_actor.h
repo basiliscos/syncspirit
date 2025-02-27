@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #pragma once
 
@@ -70,8 +70,8 @@ struct SYNCSPIRIT_API local_discovery_actor_t final : public r::actor_base_t {
     udp_socket_t broadcast_sock;
     udp_socket_t sock;
     r::address_ptr_t coordinator;
-    fmt::memory_buffer rx_buff;
-    fmt::memory_buffer tx_buff;
+    utils::bytes_t rx_buff;
+    utils::bytes_t tx_buff;
     std::uint16_t port;
     udp::endpoint peer_endpoint;
     std::optional<r::request_id_t> timer_request;
