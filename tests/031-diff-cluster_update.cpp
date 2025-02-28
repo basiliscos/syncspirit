@@ -316,7 +316,6 @@ TEST_CASE("cluster update, new folder", "[model]") {
     }
 }
 
-#if 0
 TEST_CASE("cluster update, reset folder", "[model]") {
     auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
     auto my_device = device_t::create(my_id, "my-device").value();
@@ -329,15 +328,19 @@ TEST_CASE("cluster update, reset folder", "[model]") {
     cluster->get_devices().put(peer_device);
 
     db::Folder db_folder;
-    db_folder.set_id("1234-5678");
-    db_folder.set_label("my-label");
-    db_folder.set_path("/my/path");
+    db::set_id(db_folder, "some-id");
+    db::set_label(db_folder, "my-label");
+    db::set_path(db_folder, "/my/path");
     auto folder = folder_t::create(sequencer->next_uuid(), db_folder).value();
 
     cluster->get_folders().put(folder);
-    db::PendingFolder db_p_folder;
-    db_p_folder.mutable_folder()->set_id("1111-2222");
-    db_p_folder.mutable_folder()->set_label("unknown");
+    auto db_p_folder = [&]() -> db::PendingFolder {
+        db::PendingFolder db_p_folder;
+        auto& f = db::get_folder(db_p_folder);
+        db::set_id(f, "1111-2222");
+        db::set_label(f, "unknown");
+        return db_p_folder;
+    }();
     auto u_folder = pending_folder_t::create(sequencer->next_uuid(), db_p_folder, peer_device->device_id()).value();
     auto &unknown_folders = cluster->get_pending_folders();
     unknown_folders.put(u_folder);
@@ -346,32 +349,32 @@ TEST_CASE("cluster update, reset folder", "[model]") {
     auto folder_info_peer = folder_info_ptr_t();
     {
         db::FolderInfo db_fi;
-        db_fi.set_index_id(5ul);
-        db_fi.set_max_sequence(10l);
+        db::set_index_id(db_fi, 5ul);
+        db::set_max_sequence(db_fi, 10l);
         folder_info_my = folder_info_t::create(sequencer->next_uuid(), db_fi, my_device, folder).value();
     }
     {
         db::FolderInfo db_fi;
-        db_fi.set_index_id(6ul);
-        db_fi.set_max_sequence(0l);
+        db::set_index_id(db_fi, 6ul);
+        db::set_max_sequence(db_fi, 0l);
         folder_info_peer = folder_info_t::create(sequencer->next_uuid(), db_fi, peer_device, folder).value();
     }
     folder->get_folder_infos().put(folder_info_my);
     folder->get_folder_infos().put(folder_info_peer);
 
     auto bi1 = proto::BlockInfo();
-    bi1.set_size(5);
-    bi1.set_hash(utils::sha256_digest("12345").value());
+    proto::set_size(bi1, 5);
+    proto::set_hash(bi1, utils::sha256_digest(as_bytes("12345")).value());
     auto b1 = block_info_t::create(bi1).assume_value();
 
     auto bi2 = proto::BlockInfo();
-    bi2.set_size(5);
-    bi2.set_hash(utils::sha256_digest("67890").value());
+    proto::set_size(bi2, 5);
+    proto::set_hash(bi2, utils::sha256_digest(as_bytes("67890")).value());
     auto b2 = block_info_t::create(bi2).assume_value();
 
     auto bi3 = proto::BlockInfo();
-    bi3.set_size(5);
-    bi3.set_hash(utils::sha256_digest("qqqqqq").value());
+    proto::set_size(bi3, 5);
+    proto::set_hash(bi3, utils::sha256_digest(as_bytes("qqqqqq")).value());
     auto b3 = block_info_t::create(bi3).assume_value();
 
     auto &blocks_map = cluster->get_blocks();
@@ -379,31 +382,43 @@ TEST_CASE("cluster update, reset folder", "[model]") {
     blocks_map.put(b2);
     blocks_map.put(b3);
 
-    proto::FileInfo pr_fi_my;
-    pr_fi_my.set_name("a/b.txt");
-    pr_fi_my.set_size(5ul);
-    pr_fi_my.set_block_size(5ul);
-    pr_fi_my.set_sequence(1);
-    pr_fi_my.mutable_version()->add_counters()->set_id(my_device->device_id().get_uint());
+    proto::FileInfo pr_fi_my = [&]() {
+        auto f = proto::FileInfo();
+        proto::set_name(f, "a/b.txt");
+        proto::set_size(f, 5ul);
+        proto::set_block_size(f, 5ul);
+        proto::set_sequence(f, 1);
+        auto& v = proto::get_version(f);
+        proto::add_counters(v, proto::Counter(my_device->device_id().get_uint(), 0));
+        return f;
+    }();
     auto fi_my = file_info_t::create(sequencer->next_uuid(), pr_fi_my, folder_info_my).value();
     folder_info_my->add_strict(fi_my);
 
-    proto::FileInfo pr_fi_peer1;
-    pr_fi_peer1.set_name("a/c.txt");
-    pr_fi_peer1.set_size(5ul);
-    pr_fi_peer1.set_block_size(5ul);
-    pr_fi_peer1.set_sequence(1);
-    pr_fi_peer1.mutable_version()->add_counters()->set_id(peer_device->device_id().get_uint());
+    proto::FileInfo pr_fi_peer1 = [&]() {
+        auto f = proto::FileInfo();
+        proto::set_name(f, "a/c.txt");
+        proto::set_size(f, 5ul);
+        proto::set_block_size(f, 5ul);
+        proto::set_sequence(f, 1);
+        auto& v = proto::get_version(f);
+        proto::add_counters(v, proto::Counter(peer_device->device_id().get_uint(), 0));
+        return f;
+    }();
     auto fi_peer1 = file_info_t::create(sequencer->next_uuid(), pr_fi_peer1, folder_info_peer).value();
     REQUIRE(folder_info_peer->add_strict(fi_peer1));
     REQUIRE(folder_info_peer->get_file_infos().size() == 1);
 
-    proto::FileInfo pr_fi_peer2;
-    pr_fi_peer2.set_name("a/d.txt");
-    pr_fi_peer2.set_size(10ul);
-    pr_fi_peer2.set_block_size(5ul);
-    pr_fi_peer2.set_sequence(2);
-    pr_fi_peer2.mutable_version()->add_counters()->set_id(peer_device->device_id().get_uint());
+    proto::FileInfo pr_fi_peer2 = [&]() {
+        auto f = proto::FileInfo();
+        proto::set_name(f, "a/d.txt");
+        proto::set_size(f, 10ul);
+        proto::set_block_size(f, 5ul);
+        proto::set_sequence(f, 2);
+        auto& v = proto::get_version(f);
+        proto::add_counters(v, proto::Counter(peer_device->device_id().get_uint(), 0));
+        return f;
+    }();
     auto fi_peer2 = file_info_t::create(sequencer->next_uuid(), pr_fi_peer2, folder_info_peer).value();
     REQUIRE(folder_info_peer->add_strict(fi_peer2));
     REQUIRE(folder_info_peer->get_file_infos().size() == 2);
@@ -414,14 +429,14 @@ TEST_CASE("cluster update, reset folder", "[model]") {
     fi_peer2->assign_block(b3, 1);
 
     auto cc = std::make_unique<proto::ClusterConfig>();
-    auto p_folder = cc->add_folders();
-    p_folder->set_id(std::string(folder->get_id()));
-    p_folder->set_label(std::string(folder->get_label()));
-    auto p_peer = p_folder->add_devices();
-    p_peer->set_id(std::string(peer_id.get_sha256()));
-    p_peer->set_name(std::string(peer_device->get_name()));
-    p_peer->set_max_sequence(123456u);
-    p_peer->set_index_id(7ul);
+    auto& pr_folder = proto::add_folders(*cc);
+    proto::set_id(pr_folder, folder->get_id());
+    proto::set_label(pr_folder, folder->get_label());
+    auto& pr_peer =  proto::add_devices(pr_folder);
+    proto::set_id(pr_peer, peer_id.get_sha256());
+    proto::set_name(pr_peer, peer_device->get_name());
+    proto::set_max_sequence(pr_peer, 123456u);
+    proto::set_index_id(pr_peer, 7u);
 
     auto diff_opt = diff::peer::cluster_update_t::create(*cluster, *sequencer, *peer_device, *cc);
     REQUIRE(diff_opt);
@@ -441,7 +456,7 @@ TEST_CASE("cluster update, reset folder", "[model]") {
     CHECK(fi_peer2->use_count() == 1);
 
     CHECK(blocks_map.size() == 1);
-    CHECK(blocks_map.get(b1->get_hash()));
+    CHECK(blocks_map.by_hash(b1->get_hash()));
 
     bool visited = false;
     auto visitor = my_cluster_update_visitor_t([&](auto &) { visited = true; });
@@ -467,9 +482,9 @@ TEST_CASE("cluster update for a folder, which was not shared", "[model]") {
     cluster->get_devices().put(peer_device);
 
     db::Folder db_folder;
-    db_folder.set_id("1234-5678");
-    db_folder.set_label("my-label");
-    db_folder.set_path("/my/path");
+    db::set_id(db_folder, "some-id");
+    db::set_label(db_folder, "my-label");
+    db::set_path(db_folder, "/my/path");
     auto folder = folder_t::create(sequencer->next_uuid(), db_folder).value();
 
     cluster->get_folders().put(folder);
@@ -478,21 +493,21 @@ TEST_CASE("cluster update for a folder, which was not shared", "[model]") {
     auto folder_info_peer = folder_info_ptr_t();
     {
         db::FolderInfo db_fi;
-        db_fi.set_index_id(5ul);
-        db_fi.set_max_sequence(10l);
+        db::set_index_id(db_fi, 5ul);
+        db::set_max_sequence(db_fi, 10l);
         folder_info_my = folder_info_t::create(sequencer->next_uuid(), db_fi, my_device, folder).value();
         folder->get_folder_infos().put(folder_info_my);
     }
 
     auto cc = std::make_unique<proto::ClusterConfig>();
-    auto p_folder = cc->add_folders();
-    p_folder->set_id(std::string(folder->get_id()));
-    p_folder->set_label(std::string(folder->get_label()));
-    auto p_peer = p_folder->add_devices();
-    p_peer->set_id(std::string(peer_id.get_sha256()));
-    p_peer->set_name(std::string(peer_device->get_name()));
-    p_peer->set_max_sequence(123456u);
-    p_peer->set_index_id(7ul);
+    auto& pr_folder = proto::add_folders(*cc);
+    proto::set_id(pr_folder, folder->get_id());
+    proto::set_label(pr_folder, folder->get_label());
+    auto& pr_peer =  proto::add_devices(pr_folder);
+    proto::set_id(pr_peer, peer_id.get_sha256());
+    proto::set_name(pr_peer, peer_device->get_name());
+    proto::set_max_sequence(pr_peer, 123456u);
+    proto::set_index_id(pr_peer, 7u);
 
     auto diff_opt = diff::peer::cluster_update_t::create(*cluster, *sequencer, *peer_device, *cc);
     REQUIRE(diff_opt);
@@ -515,9 +530,9 @@ TEST_CASE("cluster update with unknown devices", "[model]") {
     cluster->get_devices().put(peer_device);
 
     db::Folder db_folder;
-    db_folder.set_id("1234-5678");
-    db_folder.set_label("my-label");
-    db_folder.set_path("/my/path");
+    db::set_id(db_folder, "some-id");
+    db::set_label(db_folder, "my-label");
+    db::set_path(db_folder, "/my/path");
     auto folder = folder_t::create(sequencer->next_uuid(), db_folder).value();
 
     cluster->get_folders().put(folder);
@@ -526,15 +541,15 @@ TEST_CASE("cluster update with unknown devices", "[model]") {
     auto folder_info_peer = folder_info_ptr_t();
     {
         db::FolderInfo db_fi;
-        db_fi.set_index_id(5ul);
-        db_fi.set_max_sequence(10l);
+        db::set_index_id(db_fi, 5ul);
+        db::set_max_sequence(db_fi, 10l);
         folder_info_my = folder_info_t::create(sequencer->next_uuid(), db_fi, my_device, folder).value();
         folder->get_folder_infos().put(folder_info_my);
     }
     {
         db::FolderInfo db_fi;
-        db_fi.set_index_id(6ul);
-        db_fi.set_max_sequence(0l);
+        db::set_index_id(db_fi, 6ul);
+        db::set_max_sequence(db_fi, 0l);
         folder_info_peer = folder_info_t::create(sequencer->next_uuid(), db_fi, peer_device, folder).value();
         folder->get_folder_infos().put(folder_info_my);
     }
@@ -542,20 +557,22 @@ TEST_CASE("cluster update with unknown devices", "[model]") {
     folder->get_folder_infos().put(folder_info_peer);
 
     auto cc = std::make_unique<proto::ClusterConfig>();
-    auto p_folder = cc->add_folders();
-    p_folder->set_id(std::string(folder->get_id()));
-    p_folder->set_label(std::string(folder->get_label()));
-    auto p_peer_1 = p_folder->add_devices();
-    p_peer_1->set_id(std::string(peer_id_1.get_sha256()));
-    p_peer_1->set_name(std::string(peer_device->get_name()));
-    p_peer_1->set_max_sequence(123456u);
-    p_peer_1->set_index_id(7ul);
 
-    auto p_peer_2 = p_folder->add_devices();
-    p_peer_2->set_id(std::string(peer_id_2.get_sha256()));
-    p_peer_2->set_name(std::string(peer_device->get_name()));
-    p_peer_2->set_max_sequence(123456u);
-    p_peer_2->set_index_id(7ul);
+    auto& pr_folder = proto::add_folders(*cc);
+    proto::set_id(pr_folder, folder->get_id());
+    proto::set_label(pr_folder, folder->get_label());
+
+    auto& pr_peer_1 =  proto::add_devices(pr_folder);
+    proto::set_id(pr_peer_1, peer_id_1.get_sha256());
+    proto::set_name(pr_peer_1, peer_device->get_name());
+    proto::set_max_sequence(pr_peer_1, 123456u);
+    proto::set_index_id(pr_peer_1, 7u);
+
+    auto& pr_peer_2 =  proto::add_devices(pr_folder);
+    proto::set_id(pr_peer_2, peer_id_2.get_sha256());
+    proto::set_name(pr_peer_2, peer_device->get_name());
+    proto::set_max_sequence(pr_peer_2, 123456u);
+    proto::set_index_id(pr_peer_2, 7u);
 
     auto diff_opt = diff::peer::cluster_update_t::create(*cluster, *sequencer, *peer_device, *cc);
     REQUIRE(diff_opt);
@@ -577,15 +594,15 @@ TEST_CASE("cluster update nothing shared", "[model]") {
     auto &blocks_map = cluster->get_blocks();
 
     auto bi1 = proto::BlockInfo();
-    bi1.set_size(5);
-    bi1.set_hash(utils::sha256_digest("12345").value());
+    proto::set_size(bi1, 5);
+    proto::set_hash(bi1, utils::sha256_digest(as_bytes("12345")).value());
     auto b1 = block_info_t::create(bi1).assume_value();
     blocks_map.put(b1);
 
     db::Folder db_folder;
-    db_folder.set_id("1234-5678");
-    db_folder.set_label("my-label");
-    db_folder.set_path("/my/path");
+    db::set_id(db_folder, "some-id");
+    db::set_label(db_folder, "my-label");
+    db::set_path(db_folder, "/my/path");
     auto folder = folder_t::create(sequencer->next_uuid(), db_folder).value();
 
     cluster->get_folders().put(folder);
@@ -594,24 +611,28 @@ TEST_CASE("cluster update nothing shared", "[model]") {
     auto folder_info_peer = folder_info_ptr_t();
     {
         db::FolderInfo db_fi;
-        db_fi.set_index_id(5ul);
-        db_fi.set_max_sequence(10l);
+        db::set_index_id(db_fi, 5ul);
+        db::set_max_sequence(db_fi, 10l);
         folder_info_my = folder_info_t::create(sequencer->next_uuid(), db_fi, my_device, folder).value();
         folder->get_folder_infos().put(folder_info_my);
     }
     {
         db::FolderInfo db_fi;
-        db_fi.set_index_id(6ul);
-        db_fi.set_max_sequence(0l);
+        db::set_index_id(db_fi, 6ul);
+        db::set_max_sequence(db_fi, 0l);
         folder_info_peer = folder_info_t::create(sequencer->next_uuid(), db_fi, peer_device, folder).value();
         folder->get_folder_infos().put(folder_info_peer);
 
-        proto::FileInfo pr_fi_peer;
-        pr_fi_peer.set_name("a/c.txt");
-        pr_fi_peer.set_size(5ul);
-        pr_fi_peer.set_block_size(5ul);
-        pr_fi_peer.set_sequence(5);
-        pr_fi_peer.mutable_version()->add_counters()->set_id(peer_device->device_id().get_uint());
+        proto::FileInfo pr_fi_peer = [&]() {
+            auto f = proto::FileInfo();
+            proto::set_name(f, "a/c.txt");
+            proto::set_size(f, 5ul);
+            proto::set_block_size(f, 5ul);
+            proto::set_sequence(f, 5);
+            auto& v = proto::get_version(f);
+            proto::add_counters(v, proto::Counter(peer_device->device_id().get_uint(), 0));
+            return f;
+        }();
 
         auto fi_peer = file_info_t::create(sequencer->next_uuid(), pr_fi_peer, folder_info_peer).value();
         fi_peer->assign_block(b1, 0);
@@ -671,9 +692,9 @@ TEST_CASE("cluster update with remote folders", "[model]") {
     cluster->get_devices().put(peer_device);
 
     db::Folder db_folder;
-    db_folder.set_id("1234-5678");
-    db_folder.set_label("my-label");
-    db_folder.set_path("/my/path");
+    db::set_id(db_folder, "some-id");
+    db::set_label(db_folder, "my-label");
+    db::set_path(db_folder, "/my/path");
     auto folder = folder_t::create(sequencer->next_uuid(), db_folder).value();
 
     cluster->get_folders().put(folder);
@@ -682,15 +703,15 @@ TEST_CASE("cluster update with remote folders", "[model]") {
     auto folder_info_peer = folder_info_ptr_t();
     {
         db::FolderInfo db_fi;
-        db_fi.set_index_id(5ul);
-        db_fi.set_max_sequence(10l);
+        db::set_index_id(db_fi, 5ul);
+        db::set_max_sequence(db_fi, 10l);
         folder_info_my = folder_info_t::create(sequencer->next_uuid(), db_fi, my_device, folder).value();
         folder->get_folder_infos().put(folder_info_my);
     }
     {
         db::FolderInfo db_fi;
-        db_fi.set_index_id(6ul);
-        db_fi.set_max_sequence(0l);
+        db::set_index_id(db_fi, 6ul);
+        db::set_max_sequence(db_fi, 0l);
         folder_info_peer = folder_info_t::create(sequencer->next_uuid(), db_fi, peer_device, folder).value();
         folder->get_folder_infos().put(folder_info_my);
     }
@@ -698,20 +719,22 @@ TEST_CASE("cluster update with remote folders", "[model]") {
     folder->get_folder_infos().put(folder_info_peer);
 
     auto cc = std::make_unique<proto::ClusterConfig>();
-    auto p_folder = cc->add_folders();
-    p_folder->set_id(std::string(folder->get_id()));
-    p_folder->set_label(std::string(folder->get_label()));
-    auto p_peer_1 = p_folder->add_devices();
-    p_peer_1->set_id(std::string(peer_id_1.get_sha256()));
-    p_peer_1->set_name(std::string(peer_device->get_name()));
-    p_peer_1->set_max_sequence(123456u);
-    p_peer_1->set_index_id(7ul);
 
-    auto p_peer_my = p_folder->add_devices();
-    p_peer_my->set_id(std::string(my_id.get_sha256()));
-    p_peer_my->set_name(std::string(my_device->get_name()));
-    p_peer_my->set_max_sequence(3);
-    p_peer_my->set_index_id(5ul);
+    auto& pr_folder = proto::add_folders(*cc);
+    proto::set_id(pr_folder, folder->get_id());
+    proto::set_label(pr_folder, folder->get_label());
+
+    auto& pr_peer =  proto::add_devices(pr_folder);
+    proto::set_id(pr_peer, peer_id_1.get_sha256());
+    proto::set_name(pr_peer, peer_device->get_name());
+    proto::set_max_sequence(pr_peer, 123456u);
+    proto::set_index_id(pr_peer, 7u);
+
+    auto& pr_peer_my =  proto::add_devices(pr_folder);
+    proto::set_id(pr_peer_my, my_id.get_sha256());
+    proto::set_name(pr_peer_my, my_device->get_name());
+    proto::set_max_sequence(pr_peer_my, 3);
+    proto::set_index_id(pr_peer_my, 5ul);
 
     auto diff_opt = diff::peer::cluster_update_t::create(*cluster, *sequencer, *peer_device, *cc);
     REQUIRE(diff_opt);
@@ -738,7 +761,7 @@ TEST_CASE("cluster update with remote folders", "[model]") {
         CHECK(fi);
     }
 }
-#endif
+
 int _init() {
     test::init_logging();
     return 1;
