@@ -178,6 +178,12 @@ inline void add_folders(ClusterConfig& msg, Folder value) {
     using namespace pp;
     msg["folders"_f].emplace_back(std::move(value));
 }
+inline Folder& add_folders(ClusterConfig& msg) {
+    using namespace pp;
+    auto& opt = msg["folders"_f];
+    opt.emplace_back(Folder());
+    return opt.back();
+}
 
 /***************/
 /*** Counter ***/
@@ -535,6 +541,12 @@ inline void set_devices(Folder& msg, std::size_t i, Device value) {
 inline void add_devices(Folder& msg, Device value) {
     using namespace pp;
     msg["devices"_f].emplace_back(std::move(value));
+}
+inline Device& add_devices(Folder& msg) {
+    using namespace pp;
+    auto& opt = msg["devices"_f];
+    opt.emplace_back(Device());
+    return opt.back();
 }
 
 /**************/
