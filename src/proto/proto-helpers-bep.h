@@ -441,6 +441,12 @@ inline void add_blocks(FileInfo& msg, BlockInfo block) {
     using namespace pp;
     msg["blocks"_f].emplace_back(std::move(block));
 }
+inline BlockInfo& add_blocks(FileInfo& msg) {
+    using namespace pp;
+    auto& opt = msg["blocks"_f];
+    opt.emplace_back(BlockInfo());
+    return opt.back();
+}
 inline std::string_view get_symlink_target(const FileInfo& msg) {
     using namespace pp;
     auto& opt = msg["symlink_target"_f];
@@ -453,6 +459,7 @@ inline void set_symlink_target(FileInfo& msg, std::string_view value) {
     using namespace pp;
     msg["symlink_target"_f] = std::string(value);
 }
+template<typename T = void>
 inline void set_symlink_target(FileInfo& msg, std::string value) {
     using namespace pp;
     msg["symlink_target"_f] = std::move(value);
