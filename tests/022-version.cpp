@@ -12,13 +12,10 @@ TEST_CASE("version ", "[model]") {
     auto my_device = device_t::create(my_id, "my-device").value();
 
     auto proto_v = proto::Vector();
-    auto c0 = proto_v.add_new_counter();
-    c0.id(1);
-    c0.value(2);
-
-    auto c1 = proto_v.add_new_counter();
-    c1.id(my_device->device_id().get_uint());
-    c1.value(10);
+    auto c0 = proto::Counter(1, 2);
+    auto c1 = proto::Counter(my_device->device_id().get_uint(), 10);
+    proto::add_counters(proto_v, c0);
+    proto::add_counters(proto_v, c1);
 
     auto v1 = version_ptr_t(new version_t(proto_v));
     auto v1_copy = version_ptr_t(new version_t(proto_v));

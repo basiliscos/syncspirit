@@ -166,7 +166,7 @@ auto file_info_t::fields_update(const proto::FileInfo &source) noexcept -> outco
     version.reset(new version_t(proto::get_version(source)));
 
     full_name = fmt::format("{}/{}", folder_info->get_folder()->get_label(), get_name());
-    block_size = size ? proto::get_blocks_size(source) : 0;
+    block_size = size ? proto::get_block_size(source) : 0;
     return reserve_blocks(size ? block_size : 0);
 }
 

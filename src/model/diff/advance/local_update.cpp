@@ -20,7 +20,7 @@ local_update_t::local_update_t(const cluster_t &cluster, sequencer_t &sequencer,
     auto &local_folder_infos = folder->get_folder_infos();
     auto local_folder_info = local_folder_infos.by_device_id(self_id);
     auto &local_files = local_folder_info->get_file_infos();
-    auto name = proto::get_name(proto_file_);
+    auto name = std::string(proto::get_name(proto_file_));
     auto local_file = local_files.by_name(name);
     proto::set_modified_by(proto_file_, self.device_id().get_uint());
 
