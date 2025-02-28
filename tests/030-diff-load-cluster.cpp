@@ -114,9 +114,8 @@ TEST_CASE("loading cluster (base)", "[model]") {
 
     SECTION("ignored_devices") {
         db::SomeDevice db_device;
-        db_device.name("my-label");
-        db_device.address("tcp://127.0.0.1");
-        db_device.last_seen(0);
+        db::set_name(db_device, "my-label");
+        db::set_address(db_device, "tcp://127.0.0.1");
 
         auto device_id =
             device_id_t::from_string("KUEQE66-JJ7P6AD-BEHD4ZW-GPBNW6Q-Y4C3K4Y-X44WJWZ-DVPIDXS-UDRJMA7").value();
@@ -142,9 +141,8 @@ TEST_CASE("loading cluster (base)", "[model]") {
 
     SECTION("unknown_devices") {
         db::SomeDevice db_device;
-        db_device.name("my-label");
-        db_device.address("tcp://127.0.0.1");
-        db_device.last_seen(0);
+        db::set_name(db_device, "my-label");
+        db::set_address(db_device, "tcp://127.0.0.1");
 
         auto device_id =
             device_id_t::from_string("KUEQE66-JJ7P6AD-BEHD4ZW-GPBNW6Q-Y4C3K4Y-X44WJWZ-DVPIDXS-UDRJMA7").value();
@@ -170,9 +168,9 @@ TEST_CASE("loading cluster (base)", "[model]") {
 
     SECTION("folders") {
         db::Folder db_folder;
-        db_folder.id("1234-5678");
-        db_folder.label("my-label");
-        db_folder.path("/my/path");
+        db::set_id(db_folder, "1234-5678");
+        db::set_label(db_folder, "my-label");
+        db::set_path(db_folder, "/my/path");
 
         auto uuid = sequencer->next_uuid();
         auto id = std::string("1234-5678");
@@ -180,7 +178,7 @@ TEST_CASE("loading cluster (base)", "[model]") {
         auto folder = folder_t::create(uuid, db_folder).value();
 
         SECTION("via diff") {
-            auto data = db_folder.encode();
+            auto data = db::encode(db_folder);
             diff::load::container_t folders;
             auto key = folder->get_key();
             folders.emplace_back(diff::load::pair_t{key, data});
@@ -203,7 +201,7 @@ TEST_CASE("loading cluster (base)", "[model]") {
 
     SECTION("ignored folders") {
         db::IgnoredFolder db_folder;
-        db_folder.label("my-label");
+        db::set_label(db_folder, "my-label");
 
         auto folder = ignored_folder_t::create("folder-id", "my-label").value();
         auto key = folder->get_key();
@@ -240,17 +238,15 @@ TEST_CASE("loading cluster (folder info)", "[model]") {
     cluster->get_devices().put(my_device);
 
     db::Folder db_folder;
-    db_folder.id("1234-5678");
-    db_folder.label("my-label");
-    db_folder.path("/my/path");
+    db::set_id(db_folder, "1234-5678");
+    db::set_label(db_folder, "my-label");
+    db::set_path(db_folder, "/my/path");
 
     auto uuid = sequencer->next_uuid();
     auto folder = folder_t::create(uuid, db_folder).value();
     cluster->get_folders().put(folder);
 
-    db::FolderInfo db_fi;
-    db_fi.index_id(2);
-    db_fi.max_sequence(3);
+    db::FolderInfo db_fi(2, 3);
     auto fi = folder_info_t::create(sequencer->next_uuid(), db_fi, my_device, folder).value();
     CHECK(fi);
     CHECK(fi->get_index() == 2ul);
@@ -290,25 +286,24 @@ TEST_CASE("loading cluster (file info + block)", "[model]") {
     cluster->get_devices().put(my_device);
     cluster->get_devices().put(peer_device);
 
+    auto hash = utils::sha256_digest(as_bytes("12345")).value();
     auto bi = proto::BlockInfo();
-    bi.size(5);
-    bi.hash(utils::sha256_digest(as_bytes("12345")).value());
+    proto::set_size(bi, 5);
+    proto::set_hash(bi, hash);
     auto block = block_info_t::create(bi).assume_value();
     auto &blocks_map = cluster->get_blocks();
     blocks_map.put(block);
 
     db::Folder db_folder;
-    db_folder.id("1234-5678");
-    db_folder.label("my-label");
-    db_folder.path("/my/path");
+    db::set_id(db_folder, "1234-5678");
+    db::set_label(db_folder, "my-label");
+    db::set_path(db_folder, "/my/path");
 
     auto uuid = sequencer->next_uuid();
     auto folder = folder_t::create(uuid, db_folder).value();
     cluster->get_folders().put(folder);
 
-    db::FolderInfo db_folder_info;
-    db_folder_info.index_id(2);
-    db_folder_info.max_sequence(3);
+    db::FolderInfo db_folder_info(2, 3);
     auto folder_info = folder_info_t::create(sequencer->next_uuid(), db_folder_info, my_device, folder).value();
     CHECK(folder_info);
     CHECK(folder_info->get_index() == 2ul);
@@ -316,10 +311,11 @@ TEST_CASE("loading cluster (file info + block)", "[model]") {
     folder->get_folder_infos().put(folder_info);
 
     proto::FileInfo pr_fi;
-    pr_fi.name("a/b.txt");
-    pr_fi.size(55ul);
-    pr_fi.block_size(5ul);
-    pr_fi.mutable_version().add_new_counter().id(my_device->device_id().get_uint());
+    proto::set_name(pr_fi, "a/b.txt");
+    proto::set_size(pr_fi, 55ul);
+    proto::set_block_size(pr_fi, 5ul);
+    auto& version = proto::get_version(pr_fi);
+    proto::add_counters(version, proto::Counter(my_device->device_id().get_uint(), 0));
     auto fi = file_info_t::create(sequencer->next_uuid(), pr_fi, folder_info).value();
     CHECK(fi);
     for (size_t i = 0; i < 11; ++i) {
@@ -330,8 +326,9 @@ TEST_CASE("loading cluster (file info + block)", "[model]") {
 
     SECTION("directly") {
         auto data = fi->serialize(true);
-        auto file_info_db = db::FileInfo::decode(data).value().clone();
-        auto v = file_info_db.version();
+        auto file_info_db = db::FileInfo();
+        REQUIRE(db::decode(data, file_info_db));
+        auto v = db::get_version(file_info_db);
         target = file_info_t::create(fi->get_key(), file_info_db, std::move(folder_info)).value();
         REQUIRE(target);
         CHECK(target->get_size() == 55ul);

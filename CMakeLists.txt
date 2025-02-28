@@ -236,7 +236,6 @@ add_library(syncspirit_core
     src/utils/time.cpp
     src/utils/tls.cpp
     src/utils/uri.cpp
-    src/proto/proto-impl.h
 )
 generate_export_header(syncspirit_core
     EXPORT_MACRO_NAME SYNCSPIRIT_API

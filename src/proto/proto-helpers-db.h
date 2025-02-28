@@ -547,6 +547,7 @@ inline void set_address(SomeDevice& msg, std::string_view value) {
     using namespace pp;
     msg["address"_f] = std::string(value);
 }
+template<typename T = void>
 inline void set_address(SomeDevice& msg, std::string value) {
     using namespace pp;
     msg["address"_f] = std::move(value);
