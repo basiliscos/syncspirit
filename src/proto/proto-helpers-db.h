@@ -420,41 +420,152 @@ inline void set_rescan_interval(Folder& msg, std::uint32_t value) {
 /*** FolderInfo ***/
 /******************/
 
-std::uint64_t       get_index_id(const FolderInfo&);
-void                set_index_id(FolderInfo&, std::uint64_t value);
-std::int64_t        get_max_sequence(const FolderInfo&);
-void                set_max_sequence(FolderInfo&, std::int64_t value);
+inline std::uint64_t get_index_id(const FolderInfo& msg) {
+    using namespace pp;
+    return msg["index_id"_f].value_or(0);
+}
+inline void set_index_id(FolderInfo& msg, std::uint64_t value) {
+    using namespace pp;
+    msg["index_id"_f] = value;
+}
+inline std::int64_t get_max_sequence(const FolderInfo& msg) {
+    using namespace pp;
+    return msg["max_sequence"_f].value_or(0);
+}
+inline void set_max_sequence(FolderInfo& msg, std::int64_t value) {
+    using namespace pp;
+    msg["max_sequence"_f] = value;
+}
 
 /*********************/
 /*** IgnoredFolder ***/
 /*********************/
 
-std::string_view    get_label(const IgnoredFolder&);
-void                set_label(IgnoredFolder&, std::string_view value);
+inline std::string_view get_label(const IgnoredFolder& msg) {
+    using namespace pp;
+    auto& opt = msg["label"_f];
+    if (opt) {
+        return opt.value();
+    }
+    return {};
+}
+inline void set_label(IgnoredFolder& msg, std::string_view value) {
+    using namespace pp;
+    msg["label"_f] = std::string(value);
+}
 
 /*********************/
 /*** PendingFolder ***/
 /*********************/
 
-Folder&             get_folder(const PendingFolder&);
-void                set_folder(PendingFolder&, Folder value);
-FolderInfo&         get_folder_info(const PendingFolder&);
-void                set_folder_info(PendingFolder&, FolderInfo value);
+inline const Folder& get_folder(const PendingFolder& msg) {
+    using namespace pp;
+    auto& opt = msg["folder"_f];
+    if (!opt) {
+        using Opt = std::remove_cv_t<std::remove_reference_t<decltype(opt)>>;
+        auto& mutable_opt = const_cast<Opt&>(opt);
+        mutable_opt = Folder();
+    }
+    return opt.value();
+}
+inline Folder& get_folder(PendingFolder& msg) {
+    using namespace pp;
+    auto& opt = msg["folder"_f];
+    if (!opt) {
+        opt = Folder();
+    }
+    return opt.value();
+}
+inline void set_folder(PendingFolder& msg, Folder value) {
+    using namespace pp;
+    msg["folder"_f] = std::move(value);
+}
+inline const FolderInfo& get_folder_info(const PendingFolder& msg) {
+    using namespace pp;
+    auto& opt = msg["folder_info"_f];
+    if (!opt) {
+        using Opt = std::remove_cv_t<std::remove_reference_t<decltype(opt)>>;
+        auto& mutable_opt = const_cast<Opt&>(opt);
+        mutable_opt = FolderInfo();
+    }
+    return opt.value();
+}
+inline FolderInfo& get_folder_info(PendingFolder& msg) {
+    using namespace pp;
+    auto& opt = msg["folder_info"_f];
+    if (!opt) {
+        opt = FolderInfo();
+    }
+    return opt.value();
+}
+inline void set_folder_info(PendingFolder& msg, FolderInfo value) {
+    using namespace pp;
+    msg["folder_info"_f] = std::move(value);
+}
 
 /******************/
 /*** SomeDevice ***/
 /******************/
 
-std::string_view    get_name(const SomeDevice&);
-void                set_name(SomeDevice&, std::string_view value);
-std::string_view    get_client_name(const SomeDevice&);
-void                set_client_name(SomeDevice&, std::string_view value);
-std::string_view    get_client_version(const SomeDevice&);
-void                set_client_version(SomeDevice&, std::string_view value);
-std::string_view    get_address(const SomeDevice&);
-void                set_address(SomeDevice&, std::string_view value);
-void                set_address(SomeDevice&, std::string value);
-std::int64_t        get_last_seen(const SomeDevice&);
-void                set_last_seen(SomeDevice&, std::int64_t value);
+inline std::string_view get_name(const SomeDevice& msg) {
+    using namespace pp;
+    auto& opt = msg["name"_f];
+    if (opt) {
+        return opt.value();
+    }
+    return {};
+}
+inline void set_name(SomeDevice& msg, std::string_view value) {
+    using namespace pp;
+    msg["name"_f] = std::string(value);
+}
+inline std::string_view get_client_name(const SomeDevice& msg) {
+    using namespace pp;
+    auto& opt = msg["client_name"_f];
+    if (opt) {
+        return opt.value();
+    }
+    return {};
+}
+inline void set_client_name(SomeDevice& msg, std::string_view value) {
+    using namespace pp;
+    msg["client_name"_f] = std::string(value);
+}
+inline std::string_view get_client_version(const SomeDevice& msg) {
+    using namespace pp;
+    auto& opt = msg["client_version"_f];
+    if (opt) {
+        return opt.value();
+    }
+    return {};
+}
+inline void set_client_version(SomeDevice& msg, std::string_view value) {
+    using namespace pp;
+    msg["client_version"_f] = std::string(value);
+}
+inline std::string_view get_address(const SomeDevice& msg) {
+    using namespace pp;
+    auto& opt = msg["address"_f];
+    if (opt) {
+        return opt.value();
+    }
+    return {};
+}
+inline void set_address(SomeDevice& msg, std::string_view value) {
+    using namespace pp;
+    msg["address"_f] = std::string(value);
+}
+inline void set_address(SomeDevice& msg, std::string value) {
+    using namespace pp;
+    msg["address"_f] = std::move(value);
+}
+inline std::int64_t get_last_seen(const SomeDevice& msg) {
+    using namespace pp;
+    return msg["last_seen"_f].value_or(0);
+}
+inline void set_last_seen(SomeDevice& msg, std::int64_t value) {
+    using namespace pp;
+    msg["last_seen"_f] = value;
+}
 
 }
