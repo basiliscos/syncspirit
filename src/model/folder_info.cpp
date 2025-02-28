@@ -119,7 +119,7 @@ void folder_info_t::serialize(db::FolderInfo &storage) const noexcept {
 utils::bytes_t folder_info_t::serialize() const noexcept {
     db::FolderInfo r;
     serialize(r);
-    return db::encode::encode(r);
+    return db::encode(r);
 }
 
 void folder_info_t::set_index(std::uint64_t value) noexcept {

@@ -4,7 +4,7 @@
 #include "folder_infos.h"
 #include "model/misc/error_code.h"
 #include "model/cluster.h"
-#include "proto/proto-helpers.h"
+#include "proto/proto-helpers-db.h"
 
 using namespace syncspirit::model::diff::load;
 
@@ -28,7 +28,7 @@ auto folder_infos_t::apply_impl(cluster_t &cluster, apply_controller_t &controll
         }
 
         auto db_fi = db::FolderInfo();
-        if (auto ok = db::decode::decode(pair.value, db_fi); !ok) {
+        if (auto ok = db::decode(pair.value, db_fi); !ok) {
             return make_error_code(error_code_t::folder_info_deserialization_failure);
         }
 

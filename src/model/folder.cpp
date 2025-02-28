@@ -52,7 +52,7 @@ void folder_t::assign_cluster(const cluster_ptr_t &cluster_) noexcept { cluster 
 utils::bytes_t folder_t::serialize() noexcept {
     auto r = db::Folder();
     folder_data_t::serialize(r);
-    return db::encode::encode(r);
+    return db::encode(r);
 }
 
 auto folder_t::is_shared_with(const model::device_t &device) const noexcept -> folder_info_ptr_t {

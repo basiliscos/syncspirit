@@ -47,7 +47,7 @@ ignored_folder_t::ignored_folder_t(utils::bytes_view_t key_) noexcept {
 
 outcome::result<void> ignored_folder_t::assign_fields(utils::bytes_view_t data) noexcept {
     db::IgnoredFolder folder;
-    if (!db::decode::decode(data, folder)) {
+    if (!db::decode(data, folder)) {
         return make_error_code(error_code_t::ignored_folder_deserialization_failure);
     }
     label = std::string(db::get_label(folder));
@@ -63,7 +63,7 @@ std::string_view ignored_folder_t::get_label() const noexcept { return label; }
 utils::bytes_t ignored_folder_t::serialize() noexcept {
     db::IgnoredFolder r;
     db::set_label(r, label);
-    return db::encode::encode(r);
+    return db::encode(r);
 }
 
 template <> SYNCSPIRIT_API std::string_view get_index<0>(const ignored_folder_ptr_t &item) noexcept {

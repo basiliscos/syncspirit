@@ -5,7 +5,7 @@
 
 #include "model/device_id.h"
 #include "model/misc/error_code.h"
-#include "proto/proto-helpers.h"
+#include "proto/proto-helpers-db.h"
 #include "common.h"
 
 #include <boost/outcome.hpp>
@@ -26,7 +26,7 @@ struct some_devices_t {
             auto &device_id = *device_id_opt;
 
             auto db_sd = db::SomeDevice();
-            if (!db::decode::decode(pair.value, db_sd)) {
+            if (!db::decode(pair.value, db_sd)) {
                 return make_error_code(error_code_t::some_device_deserialization_failure);
             }
             auto option = T::create(device_id, db_sd);

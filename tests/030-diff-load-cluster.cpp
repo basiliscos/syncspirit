@@ -51,15 +51,15 @@ TEST_CASE("loading cluster (base)", "[model]") {
         key[0] = prefix;
         std::copy(device_id.begin(), device_id.end(), &key[1]);
         db::Device db_device;
-        db_device.cert_name("cn");
-        db_device.name("peer-name");
+        db::set_cert_name(db_device, "cn");
+        db::set_name(db_device, "peer-name");
 
         device_ptr_t peer;
 
         SECTION("directly") { peer = device_t::create(key, db_device).value(); }
 
         SECTION("via diff (+ local device)") {
-            auto data = db_device.encode();
+            auto data = db::encode(db_device);
             diff::load::container_t devices;
             devices.emplace_back(diff::load::pair_t{key, data});
             devices.emplace_back(diff::load::pair_t{self_key, self_data});
@@ -84,9 +84,10 @@ TEST_CASE("loading cluster (base)", "[model]") {
     }
 
     SECTION("blocks") {
+        auto hash = utils::sha256_digest(as_bytes("12345")).value();
         auto bi = proto::BlockInfo();
-        bi.size(5);
-        bi.hash(utils::sha256_digest(as_bytes("12345")).value());
+        proto::set_size(bi, 5);
+        proto::set_hash(bi, hash);
 
         auto block = block_info_t::create(bi).assume_value();
         auto key = block->get_key();
@@ -101,7 +102,7 @@ TEST_CASE("loading cluster (base)", "[model]") {
             REQUIRE(diff->apply(*cluster, get_apply_controller()));
             auto &blocks_map = cluster->get_blocks();
             REQUIRE(blocks_map.size() == 1);
-            target_block = blocks_map.by_hash(bi.hash());
+            target_block = blocks_map.by_hash(hash);
         }
 
         REQUIRE(target_block);

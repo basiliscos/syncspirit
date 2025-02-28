@@ -25,8 +25,6 @@ std::size_t estimate(const Ping&);
 std::size_t estimate(const Request&);
 std::size_t estimate(const Response&);
 
-namespace encode {
-
 void encode(const BlockInfo&, void*);
 void encode(const Close&, void*);
 void encode(const ClusterConfig&, void*);
@@ -44,27 +42,21 @@ void encode(const Response&, void*);
 utils::bytes_t encode(const Hello&, std::size_t prefix);
 utils::bytes_t encode(const Announce);
 
-}
-
-namespace decode {
-
-bool SYNCSPIRIT_API decode(utils::bytes_view_t, Announce&);
-bool SYNCSPIRIT_API decode(utils::bytes_view_t, BlockInfo&);
-bool SYNCSPIRIT_API decode(utils::bytes_view_t, Close&);
-bool SYNCSPIRIT_API decode(utils::bytes_view_t, ClusterConfig&);
-bool SYNCSPIRIT_API decode(utils::bytes_view_t, Device&);
-bool SYNCSPIRIT_API decode(utils::bytes_view_t, DownloadProgress&);
-bool SYNCSPIRIT_API decode(utils::bytes_view_t, FileDownloadProgressUpdate&);
-bool SYNCSPIRIT_API decode(utils::bytes_view_t, FileInfo&);
-bool SYNCSPIRIT_API decode(utils::bytes_view_t, Folder&);
-bool SYNCSPIRIT_API decode(utils::bytes_view_t, Header&);
-bool SYNCSPIRIT_API decode(utils::bytes_view_t, Hello&);
-bool SYNCSPIRIT_API decode(utils::bytes_view_t, IndexBase&);
-bool SYNCSPIRIT_API decode(utils::bytes_view_t, Ping&);
-bool SYNCSPIRIT_API decode(utils::bytes_view_t, Request&);
-bool SYNCSPIRIT_API decode(utils::bytes_view_t, Response&);
-
-}
+bool decode(utils::bytes_view_t, Announce&);
+bool decode(utils::bytes_view_t, BlockInfo&);
+bool decode(utils::bytes_view_t, Close&);
+bool decode(utils::bytes_view_t, ClusterConfig&);
+bool decode(utils::bytes_view_t, Device&);
+bool decode(utils::bytes_view_t, DownloadProgress&);
+bool decode(utils::bytes_view_t, FileDownloadProgressUpdate&);
+bool decode(utils::bytes_view_t, FileInfo&);
+bool decode(utils::bytes_view_t, Folder&);
+bool decode(utils::bytes_view_t, Header&);
+bool decode(utils::bytes_view_t, Hello&);
+bool decode(utils::bytes_view_t, IndexBase&);
+bool decode(utils::bytes_view_t, Ping&);
+bool decode(utils::bytes_view_t, Request&);
+bool decode(utils::bytes_view_t, Response&);
 
 /****************/
 /*** Announce ***/

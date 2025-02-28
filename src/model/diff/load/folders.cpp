@@ -4,7 +4,7 @@
 #include "folders.h"
 #include "model/cluster.h"
 #include "model/misc/error_code.h"
-#include "proto/proto-helpers.h"
+#include "proto/proto-helpers-db.h"
 
 using namespace syncspirit::model::diff::load;
 
@@ -13,7 +13,7 @@ auto folders_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) c
     for (auto &pair : folders) {
 
         auto db_folder = db::Folder();
-        if (auto ok = db::decode::decode(pair.value, db_folder); !ok) {
+        if (auto ok = db::decode(pair.value, db_folder); !ok) {
             return make_error_code(error_code_t::folder_deserialization_failure);
         }
         auto option = folder_t::create(pair.key, db_folder);

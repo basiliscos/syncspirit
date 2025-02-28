@@ -4,7 +4,6 @@
 #include "block_info.h"
 #include "file_info.h"
 #include "proto/proto-helpers.h"
-#include "proto/proto-helpers.h"
 #include "db/prefix.h"
 #include "misc/error_code.h"
 #include <spdlog/spdlog.h>
@@ -76,7 +75,7 @@ proto::BlockInfo block_info_t::as_bep(size_t offset) const noexcept {
 }
 
 utils::bytes_t block_info_t::serialize() const noexcept {
-    return db::encode::encode(db::BlockInfo{weak_hash, size});
+    return db::encode(db::BlockInfo{weak_hash, size});
 }
 
 void block_info_t::link(file_info_t *file_info, size_t block_index) noexcept {

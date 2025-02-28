@@ -26,7 +26,7 @@ void some_device_base_t::assign(const db::SomeDevice &db) noexcept {
 syncspirit::utils::bytes_t some_device_base_t::serialize() noexcept {
     db::SomeDevice db;
     serialize(db);
-    return db::encode::encode(db);
+    return db::encode(db);
 }
 
 void some_device_base_t::serialize(db::SomeDevice &db) const noexcept {

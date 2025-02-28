@@ -138,8 +138,9 @@ auto file_info_t::fields_update(const db::FileInfo &source) noexcept -> outcome:
     version.reset(new version_t(db::get_version(source)));
 
     full_name = fmt::format("{}/{}", folder_info->get_folder()->get_label(), get_name());
-    block_size = size ? db::get_blocks_size(source) : 0;
-    return reserve_blocks(size ? block_size : 0);
+    block_size = size ? db::get_block_size(source) : 0;
+    auto block_count = db::get_blocks_size(source);
+    return reserve_blocks(size ? block_count : 0);
 }
 
 auto file_info_t::fields_update(const proto::FileInfo &source) noexcept -> outcome::result<void> {
@@ -167,7 +168,8 @@ auto file_info_t::fields_update(const proto::FileInfo &source) noexcept -> outco
 
     full_name = fmt::format("{}/{}", folder_info->get_folder()->get_label(), get_name());
     block_size = size ? proto::get_block_size(source) : 0;
-    return reserve_blocks(size ? block_size : 0);
+    auto block_count = proto::get_blocks_size(source);
+    return reserve_blocks(size ? block_count : 0);
 }
 
 utils::bytes_view_t file_info_t::get_uuid() const noexcept { return {key + 1 + uuid_length, uuid_length}; }
@@ -265,7 +267,7 @@ outcome::result<void> file_info_t::reserve_blocks(size_t block_count) noexcept {
 }
 
 utils::bytes_t file_info_t::serialize(bool include_blocks) const noexcept {
-    return db::encode::encode(as_db(include_blocks));
+    return db::encode(as_db(include_blocks));
 }
 
 void file_info_t::mark_unreachable(bool value) noexcept {

@@ -8,8 +8,6 @@
 
 namespace syncspirit::db {
 
-namespace encode {
-
 utils::bytes_t SYNCSPIRIT_API encode(const BlockInfo&);
 utils::bytes_t SYNCSPIRIT_API encode(const Device&);
 utils::bytes_t SYNCSPIRIT_API encode(const FileInfo&);
@@ -19,10 +17,6 @@ utils::bytes_t SYNCSPIRIT_API encode(const IgnoredFolder&);
 utils::bytes_t SYNCSPIRIT_API encode(const PendingFolder&);
 utils::bytes_t SYNCSPIRIT_API encode(const SomeDevice&);
 
-}
-
-namespace decode {
-
 bool SYNCSPIRIT_API decode(utils::bytes_view_t, BlockInfo&);
 bool SYNCSPIRIT_API decode(utils::bytes_view_t, Device&);
 bool SYNCSPIRIT_API decode(utils::bytes_view_t, FileInfo&);
@@ -31,8 +25,6 @@ bool SYNCSPIRIT_API decode(utils::bytes_view_t, FolderInfo&);
 bool SYNCSPIRIT_API decode(utils::bytes_view_t, IgnoredFolder&);
 bool SYNCSPIRIT_API decode(utils::bytes_view_t, PendingFolder&);
 bool SYNCSPIRIT_API decode(utils::bytes_view_t, SomeDevice&);
-
-}
 
 /*****************/
 /*** BlockInfo ***/

@@ -71,7 +71,7 @@ void pending_folder_t::serialize(db::PendingFolder &data) const noexcept {
 utils::bytes_t pending_folder_t::serialize() const noexcept {
     db::PendingFolder r;
     serialize(r);
-    return db::encode::encode(r);
+    return db::encode(r);
 }
 
 template <> SYNCSPIRIT_API std::string_view get_index<0>(const pending_folder_ptr_t &item) noexcept {
