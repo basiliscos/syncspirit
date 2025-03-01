@@ -55,13 +55,15 @@ TEST_CASE("file iterator, single folder", "[model]") {
     SECTION("cloning (empty files)") {
         SECTION("1 file") {
             SECTION("no local file") {
-                auto file = proto::FileInfo();
-                file.set_name("a.txt");
-                file.set_sequence(10ul);
+                auto pr_fi = proto::FileInfo();
+                proto::set_name(pr_fi, "a.txt");
+                proto::set_sequence(pr_fi, 10);
+                auto& v = proto::get_version(pr_fi);
+                proto::add_counters(v, proto::Counter(peer_device->device_id().get_uint(), 0));
                 auto index_builder = builder.make_index(peer_id.get_sha256(), folder->get_id());
 
                 SECTION("regular file") {
-                    auto ec = index_builder.add(file, peer_device).finish().apply();
+                    auto ec = index_builder.add(pr_fi, peer_device).finish().apply();
                     REQUIRE(ec);
 
                     auto [f, action] = file_iterator->next();
@@ -78,9 +80,9 @@ TEST_CASE("file iterator, single folder", "[model]") {
                     CHECK(!f->is_locked());
                 }
                 SECTION("symblink") {
-                    file.set_symlink_target("b.txt");
-                    file.set_type(proto::FileInfoType::SYMLINK);
-                    auto ec = index_builder.add(file, peer_device).finish().apply();
+                    proto::set_symlink_target(pr_fi, "b.txt");
+                    proto::set_type(pr_fi, proto::FileInfoType::SYMLINK);
+                    auto ec = index_builder.add(pr_fi, peer_device).finish().apply();
                     REQUIRE(ec);
 
                     auto [f, action] = file_iterator->next();
@@ -91,29 +93,30 @@ TEST_CASE("file iterator, single folder", "[model]") {
                 }
             }
             SECTION("invalid file is ignored") {
-                auto file = proto::FileInfo();
-                file.set_name("a.txt");
-                file.set_sequence(10ul);
-                file.set_invalid(true);
+                auto pr_fi = proto::FileInfo();
+                proto::set_name(pr_fi, "a.txt");
+                proto::set_sequence(pr_fi, 10);
+                proto::set_invalid(pr_fi, true);
                 REQUIRE(builder.apply());
                 CHECK(file_iterator->next() == R{nullptr, A::ignore});
             }
 
             SECTION("version checks") {
-                auto file = proto::FileInfo();
-                file.set_name("a.txt");
-                file.set_sequence(10ul);
-                auto c_1 = file.mutable_version()->add_counters();
-                c_1->set_id(1);
-                c_1->set_value(5);
+                auto pr_fi = proto::FileInfo();
+                proto::set_name(pr_fi, "a.txt");
+                proto::set_sequence(pr_fi, 10);
+                auto& v = proto::get_version(pr_fi);
+                auto& c_1 = proto::add_counters(v);
+                proto::set_id(c_1, 1);
+                proto::set_value(c_1, 5);
 
-                builder.make_index(peer_id.get_sha256(), folder->get_id()).add(file, peer_device).finish();
+                builder.make_index(peer_id.get_sha256(), folder->get_id()).add(pr_fi, peer_device).finish();
 
                 SECTION("my version < peer version") {
-                    c_1->set_value(3);
+                    proto::set_value(c_1, 3);
                     REQUIRE(builder.apply());
 
-                    auto my_file = file_info_t::create(sequencer->next_uuid(), file, my_folder).value();
+                    auto my_file = file_info_t::create(sequencer->next_uuid(), pr_fi, my_folder).value();
                     my_file->mark_local();
                     my_files.put(my_file);
 
@@ -126,9 +129,9 @@ TEST_CASE("file iterator, single folder", "[model]") {
 
                 SECTION("my version < peer version, but not scanned yet") {
                     REQUIRE(builder.apply());
-                    c_1->set_value(3);
+                    proto::set_value(c_1, 3);
 
-                    auto my_file = file_info_t::create(sequencer->next_uuid(), file, my_folder).value();
+                    auto my_file = file_info_t::create(sequencer->next_uuid(), pr_fi, my_folder).value();
                     my_files.put(my_file);
 
                     CHECK(file_iterator->next() == R{nullptr, A::ignore});
@@ -136,10 +139,9 @@ TEST_CASE("file iterator, single folder", "[model]") {
 
                 SECTION("my version > peer version") {
                     REQUIRE(builder.apply());
+                    proto::set_value(c_1, 10);
 
-                    c_1->set_value(10);
-
-                    auto my_file = file_info_t::create(sequencer->next_uuid(), file, my_folder).value();
+                    auto my_file = file_info_t::create(sequencer->next_uuid(), pr_fi, my_folder).value();
                     my_file->mark_local();
                     my_files.put(my_file);
 
@@ -149,7 +151,7 @@ TEST_CASE("file iterator, single folder", "[model]") {
                 SECTION("my version == peer version") {
                     REQUIRE(builder.apply());
 
-                    auto my_file = file_info_t::create(sequencer->next_uuid(), file, my_folder).value();
+                    auto my_file = file_info_t::create(sequencer->next_uuid(), pr_fi, my_folder).value();
                     my_file->mark_local();
                     my_files.put(my_file);
 
@@ -159,15 +161,15 @@ TEST_CASE("file iterator, single folder", "[model]") {
         }
         SECTION("2+ files") {
             auto files = model::file_infos_map_t();
-            auto file_1 = proto::FileInfo();
-            file_1.set_name("a.txt");
-            file_1.set_sequence(10ul);
-            auto file_2 = proto::FileInfo();
-            file_2.set_name("b.txt");
-            file_2.set_sequence(11ul);
+            auto pr_fi_1 = proto::FileInfo();
+            proto::set_name(pr_fi_1, "a.txt");
+            proto::set_sequence(pr_fi_1, 10ul);
+            auto pr_fi_2 = proto::FileInfo();
+            proto::set_name(pr_fi_2, "b.txt");
+            proto::set_sequence(pr_fi_2, 11ul);
             builder.make_index(peer_id.get_sha256(), folder->get_id())
-                .add(file_1, peer_device)
-                .add(file_2, peer_device)
+                .add(pr_fi_1, peer_device)
+                .add(pr_fi_2, peer_device)
                 .finish();
             REQUIRE(builder.apply());
 
@@ -238,11 +240,11 @@ TEST_CASE("file iterator, single folder", "[model]") {
                 CHECK(files.by_name("a.txt"));
                 CHECK(files.by_name("b.txt"));
 
-                auto file_3 = proto::FileInfo();
-                file_3.set_name("c.txt");
-                file_3.set_sequence(12ul);
+                auto pr_fi_3 = proto::FileInfo();
+                proto::set_name(pr_fi_3, "c.txt");
+                proto::set_sequence(pr_fi_3, 12ul);
                 auto ec = builder.make_index(peer_id.get_sha256(), folder->get_id())
-                              .add(file_3, peer_device)
+                              .add(pr_fi_3, peer_device)
                               .finish()
                               .apply();
 
@@ -256,28 +258,29 @@ TEST_CASE("file iterator, single folder", "[model]") {
     }
 
     SECTION("synchronizing non-empty files") {
+        auto b1_hash = utils::sha256_digest(as_bytes("12345")).value();
         auto b1 = proto::BlockInfo();
-        b1.set_hash(utils::sha256_digest("12345").value());
-        b1.set_weak_hash(555);
-        b1.set_size(5ul);
+        proto::set_hash(b1, b1_hash);
+        proto::set_size(b1, 5);
+
+        auto b2_hash = utils::sha256_digest(as_bytes("67890")).value();
         auto b2 = proto::BlockInfo();
-        b1.set_hash(utils::sha256_digest("67890").value());
-        b1.set_weak_hash(123);
-        b1.set_size(5ul);
+        proto::set_hash(b2, b2_hash);
+        proto::set_size(b2, 5);
 
         auto &blocks_map = cluster->get_blocks();
         blocks_map.put(block_info_t::create(b1).value());
         blocks_map.put(block_info_t::create(b2).value());
 
         SECTION("missing locally") {
-            auto file = proto::FileInfo();
-            file.set_name("a.txt");
-            file.set_sequence(10ul);
-            file.set_size(b1.size());
-            file.set_block_size(b1.size());
-            *file.add_blocks() = b1;
+            auto pr_fi = proto::FileInfo();
+            proto::set_name(pr_fi, "a.txt");
+            proto::set_sequence(pr_fi, 10);
+            proto::set_size(pr_fi, proto::get_size(b1));
+            proto::set_block_size(pr_fi, proto::get_size(b1));
+            proto::add_blocks(pr_fi, b1);
 
-            REQUIRE(builder.make_index(peer_id.get_sha256(), folder->get_id()).add(file, peer_device).finish().apply());
+            REQUIRE(builder.make_index(peer_id.get_sha256(), folder->get_id()).add(pr_fi, peer_device).finish().apply());
 
             SECTION("folder is suspended") {
                 REQUIRE(builder.suspend(*folder).apply());
@@ -297,24 +300,21 @@ TEST_CASE("file iterator, single folder", "[model]") {
         }
 
         SECTION("have local, but outdated") {
-            auto file = proto::FileInfo();
-            file.set_name("a.txt");
-            file.set_sequence(10ul);
-            file.set_size(b1.size());
-            file.set_block_size(b1.size());
-            *file.add_blocks() = b1;
+            auto pr_fi = proto::FileInfo();
+            proto::set_name(pr_fi, "a.txt");
+            proto::set_sequence(pr_fi, 10);
+            proto::set_size(pr_fi, proto::get_size(b1));
+            proto::set_block_size(pr_fi, proto::get_size(b1));
+            proto::add_blocks(pr_fi, b1);
 
-            auto c_1 = file.mutable_version()->add_counters();
-            c_1->set_id(1);
-            c_1->set_value(1);
+            auto& v = proto::get_version(pr_fi);
+            proto::add_counters(v, proto::Counter(1, 1));
 
-            auto my_file = file_info_t::create(sequencer->next_uuid(), file, my_folder).value();
+            auto my_file = file_info_t::create(sequencer->next_uuid(), pr_fi, my_folder).value();
             my_files.put(my_file);
 
-            auto c_2 = file.mutable_version()->add_counters();
-            c_2->set_id(2);
-            c_2->set_value(2);
-            REQUIRE(builder.make_index(peer_id.get_sha256(), folder->get_id()).add(file, peer_device).finish().apply());
+            proto::add_counters(v, proto::Counter(2, 2));
+            REQUIRE(builder.make_index(peer_id.get_sha256(), folder->get_id()).add(pr_fi, peer_device).finish().apply());
 
             SECTION("has been scanned") {
                 my_file->mark_local();
@@ -331,22 +331,20 @@ TEST_CASE("file iterator, single folder", "[model]") {
         }
 
         SECTION("have local, local is newer") {
-            auto file = proto::FileInfo();
-            file.set_name("a.txt");
-            file.set_sequence(10ul);
-            file.set_size(b1.size());
-            file.set_block_size(b1.size());
-            *file.add_blocks() = b1;
+            auto pr_fi = proto::FileInfo();
+            proto::set_name(pr_fi, "a.txt");
+            proto::set_sequence(pr_fi, 10);
+            proto::set_size(pr_fi, proto::get_size(b1));
+            proto::set_block_size(pr_fi, proto::get_size(b1));
+            proto::add_blocks(pr_fi, b1);
 
-            auto c_1 = file.mutable_version()->add_counters();
-            c_1->set_id(1);
-            c_1->set_value(1);
-            builder.make_index(peer_id.get_sha256(), folder->get_id()).add(file, peer_device).finish();
+            auto& v = proto::get_version(pr_fi);
+            proto::add_counters(v, proto::Counter(1, 1));
 
-            auto c_2 = file.mutable_version()->add_counters();
-            c_2->set_id(2);
-            c_2->set_value(2);
-            auto my_file = file_info_t::create(sequencer->next_uuid(), file, my_folder).value();
+            builder.make_index(peer_id.get_sha256(), folder->get_id()).add(pr_fi, peer_device).finish();
+
+            proto::add_counters(v, proto::Counter(2, 2));
+            auto my_file = file_info_t::create(sequencer->next_uuid(), pr_fi, my_folder).value();
             my_files.put(my_file);
 
             REQUIRE(builder.apply());
@@ -354,15 +352,15 @@ TEST_CASE("file iterator, single folder", "[model]") {
         }
 
         SECTION("peer file is unreacheable") {
-            auto file = proto::FileInfo();
-            file.set_name("a.txt");
-            file.set_sequence(10ul);
-            file.set_size(b1.size());
-            file.set_block_size(b1.size());
-            *file.add_blocks() = b1;
+            auto pr_fi = proto::FileInfo();
+            proto::set_name(pr_fi, "a.txt");
+            proto::set_sequence(pr_fi, 10);
+            proto::set_size(pr_fi, proto::get_size(b1));
+            proto::set_block_size(pr_fi, proto::get_size(b1));
+            proto::add_blocks(pr_fi, b1);
 
-            REQUIRE(builder.make_index(peer_id.get_sha256(), folder->get_id()).add(file, peer_device).finish().apply());
-            auto f = peer_files.by_name(file.name());
+            REQUIRE(builder.make_index(peer_id.get_sha256(), folder->get_id()).add(pr_fi, peer_device).finish().apply());
+            auto f = peer_files.by_name(proto::get_name(pr_fi));
             REQUIRE(builder.remote_copy(*f).mark_reacheable(f, false).apply());
 
             CHECK(file_iterator->next() == R{nullptr, A::ignore});
@@ -406,18 +404,18 @@ TEST_CASE("file iterator for 2 folders", "[model]") {
                 .finish()
                 .apply());
 
-    auto file1 = proto::FileInfo();
-    file1.set_name("a.txt");
-    file1.set_sequence(10ul);
+    auto pr_fi_1 = proto::FileInfo();
+    proto::set_name(pr_fi_1, "a.txt");
+    proto::set_sequence(pr_fi_1, 10);
 
-    auto file2 = proto::FileInfo();
-    file2.set_name("b.txt");
-    file2.set_sequence(11ul);
+    auto pr_fi_2 = proto::FileInfo();
+    proto::set_name(pr_fi_2, "b.txt");
+    proto::set_sequence(pr_fi_2, 11);
 
     using set_t = std::set<std::string_view>;
 
     SECTION("cloning") {
-        REQUIRE(builder.make_index(sha256, "1234").add(file1, peer_device).add(file2, peer_device).finish().apply());
+        REQUIRE(builder.make_index(sha256, "1234").add(pr_fi_1, peer_device).add(pr_fi_2, peer_device).finish().apply());
 
         auto [f1, action1] = file_iterator->next();
         auto [f2, action2] = file_iterator->next();
@@ -435,27 +433,28 @@ TEST_CASE("file iterator for 2 folders", "[model]") {
     }
 
     SECTION("syncing") {
+        auto b1_hash = utils::sha256_digest(as_bytes("12345")).value();
         auto b1 = proto::BlockInfo();
-        b1.set_hash(utils::sha256_digest("12345").value());
-        b1.set_weak_hash(555);
-        b1.set_size(5ul);
+        proto::set_hash(b1, b1_hash);
+        proto::set_size(b1, 5);
+
+        auto b2_hash = utils::sha256_digest(as_bytes("67890")).value();
         auto b2 = proto::BlockInfo();
-        b2.set_hash(utils::sha256_digest("67890").value());
-        b2.set_weak_hash(123);
-        b2.set_size(5ul);
+        proto::set_hash(b2, b1_hash);
+        proto::set_size(b2, 5);
 
         auto &blocks_map = cluster->get_blocks();
         blocks_map.put(block_info_t::create(b1).value());
         blocks_map.put(block_info_t::create(b2).value());
 
-        *file1.add_blocks() = b1;
-        file1.set_size(b1.size());
+        proto::add_blocks(pr_fi_1, b1);
+        proto::set_size(pr_fi_1, proto::get_size(b1));
 
-        *file2.add_blocks() = b2;
-        file2.set_size(b2.size());
+        proto::add_blocks(pr_fi_2, b2);
+        proto::set_size(pr_fi_2, proto::get_size(b2));
 
         using set_t = std::set<std::string_view>;
-        REQUIRE(builder.make_index(sha256, "1234").add(file1, peer_device).add(file2, peer_device).finish().apply());
+        REQUIRE(builder.make_index(sha256, "1234").add(pr_fi_1, peer_device).add(pr_fi_2, peer_device).finish().apply());
 
         auto files = set_t{};
         auto [f1, action1] = file_iterator->next();
@@ -496,10 +495,10 @@ TEST_CASE("file iterator, create, share, iterae, unshare, share, iterate", "[mod
     REQUIRE(folder_infos->size() == 2u);
 
     auto file_iterator = peer_device->create_iterator(*cluster);
-    auto file = proto::FileInfo();
-    file.set_name("a.txt");
-    file.set_sequence(10ul);
-    REQUIRE(builder.make_index(peer_id.get_sha256(), folder->get_id()).add(file, peer_device).finish().apply());
+    auto pr_fi = proto::FileInfo();
+    proto::set_name(pr_fi, "a.txt");
+    proto::set_sequence(pr_fi, 10);
+    REQUIRE(builder.make_index(peer_id.get_sha256(), folder->get_id()).add(pr_fi, peer_device).finish().apply());
 
     auto [f, action] = file_iterator->next();
     REQUIRE(f);
@@ -515,7 +514,7 @@ TEST_CASE("file iterator, create, share, iterae, unshare, share, iterate", "[mod
     folder = folders.by_id("1234-5678");
     folder_infos = &folder->get_folder_infos();
     REQUIRE(folder_infos->size() == 2u);
-    REQUIRE(builder.make_index(peer_id.get_sha256(), folder->get_id()).add(file, peer_device).finish().apply());
+    REQUIRE(builder.make_index(peer_id.get_sha256(), folder->get_id()).add(pr_fi, peer_device).finish().apply());
 
     std::tie(f, action) = file_iterator->next();
     REQUIRE(f);
