@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "test-utils.h"
 #include "diff-builder.h"
@@ -29,45 +29,46 @@ TEST_CASE("update folder (via Index)", "[model]") {
     REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
 
     auto pr_index = proto::Index();
-    pr_index.set_folder("1234-5678");
+    proto::set_folder(pr_index, "1234-5678");
 
     auto sha256 = peer_id.get_sha256();
     SECTION("successful case") {
         auto peer_folder_info = folder->get_folder_infos().by_device(*peer_device);
 
-        auto file = proto::FileInfo();
-        file.set_name("a.txt");
-        file.set_sequence(10ul);
-        file.set_size(5ul);
-        file.set_block_size(5ul);
-        file.set_modified_s(1);
-        auto b = file.add_blocks();
-        b->set_hash("123");
-        b->set_size(5ul);
+        auto pr_file = proto::FileInfo();
+        proto::set_name(pr_file, "a.txt");
+        proto::set_block_size(pr_file, 5ul);
+        proto::set_size(pr_file, 5ul);
+        proto::set_sequence(pr_file, 10ul);
+        proto::set_modified_s(pr_file, 1);
+
+        auto& b = proto::add_blocks(pr_file);
+        proto::set_hash(b, as_bytes("123"));
+        proto::set_size(b, 5);
 
         SECTION("invalid cases") {
-            auto ec = builder.make_index(sha256, "1234-5678").add(file, peer_device, false).fail();
+            auto ec = builder.make_index(sha256, "1234-5678").add(pr_file, peer_device, false).fail();
             REQUIRE(ec);
             CHECK(ec == model::make_error_code(model::error_code_t::missing_version));
         }
 
         SECTION("valid cases") {
-            REQUIRE(builder.make_index(sha256, "1234-5678").add(file, peer_device).finish().apply());
+            REQUIRE(builder.make_index(sha256, "1234-5678").add(pr_file, peer_device).finish().apply());
 
             auto &peer_files = peer_folder_info->get_file_infos();
             REQUIRE(peer_files.size() == 1);
             auto f = peer_files.by_name("a.txt");
             REQUIRE(f);
 
-            auto key = std::string(f->get_key());
+            auto key = f->get_key();
 
             SECTION("when a file with existing name is added, key & instance are kept") {
-                file.set_modified_s(2);
-                file.set_sequence(11ul);
-                REQUIRE(builder.make_index(sha256, "1234-5678").add(file, peer_device).finish().apply());
+                proto::set_sequence(pr_file, 11ul);
+                proto::set_modified_s(pr_file, 2);
+                REQUIRE(builder.make_index(sha256, "1234-5678").add(pr_file, peer_device).finish().apply());
 
                 REQUIRE(peer_files.size() == 1);
-                auto same_f = peer_files.by_name(file.name());
+                auto same_f = peer_files.by_name(proto::get_name(pr_file));
                 CHECK(same_f.get() == f.get());
                 CHECK(same_f->get_key() == f->get_key());
             }
@@ -76,10 +77,10 @@ TEST_CASE("update folder (via Index)", "[model]") {
                 auto &blocks_map = cluster->get_blocks();
                 REQUIRE(blocks_map.size() == 1);
                 auto prev_block = blocks_map.begin()->item;
-                file.set_modified_s(2);
-                file.set_sequence(11ul);
-                file.mutable_blocks(0)->set_hash("345");
-                REQUIRE(builder.make_index(sha256, "1234-5678").add(file, peer_device).finish().apply());
+                proto::set_sequence(pr_file, 11ul);
+                proto::set_modified_s(pr_file, 2);
+                proto::set_hash(b, as_bytes("345"));
+                REQUIRE(builder.make_index(sha256, "1234-5678").add(pr_file, peer_device).finish().apply());
 
                 REQUIRE(peer_files.size() == 1);
                 REQUIRE(blocks_map.size() == 1);
@@ -102,16 +103,19 @@ TEST_CASE("update folder (via Index)", "[model]") {
     }
 
     SECTION("blocks are not expected") {
-        auto file = proto::FileInfo();
-        file.set_name("a.txt");
-        file.set_sequence(10ul);
-        file.set_size(5ul);
-        file.set_block_size(5ul);
-        file.set_deleted(true);
-        auto b = file.add_blocks();
-        b->set_hash("123");
+        auto pr_file = proto::FileInfo();
+        proto::set_name(pr_file, "a.txt");
+        proto::set_block_size(pr_file, 5ul);
+        proto::set_size(pr_file, 5ul);
+        proto::set_sequence(pr_file, 10ul);
+        proto::set_modified_s(pr_file, 1);
+        proto::set_deleted(pr_file, true);
 
-        auto ec = builder.make_index(sha256, "1234-5678").add(file, peer_device).fail();
+        auto& b = proto::add_blocks(pr_file);
+        proto::set_hash(b, as_bytes("123"));
+        proto::set_size(b, 5);
+
+        auto ec = builder.make_index(sha256, "1234-5678").add(pr_file, peer_device).fail();
         REQUIRE(ec);
         CHECK(ec == model::make_error_code(model::error_code_t::unexpected_blocks));
     }

@@ -44,6 +44,7 @@ struct SYNCSPIRIT_TEST_API path_guard_t {
 };
 
 SYNCSPIRIT_TEST_API utils::bytes_view_t as_bytes(std::string_view);
+SYNCSPIRIT_TEST_API utils::bytes_t as_owned_bytes(std::string_view);
 SYNCSPIRIT_TEST_API bfs::path unique_path();
 SYNCSPIRIT_TEST_API model::diff::apply_controller_t &get_apply_controller();
 SYNCSPIRIT_TEST_API void init_logging();

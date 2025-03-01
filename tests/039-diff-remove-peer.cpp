@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
 
 #include "test-utils.h"
 #include "access.h"
@@ -34,8 +34,8 @@ TEST_CASE("remove peer", "[model]") {
 
     SECTION("1 file, 1 folder, 1 block") {
         auto bi = proto::BlockInfo();
-        bi.set_size(5);
-        bi.set_hash(utils::sha256_digest("12345").value());
+        proto::set_hash(bi, utils::sha256_digest(as_bytes("12345")).value());
+        proto::set_size(bi, 5);
         auto block = block_info_t::create(bi).assume_value();
         blocks_map.put(block);
 
@@ -44,16 +44,16 @@ TEST_CASE("remove peer", "[model]") {
         REQUIRE(folder_info);
 
         proto::FileInfo pr_fi;
-        pr_fi.set_name("a.txt");
-        pr_fi.set_block_size(5);
-        pr_fi.set_size(5);
-        pr_fi.mutable_version()->add_counters()->set_id(peer_device->device_id().get_uint());
+        proto::set_name(pr_fi, "a.txt");
+        proto::set_block_size(pr_fi, 5ul);
+        proto::set_size(pr_fi, 5ul);
+        auto& v = proto::get_version(pr_fi);
+        proto::add_counters(v, proto::Counter(peer_device->device_id().get_uint(), 0));
 
-        auto b1_hash = utils::sha256_digest("12345").value();
-        auto b1 = pr_fi.add_blocks();
-        b1->set_hash(b1_hash);
-        b1->set_offset(0);
-        b1->set_size(5);
+        auto b1_hash = utils::sha256_digest(as_bytes("12345")).value();
+        auto& b1 = proto::add_blocks(pr_fi);
+        proto::set_hash(b1, as_bytes("123"));
+        proto::set_size(b1, 5);
 
         auto fi = file_info_t::create(sequencer->next_uuid(), pr_fi, folder_info).value();
         fi->assign_block(block, 0);
@@ -75,24 +75,24 @@ TEST_CASE("remove peer", "[model]") {
 
         auto b1 = [&]() {
             auto bi = proto::BlockInfo();
-            bi.set_size(5);
-            bi.set_hash(utils::sha256_digest("1").value());
+            proto::set_hash(bi, utils::sha256_digest(as_bytes("1")).value());
+            proto::set_size(bi, 5);
             auto block = block_info_t::create(bi).assume_value();
             blocks_map.put(block);
             return block;
         }();
         auto b2 = [&]() {
             auto bi = proto::BlockInfo();
-            bi.set_size(5);
-            bi.set_hash(utils::sha256_digest("2").value());
+            proto::set_hash(bi, utils::sha256_digest(as_bytes("2")).value());
+            proto::set_size(bi, 5);
             auto block = block_info_t::create(bi).assume_value();
             blocks_map.put(block);
             return block;
         }();
         auto b3 = [&]() {
             auto bi = proto::BlockInfo();
-            bi.set_size(5);
-            bi.set_hash(utils::sha256_digest("3").value());
+            proto::set_hash(bi, utils::sha256_digest(as_bytes("3")).value());
+            proto::set_size(bi, 5);
             auto block = block_info_t::create(bi).assume_value();
             blocks_map.put(block);
             return block;
@@ -108,15 +108,16 @@ TEST_CASE("remove peer", "[model]") {
 
         auto file_1 = [&]() {
             proto::FileInfo pr_fi;
-            pr_fi.set_name("a.txt");
-            pr_fi.set_block_size(5);
-            pr_fi.set_size(5);
-            pr_fi.mutable_version()->add_counters()->set_id(peer_device->device_id().get_uint());
-            auto b_hash = utils::sha256_digest("1").value();
-            auto b = pr_fi.add_blocks();
-            b->set_hash(b_hash);
-            b->set_offset(0);
-            b->set_size(5);
+            proto::set_name(pr_fi, "a.txt");
+            proto::set_block_size(pr_fi, 5ul);
+            proto::set_size(pr_fi, 5ul);
+            auto& v = proto::get_version(pr_fi);
+            proto::add_counters(v, proto::Counter(peer_device->device_id().get_uint(), 0));
+
+            auto b_hash = utils::sha256_digest(as_bytes("1")).value();
+            auto& b = proto::add_blocks(pr_fi);
+            proto::set_hash(b, b_hash);
+            proto::set_size(b, 5);
 
             auto fi = file_info_t::create(sequencer->next_uuid(), pr_fi, fi_1).value();
             fi->assign_block(b1, 0);
@@ -126,19 +127,23 @@ TEST_CASE("remove peer", "[model]") {
 
         auto file_2 = [&]() {
             proto::FileInfo pr_fi;
-            pr_fi.set_name("b.txt");
-            pr_fi.set_block_size(5);
-            pr_fi.set_size(10);
-            pr_fi.mutable_version()->add_counters()->set_id(peer_device->device_id().get_uint());
-            auto pr_b_1 = pr_fi.add_blocks();
-            pr_b_1->set_hash(utils::sha256_digest("2").value());
-            pr_b_1->set_offset(0);
-            pr_b_1->set_size(5);
+            proto::set_name(pr_fi, "b.txt");
+            proto::set_block_size(pr_fi, 5ul);
+            proto::set_size(pr_fi, 10ul);
+            auto& v = proto::get_version(pr_fi);
+            proto::add_counters(v, proto::Counter(peer_device->device_id().get_uint(), 0));
 
-            auto pr_b_2 = pr_fi.add_blocks();
-            pr_b_2->set_hash(utils::sha256_digest("1").value());
-            pr_b_2->set_offset(0);
-            pr_b_1->set_size(5);
+            auto b1_hash = utils::sha256_digest(as_bytes("2")).value();
+            auto& pr_b1 = proto::add_blocks(pr_fi);
+            proto::set_hash(pr_b1, b1_hash);
+            proto::set_size(pr_b1, 5);
+            proto::set_offset(pr_b1, 0);
+
+            auto b2_hash = utils::sha256_digest(as_bytes("1")).value();
+            auto& pr_b2 = proto::add_blocks(pr_fi);
+            proto::set_hash(pr_b2, b2_hash);
+            proto::set_size(pr_b2, 5);
+            proto::set_offset(pr_b2, 0);
 
             auto fi = file_info_t::create(sequencer->next_uuid(), pr_fi, fi_2).value();
             fi->assign_block(b2, 0);
@@ -160,11 +165,11 @@ TEST_CASE("remove peer", "[model]") {
 
     SECTION("unknown folders are removed") {
         db::PendingFolder db_pf;
-        auto mf = db_pf.mutable_folder();
-        mf->set_id("1234");
-        auto mfi = db_pf.mutable_folder_info();
-        mfi->set_max_sequence(5);
-        mfi->set_index_id(10);
+        auto& db_f = db::get_folder(db_pf);
+        db::set_id(db_f, "1234");
+        auto& db_fi = db::get_folder_info(db_pf);
+        db::set_max_sequence(db_fi, 5);
+        db::set_index_id(db_fi, 10);
 
         auto uf = pending_folder_t::create(sequencer->next_uuid(), db_pf, peer_device->device_id()).value();
         auto &unknown_folders = cluster->get_pending_folders();

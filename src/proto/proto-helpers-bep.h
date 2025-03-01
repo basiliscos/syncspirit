@@ -789,5 +789,11 @@ inline void add_counters(Vector& msg, Counter value) {
     using namespace pp;
     msg["counters"_f].emplace_back(std::move(value));
 }
+inline Counter& add_counters(Vector& msg) {
+    using namespace pp;
+    auto& opt = msg["counters"_f];
+    opt.emplace_back(Counter());
+    return opt.back();
+}
 
 }

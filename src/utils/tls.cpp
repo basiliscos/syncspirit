@@ -327,8 +327,8 @@ outcome::result<std::string> get_common_name(X509 *cert) noexcept {
     return std::string(buff, r);
 }
 
-void digest(const char *src, size_t length, char *storage) noexcept {
-    SHA256((const unsigned char *)src, length, (unsigned char *)storage);
+void digest(const unsigned char *src, size_t length, unsigned char *storage) noexcept {
+    SHA256(src, length, storage);
 }
 
 } // namespace syncspirit::utils

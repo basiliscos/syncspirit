@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "test-utils.h"
 #include "access.h"
@@ -29,35 +29,36 @@ TEST_CASE("various block diffs", "[model]") {
     auto folder = cluster->get_folders().by_id("1234-5678");
     auto folder_info = folder->get_folder_infos().by_device(*my_device);
 
-    auto b1_hash = utils::sha256_digest("12345").value();
-    auto b2_hash = utils::sha256_digest("567890").value();
+    auto b1_hash = utils::sha256_digest(as_bytes("12345")).value();
+    auto b2_hash = utils::sha256_digest(as_bytes("567890")).value();
 
-    proto::FileInfo pr_file_info;
-    pr_file_info.set_name("a.txt");
-    pr_file_info.set_block_size(5ul);
-    pr_file_info.set_size(10ul);
-    auto b1 = pr_file_info.add_blocks();
-    b1->set_hash(b1_hash);
-    b1->set_offset(0);
-    b1->set_size(5);
+    proto::FileInfo pr_file;
+    proto::set_name(pr_file, "a.txt");
+    proto::set_block_size(pr_file, 5ul);
+    proto::set_size(pr_file, 10ul);
 
-    auto b2 = pr_file_info.add_blocks();
-    b2->set_hash(b2_hash);
-    b2->set_offset(5ul);
-    b2->set_size(5);
+    auto& b1= proto::add_blocks(pr_file);
+    proto::set_offset(b1, 0);
+    proto::set_size(b1, 5);
+    proto::set_hash(b1, b1_hash);
 
-    REQUIRE(builder.local_update(folder->get_id(), pr_file_info).apply());
+    auto& b2 = proto::add_blocks(pr_file);
+    proto::set_offset(b2, 5);
+    proto::set_size(b2, 5);
+    proto::set_hash(b2, b2_hash);
+
+    REQUIRE(builder.local_update(folder->get_id(), pr_file).apply());
 
     auto file = folder_info->get_file_infos().by_name("a.txt");
-    auto bi1 = cluster->get_blocks().get(b1_hash);
-    auto bi2 = cluster->get_blocks().get(b2_hash);
+    auto bi1 = cluster->get_blocks().by_hash(b1_hash);
+    auto bi2 = cluster->get_blocks().by_hash(b2_hash);
     file->remove_blocks();
     file->assign_block(bi1, 0);
     file->assign_block(bi2, 1);
     REQUIRE(!file->is_locally_available());
 
     SECTION("append") {
-        auto diff_raw = new model::diff::modify::append_block_t(*file, 0, "12345");
+        auto diff_raw = new model::diff::modify::append_block_t(*file, 0, as_owned_bytes("12345"));
         auto diff = diff::cluster_diff_ptr_t(diff_raw);
         diff->assign_sibling(diff_raw->ack().get());
         REQUIRE(builder.assign(diff.get()).apply());
@@ -73,13 +74,14 @@ TEST_CASE("various block diffs", "[model]") {
 
     SECTION("clone, from different file") {
         proto::FileInfo pr_source;
-        pr_source.set_name("b.txt");
-        pr_source.set_block_size(5ul);
-        pr_source.set_size(5ul);
-        auto b1 = pr_source.add_blocks();
-        b1->set_hash(b2_hash);
-        b1->set_offset(0);
-        b1->set_size(5);
+        proto::set_name(pr_source, "b.txt");
+        proto::set_block_size(pr_source, 5ul);
+        proto::set_size(pr_source, 5ul);
+
+        auto& b1= proto::add_blocks(pr_source);
+        proto::set_offset(b1, 0);
+        proto::set_size(b1, 5);
+        proto::set_hash(b1, b2_hash);
 
         REQUIRE(builder.local_update(folder->get_id(), pr_source).apply());
         auto source = folder_info->get_file_infos().by_name("b.txt");
