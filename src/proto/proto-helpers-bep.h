@@ -447,6 +447,10 @@ inline BlockInfo& add_blocks(FileInfo& msg) {
     opt.emplace_back(BlockInfo());
     return opt.back();
 }
+inline void clear_blocks(FileInfo& msg) {
+    using namespace pp;
+    msg["blocks"_f].clear();
+}
 inline std::string_view get_symlink_target(const FileInfo& msg) {
     using namespace pp;
     auto& opt = msg["symlink_target"_f];

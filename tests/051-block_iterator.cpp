@@ -42,48 +42,46 @@ TEST_CASE("block iterator", "[model]") {
     auto my_folder = folder_infos.by_device(*my_device);
 
     auto p_file = proto::FileInfo();
-    p_file.set_name("a.txt");
-    p_file.set_sequence(2ul);
+    proto::set_name(p_file, "a.txt");
+    proto::set_sequence(p_file, 2);
 
     SECTION("no blocks") {
         REQUIRE(builder.local_update(folder->get_id(), p_file).apply());
 
-        auto my_file = my_folder->get_file_infos().by_name(p_file.name());
+        auto my_file = my_folder->get_file_infos().by_name(proto::get_name(p_file));
         REQUIRE(!next(my_file, true));
     }
 
-    auto b1_hash = utils::sha256_digest("12345").value();
-    auto b2_hash = utils::sha256_digest("567890").value();
-    auto b1 = p_file.add_blocks();
-    b1->set_size(5);
-    b1->set_weak_hash(12);
-    b1->set_hash(b1_hash);
+    auto b1_hash = utils::sha256_digest(as_bytes("12345")).value();
+    auto b2_hash = utils::sha256_digest(as_bytes("567890")).value();
+    auto& b1 = proto::add_blocks(p_file);
+    proto::set_hash(b1, b1_hash);
+    proto::set_size(b1, 5);
 
     SECTION("two blocks") {
-        auto b2 = p_file.add_blocks();
-        b2->set_size(5);
-        b2->set_weak_hash(12);
-        b2->set_hash(b2_hash);
-
-        p_file.set_size(10ul);
-        p_file.set_block_size(5ul);
+        auto& b2 = proto::add_blocks(p_file);
+        proto::set_hash(b2, b2_hash);
+        proto::set_size(b2, 5);
+        proto::set_size(p_file, 10);
+        proto::set_block_size(p_file, proto::get_size(b1));
 
         SECTION("no iteration upon deleted file") {
-            p_file.clear_blocks();
-            p_file.set_deleted(true);
+            proto::set_block_size(p_file, 0);
+            proto::clear_blocks(p_file);
+            proto::set_deleted(p_file, true);
 
             REQUIRE(builder.local_update(folder->get_id(), p_file).apply());
 
-            auto my_file = my_folder->get_file_infos().by_name(p_file.name());
+            auto my_file = my_folder->get_file_infos().by_name(proto::get_name(p_file));
             CHECK(!next(my_file, true));
         }
 
         SECTION("normal iteration") {
             REQUIRE(builder.local_update(folder->get_id(), p_file).apply());
 
-            auto my_file = my_folder->get_file_infos().by_name(p_file.name());
-            auto bi1 = cluster->get_blocks().get(b1_hash);
-            auto bi2 = cluster->get_blocks().get(b2_hash);
+            auto my_file = my_folder->get_file_infos().by_name(proto::get_name(p_file));
+            auto bi1 = cluster->get_blocks().by_hash(b1_hash);
+            auto bi2 = cluster->get_blocks().by_hash(b2_hash);
             my_file->remove_blocks();
             my_file->assign_block(bi1, 0);
             my_file->assign_block(bi2, 1);
@@ -106,9 +104,9 @@ TEST_CASE("block iterator", "[model]") {
         SECTION("no iteration upon unavailable file") {
             REQUIRE(builder.local_update(folder->get_id(), p_file).apply());
 
-            auto my_file = my_folder->get_file_infos().by_name(p_file.name());
-            auto bi1 = cluster->get_blocks().get(b1_hash);
-            auto bi2 = cluster->get_blocks().get(b2_hash);
+            auto my_file = my_folder->get_file_infos().by_name(proto::get_name(p_file));
+            auto bi1 = cluster->get_blocks().by_hash(b1_hash);
+            auto bi2 = cluster->get_blocks().by_hash(b2_hash);
             my_file->remove_blocks();
             my_file->assign_block(bi1, 0);
             my_file->assign_block(bi2, 1);
@@ -120,21 +118,23 @@ TEST_CASE("block iterator", "[model]") {
 
     SECTION("block is available on some other local file") {
         auto p_file_2 = proto::FileInfo();
-        p_file_2.set_name("b.txt");
-        p_file_2.set_sequence(2ul);
-        p_file_2.set_size(b1->size());
-        *p_file_2.add_blocks() = *b1;
-        p_file.set_size(b1->size());
+        proto::set_name(p_file_2, "b.txt");
+        proto::set_sequence(p_file_2, 2);
+        proto::set_size(p_file_2, proto::get_size(b1));
+        proto::set_block_size(p_file_2, proto::get_size(b1));
+        proto::add_blocks(p_file_2, b1);
+
+        proto::set_size(p_file, proto::get_size(b1));
 
         REQUIRE(builder.local_update(folder->get_id(), p_file_2).apply());
 
-        auto my_file_2 = my_folder->get_file_infos().by_name(p_file_2.name());
+        auto my_file_2 = my_folder->get_file_infos().by_name(proto::get_name(p_file_2));
         REQUIRE(my_file_2->is_locally_available());
 
         REQUIRE(builder.local_update(folder->get_id(), p_file).apply());
 
-        auto my_file = my_folder->get_file_infos().by_name(p_file.name());
-        auto bi1 = cluster->get_blocks().get(b1_hash);
+        auto my_file = my_folder->get_file_infos().by_name(proto::get_name(p_file));
+        auto bi1 = cluster->get_blocks().by_hash(b1_hash);
         my_file->remove_blocks();
         my_file->assign_block(bi1, 0);
         REQUIRE(!my_file->is_locally_available());
