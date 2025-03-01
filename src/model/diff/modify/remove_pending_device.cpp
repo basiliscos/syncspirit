@@ -19,7 +19,8 @@ remove_pending_device_t::remove_pending_device_t(const pending_device_t &device)
 auto remove_pending_device_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
     -> outcome::result<void> {
     auto &pending_devices = cluster.get_pending_devices();
-    auto pending_device = pending_devices.by_sha256(device_key);
+    auto sha256 = get_device_sha256();
+    auto pending_device = pending_devices.by_sha256(sha256);
     if (!pending_device) {
         return make_error_code(error_code_t::no_such_device);
     }
@@ -28,7 +29,8 @@ auto remove_pending_device_t::apply_impl(cluster_t &cluster, apply_controller_t 
 }
 
 auto remove_pending_device_t::get_device_sha256() const noexcept -> utils::bytes_view_t {
-    return {device_key.begin(), device_key.end()};
+    auto sha256= utils::bytes_view_t(device_key.begin() + 1, device_key.end());
+    return sha256;
 }
 
 auto remove_pending_device_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

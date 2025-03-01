@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
 
 #include "test-utils.h"
 #include "access.h"
@@ -24,11 +24,11 @@ TEST_CASE("unknown device connected", "[model]") {
     devices.put(my_device);
 
     db::SomeDevice db_device;
-    db_device.set_name("a name");
+    db::set_name(db_device, "a name");
     auto buider = diff_builder_t(*cluster);
     REQUIRE(buider.add_unknown_device(peer_id, db_device).apply());
 
-    db_device.set_name("a name-2");
+    db::set_name(db_device, "a name-2");
     auto diff = model::diff::cluster_diff_ptr_t{};
     diff = new model::diff::contact::unknown_connected_t(*cluster, peer_id, db_device);
     REQUIRE(diff->apply(*cluster, get_apply_controller()));
@@ -49,7 +49,7 @@ TEST_CASE("unknown device is removed when connecting to it ", "[model]") {
     devices.put(my_device);
 
     db::SomeDevice db_device;
-    db_device.set_name("a name");
+    db::set_name(db_device, "a name");
     auto buider = diff_builder_t(*cluster);
     REQUIRE(buider.add_unknown_device(peer_id, db_device).apply());
     REQUIRE(cluster->get_pending_devices().size() == 1);
@@ -71,7 +71,7 @@ TEST_CASE("ignored device connected", "[model]") {
     devices.put(my_device);
 
     db::SomeDevice db_device;
-    db_device.set_name("a name");
+    db::set_name(db_device, "a name");
     auto buider = diff_builder_t(*cluster);
     REQUIRE(buider.add_ignored_device(peer_id, db_device).apply());
     auto &ignored_devices = cluster->get_ignored_devices();
@@ -92,7 +92,7 @@ TEST_CASE("ignored device is removed when connecting to it ", "[model]") {
     devices.put(my_device);
 
     db::SomeDevice db_device;
-    db_device.set_name("a name");
+    db::set_name(db_device, "a name");
     auto buider = diff_builder_t(*cluster);
     REQUIRE(buider.add_ignored_device(peer_id, db_device).apply());
     REQUIRE(cluster->get_ignored_devices().size() == 1);
@@ -113,7 +113,7 @@ TEST_CASE("unknown device is removed adding the same ignored device", "[model]")
     devices.put(my_device);
 
     db::SomeDevice db_device;
-    db_device.set_name("a name");
+    db::set_name(db_device, "a name");
     auto buider = diff_builder_t(*cluster);
     REQUIRE(buider.add_unknown_device(peer_id, db_device).apply());
     REQUIRE(cluster->get_pending_devices().size() == 1);

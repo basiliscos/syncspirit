@@ -777,6 +777,10 @@ inline const Counter& get_counters(const Vector& msg, std::size_t i) {
     using namespace pp;
     return msg["counters"_f][i];
 }
+inline Counter& get_counters(Vector& msg, std::size_t i) {
+    using namespace pp;
+    return msg["counters"_f][i];
+}
 inline void clear_counters(Vector& msg) {
     using namespace pp;
     msg["counters"_f].clear();
