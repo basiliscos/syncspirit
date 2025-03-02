@@ -325,7 +325,7 @@ void db_actor_t::on_cluster_load(message::load_cluster_request_t &request) noexc
                 auto key = ptr->key;
                 auto data = ptr->value;
                 auto db_fi = db::FileInfo();
-                if (!db::decode(ptr->value, db_fi)) {
+                if (auto left = db::decode(ptr->value, db_fi); left) {
                     auto ec = make_error_code(model::error_code_t::file_info_deserialization_failure);
                     return reply_with_error(request, make_error(ec));
                 }

@@ -17,14 +17,14 @@ utils::bytes_t SYNCSPIRIT_API encode(const IgnoredFolder&);
 utils::bytes_t SYNCSPIRIT_API encode(const PendingFolder&);
 utils::bytes_t SYNCSPIRIT_API encode(const SomeDevice&);
 
-bool SYNCSPIRIT_API decode(utils::bytes_view_t, BlockInfo&);
-bool SYNCSPIRIT_API decode(utils::bytes_view_t, Device&);
-bool SYNCSPIRIT_API decode(utils::bytes_view_t, FileInfo&);
-bool SYNCSPIRIT_API decode(utils::bytes_view_t, Folder&);
-bool SYNCSPIRIT_API decode(utils::bytes_view_t, FolderInfo&);
-bool SYNCSPIRIT_API decode(utils::bytes_view_t, IgnoredFolder&);
-bool SYNCSPIRIT_API decode(utils::bytes_view_t, PendingFolder&);
-bool SYNCSPIRIT_API decode(utils::bytes_view_t, SomeDevice&);
+int SYNCSPIRIT_API decode(utils::bytes_view_t, BlockInfo&);
+int SYNCSPIRIT_API decode(utils::bytes_view_t, Device&);
+int SYNCSPIRIT_API decode(utils::bytes_view_t, FileInfo&);
+int SYNCSPIRIT_API decode(utils::bytes_view_t, Folder&);
+int SYNCSPIRIT_API decode(utils::bytes_view_t, FolderInfo&);
+int SYNCSPIRIT_API decode(utils::bytes_view_t, IgnoredFolder&);
+int SYNCSPIRIT_API decode(utils::bytes_view_t, PendingFolder&);
+int SYNCSPIRIT_API decode(utils::bytes_view_t, SomeDevice&);
 
 /*****************/
 /*** BlockInfo ***/

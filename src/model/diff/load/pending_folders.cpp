@@ -13,7 +13,7 @@ auto pending_folders_t::apply_impl(cluster_t &cluster, apply_controller_t &contr
     auto &items = cluster.get_pending_folders();
     for (auto &pair : folders) {
         auto db_pf = db::PendingFolder();
-        if (!db::decode(pair.value, db_pf)) {
+        if (auto left = db::decode(pair.value, db_pf); left) {
             return make_error_code(error_code_t::pending_folder_deserialization_failure);
         }
         auto option = pending_folder_t::create(pair.key, db_pf);

@@ -28,7 +28,7 @@ auto folder_infos_t::apply_impl(cluster_t &cluster, apply_controller_t &controll
         }
 
         auto db_fi = db::FolderInfo();
-        if (auto ok = db::decode(pair.value, db_fi); !ok) {
+        if (auto left = db::decode(pair.value, db_fi); left) {
             return make_error_code(error_code_t::folder_info_deserialization_failure);
         }
 

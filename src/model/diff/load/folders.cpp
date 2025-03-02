@@ -13,7 +13,7 @@ auto folders_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) c
     for (auto &pair : folders) {
 
         auto db_folder = db::Folder();
-        if (auto ok = db::decode(pair.value, db_folder); !ok) {
+        if (auto left = db::decode(pair.value, db_folder); left) {
             return make_error_code(error_code_t::folder_deserialization_failure);
         }
         auto option = folder_t::create(pair.key, db_folder);

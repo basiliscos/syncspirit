@@ -231,11 +231,11 @@ void test_unknown_and_ignored_devices_1() {
                 device_id_t::from_string("XBOWTOU-Y7H6RM6-D7WT3UB-7P2DZ5G-R6GNZG6-T5CCG54-SGVF3U5-LBM7RQB").value();
 
             db::SomeDevice sd_1;
-            sd_1.set_name("x1");
+            db::set_name(sd_1, "x1");
             auto unknown_device = pending_device_t::create(d_id1, sd_1).value();
 
             db::SomeDevice sd_2;
-            sd_2.set_name("x2");
+            db::set_name(sd_2, "x2");
             auto ignored_device = ignored_device_t::create(d_id2, sd_2).value();
 
             auto builder = diff_builder_t(*cluster);
@@ -254,8 +254,8 @@ void test_unknown_and_ignored_devices_1() {
                 CHECK(cluster_clone->get_ignored_devices().by_sha256(d_id2.get_sha256()));
             }
 
-            sd_1.set_name("x1_2");
-            sd_2.set_name("x2_2");
+            db::set_name(sd_1, "x1_2");
+            db::set_name(sd_2, "x2_2");
             auto diff = model::diff::cluster_diff_ptr_t{};
             diff = new model::diff::contact::unknown_connected_t(*cluster, d_id1, sd_1);
             sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
@@ -304,7 +304,7 @@ void test_unknown_and_ignored_devices_2() {
                 device_id_t::from_string("LYXKCHX-VI3NYZR-ALCJBHF-WMZYSPK-QG6QJA3-MPFYMSO-U56GTUK-NA2MIAW").value();
 
             db::SomeDevice sd;
-            sd.set_name("x1");
+            db::set_name(sd, "x1");
             auto builder = diff_builder_t(*cluster);
 
             builder.add_unknown_device(d_id, sd).apply(*sup);
@@ -415,20 +415,22 @@ void test_cluster_update_and_remove() {
             auto unknown_folder_id = "5678-999";
 
             auto file = proto::FileInfo();
-            file.set_name("a.txt");
-            file.set_size(5ul);
-            file.set_block_size(5ul);
-            file.set_sequence(6ul);
-            auto b = file.add_blocks();
-            b->set_size(5ul);
-            b->set_hash(utils::sha256_digest("12345").value());
+            proto::set_name(file, "a.txt");
+            proto::set_size(file, 5ul);
+            proto::set_block_size(file, 5ul);
+            proto::set_sequence(file, 6ul);
+
+            auto b_hash =  utils::sha256_digest(as_bytes("12345")).value();
+            auto& b = proto::add_blocks(file);
+            proto::set_size(b, 5ul);
+            proto::set_hash(b, b_hash);
 
             auto builder = diff_builder_t(*cluster);
             builder.update_peer(peer_device->device_id())
                 .apply(*sup)
                 .upsert_folder(folder_id, "/my/path")
                 .configure_cluster(sha256)
-                .add(sha256, folder_id, 5, file.sequence())
+                .add(sha256, folder_id, 5, proto::get_sequence(file))
                 .add(sha256, unknown_folder_id, 5, 5)
                 .finish()
                 .apply(*sup)
@@ -440,7 +442,7 @@ void test_cluster_update_and_remove() {
                 .apply(*sup);
 
             REQUIRE(cluster->get_blocks().size() == 1);
-            auto block = cluster->get_blocks().get(b->hash());
+            auto block = cluster->get_blocks().by_hash(b_hash);
             REQUIRE(block);
 
             auto folder = cluster->get_folders().by_id(folder_id);
@@ -464,7 +466,7 @@ void test_cluster_update_and_remove() {
             {
                 REQUIRE(reply->payload.res.diff->apply(*cluster_clone, get_apply_controller()));
                 REQUIRE(cluster_clone->get_blocks().size() == 1);
-                CHECK(cluster_clone->get_blocks().get(b->hash()));
+                CHECK(cluster_clone->get_blocks().by_hash(b_hash));
                 auto folder = cluster_clone->get_folders().by_id(folder_id);
                 auto peer_folder_info = folder->get_folder_infos().by_device(*peer_device);
                 REQUIRE(peer_folder_info);
@@ -474,12 +476,12 @@ void test_cluster_update_and_remove() {
             }
 
             auto pr_msg = proto::ClusterConfig();
-            auto pr_f = pr_msg.add_folders();
-            pr_f->set_id(folder_id);
-            auto pr_device = pr_f->add_devices();
-            pr_device->set_id(std::string(peer_device->device_id().get_sha256()));
-            pr_device->set_max_sequence(1);
-            pr_device->set_index_id(peer_folder_info->get_index() + 1);
+            auto& pr_f = proto::add_folders(pr_msg);
+            proto::set_id(pr_f, folder_id);
+            auto& pr_device = proto::add_devices(pr_f);
+            proto::set_id(pr_device, peer_device->device_id().get_sha256());
+            proto::set_max_sequence(pr_device, 1);
+            proto::set_index_id(pr_device, peer_folder_info->get_index() + 1);
             auto diff = diff::peer::cluster_update_t::create(*cluster, *sup->sequencer, *peer_device, pr_msg).value();
 
             sup->send<model::payload::model_update_t>(sup->get_address(), diff, nullptr);
@@ -513,13 +515,15 @@ void test_unshare_and_remove_folder() {
             auto folder_id = "1234-5678";
 
             auto file = proto::FileInfo();
-            file.set_name("a.txt");
-            file.set_size(5ul);
-            file.set_block_size(5ul);
-            file.set_sequence(6ul);
-            auto b = file.add_blocks();
-            b->set_size(5ul);
-            b->set_hash(utils::sha256_digest("12345").value());
+            proto::set_name(file, "a.txt");
+            proto::set_size(file, 5ul);
+            proto::set_block_size(file, 5ul);
+            proto::set_sequence(file, 6ul);
+
+            auto b_hash =  utils::sha256_digest(as_bytes("12345")).value();
+            auto& b = proto::add_blocks(file);
+            proto::set_size(b, 5ul);
+            proto::set_hash(b, b_hash);
 
             auto builder = diff_builder_t(*cluster);
             builder.update_peer(peer_device->device_id())
@@ -527,7 +531,7 @@ void test_unshare_and_remove_folder() {
                 .upsert_folder(folder_id, "/my/path")
                 .apply(*sup)
                 .configure_cluster(sha256)
-                .add(sha256, folder_id, 5, file.sequence())
+                .add(sha256, folder_id, 5, proto::get_sequence(file))
                 .finish()
                 .share_folder(sha256, folder_id)
                 .apply(*sup)
@@ -537,7 +541,7 @@ void test_unshare_and_remove_folder() {
                 .apply(*sup);
 
             REQUIRE(cluster->get_blocks().size() == 1);
-            auto block = cluster->get_blocks().get(b->hash());
+            auto block = cluster->get_blocks().by_hash(b_hash);
             REQUIRE(block);
 
             auto folder = cluster->get_folders().by_id(folder_id);
@@ -596,19 +600,18 @@ void test_remote_copy() {
             auto folder_id = "1234-5678";
 
             auto file = proto::FileInfo();
-            file.set_name("a.txt");
-            file.set_sequence(6ul);
-            auto version = file.mutable_version();
-            auto counter = version->add_counters();
-            counter->set_id(1);
-            counter->set_value(peer_device->device_id().get_uint());
+            proto::set_name(file, "a.txt");
+            proto::set_sequence(file, 6ul);
+
+            auto& v = proto::get_version(file);
+            proto::add_counters(v, proto::Counter(peer_device->device_id().get_uint(), 1));
 
             auto builder = diff_builder_t(*cluster);
             builder.update_peer(peer_device->device_id())
                 .apply(*sup)
                 .upsert_folder(folder_id, "/my/path")
                 .configure_cluster(sha256)
-                .add(sha256, folder_id, 5, file.sequence())
+                .add(sha256, folder_id, 5, proto::get_sequence(file))
                 .finish()
                 .apply(*sup)
                 .share_folder(sha256, folder_id)
@@ -621,7 +624,7 @@ void test_remote_copy() {
             SECTION("file without blocks") {
                 builder.make_index(sha256, folder_id).add(file, peer_device).finish().apply(*sup);
 
-                auto file_peer = folder_peer->get_file_infos().by_name(file.name());
+                auto file_peer = folder_peer->get_file_infos().by_name(proto::get_name(file));
                 REQUIRE(file_peer);
                 builder.remote_copy(*file_peer).apply(*sup);
 
@@ -637,9 +640,9 @@ void test_remote_copy() {
                     auto &fis = cluster_clone->get_folders().by_id(folder_id)->get_folder_infos();
                     REQUIRE(fis.size() == 2);
                     auto folder_info_clone = fis.by_device(*cluster_clone->get_device());
-                    auto file_clone = folder_info_clone->get_file_infos().by_name(file.name());
+                    auto file_clone = folder_info_clone->get_file_infos().by_name(proto::get_name(file));
                     REQUIRE(file_clone);
-                    REQUIRE(file_clone->get_name() == file.name());
+                    REQUIRE(file_clone->get_name() == proto::get_name(file));
                     REQUIRE(file_clone->get_blocks().size() == 0);
                     REQUIRE(file_clone->get_sequence() == 1);
                     REQUIRE(folder_info_clone->get_max_sequence() == 1);
@@ -647,18 +650,20 @@ void test_remote_copy() {
             }
 
             SECTION("file with blocks") {
-                file.set_size(5ul);
-                file.set_block_size(5ul);
-                auto b = file.add_blocks();
-                b->set_size(5ul);
-                b->set_hash(utils::sha256_digest("12345").value());
+                proto::set_size(file, 5ul);
+                proto::set_block_size(file, 5ul);
+
+                auto b_hash =  utils::sha256_digest(as_bytes("12345")).value();
+                auto& b = proto::add_blocks(file);
+                proto::set_size(b, 5ul);
+                proto::set_hash(b, b_hash);
 
                 builder.make_index(sha256, folder_id).add(file, peer_device).finish().apply(*sup);
 
                 auto folder = cluster->get_folders().by_id(folder_id);
                 auto folder_my = folder->get_folder_infos().by_device(*my_device);
                 auto folder_peer = folder->get_folder_infos().by_device(*peer_device);
-                auto file_peer = folder_peer->get_file_infos().by_name(file.name());
+                auto file_peer = folder_peer->get_file_infos().by_name(proto::get_name(file));
                 REQUIRE(file_peer);
 
                 builder.remote_copy(*file_peer).apply(*sup);
@@ -676,15 +681,15 @@ void test_remote_copy() {
                     auto &fis = cluster_clone->get_folders().by_id(folder_id)->get_folder_infos();
                     REQUIRE(fis.size() == 2);
                     auto folder_info_clone = fis.by_device(*cluster_clone->get_device());
-                    auto file_clone = folder_info_clone->get_file_infos().by_name(file.name());
+                    auto file_clone = folder_info_clone->get_file_infos().by_name(proto::get_name(file));
                     REQUIRE(file_clone);
-                    REQUIRE(file_clone->get_name() == file.name());
+                    REQUIRE(file_clone->get_name() == proto::get_name(file));
                     REQUIRE(file_clone->get_blocks().size() == 1);
                     REQUIRE(file_clone->get_sequence() == 1);
                     REQUIRE(folder_info_clone->get_max_sequence() == 1);
                 }
 
-                file_peer = folder_peer->get_file_infos().by_name(file.name());
+                file_peer = folder_peer->get_file_infos().by_name(proto::get_name(file));
                 file_peer->mark_local_available(0);
                 REQUIRE(file_peer->is_locally_available());
 
@@ -702,9 +707,9 @@ void test_remote_copy() {
                     auto &fis = cluster_clone->get_folders().by_id(folder_id)->get_folder_infos();
                     REQUIRE(fis.size() == 2);
                     auto folder_info_clone = fis.by_device(*cluster_clone->get_device());
-                    auto file_clone = folder_info_clone->get_file_infos().by_name(file.name());
+                    auto file_clone = folder_info_clone->get_file_infos().by_name(proto::get_name(file));
                     REQUIRE(file_clone);
-                    REQUIRE(file_clone->get_name() == file.name());
+                    REQUIRE(file_clone->get_name() == proto::get_name(file));
                     REQUIRE(file_clone->get_blocks().size() == 1);
                     REQUIRE(file_clone->get_blocks().at(0));
                     REQUIRE(file_clone->get_sequence() == 2);
@@ -723,14 +728,13 @@ void test_local_update() {
             auto folder_id = "1234-5678";
 
             auto pr_file = proto::FileInfo();
-            pr_file.set_name("a.txt");
-            pr_file.set_size(5ul);
+            proto::set_name(pr_file, "a.txt");
+            proto::set_size(pr_file, 5ul);
 
-            auto hash = utils::sha256_digest("12345").value();
-            auto pr_block = pr_file.add_blocks();
-            pr_block->set_weak_hash(12);
-            pr_block->set_size(5);
-            pr_block->set_hash(hash);
+            auto hash = utils::sha256_digest(as_bytes("12345")).value();
+            auto& pr_block = proto::add_blocks(pr_file);
+            proto::set_size(pr_block, 5ul);
+            proto::set_hash(pr_block, hash);
 
             auto builder = diff_builder_t(*cluster);
             builder.upsert_folder(folder_id, "/my/path").apply(*sup).local_update(folder_id, pr_file).apply(*sup);
@@ -751,9 +755,9 @@ void test_local_update() {
                 CHECK(file->get_blocks().size() == 1);
             }
 
-            pr_file.set_deleted(true);
-            pr_file.set_size(0);
-            pr_file.clear_blocks();
+            proto::set_deleted(pr_file, true);
+            proto::set_size(pr_file, 0);
+            proto::clear_blocks(pr_file);
             builder.local_update(folder_id, pr_file).apply(*sup);
 
             SECTION("check deleted blocks") {
@@ -786,7 +790,7 @@ void test_peer_going_offline() {
             auto sha256 = peer_device->device_id().get_sha256();
             db::Device db_peer;
             auto peer = cluster->get_devices().by_sha256(sha256);
-            REQUIRE(db_peer.last_seen() == 0);
+            REQUIRE(db::get_last_seen(db_peer) == 0);
             auto connection_id = std::string("tcp://1.1.1.1:1");
             peer->update_state(device_state_t::online, connection_id);
 
@@ -802,7 +806,7 @@ void test_peer_going_offline() {
             db::Device db_peer_clone;
             peer_clone->serialize(db_peer_clone);
             CHECK((peer->get_last_seen() - peer_clone->get_last_seen()).total_seconds() < 2);
-            CHECK(db_peer_clone.last_seen() != 0);
+            REQUIRE(db::get_last_seen(db_peer_clone) != 0);
         }
     };
     F().run();
@@ -816,20 +820,22 @@ void test_remove_peer() {
             auto unknown_folder_id = "5678-999";
 
             auto file = proto::FileInfo();
-            file.set_name("a.txt");
-            file.set_size(5ul);
-            file.set_block_size(5ul);
-            file.set_sequence(6ul);
-            auto b = file.add_blocks();
-            b->set_size(5ul);
-            b->set_hash(utils::sha256_digest("12345").value());
+            proto::set_name(file, "a.txt");
+            proto::set_size(file, 5ul);
+            proto::set_block_size(file, 5ul);
+            proto::set_sequence(file, 6ul);
+
+            auto b_hash =  utils::sha256_digest(as_bytes("12345")).value();
+            auto& b = proto::add_blocks(file);
+            proto::set_size(b, 5ul);
+            proto::set_hash(b, b_hash);
 
             auto builder = diff_builder_t(*cluster);
             builder.update_peer(peer_device->device_id())
                 .apply(*sup)
                 .upsert_folder(folder_id, "/my/path")
                 .configure_cluster(sha256)
-                .add(sha256, folder_id, 5, file.sequence())
+                .add(sha256, folder_id, 5, proto::get_sequence(file))
                 .add(sha256, unknown_folder_id, 5, 5)
                 .finish()
                 .apply(*sup)
@@ -843,7 +849,7 @@ void test_remove_peer() {
             CHECK(cluster->get_pending_folders().size() == 1);
 
             REQUIRE(cluster->get_blocks().size() == 1);
-            auto block = cluster->get_blocks().get(b->hash());
+            auto block = cluster->get_blocks().by_hash(b_hash);
             REQUIRE(block);
 
             auto folder = cluster->get_folders().by_id(folder_id);
@@ -880,7 +886,7 @@ void test_update_peer() {
             auto builder = diff_builder_t(*cluster);
 
             db::SomeDevice db;
-            db.set_name("x1");
+            db::set_name(db, "x1");
 
             SECTION("unknown device is removed") {
                 builder.add_unknown_device(peer_device->device_id(), db)
@@ -924,14 +930,10 @@ void test_peer_3_folders_6_files() {
 
             auto make_file = [&](std::string name) {
                 auto file = proto::FileInfo();
-                file.set_name(name);
-                file.set_size(0);
-                file.set_block_size(0);
-                file.set_sequence(++next_sequence);
-                auto version = file.mutable_version();
-                auto counter = version->add_counters();
-                counter->set_id(1);
-                counter->set_value(peer_device->device_id().get_uint());
+                proto::set_name(file, name);
+                proto::set_sequence(file, ++next_sequence);
+                auto& v = proto::get_version(file);
+                proto::add_counters(v, proto::Counter(peer_device->device_id().get_uint(), 1));
                 return file;
             };
 

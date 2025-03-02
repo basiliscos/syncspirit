@@ -34,7 +34,7 @@ struct SYNCSPIRIT_API cursor_t {
         }
         while ((r = mdbx_cursor_get(impl, &key, &value, MDBX_NEXT)) == MDBX_SUCCESS) {
             auto k = utils::bytes_view_t(reinterpret_cast<const unsigned char *>(key.iov_base), key.iov_len);
-            if (k.front() == prefix) {
+            if (k.front() > prefix) {
                 break;
             }
             auto v = utils::bytes_view_t(reinterpret_cast<const unsigned char *>(value.iov_base), value.iov_len);

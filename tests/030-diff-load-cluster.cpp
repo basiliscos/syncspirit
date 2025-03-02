@@ -327,7 +327,7 @@ TEST_CASE("loading cluster (file info + block)", "[model]") {
     SECTION("directly") {
         auto data = fi->serialize(true);
         auto file_info_db = db::FileInfo();
-        REQUIRE(db::decode(data, file_info_db));
+        REQUIRE(db::decode(data, file_info_db) == 0);
         auto v = db::get_version(file_info_db);
         target = file_info_t::create(fi->get_key(), file_info_db, std::move(folder_info)).value();
         REQUIRE(target);

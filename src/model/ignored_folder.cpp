@@ -47,7 +47,7 @@ ignored_folder_t::ignored_folder_t(utils::bytes_view_t key_) noexcept {
 
 outcome::result<void> ignored_folder_t::assign_fields(utils::bytes_view_t data) noexcept {
     db::IgnoredFolder folder;
-    if (!db::decode(data, folder)) {
+    if (auto left = db::decode(data, folder); left) {
         return make_error_code(error_code_t::ignored_folder_deserialization_failure);
     }
     label = std::string(db::get_label(folder));

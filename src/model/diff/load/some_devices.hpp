@@ -26,7 +26,7 @@ struct some_devices_t {
             auto &device_id = *device_id_opt;
 
             auto db_sd = db::SomeDevice();
-            if (!db::decode(pair.value, db_sd)) {
+            if (auto left = db::decode(pair.value, db_sd); left) {
                 return make_error_code(error_code_t::some_device_deserialization_failure);
             }
             auto option = T::create(device_id, db_sd);

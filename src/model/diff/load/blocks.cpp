@@ -18,7 +18,7 @@ auto blocks_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) co
     auto &blocks_map = cluster.get_blocks();
     for (auto &pair : blocks) {
         auto db_block = db::BlockInfo();
-        if (auto ok = db::decode(pair.value, db_block); !ok) {
+        if (auto left = db::decode(pair.value, db_block); left) {
             return make_error_code(error_code_t::block_deserialization_failure);
         }
         auto block = block_info_t::create(pair.key, db_block);
