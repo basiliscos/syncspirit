@@ -323,4 +323,31 @@ template utils::bytes_t SYNCSPIRIT_API serialize(const proto::Ping &message,
 template utils::bytes_t SYNCSPIRIT_API serialize(const proto::Close &message,
                                        proto::MessageCompression compression) noexcept;
 
+MessageType get_bep_type(const message::message_t &msg) noexcept {
+    auto mt = MessageType::UNKNOWN;
+    return std::visit([](auto& item) -> MessageType {
+        using T = std::decay_t<decltype(item)>;
+        if constexpr (std::is_same_v<T, message::ClusterConfig>)  {
+            return MessageType::CLUSTER_CONFIG;
+        } else if constexpr (std::is_same_v<T, message::Index>)  {
+            return MessageType::INDEX;
+        } else if constexpr (std::is_same_v<T, message::IndexUpdate>)  {
+            return MessageType::INDEX_UPDATE;
+        } else if constexpr (std::is_same_v<T, message::Request>)  {
+            return MessageType::REQUEST;
+        } else if constexpr (std::is_same_v<T, message::Response>)  {
+            return MessageType::RESPONSE;
+        } else if constexpr (std::is_same_v<T, message::DownloadProgress>)  {
+            return MessageType::DOWNLOAD_PROGRESS;
+        } else if constexpr (std::is_same_v<T, message::Ping>)  {
+            return MessageType::PING;
+        } else if constexpr (std::is_same_v<T, message::Close>)  {
+            return MessageType::CLOSE;
+        } else if constexpr (std::is_same_v<T, message::Hello>)  {
+            return MessageType::HELLO;
+        }
+        return MessageType::UNKNOWN;
+    }, msg);
+}
+
 } // namespace syncspirit::proto

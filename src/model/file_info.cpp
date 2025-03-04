@@ -426,12 +426,14 @@ void file_info_t::update(const file_info_t &other) noexcept {
         if (b) {
             for (auto &fb : b->get_file_blocks()) {
                 if (fb.is_locally_available() && fb.file() == this) {
-                    local_block_hashes.insert(b->get_hash());
+                    local_block_hashes.emplace(b->get_hash());
                     break;
                 }
             }
         }
     }
+    // avoid use after free, as local block hashes have block_views
+    auto blocks_copy = blocks;
     remove_blocks();
 
     marks = other.marks;

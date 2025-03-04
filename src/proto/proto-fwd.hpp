@@ -27,6 +27,8 @@ enum class MessageType {
     DOWNLOAD_PROGRESS = 5,
     PING              = 6,
     CLOSE             = 7,
+    HELLO             = 8,
+    UNKNOWN           = -1,
 };
 
 enum class MessageCompression {

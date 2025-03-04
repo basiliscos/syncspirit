@@ -14,7 +14,6 @@
 #include "model/diff/contact/ignored_connected.h"
 #include "model/diff/contact/unknown_connected.h"
 #include "model/diff/modify/add_pending_device.h"
-#include <boost/core/demangle.hpp>
 
 using namespace syncspirit::net;
 using namespace syncspirit;
@@ -330,17 +329,18 @@ void peer_actor_t::read_hello(proto::message::message_t &&msg) noexcept {
 void peer_actor_t::read_controlled(proto::message::message_t &&msg) noexcept {
     LOG_TRACE(log, "read_controlled");
     bool continue_reading = true;
-    std::visit(
-        [&](auto &&msg) {
-            using T = std::decay_t<decltype(msg)>;
-            using boost::core::demangle;
+    auto type = proto::get_bep_type(msg);
+    LOG_DEBUG(log, "read_controlled, type = {}", (int)type);
+    if (type == proto::MessageType::HELLO) {
+        LOG_WARN(log, "hello, unexpected_message");
+        auto ec = utils::make_error_code(utils::bep_error_code_t::unexpected_message);
+        return do_shutdown(make_error(ec));
+    }
+    std::visit([&](auto &&msg) {
             namespace m = proto::message;
-            LOG_DEBUG(log, "read_controlled, {}", demangle(typeid(T).name()));
-            const constexpr bool unexpected = std::is_same_v<T, m::Hello>;
-            if constexpr (unexpected) {
-                LOG_WARN(log, "hello, unexpected_message");
-                auto ec = utils::make_error_code(utils::bep_error_code_t::unexpected_message);
-                do_shutdown(make_error(ec));
+            using T = std::decay_t<decltype(msg)>;
+            if constexpr (std::is_same_v<T, m::Hello>) {
+                // not possible
             } else if constexpr (std::is_same_v<T, m::Ping>) {
                 handle_ping(std::move(msg));
             } else if constexpr (std::is_same_v<T, m::Close>) {

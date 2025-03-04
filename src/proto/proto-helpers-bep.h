@@ -544,6 +544,10 @@ inline const Device& get_devices(const Folder& msg, std::size_t i) {
     using namespace pp;
     return msg["devices"_f][i];
 }
+inline Device& get_devices(Folder& msg, std::size_t i) {
+    using namespace pp;
+    return msg["devices"_f][i];
+}
 inline void set_devices(Folder& msg, std::size_t i, Device value) {
     using namespace pp;
     msg["devices"_f][i] = std::move(value);
@@ -642,6 +646,10 @@ inline std::size_t get_files_size(const IndexBase& msg) {
     return msg["files"_f].size();
 }
 inline const FileInfo& get_files(const IndexBase& msg, std::size_t i) {
+    using namespace pp;
+    return msg["files"_f][i];
+}
+inline FileInfo& get_files(IndexBase& msg, std::size_t i) {
     using namespace pp;
     return msg["files"_f][i];
 }

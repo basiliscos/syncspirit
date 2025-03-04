@@ -59,4 +59,6 @@ SYNCSPIRIT_API outcome::result<message::wrapped_message_t> parse_bep(utils::byte
 
 SYNCSPIRIT_API outcome::result<message::Announce> parse_announce(utils::bytes_view_t) noexcept;
 
+SYNCSPIRIT_API MessageType get_bep_type(const message::message_t&) noexcept;
+
 } // namespace syncspirit::proto

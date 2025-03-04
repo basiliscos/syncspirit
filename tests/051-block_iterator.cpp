@@ -59,6 +59,7 @@ TEST_CASE("block iterator", "[model]") {
     proto::set_size(b1, 5);
 
     SECTION("two blocks") {
+        auto b1 = proto::get_blocks(p_file, 0);
         auto& b2 = proto::add_blocks(p_file);
         proto::set_hash(b2, b2_hash);
         proto::set_size(b2, 5);
