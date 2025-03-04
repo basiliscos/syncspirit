@@ -649,6 +649,12 @@ inline void add_files(IndexBase& msg, FileInfo value) {
     using namespace pp;
     msg["files"_f].emplace_back(std::move(value));
 }
+inline FileInfo& add_files(IndexBase& msg) {
+    using namespace pp;
+    auto& opt = msg["files"_f];
+    opt.emplace_back(FileInfo());
+    return opt.back();
+}
 
 /***************/
 /*** Request ***/

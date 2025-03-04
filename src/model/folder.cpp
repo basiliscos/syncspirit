@@ -75,7 +75,7 @@ std::optional<proto::Folder> folder_t::generate(const model::device_t &device) c
     for (auto &it : folder_infos) {
         auto &fi = *it.item;
         auto &d = *fi.get_device();
-        auto pd = proto::Device();
+        auto &pd = proto::add_devices(r);
         proto::set_id(pd, d.device_id().get_sha256());
         proto::set_name(pd, d.get_name());
         proto::set_compression(pd, d.get_compression());

@@ -151,8 +151,8 @@ void local_discovery_actor_t::on_read(size_t bytes) noexcept {
     }
 
     // LOG_TRACE(log, "local_discovery_actor_t::on_read");
-    auto buff = asio::buffer(rx_buff.data(), bytes);
-    auto result = proto::parse_announce(buff);
+    auto view = utils::bytes_view_t(rx_buff.data(), bytes);
+    auto result = proto::parse_announce(view);
     if (!result) {
         LOG_TRACE(log, "on_read, cannot parse incoming UDP packet {} bytes from {} :: {}", bytes, peer_endpoint,
                   result.error().message());

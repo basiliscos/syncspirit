@@ -47,7 +47,7 @@ template <typename... Ts> auto wrap(Ts &&...data) noexcept {
     return message::wrapped_message_t{std::forward<Ts>(data)...};
 }
 
-static outcome::result<message::wrapped_message_t> parse_hello(const asio::const_buffer &buff) noexcept {
+static outcome::result<message::wrapped_message_t> parse_hello(utils::bytes_view_t buff) noexcept {
     auto sz = buff.size();
     const std::uint16_t *ptr_16 = reinterpret_cast<const std::uint16_t *>(buff.data());
     std::uint16_t msg_sz = be::big_to_native(*ptr_16++);
@@ -120,55 +120,62 @@ template <> struct M2T<typename proto::Close> {
 };
 
 template <MessageType T>
-outcome::result<message::wrapped_message_t> parse(const asio::const_buffer &buff, std::size_t consumed) noexcept {
+outcome::result<message::wrapped_message_t> parse(utils::bytes_view_t buff, std::size_t consumed) noexcept {
     using ProtoType = typename T2M<T>::type;
     using MessageType = typename message::as_pointer<ProtoType>;
 
-    auto ptr = reinterpret_cast<const unsigned char *>(buff.data());
-    auto bytes = utils::bytes_view_t(ptr, buff.size());
-
     auto item = ProtoType();
-    if (auto left = proto::decode(bytes, item); left) {
+    if (auto left = proto::decode(buff, item); left) {
         return make_error_code(utils::bep_error_code_t::protobuf_err);
     }
     auto msg = std::make_unique<ProtoType>(std::move(item));
     return wrap(MessageType{std::move(msg)}, static_cast<size_t>(consumed + buff.size()));
 }
 
-outcome::result<message::wrapped_message_t> parse_bep(const asio::const_buffer &buff) noexcept {
-    auto sz = buff.size();
-    if (sz < 4)
-        return wrap(message::message_t(), 0u);
+static auto bep_magic_big = be::native_to_big(constants::bep_magic);
+static auto bep_magic_bytes = utils::bytes_view_t((unsigned char*)&bep_magic_big, sizeof(bep_magic_big));
 
-    const char *ptr = reinterpret_cast<const char *>(buff.data());
-    const std::uint32_t *ptr_32 = reinterpret_cast<const std::uint32_t *>(ptr);
-    if (be::big_to_native(*ptr_32) == constants::bep_magic) {
-        return parse_hello(asio::buffer(ptr + 4, sz - 4));
+outcome::result<message::wrapped_message_t> parse_bep(utils::bytes_view_t buff) noexcept {
+    auto sz = buff.size();
+    if (sz < 4) {
+        return wrap(message::message_t(), 0u);
+    }
+
+    auto head = buff.subspan(0, 4);
+    if (head == bep_magic_bytes) {
+        return parse_hello(buff.subspan(4));
     } else {
-        auto ptr_16 = reinterpret_cast<const std::uint16_t *>(buff.data());
-        auto header_sz = be::big_to_native(*ptr_16++);
+        auto ptr = head.data();
+        auto header_sz = std::uint16_t();
+        auto dst = (unsigned char*)(&header_sz);
+        *dst++ = *ptr++;
+        *dst++ = *ptr++;
+        be::big_to_native_inplace(header_sz);
         if (2 + header_sz > (int)sz) {
             return wrap(message::message_t(), 0u);
         }
 
         auto header = proto::Header();
-        auto header_buff = utils::bytes_view_t((unsigned char*)ptr_16, header_sz);
+        auto header_buff = head.subspan(2, header_sz);
         if (auto left = proto::decode(header_buff, header); left) {
             return make_error_code(utils::bep_error_code_t::protobuf_err);
         }
         auto type = proto::get_type(header);
-        ptr_32 = reinterpret_cast<const std::uint32_t *>(((const char *)ptr_16) + header_sz);
+        ptr += header_sz;
         std::uint32_t message_sz;
-        std::memcpy(&message_sz, ptr_32, sizeof(message_sz));
+        dst = (unsigned char*)(&message_sz);
+        *dst++ = *ptr++;
+        *dst++ = *ptr++;
+        *dst++ = *ptr++;
+        *dst++ = *ptr++;
         be::big_to_native_inplace(message_sz);
-        ++ptr_32;
 
-        auto tail = ptr + sz;
-        if (reinterpret_cast<const char *>(ptr_32) + message_sz > tail) {
+        // auto tail = ptr + sz;
+        if (ptr + message_sz > buff.data() + sz) {
             return wrap(message::message_t(), 0u);
         }
 
-        auto parse_msg = [type](const asio::const_buffer &buff, std::size_t consumed) noexcept {
+        auto parse_msg = [type](utils::bytes_view_t buff, std::size_t consumed) noexcept {
             switch (type) {
             case MT::CLUSTER_CONFIG:
                 return parse<MT::CLUSTER_CONFIG>(buff, consumed);
@@ -191,27 +198,32 @@ outcome::result<message::wrapped_message_t> parse_bep(const asio::const_buffer &
             }
         };
 
-        std::vector<char> uncompressed;
-        asio::const_buffer msg_buff;
+        auto rest = utils::bytes_view_t(ptr, message_sz);
         std::size_t consumed = 2 + header_sz + 4;
         auto compression = proto::get_compression(header);
         if (compression == proto::MessageCompression::NONE) {
-            auto msg_buff = asio::buffer(reinterpret_cast<const char *>(ptr_32), message_sz);
-            return parse_msg(msg_buff, consumed);
+            return parse_msg(rest, consumed);
         } else {
             std::uint32_t uncompr_sz;
-            std::memcpy(&uncompr_sz, ptr_32, sizeof(uncompr_sz));
+            dst = (unsigned char*)(&uncompr_sz);
+            *dst++ = *ptr++;
+            *dst++ = *ptr++;
+            *dst++ = *ptr++;
+            *dst++ = *ptr++;
             be::big_to_native_inplace(uncompr_sz);
-            ++ptr_32;
+
+            auto msg_buff = utils::bytes_view_t();
+
             auto block_sz = sz - (header_sz + sizeof(std::uint16_t) + sizeof(std::uint32_t) * 2);
+            std::vector<char> uncompressed;
             uncompressed.resize(uncompr_sz);
-            auto dec =
-                LZ4_decompress_safe(reinterpret_cast<const char *>(ptr_32), uncompressed.data(), block_sz, uncompr_sz);
+            auto data_ptr = reinterpret_cast<const char *>(ptr);
+            auto dec = LZ4_decompress_safe(data_ptr, uncompressed.data(), block_sz, uncompr_sz);
             if (dec < 0) {
                 return make_error_code(utils::bep_error_code_t::lz4_decoding);
             }
-            msg_buff = asio::buffer(uncompressed.data(), uncompr_sz);
-            auto &&r = parse_msg(msg_buff, 0); // consumed is ignored anyway
+            auto msg_bytes = utils::bytes_view_t((unsigned char*)uncompressed.data(), uncompr_sz);
+            auto &&r = parse_msg(msg_bytes, 0); // consumed is ignored anyway
             if (r) {
                 auto &parsed = r.value().message;
                 return wrap(std::move(parsed), static_cast<size_t>(consumed + message_sz));
@@ -249,7 +261,7 @@ std::size_t make_announce_message(utils::bytes_view_t buff, utils::bytes_view_t 
     return total_sz;
 }
 
-outcome::result<message::Announce> parse_announce(const asio::const_buffer &buff) noexcept {
+outcome::result<message::Announce> parse_announce(utils::bytes_view_t buff) noexcept {
     auto sz = buff.size();
     if (sz <= 4) {
         return utils::make_error_code(utils::error_code_t::wrong_magic);
@@ -284,7 +296,7 @@ SYNCSPIRIT_API utils::bytes_t serialize(const Message &message,
     proto::encode(header, {ptr, header_sz});
     ptr += header_sz;
 
-    auto message_sz_32 = be::native_to_big(static_cast<std::uint32_t>(header_sz));
+    auto message_sz_32 = be::native_to_big(static_cast<std::uint32_t>(message_sz));
     src = reinterpret_cast<const std::uint8_t*>(&message_sz_32);
     *ptr++ = *src++;
     *ptr++ = *src++;

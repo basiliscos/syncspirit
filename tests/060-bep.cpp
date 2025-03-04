@@ -28,7 +28,7 @@ TEST_CASE("announce", "[bep]") {
         0x18, 0xaa, 0x97, 0xfb, 0xd6, 0xb7, 0x99, 0xde, 0xd8, 0x40};
 
     constexpr auto buff_sz = sizeof(buff_raw);
-    auto buff = boost::asio::buffer(buff_raw, buff_sz);
+    auto buff = utils::bytes_view_t(buff_raw, buff_sz);
     auto r = parse_announce(buff);
     REQUIRE((bool)r);
     auto &v = *r.value();
@@ -46,7 +46,7 @@ TEST_CASE("announce", "[bep]") {
         auto sz = make_announce_message(out, device_id_bytes, uris, 1234);
         REQUIRE(sz > 50);
 
-        auto in = asio::const_buffer(bytes.data(), sz);
+        auto in = utils::bytes_view_t(bytes.data(), sz);
         auto r_ = parse_announce(in);
         REQUIRE((bool)r_);
         auto &v_ = *r_.value();
@@ -63,7 +63,7 @@ TEST_CASE("hello", "[bep]") {
                                 0x6e, 0x67, 0x1a, 0x07, 0x76, 0x31, 0x2e, 0x31, 0x31, 0x2e, 0x31};
 
     constexpr auto buff_sz = sizeof(buff_raw);
-    auto buff = boost::asio::buffer(buff_raw, buff_sz);
+    auto buff = utils::bytes_view_t(buff_raw, buff_sz);
     auto r = parse_bep(buff);
     REQUIRE((bool)r);
     auto &v = r.value();
@@ -75,7 +75,7 @@ TEST_CASE("hello", "[bep]") {
 
     SECTION("make") {
         auto out = make_hello_message("test-device");
-        auto buff = boost::asio::buffer(out.data(), out.size());
+        auto buff = utils::bytes_view_t(out.data(), out.size());
         auto r = parse_bep(buff);
 
         REQUIRE((bool)r);
@@ -103,7 +103,7 @@ TEST_CASE("cluster config", "[bep]") {
         0x12, 0x7c, 0x00, 0x50, 0x6e, 0x61, 0x6d, 0x69, 0x63};
 
     constexpr auto buff_sz = sizeof(buff_raw);
-    auto buff = boost::asio::buffer(buff_raw, buff_sz);
+    auto buff = utils::bytes_view_t(buff_raw, buff_sz);
     auto r = parse_bep(buff);
     REQUIRE((bool)r);
     auto &v = r.value();
@@ -141,7 +141,7 @@ TEST_CASE("cluster config", "[bep]") {
 
     SECTION("corrupt data a little bit") {
         buff_raw[11] = 0xC0;
-        auto buff = boost::asio::buffer(buff_raw, buff_sz);
+        auto buff = utils::bytes_view_t(buff_raw, buff_sz);
         auto r = parse_bep(buff);
         REQUIRE(!r);
         CHECK(r.error() == utils::make_error_code(utils::bep_error_code_t::lz4_decoding));
@@ -149,8 +149,7 @@ TEST_CASE("cluster config", "[bep]") {
 
     SECTION("serialize, round-trip") {
         auto buff = serialize(msg);
-        auto const_buff = asio::const_buffer(buff.data(), buff.size());
-        auto r2 = parse_bep(const_buff);
+        auto r2 = parse_bep(buff);
         REQUIRE(r2);
         auto &v2 = r.value();
         auto &msg2 = std::get<proto::message::ClusterConfig>(v.message);

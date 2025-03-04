@@ -168,7 +168,7 @@ void peer_actor_t::on_read(std::size_t bytes) noexcept {
     resources->release(resource::io_read);
     rx_idx += bytes;
     LOG_TRACE(log, "on_read, {} bytes, total = {}", bytes, rx_idx);
-    auto buff = asio::buffer(rx_buff.data(), rx_idx);
+    auto buff = utils::bytes_view_t((unsigned char*)rx_buff.data(), rx_idx);
     auto result = proto::parse_bep(buff);
     if (result.has_error()) {
         auto &ec = result.error();

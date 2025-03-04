@@ -5,7 +5,6 @@
 
 #include <fmt/format.h>
 #include <boost/outcome.hpp>
-#include <boost/asio/buffer.hpp>
 #include <memory>
 #include <variant>
 #include "syncspirit-export.h"
@@ -16,7 +15,6 @@
 namespace syncspirit::proto {
 
 namespace outcome = boost::outcome_v2;
-namespace asio = boost::asio;
 
 namespace payload {
 using URIs = utils::uri_container_t;
@@ -57,8 +55,8 @@ template <typename Message>
 utils::bytes_t serialize(const Message &message,
                proto::MessageCompression compression = proto::MessageCompression::NONE) noexcept;
 
-SYNCSPIRIT_API outcome::result<message::wrapped_message_t> parse_bep(const asio::const_buffer &buff) noexcept;
+SYNCSPIRIT_API outcome::result<message::wrapped_message_t> parse_bep(utils::bytes_view_t) noexcept;
 
-SYNCSPIRIT_API outcome::result<message::Announce> parse_announce(const asio::const_buffer &buff) noexcept;
+SYNCSPIRIT_API outcome::result<message::Announce> parse_announce(utils::bytes_view_t) noexcept;
 
 } // namespace syncspirit::proto
