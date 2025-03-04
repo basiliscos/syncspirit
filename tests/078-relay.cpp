@@ -139,7 +139,7 @@ struct fixture_t : private model::diff::cluster_visitor_t {
         cluster->get_devices().put(my_device);
         cluster->get_devices().put(peer_device);
 
-        session_key = "lorem-imspum-dolor";
+        session_key = as_owned_bytes("lorem-imspum-dolor");
 
         main();
     }
@@ -274,9 +274,9 @@ struct fixture_t : private model::diff::cluster_visitor_t {
     model::device_ptr_t relay_device;
     model::device_ptr_t peer_device;
     transport::stream_sp_t relay_trans;
-    std::string relay_rx;
-    std::string relay_tx;
-    std::string session_key;
+    utils::bytes_t relay_rx;
+    utils::bytes_t relay_tx;
+    utils::bytes_t session_key;
 };
 
 void test_master_connect() {
@@ -332,8 +332,9 @@ void test_passive() {
             fixture_t::on(update);
             if (my_device->get_uris().size() == 1 && !sent) {
                 sent = true;
-                auto msg = proto::relay::session_invitation_t{
-                    std::string(peer_device->device_id().get_sha256()), session_key, {}, 12345, true};
+                auto sha256 = peer_device->device_id().get_sha256();
+                auto id = utils::bytes_t(sha256.begin(), sha256.end());
+                auto msg = proto::relay::session_invitation_t{std::move(id), session_key, {}, 12345, true};
                 send_relay(msg);
             }
         }
@@ -379,9 +380,9 @@ void test_passive_ping_pong() {
         void on_relay(proto::relay::ping_t &message) noexcept override {
             fixture_t::on_relay(message);
             send_relay(proto::relay::pong_t{});
-
-            auto msg = proto::relay::session_invitation_t{
-                std::string(peer_device->device_id().get_sha256()), session_key, {}, 12345, true};
+            auto sha256 = peer_device->device_id().get_sha256();
+            auto id = utils::bytes_t(sha256.begin(), sha256.end());
+            auto msg = proto::relay::session_invitation_t{std::move(id), session_key, {}, 12345, true};
             send_relay(msg);
         };
 
@@ -424,8 +425,9 @@ void test_passive_unknown() {
             fixture_t::on(update);
             if (my_device->get_uris().size() == 1 && !sent) {
                 sent = true;
-                auto msg = proto::relay::session_invitation_t{
-                    std::string(peer_device->device_id().get_sha256()), session_key, {}, 12345, true};
+                auto sha256 = peer_device->device_id().get_sha256();
+                auto id = utils::bytes_t(sha256.begin(), sha256.end());
+                auto msg = proto::relay::session_invitation_t{std::move(id), session_key, {}, 12345, true};
                 send_relay(msg);
             }
         }
