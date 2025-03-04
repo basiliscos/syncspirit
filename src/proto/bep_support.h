@@ -44,6 +44,29 @@ struct wrapped_message_t {
     std::size_t consumed = 0;
 };
 
+template <typename T>
+consteval MessageType get_bep_type() {
+    if constexpr (std::is_same_v<T, message::ClusterConfig>)  {
+        return MessageType::CLUSTER_CONFIG;
+    } else if constexpr (std::is_same_v<T, message::Index>)  {
+        return MessageType::INDEX;
+    } else if constexpr (std::is_same_v<T, message::IndexUpdate>)  {
+        return MessageType::INDEX_UPDATE;
+    } else if constexpr (std::is_same_v<T, message::Request>)  {
+        return MessageType::REQUEST;
+    } else if constexpr (std::is_same_v<T, message::Response>)  {
+        return MessageType::RESPONSE;
+    } else if constexpr (std::is_same_v<T, message::DownloadProgress>)  {
+        return MessageType::DOWNLOAD_PROGRESS;
+    } else if constexpr (std::is_same_v<T, message::Ping>)  {
+        return MessageType::PING;
+    } else if constexpr (std::is_same_v<T, message::Close>)  {
+        return MessageType::CLOSE;
+    } else if constexpr (std::is_same_v<T, message::Hello>)  {
+        return MessageType::HELLO;
+    }
+}
+
 } // namespace message
 
 SYNCSPIRIT_API utils::bytes_t make_hello_message(std::string_view device_name) noexcept;
@@ -58,7 +81,4 @@ utils::bytes_t serialize(const Message &message,
 SYNCSPIRIT_API outcome::result<message::wrapped_message_t> parse_bep(utils::bytes_view_t) noexcept;
 
 SYNCSPIRIT_API outcome::result<message::Announce> parse_announce(utils::bytes_view_t) noexcept;
-
-SYNCSPIRIT_API MessageType get_bep_type(const message::message_t&) noexcept;
-
 } // namespace syncspirit::proto

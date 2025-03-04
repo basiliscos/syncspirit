@@ -16,7 +16,6 @@
 #include "utils/error_code.h"
 #include "utils/tls.h"
 #include "proto/bep_support.h"
-#include <boost/core/demangle.hpp>
 #include <type_traits>
 
 using namespace syncspirit;
@@ -120,14 +119,13 @@ struct sample_peer_t : r::actor_base_t {
         auto &data = message.payload.data;
         auto result = proto::parse_bep(data);
         auto orig = std::move(result.value().message);
-        auto type = proto::get_bep_type(orig);
+        auto type = proto::MessageType::UNKNOWN;
         auto variant = net::payload::forwarded_message_t();
-        LOG_TRACE(log, "{}, on_transfer, bytes = {}, type = {}", identity, data.size(), (int) type);
         std::visit(
             [&](auto &msg) {
-                using boost::core::demangle;
                 using T = std::decay_t<decltype(msg)>;
                 using V = net::payload::forwarded_message_t;
+                type = proto::message::get_bep_type<T>();
                 if constexpr (std::is_constructible_v<V, T>) {
                     variant = std::move(msg);
                 } else if constexpr (std::is_same_v<T, proto::message::Response>) {
@@ -135,6 +133,7 @@ struct sample_peer_t : r::actor_base_t {
                 }
             },
             orig);
+        LOG_TRACE(log, "{}, on_transfer, bytes = {}, type = {}", identity, data.size(), (int) type);
         auto fwd_msg = new net::message::forwarded_message_t(address, std::move(variant));
         messages.emplace_back(fwd_msg);
 

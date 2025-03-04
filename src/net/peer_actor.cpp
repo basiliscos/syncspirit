@@ -327,25 +327,21 @@ void peer_actor_t::read_hello(proto::message::message_t &&msg) noexcept {
 }
 
 void peer_actor_t::read_controlled(proto::message::message_t &&msg) noexcept {
+    using MT = proto::MessageType;
     LOG_TRACE(log, "read_controlled");
-    bool continue_reading = true;
-    auto type = proto::get_bep_type(msg);
-    LOG_DEBUG(log, "read_controlled, type = {}", (int)type);
-    if (type == proto::MessageType::HELLO) {
-        LOG_WARN(log, "hello, unexpected_message");
-        auto ec = utils::make_error_code(utils::bep_error_code_t::unexpected_message);
-        return do_shutdown(make_error(ec));
-    }
+    auto type = MT::UNKNOWN;
     std::visit([&](auto &&msg) {
             namespace m = proto::message;
             using T = std::decay_t<decltype(msg)>;
+            type = proto::message::get_bep_type<T>();
             if constexpr (std::is_same_v<T, m::Hello>) {
-                // not possible
+                LOG_WARN(log, "{}, hello, unexpected_message");
+                auto ec = utils::make_error_code(utils::bep_error_code_t::unexpected_message);
+                return do_shutdown(make_error(ec));
             } else if constexpr (std::is_same_v<T, m::Ping>) {
                 handle_ping(std::move(msg));
             } else if constexpr (std::is_same_v<T, m::Close>) {
                 handle_close(std::move(msg));
-                continue_reading = false;
             } else if constexpr (std::is_same_v<T, m::Response>) {
                 handle_response(std::move(msg));
             } else {
@@ -355,6 +351,8 @@ void peer_actor_t::read_controlled(proto::message::message_t &&msg) noexcept {
             }
         },
         msg);
+    LOG_DEBUG(log, "read_controlled, type = {}", (int)type);
+    bool continue_reading = !((type == MT::HELLO) || (type == MT::UNKNOWN) || (type == MT::CLOSE));
     if (continue_reading) {
         read_action = &peer_actor_t::read_controlled;
         read_more();
