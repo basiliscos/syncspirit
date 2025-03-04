@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "test-utils.h"
 #include "access.h"
@@ -229,7 +229,7 @@ struct fixture_t {
     transport::stream_sp_t peer_trans;
     ready_ptr_t connected_message;
     diff_msgs_t diff_msgs;
-    std::string relay_session;
+    utils::bytes_t relay_session;
     bool use_model = true;
 
     bool valid_handshake = false;
@@ -483,10 +483,10 @@ void test_passive_timeout() {
 }
 
 struct passive_relay_fixture_t : fixture_t {
-    std::string rx_buff;
+    utils::bytes_t rx_buff;
     bool initiate_handshake = true;
     passive_relay_fixture_t() {
-        relay_session = "relay-session-key";
+        relay_session = as_owned_bytes("relay-session-key");
         rx_buff.resize(128);
     }
 
@@ -554,7 +554,7 @@ void test_relay_passive_garbage() {
     struct F : passive_relay_fixture_t {
 
         void write(const proto::relay::message_t &) noexcept override {
-            rx_buff = "garbage-garbage-garbage";
+            rx_buff = as_owned_bytes("garbage-garbage-garbage");
             initiate_handshake = false;
             transport::error_fn_t err_fn([&](auto ec) { log->error("(relay/passive), read_err: {}", ec.message()); });
             transport::io_fn_t write_fn = [this](size_t bytes) { on_write(bytes); };
@@ -664,8 +664,8 @@ void test_relay_active_wrong_relay_device_id() {
 struct active_relay_fixture_t : fixture_t {
     utils::key_pair_t relay_keys;
     model::device_id_t relay_device;
-    std::string rx_buff;
-    std::string session_key = "lorem-session-dolor";
+    utils::bytes_t rx_buff;
+    utils::bytes_t session_key = as_owned_bytes("lorem-session-dolor");
     transport::stream_sp_t relay_trans;
     bool session_mode = false;
 
@@ -708,8 +708,10 @@ struct active_relay_fixture_t : fixture_t {
     }
 
     virtual void relay_reply() noexcept {
+        auto sha256 = peer_device->device_id().get_sha256();
+        auto id = utils::bytes_t(sha256.begin(), sha256.end());
         write(relay_trans,
-              proto::relay::session_invitation_t{std::string(peer_device->device_id().get_sha256()), session_key,
+              proto::relay::session_invitation_t{std::move(id), session_key,
                                                  asio::ip::address_v4(0), listening_ep.port(), false});
     }
 
@@ -809,7 +811,9 @@ void test_relay_wrong_device() {
     struct F : active_relay_fixture_t {
 
         void relay_reply() noexcept override {
-            write(relay_trans, proto::relay::session_invitation_t{std::string(relay_device.get_sha256()), session_key,
+            auto sha256 = relay_device.get_sha256();
+            auto id = utils::bytes_t(sha256.begin(), sha256.end());
+            write(relay_trans, proto::relay::session_invitation_t{std::move(id), session_key,
                                                                   asio::ip::address_v4(0), listening_ep.port(), false});
         }
         void on_write(size_t) override {}
@@ -833,8 +837,10 @@ void test_relay_non_connectable() {
     struct F : active_relay_fixture_t {
 
         void relay_reply() noexcept override {
+            auto sha256 = peer_device->device_id().get_sha256();
+            auto id = utils::bytes_t(sha256.begin(), sha256.end());
             write(relay_trans,
-                  proto::relay::session_invitation_t{std::string(peer_device->device_id().get_sha256()), session_key,
+                  proto::relay::session_invitation_t{std::move(id), session_key,
                                                      boost::asio::ip::address_v4(0), 0, false});
         }
 
@@ -856,7 +862,7 @@ void test_relay_garbage_reply() {
     struct F : active_relay_fixture_t {
 
         void write(transport::stream_sp_t &stream, const proto::relay::message_t &) noexcept override {
-            rx_buff = "garbage-garbage-garbage";
+            rx_buff = as_owned_bytes("garbage-garbage-garbage");
             transport::error_fn_t err_fn([&](auto ec) { log->error("(relay/passive), read_err: {}", ec.message()); });
             transport::io_fn_t write_fn = [this](size_t bytes) { on_write(bytes); };
             stream->async_send(asio::buffer(rx_buff), write_fn, err_fn);
