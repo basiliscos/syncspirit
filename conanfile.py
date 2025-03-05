@@ -16,7 +16,7 @@ class SyncspiritRecipe(ConanFile):
         self.requires("openssl/3.3.2")
         self.requires("protopuf/3.0.0")
         self.requires("pugixml/1.13")
-        self.requires("rotor/0.32")
+        self.requires("rotor/0.33")
         self.requires("spdlog/1.14.1")
         self.requires("tomlplusplus/3.3.0")
         self.requires("zlib/1.2.13")
