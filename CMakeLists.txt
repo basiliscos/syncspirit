@@ -304,6 +304,7 @@ target_link_libraries(syncspirit_core
         spdlog::spdlog
         tomlplusplus::tomlplusplus
         nlohmann_json::nlohmann_json
+        ZLIB::ZLIB
         lz4::lz4
         $<IF:$<PLATFORM_ID:Windows>,mdbx,mdbx-static>
         $<$<PLATFORM_ID:Windows>:iphlpapi>

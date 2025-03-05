@@ -10,7 +10,6 @@
 #include "misc/error_code.h"
 #include "misc/file_iterator.h"
 #include "proto/proto-helpers.h"
-#include "proto/proto-helpers.h"
 #include "utils/bytes_comparator.hpp"
 #include <zlib.h>
 #include <spdlog/spdlog.h>
@@ -21,6 +20,19 @@
 #include <set>
 
 namespace syncspirit::model {
+
+static const auto empty_block = []() -> proto::BlockInfo {
+    unsigned char digest[SHA256_DIGEST_LENGTH];
+    unsigned char empty_data[1] = {0};
+    auto weak_hash = adler32(0L, Z_NULL, 0);
+    weak_hash = adler32(weak_hash, empty_data, 0);
+    utils::digest(empty_data, 0, digest);
+    auto digets_bytes = utils::bytes_view_t(digest, SHA256_DIGEST_LENGTH);
+    auto block = proto::BlockInfo();
+    proto::set_weak_hash(block, weak_hash);
+    proto::set_hash(block, digets_bytes);
+    return block;
+}();
 
 namespace pt = boost::posix_time;
 
@@ -227,15 +239,7 @@ proto::FileInfo file_info_t::as_proto(bool include_blocks) const noexcept {
             offset += block.get_size();
         }
         if (blocks.empty() && is_file() && !is_deleted()) {
-            unsigned char digest[SHA256_DIGEST_LENGTH];
-            unsigned char empty_data[1] = {0};
-            auto emtpy_block = proto::BlockInfo();
-            auto weak_hash = adler32(0L, Z_NULL, 0);
-            weak_hash = adler32(weak_hash, empty_data, 0);
-            proto::set_weak_hash(emtpy_block, weak_hash);
-            utils::digest(empty_data, 0, digest);
-            auto digets_bytes = utils::bytes_view_t(digest, SHA256_DIGEST_LENGTH);
-            proto::set_hash(emtpy_block, digets_bytes);
+            proto::add_blocks(r, empty_block);
         }
     }
     return r;
