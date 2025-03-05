@@ -10,7 +10,6 @@
 #include <boost/endian/conversion.hpp>
 #include <algorithm>
 #include <lz4.h>
-#include <spdlog/spdlog.h>
 
 using namespace syncspirit;
 namespace be = boost::endian;
@@ -49,15 +48,17 @@ template <typename... Ts> auto wrap(Ts &&...data) noexcept {
 
 static outcome::result<message::wrapped_message_t> parse_hello(utils::bytes_view_t buff) noexcept {
     auto sz = buff.size();
-    const std::uint16_t *ptr_16 = reinterpret_cast<const std::uint16_t *>(buff.data());
-    std::uint16_t msg_sz = be::big_to_native(*ptr_16++);
+    std::uint16_t msg_sz;
+    auto src = buff.data();
+    auto dst = (unsigned char*) &msg_sz;
+    *dst++ = *src++;
+    *dst++ = *src++;
+    be::big_to_native_inplace(msg_sz);
     if (msg_sz < sz - 2) {
         return wrap(Hello(), static_cast<size_t>(0));
     }
 
-    auto ptr = reinterpret_cast<const unsigned char *>(ptr_16);
-    auto bytes = utils::bytes_view_t(ptr, msg_sz);
-
+    auto bytes = utils::bytes_view_t(src, msg_sz);
     auto msg = proto::Hello();
     if (auto left = proto::decode(bytes, msg); left != 0) {
         return make_error_code(utils::bep_error_code_t::protobuf_err);
