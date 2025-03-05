@@ -238,7 +238,7 @@ static widgetable_ptr_t make_name(my_table_t &container) {
 
         bool store(void *data) override {
             auto &device = *reinterpret_cast<db::Device *>(data);
-            device.set_name(input->value());
+            db::set_name(device, input->value());
             return true;
         };
 
@@ -260,7 +260,7 @@ static widgetable_ptr_t make_introducer(my_table_t &container) {
 
         bool store(void *data) override {
             auto &device = *reinterpret_cast<db::Device *>(data);
-            device.set_introducer(input->value());
+            db::set_introducer(device, input->value());
             return true;
         };
     };
@@ -280,7 +280,7 @@ static widgetable_ptr_t make_auto_accept(my_table_t &container) {
 
         bool store(void *data) override {
             auto &device = *reinterpret_cast<db::Device *>(data);
-            device.set_auto_accept(input->value());
+            db::set_auto_accept(device, input->value());
             return true;
         };
     };
@@ -300,7 +300,7 @@ static widgetable_ptr_t make_paused(my_table_t &container) {
 
         bool store(void *data) override {
             auto &device = *reinterpret_cast<db::Device *>(data);
-            device.set_paused(input->value());
+            db::set_paused(device, input->value());
             return true;
         };
     };
@@ -350,7 +350,8 @@ static widgetable_ptr_t make_compressions(my_table_t &container) {
 
         bool store(void *data) override {
             auto &device = *reinterpret_cast<db::Device *>(data);
-            device.set_compression(static_cast<proto::Compression>(input->value()));
+            auto value = static_cast<proto::Compression>(input->value());
+            db::set_compression(device, value);
             return true;
         };
 
@@ -405,7 +406,7 @@ static widgetable_ptr_t make_addresses(my_table_t &container) {
 
         bool store(void *data) override {
             auto &device = *reinterpret_cast<db::Device *>(data);
-            device.clear_addresses();
+            db::clear_addresses(device);
             if (input->input()->active() == 0) {
                 return true;
             } else {
@@ -432,7 +433,7 @@ static widgetable_ptr_t make_addresses(my_table_t &container) {
                     }
                 }
                 for (auto addr : addresses) {
-                    *device.add_addresses() = addr;
+                    db::add_addresses(device, addr);
                 }
                 return true;
             }

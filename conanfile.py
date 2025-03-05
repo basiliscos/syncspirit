@@ -19,7 +19,6 @@ class SyncspiritRecipe(ConanFile):
         self.requires("rotor/0.33")
         self.requires("spdlog/1.14.1")
         self.requires("tomlplusplus/3.3.0")
-        self.requires("zlib/1.2.13")
         self.requires("catch2/3.3.1")
         self.requires("boost/1.86.0", headers=True, libs=True, transitive_libs=True, force=True)
 

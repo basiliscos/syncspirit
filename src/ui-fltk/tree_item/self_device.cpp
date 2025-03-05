@@ -51,7 +51,6 @@ struct self_table_t final : static_table_t, db_info_viewer_t {
         auto& mdbx_v = ::mdbx_version;
         auto mdbx_version =fmt::format("{}.{}.{}_{}", mdbx_v.major, mdbx_v.minor, mdbx_v.patch, mdbx_v.tweak);
         auto app_version = fmt::format("{} {}", constants::client_name, constants::client_version);
-        auto protobuf_version = google::protobuf::internal::VersionString(GOOGLE_PROTOBUF_VERSION);
         auto fltk_version = fmt::format("{}", Fl::version());
         auto ares_version = std::string(utils::cares_version());
 
@@ -71,7 +70,6 @@ struct self_table_t final : static_table_t, db_info_viewer_t {
         data.push_back({"mdbx size, Kb", mdbx_size_cell});
         data.push_back({"app version", new static_string_provider_t(app_version)});
         data.push_back({"mdbx version", new static_string_provider_t(mdbx_version)});
-        data.push_back({"protobuf version", new static_string_provider_t(protobuf_version)});
         data.push_back({"lz4 version", new static_string_provider_t(LZ4_versionString())});
         data.push_back({"openssl version", new static_string_provider_t(openssl_version)});
         data.push_back({"fltk version", new static_string_provider_t(fltk_version)});

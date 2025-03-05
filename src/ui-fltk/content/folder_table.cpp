@@ -197,7 +197,7 @@ auto folder_table_t::make_path(folder_table_t &container, bool disabled) -> widg
 
         bool store(void *data) override {
             auto ctx = reinterpret_cast<ctx_t *>(data);
-            ctx->folder.path(input->value());
+            db::set_path(ctx->folder, input->value());
             return true;
         }
 
@@ -229,7 +229,7 @@ auto folder_table_t::make_id(folder_table_t &container, bool disabled) -> widget
 
         bool store(void *data) override {
             auto ctx = reinterpret_cast<ctx_t *>(data);
-            ctx->folder.id(input->value());
+            db::set_id(ctx->folder, input->value());
             return true;
         }
 
@@ -257,7 +257,7 @@ auto folder_table_t::make_label(folder_table_t &container) -> widgetable_ptr_t {
         }
 
         bool store(void *data) override {
-            auto label = std::string(input->value());
+            auto label = std::string_view(input->value());
             if (label.empty()) {
                 auto &container = static_cast<folder_table_t &>(this->container);
                 container.error = "label cannot be empty";
@@ -265,7 +265,7 @@ auto folder_table_t::make_label(folder_table_t &container) -> widgetable_ptr_t {
             }
 
             auto ctx = reinterpret_cast<ctx_t *>(data);
-            ctx->folder.label(label);
+            db::set_label(ctx->folder, label);
             return true;
         }
     };
@@ -298,7 +298,7 @@ auto folder_table_t::make_folder_type(folder_table_t &container) -> widgetable_p
             auto ctx = reinterpret_cast<ctx_t *>(data);
             auto value = (db::FolderType)(input->value());
 
-            ctx->folder.folder_type(value);
+            db::set_folder_type(ctx->folder, value);
             return true;
         }
     };
@@ -334,7 +334,7 @@ auto folder_table_t::make_pull_order(folder_table_t &container) -> widgetable_pt
             auto ctx = reinterpret_cast<ctx_t *>(data);
             auto value = (db::PullOrder)(input->value());
 
-            ctx->folder.pull_order(value);
+            db::set_pull_order(ctx->folder, value);
             return true;
         }
     };
@@ -398,7 +398,7 @@ auto folder_table_t::make_read_only(folder_table_t &container) -> widgetable_ptr
 
         bool store(void *data) override {
             auto ctx = reinterpret_cast<ctx_t *>(data);
-            ctx->folder.read_only(input->value());
+            db::set_read_only(ctx->folder, input->value());
             return true;
         }
     };
@@ -435,7 +435,8 @@ auto folder_table_t::make_rescan_interval(folder_table_t &container) -> widgetab
                 return false;
             }
 
-            ctx->folder.rescan_interval(static_cast<std::uint32_t>(value));
+            auto ri = static_cast<std::uint32_t>(value);
+            db::set_rescan_interval(ctx->folder, ri);
             return true;
         }
     };
@@ -454,7 +455,6 @@ auto folder_table_t::make_ignore_permissions(folder_table_t &container) -> widge
 
         bool store(void *data) override {
             auto ctx = reinterpret_cast<ctx_t *>(data);
-            ctx->folder.ignore_permissions(input->value());
             return true;
         }
     };
@@ -472,7 +472,7 @@ auto folder_table_t::make_ignore_delete(folder_table_t &container) -> widgetable
         }
         bool store(void *data) override {
             auto ctx = reinterpret_cast<ctx_t *>(data);
-            ctx->folder.ignore_delete(input->value());
+            db::set_ignore_delete(ctx->folder, input->value());
             return true;
         }
     };
@@ -490,7 +490,7 @@ auto folder_table_t::make_disable_tmp(folder_table_t &container) -> widgetable_p
         }
         bool store(void *data) override {
             auto ctx = reinterpret_cast<ctx_t *>(data);
-            ctx->folder.disable_temp_indexes(input->value());
+            db::set_disable_temp_indexes(ctx->folder, input->value());
             return true;
         }
     };
@@ -508,7 +508,7 @@ auto folder_table_t::make_paused(folder_table_t &container) -> widgetable_ptr_t 
         }
         bool store(void *data) override {
             auto ctx = reinterpret_cast<ctx_t *>(data);
-            ctx->folder.paused(input->value());
+            db::set_paused(ctx->folder, input->value());
             return true;
         }
     };
@@ -526,7 +526,7 @@ auto folder_table_t::make_scheduled(folder_table_t &container) -> widgetable_ptr
         }
         bool store(void *data) override {
             auto ctx = reinterpret_cast<ctx_t *>(data);
-            ctx->folder.scheduled(input->value());
+            db::set_scheduled(ctx->folder, input->value());
             return true;
         }
     };
@@ -647,7 +647,9 @@ void folder_table_t::on_share() {
     auto &sup = container.supervisor;
     auto log = sup.get_logger();
     auto &peer = ctx.shared_with.begin()->item;
-    log->info("going to create folder {}({}) & share it with {}", folder.label(), folder.id(), peer->get_name());
+    auto label = db::get_label(folder);
+    auto folder_id = db::get_id(folder);
+    log->info("going to create folder {}({}) & share it with {}", label, folder_id, peer->get_name());
     auto peer_id = peer->device_id().get_sha256();
     auto opt = modify::upsert_folder_t::create(*sup.get_cluster(), sup.get_sequencer(), folder, 0);
     if (!opt) {
@@ -655,8 +657,7 @@ void folder_table_t::on_share() {
         return;
     }
 
-    auto folder_id = std::string(folder.id());
-    auto cb = sup.call_share_folders(std::move(folder_id), {utils::bytes_t(peer_id.begin(), peer_id.end())});
+    auto cb = sup.call_share_folders(folder_id, {utils::bytes_t(peer_id.begin(), peer_id.end())});
     sup.send_model<model::payload::model_update_t>(opt.assume_value(), cb.get());
 }
 
@@ -714,9 +715,9 @@ void folder_table_t::on_apply() {
         }
     }
 
-    auto folder_id = folder_db.id();
+    auto folder_id = db::get_id(folder_db);
     auto cb =
-        devices.empty() ? sup.call_select_folder(folder_id) : sup.call_share_folders(std::string(folder_id), std::move(devices));
+        devices.empty() ? sup.call_select_folder(folder_id) : sup.call_share_folders(folder_id, std::move(devices));
     sup.send_model<model::payload::model_update_t>(diff, cb.get());
 }
 

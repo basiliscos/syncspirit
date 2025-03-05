@@ -75,6 +75,14 @@ inline void set_addresses(Device& msg, std::size_t i, std::string_view value) {
     using namespace pp;
     msg["addresses"_f][i] = std::string(value);
 }
+inline void clear_addresses(Device& msg) {
+    using namespace pp;
+    msg["addresses"_f].clear();
+}
+inline void add_addresses(Device& msg, std::string_view value) {
+    using namespace pp;
+    msg["addresses"_f].emplace_back(std::string(value));
+}
 inline Compression get_compression(const Device& msg) {
     using namespace pp;
     return msg["compression"_f].value_or(Compression{});
@@ -382,6 +390,11 @@ inline std::string_view get_path(const Folder& msg) {
 inline void set_path(Folder& msg, std::string_view value) {
     using namespace pp;
     msg["path"_f] = std::string(value);
+}
+template<typename T = void>
+inline void set_path(Folder& msg, std::string value) {
+    using namespace pp;
+    msg["path"_f] = std::move(value);
 }
 inline FolderType get_folder_type(const Folder& msg) {
     using namespace pp;

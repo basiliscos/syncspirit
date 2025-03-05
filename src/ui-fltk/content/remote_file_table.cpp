@@ -4,6 +4,7 @@
 #include "remote_file_table.h"
 #include "../table_widget/checkbox.h"
 #include "../utils.hpp"
+#include "proto/proto-helpers-bep.h"
 
 using namespace syncspirit::fltk;
 using namespace syncspirit::fltk::content;
@@ -107,14 +108,14 @@ void remote_file_table_t::refresh() {
         for (auto &it : devices) {
             auto &device = *it.item;
             auto &device_id = device.device_id();
-            if (device_id.matches(counter.id())) {
+            if (device_id.matches(proto::get_id(counter))) {
                 modification_device = device.get_name();
             }
             if (device_id.matches(modified_by_value)) {
                 modified_by_device = device.get_name();
             }
         }
-        auto value = fmt::format("({}) {}", counter.value(), modification_device);
+        auto value = fmt::format("({}) {}", proto::get_value(counter), modification_device);
         insert_row("modification", new static_string_provider_t(std::move(value)), 4);
     }
 

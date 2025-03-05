@@ -320,4 +320,4 @@ if (SYNCSPIRIT_BUILD_TESTS)
 endif()
 
 add_subdirectory("src/ui-daemon")
-# add_subdirectory("src/ui-fltk")
+add_subdirectory("src/ui-fltk")
