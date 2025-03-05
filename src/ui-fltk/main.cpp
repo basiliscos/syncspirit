@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
 
-#include <google/protobuf/stubs/common.h>
 #include <lz4.h>
 #include <openssl/crypto.h>
 #include <filesystem>
@@ -107,7 +106,6 @@ int main(int argc, char **argv) {
     auto bootstrap_guard = utils::bootstrap_guard_ptr_t();
 
     Fl::lock();
-    GOOGLE_PROTOBUF_VERIFY_VERSION;
 
 #if defined(__unix__) || defined(__APPLE__) || defined(__MACH__)
     struct sigaction act;
@@ -390,7 +388,6 @@ int main(int argc, char **argv) {
     }
 
     utils::platform_t::shutdown();
-    google::protobuf::ShutdownProtobufLibrary();
     /* exit */
 
     spdlog::info("normal exit");

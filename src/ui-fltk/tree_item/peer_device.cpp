@@ -95,10 +95,11 @@ struct my_table_t : static_table_t {
 
     void on_apply() {
         auto data = container.peer.serialize();
-        auto opt = db::Device::decode(data);
-        assert(opt);
-        auto& device = opt.value();
-        auto valid = store(&opt.value());
+        auto device = db::Device();
+        auto undecoded_bytes = db::decode(data, device);
+        assert(undecoded_bytes == 0);
+        (void)undecoded_bytes;
+        auto valid = store(&device);
         if (valid) {
             auto &supervisor = container.supervisor;
             auto &device_id = container.peer.device_id();
@@ -117,12 +118,12 @@ struct my_table_t : static_table_t {
         auto &peer = container.peer;
         auto initial_data = peer.serialize();
         auto current = db::Device();
-        auto ok = current.ParseFromArray(initial_data.data(), initial_data.size());
-        assert(ok);
-        (void)ok;
+        auto undecoded_bytes = db::decode(initial_data, current);
+        assert(undecoded_bytes == 0);
+        (void)undecoded_bytes;
         auto valid = store(&current);
 
-        auto current_data = current.SerializeAsString();
+        auto current_data = db::encode(current);
         if (initial_data != current_data) {
             if (valid) {
                 apply_button->activate();
