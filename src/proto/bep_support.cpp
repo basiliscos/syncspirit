@@ -52,17 +52,17 @@ static outcome::result<message::wrapped_message_t> parse_hello(utils::bytes_view
     const std::uint16_t *ptr_16 = reinterpret_cast<const std::uint16_t *>(buff.data());
     std::uint16_t msg_sz = be::big_to_native(*ptr_16++);
     if (msg_sz < sz - 2) {
-        return wrap(message::Hello(), static_cast<size_t>(0));
+        return wrap(Hello(), static_cast<size_t>(0));
     }
 
     auto ptr = reinterpret_cast<const unsigned char *>(ptr_16);
     auto bytes = utils::bytes_view_t(ptr, msg_sz);
 
-    auto msg = std::make_unique<proto::Hello>();
-    if (auto left = proto::decode(bytes, *msg); left != 0) {
+    auto msg = proto::Hello();
+    if (auto left = proto::decode(bytes, msg); left != 0) {
         return make_error_code(utils::bep_error_code_t::protobuf_err);
     }
-    return wrap(message::Hello{std::move(msg)}, static_cast<size_t>(msg_sz + 6));
+    return wrap(std::move(msg), static_cast<size_t>(msg_sz + 6));
 }
 
 using MT = proto::MessageType;
@@ -122,14 +122,12 @@ template <> struct M2T<typename proto::Close> {
 template <MessageType T>
 outcome::result<message::wrapped_message_t> parse(utils::bytes_view_t buff, std::size_t consumed) noexcept {
     using ProtoType = typename T2M<T>::type;
-    using MessageType = typename message::as_pointer<ProtoType>;
 
     auto item = ProtoType();
     if (auto left = proto::decode(buff, item); left) {
         return make_error_code(utils::bep_error_code_t::protobuf_err);
     }
-    auto msg = std::make_unique<ProtoType>(std::move(item));
-    return wrap(MessageType{std::move(msg)}, static_cast<size_t>(consumed + buff.size()));
+    return wrap(std::move(item), static_cast<size_t>(consumed + buff.size()));
 }
 
 static auto bep_magic_big = be::native_to_big(constants::bep_magic);
@@ -261,7 +259,7 @@ std::size_t make_announce_message(utils::bytes_view_t buff, utils::bytes_view_t 
     return total_sz;
 }
 
-outcome::result<message::Announce> parse_announce(utils::bytes_view_t buff) noexcept {
+outcome::result<Announce> parse_announce(utils::bytes_view_t buff) noexcept {
     auto sz = buff.size();
     if (sz <= 4) {
         return utils::make_error_code(utils::error_code_t::wrong_magic);
@@ -277,7 +275,7 @@ outcome::result<message::Announce> parse_announce(utils::bytes_view_t buff) noex
     if (auto ok = proto::decode({ptr, sz - 4}, msg); ok) {
         return make_error_code(utils::bep_error_code_t::protobuf_err);
     }
-    return std::make_unique<proto::Announce>(std::move(msg));
+    return msg;
 }
 
 template <typename Message>
@@ -322,32 +320,5 @@ template utils::bytes_t SYNCSPIRIT_API serialize(const proto::Ping &message,
                                        proto::MessageCompression compression) noexcept;
 template utils::bytes_t SYNCSPIRIT_API serialize(const proto::Close &message,
                                        proto::MessageCompression compression) noexcept;
-
-MessageType get_bep_type(const message::message_t &msg) noexcept {
-    auto mt = MessageType::UNKNOWN;
-    return std::visit([](auto& item) -> MessageType {
-        using T = std::decay_t<decltype(item)>;
-        if constexpr (std::is_same_v<T, message::ClusterConfig>)  {
-            return MessageType::CLUSTER_CONFIG;
-        } else if constexpr (std::is_same_v<T, message::Index>)  {
-            return MessageType::INDEX;
-        } else if constexpr (std::is_same_v<T, message::IndexUpdate>)  {
-            return MessageType::INDEX_UPDATE;
-        } else if constexpr (std::is_same_v<T, message::Request>)  {
-            return MessageType::REQUEST;
-        } else if constexpr (std::is_same_v<T, message::Response>)  {
-            return MessageType::RESPONSE;
-        } else if constexpr (std::is_same_v<T, message::DownloadProgress>)  {
-            return MessageType::DOWNLOAD_PROGRESS;
-        } else if constexpr (std::is_same_v<T, message::Ping>)  {
-            return MessageType::PING;
-        } else if constexpr (std::is_same_v<T, message::Close>)  {
-            return MessageType::CLOSE;
-        } else if constexpr (std::is_same_v<T, message::Hello>)  {
-            return MessageType::HELLO;
-        }
-        return MessageType::UNKNOWN;
-    }, msg);
-}
 
 } // namespace syncspirit::proto

@@ -21,8 +21,6 @@
 #include "model/diff/modify/upsert_folder_info.h"
 #include "model/diff/peer/cluster_update.h"
 #include "model/diff/peer/update_folder.h"
-#include "proto/proto-helpers.h"
-#include "proto/proto-helpers.h"
 #include "proto/bep_support.h"
 #include "utils/error_code.h"
 #include "utils/format.hpp"
@@ -613,9 +611,9 @@ auto controller_actor_t::operator()(const model::diff::modify::remove_peer_t &di
     return diff.visit_next(*this, custom);
 }
 
-void controller_actor_t::on_message(proto::message::ClusterConfig &message) noexcept {
+void controller_actor_t::on_message(proto::ClusterConfig &message) noexcept {
     LOG_DEBUG(log, "on_message (ClusterConfig)");
-    auto diff_opt = model::diff::peer::cluster_update_t::create(*cluster, *sequencer, *peer, *message);
+    auto diff_opt = model::diff::peer::cluster_update_t::create(*cluster, *sequencer, *peer, message);
     if (!diff_opt) {
         auto &ec = diff_opt.assume_error();
         LOG_ERROR(log, "error processing message from {} : {}", peer->device_id(), ec.message());
@@ -627,10 +625,9 @@ void controller_actor_t::on_message(proto::message::ClusterConfig &message) noex
     send_diff();
 }
 
-void controller_actor_t::on_message(proto::message::Index &message) noexcept {
-    auto &msg = *message;
+void controller_actor_t::on_message(proto::Index& msg) noexcept {
     LOG_DEBUG(log, "on_message (Index)");
-    auto diff_opt = model::diff::peer::update_folder_t::create(*cluster, *sequencer, *peer, *message);
+    auto diff_opt = model::diff::peer::update_folder_t::create(*cluster, *sequencer, *peer, msg);
     if (!diff_opt) {
         auto &ec = diff_opt.assume_error();
         LOG_ERROR(log, "error processing message from {} : {}", peer->device_id(), ec.message());
@@ -645,10 +642,9 @@ void controller_actor_t::on_message(proto::message::Index &message) noexcept {
     send_diff();
 }
 
-void controller_actor_t::on_message(proto::message::IndexUpdate &message) noexcept {
+void controller_actor_t::on_message(proto::IndexUpdate &msg) noexcept {
     LOG_TRACE(log, "on_message (IndexUpdate)");
-    auto &msg = *message;
-    auto diff_opt = model::diff::peer::update_folder_t::create(*cluster, *sequencer, *peer, *message);
+    auto diff_opt = model::diff::peer::update_folder_t::create(*cluster, *sequencer, *peer, msg);
     if (!diff_opt) {
         auto &ec = diff_opt.assume_error();
         LOG_ERROR(log, "error processing message from {} : {}", peer->device_id(), ec.message());
@@ -663,7 +659,7 @@ void controller_actor_t::on_message(proto::message::IndexUpdate &message) noexce
     send_diff();
 }
 
-void controller_actor_t::on_message(proto::message::Request &req) noexcept {
+void controller_actor_t::on_message(proto::Request &req) noexcept {
     proto::Response res;
     fmt::memory_buffer data;
     auto code = proto::ErrorCode::NO_BEP_ERROR;
@@ -672,7 +668,7 @@ void controller_actor_t::on_message(proto::message::Request &req) noexcept {
         LOG_WARN(log, "peer requesting too many blocks ({}), rejecting current request", tx_blocks_requested);
         code = proto::ErrorCode::GENERIC;
     } else {
-        auto folder_id = proto::get_folder(*req);
+        auto folder_id = proto::get_folder(req);
         auto folder = cluster->get_folders().by_id(folder_id);
         if (!folder) {
             code = proto::ErrorCode::NO_SUCH_FILE;
@@ -687,7 +683,7 @@ void controller_actor_t::on_message(proto::message::Request &req) noexcept {
                     code = proto::ErrorCode::NO_SUCH_FILE;
                 } else {
                     auto my_folder = folder_infos.by_device(*cluster->get_device());
-                    auto name = proto::get_name(*req);
+                    auto name = proto::get_name(req);
                     auto file = my_folder->get_file_infos().by_name(name);
                     if (!file) {
                         code = proto::ErrorCode::NO_SUCH_FILE;
@@ -703,7 +699,7 @@ void controller_actor_t::on_message(proto::message::Request &req) noexcept {
     }
 
     if (code != proto::ErrorCode::NO_BEP_ERROR) {
-        proto::set_id(res, proto::get_id(*req));
+        proto::set_id(res, proto::get_id(req));
         proto::set_code(res, code);
         auto data = proto::serialize(res);
         outgoing_buffer += static_cast<uint32_t>(data.size());
@@ -714,7 +710,7 @@ void controller_actor_t::on_message(proto::message::Request &req) noexcept {
     }
 }
 
-void controller_actor_t::on_message(proto::message::DownloadProgress &) noexcept {
+void controller_actor_t::on_message(proto::DownloadProgress &) noexcept {
     LOG_ERROR(log, "on_message, not implemented");
 }
 
@@ -722,7 +718,7 @@ void controller_actor_t::on_block_response(fs::message::block_response_t &messag
     --tx_blocks_requested;
     auto &p = message.payload;
     proto::Response res;
-    proto::set_id(res, proto::get_id(*p.remote_request));
+    proto::set_id(res, proto::get_id(p.remote_request));
     if (p.ec) {
         proto::set_code(res, proto::ErrorCode::GENERIC);
     } else {

@@ -315,7 +315,7 @@ void peer_actor_t::read_hello(proto::message::message_t &&msg) noexcept {
     std::visit(
         [&](auto &&msg) {
             using T = std::decay_t<decltype(msg)>;
-            if constexpr (std::is_same_v<T, proto::message::Hello>) {
+            if constexpr (std::is_same_v<T, proto::Hello>) {
                 return handle_hello(std::move(msg));
             } else {
                 LOG_WARN(log, "read_hello, unexpected_message");
@@ -331,18 +331,17 @@ void peer_actor_t::read_controlled(proto::message::message_t &&msg) noexcept {
     LOG_TRACE(log, "read_controlled");
     auto type = MT::UNKNOWN;
     std::visit([&](auto &&msg) {
-            namespace m = proto::message;
             using T = std::decay_t<decltype(msg)>;
             type = proto::message::get_bep_type<T>();
-            if constexpr (std::is_same_v<T, m::Hello>) {
+            if constexpr (std::is_same_v<T, proto::Hello>) {
                 LOG_WARN(log, "{}, hello, unexpected_message");
                 auto ec = utils::make_error_code(utils::bep_error_code_t::unexpected_message);
                 return do_shutdown(make_error(ec));
-            } else if constexpr (std::is_same_v<T, m::Ping>) {
+            } else if constexpr (std::is_same_v<T, proto::Ping>) {
                 handle_ping(std::move(msg));
-            } else if constexpr (std::is_same_v<T, m::Close>) {
+            } else if constexpr (std::is_same_v<T, proto::Close>) {
                 handle_close(std::move(msg));
-            } else if constexpr (std::is_same_v<T, m::Response>) {
+            } else if constexpr (std::is_same_v<T, proto::Response>) {
                 handle_response(std::move(msg));
             } else {
                 auto fwd = payload::forwarded_message_t{std::move(msg)};
@@ -359,11 +358,11 @@ void peer_actor_t::read_controlled(proto::message::message_t &&msg) noexcept {
     }
 }
 
-void peer_actor_t::handle_hello(proto::message::Hello &&msg) noexcept {
+void peer_actor_t::handle_hello(proto::Hello &&msg) noexcept {
     using namespace model::diff;
-    auto device_name = proto::get_device_name(*msg);
-    auto client_name = proto::get_client_name(*msg);
-    auto client_version = proto::get_client_version(*msg);
+    auto device_name = proto::get_device_name(msg);
+    auto client_name = proto::get_client_name(msg);
+    auto client_version = proto::get_client_version(msg);
     auto sha_s256 = peer_device_id.get_sha256();
     LOG_DEBUG(log, "read_hello, from {} ({} {})", device_name, client_name, client_version);
     auto diff = cluster_diff_ptr_t();
@@ -407,10 +406,10 @@ void peer_actor_t::handle_hello(proto::message::Hello &&msg) noexcept {
     }
 }
 
-void peer_actor_t::handle_ping(proto::message::Ping &&) noexcept { log->trace("handle_ping"); }
+void peer_actor_t::handle_ping(proto::Ping &&) noexcept { log->trace("handle_ping"); }
 
-void peer_actor_t::handle_close(proto::message::Close &&message) noexcept {
-    auto reason = proto::get_reason(*message);
+void peer_actor_t::handle_close(proto::Close &&message) noexcept {
+    auto reason = proto::get_reason(message);
     const char *str = reason.data();
     LOG_TRACE(log, "handle_close, reason = {}", reason);
     if (reason.size() == 0) {
@@ -420,8 +419,8 @@ void peer_actor_t::handle_close(proto::message::Close &&message) noexcept {
     do_shutdown(ee);
 }
 
-void peer_actor_t::handle_response(proto::message::Response &&message) noexcept {
-    auto id = proto::get_id(*message);
+void peer_actor_t::handle_response(proto::Response &&message) noexcept {
+    auto id = proto::get_id(message);
     LOG_TRACE(log, "handle_response, message id = {}", id);
     auto predicate = [id = id](const block_request_ptr_t &it) { return ((std::int32_t)it->payload.id) == id; };
     auto it = std::find_if(block_requests.begin(), block_requests.end(), predicate);
@@ -433,7 +432,7 @@ void peer_actor_t::handle_response(proto::message::Response &&message) noexcept 
         }
     }
 
-    auto error = proto::get_code(*message);
+    auto error = proto::get_code(message);
     auto &block_request = *it;
     if (!shutdown_reason) {
         if (error != proto::ErrorCode::NO_BEP_ERROR) {
@@ -441,7 +440,7 @@ void peer_actor_t::handle_response(proto::message::Response &&message) noexcept 
             LOG_WARN(log, "block request error: {}", ec.message());
             reply_with_error(*block_request, make_error(ec));
         } else {
-            auto data = proto::get_data(*message);
+            auto data = proto::get_data(message);
             auto request_sz = block_request->payload.request_payload.block_size;
             if (data.size() != request_sz) {
                 LOG_WARN(log, "got {} bytes, but requested {}", data.size(), request_sz);

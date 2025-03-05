@@ -558,15 +558,13 @@ void test_requesting_block() {
             proto::set_name(req, "a.txt");
             proto::set_size(req, 5);
 
-            auto req_ptr = proto::message::Request(new proto::Request(req));
-            auto msg = r::make_message<fs::payload::block_request_t>(file_actor->get_address(), std::move(req_ptr),
+            auto msg = r::make_message<fs::payload::block_request_t>(file_actor->get_address(), req,
                                                                      sup->get_address());
 
             SECTION("error, no file") {
                 sup->put(msg);
                 sup->do_process();
                 REQUIRE(block_reply);
-                REQUIRE(block_reply->payload.remote_request);
                 REQUIRE(block_reply->payload.ec);
                 REQUIRE(block_reply->payload.data.empty());
             }
@@ -576,7 +574,6 @@ void test_requesting_block() {
                 sup->put(msg);
                 sup->do_process();
                 REQUIRE(block_reply);
-                REQUIRE(block_reply->payload.remote_request);
                 REQUIRE(block_reply->payload.ec);
                 REQUIRE(block_reply->payload.data.empty());
             }
@@ -586,18 +583,15 @@ void test_requesting_block() {
                 sup->put(msg);
                 sup->do_process();
                 REQUIRE(block_reply);
-                REQUIRE(block_reply->payload.remote_request);
                 REQUIRE(!block_reply->payload.ec);
                 REQUIRE(block_reply->payload.data == as_bytes("12345"));
 
                 proto::set_offset(req, 5);
-                auto req_ptr = proto::message::Request(new proto::Request(req));
-                auto msg = r::make_message<fs::payload::block_request_t>(file_actor->get_address(), std::move(req_ptr),
+                auto msg = r::make_message<fs::payload::block_request_t>(file_actor->get_address(), req,
                                                                          sup->get_address());
                 sup->put(msg);
                 sup->do_process();
                 REQUIRE(block_reply);
-                REQUIRE(block_reply->payload.remote_request);
                 REQUIRE(!block_reply->payload.ec);
                 REQUIRE(block_reply->payload.data == as_bytes("67890"));
             }

@@ -85,8 +85,7 @@ void file_actor_t::on_block_request(message::block_request_t &message) noexcept 
     LOG_TRACE(log, "on_block_request");
     auto &p = message.payload;
     auto &dest = p.reply_to;
-    auto &req_ptr = message.payload.remote_request;
-    auto &req = *req_ptr;
+    auto &req = message.payload.remote_request;
     auto folder = cluster->get_folders().by_id(get_folder(req));
     auto folder_info = folder->get_folder_infos().by_device(*cluster->get_device());
     auto file_info = folder_info->get_file_infos().by_name(get_name(req));
@@ -110,7 +109,7 @@ void file_actor_t::on_block_request(message::block_request_t &message) noexcept 
             data = std::move(block_opt.assume_value());
         }
     }
-    send<payload::block_response_t>(dest, std::move(req_ptr), ec, std::move(data));
+    send<payload::block_response_t>(dest, std::move(req), ec, std::move(data));
 }
 
 auto file_actor_t::reflect(model::file_info_ptr_t &file_ptr, const bfs::path &path) noexcept -> outcome::result<void> {

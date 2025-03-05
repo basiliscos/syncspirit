@@ -158,13 +158,13 @@ void local_discovery_actor_t::on_read(size_t bytes) noexcept {
                   result.error().message());
     } else {
         auto &msg = result.value();
-        auto sha = proto::get_id(*msg);
+        auto sha = proto::get_id(msg);
         auto device_id = model::device_id_t::from_sha256(sha);
         if (device_id) {
             utils::uri_container_t uris;
-            auto addresses_count = proto::get_addresses_size(*msg);
+            auto addresses_count = proto::get_addresses_size(msg);
             for (int i = 0; i < addresses_count; ++i) {
-                auto address = proto::get_addresses(*msg, i);
+                auto address = proto::get_addresses(msg, i);
                 auto uri = utils::parse(address);
                 if (uri && uri->has_port()) {
                     uris.emplace_back(std::move(uri));

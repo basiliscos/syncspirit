@@ -25,12 +25,12 @@ using rehash_needed_t = chunk_iterator_t;
 using hash_anew_t = new_chunk_iterator_t;
 
 struct block_request_t {
-    proto::message::Request remote_request;
+    proto::Request remote_request;
     r::address_ptr_t reply_to;
 };
 
 struct block_response_t {
-    proto::message::Request remote_request;
+    proto::Request remote_request;
     sys::error_code ec;
     utils::bytes_t data;
 };

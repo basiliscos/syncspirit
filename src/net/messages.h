@@ -122,8 +122,8 @@ struct termination_t {
 };
 
 using forwarded_message_t =
-    std::variant<proto::message::ClusterConfig, proto::message::Index, proto::message::IndexUpdate,
-                 proto::message::Request, proto::message::DownloadProgress>;
+    std::variant<proto::ClusterConfig, proto::Index, proto::IndexUpdate,
+                 proto::Request, proto::DownloadProgress>;
 
 struct block_response_t {
     utils::bytes_t data;

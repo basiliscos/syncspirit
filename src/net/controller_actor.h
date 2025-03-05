@@ -7,7 +7,6 @@
 #include "model/messages.h"
 #include "model/cluster.h"
 #include "model/diff/local/custom.h"
-#include "model/diff/modify/block_transaction.h"
 #include "model/diff/cluster_visitor.h"
 #include "model/misc/file_iterator.h"
 #include "model/misc/block_iterator.h"
@@ -156,11 +155,11 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     void on_transfer_pop(message::transfer_pop_t &message) noexcept;
     void on_block_response(fs::message::block_response_t &message) noexcept;
 
-    void on_message(proto::message::ClusterConfig &message) noexcept;
-    void on_message(proto::message::Index &message) noexcept;
-    void on_message(proto::message::IndexUpdate &message) noexcept;
-    void on_message(proto::message::Request &message) noexcept;
-    void on_message(proto::message::DownloadProgress &message) noexcept;
+    void on_message(proto::ClusterConfig &message) noexcept;
+    void on_message(proto::Index &message) noexcept;
+    void on_message(proto::IndexUpdate &message) noexcept;
+    void on_message(proto::Request &message) noexcept;
+    void on_message(proto::DownloadProgress &message) noexcept;
 
     void on_custom(const pull_signal_t &diff) noexcept;
 

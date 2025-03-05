@@ -31,7 +31,7 @@ TEST_CASE("announce", "[bep]") {
     auto buff = utils::bytes_view_t(buff_raw, buff_sz);
     auto r = parse_announce(buff);
     REQUIRE((bool)r);
-    auto &v = *r.value();
+    auto &v = r.value();
     auto device_id = device_id_t::from_sha256(proto::get_id(v));
     REQUIRE((bool)device_id);
     CHECK(device_id.value().get_value() == "KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD");
@@ -49,7 +49,7 @@ TEST_CASE("announce", "[bep]") {
         auto in = utils::bytes_view_t(bytes.data(), sz);
         auto r_ = parse_announce(in);
         REQUIRE((bool)r_);
-        auto &v_ = *r_.value();
+        auto &v_ = r_.value();
         auto device_id_ = device_id_t::from_sha256(proto::get_id(v_));
         REQUIRE(proto::get_addresses_size(v_) == 1);
         CHECK(proto::get_addresses(v_, 0) == "tcp://192.168.100.6:22000");
@@ -68,7 +68,7 @@ TEST_CASE("hello", "[bep]") {
     REQUIRE((bool)r);
     auto &v = r.value();
     CHECK(v.consumed == buff_sz);
-    auto &msg = *std::get<proto::message::Hello>(v.message);
+    auto &msg = std::get<proto::Hello>(v.message);
     CHECK(proto::get_device_name(msg) == "localhost");
     CHECK(proto::get_client_name(msg) == "syncthing");
     CHECK(proto::get_client_version(msg) == "v1.11.1");
@@ -81,7 +81,7 @@ TEST_CASE("hello", "[bep]") {
         REQUIRE((bool)r);
         auto &v = r.value();
         CHECK(v.consumed == out.size());
-        auto &msg = *std::get<proto::message::Hello>(v.message);
+        auto &msg = std::get<proto::Hello>(v.message);
         CHECK(proto::get_device_name(msg) == "test-device");
         CHECK(proto::get_client_name(msg) == "syncspirit");
         CHECK(proto::get_client_version(msg) == SYNCSPIRIT_VERSION);
@@ -108,7 +108,7 @@ TEST_CASE("cluster config", "[bep]") {
     REQUIRE((bool)r);
     auto &v = r.value();
     CHECK(v.consumed == buff_sz);
-    auto &msg = *std::get<proto::message::ClusterConfig>(v.message);
+    auto &msg = std::get<proto::ClusterConfig>(v.message);
     REQUIRE(proto::get_folders_size(msg) == 1);
     auto &folder = proto::get_folders(msg, 0);
     CHECK(proto::get_label(folder) == "data");
@@ -152,9 +152,9 @@ TEST_CASE("cluster config", "[bep]") {
         auto r2 = parse_bep(buff);
         REQUIRE(r2);
         auto &v2 = r.value();
-        auto &msg2 = std::get<proto::message::ClusterConfig>(v.message);
+        auto &msg2 = std::get<proto::ClusterConfig>(v.message);
         CHECK(v2.consumed == buff_sz);
-        auto f_1 = proto::get_folders(*msg2, 0);
+        auto f_1 = proto::get_folders(msg2, 0);
         auto d_1 = proto::get_devices(f_1, 0);
         auto d_1_id = proto::get_id(d_1);
         CHECK(d_1_id == proto::get_id(d1));
