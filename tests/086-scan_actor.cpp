@@ -152,26 +152,48 @@ void test_meta_changes() {
                 REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
             }
 
-            proto::FileInfo pr_fi;
             auto modified = 1641828421;
-            pr_fi.set_name("q.txt");
-            pr_fi.set_modified_s(modified);
-            pr_fi.set_block_size(5ul);
-            pr_fi.set_size(5ul);
-            pr_fi.set_sequence(folder_info_peer->get_max_sequence() + 1);
+            auto file_name = std::string_view("q.txt");
+            proto::FileInfo pr_fi;
+            proto::set_name(pr_fi, file_name);
+            proto::set_type(pr_fi, proto::FileInfoType::FILE);
+            proto::set_sequence(pr_fi, folder_info_peer->get_max_sequence() + 1);
+            proto::set_size(pr_fi, 5);
+            proto::set_block_size(pr_fi, 5);
+            proto::set_modified_s(pr_fi, modified);
 
-            auto version = pr_fi.mutable_version();
-            auto counter = version->add_counters();
-            counter->set_id(1);
-            counter->set_value(peer_device->device_id().get_uint());
+            auto& v = proto::get_version(pr_fi);
+            auto& counter = proto::add_counters(v);
+            proto::set_id(counter, peer_device->device_id().get_uint());
+            proto::set_value(counter, 1);
+
+            auto data_1 = as_owned_bytes("12345");
+            auto data_1_hash = utils::sha256_digest(data_1).value();
+
+            auto data_2 = as_owned_bytes("67890");
+            auto data_2_hash = utils::sha256_digest(data_2).value();
+
+            auto data_3 = as_owned_bytes("abcde");
+            auto data_3_hash = utils::sha256_digest(data_3).value();
 
             auto bi = proto::BlockInfo();
-            bi.set_size(5);
-            bi.set_weak_hash(12);
-            bi.set_hash(utils::sha256_digest("12345").value());
-            bi.set_offset(0);
+            proto::set_hash(bi, data_1_hash);
+            proto::set_size(bi, 5);
+
+            auto bi_2 = proto::BlockInfo();
+            proto::set_hash(bi_2, data_2_hash);
+            proto::set_size(bi_2, 5);
+            proto::set_offset(bi_2, 5);
+
+            auto bi_3 = proto::BlockInfo();
+            proto::set_hash(bi_3, data_3_hash);
+            proto::set_size(bi_3, 5);
+            proto::set_offset(bi_3, 10);
 
             auto b = block_info_t::create(bi).value();
+            auto b2 = block_info_t::create(bi_2).value();
+            auto b3 = block_info_t::create(bi_3).value();
+
             auto &blocks_map = cluster->get_blocks();
             blocks_map.put(b);
             SECTION("a file does not physically exist") {
@@ -181,7 +203,7 @@ void test_meta_changes() {
                 REQUIRE(folder_info_peer->add_strict(file_peer));
                 builder->remote_copy(*file_peer).scan_start(folder->get_id()).apply(*sup);
 
-                auto file = files->by_name(pr_fi.name());
+                auto file = files->by_name(file_name);
                 CHECK(files->size() == 1);
                 CHECK(file->is_deleted());
                 REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
@@ -193,7 +215,7 @@ void test_meta_changes() {
                 REQUIRE(folder_info_peer->add_strict(file_peer));
 
                 builder->remote_copy(*file_peer).apply(*sup);
-                auto file = files->by_name(pr_fi.name());
+                auto file = files->by_name(file_name);
                 auto path = file->get_path();
 
                 SECTION("meta is not changed") {
@@ -208,7 +230,7 @@ void test_meta_changes() {
                     write_file(path, "12345");
                     builder->scan_start(folder->get_id()).apply(*sup);
                     CHECK(files->size() == 1);
-                    auto new_file = files->by_name(pr_fi.name());
+                    auto new_file = files->by_name(file_name);
                     REQUIRE(new_file);
                     CHECK(file == new_file);
                     CHECK(new_file->is_locally_available());
@@ -222,7 +244,7 @@ void test_meta_changes() {
                     bfs::last_write_time(path, from_unix(modified));
                     builder->scan_start(folder->get_id()).apply(*sup);
                     CHECK(files->size() == 1);
-                    auto new_file = files->by_name(pr_fi.name());
+                    auto new_file = files->by_name(file_name);
                     REQUIRE(new_file);
                     CHECK(file == new_file);
                     CHECK(new_file->is_locally_available());
@@ -235,7 +257,7 @@ void test_meta_changes() {
                     write_file(path, "67890");
                     builder->scan_start(folder->get_id()).apply(*sup);
                     CHECK(files->size() == 1);
-                    auto new_file = files->by_name(pr_fi.name());
+                    auto new_file = files->by_name(file_name);
                     REQUIRE(new_file);
                     CHECK(file == new_file);
                     CHECK(new_file->is_locally_available());
@@ -246,15 +268,8 @@ void test_meta_changes() {
                 REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
             }
             SECTION("incomplete file exists") {
-                pr_fi.set_size(10ul);
-                pr_fi.set_block_size(5ul);
-
-                auto bi_2 = proto::BlockInfo();
-                bi_2.set_size(5);
-                bi_2.set_weak_hash(12);
-                bi_2.set_hash(utils::sha256_digest("67890").value());
-                bi_2.set_offset(5);
-                auto b2 = block_info_t::create(bi_2).value();
+                proto::set_size(pr_fi, 10);
+                proto::set_block_size(pr_fi, 5);
 
                 auto uuid = sup->sequencer->next_uuid();
                 auto file = file_info_t::create(uuid, pr_fi, folder_info_peer).value();
@@ -328,32 +343,18 @@ void test_meta_changes() {
             }
 
             SECTION("local (previous) file exists") {
-                pr_fi.set_size(15ul);
-                pr_fi.set_block_size(5ul);
+                proto::set_size(pr_fi, 15);
+                proto::set_block_size(pr_fi, 5);
 
-                auto bi_2 = proto::BlockInfo();
-                bi_2.set_size(5);
-                bi_2.set_weak_hash(12);
-                bi_2.set_hash(utils::sha256_digest("67890").value());
-                bi_2.set_offset(5);
-                auto b2 = block_info_t::create(bi_2).value();
-
-                auto bi_3 = proto::BlockInfo();
-                bi_3.set_size(5);
-                bi_3.set_weak_hash(12);
-                bi_3.set_hash(utils::sha256_digest("abcde").value());
-                bi_3.set_offset(10);
-                auto b3 = block_info_t::create(bi_3).value();
-
-                pr_fi.set_size(5ul);
+                proto::set_size(pr_fi, 5);
                 auto uuid_1 = sup->sequencer->next_uuid();
                 auto file_my = file_info_t::create(uuid_1, pr_fi, folder_info).value();
                 file_my->assign_block(b, 0);
                 file_my->lock();
                 REQUIRE(folder_info->add_strict(file_my));
 
-                pr_fi.set_size(15ul);
-                counter->set_id(2);
+                proto::set_size(pr_fi, 15);
+                proto::set_value(counter, 2);
 
                 auto uuid_2 = sup->sequencer->next_uuid();
                 auto file_peer = file_info_t::create(uuid_2, pr_fi, folder_info_peer).value();
@@ -362,7 +363,7 @@ void test_meta_changes() {
                 file_peer->assign_block(b3, 2);
                 REQUIRE(folder_info_peer->add_strict(file_peer));
 
-                auto file = files->by_name(pr_fi.name());
+                auto file = files->by_name(file_name);
                 auto path_my = file->get_path().string();
                 auto path_peer = file->get_path().string() + ".syncspirit-tmp";
                 write_file(path_my, "12345");
@@ -381,8 +382,8 @@ void test_meta_changes() {
             }
 
             SECTION("local (previous) file changes") {
-                pr_fi.set_size(15ul);
-                pr_fi.set_block_size(5ul);
+                proto::set_size(pr_fi, 15);
+                proto::set_block_size(pr_fi, 5);
                 auto uuid_1 = sup->sequencer->next_uuid();
                 auto file_my = file_info_t::create(uuid_1, pr_fi, folder_info).value();
                 file_my->assign_block(b, 0);
@@ -391,10 +392,9 @@ void test_meta_changes() {
                 file_my->lock();
                 REQUIRE(folder_info->add_strict(file_my));
 
-                pr_fi.set_size(15ul);
-                counter->set_id(2);
+                proto::set_value(counter, 2);
 
-                auto file = files->by_name(pr_fi.name());
+                auto file = files->by_name(file_name);
                 auto path_my = file->get_path().string();
                 write_file(path_my, "12345");
                 bfs::last_write_time(path_my, from_unix(modified));
@@ -606,9 +606,13 @@ void test_remove_file() {
             CHECK(file->is_deleted() == 1);
             CHECK(file->is_local());
             CHECK(blocks.size() == 0);
-            CHECK(file->get_version()->counters_size() == 1);
-            CHECK(file->get_version()->get_best().id() == counter.id());
-            CHECK(file->get_version()->get_best().value() > counter.value());
+
+            auto v = file->get_version();
+            REQUIRE(v->counters_size() == 1);
+
+            auto& c = v->get_best();
+            CHECK(proto::get_id(c) == proto::get_id((counter)));;
+            CHECK(proto::get_value(c) > proto::get_value((counter)));;
             REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
             REQUIRE(folder->get_scan_finish() > prev_finish);
         }

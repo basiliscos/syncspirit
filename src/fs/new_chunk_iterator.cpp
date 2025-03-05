@@ -13,12 +13,13 @@ new_chunk_iterator_t::new_chunk_iterator_t(scan_task_ptr_t task_, proto::FileInf
     using namespace pp;
     if (proto::get_type(metadata) == proto::FileInfoType::FILE) {
         file_size = proto::get_size(metadata);
-        auto block_size = proto::get_block_size(metadata);
-        auto div = syncspirit::fs::get_block_size(file_size, block_size);
+        auto bs = proto::get_block_size(metadata);
+        auto div = syncspirit::fs::get_block_size(file_size, bs);
         unread_blocks = div.count;
         block_size = div.size;
         unread_bytes = file_size;
         hashes.resize(unread_blocks);
+        assert(!(unread_bytes && !block_size));
     } else {
         file_size = 0;
         unread_blocks = 0;
@@ -34,14 +35,18 @@ bool new_chunk_iterator_t::is_complete() const noexcept {
 auto new_chunk_iterator_t::read() noexcept -> outcome::result<details::chunk_t> {
     assert(unread_bytes);
     size_t next_sz = std::min(block_size, unread_bytes);
+    assert(next_sz);
     auto r = backend->read(offset, next_sz);
     if (r) {
         offset += next_sz;
         auto idx = next_idx++;
         auto data = std::move(r.assume_value());
         unfinished.insert(idx);
-        unread_bytes -= next_sz;
-        --unread_blocks;
+        if (next_sz) {
+            unread_bytes -= next_sz;
+            assert(unread_blocks);
+            --unread_blocks;
+        }
         return details::chunk_t{std::move(data), idx};
     }
     invalid = true;
