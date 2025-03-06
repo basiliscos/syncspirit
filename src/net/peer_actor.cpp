@@ -440,14 +440,14 @@ void peer_actor_t::handle_response(proto::Response &&message) noexcept {
             LOG_WARN(log, "block request error: {}", ec.message());
             reply_with_error(*block_request, make_error(ec));
         } else {
-            auto data = proto::get_data(message);
+            auto data = proto::extract_data(message);
             auto request_sz = block_request->payload.request_payload.block_size;
             if (data.size() != request_sz) {
                 LOG_WARN(log, "got {} bytes, but requested {}", data.size(), request_sz);
                 auto ec = utils::make_error_code(utils::bep_error_code_t::response_missize);
                 return do_shutdown(make_error(ec));
             }
-            auto bytes = utils::bytes_t(data.begin(), data.end());
+            auto bytes = utils::bytes_t(std::move(data));
             reply_to(*block_request, std::move(bytes));
         }
     }

@@ -31,7 +31,6 @@ utils::bytes_t make_hello_message(std::string_view device_name) noexcept {
     *dst++ = *src++;
     *dst++ = *src++;
 
-    // auto sz = be::native_to_big(uint16_t(bytes.size() - (4 + 6)));
     auto sz = be::native_to_big(uint16_t(bytes.size() - 6));
     src = (unsigned char*)&sz;
     *dst++ = *src++;
@@ -39,8 +38,6 @@ utils::bytes_t make_hello_message(std::string_view device_name) noexcept {
 
     return bytes;
 }
-
-// void parse hello
 
 template <typename... Ts> auto wrap(Ts &&...data) noexcept {
     return message::wrapped_message_t{std::forward<Ts>(data)...};

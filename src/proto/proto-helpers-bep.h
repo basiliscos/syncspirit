@@ -765,6 +765,11 @@ inline utils::bytes_view_t get_data(const Response& msg) {
     }
     return {};
 }
+inline std::vector<unsigned char> extract_data(Response& msg) {
+    using namespace pp;
+    auto& opt = msg["data"_f];
+    return std::move(opt.value());
+}
 inline void set_data(Response& msg, utils::bytes_view_t value) {
     using namespace pp;
     msg["data"_f] = utils::bytes_t{value.begin(), value.end()};
