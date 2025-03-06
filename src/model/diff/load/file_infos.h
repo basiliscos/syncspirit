@@ -4,7 +4,7 @@
 #pragma once
 
 #include "common.h"
-#include "proto/proto-helpers.h"
+#include "proto/proto-fwd.hpp"
 
 namespace syncspirit::model::diff::load {
 

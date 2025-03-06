@@ -22,8 +22,8 @@ remove_files_t::remove_files_t(const device_t &device, const file_infos_map_t &f
         orphaned_blocks.record(*file);
         auto folder_id = file->get_folder_info()->get_folder()->get_id();
         folder_ids.push_back(std::string(folder_id));
-        auto folder_key = file->get_key();
-        keys.push_back(utils::bytes_t(folder_key.begin(), folder_key.end()));
+        auto file_key = file->get_key();
+        keys.push_back(utils::bytes_t(file_key.begin(), file_key.end()));
     }
     if (!orphaned_blocks_) {
         auto block_keys = local_orphaned_blocks.deduce();

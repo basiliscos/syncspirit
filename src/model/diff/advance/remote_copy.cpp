@@ -12,8 +12,7 @@ remote_copy_t::remote_copy_t(const cluster_t &cluster, sequencer_t &sequencer, p
                              std::string_view folder_id_, utils::bytes_view_t peer_id_,
                              bool disable_blocks_removal_) noexcept
     : advance_t(folder_id_, peer_id_, advance_action_t::remote_copy, disable_blocks_removal_) {
-    auto name = std::string(proto::get_name(proto_file_));
-    initialize(cluster, sequencer, std::move(proto_file_), name);
+    initialize(cluster, sequencer, std::move(proto_file_), {});
 }
 
 auto remote_copy_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept

@@ -5,6 +5,7 @@
 #include "model/cluster.h"
 #include "model/diff//cluster_visitor.h"
 #include "upsert_folder_info.h"
+#include "proto/proto-helpers-db.h"
 #include "utils/format.hpp"
 
 using namespace syncspirit::model::diff::modify;

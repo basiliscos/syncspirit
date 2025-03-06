@@ -4,6 +4,7 @@
 #include "file_infos.h"
 #include "model/cluster.h"
 #include "model/diff/apply_controller.h"
+#include "proto/proto-helpers-db.h"
 #include <unordered_map>
 
 using namespace syncspirit::model::diff::load;

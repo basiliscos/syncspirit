@@ -50,6 +50,9 @@ advance_t::advance_t(std::string_view folder_id_, utils::bytes_view_t peer_id_, 
 void advance_t::initialize(const cluster_t &cluster, sequencer_t &sequencer, proto::FileInfo proto_source_,
                            std::string_view local_file_name_) noexcept {
     proto_source = std::move(proto_source_);
+    if (local_file_name_.empty()) {
+        local_file_name_ = proto::get_name(proto_source);
+    }
     assert(!(proto::get_blocks_size(proto_source) && proto::get_deleted(proto_source)));
     auto folder = cluster.get_folders().by_id(folder_id);
     auto folder_id = folder->get_id();

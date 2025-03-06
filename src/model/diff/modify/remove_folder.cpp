@@ -8,6 +8,7 @@
 #include "add_pending_folders.h"
 #include "model/misc/orphaned_blocks.h"
 #include "model/diff/cluster_visitor.h"
+#include "proto/proto-helpers-db.h"
 
 using namespace syncspirit::model::diff::modify;
 
