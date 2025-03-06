@@ -17,6 +17,7 @@
 #include <openssl/crypto.h>
 #include <openssl/opensslv.h>
 #include <mdbx.h>
+#include <boost/version.hpp>
 
 using namespace syncspirit;
 using namespace syncspirit::fltk;
@@ -53,6 +54,12 @@ struct self_table_t final : static_table_t, db_info_viewer_t {
         auto app_version = fmt::format("{} {}", constants::client_name, constants::client_version);
         auto fltk_version = fmt::format("{}", Fl::version());
         auto ares_version = std::string(utils::cares_version());
+        auto boost_version = []() {
+            auto maj = BOOST_VERSION / 100000;
+            auto min = (BOOST_VERSION / 100 % 1000);
+            auto patch = (BOOST_VERSION % 100);
+            return fmt::format("{}.{}.{}", maj, min, patch);
+        }();
 
         device_id_short_cell = new static_string_provider_t();
         device_id_cell = new static_string_provider_t();
@@ -70,6 +77,7 @@ struct self_table_t final : static_table_t, db_info_viewer_t {
         data.push_back({"mdbx size, Kb", mdbx_size_cell});
         data.push_back({"app version", new static_string_provider_t(app_version)});
         data.push_back({"mdbx version", new static_string_provider_t(mdbx_version)});
+        data.push_back({"boost version", new static_string_provider_t(boost_version)});
         data.push_back({"lz4 version", new static_string_provider_t(LZ4_versionString())});
         data.push_back({"openssl version", new static_string_provider_t(openssl_version)});
         data.push_back({"fltk version", new static_string_provider_t(fltk_version)});
