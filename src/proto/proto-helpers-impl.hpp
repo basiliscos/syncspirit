@@ -11,13 +11,9 @@ template<typename T> size_t generic_decode(utils::bytes_view_t bytes, T& storage
     using coder_t = pp::message_coder<T>;
     auto ptr = (std::byte*)bytes.data();
     auto span = std::span<std::byte>(ptr, bytes.size());
-    auto opt = coder_t::decode(span);
-    if (opt) {
-        auto& value = *opt;
-        storage = std::move(value.first);
-        return value.second.size();
-    }
-    return 0;
+    auto pair = coder_t::template decode<pp::unsafe_mode>(span);
+    storage = std::move(pair.first);
+    return pair.second.size();
 }
 
 template<typename T> utils::bytes_t generic_encode(const T& object) noexcept {
