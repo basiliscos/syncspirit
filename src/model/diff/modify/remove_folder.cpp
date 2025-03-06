@@ -14,9 +14,7 @@ using namespace syncspirit::model::diff::modify;
 remove_folder_t::remove_folder_t(const model::cluster_t &cluster, model::sequencer_t &sequencer,
                                  const model::folder_t &folder) noexcept
     : folder_id(folder.get_id()) {
-    auto folder_key_ = folder.get_key();
-    folder_key = {folder_key_.begin(), folder_key_.end()};
-
+    folder_key = folder.get_key();
     auto orphaned_blocks = orphaned_blocks_t();
     auto &folder_infos = folder.get_folder_infos();
     auto current = (cluster_diff_t *){nullptr};

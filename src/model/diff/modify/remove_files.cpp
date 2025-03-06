@@ -12,8 +12,7 @@ using namespace syncspirit::model::diff::modify;
 remove_files_t::remove_files_t(const device_t &device, const file_infos_map_t &files,
                                orphaned_blocks_t *orphaned_blocks_) noexcept
     {
-    auto sha256 = device.device_id().get_sha256();
-    device_id = {sha256.begin(), sha256.end()};
+    device_id = device.device_id().get_sha256();
     keys.reserve(files.size());
     folder_ids.reserve(files.size());
     auto local_orphaned_blocks = orphaned_blocks_t();
@@ -48,9 +47,7 @@ auto remove_files_t::apply_impl(cluster_t &cluster, apply_controller_t &controll
         auto folder_info = folder_infos.by_device_id(device_id);
         auto &file_infos = folder_info->get_file_infos();
         auto decomposed = file_info_t::decompose_key(keys[i]);
-        auto ptr = (const char*) decomposed.file_id.data();
-        auto file_id = std::string_view(ptr, decomposed.file_id.size());
-        auto file = file_infos.get(file_id);
+        auto file = file_infos.get(decomposed.file_id);
         file_infos.remove(file);
     }
     return applicator_t::apply_sibling(cluster, controller);

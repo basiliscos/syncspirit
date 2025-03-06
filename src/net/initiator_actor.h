@@ -44,7 +44,7 @@ template <typename Actor> struct initiator_actor_config_builder_t : r::actor_con
     }
 
     builder_t &&relay_session(utils::bytes_view_t value) && noexcept {
-        parent_t::config.relay_session = {value.begin(), value.end()};
+        parent_t::config.relay_session = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 

@@ -32,8 +32,7 @@ clone_block_t::clone_block_t(const file_block_t &file_block) noexcept
                                                                               .at(block_index)
                                                                               ->get_hash());
     auto source_fi = source_file->get_folder_info();
-    auto sha256 = source_fi->get_device()->device_id().get_sha256();
-    source_device_id = {sha256.begin(), sha256.end()};
+    source_device_id = source_fi->get_device()->device_id().get_sha256();
     source_folder_id = source_fi->get_folder()->get_id();
     source_file_name = source_file->get_name();
 

@@ -195,7 +195,7 @@ namespace details {
 
 template <> struct indexed_item_t<file_info_ptr_t, 3> {
     static constexpr size_t size = 3;
-    using storage_t = std::tuple<std::string, std::string, std::int64_t>;
+    using storage_t = std::tuple<utils::bytes_t, utils::bytes_t, std::int64_t>;
     using item_t = file_info_ptr_t;
     item_t item;
     mutable storage_t keys;

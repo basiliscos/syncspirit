@@ -7,8 +7,7 @@
 using namespace syncspirit::model::diff::contact;
 
 dial_request_t::dial_request_t(model::device_t &peer) noexcept {
-    auto sha256 = peer.device_id().get_sha256();
-    peer_id = {sha256.begin(), sha256.end()};
+    peer_id = peer.device_id().get_sha256();
     LOG_DEBUG(log, "dial_request_t, peer = ", peer.device_id().get_short());
 }
 

@@ -131,42 +131,31 @@ void folder_info_t::set_index(std::uint64_t value) noexcept {
 }
 
 folder_info_ptr_t folder_infos_map_t::by_uuid(utils::bytes_view_t uuid) const noexcept {
-    auto ptr = (const char*)uuid.data();
-    return get<0>(std::string_view{ptr, uuid.size()});
+    return get<0>(uuid);
 }
 
 folder_info_ptr_t folder_infos_map_t::by_device(const device_t &device) const noexcept {
-    auto sha256 = device.device_id().get_sha256();
-    auto ptr = (const char*)sha256.data();
-    return get<1>(std::string_view{ptr, sha256.size()});
+    return get<1>(device.device_id().get_sha256());
 }
 
 folder_info_ptr_t folder_infos_map_t::by_device_id(utils::bytes_view_t device_id) const noexcept {
-    auto ptr = (const char*)device_id.data();
-    return get<1>(std::string_view{ptr, device_id.size()});
+    return get<1>(device_id);
 }
 
 folder_info_ptr_t folder_infos_map_t::by_device_key(utils::bytes_view_t device_key) const noexcept {
-    auto ptr = (const char*)device_key.data();
-    return get<2>(std::string_view{ptr, device_key.size()});
+    return get<2>(device_key);
 }
 
-template <> SYNCSPIRIT_API std::string_view get_index<0>(const folder_info_ptr_t &item) noexcept {
-    auto uuid = item->get_uuid();
-    auto ptr = (const char*)uuid.data();
-    return {ptr, uuid.size()};
+template <> SYNCSPIRIT_API utils::bytes_view_t get_index<0>(const folder_info_ptr_t &item) noexcept {
+    return item->get_uuid();
 }
 
-template <> SYNCSPIRIT_API std::string_view get_index<1>(const folder_info_ptr_t &item) noexcept {
-    auto sha256 = item->get_device()->device_id().get_sha256();
-    auto ptr = (const char*)sha256.data();
-    return {ptr, sha256.size()};
+template <> SYNCSPIRIT_API utils::bytes_view_t get_index<1>(const folder_info_ptr_t &item) noexcept {
+    return item->get_device()->device_id().get_sha256();
 }
 
-template <> SYNCSPIRIT_API std::string_view get_index<2>(const folder_info_ptr_t &item) noexcept {
-    auto key = item->get_device()->get_key();
-    auto ptr = (const char*)key.data();
-    return {ptr, key.size()};
+template <> SYNCSPIRIT_API utils::bytes_view_t get_index<2>(const folder_info_ptr_t &item) noexcept {
+    return item->get_device()->get_key();
 }
 
 } // namespace syncspirit::model

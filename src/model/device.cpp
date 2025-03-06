@@ -145,26 +145,20 @@ local_device_t::local_device_t(const device_id_t &device_id, std::string_view na
 
 utils::bytes_view_t local_device_t::get_key() const noexcept { return local_device_id.get_key(); }
 
-template <> SYNCSPIRIT_API std::string_view get_index<0>(const device_ptr_t &item) noexcept {
-    auto key = item->get_key();
-    auto ptr = (const char*)key.data();
-    return std::string_view(ptr, key.size());
+template <> SYNCSPIRIT_API utils::bytes_view_t get_index<0>(const device_ptr_t &item) noexcept {
+    return item->get_key();
 }
 
-template <> SYNCSPIRIT_API std::string_view get_index<1>(const device_ptr_t &item) noexcept {
-    auto sha256 = item->device_id().get_sha256();
-    auto ptr = (const char*)sha256.data();
-    return std::string_view(ptr, sha256.size());
+template <> SYNCSPIRIT_API utils::bytes_view_t get_index<1>(const device_ptr_t &item) noexcept {
+    return item->device_id().get_sha256();
 }
 
 device_ptr_t devices_map_t::by_sha256(utils::bytes_view_t device_id) const noexcept {
-    auto ptr = (const char*)device_id.data();
-    return get<1>(std::string_view(ptr, device_id.size()));
+    return get<1>(device_id);
 }
 
 device_ptr_t devices_map_t::by_key(utils::bytes_view_t key) const noexcept {
-    auto ptr = (const char*)key.data();
-    return get<0>(std::string_view(ptr, key.size()));
+    return get<0>(key);
 }
 
 } // namespace syncspirit::model

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "share_folder.h"
 #include "model/cluster.h"
@@ -36,8 +36,7 @@ auto share_folder_t::create(cluster_t &cluster, sequencer_t &sequencer, const mo
 share_folder_t::share_folder_t(const bu::uuid &uuid, const model::device_t &peer, std::string_view folder_id_,
                                std::uint64_t index_id, model::pending_folder_ptr_t pf) noexcept
     : folder_id{folder_id_} {
-    auto sha256 = peer.device_id().get_sha256();
-    peer_id = {sha256.begin(), sha256.end()};
+    peer_id = peer.device_id().get_sha256();
     LOG_DEBUG(log, "share_folder_t, with peer = {}, folder_id = {}", peer.device_id(), folder_id);
     auto current = assign_child(new upsert_folder_info_t(uuid, peer_id, folder_id, index_id));
     if (pf) {

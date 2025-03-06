@@ -10,9 +10,7 @@ using namespace syncspirit::model::diff::modify;
 
 remove_pending_device_t::remove_pending_device_t(const pending_device_t &device) noexcept
      {
-    auto key = device.get_key();
-    device_key = {key.begin(), key.end()};
-
+    device_key = device.get_key();
     LOG_DEBUG(log, "remove_pending_device_t, device = {}", device.get_device_id());
 }
 

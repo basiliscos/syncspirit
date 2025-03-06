@@ -30,7 +30,7 @@ peer_state_t::peer_state_t(cluster_t &cluster, utils::bytes_view_t peer_id_, con
                            std::string_view client_version_) noexcept
     : peer_addr{peer_addr_}, cert_name{cert_name_}, endpoint{endpoint_}, client_name{client_name_},
       client_version{client_version_}, state{state_}, connection_id{connection_id_}, has_been_online{false} {
-    peer_id = {peer_id_.begin(), peer_id_.end()};
+    peer_id = peer_id_;
     auto peer = cluster.get_devices().by_sha256(peer_id_);
     assert(peer);
     has_been_online = (state == device_state_t::offline) && (peer->get_state() == device_state_t::online);

@@ -66,16 +66,12 @@ utils::bytes_t ignored_folder_t::serialize() noexcept {
     return db::encode(r);
 }
 
-template <> SYNCSPIRIT_API std::string_view get_index<0>(const ignored_folder_ptr_t &item) noexcept {
-    auto id = item->get_id();
-    auto ptr = (const char*)id.data();
-    return {ptr, id.size()};
+template <> SYNCSPIRIT_API utils::bytes_view_t get_index<0>(const ignored_folder_ptr_t &item) noexcept {
+    return item->get_id();
 }
 
 ignored_folder_ptr_t ignored_folders_map_t::by_key(utils::bytes_view_t key) const noexcept {
-    auto ptr = (const char*)key.data();
-    auto id = std::string_view(ptr, key.size());
-    return get<0>(id);
+    return get<0>(key);
 }
 
 

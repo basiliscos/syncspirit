@@ -10,9 +10,6 @@
 
 namespace syncspirit::utils {
 
-// using bytes_view_t = std::span<const unsigned char>;
-// using bytes_t = std::vector<unsigned char>;
-
 struct SYNCSPIRIT_API bytes_t;
 
 struct SYNCSPIRIT_API bytes_view_t: std::span<const unsigned char> {
@@ -31,6 +28,8 @@ struct SYNCSPIRIT_API bytes_view_t: std::span<const unsigned char> {
 struct SYNCSPIRIT_API bytes_t: std::vector<unsigned char> {
     using parent_t =   std::vector<unsigned char>;
     using parent_t::parent_t;
+    using parent_t::operator=;
+    bytes_t& operator=(bytes_view_t) noexcept;
     bool operator==(const bytes_view_t&) const noexcept;
     bool operator==(const bytes_t&) const noexcept;
 };
@@ -39,10 +38,16 @@ struct SYNCSPIRIT_API bytes_t: std::vector<unsigned char> {
 
 namespace std {
 
-// bool operator==(syncspirit::utils::bytes_view_t, syncspirit::utils::bytes_view_t) noexcept;
-
 template <> struct hash<syncspirit::utils::bytes_view_t> {
     inline size_t operator()(syncspirit::utils::bytes_view_t bytes) const noexcept {
+        auto ptr = (const char*)bytes.data();
+        auto str = std::string_view(ptr, bytes.size());
+        return std::hash<std::string_view>()(str);
+    }
+};
+
+template <> struct hash<syncspirit::utils::bytes_t> {
+    inline size_t operator()(const syncspirit::utils::bytes_t& bytes) const noexcept {
         auto ptr = (const char*)bytes.data();
         auto str = std::string_view(ptr, bytes.size());
         return std::hash<std::string_view>()(str);

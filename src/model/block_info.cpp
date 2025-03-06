@@ -125,17 +125,12 @@ void block_info_t::unlock() noexcept {
     --locked;
 }
 
-template <> SYNCSPIRIT_API std::string_view get_index<0>(const block_info_ptr_t &item) noexcept {
-    auto hash = item->get_hash();
-    auto b = reinterpret_cast<const char*>(hash.data());
-    auto e = b + hash.size();
-    return std::string_view(b, e);
+template <> SYNCSPIRIT_API utils::bytes_view_t get_index<0>(const block_info_ptr_t &item) noexcept {
+    return item->get_hash();
 }
 
 block_info_ptr_t block_infos_map_t::by_hash(utils::bytes_view_t hash) const noexcept {
-    auto b = reinterpret_cast<const char*>(hash.data());
-    auto e = b + hash.size();
-    return get(std::string_view(b, e));
+    return get(std::move(hash));
 }
 
 } // namespace syncspirit::model

@@ -498,13 +498,13 @@ std::string file_info_t::make_conflicting_name() const noexcept {
 
 auto file_info_t::guard() noexcept -> guard_ptr_t { return new guard_t(*this); }
 
-template <> SYNCSPIRIT_API std::string_view get_index<0>(const file_info_ptr_t &item) noexcept {
-    auto bytes = item->get_uuid();
-    auto ptr = (const char*) bytes.data();
-    return {ptr, bytes.size()};
+template <> SYNCSPIRIT_API utils::bytes_view_t get_index<0>(const file_info_ptr_t &item) noexcept {
+    return item->get_uuid();
 }
-template <> SYNCSPIRIT_API std::string_view get_index<1>(const file_info_ptr_t &item) noexcept {
-    return item->get_name();
+template <> SYNCSPIRIT_API utils::bytes_view_t get_index<1>(const file_info_ptr_t &item) noexcept {
+    auto name = item->get_name();
+    auto ptr = (unsigned char*)name.data();
+    return {ptr, name.size()};
 }
 
 template <> SYNCSPIRIT_API std::int64_t get_index<2>(const file_info_ptr_t &item) noexcept {
@@ -514,11 +514,14 @@ template <> SYNCSPIRIT_API std::int64_t get_index<2>(const file_info_ptr_t &item
 auto file_infos_map_t::sequence_projection() noexcept -> seq_projection_t { return key2item.template get<2>(); }
 
 file_info_ptr_t file_infos_map_t::by_uuid(utils::bytes_view_t uuid) noexcept {
-    auto ptr = (const char*)uuid.data();
-    return get<0>({ptr, uuid.size()});
+    return get<0>(uuid);
 }
 
-file_info_ptr_t file_infos_map_t::by_name(std::string_view name) noexcept { return get<1>(name); }
+file_info_ptr_t file_infos_map_t::by_name(std::string_view name) noexcept {
+    auto ptr = (unsigned char*)name.data();
+    auto view = utils::bytes_view_t(ptr, name.size());
+    return get<1>(view);
+}
 
 file_info_ptr_t file_infos_map_t::by_sequence(std::int64_t value) noexcept { return get<2>(value); }
 

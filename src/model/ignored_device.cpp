@@ -5,10 +5,8 @@
 
 namespace syncspirit::model {
 
-template <> SYNCSPIRIT_API std::string_view get_index<0>(const ignored_device_ptr_t &item) noexcept {
-    auto sha256 = item->get_device_id().get_sha256();
-    auto ptr = (const char*)sha256.data();
-    return {ptr, sha256.size()};
+template <> SYNCSPIRIT_API utils::bytes_view_t get_index<0>(const ignored_device_ptr_t &item) noexcept {
+    return item->get_device_id().get_sha256();
 }
 
 } // namespace syncspirit::model

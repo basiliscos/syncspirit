@@ -33,7 +33,7 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
                                    const message_t &message) noexcept
     {
     auto sha256 = source.device_id().get_sha256();
-    peer_id = {sha256.begin(), sha256.end()};
+    peer_id = sha256;
     LOG_DEBUG(log, "cluster_update_t, source = {}", source.device_id().get_short());
 
     auto &known_pending_folders = cluster.get_pending_folders();
@@ -68,7 +68,6 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
         db::set_disable_temp_indexes(db_f, proto::get_disable_temp_indexes(f));
         db::set_paused(db_f, proto::get_paused(f));
 
-        auto sha256 = source.device_id().get_sha256();
         auto id = utils::bytes_t(sha256.begin(), sha256.end());
         new_pending_folders.push_back(item_t{std::move(db), std::move(id), sequencer.next_uuid()});
     };

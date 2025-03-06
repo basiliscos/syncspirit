@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "mark_reachable.h"
 #include "../cluster_visitor.h"
@@ -13,8 +13,7 @@ mark_reachable_t::mark_reachable_t(const model::file_info_t &file, bool reachabl
       file_name{file.get_name()},
       reachable{reachable_} {
     auto& peer = file.get_folder_info()->get_device()->device_id();
-    auto sha256 = peer.get_sha256();
-    device_id = {sha256.begin(), sha256.end()};
+    device_id = peer.get_sha256();
     LOG_DEBUG(log, "mark_reachable_t, file = {}, folder = {}, device = {}, value = {}", file_name, folder_id, peer,
               reachable);
 }

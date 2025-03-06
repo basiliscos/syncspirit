@@ -10,8 +10,7 @@ using namespace syncspirit::model::diff::modify;
 
 remove_ignored_device_t::remove_ignored_device_t(const ignored_device_t &device) noexcept
      {
-    auto key = device.get_key();
-    device_key = {key.begin(), key.end()};
+    device_key =  device.get_key();
     LOG_DEBUG(log, "remove_ignored_device_t, device = {}", device.get_device_id());
 }
 

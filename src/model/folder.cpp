@@ -122,18 +122,23 @@ void folder_t::adjust_synchronization(std::int_fast32_t delta) noexcept {
 void folder_t::mark_suspended(bool value) noexcept { suspended = value; }
 bool folder_t::is_suspended() const noexcept { return suspended; }
 
-template <> SYNCSPIRIT_API std::string_view get_index<0>(const folder_ptr_t &item) noexcept {
-    auto key = item->get_key();
-    auto ptr = (const char*)key.data();
-    return {ptr, key.size()};
+template <> SYNCSPIRIT_API utils::bytes_view_t get_index<0>(const folder_ptr_t &item) noexcept {
+    return item->get_key();
 }
-template <> SYNCSPIRIT_API std::string_view get_index<1>(const folder_ptr_t &item) noexcept { return item->get_id(); }
+template <> SYNCSPIRIT_API utils::bytes_view_t get_index<1>(const folder_ptr_t &item) noexcept {
+    auto id = item->get_id();
+    auto ptr = (unsigned char*) id.data();
+    return {ptr, id.size()};
+}
 
-folder_ptr_t folders_map_t::by_id(std::string_view id) const noexcept { return get<1>(id); }
+folder_ptr_t folders_map_t::by_id(std::string_view id) const noexcept {
+    auto ptr = (unsigned char*)id.data();
+    auto view = utils::bytes_view_t(ptr, id.size());
+    return get<1>(view);
+}
 
 folder_ptr_t folders_map_t::by_key(utils::bytes_view_t key) const noexcept {
-    auto ptr = (const char* )key.data();
-    return get<0>({ptr, key.size()});
+    return get<0>(key);
 }
 
 } // namespace syncspirit::model

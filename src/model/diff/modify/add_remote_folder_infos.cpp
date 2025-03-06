@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
 
 #include "add_remote_folder_infos.h"
 #include "model/cluster.h"
@@ -10,8 +10,7 @@ using namespace syncspirit::model::diff::modify;
 
 add_remote_folder_infos_t::add_remote_folder_infos_t(const model::device_t &peer, container_t items) noexcept
     : container{std::move(items)} {
-    auto sha256 = peer.device_id().get_sha256();
-    device_id = {sha256.begin(), sha256.end()};
+    device_id = peer.device_id().get_sha256();
     LOG_DEBUG(log, "add_remote_folder_infos_t, device = {}, items = {}", peer.device_id().get_short(),
               container.size());
 }
