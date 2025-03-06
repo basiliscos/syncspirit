@@ -12,7 +12,6 @@
 #include "net/names.h"
 #include <algorithm>
 
-using namespace pp;
 namespace sys = boost::system;
 using namespace syncspirit::fs;
 

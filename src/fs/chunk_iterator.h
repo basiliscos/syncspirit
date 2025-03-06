@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "model/file_info.h"
+#include "utils/bytes.h"
 #include "file.h"
 #include "scan_task.h"
 #include "syncspirit-export.h"
@@ -20,7 +21,6 @@ namespace bfs = std::filesystem;
 
 struct SYNCSPIRIT_API chunk_iterator_t {
     using valid_blocks_map_t = std::vector<bool>;
-    using bytes_view_t = std::span<unsigned char>;
 
     chunk_iterator_t(scan_task_ptr_t task, model::file_info_ptr_t file, file_ptr_t backend) noexcept;
 
@@ -30,7 +30,7 @@ struct SYNCSPIRIT_API chunk_iterator_t {
     inline const valid_blocks_map_t &valid_blocks() const noexcept { return valid_blocks_map; }
 
     void ack_hashing() noexcept;
-    void ack_block(bytes_view_t digest, size_t block_index) noexcept;
+    void ack_block(utils::bytes_view_t digest, size_t block_index) noexcept;
     outcome::result<details::chunk_t> read() noexcept;
 
     inline model::file_info_ptr_t get_file() { return peer_file; }

@@ -10,7 +10,6 @@ using namespace syncspirit::fs;
 new_chunk_iterator_t::new_chunk_iterator_t(scan_task_ptr_t task_, proto::FileInfo metadata_,
                                            file_ptr_t backend_) noexcept
     : task{std::move(task_)}, metadata{std::move(metadata_)}, backend{std::move(backend_)}, next_idx{0}, offset{0} {
-    using namespace pp;
     if (proto::get_type(metadata) == proto::FileInfoType::FILE) {
         file_size = proto::get_size(metadata);
         auto bs = proto::get_block_size(metadata);

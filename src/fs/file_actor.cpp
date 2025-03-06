@@ -81,7 +81,6 @@ void file_actor_t::on_model_update(model::message::model_update_t &message) noex
 }
 
 void file_actor_t::on_block_request(message::block_request_t &message) noexcept {
-    using namespace pp;
     LOG_TRACE(log, "on_block_request");
     auto &p = message.payload;
     auto &dest = p.reply_to;
@@ -201,7 +200,6 @@ auto file_actor_t::reflect(model::file_info_ptr_t &file_ptr, const bfs::path &pa
 
 auto file_actor_t::operator()(const model::diff::advance::remote_copy_t &diff, void *custom) noexcept
     -> outcome::result<void> {
-    using namespace pp;
     auto folder = cluster->get_folders().by_id(diff.folder_id);
     auto file_info = folder->get_folder_infos().by_device_id(diff.peer_id);
     auto name = get_name(diff.proto_source);
@@ -212,7 +210,6 @@ auto file_actor_t::operator()(const model::diff::advance::remote_copy_t &diff, v
 
 auto file_actor_t::operator()(const model::diff::advance::remote_win_t &diff, void *custom) noexcept
     -> outcome::result<void> {
-    using namespace pp;
     auto folder = cluster->get_folders().by_id(diff.folder_id);
     auto folder_info = folder->get_folder_infos();
     auto file_info = folder_info.by_device_id(diff.peer_id);

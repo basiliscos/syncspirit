@@ -7,7 +7,6 @@
 #include "syncspirit-export.h"
 #include "utils/bytes.h"
 #include <boost/outcome.hpp>
-#include <span>
 
 namespace syncspirit {
 namespace db {
@@ -17,7 +16,6 @@ namespace outcome = boost::outcome_v2;
 struct transaction_t;
 
 struct SYNCSPIRIT_API cursor_t {
-    using bytes_view_t = std::span<const unsigned char>;
 
     cursor_t() noexcept : impl{nullptr} {};
     cursor_t(cursor_t &&other) noexcept;

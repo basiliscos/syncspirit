@@ -115,7 +115,7 @@ outcome::result<container_t> load(discr_t prefix, transaction_t &txn) noexcept {
     }
     auto &cursor = cursor_opt.value();
     container_t container;
-    auto r = cursor.iterate(prefix, [&](auto &key, auto &value) -> outcome::result<void> {
+    auto r = cursor.iterate(prefix, [&](auto key, auto value) -> outcome::result<void> {
         container.push_back(pair_t{key, value});
         return outcome::success();
     });

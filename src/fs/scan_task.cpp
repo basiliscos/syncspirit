@@ -7,7 +7,6 @@
 #include "fs/messages.h"
 
 using namespace syncspirit::fs;
-using namespace pp;
 
 scan_task_t::scan_task_t(model::cluster_ptr_t cluster_, std::string_view folder_id_,
                          const config::fs_config_t &config_) noexcept
@@ -79,7 +78,7 @@ scan_result_t scan_task_t::advance() noexcept {
     return false;
 }
 
-scan_result_t scan_task_t::advance_dir(std::filesystem::__cxx11::path &dir) noexcept {
+scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
     sys::error_code ec;
 
     bool exists = bfs::exists(dir, ec);
@@ -260,11 +259,11 @@ scan_result_t scan_task_t::advance_symlink_file(file_info_t &file) noexcept {
 }
 
 scan_result_t scan_task_t::advance_unknown_file(unknown_file_t &file) noexcept {
+    auto &path = file.path;
     if (!is_temporal(file.path.filename())) {
-        return unknown_file_t{file.path, std::move(file.metadata)};
+        return unknown_file_t{std::move(path), std::move(file.metadata)};
     }
 
-    auto &path = file.path;
     auto peer_file = model::file_info_ptr_t{};
     auto peer_counter = proto::Counter();
     auto relative_path = [&]() -> std::string {
