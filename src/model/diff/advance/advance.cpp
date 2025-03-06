@@ -12,7 +12,6 @@
 
 using namespace syncspirit::model;
 using namespace syncspirit::model::diff::advance;
-using namespace pp;
 
 static std::string_view stringify(advance_action_t action) {
     if (action == advance_action_t::remote_copy) {

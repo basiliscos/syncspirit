@@ -5,6 +5,7 @@
 
 #include "../cluster_diff.h"
 #include "model/device.h"
+#include "model/misc/uuid.h"
 #include "proto/proto-helpers.h"
 #include <vector>
 

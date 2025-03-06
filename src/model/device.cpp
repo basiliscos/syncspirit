@@ -72,8 +72,7 @@ auto device_t::serialize(db::Device &r) const noexcept -> utils::bytes_t {
     db::set_name(r, name);
     db::set_compression(r, compression);
     if (cert_name.has_value()) {
-        auto cn = std::string_view(cert_name.value());
-        db::set_cert_name(r, cn);
+        db::set_cert_name(r, cert_name.value());
     }
     db::set_introducer(r, introducer);
     db::set_skip_introduction_removals(r, skip_introduction_removals);

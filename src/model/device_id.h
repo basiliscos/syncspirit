@@ -42,7 +42,6 @@ struct SYNCSPIRIT_API device_id_t {
     operator bool() const noexcept { return !value.empty(); }
 
     const std::string &get_value() const noexcept { return value; }
-    // const std::string &serialize() const noexcept { return value; }
 
     std::string_view get_short() const noexcept;
     utils::bytes_view_t get_sha256() const noexcept { return utils::bytes_view_t(hash + 1, digest_length); }

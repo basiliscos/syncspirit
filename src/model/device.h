@@ -5,13 +5,11 @@
 
 #include "misc/augmentation.hpp"
 #include "misc/map.hpp"
-#include "misc/uuid.h"
 #include "device_id.h"
 #include "remote_folder_info.h"
 #include "utils/uri.h"
 #include "utils/bytes.h"
 #include "syncspirit-export.h"
-#include "proto/proto-fwd.hpp"
 #include "proto/proto-fwd.hpp"
 #include <boost/asio.hpp>
 #include <boost/outcome.hpp>
