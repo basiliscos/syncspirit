@@ -77,11 +77,11 @@ TEST_CASE("cluster update, new folder", "[model]") {
 
     SECTION("unknown folder") {
         auto cc = std::make_unique<proto::ClusterConfig>();
-        auto& pr_folder = proto::add_folders(*cc);
+        auto &pr_folder = proto::add_folders(*cc);
         proto::set_id(pr_folder, "some-id");
         proto::set_label(pr_folder, "some-label");
 
-        auto& pr_peer = proto::add_devices(pr_folder);
+        auto &pr_peer = proto::add_devices(pr_folder);
         proto::set_id(pr_peer, peer_id.get_sha256());
         proto::set_name(pr_peer, peer_device->get_name());
         proto::set_max_sequence(pr_peer, 10);
@@ -107,9 +107,9 @@ TEST_CASE("cluster update, new folder", "[model]") {
 
         // no changes
         db::PendingFolder db_pf;
-        auto& mf = db::get_folder(db_pf);
+        auto &mf = db::get_folder(db_pf);
         db::set_id(mf, proto::get_id(pr_folder));
-        auto& mfi = db::get_folder_info(db_pf);
+        auto &mfi = db::get_folder_info(db_pf);
         db::set_max_sequence(mfi, proto::get_max_sequence(pr_peer));
         db::set_index_id(mfi, proto::get_index_id(pr_peer));
 
@@ -142,10 +142,10 @@ TEST_CASE("cluster update, new folder", "[model]") {
         {
             // change unknown folder
             auto cc = std::make_unique<proto::ClusterConfig>();
-            auto& pr_folder = proto::add_folders(*cc);
+            auto &pr_folder = proto::add_folders(*cc);
             proto::set_id(pr_folder, "some-id-n");
             proto::set_label(pr_folder, "some-label-N");
-            auto& pr_device = proto::add_devices(pr_folder);
+            auto &pr_device = proto::add_devices(pr_folder);
             proto::set_id(pr_device, peer_id.get_sha256());
             proto::set_name(pr_device, peer_device->get_name());
             proto::set_max_sequence(pr_device, 10);
@@ -187,10 +187,10 @@ TEST_CASE("cluster update, new folder", "[model]") {
         }
 
         auto cc = std::make_unique<proto::ClusterConfig>();
-        auto& pr_folder = proto::add_folders(*cc);
+        auto &pr_folder = proto::add_folders(*cc);
         proto::set_id(pr_folder, folder->get_id());
         proto::set_label(pr_folder, folder->get_label());
-        auto& pr_peer = proto::add_devices(pr_folder);
+        auto &pr_peer = proto::add_devices(pr_folder);
         proto::set_id(pr_peer, peer_id.get_sha256());
         proto::set_name(pr_peer, peer_device->get_name());
         proto::set_max_sequence(pr_peer, folder_info_peer->get_max_sequence());
@@ -206,7 +206,7 @@ TEST_CASE("cluster update, new folder", "[model]") {
             CHECK(r_a);
             auto pr_file = proto::FileInfo();
             proto::set_sequence(pr_file, folder_info_peer->get_max_sequence());
-            auto& pr_version = proto::get_version(pr_file);
+            auto &pr_version = proto::get_version(pr_file);
             proto::add_counters(pr_version, proto::Counter(peer_device->device_id().get_uint(), 0));
             auto peer_file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_info_peer).value();
             folder_info_peer->add_strict(peer_file);
@@ -249,17 +249,17 @@ TEST_CASE("cluster update, new folder", "[model]") {
             auto pr_file = proto::FileInfo();
             proto::set_name(pr_file, "a.txt");
             proto::set_sequence(pr_file, 10l);
-            auto& pr_version = proto::get_version(pr_file);
+            auto &pr_version = proto::get_version(pr_file);
             proto::add_counters(pr_version, proto::Counter(peer_device->device_id().get_uint(), 0));
             auto file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_info_peer).value();
             folder_info_peer->get_file_infos().put(file);
         }
 
         auto cc = std::make_unique<proto::ClusterConfig>();
-        auto& pr_folder = proto::add_folders(*cc);
+        auto &pr_folder = proto::add_folders(*cc);
         proto::set_id(pr_folder, folder->get_id());
         proto::set_label(pr_folder, folder->get_label());
-        auto& pr_peer = proto::add_devices(pr_folder);
+        auto &pr_peer = proto::add_devices(pr_folder);
         proto::set_id(pr_peer, peer_id.get_sha256());
         proto::set_name(pr_peer, peer_device->get_name());
 
@@ -336,7 +336,7 @@ TEST_CASE("cluster update, reset folder", "[model]") {
     cluster->get_folders().put(folder);
     auto db_p_folder = [&]() -> db::PendingFolder {
         db::PendingFolder db_p_folder;
-        auto& f = db::get_folder(db_p_folder);
+        auto &f = db::get_folder(db_p_folder);
         db::set_id(f, "1111-2222");
         db::set_label(f, "unknown");
         return db_p_folder;
@@ -388,7 +388,7 @@ TEST_CASE("cluster update, reset folder", "[model]") {
         proto::set_size(f, 5ul);
         proto::set_block_size(f, 5ul);
         proto::set_sequence(f, 1);
-        auto& v = proto::get_version(f);
+        auto &v = proto::get_version(f);
         proto::add_counters(v, proto::Counter(my_device->device_id().get_uint(), 0));
         return f;
     }();
@@ -401,7 +401,7 @@ TEST_CASE("cluster update, reset folder", "[model]") {
         proto::set_size(f, 5ul);
         proto::set_block_size(f, 5ul);
         proto::set_sequence(f, 1);
-        auto& v = proto::get_version(f);
+        auto &v = proto::get_version(f);
         proto::add_counters(v, proto::Counter(peer_device->device_id().get_uint(), 0));
         return f;
     }();
@@ -415,7 +415,7 @@ TEST_CASE("cluster update, reset folder", "[model]") {
         proto::set_size(f, 10ul);
         proto::set_block_size(f, 5ul);
         proto::set_sequence(f, 2);
-        auto& v = proto::get_version(f);
+        auto &v = proto::get_version(f);
         proto::add_counters(v, proto::Counter(peer_device->device_id().get_uint(), 0));
         return f;
     }();
@@ -429,10 +429,10 @@ TEST_CASE("cluster update, reset folder", "[model]") {
     fi_peer2->assign_block(b3, 1);
 
     auto cc = std::make_unique<proto::ClusterConfig>();
-    auto& pr_folder = proto::add_folders(*cc);
+    auto &pr_folder = proto::add_folders(*cc);
     proto::set_id(pr_folder, folder->get_id());
     proto::set_label(pr_folder, folder->get_label());
-    auto& pr_peer =  proto::add_devices(pr_folder);
+    auto &pr_peer = proto::add_devices(pr_folder);
     proto::set_id(pr_peer, peer_id.get_sha256());
     proto::set_name(pr_peer, peer_device->get_name());
     proto::set_max_sequence(pr_peer, 123456u);
@@ -500,10 +500,10 @@ TEST_CASE("cluster update for a folder, which was not shared", "[model]") {
     }
 
     auto cc = std::make_unique<proto::ClusterConfig>();
-    auto& pr_folder = proto::add_folders(*cc);
+    auto &pr_folder = proto::add_folders(*cc);
     proto::set_id(pr_folder, folder->get_id());
     proto::set_label(pr_folder, folder->get_label());
-    auto& pr_peer =  proto::add_devices(pr_folder);
+    auto &pr_peer = proto::add_devices(pr_folder);
     proto::set_id(pr_peer, peer_id.get_sha256());
     proto::set_name(pr_peer, peer_device->get_name());
     proto::set_max_sequence(pr_peer, 123456u);
@@ -558,17 +558,17 @@ TEST_CASE("cluster update with unknown devices", "[model]") {
 
     auto cc = std::make_unique<proto::ClusterConfig>();
 
-    auto& pr_folder = proto::add_folders(*cc);
+    auto &pr_folder = proto::add_folders(*cc);
     proto::set_id(pr_folder, folder->get_id());
     proto::set_label(pr_folder, folder->get_label());
 
-    auto& pr_peer_1 =  proto::add_devices(pr_folder);
+    auto &pr_peer_1 = proto::add_devices(pr_folder);
     proto::set_id(pr_peer_1, peer_id_1.get_sha256());
     proto::set_name(pr_peer_1, peer_device->get_name());
     proto::set_max_sequence(pr_peer_1, 123456u);
     proto::set_index_id(pr_peer_1, 7u);
 
-    auto& pr_peer_2 =  proto::add_devices(pr_folder);
+    auto &pr_peer_2 = proto::add_devices(pr_folder);
     proto::set_id(pr_peer_2, peer_id_2.get_sha256());
     proto::set_name(pr_peer_2, peer_device->get_name());
     proto::set_max_sequence(pr_peer_2, 123456u);
@@ -629,7 +629,7 @@ TEST_CASE("cluster update nothing shared", "[model]") {
             proto::set_size(f, 5ul);
             proto::set_block_size(f, 5ul);
             proto::set_sequence(f, 5);
-            auto& v = proto::get_version(f);
+            auto &v = proto::get_version(f);
             proto::add_counters(v, proto::Counter(peer_device->device_id().get_uint(), 0));
             return f;
         }();
@@ -720,17 +720,17 @@ TEST_CASE("cluster update with remote folders", "[model]") {
 
     auto cc = std::make_unique<proto::ClusterConfig>();
 
-    auto& pr_folder = proto::add_folders(*cc);
+    auto &pr_folder = proto::add_folders(*cc);
     proto::set_id(pr_folder, folder->get_id());
     proto::set_label(pr_folder, folder->get_label());
 
-    auto& pr_peer =  proto::add_devices(pr_folder);
+    auto &pr_peer = proto::add_devices(pr_folder);
     proto::set_id(pr_peer, peer_id_1.get_sha256());
     proto::set_name(pr_peer, peer_device->get_name());
     proto::set_max_sequence(pr_peer, 123456u);
     proto::set_index_id(pr_peer, 7u);
 
-    auto& pr_peer_my =  proto::add_devices(pr_folder);
+    auto &pr_peer_my = proto::add_devices(pr_folder);
     proto::set_id(pr_peer_my, my_id.get_sha256());
     proto::set_name(pr_peer_my, my_device->get_name());
     proto::set_max_sequence(pr_peer_my, 3);

@@ -35,8 +35,7 @@ struct SYNCSPIRIT_API ignored_folder_t final : augmentable_t<ignored_folder_t> {
     utils::bytes_t key;
 };
 
-struct SYNCSPIRIT_API ignored_folders_map_t: generic_map_t<ignored_folder_ptr_t, 1>
-{
+struct SYNCSPIRIT_API ignored_folders_map_t : generic_map_t<ignored_folder_ptr_t, 1> {
     ignored_folder_ptr_t by_key(utils::bytes_view_t key) const noexcept;
 };
 

@@ -10,8 +10,7 @@
 using namespace syncspirit::model::diff::modify;
 
 remove_files_t::remove_files_t(const device_t &device, const file_infos_map_t &files,
-                               orphaned_blocks_t *orphaned_blocks_) noexcept
-    {
+                               orphaned_blocks_t *orphaned_blocks_) noexcept {
     device_id = device.device_id().get_sha256();
     keys.reserve(files.size());
     folder_ids.reserve(files.size());

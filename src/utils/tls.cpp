@@ -21,8 +21,7 @@ namespace sys = boost::system;
 
 namespace syncspirit::utils {
 
-
-bool cert_data_t::operator==(const cert_data_t& other) const noexcept {
+bool cert_data_t::operator==(const cert_data_t &other) const noexcept {
     auto view_mine = bytes_view_t(*this);
     auto view_other = bytes_view_t(other);
     return view_mine == view_other;
@@ -327,8 +326,6 @@ outcome::result<std::string> get_common_name(X509 *cert) noexcept {
     return std::string(buff, r);
 }
 
-void digest(const unsigned char *src, size_t length, unsigned char *storage) noexcept {
-    SHA256(src, length, storage);
-}
+void digest(const unsigned char *src, size_t length, unsigned char *storage) noexcept { SHA256(src, length, storage); }
 
 } // namespace syncspirit::utils

@@ -67,7 +67,7 @@ index_maker_t::index_maker_t(diff_builder_t &builder_, utils::bytes_view_t sha25
 index_maker_t &&index_maker_t::add(const proto::FileInfo &file, const model::device_ptr_t &peer,
                                    bool add_version) noexcept {
     auto f = file;
-    auto& v = proto::get_version(f);
+    auto &v = proto::get_version(f);
     if (add_version && proto::get_counters_size(v) == 0) {
         auto c = proto::Counter(peer->device_id().get_uint(), 1);
         proto::add_counters(v, std::move(c));

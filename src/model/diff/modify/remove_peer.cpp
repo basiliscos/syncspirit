@@ -16,8 +16,7 @@ using namespace syncspirit::model::diff::modify;
 
 using blocks_t = remove_blocks_t::unique_keys_t;
 
-remove_peer_t::remove_peer_t(const cluster_t &cluster, const device_t &peer) noexcept
-    : parent_t(){
+remove_peer_t::remove_peer_t(const cluster_t &cluster, const device_t &peer) noexcept : parent_t() {
     auto key = peer.get_key();
     peer_key = utils::bytes_t(key.begin(), key.end());
     LOG_DEBUG(log, "remove_peer_t, device = {}", peer.device_id());

@@ -46,7 +46,7 @@ TEST_CASE("new file diff", "[model]") {
         REQUIRE(folder_info->get_max_sequence() == 1);
         REQUIRE(file->get_version()->counters_size() == 1);
         REQUIRE(file->get_modified_by() == my_device->device_id().get_uint());
-        auto& counter = file->get_version()->get_best();
+        auto &counter = file->get_version()->get_best();
         auto v1 = proto::get_value(counter);
         CHECK(v1 > 0);
 
@@ -55,11 +55,11 @@ TEST_CASE("new file diff", "[model]") {
             auto p = file->get_version()->as_proto();
             REQUIRE(proto::get_counters_size(p) == 2);
 
-            auto& c0 = proto::get_counters(p, 0);
+            auto &c0 = proto::get_counters(p, 0);
             CHECK(proto::get_value(c0) == v1);
             CHECK(proto::get_id(c0) == my_device->device_id().get_uint());
 
-            auto& c1 = proto::get_counters(p, 1);
+            auto &c1 = proto::get_counters(p, 1);
             CHECK(proto::get_value(c1) > v1);
             CHECK(proto::get_id(c1) == peer_device->device_id().get_uint());
         }
@@ -85,7 +85,7 @@ TEST_CASE("new file diff", "[model]") {
         proto::set_block_size(pr_file, 5ul);
 
         auto hash = utils::sha256_digest(as_bytes("12345")).value();
-        auto& pr_block = proto::add_blocks(pr_file);
+        auto &pr_block = proto::add_blocks(pr_file);
         proto::set_weak_hash(pr_block, 12);
         proto::set_size(pr_block, 5);
         proto::set_hash(pr_block, hash);
@@ -113,7 +113,7 @@ TEST_CASE("new file diff", "[model]") {
         proto::set_sequence(pr_file, 1ul);
 
         auto hash = utils::sha256_digest(as_bytes("12345")).value();
-        auto& pr_block = proto::add_blocks(pr_file);
+        auto &pr_block = proto::add_blocks(pr_file);
         proto::set_weak_hash(pr_block, 12);
         proto::set_size(pr_block, 5);
         proto::set_hash(pr_block, hash);
@@ -138,7 +138,7 @@ TEST_CASE("new file diff", "[model]") {
         proto::set_sequence(pr_file, 1ul);
 
         auto hash = utils::sha256_digest(as_bytes("12345")).value();
-        auto& pr_block = proto::add_blocks(pr_file);
+        auto &pr_block = proto::add_blocks(pr_file);
         proto::set_weak_hash(pr_block, 12);
         proto::set_size(pr_block, 5);
         proto::set_hash(pr_block, hash);

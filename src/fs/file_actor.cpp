@@ -102,8 +102,7 @@ void file_actor_t::on_block_request(message::block_request_t &message) noexcept 
         auto block_opt = file->read(offset, size);
         if (!block_opt) {
             ec = block_opt.assume_error();
-            LOG_WARN(log, "error requesting block; offset = {}, size = {} :: {} ", offset, size,
-                     ec.message());
+            LOG_WARN(log, "error requesting block; offset = {}, size = {} :: {} ", offset, size, ec.message());
         } else {
             data = std::move(block_opt.assume_value());
         }

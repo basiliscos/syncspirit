@@ -97,12 +97,13 @@ bool add_folder_t::execute(governor_actor_t &actor) noexcept {
     auto opt = modify::upsert_folder_t::create(*cluster, *actor.sequencer, folder, 0);
     if (opt.has_error()) {
         auto message = opt.assume_error().message();
-        log->warn("{}, cannot create folder '{}' on '{}': {}", actor.get_identity(), db::get_label(folder), db::get_path(folder),
-                  message);
+        log->warn("{}, cannot create folder '{}' on '{}': {}", actor.get_identity(), db::get_label(folder),
+                  db::get_path(folder), message);
         return false;
     }
 
-    log->debug("{}, going to add folder '{}' on '{}'", actor.get_identity(), db::get_label(folder), db::get_path(folder));
+    log->debug("{}, going to add folder '{}' on '{}'", actor.get_identity(), db::get_label(folder),
+               db::get_path(folder));
 
     actor.send_command(std::move(opt.value()), *this);
     return true;

@@ -13,11 +13,9 @@ using namespace syncspirit;
 using namespace syncspirit::model;
 using namespace syncspirit::model::diff::peer;
 
-update_folder_t::update_folder_t(std::string_view folder_id_, utils::bytes_view_t peer_id_, files_t files_, uuids_t uuids,
-                                 blocks_t blocks, orphaned_blocks_t::set_t removed_blocks) noexcept
-    :
-      folder_id{std::string(folder_id_)}, peer_id{peer_id_.begin(), peer_id_.end()},
-      files(std::move(files_)),
+update_folder_t::update_folder_t(std::string_view folder_id_, utils::bytes_view_t peer_id_, files_t files_,
+                                 uuids_t uuids, blocks_t blocks, orphaned_blocks_t::set_t removed_blocks) noexcept
+    : folder_id{std::string(folder_id_)}, peer_id{peer_id_.begin(), peer_id_.end()}, files(std::move(files_)),
       uuids{std::move(uuids)} {
     LOG_DEBUG(log, "update_folder_t, folder = {}", folder_id);
     auto current = (cluster_diff_t *)(nullptr);
@@ -62,7 +60,7 @@ auto update_folder_t::apply_impl(cluster_t &cluster, apply_controller_t &control
         if (proto::get_size(f)) {
             auto blocks_count = proto::get_blocks_size(f);
             for (int i = 0; i < blocks_count; ++i) {
-                auto& b = proto::get_blocks(f, i);
+                auto &b = proto::get_blocks(f, i);
                 auto hash = proto::get_hash(b);
                 auto strict_hash = block_info_t::make_strict_hash(hash);
                 auto block = bm.by_hash(strict_hash.get_hash());
@@ -159,7 +157,7 @@ static auto instantiate(const cluster_t &cluster, sequencer_t &sequencer, const 
     auto files_count = proto::get_files_size(message);
     files.reserve(files_count);
     for (int i = 0; i < files_count; ++i) {
-        auto& f = proto::get_files(message, i);
+        auto &f = proto::get_files(message, i);
         auto name = proto::get_name(f);
         if (proto::get_deleted(f) && proto::get_blocks_size(f)) {
             LOG_WARN(log, "file {} should not have blocks", name);
@@ -179,7 +177,7 @@ static auto instantiate(const cluster_t &cluster, sequencer_t &sequencer, const 
         auto blocks_count = proto::get_blocks_size(f);
         auto size_by_blocks = std::int64_t(0);
         for (int j = 0; j < blocks_count; ++j) {
-            auto& b = proto::get_blocks(f, j);
+            auto &b = proto::get_blocks(f, j);
             size_by_blocks += proto::get_size(b);
             auto hash = proto::get_hash(b);
             auto strict_hash = block_info_t::make_strict_hash(hash);
@@ -190,7 +188,7 @@ static auto instantiate(const cluster_t &cluster, sequencer_t &sequencer, const 
         if (file_size != size_by_blocks) {
             return make_error_code(error_code_t::mismatch_file_size);
         }
-        auto& version = proto::get_version(f);
+        auto &version = proto::get_version(f);
         if (!proto::get_counters_size(version)) {
             return make_error_code(error_code_t::missing_version);
         }

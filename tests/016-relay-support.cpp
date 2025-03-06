@@ -46,7 +46,7 @@ TEST_CASE("relay proto", "[relay]") {
 
         SECTION("join_session_request") {
             auto key = std::string_view("lorem impsum dolor");
-            auto ptr = (unsigned char*)key.data();
+            auto ptr = (unsigned char *)key.data();
             auto source = join_session_request_t(bytes_t(ptr, ptr + key.size()));
             auto sz = serialize(source, buff);
             REQUIRE(sz);
@@ -75,8 +75,8 @@ TEST_CASE("relay proto", "[relay]") {
 
         SECTION("connect_request") {
             auto device_id = std::string_view("lorem impsum dolor");
-            auto ptr = (unsigned char*)device_id.data();
-            auto source = connect_request_t(bytes_t(ptr, ptr+device_id.size()));
+            auto ptr = (unsigned char *)device_id.data();
+            auto source = connect_request_t(bytes_t(ptr, ptr + device_id.size()));
             auto sz = serialize(source, buff);
             REQUIRE(sz);
             auto r = parse(buff);
@@ -90,10 +90,10 @@ TEST_CASE("relay proto", "[relay]") {
 
         SECTION("session_invitation") {
             auto device_id = std::string_view("lorem");
-            auto ptr = (unsigned char*)device_id.data();
+            auto ptr = (unsigned char *)device_id.data();
             auto device_id_bytes = bytes_t(ptr, ptr + device_id.size());
             auto key = std::string_view("impsum dolor");
-            ptr = (unsigned char*)key.data();
+            ptr = (unsigned char *)key.data();
             auto key_bytes = bytes_t(ptr, ptr + key.size());
             auto ip = boost::asio::ip::address_v4::from_string("127.0.0.1");
             auto source = session_invitation_t(device_id_bytes, key_bytes, ip, 1234, true);
@@ -113,10 +113,10 @@ TEST_CASE("relay proto", "[relay]") {
 
         SECTION("session_invitation (host of zeroes)") {
             auto device_id = std::string_view("lorem");
-            auto ptr = (unsigned char*)device_id.data();
+            auto ptr = (unsigned char *)device_id.data();
             auto device_id_bytes = bytes_t(ptr, ptr + device_id.size());
             auto key = std::string_view("impsum dolor");
-            ptr = (unsigned char*)key.data();
+            ptr = (unsigned char *)key.data();
             auto key_bytes = bytes_t(ptr, ptr + key.size());
             auto ip = boost::asio::ip::address_v4(0);
             auto source = session_invitation_t(device_id_bytes, key_bytes, ip, 1234, true);
@@ -180,7 +180,7 @@ TEST_CASE("relay proto", "[relay]") {
             auto target = std::get_if<session_invitation_t>(&msg->message);
             REQUIRE(target);
             CHECK(target->from.size() == 32);
-            auto ptr = (const char*)(target->key.data());
+            auto ptr = (const char *)(target->key.data());
             CHECK(std::string_view(ptr, target->key.size()) == "lorem-imspum-dolor");
             CHECK(!target->address.has_value());
             CHECK(target->port == 12345);

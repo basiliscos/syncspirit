@@ -55,22 +55,21 @@ TEST_CASE("scan_task", "[fs]") {
     SECTION("without files"){
 
 #ifndef SYNCSPIRIT_WIN
-        SECTION("no permissions to read dir => err"){
-            bfs::permissions(root_path, bfs::perms::none);
-            auto folder_info = folder_info_t::create(sequencer->next_uuid(), db_folder_info, my_device, folder).value();
-            folder->get_folder_infos().put(folder_info);
+        SECTION("no permissions to read dir => err"){bfs::permissions(root_path, bfs::perms::none);
+    auto folder_info = folder_info_t::create(sequencer->next_uuid(), db_folder_info, my_device, folder).value();
+    folder->get_folder_infos().put(folder_info);
 
-            auto task = scan_task_t(cluster, folder->get_id(), config);
-            auto r = task.advance();
-            CHECK(std::get_if<scan_errors_t>(&r));
+    auto task = scan_task_t(cluster, folder->get_id(), config);
+    auto r = task.advance();
+    CHECK(std::get_if<scan_errors_t>(&r));
 
-            auto errs = std::get_if<scan_errors_t>(&r);
-            REQUIRE(errs->size() == 1);
+    auto errs = std::get_if<scan_errors_t>(&r);
+    REQUIRE(errs->size() == 1);
 
-            auto &err = errs->at(0);
-            CHECK(err.ec);
-            CHECK(err.path == root_path);
-        }
+    auto &err = errs->at(0);
+    CHECK(err.ec);
+    CHECK(err.path == root_path);
+}
 #endif
 
 SECTION("no dirs, no files") {
@@ -158,8 +157,8 @@ SECTION("regular files") {
     proto::set_name(pr_file, "a.txt");
     proto::set_sequence(pr_file, 4);
 
-    auto& v = proto::get_version(pr_file);
-    auto& counter = proto::add_counters(v);
+    auto &v = proto::get_version(pr_file);
+    auto &counter = proto::add_counters(v);
     proto::set_id(counter, peer_device->device_id().get_uint());
     proto::set_id(counter, 1);
 
@@ -698,7 +697,7 @@ SECTION("symlink file") {
     proto::set_type(pr_file, proto::FileInfoType::SYMLINK);
     proto::set_symlink_target(pr_file, "b.txt");
 
-    auto& v = proto::get_version(pr_file);
+    auto &v = proto::get_version(pr_file);
     proto::add_counters(v, proto::Counter(peer_device->device_id().get_uint(), 1));
 
     SECTION("symlink does not exists") {

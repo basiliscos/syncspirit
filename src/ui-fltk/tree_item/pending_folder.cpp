@@ -153,7 +153,7 @@ bool pending_folder_t::on_select() {
         auto db = db::PendingFolder();
         folder.serialize(db);
 
-        auto& db_folder = db::get_folder(db);
+        auto &db_folder = db::get_folder(db);
         db::set_path(db_folder, path.string());
         db::set_rescan_interval(db_folder, 3600);
 

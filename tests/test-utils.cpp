@@ -110,12 +110,12 @@ bfs::path unique_path() {
 }
 
 utils::bytes_view_t as_bytes(std::string_view str) {
-    auto ptr = (const unsigned char*) str.data();
+    auto ptr = (const unsigned char *)str.data();
     return {ptr, str.size()};
 }
 
 utils::bytes_t as_owned_bytes(std::string_view str) {
-    auto ptr = (const unsigned char*) str.data();
+    auto ptr = (const unsigned char *)str.data();
     return {ptr, ptr + str.size()};
 }
 

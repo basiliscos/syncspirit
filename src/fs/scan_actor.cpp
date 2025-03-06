@@ -290,12 +290,7 @@ void scan_actor_t::commit_new_file(new_chunk_iterator_t &info) noexcept {
     // file.clear_blocks();
     for (auto &b : hashes) {
 
-        auto block_info = proto::BlockInfo {
-            offset,
-            b.size,
-            b.digest,
-            b.weak
-        };
+        auto block_info = proto::BlockInfo{offset, b.size, b.digest, b.weak};
         proto::add_blocks(file, std::move(block_info));
         offset += b.size;
     }

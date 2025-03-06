@@ -19,13 +19,13 @@ namespace outcome = boost::outcome_v2;
 template <typename T> using guard_t = std::unique_ptr<T, std::function<void(T *)>>;
 
 /* in DER-format */
-struct cert_data_view_t: bytes_view_t {
+struct cert_data_view_t : bytes_view_t {
     using bytes_view_t::bytes_view_t;
 };
-struct SYNCSPIRIT_API cert_data_t: bytes_t {
-    inline explicit cert_data_t(bytes_t bytes) noexcept: bytes_t(std::move(bytes)) {}
+struct SYNCSPIRIT_API cert_data_t : bytes_t {
+    inline explicit cert_data_t(bytes_t bytes) noexcept : bytes_t(std::move(bytes)) {}
     using bytes_t::bytes_t;
-    bool operator==(const cert_data_t& other) const noexcept;
+    bool operator==(const cert_data_t &other) const noexcept;
 };
 
 struct SYNCSPIRIT_API key_pair_t {

@@ -30,8 +30,7 @@ auto cluster_update_t::create(const cluster_t &cluster, sequencer_t &sequencer, 
 };
 
 cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequencer, const device_t &source,
-                                   const message_t &message) noexcept
-    {
+                                   const message_t &message) noexcept {
     auto sha256 = source.device_id().get_sha256();
     peer_id = sha256;
     LOG_DEBUG(log, "cluster_update_t, source = {}", source.device_id().get_short());
@@ -51,13 +50,13 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
     auto folder_update_diff = diff::cluster_diff_ptr_t{};
     auto folder_update = (diff::cluster_diff_t *){nullptr};
 
-    auto add_pending = [&](const proto::Folder& f, const proto::Device& d) noexcept {
+    auto add_pending = [&](const proto::Folder &f, const proto::Device &d) noexcept {
         using item_t = decltype(new_pending_folders)::value_type;
         auto label = proto::get_label(f);
         LOG_TRACE(log, "cluster_update_t, (add/update) pending folder = {}", label);
         db::PendingFolder db;
-        auto& db_fi = db::get_folder_info(db);
-        auto& db_f =  db::get_folder(db);
+        auto &db_fi = db::get_folder_info(db);
+        auto &db_f = db::get_folder(db);
         db::set_index_id(db_fi, proto::get_index_id(d));
         db::set_max_sequence(db_fi, proto::get_max_sequence(d));
         db::set_id(db_f, proto::get_id(f));
@@ -73,8 +72,8 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
     };
 
     auto folders_count = proto::get_folders_size(message);
-    for (size_t i = 0; i < folders_count ; ++i) {
-        auto& f = proto::get_folders(message, i);
+    for (size_t i = 0; i < folders_count; ++i) {
+        auto &f = proto::get_folders(message, i);
         auto folder_id = proto::get_id(f);
         auto folder_label = proto::get_label(f);
         auto folder = folders.by_id(folder_id);
@@ -82,7 +81,7 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
         auto devices_count = proto::get_devices_size(f);
         if (!folder) {
             for (int j = 0; j < devices_count; ++j) {
-                auto& d = proto::get_devices(f, j);
+                auto &d = proto::get_devices(f, j);
                 if (proto::get_id(d) == source.device_id().get_sha256()) {
                     for (auto &it : known_pending_folders) {
                         auto &uf = it.item;
@@ -92,7 +91,8 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
                             auto key = uf->get_key();
                             auto uf_key = utils::bytes_t(key.begin(), key.end());
                             confirmed_pending_folders.emplace(uf_key);
-                            bool actual = uf->get_index() == index_id && uf->get_max_sequence() == proto::get_max_sequence(d);
+                            bool actual =
+                                uf->get_index() == index_id && uf->get_max_sequence() == proto::get_max_sequence(d);
                             if (!actual) {
                                 removed_pending_folders.emplace(std::move(uf_key));
                                 add_pending(f, d);
@@ -109,7 +109,7 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
         }
 
         for (int j = 0; j < devices_count; ++j) {
-            auto& d = proto::get_devices(f, j);
+            auto &d = proto::get_devices(f, j);
             auto device_sha = proto::get_id(d);
             auto device = devices.by_sha256(device_sha);
             auto device_opt = model::device_id_t::from_sha256(device_sha);
@@ -152,8 +152,7 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
                 reset_folders.put(folder_info);
             } else if (max_sequence > folder_info->get_max_sequence()) {
                 LOG_TRACE(log, "cluster_update_t, updating folder = {}, index = {:#x}, max seq = {} -> {}",
-                          folder->get_label(), folder_info->get_index(), folder_info->get_max_sequence(),
-                          max_sequence);
+                          folder->get_label(), folder_info->get_index(), folder_info->get_max_sequence(), max_sequence);
             }
             if (do_update) {
                 auto uuid = bu::uuid{};

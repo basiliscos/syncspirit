@@ -22,7 +22,8 @@ using pending_folder_ptr_t = intrusive_ptr_t<pending_folder_t>;
 
 struct SYNCSPIRIT_API pending_folder_t final : augmentable_t<pending_folder_t>, folder_data_t {
 
-    static outcome::result<pending_folder_ptr_t> create(utils::bytes_view_t key, const db::PendingFolder &data) noexcept;
+    static outcome::result<pending_folder_ptr_t> create(utils::bytes_view_t key,
+                                                        const db::PendingFolder &data) noexcept;
     static outcome::result<pending_folder_ptr_t> create(const bu::uuid &uuid, const db::PendingFolder &data,
                                                         const device_id_t &device_) noexcept;
 

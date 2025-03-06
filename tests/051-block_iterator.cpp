@@ -54,13 +54,13 @@ TEST_CASE("block iterator", "[model]") {
 
     auto b1_hash = utils::sha256_digest(as_bytes("12345")).value();
     auto b2_hash = utils::sha256_digest(as_bytes("567890")).value();
-    auto& b1 = proto::add_blocks(p_file);
+    auto &b1 = proto::add_blocks(p_file);
     proto::set_hash(b1, b1_hash);
     proto::set_size(b1, 5);
 
     SECTION("two blocks") {
         auto b1 = proto::get_blocks(p_file, 0);
-        auto& b2 = proto::add_blocks(p_file);
+        auto &b2 = proto::add_blocks(p_file);
         proto::set_hash(b2, b2_hash);
         proto::set_size(b2, 5);
         proto::set_size(p_file, 10);

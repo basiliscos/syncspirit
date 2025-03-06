@@ -61,12 +61,12 @@ TEST_CASE("cluster modifications from ui", "[model]") {
 
         SECTION("with unknown folder, then unshare") {
             auto db_pf = db::PendingFolder();
-            auto& db_folder = db::get_folder(db_pf);
+            auto &db_folder = db::get_folder(db_pf);
             db::set_id(db_folder, id);
             db::set_label(db_folder, label);
             db::set_path(db_folder, path);
 
-            auto& db_fi = db::get_folder_info(db_pf);
+            auto &db_fi = db::get_folder_info(db_pf);
             db::set_max_sequence(db_fi, 2345);
             db::set_index_id(db_fi, 12);
 
@@ -92,15 +92,15 @@ TEST_CASE("cluster modifications from ui", "[model]") {
             proto::set_name(pr_file_1, "a.txt");
             proto::set_sequence(pr_file_1, 1l);
             proto::set_size(pr_file_1, 10);
-            auto& pr_version = proto::get_version(pr_file_1);
+            auto &pr_version = proto::get_version(pr_file_1);
             proto::add_counters(pr_version, proto::Counter(peer_device->device_id().get_uint(), 0));
 
-            auto& b1 = proto::add_blocks(pr_file_1);
+            auto &b1 = proto::add_blocks(pr_file_1);
             proto::set_size(b1, 5);
             proto::set_hash(b1, utils::sha256_digest(as_bytes("12345")).value());
             auto bi_1 = block_info_t::create(b1).value();
 
-            auto& b2 = proto::add_blocks(pr_file_1);
+            auto &b2 = proto::add_blocks(pr_file_1);
             proto::set_size(b2, 5);
             proto::set_hash(b2, utils::sha256_digest(as_bytes("567890")).value());
             auto bi_2 = block_info_t::create(b2).value();

@@ -13,6 +13,6 @@ namespace bu = boost::uuids;
 
 static const constexpr size_t uuid_length = 16;
 
-SYNCSPIRIT_API void assign(bu::uuid&, utils::bytes_view_t source) noexcept;
+SYNCSPIRIT_API void assign(bu::uuid &, utils::bytes_view_t source) noexcept;
 
 } // namespace syncspirit::model

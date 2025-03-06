@@ -127,18 +127,16 @@ template <> SYNCSPIRIT_API utils::bytes_view_t get_index<0>(const folder_ptr_t &
 }
 template <> SYNCSPIRIT_API utils::bytes_view_t get_index<1>(const folder_ptr_t &item) noexcept {
     auto id = item->get_id();
-    auto ptr = (unsigned char*) id.data();
+    auto ptr = (unsigned char *)id.data();
     return {ptr, id.size()};
 }
 
 folder_ptr_t folders_map_t::by_id(std::string_view id) const noexcept {
-    auto ptr = (unsigned char*)id.data();
+    auto ptr = (unsigned char *)id.data();
     auto view = utils::bytes_view_t(ptr, id.size());
     return get<1>(view);
 }
 
-folder_ptr_t folders_map_t::by_key(utils::bytes_view_t key) const noexcept {
-    return get<0>(key);
-}
+folder_ptr_t folders_map_t::by_key(utils::bytes_view_t key) const noexcept { return get<0>(key); }
 
 } // namespace syncspirit::model

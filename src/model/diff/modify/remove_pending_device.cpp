@@ -8,8 +8,7 @@
 
 using namespace syncspirit::model::diff::modify;
 
-remove_pending_device_t::remove_pending_device_t(const pending_device_t &device) noexcept
-     {
+remove_pending_device_t::remove_pending_device_t(const pending_device_t &device) noexcept {
     device_key = device.get_key();
     LOG_DEBUG(log, "remove_pending_device_t, device = {}", device.get_device_id());
 }
@@ -27,7 +26,7 @@ auto remove_pending_device_t::apply_impl(cluster_t &cluster, apply_controller_t 
 }
 
 auto remove_pending_device_t::get_device_sha256() const noexcept -> utils::bytes_view_t {
-    auto sha256= utils::bytes_view_t(device_key.begin() + 1, device_key.end());
+    auto sha256 = utils::bytes_view_t(device_key.begin() + 1, device_key.end());
     return sha256;
 }
 

@@ -30,7 +30,7 @@ TEST_CASE("remove folder", "[model]") {
 
     proto::FileInfo pr_fi;
     proto::set_name(pr_fi, "a.txt");
-    auto& v = proto::get_version(pr_fi);
+    auto &v = proto::get_version(pr_fi);
     proto::add_counters(v, proto::Counter(peer_device->device_id().get_uint(), 5));
 
     auto builder = diff_builder_t(*cluster);
@@ -79,8 +79,8 @@ TEST_CASE("remove folder", "[model]") {
 
     SECTION("remote win") {
         auto pr_fi_local = pr_fi;
-        auto& v_l = proto::get_version(pr_fi_local);
-        auto& c_l = proto::get_counters(v_l, 0);
+        auto &v_l = proto::get_version(pr_fi_local);
+        auto &c_l = proto::get_counters(v_l, 0);
         proto::set_value(c_l, 3);
 
         SECTION("all ok") {

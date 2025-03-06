@@ -152,7 +152,7 @@ auto file_t::read(size_t offset, size_t size) const noexcept -> outcome::result<
 
     utils::bytes_t r;
     r.resize(size);
-    if (!backend->read(reinterpret_cast<char*>(r.data()), size)) {
+    if (!backend->read(reinterpret_cast<char *>(r.data()), size)) {
         return sys::errc::make_error_code(sys::errc::io_error);
     }
     if (backend->gcount() != size) {
@@ -170,7 +170,7 @@ auto file_t::write(size_t offset, utils::bytes_view_t data) noexcept -> outcome:
         }
     }
 
-    auto ptr = reinterpret_cast<const char*>(data.data());
+    auto ptr = reinterpret_cast<const char *>(data.data());
     if (!backend->write(ptr, data.size())) {
         return sys::errc::make_error_code(sys::errc::io_error);
     }

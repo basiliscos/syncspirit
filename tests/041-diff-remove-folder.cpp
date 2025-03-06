@@ -71,11 +71,11 @@ TEST_CASE("remove folder", "[model]") {
         proto::set_name(pr_fi, "a.txt");
         proto::set_block_size(pr_fi, 5ul);
         proto::set_size(pr_fi, 5ul);
-        auto& v = proto::get_version(pr_fi);
+        auto &v = proto::get_version(pr_fi);
         proto::add_counters(v, proto::Counter(peer_device->device_id().get_uint(), 0));
 
         auto b_hash = utils::sha256_digest(as_bytes("1")).value();
-        auto& b = proto::add_blocks(pr_fi);
+        auto &b = proto::add_blocks(pr_fi);
         proto::set_hash(b, b_hash);
         proto::set_size(b, 5);
 
@@ -90,11 +90,11 @@ TEST_CASE("remove folder", "[model]") {
         proto::set_name(pr_fi, "b.txt");
         proto::set_block_size(pr_fi, 5ul);
         proto::set_size(pr_fi, 5ul);
-        auto& v = proto::get_version(pr_fi);
+        auto &v = proto::get_version(pr_fi);
         proto::add_counters(v, proto::Counter(peer_device->device_id().get_uint(), 0));
 
         auto b_hash = utils::sha256_digest(as_bytes("2")).value();
-        auto& b = proto::add_blocks(pr_fi);
+        auto &b = proto::add_blocks(pr_fi);
         proto::set_hash(b, b_hash);
         proto::set_size(b, 5);
 
@@ -109,11 +109,11 @@ TEST_CASE("remove folder", "[model]") {
         proto::set_name(pr_fi, "c.txt");
         proto::set_block_size(pr_fi, 5ul);
         proto::set_size(pr_fi, 5ul);
-        auto& v = proto::get_version(pr_fi);
+        auto &v = proto::get_version(pr_fi);
         proto::add_counters(v, proto::Counter(peer_device->device_id().get_uint(), 0));
 
         auto b_hash = utils::sha256_digest(as_bytes("3")).value();
-        auto& b = proto::add_blocks(pr_fi);
+        auto &b = proto::add_blocks(pr_fi);
         proto::set_hash(b, b_hash);
         proto::set_size(b, 5);
 

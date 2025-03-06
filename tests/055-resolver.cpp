@@ -45,8 +45,8 @@ TEST_CASE("resolver", "[model]") {
     proto::set_name(pr_remote, "a.txt");
     proto::set_sequence(pr_remote, 2);
 
-    auto& peer_v = proto::get_version(pr_remote);
-    auto& peer_c1 = proto::add_counters(peer_v);
+    auto &peer_v = proto::get_version(pr_remote);
+    auto &peer_c1 = proto::add_counters(peer_v);
     proto::set_id(peer_c1, 1);
     proto::set_value(peer_c1, 2);
 
@@ -75,7 +75,7 @@ TEST_CASE("resolver", "[model]") {
 
     SECTION("3rd party has global version -> ignore") {
         auto pr_remote_2 = pr_remote;
-        auto& c2 = proto::add_counters(proto::get_version(pr_remote_2));
+        auto &c2 = proto::add_counters(proto::get_version(pr_remote_2));
         proto::set_id(c2, 2);
         proto::set_value(c2, 3);
 
@@ -91,7 +91,7 @@ TEST_CASE("resolver", "[model]") {
 
     SECTION("has outdated local file, which is not scanned yet -> ignore") {
         auto pr_local = pr_remote;
-        auto& c_local = proto::get_counters(proto::get_version(pr_local), 0) ;
+        auto &c_local = proto::get_counters(proto::get_version(pr_local), 0);
         proto::set_value(c_local, 1);
 
         auto file_remote = file_info_t::create(sequencer->next_uuid(), pr_remote, folder_peer).value();
@@ -104,7 +104,7 @@ TEST_CASE("resolver", "[model]") {
 
     SECTION("has outdated local file, scanned -> copy remote (1)") {
         auto pr_local = pr_remote;
-        auto& c_local = proto::get_counters(proto::get_version(pr_local), 0) ;
+        auto &c_local = proto::get_counters(proto::get_version(pr_local), 0);
         proto::set_value(c_local, 1);
         auto file_remote = file_info_t::create(sequencer->next_uuid(), pr_remote, folder_peer).value();
         auto file_local = file_info_t::create(sequencer->next_uuid(), pr_local, folder_my).value();
@@ -117,7 +117,7 @@ TEST_CASE("resolver", "[model]") {
 
     SECTION("has outdated local file, scanned -> copy remote (2)") {
         auto pr_local = pr_remote;
-        auto& c2 = proto::add_counters(proto::get_version(pr_remote));
+        auto &c2 = proto::add_counters(proto::get_version(pr_remote));
         proto::set_id(c2, 2);
         proto::set_value(c2, 3);
         auto file_remote = file_info_t::create(sequencer->next_uuid(), pr_remote, folder_peer).value();
@@ -131,7 +131,7 @@ TEST_CASE("resolver", "[model]") {
 
     SECTION("has outdated local file, scanned & remote deleted -> copy remote (3)") {
         auto pr_local = pr_remote;
-        auto& c2 = proto::add_counters(proto::get_version(pr_remote));
+        auto &c2 = proto::add_counters(proto::get_version(pr_remote));
         proto::set_id(c2, 2);
         proto::set_value(c2, 3);
         proto::set_deleted(pr_remote, true);
@@ -146,7 +146,7 @@ TEST_CASE("resolver", "[model]") {
 
     SECTION("has newer local file, scanned -> ignore (1)") {
         auto pr_local = pr_remote;
-        auto& c2 = proto::get_counters(proto::get_version(pr_local), 0);
+        auto &c2 = proto::get_counters(proto::get_version(pr_local), 0);
         proto::set_value(c2, 3);
         auto file_remote = file_info_t::create(sequencer->next_uuid(), pr_remote, folder_peer).value();
         auto file_local = file_info_t::create(sequencer->next_uuid(), pr_local, folder_my).value();
@@ -159,7 +159,7 @@ TEST_CASE("resolver", "[model]") {
 
     SECTION("has newer local file, scanned -> ignore (2)") {
         auto pr_local = pr_remote;
-        auto& c2 = proto::add_counters(proto::get_version(pr_local));
+        auto &c2 = proto::add_counters(proto::get_version(pr_local));
         proto::set_id(c2, 2);
         proto::set_value(c2, 3);
         auto file_remote = file_info_t::create(sequencer->next_uuid(), pr_remote, folder_peer).value();
@@ -187,11 +187,11 @@ TEST_CASE("resolver", "[model]") {
         auto pr_local = pr_remote;
 
         SECTION("remote deleted, locally modified -> ignore") {
-            auto& c2_remote = proto::add_counters(proto::get_version(pr_remote));
+            auto &c2_remote = proto::add_counters(proto::get_version(pr_remote));
             proto::set_id(c2_remote, 2);
             proto::set_value(c2_remote, 3);
 
-            auto& c2_local = proto::add_counters(proto::get_version(pr_local));
+            auto &c2_local = proto::add_counters(proto::get_version(pr_local));
             proto::set_id(c2_local, 3);
             proto::set_value(c2_local, 3);
 
@@ -205,12 +205,12 @@ TEST_CASE("resolver", "[model]") {
             CHECK(action == A::ignore);
         }
         SECTION("remote deleted, locally modified -> ignore (2)") {
-            auto& v_remote = proto::get_version(pr_remote);
-            auto& c2_remote = proto::get_counters(v_remote, 0);
+            auto &v_remote = proto::get_version(pr_remote);
+            auto &c2_remote = proto::get_counters(v_remote, 0);
             auto v = proto::get_value(c2_remote) + 1;
             proto::set_value(c2_remote, v);
 
-            auto& c2_local = proto::add_counters(proto::get_version(pr_local));
+            auto &c2_local = proto::add_counters(proto::get_version(pr_local));
             proto::set_id(c2_local, 3);
             proto::set_value(c2_local, v);
 
@@ -224,11 +224,11 @@ TEST_CASE("resolver", "[model]") {
             CHECK(action == A::ignore);
         }
         SECTION("locally deleted, remotely modified -> resurrect remote") {
-            auto& c2_remote = proto::add_counters(proto::get_version(pr_remote));
+            auto &c2_remote = proto::add_counters(proto::get_version(pr_remote));
             proto::set_id(c2_remote, 2);
             proto::set_value(c2_remote, 3);
 
-            auto& c2_local = proto::add_counters(proto::get_version(pr_local));
+            auto &c2_local = proto::add_counters(proto::get_version(pr_local));
             proto::set_id(c2_local, 3);
             proto::set_value(c2_local, 1);
 
@@ -242,12 +242,12 @@ TEST_CASE("resolver", "[model]") {
             CHECK(action == A::remote_copy);
         }
         SECTION("locally mod > remote mod -> ignore(local_win)") {
-            auto& c2_remote = proto::add_counters(proto::get_version(pr_remote));
+            auto &c2_remote = proto::add_counters(proto::get_version(pr_remote));
             proto::set_id(c2_remote, 2);
             proto::set_value(c2_remote, 3);
             proto::set_modified_s(pr_remote, 1734680000);
 
-            auto& c2_local = proto::add_counters(proto::get_version(pr_local));
+            auto &c2_local = proto::add_counters(proto::get_version(pr_local));
             proto::set_id(c2_local, 3);
             proto::set_value(c2_local, 4);
             proto::set_modified_s(pr_local, 1734690000);
@@ -261,12 +261,12 @@ TEST_CASE("resolver", "[model]") {
             CHECK(action == A::ignore);
         }
         SECTION("locally mod < remote mod -> remote_win") {
-            auto& c2_remote = proto::add_counters(proto::get_version(pr_remote));
+            auto &c2_remote = proto::add_counters(proto::get_version(pr_remote));
             proto::set_id(c2_remote, 2);
             proto::set_value(c2_remote, 4);
             proto::set_modified_s(pr_remote, 1734680000);
 
-            auto& c2_local = proto::add_counters(proto::get_version(pr_local));
+            auto &c2_local = proto::add_counters(proto::get_version(pr_local));
             proto::set_id(c2_local, 3);
             proto::set_value(c2_local, 3);
             proto::set_modified_s(pr_local, 1734670000);
@@ -280,12 +280,12 @@ TEST_CASE("resolver", "[model]") {
             CHECK(action == A::resolve_remote_win);
         }
         SECTION("locally version == remote version -> local_win(ignore), by device") {
-            auto& c2_remote = proto::add_counters(proto::get_version(pr_remote));
+            auto &c2_remote = proto::add_counters(proto::get_version(pr_remote));
             proto::set_id(c2_remote, 2);
             proto::set_value(c2_remote, 4);
             proto::set_modified_s(pr_remote, 1734680000);
 
-            auto& c2_local = proto::add_counters(proto::get_version(pr_local));
+            auto &c2_local = proto::add_counters(proto::get_version(pr_local));
             proto::set_id(c2_local, 3);
             proto::set_value(c2_local, 4);
             proto::set_modified_s(pr_local, 1734680000);
@@ -303,11 +303,11 @@ TEST_CASE("resolver", "[model]") {
             proto::set_name(pr_remote, name);
             proto::set_name(pr_local, name);
 
-            auto& c2_remote = proto::add_counters(proto::get_version(pr_remote));
+            auto &c2_remote = proto::add_counters(proto::get_version(pr_remote));
             proto::set_id(c2_remote, 2);
             proto::set_value(c2_remote, 4);
 
-            auto& c2_local = proto::add_counters(proto::get_version(pr_local));
+            auto &c2_local = proto::add_counters(proto::get_version(pr_local));
             proto::set_id(c2_local, 3);
             proto::set_value(c2_local, 4);
 
@@ -320,12 +320,12 @@ TEST_CASE("resolver", "[model]") {
             CHECK(action == A::ignore);
         }
         SECTION("locally version < remote version, already resolved -> ignore") {
-            auto& c2_remote = proto::add_counters(proto::get_version(pr_remote));
+            auto &c2_remote = proto::add_counters(proto::get_version(pr_remote));
             proto::set_id(c2_remote, 2);
             proto::set_value(c2_remote, 4);
 
-            auto& v_local = proto::get_version(pr_local);
-            auto& c2_local = proto::add_counters(v_local);
+            auto &v_local = proto::get_version(pr_local);
+            auto &c2_local = proto::add_counters(v_local);
             proto::set_id(c2_local, 3);
             proto::set_value(c2_local, 3);
 
@@ -336,7 +336,7 @@ TEST_CASE("resolver", "[model]") {
             folder_peer->add_strict(file_remote);
 
             proto::clear_counters(v_local);
-            auto& c3_local = proto::add_counters(v_local);
+            auto &c3_local = proto::add_counters(v_local);
             proto::set_id(c3_local, 3);
             proto::set_value(c3_local, 1);
 
@@ -350,12 +350,12 @@ TEST_CASE("resolver", "[model]") {
             CHECK(action == A::ignore);
         }
         SECTION("locally version > remote version, already resolved -> ignore") {
-            auto& c2_remote = proto::add_counters(proto::get_version(pr_remote));
+            auto &c2_remote = proto::add_counters(proto::get_version(pr_remote));
             proto::set_id(c2_remote, 2);
             proto::set_value(c2_remote, 3);
 
-            auto& v_local = proto::get_version(pr_local);
-            auto& c2_local = proto::add_counters(v_local);
+            auto &v_local = proto::get_version(pr_local);
+            auto &c2_local = proto::add_counters(v_local);
             proto::set_id(c2_local, 3);
             proto::set_value(c2_local, 4);
 
@@ -366,7 +366,7 @@ TEST_CASE("resolver", "[model]") {
             folder_peer->add_strict(file_remote);
 
             proto::clear_counters(v_local);
-            auto& c3_local = proto::add_counters(v_local);
+            auto &c3_local = proto::add_counters(v_local);
             proto::set_id(c3_local, 3);
             proto::set_value(c3_local, 1);
 

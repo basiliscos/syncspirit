@@ -251,8 +251,8 @@ int main(int argc, char **argv) {
             }
         }
 
-        spdlog::info("starting {} {}, libraries: lz4: v{}, OpenSSL {}", constants::client_name,
-                     SYNCSPIRIT_VERSION, LZ4_versionString(), OpenSSL_version(0));
+        spdlog::info("starting {} {}, libraries: lz4: v{}, OpenSSL {}", constants::client_name, SYNCSPIRIT_VERSION,
+                     LZ4_versionString(), OpenSSL_version(0));
 
         /* pre-init actors */
         asio::io_context io_context;

@@ -57,7 +57,7 @@ TEST_CASE("new file diff", "[model]") {
             proto::set_size(pr_file, 5ul);
             proto::set_block_size(pr_file, 5ul);
 
-            auto& b = proto::add_blocks(pr_file);
+            auto &b = proto::add_blocks(pr_file);
             proto::set_hash(b, as_bytes("12345"));
             proto::set_size(b, 5);
             auto bi = model::block_info_t::create(b).value();

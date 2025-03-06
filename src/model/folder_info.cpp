@@ -62,7 +62,8 @@ outcome::result<folder_info_ptr_t> folder_info_t::create(const bu::uuid &uuid, c
     return outcome::success(std::move(ptr));
 }
 
-folder_info_t::folder_info_t(utils::bytes_view_t key_, const device_ptr_t &device_, const folder_ptr_t &folder_) noexcept
+folder_info_t::folder_info_t(utils::bytes_view_t key_, const device_ptr_t &device_,
+                             const folder_ptr_t &folder_) noexcept
     : device{device_.get()}, folder{folder_.get()} {
     assert(key_.subspan(1, device_id_t::digest_length) == device->get_key().subspan(1));
     assert(key_.subspan(device_id_t::digest_length + 1, uuid_length) == folder->get_key().subspan(1));
@@ -130,9 +131,7 @@ void folder_info_t::set_index(std::uint64_t value) noexcept {
     }
 }
 
-folder_info_ptr_t folder_infos_map_t::by_uuid(utils::bytes_view_t uuid) const noexcept {
-    return get<0>(uuid);
-}
+folder_info_ptr_t folder_infos_map_t::by_uuid(utils::bytes_view_t uuid) const noexcept { return get<0>(uuid); }
 
 folder_info_ptr_t folder_infos_map_t::by_device(const device_t &device) const noexcept {
     return get<1>(device.device_id().get_sha256());

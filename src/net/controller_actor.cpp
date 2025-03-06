@@ -625,7 +625,7 @@ void controller_actor_t::on_message(proto::ClusterConfig &message) noexcept {
     send_diff();
 }
 
-void controller_actor_t::on_message(proto::Index& msg) noexcept {
+void controller_actor_t::on_message(proto::Index &msg) noexcept {
     LOG_DEBUG(log, "on_message (Index)");
     auto diff_opt = model::diff::peer::update_folder_t::create(*cluster, *sequencer, *peer, msg);
     if (!diff_opt) {
@@ -636,7 +636,7 @@ void controller_actor_t::on_message(proto::Index& msg) noexcept {
     auto &diff = diff_opt.assume_value();
     auto folder = cluster->get_folders().by_id(proto::get_folder(msg));
     auto file_count = proto::get_files_size(msg);
-    LOG_DEBUG(log, "on_message (Index), folder = {}, files = {}", folder->get_label(),file_count);
+    LOG_DEBUG(log, "on_message (Index), folder = {}, files = {}", folder->get_label(), file_count);
     push(diff.get());
     pull_ready();
     send_diff();
@@ -766,7 +766,8 @@ void controller_actor_t::on_block(message::block_response_t &message) noexcept {
             auto hash_bytes = utils::bytes_t(hash.begin(), hash.end());
             request_pool += block.get_size();
 
-            request<hasher::payload::validation_request_t>(hasher_proxy, data, std::move(hash_bytes), &message).send(init_timeout);
+            request<hasher::payload::validation_request_t>(hasher_proxy, data, std::move(hash_bytes), &message)
+                .send(init_timeout);
             resources->acquire(resource::hash);
         }
     }

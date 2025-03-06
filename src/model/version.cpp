@@ -13,14 +13,14 @@ using namespace syncspirit::model;
 
 // auto now = r::pt::second_clock::local_time();
 
-version_t::version_t(const proto::Vector& v) noexcept {
+version_t::version_t(const proto::Vector &v) noexcept {
     auto counters_sz = proto::get_counters_size(v);
     assert(counters_sz);
     counters.resize(counters_sz);
     auto best = proto::get_counters(v, 0);
     best_index = 0;
     for (int i = 0; i < counters_sz; ++i) {
-        auto& c = proto::get_counters(v, i);
+        auto &c = proto::get_counters(v, i);
         counters[i] = c;
         if (proto::get_value(c) > proto::get_value(best)) {
             best = c;

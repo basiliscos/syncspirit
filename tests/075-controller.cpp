@@ -133,7 +133,7 @@ struct sample_peer_t : r::actor_base_t {
                 }
             },
             orig);
-        LOG_TRACE(log, "{}, on_transfer, bytes = {}, type = {}", identity, data.size(), (int) type);
+        LOG_TRACE(log, "{}, on_transfer, bytes = {}, type = {}", identity, data.size(), (int)type);
         auto fwd_msg = new net::message::forwarded_message_t(address, std::move(variant));
         messages.emplace_back(fwd_msg);
 
@@ -526,9 +526,9 @@ void test_index_receiving() {
             }
 
             SECTION("index is applied") {
-                auto& folder = proto::add_folders(cc);
+                auto &folder = proto::add_folders(cc);
                 proto::set_id(folder, folder_1->get_id());
-                auto& d_peer = proto::add_devices(folder);
+                auto &d_peer = proto::add_devices(folder);
                 proto::set_id(d_peer, peer_device->device_id().get_sha256());
                 REQUIRE(cluster->get_pending_folders().size() == 0);
                 proto::set_max_sequence(d_peer, 10);
@@ -538,12 +538,12 @@ void test_index_receiving() {
                 proto::set_folder(index, folder_1->get_id());
 
                 auto file_name = std::string_view("some-dir");
-                auto& file = proto::add_files(index);
+                auto &file = proto::add_files(index);
                 proto::set_name(file, file_name);
                 proto::set_type(file, proto::FileInfoType::DIRECTORY);
                 proto::set_sequence(file, 10);
 
-                auto& v = proto::get_version(file);
+                auto &v = proto::get_version(file);
                 proto::add_counters(v, proto::Counter(peer_device->device_id().get_uint(), 1));
 
                 peer_actor->forward(index);
@@ -564,19 +564,19 @@ void test_index_receiving() {
                 REQUIRE(folder_my);
                 CHECK(folder_my->get_max_sequence() == 1ul);
                 REQUIRE(folder_my->get_file_infos().size() == 1);
-                CHECK(folder_my->get_file_infos().begin()->item->get_name() ==file_name);
+                CHECK(folder_my->get_file_infos().begin()->item->get_name() == file_name);
 
                 SECTION("then index update is applied") {
                     auto index_update = proto::IndexUpdate{};
                     proto::set_folder(index_update, folder_1->get_id());
                     auto file_name = std::string_view("some-dir-2");
                     auto sequence = folder_1_peer->get_max_sequence() + 1;
-                    auto& file = proto::add_files(index_update);
+                    auto &file = proto::add_files(index_update);
                     proto::set_name(file, file_name);
                     proto::set_type(file, proto::FileInfoType::DIRECTORY);
                     proto::set_sequence(file, sequence);
 
-                    auto& v = proto::get_version(file);
+                    auto &v = proto::get_version(file);
                     proto::add_counters(v, proto::Counter(peer_device->device_id().get_uint(), 1));
 
                     peer_actor->forward(index_update);
@@ -618,15 +618,15 @@ void test_index_sending() {
             auto folder_1_my = folder_1->get_folder_infos().by_device(*my_device);
 
             auto cc = proto::ClusterConfig{};
-            auto& folder = proto::add_folders(cc);
+            auto &folder = proto::add_folders(cc);
             proto::set_id(folder, folder_1->get_id());
-            auto& d_peer = proto::add_devices(folder);
+            auto &d_peer = proto::add_devices(folder);
             proto::set_id(d_peer, peer_device->device_id().get_sha256());
             proto::set_max_sequence(d_peer, folder_1_peer->get_max_sequence());
             proto::set_index_id(d_peer, folder_1_peer->get_index());
 
             SECTION("peer has outdated by sequence view") {
-                auto& d_my = proto::add_devices(folder);
+                auto &d_my = proto::add_devices(folder);
                 proto::set_id(d_my, my_device->device_id().get_sha256());
                 proto::set_max_sequence(d_my, folder_1_my->get_max_sequence() - 1);
                 proto::set_index_id(d_my, folder_1_my->get_index());
@@ -642,7 +642,7 @@ void test_index_sending() {
             }
 
             SECTION("peer has outdated by index view") {
-                auto& d_my = proto::add_devices(folder);
+                auto &d_my = proto::add_devices(folder);
                 proto::set_id(d_my, my_device->device_id().get_sha256());
                 proto::set_max_sequence(d_my, folder_1_my->get_max_sequence());
                 proto::set_index_id(d_my, folder_1_my->get_index() + 5);
@@ -663,7 +663,7 @@ void test_index_sending() {
             }
 
             SECTION("peer has actual view") {
-                auto& d_my = proto::add_devices(folder);
+                auto &d_my = proto::add_devices(folder);
                 proto::set_id(d_my, my_device->device_id().get_sha256());
                 proto::set_max_sequence(d_my, folder_1_my->get_max_sequence());
                 proto::set_index_id(d_my, folder_1_my->get_index());
@@ -687,13 +687,13 @@ void test_downloading() {
             auto folder_my = folder_infos.by_device(*my_device);
 
             auto cc = proto::ClusterConfig{};
-            auto& folder = proto::add_folders(cc);
+            auto &folder = proto::add_folders(cc);
             proto::set_id(folder, folder_1->get_id());
             auto d_peer = &proto::add_devices(folder);
             proto::set_id(*d_peer, peer_device->device_id().get_sha256());
             proto::set_max_sequence(*d_peer, 10);
             proto::set_index_id(*d_peer, folder_1_peer->get_index());
-            auto& d_my = proto::add_devices(folder);
+            auto &d_my = proto::add_devices(folder);
             proto::set_id(d_my, my_device->device_id().get_sha256());
             proto::set_max_sequence(d_my, folder_my->get_max_sequence());
             proto::set_index_id(d_my, folder_my->get_index());
@@ -704,21 +704,21 @@ void test_downloading() {
                 auto index = proto::Index{};
                 proto::set_folder(index, folder_1->get_id());
                 auto file_name = std::string_view("some-file");
-                auto& file = proto::add_files(index);
+                auto &file = proto::add_files(index);
                 proto::set_name(file, file_name);
                 proto::set_type(file, proto::FileInfoType::FILE);
                 proto::set_sequence(file, folder_1_peer->get_max_sequence() + 1);
                 proto::set_size(file, 5);
                 proto::set_block_size(file, 5);
 
-                auto& v = proto::get_version(file);
-                auto& counter = proto::add_counters(v);
+                auto &v = proto::get_version(file);
+                auto &counter = proto::add_counters(v);
                 proto::set_id(counter, 1);
                 proto::set_value(counter, 1);
 
                 auto data_1 = as_owned_bytes("12345");
                 auto data_1_h = utils::sha256_digest(data_1).value();
-                auto& b1 = proto::add_blocks(file);
+                auto &b1 = proto::add_blocks(file);
                 proto::set_hash(b1, data_1_h);
                 proto::set_size(b1, data_1.size());
 
@@ -783,8 +783,8 @@ void test_downloading() {
                 proto::set_size(*file_1, 5);
                 proto::set_block_size(*file_1, 5);
 
-                auto& v_1 = proto::get_version(*file_1);
-                auto& c_1 = proto::add_counters(v_1);
+                auto &v_1 = proto::get_version(*file_1);
+                auto &c_1 = proto::add_counters(v_1);
                 proto::set_id(c_1, 1);
                 proto::set_value(c_1, 1);
 
@@ -794,7 +794,7 @@ void test_downloading() {
                 auto data_2 = as_owned_bytes("67890");
                 auto data_2_hash = utils::sha256_digest(data_2).value();
 
-                auto& b1 = proto::add_blocks(*file_1);
+                auto &b1 = proto::add_blocks(*file_1);
                 proto::set_hash(b1, data_1_hash);
                 proto::set_size(b1, 5);
 
@@ -806,14 +806,14 @@ void test_downloading() {
                 proto::set_size(*file_2, 5);
                 proto::set_block_size(*file_2, 5);
 
-                auto& v_2 = proto::get_version(*file_2);
-                auto& c_2 = proto::add_counters(v_2);
+                auto &v_2 = proto::get_version(*file_2);
+                auto &c_2 = proto::add_counters(v_2);
                 proto::set_id(c_2, 1);
                 proto::set_value(c_2, 2);
 
                 file_1 = &proto::get_files(index, 0);
                 SECTION("with different blocks") {
-                    auto& b2 = proto::add_blocks(*file_2);
+                    auto &b2 = proto::add_blocks(*file_2);
                     proto::set_hash(b2, data_2_hash);
                     proto::set_size(b2, 5);
 
@@ -932,13 +932,13 @@ void test_downloading() {
                 proto::set_size(pr_fi, 5);
                 proto::set_block_size(pr_fi, 5);
 
-                auto& version = proto::get_version(pr_fi);
+                auto &version = proto::get_version(pr_fi);
                 proto::add_counters(version, proto::Counter(1, 1));
 
                 auto data_1 = as_owned_bytes("12345");
                 auto data_1_hash = utils::sha256_digest(data_1).value();
 
-                auto& b1 = proto::add_blocks(pr_fi);
+                auto &b1 = proto::add_blocks(pr_fi);
                 proto::set_hash(b1, data_1_hash);
                 proto::set_size(b1, 5);
                 auto b = model::block_info_t::create(b1).value();
@@ -957,13 +957,13 @@ void test_downloading() {
                 auto index_update = proto::IndexUpdate{};
                 proto::set_folder(index_update, folder_1->get_id());
 
-                auto& file = proto::add_files(index_update);
+                auto &file = proto::add_files(index_update);
                 proto::set_name(file, file_name);
                 proto::set_type(file, proto::FileInfoType::FILE);
                 proto::set_sequence(file, folder_1_peer->get_max_sequence() + 1);
                 proto::set_deleted(file, true);
 
-                auto& v = proto::get_version(file);
+                auto &v = proto::get_version(file);
                 proto::add_counters(v, proto::Counter(peer_device->device_id().get_uint(), 1));
 
                 peer_actor->forward(index_update);
@@ -994,19 +994,19 @@ void test_downloading() {
                 proto::set_folder(index_update, folder_1->get_id());
 
                 auto file_name = std::string_view("some-file");
-                auto& file = proto::add_files(index_update);
+                auto &file = proto::add_files(index_update);
                 proto::set_name(file, file_name);
                 proto::set_type(file, proto::FileInfoType::FILE);
                 proto::set_sequence(file, folder_1_peer->get_max_sequence() + 1);
                 proto::set_block_size(file, 5);
                 proto::set_size(file, 5);
 
-                auto& v = proto::get_version(file);
+                auto &v = proto::get_version(file);
                 proto::add_counters(v, proto::Counter(1, 1));
 
                 auto data_1 = as_owned_bytes("12345");
                 auto data_1_h = utils::sha256_digest(data_1).value();
-                auto& b1 = proto::add_blocks(file);
+                auto &b1 = proto::add_blocks(file);
                 proto::set_hash(b1, data_1_h);
                 proto::set_size(b1, data_1.size());
 
@@ -1038,13 +1038,13 @@ void test_downloading() {
                 proto::set_folder(index, folder_1->get_id());
 
                 auto file_name = std::string_view("file-1");
-                auto& file_1 = proto::add_files(index);
+                auto &file_1 = proto::add_files(index);
                 proto::set_name(file_1, file_name);
                 proto::set_type(file_1, proto::FileInfoType::FILE);
                 proto::set_sequence(file_1, folder_1_peer->get_max_sequence() + 1);
                 proto::set_deleted(file_1, true);
 
-                auto& v_1 = proto::get_version(file_1);
+                auto &v_1 = proto::get_version(file_1);
                 proto::add_counters(v_1, proto::Counter(1, 1));
                 peer_actor->forward(index);
 
@@ -1056,20 +1056,20 @@ void test_downloading() {
 
                 auto index_update = proto::IndexUpdate{};
                 proto::set_folder(index_update, folder_1->get_id());
-                auto& file_2 = proto::add_files(index_update);
+                auto &file_2 = proto::add_files(index_update);
                 proto::set_name(file_2, file_name);
                 proto::set_type(file_2, proto::FileInfoType::FILE);
                 proto::set_sequence(file_2, folder_1_peer->get_max_sequence() + 1);
                 proto::set_block_size(file_2, 5);
                 proto::set_size(file_2, 5);
 
-                auto& v_2 = proto::get_version(file_2);
+                auto &v_2 = proto::get_version(file_2);
                 proto::add_counters(v_2, proto::Counter(1, 2));
 
                 auto data_1 = as_owned_bytes("12345");
                 auto data_1_hash = utils::sha256_digest(data_1).value();
 
-                auto& b1 = proto::add_blocks(file_2);
+                auto &b1 = proto::add_blocks(file_2);
                 proto::set_hash(b1, data_1_hash);
                 proto::set_size(b1, 5);
 
@@ -1096,20 +1096,20 @@ void test_downloading() {
                 proto::set_folder(index, folder_1->get_id());
 
                 auto file_name_1 = std::string_view("file-1");
-                auto& file_1 = proto::add_files(index);
+                auto &file_1 = proto::add_files(index);
                 proto::set_name(file_1, file_name_1);
                 proto::set_type(file_1, proto::FileInfoType::FILE);
                 proto::set_sequence(file_1, folder_1_peer->get_max_sequence() + 1);
                 proto::set_block_size(file_1, 5);
                 proto::set_size(file_1, 10);
 
-                auto& v_1 = proto::get_version(file_1);
+                auto &v_1 = proto::get_version(file_1);
                 proto::add_counters(v_1, proto::Counter(1, 1));
 
                 auto data_1 = as_owned_bytes("12345");
                 auto data_1_hash = utils::sha256_digest(data_1).value();
 
-                auto& b1 = proto::add_blocks(file_1);
+                auto &b1 = proto::add_blocks(file_1);
                 proto::set_hash(b1, data_1_hash);
                 proto::set_size(b1, 5);
                 auto bi_1 = model::block_info_t::create(b1).value();
@@ -1117,7 +1117,7 @@ void test_downloading() {
                 auto data_2 = as_owned_bytes("67890");
                 auto data_2_hash = utils::sha256_digest(data_2).value();
 
-                auto& b2 = proto::add_blocks(file_1);
+                auto &b2 = proto::add_blocks(file_1);
                 proto::set_hash(b2, data_2_hash);
                 proto::set_size(b2, 5);
                 proto::set_offset(b2, 5);
@@ -1135,7 +1135,7 @@ void test_downloading() {
                 proto::set_block_size(pr_file_my, 5);
                 proto::set_size(pr_file_my, 5);
 
-                auto& v_my = proto::get_version(pr_file_my);
+                auto &v_my = proto::get_version(pr_file_my);
                 proto::add_counters(v_my, proto::Counter(my_device->device_id().get_uint(), 1));
 
                 auto uuid = sup->sequencer->next_uuid();
@@ -1174,13 +1174,13 @@ void test_downloading_errors() {
             auto folder_my = folder_infos.by_device(*my_device);
 
             auto cc = proto::ClusterConfig{};
-            auto& folder = proto::add_folders(cc);
+            auto &folder = proto::add_folders(cc);
             proto::set_id(folder, folder_1->get_id());
-            auto& d_peer = proto::add_devices(folder);
+            auto &d_peer = proto::add_devices(folder);
             proto::set_id(d_peer, peer_device->device_id().get_sha256());
             proto::set_max_sequence(d_peer, folder_1_peer->get_max_sequence());
             proto::set_index_id(d_peer, folder_1_peer->get_index());
-            auto& d_my = proto::add_devices(folder);
+            auto &d_my = proto::add_devices(folder);
             proto::set_id(d_my, my_device->device_id().get_sha256());
             proto::set_max_sequence(d_my, folder_my->get_max_sequence());
             proto::set_index_id(d_my, folder_my->get_index());
@@ -1190,15 +1190,15 @@ void test_downloading_errors() {
             auto index = proto::Index{};
             proto::set_folder(index, folder_1->get_id());
             auto file_name = std::string_view("some-file");
-            auto& file = proto::add_files(index);
+            auto &file = proto::add_files(index);
             proto::set_name(file, file_name);
             proto::set_type(file, proto::FileInfoType::FILE);
             proto::set_sequence(file, folder_1_peer->get_max_sequence() + 1);
             proto::set_block_size(file, 5);
             proto::set_size(file, 15);
 
-            auto& v = proto::get_version(file);
-            auto& counter = proto::add_counters(v);
+            auto &v = proto::get_version(file);
+            auto &counter = proto::add_counters(v);
             proto::set_id(counter, 1);
 
             auto data_1 = as_owned_bytes("12345");
@@ -1210,16 +1210,16 @@ void test_downloading_errors() {
             auto data_3 = as_owned_bytes("11111");
             auto data_3_hash = utils::sha256_digest(data_3).value();
 
-            auto& b1 = proto::add_blocks(file);
+            auto &b1 = proto::add_blocks(file);
             proto::set_hash(b1, data_1_hash);
             proto::set_size(b1, 5);
 
-            auto& b2 = proto::add_blocks(file);
+            auto &b2 = proto::add_blocks(file);
             proto::set_hash(b2, data_2_hash);
             proto::set_size(b2, 5);
             proto::set_offset(b2, 5);
 
-            auto& b3 = proto::add_blocks(file);
+            auto &b3 = proto::add_blocks(file);
             proto::set_hash(b3, data_2_hash);
             proto::set_size(b3, 5);
             proto::set_offset(b3, 10);
@@ -1269,16 +1269,16 @@ void test_download_from_scratch() {
             auto sha256 = peer_device->device_id().get_sha256();
 
             auto cc = proto::ClusterConfig{};
-            auto& folder = proto::add_folders(cc);
+            auto &folder = proto::add_folders(cc);
             proto::set_id(folder, folder_1->get_id());
             {
-                auto& device = proto::add_devices(folder);
+                auto &device = proto::add_devices(folder);
                 proto::set_id(device, peer_device->device_id().get_sha256());
                 proto::set_max_sequence(device, 15);
                 proto::set_index_id(device, 12345);
             }
             {
-                auto& device = proto::add_devices(folder);
+                auto &device = proto::add_devices(folder);
                 proto::set_id(device, my_device->device_id().get_sha256());
                 proto::set_max_sequence(device, 0);
                 proto::set_index_id(device, 0);
@@ -1292,21 +1292,21 @@ void test_download_from_scratch() {
             auto index = proto::Index{};
             proto::set_folder(index, folder_1->get_id());
             auto file_name = std::string_view("some-file");
-            auto& file = proto::add_files(index);
+            auto &file = proto::add_files(index);
             proto::set_name(file, file_name);
             proto::set_type(file, proto::FileInfoType::FILE);
             proto::set_sequence(file, 154);
             proto::set_size(file, 5);
             proto::set_block_size(file, 5);
 
-            auto& v = proto::get_version(file);
-            auto& counter = proto::add_counters(v);
+            auto &v = proto::get_version(file);
+            auto &counter = proto::add_counters(v);
             proto::set_id(counter, 1);
             proto::set_value(counter, 1);
 
             auto data_1 = as_owned_bytes("12345");
             auto data_1_h = utils::sha256_digest(data_1).value();
-            auto& b1 = proto::add_blocks(file);
+            auto &b1 = proto::add_blocks(file);
             proto::set_hash(b1, data_1_h);
             proto::set_size(b1, data_1.size());
 
@@ -1353,9 +1353,9 @@ void test_download_resuming() {
             auto sha256 = peer_device->device_id().get_sha256();
 
             auto cc = proto::ClusterConfig{};
-            auto& folder = proto::add_folders(cc);
+            auto &folder = proto::add_folders(cc);
             proto::set_id(folder, folder_1->get_id());
-            auto& d_peer = proto::add_devices(folder);
+            auto &d_peer = proto::add_devices(folder);
             proto::set_id(d_peer, peer_device->device_id().get_sha256());
             proto::set_max_sequence(d_peer, 15);
             proto::set_index_id(d_peer, 12345);
@@ -1371,15 +1371,15 @@ void test_download_resuming() {
             proto::set_folder(index, folder_1->get_id());
 
             auto file_name = std::string_view("some-file");
-            auto& file = proto::add_files(index);
+            auto &file = proto::add_files(index);
             proto::set_name(file, file_name);
             proto::set_type(file, proto::FileInfoType::FILE);
             proto::set_sequence(file, 154);
             proto::set_block_size(file, 5);
             proto::set_size(file, 10);
 
-            auto& v = proto::get_version(file);
-            auto& counter = proto::add_counters(v);
+            auto &v = proto::get_version(file);
+            auto &counter = proto::add_counters(v);
             proto::set_id(counter, 1);
 
             auto data_1 = as_owned_bytes("12345");
@@ -1388,11 +1388,11 @@ void test_download_resuming() {
             auto data_2 = as_owned_bytes("67890");
             auto data_2_hash = utils::sha256_digest(data_2).value();
 
-            auto& b1 = proto::add_blocks(file);
+            auto &b1 = proto::add_blocks(file);
             proto::set_hash(b1, data_1_hash);
             proto::set_size(b1, 5);
 
-            auto& b2 = proto::add_blocks(file);
+            auto &b2 = proto::add_blocks(file);
             proto::set_hash(b2, data_2_hash);
             proto::set_size(b2, 5);
             proto::set_offset(b2, 5);
@@ -1464,7 +1464,7 @@ void test_initiate_my_sharing() {
                 REQUIRE((peer_cluster_msg && peer_cluster_msg));
                 auto &msg = *peer_cluster_msg;
                 REQUIRE(proto::get_folders_size(msg) == 1);
-                auto& f = proto::get_folders(msg, 0);
+                auto &f = proto::get_folders(msg, 0);
                 REQUIRE(proto::get_devices_size(f) == 2);
 
                 using f_t = const proto::Device;
@@ -1512,16 +1512,16 @@ void test_initiate_peer_sharing() {
             sup->do_process();
 
             auto cc = proto::ClusterConfig{};
-            auto& folder = proto::add_folders(cc);
+            auto &folder = proto::add_folders(cc);
             proto::set_id(folder, folder_1->get_id());
             {
-                auto& device = proto::add_devices(folder);
+                auto &device = proto::add_devices(folder);
                 proto::set_id(device, peer_device->device_id().get_sha256());
                 proto::set_max_sequence(device, 15);
                 proto::set_index_id(device, 0x12345);
             }
             {
-                auto& device = proto::add_devices(folder);
+                auto &device = proto::add_devices(folder);
                 proto::set_id(device, my_device->device_id().get_sha256());
                 proto::set_max_sequence(device, 0);
                 proto::set_index_id(device, 0);
@@ -1557,7 +1557,7 @@ void test_initiate_peer_sharing() {
 
                 auto &msg = *peer_cluster_msg;
                 REQUIRE(proto::get_folders_size(msg) == 1);
-                auto& f = proto::get_folders(msg, 0);
+                auto &f = proto::get_folders(msg, 0);
                 REQUIRE(proto::get_devices_size(f) == 2);
 
                 using f_t = const proto::Device;
@@ -1614,13 +1614,13 @@ void test_sending_index_updates() {
             auto folder_my = folder_infos.by_device(*my_device);
 
             auto cc = proto::ClusterConfig{};
-            auto& folder = proto::add_folders(cc);
+            auto &folder = proto::add_folders(cc);
             proto::set_id(folder, folder_1->get_id());
-            auto& d_peer = proto::add_devices(folder);
+            auto &d_peer = proto::add_devices(folder);
             proto::set_id(d_peer, peer_device->device_id().get_sha256());
             proto::set_max_sequence(d_peer, folder_1_peer->get_max_sequence());
             proto::set_index_id(d_peer, folder_1_peer->get_index());
-            auto& d_my = proto::add_devices(folder);
+            auto &d_my = proto::add_devices(folder);
             proto::set_id(d_my, my_device->device_id().get_sha256());
             proto::set_max_sequence(d_my, folder_my->get_max_sequence());
             proto::set_index_id(d_my, folder_my->get_index());
@@ -1656,13 +1656,13 @@ void test_uploading() {
             auto folder_my = folder_infos.by_device(*my_device);
 
             auto cc = proto::ClusterConfig{};
-            auto& folder = proto::add_folders(cc);
+            auto &folder = proto::add_folders(cc);
             proto::set_id(folder, folder_1->get_id());
-            auto& d_peer = proto::add_devices(folder);
+            auto &d_peer = proto::add_devices(folder);
             proto::set_id(d_peer, peer_device->device_id().get_sha256());
             proto::set_max_sequence(d_peer, folder_1_peer->get_max_sequence());
             proto::set_index_id(d_peer, folder_1_peer->get_index());
-            auto& d_my = proto::add_devices(folder);
+            auto &d_my = proto::add_devices(folder);
             proto::set_id(d_my, my_device->device_id().get_sha256());
             proto::set_max_sequence(d_my, folder_my->get_max_sequence());
             proto::set_index_id(d_my, folder_my->get_index());
@@ -1675,14 +1675,14 @@ void test_uploading() {
             proto::set_size(file, 5);
             proto::set_block_size(file, 5);
 
-            auto& v = proto::get_version(file);
-            auto& counter = proto::add_counters(v);
+            auto &v = proto::get_version(file);
+            auto &counter = proto::add_counters(v);
             proto::set_id(counter, 1);
             proto::set_value(counter, 1);
 
             auto data_1 = as_owned_bytes("12345");
             auto data_1_h = utils::sha256_digest(data_1).value();
-            auto& b1 = proto::add_blocks(file);
+            auto &b1 = proto::add_blocks(file);
             proto::set_hash(b1, data_1_h);
             proto::set_size(b1, data_1.size());
 
@@ -1704,8 +1704,8 @@ void test_uploading() {
             SECTION("upload regular file, no hash") {
                 peer_actor->forward(req);
 
-                auto res = r::make_message<fs::payload::block_response_t>(target->get_address(), req,
-                                                                          sys::error_code{}, data_1);
+                auto res = r::make_message<fs::payload::block_response_t>(target->get_address(), req, sys::error_code{},
+                                                                          data_1);
                 block_responses.push_back(res);
 
                 sup->do_process();
@@ -1748,9 +1748,9 @@ void test_conflicts() {
 
             auto cc = proto::ClusterConfig{};
 
-            auto& folder = proto::add_folders(cc);
+            auto &folder = proto::add_folders(cc);
             proto::set_id(folder, folder_1->get_id());
-            auto& d_peer = proto::add_devices(folder);
+            auto &d_peer = proto::add_devices(folder);
             proto::set_id(d_peer, peer_device->device_id().get_sha256());
             proto::set_max_sequence(d_peer, 15);
             proto::set_index_id(d_peer, 12345);
@@ -1766,21 +1766,21 @@ void test_conflicts() {
             proto::set_folder(index, folder_1->get_id());
 
             auto file_name = std::string_view("some-file.txt");
-            auto& file = proto::add_files(index);
+            auto &file = proto::add_files(index);
             proto::set_name(file, file_name);
             proto::set_type(file, proto::FileInfoType::FILE);
             proto::set_sequence(file, 154);
             proto::set_block_size(file, 5);
             proto::set_size(file, 5);
 
-            auto& v = proto::get_version(file);
-            auto& c_1 = proto::add_counters(v);
+            auto &v = proto::get_version(file);
+            auto &c_1 = proto::add_counters(v);
             proto::set_id(c_1, 1);
             proto::set_value(c_1, 1);
 
             auto data_1 = as_owned_bytes("12345");
             auto data_1_h = utils::sha256_digest(data_1).value();
-            auto& b1 = proto::add_blocks(file);
+            auto &b1 = proto::add_blocks(file);
             proto::set_hash(b1, data_1_h);
             proto::set_size(b1, data_1.size());
 
@@ -1796,7 +1796,7 @@ void test_conflicts() {
 
             auto data_2 = as_owned_bytes("67890");
             auto data_2_h = utils::sha256_digest(data_2).value();
-            auto& b2 = proto::add_blocks(pr_file);
+            auto &b2 = proto::add_blocks(pr_file);
             proto::set_hash(b2, data_2_h);
             proto::set_size(b2, data_2.size());
 
@@ -1809,7 +1809,7 @@ void test_conflicts() {
 
             auto data_3 = as_owned_bytes("12346");
             auto data_3_h = utils::sha256_digest(data_3).value();
-            auto& b3 = proto::add_blocks(pr_file);
+            auto &b3 = proto::add_blocks(pr_file);
             proto::set_hash(b3, data_3_h);
             proto::set_size(b3, data_3.size());
             proto::add_blocks(file, b3);
@@ -1860,8 +1860,8 @@ void test_conflicts() {
                 auto &msg = peer_actor->messages.back();
                 auto &index_update_sent = std::get<proto::IndexUpdate>(msg->payload);
                 REQUIRE(proto::get_files_size(index_update_sent) == 2);
-                auto& f1 = proto::get_files(index_update_sent, 0);
-                auto& f2 = proto::get_files(index_update_sent, 1);
+                auto &f1 = proto::get_files(index_update_sent, 0);
+                auto &f2 = proto::get_files(index_update_sent, 1);
                 CHECK(proto::get_name(f1) == local_conflict->get_name());
                 CHECK(proto::get_name(f2) == file->get_name());
             }
@@ -1890,9 +1890,9 @@ void test_download_interrupting() {
             auto sha256 = peer_device->device_id().get_sha256();
 
             auto cc = proto::ClusterConfig{};
-            auto& folder = proto::add_folders(cc);
+            auto &folder = proto::add_folders(cc);
             proto::set_id(folder, folder_1->get_id());
-            auto& d_peer = proto::add_devices(folder);
+            auto &d_peer = proto::add_devices(folder);
             proto::set_id(d_peer, peer_device->device_id().get_sha256());
             proto::set_max_sequence(d_peer, 15);
             proto::set_index_id(d_peer, 12345);
@@ -1907,26 +1907,26 @@ void test_download_interrupting() {
             auto index = proto::Index{};
             proto::set_folder(index, folder_1->get_id());
             auto file_name = std::string_view("some-file");
-            auto& file = proto::add_files(index);
+            auto &file = proto::add_files(index);
             proto::set_name(file, file_name);
             proto::set_type(file, proto::FileInfoType::FILE);
             proto::set_sequence(file, 154);
             proto::set_block_size(file, 5);
             proto::set_size(file, 10);
 
-            auto& v = proto::get_version(file);
-            auto& counter = proto::add_counters(v);
+            auto &v = proto::get_version(file);
+            auto &counter = proto::add_counters(v);
             proto::set_id(counter, 1);
 
             auto data_1 = as_owned_bytes("12345");
             auto data_1_h = utils::sha256_digest(data_1).value();
-            auto& b1 = proto::add_blocks(file);
+            auto &b1 = proto::add_blocks(file);
             proto::set_hash(b1, data_1_h);
             proto::set_size(b1, data_1.size());
 
             auto data_2 = as_owned_bytes("67890");
             auto data_2_h = utils::sha256_digest(data_2).value();
-            auto& b2 = proto::add_blocks(file);
+            auto &b2 = proto::add_blocks(file);
             proto::set_hash(b2, data_2_h);
             proto::set_size(b2, data_2.size());
 

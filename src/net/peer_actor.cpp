@@ -167,7 +167,7 @@ void peer_actor_t::on_read(std::size_t bytes) noexcept {
     resources->release(resource::io_read);
     rx_idx += bytes;
     LOG_TRACE(log, "on_read, {} bytes, total = {}", bytes, rx_idx);
-    auto buff = utils::bytes_view_t((unsigned char*)rx_buff.data(), rx_idx);
+    auto buff = utils::bytes_view_t((unsigned char *)rx_buff.data(), rx_idx);
     auto result = proto::parse_bep(buff);
     if (result.has_error()) {
         auto &ec = result.error();
@@ -218,7 +218,7 @@ void peer_actor_t::shutdown_start() noexcept {
 
     proto::Close close;
     proto::set_reason(close, shutdown_reason->message());
-    auto buff = proto::serialize( close);
+    auto buff = proto::serialize(close);
     tx_queue.clear();
     push_write(std::move(buff), true, true);
     LOG_TRACE(log, "going to send close message");
@@ -330,7 +330,8 @@ void peer_actor_t::read_controlled(proto::message::message_t &&msg) noexcept {
     using MT = proto::MessageType;
     LOG_TRACE(log, "read_controlled");
     auto type = MT::UNKNOWN;
-    std::visit([&](auto &&msg) {
+    std::visit(
+        [&](auto &&msg) {
             using T = std::decay_t<decltype(msg)>;
             type = proto::message::get_bep_type<T>();
             if constexpr (std::is_same_v<T, proto::Hello>) {

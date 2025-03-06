@@ -47,11 +47,11 @@ TEST_CASE("remove peer", "[model]") {
         proto::set_name(pr_fi, "a.txt");
         proto::set_block_size(pr_fi, 5ul);
         proto::set_size(pr_fi, 5ul);
-        auto& v = proto::get_version(pr_fi);
+        auto &v = proto::get_version(pr_fi);
         proto::add_counters(v, proto::Counter(peer_device->device_id().get_uint(), 0));
 
         auto b1_hash = utils::sha256_digest(as_bytes("12345")).value();
-        auto& b1 = proto::add_blocks(pr_fi);
+        auto &b1 = proto::add_blocks(pr_fi);
         proto::set_hash(b1, as_bytes("123"));
         proto::set_size(b1, 5);
 
@@ -111,11 +111,11 @@ TEST_CASE("remove peer", "[model]") {
             proto::set_name(pr_fi, "a.txt");
             proto::set_block_size(pr_fi, 5ul);
             proto::set_size(pr_fi, 5ul);
-            auto& v = proto::get_version(pr_fi);
+            auto &v = proto::get_version(pr_fi);
             proto::add_counters(v, proto::Counter(peer_device->device_id().get_uint(), 0));
 
             auto b_hash = utils::sha256_digest(as_bytes("1")).value();
-            auto& b = proto::add_blocks(pr_fi);
+            auto &b = proto::add_blocks(pr_fi);
             proto::set_hash(b, b_hash);
             proto::set_size(b, 5);
 
@@ -130,17 +130,17 @@ TEST_CASE("remove peer", "[model]") {
             proto::set_name(pr_fi, "b.txt");
             proto::set_block_size(pr_fi, 5ul);
             proto::set_size(pr_fi, 10ul);
-            auto& v = proto::get_version(pr_fi);
+            auto &v = proto::get_version(pr_fi);
             proto::add_counters(v, proto::Counter(peer_device->device_id().get_uint(), 0));
 
             auto b1_hash = utils::sha256_digest(as_bytes("2")).value();
-            auto& pr_b1 = proto::add_blocks(pr_fi);
+            auto &pr_b1 = proto::add_blocks(pr_fi);
             proto::set_hash(pr_b1, b1_hash);
             proto::set_size(pr_b1, 5);
             proto::set_offset(pr_b1, 0);
 
             auto b2_hash = utils::sha256_digest(as_bytes("1")).value();
-            auto& pr_b2 = proto::add_blocks(pr_fi);
+            auto &pr_b2 = proto::add_blocks(pr_fi);
             proto::set_hash(pr_b2, b2_hash);
             proto::set_size(pr_b2, 5);
             proto::set_offset(pr_b2, 0);
@@ -165,9 +165,9 @@ TEST_CASE("remove peer", "[model]") {
 
     SECTION("unknown folders are removed") {
         db::PendingFolder db_pf;
-        auto& db_f = db::get_folder(db_pf);
+        auto &db_f = db::get_folder(db_pf);
         db::set_id(db_f, "1234");
-        auto& db_fi = db::get_folder_info(db_pf);
+        auto &db_fi = db::get_folder_info(db_pf);
         db::set_max_sequence(db_fi, 5);
         db::set_index_id(db_fi, 10);
 

@@ -33,7 +33,7 @@ local_update_t::local_update_t(const cluster_t &cluster, sequencer_t &sequencer,
     } else {
         version.reset(new version_t(device));
     }
-    auto& proto_version = proto::get_version(proto_local);
+    auto &proto_version = proto::get_version(proto_local);
     version->to_proto(proto_version);
 }
 

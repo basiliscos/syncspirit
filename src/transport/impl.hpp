@@ -172,7 +172,7 @@ template <> struct base_impl_t<ssl_socket_t> {
                     return false;
                 }
 
-                auto& der_bytes = der_option.value();
+                auto &der_bytes = der_option.value();
                 auto cert_data = utils::cert_data_t(std::move(der_bytes));
                 auto peer_option = model::device_id_t::from_cert(cert_data);
                 if (!peer_option) {

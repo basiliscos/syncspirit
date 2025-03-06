@@ -9,8 +9,7 @@
 #include <fmt/format.h>
 #include <cstdint>
 
-
-namespace syncspirit{
+namespace syncspirit {
 
 namespace proto {
 
@@ -282,6 +281,6 @@ using SomeDevice = pp::message<
 
 // clang-format on
 
-}
+} // namespace db
 
-}
+} // namespace syncspirit

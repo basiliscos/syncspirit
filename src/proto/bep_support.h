@@ -29,25 +29,24 @@ struct wrapped_message_t {
     std::size_t consumed = 0;
 };
 
-template <typename T>
-consteval MessageType get_bep_type() {
-    if constexpr (std::is_same_v<T, ClusterConfig>)  {
+template <typename T> consteval MessageType get_bep_type() {
+    if constexpr (std::is_same_v<T, ClusterConfig>) {
         return MessageType::CLUSTER_CONFIG;
-    } else if constexpr (std::is_same_v<T, Index>)  {
+    } else if constexpr (std::is_same_v<T, Index>) {
         return MessageType::INDEX;
-    } else if constexpr (std::is_same_v<T, IndexUpdate>)  {
+    } else if constexpr (std::is_same_v<T, IndexUpdate>) {
         return MessageType::INDEX_UPDATE;
-    } else if constexpr (std::is_same_v<T, Request>)  {
+    } else if constexpr (std::is_same_v<T, Request>) {
         return MessageType::REQUEST;
-    } else if constexpr (std::is_same_v<T, Response>)  {
+    } else if constexpr (std::is_same_v<T, Response>) {
         return MessageType::RESPONSE;
-    } else if constexpr (std::is_same_v<T, DownloadProgress>)  {
+    } else if constexpr (std::is_same_v<T, DownloadProgress>) {
         return MessageType::DOWNLOAD_PROGRESS;
-    } else if constexpr (std::is_same_v<T, Ping>)  {
+    } else if constexpr (std::is_same_v<T, Ping>) {
         return MessageType::PING;
-    } else if constexpr (std::is_same_v<T, Close>)  {
+    } else if constexpr (std::is_same_v<T, Close>) {
         return MessageType::CLOSE;
-    } else if constexpr (std::is_same_v<T, Hello>)  {
+    } else if constexpr (std::is_same_v<T, Hello>) {
         return MessageType::HELLO;
     }
 }
@@ -61,7 +60,7 @@ SYNCSPIRIT_API std::size_t make_announce_message(utils::bytes_view_t storage, ut
 
 template <typename Message>
 utils::bytes_t serialize(const Message &message,
-               proto::MessageCompression compression = proto::MessageCompression::NONE) noexcept;
+                         proto::MessageCompression compression = proto::MessageCompression::NONE) noexcept;
 
 SYNCSPIRIT_API outcome::result<message::wrapped_message_t> parse_bep(utils::bytes_view_t) noexcept;
 

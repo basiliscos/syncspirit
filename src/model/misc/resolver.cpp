@@ -59,7 +59,7 @@ static advance_action_t resolve(const file_info_t &remote, const file_info_t *lo
     auto l_id = proto::get_id(l_best);
 
     // check possible conflict
-    if (r_id  == l_id) {
+    if (r_id == l_id) {
         if (lv > rv) {
             return advance_action_t::ignore;
         } else if (lv < rv) {

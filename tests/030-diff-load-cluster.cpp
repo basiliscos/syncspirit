@@ -314,7 +314,7 @@ TEST_CASE("loading cluster (file info + block)", "[model]") {
     proto::set_name(pr_fi, "a/b.txt");
     proto::set_size(pr_fi, 55ul);
     proto::set_block_size(pr_fi, 5ul);
-    auto& version = proto::get_version(pr_fi);
+    auto &version = proto::get_version(pr_fi);
     proto::add_counters(version, proto::Counter(my_device->device_id().get_uint(), 0));
     auto fi = file_info_t::create(sequencer->next_uuid(), pr_fi, folder_info).value();
     CHECK(fi);

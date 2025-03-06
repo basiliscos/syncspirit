@@ -710,9 +710,8 @@ struct active_relay_fixture_t : fixture_t {
     virtual void relay_reply() noexcept {
         auto sha256 = peer_device->device_id().get_sha256();
         auto id = utils::bytes_t(sha256.begin(), sha256.end());
-        write(relay_trans,
-              proto::relay::session_invitation_t{std::move(id), session_key,
-                                                 asio::ip::address_v4(0), listening_ep.port(), false});
+        write(relay_trans, proto::relay::session_invitation_t{std::move(id), session_key, asio::ip::address_v4(0),
+                                                              listening_ep.port(), false});
     }
 
     virtual void session_reply() noexcept { write(peer_trans, proto::relay::response_t{0, "ok"}); }
@@ -813,8 +812,8 @@ void test_relay_wrong_device() {
         void relay_reply() noexcept override {
             auto sha256 = relay_device.get_sha256();
             auto id = utils::bytes_t(sha256.begin(), sha256.end());
-            write(relay_trans, proto::relay::session_invitation_t{std::move(id), session_key,
-                                                                  asio::ip::address_v4(0), listening_ep.port(), false});
+            write(relay_trans, proto::relay::session_invitation_t{std::move(id), session_key, asio::ip::address_v4(0),
+                                                                  listening_ep.port(), false});
         }
         void on_write(size_t) override {}
 
@@ -839,9 +838,8 @@ void test_relay_non_connectable() {
         void relay_reply() noexcept override {
             auto sha256 = peer_device->device_id().get_sha256();
             auto id = utils::bytes_t(sha256.begin(), sha256.end());
-            write(relay_trans,
-                  proto::relay::session_invitation_t{std::move(id), session_key,
-                                                     boost::asio::ip::address_v4(0), 0, false});
+            write(relay_trans, proto::relay::session_invitation_t{std::move(id), session_key,
+                                                                  boost::asio::ip::address_v4(0), 0, false});
         }
 
         void main() noexcept override {

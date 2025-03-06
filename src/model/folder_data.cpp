@@ -12,7 +12,7 @@ void folder_data_t::assign_fields(const db::Folder &item) noexcept {
     id = db::get_id(item);
     label = db::get_label(item);
     path = boost::nowide::widen(db::get_path(item));
-    folder_type =  db::get_folder_type(item);
+    folder_type = db::get_folder_type(item);
     rescan_interval = db::get_rescan_interval(item);
     pull_order = db::get_pull_order(item);
     scheduled = db::get_scheduled(item);

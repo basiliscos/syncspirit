@@ -224,7 +224,7 @@ static parse_result_t parse_response(utils::bytes_view_t data) noexcept {
         return protocol_error_t{};
     }
     auto tail = data.subspan(sizeof(uint32_t) * 2, sz);
-    auto tail_str = std::string_view((const char*)tail.data(), tail.size());
+    auto tail_str = std::string_view((const char *)tail.data(), tail.size());
     return wrapped_message_t{header_sz + data.size(), response_t{code, std::string(tail_str)}};
 }
 
@@ -303,8 +303,8 @@ static parse_result_t parse_session_invitation(utils::bytes_view_t data) noexcep
 
     auto from_bytes = utils::bytes_t(from.begin(), from.end());
     auto key_bytes = utils::bytes_t(key.begin(), key.end());
-    return wrapped_message_t{header_sz + orig.size(),
-                             session_invitation_t{std::move(from_bytes), std::move(key_bytes), ip, port, (bool)server_socket}};
+    return wrapped_message_t{header_sz + orig.size(), session_invitation_t{std::move(from_bytes), std::move(key_bytes),
+                                                                           ip, port, (bool)server_socket}};
 }
 
 parse_result_t parse(utils::bytes_view_t data) noexcept {

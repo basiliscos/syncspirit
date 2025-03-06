@@ -420,8 +420,8 @@ void test_cluster_update_and_remove() {
             proto::set_block_size(file, 5ul);
             proto::set_sequence(file, 6ul);
 
-            auto b_hash =  utils::sha256_digest(as_bytes("12345")).value();
-            auto& b = proto::add_blocks(file);
+            auto b_hash = utils::sha256_digest(as_bytes("12345")).value();
+            auto &b = proto::add_blocks(file);
             proto::set_size(b, 5ul);
             proto::set_hash(b, b_hash);
 
@@ -476,9 +476,9 @@ void test_cluster_update_and_remove() {
             }
 
             auto pr_msg = proto::ClusterConfig();
-            auto& pr_f = proto::add_folders(pr_msg);
+            auto &pr_f = proto::add_folders(pr_msg);
             proto::set_id(pr_f, folder_id);
-            auto& pr_device = proto::add_devices(pr_f);
+            auto &pr_device = proto::add_devices(pr_f);
             proto::set_id(pr_device, peer_device->device_id().get_sha256());
             proto::set_max_sequence(pr_device, 1);
             proto::set_index_id(pr_device, peer_folder_info->get_index() + 1);
@@ -520,8 +520,8 @@ void test_unshare_and_remove_folder() {
             proto::set_block_size(file, 5ul);
             proto::set_sequence(file, 6ul);
 
-            auto b_hash =  utils::sha256_digest(as_bytes("12345")).value();
-            auto& b = proto::add_blocks(file);
+            auto b_hash = utils::sha256_digest(as_bytes("12345")).value();
+            auto &b = proto::add_blocks(file);
             proto::set_size(b, 5ul);
             proto::set_hash(b, b_hash);
 
@@ -603,7 +603,7 @@ void test_remote_copy() {
             proto::set_name(file, "a.txt");
             proto::set_sequence(file, 6ul);
 
-            auto& v = proto::get_version(file);
+            auto &v = proto::get_version(file);
             proto::add_counters(v, proto::Counter(peer_device->device_id().get_uint(), 1));
 
             auto builder = diff_builder_t(*cluster);
@@ -653,8 +653,8 @@ void test_remote_copy() {
                 proto::set_size(file, 5ul);
                 proto::set_block_size(file, 5ul);
 
-                auto b_hash =  utils::sha256_digest(as_bytes("12345")).value();
-                auto& b = proto::add_blocks(file);
+                auto b_hash = utils::sha256_digest(as_bytes("12345")).value();
+                auto &b = proto::add_blocks(file);
                 proto::set_size(b, 5ul);
                 proto::set_hash(b, b_hash);
 
@@ -732,7 +732,7 @@ void test_local_update() {
             proto::set_size(pr_file, 5ul);
 
             auto hash = utils::sha256_digest(as_bytes("12345")).value();
-            auto& pr_block = proto::add_blocks(pr_file);
+            auto &pr_block = proto::add_blocks(pr_file);
             proto::set_size(pr_block, 5ul);
             proto::set_hash(pr_block, hash);
 
@@ -825,8 +825,8 @@ void test_remove_peer() {
             proto::set_block_size(file, 5ul);
             proto::set_sequence(file, 6ul);
 
-            auto b_hash =  utils::sha256_digest(as_bytes("12345")).value();
-            auto& b = proto::add_blocks(file);
+            auto b_hash = utils::sha256_digest(as_bytes("12345")).value();
+            auto &b = proto::add_blocks(file);
             proto::set_size(b, 5ul);
             proto::set_hash(b, b_hash);
 
@@ -932,7 +932,7 @@ void test_peer_3_folders_6_files() {
                 auto file = proto::FileInfo();
                 proto::set_name(file, name);
                 proto::set_sequence(file, ++next_sequence);
-                auto& v = proto::get_version(file);
+                auto &v = proto::get_version(file);
                 proto::add_counters(v, proto::Counter(peer_device->device_id().get_uint(), 1));
                 return file;
             };

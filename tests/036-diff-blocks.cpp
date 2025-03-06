@@ -37,12 +37,12 @@ TEST_CASE("various block diffs", "[model]") {
     proto::set_block_size(pr_file, 5ul);
     proto::set_size(pr_file, 10ul);
 
-    auto& b1= proto::add_blocks(pr_file);
+    auto &b1 = proto::add_blocks(pr_file);
     proto::set_offset(b1, 0);
     proto::set_size(b1, 5);
     proto::set_hash(b1, b1_hash);
 
-    auto& b2 = proto::add_blocks(pr_file);
+    auto &b2 = proto::add_blocks(pr_file);
     proto::set_offset(b2, 5);
     proto::set_size(b2, 5);
     proto::set_hash(b2, b2_hash);
@@ -78,7 +78,7 @@ TEST_CASE("various block diffs", "[model]") {
         proto::set_block_size(pr_source, 5ul);
         proto::set_size(pr_source, 5ul);
 
-        auto& b1= proto::add_blocks(pr_source);
+        auto &b1 = proto::add_blocks(pr_source);
         proto::set_offset(b1, 0);
         proto::set_size(b1, 5);
         proto::set_hash(b1, b2_hash);

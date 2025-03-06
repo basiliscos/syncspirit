@@ -49,8 +49,8 @@ struct self_table_t final : static_table_t, db_info_viewer_t {
         }
 
         auto openssl_version = fmt::format("{}.{}.{}{}", openssl_major, openssl_minor, openssl_patch, openssl_nibble_c);
-        auto& mdbx_v = ::mdbx_version;
-        auto mdbx_version =fmt::format("{}.{}.{}_{}", mdbx_v.major, mdbx_v.minor, mdbx_v.patch, mdbx_v.tweak);
+        auto &mdbx_v = ::mdbx_version;
+        auto mdbx_version = fmt::format("{}.{}.{}_{}", mdbx_v.major, mdbx_v.minor, mdbx_v.patch, mdbx_v.tweak);
         auto app_version = fmt::format("{} {}", constants::client_name, constants::client_version);
         auto fltk_version = fmt::format("{}", Fl::version());
         auto ares_version = std::string(utils::cares_version());

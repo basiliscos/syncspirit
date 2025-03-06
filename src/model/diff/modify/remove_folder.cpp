@@ -35,8 +35,8 @@ remove_folder_t::remove_folder_t(const model::cluster_t &cluster, model::sequenc
         assign(new unshare_folder_t(cluster, *it.item, &orphaned_blocks));
         if (d != self && fi.get_index()) {
             auto db = db::PendingFolder();
-            auto& db_fi = db::get_folder_info(db);
-            auto& db_f = db::get_folder(db);
+            auto &db_fi = db::get_folder_info(db);
+            auto &db_f = db::get_folder(db);
             db::set_index_id(db_fi, fi.get_index());
             db::set_max_sequence(db_fi, fi.get_max_sequence());
             db::set_id(db_f, folder.get_id());
@@ -53,8 +53,7 @@ remove_folder_t::remove_folder_t(const model::cluster_t &cluster, model::sequenc
 
             auto sha256 = d->device_id().get_sha256();
             auto peer_id = utils::bytes_t{sha256.begin(), sha256.end()};
-            auto item = add_pending_folders_t::item_t{std::move(db), std::move(peer_id),
-                                                      sequencer.next_uuid()};
+            auto item = add_pending_folders_t::item_t{std::move(db), std::move(peer_id), sequencer.next_uuid()};
             pending_folders.emplace_back(std::move(item));
         }
     }

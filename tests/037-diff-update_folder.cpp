@@ -42,7 +42,7 @@ TEST_CASE("update folder (via Index)", "[model]") {
         proto::set_sequence(pr_file, 10ul);
         proto::set_modified_s(pr_file, 1);
 
-        auto& b = proto::add_blocks(pr_file);
+        auto &b = proto::add_blocks(pr_file);
         proto::set_hash(b, as_bytes("123"));
         proto::set_size(b, 5);
 
@@ -111,7 +111,7 @@ TEST_CASE("update folder (via Index)", "[model]") {
         proto::set_modified_s(pr_file, 1);
         proto::set_deleted(pr_file, true);
 
-        auto& b = proto::add_blocks(pr_file);
+        auto &b = proto::add_blocks(pr_file);
         proto::set_hash(b, as_bytes("123"));
         proto::set_size(b, 5);
 

@@ -83,7 +83,7 @@ void advance_t::initialize(const cluster_t &cluster, sequencer_t &sequencer, pro
     if (proto::get_size(proto_local)) {
         auto blocks_size = proto::get_blocks_size(proto_local);
         for (int i = 0; i < blocks_size; ++i) {
-            auto& proto_block = proto::get_blocks(proto_local, i);
+            auto &proto_block = proto::get_blocks(proto_local, i);
             auto h = proto::get_hash(proto_block);
             auto strict_hash = block_info_t::make_strict_hash(h);
             auto block = blocks_map.by_hash(strict_hash.get_hash());
@@ -99,8 +99,8 @@ void advance_t::initialize(const cluster_t &cluster, sequencer_t &sequencer, pro
     }
 
     LOG_DEBUG(log, "advance_t ({}), folder = {}, name = {} ( -> {}), blocks = {}, removed blocks = {}, new blocks = {}",
-              stringify(action), folder_id, proto::get_name(proto_source), proto::get_name(proto_local), proto::get_blocks_size(proto_local),
-              orphans.size(), new_blocks.size());
+              stringify(action), folder_id, proto::get_name(proto_source), proto::get_name(proto_local),
+              proto::get_blocks_size(proto_local), orphans.size(), new_blocks.size());
 
     auto current = (cluster_diff_t *){};
     if (!new_blocks.empty()) {
@@ -144,7 +144,7 @@ auto advance_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) c
         auto &blocks_map = cluster.get_blocks();
         auto blocks_count = proto::get_blocks_size(proto_local);
         for (size_t i = 0; i < blocks_count; ++i) {
-            auto& block =  proto::get_blocks(proto_local, i);
+            auto &block = proto::get_blocks(proto_local, i);
             auto hash = proto::get_hash(block);
             auto strict_hash = block_info_t::make_strict_hash(hash);
             auto block_info = blocks_map.by_hash(strict_hash.get_hash());

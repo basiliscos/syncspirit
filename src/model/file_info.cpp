@@ -270,9 +270,7 @@ outcome::result<void> file_info_t::reserve_blocks(size_t block_count) noexcept {
     return outcome::success();
 }
 
-utils::bytes_t file_info_t::serialize(bool include_blocks) const noexcept {
-    return db::encode(as_db(include_blocks));
-}
+utils::bytes_t file_info_t::serialize(bool include_blocks) const noexcept { return db::encode(as_db(include_blocks)); }
 
 void file_info_t::mark_unreachable(bool value) noexcept {
     if (value) {
@@ -503,7 +501,7 @@ template <> SYNCSPIRIT_API utils::bytes_view_t get_index<0>(const file_info_ptr_
 }
 template <> SYNCSPIRIT_API utils::bytes_view_t get_index<1>(const file_info_ptr_t &item) noexcept {
     auto name = item->get_name();
-    auto ptr = (unsigned char*)name.data();
+    auto ptr = (unsigned char *)name.data();
     return {ptr, name.size()};
 }
 
@@ -513,12 +511,10 @@ template <> SYNCSPIRIT_API std::int64_t get_index<2>(const file_info_ptr_t &item
 
 auto file_infos_map_t::sequence_projection() noexcept -> seq_projection_t { return key2item.template get<2>(); }
 
-file_info_ptr_t file_infos_map_t::by_uuid(utils::bytes_view_t uuid) noexcept {
-    return get<0>(uuid);
-}
+file_info_ptr_t file_infos_map_t::by_uuid(utils::bytes_view_t uuid) noexcept { return get<0>(uuid); }
 
 file_info_ptr_t file_infos_map_t::by_name(std::string_view name) noexcept {
-    auto ptr = (unsigned char*)name.data();
+    auto ptr = (unsigned char *)name.data();
     auto view = utils::bytes_view_t(ptr, name.size());
     return get<1>(view);
 }

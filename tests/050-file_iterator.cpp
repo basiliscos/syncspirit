@@ -58,7 +58,7 @@ TEST_CASE("file iterator, single folder", "[model]") {
                 auto pr_fi = proto::FileInfo();
                 proto::set_name(pr_fi, "a.txt");
                 proto::set_sequence(pr_fi, 10);
-                auto& v = proto::get_version(pr_fi);
+                auto &v = proto::get_version(pr_fi);
                 proto::add_counters(v, proto::Counter(peer_device->device_id().get_uint(), 0));
                 auto index_builder = builder.make_index(peer_id.get_sha256(), folder->get_id());
 
@@ -105,8 +105,8 @@ TEST_CASE("file iterator, single folder", "[model]") {
                 auto pr_fi = proto::FileInfo();
                 proto::set_name(pr_fi, "a.txt");
                 proto::set_sequence(pr_fi, 10);
-                auto& v = proto::get_version(pr_fi);
-                auto& c_1 = proto::add_counters(v);
+                auto &v = proto::get_version(pr_fi);
+                auto &c_1 = proto::add_counters(v);
                 proto::set_id(c_1, 1);
                 proto::set_value(c_1, 5);
 
@@ -280,7 +280,8 @@ TEST_CASE("file iterator, single folder", "[model]") {
             proto::set_block_size(pr_fi, proto::get_size(b1));
             proto::add_blocks(pr_fi, b1);
 
-            REQUIRE(builder.make_index(peer_id.get_sha256(), folder->get_id()).add(pr_fi, peer_device).finish().apply());
+            REQUIRE(
+                builder.make_index(peer_id.get_sha256(), folder->get_id()).add(pr_fi, peer_device).finish().apply());
 
             SECTION("folder is suspended") {
                 REQUIRE(builder.suspend(*folder).apply());
@@ -307,14 +308,15 @@ TEST_CASE("file iterator, single folder", "[model]") {
             proto::set_block_size(pr_fi, proto::get_size(b1));
             proto::add_blocks(pr_fi, b1);
 
-            auto& v = proto::get_version(pr_fi);
+            auto &v = proto::get_version(pr_fi);
             proto::add_counters(v, proto::Counter(1, 1));
 
             auto my_file = file_info_t::create(sequencer->next_uuid(), pr_fi, my_folder).value();
             my_files.put(my_file);
 
             proto::add_counters(v, proto::Counter(2, 2));
-            REQUIRE(builder.make_index(peer_id.get_sha256(), folder->get_id()).add(pr_fi, peer_device).finish().apply());
+            REQUIRE(
+                builder.make_index(peer_id.get_sha256(), folder->get_id()).add(pr_fi, peer_device).finish().apply());
 
             SECTION("has been scanned") {
                 my_file->mark_local();
@@ -338,7 +340,7 @@ TEST_CASE("file iterator, single folder", "[model]") {
             proto::set_block_size(pr_fi, proto::get_size(b1));
             proto::add_blocks(pr_fi, b1);
 
-            auto& v = proto::get_version(pr_fi);
+            auto &v = proto::get_version(pr_fi);
             proto::add_counters(v, proto::Counter(1, 1));
 
             builder.make_index(peer_id.get_sha256(), folder->get_id()).add(pr_fi, peer_device).finish();
@@ -359,7 +361,8 @@ TEST_CASE("file iterator, single folder", "[model]") {
             proto::set_block_size(pr_fi, proto::get_size(b1));
             proto::add_blocks(pr_fi, b1);
 
-            REQUIRE(builder.make_index(peer_id.get_sha256(), folder->get_id()).add(pr_fi, peer_device).finish().apply());
+            REQUIRE(
+                builder.make_index(peer_id.get_sha256(), folder->get_id()).add(pr_fi, peer_device).finish().apply());
             auto f = peer_files.by_name(proto::get_name(pr_fi));
             REQUIRE(builder.remote_copy(*f).mark_reacheable(f, false).apply());
 
@@ -415,7 +418,8 @@ TEST_CASE("file iterator for 2 folders", "[model]") {
     using set_t = std::set<std::string_view>;
 
     SECTION("cloning") {
-        REQUIRE(builder.make_index(sha256, "1234").add(pr_fi_1, peer_device).add(pr_fi_2, peer_device).finish().apply());
+        REQUIRE(
+            builder.make_index(sha256, "1234").add(pr_fi_1, peer_device).add(pr_fi_2, peer_device).finish().apply());
 
         auto [f1, action1] = file_iterator->next();
         auto [f2, action2] = file_iterator->next();
@@ -454,7 +458,8 @@ TEST_CASE("file iterator for 2 folders", "[model]") {
         proto::set_size(pr_fi_2, proto::get_size(b2));
 
         using set_t = std::set<std::string_view>;
-        REQUIRE(builder.make_index(sha256, "1234").add(pr_fi_1, peer_device).add(pr_fi_2, peer_device).finish().apply());
+        REQUIRE(
+            builder.make_index(sha256, "1234").add(pr_fi_1, peer_device).add(pr_fi_2, peer_device).finish().apply());
 
         auto files = set_t{};
         auto [f1, action1] = file_iterator->next();

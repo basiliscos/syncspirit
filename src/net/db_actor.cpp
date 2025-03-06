@@ -519,7 +519,7 @@ auto db_actor_t::operator()(const model::diff::modify::add_pending_folders_t &di
 
     auto &pending = cluster->get_pending_folders();
     for (auto &item : diff.container) {
-        auto& folder = db::get_folder(item.db);
+        auto &folder = db::get_folder(item.db);
         auto id = db::get_id(folder);
         auto uf = pending.by_id(id);
         if (uf && uf->device_id().get_sha256() == item.peer_id) {

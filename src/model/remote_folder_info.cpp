@@ -23,7 +23,7 @@ bool remote_folder_info_t::needs_update() const noexcept {
 
 remote_folder_info_t_ptr_t remote_folder_infos_map_t::by_folder(const folder_t &folder) const noexcept {
     auto id = folder.get_id();
-    auto ptr = (unsigned char*) id.data();
+    auto ptr = (unsigned char *)id.data();
     auto view = utils::bytes_view_t(ptr, id.size());
     return get<0>(view);
 }
@@ -35,7 +35,7 @@ auto remote_folder_info_t::get_local() const noexcept -> folder_info_ptr_t {
 
 template <> SYNCSPIRIT_API utils::bytes_view_t get_index<0>(const remote_folder_info_t_ptr_t &item) noexcept {
     auto key = item->get_key();
-    auto ptr = (unsigned char*)key.data();
+    auto ptr = (unsigned char *)key.data();
     return {ptr, key.size()};
 }
 

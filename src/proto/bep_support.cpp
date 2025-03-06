@@ -24,15 +24,15 @@ utils::bytes_t make_hello_message(std::string_view device_name) noexcept {
     auto bytes = proto::encode(msg, 4 + 2);
 
     auto magic = be::native_to_big(constants::bep_magic);
-    auto dst = (unsigned char*)bytes.data();
-    auto src = (unsigned char*)&magic;
+    auto dst = (unsigned char *)bytes.data();
+    auto src = (unsigned char *)&magic;
     *dst++ = *src++;
     *dst++ = *src++;
     *dst++ = *src++;
     *dst++ = *src++;
 
     auto sz = be::native_to_big(uint16_t(bytes.size() - 6));
-    src = (unsigned char*)&sz;
+    src = (unsigned char *)&sz;
     *dst++ = *src++;
     *dst++ = *src++;
 
@@ -47,7 +47,7 @@ static outcome::result<message::wrapped_message_t> parse_hello(utils::bytes_view
     auto sz = buff.size();
     std::uint16_t msg_sz;
     auto src = buff.data();
-    auto dst = (unsigned char*) &msg_sz;
+    auto dst = (unsigned char *)&msg_sz;
     *dst++ = *src++;
     *dst++ = *src++;
     be::big_to_native_inplace(msg_sz);
@@ -129,7 +129,7 @@ outcome::result<message::wrapped_message_t> parse(utils::bytes_view_t buff, std:
 }
 
 static auto bep_magic_big = be::native_to_big(constants::bep_magic);
-static auto bep_magic_bytes = utils::bytes_view_t((unsigned char*)&bep_magic_big, sizeof(bep_magic_big));
+static auto bep_magic_bytes = utils::bytes_view_t((unsigned char *)&bep_magic_big, sizeof(bep_magic_big));
 
 outcome::result<message::wrapped_message_t> parse_bep(utils::bytes_view_t buff) noexcept {
     auto sz = buff.size();
@@ -143,7 +143,7 @@ outcome::result<message::wrapped_message_t> parse_bep(utils::bytes_view_t buff) 
     } else {
         auto ptr = head.data();
         auto header_sz = std::uint16_t();
-        auto dst = (unsigned char*)(&header_sz);
+        auto dst = (unsigned char *)(&header_sz);
         *dst++ = *ptr++;
         *dst++ = *ptr++;
         be::big_to_native_inplace(header_sz);
@@ -159,7 +159,7 @@ outcome::result<message::wrapped_message_t> parse_bep(utils::bytes_view_t buff) 
         auto type = proto::get_type(header);
         ptr += header_sz;
         std::uint32_t message_sz;
-        dst = (unsigned char*)(&message_sz);
+        dst = (unsigned char *)(&message_sz);
         *dst++ = *ptr++;
         *dst++ = *ptr++;
         *dst++ = *ptr++;
@@ -201,7 +201,7 @@ outcome::result<message::wrapped_message_t> parse_bep(utils::bytes_view_t buff) 
             return parse_msg(rest, consumed);
         } else {
             std::uint32_t uncompr_sz;
-            dst = (unsigned char*)(&uncompr_sz);
+            dst = (unsigned char *)(&uncompr_sz);
             *dst++ = *ptr++;
             *dst++ = *ptr++;
             *dst++ = *ptr++;
@@ -218,7 +218,7 @@ outcome::result<message::wrapped_message_t> parse_bep(utils::bytes_view_t buff) 
             if (dec < 0) {
                 return make_error_code(utils::bep_error_code_t::lz4_decoding);
             }
-            auto msg_bytes = utils::bytes_view_t((unsigned char*)uncompressed.data(), uncompr_sz);
+            auto msg_bytes = utils::bytes_view_t((unsigned char *)uncompressed.data(), uncompr_sz);
             auto &&r = parse_msg(msg_bytes, 0); // consumed is ignored anyway
             if (r) {
                 auto &parsed = r.value().message;
@@ -233,7 +233,6 @@ outcome::result<message::wrapped_message_t> parse_bep(utils::bytes_view_t buff) 
 std::size_t make_announce_message(utils::bytes_view_t buff, utils::bytes_view_t device_id, const payload::URIs &uris,
                                   std::int64_t instance) noexcept {
 
-
     proto::Announce msg;
     proto::set_id(msg, device_id);
     proto::set_instance_id(msg, instance);
@@ -241,13 +240,13 @@ std::size_t make_announce_message(utils::bytes_view_t buff, utils::bytes_view_t 
         proto::add_addresses(msg, uri->buffer());
     }
 
-    auto msg_sz = proto::estimate(msg) ;
+    auto msg_sz = proto::estimate(msg);
     auto total_sz = msg_sz + 4;
     assert(buff.size() >= msg_sz);
 
     auto magic = be::native_to_big(constants::bep_magic);
-    auto dst = const_cast<unsigned char*>(buff.data());
-    auto src = reinterpret_cast<unsigned char*>(&magic);
+    auto dst = const_cast<unsigned char *>(buff.data());
+    auto src = reinterpret_cast<unsigned char *>(&magic);
     *dst++ = *src++;
     *dst++ = *src++;
     *dst++ = *src++;
@@ -268,7 +267,7 @@ outcome::result<Announce> parse_announce(utils::bytes_view_t buff) noexcept {
         return utils::make_error_code(utils::error_code_t::wrong_magic);
     }
 
-    auto ptr = (unsigned char*)(ptr_32);
+    auto ptr = (unsigned char *)(ptr_32);
     proto::Announce msg;
     if (auto ok = proto::decode({ptr, sz - 4}, msg); ok) {
         return make_error_code(utils::bep_error_code_t::protobuf_err);
@@ -277,14 +276,13 @@ outcome::result<Announce> parse_announce(utils::bytes_view_t buff) noexcept {
 }
 
 template <typename Message>
-SYNCSPIRIT_API utils::bytes_t serialize(const Message &message,
-                                        proto::MessageCompression compression) noexcept {
+SYNCSPIRIT_API utils::bytes_t serialize(const Message &message, proto::MessageCompression compression) noexcept {
     using type = typename M2T<Message>::type;
     auto message_sz = proto::estimate(message);
     proto::Header header(type::value, compression);
     auto header_sz = proto::estimate(header);
     auto header_sz_16 = be::native_to_big(static_cast<std::uint16_t>(header_sz));
-    auto src = reinterpret_cast<const std::uint8_t*>(&header_sz_16);
+    auto src = reinterpret_cast<const std::uint8_t *>(&header_sz_16);
     auto bytes = utils::bytes_t(2 + header_sz + 4 + message_sz);
     auto *ptr = reinterpret_cast<std::uint8_t *>(bytes.data());
     *ptr++ = *src++;
@@ -293,7 +291,7 @@ SYNCSPIRIT_API utils::bytes_t serialize(const Message &message,
     ptr += header_sz;
 
     auto message_sz_32 = be::native_to_big(static_cast<std::uint32_t>(message_sz));
-    src = reinterpret_cast<const std::uint8_t*>(&message_sz_32);
+    src = reinterpret_cast<const std::uint8_t *>(&message_sz_32);
     *ptr++ = *src++;
     *ptr++ = *src++;
     *ptr++ = *src++;
@@ -303,20 +301,20 @@ SYNCSPIRIT_API utils::bytes_t serialize(const Message &message,
 }
 
 template utils::bytes_t SYNCSPIRIT_API serialize(const proto::ClusterConfig &message,
-                                       proto::MessageCompression compression) noexcept;
+                                                 proto::MessageCompression compression) noexcept;
 template utils::bytes_t SYNCSPIRIT_API serialize(const proto::Index &message,
-                                       proto::MessageCompression compression) noexcept;
+                                                 proto::MessageCompression compression) noexcept;
 template utils::bytes_t SYNCSPIRIT_API serialize(const proto::IndexUpdate &message,
-                                       proto::MessageCompression compression) noexcept;
+                                                 proto::MessageCompression compression) noexcept;
 template utils::bytes_t SYNCSPIRIT_API serialize(const proto::Request &message,
-                                       proto::MessageCompression compression) noexcept;
+                                                 proto::MessageCompression compression) noexcept;
 template utils::bytes_t SYNCSPIRIT_API serialize(const proto::Response &message,
-                                       proto::MessageCompression compression) noexcept;
+                                                 proto::MessageCompression compression) noexcept;
 template utils::bytes_t SYNCSPIRIT_API serialize(const proto::DownloadProgress &message,
-                                       proto::MessageCompression compression) noexcept;
+                                                 proto::MessageCompression compression) noexcept;
 template utils::bytes_t SYNCSPIRIT_API serialize(const proto::Ping &message,
-                                       proto::MessageCompression compression) noexcept;
+                                                 proto::MessageCompression compression) noexcept;
 template utils::bytes_t SYNCSPIRIT_API serialize(const proto::Close &message,
-                                       proto::MessageCompression compression) noexcept;
+                                                 proto::MessageCompression compression) noexcept;
 
 } // namespace syncspirit::proto

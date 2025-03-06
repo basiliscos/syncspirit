@@ -162,8 +162,8 @@ void test_meta_changes() {
             proto::set_block_size(pr_fi, 5);
             proto::set_modified_s(pr_fi, modified);
 
-            auto& v = proto::get_version(pr_fi);
-            auto& counter = proto::add_counters(v);
+            auto &v = proto::get_version(pr_fi);
+            auto &counter = proto::add_counters(v);
             proto::set_id(counter, peer_device->device_id().get_uint());
             proto::set_value(counter, 1);
 
@@ -610,9 +610,9 @@ void test_remove_file() {
             auto v = file->get_version();
             REQUIRE(v->counters_size() == 1);
 
-            auto& c = v->get_best();
-            CHECK(proto::get_id(c) == proto::get_id((counter)));;
-            CHECK(proto::get_value(c) > proto::get_value((counter)));;
+            auto &c = v->get_best();
+            CHECK(proto::get_id(c) == proto::get_id((counter)));
+            CHECK(proto::get_value(c) > proto::get_value((counter)));
             REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
             REQUIRE(folder->get_scan_finish() > prev_finish);
         }

@@ -221,7 +221,7 @@ struct fixture_t : private model::diff::cluster_visitor_t {
         }
     }
 
-    virtual void on_hello(proto::Hello& msg) noexcept {
+    virtual void on_hello(proto::Hello &msg) noexcept {
         auto device_name = proto::get_device_name(msg);
         auto client_name = proto::get_client_name(msg);
         auto client_version = proto::get_client_version(msg);
@@ -278,7 +278,7 @@ void test_online_on_hello() {
             send_hello();
         }
 
-        void on_hello(proto::Hello&) noexcept override {
+        void on_hello(proto::Hello &) noexcept override {
             auto peer = cluster->get_devices().by_sha256(peer_device->device_id().get_sha256());
             CHECK(peer->get_state() == device_state_t::online);
         }
@@ -293,7 +293,7 @@ void test_hello_from_unknown() {
             send_hello();
         }
 
-        void on_hello(proto::Hello&) noexcept override {
+        void on_hello(proto::Hello &) noexcept override {
             CHECK(cluster->get_devices().size() == 1);
             auto &unknown_devices = cluster->get_pending_devices();
             CHECK(unknown_devices.size() == 1);
@@ -320,7 +320,7 @@ void test_hello_from_known_unknown() {
             send_hello();
         }
 
-        void on_hello(proto::Hello&) noexcept override {
+        void on_hello(proto::Hello &) noexcept override {
             CHECK(cluster->get_devices().size() == 1);
             auto &unknown_devices = cluster->get_pending_devices();
             CHECK(unknown_devices.size() == 1);
@@ -347,7 +347,7 @@ void test_hello_from_ignored() {
             send_hello();
         }
 
-        void on_hello(proto::Hello&) noexcept override {
+        void on_hello(proto::Hello &) noexcept override {
             CHECK(cluster->get_devices().size() == 1);
             auto &ignored_devices = cluster->get_ignored_devices();
             CHECK(ignored_devices.size() == 1);

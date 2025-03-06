@@ -64,9 +64,7 @@ struct SYNCSPIRIT_API block_info_t final : arc_base_t<block_info_t> {
         auto rh = right.get_hash();
         return std::equal(lh.begin(), lh.end(), rh.begin(), rh.end());
     }
-    inline bool operator!=(const block_info_t &right) const noexcept {
-        return !(*this == right);
-    }
+    inline bool operator!=(const block_info_t &right) const noexcept { return !(*this == right); }
 
   private:
     template <typename T> void assign(const T &item) noexcept;
@@ -80,7 +78,7 @@ struct SYNCSPIRIT_API block_info_t final : arc_base_t<block_info_t> {
     std::uint32_t locked = 0;
 };
 
-struct SYNCSPIRIT_API block_infos_map_t: generic_map_t<block_info_ptr_t, 1> {
+struct SYNCSPIRIT_API block_infos_map_t : generic_map_t<block_info_ptr_t, 1> {
     block_info_ptr_t by_hash(utils::bytes_view_t view) const noexcept;
 };
 

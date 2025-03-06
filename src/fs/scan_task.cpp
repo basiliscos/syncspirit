@@ -128,7 +128,7 @@ scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
             proto::FileInfo metadata;
             proto::set_name(metadata, rp);
             if (status.type() == bfs::file_type::regular) {
-                proto::set_type(metadata,proto::FileInfoType::FILE);
+                proto::set_type(metadata, proto::FileInfoType::FILE);
                 auto sz = bfs::file_size(child, ec);
                 if (ec) {
                     errors.push_back(scan_error_t{dir, ec});
@@ -143,7 +143,7 @@ scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
                 }
                 proto::set_modified_s(metadata, to_unix(modification_time));
             } else if (status.type() == bfs::file_type::directory) {
-                proto::set_type(metadata,proto::FileInfoType::DIRECTORY);
+                proto::set_type(metadata, proto::FileInfoType::DIRECTORY);
                 dirs_queue.push_back(child);
             } else if (status.type() == bfs::file_type::symlink) {
                 auto target = bfs::read_symlink(child, ec);
@@ -152,7 +152,7 @@ scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
                     continue;
                 }
                 proto::set_symlink_target(metadata, target.string());
-                proto::set_type(metadata,proto::FileInfoType::SYMLINK);
+                proto::set_type(metadata, proto::FileInfoType::SYMLINK);
             } else {
                 LOG_WARN(log, "unknown/unimplemented file type {} : {}", (int)status.type(), bfs::path(child).string());
                 continue;

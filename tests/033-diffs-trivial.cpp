@@ -59,7 +59,7 @@ TEST_CASE("with file", "[model]") {
         return f;
     }();
     auto b1_hash = utils::sha256_digest(as_bytes("12345")).value();
-    auto& b1 = proto::add_blocks(pr_file);
+    auto &b1 = proto::add_blocks(pr_file);
     proto::set_hash(b1, b1_hash);
     proto::set_offset(b1, 0);
     proto::set_size(b1, 5);

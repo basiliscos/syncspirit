@@ -17,7 +17,8 @@ outcome::result<ignored_folder_ptr_t> ignored_folder_t::create(std::string_view 
     return outcome::success(std::move(ptr));
 }
 
-outcome::result<ignored_folder_ptr_t> ignored_folder_t::create(utils::bytes_view_t key, utils::bytes_view_t data) noexcept {
+outcome::result<ignored_folder_ptr_t> ignored_folder_t::create(utils::bytes_view_t key,
+                                                               utils::bytes_view_t data) noexcept {
     if (key[0] != prefix) {
         return make_error_code(error_code_t::invalid_ignored_folder_prefix);
     }
@@ -36,7 +37,7 @@ outcome::result<ignored_folder_ptr_t> ignored_folder_t::create(utils::bytes_view
 ignored_folder_t::ignored_folder_t(std::string_view folder_id, std::string_view label_) noexcept {
     key.resize(folder_id.size() + 1);
     key[0] = prefix;
-    auto ptr = (unsigned char*)folder_id.data();
+    auto ptr = (unsigned char *)folder_id.data();
     std::copy(ptr, ptr + folder_id.size(), key.data() + 1);
     label = label_;
 }
@@ -70,9 +71,6 @@ template <> SYNCSPIRIT_API utils::bytes_view_t get_index<0>(const ignored_folder
     return item->get_id();
 }
 
-ignored_folder_ptr_t ignored_folders_map_t::by_key(utils::bytes_view_t key) const noexcept {
-    return get<0>(key);
-}
-
+ignored_folder_ptr_t ignored_folders_map_t::by_key(utils::bytes_view_t key) const noexcept { return get<0>(key); }
 
 } // namespace syncspirit::model

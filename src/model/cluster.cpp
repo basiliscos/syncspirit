@@ -17,7 +17,7 @@ proto::ClusterConfig cluster_t::generate(const device_t &target) const noexcept 
         auto &folder = it.item;
         auto folder_opt = folder->generate(target);
         if (folder_opt) {
-            auto& folder_value = folder_opt.value();
+            auto &folder_value = folder_opt.value();
             proto::add_folders(r, std::move(folder_value));
         }
     }

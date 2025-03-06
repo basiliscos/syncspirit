@@ -30,7 +30,7 @@ TEST_CASE("folder update (Index)", "[model]") {
     auto sha256 = peer_id.get_sha256();
     REQUIRE(builder.upsert_folder("1234-5678", "some/path", "my-label").apply());
     REQUIRE(builder.share_folder(sha256, "1234-5678").apply());
-    REQUIRE(builder.configure_cluster(sha256).add(sha256,  "1234-5678", index_id, max_seq).finish().apply());
+    REQUIRE(builder.configure_cluster(sha256).add(sha256, "1234-5678", index_id, max_seq).finish().apply());
 
     proto::FileInfo pr_fi;
     proto::set_name(pr_fi, "a.txt");
@@ -39,7 +39,7 @@ TEST_CASE("folder update (Index)", "[model]") {
     proto::set_sequence(pr_fi, 5);
 
     auto b1_hash = utils::sha256_digest(as_bytes("12345")).value();
-    auto& b1 = proto::add_blocks(pr_fi);
+    auto &b1 = proto::add_blocks(pr_fi);
     proto::set_hash(b1, as_bytes("12345"));
     proto::set_size(b1, 5);
 

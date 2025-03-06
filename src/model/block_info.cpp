@@ -21,19 +21,24 @@ auto block_info_t::make_strict_hash(utils::bytes_view_t hash) noexcept -> strict
     return r;
 }
 
-auto block_info_t::strict_hash_t::get_hash() noexcept -> utils::bytes_view_t { return utils::bytes_view_t(data + 1, digest_length); }
+auto block_info_t::strict_hash_t::get_hash() noexcept -> utils::bytes_view_t {
+    return utils::bytes_view_t(data + 1, digest_length);
+}
 
-auto block_info_t::strict_hash_t::get_key() noexcept -> utils::bytes_view_t { return utils::bytes_view_t(data, data_length); }
+auto block_info_t::strict_hash_t::get_key() noexcept -> utils::bytes_view_t {
+    return utils::bytes_view_t(data, data_length);
+}
 
 block_info_t::block_info_t(utils::bytes_view_t key) noexcept { std::copy(key.begin(), key.end(), hash); }
 
-block_info_t::block_info_t(const proto::BlockInfo &block) noexcept : weak_hash{proto::get_weak_hash(block)}, size{proto::get_size(block)} {
+block_info_t::block_info_t(const proto::BlockInfo &block) noexcept
+    : weak_hash{proto::get_weak_hash(block)}, size{proto::get_size(block)} {
     hash[0] = prefix;
 }
 
 template <> void block_info_t::assign<db::BlockInfo>(const db::BlockInfo &block) noexcept {
     weak_hash = db::get_weak_hash(block);
-    size =  db::get_size(block);
+    size = db::get_size(block);
 }
 
 outcome::result<block_info_ptr_t> block_info_t::create(utils::bytes_view_t key, const db::BlockInfo &data) noexcept {
@@ -74,9 +79,7 @@ proto::BlockInfo block_info_t::as_bep(size_t offset) const noexcept {
     return r;
 }
 
-utils::bytes_t block_info_t::serialize() const noexcept {
-    return db::encode(db::BlockInfo{weak_hash, size});
-}
+utils::bytes_t block_info_t::serialize() const noexcept { return db::encode(db::BlockInfo{weak_hash, size}); }
 
 void block_info_t::link(file_info_t *file_info, size_t block_index) noexcept {
     file_blocks.emplace_back(this, file_info, block_index);
@@ -129,8 +132,6 @@ template <> SYNCSPIRIT_API utils::bytes_view_t get_index<0>(const block_info_ptr
     return item->get_hash();
 }
 
-block_info_ptr_t block_infos_map_t::by_hash(utils::bytes_view_t hash) const noexcept {
-    return get(std::move(hash));
-}
+block_info_ptr_t block_infos_map_t::by_hash(utils::bytes_view_t hash) const noexcept { return get(std::move(hash)); }
 
 } // namespace syncspirit::model

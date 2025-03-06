@@ -265,7 +265,7 @@ void relay_actor_t::on_read(std::size_t bytes) noexcept {
     size_t from = 0;
     auto process_op = process_t::more;
     while (process_op == process_t::more && from < rx_idx) {
-        auto start = (unsigned char*)(rx_buff.data() + from);
+        auto start = (unsigned char *)(rx_buff.data() + from);
         auto sz = rx_idx - from;
         auto r = proto::relay::parse({start, sz});
         process_op = std::visit(

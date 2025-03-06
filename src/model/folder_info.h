@@ -27,14 +27,17 @@ struct SYNCSPIRIT_API folder_info_t final : augmentable_t<folder_info_t> {
     struct decomposed_key_t {
         static constexpr size_t folder_data_length = uuid_length + 1;
 
-        decomposed_key_t(utils::bytes_view_t reduced_key, utils::bytes_view_t folder_uuid, utils::bytes_view_t folder_info_id);
+        decomposed_key_t(utils::bytes_view_t reduced_key, utils::bytes_view_t folder_uuid,
+                         utils::bytes_view_t folder_info_id);
         decomposed_key_t(const decomposed_key_t &) = default;
         decomposed_key_t(decomposed_key_t &&) = default;
 
         inline utils::bytes_view_t const device_key() {
             return utils::bytes_view_t(device_key_raw, device_id_t::data_length);
         }
-        inline utils::bytes_view_t const folder_key() { return utils::bytes_view_t(folder_key_raw, folder_data_length); }
+        inline utils::bytes_view_t const folder_key() {
+            return utils::bytes_view_t(folder_key_raw, folder_data_length);
+        }
 
         utils::bytes_view_t folder_info_id;
         unsigned char device_key_raw[device_id_t::data_length];

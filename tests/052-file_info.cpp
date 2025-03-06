@@ -33,7 +33,7 @@ TEST_CASE("file_info_t::local_file", "[model]") {
     auto pr_file = proto::FileInfo();
     proto::set_name(pr_file, "a.txt");
 
-    auto& v = proto::get_version(pr_file);
+    auto &v = proto::get_version(pr_file);
     proto::add_counters(v, proto::Counter(1, 1));
 
     SECTION("no local file") {
@@ -79,7 +79,7 @@ TEST_CASE("file_info_t::check_consistency", "[model]") {
     proto::set_size(pr_file, 5);
 
     auto b_hash = utils::sha256_digest(as_bytes("12345")).value();
-    auto& b = proto::add_blocks(pr_file);
+    auto &b = proto::add_blocks(pr_file);
     proto::set_hash(b, b_hash);
     proto::set_size(b, 5);
 
@@ -119,7 +119,7 @@ TEST_CASE("file_info_t::create, inconsistent source") {
     proto::set_block_size(pr_file, 131072);
     proto::set_size(pr_file, 0);
 
-    auto& v = proto::get_version(pr_file);
+    auto &v = proto::get_version(pr_file);
     proto::add_counters(v, proto::Counter(my_device->device_id().get_uint(), 1));
     proto::add_blocks(pr_file, pr_block);
 

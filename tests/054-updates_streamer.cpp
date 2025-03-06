@@ -56,7 +56,7 @@ TEST_CASE("updates_streamer", "[model]") {
         proto::set_name(pr_file, name);
         proto::set_sequence(pr_file, seq++);
 
-        auto& v = proto::get_version(pr_file);
+        auto &v = proto::get_version(pr_file);
         proto::add_counters(v, proto::Counter(my_device->device_id().get_uint(), 0));
 
         auto f = file_info_t::create(sequencer->next_uuid(), pr_file, my_folder).value();

@@ -153,12 +153,8 @@ template <> SYNCSPIRIT_API utils::bytes_view_t get_index<1>(const device_ptr_t &
     return item->device_id().get_sha256();
 }
 
-device_ptr_t devices_map_t::by_sha256(utils::bytes_view_t device_id) const noexcept {
-    return get<1>(device_id);
-}
+device_ptr_t devices_map_t::by_sha256(utils::bytes_view_t device_id) const noexcept { return get<1>(device_id); }
 
-device_ptr_t devices_map_t::by_key(utils::bytes_view_t key) const noexcept {
-    return get<0>(key);
-}
+device_ptr_t devices_map_t::by_key(utils::bytes_view_t key) const noexcept { return get<0>(key); }
 
 } // namespace syncspirit::model

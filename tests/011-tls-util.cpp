@@ -51,7 +51,7 @@ TEST_CASE("generate cert/key pair, save & load", "[support][tls]") {
 
 TEST_CASE("sha256 for certificate", "[support][tls]") {
     auto cert = read_file(locate_path("data/cert.der"));
-    auto cert_bytes = bytes_view_t((unsigned char*)cert.data(), cert.size());
+    auto cert_bytes = bytes_view_t((unsigned char *)cert.data(), cert.size());
     auto sha_result = sha256_digest(cert_bytes);
     REQUIRE((bool)sha_result);
     auto &sha = sha_result.value();
