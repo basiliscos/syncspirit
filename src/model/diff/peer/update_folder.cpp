@@ -175,19 +175,26 @@ static auto instantiate(const cluster_t &cluster, sequencer_t &sequencer, const 
             LOG_WARN(log, "file '{}' has wrong sequence", name, sequence);
             return make_error_code(error_code_t::invalid_sequence);
         }
+        auto file_size = proto::get_size(f);
         auto blocks_count = proto::get_blocks_size(f);
+        auto size_by_blocks = std::int64_t(0);
         for (int j = 0; j < blocks_count; ++j) {
             auto& b = proto::get_blocks(f, j);
+            size_by_blocks += proto::get_size(b);
             auto hash = proto::get_hash(b);
             auto strict_hash = block_info_t::make_strict_hash(hash);
             if (!blocks.by_hash(strict_hash.get_hash())) {
                 new_blocks.emplace_back(b);
             }
         }
+        if (file_size != size_by_blocks) {
+            return make_error_code(error_code_t::mismatch_file_size);
+        }
         auto& version = proto::get_version(f);
         if (!proto::get_counters_size(version)) {
             return make_error_code(error_code_t::missing_version);
         }
+
         files.emplace_back(f);
     }
 

@@ -120,6 +120,9 @@ std::string error_code_category_t::message(int c) const {
     case error_code_t::missing_version:
         r = "file version is missing";
         break;
+    case error_code_t::mismatch_file_size:
+        r = "file size mismatches total size of it's blocks";
+        break;
     case error_code_t::invalid_sequence:
         r = "file sequence is invalid";
         break;
