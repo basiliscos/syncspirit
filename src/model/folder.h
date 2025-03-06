@@ -13,7 +13,7 @@
 #include "misc/uuid.h"
 #include "folder_data.h"
 #include "syncspirit-export.h"
-#include "bep.pb.h"
+#include "proto/proto-fwd.hpp"
 
 namespace syncspirit::model {
 
@@ -28,7 +28,7 @@ struct folder_t;
 using folder_ptr_t = intrusive_ptr_t<folder_t>;
 
 struct SYNCSPIRIT_API folder_t final : augmentable_t<folder_t>, folder_data_t {
-    static outcome::result<folder_ptr_t> create(std::string_view key, const db::Folder &folder) noexcept;
+    static outcome::result<folder_ptr_t> create(utils::bytes_view_t key, const db::Folder &folder) noexcept;
     static outcome::result<folder_ptr_t> create(const bu::uuid &uuid, const db::Folder &folder) noexcept;
 
     using folder_data_t::assign_fields;
@@ -36,15 +36,15 @@ struct SYNCSPIRIT_API folder_t final : augmentable_t<folder_t>, folder_data_t {
 
     void assign_cluster(const cluster_ptr_t &cluster) noexcept;
     void add(const folder_info_ptr_t &folder_info) noexcept;
-    std::string serialize() noexcept;
+    utils::bytes_t serialize() noexcept;
 
     bool operator==(const folder_t &other) const noexcept { return get_id() == other.get_id(); }
     bool operator!=(const folder_t &other) const noexcept { return !(*this == other); }
 
     folder_info_ptr_t is_shared_with(const device_t &device) const noexcept;
 
-    std::string_view get_key() const noexcept { return std::string_view(key, data_length); }
-    std::string_view get_uuid() const noexcept;
+    utils::bytes_view_t get_key() const noexcept { return utils::bytes_view_t(key, data_length); }
+    utils::bytes_view_t get_uuid() const noexcept;
     inline auto &get_folder_infos() noexcept { return folder_infos; }
     inline auto &get_folder_infos() const noexcept { return folder_infos; }
     inline cluster_t *&get_cluster() noexcept { return cluster; }
@@ -68,7 +68,7 @@ struct SYNCSPIRIT_API folder_t final : augmentable_t<folder_t>, folder_data_t {
     static const constexpr size_t data_length = uuid_length + 1;
 
   private:
-    folder_t(std::string_view key) noexcept;
+    folder_t(utils::bytes_view_t key) noexcept;
     folder_t(const bu::uuid &uuid) noexcept;
 
     pt::ptime scan_start;
@@ -76,12 +76,13 @@ struct SYNCSPIRIT_API folder_t final : augmentable_t<folder_t>, folder_data_t {
     device_ptr_t device;
     folder_infos_map_t folder_infos;
     cluster_t *cluster = nullptr;
-    char key[data_length];
+    unsigned char key[data_length];
     std::int_fast32_t synchronizing = 0;
     bool suspended;
 };
 
 struct SYNCSPIRIT_API folders_map_t : generic_map_t<folder_ptr_t, 2> {
+    folder_ptr_t by_key(utils::bytes_view_t id) const noexcept;
     folder_ptr_t by_id(std::string_view id) const noexcept;
 };
 

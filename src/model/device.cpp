@@ -2,7 +2,8 @@
 // SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "device.h"
-#include "structs.pb.h"
+#include "proto/proto-helpers.h"
+#include "proto/proto-helpers.h"
 #include "db/prefix.h"
 #include "misc/error_code.h"
 #include "utils/time.h"
@@ -14,37 +15,40 @@ namespace syncspirit::model {
 static const constexpr char prefix = (char)(db::prefix::device);
 
 template <> void device_t::assign(const db::Device &d) noexcept {
-    name = d.name();
-    compression = d.compression();
-    cert_name = d.cert_name();
-    introducer = d.introducer();
-    auto_accept = d.auto_accept();
-    paused = d.paused();
-    skip_introduction_removals = d.skip_introduction_removals();
+    name = db::get_name(d);
+    compression = db::get_compression(d);
+    cert_name = db::get_cert_name(d);
+    introducer = db::get_introducer(d);
+    auto_accept = db::get_auto_accept(d);
+    paused = db::get_paused(d);
+    skip_introduction_removals = db::get_skip_introduction_removals(d);
     static_uris.clear();
     uris.clear();
-    last_seen = pt::from_time_t(d.last_seen());
+    last_seen = pt::from_time_t(db::get_last_seen(d));
 
     auto uris = uris_t{};
-    for (int i = 0; i < d.addresses_size(); ++i) {
-        auto uri = utils::parse(d.addresses(i));
+    auto addresses_count = db::get_addresses_size(d);
+    for (size_t i = 0; i < addresses_count; ++i) {
+        auto uri = utils::parse(db::get_addresses(d, i));
         assert(uri);
         uris.emplace_back(uri);
     }
     set_static_uris(std::move(uris));
 }
 
-outcome::result<device_ptr_t> device_t::create(std::string_view key, const db::Device &data) noexcept {
+outcome::result<device_ptr_t> device_t::create(utils::bytes_view_t key, const db::Device &data) noexcept {
     if (key[0] != prefix) {
         return make_error_code(error_code_t::invalid_device_prefix);
     }
 
-    auto id = device_id_t::from_sha256(key.substr(1));
+    auto id = device_id_t::from_sha256(key.subspan(1));
     if (!id) {
         return make_error_code(error_code_t::invalid_device_sha256_digest);
     }
 
-    auto ptr = device_ptr_t(new device_t(id.value(), data.name(), data.cert_name()));
+    auto name = db::get_name(data);
+    auto cert_name = db::get_cert_name(data);
+    auto ptr = device_ptr_t(new device_t(id.value(), name, cert_name));
     ptr->assign(data);
     return outcome::success(std::move(ptr));
 }
@@ -64,26 +68,26 @@ device_t::~device_t() {}
 
 void device_t::update(const db::Device &source) noexcept { assign(source); }
 
-std::string device_t::serialize(db::Device &r) const noexcept {
-    r.set_name(name);
-    r.set_compression(compression);
-    if (cert_name) {
-        r.set_cert_name(cert_name.value());
+auto device_t::serialize(db::Device &r) const noexcept -> utils::bytes_t {
+    db::set_name(r, name);
+    db::set_compression(r, compression);
+    if (cert_name.has_value()) {
+        db::set_cert_name(r, cert_name.value());
     }
-    r.set_introducer(introducer);
-    r.set_skip_introduction_removals(skip_introduction_removals);
-    r.set_auto_accept(auto_accept);
-    r.set_paused(paused);
-    r.set_last_seen(utils::as_seconds(last_seen));
+    db::set_introducer(r, introducer);
+    db::set_skip_introduction_removals(r, skip_introduction_removals);
+    db::set_auto_accept(r, auto_accept);
+    db::set_paused(r, paused);
+    db::set_last_seen(r, utils::as_seconds(last_seen));
 
-    for (auto &address : static_uris) {
-        *r.add_addresses() = address->buffer();
+    for (size_t i = 0; i < static_uris.size(); ++i) {
+        auto buff = static_uris[i]->buffer();
+        db::set_addresses(r, i, buff);
     }
-
-    return r.SerializeAsString();
+    return db::encode(r);
 }
 
-std::string device_t::serialize() const noexcept {
+auto device_t::serialize() const noexcept -> utils::bytes_t {
     db::Device r;
     return serialize(r);
 }
@@ -112,7 +116,7 @@ void device_t::update_contact(const tcp::endpoint &endpoint_, std::string_view c
     client_version = client_version_;
 }
 
-std::string_view device_t::get_key() const noexcept { return id.get_key(); }
+auto device_t::get_key() const noexcept -> utils::bytes_view_t { return id.get_key(); }
 
 void device_t::set_static_uris(uris_t uris) noexcept { static_uris = std::move(uris); }
 
@@ -139,14 +143,22 @@ local_device_t::local_device_t(const device_id_t &device_id, std::string_view na
     state = device_state_t::online;
 }
 
-std::string_view local_device_t::get_key() const noexcept { return local_device_id.get_key(); }
+utils::bytes_view_t local_device_t::get_key() const noexcept { return local_device_id.get_key(); }
 
-template <> SYNCSPIRIT_API std::string_view get_index<0>(const device_ptr_t &item) noexcept { return item->get_key(); }
+template <> SYNCSPIRIT_API utils::bytes_view_t get_index<0>(const device_ptr_t &item) noexcept {
+    return item->get_key();
+}
 
-template <> SYNCSPIRIT_API std::string_view get_index<1>(const device_ptr_t &item) noexcept {
+template <> SYNCSPIRIT_API utils::bytes_view_t get_index<1>(const device_ptr_t &item) noexcept {
     return item->device_id().get_sha256();
 }
 
-device_ptr_t devices_map_t::by_sha256(std::string_view device_id) const noexcept { return get<1>(device_id); }
+device_ptr_t devices_map_t::by_sha256(utils::bytes_view_t device_id) const noexcept {
+    return get<1>(device_id);
+}
+
+device_ptr_t devices_map_t::by_key(utils::bytes_view_t key) const noexcept {
+    return get<0>(key);
+}
 
 } // namespace syncspirit::model

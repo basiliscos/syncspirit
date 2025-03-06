@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #pragma once
 
-#include <string>
-#include <string_view>
 #include <algorithm>
 #include <tuple>
+#include "utils/bytes.h"
 #include <boost/multi_index/global_fun.hpp>
 #include <boost/multi_index/hashed_index.hpp>
 #include <boost/multi_index/mem_fun.hpp>
@@ -21,13 +20,13 @@ namespace mi = boost::multi_index;
 
 template <size_t N> struct string_tuple_t;
 template <> struct string_tuple_t<1> {
-    using key_storage_t = std::tuple<std::string>;
+    using key_storage_t = std::tuple<utils::bytes_t>;
 };
 template <> struct string_tuple_t<2> {
-    using key_storage_t = std::tuple<std::string, std::string>;
+    using key_storage_t = std::tuple<utils::bytes_t, utils::bytes_t>;
 };
 template <> struct string_tuple_t<3> {
-    using key_storage_t = std::tuple<std::string, std::string, std::string>;
+    using key_storage_t = std::tuple<utils::bytes_t, utils::bytes_t, utils::bytes_t>;
 };
 
 template <typename Item, size_t N> struct indexed_item_t {
@@ -46,8 +45,8 @@ template <typename T> struct reduced_type_t {
     using type = T;
 };
 
-template <> struct reduced_type_t<std::string> {
-    using type = std::string_view;
+template <> struct reduced_type_t<utils::bytes_t> {
+    using type = utils::bytes_view_t;
 };
 
 template <typename Key, size_t I>
@@ -65,23 +64,22 @@ template <size_t I, typename K> single_key_t<K, I> get_key(const K &key) noexcep
 }
 
 struct hash_op_t {
-    std::size_t operator()(std::string_view v) const noexcept { return std::hash<std::string_view>()(v); }
-    std::size_t operator()(const std::string &s) const noexcept { return std::hash<std::string>()(s); }
+    std::size_t operator()(utils::bytes_view_t v) const noexcept { return std::hash<utils::bytes_view_t>()(v); }
+    std::size_t operator()(const utils::bytes_t &s) const noexcept { return std::hash<utils::bytes_t>()(s); }
     std::size_t operator()(std::int64_t v) const noexcept { return std::hash<std::int64_t>()(v); }
 };
 
 struct eq_op_t {
-    std::size_t operator()(const std::string &s1, const std::string &s2) const noexcept { return s1 == s2; }
-    std::size_t operator()(const std::string &s1, std::string_view s2) const noexcept { return s1 == s2; }
-    std::size_t operator()(std::string_view s1, const std::string &s2) const { return s1 == s2; }
-    std::size_t operator()(std::string_view s1, std::string_view s2) const { return s1 == s2; }
-    std::size_t operator()(std::int64_t v1, std::int64_t v2) const { return v1 == v2; }
+    bool operator()(const utils::bytes_t &s1, const utils::bytes_t &s2) const noexcept { return s1 == s2; }
+    bool operator()(const utils::bytes_t &s1, utils::bytes_view_t s2) const noexcept { return s1 == s2; }
+    bool operator()(utils::bytes_view_t s1, const utils::bytes_t &s2) const { return s1 == s2; }
+    bool operator()(utils::bytes_view_t s1, utils::bytes_view_t s2) const { return s1 == s2; }
+    bool operator()(std::int64_t v1, std::int64_t v2) const { return v1 == v2; }
 };
 
 template <size_t I, typename K> struct indexed_by {
     using type = mi::hashed_unique<mi::global_fun<const K &, single_key_t<K, I>, &get_key<I, K>>, hash_op_t, eq_op_t>;
 };
-// using hash_fn_t = mi::hashed_unique<mi::mem_fun<T, std::string, &T::template get<I>>, hash_op_t, eq_op_t>;
 
 template <size_t N, size_t I, typename Key> struct hash_impl_t {
     using type = indexed_by<I, Key>::type;

@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #pragma once
 
-#include <string>
-#include <string_view>
+#include "utils/bytes.h"
 #include <rotor.hpp>
 
 namespace syncspirit {
@@ -15,13 +14,13 @@ namespace r = rotor;
 namespace payload {
 
 struct digest_response_t {
-    std::string digest;
+    utils::bytes_t digest;
     uint32_t weak;
 };
 
 struct digest_request_t {
     using response_t = digest_response_t;
-    std::string data;
+    utils::bytes_t data;
     size_t block_index;
     r::message_ptr_t custom;
 };
@@ -32,12 +31,12 @@ struct validation_response_t {
 
 struct validation_request_t : r::arc_base_t<validation_request_t> {
     using response_t = validation_response_t;
-    std::string_view data;
-    std::string hash;
+    utils::bytes_view_t data;
+    utils::bytes_t hash;
     r::message_ptr_t custom;
 
-    validation_request_t(std::string_view data_, std::string hash_, r::message_ptr_t custom_ = nullptr) noexcept
-        : data{data_}, hash{hash_}, custom{std::move(custom_)} {}
+    validation_request_t(utils::bytes_view_t data_, utils::bytes_t hash_, r::message_ptr_t custom_ = nullptr) noexcept
+        : data{data_}, hash{std::move(hash_)}, custom{std::move(custom_)} {}
 };
 
 } // namespace payload

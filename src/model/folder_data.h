@@ -6,15 +6,15 @@
 #include <string>
 #include <filesystem>
 #include "syncspirit-export.h"
-#include "structs.pb.h"
+#include "proto/proto-fwd.hpp"
 
 namespace syncspirit::model {
 
 namespace bfs = std::filesystem;
 
 struct SYNCSPIRIT_API folder_data_t {
-    enum class folder_type_t { send = 0, receive, send_and_receive };
-    enum class pull_order_t { random = 0, alphabetic, smallest, largest, oldest, newest };
+    using folder_type_t = syncspirit::db::FolderType;
+    using pull_order_t = syncspirit::db::PullOrder;
 
     inline const std::string &get_label() const noexcept { return label; }
     inline std::string_view get_id() const noexcept { return id; }
@@ -27,12 +27,12 @@ struct SYNCSPIRIT_API folder_data_t {
     inline bool is_scheduled() const noexcept { return scheduled; }
     inline folder_type_t get_folder_type() const noexcept { return folder_type; }
     inline pull_order_t get_pull_order() const noexcept { return pull_order; }
-    inline const bfs::path &get_path() noexcept { return path; }
+    inline const bfs::path &get_path() const noexcept { return path; }
     inline void set_path(const bfs::path &value) noexcept { path = value; }
     inline std::uint32_t get_rescan_interval() const noexcept { return rescan_interval; };
     inline void set_rescan_interval(std::uint32_t value) noexcept { rescan_interval = value; };
 
-    void serialize(db::Folder &dest) const noexcept;
+    void serialize(syncspirit::db::Folder &dest) const noexcept;
 
   protected:
     void assign_fields(const db::Folder &item) noexcept;

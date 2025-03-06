@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "utils.h"
 #include "transaction.h"
@@ -109,15 +109,13 @@ outcome::result<void> migrate(uint32_t from, model::device_ptr_t device, transac
 }
 
 outcome::result<container_t> load(discr_t prefix, transaction_t &txn) noexcept {
-    char prefix_val = (char)prefix;
-    std::string_view prefix_mask(&prefix_val, 1);
     auto cursor_opt = txn.cursor();
     if (!cursor_opt) {
         return cursor_opt.error();
     }
     auto &cursor = cursor_opt.value();
     container_t container;
-    auto r = cursor.iterate(prefix_mask, [&](auto &key, auto &value) -> outcome::result<void> {
+    auto r = cursor.iterate(prefix, [&](auto key, auto value) -> outcome::result<void> {
         container.push_back(pair_t{key, value});
         return outcome::success();
     });
@@ -143,7 +141,7 @@ outcome::result<void> save(const pair_t &container, transaction_t &txn) noexcept
     return outcome::success();
 }
 
-outcome::result<void> remove(std::string_view key_, transaction_t &txn) noexcept {
+outcome::result<void> remove(utils::bytes_view_t key_, transaction_t &txn) noexcept {
     MDBX_val key;
     key.iov_base = (void *)key_.data();
     key.iov_len = key_.size();

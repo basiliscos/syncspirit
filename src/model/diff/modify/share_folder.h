@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #pragma once
 
@@ -19,7 +19,7 @@ struct SYNCSPIRIT_API share_folder_t final : cluster_diff_t {
     outcome::result<void> apply_impl(cluster_t &, apply_controller_t &) const noexcept override;
     outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;
 
-    std::string peer_id;
+    utils::bytes_t peer_id;
     std::string folder_id;
 
   private:

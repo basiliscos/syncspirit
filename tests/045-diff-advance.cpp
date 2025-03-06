@@ -29,12 +29,9 @@ TEST_CASE("remove folder", "[model]") {
     devices.put(peer_device);
 
     proto::FileInfo pr_fi;
-    pr_fi.set_name("a.txt");
-    pr_fi.set_block_size(0);
-    pr_fi.set_size(0);
-    auto counter = pr_fi.mutable_version()->add_counters();
-    counter->set_id(peer_device->device_id().get_uint());
-    counter->set_value(5);
+    proto::set_name(pr_fi, "a.txt");
+    auto& v = proto::get_version(pr_fi);
+    proto::add_counters(v, proto::Counter(peer_device->device_id().get_uint(), 5));
 
     auto builder = diff_builder_t(*cluster);
     REQUIRE(builder.upsert_folder("f1", "some/path-1", "my-label-1").apply());
@@ -82,7 +79,10 @@ TEST_CASE("remove folder", "[model]") {
 
     SECTION("remote win") {
         auto pr_fi_local = pr_fi;
-        pr_fi_local.mutable_version()->mutable_counters(0)->set_value(3);
+        auto& v_l = proto::get_version(pr_fi_local);
+        auto& c_l = proto::get_counters(v_l, 0);
+        proto::set_value(c_l, 3);
+
         SECTION("all ok") {
             REQUIRE(builder.advance(*file_peer).apply());
             REQUIRE(files_my.size() == 1);

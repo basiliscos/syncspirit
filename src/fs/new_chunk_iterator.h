@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2023-2025 Ivan Baidakou
 
 #pragma once
 
-#include <string_view>
 #include <boost/outcome.hpp>
-#include <vector>
 
+#include "utils/bytes.h"
 #include "file.h"
 #include "scan_task.h"
 #include "syncspirit-export.h"
@@ -17,9 +16,8 @@ namespace outcome = boost::outcome_v2;
 namespace bfs = std::filesystem;
 
 struct SYNCSPIRIT_API new_chunk_iterator_t {
-
     struct block_hash_t {
-        std::string digest;
+        utils::bytes_t digest;
         uint32_t weak;
         int32_t size;
     };
@@ -33,7 +31,7 @@ struct SYNCSPIRIT_API new_chunk_iterator_t {
     inline const bfs::path &get_path() noexcept { return backend->get_path(); }
 
     inline scan_task_ptr_t get_task() noexcept { return task; }
-    void ack(size_t block_index, uint32_t weak, std::string_view hash, int32_t block_size) noexcept;
+    void ack(size_t block_index, uint32_t weak, utils::bytes_t hash, int32_t block_size) noexcept;
     bool is_complete() const noexcept;
     inline hashes_t &get_hashes() noexcept { return hashes; }
     inline int64_t get_size() const noexcept { return file_size; }

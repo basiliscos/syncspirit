@@ -35,7 +35,7 @@ bool add_peer_t::execute(governor_actor_t &actor) noexcept {
     }
 
     db::Device db_dev;
-    db_dev.set_name(label);
+    db::set_name(db_dev, label);
 
     auto diff = cluster_diff_ptr_t(new modify::update_peer_t(std::move(db_dev), peer, cluster));
     actor.send_command(std::move(diff), *this);

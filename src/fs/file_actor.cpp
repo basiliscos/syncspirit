@@ -16,6 +16,7 @@
 #include "utils/platform.h"
 
 using namespace syncspirit::fs;
+using namespace syncspirit::proto;
 
 file_actor_t::write_guard_t::write_guard_t(file_actor_t &actor_,
                                            const model::diff::modify::block_transaction_t &txn_) noexcept
@@ -83,30 +84,31 @@ void file_actor_t::on_block_request(message::block_request_t &message) noexcept 
     LOG_TRACE(log, "on_block_request");
     auto &p = message.payload;
     auto &dest = p.reply_to;
-    auto &req_ptr = message.payload.remote_request;
-    auto &req = *req_ptr;
-    auto folder = cluster->get_folders().by_id(req.folder());
+    auto &req = message.payload.remote_request;
+    auto folder = cluster->get_folders().by_id(get_folder(req));
     auto folder_info = folder->get_folder_infos().by_device(*cluster->get_device());
-    auto file_info = folder_info->get_file_infos().by_name(req.name());
+    auto file_info = folder_info->get_file_infos().by_name(get_name(req));
     auto &path = file_info->get_path();
     auto file_opt = open_file_ro(path, true);
     auto ec = sys::error_code{};
-    auto data = std::string{};
+    auto data = utils::bytes_t{};
     if (!file_opt) {
         ec = file_opt.assume_error();
         LOG_ERROR(log, "error opening file {}: {}", path.string(), ec.message());
     } else {
         auto &file = file_opt.assume_value();
-        auto block_opt = file->read(req.offset(), req.size());
+        auto offset = get_offset(req);
+        auto size = get_size(req);
+        auto block_opt = file->read(offset, size);
         if (!block_opt) {
             ec = block_opt.assume_error();
-            LOG_WARN(log, "error requesting block; offset = {}, size = {} :: {} ", req.offset(), req.size(),
+            LOG_WARN(log, "error requesting block; offset = {}, size = {} :: {} ", offset, size,
                      ec.message());
         } else {
             data = std::move(block_opt.assume_value());
         }
     }
-    send<payload::block_response_t>(dest, std::move(req_ptr), ec, std::move(data));
+    send<payload::block_response_t>(dest, std::move(req), ec, std::move(data));
 }
 
 auto file_actor_t::reflect(model::file_info_ptr_t &file_ptr, const bfs::path &path) noexcept -> outcome::result<void> {
@@ -200,7 +202,8 @@ auto file_actor_t::operator()(const model::diff::advance::remote_copy_t &diff, v
     -> outcome::result<void> {
     auto folder = cluster->get_folders().by_id(diff.folder_id);
     auto file_info = folder->get_folder_infos().by_device_id(diff.peer_id);
-    auto file = file_info->get_file_infos().by_name(diff.proto_source.name());
+    auto name = get_name(diff.proto_source);
+    auto file = file_info->get_file_infos().by_name(name);
     auto r = reflect(file, file->get_path());
     return r ? diff.visit_next(*this, custom) : r;
 }
@@ -210,9 +213,11 @@ auto file_actor_t::operator()(const model::diff::advance::remote_win_t &diff, vo
     auto folder = cluster->get_folders().by_id(diff.folder_id);
     auto folder_info = folder->get_folder_infos();
     auto file_info = folder_info.by_device_id(diff.peer_id);
-    auto file = file_info->get_file_infos().by_name(diff.proto_source.name());
+    auto source_name = get_name(diff.proto_source);
+    auto local_name = get_name(diff.proto_local);
+    auto file = file_info->get_file_infos().by_name(source_name);
     auto &source_path = file->get_path();
-    auto target_path = folder->get_path() / diff.proto_local.name();
+    auto target_path = folder->get_path() / local_name;
     LOG_DEBUG(log, "renaming {} -> {}", source_path, target_path);
     auto ec = sys::error_code{};
     bfs::rename(source_path, target_path);

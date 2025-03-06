@@ -10,8 +10,7 @@
 
 #include "device_id.h"
 #include "syncspirit-export.h"
-#include "structs.pb.h"
-#include "utils/time.h"
+#include "proto/proto-fwd.hpp"
 
 #include <boost/outcome.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
@@ -27,7 +26,7 @@ struct SYNCSPIRIT_API some_device_base_t {
 
     some_device_base_t(const some_device_base_t &other) = delete;
     void assign(const db::SomeDevice &db) noexcept;
-    std::string_view get_key() const noexcept { return std::string_view(hash, data_length); }
+    utils::bytes_view_t get_key() const noexcept { return utils::bytes_view_t(hash, data_length); }
     const device_id_t &get_device_id() const noexcept { return device_id; }
 
     std::string_view get_name() const noexcept;
@@ -37,7 +36,7 @@ struct SYNCSPIRIT_API some_device_base_t {
     const pt::ptime &get_last_seen() const noexcept;
     void set_last_seen(const pt::ptime &value) noexcept;
 
-    std::string serialize() noexcept;
+    utils::bytes_t serialize() noexcept;
     void serialize(db::SomeDevice &db) const noexcept;
 
   protected:
@@ -49,7 +48,7 @@ struct SYNCSPIRIT_API some_device_base_t {
     std::string address;
     pt::ptime last_seen;
     device_id_t device_id;
-    char hash[data_length];
+    unsigned char hash[data_length];
 };
 
 template <char prefix>
@@ -62,7 +61,9 @@ struct SYNCSPIRIT_API some_device_t final : some_device_base_t, augmentable_t<so
 
     struct SYNCSPIRIT_API map_t : public generic_map_t<ptr_t, 1> {
         using parent_t = generic_map_t<ptr_t, 1>;
-        ptr_t by_sha256(std::string_view value) const noexcept { return this->template get<0>(value); }
+        ptr_t by_sha256(utils::bytes_view_t value) const noexcept {
+            return this->template get<0>(value);
+        }
     };
 
   private:

@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #pragma once
 
 #include "../cluster_diff.h"
 #include "model/device.h"
 #include "model/misc/sequencer.h"
-#include "structs.pb.h"
+#include "proto/proto-fwd.hpp"
 
 namespace syncspirit::model::diff::modify {
 

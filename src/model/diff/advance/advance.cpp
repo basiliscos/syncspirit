@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "advance.h"
 #include "remote_copy.h"
 #include "remote_win.h"
+#include "proto/proto-helpers.h"
 #include "model/cluster.h"
 #include "model/diff/modify/add_blocks.h"
 #include "model/diff/modify/remove_blocks.h"
@@ -40,14 +41,19 @@ auto advance_t::create(advance_action_t action, const model::file_info_t &source
     }
 }
 
-advance_t::advance_t(std::string_view folder_id_, std::string_view peer_id_, advance_action_t action_,
+advance_t::advance_t(std::string_view folder_id_, utils::bytes_view_t peer_id_, advance_action_t action_,
                      bool disable_blocks_removal_) noexcept
-    : folder_id{folder_id_}, peer_id{peer_id_}, action{action_}, disable_blocks_removal{disable_blocks_removal_} {}
+    : folder_id{folder_id_}, action{action_}, disable_blocks_removal{disable_blocks_removal_} {
+    peer_id = utils::bytes_t(peer_id_.begin(), peer_id_.end());
+}
 
 void advance_t::initialize(const cluster_t &cluster, sequencer_t &sequencer, proto::FileInfo proto_source_,
                            std::string_view local_file_name_) noexcept {
     proto_source = std::move(proto_source_);
-    assert(!(proto_source.blocks_size() && proto_source.deleted()));
+    if (local_file_name_.empty()) {
+        local_file_name_ = proto::get_name(proto_source);
+    }
+    assert(!(proto::get_blocks_size(proto_source) && proto::get_deleted(proto_source)));
     auto folder = cluster.get_folders().by_id(folder_id);
     auto folder_id = folder->get_id();
     auto &self = *cluster.get_device();
@@ -60,8 +66,8 @@ void advance_t::initialize(const cluster_t &cluster, sequencer_t &sequencer, pro
 
     auto orphans = orphaned_blocks_t::set_t();
     proto_local = proto_source;
-    proto_local.set_sequence(0);
-    proto_local.set_name(std::string(local_file_name_));
+    proto::set_sequence(proto_local, 0);
+    proto::set_name(proto_local, local_file_name_);
 
     if (!local_file) {
         uuid = sequencer.next_uuid();
@@ -74,13 +80,15 @@ void advance_t::initialize(const cluster_t &cluster, sequencer_t &sequencer, pro
 
     auto new_blocks = modify::add_blocks_t::blocks_t{};
     auto &blocks_map = cluster.get_blocks();
-    if (proto_local.size()) {
-        for (int i = 0; i < proto_local.blocks_size(); ++i) {
-            auto &b = proto_local.blocks(i);
-            auto strict_hash = block_info_t::make_strict_hash(b.hash());
-            auto block = blocks_map.get(strict_hash.get_hash());
+    if (proto::get_size(proto_local)) {
+        auto blocks_size = proto::get_blocks_size(proto_local);
+        for (int i = 0; i < blocks_size; ++i) {
+            auto& proto_block = proto::get_blocks(proto_local, i);
+            auto h = proto::get_hash(proto_block);
+            auto strict_hash = block_info_t::make_strict_hash(h);
+            auto block = blocks_map.by_hash(strict_hash.get_hash());
             if (!block) {
-                new_blocks.push_back(b);
+                new_blocks.push_back(proto_block);
             } else {
                 auto it = orphans.find(strict_hash.get_key());
                 if (it != orphans.end()) {
@@ -91,7 +99,7 @@ void advance_t::initialize(const cluster_t &cluster, sequencer_t &sequencer, pro
     }
 
     LOG_DEBUG(log, "advance_t ({}), folder = {}, name = {} ( -> {}), blocks = {}, removed blocks = {}, new blocks = {}",
-              stringify(action), folder_id, proto_source.name(), proto_local.name(), proto_local.blocks_size(),
+              stringify(action), folder_id, proto::get_name(proto_source), proto::get_name(proto_local), proto::get_blocks_size(proto_local),
               orphans.size(), new_blocks.size());
 
     auto current = (cluster_diff_t *){};
@@ -120,7 +128,7 @@ auto advance_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) c
     auto local_folder = folder->get_folder_infos().by_device(*my_device);
     auto peer_folder = folder->get_folder_infos().by_device_id(peer_id);
 
-    auto prev_file = local_folder->get_file_infos().by_name(proto_local.name());
+    auto prev_file = local_folder->get_file_infos().by_name(proto::get_name(proto_local));
     auto local_file_opt = file_info_t::create(uuid, proto_local, local_folder);
     if (!local_file_opt) {
         return local_file_opt.assume_error();
@@ -132,12 +140,14 @@ auto advance_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) c
         local_file = std::move(prev_file);
     }
 
-    if (proto_local.size()) {
+    if (proto::get_size(proto_local)) {
         auto &blocks_map = cluster.get_blocks();
-        for (int i = 0; i < proto_local.blocks_size(); ++i) {
-            auto &block = proto_local.blocks(i);
-            auto strict_hash = block_info_t::make_strict_hash(block.hash());
-            auto block_info = blocks_map.get(strict_hash.get_hash());
+        auto blocks_count = proto::get_blocks_size(proto_local);
+        for (size_t i = 0; i < blocks_count; ++i) {
+            auto& block =  proto::get_blocks(proto_local, i);
+            auto hash = proto::get_hash(block);
+            auto strict_hash = block_info_t::make_strict_hash(hash);
+            auto block_info = blocks_map.by_hash(strict_hash.get_hash());
             assert(block_info);
             local_file->assign_block(block_info, i);
             local_file->mark_local_available(i);
@@ -150,7 +160,7 @@ auto advance_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) c
     local_folder->add_strict(local_file);
 
     LOG_TRACE(log, "advance_t ({}), folder = {}, name = {}, blocks = {}, seq. = {}", stringify(action), folder_id,
-              local_file->get_name(), proto_local.blocks_size(), sequence);
+              local_file->get_name(), proto::get_blocks_size(proto_local), sequence);
 
     local_file->notify_update();
     local_folder->notify_update();

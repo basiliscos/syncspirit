@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
 
 #include "remove_blocks.h"
 
@@ -14,8 +14,8 @@ auto remove_blocks_t::apply_impl(cluster_t &cluster, apply_controller_t &control
         LOG_TRACE(log, "applying remove_blocks_t, blocks = {}", keys.size());
         auto &blocks = cluster.get_blocks();
         for (auto &block_key : keys) {
-            auto block_hash = block_key.substr(1);
-            auto b = blocks.get(block_hash);
+            auto block_hash = utils::bytes_view_t(block_key.data() + 1, block_key.size() - 1);
+            auto b = blocks.by_hash(block_hash);
             blocks.remove(b);
         }
     }

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #pragma once
 
@@ -9,6 +9,7 @@
 #include "file.h"
 #include "chunk_iterator.h"
 #include "new_chunk_iterator.h"
+#include "utils/bytes.h"
 
 namespace syncspirit::fs {
 
@@ -24,14 +25,14 @@ using rehash_needed_t = chunk_iterator_t;
 using hash_anew_t = new_chunk_iterator_t;
 
 struct block_request_t {
-    proto::message::Request remote_request;
+    proto::Request remote_request;
     r::address_ptr_t reply_to;
 };
 
 struct block_response_t {
-    proto::message::Request remote_request;
+    proto::Request remote_request;
     sys::error_code ec;
-    std::string data;
+    utils::bytes_t data;
 };
 
 } // namespace payload

@@ -183,12 +183,12 @@ struct table_t : content::folder_table_t {
         serialization_context_t ctx;
         description.get_folder()->serialize(ctx.folder);
 
-        auto copy_data = ctx.folder.SerializeAsString();
+        auto copy_data = db::encode(ctx.folder);
         error = {};
         auto valid = store(&ctx);
 
         // clang-format off
-        auto is_same = (copy_data == ctx.folder.SerializeAsString())
+        auto is_same = (copy_data == db::encode(ctx.folder))
                     && (initially_shared_with == ctx.shared_with);
         // clang-format on
         if (!is_same) {
@@ -200,7 +200,8 @@ struct table_t : content::folder_table_t {
         } else {
             apply_button->deactivate();
             auto &folders = container.supervisor.get_cluster()->get_folders();
-            auto folder = folders.by_id(ctx.folder.id());
+            auto folder_id = db::get_id(ctx.folder);
+            auto folder = folders.by_id(folder_id);
             if (!folder->is_scanning()) {
                 rescan_button->activate();
             }

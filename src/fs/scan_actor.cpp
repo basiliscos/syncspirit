@@ -112,7 +112,7 @@ void scan_actor_t::on_scan(message::scan_progress_t &message) noexcept {
                     auto folder = file.get_folder_info()->get_folder();
                     auto folder_id = std::string(folder->get_id());
                     auto fi = file.as_proto(false);
-                    fi.set_deleted(true);
+                    proto::set_deleted(fi, true);
                     task->push(new model::diff::advance::local_update_t(*cluster, *sequencer, std::move(fi),
                                                                         std::move(folder_id)));
                 } else if constexpr (std::is_same_v<T, changed_meta_t>) {
@@ -173,7 +173,7 @@ auto scan_actor_t::initiate_hash(scan_task_ptr_t task, const bfs::path &path, pr
     -> scan_errors_t {
     file_ptr_t file;
     LOG_DEBUG(log, "will try to initiate hashing of {}", path.string());
-    if (metadata.type() == proto::FileInfoType::FILE) {
+    if (proto::get_type(metadata) == proto::FileInfoType::FILE) {
         auto opt = file_t::open_read(path);
         if (!opt) {
             auto &ec = opt.assume_error();
@@ -284,16 +284,19 @@ void scan_actor_t::commit_new_file(new_chunk_iterator_t &info) noexcept {
     auto &hashes = info.get_hashes();
     auto folder_id = std::string(info.get_task()->get_folder_id());
     auto &file = info.get_metadata();
-    file.set_block_size(info.get_block_size());
+    proto::set_block_size(file, info.get_block_size());
     int offset = 0;
 
-    file.clear_blocks();
+    // file.clear_blocks();
     for (auto &b : hashes) {
-        auto block = file.add_blocks();
-        block->set_hash(b.digest);
-        block->set_weak_hash(b.weak);
-        block->set_size(b.size);
-        block->set_offset(offset);
+
+        auto block_info = proto::BlockInfo {
+            offset,
+            b.size,
+            b.digest,
+            b.weak
+        };
+        proto::add_blocks(file, std::move(block_info));
         offset += b.size;
     }
 

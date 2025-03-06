@@ -19,11 +19,11 @@ TEST_CASE("generic map", "[model]") {
     auto map = devices_map_t();
     map.put(my_device);
     REQUIRE(map.by_sha256(my_id.get_sha256()));
-    REQUIRE(map.get(my_device->get_key()));
+    REQUIRE(map.by_key(my_device->get_key()));
 
     map.remove(my_device);
     REQUIRE(!map.by_sha256(my_id.get_sha256()));
-    REQUIRE(!map.get(my_device->get_key()));
+    REQUIRE(!map.by_key(my_device->get_key()));
     REQUIRE(map == map);
 }
 
@@ -83,7 +83,7 @@ TEST_CASE("lru cache", "[model]") {
 }
 
 struct item_t {
-    std::string key;
+    utils::bytes_t key;
     int value;
 };
 
@@ -91,20 +91,24 @@ using item_map_t = syncspirit::model::generic_map_t<item_t, 1>;
 
 namespace syncspirit::model {
 
-template <> SYNCSPIRIT_API inline std::string_view get_index<0>(const item_t &item) noexcept { return item.key; }
+template <> inline utils::bytes_view_t get_index<0>(const item_t &item) noexcept { return item.key; }
 
 } // namespace syncspirit::model
 
 TEST_CASE("generic map ops") {
     item_map_t map;
-    auto i1 = item_t{"k", 1};
-    auto i2 = item_t{"k", 2};
+    auto k = as_owned_bytes("k");
+    auto kv = utils::bytes_view_t(k);
+    auto i1 = item_t{k, 1};
+    auto i2 = item_t{k, 2};
 
     map.put(i1);
-    CHECK(map.get("k").value == 1);
+    CHECK(map.get(k).value == 1);
+    CHECK(map.get(kv).value == 1);
 
     map.put(i2);
-    CHECK(map.get("k").value == 2);
+    CHECK(map.get(k).value == 2);
+    CHECK(map.get(kv).value == 2);
     REQUIRE(map.size() == 1);
 
     map.remove(i2);

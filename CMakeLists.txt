@@ -29,12 +29,13 @@ find_package(
     REQUIRED
 )
 find_package(OpenSSL REQUIRED)
-find_package(Protobuf REQUIRED)
+find_package(protopuf REQUIRED)
 find_package(ZLIB REQUIRED)
 find_package(rotor COMPONENTS asio thread REQUIRED)
 find_package(lz4 REQUIRED)
 find_package(fmt REQUIRED)
 find_package(spdlog REQUIRED)
+find_package(protopuf REQUIRED)
 find_package(pugixml REQUIRED)
 find_package(tomlplusplus REQUIRED)
 find_package(nlohmann_json REQUIRED)
@@ -84,15 +85,8 @@ function(install_executable target)
 endfunction()
 
 configure_file(misc/syncspirit-config.h.in include/syncspirit-config.h @ONLY)
-set(Protobuf_IMPORT_DIRS ${syncspirit_SOURCE_DIR}/src/protobuf)
-protobuf_generate_cpp(
-    PROTO_SRCS PROTO_HDRS
-    EXPORT_MACRO SYNCSPIRIT_API
-    src/protobuf/bep.proto
-    src/protobuf/structs.proto
-)
+
 add_library(syncspirit_core
-    ${PROTO_SRCS}
     src/constants.cpp
     src/config/utils.cpp
     src/db/cursor.cpp
@@ -223,12 +217,15 @@ add_library(syncspirit_core
     src/proto/bep_support.cpp
     src/proto/discovery_support.cpp
     src/proto/luhn32.cpp
+    src/proto/proto-helpers-bep.cpp
+    src/proto/proto-helpers-db.cpp
     src/proto/relay_support.cpp
     src/proto/upnp_support.cpp
     src/transport/stream.cpp
     src/transport/http.cpp
     src/utils/base32.cpp
     src/utils/beast_support.cpp
+    src/utils/bytes.cpp
     src/utils/dns.cpp
     src/utils/error_code.cpp
     src/utils/location.cpp
@@ -286,7 +283,6 @@ FetchContent_Declare(C_ARES
 FetchContent_MakeAvailable(C_ARES)
 
 target_include_directories(syncspirit_core PUBLIC
-    ${Protobuf_INCLUDE_DIRS}
     ${OPENSSL_INCLUDE_DIR}
     ${CMAKE_CURRENT_BINARY_DIR}
     ${CMAKE_CURRENT_BINARY_DIR}/include
@@ -295,7 +291,7 @@ target_include_directories(syncspirit_core PUBLIC
 
 target_link_libraries(syncspirit_core
     PUBLIC
-        protobuf::libprotobuf
+        protopuf::protopuf
         rotor::asio
         rotor::thread
         pugixml::pugixml
@@ -314,6 +310,7 @@ target_link_libraries(syncspirit_core
         $<$<PLATFORM_ID:Windows>:ws2_32>
         $<$<PLATFORM_ID:Windows>:wsock32>
     PRIVATE
+        ZLIB::ZLIB
         c-ares::cares
 )
 install_executable("syncspirit_core")

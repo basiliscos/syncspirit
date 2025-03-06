@@ -11,7 +11,7 @@
 
 namespace syncspirit::db {
 
-using discr_t = std::byte;
+using discr_t = unsigned char;
 
 namespace prefix {
 // clang-format off

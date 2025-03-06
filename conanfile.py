@@ -14,9 +14,9 @@ class SyncspiritRecipe(ConanFile):
         self.requires("lz4/1.9.4")
         self.requires("nlohmann_json/3.11.2")
         self.requires("openssl/3.3.2")
-        self.requires("protobuf/3.21.12")
+        self.requires("protopuf/3.0.0")
         self.requires("pugixml/1.13")
-        self.requires("rotor/0.32")
+        self.requires("rotor/0.33")
         self.requires("spdlog/1.14.1")
         self.requires("tomlplusplus/3.3.0")
         self.requires("zlib/1.2.13")
@@ -24,7 +24,6 @@ class SyncspiritRecipe(ConanFile):
         self.requires("boost/1.86.0", headers=True, libs=True, transitive_libs=True, force=True)
 
     def build_requirements(self):
-        self.tool_requires("protobuf/3.21.12")
         self.tool_requires("cmake/3.31.5")
 
     def generate(self):

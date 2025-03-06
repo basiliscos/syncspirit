@@ -100,12 +100,12 @@ struct table_t : content::folder_table_t {
         serialization_context_t ctx;
         description.get_folder()->serialize(ctx.folder);
 
-        auto copy_data = ctx.folder.SerializeAsString();
+        auto copy_data = db::encode(ctx.folder);
         error = {};
         auto valid = store(&ctx);
 
         // clang-format off
-        auto is_same = (copy_data == ctx.folder.SerializeAsString())
+        auto is_same = (copy_data == db::encode(ctx.folder))
                     && (initially_shared_with == ctx.shared_with);
         // clang-format on
         if (!is_same) {
@@ -119,10 +119,11 @@ struct table_t : content::folder_table_t {
         }
 
         if (valid) {
-            if (ctx.folder.path().empty()) {
+            auto db_path = db::get_path(ctx.folder);
+            if (db_path.empty()) {
                 error = "path should be defined";
             } else {
-                auto path = bfs::path(boost::nowide::widen(ctx.folder.path()));
+                auto path = bfs::path(boost::nowide::widen(db_path));
                 auto ec = sys::error_code{};
                 if (bfs::exists(path, ec)) {
                     if (!bfs::is_empty(path, ec)) {
@@ -195,8 +196,8 @@ bool folders_t::on_select() {
         auto &sequencer = supervisor.get_sequencer();
 
         auto random_id = sequencer.next_uint64();
-        auto random_id_ptr = reinterpret_cast<const char *>(&random_id);
-        auto sample_id = utils::base32::encode(std::string_view(random_id_ptr, sizeof(random_id)));
+        auto random_id_ptr = reinterpret_cast<unsigned char *>(&random_id);
+        auto sample_id = utils::base32::encode(utils::bytes_view_t(random_id_ptr, sizeof(random_id)));
         auto lower_caser = [](unsigned char c) { return std::tolower(c); };
         std::transform(sample_id.begin(), sample_id.end(), sample_id.begin(), lower_caser);
         auto sz = sample_id.size();
@@ -204,14 +205,14 @@ bool folders_t::on_select() {
         auto &path = supervisor.get_app_config().default_location;
 
         auto db_folder = db::Folder();
-        db_folder.set_rescan_interval(3600u);
-        db_folder.set_path(boost::nowide::narrow(path.wstring()));
-        db_folder.set_id(id);
+        db::set_rescan_interval(db_folder, 3600);
+        db::set_path(db_folder, boost::nowide::narrow(path.wstring()));
+        db::set_id(db_folder, id);
         auto folder = model::folder_t::create(sequencer.next_uuid(), db_folder).value();
         folder->assign_cluster(cluster);
 
         auto db_folder_info = db::FolderInfo();
-        db_folder_info.set_index_id(sequencer.next_uint64());
+        db::set_index_id(db_folder_info, sequencer.next_uint64());
         auto fi = model::folder_info_t::create(sequencer.next_uuid(), db_folder_info, &self, folder).value();
 
         auto prev = content->get_widget();

@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2023-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2023-2025 Ivan Baidakou
 
 #pragma once
 
-#include <string_view>
 #include <boost/outcome.hpp>
 #include <rotor/address.hpp>
 #include <vector>
 
 #include "model/file_info.h"
+#include "utils/bytes.h"
 #include "file.h"
 #include "scan_task.h"
 #include "syncspirit-export.h"
@@ -17,6 +17,7 @@ namespace syncspirit::fs {
 
 namespace outcome = boost::outcome_v2;
 namespace bfs = std::filesystem;
+
 
 struct SYNCSPIRIT_API chunk_iterator_t {
     using valid_blocks_map_t = std::vector<bool>;
@@ -29,7 +30,7 @@ struct SYNCSPIRIT_API chunk_iterator_t {
     inline const valid_blocks_map_t &valid_blocks() const noexcept { return valid_blocks_map; }
 
     void ack_hashing() noexcept;
-    void ack_block(std::string_view digest, size_t block_index) noexcept;
+    void ack_block(utils::bytes_view_t digest, size_t block_index) noexcept;
     outcome::result<details::chunk_t> read() noexcept;
 
     inline model::file_info_ptr_t get_file() { return peer_file; }

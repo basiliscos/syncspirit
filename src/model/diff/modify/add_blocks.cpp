@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
 
 #include "add_blocks.h"
 #include "model/cluster.h"
@@ -7,7 +7,7 @@
 
 using namespace syncspirit::model::diff::modify;
 
-add_blocks_t::add_blocks_t(blocks_t blocks_) noexcept : blocks{std::move(blocks_)} {
+add_blocks_t::add_blocks_t(blocks_t blocks_) noexcept : blocks(std::move(blocks_)) {
     LOG_DEBUG(log, "add_blocks_t, count = {}", blocks.size());
 }
 

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #pragma once
 
@@ -9,6 +9,7 @@
 #include "config/fs.h"
 #include "utils/log.h"
 #include "file.h"
+#include "proto/proto-helpers.h"
 #include <rotor.hpp>
 #include <boost/intrusive_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ref_counter.hpp>
@@ -95,10 +96,10 @@ struct SYNCSPIRIT_API scan_task_t : boost::intrusive_ref_counter<scan_task_t, bo
 
   private:
     scan_result_t advance_dir(const bfs::path &dir) noexcept;
-    scan_result_t advance_file(const file_info_t &file) noexcept;
-    scan_result_t advance_regular_file(const file_info_t &file) noexcept;
-    scan_result_t advance_symlink_file(const file_info_t &file) noexcept;
-    scan_result_t advance_unknown_file(const unknown_file_t &file) noexcept;
+    scan_result_t advance_file(file_info_t &file) noexcept;
+    scan_result_t advance_regular_file(file_info_t &file) noexcept;
+    scan_result_t advance_symlink_file(file_info_t &file) noexcept;
+    scan_result_t advance_unknown_file(unknown_file_t &file) noexcept;
 
     std::string folder_id;
     model::folder_ptr_t folder;

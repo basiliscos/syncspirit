@@ -311,9 +311,9 @@ callback_ptr_t app_supervisor_t::call_select_folder(std::string_view folder_id) 
     return cb;
 }
 
-callback_ptr_t app_supervisor_t::call_share_folders(std::string folder_id, std::vector<std::string> devices) {
+callback_ptr_t app_supervisor_t::call_share_folders(std::string_view folder_id, std::vector<utils::bytes_t> devices) {
     assert(devices.size());
-    auto fn = callback_fn_t([this, folder_id = std::move(folder_id), devices = std::move(devices)]() {
+    auto fn = callback_fn_t([this, folder_id = std::string(folder_id), devices = std::move(devices)]() {
         auto diff = model::diff::cluster_diff_ptr_t{};
         auto current = diff.get();
         for (auto &sha256 : devices) {
@@ -433,7 +433,8 @@ auto app_supervisor_t::operator()(const model::diff::modify::add_pending_folders
         auto augmentation = static_cast<augmentation_t *>(peer->get_augmentation().get());
         auto peer_node = static_cast<tree_item::peer_device_t *>(augmentation->get_owner());
         auto pending_node = static_cast<tree_item::pending_folders_t *>(peer_node->get_pending_folders());
-        auto pending_folder = pending_folders.by_id(item.db.folder().id());
+        auto folder_id = db::get_id(db::get_folder(item.db));
+        auto pending_folder = pending_folders.by_id(folder_id);
         if (pending_folder->get_augmentation()) {
             continue;
         }
@@ -464,7 +465,8 @@ auto app_supervisor_t::operator()(const model::diff::advance::advance_t &diff, v
     if (folder && !folder->is_suspended()) {
         auto &folder_infos = folder->get_folder_infos();
         auto local_fi = folder_infos.by_device(*cluster->get_device());
-        auto local_file = local_fi->get_file_infos().by_name(diff.proto_local.name());
+        auto file_name = proto::get_name(diff.proto_local);
+        auto local_file = local_fi->get_file_infos().by_name(file_name);
         if (local_file) {
             auto generic_augmentation = local_fi->get_augmentation();
             auto augmentation = static_cast<augmentation_entry_root_t *>(generic_augmentation.get());
@@ -476,7 +478,7 @@ auto app_supervisor_t::operator()(const model::diff::advance::advance_t &diff, v
             for (auto it : folder_infos) {
                 auto &remote_fi = it.item;
                 if (remote_fi->get_device() != local_fi->get_device()) {
-                    auto remote_file = remote_fi->get_file_infos().by_name(local_file->get_name());
+                    auto remote_file = remote_fi->get_file_infos().by_name(file_name);
                     if (remote_file) {
                         auto aug = remote_file->get_augmentation();
                         if (aug) {
@@ -492,7 +494,8 @@ auto app_supervisor_t::operator()(const model::diff::advance::advance_t &diff, v
 
 auto app_supervisor_t::operator()(const model::diff::modify::upsert_folder_t &diff, void *custom) noexcept
     -> outcome::result<void> {
-    auto &folder = *cluster->get_folders().by_id(diff.db.id());
+    auto folder_id = db::get_id(diff.db);
+    auto &folder = *cluster->get_folders().by_id(folder_id);
     if (!folder.get_augmentation()) {
         auto folders_node = static_cast<tree_item::folders_t *>(folders);
         auto augmentation = folders_node->add_folder(folder);
@@ -527,7 +530,8 @@ auto app_supervisor_t::operator()(const model::diff::peer::update_folder_t &diff
         auto augmentation = static_cast<augmentation_entry_root_t *>(generic_augmentation.get());
         auto &files_map = folder_info->get_file_infos();
         for (auto &file : diff.files) {
-            auto file_info = files_map.by_name(file.name());
+            auto file_name = proto::get_name(file);
+            auto file_info = files_map.by_name(file_name);
             if (!file_info->get_augmentation()) {
                 augmentation->track(*file_info);
             }

@@ -4,6 +4,7 @@
 #include "file_infos.h"
 #include "model/cluster.h"
 #include "model/diff/apply_controller.h"
+#include "proto/proto-helpers-db.h"
 #include <unordered_map>
 
 using namespace syncspirit::model::diff::load;
@@ -15,8 +16,7 @@ auto file_infos_t::apply_forward(cluster_t &cluster, apply_controller_t &control
 
 auto file_infos_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
     -> outcome::result<void> {
-    using folder_info_by_id_t = std::unordered_map<std::string_view, folder_info_ptr_t>;
-
+    using folder_info_by_id_t = std::unordered_map<utils::bytes_view_t, folder_info_ptr_t>;
     auto all_fi = folder_info_by_id_t{};
     auto &folders = cluster.get_folders();
     for (auto f : folders) {
@@ -25,16 +25,15 @@ auto file_infos_t::apply_impl(cluster_t &cluster, apply_controller_t &controller
             all_fi[f->get_uuid()] = f;
         }
     }
-
     auto &blocks = cluster.get_blocks();
-
     for (auto &pair : container) {
         auto key = pair.first;
         auto &db = pair.second;
-        auto folder_info_uuid = key.substr(1, uuid_length);
+        auto folder_info_uuid = key.subspan(1, uuid_length);
         auto folder_info = all_fi[folder_info_uuid];
         if (!folder_info) {
-            LOG_WARN(log, "cannot restore file '{}', missing folder, corrupted db?", db.name());
+            auto name = db::get_name(db);
+            LOG_WARN(log, "cannot restore file '{}', missing folder, corrupted db?", name);
             continue;
         }
 
@@ -45,11 +44,12 @@ auto file_infos_t::apply_impl(cluster_t &cluster, apply_controller_t &controller
         auto &fi = option.assume_value();
         folder_info->add_relaxed(fi);
 
-        for (int i = 0; i < db.blocks_size(); ++i) {
-            auto block_hash = db.blocks(i);
-            auto block = blocks.get(block_hash);
+        auto blocks_count = db::get_blocks_size(db);
+        for (int i = 0; i < blocks_count; ++i) {
+            auto block_hash = db::get_blocks(db, i);
+            auto block = blocks.by_hash(block_hash);
             assert(block);
-            fi->assign_block(block, (size_t)i);
+            fi->assign_block(std::move(block), (size_t)i);
         }
     }
     return applicator_t::apply_sibling(cluster, controller);

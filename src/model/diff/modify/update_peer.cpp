@@ -14,9 +14,9 @@ using namespace syncspirit::model::diff::modify;
 
 update_peer_t::update_peer_t(db::Device db, const model::device_id_t &device_id,
                              const model::cluster_t &cluster) noexcept
-    : item{std::move(db)}, peer_id{device_id.get_sha256()} {
+    : item{std::move(db)} {
+    peer_id = device_id.get_sha256();
     LOG_DEBUG(log, "update_peer_t, peer = {}", device_id.get_short());
-
     auto &ignored_devices = cluster.get_ignored_devices();
     auto &pending_devices = cluster.get_pending_devices();
     auto current = (cluster_diff_t *){nullptr};
@@ -46,7 +46,9 @@ auto update_peer_t::apply_impl(cluster_t &cluster, apply_controller_t &controlle
         if (!device_id_opt) {
             return make_error_code(error_code_t::malformed_deviceid);
         }
-        std::string key = std::string(&prefix, 1) + peer_id;
+        auto key = utils::bytes_t(peer_id.size() + 1);
+        key[0] = prefix;
+        std::copy(peer_id.begin(), peer_id.end(), key.data() + 1);
         auto device_opt = device_t::create(key, item);
         if (!device_opt) {
             return device_opt.assume_error();

@@ -66,8 +66,10 @@ void write_file(const bfs::path &path, std::string_view content) {
     fclose(out);
 }
 
-std::string device_id2sha256(std::string_view device_id) {
-    return std::string(model::device_id_t::from_string(device_id).value().get_sha256());
+utils::bytes_t device_id2sha256(std::string_view device_id_) {
+    auto device_id = model::device_id_t::from_string(device_id_).value();
+    auto sha256 = device_id.get_sha256();
+    return {sha256.begin(), sha256.end()};
 }
 
 model::device_ptr_t make_device(std::string_view device_id, std::string_view name) {
@@ -99,12 +101,22 @@ static std::uniform_int_distribution<std::uint64_t> dist;
 
 bfs::path unique_path() {
     auto n = dist(rd);
-    auto view = std::string_view(reinterpret_cast<const char *>(&n), sizeof(n));
+    auto view = utils::bytes_view_t(reinterpret_cast<const unsigned char *>(&n), sizeof(n));
     auto random_name = utils::base32::encode(view);
     std::transform(random_name.begin(), random_name.end(), random_name.begin(),
                    [](unsigned char c) { return std::tolower(c); });
     auto name = std::string("tmp-") + random_name;
     return bfs::path(name);
+}
+
+utils::bytes_view_t as_bytes(std::string_view str) {
+    auto ptr = (const unsigned char*) str.data();
+    return {ptr, str.size()};
+}
+
+utils::bytes_t as_owned_bytes(std::string_view str) {
+    auto ptr = (const unsigned char*) str.data();
+    return {ptr, ptr + str.size()};
 }
 
 } // namespace syncspirit::test

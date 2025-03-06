@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #pragma once
 
@@ -15,7 +15,7 @@
 #include "misc/uuid.h"
 #include "block_info.h"
 #include "version.h"
-#include "structs.pb.h"
+#include "proto/proto-fwd.hpp"
 #include "syncspirit-export.h"
 
 namespace syncspirit::model {
@@ -50,8 +50,8 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t<file_info_t> {
     using blocks_t = std::vector<block_info_ptr_t>;
 
     struct decomposed_key_t {
-        std::string_view folder_info_id;
-        std::string_view file_id;
+        utils::bytes_view_t folder_info_id;
+        utils::bytes_view_t file_id;
     };
 
     struct guard_t : arc_base_t<guard_t> {
@@ -62,23 +62,23 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t<file_info_t> {
     };
     using guard_ptr_t = intrusive_ptr_t<guard_t>;
 
-    static outcome::result<file_info_ptr_t> create(std::string_view key, const db::FileInfo &data,
+    static outcome::result<file_info_ptr_t> create(utils::bytes_view_t key, const db::FileInfo &data,
                                                    const folder_info_ptr_t &folder_info_) noexcept;
     static outcome::result<file_info_ptr_t> create(const bu::uuid &uuid, const proto::FileInfo &info_,
                                                    const folder_info_ptr_t &folder_info_) noexcept;
-    static std::string create_key(const bu::uuid &uuid, const folder_info_ptr_t &folder_info_) noexcept;
+    static utils::bytes_t create_key(const bu::uuid &uuid, const folder_info_ptr_t &folder_info_) noexcept;
 
-    static decomposed_key_t decompose_key(std::string_view key);
+    static decomposed_key_t decompose_key(utils::bytes_view_t key);
 
     ~file_info_t();
 
-    std::string_view get_key() const noexcept { return std::string_view(key, data_length); }
-    std::string_view get_uuid() const noexcept;
+    utils::bytes_view_t get_key() const noexcept { return utils::bytes_view_t(key, data_length); }
+    utils::bytes_view_t get_uuid() const noexcept;
     bool operator==(const file_info_t &other) const noexcept { return get_uuid() == other.get_uuid(); }
 
     proto::FileInfo as_proto(bool include_blocks = true) const noexcept;
     db::FileInfo as_db(bool include_blocks = true) const noexcept;
-    std::string serialize(bool include_blocks = true) const noexcept;
+    utils::bytes_t serialize(bool include_blocks = true) const noexcept;
 
     void update(const file_info_t &updated) noexcept;
 
@@ -145,6 +145,7 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t<file_info_t> {
     static const constexpr auto data_length = 1 + uuid_length * 2;
 
     outcome::result<void> fields_update(const db::FileInfo &) noexcept;
+    outcome::result<void> fields_update(const proto::FileInfo &) noexcept;
 
     proto::Index generate() noexcept;
     std::size_t expected_meta_size() const noexcept;
@@ -159,17 +160,14 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t<file_info_t> {
   private:
     using marks_vector_t = std::vector<bool>;
 
-    template <typename Source> outcome::result<void> fields_update(const Source &s, size_t block_count) noexcept;
-    template <typename T> T as() const noexcept;
-
-    file_info_t(std::string_view key, const folder_info_ptr_t &folder_info_) noexcept;
+    file_info_t(utils::bytes_view_t key, const folder_info_ptr_t &folder_info_) noexcept;
     file_info_t(const bu::uuid &uuid, const folder_info_ptr_t &folder_info_) noexcept;
     outcome::result<void> reserve_blocks(size_t block_count) noexcept;
 
     void update_blocks(const proto::FileInfo &remote_info) noexcept;
     void remove_block(block_info_ptr_t &block) noexcept;
 
-    char key[data_length];
+    unsigned char key[data_length];
     std::string name;
     folder_info_t *folder_info;
     proto::FileInfoType type;
@@ -197,7 +195,7 @@ namespace details {
 
 template <> struct indexed_item_t<file_info_ptr_t, 3> {
     static constexpr size_t size = 3;
-    using storage_t = std::tuple<std::string, std::string, std::int64_t>;
+    using storage_t = std::tuple<utils::bytes_t, utils::bytes_t, std::int64_t>;
     using item_t = file_info_ptr_t;
     item_t item;
     mutable storage_t keys;
@@ -222,6 +220,7 @@ struct SYNCSPIRIT_API file_infos_map_t : generic_map_t<file_info_ptr_t, 3> {
     using seq_iterator_t = decltype(std::declval<seq_projection_t>().begin());
     using range_t = std::pair<seq_iterator_t, seq_iterator_t>;
 
+    file_info_ptr_t by_uuid(utils::bytes_view_t) noexcept;
     file_info_ptr_t by_name(std::string_view name) noexcept;
     file_info_ptr_t by_sequence(std::int64_t sequence) noexcept;
     seq_projection_t &sequence_projection() noexcept;

@@ -4,6 +4,7 @@
 #include "resolver.h"
 #include "model/cluster.h"
 #include "model/folder_info.h"
+#include "proto/proto-helpers.h"
 
 namespace syncspirit::model {
 
@@ -52,13 +53,13 @@ static advance_action_t resolve(const file_info_t &remote, const file_info_t *lo
 
     auto &r_best = r_v.get_best();
     auto &l_best = l_v.get_best();
-    auto rv = r_best.value();
-    auto lv = l_best.value();
-    auto r_id = r_best.id();
-    auto l_id = l_best.id();
+    auto rv = proto::get_value(r_best);
+    auto lv = proto::get_value(l_best);
+    auto r_id = proto::get_id(r_best);
+    auto l_id = proto::get_id(l_best);
 
     // check possible conflict
-    if (r_best.id() == l_best.id()) {
+    if (r_id  == l_id) {
         if (lv > rv) {
             return advance_action_t::ignore;
         } else if (lv < rv) {

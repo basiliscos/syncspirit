@@ -131,13 +131,12 @@ void test_remote_copy() {
         void main() noexcept override {
             proto::FileInfo pr_fi;
             std::int64_t modified = 1641828421;
-            pr_fi.set_name("q.txt");
-            pr_fi.set_modified_s(modified);
-            pr_fi.set_sequence(folder_peer->get_max_sequence() + 1);
-            auto version = pr_fi.mutable_version();
-            auto counter = version->add_counters();
-            counter->set_id(1);
-            counter->set_value(peer_device->device_id().get_uint());
+            proto::set_name(pr_fi, "q.txt");
+            proto::set_modified_s(pr_fi, modified);
+            proto::set_sequence(pr_fi, folder_peer->get_max_sequence() + 1);
+
+            auto& v = proto::get_version(pr_fi);
+            proto::add_counters(v, proto::Counter(peer_device->device_id().get_uint(), 1));
 
             auto builder = diff_builder_t(*cluster, file_addr);
 
@@ -159,24 +158,25 @@ void test_remote_copy() {
             }
 
             SECTION("empty regular file a subdir") {
-                pr_fi.set_name("a/b/c/d/e.txt");
+                auto name = std::string_view("a/b/c/d/e.txt");
+                proto::set_name(pr_fi, name);
                 auto peer_file = make_file();
                 builder.remote_copy(*peer_file).apply(*sup);
 
-                auto file = folder_my->get_file_infos().by_name(pr_fi.name());
+                auto file = folder_my->get_file_infos().by_name(name);
                 auto &path = file->get_path();
                 REQUIRE(bfs::exists(path));
                 REQUIRE(bfs::file_size(path) == 0);
             }
 
             SECTION("non-empty regular file") {
-                pr_fi.set_size(5);
-                pr_fi.set_block_size(5);
+                proto::set_size(pr_fi, 5);
+                proto::set_block_size(pr_fi, 5);
 
-                auto b = proto::BlockInfo();
-                b.set_hash(utils::sha256_digest("12345").value());
-                b.set_weak_hash(555);
-                b.set_size(5ul);
+                auto block_hash = utils::sha256_digest(as_bytes("12345")).value();
+                auto& b = proto::add_blocks(pr_fi);
+                proto::set_hash(b, block_hash);
+                proto::set_size(b, 5);
                 auto bi = block_info_t::create(b).value();
                 auto &blocks_map = cluster->get_blocks();
                 blocks_map.put(bi);
@@ -185,7 +185,7 @@ void test_remote_copy() {
                 peer_file->assign_block(bi, 0);
                 builder.remote_copy(*peer_file).apply(*sup);
 
-                auto file = folder_my->get_file_infos().by_name(pr_fi.name());
+                auto file = folder_my->get_file_infos().by_name(proto::get_name(pr_fi));
 
                 auto filename = std::string(file->get_name()) + ".syncspirit-tmp";
                 auto path = root_path / filename;
@@ -194,12 +194,12 @@ void test_remote_copy() {
             }
 
             SECTION("directory") {
-                pr_fi.set_type(proto::FileInfoType::DIRECTORY);
+                proto::set_type(pr_fi, proto::FileInfoType::DIRECTORY);
 
                 auto peer_file = make_file();
                 builder.remote_copy(*peer_file).apply(*sup);
 
-                auto file = folder_my->get_file_infos().by_name(pr_fi.name());
+                auto file = folder_my->get_file_infos().by_name(proto::get_name(pr_fi));
 
                 auto &path = file->get_path();
                 REQUIRE(bfs::exists(path));
@@ -210,13 +210,13 @@ void test_remote_copy() {
                 bfs::path target = root_path / "some-existing-file";
                 write_file(target, "zzz");
 
-                pr_fi.set_type(proto::FileInfoType::SYMLINK);
-                pr_fi.set_symlink_target(target.string());
+                proto::set_type(pr_fi, proto::FileInfoType::SYMLINK);
+                proto::set_symlink_target(pr_fi, target.string());
 
                 auto peer_file = make_file();
                 builder.remote_copy(*peer_file).apply(*sup);
 
-                auto file = folder_my->get_file_infos().by_name(pr_fi.name());
+                auto file = folder_my->get_file_infos().by_name(proto::get_name(pr_fi));
 
                 auto &path = file->get_path();
                 CHECK(!bfs::exists(path));
@@ -227,15 +227,15 @@ void test_remote_copy() {
             }
 
             SECTION("deleted file") {
-                pr_fi.set_deleted(true);
-                bfs::path target = root_path / pr_fi.name();
+                proto::set_deleted(pr_fi, true);
+                bfs::path target = root_path / proto::get_name(pr_fi);
                 write_file(target, "zzz");
                 REQUIRE(bfs::exists(target));
 
                 auto peer_file = make_file();
                 builder.remote_copy(*peer_file).apply(*sup);
 
-                auto file = folder_my->get_file_infos().by_name(pr_fi.name());
+                auto file = folder_my->get_file_infos().by_name(proto::get_name(pr_fi));
                 CHECK(file->is_deleted());
 
                 REQUIRE(!bfs::exists(target));
@@ -251,39 +251,39 @@ void test_append_block() {
             std::int64_t modified = 1641828421;
             proto::FileInfo pr_source;
             auto next_sequence = 7ul;
-            pr_source.set_name("q.txt");
-            pr_source.set_block_size(5ul);
-            pr_source.set_modified_s(modified);
-            auto version = pr_source.mutable_version();
-            auto counter = version->add_counters();
-            counter->set_id(1);
-            counter->set_value(peer_device->device_id().get_uint());
 
+            proto::set_name(pr_source, "q.txt");
+            proto::set_modified_s(pr_source, modified);
+            proto::set_block_size(pr_source, 5);
+
+            auto& v = proto::get_version(pr_source);
+            proto::add_counters(v, proto::Counter(peer_device->device_id().get_uint(), 1));
+
+            auto block_hash_1 = utils::sha256_digest(as_bytes("12345")).value();
             auto bi = proto::BlockInfo();
-            bi.set_size(5);
-            bi.set_weak_hash(12);
-            bi.set_hash(utils::sha256_digest("12345").value());
-            bi.set_offset(0);
+            proto::set_hash(bi, block_hash_1);
+            proto::set_size(bi, 5);
             auto b = block_info_t::create(bi).value();
 
+            auto block_hash_2 = utils::sha256_digest(as_bytes("67890")).value();
             auto bi2 = proto::BlockInfo();
-            bi2.set_size(5);
-            bi2.set_weak_hash(12);
-            bi2.set_hash(utils::sha256_digest("67890").value());
-            bi2.set_offset(0);
-            auto b2 = block_info_t::create(bi2).value();
+            proto::set_hash(bi2, block_hash_2);
+            proto::set_size(bi2, 5);
+            auto b2 = block_info_t::create(bi).value();
 
             cluster->get_blocks().put(b);
             cluster->get_blocks().put(b2);
             auto blocks = std::vector<block_info_ptr_t>{b, b2};
 
             auto make_file = [&](size_t block_count) {
-                pr_source.set_sequence(++next_sequence);
+                proto::set_sequence(pr_source, ++next_sequence);
+
                 auto copy = pr_source;
-                auto &v = *copy.mutable_version();
-                auto version = model::version_t(v);
+                auto& v2 = proto::get_version(copy);
+                auto version = model::version_t(v2);
                 version.update(*peer_device);
-                version.to_proto(v);
+                version.to_proto(v2);
+
                 auto file = file_info_t::create(sequencer->next_uuid(), copy, folder_peer).value();
                 for (size_t i = 0; i < block_count; ++i) {
                     file->assign_block(blocks[i], i);
@@ -295,11 +295,11 @@ void test_append_block() {
             auto builder = diff_builder_t(*cluster, file_addr);
 
             SECTION("file with 1 block") {
-                pr_source.set_size(5ul);
+                proto::set_size(pr_source, 5);
                 auto peer_file = make_file(1);
-                builder.append_block(*peer_file, 0, "12345").apply(*sup).finish_file(*peer_file).apply(*sup);
+                builder.append_block(*peer_file, 0, as_owned_bytes("12345")).apply(*sup).finish_file(*peer_file).apply(*sup);
 
-                auto file = folder_my->get_file_infos().by_name(pr_source.name());
+                auto file = folder_my->get_file_infos().by_name(proto::get_name(pr_source));
                 auto path = root_path / std::string(file->get_name());
                 REQUIRE(bfs::exists(path));
                 REQUIRE(bfs::file_size(path) == 5);
@@ -308,11 +308,11 @@ void test_append_block() {
                 CHECK(to_unix(bfs::last_write_time(path)) == 1641828421);
             }
             SECTION("file with 2 different blocks") {
-                pr_source.set_size(10ul);
+                proto::set_size(pr_source, 10);
 
                 auto peer_file = make_file(2);
 
-                builder.append_block(*peer_file, 0, "12345").apply(*sup);
+                builder.append_block(*peer_file, 0, as_owned_bytes("12345")).apply(*sup);
 
                 auto filename = std::string(peer_file->get_name()) + ".syncspirit-tmp";
                 auto path = root_path / filename;
@@ -322,7 +322,7 @@ void test_append_block() {
                 auto data = read_file(path);
                 CHECK(data.substr(0, 5) == "12345");
 #endif
-                builder.append_block(*peer_file, 1, "67890").apply(*sup);
+                builder.append_block(*peer_file, 1, as_owned_bytes("67890")).apply(*sup);
 
                 SECTION("add 2nd block") {
                     builder.finish_file(*peer_file).apply(*sup);
@@ -350,22 +350,21 @@ void test_append_block() {
     F().run();
 }
 
+
 void test_clone_block() {
     struct F : fixture_t {
         void main() noexcept override {
 
+            auto hash_1 = utils::sha256_digest(as_bytes("12345")).value();
             auto bi = proto::BlockInfo();
-            bi.set_size(5);
-            bi.set_weak_hash(12);
-            bi.set_hash(utils::sha256_digest("12345").value());
-            bi.set_offset(0);
+            proto::set_size(bi, 5);
+            proto::set_hash(bi, hash_1);
             auto b = block_info_t::create(bi).value();
 
+            auto hash_2 = utils::sha256_digest(as_bytes("67890")).value();
             auto bi2 = proto::BlockInfo();
-            bi2.set_size(5);
-            bi2.set_weak_hash(12);
-            bi2.set_hash(utils::sha256_digest("67890").value());
-            bi2.set_offset(0);
+            proto::set_size(bi2, 5);
+            proto::set_hash(bi2, hash_2);
             auto b2 = block_info_t::create(bi2).value();
 
             cluster->get_blocks().put(b);
@@ -374,18 +373,18 @@ void test_clone_block() {
 
             std::int64_t modified = 1641828421;
             proto::FileInfo pr_source;
-            pr_source.set_name("a.txt");
-            pr_source.set_block_size(5ul);
-            pr_source.set_modified_s(modified);
-            auto version = pr_source.mutable_version();
-            auto counter = version->add_counters();
-            counter->set_id(1);
-            counter->set_value(peer_device->device_id().get_uint());
+            proto::set_name(pr_source, "a.txt");
+            proto::set_modified_s(pr_source, modified);
+            proto::set_block_size(pr_source, 5);
+
+            auto& v = proto::get_version(pr_source);
+            proto::add_counters(v, proto::Counter(peer_device->device_id().get_uint(), 1));
+
             auto next_sequence = 7ul;
 
             auto make_file = [&](const proto::FileInfo &fi, size_t count) {
                 auto copy = fi;
-                copy.set_sequence(++next_sequence);
+                proto::set_sequence(copy, ++next_sequence);
                 auto file = file_info_t::create(sequencer->next_uuid(), copy, folder_peer).value();
                 for (size_t i = 0; i < count; ++i) {
                     file->assign_block(blocks[i], i);
@@ -398,22 +397,22 @@ void test_clone_block() {
 
             SECTION("source & target are different files") {
                 proto::FileInfo pr_target;
-                pr_target.set_name("b.txt");
-                pr_target.set_block_size(5ul);
-                (*pr_target.mutable_version()) = *version;
+                proto::set_name(pr_target, "b.txt");
+                proto::set_block_size(pr_target, 5);
+                proto::set_version(pr_target, v);
 
                 SECTION("single block target file") {
-                    pr_source.set_size(5ul);
-                    pr_target.set_size(5ul);
-                    pr_target.set_modified_s(modified);
+                    proto::set_size(pr_source, 5);
+                    proto::set_size(pr_target, 5);
+                    proto::set_modified_s(pr_target, modified);
 
                     auto source = make_file(pr_source, 1);
                     auto target = make_file(pr_target, 1);
 
-                    auto source_file = folder_peer->get_file_infos().by_name(pr_source.name());
-                    builder.append_block(*source_file, 0, "12345").apply(*sup).finish_file(*source_file).apply(*sup);
+                    auto source_file = folder_peer->get_file_infos().by_name(proto::get_name(pr_source));
+                    builder.append_block(*source_file, 0, as_owned_bytes("12345")).apply(*sup).finish_file(*source_file).apply(*sup);
 
-                    auto target_file = folder_peer->get_file_infos().by_name(pr_target.name());
+                    auto target_file = folder_peer->get_file_infos().by_name(proto::get_name(pr_target));
                     auto block = source_file->get_blocks()[0];
                     auto file_block = model::file_block_t(block.get(), target_file.get(), 0);
                     builder.clone_block(file_block).apply(*sup).finish_file(*target).apply(*sup);
@@ -427,16 +426,19 @@ void test_clone_block() {
                 }
 
                 SECTION("multi block target file") {
-                    pr_source.set_size(10ul);
-                    pr_target.set_size(10ul);
+                    proto::set_size(pr_source, 10);
+                    proto::set_size(pr_target, 10);
                     auto source = make_file(pr_source, 2);
                     auto target = make_file(pr_target, 2);
 
-                    auto source_file = folder_peer->get_file_infos().by_name(pr_source.name());
+                    auto source_file = folder_peer->get_file_infos().by_name(proto::get_name(pr_source));
 
-                    builder.append_block(*source_file, 0, "12345").append_block(*source_file, 1, "67890").apply(*sup);
+                    builder
+                        .append_block(*source_file, 0, as_owned_bytes("12345"))
+                        .append_block(*source_file, 1, as_owned_bytes("67890"))
+                        .apply(*sup);
 
-                    auto target_file = folder_peer->get_file_infos().by_name(pr_target.name());
+                    auto target_file = folder_peer->get_file_infos().by_name(proto::get_name(pr_target));
                     auto blocks = source_file->get_blocks();
                     auto fb_1 = model::file_block_t(blocks[0].get(), target_file.get(), 0);
                     auto fb_2 = model::file_block_t(blocks[1].get(), target_file.get(), 1);
@@ -451,19 +453,22 @@ void test_clone_block() {
                 }
 
                 SECTION("source/target different sizes") {
-                    pr_source.set_size(5ul);
-                    pr_target.set_size(10ul);
+                    proto::set_size(pr_source, 5);
+                    proto::set_size(pr_target, 10);
                     auto target = make_file(pr_target, 2);
 
-                    pr_source.set_sequence(folder_peer->get_max_sequence() + 1);
+                    proto::set_sequence(pr_source, folder_peer->get_max_sequence() + 1);
                     auto source = file_info_t::create(sequencer->next_uuid(), pr_source, folder_peer).value();
                     source->assign_block(blocks[1], 0);
                     REQUIRE(folder_peer->add_strict(source));
 
-                    auto source_file = folder_peer->get_file_infos().by_name(pr_source.name());
-                    auto target_file = folder_peer->get_file_infos().by_name(pr_target.name());
+                    auto source_file = folder_peer->get_file_infos().by_name(proto::get_name(pr_source));
+                    auto target_file = folder_peer->get_file_infos().by_name(proto::get_name(pr_target));
 
-                    builder.append_block(*source_file, 0, "67890").append_block(*target_file, 0, "12345").apply(*sup);
+                    builder
+                        .append_block(*source_file, 0, as_owned_bytes("67890"))
+                        .append_block(*target_file, 0, as_owned_bytes("12345"))
+                        .apply(*sup);
 
                     auto blocks = source_file->get_blocks();
                     auto fb = model::file_block_t(blocks[0].get(), target_file.get(), 1);
@@ -479,18 +484,18 @@ void test_clone_block() {
             }
 
             SECTION("source & target are is the same file") {
-                pr_source.set_sequence(folder_peer->get_max_sequence() + 1);
-                pr_source.set_size(10ul);
+                proto::set_sequence(pr_source, folder_peer->get_max_sequence() + 1);
+                proto::set_size(pr_source, 10);
 
                 auto source = file_info_t::create(sequencer->next_uuid(), pr_source, folder_peer).value();
                 source->assign_block(blocks[0], 0);
                 source->assign_block(blocks[0], 1);
                 REQUIRE(folder_peer->add_strict(source));
 
-                auto source_file = folder_peer->get_file_infos().by_name(pr_source.name());
+                auto source_file = folder_peer->get_file_infos().by_name(proto::get_name(pr_source));
                 auto target_file = source_file;
 
-                builder.append_block(*source_file, 0, "12345").apply(*sup);
+                builder.append_block(*source_file, 0, as_owned_bytes("12345")).apply(*sup);
 
                 auto block = source_file->get_blocks()[0];
                 auto file_block = model::file_block_t(block.get(), target_file.get(), 1);
@@ -512,18 +517,16 @@ void test_requesting_block() {
     struct F : fixture_t {
         void main() noexcept override {
 
+            auto hash_1 = utils::sha256_digest(as_bytes("12345")).value();
             auto bi = proto::BlockInfo();
-            bi.set_size(5);
-            bi.set_weak_hash(12);
-            bi.set_hash(utils::sha256_digest("12345").value());
-            bi.set_offset(0);
+            proto::set_size(bi, 5);
+            proto::set_hash(bi, hash_1);
             auto b = block_info_t::create(bi).value();
 
+            auto hash_2 = utils::sha256_digest(as_bytes("67890")).value();
             auto bi2 = proto::BlockInfo();
-            bi2.set_size(5);
-            bi2.set_weak_hash(12);
-            bi2.set_hash(utils::sha256_digest("67890").value());
-            bi2.set_offset(0);
+            proto::set_size(bi2, 5);
+            proto::set_hash(bi2, hash_2);
             auto b2 = block_info_t::create(bi2).value();
 
             cluster->get_blocks().put(b);
@@ -532,17 +535,18 @@ void test_requesting_block() {
 
             std::int64_t modified = 1641828421;
             proto::FileInfo pr_source;
-            pr_source.set_name("a.txt");
-            pr_source.set_block_size(5ul);
-            pr_source.set_modified_s(modified);
-            pr_source.set_size(10);
-            pr_source.set_sequence(folder_my->get_max_sequence() + 1);
-            auto version = pr_source.mutable_version();
-            auto counter = version->add_counters();
-            counter->set_id(1);
-            counter->set_value(my_device->device_id().get_uint());
-            *pr_source.add_blocks() = bi;
-            *pr_source.add_blocks() = bi2;
+
+            proto::set_name(pr_source, "a.txt");
+            proto::set_modified_s(pr_source, modified);
+            proto::set_block_size(pr_source, 5);
+            proto::set_size(pr_source, 10);
+            proto::set_sequence(pr_source, folder_my->get_max_sequence() + 1);
+
+            auto& v = proto::get_version(pr_source);
+            proto::add_counters(v, proto::Counter(peer_device->device_id().get_uint(), 1));
+
+            proto::add_blocks(pr_source, bi);
+            proto::add_blocks(pr_source, bi2);
 
             auto file = file_info_t::create(sequencer->next_uuid(), pr_source, folder_my).value();
             file->assign_block(b, 0);
@@ -550,19 +554,17 @@ void test_requesting_block() {
             folder_my->add_relaxed(file);
 
             auto req = proto::Request();
-            req.set_folder(std::string(folder->get_id()));
-            req.set_name("a.txt");
-            req.set_offset(0);
-            req.set_size(5);
-            auto req_ptr = proto::message::Request(new proto::Request(req));
-            auto msg = r::make_message<fs::payload::block_request_t>(file_actor->get_address(), std::move(req_ptr),
+            proto::set_folder(req, folder->get_id());
+            proto::set_name(req, "a.txt");
+            proto::set_size(req, 5);
+
+            auto msg = r::make_message<fs::payload::block_request_t>(file_actor->get_address(), req,
                                                                      sup->get_address());
 
             SECTION("error, no file") {
                 sup->put(msg);
                 sup->do_process();
                 REQUIRE(block_reply);
-                REQUIRE(block_reply->payload.remote_request);
                 REQUIRE(block_reply->payload.ec);
                 REQUIRE(block_reply->payload.data.empty());
             }
@@ -572,7 +574,6 @@ void test_requesting_block() {
                 sup->put(msg);
                 sup->do_process();
                 REQUIRE(block_reply);
-                REQUIRE(block_reply->payload.remote_request);
                 REQUIRE(block_reply->payload.ec);
                 REQUIRE(block_reply->payload.data.empty());
             }
@@ -582,20 +583,17 @@ void test_requesting_block() {
                 sup->put(msg);
                 sup->do_process();
                 REQUIRE(block_reply);
-                REQUIRE(block_reply->payload.remote_request);
                 REQUIRE(!block_reply->payload.ec);
-                REQUIRE(block_reply->payload.data == "12345");
+                REQUIRE(block_reply->payload.data == as_bytes("12345"));
 
-                req.set_offset(5);
-                auto req_ptr = proto::message::Request(new proto::Request(req));
-                auto msg = r::make_message<fs::payload::block_request_t>(file_actor->get_address(), std::move(req_ptr),
+                proto::set_offset(req, 5);
+                auto msg = r::make_message<fs::payload::block_request_t>(file_actor->get_address(), req,
                                                                          sup->get_address());
                 sup->put(msg);
                 sup->do_process();
                 REQUIRE(block_reply);
-                REQUIRE(block_reply->payload.remote_request);
                 REQUIRE(!block_reply->payload.ec);
-                REQUIRE(block_reply->payload.data == "67890");
+                REQUIRE(block_reply->payload.data == as_bytes("67890"));
             }
         }
     };
@@ -610,19 +608,19 @@ void test_conflicts() {
 
             proto::FileInfo pr_fi;
             std::int64_t modified = 1641828421;
-            pr_fi.set_name("q.txt");
-            pr_fi.set_modified_s(modified);
-            pr_fi.set_sequence(folder_peer->get_max_sequence() + 1);
+            proto::set_name(pr_fi, "q.txt");
+            proto::set_modified_s(pr_fi, modified);
+            proto::set_sequence(pr_fi, folder_peer->get_max_sequence() + 1);
 
             SECTION("non-empty (via file_finish)") {
-                pr_fi.set_block_size(5);
-                pr_fi.set_size(5);
+                proto::set_block_size(pr_fi, 5);
+                proto::set_size(pr_fi, 5);
 
                 auto peer_block = []() {
                     auto block = proto::BlockInfo();
-                    block.set_hash(utils::sha256_digest("12345").value());
-                    block.set_offset(0);
-                    block.set_size(5);
+                    auto hash = utils::sha256_digest(as_bytes("12345")).value();
+                    proto::set_hash(block, hash);
+                    proto::set_size(block, 5);
                     auto bi = block_info_t::create(block).value();
                     return bi;
                 }();
@@ -630,9 +628,9 @@ void test_conflicts() {
 
                 auto my_block = []() {
                     auto block = proto::BlockInfo();
-                    block.set_hash(utils::sha256_digest("67890").value());
-                    block.set_offset(0);
-                    block.set_size(5);
+                    auto hash = utils::sha256_digest(as_bytes("67890")).value();
+                    proto::set_hash(block, hash);
+                    proto::set_size(block, 5);
                     auto bi = block_info_t::create(block).value();
                     return bi;
                 }();
@@ -640,27 +638,28 @@ void test_conflicts() {
 
                 SECTION("remote win") {
                     auto peer_file = [&]() {
-                        auto counter = pr_fi.mutable_version()->add_counters();
-                        counter->set_id(peer_device->device_id().get_uint());
-                        counter->set_value(10);
-                        *pr_fi.add_blocks() = peer_block->as_bep(0);
-                        pr_fi.set_modified_s(1734690000);
+                        auto &v = proto::get_version(pr_fi);
+                        auto& c = proto::add_counters(v);
+                        proto::set_id(c, peer_device->device_id().get_uint());
+                        proto::set_value(c, 10);
+                        proto::add_blocks(pr_fi, peer_block->as_bep(0));
+                        proto::set_modified_s(pr_fi, 1734690000);
 
                         auto file = file_info_t::create(sequencer->next_uuid(), pr_fi, folder_peer).value();
                         REQUIRE(folder_peer->add_strict(file));
-                        pr_fi.mutable_version()->clear_counters();
-                        pr_fi.clear_blocks();
-
+                        auto vv = &proto::get_version(pr_fi);
+                        proto::clear_counters(*vv);
+                        proto::clear_blocks(pr_fi);
                         file->assign_block(peer_block, 0);
                         return file;
                     }();
 
                     auto my_file = [&]() {
-                        auto counter = pr_fi.mutable_version()->add_counters();
-                        counter->set_id(my_device->device_id().get_uint());
-                        counter->set_value(5);
-                        *pr_fi.add_blocks() = my_block->as_bep(0);
-                        pr_fi.set_modified_s(1734600000);
+                        proto:
+                        auto &v = proto::get_version(pr_fi);
+                        proto::add_counters(v, proto::Counter(my_device->device_id().get_uint(), 5));
+                        proto::set_modified_s(pr_fi,1734600000);
+                        proto::add_blocks(pr_fi, my_block->as_bep(0));
                         auto file = file_info_t::create(sequencer->next_uuid(), pr_fi, folder_my).value();
                         REQUIRE(folder_my->add_strict(file));
                         file->mark_local();
@@ -669,11 +668,11 @@ void test_conflicts() {
                         return file;
                     }();
 
-                    bfs::path kept_file = root_path / pr_fi.name();
+                    bfs::path kept_file = root_path / proto::get_name(pr_fi);
                     write_file(kept_file, "12345");
 
                     REQUIRE(model::resolve(*peer_file) == advance_action_t::resolve_remote_win);
-                    builder.append_block(*peer_file, 0, "67890").apply(*sup).finish_file(*peer_file).apply(*sup);
+                    builder.append_block(*peer_file, 0, as_owned_bytes("67890")).apply(*sup).finish_file(*peer_file).apply(*sup);
 
                     auto conflict_file = root_path / my_file->make_conflicting_name();
                     CHECK(read_file(kept_file) == "67890");
@@ -683,28 +682,27 @@ void test_conflicts() {
             }
             SECTION("remote win emtpy (file vs directory)") {
                 auto peer_file = [&]() {
-                    auto counter = pr_fi.mutable_version()->add_counters();
-                    counter->set_id(peer_device->device_id().get_uint());
-                    counter->set_value(10);
-                    pr_fi.set_modified_s(1734690000);
+                    auto &v = proto::get_version(pr_fi);
+                    proto::add_counters(v, proto::Counter(peer_device->device_id().get_uint(), 10));
+                    proto::set_modified_s(pr_fi, 1734690000);
                     auto file = file_info_t::create(sequencer->next_uuid(), pr_fi, folder_peer).value();
                     REQUIRE(folder_peer->add_strict(file));
-                    pr_fi.mutable_version()->clear_counters();
+                    auto vv = &proto::get_version(pr_fi);
+                    proto::clear_counters(*vv);
                     return file;
                 }();
 
                 auto my_file = [&]() {
-                    auto counter = pr_fi.mutable_version()->add_counters();
-                    counter->set_id(my_device->device_id().get_uint());
-                    counter->set_value(5);
-                    pr_fi.set_modified_s(1734600000);
+                    auto &v = proto::get_version(pr_fi);
+                    proto::add_counters(v, proto::Counter(my_device->device_id().get_uint(), 5));
+                    proto::set_modified_s(pr_fi, 1734600000);
                     auto file = file_info_t::create(sequencer->next_uuid(), pr_fi, folder_my).value();
                     REQUIRE(folder_my->add_strict(file));
                     file->mark_local();
                     return file;
                 }();
 
-                bfs::path kept_file = root_path / pr_fi.name();
+                bfs::path kept_file = root_path / proto::get_name(pr_fi);
                 bfs::create_directories(kept_file);
 
                 builder.advance(*peer_file).apply(*sup);

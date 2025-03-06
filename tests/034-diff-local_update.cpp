@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "test-utils.h"
 #include "access.h"
@@ -27,17 +27,17 @@ TEST_CASE("new file diff", "[model]") {
 
     auto folder = cluster->get_folders().by_id("1234-5678");
 
-    proto::FileInfo pr_file_info;
-    pr_file_info.set_name("a.txt");
+    proto::FileInfo pr_file;
+    proto::set_name(pr_file, "a.txt");
 
     SECTION("symlink, inc sequence, no blocks") {
-        pr_file_info.set_type(proto::FileInfoType::SYMLINK);
-        pr_file_info.set_symlink_target("/some/where");
-        REQUIRE(builder.local_update(folder->get_id(), pr_file_info).apply());
+        proto::set_type(pr_file, proto::FileInfoType::SYMLINK);
+        proto::set_symlink_target(pr_file, "/some/where");
+        REQUIRE(builder.local_update(folder->get_id(), pr_file).apply());
 
         auto folder_info = folder->get_folder_infos().by_device(*my_device);
         auto &files = folder_info->get_file_infos();
-        auto file = files.by_name(pr_file_info.name());
+        auto file = files.by_name(proto::get_name(pr_file));
         REQUIRE(file);
         REQUIRE(file->get_name() == "a.txt");
         REQUIRE(file->get_link_target() == "/some/where");
@@ -46,22 +46,27 @@ TEST_CASE("new file diff", "[model]") {
         REQUIRE(folder_info->get_max_sequence() == 1);
         REQUIRE(file->get_version()->counters_size() == 1);
         REQUIRE(file->get_modified_by() == my_device->device_id().get_uint());
-        auto v1 = file->get_version()->get_best().value();
+        auto& counter = file->get_version()->get_best();
+        auto v1 = proto::get_value(counter);
         CHECK(v1 > 0);
 
         SECTION("peer update") {
             file->get_version()->update(*peer_device);
             auto p = file->get_version()->as_proto();
-            REQUIRE(p.counters_size() == 2);
-            CHECK(p.counters(0).value() == v1);
-            CHECK(p.counters(0).id() == my_device->device_id().get_uint());
-            CHECK(p.counters(1).value() > v1);
-            CHECK(p.counters(1).id() == peer_device->device_id().get_uint());
+            REQUIRE(proto::get_counters_size(p) == 2);
+
+            auto& c0 = proto::get_counters(p, 0);
+            CHECK(proto::get_value(c0) == v1);
+            CHECK(proto::get_id(c0) == my_device->device_id().get_uint());
+
+            auto& c1 = proto::get_counters(p, 1);
+            CHECK(proto::get_value(c1) > v1);
+            CHECK(proto::get_id(c1) == peer_device->device_id().get_uint());
         }
 
         SECTION("update it") {
-            pr_file_info.set_symlink_target("/new/location");
-            REQUIRE(builder.local_update(folder->get_id(), pr_file_info).apply());
+            proto::set_symlink_target(pr_file, "/new/location");
+            REQUIRE(builder.local_update(folder->get_id(), pr_file).apply());
             REQUIRE(files.size() == 1);
 
             auto new_file = files.by_name(file->get_name());
@@ -69,26 +74,26 @@ TEST_CASE("new file diff", "[model]") {
             CHECK(new_file.get() == file.get());
             CHECK(new_file->get_key() == file->get_key());
             REQUIRE(new_file->get_version()->counters_size() == 1);
-            auto v2 = new_file->get_version()->get_best().value();
+            auto v2 = proto::get_value(new_file->get_version()->get_best());
             REQUIRE(v1 < v2);
         }
     }
 
     SECTION("file, no inc, new block") {
-        pr_file_info.set_type(proto::FileInfoType::FILE);
-        pr_file_info.set_size(5ul);
-        pr_file_info.set_block_size(5ul);
+        proto::set_type(pr_file, proto::FileInfoType::FILE);
+        proto::set_size(pr_file, 5ul);
+        proto::set_block_size(pr_file, 5ul);
 
-        auto hash = utils::sha256_digest("12345").value();
-        auto pr_block = pr_file_info.add_blocks();
-        pr_block->set_weak_hash(12);
-        pr_block->set_size(5);
-        pr_block->set_hash(hash);
+        auto hash = utils::sha256_digest(as_bytes("12345")).value();
+        auto& pr_block = proto::add_blocks(pr_file);
+        proto::set_weak_hash(pr_block, 12);
+        proto::set_size(pr_block, 5);
+        proto::set_hash(pr_block, hash);
 
-        REQUIRE(builder.local_update(folder->get_id(), pr_file_info).apply());
+        REQUIRE(builder.local_update(folder->get_id(), pr_file).apply());
 
         auto folder_info = folder->get_folder_infos().by_device(*my_device);
-        auto file = folder_info->get_file_infos().by_name(pr_file_info.name());
+        auto file = folder_info->get_file_infos().by_name(proto::get_name(pr_file));
         REQUIRE(file);
         REQUIRE(file->get_size() == 5);
         REQUIRE(file->get_name() == "a.txt");
@@ -98,66 +103,65 @@ TEST_CASE("new file diff", "[model]") {
         REQUIRE(file->get_blocks().size() == 1);
         REQUIRE(file->get_blocks()[0]->get_hash() == hash);
         REQUIRE(cluster->get_blocks().size() == 1);
-        REQUIRE(cluster->get_blocks().get(hash));
+        REQUIRE(cluster->get_blocks().by_hash(hash));
     }
 
     SECTION("identical blocks") {
-        pr_file_info.set_type(proto::FileInfoType::FILE);
-        pr_file_info.set_size(5ul);
-        pr_file_info.set_block_size(5ul);
-        pr_file_info.set_sequence(1ul);
+        proto::set_type(pr_file, proto::FileInfoType::FILE);
+        proto::set_size(pr_file, 5ul);
+        proto::set_block_size(pr_file, 5ul);
+        proto::set_sequence(pr_file, 1ul);
 
-        auto hash = utils::sha256_digest("12345").value();
-        auto pr_block = pr_file_info.add_blocks();
-        pr_block->set_weak_hash(12);
-        pr_block->set_size(5);
-        pr_block->set_hash(hash);
-
-        REQUIRE(builder.local_update(folder->get_id(), pr_file_info).apply());
+        auto hash = utils::sha256_digest(as_bytes("12345")).value();
+        auto& pr_block = proto::add_blocks(pr_file);
+        proto::set_weak_hash(pr_block, 12);
+        proto::set_size(pr_block, 5);
+        proto::set_hash(pr_block, hash);
+        REQUIRE(builder.local_update(folder->get_id(), pr_file).apply());
 
         auto folder_info = folder->get_folder_infos().by_device(*my_device);
-        auto file = folder_info->get_file_infos().by_name(pr_file_info.name());
+        auto file = folder_info->get_file_infos().by_name(proto::get_name(pr_file));
         REQUIRE(file->get_sequence() == 1);
         CHECK(file->is_locally_available());
 
-        pr_file_info.set_sequence(2ul);
-        REQUIRE(builder.local_update(folder->get_id(), pr_file_info).apply());
-        file = folder_info->get_file_infos().by_name(pr_file_info.name());
+        proto::set_sequence(pr_file, 2ul);
+        REQUIRE(builder.local_update(folder->get_id(), pr_file).apply());
+        file = folder_info->get_file_infos().by_name(proto::get_name(pr_file));
         REQUIRE(file->get_sequence() == 2);
         CHECK(file->is_locally_available());
     }
 
     SECTION("delete file with blocks") {
-        pr_file_info.set_type(proto::FileInfoType::FILE);
-        pr_file_info.set_size(5ul);
-        pr_file_info.set_block_size(5ul);
-        pr_file_info.set_sequence(1ul);
+        proto::set_type(pr_file, proto::FileInfoType::FILE);
+        proto::set_size(pr_file, 5ul);
+        proto::set_block_size(pr_file, 5ul);
+        proto::set_sequence(pr_file, 1ul);
 
-        auto hash = utils::sha256_digest("12345").value();
-        auto pr_block = pr_file_info.add_blocks();
-        pr_block->set_weak_hash(12);
-        pr_block->set_size(5);
-        pr_block->set_hash(hash);
+        auto hash = utils::sha256_digest(as_bytes("12345")).value();
+        auto& pr_block = proto::add_blocks(pr_file);
+        proto::set_weak_hash(pr_block, 12);
+        proto::set_size(pr_block, 5);
+        proto::set_hash(pr_block, hash);
 
         auto folder_info = folder->get_folder_infos().by_device(*my_device);
         auto &files = folder_info->get_file_infos();
         auto &blocks = cluster->get_blocks();
-        REQUIRE(builder.local_update(folder->get_id(), pr_file_info).apply());
+        REQUIRE(builder.local_update(folder->get_id(), pr_file).apply());
         REQUIRE(files.size() == 1);
         REQUIRE(blocks.size() == 1);
 
-        auto file = folder_info->get_file_infos().by_name(pr_file_info.name());
+        auto file = folder_info->get_file_infos().by_name(proto::get_name(pr_file));
         auto sequence = file->get_sequence();
         auto version = file->get_version();
 
         proto::FileInfo pr_updated;
-        pr_updated.set_name("a.txt");
-        pr_updated.set_deleted(true);
+        proto::set_name(pr_updated, "a.txt");
+        proto::set_deleted(pr_updated, true);
         REQUIRE(builder.local_update(folder->get_id(), pr_updated).apply());
         REQUIRE(files.size() == 1);
         CHECK(blocks.size() == 0);
 
-        file = folder_info->get_file_infos().by_name(pr_file_info.name());
+        file = file = folder_info->get_file_infos().by_name(proto::get_name(pr_file));
         CHECK(file->is_deleted());
         CHECK(file->get_blocks().size() == 0);
         CHECK(file->get_sequence() > sequence);

@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "test-utils.h"
 #include "test_supervisor.h"
 #include "access.h"
 #include "hasher/hasher_actor.h"
-#include <ostream>
-#include <fstream>
+#include "utils/bytes.h"
 #include <net/names.h>
 
 namespace r = rotor;
 namespace st = syncspirit::test;
 namespace h = syncspirit::hasher;
 
+using namespace syncspirit;
 using namespace syncspirit::hasher;
 
 struct hash_consumer_t : r::actor_base_t {
@@ -32,12 +32,13 @@ struct hash_consumer_t : r::actor_base_t {
         });
     }
 
-    void request_digest(const std::string_view &data) {
-        request<payload::digest_request_t>(hasher, std::string(data)).send(init_timeout);
+    void request_digest(const utils::bytes_t& data) {
+        request<payload::digest_request_t>(hasher, data).send(init_timeout);
     }
 
-    void request_validation(const std::string_view &data, const std::string_view &hash) {
-        request<payload::validation_request_t>(hasher, data, std::string(hash), nullptr).send(init_timeout);
+    void request_validation(const utils::bytes_t &data, utils::bytes_view_t hash) {
+        auto hash_bytes = utils::bytes_t(hash.begin(), hash.end());
+        request<payload::validation_request_t>(hasher, data, std::move(hash_bytes), nullptr).send(init_timeout);
     }
 
     void on_digest(message::digest_response_t &res) noexcept { digest_res = &res; }
@@ -54,7 +55,7 @@ TEST_CASE("hasher-actor", "[hasher]") {
     auto consumer = sup->create_actor<hash_consumer_t>().timeout(timeout).finish();
     sup->do_process();
 
-    std::string data = "abcdef";
+    auto data = test::as_owned_bytes("abcdef");
     consumer->request_digest(data);
     sup->do_process();
     REQUIRE(consumer->digest_res);

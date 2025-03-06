@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
 
 #include "remove_folder.h"
 #include "unshare_folder.h"
@@ -8,13 +8,14 @@
 #include "add_pending_folders.h"
 #include "model/misc/orphaned_blocks.h"
 #include "model/diff/cluster_visitor.h"
+#include "proto/proto-helpers-db.h"
 
 using namespace syncspirit::model::diff::modify;
 
 remove_folder_t::remove_folder_t(const model::cluster_t &cluster, model::sequencer_t &sequencer,
                                  const model::folder_t &folder) noexcept
-    : folder_id(folder.get_id()), folder_key{folder.get_key()} {
-
+    : folder_id(folder.get_id()) {
+    folder_key = folder.get_key();
     auto orphaned_blocks = orphaned_blocks_t();
     auto &folder_infos = folder.get_folder_infos();
     auto current = (cluster_diff_t *){nullptr};
@@ -34,19 +35,25 @@ remove_folder_t::remove_folder_t(const model::cluster_t &cluster, model::sequenc
         assign(new unshare_folder_t(cluster, *it.item, &orphaned_blocks));
         if (d != self && fi.get_index()) {
             auto db = db::PendingFolder();
-            auto db_fi = db.mutable_folder_info();
-            auto db_f = db.mutable_folder();
-            db_fi->set_index_id(fi.get_index());
-            db_fi->set_max_sequence(fi.get_max_sequence());
-            db_f->set_id(std::string(folder.get_id()));
-            db_f->set_label(std::string(folder.get_label()));
-            db_f->set_read_only(folder.is_read_only());
-            db_f->set_ignore_permissions(folder.are_permissions_ignored());
-            db_f->set_ignore_delete(folder.is_deletion_ignored());
-            db_f->set_disable_temp_indexes(folder.are_temp_indixes_disabled());
-            db_f->set_paused(folder.is_paused());
+            auto& db_fi = db::get_folder_info(db);
+            auto& db_f = db::get_folder(db);
+            db::set_index_id(db_fi, fi.get_index());
+            db::set_max_sequence(db_fi, fi.get_max_sequence());
+            db::set_id(db_f, folder.get_id());
+            db::set_label(db_f, folder.get_label());
+            db::set_read_only(db_f, folder.is_read_only());
+            db::set_ignore_permissions(db_f, folder.are_permissions_ignored());
+            db::set_ignore_delete(db_f, folder.is_deletion_ignored());
+            db::set_disable_temp_indexes(db_f, folder.are_temp_indixes_disabled());
+            db::set_paused(db_f, folder.is_paused());
+            db::set_scheduled(db_f, folder.is_scheduled());
+            db::set_path(db_f, folder.get_path().string());
+            db::set_folder_type(db_f, folder.get_folder_type());
+            db::set_pull_order(db_f, folder.get_pull_order());
 
-            auto item = add_pending_folders_t::item_t{std::move(db), std::string(d->device_id().get_sha256()),
+            auto sha256 = d->device_id().get_sha256();
+            auto peer_id = utils::bytes_t{sha256.begin(), sha256.end()};
+            auto item = add_pending_folders_t::item_t{std::move(db), std::move(peer_id),
                                                       sequencer.next_uuid()};
             pending_folders.emplace_back(std::move(item));
         }

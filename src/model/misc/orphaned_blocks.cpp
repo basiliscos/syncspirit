@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
 
 #include "orphaned_blocks.h"
 #include "model/file_info.h"
@@ -9,7 +9,8 @@ using namespace syncspirit::model;
 void orphaned_blocks_t::record(file_info_t &file) { file_for_removal.emplace(&file); }
 
 auto orphaned_blocks_t::deduce() const -> set_t {
-    set_t processed;
+    using set_view_t = std::set<utils::bytes_view_t, utils::bytes_comparator_t>;
+    set_view_t processed;
     set_t r;
     for (auto &file : file_for_removal) {
         auto &blocks = file->get_blocks();
@@ -28,9 +29,10 @@ auto orphaned_blocks_t::deduce() const -> set_t {
                 }
             }
             if (!usages) {
-                r.emplace(std::string{key});
+                auto copy = utils::bytes_t(key.begin(), key.end());
+                r.emplace(std::move(copy));
             }
-            processed.emplace(std::string{key});
+            processed.emplace(key);
         }
     }
     return r;

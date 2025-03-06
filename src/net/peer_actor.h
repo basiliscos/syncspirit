@@ -89,10 +89,10 @@ struct SYNCSPIRIT_API peer_actor_t : public r::actor_base_t {
     struct confidential {
         struct payload {
             struct tx_item_t : boost::intrusive_ref_counter<tx_item_t, boost::thread_unsafe_counter> {
-                fmt::memory_buffer buff;
+                utils::bytes_t buff;
                 bool final = false;
 
-                tx_item_t(fmt::memory_buffer &&buff_, bool final_) noexcept : buff{std::move(buff_)}, final{final_} {}
+                tx_item_t(utils::bytes_t buff_, bool final_) noexcept : buff{std::move(buff_)}, final{final_} {}
                 tx_item_t(tx_item_t &&other) = default;
             };
         };
@@ -119,7 +119,7 @@ struct SYNCSPIRIT_API peer_actor_t : public r::actor_base_t {
     void on_read(std::size_t bytes) noexcept;
     void on_timer(r::request_id_t, bool cancelled) noexcept;
     void read_more() noexcept;
-    void push_write(fmt::memory_buffer &&buff, bool signal, bool final) noexcept;
+    void push_write(utils::bytes_t buff, bool signal, bool final) noexcept;
     void process_tx_queue() noexcept;
     void cancel_timer() noexcept;
     void cancel_io() noexcept;
@@ -131,10 +131,10 @@ struct SYNCSPIRIT_API peer_actor_t : public r::actor_base_t {
     void read_hello(proto::message::message_t &&msg) noexcept;
     void read_controlled(proto::message::message_t &&msg) noexcept;
 
-    void handle_hello(proto::message::Hello &&) noexcept;
-    void handle_ping(proto::message::Ping &&) noexcept;
-    void handle_close(proto::message::Close &&) noexcept;
-    void handle_response(proto::message::Response &&) noexcept;
+    void handle_hello(proto::Hello &&) noexcept;
+    void handle_ping(proto::Ping &&) noexcept;
+    void handle_close(proto::Close &&) noexcept;
+    void handle_response(proto::Response &&) noexcept;
 
     model::cluster_ptr_t cluster;
     utils::logger_t log;

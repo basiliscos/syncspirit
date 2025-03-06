@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2023-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2023-2025 Ivan Baidakou
 
 #include "test-utils.h"
 #include "diff-builder.h"
@@ -53,9 +53,12 @@ TEST_CASE("updates_streamer", "[model]") {
     int seq = 1;
     auto add_file = [&](const char *name) {
         auto pr_file = proto::FileInfo();
-        pr_file.set_name(name);
-        pr_file.set_sequence(seq++);
-        pr_file.mutable_version()->add_counters()->set_id(my_device->device_id().get_uint());
+        proto::set_name(pr_file, name);
+        proto::set_sequence(pr_file, seq++);
+
+        auto& v = proto::get_version(pr_file);
+        proto::add_counters(v, proto::Counter(my_device->device_id().get_uint(), 0));
+
         auto f = file_info_t::create(sequencer->next_uuid(), pr_file, my_folder).value();
         my_folder->add_strict(f);
         return f;

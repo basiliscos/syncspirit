@@ -100,15 +100,16 @@ struct table_t : content::folder_table_t {
         serialization_context_t ctx;
         folder->serialize(ctx.folder);
 
-        auto copy_data = ctx.folder.SerializeAsString();
+        auto copy_data = db::encode(ctx.folder);
         error = {};
         auto valid = store(&ctx);
 
         if (valid) {
-            if (ctx.folder.path().empty()) {
+            auto db_path = db::get_path(ctx.folder);
+            if (db_path.empty()) {
                 error = "path should be defined";
             } else {
-                auto path = bfs::path(boost::nowide::widen(ctx.folder.path()));
+                auto path = bfs::path(boost::nowide::widen(db_path));
                 auto ec = sys::error_code{};
                 if (bfs::exists(path, ec)) {
                     if (!bfs::is_empty(path, ec)) {
@@ -151,14 +152,16 @@ bool pending_folder_t::on_select() {
 
         auto db = db::PendingFolder();
         folder.serialize(db);
-        db.mutable_folder()->set_path(path.string());
-        db.mutable_folder()->set_rescan_interval(3600u);
 
-        auto folder = model::folder_t::create(sequencer.next_uuid(), db.folder()).value();
+        auto& db_folder = db::get_folder(db);
+        db::set_path(db_folder, path.string());
+        db::set_rescan_interval(db_folder, 3600);
+
+        auto folder = model::folder_t::create(sequencer.next_uuid(), db_folder).value();
         folder->assign_cluster(cluster);
 
         auto db_folder_info = db::FolderInfo();
-        db_folder_info.set_index_id(sequencer.next_uint64());
+        db::set_index_id(db_folder_info, sequencer.next_uint64());
         auto fi = model::folder_info_t::create(sequencer.next_uuid(), db_folder_info, &peer, folder).value();
         folder->get_folder_infos().put(fi);
 

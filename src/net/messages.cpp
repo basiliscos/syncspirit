@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+
 #include "messages.h"
 #include "model/cluster.h"
 
@@ -9,7 +12,7 @@ block_request_t::block_request_t(const model::file_info_ptr_t &file_, size_t blo
     file_name = file_->get_name();
     sequence = file_->get_sequence();
     block_index = block_index_;
-    auto &block = file_->get_blocks()[block_index_];
+    auto block = file_->get_blocks()[block_index_].get();
     block_hash = block->get_hash();
     block_offset = block->get_file_blocks().front().get_offset();
     block_size = block->get_size();

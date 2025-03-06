@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
 
 #include "remove_files.h"
 #include "remove_blocks.h"
@@ -11,7 +11,8 @@ using namespace syncspirit::model::diff::modify;
 
 remove_files_t::remove_files_t(const device_t &device, const file_infos_map_t &files,
                                orphaned_blocks_t *orphaned_blocks_) noexcept
-    : device_id{device.device_id().get_sha256()} {
+    {
+    device_id = device.device_id().get_sha256();
     keys.reserve(files.size());
     folder_ids.reserve(files.size());
     auto local_orphaned_blocks = orphaned_blocks_t();
@@ -19,8 +20,10 @@ remove_files_t::remove_files_t(const device_t &device, const file_infos_map_t &f
     for (auto &it : files) {
         auto &file = it.item;
         orphaned_blocks.record(*file);
-        folder_ids.push_back(std::string(file->get_folder_info()->get_folder()->get_id()));
-        keys.push_back(std::string(file->get_key()));
+        auto folder_id = file->get_folder_info()->get_folder()->get_id();
+        folder_ids.push_back(std::string(folder_id));
+        auto file_key = file->get_key();
+        keys.push_back(utils::bytes_t(file_key.begin(), file_key.end()));
     }
     if (!orphaned_blocks_) {
         auto block_keys = local_orphaned_blocks.deduce();

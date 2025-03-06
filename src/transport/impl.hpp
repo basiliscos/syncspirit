@@ -113,10 +113,10 @@ template <> struct base_impl_t<ssl_socket_t> {
 
         auto me = source.me;
         if (me) {
-            auto &cert_data = me->cert_data.bytes;
-            auto &key_data = me->key_data.bytes;
-            ctx.use_certificate(asio::const_buffer(cert_data.c_str(), cert_data.size()), ssl::context::asn1);
-            ctx.use_private_key(asio::const_buffer(key_data.c_str(), key_data.size()), ssl::context::asn1);
+            auto &cert_data = me->cert_data;
+            auto &key_data = me->key_data;
+            ctx.use_certificate(asio::const_buffer(cert_data.data(), cert_data.size()), ssl::context::asn1);
+            ctx.use_private_key(asio::const_buffer(key_data.data(), key_data.size()), ssl::context::asn1);
         }
 
         if (alpn.size()) {
@@ -172,7 +172,8 @@ template <> struct base_impl_t<ssl_socket_t> {
                     return false;
                 }
 
-                utils::cert_data_t cert_data{std::move(der_option.value())};
+                auto& der_bytes = der_option.value();
+                auto cert_data = utils::cert_data_t(std::move(der_bytes));
                 auto peer_option = model::device_id_t::from_cert(cert_data);
                 if (!peer_option) {
                     log->warn("cannot get device_id from peer");

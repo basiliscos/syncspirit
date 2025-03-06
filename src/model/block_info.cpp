@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "block_info.h"
 #include "file_info.h"
-#include "structs.pb.h"
+#include "proto/proto-helpers.h"
 #include "db/prefix.h"
 #include "misc/error_code.h"
 #include <spdlog/spdlog.h>
@@ -12,7 +12,7 @@ namespace syncspirit::model {
 
 static const constexpr char prefix = (char)(db::prefix::block_info);
 
-auto block_info_t::make_strict_hash(std::string_view hash) noexcept -> strict_hash_t {
+auto block_info_t::make_strict_hash(utils::bytes_view_t hash) noexcept -> strict_hash_t {
     assert(hash.size() <= digest_length);
     auto r = strict_hash_t{};
     r.data[0] = prefix;
@@ -21,23 +21,23 @@ auto block_info_t::make_strict_hash(std::string_view hash) noexcept -> strict_ha
     return r;
 }
 
-std::string_view block_info_t::strict_hash_t::get_hash() noexcept { return std::string_view(data + 1, digest_length); }
+auto block_info_t::strict_hash_t::get_hash() noexcept -> utils::bytes_view_t { return utils::bytes_view_t(data + 1, digest_length); }
 
-std::string_view block_info_t::strict_hash_t::get_key() noexcept { return std::string_view(data, data_length); }
+auto block_info_t::strict_hash_t::get_key() noexcept -> utils::bytes_view_t { return utils::bytes_view_t(data, data_length); }
 
-block_info_t::block_info_t(std::string_view key) noexcept { std::copy(key.begin(), key.end(), hash); }
+block_info_t::block_info_t(utils::bytes_view_t key) noexcept { std::copy(key.begin(), key.end(), hash); }
 
-block_info_t::block_info_t(const proto::BlockInfo &block) noexcept : weak_hash{block.weak_hash()}, size{block.size()} {
+block_info_t::block_info_t(const proto::BlockInfo &block) noexcept : weak_hash{proto::get_weak_hash(block)}, size{proto::get_size(block)} {
     hash[0] = prefix;
 }
 
-template <> void block_info_t::assign<db::BlockInfo>(const db::BlockInfo &item) noexcept {
-    weak_hash = item.weak_hash();
-    size = item.size();
+template <> void block_info_t::assign<db::BlockInfo>(const db::BlockInfo &block) noexcept {
+    weak_hash = db::get_weak_hash(block);
+    size =  db::get_size(block);
 }
 
-outcome::result<block_info_ptr_t> block_info_t::create(std::string_view key, const db::BlockInfo &data) noexcept {
-    if (key.length() != data_length) {
+outcome::result<block_info_ptr_t> block_info_t::create(utils::bytes_view_t key, const db::BlockInfo &data) noexcept {
+    if (key.size() != data_length) {
         return make_error_code(error_code_t::invalid_block_key_length);
     }
     if (key[0] != prefix) {
@@ -50,35 +50,32 @@ outcome::result<block_info_ptr_t> block_info_t::create(std::string_view key, con
 }
 
 outcome::result<block_info_ptr_t> block_info_t::create(const proto::BlockInfo &block) noexcept {
-    auto &h = block.hash();
-    if (h.length() > digest_length) {
+    auto h = proto::get_hash(block);
+    if (h.size() > digest_length) {
         return make_error_code(error_code_t::invalid_block_key_length);
     }
 
     auto ptr = block_info_ptr_t(new block_info_t(block));
     auto &h_ptr = ptr->hash;
     std::copy(h.begin(), h.end(), h_ptr + 1);
-    auto left = digest_length - h.length();
+    auto left = digest_length - h.size();
     if (left) {
-        std::fill_n(h_ptr + 1 + h.length(), left, 0);
+        std::fill_n(h_ptr + 1 + h.size(), left, 0);
     }
     return outcome::success(ptr);
 }
 
 proto::BlockInfo block_info_t::as_bep(size_t offset) const noexcept {
     proto::BlockInfo r;
-    r.set_hash(std::string(get_hash()));
-    r.set_weak_hash(weak_hash);
-    r.set_size(size);
-    r.set_offset(offset);
+    proto::set_size(r, size);
+    proto::set_weak_hash(r, weak_hash);
+    proto::set_hash(r, get_hash());
+    proto::set_offset(r, offset);
     return r;
 }
 
-std::string block_info_t::serialize() const noexcept {
-    db::BlockInfo r;
-    r.set_weak_hash(weak_hash);
-    r.set_size(size);
-    return r.SerializeAsString();
+utils::bytes_t block_info_t::serialize() const noexcept {
+    return db::encode(db::BlockInfo{weak_hash, size});
 }
 
 void block_info_t::link(file_info_t *file_info, size_t block_index) noexcept {
@@ -128,8 +125,12 @@ void block_info_t::unlock() noexcept {
     --locked;
 }
 
-template <> SYNCSPIRIT_API std::string_view get_index<0>(const block_info_ptr_t &item) noexcept {
+template <> SYNCSPIRIT_API utils::bytes_view_t get_index<0>(const block_info_ptr_t &item) noexcept {
     return item->get_hash();
+}
+
+block_info_ptr_t block_infos_map_t::by_hash(utils::bytes_view_t hash) const noexcept {
+    return get(std::move(hash));
 }
 
 } // namespace syncspirit::model

@@ -126,6 +126,9 @@ distributions on it)
 
 # changes
 
+## 0.4.1 (xx-xxx-xxxx)
+ - [impl] degoogle: use [protopuf](https://github.com/PragmaTwice/protopuf) instead of protobuf
+
 ## 0.4.0 (22-Feb-2025)
  - [feature] new [fltk-fronted](docs/ui-fltk.md)
  - major app refactoring

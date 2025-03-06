@@ -13,12 +13,12 @@
 #include <memory>
 #include <optional>
 
-#include <fmt/core.h>
 #include "model/diff/cluster_diff.h"
 #include "model/file_info.h"
 #include "model/folder_info.h"
 #include "transport/base.h"
 #include "proto/bep_support.h"
+#include "utils/bytes.h"
 #include "utils/dns.h"
 
 namespace syncspirit {
@@ -122,11 +122,11 @@ struct termination_t {
 };
 
 using forwarded_message_t =
-    std::variant<proto::message::ClusterConfig, proto::message::Index, proto::message::IndexUpdate,
-                 proto::message::Request, proto::message::DownloadProgress>;
+    std::variant<proto::ClusterConfig, proto::Index, proto::IndexUpdate,
+                 proto::Request, proto::DownloadProgress>;
 
 struct block_response_t {
-    std::string data;
+    utils::bytes_t data;
 };
 
 struct block_request_t {
@@ -137,7 +137,7 @@ struct block_request_t {
     size_t block_index;
     std::int64_t block_offset;
     std::uint32_t block_size;
-    std::string block_hash;
+    utils::bytes_t block_hash;
     block_request_t(const model::file_info_ptr_t &file, size_t block_index) noexcept;
 
     model::file_block_t get_block(model::cluster_t &, model::device_t &peer) noexcept;
@@ -156,7 +156,7 @@ struct connect_request_t {
 };
 
 struct transfer_data_t {
-    fmt::memory_buffer data;
+    utils::bytes_t data;
 };
 
 struct transfer_push_t {

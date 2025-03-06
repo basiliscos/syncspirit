@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "test-utils.h"
 #include "diff-builder.h"
@@ -60,23 +60,22 @@ TEST_CASE("cluster modifications from ui", "[model]") {
         }
 
         SECTION("with unknown folder, then unshare") {
-            db::Folder db_folder;
-            db_folder.set_id(id);
-            db_folder.set_label(label);
-            db_folder.set_path(path);
-
             auto db_pf = db::PendingFolder();
-            *db_pf.mutable_folder() = db_folder;
-            auto db_fi = db_pf.mutable_folder_info();
-            db_fi->set_index_id(2345);
-            db_fi->set_max_sequence(12);
+            auto& db_folder = db::get_folder(db_pf);
+            db::set_id(db_folder, id);
+            db::set_label(db_folder, label);
+            db::set_path(db_folder, path);
+
+            auto& db_fi = db::get_folder_info(db_pf);
+            db::set_max_sequence(db_fi, 2345);
+            db::set_index_id(db_fi, 12);
 
             auto uf = pending_folder_t::create(sequencer->next_uuid(), db_pf, peer_device->device_id()).value();
             cluster->get_pending_folders().put(uf);
 
             REQUIRE(builder.share_folder(peer_id.get_sha256(), id).apply());
 
-            auto folder = folders.by_id(db_folder.id());
+            auto folder = folders.by_id(id);
             REQUIRE(folder);
             REQUIRE(folder->is_shared_with(*peer_device));
             auto fi_peer = folder->get_folder_infos().by_device(*peer_device);
@@ -86,23 +85,25 @@ TEST_CASE("cluster modifications from ui", "[model]") {
 
             CHECK(fi_peer->get_device() == peer_device);
             CHECK(fi_peer->get_max_sequence() == 0);
-            CHECK(fi_peer->get_index() == db_fi->index_id());
+            CHECK(fi_peer->get_index() == db::get_index_id(db_fi));
             CHECK(cluster->get_pending_folders().size() == 0);
 
             auto pr_file_1 = proto::FileInfo();
-            pr_file_1.set_name("a.txt");
-            pr_file_1.set_sequence(1);
-            pr_file_1.set_size(10);
-            pr_file_1.mutable_version()->add_counters()->set_id(peer_device->device_id().get_uint());
+            proto::set_name(pr_file_1, "a.txt");
+            proto::set_sequence(pr_file_1, 1l);
+            proto::set_size(pr_file_1, 10);
+            auto& pr_version = proto::get_version(pr_file_1);
+            proto::add_counters(pr_version, proto::Counter(peer_device->device_id().get_uint(), 0));
 
-            auto b1 = pr_file_1.add_blocks();
-            b1->set_hash("12345");
-            b1->set_size(5);
-            auto b2 = pr_file_1.add_blocks();
-            b2->set_hash("567890");
-            b2->set_size(5);
-            auto bi_1 = block_info_t::create(*b1).value();
-            auto bi_2 = block_info_t::create(*b2).value();
+            auto& b1 = proto::add_blocks(pr_file_1);
+            proto::set_size(b1, 5);
+            proto::set_hash(b1, utils::sha256_digest(as_bytes("12345")).value());
+            auto bi_1 = block_info_t::create(b1).value();
+
+            auto& b2 = proto::add_blocks(pr_file_1);
+            proto::set_size(b2, 5);
+            proto::set_hash(b2, utils::sha256_digest(as_bytes("567890")).value());
+            auto bi_2 = block_info_t::create(b2).value();
 
             auto &blocks = cluster->get_blocks();
             blocks.put(bi_1);

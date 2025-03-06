@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "db_actor.h"
 #include "names.h"
@@ -324,13 +324,12 @@ void db_actor_t::on_cluster_load(message::load_cluster_request_t &request) noexc
                 using item_t = decltype(items)::value_type;
                 auto key = ptr->key;
                 auto data = ptr->value;
-                db::FileInfo db;
-                auto ok = db.ParseFromArray(data.data(), data.size());
-                if (!ok) {
+                auto db_fi = db::FileInfo();
+                if (auto left = db::decode(ptr->value, db_fi); left) {
                     auto ec = make_error_code(model::error_code_t::file_info_deserialization_failure);
                     return reply_with_error(request, make_error(ec));
                 }
-                items.emplace_back(item_t{key, std::move(db)});
+                items.emplace_back(item_t{key, std::move(db_fi)});
                 ++ptr;
             }
             current = current->assign_sibling(new load::file_infos_t(std::move(items)));
@@ -467,7 +466,7 @@ auto db_actor_t::operator()(const model::diff::modify::upsert_folder_t &diff, vo
     auto &txn = *get_txn().assume_value();
 
     auto &db = diff.db;
-    auto folder = cluster->get_folders().by_id(db.id());
+    auto folder = cluster->get_folders().by_id(db::get_id(db));
     assert(folder);
     auto f_key = folder->get_key();
     auto f_data = folder->serialize();
@@ -494,7 +493,7 @@ auto db_actor_t::operator()(const model::diff::modify::add_blocks_t &diff, void 
 
     auto &blocks_map = cluster->get_blocks();
     for (const auto &it : diff.blocks) {
-        auto block = blocks_map.get(it.hash());
+        auto block = blocks_map.by_hash(proto::get_hash(it));
         auto key = block->get_key();
         auto data = block->serialize();
         auto r = db::save({key, data}, txn);
@@ -520,9 +519,11 @@ auto db_actor_t::operator()(const model::diff::modify::add_pending_folders_t &di
 
     auto &pending = cluster->get_pending_folders();
     for (auto &item : diff.container) {
-        auto uf = pending.by_id(item.db.folder().id());
+        auto& folder = db::get_folder(item.db);
+        auto id = db::get_id(folder);
+        auto uf = pending.by_id(id);
         if (uf && uf->device_id().get_sha256() == item.peer_id) {
-            if (uf->get_id() == item.db.folder().id()) {
+            if (uf->get_id() == id) {
                 auto key = uf->get_key();
                 auto data = uf->serialize();
 
@@ -746,7 +747,8 @@ auto db_actor_t::operator()(const model::diff::advance::advance_t &diff, void *c
     if (folder && !folder->is_suspended()) {
         auto folder_info = folder->get_folder_infos().by_device(*cluster->get_device());
         if (folder_info) {
-            auto file = folder_info->get_file_infos().by_name(diff.proto_local.name());
+            auto name = proto::get_name(diff.proto_local);
+            auto file = folder_info->get_file_infos().by_name(name);
             auto &txn = *get_txn().assume_value();
 
             {
@@ -795,7 +797,8 @@ auto db_actor_t::operator()(const model::diff::peer::update_folder_t &diff, void
 
     auto &files_map = folder_info->get_file_infos();
     for (const auto &f : diff.files) {
-        auto file = files_map.by_name(f.name());
+        auto name = proto::get_name(f);
+        auto file = files_map.by_name(name);
         LOG_TRACE(log, "saving {}, seq = {}", file->get_full_name(), file->get_sequence());
         auto key = file->get_key();
         auto data = file->serialize();

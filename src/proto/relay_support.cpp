@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2022-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2022-2025 Ivan Baidakou
 
 #include "relay_support.h"
 #include "utils/error_code.h"
@@ -77,7 +77,7 @@ static pt::time_duration parse_interval(const std::string_view in) noexcept {
     return pt::minutes{mins} + pt::seconds{secs};
 }
 
-static void serialize_header(char *ptr, type_t type, size_t payload_sz) noexcept {
+static void serialize_header(unsigned char *ptr, type_t type, size_t payload_sz) noexcept {
     auto h = header_t{be::native_to_big(magic), be::native_to_big(static_cast<uint32_t>(type)),
                       be::native_to_big(static_cast<uint32_t>(payload_sz))};
     auto in = reinterpret_cast<const char *>(&h);
@@ -95,7 +95,7 @@ static inline std::uint32_t read32_be(const void *ptr) {
     return be::big_to_native(value);
 }
 
-size_t serialize(const message_t &msg, std::string &out) noexcept {
+size_t serialize(const message_t &msg, utils::bytes_t &out) noexcept {
     return std::visit(
         [&](auto &it) -> size_t {
             using T = std::decay_t<decltype(it)>;
@@ -190,15 +190,15 @@ size_t serialize(const message_t &msg, std::string &out) noexcept {
         msg);
 }
 
-static parse_result_t parse_ping(std::string_view) noexcept { return wrapped_message_t{header_sz, ping_t{}}; }
+static parse_result_t parse_ping(utils::bytes_view_t) noexcept { return wrapped_message_t{header_sz, ping_t{}}; }
 
-static parse_result_t parse_pong(std::string_view) noexcept { return wrapped_message_t{header_sz, pong_t{}}; }
+static parse_result_t parse_pong(utils::bytes_view_t) noexcept { return wrapped_message_t{header_sz, pong_t{}}; }
 
-static parse_result_t parse_join_relay_request(std::string_view) noexcept {
+static parse_result_t parse_join_relay_request(utils::bytes_view_t) noexcept {
     return wrapped_message_t{header_sz, join_relay_request_t{}};
 }
 
-static parse_result_t parse_join_session_request(std::string_view data) noexcept {
+static parse_result_t parse_join_session_request(utils::bytes_view_t data) noexcept {
     if (data.size() < sizeof(uint32_t)) {
         return protocol_error_t{};
     }
@@ -207,11 +207,12 @@ static parse_result_t parse_join_session_request(std::string_view data) noexcept
     if (sz + sizeof(uint32_t) > data.size()) {
         return protocol_error_t{};
     }
-    auto tail = data.substr(sizeof(uint32_t));
-    return wrapped_message_t{header_sz + data.size(), join_session_request_t{std::string(tail)}};
+    auto tail = data.subspan(sizeof(uint32_t));
+    auto tail_bytes = utils::bytes_t(tail.begin(), tail.end());
+    return wrapped_message_t{header_sz + data.size(), join_session_request_t{std::move(tail_bytes)}};
 }
 
-static parse_result_t parse_response(std::string_view data) noexcept {
+static parse_result_t parse_response(utils::bytes_view_t data) noexcept {
     if (data.size() < sizeof(uint32_t) * 2) {
         return protocol_error_t{};
     }
@@ -222,11 +223,12 @@ static parse_result_t parse_response(std::string_view data) noexcept {
     if (sz + sizeof(uint32_t) * 2 > data.size()) {
         return protocol_error_t{};
     }
-    auto tail = data.substr(sizeof(uint32_t) * 2, sz);
-    return wrapped_message_t{header_sz + data.size(), response_t{code, std::string(tail)}};
+    auto tail = data.subspan(sizeof(uint32_t) * 2, sz);
+    auto tail_str = std::string_view((const char*)tail.data(), tail.size());
+    return wrapped_message_t{header_sz + data.size(), response_t{code, std::string(tail_str)}};
 }
 
-static parse_result_t parse_connect_request(std::string_view data) noexcept {
+static parse_result_t parse_connect_request(utils::bytes_view_t data) noexcept {
     if (data.size() < sizeof(uint32_t)) {
         return protocol_error_t{};
     }
@@ -235,45 +237,46 @@ static parse_result_t parse_connect_request(std::string_view data) noexcept {
     if (sz + sizeof(uint32_t) != data.size()) {
         return protocol_error_t{};
     }
-    auto tail = data.substr(sizeof(uint32_t));
-    return wrapped_message_t{header_sz + data.size(), connect_request_t{std::string(tail)}};
+    auto tail = data.subspan(sizeof(uint32_t));
+    auto tail_bytes = utils::bytes_t(tail.begin(), tail.end());
+    return wrapped_message_t{header_sz + data.size(), connect_request_t{std::move(tail_bytes)}};
 }
 
-static parse_result_t parse_session_invitation(std::string_view data) noexcept {
+static parse_result_t parse_session_invitation(utils::bytes_view_t data) noexcept {
     if (data.size() < sizeof(uint32_t)) {
         return protocol_error_t{};
     }
     auto orig = data;
 
     auto from_sz = read32_be(data.data());
-    data = data.substr(sizeof(uint32_t));
+    data = data.subspan(sizeof(uint32_t));
     if (data.size() < from_sz) {
         return protocol_error_t{};
     }
-    auto from = data.substr(0, from_sz);
-    data = data.substr(from_sz);
+    auto from = data.subspan(0, from_sz);
+    data = data.subspan(from_sz);
 
     if (data.size() < sizeof(uint32_t)) {
         return protocol_error_t{};
     }
     auto key_sz = read32_be(data.data());
-    data = data.substr(sizeof(uint32_t));
+    data = data.subspan(sizeof(uint32_t));
     if (data.size() < key_sz) {
         return protocol_error_t{};
     }
-    auto key = data.substr(0, key_sz);
-    data = data.substr(key_sz);
+    auto key = data.subspan(0, key_sz);
+    data = data.subspan(key_sz);
 
     if (data.size() < sizeof(uint32_t)) {
         return protocol_error_t{};
     }
     auto addr_sz = read32_be(data.data());
-    data = data.substr(sizeof(uint32_t));
+    data = data.subspan(sizeof(uint32_t));
     if (data.size() < addr_sz) {
         return protocol_error_t{};
     }
-    auto addr = data.substr(0, addr_sz);
-    data = data.substr(addr_sz);
+    auto addr = data.subspan(0, addr_sz);
+    data = data.subspan(addr_sz);
     auto ip = ipv4_option_t{};
     if (addr_sz == 4) {
         auto number = std::uint32_t{0};
@@ -286,23 +289,25 @@ static parse_result_t parse_session_invitation(std::string_view data) noexcept {
         return protocol_error_t{};
     }
     auto port = read32_be(data.data());
-    data = data.substr(sizeof(uint32_t));
+    data = data.subspan(sizeof(uint32_t));
 
     if (data.size() < sizeof(uint32_t)) {
         return protocol_error_t{};
     }
     auto server_socket = read32_be(data.data());
-    data = data.substr(sizeof(uint32_t));
+    data = data.subspan(sizeof(uint32_t));
 
     if (!addr.empty() && !addr[0]) {
-        addr = "";
+        addr = {};
     };
 
+    auto from_bytes = utils::bytes_t(from.begin(), from.end());
+    auto key_bytes = utils::bytes_t(key.begin(), key.end());
     return wrapped_message_t{header_sz + orig.size(),
-                             session_invitation_t{std::string(from), std::string(key), ip, port, (bool)server_socket}};
+                             session_invitation_t{std::move(from_bytes), std::move(key_bytes), ip, port, (bool)server_socket}};
 }
 
-parse_result_t parse(std::string_view data) noexcept {
+parse_result_t parse(utils::bytes_view_t data) noexcept {
     if (data.size() < header_sz) {
         return incomplete_t{};
     }
@@ -322,7 +327,7 @@ parse_result_t parse(std::string_view data) noexcept {
     if (data.size() < header_sz + sz) {
         return incomplete_t{};
     }
-    auto tail = data.substr(header_sz);
+    auto tail = data.subspan(header_sz);
 
     switch ((type_t)type) {
     case type_t::ping:

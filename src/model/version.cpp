@@ -3,6 +3,7 @@
 
 #include "version.h"
 #include "device.h"
+#include "proto/proto-helpers.h"
 #include "utils/time.h"
 #include <limits>
 
@@ -12,15 +13,16 @@ using namespace syncspirit::model;
 
 // auto now = r::pt::second_clock::local_time();
 
-version_t::version_t(const proto::Vector &v) noexcept {
-    assert(v.counters_size());
-    counters.resize(v.counters_size());
-    auto best = v.counters(0);
+version_t::version_t(const proto::Vector& v) noexcept {
+    auto counters_sz = proto::get_counters_size(v);
+    assert(counters_sz);
+    counters.resize(counters_sz);
+    auto best = proto::get_counters(v, 0);
     best_index = 0;
-    for (int i = 0; i < v.counters_size(); ++i) {
-        auto &c = v.counters(i);
+    for (int i = 0; i < counters_sz; ++i) {
+        auto& c = proto::get_counters(v, i);
         counters[i] = c;
-        if (c.value() > best.value()) {
+        if (proto::get_value(c) > proto::get_value(best)) {
             best = c;
             best_index = i;
         }
@@ -39,9 +41,9 @@ auto version_t::as_proto() const noexcept -> proto::Vector {
 }
 
 void version_t::to_proto(proto::Vector &v) const noexcept {
-    v.Clear();
+    proto::clear_counters(v);
     for (auto &c : counters) {
-        *v.add_counters() = c;
+        proto::add_counters(v, c);
     }
 }
 
@@ -51,10 +53,10 @@ void version_t::update(const device_t &device) noexcept {
     auto v = static_cast<std::uint64_t>(utils::as_seconds(clock_t::universal_time()));
     auto counter = (proto::Counter *)(nullptr);
     if (best_index != undef) {
-        v = std::max(counters[best_index].value() + 1, v);
+        v = std::max(proto::get_value(counters[best_index]) + 1, v);
         best_index = undef;
         for (size_t i = 0; i < counters.size(); ++i) {
-            if (counters[i].id() == id) {
+            if (proto::get_id(counters[i]) == id) {
                 counter = &counters[i];
                 best_index = i;
                 break;
@@ -64,10 +66,10 @@ void version_t::update(const device_t &device) noexcept {
     if (best_index == undef) {
         counters.emplace_back(proto::Counter());
         counter = &counters.back();
-        counter->set_id(id);
+        proto::set_id(*counter, id);
         best_index = &counters.back() - counters.data();
     }
-    counter->set_value(v);
+    proto::set_value(*counter, v);
 }
 
 auto version_t::get_best() noexcept -> proto::Counter & {
@@ -84,8 +86,9 @@ bool version_t::contains(const version_t &other) noexcept {
     auto &other_best = other.get_best();
     for (size_t i = 0; i < counters.size(); ++i) {
         auto &c = counters[i];
-        if (c.id() == other_best.id()) {
-            return c.value() >= other_best.value();
+        auto ids_match = proto::get_id(c) == proto::get_id(other_best);
+        if (ids_match) {
+            return proto::get_value(c) >= proto::get_value(other_best);
         }
     }
     return false;
@@ -97,7 +100,9 @@ bool version_t::identical_to(const version_t &other) noexcept {
         auto p2 = other.counters.data();
         auto end = p1 + counters.size();
         while (p1 != end) {
-            if (p1->id() == p2->id() && p1->value() == p2->value()) {
+            auto ids_match = proto::get_id(*p1) == proto::get_id(*p2);
+            auto values_match = proto::get_value(*p1) == proto::get_value(*p2);
+            if (ids_match && values_match) {
                 ++p1;
                 ++p2;
                 continue;

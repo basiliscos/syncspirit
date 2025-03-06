@@ -204,8 +204,8 @@ struct fixture_t : private model::diff::cluster_visitor_t {
 
     virtual void on_client_read(std::size_t bytes) noexcept {
         LOG_INFO(log, "client received {} bytes", bytes);
-        auto result = proto::parse_bep(asio::buffer(rx_buff, bytes)).value();
-        auto hello = std::get_if<proto::message::Hello>(&result.message);
+        auto result = proto::parse_bep(utils::bytes_view_t(rx_buff, bytes)).value();
+        auto hello = std::get_if<proto::Hello>(&result.message);
         // On some platforms 'on_client_read' triggers before 'on_server_send', but as we
         // check server code here, there might be problems. So, give server-side
         // some time via timer.
@@ -215,19 +215,21 @@ struct fixture_t : private model::diff::cluster_visitor_t {
             hello_timer->expires_from_now(r::pt::milliseconds{1});
             hello_timer->async_wait([hello = std::move(*hello), this](const sys::error_code &ec) mutable {
                 LOG_INFO(log, "on hello timer, ec: {}", ec.value());
-                on_hello(std::move(hello));
+                on_hello(hello);
                 hello_timer.reset();
             });
         }
     }
 
-    virtual void on_hello(proto::message::Hello msg) noexcept {
-        LOG_INFO(log, "client received hello message from {}, {}/{}", msg->device_name(), msg->client_name(),
-                 msg->client_version());
+    virtual void on_hello(proto::Hello& msg) noexcept {
+        auto device_name = proto::get_device_name(msg);
+        auto client_name = proto::get_client_name(msg);
+        auto client_version = proto::get_client_version(msg);
+        LOG_INFO(log, "client received hello message from {}, {}/{}", device_name, client_name, client_version);
     }
 
     virtual void send_hello() noexcept {
-        proto::make_hello_message(tx_buff, "self-name");
+        tx_buff = proto::make_hello_message("self-name");
         transport::io_fn_t on_write = [&](size_t bytes) { on_client_write(bytes); };
         transport::io_fn_t on_read = [&](size_t bytes) { on_client_read(bytes); };
         transport::error_fn_t on_error = [&](auto &ec) { on_client_error(ec); };
@@ -250,9 +252,9 @@ struct fixture_t : private model::diff::cluster_visitor_t {
     model::device_ptr_t my_device;
     transport::stream_sp_t peer_trans;
     transport::stream_sp_t client_trans;
-    fmt::memory_buffer tx_buff;
+    utils::bytes_t tx_buff;
     timer_ptr_t hello_timer;
-    char rx_buff[2000];
+    unsigned char rx_buff[2000];
     bool known_peer = false;
     int pre_main_counter;
 };
@@ -276,7 +278,7 @@ void test_online_on_hello() {
             send_hello();
         }
 
-        void on_hello(proto::message::Hello) noexcept override {
+        void on_hello(proto::Hello&) noexcept override {
             auto peer = cluster->get_devices().by_sha256(peer_device->device_id().get_sha256());
             CHECK(peer->get_state() == device_state_t::online);
         }
@@ -291,7 +293,7 @@ void test_hello_from_unknown() {
             send_hello();
         }
 
-        void on_hello(proto::message::Hello) noexcept override {
+        void on_hello(proto::Hello&) noexcept override {
             CHECK(cluster->get_devices().size() == 1);
             auto &unknown_devices = cluster->get_pending_devices();
             CHECK(unknown_devices.size() == 1);
@@ -318,7 +320,7 @@ void test_hello_from_known_unknown() {
             send_hello();
         }
 
-        void on_hello(proto::message::Hello) noexcept override {
+        void on_hello(proto::Hello&) noexcept override {
             CHECK(cluster->get_devices().size() == 1);
             auto &unknown_devices = cluster->get_pending_devices();
             CHECK(unknown_devices.size() == 1);
@@ -345,7 +347,7 @@ void test_hello_from_ignored() {
             send_hello();
         }
 
-        void on_hello(proto::message::Hello) noexcept override {
+        void on_hello(proto::Hello&) noexcept override {
             CHECK(cluster->get_devices().size() == 1);
             auto &ignored_devices = cluster->get_ignored_devices();
             CHECK(ignored_devices.size() == 1);
