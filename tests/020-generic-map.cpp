@@ -91,7 +91,7 @@ using item_map_t = syncspirit::model::generic_map_t<item_t, 1>;
 
 namespace syncspirit::model {
 
-template <> SYNCSPIRIT_API inline std::string_view get_index<0>(const item_t &item) noexcept { return item.key; }
+template <> inline std::string_view get_index<0>(const item_t &item) noexcept { return item.key; }
 
 } // namespace syncspirit::model
 
