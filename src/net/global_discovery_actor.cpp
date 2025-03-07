@@ -91,7 +91,7 @@ void global_discovery_actor_t::announce() noexcept {
         LOG_DEBUG(log, "announcing accessibility via {}", joint_uris);
     }
 
-    fmt::memory_buffer tx_buff;
+    utils::bytes_t tx_buff;
     auto res = proto::make_announce_request(tx_buff, announce_url, uris);
     if (!res) {
         LOG_TRACE(log, "error making announce request :: {}", res.error().message());
@@ -207,7 +207,7 @@ void global_discovery_actor_t::on_timer(r::request_id_t, bool cancelled) noexcep
 }
 
 void global_discovery_actor_t::make_request(const r::address_ptr_t &addr, utils::uri_ptr_t &uri,
-                                            fmt::memory_buffer &&tx_buff, const custom_msg_ptr_t &custom) noexcept {
+                                            utils::bytes_t &&tx_buff, const custom_msg_ptr_t &custom) noexcept {
     auto timeout = r::pt::millisec{io_timeout};
     transport::ssl_junction_t ssl{discovery_device_id, &ssl_pair, true, ""};
     http_request = request_via<payload::http_request_t>(http_client, addr, uri, std::move(tx_buff), rx_buff,
@@ -257,7 +257,7 @@ auto global_discovery_actor_t::operator()(const model::diff::contact::peer_state
     if (!peer) {
         LOG_ERROR(log, "no peer device '{}'", peer->device_id());
     } else {
-        fmt::memory_buffer tx_buff;
+        utils::bytes_t tx_buff;
         auto r = proto::make_discovery_request(tx_buff, announce_url, peer->device_id());
         if (!r) {
             LOG_ERROR(log, "error making discovery request: {}", r.error().message());

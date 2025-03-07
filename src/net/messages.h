@@ -15,9 +15,7 @@
 
 #include "model/diff/cluster_diff.h"
 #include "model/file_info.h"
-#include "model/folder_info.h"
 #include "transport/base.h"
-#include "proto/bep_support.h"
 #include "utils/bytes.h"
 #include "utils/dns.h"
 
@@ -76,7 +74,7 @@ struct http_request_t : r::arc_base_t<http_request_t> {
     using response_t = r::intrusive_ptr_t<http_response_t>;
 
     utils::uri_ptr_t url;
-    fmt::memory_buffer data;
+    utils::bytes_t data;
     rx_buff_ptr_t rx_buff;
     std::size_t rx_buff_size;
     ssl_option_t ssl_context;
@@ -85,13 +83,13 @@ struct http_request_t : r::arc_base_t<http_request_t> {
     r::message_ptr_t custom;
 
     template <typename URI>
-    http_request_t(URI &&url_, fmt::memory_buffer &&data_, rx_buff_ptr_t rx_buff_, std::size_t rx_buff_size_,
+    http_request_t(URI &&url_, utils::bytes_t &&data_, rx_buff_ptr_t rx_buff_, std::size_t rx_buff_size_,
                    bool local_ip_, bool debug_ = false, const r::message_ptr_t &custom_ = {})
         : url{std::forward<URI>(url_)}, data{std::move(data_)}, rx_buff{rx_buff_}, rx_buff_size{rx_buff_size_},
           local_ip{local_ip_}, debug{debug_}, custom{custom_} {}
 
     template <typename URI>
-    http_request_t(URI &&url_, fmt::memory_buffer &&data_, rx_buff_ptr_t rx_buff_, std::size_t rx_buff_size_,
+    http_request_t(URI &&url_, utils::bytes_t &&data_, rx_buff_ptr_t rx_buff_, std::size_t rx_buff_size_,
                    transport::ssl_junction_t &&ssl_, bool debug = false, const r::message_ptr_t &custom_ = {})
         : http_request_t(std::forward<URI>(url_), std::move(data_), rx_buff_, rx_buff_size_, {}, debug, custom_) {
         ssl_context = ssl_option_t(std::move(ssl_));

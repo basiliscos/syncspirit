@@ -40,7 +40,7 @@ namespace http = boost::beast::http;
 namespace asio = boost::asio;
 namespace sys = boost::system;
 
-outcome::result<void> make_discovery_request(fmt::memory_buffer &buff, std::uint32_t max_wait) noexcept {
+outcome::result<void> make_discovery_request(utils::bytes_t &buff, std::uint32_t max_wait) noexcept {
     std::string upnp_host = fmt::format("{}:{}", upnp_addr, upnp_port);
     std::string upnp_max_wait = fmt::format("{}", max_wait);
 
@@ -105,7 +105,7 @@ outcome::result<discovery_result> parse(const char *data, std::size_t bytes) noe
     };
 }
 
-outcome::result<void> make_description_request(fmt::memory_buffer &buff, const uri_ptr_t &uri) noexcept {
+outcome::result<void> make_description_request(utils::bytes_t &buff, const uri_ptr_t &uri) noexcept {
     http::request<http::empty_body> req;
     req.method(http::verb::get);
     req.version(http_version);
@@ -135,7 +135,7 @@ outcome::result<igd_result> parse_igd(const char *data, std::size_t bytes) noexc
     return error_code_t::wan_notfound;
 }
 
-outcome::result<void> make_external_ip_request(fmt::memory_buffer &buff, const uri_ptr_t &uri) noexcept {
+outcome::result<void> make_external_ip_request(utils::bytes_t &buff, const uri_ptr_t &uri) noexcept {
     http::request<http::string_body> req;
     std::string soap_action = fmt::format("\"{0}#{1}\"", igd_wan_service, soap_GetExternalIPAddress);
     req.method(http::verb::post);
@@ -172,7 +172,7 @@ outcome::result<std::string> parse_external_ip(const char *data, std::size_t byt
     return node.node().child_value();
 }
 
-outcome::result<void> make_mapping_request(fmt::memory_buffer &buff, const uri_ptr_t &uri, std::uint16_t external_port,
+outcome::result<void> make_mapping_request(utils::bytes_t &buff, const uri_ptr_t &uri, std::uint16_t external_port,
                                            const std::string &internal_ip, std::uint16_t internal_port) noexcept {
     http::request<http::string_body> req;
     std::string soap_action = fmt::format("\"{0}#{1}\"", igd_wan_service, soap_AddPortMapping);
@@ -206,7 +206,7 @@ outcome::result<void> make_mapping_request(fmt::memory_buffer &buff, const uri_p
     return serialize(req, buff);
 }
 
-outcome::result<void> make_unmapping_request(fmt::memory_buffer &buff, const uri_ptr_t &uri,
+outcome::result<void> make_unmapping_request(utils::bytes_t &buff, const uri_ptr_t &uri,
                                              std::uint16_t external_port) noexcept {
     http::request<http::string_body> req;
     std::string soap_action = fmt::format("\"{0}#{1}\"", igd_wan_service, soap_DeletePortMapping);
@@ -235,7 +235,7 @@ outcome::result<void> make_unmapping_request(fmt::memory_buffer &buff, const uri
     return serialize(req, buff);
 }
 
-outcome::result<void> make_mapping_validation_request(fmt::memory_buffer &buff, const uri_ptr_t &uri,
+outcome::result<void> make_mapping_validation_request(utils::bytes_t &buff, const uri_ptr_t &uri,
                                                       std::uint16_t external_port) noexcept {
     http::request<http::string_body> req;
     std::string soap_action = fmt::format("\"{0}#{1}\"", igd_wan_service, soap_GetSpecificPortMappingEntry);

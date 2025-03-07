@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "discovery_support.h"
 #include "utils/beast_support.h"
@@ -7,6 +7,7 @@
 #include <boost/beast/http.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <nlohmann/json.hpp>
+#include <fmt/format.h>
 #include <charconv>
 #include <cctype>
 
@@ -17,7 +18,7 @@ namespace syncspirit::proto {
 namespace http = boost::beast::http;
 using json = nlohmann::json;
 
-outcome::result<uri_ptr_t> make_announce_request(fmt::memory_buffer &buff, const uri_ptr_t &announce_uri,
+outcome::result<uri_ptr_t> make_announce_request(utils::bytes_t &buff, const uri_ptr_t &announce_uri,
                                                  const utils::uri_container_t &listening_uris) noexcept {
     json payload = json::object();
     json addresses = json::array();
@@ -46,7 +47,7 @@ outcome::result<uri_ptr_t> make_announce_request(fmt::memory_buffer &buff, const
     return uri;
 }
 
-outcome::result<uri_ptr_t> make_discovery_request(fmt::memory_buffer &buff, const uri_ptr_t &announce_uri,
+outcome::result<uri_ptr_t> make_discovery_request(utils::bytes_t &buff, const uri_ptr_t &announce_uri,
                                                   const model::device_id_t device_id) noexcept {
     auto target = fmt::format("device={}", device_id.get_value());
     auto uri = announce_uri->clone();
@@ -59,7 +60,6 @@ outcome::result<uri_ptr_t> make_discovery_request(fmt::memory_buffer &buff, cons
     req.target(uri->encoded_target());
     req.set(http::field::host, uri->host());
 
-    fmt::memory_buffer tx_buff;
     auto ok = serialize(req, buff);
     if (!ok) {
         return ok.error();

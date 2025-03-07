@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #pragma once
 #include "utils/uri.h"
 #include "model/device_id.h"
 #include "syncspirit-export.h"
-#include <spdlog/fmt/fmt.h>
+#include "utils/bytes.h"
 #include <boost/outcome.hpp>
 #include <boost/asio.hpp>
 #include <boost/beast/http.hpp>
@@ -17,9 +17,10 @@ namespace asio = boost::asio;
 namespace http = boost::beast::http;
 
 SYNCSPIRIT_API outcome::result<utils::uri_ptr_t>
-make_announce_request(fmt::memory_buffer &buff, const utils::uri_ptr_t &announce_uri,
+make_announce_request(utils::bytes_t &buff, const utils::uri_ptr_t &announce_uri,
                       const utils::uri_container_t &listening_uris) noexcept;
-SYNCSPIRIT_API outcome::result<utils::uri_ptr_t> make_discovery_request(fmt::memory_buffer &buff,
+
+SYNCSPIRIT_API outcome::result<utils::uri_ptr_t> make_discovery_request(utils::bytes_t &buff,
                                                                         const utils::uri_ptr_t &announce_uri,
                                                                         const model::device_id_t device_id) noexcept;
 

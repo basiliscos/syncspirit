@@ -3,7 +3,6 @@
 
 #pragma once
 
-#include <fmt/format.h>
 #include <boost/outcome.hpp>
 #include <variant>
 #include "syncspirit-export.h"

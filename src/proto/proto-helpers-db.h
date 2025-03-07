@@ -3,8 +3,9 @@
 
 #pragma once
 
-#include "syncspirit-export.h"
 #include "proto-fwd.hpp"
+#include "utils/bytes.h"
+#include "syncspirit-export.h"
 
 namespace syncspirit::db {
 

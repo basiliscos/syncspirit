@@ -118,7 +118,7 @@ void ssdp_actor_t::on_discovery_received(std::size_t bytes) noexcept {
         return do_shutdown(make_error(ec));
     }
 
-    const char *buff = static_cast<const char *>(rx_buff.data());
+    const char *buff = reinterpret_cast<const char *>(rx_buff.data());
     auto discovery_result = parse(buff, bytes);
     if (!discovery_result) {
         auto &ec = discovery_result.error();

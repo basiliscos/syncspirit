@@ -90,7 +90,7 @@ struct SYNCSPIRIT_API global_discovery_actor_t : public r::actor_base_t, private
     void on_discovery_response(message::http_response_t &message) noexcept;
     void on_model_update(model::message::model_update_t &message) noexcept;
     void on_timer(r::request_id_t, bool cancelled) noexcept;
-    void make_request(const r::address_ptr_t &addr, utils::uri_ptr_t &uri, fmt::memory_buffer &&tx_buff,
+    void make_request(const r::address_ptr_t &addr, utils::uri_ptr_t &uri, utils::bytes_t &&tx_buff,
                       const custom_msg_ptr_t &custom = {}) noexcept;
 
     outcome::result<void> operator()(const model::diff::contact::update_contact_t &, void *custom) noexcept override;

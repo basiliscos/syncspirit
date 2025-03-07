@@ -661,7 +661,6 @@ void controller_actor_t::on_message(proto::IndexUpdate &msg) noexcept {
 
 void controller_actor_t::on_message(proto::Request &req) noexcept {
     proto::Response res;
-    fmt::memory_buffer data;
     auto code = proto::ErrorCode::NO_BEP_ERROR;
 
     if (tx_blocks_requested > blocks_max_requested * constants::tx_blocks_max_factor) {

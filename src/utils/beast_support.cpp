@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "beast_support.h"
 #include <boost/beast/version.hpp>
@@ -12,7 +12,7 @@ template <typename Request> void set_ua(Request &req) noexcept {
     req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
 }
 
-outcome::result<void> serialize(http::request<http::empty_body> &req, fmt::memory_buffer &buff) {
+outcome::result<void> serialize(http::request<http::empty_body> &req, bytes_t &buff) {
 
     set_ua(req);
     auto serializer = http::serializer<true, http::empty_body>(req);
@@ -32,7 +32,7 @@ outcome::result<void> serialize(http::request<http::empty_body> &req, fmt::memor
     return outcome::success();
 }
 
-outcome::result<void> serialize(http::request<http::string_body> &req, fmt::memory_buffer &buff) {
+outcome::result<void> serialize(http::request<http::string_body> &req, bytes_t &buff) {
     set_ua(req);
 
     sys::error_code ec;

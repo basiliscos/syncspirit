@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #pragma once
 
@@ -72,7 +72,7 @@ struct SYNCSPIRIT_API upnp_actor_t : public r::actor_base_t {
     void on_mapping_port(message::http_response_t &res) noexcept;
     void on_unmapping_port(message::http_response_t &res) noexcept;
     void on_validate(message::http_response_t &res) noexcept;
-    void make_request(const r::address_ptr_t &addr, utils::uri_ptr_t &uri, fmt::memory_buffer &&tx_buff,
+    void make_request(const r::address_ptr_t &addr, utils::uri_ptr_t &uri, utils::bytes_t &&tx_buff,
                       bool get_local_address = false) noexcept;
     void request_finish() noexcept;
 

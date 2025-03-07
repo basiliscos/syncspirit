@@ -131,7 +131,7 @@ void relay_actor_t::request_relay_list() noexcept {
     req.set(http::field::host, uri->host());
     req.set(http::field::connection, "close");
 
-    fmt::memory_buffer tx_buff;
+    utils::bytes_t tx_buff;
     auto r = utils::serialize(req, tx_buff);
     if (!r) {
         auto &ec = r.assume_error();
