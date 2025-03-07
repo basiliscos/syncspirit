@@ -241,16 +241,12 @@ generate_export_header(syncspirit_core
     EXPORT_MACRO_NAME SYNCSPIRIT_API
     EXPORT_FILE_NAME include/syncspirit-export.h
 )
-target_compile_options(syncspirit_core PRIVATE
-    -include ${CMAKE_CURRENT_BINARY_DIR}/include/syncspirit-export.h
-)
-
-# windows xp patch required:
-# -        CancelIoEx(ior->overlapped_fd, &item->ov);
-# +        CancelIo(ior->overlapped_fd);
 FetchContent_Declare(MDBX
     URL https://libmdbx.dqdkfa.ru/release/libmdbx-amalgamated-0.13.4.tar.xz
     URL_HASH SHA256=86df30ca2231c9b3ad71424bb829dca9041947f5539d4295030c653d4982c1be
+    PATCH_COMMAND ${CMAKE_COMMAND} -E
+        chdir ${CMAKE_CURRENT_BINARY_DIR}
+        patch -u _deps/mdbx-src/mdbx.c -i ${CMAKE_CURRENT_SOURCE_DIR}/misc/mdbx-win32.patch
 )
     if (WIN32)
         set(BUILD_SHARED_LIBS true CACHE BOOL "BUILD_SHARED_LIBS")
