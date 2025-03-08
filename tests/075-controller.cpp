@@ -334,10 +334,15 @@ struct fixture_t {
 
     virtual void start_target() noexcept { _start_target("test-common://1.2.3.4:5"); }
 
+    virtual void _tune_peer(db::Device&) noexcept {}
+
     virtual void run() noexcept {
-        auto peer_id =
-            device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
-        peer_device = device_t::create(peer_id, "peer-device").value();
+        auto peer_sha256_s = "VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ";
+        auto peer_id = device_id_t::from_string(peer_sha256_s).value();
+        auto peer_db = db::Device();
+        db::set_name(peer_db, "peer-device");
+        _tune_peer(peer_db);
+        peer_device = device_t::create(peer_id.get_key(), peer_db).value();
 
         auto my_id =
             device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
@@ -1650,6 +1655,11 @@ void test_sending_index_updates() {
 
 void test_uploading() {
     struct F : fixture_t {
+
+        void _tune_peer(db::Device& device) noexcept override {
+            db::set_compression(device, proto::Compression::ALWAYS);
+        }
+
         using fixture_t::fixture_t;
         void main(diff_builder_t &) noexcept override {
             auto &folder_infos = folder_1->get_folder_infos();
@@ -1667,20 +1677,25 @@ void test_uploading() {
             proto::set_max_sequence(d_my, folder_my->get_max_sequence());
             proto::set_index_id(d_my, folder_my->get_index());
 
+            auto data_sample = "/my-folder-1/my-folder-2/my-folder-3/my-folder-4/";
+            auto data = fmt::format("{0}{0}{0}{0}{0}", data_sample);
+            auto data_begin = (const unsigned char*)data.data();
+            auto data_end = (const unsigned char*)data.data() + data.size();
+
             auto file_name = std::string_view("data.bin");
             auto file = proto::FileInfo();
             proto::set_name(file, file_name);
             proto::set_type(file, proto::FileInfoType::FILE);
             proto::set_sequence(file, folder_my->get_max_sequence() + 1);
-            proto::set_size(file, 5);
-            proto::set_block_size(file, 5);
+            proto::set_size(file, data.size());
+            proto::set_block_size(file, data.size());
 
             auto &v = proto::get_version(file);
             auto &counter = proto::add_counters(v);
             proto::set_id(counter, 1);
             proto::set_value(counter, 1);
 
-            auto data_1 = as_owned_bytes("12345");
+            auto data_1 = utils::bytes_t(data_begin, data_end);
             auto data_1_h = utils::sha256_digest(data_1).value();
             auto &b1 = proto::add_blocks(file);
             proto::set_hash(b1, data_1_h);
@@ -1697,7 +1712,7 @@ void test_uploading() {
             proto::set_id(req, 1);
             proto::set_folder(req, folder_1->get_id());
             proto::set_name(req, file_name);
-            proto::set_size(req, 5);
+            proto::set_size(req, data.size());
 
             peer_actor->forward(cc);
 
