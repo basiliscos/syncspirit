@@ -42,6 +42,8 @@ All front-ends share the same configuration and database when running on same ho
 
 - [x] conflict resolution
 
+- [x] incoming and outcoming messages (de)compression using lz4
+
 # missing features
 
 This list is probably incomplete. Here are the most important changes:
@@ -53,8 +55,6 @@ This list is probably incomplete. Here are the most important changes:
 - [ ] [QUIC transport](https://en.wikipedia.org/wiki/QUIC)
 
 - [ ] introducer support
-
-- [ ] outgoing messages compression
 
 - [ ] [untrusted devices encryption](https://docs.syncthing.net/specs/untrusted.html)
 
@@ -127,6 +127,7 @@ distributions on it)
 # changes
 
 ## 0.4.1 (xx-xxx-xxxx)
+ - [core, bep] support outgoing messages to be compressed using lz4
  - [impl] degoogle: use [protopuf](https://github.com/PragmaTwice/protopuf) instead of protobuf
 
 ## 0.4.0 (22-Feb-2025)

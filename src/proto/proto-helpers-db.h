@@ -5,6 +5,7 @@
 
 #include "syncspirit-export.h"
 #include "proto-fwd.hpp"
+#include "utils/bytes.h"
 
 namespace syncspirit::db {
 

@@ -4,17 +4,20 @@
 #include "bep_support.h"
 #include "constants.h"
 #include "utils/error_code.h"
-#include "proto/proto-helpers.h"
+#include "proto/proto-helpers-bep.h"
 #include "syncspirit-config.h"
 #include <boost/endian/arithmetic.hpp>
 #include <boost/endian/conversion.hpp>
 #include <algorithm>
 #include <lz4.h>
+#include <type_traits>
 
 using namespace syncspirit;
 namespace be = boost::endian;
 
 namespace syncspirit::proto {
+
+static const constexpr std::size_t compression_threshold = 128;
 
 utils::bytes_t make_hello_message(std::string_view device_name) noexcept {
     proto::Hello msg;
@@ -210,7 +213,7 @@ outcome::result<message::wrapped_message_t> parse_bep(utils::bytes_view_t buff) 
 
             auto msg_buff = utils::bytes_view_t();
 
-            auto block_sz = sz - (header_sz + sizeof(std::uint16_t) + sizeof(std::uint32_t) * 2);
+            auto block_sz = message_sz - sizeof(std::uint32_t);
             std::vector<char> uncompressed;
             uncompressed.resize(uncompr_sz);
             auto data_ptr = reinterpret_cast<const char *>(ptr);
@@ -276,15 +279,54 @@ outcome::result<Announce> parse_announce(utils::bytes_view_t buff) noexcept {
 }
 
 template <typename Message>
-SYNCSPIRIT_API utils::bytes_t serialize(const Message &message, proto::MessageCompression compression) noexcept {
+SYNCSPIRIT_API utils::bytes_t serialize(const Message &message, Compression compression) noexcept {
+    using MC = MessageCompression;
     using type = typename M2T<Message>::type;
-    auto message_sz = proto::estimate(message);
-    proto::Header header(type::value, compression);
+    auto message_sz = static_cast<int>(proto::estimate(message));
+    auto applied_compression = MC::NONE;
+    if (message_sz > compression_threshold && compression != Compression::NEVER) {
+        if constexpr (std::is_same_v<Message, Response>) {
+            if (compression == Compression::ALWAYS) {
+                applied_compression = MC::LZ4;
+            }
+        } else {
+            applied_compression = MC::LZ4;
+        }
+    }
+    proto::Header header(type::value, applied_compression);
     auto header_sz = proto::estimate(header);
     auto header_sz_16 = be::native_to_big(static_cast<std::uint16_t>(header_sz));
-    auto src = reinterpret_cast<const std::uint8_t *>(&header_sz_16);
-    auto bytes = utils::bytes_t(2 + header_sz + 4 + message_sz);
+
+    auto bytes = utils::bytes_t();
+    if (applied_compression == MC::NONE) {
+        auto raw_offset = (2 + 4 + header_sz);
+        auto storage_sz = raw_offset + message_sz;
+        bytes = utils::bytes_t(storage_sz);
+        auto ptr = bytes.data() + raw_offset;
+        proto::encode(message, {ptr, static_cast<size_t>(message_sz)});
+    } else {
+        auto bound_sz = LZ4_COMPRESSBOUND(message_sz);
+        auto raw_offset = (2 + 4 + 4 + header_sz) + bound_sz;
+        auto storage_sz = raw_offset + message_sz;
+        bytes = utils::bytes_t(storage_sz);
+        auto ptr = reinterpret_cast<unsigned char*>(bytes.data() + raw_offset);
+        proto::encode(message, {ptr, static_cast<size_t>(message_sz)});
+        auto dst = (unsigned char*)(bytes.data() + 2 + 4 + 4 + header_sz);
+        auto uncompressed_sz = be::native_to_big(static_cast<std::uint32_t>(message_sz));
+        auto result_sz = LZ4_compress_destSize((char*)ptr, (char*)dst, &message_sz, bound_sz);
+        assert(result_sz);
+        message_sz = result_sz + sizeof(std::uint32_t);
+        ptr = dst - 4;
+        auto src = (decltype(ptr))&uncompressed_sz;
+        *ptr++ = *src++;
+        *ptr++ = *src++;
+        *ptr++ = *src++;
+        *ptr++ = *src++;
+        bytes.resize(2 + 4 + header_sz + message_sz);
+    }
+
     auto *ptr = reinterpret_cast<std::uint8_t *>(bytes.data());
+    auto src = reinterpret_cast<const std::uint8_t *>(&header_sz_16);
     *ptr++ = *src++;
     *ptr++ = *src++;
     proto::encode(header, {ptr, header_sz});
@@ -296,25 +338,24 @@ SYNCSPIRIT_API utils::bytes_t serialize(const Message &message, proto::MessageCo
     *ptr++ = *src++;
     *ptr++ = *src++;
     *ptr++ = *src++;
-    proto::encode(message, {ptr, message_sz});
     return bytes;
 }
 
 template utils::bytes_t SYNCSPIRIT_API serialize(const proto::ClusterConfig &message,
-                                                 proto::MessageCompression compression) noexcept;
+                                                 proto::Compression compression) noexcept;
 template utils::bytes_t SYNCSPIRIT_API serialize(const proto::Index &message,
-                                                 proto::MessageCompression compression) noexcept;
+                                                 proto::Compression compression) noexcept;
 template utils::bytes_t SYNCSPIRIT_API serialize(const proto::IndexUpdate &message,
-                                                 proto::MessageCompression compression) noexcept;
+                                                 proto::Compression compression) noexcept;
 template utils::bytes_t SYNCSPIRIT_API serialize(const proto::Request &message,
-                                                 proto::MessageCompression compression) noexcept;
+                                                 proto::Compression compression) noexcept;
 template utils::bytes_t SYNCSPIRIT_API serialize(const proto::Response &message,
-                                                 proto::MessageCompression compression) noexcept;
+                                                 proto::Compression compression) noexcept;
 template utils::bytes_t SYNCSPIRIT_API serialize(const proto::DownloadProgress &message,
-                                                 proto::MessageCompression compression) noexcept;
+                                                 proto::Compression compression) noexcept;
 template utils::bytes_t SYNCSPIRIT_API serialize(const proto::Ping &message,
-                                                 proto::MessageCompression compression) noexcept;
+                                                 proto::Compression compression) noexcept;
 template utils::bytes_t SYNCSPIRIT_API serialize(const proto::Close &message,
-                                                 proto::MessageCompression compression) noexcept;
+                                                 proto::Compression compression) noexcept;
 
 } // namespace syncspirit::proto
