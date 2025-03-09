@@ -306,6 +306,8 @@ void test_hello_from_unknown() {
 
             auto delta = pt::microsec_clock::local_time() - peer->get_last_seen();
             CHECK(delta.seconds() <= 2);
+            CHECK(my_device->get_rx_bytes() > 0);
+            CHECK(my_device->get_tx_bytes() > 0);
         }
     };
     F().run(false);
@@ -333,6 +335,8 @@ void test_hello_from_known_unknown() {
 
             auto delta = pt::microsec_clock::local_time() - peer->get_last_seen();
             CHECK(delta.seconds() <= 2);
+            CHECK(my_device->get_rx_bytes() > 0);
+            CHECK(my_device->get_tx_bytes() > 0);
         }
     };
     F().run(false);

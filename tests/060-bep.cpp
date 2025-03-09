@@ -159,4 +159,18 @@ TEST_CASE("cluster config", "[bep]") {
         auto d_1_id = proto::get_id(d_1);
         CHECK(d_1_id == proto::get_id(d1));
     }
+
+    SECTION("serialize compressed, round-trip") {
+        auto buff = serialize(msg, proto::Compression::ALWAYS);
+        REQUIRE(buff.size() <= buff_sz + 10);
+        auto r2 = parse_bep(buff);
+        REQUIRE(r2);
+        auto &v2 = r2.value();
+        auto &msg2 = std::get<proto::ClusterConfig>(v2.message);
+        CHECK(v2.consumed == buff.size());
+        auto f_1 = proto::get_folders(msg2, 0);
+        auto d_1 = proto::get_devices(f_1, 0);
+        auto d_1_id = proto::get_id(d_1);
+        CHECK(d_1_id == proto::get_id(d1));
+    }
 }

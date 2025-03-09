@@ -169,7 +169,7 @@ void controller_actor_t::shutdown_finish() noexcept {
 void controller_actor_t::send_cluster_config() noexcept {
     LOG_TRACE(log, "sending cluster config");
     auto cluster_config = cluster->generate(*peer);
-    auto bytes = proto::serialize(cluster_config);
+    auto bytes = proto::serialize(cluster_config, peer->get_compression());
     outgoing_buffer += static_cast<uint32_t>(bytes.size());
     send<payload::transfer_data_t>(peer_addr, std::move(bytes));
     send_new_indices();
@@ -188,7 +188,7 @@ void controller_actor_t::send_new_indices() noexcept {
                     LOG_DEBUG(log, "sending new index for folder '{}' ({})", folder.get_label(), folder.get_id());
                     proto::Index index;
                     proto::set_folder(index, folder.get_id());
-                    auto data = proto::serialize(index);
+                    auto data = proto::serialize(index, peer->get_compression());
                     outgoing_buffer += static_cast<uint32_t>(data.size());
                     send<payload::transfer_data_t>(peer_addr, std::move(data));
                 }
@@ -259,7 +259,7 @@ void controller_actor_t::push_pending() noexcept {
     for (auto &p : indices) {
         auto &index = p.second;
         if (proto::get_files_size(index) > 0) {
-            auto data = proto::serialize(index);
+            auto data = proto::serialize(index, peer->get_compression());
             outgoing_buffer += static_cast<uint32_t>(data.size());
             send<payload::transfer_data_t>(peer_addr, std::move(data));
         }
@@ -700,7 +700,7 @@ void controller_actor_t::on_message(proto::Request &req) noexcept {
     if (code != proto::ErrorCode::NO_BEP_ERROR) {
         proto::set_id(res, proto::get_id(req));
         proto::set_code(res, code);
-        auto data = proto::serialize(res);
+        auto data = proto::serialize(res, peer->get_compression());
         outgoing_buffer += static_cast<uint32_t>(data.size());
         send<payload::transfer_data_t>(peer_addr, std::move(data));
     } else {
@@ -724,7 +724,7 @@ void controller_actor_t::on_block_response(fs::message::block_response_t &messag
         proto::set_data(res, std::move(p.data));
     }
 
-    auto data = proto::serialize(res);
+    auto data = proto::serialize(res, peer->get_compression());
     outgoing_buffer += static_cast<uint32_t>(data.size());
     send<payload::transfer_data_t>(peer_addr, std::move(data));
 }

@@ -14,6 +14,8 @@
 #include "model/diff/contact/ignored_connected.h"
 #include "model/diff/contact/unknown_connected.h"
 #include "model/diff/modify/add_pending_device.h"
+#include "model/diff/peer/rx.h"
+#include "model/diff/peer/tx.h"
 
 using namespace syncspirit::net;
 using namespace syncspirit;
@@ -149,6 +151,10 @@ void peer_actor_t::on_write(std::size_t sz) noexcept {
     if (controller) {
         send<payload::transfer_pop_t>(controller, (uint32_t)sz);
     }
+    auto diff = model::diff::cluster_diff_ptr_t{};
+    diff.reset(new model::diff::peer::tx_t(peer_device_id.get_sha256(), sz));
+    send<model::payload::model_update_t>(coordinator, std::move(diff));
+
     assert(tx_item);
     if (tx_item->final) {
         LOG_TRACE(log, "process_tx_queue, final message has been sent, shutting down");
@@ -166,7 +172,12 @@ void peer_actor_t::on_read(std::size_t bytes) noexcept {
     assert(read_action);
     resources->release(resource::io_read);
     rx_idx += bytes;
+
     LOG_TRACE(log, "on_read, {} bytes, total = {}", bytes, rx_idx);
+    auto diff = model::diff::cluster_diff_ptr_t{};
+    diff.reset(new model::diff::peer::rx_t(peer_device_id.get_sha256(), bytes));
+    send<model::payload::model_update_t>(coordinator, std::move(diff));
+
     auto buff = utils::bytes_view_t((unsigned char *)rx_buff.data(), rx_idx);
     auto result = proto::parse_bep(buff);
     if (result.has_error()) {
@@ -188,7 +199,7 @@ void peer_actor_t::on_read(std::size_t bytes) noexcept {
         std::memcpy(ptr, ptr + value.consumed, rx_idx);
     }
     (this->*read_action)(std::move(value.message));
-    LOG_TRACE(log, "on_read, rx_idx = {} ", rx_idx);
+    // LOG_TRACE(log, "on_read, rx_idx = {} ", rx_idx);
 }
 
 void peer_actor_t::on_timer(r::request_id_t, bool cancelled) noexcept {

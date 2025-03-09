@@ -6,6 +6,7 @@
 #include "settings.h"
 #include "../static_table.h"
 #include "../qr_button.h"
+#include "../utils.hpp"
 #include "utils/dns.h"
 #include "constants.h"
 
@@ -64,6 +65,8 @@ struct self_table_t final : static_table_t, db_info_viewer_t {
         device_id_short_cell = new static_string_provider_t();
         device_id_cell = new static_string_provider_t();
         uptime_cell = new static_string_provider_t();
+        rx_cell = new static_string_provider_t();
+        tx_cell = new static_string_provider_t();
         mdbx_entries_cell = new static_string_provider_t();
         mdbx_pages_cell = new static_string_provider_t();
         mdbx_size_cell = new static_string_provider_t();
@@ -72,6 +75,8 @@ struct self_table_t final : static_table_t, db_info_viewer_t {
         data.push_back({"device id (short)", device_id_short_cell});
         data.push_back({"device id", device_id_cell});
         data.push_back({"uptime", uptime_cell});
+        data.push_back({"received", rx_cell});
+        data.push_back({"send", tx_cell});
         data.push_back({"mdbx entries", mdbx_entries_cell});
         data.push_back({"mdbx pages", mdbx_pages_cell});
         data.push_back({"mdbx size, Kb", mdbx_size_cell});
@@ -94,13 +99,18 @@ struct self_table_t final : static_table_t, db_info_viewer_t {
     void refresh() override {
         auto &sup = owner->supervisor;
         auto cluster = sup.get_cluster();
+        auto rx_bytes = std::int64_t{0};
+        auto tx_bytes = std::int64_t{0};
 
         auto device_id_short = std::string_view("XXXXXXX");
         auto device_id = std::string_view("XXXXXXX-XXXXXXX-XXXXXXX-XXXXXXX-XXXXXXX-XXXXXXX-XXXXXXX-XXXXXXX");
         if (cluster) {
-            auto &id = cluster->get_device()->device_id();
+            auto &self = cluster->get_device();
+            auto &id = self->device_id();
             device_id_short = id.get_short();
             device_id = id.get_value();
+            rx_bytes = static_cast<std::int64_t>(self->get_rx_bytes());
+            tx_bytes = static_cast<std::int64_t>(self->get_tx_bytes());
         }
         auto pages = db_info.leaf_pages + db_info.ms_branch_pages + db_info.overflow_pages;
         auto size = pages * db_info.page_size / 1024;
@@ -108,6 +118,8 @@ struct self_table_t final : static_table_t, db_info_viewer_t {
         device_id_short_cell->update(device_id_short);
         device_id_cell->update(device_id);
         uptime_cell->update(sup.get_uptime());
+        rx_cell->update(get_file_size(rx_bytes));
+        tx_cell->update(get_file_size(tx_bytes));
         mdbx_entries_cell->update(fmt::format("{}", db_info.entries));
         mdbx_pages_cell->update(fmt::format("{}", pages));
         mdbx_size_cell->update(fmt::format("{}", size));
@@ -133,6 +145,8 @@ struct self_table_t final : static_table_t, db_info_viewer_t {
     static_string_provider_ptr_t device_id_short_cell;
     static_string_provider_ptr_t device_id_cell;
     static_string_provider_ptr_t uptime_cell;
+    static_string_provider_ptr_t rx_cell;
+    static_string_provider_ptr_t tx_cell;
     static_string_provider_ptr_t mdbx_entries_cell;
     static_string_provider_ptr_t mdbx_pages_cell;
     static_string_provider_ptr_t mdbx_size_cell;

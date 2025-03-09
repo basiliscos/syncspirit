@@ -58,8 +58,7 @@ SYNCSPIRIT_API std::size_t make_announce_message(utils::bytes_view_t storage, ut
                                                  const payload::URIs &uris, std::int64_t instance) noexcept;
 
 template <typename Message>
-utils::bytes_t serialize(const Message &message,
-                         proto::MessageCompression compression = proto::MessageCompression::NONE) noexcept;
+utils::bytes_t serialize(const Message &message, proto::Compression compression = proto::Compression::NEVER) noexcept;
 
 SYNCSPIRIT_API outcome::result<message::wrapped_message_t> parse_bep(utils::bytes_view_t) noexcept;
 

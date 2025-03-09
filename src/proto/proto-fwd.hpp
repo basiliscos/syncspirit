@@ -4,7 +4,6 @@
 #pragma once
 
 #include <protopuf/message.h>
-#include <vector>
 
 namespace syncspirit {
 
@@ -24,7 +23,7 @@ enum class MessageType {
     PING              = 6,
     CLOSE             = 7,
     HELLO             = 8,
-    UNKNOWN           = -1,
+    UNKNOWN           = 9,
 };
 
 enum class MessageCompression {
