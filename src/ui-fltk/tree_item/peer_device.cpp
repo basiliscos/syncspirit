@@ -4,8 +4,8 @@
 #include "peer_device.h"
 #include "peer_folders.h"
 #include "pending_folders.h"
-#include "../qr_button.h"
 #include "../symbols.h"
+#include "../utils.hpp"
 #include "../table_widget/checkbox.h"
 #include "model/diff/modify/remove_peer.h"
 #include "model/diff/modify/update_peer.h"
@@ -58,6 +58,8 @@ struct my_table_t : static_table_t {
         last_seen_cell = new static_string_provider_t();
         endpoint_cell = new static_string_provider_t();
         state_cell = new static_string_provider_t();
+        rx_cell = new static_string_provider_t();
+        tx_cell = new static_string_provider_t();
         certname_cell = new static_string_provider_t();
         client_name_cell = new static_string_provider_t();
         client_version_cell = new static_string_provider_t();
@@ -67,6 +69,8 @@ struct my_table_t : static_table_t {
         data.push_back({"addresses", make_addresses(*this)});
         data.push_back({"endpoint", endpoint_cell});
         data.push_back({"state", state_cell});
+        data.push_back({"received", rx_cell});
+        data.push_back({"send", tx_cell});
         data.push_back({"cert name", certname_cell});
         data.push_back({"client name", client_name_cell});
         data.push_back({"client version", client_version_cell});
@@ -142,7 +146,13 @@ struct my_table_t : static_table_t {
 
         auto state_symbol = container.get_state();
         auto state = fmt::format("{} ({})", state_symbol, symbols::get_description(state_symbol));
+        auto rx = get_file_size(peer.get_rx_bytes());
+        auto tx = get_file_size(peer.get_tx_bytes());
+
         state_cell->update(std::move(state));
+        rx_cell->update(std::move(rx));
+        tx_cell->update(std::move(tx));
+
         certname_cell->update(peer.get_cert_name().value_or(""));
         client_name_cell->update(peer.get_client_name());
         client_version_cell->update(peer.get_client_version());
@@ -155,6 +165,8 @@ struct my_table_t : static_table_t {
     static_string_provider_ptr_t last_seen_cell;
     static_string_provider_ptr_t endpoint_cell;
     static_string_provider_ptr_t state_cell;
+    static_string_provider_ptr_t rx_cell;
+    static_string_provider_ptr_t tx_cell;
     static_string_provider_ptr_t certname_cell;
     static_string_provider_ptr_t client_name_cell;
     static_string_provider_ptr_t client_version_cell;

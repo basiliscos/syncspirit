@@ -25,7 +25,7 @@ template <typename T, typename E = void> struct contentable_t : T, content_t {
     Fl_Widget *get_widget() override { return this; }
 };
 
-template <typename T> struct contentable_t<T, std::is_base_of<Fl_Group, T>> : T, content_t {
+template <typename T> struct contentable_t<T, std::enable_if_t<std::is_base_of_v<Fl_Group, T>>> : T, content_t {
     using T::T;
 
     Fl_Widget *get_widget() override { return this; }
