@@ -54,6 +54,8 @@
 #include "modify/upsert_folder.h"
 #include "modify/upsert_folder_info.h"
 #include "peer/cluster_update.h"
+#include "peer/rx.h"
+#include "peer/tx.h"
 #include "peer/update_folder.h"
 
 using namespace syncspirit::model::diff;
@@ -166,6 +168,14 @@ auto cluster_visitor_t::operator()(const local::synchronization_finish_t &diff, 
 }
 
 auto cluster_visitor_t::operator()(const peer::cluster_update_t &diff, void *custom) noexcept -> outcome::result<void> {
+    return diff.visit_next(*this, custom);
+}
+
+auto cluster_visitor_t::operator()(const peer::rx_t &diff, void *custom) noexcept -> outcome::result<void> {
+    return diff.visit_next(*this, custom);
+}
+
+auto cluster_visitor_t::operator()(const peer::tx_t &diff, void *custom) noexcept -> outcome::result<void> {
     return diff.visit_next(*this, custom);
 }
 

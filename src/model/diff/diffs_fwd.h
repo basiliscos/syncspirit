@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #pragma once
 
@@ -47,6 +47,8 @@ struct synchronization_finish_t;
 
 namespace peer {
 struct cluster_update_t;
+struct rx_t;
+struct tx_t;
 struct update_folder_t;
 } // namespace peer
 

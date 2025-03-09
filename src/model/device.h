@@ -70,8 +70,12 @@ struct SYNCSPIRIT_API device_t : augmentable_t<device_t> {
     void assign_uris(const uris_t &uris) noexcept;
 
     std::string_view get_connection_id() noexcept;
-
     void update(const db::Device &source) noexcept;
+
+    inline size_t get_rx_bytes() const noexcept { return rx_bytes; }
+    inline void set_rx_bytes(size_t value) noexcept { rx_bytes = value; }
+    inline size_t get_tx_bytes() const noexcept { return tx_bytes; }
+    inline void set_tx_bytes(size_t value) noexcept { tx_bytes = value; }
 
     file_iterator_ptr_t create_iterator(cluster_t &) noexcept;
     void release_iterator(file_iterator_ptr_t &) noexcept;
@@ -101,6 +105,8 @@ struct SYNCSPIRIT_API device_t : augmentable_t<device_t> {
 
     remote_folder_infos_map_t remote_folder_infos;
     pt::ptime last_seen;
+    std::size_t rx_bytes;
+    std::size_t tx_bytes;
 };
 
 struct SYNCSPIRIT_API local_device_t final : device_t {

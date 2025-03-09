@@ -334,7 +334,7 @@ struct fixture_t {
 
     virtual void start_target() noexcept { _start_target("test-common://1.2.3.4:5"); }
 
-    virtual void _tune_peer(db::Device&) noexcept {}
+    virtual void _tune_peer(db::Device &) noexcept {}
 
     virtual void run() noexcept {
         auto peer_sha256_s = "VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ";
@@ -1656,7 +1656,7 @@ void test_sending_index_updates() {
 void test_uploading() {
     struct F : fixture_t {
 
-        void _tune_peer(db::Device& device) noexcept override {
+        void _tune_peer(db::Device &device) noexcept override {
             db::set_compression(device, proto::Compression::ALWAYS);
         }
 
@@ -1679,8 +1679,8 @@ void test_uploading() {
 
             auto data_sample = "/my-folder-1/my-folder-2/my-folder-3/my-folder-4/";
             auto data = fmt::format("{0}{0}{0}{0}{0}", data_sample);
-            auto data_begin = (const unsigned char*)data.data();
-            auto data_end = (const unsigned char*)data.data() + data.size();
+            auto data_begin = (const unsigned char *)data.data();
+            auto data_end = (const unsigned char *)data.data() + data.size();
 
             auto file_name = std::string_view("data.bin");
             auto file = proto::FileInfo();

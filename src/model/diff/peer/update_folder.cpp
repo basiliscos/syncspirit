@@ -159,7 +159,11 @@ static auto instantiate(const cluster_t &cluster, sequencer_t &sequencer, const 
     for (int i = 0; i < files_count; ++i) {
         auto &f = proto::get_files(message, i);
         auto name = proto::get_name(f);
-        if (proto::get_deleted(f) && proto::get_blocks_size(f)) {
+        auto is_deleted = proto::get_deleted(f);
+        auto is_invalid = proto::get_invalid(f);
+        auto blocks_count = proto::get_blocks_size(f);
+        auto is_downloadable = !is_deleted && !is_invalid;
+        if (!is_downloadable && blocks_count) {
             LOG_WARN(log, "file {} should not have blocks", name);
             return make_error_code(error_code_t::unexpected_blocks);
         }
@@ -174,7 +178,6 @@ static auto instantiate(const cluster_t &cluster, sequencer_t &sequencer, const 
             return make_error_code(error_code_t::invalid_sequence);
         }
         auto file_size = proto::get_size(f);
-        auto blocks_count = proto::get_blocks_size(f);
         auto size_by_blocks = std::int64_t(0);
         for (int j = 0; j < blocks_count; ++j) {
             auto &b = proto::get_blocks(f, j);
@@ -185,7 +188,7 @@ static auto instantiate(const cluster_t &cluster, sequencer_t &sequencer, const 
                 new_blocks.emplace_back(b);
             }
         }
-        if (file_size != size_by_blocks) {
+        if (is_downloadable && file_size != size_by_blocks) {
             return make_error_code(error_code_t::mismatch_file_size);
         }
         auto &version = proto::get_version(f);
