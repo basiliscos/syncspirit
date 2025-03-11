@@ -3,7 +3,7 @@
 
 #include "upsert_folder.h"
 #include "model/cluster.h"
-#include "model/diff//cluster_visitor.h"
+#include "model/diff/cluster_visitor.h"
 #include "upsert_folder_info.h"
 #include "proto/proto-helpers-db.h"
 #include "utils/format.hpp"
@@ -28,21 +28,21 @@ auto upsert_folder_t::create(const cluster_t &cluster, sequencer_t &sequencer, d
     }
 
     auto diff = cluster_diff_ptr_t{};
-    diff = new upsert_folder_t(sequencer, uuid, std::move(db), folder_info, device, index_id);
+    diff = new upsert_folder_t(sequencer, uuid, std::move(db), folder_info, device.device_id(), index_id);
     return outcome::success(diff);
 }
 
 upsert_folder_t::upsert_folder_t(sequencer_t &sequencer, bu::uuid uuid_, db::Folder db_,
-                                 model::folder_info_ptr_t folder_info, const model::device_t &device,
+                                 model::folder_info_ptr_t folder_info, const device_id_t &device,
                                  std::uint64_t index_id) noexcept
     : uuid{uuid_}, db{std::move(db_)} {
     auto folder_id = db::get_id(db);
-    LOG_DEBUG(log, "upsert_folder_t, folder_id = {}, device = {}", folder_id, device.device_id());
+    LOG_DEBUG(log, "upsert_folder_t, folder_id = {}, device = {}", folder_id, device);
 
     if (!folder_info) {
         auto fi_uuid = sequencer.next_uuid();
         auto diff = cluster_diff_ptr_t{};
-        diff = new upsert_folder_info_t(fi_uuid, device.device_id().get_sha256(), folder_id, index_id);
+        diff = new upsert_folder_info_t(fi_uuid, device, device, folder_id, index_id);
         assign_child(diff);
     }
 }

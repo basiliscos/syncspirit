@@ -246,7 +246,7 @@ TEST_CASE("loading cluster (folder info)", "[model]") {
     auto folder = folder_t::create(uuid, db_folder).value();
     cluster->get_folders().put(folder);
 
-    db::FolderInfo db_fi(2, 3);
+    db::FolderInfo db_fi(2, 3, {});
     auto fi = folder_info_t::create(sequencer->next_uuid(), db_fi, my_device, folder).value();
     CHECK(fi);
     CHECK(fi->get_index() == 2ul);
@@ -303,7 +303,7 @@ TEST_CASE("loading cluster (file info + block)", "[model]") {
     auto folder = folder_t::create(uuid, db_folder).value();
     cluster->get_folders().put(folder);
 
-    db::FolderInfo db_folder_info(2, 3);
+    db::FolderInfo db_folder_info(2, 3, {});
     auto folder_info = folder_info_t::create(sequencer->next_uuid(), db_folder_info, my_device, folder).value();
     CHECK(folder_info);
     CHECK(folder_info->get_index() == 2ul);

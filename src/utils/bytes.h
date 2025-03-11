@@ -30,6 +30,7 @@ struct SYNCSPIRIT_API bytes_t : std::vector<unsigned char> {
     using parent_t::parent_t;
     using parent_t::operator=;
     bytes_t(parent_t data) noexcept;
+    explicit bytes_t(bytes_view_t data) noexcept;
 
     bytes_t &operator=(bytes_view_t) noexcept;
     bool operator==(const bytes_view_t &) const noexcept;

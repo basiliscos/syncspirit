@@ -163,10 +163,16 @@ index_maker_t diff_builder_t::make_index(utils::bytes_view_t sha256, std::string
     return index_maker_t(*this, sha256, folder_id);
 }
 
-diff_builder_t &diff_builder_t::share_folder(utils::bytes_view_t sha256, std::string_view folder_id) noexcept {
-    auto device = cluster.get_devices().by_sha256(sha256);
+diff_builder_t &diff_builder_t::share_folder(utils::bytes_view_t sha256, std::string_view folder_id,
+                                             utils::bytes_view_t introducer_sha256) noexcept {
+    auto &devices = cluster.get_devices();
+    auto device = devices.by_sha256(sha256);
+    auto introcuder = devices.by_sha256(introducer_sha256);
+    if (!introcuder) {
+        introcuder = cluster.get_device();
+    }
     auto folder = cluster.get_folders().by_id(folder_id);
-    auto opt = diff::modify::share_folder_t::create(cluster, *sequencer, *device, *folder);
+    auto opt = diff::modify::share_folder_t::create(cluster, *sequencer, *device, introcuder->device_id(), *folder);
     if (!opt) {
         spdlog::error("cannot share: {}", opt.assume_error().message());
         return *this;

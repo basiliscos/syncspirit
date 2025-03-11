@@ -316,6 +316,7 @@ callback_ptr_t app_supervisor_t::call_share_folders(std::string_view folder_id, 
     auto fn = callback_fn_t([this, folder_id = std::string(folder_id), devices = std::move(devices)]() {
         auto diff = model::diff::cluster_diff_ptr_t{};
         auto current = diff.get();
+        auto &self = cluster->get_device()->device_id();
         for (auto &sha256 : devices) {
             auto device = cluster->get_devices().by_sha256(sha256);
             if (!device) {
@@ -328,7 +329,7 @@ callback_ptr_t app_supervisor_t::call_share_folders(std::string_view folder_id, 
                 return;
             }
             using diff_t = model::diff::modify::share_folder_t;
-            auto opt = diff_t::create(*cluster, *sequencer, *device, *folder);
+            auto opt = diff_t::create(*cluster, *sequencer, *device, self, *folder);
             if (!opt) {
                 auto message = opt.assume_error().message();
                 log->error("cannot share folder {} with {} : {}", folder_id, device->device_id(), message);

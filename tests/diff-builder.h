@@ -64,7 +64,8 @@ struct SYNCSPIRIT_TEST_API diff_builder_t : private model::diff::apply_controlle
     diff_builder_t &upsert_folder(const db::Folder &data, std::uint64_t index_id = 0) noexcept;
     diff_builder_t &update_peer(const model::device_id_t &device, std::string_view name = "",
                                 std::string_view cert_name = "", bool auto_accept = true) noexcept;
-    diff_builder_t &share_folder(utils::bytes_view_t sha256, std::string_view folder_id) noexcept;
+    diff_builder_t &share_folder(utils::bytes_view_t sha256, std::string_view folder_id,
+                                 utils::bytes_view_t introducer_sha256 = {}) noexcept;
     diff_builder_t &unshare_folder(model::folder_info_t &fi) noexcept;
     diff_builder_t &remote_copy(const model::file_info_t &source) noexcept;
     diff_builder_t &advance(const model::file_info_t &source) noexcept;

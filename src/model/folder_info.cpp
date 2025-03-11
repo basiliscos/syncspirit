@@ -83,6 +83,7 @@ folder_info_t::folder_info_t(const bu::uuid &uuid, const device_ptr_t &device_, 
 void folder_info_t::assign_fields(const db::FolderInfo &fi) noexcept {
     index = db::get_index_id(fi);
     max_sequence = db::get_max_sequence(fi);
+    introducer_device_key = db::get_introducer_device_key(fi);
 }
 
 utils::bytes_view_t folder_info_t::get_key() const noexcept { return utils::bytes_view_t(key, data_length); }
@@ -115,6 +116,7 @@ bool folder_info_t::add_strict(const file_info_ptr_t &file_info) noexcept {
 void folder_info_t::serialize(db::FolderInfo &storage) const noexcept {
     db::set_index_id(storage, index);
     db::set_max_sequence(storage, max_sequence);
+    db::set_introducer_device_key(storage, introducer_device_key);
 }
 
 utils::bytes_t folder_info_t::serialize() const noexcept {
@@ -130,6 +132,12 @@ void folder_info_t::set_index(std::uint64_t value) noexcept {
         file_infos.clear();
     }
 }
+
+bool folder_info_t::is_introduced_by(const model::device_id_t &device) const noexcept {
+    return introducer_device_key == device.get_key();
+}
+
+utils::bytes_view_t folder_info_t::get_introducer_device_key() const noexcept { return introducer_device_key; }
 
 folder_info_ptr_t folder_infos_map_t::by_uuid(utils::bytes_view_t uuid) const noexcept { return get<0>(uuid); }
 

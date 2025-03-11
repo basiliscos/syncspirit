@@ -14,6 +14,8 @@ bool bytes_view_t::operator==(const bytes_view_t &other) const noexcept {
 
 bytes_t::bytes_t(parent_t data) noexcept : parent_t(std::move(data)) {}
 
+bytes_t::bytes_t(bytes_view_t data) noexcept : parent_t(data.begin(), data.end()) {}
+
 bool bytes_t::operator==(const bytes_view_t &other) const noexcept {
     return std::equal(begin(), end(), other.begin(), other.end());
 }
