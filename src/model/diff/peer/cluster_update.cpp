@@ -8,12 +8,13 @@
 #include "model/diff/modify/remove_folder_infos.h"
 #include "model/diff/modify/remove_pending_folders.h"
 #include "model/diff/modify/reset_folder_infos.h"
+#include "model/diff/modify/update_peer.h"
 #include "model/diff/modify/upsert_folder_info.h"
 #include "model/diff/cluster_visitor.h"
 #include "model/cluster.h"
 #include "model/misc/orphaned_blocks.h"
-#include "proto/proto-helpers.h"
-#include "proto/proto-helpers.h"
+#include "proto/proto-helpers-bep.h"
+#include "proto/proto-helpers-db.h"
 #include "utils/format.hpp"
 #include <spdlog/fmt/bin_to_hex.h>
 #include <spdlog/spdlog.h>
@@ -44,11 +45,14 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
     keys_t removed_pending_folders;
     keys_t confirmed_pending_folders;
     keys_view_t confirmed_folders;
+    keys_view_t processed_introduced_devices;
     auto &folders = cluster.get_folders();
     auto &devices = cluster.get_devices();
     auto orphaned_blocks = orphaned_blocks_t{};
     auto folder_update_diff = diff::cluster_diff_ptr_t{};
     auto folder_update = (diff::cluster_diff_t *){nullptr};
+    auto introduced_devices_diff = diff::cluster_diff_ptr_t{};
+    auto introduced_devices = (diff::cluster_diff_t *){nullptr};
 
     auto add_pending = [&](const proto::Folder &f, const proto::Device &d) noexcept {
         using item_t = decltype(new_pending_folders)::value_type;
@@ -69,6 +73,56 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
 
         auto id = utils::bytes_t(sha256.begin(), sha256.end());
         new_pending_folders.push_back(item_t{std::move(db), std::move(id), sequencer.next_uuid()});
+    };
+
+    auto add_upsert_folder_info = [&](modify::upsert_folder_info_t *diff) noexcept {
+        auto ptr = cluster_diff_ptr_t(diff);
+        if (folder_update) {
+            folder_update = folder_update->assign_sibling(ptr.get());
+        } else {
+            folder_update_diff = ptr;
+            folder_update = ptr.get();
+        }
+    };
+
+    auto upsert_folder_info = [&](const model::folder_info_t &fi, std::uint64_t new_index_id) noexcept {
+        add_upsert_folder_info(new modify::upsert_folder_info_t(fi, new_index_id));
+    };
+
+    auto introduce_device = [&](const model::folder_t &folder, const proto::Device &device,
+                                const device_id_t &device_id) noexcept {
+        auto device_name = proto::get_name(device);
+        if (!processed_introduced_devices.count(device_id.get_sha256())) {
+            auto db_peer = db::Device();
+            auto addresses_count = proto::get_addresses_size(device);
+            for (size_t i = 0; i < addresses_count; ++i) {
+                auto address = proto::get_addresses(device, i);
+                db::add_addresses(db_peer, address);
+            }
+            db::set_name(db_peer, device_name);
+            db::set_compression(db_peer, proto::get_compression(device));
+            db::set_introducer(db_peer, proto::get_introducer(device));
+            db::set_skip_introduction_removals(db_peer, proto::get_skip_introduction_removals(device));
+
+            auto ptr_device = cluster_diff_ptr_t();
+            ptr_device = new diff::modify::update_peer_t(db_peer, device_id, cluster);
+
+            if (introduced_devices) {
+                introduced_devices = introduced_devices->assign_sibling(ptr_device.get());
+            } else {
+                introduced_devices_diff = ptr_device;
+                introduced_devices = ptr_device.get();
+            }
+        }
+
+        LOG_DEBUG(log, "cluster_update_t, going to share folder '{}' with introduced device '{}' ({})", folder.get_id(),
+                  device_id, device_name);
+
+        auto index_id = proto::get_index_id(device);
+        auto ptr_fi = cluster_diff_ptr_t();
+        ptr_fi = new diff::modify::upsert_folder_info_t(sequencer.next_uuid(), device_id, source.device_id(),
+                                                        folder.get_id(), index_id);
+        introduced_devices = introduced_devices->assign_sibling(ptr_fi.get());
     };
 
     auto folders_count = proto::get_folders_size(message);
@@ -125,6 +179,12 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
                       index_id, max_sequence);
 
             if (!device) {
+                if (source.is_introducer()) {
+                    if (folder->is_shared_with(source)) {
+                        introduce_device(*folder, d, device_id);
+                        continue;
+                    }
+                }
                 LOG_TRACE(log, "cluster_update_t, unknown device, ignoring");
                 continue;
             }
@@ -155,14 +215,7 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
                           folder->get_label(), folder_info->get_index(), folder_info->get_max_sequence(), max_sequence);
             }
             if (do_update) {
-                auto ptr = cluster_diff_ptr_t{};
-                ptr = new modify::upsert_folder_info_t(*folder_info, index_id);
-                if (folder_update) {
-                    folder_update = folder_update->assign_sibling(ptr.get());
-                } else {
-                    folder_update_diff = ptr;
-                    folder_update = ptr.get();
-                }
+                upsert_folder_info(*folder_info, index_id);
             }
             confirmed_folders.emplace(folder_info->get_key());
         }
@@ -237,6 +290,10 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
         auto diff = cluster_diff_ptr_t{};
         diff = new modify::add_remote_folder_infos_t(source, std::move(remote_folders));
         current = current ? current->assign_sibling(diff.get()) : assign_child(diff);
+    }
+    if (introduced_devices_diff) {
+        auto d = introduced_devices_diff.get();
+        current = current ? current->assign_sibling(d) : assign_child(d);
     }
 }
 

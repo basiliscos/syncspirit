@@ -57,6 +57,7 @@ struct SYNCSPIRIT_TEST_API diff_builder_t : private model::diff::apply_controlle
     cluster_configurer_t configure_cluster(utils::bytes_view_t sha256) noexcept;
     diff_builder_t &apply(r::supervisor_t &sup) noexcept;
     outcome::result<void> apply() noexcept;
+    diff_builder_t &then() noexcept;
     index_maker_t make_index(utils::bytes_view_t sha256, std::string_view folder_id) noexcept;
 
     diff_builder_t &upsert_folder(std::string_view id, std::string_view path, std::string_view label = "",

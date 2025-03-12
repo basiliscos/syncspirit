@@ -762,6 +762,60 @@ TEST_CASE("cluster update with remote folders", "[model]") {
     }
 }
 
+TEST_CASE("device introduction", "[model]") {
+    auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
+    auto my_device = device_t::create(my_id, "my-device").value();
+    auto peer_id_1 =
+        device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
+    auto peer_id_2 =
+        device_id_t::from_string("EAMTZPW-Q4QYERN-D57DHFS-AUP2OMG-PAHOR3R-ZWLKGAA-WQC5SVW-UJ5NXQA").value();
+
+    auto peer_device_1 = device_t::create(peer_id_1, "peer-device").value();
+    auto db_peer_1 = db::Device();
+    peer_device_1->serialize(db_peer_1);
+    db::set_introducer(db_peer_1, true);
+    peer_device_1->update(db_peer_1);
+
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
+    auto sequencer = model::make_sequencer(5);
+    auto &devices = cluster->get_devices();
+    devices.put(my_device);
+    devices.put(peer_device_1);
+
+    auto builder = diff_builder_t(*cluster);
+    auto folder_1_id = "1234";
+    auto folder_2_id = "5678";
+
+    auto sha256_1 = peer_id_1.get_sha256();
+    auto sha256_2 = peer_id_2.get_sha256();
+
+    auto r = builder.upsert_folder(folder_1_id, "/my/path-1")
+                 .upsert_folder(folder_2_id, "/my/path-2")
+                 .then()
+                 .share_folder(sha256_1, folder_1_id, {})
+                 .share_folder(sha256_1, folder_2_id, {})
+                 .apply();
+    REQUIRE(r);
+
+    r = builder.configure_cluster(sha256_1)
+            .add(sha256_1, folder_1_id, 5, 4)
+            .add(sha256_2, folder_1_id, 55, 444)
+            .add(sha256_1, folder_2_id, 6, 4)
+            .add(sha256_2, folder_2_id, 66, 444)
+            .finish()
+            .apply();
+    REQUIRE(r);
+
+    REQUIRE(devices.size() == 3);
+
+    auto peer_device_2 = devices.by_sha256(peer_id_2.get_sha256());
+    REQUIRE(peer_device_2);
+    auto folder_1 = cluster->get_folders().by_id(folder_1_id);
+    auto folder_2 = cluster->get_folders().by_id(folder_2_id);
+    REQUIRE(folder_1->is_shared_with(*peer_device_2));
+    REQUIRE(folder_2->is_shared_with(*peer_device_2));
+}
+
 int _init() {
     test::init_logging();
     return 1;

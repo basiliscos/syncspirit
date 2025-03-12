@@ -131,6 +131,15 @@ auto diff_builder_t::apply() noexcept -> outcome::result<void> {
     return r;
 }
 
+diff_builder_t &diff_builder_t::then() noexcept {
+    auto r = apply();
+    if (!r) {
+        spdlog::critical("diff application failure: {}", r.error().message());
+        std::abort();
+    }
+    return *this;
+}
+
 diff_builder_t &diff_builder_t::upsert_folder(std::string_view id, std::string_view path, std::string_view label,
                                               std::uint64_t index_id) noexcept {
     db::Folder db_folder;
