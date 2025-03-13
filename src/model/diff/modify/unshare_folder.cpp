@@ -20,8 +20,8 @@ unshare_folder_t::unshare_folder_t(const model::cluster_t &, model::folder_info_
     auto local_orphaned_blocks = orphaned_blocks_t();
     auto &orphaned_blocks = orphaned_blocks_ ? *orphaned_blocks_ : local_orphaned_blocks;
 
-    auto remove_folders_map = model::folder_infos_map_t{};
-    remove_folders_map.put(&folder_info);
+    auto remove_folders_map = uuid_folder_infos_map_t();
+    remove_folders_map.emplace(folder_info.get_uuid(), &folder_info);
     auto current = assign_child(new remove_folder_infos_t(std::move(remove_folders_map), &orphaned_blocks));
 
     if (!orphaned_blocks_) {

@@ -814,6 +814,44 @@ TEST_CASE("device introduction", "[model]") {
     auto folder_2 = cluster->get_folders().by_id(folder_2_id);
     REQUIRE(folder_1->is_shared_with(*peer_device_2));
     REQUIRE(folder_2->is_shared_with(*peer_device_2));
+
+    SECTION("de-introduce 1 folder") {
+        r = builder.configure_cluster(sha256_1)
+                .add(sha256_1, folder_1_id, 5, 4)
+                .add(sha256_2, folder_1_id, 55, 444)
+                .add(sha256_1, folder_2_id, 6, 4)
+                .finish()
+                .apply();
+        REQUIRE(r);
+        CHECK(devices.size() == 3);
+        CHECK(folder_1->is_shared_with(*peer_device_2));
+        CHECK(!folder_2->is_shared_with(*peer_device_2));
+    }
+    SECTION("de-introduce all folders => de-introduce device") {
+        r = builder.configure_cluster(sha256_1)
+                .add(sha256_1, folder_1_id, 5, 4)
+                .add(sha256_1, folder_2_id, 6, 4)
+                .finish()
+                .apply();
+        REQUIRE(r);
+        CHECK(devices.size() == 2);
+        CHECK(!folder_1->is_shared_with(*peer_device_2));
+        CHECK(!folder_2->is_shared_with(*peer_device_2));
+    }
+    SECTION("don't de-introduce folders/devices if skip_introduction_removals") {
+        db::set_skip_introduction_removals(db_peer_1, true);
+        peer_device_1->update(db_peer_1);
+
+        r = builder.configure_cluster(sha256_1)
+                .add(sha256_1, folder_1_id, 5, 4)
+                .add(sha256_1, folder_2_id, 6, 4)
+                .finish()
+                .apply();
+        REQUIRE(r);
+        CHECK(devices.size() == 3);
+        CHECK(folder_1->is_shared_with(*peer_device_2));
+        CHECK(folder_2->is_shared_with(*peer_device_2));
+    }
 }
 
 int _init() {

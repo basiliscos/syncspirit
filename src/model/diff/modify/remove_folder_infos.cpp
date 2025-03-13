@@ -10,10 +10,10 @@
 
 using namespace syncspirit::model::diff::modify;
 
-remove_folder_infos_t::remove_folder_infos_t(const folder_infos_map_t &map, orphaned_blocks_t *orphaned_blocks_) {
+remove_folder_infos_t::remove_folder_infos_t(const uuid_folder_infos_map_t &map, orphaned_blocks_t *orphaned_blocks_) {
     auto keys = unique_keys_t();
     for (auto &it : map) {
-        auto &folder_info = *it.item;
+        auto &folder_info = *it.second;
         auto key = folder_info.get_key();
         keys.emplace(utils::bytes_t(key.data(), key.data() + key.size()));
     }

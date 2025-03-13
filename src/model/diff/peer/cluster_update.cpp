@@ -6,6 +6,7 @@
 #include "model/diff/modify/add_pending_folders.h"
 #include "model/diff/modify/remove_blocks.h"
 #include "model/diff/modify/remove_folder_infos.h"
+#include "model/diff/modify/remove_peer.h"
 #include "model/diff/modify/remove_pending_folders.h"
 #include "model/diff/modify/reset_folder_infos.h"
 #include "model/diff/modify/update_peer.h"
@@ -39,13 +40,14 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
     auto &known_pending_folders = cluster.get_pending_folders();
     auto new_pending_folders = diff::modify::add_pending_folders_t::container_t{};
     auto remote_folders = diff::modify::add_remote_folder_infos_t::container_t{};
-    folder_infos_map_t reset_folders;
-    folder_infos_map_t removed_folders;
+    uuid_folder_infos_map_t reset_folders;
+    uuid_folder_infos_map_t removed_folders;
     folder_infos_map_t reshared_folders;
     keys_t removed_pending_folders;
     keys_t confirmed_pending_folders;
     keys_view_t confirmed_folders;
     keys_view_t processed_introduced_devices;
+    keys_view_t seen_devices;
     auto &folders = cluster.get_folders();
     auto &devices = cluster.get_devices();
     auto orphaned_blocks = orphaned_blocks_t{};
@@ -92,7 +94,10 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
     auto introduce_device = [&](const model::folder_t &folder, const proto::Device &device,
                                 const device_id_t &device_id) noexcept {
         auto device_name = proto::get_name(device);
-        if (!processed_introduced_devices.count(device_id.get_sha256())) {
+        auto sha256 = device_id.get_sha256();
+        if (!processed_introduced_devices.count(sha256)) {
+            processed_introduced_devices.emplace(sha256);
+            seen_devices.emplace(sha256);
             auto db_peer = db::Device();
             auto addresses_count = proto::get_addresses_size(device);
             for (size_t i = 0; i < addresses_count; ++i) {
@@ -188,7 +193,8 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
                 LOG_TRACE(log, "cluster_update_t, unknown device, ignoring");
                 continue;
             }
-            if (*device != source) {
+            seen_devices.emplace(device_sha);
+            if (device.get() == cluster.get_device()) {
                 remote_folders.emplace_back(std::string(folder_id), index_id, max_sequence);
                 LOG_TRACE(log, "cluster_update_t, remote folder = {}, device = {}, max seq. = {}", folder_label,
                           device_id.get_short(), max_sequence);
@@ -209,7 +215,7 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
                 do_update = true;
                 LOG_TRACE(log, "cluster_update_t, reseting folder: {}, new index = {:#x}, max_seq = {}", folder_label,
                           index_id, max_sequence);
-                reset_folders.put(folder_info);
+                reset_folders.emplace(folder_info->get_uuid(), folder_info.get());
             } else if (max_sequence > folder_info->get_max_sequence()) {
                 LOG_TRACE(log, "cluster_update_t, updating folder = {}, index = {:#x}, max seq = {} -> {}",
                           folder->get_label(), folder_info->get_index(), folder_info->get_max_sequence(), max_sequence);
@@ -241,8 +247,32 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
         auto folder_info = folder->get_folder_infos().by_device(source);
         if (folder_info) {
             if (!confirmed_folders.contains(folder_info->get_key())) {
-                removed_folders.put(folder_info);
+                removed_folders.emplace(folder_info->get_uuid(), folder_info.get());
                 reshared_folders.put(folder_info);
+            }
+        }
+    }
+
+    keys_view_t removed_introduced_devices;
+    if (!source.get_skip_introduction_removals()) {
+        for (auto fit : cluster.get_folders()) {
+            auto &folder_infos = fit.item->get_folder_infos();
+            for (auto it : folder_infos) {
+                auto &fi = *it.item;
+                auto &i_device = fi.get_device()->device_id();
+                if (fi.is_introduced_by(source.device_id())) {
+                    auto remove_fi = !confirmed_folders.count(fi.get_key()) && !removed_folders.count(fi.get_uuid());
+                    if (remove_fi) {
+                        auto sha256 = i_device.get_sha256();
+                        if (!seen_devices.count(sha256)) {
+                            removed_introduced_devices.emplace(sha256);
+                        } else {
+                            removed_folders.emplace(fi.get_uuid(), &fi);
+                            LOG_TRACE(log, "unsharing folder '{}' with introduced device '{}'",
+                                      fi.get_folder()->get_id(), i_device);
+                        }
+                    }
+                }
             }
         }
     }
@@ -256,6 +286,15 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
     if (folder_update_diff) { // must be applied after folders reset
         auto &diff = folder_update_diff;
         current = current ? current->assign_sibling(diff.get()) : assign_child(diff);
+    }
+    if (!removed_introduced_devices.empty()) {
+        for (auto sha256 : removed_introduced_devices) {
+            auto peer = devices.by_sha256(sha256);
+            auto diff = cluster_diff_ptr_t{};
+            diff = new modify::remove_peer_t(cluster, *peer);
+            current = current ? current->assign_sibling(diff.get()) : assign_child(diff);
+            LOG_TRACE(log, "removing introduced device '{}'", peer->device_id());
+        }
     }
     if (removed_folders.size()) {
         auto diff = cluster_diff_ptr_t{};

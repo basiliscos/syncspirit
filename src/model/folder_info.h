@@ -99,4 +99,6 @@ struct SYNCSPIRIT_API folder_infos_map_t : public generic_map_t<folder_info_ptr_
     folder_info_ptr_t by_device_key(utils::bytes_view_t device_id) const noexcept;
 };
 
+using uuid_folder_infos_map_t = std::unordered_map<utils::bytes_view_t, folder_info_t *>;
+
 }; // namespace syncspirit::model

@@ -75,6 +75,7 @@ std::optional<proto::Folder> folder_t::generate(const model::device_t &device) c
     for (auto &it : folder_infos) {
         auto &fi = *it.item;
         auto &d = *fi.get_device();
+        auto introducer = d.is_introducer();
         auto &pd = proto::add_devices(r);
         proto::set_id(pd, d.device_id().get_sha256());
         proto::set_name(pd, d.get_name());
@@ -85,10 +86,11 @@ std::optional<proto::Folder> folder_t::generate(const model::device_t &device) c
         std::int64_t max_seq = fi.get_max_sequence();
         proto::set_max_sequence(pd, max_seq);
         proto::set_index_id(pd, fi.get_index());
-        proto::set_introducer(pd, d.is_introducer());
+        proto::set_introducer(pd, introducer);
         proto::set_skip_introduction_removals(pd, d.get_skip_introduction_removals());
-        spdlog::trace("folder_t::generate (==>), folder = {} (index = 0x{:x}), device = {}, max_seq = {}", label,
-                      fi.get_index(), d.device_id(), max_seq);
+        spdlog::trace(
+            "folder_t::generate (==>), folder = {} (index = 0x{:x}), device = {} (introducer: {}), max_seq = {}", label,
+            fi.get_index(), d.device_id(), introducer, max_seq);
     }
     return r;
 }
