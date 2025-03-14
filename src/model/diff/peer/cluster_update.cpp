@@ -99,6 +99,22 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
         add_upsert_folder_info(new modify::upsert_folder_info_t(fi, new_index_id));
     };
 
+    auto upsert_folder = [&](const model::folder_t &folder, const proto::Device &device, const device_id_t &device_id) {
+        LOG_DEBUG(log, "cluster_update_t, going to share folder '{}' with introduced device '{}'", folder.get_id(),
+                  device_id);
+        auto index_id = proto::get_index_id(device);
+        auto ptr = cluster_diff_ptr_t();
+        ptr = new diff::modify::upsert_folder_info_t(sequencer.next_uuid(), device_id, source.device_id(),
+                                                     folder.get_id(), index_id);
+
+        if (introduced_devices) {
+            introduced_devices = introduced_devices->assign_sibling(ptr.get());
+        } else {
+            introduced_devices_diff = ptr;
+            introduced_devices = ptr.get();
+        }
+    };
+
     auto introduce_device = [&](const model::folder_t &folder, const proto::Device &device,
                                 const device_id_t &device_id) noexcept -> bool {
         auto device_name = proto::get_name(device);
@@ -124,25 +140,18 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
             db::set_introducer(db_peer, proto::get_introducer(device));
             db::set_skip_introduction_removals(db_peer, proto::get_skip_introduction_removals(device));
 
-            auto ptr_device = cluster_diff_ptr_t();
-            ptr_device = new diff::modify::update_peer_t(db_peer, device_id, cluster);
+            auto ptr = cluster_diff_ptr_t();
+            ptr = new diff::modify::update_peer_t(db_peer, device_id, cluster);
 
             if (introduced_devices) {
-                introduced_devices = introduced_devices->assign_sibling(ptr_device.get());
+                introduced_devices = introduced_devices->assign_sibling(ptr.get());
             } else {
-                introduced_devices_diff = ptr_device;
-                introduced_devices = ptr_device.get();
+                introduced_devices_diff = ptr;
+                introduced_devices = ptr.get();
             }
         }
 
-        LOG_DEBUG(log, "cluster_update_t, going to share folder '{}' with introduced device '{}' ({})", folder.get_id(),
-                  device_id, device_name);
-
-        auto index_id = proto::get_index_id(device);
-        auto ptr_fi = cluster_diff_ptr_t();
-        ptr_fi = new diff::modify::upsert_folder_info_t(sequencer.next_uuid(), device_id, source.device_id(),
-                                                        folder.get_id(), index_id);
-        introduced_devices = introduced_devices->assign_sibling(ptr_fi.get());
+        upsert_folder(folder, device, device_id);
         return true;
     };
 
@@ -222,9 +231,13 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
             auto &folder_infos = folder->get_folder_infos();
             auto folder_info = folder_infos.by_device(*device);
             if (!folder_info) {
-                LOG_TRACE(log, "cluster_update_t, adding pending folder {} non-shared with {}", folder_label,
-                          device->device_id());
-                add_pending(f, d);
+                if (device_sha == source.device_id().get_sha256()) {
+                    LOG_TRACE(log, "cluster_update_t, adding pending folder {} non-shared with {}", folder_label,
+                              device->device_id());
+                    add_pending(f, d);
+                } else if (source.is_introducer()) {
+                    upsert_folder(*folder, d, device_id);
+                }
                 continue;
             }
 

@@ -786,19 +786,22 @@ TEST_CASE("device introduction", "[model]") {
     auto builder = diff_builder_t(*cluster);
     auto folder_1_id = "1234";
     auto folder_2_id = "5678";
+    auto folder_3_id = "abcd";
 
     auto sha256_1 = peer_id_1.get_sha256();
     auto sha256_2 = peer_id_2.get_sha256();
 
     auto r = builder.upsert_folder(folder_1_id, "/my/path-1")
                  .upsert_folder(folder_2_id, "/my/path-2")
+                 .upsert_folder(folder_3_id, "/my/path-3")
                  .then()
                  .share_folder(sha256_1, folder_1_id, {})
                  .share_folder(sha256_1, folder_2_id, {})
+                 .share_folder(sha256_1, folder_3_id, {})
                  .apply();
     REQUIRE(r);
 
-    SECTION("emtpy introduced device address") {
+    SECTION("non-emtpy introduced device address") {
         SECTION("dynamic address") {
             r = builder.configure_cluster(sha256_1)
                     .add(sha256_1, folder_1_id, 5, 4)
@@ -832,9 +835,27 @@ TEST_CASE("device introduction", "[model]") {
         REQUIRE(peer_device_2);
         auto folder_1 = cluster->get_folders().by_id(folder_1_id);
         auto folder_2 = cluster->get_folders().by_id(folder_2_id);
+        auto folder_3 = cluster->get_folders().by_id(folder_3_id);
         REQUIRE(folder_1->is_shared_with(*peer_device_2));
         REQUIRE(folder_2->is_shared_with(*peer_device_2));
+        REQUIRE(!folder_3->is_shared_with(*peer_device_2));
 
+        SECTION("introduce 3rd folder") {
+            r = builder.configure_cluster(sha256_1)
+                    .add(sha256_1, folder_1_id, 5, 4)
+                    .add(sha256_2, folder_1_id, 55, 444)
+                    .add(sha256_1, folder_2_id, 6, 4)
+                    .add(sha256_2, folder_2_id, 66, 444)
+                    .add(sha256_1, folder_3_id, 7, 4)
+                    .add(sha256_2, folder_3_id, 77, 444)
+                    .finish()
+                    .apply();
+            REQUIRE(r);
+            CHECK(devices.size() == 3);
+            CHECK(folder_1->is_shared_with(*peer_device_2));
+            CHECK(folder_2->is_shared_with(*peer_device_2));
+            CHECK(folder_3->is_shared_with(*peer_device_2));
+        }
         SECTION("de-introduce 1 folder") {
             r = builder.configure_cluster(sha256_1)
                     .add(sha256_1, folder_1_id, 5, 4)
