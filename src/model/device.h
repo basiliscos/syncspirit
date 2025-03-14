@@ -70,7 +70,7 @@ struct SYNCSPIRIT_API device_t : augmentable_t<device_t> {
     void assign_uris(const uris_t &uris) noexcept;
 
     std::string_view get_connection_id() noexcept;
-    void update(const db::Device &source) noexcept;
+    outcome::result<void> update(const db::Device &source) noexcept;
 
     inline size_t get_rx_bytes() const noexcept { return rx_bytes; }
     inline void set_rx_bytes(size_t value) noexcept { rx_bytes = value; }
@@ -83,7 +83,7 @@ struct SYNCSPIRIT_API device_t : augmentable_t<device_t> {
 
   protected:
     device_t(const device_id_t &device_id, std::string_view name, std::string_view cert_name) noexcept;
-    template <typename T> void assign(const T &item) noexcept;
+    template <typename T> outcome::result<void> assign(const T &item) noexcept;
 
     device_id_t id;
     std::string name;

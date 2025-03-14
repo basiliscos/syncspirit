@@ -2,19 +2,19 @@
 // SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "device.h"
-#include "proto/proto-helpers.h"
-#include "proto/proto-helpers.h"
+#include "proto/proto-helpers-db.h"
 #include "db/prefix.h"
 #include "misc/error_code.h"
-#include "utils/time.h"
 #include "misc/file_iterator.h"
+#include "utils/time.h"
+#include "utils/error_code.h"
 #include <cassert>
 
 namespace syncspirit::model {
 
 static const constexpr char prefix = (char)(db::prefix::device);
 
-template <> void device_t::assign(const db::Device &d) noexcept {
+template <> auto device_t::assign(const db::Device &d) noexcept -> outcome::result<void> {
     name = db::get_name(d);
     compression = db::get_compression(d);
     cert_name = db::get_cert_name(d);
@@ -30,10 +30,14 @@ template <> void device_t::assign(const db::Device &d) noexcept {
     auto addresses_count = db::get_addresses_size(d);
     for (size_t i = 0; i < addresses_count; ++i) {
         auto uri = utils::parse(db::get_addresses(d, i));
+        if (!uri) {
+            return make_error_code(utils::error_code_t::malformed_url);
+        }
         assert(uri);
         uris.emplace_back(uri);
     }
     set_static_uris(std::move(uris));
+    return outcome::success();
 }
 
 outcome::result<device_ptr_t> device_t::create(utils::bytes_view_t key, const db::Device &data) noexcept {
@@ -49,7 +53,10 @@ outcome::result<device_ptr_t> device_t::create(utils::bytes_view_t key, const db
     auto name = db::get_name(data);
     auto cert_name = db::get_cert_name(data);
     auto ptr = device_ptr_t(new device_t(id.value(), name, cert_name));
-    ptr->assign(data);
+    auto ec = ptr->assign(data);
+    if (!ec) {
+        return ec.error();
+    }
     return outcome::success(std::move(ptr));
 }
 
@@ -66,7 +73,7 @@ device_t::device_t(const device_id_t &device_id_, std::string_view name_, std::s
 
 device_t::~device_t() {}
 
-void device_t::update(const db::Device &source) noexcept { assign(source); }
+auto device_t::update(const db::Device &source) noexcept -> outcome::result<void> { return assign(source); }
 
 auto device_t::serialize(db::Device &r) const noexcept -> utils::bytes_t {
     db::set_name(r, name);

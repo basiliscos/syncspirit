@@ -44,8 +44,7 @@ SYNCSPIRIT_API outcome::result<void> make_mapping_request(utils::bytes_t &buff, 
 SYNCSPIRIT_API outcome::result<void> make_unmapping_request(utils::bytes_t &buff, const utils::uri_ptr_t &uri,
                                                             std::uint16_t external_port) noexcept;
 
-SYNCSPIRIT_API outcome::result<void> make_mapping_validation_request(utils::bytes_t &buff,
-                                                                     const utils::uri_ptr_t &uri,
+SYNCSPIRIT_API outcome::result<void> make_mapping_validation_request(utils::bytes_t &buff, const utils::uri_ptr_t &uri,
                                                                      std::uint16_t external_port) noexcept;
 
 SYNCSPIRIT_API outcome::result<bool> parse_mapping(const char *data, std::size_t bytes) noexcept;

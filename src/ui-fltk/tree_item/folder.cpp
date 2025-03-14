@@ -139,22 +139,22 @@ struct table_t : content::folder_table_t {
         data.push_back({"", make_title(*this, "edit existing folder")});
         data.push_back({"path", make_path(*this, true)});
         data.push_back({"id", make_id(*this, true)});
-        data.push_back({"label", make_label(*this)});
-        data.push_back({"type", make_folder_type(*this)});
-        data.push_back({"pull order", make_pull_order(*this)});
+        data.push_back({"label", make_label(*this, false)});
+        data.push_back({"type", make_folder_type(*this, false)});
+        data.push_back({"pull order", make_pull_order(*this, false)});
         data.push_back({"entries", entries_cell});
         data.push_back({"entries size", entries_size_cell});
         data.push_back({"max sequence", max_sequence_cell});
         data.push_back({"index", make_index(*this, true)});
         data.push_back({"scan start", scan_start_cell});
         data.push_back({"scan finish", scan_finish_cell});
-        data.push_back({"read only", make_read_only(*this)});
-        data.push_back({"rescan interval", make_rescan_interval(*this)});
-        data.push_back({"ignore permissions", make_ignore_permissions(*this)});
-        data.push_back({"ignore delete", make_ignore_delete(*this)});
-        data.push_back({"disable temp indixes", make_disable_tmp(*this)});
-        data.push_back({"scheduled", make_scheduled(*this)});
-        data.push_back({"paused", make_paused(*this)});
+        data.push_back({"read only", make_read_only(*this, false)});
+        data.push_back({"rescan interval", make_rescan_interval(*this, false)});
+        data.push_back({"ignore permissions", make_ignore_permissions(*this, false)});
+        data.push_back({"ignore delete", make_ignore_delete(*this, false)});
+        data.push_back({"disable temp indixes", make_disable_tmp(*this, false)});
+        data.push_back({"scheduled", make_scheduled(*this, false)});
+        data.push_back({"paused", make_paused(*this, false)});
 
         int shared_count = 0;
         for (auto it : *shared_with) {

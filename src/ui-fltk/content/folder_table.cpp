@@ -5,6 +5,7 @@
 
 #include "model/diff/modify/remove_folder.h"
 #include "model/diff/modify/remove_blocks.h"
+#include "model/diff/modify/share_folder.h"
 #include "model/diff/modify/suspend_folder.h"
 #include "model/diff/modify/unshare_folder.h"
 #include "model/diff/modify/upsert_folder.h"
@@ -16,6 +17,8 @@
 #include "../table_widget/int_input.h"
 #include "../table_widget/label.h"
 #include "../table_widget/path.h"
+
+#include "utils/format.hpp"
 
 #include <FL/fl_ask.H>
 #include <boost/nowide/convert.hpp>
@@ -238,15 +241,18 @@ auto folder_table_t::make_id(folder_table_t &container, bool disabled) -> widget
     return new widget_t(container, disabled);
 }
 
-auto folder_table_t::make_label(folder_table_t &container) -> widgetable_ptr_t {
+auto folder_table_t::make_label(folder_table_t &container, bool disabled) -> widgetable_ptr_t {
     struct widget_t final : table_widget::input_t {
         using parent_t = table_widget::input_t;
-        using parent_t::parent_t;
+        widget_t(Fl_Widget &container, bool disabled_) : parent_t{container}, disabled{disabled_} {}
 
         Fl_Widget *create_widget(int x, int y, int w, int h) override {
             auto r = parent_t::create_widget(x, y, w, h);
             input->callback([](auto, void *data) { reinterpret_cast<folder_table_t *>(data)->refresh(); }, &container);
             input->when(input->when() | FL_WHEN_CHANGED);
+            if (disabled) {
+                widget->deactivate();
+            }
             return r;
         }
 
@@ -268,14 +274,16 @@ auto folder_table_t::make_label(folder_table_t &container) -> widgetable_ptr_t {
             db::set_label(ctx->folder, label);
             return true;
         }
+
+        bool disabled;
     };
-    return new widget_t(container);
+    return new widget_t(container, disabled);
 }
 
-auto folder_table_t::make_folder_type(folder_table_t &container) -> widgetable_ptr_t {
+auto folder_table_t::make_folder_type(folder_table_t &container, bool disabled) -> widgetable_ptr_t {
     struct widget_t final : table_widget::choice_t {
         using parent_t = table_widget::choice_t;
-        using parent_t::parent_t;
+        widget_t(Fl_Widget &container, bool disabled_) : parent_t{container}, disabled{disabled_} {}
 
         Fl_Widget *create_widget(int x, int y, int w, int h) override {
             auto r = parent_t::create_widget(x, y, w, h);
@@ -285,6 +293,9 @@ auto folder_table_t::make_folder_type(folder_table_t &container) -> widgetable_p
             input->add("Send and Receive");
             input->add("Send only");
             input->add("Receive only");
+            if (disabled) {
+                widget->deactivate();
+            }
             return r;
         }
 
@@ -301,14 +312,15 @@ auto folder_table_t::make_folder_type(folder_table_t &container) -> widgetable_p
             db::set_folder_type(ctx->folder, value);
             return true;
         }
+        bool disabled;
     };
-    return new widget_t(container);
+    return new widget_t(container, disabled);
 }
 
-auto folder_table_t::make_pull_order(folder_table_t &container) -> widgetable_ptr_t {
+auto folder_table_t::make_pull_order(folder_table_t &container, bool disabled) -> widgetable_ptr_t {
     struct widget_t final : table_widget::choice_t {
         using parent_t = table_widget::choice_t;
-        using parent_t::parent_t;
+        widget_t(Fl_Widget &container, bool disabled_) : parent_t{container}, disabled{disabled_} {}
 
         Fl_Widget *create_widget(int x, int y, int w, int h) override {
             auto r = parent_t::create_widget(x, y, w, h);
@@ -321,6 +333,9 @@ auto folder_table_t::make_pull_order(folder_table_t &container) -> widgetable_pt
             input->add("largest first");
             input->add("oldest first");
             input->add("newest first");
+            if (disabled) {
+                widget->deactivate();
+            }
             return r;
         }
 
@@ -337,8 +352,9 @@ auto folder_table_t::make_pull_order(folder_table_t &container) -> widgetable_pt
             db::set_pull_order(ctx->folder, value);
             return true;
         }
+        bool disabled;
     };
-    return new widget_t(container);
+    return new widget_t(container, disabled);
 }
 
 auto folder_table_t::make_index(folder_table_t &container, bool disabled) -> widgetable_ptr_t {
@@ -386,34 +402,44 @@ auto folder_table_t::make_index(folder_table_t &container, bool disabled) -> wid
     return new widget_t(container, disabled);
 }
 
-auto folder_table_t::make_read_only(folder_table_t &container) -> widgetable_ptr_t {
+auto folder_table_t::make_read_only(folder_table_t &container, bool disabled) -> widgetable_ptr_t {
     struct widget_t final : checkbox_widget_t {
         using parent_t = checkbox_widget_t;
-        using parent_t::parent_t;
+        widget_t(Fl_Widget &container, bool disabled_) : parent_t{container}, disabled{disabled_} {}
 
+        Fl_Widget *create_widget(int x, int y, int w, int h) override {
+            auto r = parent_t::create_widget(x, y, w, h);
+            if (disabled) {
+                widget->deactivate();
+            }
+            return r;
+        }
         void reset() override {
             auto &container = static_cast<folder_table_t &>(this->container);
             input->value(container.description.get_folder()->is_read_only());
         }
-
         bool store(void *data) override {
             auto ctx = reinterpret_cast<ctx_t *>(data);
             db::set_read_only(ctx->folder, input->value());
             return true;
         }
+        bool disabled;
     };
-    return new widget_t(container);
+    return new widget_t(container, disabled);
 }
 
-auto folder_table_t::make_rescan_interval(folder_table_t &container) -> widgetable_ptr_t {
+auto folder_table_t::make_rescan_interval(folder_table_t &container, bool disabled) -> widgetable_ptr_t {
     struct widget_t final : table_widget::int_input_t {
         using parent_t = table_widget::int_input_t;
-        using parent_t::parent_t;
+        widget_t(Fl_Widget &container, bool disabled_) : parent_t{container}, disabled{disabled_} {}
 
         Fl_Widget *create_widget(int x, int y, int w, int h) override {
             auto r = parent_t::create_widget(x, y, w, h);
             input->callback([](auto, void *data) { reinterpret_cast<folder_table_t *>(data)->refresh(); }, &container);
             input->when(input->when() | FL_WHEN_CHANGED);
+            if (disabled) {
+                widget->deactivate();
+            }
             return r;
         }
 
@@ -439,15 +465,23 @@ auto folder_table_t::make_rescan_interval(folder_table_t &container) -> widgetab
             db::set_rescan_interval(ctx->folder, ri);
             return true;
         }
+        bool disabled;
     };
-    return new widget_t(container);
+    return new widget_t(container, disabled);
 }
 
-auto folder_table_t::make_ignore_permissions(folder_table_t &container) -> widgetable_ptr_t {
+auto folder_table_t::make_ignore_permissions(folder_table_t &container, bool disabled) -> widgetable_ptr_t {
     struct widget_t final : checkbox_widget_t {
         using parent_t = checkbox_widget_t;
-        using parent_t::parent_t;
+        widget_t(Fl_Widget &container, bool disabled_) : parent_t{container}, disabled{disabled_} {}
 
+        Fl_Widget *create_widget(int x, int y, int w, int h) override {
+            auto r = parent_t::create_widget(x, y, w, h);
+            if (disabled) {
+                widget->deactivate();
+            }
+            return r;
+        }
         void reset() override {
             auto &container = static_cast<folder_table_t &>(this->container);
             input->value(container.description.get_folder()->are_permissions_ignored());
@@ -457,15 +491,23 @@ auto folder_table_t::make_ignore_permissions(folder_table_t &container) -> widge
             auto ctx = reinterpret_cast<ctx_t *>(data);
             return true;
         }
+        bool disabled;
     };
-    return new widget_t(container);
+    return new widget_t(container, disabled);
 }
 
-auto folder_table_t::make_ignore_delete(folder_table_t &container) -> widgetable_ptr_t {
+auto folder_table_t::make_ignore_delete(folder_table_t &container, bool disabled) -> widgetable_ptr_t {
     struct widget_t final : checkbox_widget_t {
         using parent_t = checkbox_widget_t;
-        using parent_t::parent_t;
+        widget_t(Fl_Widget &container, bool disabled_) : parent_t{container}, disabled{disabled_} {}
 
+        Fl_Widget *create_widget(int x, int y, int w, int h) override {
+            auto r = parent_t::create_widget(x, y, w, h);
+            if (disabled) {
+                widget->deactivate();
+            }
+            return r;
+        }
         void reset() override {
             auto &container = static_cast<folder_table_t &>(this->container);
             input->value(container.description.get_folder()->is_deletion_ignored());
@@ -475,15 +517,23 @@ auto folder_table_t::make_ignore_delete(folder_table_t &container) -> widgetable
             db::set_ignore_delete(ctx->folder, input->value());
             return true;
         }
+        bool disabled;
     };
-    return new widget_t(container);
+    return new widget_t(container, disabled);
 }
 
-auto folder_table_t::make_disable_tmp(folder_table_t &container) -> widgetable_ptr_t {
+auto folder_table_t::make_disable_tmp(folder_table_t &container, bool disabled) -> widgetable_ptr_t {
     struct widget_t final : checkbox_widget_t {
         using parent_t = checkbox_widget_t;
-        using parent_t::parent_t;
+        widget_t(Fl_Widget &container, bool disabled_) : parent_t{container}, disabled{disabled_} {}
 
+        Fl_Widget *create_widget(int x, int y, int w, int h) override {
+            auto r = parent_t::create_widget(x, y, w, h);
+            if (disabled) {
+                widget->deactivate();
+            }
+            return r;
+        }
         void reset() override {
             auto &container = static_cast<folder_table_t &>(this->container);
             input->value(container.description.get_folder()->are_temp_indixes_disabled());
@@ -493,15 +543,23 @@ auto folder_table_t::make_disable_tmp(folder_table_t &container) -> widgetable_p
             db::set_disable_temp_indexes(ctx->folder, input->value());
             return true;
         }
+        bool disabled;
     };
-    return new widget_t(container);
+    return new widget_t(container, disabled);
 }
 
-auto folder_table_t::make_paused(folder_table_t &container) -> widgetable_ptr_t {
+auto folder_table_t::make_paused(folder_table_t &container, bool disabled) -> widgetable_ptr_t {
     struct widget_t final : checkbox_widget_t {
         using parent_t = checkbox_widget_t;
-        using parent_t::parent_t;
+        widget_t(Fl_Widget &container, bool disabled_) : parent_t{container}, disabled{disabled_} {}
 
+        Fl_Widget *create_widget(int x, int y, int w, int h) override {
+            auto r = parent_t::create_widget(x, y, w, h);
+            if (disabled) {
+                widget->deactivate();
+            }
+            return r;
+        }
         void reset() override {
             auto &container = static_cast<folder_table_t &>(this->container);
             input->value(container.description.get_folder()->is_paused());
@@ -511,15 +569,23 @@ auto folder_table_t::make_paused(folder_table_t &container) -> widgetable_ptr_t 
             db::set_paused(ctx->folder, input->value());
             return true;
         }
+        bool disabled;
     };
-    return new widget_t(container);
+    return new widget_t(container, disabled);
 }
 
-auto folder_table_t::make_scheduled(folder_table_t &container) -> widgetable_ptr_t {
+auto folder_table_t::make_scheduled(folder_table_t &container, bool disabled) -> widgetable_ptr_t {
     struct widget_t final : checkbox_widget_t {
         using parent_t = checkbox_widget_t;
-        using parent_t::parent_t;
+        widget_t(Fl_Widget &container, bool disabled_) : parent_t{container}, disabled{disabled_} {}
 
+        Fl_Widget *create_widget(int x, int y, int w, int h) override {
+            auto r = parent_t::create_widget(x, y, w, h);
+            if (disabled) {
+                widget->deactivate();
+            }
+            return r;
+        }
         void reset() override {
             auto &container = static_cast<folder_table_t &>(this->container);
             input->value(container.description.get_folder()->is_scheduled());
@@ -529,8 +595,9 @@ auto folder_table_t::make_scheduled(folder_table_t &container) -> widgetable_ptr
             db::set_scheduled(ctx->folder, input->value());
             return true;
         }
+        bool disabled;
     };
-    return new widget_t(container);
+    return new widget_t(container, disabled);
 }
 
 auto folder_table_t::make_shared_with(folder_table_t &container, model::device_ptr_t device, bool disabled)
@@ -645,20 +712,39 @@ void folder_table_t::on_share() {
 
     auto &folder = ctx.folder;
     auto &sup = container.supervisor;
+    auto cluster = sup.get_cluster();
     auto log = sup.get_logger();
     auto &peer = ctx.shared_with.begin()->item;
     auto label = db::get_label(folder);
     auto folder_id = db::get_id(folder);
-    log->info("going to create folder {}({}) & share it with {}", label, folder_id, peer->get_name());
     auto peer_id = peer->device_id().get_sha256();
-    auto opt = modify::upsert_folder_t::create(*sup.get_cluster(), sup.get_sequencer(), folder, 0);
-    if (!opt) {
-        log->error("cannot create folder: {}", opt.assume_error().message());
-        return;
-    }
+    auto existing_folder = sup.get_cluster()->get_folders().by_id(folder_id);
+    if (!existing_folder) {
+        log->info("going to create folder {}({}) & share it with {}", label, folder_id, peer->get_name());
+        auto opt = modify::upsert_folder_t::create(*sup.get_cluster(), sup.get_sequencer(), folder, 0);
+        if (!opt) {
+            log->error("cannot create folder: {}", opt.assume_error().message());
+            return;
+        }
 
-    auto cb = sup.call_share_folders(folder_id, {utils::bytes_t(peer_id.begin(), peer_id.end())});
-    sup.send_model<model::payload::model_update_t>(opt.assume_value(), cb.get());
+        auto cb = sup.call_share_folders(folder_id, {utils::bytes_t(peer_id.begin(), peer_id.end())});
+        sup.send_model<model::payload::model_update_t>(opt.assume_value(), cb.get());
+    } else {
+        log->info("going to share folder {}({}) with {}", label, folder_id, peer->get_name());
+        auto &sequncecer = sup.get_sequencer();
+        using diff_t = model::diff::modify::share_folder_t;
+        auto &self = *cluster->get_device();
+        auto opt = diff_t::create(*cluster, sequncecer, *peer, self.device_id(), *existing_folder);
+        if (!opt) {
+            auto message = opt.assume_error().message();
+            log->error("cannot share folder {} with {} : {}", folder_id, peer->device_id(), message);
+            return;
+        }
+
+        auto diff = std::move(opt.value());
+        auto cb = sup.call_select_folder(folder_id);
+        sup.send_model<model::payload::model_update_t>(diff, cb.get());
+    }
 }
 
 void folder_table_t::on_apply() {

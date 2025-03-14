@@ -441,6 +441,18 @@ inline void set_max_sequence(FolderInfo &msg, std::int64_t value) {
     using namespace pp;
     msg["max_sequence"_f] = value;
 }
+inline utils::bytes_view_t get_introducer_device_key(const FolderInfo &msg) {
+    using namespace pp;
+    auto &opt = msg["introducer_device_key"_f];
+    if (opt) {
+        return opt.value();
+    }
+    return {};
+}
+inline void set_introducer_device_key(FolderInfo &msg, utils::bytes_view_t value) {
+    using namespace pp;
+    msg["introducer_device_key"_f] = utils::bytes_t{value.begin(), value.end()};
+}
 
 /*********************/
 /*** IgnoredFolder ***/

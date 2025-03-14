@@ -39,7 +39,7 @@ struct SYNCSPIRIT_API device_id_t {
 
     bool operator==(const device_id_t &other) const noexcept { return get_sha256() == other.get_sha256(); }
     bool operator!=(const device_id_t &other) const noexcept { return !(*this == other); }
-    operator bool() const noexcept { return !value.empty(); }
+    explicit operator bool() const noexcept { return !value.empty(); }
 
     const std::string &get_value() const noexcept { return value; }
 

@@ -70,6 +70,9 @@ struct SYNCSPIRIT_API folder_info_t final : augmentable_t<folder_info_t> {
     inline file_infos_map_t &get_file_infos() noexcept { return file_infos; }
     inline const file_infos_map_t &get_file_infos() const noexcept { return file_infos; }
 
+    bool is_introduced_by(const model::device_id_t &device) const noexcept;
+    utils::bytes_view_t get_introducer_device_key() const noexcept;
+
   private:
     folder_info_t(utils::bytes_view_t key, const device_ptr_t &device_, const folder_ptr_t &folder_) noexcept;
     folder_info_t(const bu::uuid &uuid, const device_ptr_t &device_, const folder_ptr_t &folder_) noexcept;
@@ -81,6 +84,7 @@ struct SYNCSPIRIT_API folder_info_t final : augmentable_t<folder_info_t> {
 
     std::uint64_t index;
     std::int64_t max_sequence;
+    utils::bytes_t introducer_device_key;
     device_t *device;
     folder_t *folder;
     file_infos_map_t file_infos;
@@ -94,5 +98,7 @@ struct SYNCSPIRIT_API folder_infos_map_t : public generic_map_t<folder_info_ptr_
     folder_info_ptr_t by_device_id(utils::bytes_view_t device_id) const noexcept;
     folder_info_ptr_t by_device_key(utils::bytes_view_t device_id) const noexcept;
 };
+
+using uuid_folder_infos_map_t = std::unordered_map<utils::bytes_view_t, folder_info_t *>;
 
 }; // namespace syncspirit::model

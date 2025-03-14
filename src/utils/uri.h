@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #pragma once
 
@@ -23,6 +23,7 @@ struct SYNCSPIRIT_API uri_t : boost::intrusive_ref_counter<uri_t, boost::thread_
 
 using uri_container_t = std::vector<uri_ptr_t>;
 
-SYNCSPIRIT_API uri_ptr_t parse(std::string_view string);
+SYNCSPIRIT_API uri_ptr_t parse(std::string_view string) noexcept;
+SYNCSPIRIT_API bool is_parsable(std::string_view string) noexcept;
 
 } // namespace syncspirit::utils

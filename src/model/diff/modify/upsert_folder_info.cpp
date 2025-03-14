@@ -12,9 +12,19 @@
 
 using namespace syncspirit::model::diff::modify;
 
-upsert_folder_info_t::upsert_folder_info_t(const bu::uuid &uuid_, utils::bytes_view_t device_id_,
-                                           std::string_view folder_id_, std::uint64_t index_id_) noexcept
-    : uuid{uuid_}, device_id{device_id_.begin(), device_id_.end()}, folder_id{folder_id_}, index_id{index_id_} {
+upsert_folder_info_t::upsert_folder_info_t(const bu::uuid &uuid_, const model::device_id_t &device_id_,
+                                           const model::device_id_t &introducer_device_id, std::string_view folder_id_,
+                                           std::uint64_t index_id_) noexcept
+    : uuid{uuid_}, device_id(device_id_.get_sha256()), introducer_device_key(introducer_device_id.get_key()),
+      folder_id{folder_id_}, index_id{index_id_} {
+    LOG_DEBUG(log, "upsert_folder_info_t, folder = {}, index = {}", folder_id, index_id);
+}
+
+upsert_folder_info_t::upsert_folder_info_t(const model::folder_info_t &original, std::uint64_t new_index_id) noexcept
+    : device_id(original.get_device()->device_id().get_sha256()),
+      introducer_device_key(original.get_introducer_device_key()), folder_id{original.get_folder()->get_id()},
+      index_id{new_index_id} {
+    assign(uuid, original.get_uuid());
     LOG_DEBUG(log, "upsert_folder_info_t, folder = {}, index = {}", folder_id, index_id);
 }
 
@@ -41,6 +51,7 @@ auto upsert_folder_info_t::apply_impl(cluster_t &cluster, apply_controller_t &co
                   folder->get_label(), folder_id, device->device_id(), index_id);
         db::FolderInfo db;
         db::set_index_id(db, index_id);
+        db::set_introducer_device_key(db, introducer_device_key);
 
         auto opt = folder_info_t::create(uuid, db, device, folder);
         if (!opt) {

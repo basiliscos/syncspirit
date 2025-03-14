@@ -24,17 +24,17 @@ struct folder_table_t : static_table_t {
     static widgetable_ptr_t make_title(folder_table_t &container, std::string_view title);
     static widgetable_ptr_t make_path(folder_table_t &container, bool disabled);
     static widgetable_ptr_t make_id(folder_table_t &container, bool disabled);
-    static widgetable_ptr_t make_label(folder_table_t &container);
-    static widgetable_ptr_t make_folder_type(folder_table_t &container);
-    static widgetable_ptr_t make_pull_order(folder_table_t &container);
+    static widgetable_ptr_t make_label(folder_table_t &container, bool disabled);
+    static widgetable_ptr_t make_folder_type(folder_table_t &container, bool disabled);
+    static widgetable_ptr_t make_pull_order(folder_table_t &container, bool disabled);
     static widgetable_ptr_t make_index(folder_table_t &container, bool disabled);
-    static widgetable_ptr_t make_read_only(folder_table_t &container);
-    static widgetable_ptr_t make_rescan_interval(folder_table_t &container);
-    static widgetable_ptr_t make_ignore_permissions(folder_table_t &container);
-    static widgetable_ptr_t make_ignore_delete(folder_table_t &container);
-    static widgetable_ptr_t make_disable_tmp(folder_table_t &container);
-    static widgetable_ptr_t make_scheduled(folder_table_t &container);
-    static widgetable_ptr_t make_paused(folder_table_t &container);
+    static widgetable_ptr_t make_read_only(folder_table_t &container, bool disabled);
+    static widgetable_ptr_t make_rescan_interval(folder_table_t &container, bool disabled);
+    static widgetable_ptr_t make_ignore_permissions(folder_table_t &container, bool disabled);
+    static widgetable_ptr_t make_ignore_delete(folder_table_t &container, bool disabled);
+    static widgetable_ptr_t make_disable_tmp(folder_table_t &container, bool disabled);
+    static widgetable_ptr_t make_scheduled(folder_table_t &container, bool disabled);
+    static widgetable_ptr_t make_paused(folder_table_t &container, bool disabled);
     static widgetable_ptr_t make_shared_with(folder_table_t &container, model::device_ptr_t device, bool disabled);
     static widgetable_ptr_t make_notice(folder_table_t &container);
 

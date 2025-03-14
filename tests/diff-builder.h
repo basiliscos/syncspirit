@@ -28,8 +28,9 @@ struct diff_builder_t;
 struct SYNCSPIRIT_TEST_API cluster_configurer_t {
     cluster_configurer_t(diff_builder_t &builder, utils::bytes_view_t peer_sha256) noexcept;
     cluster_configurer_t &&add(utils::bytes_view_t sha256, std::string_view folder_id, uint64_t index,
-                               int64_t max_sequence) noexcept;
+                               int64_t max_sequence, std::string_view url = {}) noexcept;
     diff_builder_t &finish() noexcept;
+    std::error_code fail() noexcept;
 
   private:
     proto::ClusterConfig cc;
@@ -57,6 +58,7 @@ struct SYNCSPIRIT_TEST_API diff_builder_t : private model::diff::apply_controlle
     cluster_configurer_t configure_cluster(utils::bytes_view_t sha256) noexcept;
     diff_builder_t &apply(r::supervisor_t &sup) noexcept;
     outcome::result<void> apply() noexcept;
+    diff_builder_t &then() noexcept;
     index_maker_t make_index(utils::bytes_view_t sha256, std::string_view folder_id) noexcept;
 
     diff_builder_t &upsert_folder(std::string_view id, std::string_view path, std::string_view label = "",
@@ -64,7 +66,8 @@ struct SYNCSPIRIT_TEST_API diff_builder_t : private model::diff::apply_controlle
     diff_builder_t &upsert_folder(const db::Folder &data, std::uint64_t index_id = 0) noexcept;
     diff_builder_t &update_peer(const model::device_id_t &device, std::string_view name = "",
                                 std::string_view cert_name = "", bool auto_accept = true) noexcept;
-    diff_builder_t &share_folder(utils::bytes_view_t sha256, std::string_view folder_id) noexcept;
+    diff_builder_t &share_folder(utils::bytes_view_t sha256, std::string_view folder_id,
+                                 utils::bytes_view_t introducer_sha256 = {}) noexcept;
     diff_builder_t &unshare_folder(model::folder_info_t &fi) noexcept;
     diff_builder_t &remote_copy(const model::file_info_t &source) noexcept;
     diff_builder_t &advance(const model::file_info_t &source) noexcept;

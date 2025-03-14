@@ -46,6 +46,9 @@ struct fixture_t {
         bfs::create_directory(root_path);
     }
 
+    fixture_t(fixture_t &&source) noexcept
+        : root_path(std::move(source.root_path)), path_quard(std::move(source.path_quard)) {}
+
     virtual supervisor_t::configure_callback_t configure() noexcept {
         return [&](r::plugin::plugin_base_t &plugin) {
             plugin.template with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
@@ -81,7 +84,7 @@ struct fixture_t {
         return cluster;
     }
 
-    virtual void run() noexcept {
+    virtual fixture_t &run() noexcept {
         cluster = make_cluster();
 
         r::system_context_t ctx;
@@ -111,6 +114,7 @@ struct fixture_t {
         sup->do_process();
 
         CHECK(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::SHUT_DOWN);
+        return *this;
     }
 
     virtual void main() noexcept {}
@@ -131,7 +135,7 @@ struct fixture_t {
 
 } // namespace
 
-void test_db_migration() {
+void test_db_population() {
     struct F : fixture_t {
         void main() noexcept override {
             auto &db_env = db_actor->access<env>();
@@ -1027,7 +1031,74 @@ void test_peer_3_folders_6_files() {
     F().run();
 }
 
+void test_db_migration_1_2() {
+    static constexpr auto folder_id = "1234-5678";
+
+    struct F1 : fixture_t {
+        void main() noexcept override {
+
+            auto sha256 = peer_device->device_id().get_sha256();
+            auto builder = diff_builder_t(*cluster);
+            builder.update_peer(peer_device->device_id())
+                .apply(*sup)
+                .upsert_folder(folder_id, "/my/path")
+                .apply(*sup)
+                .share_folder(sha256, folder_id)
+                .apply(*sup);
+
+            auto &folder_infos = cluster->get_folders().by_id(folder_id)->get_folder_infos();
+            auto fi_my = folder_infos.by_device(*my_device);
+            auto fi_peer = folder_infos.by_device(*peer_device);
+
+            REQUIRE(fi_my->is_introduced_by(my_device->device_id()));
+            REQUIRE(fi_peer->is_introduced_by(my_device->device_id()));
+
+            auto &db_env = db_actor->access<env>();
+            auto txn_opt = db::make_transaction(db::transaction_type_t::RW, db_env);
+            REQUIRE(txn_opt);
+            auto &txn = txn_opt.value();
+            REQUIRE(db::save_version(1, txn));
+
+            auto save = [&](const model::folder_info_t &fi) -> outcome::result<void> {
+                auto fi_db = db::FolderInfo();
+                auto fi_key = fi.get_key();
+                fi.serialize(fi_db);
+                db::set_introducer_device_key(fi_db, {});
+                auto fi_data = db::encode(fi_db);
+                return db::save({fi_key, fi_data}, txn);
+            };
+
+            REQUIRE(save(*fi_my));
+            REQUIRE(save(*fi_peer));
+            REQUIRE(txn.commit());
+
+            {}
+        }
+    };
+    struct F2 : fixture_t {
+        F2(fixture_t &other) : fixture_t(std::move(other)) {}
+        void main() noexcept override {
+            sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
+            sup->do_process();
+            REQUIRE(reply);
+            REQUIRE(!reply->payload.ee);
+            auto cluster_clone = make_cluster();
+            REQUIRE(reply->payload.res.diff->apply(*cluster_clone, get_apply_controller()));
+
+            auto f_cloned = cluster_clone->get_folders().by_id(folder_id);
+            auto &folder_infos = f_cloned->get_folder_infos();
+            auto fi_my = folder_infos.by_device(*my_device);
+            auto fi_peer = folder_infos.by_device(*peer_device);
+
+            CHECK(fi_my->is_introduced_by(my_device->device_id()));
+            CHECK(fi_peer->is_introduced_by(my_device->device_id()));
+        }
+    };
+    F2(F1().run()).run();
+}
+
 int _init() {
+    REGISTER_TEST_CASE(test_db_population, "test_db_population", "[db]");
     REGISTER_TEST_CASE(test_loading_empty_db, "test_loading_empty_db", "[db]");
     REGISTER_TEST_CASE(test_unknown_and_ignored_devices_1, "test_unknown_and_ignored_devices_1", "[db]");
     REGISTER_TEST_CASE(test_unknown_and_ignored_devices_2, "test_unknown_and_ignored_devices_2", "[db]");
@@ -1042,6 +1113,7 @@ int _init() {
     REGISTER_TEST_CASE(test_remove_peer, "test_remove_peer", "[db]");
     REGISTER_TEST_CASE(test_update_peer, "test_update_peer", "[db]");
     REGISTER_TEST_CASE(test_peer_3_folders_6_files, "test_peer_3_folders_6_files", "[db]");
+    REGISTER_TEST_CASE(test_db_migration_1_2, "test_db_migration_1_2", "[db]");
     return 1;
 }
 

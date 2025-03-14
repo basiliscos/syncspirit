@@ -235,8 +235,9 @@ using Folder = pp::message<
 >;
 
 using FolderInfo = pp::message<
-    pp::uint64_field    <"index_id",     1>,
-    pp::int64_field     <"max_sequence", 2>
+    pp::uint64_field  <"index_id",              1                                      >,
+    pp::int64_field   <"max_sequence",          2                                      >,
+    pp::bytes_field   <"introducer_device_key", 3, pp::singular, proto::bytes_backend_t>
 >;
 
 using PendingFolder = pp::message<

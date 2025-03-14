@@ -56,7 +56,12 @@ auto update_peer_t::apply_impl(cluster_t &cluster, apply_controller_t &controlle
         peer = device_opt.assume_value();
         devices.put(peer);
     } else {
-        peer->update(item);
+        auto ec = peer->update(item);
+        if (!ec) {
+            auto &error = ec.error();
+            LOG_ERROR(log, "applying update_peer_t, device {} fail: {}", peer->device_id(), error.message());
+            return error;
+        }
         peer->notify_update();
     }
     LOG_TRACE(log, "applying update_peer_t, device {}", peer->device_id());

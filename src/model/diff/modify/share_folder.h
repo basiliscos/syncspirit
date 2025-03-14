@@ -14,6 +14,7 @@ namespace syncspirit::model::diff::modify {
 struct SYNCSPIRIT_API share_folder_t final : cluster_diff_t {
 
     static outcome::result<cluster_diff_ptr_t> create(cluster_t &, sequencer_t &sequencer, const model::device_t &,
+                                                      const model::device_id_t &introducer,
                                                       const model::folder_t &folder) noexcept;
 
     outcome::result<void> apply_impl(cluster_t &, apply_controller_t &) const noexcept override;
@@ -23,8 +24,8 @@ struct SYNCSPIRIT_API share_folder_t final : cluster_diff_t {
     std::string folder_id;
 
   private:
-    share_folder_t(const bu::uuid &uuid, const model::device_t &peer, std::string_view folder_id,
-                   std::uint64_t index_id, model::pending_folder_ptr_t pf) noexcept;
+    share_folder_t(const bu::uuid &uuid, const model::device_t &peer, const model::device_id_t &introducer,
+                   std::string_view folder_id, std::uint64_t index_id, model::pending_folder_ptr_t pf) noexcept;
 };
 
 } // namespace syncspirit::model::diff::modify

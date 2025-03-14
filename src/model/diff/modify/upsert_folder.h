@@ -23,7 +23,7 @@ struct SYNCSPIRIT_API upsert_folder_t final : cluster_diff_t {
 
   private:
     upsert_folder_t(sequencer_t &sequencer, bu::uuid uuid, db::Folder db, model::folder_info_ptr_t folder_info,
-                    const model::device_t &device, std::uint64_t index_id) noexcept;
+                    const model::device_id_t &device, std::uint64_t index_id) noexcept;
 };
 
 } // namespace syncspirit::model::diff::modify

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
 
 #include "reset_folder_infos.h"
 #include "remove_files.h"
@@ -8,14 +8,14 @@
 
 using namespace syncspirit::model::diff::modify;
 
-reset_folder_infos_t::reset_folder_infos_t(const folder_infos_map_t &map, orphaned_blocks_t *orphaned_blocks_) {
+reset_folder_infos_t::reset_folder_infos_t(const uuid_folder_infos_map_t &map, orphaned_blocks_t *orphaned_blocks_) {
     LOG_DEBUG(log, "reset_folder_infos_t, count = {}", map.size());
     auto local_orphaned_blocks = orphaned_blocks_t();
     auto &orphaned_blocks = orphaned_blocks_ ? *orphaned_blocks_ : local_orphaned_blocks;
 
     auto current = (cluster_diff_t *){nullptr};
     for (auto &it : map) {
-        auto &folder_info = *it.item;
+        auto &folder_info = *it.second;
         auto &files_info = folder_info.get_file_infos();
         if (files_info.size()) {
             auto diff = cluster_diff_ptr_t{};

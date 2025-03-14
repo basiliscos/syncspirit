@@ -84,7 +84,8 @@ bool share_folder_t::execute(governor_actor_t &actor) noexcept {
         return false;
     }
 
-    auto opt = modify::share_folder_t::create(*actor.cluster, *actor.sequencer, *device, *folder);
+    auto &self = actor.cluster->get_device()->device_id();
+    auto opt = modify::share_folder_t::create(*actor.cluster, *actor.sequencer, *device, self, *folder);
     if (!opt) {
         log->warn("{}, cannot share: ", actor.get_identity(), opt.assume_error().message());
         return false;
