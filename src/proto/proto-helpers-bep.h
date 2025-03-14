@@ -245,6 +245,10 @@ inline void set_addresses(Device &msg, std::size_t i, std::string_view value) {
     using namespace pp;
     msg["addresses"_f][i] = std::string(value);
 }
+inline void add_addresses(Device &msg, std::string_view value) {
+    using namespace pp;
+    msg["addresses"_f].emplace_back(std::string(value));
+}
 inline Compression get_compression(const Device &msg) {
     using namespace pp;
     return msg["compression"_f].value_or(Compression{});

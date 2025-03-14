@@ -28,8 +28,9 @@ struct diff_builder_t;
 struct SYNCSPIRIT_TEST_API cluster_configurer_t {
     cluster_configurer_t(diff_builder_t &builder, utils::bytes_view_t peer_sha256) noexcept;
     cluster_configurer_t &&add(utils::bytes_view_t sha256, std::string_view folder_id, uint64_t index,
-                               int64_t max_sequence) noexcept;
+                               int64_t max_sequence, std::string_view url = {}) noexcept;
     diff_builder_t &finish() noexcept;
+    std::error_code fail() noexcept;
 
   private:
     proto::ClusterConfig cc;

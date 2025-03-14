@@ -38,13 +38,16 @@ cluster_configurer_t::cluster_configurer_t(diff_builder_t &builder_, utils::byte
     : builder{builder_}, peer_sha256{peer_sha256_} {}
 
 cluster_configurer_t &&cluster_configurer_t::add(utils::bytes_view_t sha256, std::string_view folder_id, uint64_t index,
-                                                 int64_t max_sequence) noexcept {
+                                                 int64_t max_sequence, std::string_view url) noexcept {
     proto::Folder folder;
     proto::set_id(folder, folder_id);
     proto::Device device;
     proto::set_id(device, sha256);
     proto::set_index_id(device, index);
     proto::set_max_sequence(device, max_sequence);
+    if (!url.empty()) {
+        proto::add_addresses(device, url);
+    }
     proto::add_devices(folder, std::move(device));
     proto::add_folders(cc, std::move(folder));
     return std::move(*this);
@@ -57,6 +60,13 @@ diff_builder_t &cluster_configurer_t::finish() noexcept {
     assert(diff.has_value());
     builder.assign(diff.value().get());
     return builder;
+}
+
+std::error_code cluster_configurer_t::fail() noexcept {
+    auto &cluster = builder.cluster;
+    auto peer = builder.cluster.get_devices().by_sha256(peer_sha256);
+    auto opt = diff::peer::cluster_update_t::create(cluster, *builder.sequencer, *peer, cc);
+    return opt.error();
 }
 
 index_maker_t::index_maker_t(diff_builder_t &builder_, utils::bytes_view_t sha256, std::string_view folder_id) noexcept

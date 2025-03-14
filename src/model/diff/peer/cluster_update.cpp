@@ -16,7 +16,9 @@
 #include "model/misc/orphaned_blocks.h"
 #include "proto/proto-helpers-bep.h"
 #include "proto/proto-helpers-db.h"
+#include "utils/error_code.h"
 #include "utils/format.hpp"
+#include "utils/uri.h"
 #include <spdlog/fmt/bin_to_hex.h>
 #include <spdlog/spdlog.h>
 
@@ -28,7 +30,13 @@ using keys_view_t = std::set<utils::bytes_view_t, utils::bytes_comparator_t>;
 
 auto cluster_update_t::create(const cluster_t &cluster, sequencer_t &sequencer, const device_t &source,
                               const message_t &message) noexcept -> outcome::result<cluster_diff_ptr_t> {
-    return cluster_diff_ptr_t{new cluster_update_t(cluster, sequencer, source, message)};
+    auto diff = cluster_diff_ptr_t();
+    auto ptr = new cluster_update_t(cluster, sequencer, source, message);
+    diff.reset(ptr);
+    if (ptr->ec) {
+        return ptr->ec;
+    }
+    return diff;
 };
 
 cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequencer, const device_t &source,
@@ -92,9 +100,9 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
     };
 
     auto introduce_device = [&](const model::folder_t &folder, const proto::Device &device,
-                                const device_id_t &device_id) noexcept {
+                                const device_id_t &device_id) noexcept -> bool {
         auto device_name = proto::get_name(device);
-        auto sha256 = device_id.get_sha256();
+        auto sha256 = proto::get_id(device);
         if (!processed_introduced_devices.count(sha256)) {
             processed_introduced_devices.emplace(sha256);
             seen_devices.emplace(sha256);
@@ -102,7 +110,14 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
             auto addresses_count = proto::get_addresses_size(device);
             for (size_t i = 0; i < addresses_count; ++i) {
                 auto address = proto::get_addresses(device, i);
-                db::add_addresses(db_peer, address);
+                if (address != "dynamic") {
+                    if (utils::is_parsable(address)) {
+                        db::add_addresses(db_peer, address);
+                    } else {
+                        ec = make_error_code(utils::error_code_t::malformed_url);
+                        return false;
+                    }
+                }
             }
             db::set_name(db_peer, device_name);
             db::set_compression(db_peer, proto::get_compression(device));
@@ -128,6 +143,7 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
         ptr_fi = new diff::modify::upsert_folder_info_t(sequencer.next_uuid(), device_id, source.device_id(),
                                                         folder.get_id(), index_id);
         introduced_devices = introduced_devices->assign_sibling(ptr_fi.get());
+        return true;
     };
 
     auto folders_count = proto::get_folders_size(message);
@@ -186,8 +202,10 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
             if (!device) {
                 if (source.is_introducer()) {
                     if (folder->is_shared_with(source)) {
-                        introduce_device(*folder, d, device_id);
-                        continue;
+                        if (introduce_device(*folder, d, device_id)) {
+                            continue;
+                        }
+                        return;
                     }
                 }
                 LOG_TRACE(log, "cluster_update_t, unknown device, ignoring");
