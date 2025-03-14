@@ -63,28 +63,31 @@ struct table_t : content::folder_table_t {
 
     table_t(tree_item_t &container_, model::folder_info_ptr_t fi_, model::folder_ptr_t folder_, int x, int y, int w,
             int h)
-        : parent_t(container_, *fi_, x, y, w, h), fi{fi_}, folder{folder_} {
+        : parent_t(container_, *fi_, x, y, w, h), fi{fi_}, folder{folder_}, existing{false} {
 
         entries_cell = new static_string_provider_t();
         max_sequence_cell = new static_string_provider_t();
         scan_start_cell = new static_string_provider_t();
         scan_finish_cell = new static_string_provider_t();
 
+        auto folder_id = folder_->get_id();
+        existing = (bool)container_.supervisor.get_cluster()->get_folders().by_id(folder_id);
+
         auto data = table_rows_t();
         data.push_back({"", make_title(*this, "accepting pending folder")});
-        data.push_back({"path", make_path(*this, false)});
-        data.push_back({"id", make_id(*this, false)});
-        data.push_back({"label", make_label(*this)});
-        data.push_back({"type", make_folder_type(*this)});
-        data.push_back({"pull order", make_pull_order(*this)});
+        data.push_back({"path", make_path(*this, existing)});
+        data.push_back({"id", make_id(*this, existing)});
+        data.push_back({"label", make_label(*this, existing)});
+        data.push_back({"type", make_folder_type(*this, existing)});
+        data.push_back({"pull order", make_pull_order(*this, existing)});
         data.push_back({"index", make_index(*this, true)});
-        data.push_back({"read only", make_read_only(*this)});
-        data.push_back({"rescan interval", make_rescan_interval(*this)});
-        data.push_back({"ignore permissions", make_ignore_permissions(*this)});
-        data.push_back({"ignore delete", make_ignore_delete(*this)});
-        data.push_back({"disable temp indixes", make_disable_tmp(*this)});
-        data.push_back({"scheduled", make_scheduled(*this)});
-        data.push_back({"paused", make_paused(*this)});
+        data.push_back({"read only", make_read_only(*this, existing)});
+        data.push_back({"rescan interval", make_rescan_interval(*this, existing)});
+        data.push_back({"ignore permissions", make_ignore_permissions(*this, existing)});
+        data.push_back({"ignore delete", make_ignore_delete(*this, existing)});
+        data.push_back({"disable temp indixes", make_disable_tmp(*this, existing)});
+        data.push_back({"scheduled", make_scheduled(*this, existing)});
+        data.push_back({"paused", make_paused(*this, existing)});
         data.push_back({"shared_with", make_shared_with(*this, fi->get_device(), true)});
         data.push_back({"", notice = make_notice(*this)});
         data.push_back({"actions", make_actions(*this)});
@@ -131,6 +134,7 @@ struct table_t : content::folder_table_t {
 
     model::folder_info_ptr_t fi;
     model::folder_ptr_t folder;
+    bool existing;
 };
 
 } // namespace
