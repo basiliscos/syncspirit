@@ -211,6 +211,7 @@ void app_supervisor_t::on_model_update(model::message::model_update_t &message) 
     auto r = diff.apply(*cluster, *this);
     if (!r) {
         LOG_ERROR(log, "error applying cluster diff: {}", r.assume_error().message());
+        return;
     }
 
     if (!has_been_loaded) {
@@ -219,6 +220,7 @@ void app_supervisor_t::on_model_update(model::message::model_update_t &message) 
     r = diff.visit(*this, nullptr);
     if (!r) {
         LOG_ERROR(log, "error visiting cluster diff: {}", r.assume_error().message());
+        return;
     }
 
     auto custom = message.payload.custom;

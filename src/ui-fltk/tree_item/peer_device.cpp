@@ -488,9 +488,11 @@ peer_device_t::peer_device_t(model::device_t &peer_, app_supervisor_t &superviso
     auto &cluster = *supervisor.get_cluster();
     bool has_folders = false;
     auto &folders = cluster.get_folders();
+    auto total_files = std::size_t{0};
     for (auto &it : folders) {
-        if (it.item->is_shared_with(peer)) {
+        if (auto fi = it.item->is_shared_with(peer); fi) {
             has_folders = true;
+            total_files += fi->get_file_infos().size();
             break;
         }
     }
@@ -509,6 +511,10 @@ peer_device_t::peer_device_t(model::device_t &peer_, app_supervisor_t &superviso
     }
     if (has_pending_folders) {
         get_pending_folders();
+    }
+
+    if ((total_files == 0) && !has_pending_folders) {
+        tree->close(this, 0);
     }
 
     update_label();
