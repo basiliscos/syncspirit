@@ -166,10 +166,10 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
         if (!folder) {
             for (int j = 0; j < devices_count; ++j) {
                 auto &d = proto::get_devices(f, j);
-                if (proto::get_id(d) == source.device_id().get_sha256()) {
+                if (proto::get_id(d) == sha256) {
                     for (auto &it : known_pending_folders) {
                         auto &uf = it.item;
-                        auto match = uf->device_id() == source.device_id() && uf->get_id() == folder_id;
+                        auto match = uf->device_id().get_sha256() == sha256 && uf->get_id() == folder_id;
                         if (match) {
                             auto index_id = proto::get_index_id(d);
                             auto key = uf->get_key();
@@ -260,13 +260,13 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
 
     for (auto &it : known_pending_folders) {
         auto &uf = it.item;
-        if (uf->device_id() != source.device_id()) {
+        if (uf->device_id().get_sha256() != sha256) {
             continue;
         }
         if (confirmed_pending_folders.contains(uf->get_key())) {
             continue;
         }
-        if (uf->device_id() == source.device_id()) {
+        if (uf->device_id().get_sha256() == sha256) {
             auto key = uf->get_key();
             auto uf_key = utils::bytes_t(key.begin(), key.end());
             removed_pending_folders.emplace(std::move(uf_key));
