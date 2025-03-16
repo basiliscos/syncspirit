@@ -41,6 +41,18 @@ auto cluster_update_t::create(const cluster_t &cluster, sequencer_t &sequencer, 
 
 cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequencer, const device_t &source,
                                    const message_t &message) noexcept {
+    struct introduced_device_t {
+        db::Device device;
+        model::device_id_t device_id;
+    };
+    using introduced_devices_t = std::vector<introduced_device_t>;
+    struct inserted_folder_info_t {
+        std::string_view folder_id;
+        std::uint64_t new_index_id;
+        model::device_id_t device_id;
+    };
+    using inserted_folder_infos_t = std::vector<inserted_folder_info_t>;
+
     auto sha256 = source.device_id().get_sha256();
     peer_id = sha256;
     LOG_DEBUG(log, "cluster_update_t, source = {}", source.device_id().get_short());
@@ -61,8 +73,8 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
     auto orphaned_blocks = orphaned_blocks_t{};
     auto folder_update_diff = diff::cluster_diff_ptr_t{};
     auto folder_update = (diff::cluster_diff_t *){nullptr};
-    auto introduced_devices_diff = diff::cluster_diff_ptr_t{};
-    auto introduced_devices = (diff::cluster_diff_t *){nullptr};
+    auto introduced_devices = introduced_devices_t();
+    auto inserted_folder_infos = inserted_folder_infos_t();
 
     auto add_pending = [&](const proto::Folder &f, const proto::Device &d) noexcept {
         using item_t = decltype(new_pending_folders)::value_type;
@@ -103,16 +115,7 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
         LOG_DEBUG(log, "cluster_update_t, going to share folder '{}' with introduced device '{}'", folder.get_id(),
                   device_id);
         auto index_id = proto::get_index_id(device);
-        auto ptr = cluster_diff_ptr_t();
-        ptr = new diff::modify::upsert_folder_info_t(sequencer.next_uuid(), device_id, source.device_id(),
-                                                     folder.get_id(), index_id);
-
-        if (introduced_devices) {
-            introduced_devices = introduced_devices->assign_sibling(ptr.get());
-        } else {
-            introduced_devices_diff = ptr;
-            introduced_devices = ptr.get();
-        }
+        inserted_folder_infos.emplace_back(inserted_folder_info_t(folder.get_id(), index_id, device_id));
     };
 
     auto introduce_device = [&](const model::folder_t &folder, const proto::Device &device,
@@ -139,16 +142,7 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
             db::set_compression(db_peer, proto::get_compression(device));
             db::set_introducer(db_peer, proto::get_introducer(device));
             db::set_skip_introduction_removals(db_peer, proto::get_skip_introduction_removals(device));
-
-            auto ptr = cluster_diff_ptr_t();
-            ptr = new diff::modify::update_peer_t(db_peer, device_id, cluster);
-
-            if (introduced_devices) {
-                introduced_devices = introduced_devices->assign_sibling(ptr.get());
-            } else {
-                introduced_devices_diff = ptr;
-                introduced_devices = ptr.get();
-            }
+            introduced_devices.emplace_back(introduced_device_t{std::move(db_peer), device_id});
         }
 
         upsert_folder(folder, device, device_id);
@@ -356,8 +350,14 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
         auto ptr = new modify::add_remote_folder_infos_t(source, std::move(remote_folders));
         update_current(ptr);
     }
-    if (introduced_devices_diff) {
-        update_current(introduced_devices_diff.get());
+    for (auto &id : introduced_devices) {
+        auto ptr = new diff::modify::update_peer_t(std::move(id.device), id.device_id, cluster);
+        update_current(ptr);
+    }
+    for (auto &info : inserted_folder_infos) {
+        auto ptr = new diff::modify::upsert_folder_info_t(sequencer.next_uuid(), info.device_id, source.device_id(),
+                                                          info.folder_id, info.new_index_id);
+        update_current(ptr);
     }
 }
 
