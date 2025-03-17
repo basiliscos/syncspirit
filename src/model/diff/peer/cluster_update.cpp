@@ -46,12 +46,12 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
         model::device_id_t device_id;
     };
     using introduced_devices_t = std::vector<introduced_device_t>;
-    struct inserted_folder_info_t {
+    struct upserted_folder_info_t {
         std::string_view folder_id;
         std::uint64_t new_index_id;
         model::device_id_t device_id;
     };
-    using inserted_folder_infos_t = std::vector<inserted_folder_info_t>;
+    using upserted_folder_infos_t = std::vector<upserted_folder_info_t>;
 
     auto sha256 = source.device_id().get_sha256();
     peer_id = sha256;
@@ -71,10 +71,8 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
     auto &folders = cluster.get_folders();
     auto &devices = cluster.get_devices();
     auto orphaned_blocks = orphaned_blocks_t{};
-    auto folder_update_diff = diff::cluster_diff_ptr_t{};
-    auto folder_update = (diff::cluster_diff_t *){nullptr};
     auto introduced_devices = introduced_devices_t();
-    auto inserted_folder_infos = inserted_folder_infos_t();
+    auto upserted_folder_infos = upserted_folder_infos_t();
 
     auto add_pending = [&](const proto::Folder &f, const proto::Device &d) noexcept {
         auto folder_id = proto::get_id(f);
@@ -117,25 +115,17 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
         new_pending_folders.push_back(item_t{std::move(db), std::move(id), sequencer.next_uuid()});
     };
 
-    auto add_upsert_folder_info = [&](modify::upsert_folder_info_t *diff) noexcept {
-        auto ptr = cluster_diff_ptr_t(diff);
-        if (folder_update) {
-            folder_update = folder_update->assign_sibling(ptr.get());
-        } else {
-            folder_update_diff = ptr;
-            folder_update = ptr.get();
-        }
-    };
-
     auto upsert_folder_info = [&](const model::folder_info_t &fi, std::uint64_t new_index_id) noexcept {
-        add_upsert_folder_info(new modify::upsert_folder_info_t(fi, new_index_id));
+        auto folder_id = fi.get_folder()->get_id();
+        auto &device_id = fi.get_device()->device_id();
+        upserted_folder_infos.emplace_back(upserted_folder_info_t(folder_id, new_index_id, device_id));
     };
 
     auto upsert_folder = [&](std::string_view folder_id, const proto::Device &device, const device_id_t &device_id) {
         LOG_DEBUG(log, "cluster_update_t, going to share folder '{}' with introduced device '{}'", folder_id,
                   device_id);
         auto index_id = proto::get_index_id(device);
-        inserted_folder_infos.emplace_back(inserted_folder_info_t(folder_id, index_id, device_id));
+        upserted_folder_infos.emplace_back(upserted_folder_info_t(folder_id, index_id, device_id));
     };
 
     auto introduce_device = [&](std::string_view folder_id, const proto::Device &device,
@@ -233,12 +223,13 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
                 bool do_update = false;
                 if (index_id != folder_info->get_index()) {
                     do_update = true;
-                    LOG_DEBUG(log, "cluster_update_t, reseting folder: {}, new index = {:#x}, max_seq = {}", folder_label,
-                              index_id, max_sequence);
+                    LOG_DEBUG(log, "cluster_update_t, reseting folder: {}, new index = {:#x}, max_seq = {}",
+                              folder_label, index_id, max_sequence);
                     reset_folders.emplace(folder_info->get_uuid(), folder_info.get());
                 } else if (max_sequence > folder_info->get_max_sequence()) {
                     LOG_DEBUG(log, "cluster_update_t, updating folder = {}, index = {:#x}, max seq = {} -> {}",
-                              folder->get_label(), folder_info->get_index(), folder_info->get_max_sequence(), max_sequence);
+                              folder->get_label(), folder_info->get_index(), folder_info->get_max_sequence(),
+                              max_sequence);
                 }
                 if (do_update) {
                     upsert_folder_info(*folder_info, index_id);
@@ -307,10 +298,6 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
         auto ptr = new modify::reset_folder_infos_t(std::move(reset_folders), &orphaned_blocks);
         update_current(ptr);
     }
-    if (folder_update_diff) { // must be applied after folders reset
-        auto &diff = folder_update_diff;
-        update_current(folder_update_diff.get());
-    }
     if (!removed_introduced_devices.empty()) {
         for (auto sha256 : removed_introduced_devices) {
             auto peer = devices.by_sha256(sha256);
@@ -350,7 +337,7 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
         auto ptr = new diff::modify::update_peer_t(std::move(id.device), id.device_id, cluster);
         update_current(ptr);
     }
-    for (auto &info : inserted_folder_infos) {
+    for (auto &info : upserted_folder_infos) {
         auto ptr = new diff::modify::upsert_folder_info_t(sequencer.next_uuid(), info.device_id, source.device_id(),
                                                           info.folder_id, info.new_index_id);
         update_current(ptr);
