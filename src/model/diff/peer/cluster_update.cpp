@@ -97,7 +97,11 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
 
         using item_t = decltype(new_pending_folders)::value_type;
         auto label = proto::get_label(f);
-        LOG_DEBUG(log, "cluster_update_t, (add/update) pending folder = {}", label);
+        auto device_id = proto::get_id(d);
+        auto device_short = device_id_t::make_short(device_id);
+        LOG_DEBUG(log, "cluster_update_t, adding pending folder {}({}) non-shared with '{}'", label, folder_id,
+                  device_short);
+
         db::PendingFolder db;
         auto &db_fi = db::get_folder_info(db);
         auto &db_f = db::get_folder(db);
@@ -121,7 +125,7 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
         upserted_folder_infos.emplace_back(upserted_folder_info_t(folder_id, new_index_id, device_id));
     };
 
-    auto upsert_folder = [&](std::string_view folder_id, const proto::Device &device, const device_id_t &device_id) {
+    auto add_folder_info = [&](std::string_view folder_id, const proto::Device &device, const device_id_t &device_id) {
         LOG_DEBUG(log, "cluster_update_t, going to share folder '{}' with introduced device '{}'", folder_id,
                   device_id);
         auto index_id = proto::get_index_id(device);
@@ -155,7 +159,7 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
             introduced_devices.emplace_back(introduced_device_t{std::move(db_peer), device_id});
         }
 
-        upsert_folder(folder_id, device, device_id);
+        add_folder_info(folder_id, device, device_id);
         return true;
     };
 
@@ -212,11 +216,9 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
 
             if (!folder_info) {
                 if (device_sha == source.device_id().get_sha256()) {
-                    LOG_DEBUG(log, "cluster_update_t, adding pending folder {} non-shared with {}", folder_label,
-                              device->device_id());
                     add_pending(f, d);
                 } else if (source.is_introducer()) {
-                    upsert_folder(folder_id, d, device_id);
+                    add_folder_info(folder_id, d, device_id);
                 }
                 continue;
             } else {
