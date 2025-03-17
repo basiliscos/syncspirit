@@ -111,14 +111,14 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
         add_upsert_folder_info(new modify::upsert_folder_info_t(fi, new_index_id));
     };
 
-    auto upsert_folder = [&](const model::folder_t &folder, const proto::Device &device, const device_id_t &device_id) {
-        LOG_DEBUG(log, "cluster_update_t, going to share folder '{}' with introduced device '{}'", folder.get_id(),
+    auto upsert_folder = [&](std::string_view folder_id, const proto::Device &device, const device_id_t &device_id) {
+        LOG_DEBUG(log, "cluster_update_t, going to share folder '{}' with introduced device '{}'", folder_id,
                   device_id);
         auto index_id = proto::get_index_id(device);
-        inserted_folder_infos.emplace_back(inserted_folder_info_t(folder.get_id(), index_id, device_id));
+        inserted_folder_infos.emplace_back(inserted_folder_info_t(folder_id, index_id, device_id));
     };
 
-    auto introduce_device = [&](const model::folder_t &folder, const proto::Device &device,
+    auto introduce_device = [&](std::string_view folder_id, const proto::Device &device,
                                 const device_id_t &device_id) noexcept -> bool {
         auto device_name = proto::get_name(device);
         auto sha256 = proto::get_id(device);
@@ -145,7 +145,7 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
             introduced_devices.emplace_back(introduced_device_t{std::move(db_peer), device_id});
         }
 
-        upsert_folder(folder, device, device_id);
+        upsert_folder(folder_id, device, device_id);
         return true;
     };
 
@@ -205,7 +205,7 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
             if (!device) {
                 if (source.is_introducer()) {
                     if (folder->is_shared_with(source)) {
-                        if (introduce_device(*folder, d, device_id)) {
+                        if (introduce_device(folder_id, d, device_id)) {
                             continue;
                         }
                         return;
@@ -230,7 +230,7 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
                               device->device_id());
                     add_pending(f, d);
                 } else if (source.is_introducer()) {
-                    upsert_folder(*folder, d, device_id);
+                    upsert_folder(folder_id, d, device_id);
                 }
                 continue;
             }
