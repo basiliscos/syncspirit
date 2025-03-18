@@ -47,6 +47,7 @@ enum class error_code_t {
     missing_version,
     mismatch_file_size,
     invalid_sequence,
+    empty_folder_name,
 };
 
 namespace detail {

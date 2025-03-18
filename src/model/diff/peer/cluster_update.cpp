@@ -10,6 +10,7 @@
 #include "model/diff/modify/remove_pending_folders.h"
 #include "model/diff/modify/reset_folder_infos.h"
 #include "model/diff/modify/update_peer.h"
+#include "model/diff/modify/upsert_folder.h"
 #include "model/diff/modify/upsert_folder_info.h"
 #include "model/diff/cluster_visitor.h"
 #include "model/cluster.h"
@@ -21,6 +22,7 @@
 #include "utils/uri.h"
 #include <spdlog/fmt/bin_to_hex.h>
 #include <spdlog/spdlog.h>
+#include <boost/nowide/convert.hpp>
 
 using namespace syncspirit;
 using namespace syncspirit::model::diff::peer;
@@ -28,10 +30,11 @@ using namespace syncspirit::model::diff::peer;
 using keys_t = syncspirit::model::diff::modify::generic_remove_t::unique_keys_t;
 using keys_view_t = std::set<utils::bytes_view_t, utils::bytes_comparator_t>;
 
-auto cluster_update_t::create(const cluster_t &cluster, sequencer_t &sequencer, const device_t &source,
-                              const message_t &message) noexcept -> outcome::result<cluster_diff_ptr_t> {
+auto cluster_update_t::create(const bfs::path &default_path, const cluster_t &cluster, sequencer_t &sequencer,
+                              const device_t &source, const message_t &message) noexcept
+    -> outcome::result<cluster_diff_ptr_t> {
     auto diff = cluster_diff_ptr_t();
-    auto ptr = new cluster_update_t(cluster, sequencer, source, message);
+    auto ptr = new cluster_update_t(default_path, cluster, sequencer, source, message);
     diff.reset(ptr);
     if (ptr->ec) {
         return ptr->ec;
@@ -39,8 +42,8 @@ auto cluster_update_t::create(const cluster_t &cluster, sequencer_t &sequencer, 
     return diff;
 };
 
-cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequencer, const device_t &source,
-                                   const message_t &message) noexcept {
+cluster_update_t::cluster_update_t(const bfs::path &default_path, const cluster_t &cluster, sequencer_t &sequencer,
+                                   const device_t &source, const message_t &message) noexcept {
     struct introduced_device_t {
         db::Device device;
         model::device_id_t device_id;
@@ -52,6 +55,7 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
         model::device_id_t device_id;
     };
     using upserted_folder_infos_t = std::vector<upserted_folder_info_t>;
+    using upserted_folders_t = std::vector<db::Folder>;
 
     auto sha256 = source.device_id().get_sha256();
     peer_id = sha256;
@@ -73,6 +77,7 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
     auto orphaned_blocks = orphaned_blocks_t{};
     auto introduced_devices = introduced_devices_t();
     auto upserted_folder_infos = upserted_folder_infos_t();
+    auto upserted_folders = upserted_folders_t();
 
     auto add_pending = [&](const proto::Folder &f, const proto::Device &d) noexcept {
         auto folder_id = proto::get_id(f);
@@ -130,6 +135,48 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
                   device_id);
         auto index_id = proto::get_index_id(device);
         upserted_folder_infos.emplace_back(upserted_folder_info_t(folder_id, index_id, device_id));
+    };
+
+    auto add_folder = [&](const proto::Folder &folder) -> bool {
+        auto folder_id = proto::get_id(folder);
+        auto label = proto::get_label(folder);
+        auto try_make_path = [&](std::string_view label) -> outcome::result<bfs::path> {
+            auto path = default_path / boost::nowide::widen(label);
+            if (label.empty()) {
+                return model::make_error_code(model::error_code_t::empty_folder_name);
+            }
+            auto ec = sys::error_code();
+            bfs::create_directories(path, ec);
+            LOG_TRACE(log, "cluster_update_t, trying to make a dir: '{}' for folder '{}', result: {}", path.string(),
+                      folder_id, ec.message());
+            if (ec) {
+                return ec;
+            }
+            return path;
+        };
+
+        auto r = try_make_path(label);
+        if (!r) {
+            r = try_make_path(folder_id);
+        }
+        if (!r) {
+            this->ec = r.assume_error();
+            return false;
+        }
+
+        LOG_DEBUG(log, "cluster_update_t, going to create folder '{}' ('{}')", folder_id, label);
+        auto db = db::Folder();
+        db::set_id(db, folder_id);
+        db::set_label(db, label);
+        db::set_read_only(db, proto::get_read_only(folder));
+        db::set_ignore_permissions(db, proto::get_ignore_permissions(folder));
+        db::set_ignore_delete(db, proto::get_ignore_delete(folder));
+        db::set_disable_temp_indexes(db, proto::get_disable_temp_indexes(folder));
+        db::set_paused(db, proto::get_paused(folder));
+        db::set_path(db, boost::nowide::narrow(r.value().wstring()));
+        db::set_rescan_interval(db, 3600);
+        upserted_folders.emplace_back(std::move(db));
+        return true;
     };
 
     auto introduce_device = [&](std::string_view folder_id, const proto::Device &device,
@@ -215,9 +262,24 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
             }
 
             if (!folder_info) {
+                bool share = false;
                 if (device_sha == source.device_id().get_sha256()) {
-                    add_pending(f, d);
+                    if (source.has_auto_accept()) {
+                        if (!folder) {
+                            if (!add_folder(f)) {
+                                return;
+                            }
+                            share = true;
+                        } else {
+                            share = true;
+                        }
+                    } else {
+                        add_pending(f, d);
+                    }
                 } else if (source.is_introducer()) {
+                    share = true;
+                }
+                if (share) {
                     add_folder_info(folder_id, d, device_id);
                 }
                 continue;
@@ -295,6 +357,15 @@ cluster_update_t::cluster_update_t(const cluster_t &cluster, sequencer_t &sequen
     auto update_current = [&](cluster_diff_t *diff) {
         current = current ? current->assign_sibling(diff) : assign_child(diff);
     };
+
+    for (auto &db : upserted_folders) {
+        auto opt = modify::upsert_folder_t::create(cluster, sequencer, db, 0);
+        if (!opt) {
+            ec = opt.assume_error();
+            return;
+        }
+        update_current(opt.assume_value().get());
+    }
 
     if (reset_folders.size()) {
         auto ptr = new modify::reset_folder_infos_t(std::move(reset_folders), &orphaned_blocks);

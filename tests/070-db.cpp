@@ -486,7 +486,8 @@ void test_cluster_update_and_remove() {
             proto::set_id(pr_device, peer_device->device_id().get_sha256());
             proto::set_max_sequence(pr_device, 1);
             proto::set_index_id(pr_device, peer_folder_info->get_index() + 1);
-            auto diff = diff::peer::cluster_update_t::create(*cluster, *sup->sequencer, *peer_device, pr_msg).value();
+            auto diff =
+                diff::peer::cluster_update_t::create({}, *cluster, *sup->sequencer, *peer_device, pr_msg).value();
 
             sup->send<model::payload::model_update_t>(sup->get_address(), diff, nullptr);
             sup->do_process();
