@@ -210,6 +210,21 @@ cluster_update_t::cluster_update_t(const bfs::path &default_path, const cluster_
         return true;
     };
 
+    auto is_shared_with_source = [&](std::string_view folder_id) {
+        auto folder = cluster.get_folders().by_id(folder_id);
+        if (folder) {
+            if (folder->get_folder_infos().by_device(source)) {
+                return true;
+            }
+        }
+        for (auto &db_f : upserted_folders) {
+            if (db::get_id(db_f) == folder_id) {
+                return true;
+            }
+        }
+        return false;
+    };
+
     auto folders_count = proto::get_folders_size(message);
     for (size_t i = 0; i < folders_count; ++i) {
         auto &f = proto::get_folders(message, i);
@@ -236,7 +251,7 @@ cluster_update_t::cluster_update_t(const bfs::path &default_path, const cluster_
 
             if (!device) {
                 if (source.is_introducer()) {
-                    if (folder && folder->is_shared_with(source)) {
+                    if (is_shared_with_source(folder_id)) {
                         if (introduce_device(folder_id, d, device_id)) {
                             continue;
                         } else {

@@ -910,6 +910,7 @@ TEST_CASE("auto-accept folders", "[model]") {
     auto peer_device_1 = device_t::create(peer_id_1, "peer-device").value();
     auto db_peer_1 = db::Device();
     peer_device_1->serialize(db_peer_1);
+    db::set_introducer(db_peer_1, true);
     db::set_auto_accept(db_peer_1, true);
     REQUIRE(peer_device_1->update(db_peer_1));
 
@@ -918,6 +919,8 @@ TEST_CASE("auto-accept folders", "[model]") {
     auto &devices = cluster->get_devices();
     devices.put(my_device);
     devices.put(peer_device_1);
+
+    auto peer_device_2 = device_t::create(peer_id_2, "peer-device").value();
 
     auto builder = diff_builder_t(*cluster);
     auto folder_1_id = "1234";
@@ -960,6 +963,21 @@ TEST_CASE("auto-accept folders", "[model]") {
 
         bfs::permissions(new_root, bfs::perms::all, bfs::perm_options::add);
         CHECK(!bfs::exists(new_root / folder_1_id));
+    }
+    SECTION("auto accept + introduce peer (source first)") {
+        auto r = builder.configure_cluster(sha256_1, root_path)
+                     .add(sha256_1, folder_1_id, 5, 4)
+                     .add(sha256_2, folder_1_id, 55, 44)
+                     .finish()
+                     .apply();
+        REQUIRE(r);
+
+        REQUIRE(cluster->get_folders().size() == 1);
+        REQUIRE(cluster->get_devices().size() == 3);
+        auto folder_1 = cluster->get_folders().by_id(folder_1_id);
+        REQUIRE(folder_1->is_shared_with(*peer_device_1));
+        REQUIRE(folder_1->is_shared_with(*peer_device_2));
+        CHECK(bfs::exists(root_path / folder_1_id));
     }
 }
 
