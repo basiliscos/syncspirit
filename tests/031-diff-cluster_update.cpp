@@ -928,6 +928,17 @@ TEST_CASE("auto-accept folders", "[model]") {
     auto sha256_1 = peer_id_1.get_sha256();
     auto sha256_2 = peer_id_2.get_sha256();
 
+    SECTION("folder already exists => just share it") {
+        auto r = builder.upsert_folder(folder_1_id, "/my/path-1").apply();
+        REQUIRE(r);
+
+        r = builder.configure_cluster(sha256_1, root_path).add(sha256_1, folder_1_id, 5, 4).finish().apply();
+        REQUIRE(r);
+
+        REQUIRE(cluster->get_folders().size() == 1);
+        auto folder_1 = cluster->get_folders().by_id(folder_1_id);
+        REQUIRE(folder_1->is_shared_with(*peer_device_1));
+    }
     SECTION("able to create dir by folder_id") {
         auto r = builder.configure_cluster(sha256_1, root_path).add(sha256_1, folder_1_id, 5, 4).finish().apply();
         REQUIRE(r);
