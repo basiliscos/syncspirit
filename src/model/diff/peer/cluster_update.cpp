@@ -226,6 +226,8 @@ cluster_update_t::cluster_update_t(const bfs::path &default_path, const cluster_
     };
 
     auto folders_count = proto::get_folders_size(message);
+
+    // 1st pass, for source device & self only
     for (size_t i = 0; i < folders_count; ++i) {
         auto &f = proto::get_folders(message, i);
         auto folder_id = proto::get_id(f);
@@ -241,7 +243,8 @@ cluster_update_t::cluster_update_t(const bfs::path &default_path, const cluster_
             if (!device_opt) {
                 auto device_hex = spdlog::to_hex(device_sha.begin(), device_sha.end());
                 LOG_WARN(log, "cluster_update_t, malformed device id: {}", device_hex);
-                continue;
+                ec = make_error_code(utils::error_code_t::malformed_url);
+                return;
             }
             auto index_id = proto::get_index_id(d);
             auto &device_id = *device_opt;
@@ -250,16 +253,6 @@ cluster_update_t::cluster_update_t(const bfs::path &default_path, const cluster_
                       index_id, max_sequence);
 
             if (!device) {
-                if (source.is_introducer()) {
-                    if (is_shared_with_source(folder_id)) {
-                        if (introduce_device(folder_id, d, device_id)) {
-                            continue;
-                        } else {
-                            return;
-                        }
-                    }
-                }
-                LOG_TRACE(log, "cluster_update_t, unknown device, ignoring");
                 continue;
             }
             seen_devices.emplace(device_sha);
@@ -273,6 +266,10 @@ cluster_update_t::cluster_update_t(const bfs::path &default_path, const cluster_
                 remote_folders.emplace_back(std::string(folder_id), index_id, max_sequence);
                 LOG_DEBUG(log, "cluster_update_t, remote folder = {}, device = {}, max seq. = {}", folder_label,
                           device_id.get_short(), max_sequence);
+                continue;
+            }
+
+            if (device_sha != sha256) {
                 continue;
             }
 
@@ -313,6 +310,52 @@ cluster_update_t::cluster_update_t(const bfs::path &default_path, const cluster_
                 if (do_update) {
                     upsert_folder_info(*folder_info, index_id);
                 }
+                confirmed_folders.emplace(folder_info->get_key());
+            }
+        }
+    }
+
+    // 2st pass, for all other devices
+    for (size_t i = 0; i < folders_count; ++i) {
+        auto &f = proto::get_folders(message, i);
+        auto folder_id = proto::get_id(f);
+        auto folder_label = proto::get_label(f);
+        auto folder = folders.by_id(folder_id);
+        auto devices_count = proto::get_devices_size(f);
+        for (int j = 0; j < devices_count; ++j) {
+            auto &d = proto::get_devices(f, j);
+            auto device_sha = proto::get_id(d);
+            if ((device_sha == sha256) || device_sha == cluster.get_device()->device_id().get_sha256()) {
+                continue;
+            }
+            auto device = devices.by_sha256(device_sha);
+            auto device_opt = model::device_id_t::from_sha256(device_sha);
+            auto index_id = proto::get_index_id(d);
+            auto &device_id = *device_opt;
+            auto max_sequence = proto::get_max_sequence(d);
+            LOG_DEBUG(log, "cluster_update_t, shared with device = '{}', index = {:#x}, max seq. = {}", device_id,
+                      index_id, max_sequence);
+
+            if (!device) {
+                if (source.is_introducer()) {
+                    if (is_shared_with_source(folder_id)) {
+                        if (!introduce_device(folder_id, d, device_id)) {
+                            return;
+                        }
+                    }
+                }
+                continue;
+            }
+            seen_devices.emplace(device_sha);
+
+            auto folder_info = model::folder_info_ptr_t();
+            if (folder && device) {
+                folder_info = folder->get_folder_infos().by_device_id(device_sha);
+            }
+
+            if (!folder_info && source.is_introducer()) {
+                add_folder_info(folder_id, d, device_id);
+            } else {
                 confirmed_folders.emplace(folder_info->get_key());
             }
         }

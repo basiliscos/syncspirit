@@ -990,6 +990,21 @@ TEST_CASE("auto-accept folders", "[model]") {
         REQUIRE(folder_1->is_shared_with(*peer_device_2));
         CHECK(bfs::exists(root_path / folder_1_id));
     }
+    SECTION("auto accept + introduce peer (source second)") {
+        auto r = builder.configure_cluster(sha256_1, root_path)
+                     .add(sha256_2, folder_1_id, 55, 44)
+                     .add(sha256_1, folder_1_id, 5, 4)
+                     .finish()
+                     .apply();
+        REQUIRE(r);
+
+        REQUIRE(cluster->get_folders().size() == 1);
+        REQUIRE(cluster->get_devices().size() == 3);
+        auto folder_1 = cluster->get_folders().by_id(folder_1_id);
+        REQUIRE(folder_1->is_shared_with(*peer_device_1));
+        REQUIRE(folder_1->is_shared_with(*peer_device_2));
+        CHECK(bfs::exists(root_path / folder_1_id));
+    }
 }
 
 int _init() {
