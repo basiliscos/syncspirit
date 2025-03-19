@@ -263,9 +263,14 @@ cluster_update_t::cluster_update_t(const bfs::path &default_path, const cluster_
             }
 
             if (device.get() == cluster.get_device()) {
-                remote_folders.emplace_back(std::string(folder_id), index_id, max_sequence);
-                LOG_DEBUG(log, "cluster_update_t, remote folder = {}, device = {}, max seq. = {}", folder_label,
-                          device_id.get_short(), max_sequence);
+                if (is_shared_with_source(folder_id)) {
+                    remote_folders.emplace_back(std::string(folder_id), index_id, max_sequence);
+                    LOG_DEBUG(log, "cluster_update_t, remote folder = {}, device = {}, max seq. = {}", folder_label,
+                              device_id.get_short(), max_sequence);
+                } else {
+                    LOG_DEBUG(log, "cluster_update_t, our side is no longer shares folder '{}' with {}", folder_id,
+                              source.device_id());
+                }
                 continue;
             }
 

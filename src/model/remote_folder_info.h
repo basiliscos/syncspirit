@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2023-2025 Ivan Baidakou
 
 #pragma once
 
 #include <cstdint>
 #include "syncspirit-export.h"
-#include "proto/proto-fwd.hpp"
 #include <boost/outcome.hpp>
 #include "misc/augmentation.hpp"
 #include "misc/map.hpp"
@@ -35,7 +34,6 @@ struct SYNCSPIRIT_API remote_folder_info_t final : augmentable_t<remote_folder_i
 
     inline std::uint64_t get_index() const noexcept { return index_id; }
     inline std::int64_t get_max_sequence() const noexcept { return max_sequence; }
-    bool needs_update() const noexcept;
 
     folder_info_ptr_t get_local() const noexcept;
 
