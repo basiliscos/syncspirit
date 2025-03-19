@@ -960,7 +960,7 @@ TEST_CASE("auto-accept folders", "[model]") {
         REQUIRE(folder_1->is_shared_with(*peer_device_1));
         CHECK(bfs::exists(root_path / "zzz"));
     }
-    SECTION("able to create dir by folder_id") {
+    SECTION("not able to create dir by folder_id") {
         auto new_root = root_path / "sub-root";
         bfs::create_directories(new_root);
         bfs::permissions(new_root, bfs::perms::all, bfs::perm_options::remove);
@@ -1004,6 +1004,25 @@ TEST_CASE("auto-accept folders", "[model]") {
         REQUIRE(folder_1->is_shared_with(*peer_device_1));
         REQUIRE(folder_1->is_shared_with(*peer_device_2));
         CHECK(bfs::exists(root_path / folder_1_id));
+    }
+    SECTION("not able to create dir (source second)") {
+        auto new_root = root_path / "sub-root";
+        bfs::create_directories(new_root);
+        bfs::permissions(new_root, bfs::perms::all, bfs::perm_options::remove);
+        auto new_guard = path_guard_t(new_root);
+
+        auto r = builder.configure_cluster(sha256_1, new_root)
+                     .add(sha256_2, folder_1_id, 55, 44)
+                     .add(sha256_1, folder_1_id, 5, 4)
+                     .fail();
+        REQUIRE(r);
+
+        REQUIRE(cluster->get_folders().size() == 0);
+        REQUIRE(cluster->get_devices().size() == 2);
+        REQUIRE(!cluster->get_folders().by_id(folder_1_id));
+
+        bfs::permissions(new_root, bfs::perms::all, bfs::perm_options::add);
+        CHECK(!bfs::exists(new_root / folder_1_id));
     }
 }
 
