@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #pragma once
 
-#include "config/bep.h"
+#include "config/main.h"
 #include "model/cluster.h"
 #include "model/folder.h"
 #include "model/messages.h"
@@ -22,8 +22,7 @@ namespace bfs = std::filesystem;
 namespace outcome = boost::outcome_v2;
 
 struct cluster_supervisor_config_t : ra::supervisor_config_asio_t {
-    config::bep_config_t bep_config;
-    std::uint32_t hasher_threads;
+    config::main_t config;
     model::cluster_ptr_t cluster;
     model::sequencer_ptr_t sequencer;
 };
@@ -34,13 +33,8 @@ struct cluster_supervisor_config_builder_t : ra::supervisor_config_asio_builder_
     using parent_t = ra::supervisor_config_asio_builder_t<Supervisor>;
     using parent_t::parent_t;
 
-    builder_t &&bep_config(const config::bep_config_t &value) && noexcept {
-        parent_t::config.bep_config = value;
-        return std::move(*static_cast<typename parent_t::builder_t *>(this));
-    }
-
-    builder_t &&hasher_threads(std::uint32_t value) && noexcept {
-        parent_t::config.hasher_threads = value;
+    builder_t &&config(const config::main_t &value) && noexcept {
+        parent_t::config.config = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
@@ -73,8 +67,7 @@ struct SYNCSPIRIT_API cluster_supervisor_t : public ra::supervisor_asio_t, priva
 
     utils::logger_t log;
     r::address_ptr_t coordinator;
-    config::bep_config_t bep_config;
-    std::uint32_t hasher_threads;
+    config::main_t config;
     model::cluster_ptr_t cluster;
     model::sequencer_ptr_t sequencer;
 };
