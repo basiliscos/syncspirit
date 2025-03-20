@@ -3,6 +3,7 @@
 
 #include "test-utils.h"
 #include "diff-builder.h"
+#include "access.h"
 #include "model/cluster.h"
 #include "model/misc/resolver.h"
 
@@ -174,6 +175,21 @@ TEST_CASE("resolver", "[model]") {
     SECTION("local & remote are both deleted-> ignore") {
         proto::set_deleted(pr_remote, true);
         auto pr_local = pr_remote;
+        auto file_remote = file_info_t::create(sequencer->next_uuid(), pr_remote, folder_peer).value();
+        auto file_local = file_info_t::create(sequencer->next_uuid(), pr_local, folder_my).value();
+        file_local->mark_local();
+        folder_peer->add_strict(file_remote);
+        folder_my->add_strict(file_local);
+        auto action = resolve(*file_remote);
+        CHECK(action == A::ignore);
+    }
+
+    SECTION("remote is deleted, local is outdated, folder is marked as ignored deletes -> ignore") {
+        ((model::folder_data_t *)folder.get())->access<test::to::ignore_delete>() = true;
+        auto pr_local = pr_remote;
+        auto &c_local = proto::get_counters(proto::get_version(pr_local), 0);
+        proto::set_value(c_local, 1);
+        proto::set_deleted(pr_remote, true);
         auto file_remote = file_info_t::create(sequencer->next_uuid(), pr_remote, folder_peer).value();
         auto file_local = file_info_t::create(sequencer->next_uuid(), pr_local, folder_my).value();
         file_local->mark_local();

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #pragma once
 
@@ -11,6 +11,7 @@ namespace {
 namespace to {
 struct device {};
 struct state {};
+struct ignore_delete {};
 } // namespace to
 } // namespace
 } // namespace syncspirit::test
@@ -18,6 +19,7 @@ struct state {};
 namespace syncspirit::model {
 
 template <> inline auto &folder_t::access<test::to::device>() noexcept { return device; }
+template <> inline auto &folder_data_t::access<test::to::ignore_delete>() noexcept { return ignore_delete; }
 
 } // namespace syncspirit::model
 

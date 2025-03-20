@@ -38,6 +38,9 @@ static advance_action_t resolve(const file_info_t &remote, const file_info_t *lo
             }
         }
     }
+    if (remote.is_deleted() && folder->is_deletion_ignored()) {
+        return advance_action_t::ignore;
+    }
     if (!local) {
         return advance_action_t::remote_copy;
     }

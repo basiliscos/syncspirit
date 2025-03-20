@@ -34,6 +34,9 @@ struct SYNCSPIRIT_API folder_data_t {
 
     void serialize(syncspirit::db::Folder &dest) const noexcept;
 
+    template <typename T> auto &access() noexcept;
+    template <typename T> auto &access() const noexcept;
+
   protected:
     void assign_fields(const db::Folder &item) noexcept;
 

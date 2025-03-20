@@ -4,7 +4,7 @@
 
 ## fltk
 
- - [fltk] add localization support
- - [fltk] put app into system tray somehow (win32, linux)
+ - add localization support
+ - put app into system tray somehow (win32, linux)
  
  
