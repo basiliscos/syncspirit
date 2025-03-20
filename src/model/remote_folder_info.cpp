@@ -16,11 +16,6 @@ remote_folder_info_t::remote_folder_info_t(std::uint64_t index_id_, std::int64_t
 
 std::string_view remote_folder_info_t::get_key() const noexcept { return folder->get_id(); }
 
-bool remote_folder_info_t::needs_update() const noexcept {
-    auto local = get_local();
-    return (local->get_index() != index_id) || local->get_max_sequence() > max_sequence;
-}
-
 remote_folder_info_t_ptr_t remote_folder_infos_map_t::by_folder(const folder_t &folder) const noexcept {
     auto id = folder.get_id();
     auto ptr = (unsigned char *)id.data();

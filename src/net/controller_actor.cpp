@@ -93,7 +93,8 @@ controller_actor_t::controller_actor_t(config_t &config)
       connection_id{config.connection_id}, peer_addr{config.peer_addr}, request_timeout{config.request_timeout},
       rx_blocks_requested{0}, tx_blocks_requested{0}, outgoing_buffer{0},
       outgoing_buffer_max{config.outgoing_buffer_max}, request_pool{config.request_pool},
-      blocks_max_requested{config.blocks_max_requested}, advances_per_iteration{config.advances_per_iteration} {
+      blocks_max_requested{config.blocks_max_requested}, advances_per_iteration{config.advances_per_iteration},
+      default_path(std::move(config.default_path)) {
     {
         assert(cluster);
         assert(sequencer);
@@ -612,8 +613,9 @@ auto controller_actor_t::operator()(const model::diff::modify::remove_peer_t &di
 }
 
 void controller_actor_t::on_message(proto::ClusterConfig &message) noexcept {
+    using diff_t = model::diff::peer::cluster_update_t;
     LOG_DEBUG(log, "on_message (ClusterConfig)");
-    auto diff_opt = model::diff::peer::cluster_update_t::create(*cluster, *sequencer, *peer, message);
+    auto diff_opt = diff_t::create(default_path, *cluster, *sequencer, *peer, message);
     if (!diff_opt) {
         auto &ec = diff_opt.assume_error();
         LOG_ERROR(log, "error processing message from {} : {}", peer->device_id(), ec.message());

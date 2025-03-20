@@ -205,8 +205,7 @@ auto net_supervisor_t::operator()(const model::diff::load::load_cluster_t &diff,
             .strand(strand)
             .cluster(cluster)
             .sequencer(sequencer)
-            .bep_config(app_config.bep_config)
-            .hasher_threads(app_config.hasher_threads)
+            .config(app_config)
             .escalate_failure()
             .finish();
         launch_net();

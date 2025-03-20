@@ -36,6 +36,7 @@ struct controller_actor_config_t : r::actor_config_t {
     uint32_t blocks_max_requested = 8;
     uint32_t outgoing_buffer_max = 0;
     std::uint32_t advances_per_iteration = 10;
+    bfs::path default_path;
 };
 
 template <typename Actor> struct controller_actor_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -95,6 +96,11 @@ template <typename Actor> struct controller_actor_config_builder_t : r::actor_co
 
     builder_t &&sequencer(model::sequencer_ptr_t value) && noexcept {
         parent_t::config.sequencer = std::move(value);
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+
+    builder_t &&default_path(const bfs::path &value) && noexcept {
+        parent_t::config.default_path = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };
@@ -220,6 +226,7 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     uint32_t blocks_max_kept;
     uint32_t blocks_max_requested;
     uint32_t advances_per_iteration;
+    bfs::path default_path;
     updates_streamer_ptr_t updates_streamer;
     utils::logger_t log;
     unlink_requests_t unlink_requests;

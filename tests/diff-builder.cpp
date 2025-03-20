@@ -34,8 +34,9 @@
 using namespace syncspirit::test;
 using namespace syncspirit::model;
 
-cluster_configurer_t::cluster_configurer_t(diff_builder_t &builder_, utils::bytes_view_t peer_sha256_) noexcept
-    : builder{builder_}, peer_sha256{peer_sha256_} {}
+cluster_configurer_t::cluster_configurer_t(diff_builder_t &builder_, utils::bytes_view_t peer_sha256_,
+                                           const bfs::path default_location_) noexcept
+    : builder{builder_}, peer_sha256{peer_sha256_}, default_location{default_location_} {}
 
 cluster_configurer_t &&cluster_configurer_t::add(utils::bytes_view_t sha256, std::string_view folder_id, uint64_t index,
                                                  int64_t max_sequence, std::string_view url) noexcept {
@@ -53,10 +54,25 @@ cluster_configurer_t &&cluster_configurer_t::add(utils::bytes_view_t sha256, std
     return std::move(*this);
 }
 
+cluster_configurer_t &&cluster_configurer_t::add_named(utils::bytes_view_t sha256, std::string_view folder_id,
+                                                       uint64_t index, int64_t max_sequence,
+                                                       std::string_view folder_name) noexcept {
+    proto::Folder folder;
+    proto::set_id(folder, folder_id);
+    proto::set_label(folder, folder_name);
+    proto::Device device;
+    proto::set_id(device, sha256);
+    proto::set_index_id(device, index);
+    proto::set_max_sequence(device, max_sequence);
+    proto::add_devices(folder, std::move(device));
+    proto::add_folders(cc, std::move(folder));
+    return std::move(*this);
+}
+
 diff_builder_t &cluster_configurer_t::finish() noexcept {
     auto &cluster = builder.cluster;
     auto peer = builder.cluster.get_devices().by_sha256(peer_sha256);
-    auto diff = diff::peer::cluster_update_t::create(cluster, *builder.sequencer, *peer, cc);
+    auto diff = diff::peer::cluster_update_t::create(default_location, cluster, *builder.sequencer, *peer, cc);
     assert(diff.has_value());
     builder.assign(diff.value().get());
     return builder;
@@ -65,7 +81,7 @@ diff_builder_t &cluster_configurer_t::finish() noexcept {
 std::error_code cluster_configurer_t::fail() noexcept {
     auto &cluster = builder.cluster;
     auto peer = builder.cluster.get_devices().by_sha256(peer_sha256);
-    auto opt = diff::peer::cluster_update_t::create(cluster, *builder.sequencer, *peer, cc);
+    auto opt = diff::peer::cluster_update_t::create(default_location, cluster, *builder.sequencer, *peer, cc);
     return opt.error();
 }
 
@@ -174,8 +190,9 @@ diff_builder_t &diff_builder_t::update_peer(const model::device_id_t &device, st
     return assign(new diff::modify::update_peer_t(db_device, device, cluster));
 }
 
-cluster_configurer_t diff_builder_t::configure_cluster(utils::bytes_view_t sha256) noexcept {
-    return cluster_configurer_t(*this, sha256);
+cluster_configurer_t diff_builder_t::configure_cluster(utils::bytes_view_t sha256,
+                                                       const bfs::path &default_location) noexcept {
+    return cluster_configurer_t(*this, sha256, default_location);
 }
 
 index_maker_t diff_builder_t::make_index(utils::bytes_view_t sha256, std::string_view folder_id) noexcept {

@@ -144,6 +144,17 @@ std::string device_id_t::make_short(std::uint64_t value) noexcept {
     return encoded.substr(0, DASH_INT);
 }
 
+std::string device_id_t::make_short(utils::bytes_view_t sha_256) noexcept {
+    std::uint64_t value;
+    auto ptr = sha_256.data();
+    std::copy(sha_256.data(), ptr + sizeof(value), reinterpret_cast<char *>(&value));
+    be::native_to_big_inplace(value);
+
+    auto view = utils::bytes_view_t(reinterpret_cast<const unsigned char *>(&value), sizeof(value));
+    auto encoded = base32::encode(view.subspan(0, 5)); // it is enought to encode just first 5 bytes
+    return encoded.substr(0, DASH_INT);
+}
+
 std::optional<device_id_t> device_id_t::from_cert(cert_data_view_t data) noexcept {
     using result_t = std::optional<device_id_t>;
     auto sha_result = sha256_digest(data);

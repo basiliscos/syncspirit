@@ -29,6 +29,7 @@ struct SYNCSPIRIT_API device_id_t {
     static std::optional<device_id_t> from_cert(utils::cert_data_view_t cert) noexcept;
     static std::optional<device_id_t> from_uuid(std::string_view value) noexcept;
     static std::string make_short(std::uint64_t value) noexcept;
+    static std::string make_short(utils::bytes_view_t sha_256) noexcept;
 
     device_id_t() noexcept {};
     device_id_t(device_id_t &&other) noexcept;

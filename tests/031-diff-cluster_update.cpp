@@ -88,7 +88,7 @@ TEST_CASE("cluster update, new folder", "[model]") {
         proto::set_max_sequence(pr_peer, 10);
         proto::set_index_id(pr_peer, 22u);
 
-        auto diff_opt = diff::peer::cluster_update_t::create(*cluster, *sequencer, *peer_device, *cc);
+        auto diff_opt = diff::peer::cluster_update_t::create({}, *cluster, *sequencer, *peer_device, *cc);
         REQUIRE(diff_opt);
 
         auto &diff = diff_opt.value();
@@ -114,7 +114,7 @@ TEST_CASE("cluster update, new folder", "[model]") {
         db::set_max_sequence(mfi, proto::get_max_sequence(pr_peer));
         db::set_index_id(mfi, proto::get_index_id(pr_peer));
 
-        diff_opt = diff::peer::cluster_update_t::create(*cluster, *sequencer, *peer_device, *cc);
+        diff_opt = diff::peer::cluster_update_t::create({}, *cluster, *sequencer, *peer_device, *cc);
         REQUIRE(diff_opt);
         diff = diff_opt.value();
         r_a = diff->apply(*cluster, get_apply_controller());
@@ -125,7 +125,7 @@ TEST_CASE("cluster update, new folder", "[model]") {
 
         // max-id changed
         proto::set_max_sequence(pr_peer, 15);
-        diff_opt = diff::peer::cluster_update_t::create(*cluster, *sequencer, *peer_device, *cc);
+        diff_opt = diff::peer::cluster_update_t::create({}, *cluster, *sequencer, *peer_device, *cc);
         REQUIRE(diff_opt);
         diff = diff_opt.value();
         r_a = diff->apply(*cluster, get_apply_controller());
@@ -152,7 +152,7 @@ TEST_CASE("cluster update, new folder", "[model]") {
             proto::set_max_sequence(pr_device, 10);
             proto::set_index_id(pr_device, 22ul);
 
-            diff_opt = diff::peer::cluster_update_t::create(*cluster, *sequencer, *peer_device, *cc);
+            diff_opt = diff::peer::cluster_update_t::create({}, *cluster, *sequencer, *peer_device, *cc);
             REQUIRE(diff_opt);
 
             r_a = diff_opt.value()->apply(*cluster, get_apply_controller());
@@ -199,7 +199,7 @@ TEST_CASE("cluster update, new folder", "[model]") {
         SECTION("nothing changed") {
             proto::set_index_id(pr_peer, folder_info_peer->get_index());
 
-            auto diff_opt = diff::peer::cluster_update_t::create(*cluster, *sequencer, *peer_device, *cc);
+            auto diff_opt = diff::peer::cluster_update_t::create({}, *cluster, *sequencer, *peer_device, *cc);
             REQUIRE(diff_opt);
 
             auto &diff = diff_opt.value();
@@ -269,7 +269,7 @@ TEST_CASE("cluster update, new folder", "[model]") {
                 proto::set_index_id(pr_peer, 1234ul);
                 proto::set_max_sequence(pr_peer, 123456u);
 
-                auto diff_opt = diff::peer::cluster_update_t::create(*cluster, *sequencer, *peer_device, *cc);
+                auto diff_opt = diff::peer::cluster_update_t::create({}, *cluster, *sequencer, *peer_device, *cc);
                 REQUIRE(diff_opt);
 
                 auto &diff = diff_opt.value();
@@ -293,7 +293,7 @@ TEST_CASE("cluster update, new folder", "[model]") {
                 proto::set_index_id(pr_peer, 0ul);
                 proto::set_max_sequence(pr_peer, 123456u);
 
-                auto diff_opt = diff::peer::cluster_update_t::create(*cluster, *sequencer, *peer_device, *cc);
+                auto diff_opt = diff::peer::cluster_update_t::create({}, *cluster, *sequencer, *peer_device, *cc);
                 REQUIRE(diff_opt);
 
                 auto &diff = diff_opt.value();
@@ -439,7 +439,7 @@ TEST_CASE("cluster update, reset folder", "[model]") {
     proto::set_max_sequence(pr_peer, 123456u);
     proto::set_index_id(pr_peer, 7u);
 
-    auto diff_opt = diff::peer::cluster_update_t::create(*cluster, *sequencer, *peer_device, *cc);
+    auto diff_opt = diff::peer::cluster_update_t::create({}, *cluster, *sequencer, *peer_device, *cc);
     REQUIRE(diff_opt);
 
     auto &diff = diff_opt.value();
@@ -510,7 +510,7 @@ TEST_CASE("cluster update for a folder, which was not shared", "[model]") {
     proto::set_max_sequence(pr_peer, 123456u);
     proto::set_index_id(pr_peer, 7u);
 
-    auto diff_opt = diff::peer::cluster_update_t::create(*cluster, *sequencer, *peer_device, *cc);
+    auto diff_opt = diff::peer::cluster_update_t::create({}, *cluster, *sequencer, *peer_device, *cc);
     REQUIRE(diff_opt);
     auto &diff = diff_opt.value();
     REQUIRE(diff->apply(*cluster, get_apply_controller()));
@@ -575,7 +575,7 @@ TEST_CASE("cluster update with unknown devices", "[model]") {
     proto::set_max_sequence(pr_peer_2, 123456u);
     proto::set_index_id(pr_peer_2, 7u);
 
-    auto diff_opt = diff::peer::cluster_update_t::create(*cluster, *sequencer, *peer_device, *cc);
+    auto diff_opt = diff::peer::cluster_update_t::create({}, *cluster, *sequencer, *peer_device, *cc);
     REQUIRE(diff_opt);
 }
 
@@ -643,7 +643,7 @@ TEST_CASE("cluster update nothing shared", "[model]") {
     }
 
     auto cc = std::make_unique<proto::ClusterConfig>();
-    auto diff_opt = diff::peer::cluster_update_t::create(*cluster, *sequencer, *peer_device, *cc);
+    auto diff_opt = diff::peer::cluster_update_t::create({}, *cluster, *sequencer, *peer_device, *cc);
     REQUIRE(diff_opt);
     auto opt = diff_opt.value()->apply(*cluster, get_apply_controller());
     REQUIRE(opt);
@@ -680,7 +680,7 @@ TEST_CASE("non-shared pending folder", "[model]") {
     REQUIRE(uf.get_max_sequence() == 4);
 }
 
-TEST_CASE("cluster update with remote folders", "[model]") {
+TEST_CASE("cluster update with remote folders (1)", "[model]") {
     auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
     auto my_device = device_t::create(my_id, "my-device").value();
     auto peer_id_1 =
@@ -737,7 +737,7 @@ TEST_CASE("cluster update with remote folders", "[model]") {
     proto::set_max_sequence(pr_peer_my, 3);
     proto::set_index_id(pr_peer_my, 5ul);
 
-    auto diff_opt = diff::peer::cluster_update_t::create(*cluster, *sequencer, *peer_device, *cc);
+    auto diff_opt = diff::peer::cluster_update_t::create({}, *cluster, *sequencer, *peer_device, *cc);
     REQUIRE(diff_opt);
 
     auto opt = diff_opt.value()->apply(*cluster, get_apply_controller());
@@ -750,7 +750,7 @@ TEST_CASE("cluster update with remote folders", "[model]") {
 
     SECTION("unshare by peer") {
         auto cc = std::make_unique<proto::ClusterConfig>();
-        diff_opt = diff::peer::cluster_update_t::create(*cluster, *sequencer, *peer_device, *cc);
+        diff_opt = diff::peer::cluster_update_t::create({}, *cluster, *sequencer, *peer_device, *cc);
         REQUIRE(diff_opt);
 
         auto &diff = diff_opt.value();
@@ -761,6 +761,36 @@ TEST_CASE("cluster update with remote folders", "[model]") {
         // we are still sharing the folder with peer
         CHECK(fi);
     }
+}
+
+TEST_CASE("cluster update, inactual remote folders for non-shared folder", "[model]") {
+    auto root_path = unique_path();
+    auto path_guard = path_guard_t(root_path);
+
+    auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
+    auto my_device = device_t::create(my_id, "my-device").value();
+    auto peer_id = device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
+
+    auto peer_device = device_t::create(peer_id, "peer-device").value();
+
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
+    auto sequencer = model::make_sequencer(5);
+    auto &devices = cluster->get_devices();
+    devices.put(my_device);
+    devices.put(peer_device);
+
+    auto builder = diff_builder_t(*cluster);
+    auto folder_1_id = "1234";
+
+    auto sha256 = peer_id.get_sha256();
+
+    auto r = builder.configure_cluster(sha256, root_path)
+                 .add(sha256, folder_1_id, 5, 4)
+                 .add(my_id.get_sha256(), folder_1_id, 55, 44)
+                 .finish()
+                 .apply();
+    REQUIRE(r);
+    REQUIRE(cluster->get_folders().size() == 0);
 }
 
 TEST_CASE("device introduction", "[model]") {
@@ -893,6 +923,136 @@ TEST_CASE("device introduction", "[model]") {
             CHECK(folder_1->is_shared_with(*peer_device_2));
             CHECK(folder_2->is_shared_with(*peer_device_2));
         }
+    }
+}
+
+TEST_CASE("auto-accept folders", "[model]") {
+    auto root_path = unique_path();
+    auto path_guard = path_guard_t(root_path);
+
+    auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
+    auto my_device = device_t::create(my_id, "my-device").value();
+    auto peer_id_1 =
+        device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
+    auto peer_id_2 =
+        device_id_t::from_string("EAMTZPW-Q4QYERN-D57DHFS-AUP2OMG-PAHOR3R-ZWLKGAA-WQC5SVW-UJ5NXQA").value();
+
+    auto peer_device_1 = device_t::create(peer_id_1, "peer-device").value();
+    auto db_peer_1 = db::Device();
+    peer_device_1->serialize(db_peer_1);
+    db::set_introducer(db_peer_1, true);
+    db::set_auto_accept(db_peer_1, true);
+    REQUIRE(peer_device_1->update(db_peer_1));
+
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
+    auto sequencer = model::make_sequencer(5);
+    auto &devices = cluster->get_devices();
+    devices.put(my_device);
+    devices.put(peer_device_1);
+
+    auto peer_device_2 = device_t::create(peer_id_2, "peer-device").value();
+
+    auto builder = diff_builder_t(*cluster);
+    auto folder_1_id = "1234";
+
+    auto sha256_1 = peer_id_1.get_sha256();
+    auto sha256_2 = peer_id_2.get_sha256();
+
+    SECTION("folder already exists => just share it") {
+        auto r = builder.upsert_folder(folder_1_id, "/my/path-1").apply();
+        REQUIRE(r);
+
+        r = builder.configure_cluster(sha256_1, root_path).add(sha256_1, folder_1_id, 5, 4).finish().apply();
+        REQUIRE(r);
+
+        REQUIRE(cluster->get_folders().size() == 1);
+        auto folder_1 = cluster->get_folders().by_id(folder_1_id);
+        REQUIRE(folder_1->is_shared_with(*peer_device_1));
+    }
+    SECTION("able to create dir by folder_id") {
+        auto r = builder.configure_cluster(sha256_1, root_path).add(sha256_1, folder_1_id, 5, 4).finish().apply();
+        REQUIRE(r);
+
+        REQUIRE(cluster->get_folders().size() == 1);
+        auto folder_1 = cluster->get_folders().by_id(folder_1_id);
+        REQUIRE(folder_1->is_shared_with(*peer_device_1));
+        CHECK(bfs::exists(root_path / folder_1_id));
+    }
+    SECTION("able to create dir by folder label") {
+        auto r = builder.configure_cluster(sha256_1, root_path)
+                     .add_named(sha256_1, folder_1_id, 5, 4, "zzz")
+                     .finish()
+                     .apply();
+        REQUIRE(r);
+
+        REQUIRE(cluster->get_folders().size() == 1);
+        auto folder_1 = cluster->get_folders().by_id(folder_1_id);
+        REQUIRE(folder_1->is_shared_with(*peer_device_1));
+        CHECK(bfs::exists(root_path / "zzz"));
+    }
+    SECTION("not able to create dir by folder_id") {
+        auto new_root = root_path / "sub-root";
+        bfs::create_directories(new_root);
+        bfs::permissions(new_root, bfs::perms::all, bfs::perm_options::remove);
+        auto new_guard = path_guard_t(new_root);
+
+        auto r = builder.configure_cluster(sha256_1, new_root).add(sha256_1, folder_1_id, 5, 4).fail();
+        REQUIRE(r);
+
+        REQUIRE(cluster->get_folders().size() == 0);
+        REQUIRE(!cluster->get_folders().by_id(folder_1_id));
+
+        bfs::permissions(new_root, bfs::perms::all, bfs::perm_options::add);
+        CHECK(!bfs::exists(new_root / folder_1_id));
+    }
+    SECTION("auto accept + introduce peer (source first)") {
+        auto r = builder.configure_cluster(sha256_1, root_path)
+                     .add(sha256_1, folder_1_id, 5, 4)
+                     .add(sha256_2, folder_1_id, 55, 44)
+                     .finish()
+                     .apply();
+        REQUIRE(r);
+
+        REQUIRE(cluster->get_folders().size() == 1);
+        REQUIRE(cluster->get_devices().size() == 3);
+        auto folder_1 = cluster->get_folders().by_id(folder_1_id);
+        REQUIRE(folder_1->is_shared_with(*peer_device_1));
+        REQUIRE(folder_1->is_shared_with(*peer_device_2));
+        CHECK(bfs::exists(root_path / folder_1_id));
+    }
+    SECTION("auto accept + introduce peer (source second)") {
+        auto r = builder.configure_cluster(sha256_1, root_path)
+                     .add(sha256_2, folder_1_id, 55, 44)
+                     .add(sha256_1, folder_1_id, 5, 4)
+                     .finish()
+                     .apply();
+        REQUIRE(r);
+
+        REQUIRE(cluster->get_folders().size() == 1);
+        REQUIRE(cluster->get_devices().size() == 3);
+        auto folder_1 = cluster->get_folders().by_id(folder_1_id);
+        REQUIRE(folder_1->is_shared_with(*peer_device_1));
+        REQUIRE(folder_1->is_shared_with(*peer_device_2));
+        CHECK(bfs::exists(root_path / folder_1_id));
+    }
+    SECTION("not able to create dir (source second)") {
+        auto new_root = root_path / "sub-root";
+        bfs::create_directories(new_root);
+        bfs::permissions(new_root, bfs::perms::all, bfs::perm_options::remove);
+        auto new_guard = path_guard_t(new_root);
+
+        auto r = builder.configure_cluster(sha256_1, new_root)
+                     .add(sha256_2, folder_1_id, 55, 44)
+                     .add(sha256_1, folder_1_id, 5, 4)
+                     .fail();
+        REQUIRE(r);
+
+        REQUIRE(cluster->get_folders().size() == 0);
+        REQUIRE(cluster->get_devices().size() == 2);
+        REQUIRE(!cluster->get_folders().by_id(folder_1_id));
+
+        bfs::permissions(new_root, bfs::perms::all, bfs::perm_options::add);
+        CHECK(!bfs::exists(new_root / folder_1_id));
     }
 }
 

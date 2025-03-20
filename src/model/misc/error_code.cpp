@@ -126,6 +126,9 @@ std::string error_code_category_t::message(int c) const {
     case error_code_t::invalid_sequence:
         r = "file sequence is invalid";
         break;
+    case error_code_t::empty_folder_name:
+        r = "folder name is empty";
+        break;
     default:
         r = "unknown";
         break;
