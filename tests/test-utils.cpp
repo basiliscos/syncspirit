@@ -119,4 +119,12 @@ utils::bytes_t as_owned_bytes(std::string_view str) {
     return {ptr, ptr + str.size()};
 }
 
+bool has_ipv6() noexcept {
+    namespace ip = boost::asio::ip;
+    namespace sys = boost::system;
+    auto ec = sys::error_code();
+    ip::make_address_v6("1:2:3::4", ec);
+    return !ec;
+}
+
 } // namespace syncspirit::test

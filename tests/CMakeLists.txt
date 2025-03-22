@@ -44,7 +44,7 @@ function(create_test source)
     target_link_libraries(${target} syncspirit_test_lib)
     add_test(
         NAME "${target}-test"
-        COMMAND $<TARGET_FILE_NAME:${target}>
+        COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE_NAME:${target}>
     )
 endfunction()
 

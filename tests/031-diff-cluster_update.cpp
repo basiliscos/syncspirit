@@ -990,6 +990,7 @@ TEST_CASE("auto-accept folders", "[model]") {
         REQUIRE(folder_1->is_shared_with(*peer_device_1));
         CHECK(bfs::exists(root_path / "zzz"));
     }
+#ifndef SYNCSPIRIT_WIN
     SECTION("not able to create dir by folder_id") {
         auto new_root = root_path / "sub-root";
         bfs::create_directories(new_root);
@@ -1005,6 +1006,7 @@ TEST_CASE("auto-accept folders", "[model]") {
         bfs::permissions(new_root, bfs::perms::all, bfs::perm_options::add);
         CHECK(!bfs::exists(new_root / folder_1_id));
     }
+#endif
     SECTION("auto accept + introduce peer (source first)") {
         auto r = builder.configure_cluster(sha256_1, root_path)
                      .add(sha256_1, folder_1_id, 5, 4)
@@ -1035,6 +1037,7 @@ TEST_CASE("auto-accept folders", "[model]") {
         REQUIRE(folder_1->is_shared_with(*peer_device_2));
         CHECK(bfs::exists(root_path / folder_1_id));
     }
+#ifndef SYNCSPIRIT_WIN
     SECTION("not able to create dir (source second)") {
         auto new_root = root_path / "sub-root";
         bfs::create_directories(new_root);
@@ -1054,6 +1057,7 @@ TEST_CASE("auto-accept folders", "[model]") {
         bfs::permissions(new_root, bfs::perms::all, bfs::perm_options::add);
         CHECK(!bfs::exists(new_root / folder_1_id));
     }
+#endif
 }
 
 int _init() {
