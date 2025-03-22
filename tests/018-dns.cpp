@@ -22,7 +22,7 @@ TEST_CASE("get_block_size", "[support]") {
     CHECK(e1.ip == ip::make_address_v4("192.168.1.101"));
     CHECK(e1.port == 53);
 
-    if (test::has_ipv6())  {
+    if (test::has_ipv6()) {
         CHECK(endpoints.size() == 4u);
         auto &e2 = endpoints[2];
         CHECK(e2.ip == ip::make_address_v6("1:2:3::4"));

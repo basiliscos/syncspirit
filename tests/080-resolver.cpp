@@ -223,7 +223,7 @@ void test_success_ipv6() {
 
             REQUIRE(sup->responses.size() == 1);
 
-            if (test::has_ipv6())  {
+            if (test::has_ipv6()) {
                 auto &results = sup->responses.at(0)->payload.res->results;
                 REQUIRE(results.size() == 1);
                 REQUIRE(results.at(0) == asio::ip::make_address("fde8:6819:8685:4d00:be03:58ff:fe74:c854"));
