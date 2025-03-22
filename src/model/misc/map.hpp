@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <tuple>
+#include <utility>
 #include "utils/bytes.h"
 #include <boost/multi_index/global_fun.hpp>
 #include <boost/multi_index/hashed_index.hpp>
@@ -101,22 +102,21 @@ template <typename Item, typename WrappedItem> struct generalized_map_t {
     using composite_key_t = typename WrappedItem::storage_t;
     using iterator_t = decltype(std::declval<map_t>().template get<0>().begin());
     using const_iterator_t = decltype(std::declval<map_t>().template get<0>().cbegin());
+    using sequence_t = std::make_index_sequence<N>;
 
     void put(const Item &item) noexcept {
-        composite_key_t arr;
-        fill<N - 1>(arr, item);
-        auto r = key2item.emplace(item, std::move(arr));
+        auto r = key2item.emplace(item, make_key(item));
         if (!r.second) {
             remove(item);
-            fill<N - 1>(arr, item);
-            r = key2item.emplace(item, std::move(arr));
+            r = key2item.emplace(item, make_key(item));
             assert(r.second);
         }
     }
 
     void remove(const Item &item) noexcept {
-        remove<0>(item);
-        // key2item.template get<0>().erase(get_index<0>(item));
+        [&]<std::size_t... I>(const Item &item, std::index_sequence<I...>) {
+            (key2item.template get<I>().erase(get_index<I, details::single_key_t<WrappedItem, I>>(item)), ...);
+        }(item, sequence_t{});
     }
 
     template <size_t I = 0> Item get(details::single_key_t<WrappedItem, I> id) const noexcept {
@@ -157,22 +157,11 @@ template <typename Item, typename WrappedItem> struct generalized_map_t {
     void clear() noexcept { key2item.clear(); }
 
   protected:
-    template <size_t I> static void constexpr fill(composite_key_t &arr, const Item &item) noexcept {
-        using single_key_t = details::single_key_t<WrappedItem, I>;
-        std::get<I>(arr) = get_index<I, single_key_t>(item);
-        if constexpr (I > 0) {
-            fill<I - 1>(arr, item);
-        }
+    inline composite_key_t make_key(const Item &item) {
+        return []<std::size_t... I>(const Item &item, std::index_sequence<I...>) -> composite_key_t {
+            return composite_key_t{get_index<I, details::single_key_t<WrappedItem, I>>(item)...};
+        }(item, sequence_t{});
     }
-
-    template <size_t I> void remove(const Item &item) noexcept {
-        using single_key_t = details::single_key_t<WrappedItem, I>;
-        key2item.template get<I>().erase(get_index<I, single_key_t>(item));
-        if constexpr (I + 1 < N) {
-            remove<I + 1>(item);
-        }
-    }
-
     map_t key2item;
 };
 
