@@ -10,12 +10,31 @@
 using namespace syncspirit::model;
 
 bool file_iterator_t::file_comparator_t::operator()(const file_info_t *l, const file_info_t *r) const {
+    using P = db::PullOrder;
+
     auto le = l->get_blocks().empty();
     auto re = r->get_blocks().empty();
 
     if (le && !re) {
         return true;
     } else if (re && !le) {
+        return false;
+    }
+
+    auto cmp = std::strong_ordering::equal;
+    if (pull_order == P::newest) {
+        cmp = r->get_modified_s() <=> l->get_modified_s();
+    } else if (pull_order == P::oldest) {
+        cmp = l->get_modified_s() <=> r->get_modified_s();
+    } else if (pull_order == P::smallest) {
+        cmp = l->get_size() <=> r->get_size();
+    } else if (pull_order == P::largest) {
+        cmp = r->get_size() <=> l->get_size();
+    }
+
+    if (cmp == std::strong_ordering::less) {
+        return true;
+    } else if (cmp == std::strong_ordering::greater) {
         return false;
     }
 
@@ -28,7 +47,6 @@ bool file_iterator_t::file_comparator_t::operator()(const file_info_t *l, const 
 file_iterator_t::file_iterator_t(cluster_t &cluster_, const device_ptr_t &peer_) noexcept
     : cluster{cluster_}, peer{peer_.get()}, folder_index{0} {
     auto &folders = cluster.get_folders();
-    comparator.reset(new file_comparator_t());
 
     for (auto &[folder, _] : folders) {
         auto peer_folder = folder->get_folder_infos().by_device(*peer);
@@ -51,7 +69,8 @@ auto file_iterator_t::find_folder(folder_t *folder) noexcept -> folder_iterator_
 
 auto file_iterator_t::prepare_folder(folder_info_ptr_t peer_folder) noexcept -> folder_iterator_t & {
     auto &files = peer_folder->get_file_infos();
-    auto set = std::make_unique<queue_t>(*comparator);
+    auto order = peer_folder->get_folder()->get_pull_order();
+    auto set = std::make_unique<queue_t>(file_comparator_t{order});
 
     for (auto it : files) {
         auto f = it.item.get();
@@ -118,6 +137,23 @@ void file_iterator_t::on_upsert(folder_info_ptr_t peer_folder) noexcept {
         }
     }
     prepare_folder(peer_folder);
+}
+
+void file_iterator_t::on_upsert(folder_t &folder) noexcept {
+    auto order = folder.get_pull_order();
+    for (auto &it : folders_list) {
+        if (it.peer_folder->get_folder() == &folder) {
+            auto &peer_folder = *it.peer_folder;
+            if (it.files_queue->key_comp().pull_order != order) {
+                auto new_set = std::make_unique<queue_t>(file_comparator_t{order});
+                for (auto fi : *it.files_queue) {
+                    new_set->insert(fi);
+                }
+                it.files_queue = std::move(new_set);
+                it.it = it.files_queue->begin();
+            }
+        }
+    }
 }
 
 void file_iterator_t::on_remove(folder_info_ptr_t peer_folder) noexcept {

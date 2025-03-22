@@ -16,6 +16,8 @@
 
 namespace syncspirit::model {
 
+using compare_fn_t = bool(const file_info_t *l, const file_info_t *r);
+
 struct SYNCSPIRIT_API file_iterator_t : arc_base_t<file_iterator_t> {
     using files_list_t = std::vector<file_info_ptr_t>;
     using result_t = std::pair<file_info_t *, advance_action_t>;
@@ -25,6 +27,7 @@ struct SYNCSPIRIT_API file_iterator_t : arc_base_t<file_iterator_t> {
 
     result_t next() noexcept;
 
+    void on_upsert(folder_t &folder) noexcept;
     void on_upsert(folder_info_ptr_t peer_folder) noexcept;
     void on_remove(folder_info_ptr_t peer_folder) noexcept;
     void recheck(file_info_t &file) noexcept;
@@ -32,6 +35,7 @@ struct SYNCSPIRIT_API file_iterator_t : arc_base_t<file_iterator_t> {
   private:
     struct file_comparator_t {
         bool operator()(const file_info_t *l, const file_info_t *r) const;
+        db::PullOrder pull_order;
     };
     using file_comparator_ptr_t = std::unique_ptr<file_comparator_t>;
     using queue_t = std::set<file_info_t *, file_comparator_t>;
@@ -52,7 +56,6 @@ struct SYNCSPIRIT_API file_iterator_t : arc_base_t<file_iterator_t> {
     cluster_t &cluster;
     device_t *peer;
     std::size_t folder_index;
-    file_comparator_ptr_t comparator;
     folder_iterators_t folders_list;
 };
 

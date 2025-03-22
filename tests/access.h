@@ -12,6 +12,7 @@ namespace to {
 struct device {};
 struct state {};
 struct ignore_delete {};
+struct pull_order {};
 } // namespace to
 } // namespace
 } // namespace syncspirit::test
@@ -20,6 +21,7 @@ namespace syncspirit::model {
 
 template <> inline auto &folder_t::access<test::to::device>() noexcept { return device; }
 template <> inline auto &folder_data_t::access<test::to::ignore_delete>() noexcept { return ignore_delete; }
+template <> inline auto &folder_data_t::access<test::to::pull_order>() noexcept { return pull_order; }
 
 } // namespace syncspirit::model
 

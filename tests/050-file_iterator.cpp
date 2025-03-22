@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "test-utils.h"
+#include "access.h"
 #include "model/cluster.h"
 #include "model/misc/file_iterator.h"
 #include "model/misc/sequencer.h"
@@ -525,6 +526,135 @@ TEST_CASE("file iterator, create, share, iterae, unshare, share, iterate", "[mod
     REQUIRE(f);
     CHECK(action == A::remote_copy);
     CHECK(f->get_name() == "a.txt");
+}
+
+TEST_CASE("file pull order", "[model]") {
+    using names_t = std::vector<std::string>;
+    struct file_meta_t {
+        std::string_view name;
+        std::int64_t size;
+        std::int64_t modified;
+    };
+    file_meta_t file_metas[5] = {
+        {"0.txt", 0, 123}, {"1/a.txt", 5, 5000}, {"1/c.txt", 15, 4000}, {"1/d.txt", 10, 4500}, {"1/e.txt", 20, 6000},
+    };
+
+    auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
+    auto my_device = device_t::create(my_id, "my-device").value();
+    auto peer_id = device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
+
+    auto peer_device = device_t::create(peer_id, "peer-device").value();
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
+    auto sequencer = make_sequencer(4);
+    cluster->get_devices().put(my_device);
+    cluster->get_devices().put(peer_device);
+
+    auto builder = diff_builder_t(*cluster);
+
+    auto &folders = cluster->get_folders();
+    REQUIRE(builder.upsert_folder("1234-5678", "/my/path").apply());
+    REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
+    auto folder = folders.by_id("1234-5678");
+    auto folder_infos = &folder->get_folder_infos();
+    REQUIRE(folder_infos->size() == 2u);
+
+    auto index = builder.make_index(peer_id.get_sha256(), folder->get_id());
+    std::int64_t sequence = 10;
+    for (auto &meta : file_metas) {
+        auto pr = proto::FileInfo();
+        proto::set_name(pr, meta.name);
+        proto::set_size(pr, meta.size);
+        proto::set_modified_s(pr, meta.modified);
+
+        if (meta.size) {
+            auto bytes_view = utils::bytes_view_t((unsigned char *)&file_metas, meta.size);
+            auto hash = utils::sha256_digest(bytes_view).value();
+            auto block = proto::BlockInfo();
+            proto::set_hash(block, hash);
+            proto::set_size(block, meta.size);
+            proto::add_blocks(pr, std::move(block));
+        }
+
+        proto::set_sequence(pr, sequence++);
+        index.add(pr, peer_device);
+    }
+    REQUIRE(index.finish().apply());
+
+    SECTION("iteration anew") {
+        auto iterate = [&]() -> names_t {
+            auto file_iterator = peer_device->create_iterator(*cluster);
+            auto names = names_t();
+            while (true) {
+                auto [fi, action] = file_iterator->next();
+                if (!fi) {
+                    break;
+                };
+                CHECK(action == A::remote_copy);
+                names.emplace_back(std::string(fi->get_name()));
+            }
+            return names;
+        };
+
+        auto &pull_order = ((model::folder_data_t *)folder.get())->access<test::to::pull_order>();
+        SECTION("defaul order (alphabetic)") {
+            auto expected = names_t{"0.txt", "1/a.txt", "1/c.txt", "1/d.txt", "1/e.txt"};
+            CHECK(iterate() == expected);
+        }
+        SECTION("random (aka alphabetic)") {
+            pull_order = db::PullOrder::random;
+            auto expected = names_t{"0.txt", "1/a.txt", "1/c.txt", "1/d.txt", "1/e.txt"};
+            CHECK(iterate() == expected);
+        }
+        SECTION("alphabetic") {
+            pull_order = db::PullOrder::alphabetic;
+            auto expected = names_t{"0.txt", "1/a.txt", "1/c.txt", "1/d.txt", "1/e.txt"};
+            CHECK(iterate() == expected);
+        }
+        SECTION("smallest") {
+            pull_order = db::PullOrder::smallest;
+            auto expected = names_t{"0.txt", "1/a.txt", "1/d.txt", "1/c.txt", "1/e.txt"};
+            CHECK(iterate() == expected);
+        }
+        SECTION("largest") {
+            pull_order = db::PullOrder::largest;
+            auto expected = names_t{"0.txt", "1/e.txt", "1/c.txt", "1/d.txt", "1/a.txt"};
+            CHECK(iterate() == expected);
+        }
+        SECTION("oldest") {
+            pull_order = db::PullOrder::oldest;
+            auto expected = names_t{"0.txt", "1/c.txt", "1/d.txt", "1/a.txt", "1/e.txt"};
+            CHECK(iterate() == expected);
+        }
+        SECTION("newest") {
+            pull_order = db::PullOrder::newest;
+            auto expected = names_t{"0.txt", "1/e.txt", "1/a.txt", "1/d.txt", "1/c.txt"};
+            CHECK(iterate() == expected);
+        }
+    }
+    SECTION("change iteration order") {
+        auto &pull_order = ((model::folder_data_t *)folder.get())->access<test::to::pull_order>();
+        pull_order = db::PullOrder::alphabetic;
+        auto file_iterator = peer_device->create_iterator(*cluster);
+        auto names = names_t();
+        auto next = [&]() {
+            auto [fi, action] = file_iterator->next();
+            REQUIRE(fi);
+            CHECK(action == A::remote_copy);
+            names.emplace_back(std::string(fi->get_name()));
+        };
+
+        next();
+        next();
+
+        pull_order = db::PullOrder::newest;
+        file_iterator->on_upsert(*folder);
+        next();
+        next();
+        next();
+
+        auto expected = names_t{"0.txt", "1/a.txt", "1/e.txt", "1/d.txt", "1/c.txt"};
+        CHECK(names == expected);
+    }
 }
 
 int _init() {

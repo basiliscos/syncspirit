@@ -127,9 +127,10 @@ distributions on it)
 # changes
 
 ## 0.4.1 (xx-xxx-xxxx)
- - [core, bep] support`ignore_deletes` folder flag.
- - [core, bep] support device `auto-accept` folder flag.
- - [core, bep] support device `introducer` and `skip_introduction_removals` markers.
+ - [core, bep] support `pull_older` folder setting (alphabetic, by size, by modification date)
+ - [core, bep] support `ignore_deletes` folder flag
+ - [core, bep] support device `auto-accept` folder flag
+ - [core, bep] support device `introducer` and `skip_introduction_removals` markers
  - [core, bep] support outgoing messages to be compressed using lz4
  - [impl] degoogle: use [protopuf](https://github.com/PragmaTwice/protopuf) instead of protobuf
 

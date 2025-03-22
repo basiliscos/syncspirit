@@ -14,6 +14,11 @@ cmake_policy(SET CMP0135 NEW)
 include(GenerateExportHeader)
 include (FetchContent)
 
+if (WIN32)
+    # set(CMAKE_CROSSCOMPILING on)
+    # set(CMAKE_CROSSCOMPILING_EMULATOR "/usr/bin/wine")
+endif()
+
 set(CMAKE_POSITION_INDEPENDENT_CODE True)
 
 #set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
