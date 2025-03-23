@@ -19,15 +19,20 @@ using namespace syncspirit::fltk;
 
 static constexpr int padding = 5;
 
+static std::mutex incoming_mutex;
+log_panel_t *widget;
+
 struct syncspirit::fltk::fltk_sink_t final : base_sink_t {
-    fltk_sink_t(log_panel_t *widget_) : widget{widget_} {}
+    fltk_sink_t() {}
+    fltk_sink_t(const fltk_sink_t &) = delete;
+    fltk_sink_t(fltk_sink_t &&) = default;
 
     void forward(log_record_ptr_t record) override {
-        auto lock = std::unique_lock(widget->incoming_mutex);
-        widget->incoming_records.push_back(std::move(record));
+        auto lock = std::unique_lock(incoming_mutex);
+        if (widget) {
+            widget->incoming_records.push_back(std::move(record));
+        }
     }
-
-    log_panel_t *widget;
 };
 
 static void _pull_in_logs(void *data) {
@@ -235,7 +240,9 @@ log_panel_t::log_panel_t(app_supervisor_t &supervisor_, int x, int y, int w, int
 
     resizable(log_table);
 
-    auto bridge_sink = sink_ptr_t(new fltk_sink_t(this));
+    auto lock = std::unique_lock(incoming_mutex);
+    widget = this;
+    auto bridge_sink = sink_ptr_t(new fltk_sink_t());
 
     auto &dist_sink = supervisor.get_dist_sink();
     for (auto sink : dist_sink->sinks()) {
@@ -258,7 +265,11 @@ void log_panel_t::on_loading_done() {
     Fl::add_timeout(0.05, _pull_in_logs, this);
 }
 
-log_panel_t::~log_panel_t() { Fl::remove_timeout(_pull_in_logs, this); }
+log_panel_t::~log_panel_t() {
+    Fl::remove_timeout(_pull_in_logs, this);
+    auto lock = std::unique_lock(incoming_mutex);
+    widget = nullptr;
+}
 
 void log_panel_t::update(log_queue_t new_records) {
     auto display_level = supervisor.get_app_config().fltk_config.level;
