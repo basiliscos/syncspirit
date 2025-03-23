@@ -1,6 +1,7 @@
 ## core
 
  - add inotify-support
+ - dynamically apply config changes
 
 ## fltk
 
