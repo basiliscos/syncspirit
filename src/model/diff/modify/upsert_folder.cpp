@@ -4,6 +4,7 @@
 #include "upsert_folder.h"
 #include "model/cluster.h"
 #include "model/diff/cluster_visitor.h"
+#include "model/misc/file_iterator.h"
 #include "upsert_folder_info.h"
 #include "proto/proto-helpers-db.h"
 #include "utils/format.hpp"
@@ -72,6 +73,19 @@ auto upsert_folder_t::apply_impl(cluster_t &cluster, apply_controller_t &control
     auto r = applicator_t::apply_child(cluster, controller);
     if (!r) {
         return r;
+    }
+
+    if (prev_folder) {
+        for (auto it : cluster.get_devices()) {
+            auto &device = *it.item;
+            if (&device != cluster.get_device().get()) {
+                if (prev_folder->is_shared_with(device)) {
+                    if (auto it = device.get_iterator(); it) {
+                        it->on_upsert(*prev_folder);
+                    }
+                }
+            }
+        }
     }
 
     return applicator_t::apply_sibling(cluster, controller);
