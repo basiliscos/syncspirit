@@ -45,24 +45,30 @@ r::plugin::resource_id_t model = 0;
 }
 } // namespace
 
-db_info_viewer_guard_t::db_info_viewer_guard_t(app_supervisor_t *supervisor_) : supervisor{supervisor_} {}
+db_info_viewer_guard_t::db_info_viewer_guard_t(main_window_t *main_window_) : main_window{main_window_} {}
 db_info_viewer_guard_t::db_info_viewer_guard_t(db_info_viewer_guard_t &&other) { *this = std::move(other); }
 
 db_info_viewer_guard_t &db_info_viewer_guard_t::operator=(db_info_viewer_guard_t &&other) {
-    std::swap(supervisor, other.supervisor);
+    std::swap(main_window, other.main_window);
     return *this;
 }
 
 db_info_viewer_guard_t::~db_info_viewer_guard_t() {
-    if (supervisor) {
-        supervisor->log->trace("~db_info_viewer_guard_t");
-        supervisor->db_info_viewer = nullptr;
+    if (main_window) {
+        if (auto sup = main_window->get_supervisor(); sup) {
+            sup->log->trace("~db_info_viewer_guard_t");
+            sup->db_info_viewer = nullptr;
+        }
     }
 }
 
 void db_info_viewer_guard_t::reset() {
-    supervisor->db_info_viewer = nullptr;
-    supervisor = nullptr;
+    if (main_window) {
+        if (auto sup = main_window->get_supervisor(); sup) {
+            sup->db_info_viewer = nullptr;
+        }
+        main_window = nullptr;
+    }
 }
 
 using callback_fn_t = std::function<void()>;
@@ -128,6 +134,9 @@ app_supervisor_t::~app_supervisor_t() {
         dist_sink->remove_sink(ui_sink);
         ui_sink.reset();
     }
+    if (main_window) {
+        main_window->detach_supervisor();
+    }
     spdlog::debug("~app_supervisor_t()");
 }
 
@@ -168,6 +177,8 @@ void app_supervisor_t::shutdown_finish() noexcept {
     LOG_TRACE(log, "shutdown_finish");
     if (main_window) {
         main_window->on_shutdown();
+        main_window->detach_supervisor();
+        main_window = nullptr;
     }
     std::stringstream out;
     std::stringstream out_orig;
@@ -299,7 +310,7 @@ auto app_supervisor_t::request_db_info(db_info_viewer_t *viewer) -> db_info_view
     log->trace("request_db_info");
     request<net::payload::db_info_request_t>(coordinator).send(init_timeout * 5 / 6);
     db_info_viewer = viewer;
-    return db_info_viewer_guard_t(this);
+    return db_info_viewer_guard_t(main_window);
 }
 
 callback_ptr_t app_supervisor_t::call_select_folder(std::string_view folder_id) {

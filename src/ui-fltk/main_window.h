@@ -16,13 +16,16 @@ struct main_window_t : Fl_Double_Window {
     using parent_t = Fl_Double_Window;
 
     main_window_t(app_supervisor_t &supervisor, int w, int h);
+    ~main_window_t();
 
     void on_shutdown();
     void set_splash_text(std::string text);
     void on_loading_done();
+    void detach_supervisor();
+    app_supervisor_t *get_supervisor();
 
   private:
-    app_supervisor_t &supervisor;
+    app_supervisor_t *supervisor;
     Fl_Group *content_left;
     tree_view_t *tree;
     log_panel_t *log_panel;

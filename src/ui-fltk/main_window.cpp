@@ -15,15 +15,16 @@
 using namespace syncspirit::fltk;
 
 main_window_t::main_window_t(app_supervisor_t &supervisor_, int w_, int h_)
-    : parent_t(w_, h_, "syncspirit-fltk"), supervisor{supervisor_} {
+    : parent_t(w_, h_, "syncspirit-fltk"), supervisor{&supervisor_} {
 
 #ifdef _WIN32
     auto icon = LoadIcon(fl_display, MAKEINTRESOURCE(ID_SYNCSPIRIT_ICON));
     this->icon((const void *)icon);
 #endif
+    supervisor->set_main_window(this);
 
     auto container = new Fl_Tile(0, 0, w(), h());
-    auto &cfg = supervisor.get_app_config().fltk_config;
+    auto &cfg = supervisor->get_app_config().fltk_config;
     auto left_share = std::min(std::max(0.1, cfg.left_panel_share), 0.9);
     auto bottom_share = std::min(std::max(0.1, cfg.bottom_panel_share), 0.9);
     container->begin();
@@ -37,14 +38,14 @@ main_window_t::main_window_t(app_supervisor_t &supervisor_, int w_, int h_)
     content_left = new Fl_Group(0, 0, left_w, top_h);
     content_left->box(FL_ENGRAVED_BOX);
     content_left->begin();
-    auto toolbar = new toolbar_t(supervisor, 0, 0, left_w, 0);
+    auto toolbar = new toolbar_t(*supervisor, 0, 0, left_w, 0);
     toolbar->end();
     auto toolbar_h = toolbar->h();
-    tree = new tree_view_t(supervisor, 0, toolbar_h, left_w, top_h - toolbar_h);
+    tree = new tree_view_t(*supervisor, 0, toolbar_h, left_w, top_h - toolbar_h);
     content_left->end();
     content_left->resizable(tree);
 
-    supervisor.replace_content([&](content_t *) -> content_t * {
+    supervisor->replace_content([&](content_t *) -> content_t * {
         struct my_box_t : contentable_t<Fl_Box> {
             using parent_t = contentable_t<Fl_Box>;
             using parent_t::parent_t;
@@ -56,7 +57,7 @@ main_window_t::main_window_t(app_supervisor_t &supervisor_, int w_, int h_)
         return box;
     });
 
-    log_panel = new log_panel_t(supervisor, 0, 0, w(), bottom_h);
+    log_panel = new log_panel_t(*supervisor, 0, 0, w(), bottom_h);
     log_panel->position(0, content_left->h());
     log_panel->box(FL_FLAT_BOX);
 
@@ -66,12 +67,17 @@ main_window_t::main_window_t(app_supervisor_t &supervisor_, int w_, int h_)
     end();
 
     resizable(this);
-    supervisor.set_main_window(this);
     deactivate();
 }
 
+main_window_t::~main_window_t() {
+    // one of the child d-tors use `main_window` object (indirectly),
+    // hence it should be alive a little bit before children deletion
+    clear();
+}
+
 void main_window_t::on_shutdown() {
-    auto &cfg = supervisor.get_app_config().fltk_config;
+    auto &cfg = supervisor->get_app_config().fltk_config;
     cfg.main_window_height = h();
     cfg.main_window_width = w();
     cfg.left_panel_share = (content_left->w() + 0.) / w();
@@ -98,3 +104,7 @@ void main_window_t::on_loading_done() {
     log_panel->on_loading_done();
     activate();
 }
+
+void main_window_t::detach_supervisor() { supervisor = nullptr; }
+
+app_supervisor_t *main_window_t::get_supervisor() { return supervisor; }

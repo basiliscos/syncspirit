@@ -41,7 +41,7 @@ struct db_info_viewer_t {
 };
 
 struct db_info_viewer_guard_t {
-    db_info_viewer_guard_t(app_supervisor_t *supervisor);
+    db_info_viewer_guard_t(main_window_t *main_window);
     db_info_viewer_guard_t(const db_info_viewer_guard_t &) = delete;
     db_info_viewer_guard_t(db_info_viewer_guard_t &&);
 
@@ -50,7 +50,7 @@ struct db_info_viewer_guard_t {
     void reset();
 
   private:
-    app_supervisor_t *supervisor;
+    main_window_t *main_window;
 };
 
 using dist_sink_t = std::shared_ptr<spdlog::sinks::dist_sink_mt>;
