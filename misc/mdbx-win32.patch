@@ -1,0 +1,11 @@
+--- _deps/mdbx-src/mdbx.c	2025-03-07 09:32:49.342834537 +0300
++++ _deps/mdbx-src/mdbx.c.orig	2025-03-07 09:32:13.593479783 +0300
+@@ -28490,7 +28490,7 @@
+     for (ior_item_t *item = ior->pool; item <= ior->last;) {
+       if (!HasOverlappedIoCompleted(&item->ov)) {
+         assert(ior->overlapped_fd);
+-        CancelIoEx(ior->overlapped_fd, &item->ov);
++        CancelIo(ior->overlapped_fd);
+       }
+       if (item->ov.hEvent && item->ov.hEvent != ior)
+         ior_put_event(ior, item->ov.hEvent);
