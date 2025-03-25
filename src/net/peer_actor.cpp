@@ -8,14 +8,14 @@
 #include "utils/error_code.h"
 #include "utils/format.hpp"
 #include "utils/time.h"
+#include "transport/stream.h"
 #include "proto/bep_support.h"
 #include "model/messages.h"
 #include "model/diff/contact/peer_state.h"
 #include "model/diff/contact/ignored_connected.h"
 #include "model/diff/contact/unknown_connected.h"
 #include "model/diff/modify/add_pending_device.h"
-#include "model/diff/peer/rx.h"
-#include "model/diff/peer/tx.h"
+#include "model/diff/peer/rx_tx.h"
 
 using namespace syncspirit::net;
 using namespace syncspirit;
@@ -34,7 +34,7 @@ r::plugin::resource_id_t finalization = 5;
 peer_actor_t::peer_actor_t(config_t &config)
     : r::actor_base_t{config}, cluster{config.cluster}, device_name{config.device_name}, bep_config{config.bep_config},
       coordinator{config.coordinator}, peer_device_id{config.peer_device_id}, transport(std::move(config.transport)),
-      peer_endpoint{config.peer_endpoint}, peer_proto(std::move(config.peer_proto)) {
+      peer_endpoint{config.peer_endpoint}, peer_proto(std::move(config.peer_proto)), rx_bytes{0}, tx_bytes{0} {
     rx_buff.resize(config.bep_config.rx_buff_size);
 }
 
@@ -151,9 +151,8 @@ void peer_actor_t::on_write(std::size_t sz) noexcept {
     if (controller) {
         send<payload::transfer_pop_t>(controller, (uint32_t)sz);
     }
-    auto diff = model::diff::cluster_diff_ptr_t{};
-    diff.reset(new model::diff::peer::tx_t(peer_device_id.get_sha256(), sz));
-    send<model::payload::model_update_t>(coordinator, std::move(diff));
+    tx_bytes += sz;
+    emit_io_stats();
 
     assert(tx_item);
     if (tx_item->final) {
@@ -174,9 +173,7 @@ void peer_actor_t::on_read(std::size_t bytes) noexcept {
     rx_idx += bytes;
 
     LOG_TRACE(log, "on_read, {} bytes, total = {}", bytes, rx_idx);
-    auto diff = model::diff::cluster_diff_ptr_t{};
-    diff.reset(new model::diff::peer::rx_t(peer_device_id.get_sha256(), bytes));
-    send<model::payload::model_update_t>(coordinator, std::move(diff));
+    rx_bytes += bytes;
 
     auto buff = utils::bytes_view_t((unsigned char *)rx_buff.data(), rx_idx);
     auto result = proto::parse_bep(buff);
@@ -199,6 +196,7 @@ void peer_actor_t::on_read(std::size_t bytes) noexcept {
         std::memcpy(ptr, ptr + value.consumed, rx_idx);
     }
     (this->*read_action)(std::move(value.message));
+    emit_io_stats();
     // LOG_TRACE(log, "on_read, rx_idx = {} ", rx_idx);
 }
 
@@ -506,5 +504,17 @@ void peer_actor_t::on_rx_timeout(r::request_id_t, bool cancelled) noexcept {
         auto ec = utils::make_error_code(utils::error_code_t::rx_timeout);
         auto reason = make_error(ec);
         do_shutdown(reason);
+    }
+}
+
+void peer_actor_t::emit_io_stats() noexcept {
+    using namespace std::chrono;
+    auto now = clock_t::now();
+    if (now > last_stats + milliseconds{bep_config.stats_interval}) {
+        auto diff = model::diff::cluster_diff_ptr_t();
+        last_stats = now;
+        diff.reset(new model::diff::peer::rx_tx_t(peer_device_id.get_sha256(), rx_bytes, tx_bytes));
+        rx_bytes = tx_bytes = 0;
+        send<model::payload::model_update_t>(coordinator, std::move(diff));
     }
 }

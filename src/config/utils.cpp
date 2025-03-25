@@ -335,6 +335,12 @@ config_result_t get_config(std::istream &config, const bfs::path &config_path) {
             return "bep/advances_per_iteration is incorrect or missing";
         }
         c.advances_per_iteration = advances_per_iteration.value();
+
+        auto stats_interval = t["stats_interval"].value<std::uint32_t>();
+        if (!stats_interval) {
+            return "bep/stats_interval is incorrect or missing";
+        }
+        c.stats_interval = stats_interval.value();
     }
 
     // dialer
@@ -569,6 +575,7 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
                     {"request_timeout", cfg.bep_config.request_timeout},
                     {"rx_buff_size", cfg.bep_config.rx_buff_size},
                     {"rx_timeout", cfg.bep_config.rx_timeout},
+                    {"stats_interval", cfg.bep_config.stats_interval},
                     {"tx_buff_limit", cfg.bep_config.tx_buff_limit},
                     {"tx_timeout", cfg.bep_config.tx_timeout},
                 }}},
@@ -688,6 +695,7 @@ outcome::result<main_t> generate_config(const bfs::path &config_path) {
         16,                 /* blocks_max_requested */
         32,                 /* blocks_simultaneous_write */
         10,                 /* advances_per_iteration */
+        100,                /* stats_interval */
     };
     cfg.dialer_config = dialer_config_t {
         true,       /* enabled */

@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #pragma once
 
 #include "config/bep.h"
-#include "transport/stream.h"
 #include "proto/bep_support.h"
 #include "utils/log.h"
 #include "model/cluster.h"
@@ -13,6 +12,7 @@
 #include <rotor/asio/supervisor_asio.h>
 #include <optional>
 #include <list>
+#include <chrono>
 
 namespace syncspirit {
 
@@ -108,6 +108,7 @@ struct SYNCSPIRIT_API peer_actor_t : public r::actor_base_t {
     using read_action_t = void (peer_actor_t::*)(proto::message::message_t &&msg);
     using block_request_ptr_t = r::intrusive_ptr_t<message::block_request_t>;
     using block_requests_t = std::list<block_request_ptr_t>;
+    using clock_t = std::chrono::steady_clock;
 
     void on_start_reading(message::start_reading_t &) noexcept;
     void on_termination(message::termination_signal_t &) noexcept;
@@ -136,6 +137,8 @@ struct SYNCSPIRIT_API peer_actor_t : public r::actor_base_t {
     void handle_close(proto::Close &&) noexcept;
     void handle_response(proto::Response &&) noexcept;
 
+    void emit_io_stats() noexcept;
+
     model::cluster_ptr_t cluster;
     utils::logger_t log;
     std::string_view device_name;
@@ -150,14 +153,17 @@ struct SYNCSPIRIT_API peer_actor_t : public r::actor_base_t {
     tx_item_t tx_item;
     fmt::memory_buffer rx_buff;
     std::size_t rx_idx = 0;
-    bool finished = false;
-    bool io_error = false;
     std::string cert_name;
     tcp::endpoint peer_endpoint;
     std::string peer_proto;
     read_action_t read_action;
     r::address_ptr_t controller;
     block_requests_t block_requests;
+    std::size_t rx_bytes;
+    std::size_t tx_bytes;
+    clock_t::time_point last_stats;
+    bool finished = false;
+    bool io_error = false;
 };
 
 } // namespace net

@@ -41,8 +41,7 @@ struct SYNCSPIRIT_API cluster_visitor_t {
     virtual outcome::result<void> operator()(const local::synchronization_finish_t &, void *custom) noexcept;
 
     virtual outcome::result<void> operator()(const peer::cluster_update_t &, void *custom) noexcept;
-    virtual outcome::result<void> operator()(const peer::rx_t &, void *custom) noexcept;
-    virtual outcome::result<void> operator()(const peer::tx_t &, void *custom) noexcept;
+    virtual outcome::result<void> operator()(const peer::rx_tx_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const peer::update_folder_t &, void *custom) noexcept;
 
     virtual outcome::result<void> operator()(const modify::add_blocks_t &, void *custom) noexcept;

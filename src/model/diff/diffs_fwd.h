@@ -47,8 +47,7 @@ struct synchronization_finish_t;
 
 namespace peer {
 struct cluster_update_t;
-struct rx_t;
-struct tx_t;
+struct rx_tx_t;
 struct update_folder_t;
 } // namespace peer
 

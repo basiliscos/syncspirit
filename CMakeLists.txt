@@ -175,8 +175,7 @@ add_library(syncspirit_core
     src/model/diff/modify/upsert_folder.cpp
     src/model/diff/modify/upsert_folder_info.cpp
     src/model/diff/peer/cluster_update.cpp
-    src/model/diff/peer/rx.cpp
-    src/model/diff/peer/tx.cpp
+    src/model/diff/peer/rx_tx.cpp
     src/model/diff/peer/update_folder.cpp
     src/model/misc/block_iterator.cpp
     src/model/misc/error_code.cpp
