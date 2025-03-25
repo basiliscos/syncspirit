@@ -7,6 +7,7 @@
 #include "../static_table.h"
 #include "../qr_button.h"
 #include "../utils.hpp"
+#include "../main_window.h"
 #include "utils/dns.h"
 #include "constants.h"
 
@@ -33,7 +34,7 @@ struct self_table_t final : static_table_t, db_info_viewer_t {
     using parent_t = static_table_t;
     using db_info_t = syncspirit::net::payload::db_info_response_t;
 
-    self_table_t(self_device_t *owner_, int x, int y, int w, int h)
+    self_table_t(main_window_t *owner_, int x, int y, int w, int h)
         : parent_t(x, y, w, h), owner{owner_}, db_info_guard(nullptr) {
 
         auto v = OPENSSL_VERSION_NUMBER;
@@ -97,8 +98,11 @@ struct self_table_t final : static_table_t, db_info_viewer_t {
     }
 
     void refresh() override {
-        auto &sup = owner->supervisor;
-        auto cluster = sup.get_cluster();
+        auto sup = owner->get_supervisor();
+        if (!sup) {
+            return;
+        }
+        auto cluster = sup->get_cluster();
         auto rx_bytes = std::int64_t{0};
         auto tx_bytes = std::int64_t{0};
 
@@ -117,7 +121,7 @@ struct self_table_t final : static_table_t, db_info_viewer_t {
 
         device_id_short_cell->update(device_id_short);
         device_id_cell->update(device_id);
-        uptime_cell->update(sup.get_uptime());
+        uptime_cell->update(sup->get_uptime());
         rx_cell->update(get_file_size(rx_bytes));
         tx_cell->update(get_file_size(tx_bytes));
         mdbx_entries_cell->update(fmt::format("{}", db_info.entries));
@@ -137,9 +141,13 @@ struct self_table_t final : static_table_t, db_info_viewer_t {
         Fl::remove_timeout(on_db_refresh_timeout, this);
     }
 
-    void update_db_info() { db_info_guard = owner->supervisor.request_db_info(this); }
+    void update_db_info() {
+        if (auto sup = owner->get_supervisor(); sup) {
+            db_info_guard = sup->request_db_info(this);
+        }
+    }
 
-    self_device_t *owner;
+    main_window_t *owner;
     db_info_viewer_guard_t db_info_guard;
     db_info_t db_info;
     static_string_provider_ptr_t device_id_short_cell;
@@ -195,7 +203,7 @@ bool self_device_t::on_select() {
         group->resizable(resizable_area);
 
         group->begin();
-        auto top = new self_table_t(this, x, y, w, h - bot_h);
+        auto top = new self_table_t(supervisor.get_main_window(), x, y, w, h - bot_h);
         auto bot = [&]() -> Fl_Widget * {
             auto &device = supervisor.get_cluster()->get_device()->device_id();
             return new qr_button_t(device, supervisor, x, y + top->h(), w, bot_h);

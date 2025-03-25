@@ -160,6 +160,7 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
     Fl_Color get_color(color_context_t context) const;
 
     void set_main_window(main_window_t *window);
+    main_window_t *get_main_window();
     void set_devices(tree_item_t *node);
     void set_folders(tree_item_t *node);
     void set_pending_devices(tree_item_t *node);

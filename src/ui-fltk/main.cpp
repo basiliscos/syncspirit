@@ -54,13 +54,6 @@ namespace rth = r::thread;
 namespace rf = rotor::fltk;
 namespace asio = boost::asio;
 
-namespace {
-namespace to {
-struct on_timer_trigger {};
-struct timers_map {};
-} // namespace to
-} // namespace
-
 using namespace syncspirit;
 
 [[noreturn]] static void report_error_and_die(r::actor_base_t *actor, const r::extended_error_ptr_t &ec) noexcept {
@@ -79,6 +72,14 @@ struct asio_sys_context_t : ra::system_context_asio_t {
 
 struct thread_sys_context_t : rth::system_context_thread_t {
     using parent_t = rth::system_context_thread_t;
+    using parent_t::parent_t;
+    void on_error(r::actor_base_t *actor, const r::extended_error_ptr_t &ec) noexcept override {
+        report_error_and_die(actor, ec);
+    }
+};
+
+struct fltk_context_t : rf::system_context_fltk_t {
+    using parent_t = rf::system_context_fltk_t;
     using parent_t::parent_t;
     void on_error(r::actor_base_t *actor, const r::extended_error_ptr_t &ec) noexcept override {
         report_error_and_die(actor, ec);
@@ -283,7 +284,7 @@ int main(int argc, char **argv) {
         // window should outlive fltk ctx, as in ctx d-tor model augmentations
         // invoke fltk-things..
         auto main_window = std::unique_ptr<fltk::main_window_t>();
-        auto fltk_ctx = rf::system_context_ptr_t(new rf::system_context_fltk_t());
+        auto fltk_ctx = rf::system_context_ptr_t(new fltk_context_t());
         auto sup_fltk = fltk_ctx->create_supervisor<fltk::app_supervisor_t>()
                             .dist_sink(bootstrap_guard->get_dist_sink())
                             .config_path(config_file_path)

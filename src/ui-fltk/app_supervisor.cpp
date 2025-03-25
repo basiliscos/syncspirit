@@ -295,6 +295,7 @@ void app_supervisor_t::set_folders(tree_item_t *node) { folders = node; }
 void app_supervisor_t::set_pending_devices(tree_item_t *node) { pending_devices = node; }
 void app_supervisor_t::set_ignored_devices(tree_item_t *node) { ignored_devices = node; }
 void app_supervisor_t::set_main_window(main_window_t *window) { main_window = window; }
+main_window_t *app_supervisor_t::get_main_window() { return main_window; }
 
 void app_supervisor_t::add_sink(spdlog::sink_ptr ui_sink_) {
     ui_sink = ui_sink_;
