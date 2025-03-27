@@ -172,6 +172,7 @@ diff_builder_t &diff_builder_t::upsert_folder(std::string_view id, std::string_v
     db::set_id(db_folder, id);
     db::set_label(db_folder, label);
     db::set_path(db_folder, path);
+    db::set_folder_type(db_folder, db::FolderType::send_and_receive);
     auto opt = diff::modify::upsert_folder_t::create(cluster, *sequencer, std::move(db_folder), index_id);
     return assign(opt.value().get());
 }
