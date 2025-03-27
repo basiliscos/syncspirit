@@ -158,6 +158,13 @@ void tx_timeout_t::reflect_to(syncspirit::config::main_t &main) { main.bep_confi
 
 const char *tx_timeout_t::explanation_ = "tx max time, milliseconds";
 
+stats_interval_t::stats_interval_t(std::uint64_t value, std::uint64_t default_value)
+    : parent_t("tx_timeout", explanation_, value, default_value) {}
+
+void stats_interval_t::reflect_to(syncspirit::config::main_t &main) { main.bep_config.stats_interval = native_value; }
+
+const char *stats_interval_t::explanation_ = "min delay before gathering I/O stats, milliseconds";
+
 } // namespace bep
 
 namespace db {

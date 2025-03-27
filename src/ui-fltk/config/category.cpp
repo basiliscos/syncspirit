@@ -31,6 +31,7 @@ auto reflect(const main_cfg_t &config, const main_cfg_t &default_config) -> cate
             property_ptr_t(new bep::rx_timeout_t(bep.rx_timeout, bep_def.rx_timeout)),
             property_ptr_t(new bep::tx_buff_limit_t(bep.tx_buff_limit, bep_def.tx_buff_limit)),
             property_ptr_t(new bep::tx_timeout_t(bep.tx_timeout, bep_def.tx_timeout)),
+            property_ptr_t(new bep::stats_interval_t(bep.stats_interval, bep_def.stats_interval)),
             // clang-format on
         };
         return new category_t("bep", "BEP protocol/network settings", std::move(props));
