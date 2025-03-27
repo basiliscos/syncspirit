@@ -28,7 +28,6 @@ struct folder_table_t : static_table_t {
     static widgetable_ptr_t make_folder_type(folder_table_t &container, bool disabled);
     static widgetable_ptr_t make_pull_order(folder_table_t &container, bool disabled);
     static widgetable_ptr_t make_index(folder_table_t &container, bool disabled);
-    static widgetable_ptr_t make_read_only(folder_table_t &container, bool disabled);
     static widgetable_ptr_t make_rescan_interval(folder_table_t &container, bool disabled);
     static widgetable_ptr_t make_ignore_permissions(folder_table_t &container, bool disabled);
     static widgetable_ptr_t make_ignore_delete(folder_table_t &container, bool disabled);

@@ -222,7 +222,6 @@ using Device = pp::message<
 using Folder = pp::message<
     pp::string_field    <"id",                    1             >,
     pp::string_field    <"label",                 2             >,
-    pp::bool_field      <"read_only",             3             >,
     pp::bool_field      <"ignore_permissions",    4             >,
     pp::bool_field      <"ignore_delete",         5             >,
     pp::bool_field      <"disable_temp_indexes",  6             >,

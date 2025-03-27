@@ -148,7 +148,6 @@ struct table_t : content::folder_table_t {
         data.push_back({"index", make_index(*this, true)});
         data.push_back({"scan start", scan_start_cell});
         data.push_back({"scan finish", scan_finish_cell});
-        data.push_back({"read only", make_read_only(*this, false)});
         data.push_back({"rescan interval", make_rescan_interval(*this, false)});
         data.push_back({"ignore permissions", make_ignore_permissions(*this, false)});
         data.push_back({"ignore delete", make_ignore_delete(*this, false)});

@@ -41,7 +41,6 @@ remove_folder_t::remove_folder_t(const model::cluster_t &cluster, model::sequenc
             db::set_max_sequence(db_fi, fi.get_max_sequence());
             db::set_id(db_f, folder.get_id());
             db::set_label(db_f, folder.get_label());
-            db::set_read_only(db_f, folder.is_read_only());
             db::set_ignore_permissions(db_f, folder.are_permissions_ignored());
             db::set_ignore_delete(db_f, folder.is_deletion_ignored());
             db::set_disable_temp_indexes(db_f, folder.are_temp_indixes_disabled());

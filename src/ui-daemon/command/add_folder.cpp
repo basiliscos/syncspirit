@@ -59,7 +59,6 @@ outcome::result<command_ptr_t> add_folder_t::construct(std::string_view in) noex
     db::set_path(f, path);
     db::set_id(f, id);
     db::set_label(f, label);
-    db::set_read_only(f, false);
     db::set_ignore_permissions(f, false);
     db::set_ignore_delete(f, false);
     db::set_disable_temp_indexes(f, false);

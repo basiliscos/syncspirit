@@ -402,32 +402,6 @@ auto folder_table_t::make_index(folder_table_t &container, bool disabled) -> wid
     return new widget_t(container, disabled);
 }
 
-auto folder_table_t::make_read_only(folder_table_t &container, bool disabled) -> widgetable_ptr_t {
-    struct widget_t final : checkbox_widget_t {
-        using parent_t = checkbox_widget_t;
-        widget_t(Fl_Widget &container, bool disabled_) : parent_t{container}, disabled{disabled_} {}
-
-        Fl_Widget *create_widget(int x, int y, int w, int h) override {
-            auto r = parent_t::create_widget(x, y, w, h);
-            if (disabled) {
-                widget->deactivate();
-            }
-            return r;
-        }
-        void reset() override {
-            auto &container = static_cast<folder_table_t &>(this->container);
-            input->value(container.description.get_folder()->is_read_only());
-        }
-        bool store(void *data) override {
-            auto ctx = reinterpret_cast<ctx_t *>(data);
-            db::set_read_only(ctx->folder, input->value());
-            return true;
-        }
-        bool disabled;
-    };
-    return new widget_t(container, disabled);
-}
-
 auto folder_table_t::make_rescan_interval(folder_table_t &container, bool disabled) -> widgetable_ptr_t {
     struct widget_t final : table_widget::int_input_t {
         using parent_t = table_widget::int_input_t;

@@ -67,7 +67,7 @@ std::optional<proto::Folder> folder_t::generate(const model::device_t &device) c
     proto::Folder r;
     proto::set_id(r, id);
     proto::set_label(r, label);
-    proto::set_read_only(r, read_only);
+    proto::set_read_only(r, folder_type == db::FolderType::send);
     proto::set_ignore_permissions(r, ignore_permissions);
     proto::set_ignore_delete(r, ignore_delete);
     proto::set_disable_temp_indexes(r, disable_temp_indixes);

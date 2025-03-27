@@ -16,7 +16,6 @@ void folder_data_t::assign_fields(const db::Folder &item) noexcept {
     rescan_interval = db::get_rescan_interval(item);
     pull_order = db::get_pull_order(item);
     scheduled = db::get_scheduled(item);
-    read_only = db::get_read_only(item);
     ignore_permissions = db::get_ignore_permissions(item);
     ignore_delete = db::get_ignore_delete(item);
     disable_temp_indixes = db::get_disable_temp_indexes(item);
@@ -26,7 +25,6 @@ void folder_data_t::assign_fields(const db::Folder &item) noexcept {
 void folder_data_t::serialize(db::Folder &r) const noexcept {
     db::set_id(r, id);
     db::set_label(r, label);
-    db::set_read_only(r, read_only);
     db::set_ignore_permissions(r, ignore_permissions);
     db::set_ignore_delete(r, ignore_delete);
     db::set_disable_temp_indexes(r, disable_temp_indixes);
