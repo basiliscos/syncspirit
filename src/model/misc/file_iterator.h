@@ -47,6 +47,7 @@ struct SYNCSPIRIT_API file_iterator_t : arc_base_t<file_iterator_t> {
         queue_ptr_t files_queue;
         std::int64_t seen_sequence;
         it_t it;
+        bool can_receive;
     };
     using folder_iterators_t = std::vector<folder_iterator_t>;
 

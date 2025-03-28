@@ -657,6 +657,43 @@ TEST_CASE("file pull order", "[model]") {
     }
 }
 
+TEST_CASE("no file iteration for send-only folder", "[model]") {
+    auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
+    auto my_device = device_t::create(my_id, "my-device").value();
+    auto peer_id = device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
+
+    auto peer_device = device_t::create(peer_id, "peer-device").value();
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
+    auto sequencer = make_sequencer(4);
+    cluster->get_devices().put(my_device);
+    cluster->get_devices().put(peer_device);
+
+    auto builder = diff_builder_t(*cluster);
+
+    auto &folders = cluster->get_folders();
+
+    db::Folder db_folder;
+    db::set_id(db_folder, "1234-5678");
+    db::set_label(db_folder, "l");
+    db::set_path(db_folder, "/my/path");
+    db::set_folder_type(db_folder, db::FolderType::send);
+
+    REQUIRE(builder.upsert_folder(db_folder).apply());
+    REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
+    auto folder = folders.by_id("1234-5678");
+    auto folder_infos = &folder->get_folder_infos();
+    REQUIRE(folder_infos->size() == 2u);
+
+    auto file_iterator = peer_device->create_iterator(*cluster);
+    auto pr_fi = proto::FileInfo();
+    proto::set_name(pr_fi, "a.txt");
+    proto::set_sequence(pr_fi, 10);
+    REQUIRE(builder.make_index(peer_id.get_sha256(), folder->get_id()).add(pr_fi, peer_device).finish().apply());
+
+    auto [f, action] = file_iterator->next();
+    REQUIRE(!f);
+}
+
 int _init() {
     test::init_logging();
     return 1;
