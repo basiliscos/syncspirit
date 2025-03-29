@@ -290,9 +290,9 @@ auto folder_table_t::make_folder_type(folder_table_t &container, bool disabled) 
             input->size(200, r->h());
             input->callback([](auto, void *data) { reinterpret_cast<folder_table_t *>(data)->refresh(); }, &container);
             input->when(input->when() | FL_WHEN_CHANGED);
-            input->add("Send and Receive");
             input->add("Send only");
             input->add("Receive only");
+            input->add("Send and Receive");
             if (disabled) {
                 widget->deactivate();
             }
