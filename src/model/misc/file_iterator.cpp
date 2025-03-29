@@ -123,25 +123,28 @@ auto file_iterator_t::next() noexcept -> result_t {
 
 void file_iterator_t::on_upsert(folder_info_ptr_t peer_folder) noexcept {
     auto folder = peer_folder->get_folder();
-    auto &files_map = peer_folder->get_file_infos();
     for (auto &it : folders_list) {
         if (it.peer_folder->get_folder() == folder && it.can_receive) {
-            auto &peer_folder = *it.peer_folder;
-            auto seen_sequence = it.seen_sequence;
-            auto max_sequence = peer_folder.get_max_sequence();
-            auto [from, to] = files_map.range(seen_sequence + 1, max_sequence);
-            for (auto fit = from; fit != to; ++fit) {
-                auto file = fit->item.get();
-                if (resolve(*file) != advance_action_t::ignore) {
-                    it.files_queue->insert(file);
-                }
-            }
-            it.seen_sequence = max_sequence;
-            it.it = it.files_queue->begin();
-            return;
+            return populate(it);
         }
     }
     prepare_folder(peer_folder);
+}
+
+void file_iterator_t::populate(folder_iterator_t &it) noexcept {
+    auto peer_folder = it.peer_folder.get();
+    auto &files_map = peer_folder->get_file_infos();
+    auto seen_sequence = it.seen_sequence;
+    auto max_sequence = peer_folder->get_max_sequence();
+    auto [from, to] = files_map.range(seen_sequence + 1, max_sequence);
+    for (auto fit = from; fit != to; ++fit) {
+        auto file = fit->item.get();
+        if (resolve(*file) != advance_action_t::ignore) {
+            it.files_queue->insert(file);
+        }
+    }
+    it.seen_sequence = max_sequence;
+    it.it = it.files_queue->begin();
 }
 
 void file_iterator_t::on_upsert(folder_t &folder) noexcept {
@@ -152,7 +155,10 @@ void file_iterator_t::on_upsert(folder_t &folder) noexcept {
             auto folder_type = peer_folder.get_folder()->get_folder_type();
             auto can_receive = folder_type != db::FolderType::send;
             if (can_receive) {
-                if (it.files_queue->key_comp().pull_order != order) {
+                if (!it.can_receive) {
+                    it.seen_sequence = 0;
+                    populate(it);
+                } else if (it.files_queue->key_comp().pull_order != order) {
                     auto new_set = std::make_unique<queue_t>(file_comparator_t{order});
                     for (auto fi : *it.files_queue) {
                         new_set->insert(fi);

@@ -692,6 +692,15 @@ TEST_CASE("no file iteration for send-only folder", "[model]") {
 
     auto [f, action] = file_iterator->next();
     REQUIRE(!f);
+
+    SECTION("back to send & receive") {
+        db::set_folder_type(db_folder, db::FolderType::send_and_receive);
+        REQUIRE(builder.upsert_folder(db_folder).apply());
+        auto [f, action] = file_iterator->next();
+        REQUIRE(f);
+        REQUIRE(action == A::remote_copy);
+        CHECK(f->get_name() == "a.txt");
+    }
 }
 
 int _init() {

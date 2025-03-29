@@ -2125,6 +2125,12 @@ void test_change_folder_type() {
                     sup->do_process();
 
                     REQUIRE(peer_actor->blocks_requested == 1);
+
+                    SECTION("folder type is send & receive again") {
+                        db::set_folder_type(db_folder, db::FolderType::send_and_receive);
+                        builder.upsert_folder(db_folder, folder_my->get_index()).apply(*sup);
+                        REQUIRE(peer_actor->blocks_requested == 2);
+                    }
                 }
             }
             SECTION("send & receive -> recv only") {
@@ -2160,6 +2166,16 @@ void test_change_folder_type() {
 
                     builder.local_update(folder_1->get_id(), pr_file_1).apply(*sup);
                     REQUIRE(peer_actor->messages.size() == 0);
+
+                    SECTION("folder type is send & receive again") {
+                        db::set_folder_type(db_folder, db::FolderType::send_and_receive);
+                        builder.upsert_folder(db_folder, folder_my->get_index()).apply(*sup);
+
+                        REQUIRE(peer_actor->messages.size() == 1);
+                        auto &last_message = *peer_actor->messages.back();
+                        auto &index_update_2 = std::get<proto::IndexUpdate>(last_message.payload);
+                        CHECK(proto::get_files_size(index_update_2) == 1);
+                    }
                 }
             }
         }

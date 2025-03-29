@@ -53,6 +53,7 @@ struct SYNCSPIRIT_API file_iterator_t : arc_base_t<file_iterator_t> {
 
     folder_iterator_t &prepare_folder(folder_info_ptr_t peer_folder) noexcept;
     folder_iterator_t &find_folder(folder_t *folder) noexcept;
+    void populate(folder_iterator_t &it) noexcept;
 
     cluster_t &cluster;
     device_t *peer;
