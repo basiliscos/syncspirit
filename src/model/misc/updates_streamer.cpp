@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2023-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2023-2025 Ivan Baidakou
 
 #include "updates_streamer.h"
 #include "model/remote_folder_info.h"
@@ -20,21 +20,23 @@ void updates_streamer_t::refresh_remote() noexcept {
     auto prev_seen = std::move(seen_info);
     seen_info = {};
     for (auto &it : folders) {
-        auto &folder = it.item;
-        auto peer_folder = folder->is_shared_with(*peer);
-        if (peer_folder) {
-            auto local_folder = folder->get_folder_infos().by_device(*self);
-            if (streaming && streaming->folder_info == local_folder) {
-                streaming_folder = local_folder.get();
-            }
-            auto remote_folder = remote_folders.by_folder(*folder);
-            if (remote_folder) {
-                auto seen_sequence = std::int64_t{0};
-                if (remote_folder->get_index() == local_folder->get_index()) {
-                    auto previously_seen = prev_seen[local_folder];
-                    seen_sequence = std::max(remote_folder->get_max_sequence(), previously_seen);
+        auto &folder = *it.item;
+        if (folder.get_folder_type() != db::FolderType::receive) {
+            auto peer_folder = folder.is_shared_with(*peer);
+            if (peer_folder) {
+                auto local_folder = folder.get_folder_infos().by_device(*self);
+                if (streaming && streaming->folder_info == local_folder) {
+                    streaming_folder = local_folder.get();
                 }
-                seen_info[local_folder] = seen_sequence;
+                auto remote_folder = remote_folders.by_folder(folder);
+                if (remote_folder) {
+                    auto seen_sequence = std::int64_t{0};
+                    if (remote_folder->get_index() == local_folder->get_index()) {
+                        auto previously_seen = prev_seen[local_folder];
+                        seen_sequence = std::max(remote_folder->get_max_sequence(), previously_seen);
+                    }
+                    seen_info[local_folder] = seen_sequence;
+                }
             }
         }
     }
