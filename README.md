@@ -44,6 +44,11 @@ All front-ends share the same configuration and database when running on same ho
 
 - [x] incoming and outcoming messages (de)compression using lz4
 
+- [x] introducer support
+
+- [x] send only/receive only dirs
+
+
 # missing features
 
 This list is probably incomplete. Here are the most important changes:
@@ -54,13 +59,9 @@ This list is probably incomplete. Here are the most important changes:
 
 - [ ] [QUIC transport](https://en.wikipedia.org/wiki/QUIC)
 
-- [ ] introducer support
-
 - [ ] [untrusted devices encryption](https://docs.syncthing.net/specs/untrusted.html)
 
-- [ ] send only/receive only dirs
-
-- [ ] ...
+- [ ] encrypted folders
 
 # run
 
@@ -121,13 +122,13 @@ after the core completion.
 
 - linux
 - windows
-- mac os x (it is know that it can be build and run on that platform, but I don't know to make
-distributions on it)
+- mac os x
 
 # changes
 
 ## 0.4.1 (xx-xxx-xxxx)
- - [core, bep] support `pull_older` folder setting (alphabetic, by size, by modification date)
+ - [core] support `folder_type` folder setting (send only, receive only, send & receive)
+ - [core] support `pull_older` folder setting (alphabetic, by size, by modification date)
  - [core, bep] support `ignore_deletes` folder flag
  - [core, bep] support device `auto-accept` folder flag
  - [core, bep] support device `introducer` and `skip_introduction_removals` markers

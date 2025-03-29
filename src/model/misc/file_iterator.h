@@ -47,11 +47,13 @@ struct SYNCSPIRIT_API file_iterator_t : arc_base_t<file_iterator_t> {
         queue_ptr_t files_queue;
         std::int64_t seen_sequence;
         it_t it;
+        bool can_receive;
     };
     using folder_iterators_t = std::vector<folder_iterator_t>;
 
     folder_iterator_t &prepare_folder(folder_info_ptr_t peer_folder) noexcept;
     folder_iterator_t &find_folder(folder_t *folder) noexcept;
+    void populate(folder_iterator_t &it) noexcept;
 
     cluster_t &cluster;
     device_t *peer;

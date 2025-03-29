@@ -107,6 +107,7 @@ cluster_update_t::cluster_update_t(const bfs::path &default_path, const cluster_
         LOG_DEBUG(log, "cluster_update_t, adding pending folder {}({}) non-shared with '{}'", label, folder_id,
                   device_short);
 
+        auto ro = proto::get_read_only(f);
         db::PendingFolder db;
         auto &db_fi = db::get_folder_info(db);
         auto &db_f = db::get_folder(db);
@@ -114,11 +115,11 @@ cluster_update_t::cluster_update_t(const bfs::path &default_path, const cluster_
         db::set_max_sequence(db_fi, proto::get_max_sequence(d));
         db::set_id(db_f, proto::get_id(f));
         db::set_label(db_f, label);
-        db::set_read_only(db_f, proto::get_read_only(f));
         db::set_ignore_permissions(db_f, proto::get_ignore_permissions(f));
         db::set_ignore_delete(db_f, proto::get_ignore_delete(f));
         db::set_disable_temp_indexes(db_f, proto::get_disable_temp_indexes(f));
         db::set_paused(db_f, proto::get_paused(f));
+        db::set_folder_type(db_f, db::FolderType::send_and_receive);
 
         auto id = utils::bytes_t(sha256.begin(), sha256.end());
         new_pending_folders.push_back(item_t{std::move(db), std::move(id), sequencer.next_uuid()});
@@ -168,13 +169,13 @@ cluster_update_t::cluster_update_t(const bfs::path &default_path, const cluster_
         auto db = db::Folder();
         db::set_id(db, folder_id);
         db::set_label(db, label);
-        db::set_read_only(db, proto::get_read_only(folder));
         db::set_ignore_permissions(db, proto::get_ignore_permissions(folder));
         db::set_ignore_delete(db, proto::get_ignore_delete(folder));
         db::set_disable_temp_indexes(db, proto::get_disable_temp_indexes(folder));
         db::set_paused(db, proto::get_paused(folder));
         db::set_path(db, boost::nowide::narrow(r.value().wstring()));
         db::set_rescan_interval(db, 3600);
+        db::set_folder_type(db, db::FolderType::send_and_receive);
         upserted_folders.emplace_back(std::move(db));
         return true;
     };

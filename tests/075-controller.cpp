@@ -2035,6 +2035,154 @@ void test_download_interrupting() {
     F(false, 10, false).run();
 }
 
+void test_change_folder_type() {
+    struct F : fixture_t {
+        using fixture_t::fixture_t;
+
+        std::uint32_t get_blocks_max_requested() override { return 1; }
+
+        void main(diff_builder_t &builder) noexcept override {
+            auto &folder_infos = folder_1->get_folder_infos();
+            auto folder_my = folder_infos.by_device(*my_device);
+
+            auto cc = proto::ClusterConfig{};
+            auto &folder = proto::add_folders(cc);
+            proto::set_id(folder, folder_1->get_id());
+            auto &d_peer = proto::add_devices(folder);
+            proto::set_id(d_peer, peer_device->device_id().get_sha256());
+            proto::set_max_sequence(d_peer, folder_1_peer->get_max_sequence());
+            proto::set_index_id(d_peer, folder_1_peer->get_index());
+            auto &d_my = proto::add_devices(folder);
+            proto::set_id(d_my, my_device->device_id().get_sha256());
+            proto::set_max_sequence(d_my, folder_my->get_max_sequence());
+            proto::set_index_id(d_my, folder_my->get_index());
+
+            peer_actor->forward(cc);
+            sup->do_process();
+
+            SECTION("send & receive -> send only") {
+                auto index = proto::Index{};
+                proto::set_folder(index, folder_1->get_id());
+                auto file_name_1 = std::string_view("some-file-1");
+                auto file_name_2 = std::string_view("some-file-2");
+
+                auto &file_1 = proto::add_files(index);
+                proto::set_name(file_1, file_name_1);
+                proto::set_type(file_1, proto::FileInfoType::FILE);
+                proto::set_sequence(file_1, folder_1_peer->get_max_sequence() + 1);
+                proto::set_block_size(file_1, 5);
+                proto::set_size(file_1, 5);
+
+                auto &v_1 = proto::get_version(file_1);
+                auto &counter_1 = proto::add_counters(v_1);
+                proto::set_id(counter_1, 1);
+
+                auto data_1 = as_owned_bytes("12345");
+                auto data_1_hash = utils::sha256_digest(data_1).value();
+
+                auto data_2 = as_owned_bytes("67890");
+                auto data_2_hash = utils::sha256_digest(data_2).value();
+
+                auto &b1 = proto::add_blocks(file_1);
+                proto::set_hash(b1, data_1_hash);
+                proto::set_size(b1, 5);
+
+                auto &file_2 = proto::add_files(index);
+                proto::set_name(file_2, file_name_2);
+                proto::set_type(file_2, proto::FileInfoType::FILE);
+                proto::set_sequence(file_2, folder_1_peer->get_max_sequence() + 2);
+                proto::set_block_size(file_2, 5);
+                proto::set_size(file_2, 5);
+
+                auto &v_2 = proto::get_version(file_2);
+                auto &counter_2 = proto::add_counters(v_2);
+                proto::set_id(counter_2, 1);
+
+                auto &b2 = proto::add_blocks(file_2);
+                proto::set_hash(b2, data_2_hash);
+                proto::set_size(b2, 5);
+
+                CHECK(folder_my->get_max_sequence() == 0ul);
+                peer_actor->forward(index);
+                sup->do_process();
+
+                REQUIRE(peer_actor->blocks_requested == 1);
+
+                SECTION("folder type is kept as send/receive") {
+                    peer_actor->push_block(data_1, 0);
+                    peer_actor->process_block_requests();
+                    sup->do_process();
+                    REQUIRE(peer_actor->blocks_requested == 2);
+                }
+                SECTION("folder type changed to send only") {
+                    auto db_folder = db::Folder();
+                    folder_1->serialize(db_folder);
+                    db::set_folder_type(db_folder, db::FolderType::send);
+                    builder.upsert_folder(db_folder, folder_my->get_index()).apply(*sup);
+
+                    peer_actor->push_block(data_1, 0);
+                    peer_actor->process_block_requests();
+                    sup->do_process();
+
+                    REQUIRE(peer_actor->blocks_requested == 1);
+
+                    SECTION("folder type is send & receive again") {
+                        db::set_folder_type(db_folder, db::FolderType::send_and_receive);
+                        builder.upsert_folder(db_folder, folder_my->get_index()).apply(*sup);
+                        REQUIRE(peer_actor->blocks_requested == 2);
+                    }
+                }
+            }
+            SECTION("send & receive -> recv only") {
+                proto::FileInfo pr_file_1;
+                auto file_name_1 = std::string_view("file-name.1");
+                proto::set_name(pr_file_1, file_name_1);
+
+                builder.local_update(folder_1->get_id(), pr_file_1);
+                builder.apply(*sup);
+                REQUIRE(peer_actor->messages.size() >= 1);
+                auto &last_message = *peer_actor->messages.back();
+                auto &index_update_1 = std::get<proto::IndexUpdate>(last_message.payload);
+                CHECK(proto::get_files_size(index_update_1) == 1);
+
+                peer_actor->messages.clear();
+                proto::FileInfo pr_file_2;
+                auto file_name_2 = std::string_view("file-name.2");
+                proto::set_name(pr_file_2, file_name_2);
+
+                SECTION("folder type is kept as send/receive") {
+                    builder.local_update(folder_1->get_id(), pr_file_1);
+                    builder.apply(*sup);
+                    REQUIRE(peer_actor->messages.size() == 1);
+                    auto &last_message = *peer_actor->messages.back();
+                    auto &index_update_2 = std::get<proto::IndexUpdate>(last_message.payload);
+                    CHECK(proto::get_files_size(index_update_2) == 1);
+                }
+                SECTION("folder type changed to send only") {
+                    auto db_folder = db::Folder();
+                    folder_1->serialize(db_folder);
+                    db::set_folder_type(db_folder, db::FolderType::receive);
+                    builder.upsert_folder(db_folder, folder_my->get_index()).apply(*sup);
+
+                    builder.local_update(folder_1->get_id(), pr_file_1).apply(*sup);
+                    REQUIRE(peer_actor->messages.size() == 0);
+
+                    SECTION("folder type is send & receive again") {
+                        db::set_folder_type(db_folder, db::FolderType::send_and_receive);
+                        builder.upsert_folder(db_folder, folder_my->get_index()).apply(*sup);
+
+                        REQUIRE(peer_actor->messages.size() == 1);
+                        auto &last_message = *peer_actor->messages.back();
+                        auto &index_update_2 = std::get<proto::IndexUpdate>(last_message.payload);
+                        CHECK(proto::get_files_size(index_update_2) == 1);
+                    }
+                }
+            }
+        }
+    };
+    F(true, 10).run();
+}
+
 int _init() {
     REGISTER_TEST_CASE(test_startup, "test_startup", "[net]");
     REGISTER_TEST_CASE(test_overwhelm, "test_overwhelm", "[net]");
@@ -2051,6 +2199,7 @@ int _init() {
     REGISTER_TEST_CASE(test_peer_removal, "test_peer_removal", "[net]");
     REGISTER_TEST_CASE(test_conflicts, "test_conflicts", "[net]");
     REGISTER_TEST_CASE(test_download_interrupting, "test_download_interrupting", "[net]");
+    REGISTER_TEST_CASE(test_change_folder_type, "test_change_folder_type", "[net]");
     return 1;
 }
 

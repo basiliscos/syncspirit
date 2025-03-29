@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2023-2025 Ivan Baidakou
 
 #include "test-utils.h"
+#include "access.h"
 #include "diff-builder.h"
 #include "model/misc/updates_streamer.h"
 
@@ -139,5 +140,29 @@ TEST_CASE("updates_streamer", "[model]") {
         REQUIRE(streamer.next() == f2);
         REQUIRE(streamer.next() == f1);
         REQUIRE(!streamer.next());
+    }
+
+    SECTION("no files streaming for receive-only folder") {
+        SECTION("lazy streamer update") {
+            add_remote(0, seq);
+            auto &folder_type = ((model::folder_data_t *)folder.get())->access<test::to::folder_type>();
+            folder_type = db::FolderType::receive;
+
+            auto streamer = model::updates_streamer_t(*cluster, *peer_device);
+            REQUIRE(!streamer.next());
+
+            auto f1 = add_file("a.txt");
+            streamer.on_update(*f1);
+            CHECK(!streamer.next());
+        }
+        SECTION("non-lazy streamer update") {
+            add_remote(0, seq);
+            auto f1 = add_file("a.txt");
+            auto &folder_type = ((model::folder_data_t *)folder.get())->access<test::to::folder_type>();
+            folder_type = db::FolderType::receive;
+
+            auto streamer = model::updates_streamer_t(*cluster, *peer_device);
+            CHECK(!streamer.next());
+        }
     }
 }

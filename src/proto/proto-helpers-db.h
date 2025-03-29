@@ -332,14 +332,6 @@ inline void set_label(Folder &msg, std::string_view value) {
     using namespace pp;
     msg["label"_f] = std::string(value);
 }
-inline bool get_read_only(const Folder &msg) {
-    using namespace pp;
-    return msg["read_only"_f].value_or(false);
-}
-inline void set_read_only(Folder &msg, bool value) {
-    using namespace pp;
-    msg["read_only"_f] = value;
-}
 inline bool get_ignore_permissions(const Folder &msg) {
     using namespace pp;
     return msg["ignore_permissions"_f].value_or(false);

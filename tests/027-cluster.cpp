@@ -3,6 +3,7 @@
 
 #include <catch2/catch_all.hpp>
 #include "test-utils.h"
+#include "access.h"
 #include "diff-builder.h"
 #include "model/cluster.h"
 
@@ -51,6 +52,7 @@ TEST_CASE("cluster", "[model]") {
 
         CHECK(proto::get_id(f) == folder_1_id);
         REQUIRE(proto::get_devices_size(f) == 3);
+        CHECK(proto::get_read_only(f) == false);
 
         auto dS = (const proto::Device *){nullptr};
         auto d1 = (const proto::Device *){nullptr};
@@ -73,5 +75,18 @@ TEST_CASE("cluster", "[model]") {
 
         CHECK(proto::get_id(*d1) == sha256_1);
         CHECK(proto::get_id(*d2) == sha256_2);
+    }
+    SECTION("cluster config for d1, when folder is read-only") {
+        auto folder = cluster->get_folders().by_id(folder_1_id);
+        auto &folder_type = ((model::folder_data_t *)folder.get())->access<test::to::folder_type>();
+        folder_type = db::FolderType::send;
+
+        auto cc = cluster->generate(*peer_device_1);
+        REQUIRE(proto::get_folders_size(cc) == 1);
+        auto &f = proto::get_folders(cc, 0);
+
+        CHECK(proto::get_id(f) == folder_1_id);
+        REQUIRE(proto::get_devices_size(f) == 3);
+        CHECK(proto::get_read_only(f));
     }
 }

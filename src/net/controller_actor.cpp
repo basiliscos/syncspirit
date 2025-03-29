@@ -19,6 +19,7 @@
 #include "model/diff/modify/remove_files.h"
 #include "model/diff/modify/remove_folder_infos.h"
 #include "model/diff/modify/upsert_folder_info.h"
+#include "model/diff/modify/upsert_folder.h"
 #include "model/diff/peer/cluster_update.h"
 #include "model/diff/peer/update_folder.h"
 #include "proto/bep_support.h"
@@ -495,6 +496,16 @@ auto controller_actor_t::operator()(const model::diff::modify::add_remote_folder
             updates_streamer->on_remote_refresh();
         }
         push_pending();
+    }
+    return diff.visit_next(*this, custom);
+}
+
+auto controller_actor_t::operator()(const model::diff::modify::upsert_folder_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    auto folder = cluster->get_folders().by_id(db::get_id(diff.db));
+    if (folder->is_shared_with(*peer)) {
+        updates_streamer->on_remote_refresh();
+        pull_ready();
     }
     return diff.visit_next(*this, custom);
 }
