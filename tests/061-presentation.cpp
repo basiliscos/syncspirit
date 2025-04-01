@@ -37,7 +37,6 @@ TEST_CASE("presentation", "[presentation]") {
 
     auto builder = diff_builder_t(*cluster);
 
-#if 0
     SECTION("empty folder") {
         SECTION("shared with nobody") {
             REQUIRE(builder.upsert_folder("1234-5678", "some/path", "my-label").apply());
@@ -118,7 +117,6 @@ TEST_CASE("presentation", "[presentation]") {
             CHECK(&peer_presense->get_folder_info() == peer_fi);
         }
     }
-#endif
 
     SECTION("non-emtpy folder, flat hierarchy") {
         REQUIRE(builder.upsert_folder("1234-5678", "some/path", "my-label").apply());

@@ -227,6 +227,7 @@ add_library(syncspirit_core
     src/presentation/folder_entity.cpp
     src/presentation/folder_presence.cpp
     src/presentation/local_file_presence.cpp
+    src/presentation/missing_file_presence.cpp
     src/presentation/peer_file_presence.cpp
     src/presentation/presence.cpp
     src/proto/bep_support.cpp
