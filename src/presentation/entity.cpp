@@ -41,3 +41,32 @@ presence_t *entity_t::get_presense_raw(model::device_t &device) {
 
 void entity_t::on_update() noexcept { notify_update(); }
 void entity_t::on_delete() noexcept {}
+
+using nc_t = entity_t::name_comparator_t;
+
+bool nc_t::operator()(const entity_ptr_t &lhs, const entity_ptr_t &rhs) const {
+    auto ld = lhs->children.size() > 0;
+    auto rd = rhs->children.size() > 0;
+    if (ld && !rd) {
+        return true;
+    } else if (rd && !ld) {
+        return false;
+    }
+    return lhs->get_name() < rhs->get_name();
+}
+
+bool nc_t::operator()(const entity_ptr_t &lhs, const std::string_view rhs) const {
+    auto ld = lhs->children.size() > 0;
+    if (!ld) {
+        return false;
+    }
+    return lhs->get_name() < rhs;
+}
+
+bool nc_t::operator()(const std::string_view lhs, const entity_ptr_t &rhs) const {
+    auto rd = rhs->children.size() > 0;
+    if (!rd) {
+        return true;
+    }
+    return lhs < rhs->get_name();
+}

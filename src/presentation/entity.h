@@ -58,7 +58,7 @@ struct SYNCSPIRIT_API entity_t : virtual model::augmentable_t<entity_t>, protect
 
     entity_t *parent;
     records_t records;
-    std::string_view name;
+    std::string name;
     children_t children;
 };
 

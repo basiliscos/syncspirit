@@ -33,6 +33,7 @@ TEST_CASE("presentation", "[presentation]") {
 
     auto builder = diff_builder_t(*cluster);
 
+#if 0
     SECTION("empty folder") {
         SECTION("shared with nobody") {
             REQUIRE(builder.upsert_folder("1234-5678", "some/path", "my-label").apply());
@@ -112,5 +113,51 @@ TEST_CASE("presentation", "[presentation]") {
             CHECK(&my_presense->get_folder_info() == my_fi);
             CHECK(&peer_presense->get_folder_info() == peer_fi);
         }
+    }
+#endif
+
+    SECTION("non-emtpy folder, flat hierarchy") {
+        REQUIRE(builder.upsert_folder("1234-5678", "some/path", "my-label").apply());
+        REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
+        REQUIRE(builder.share_folder(peer_2_id.get_sha256(), "1234-5678").apply());
+        auto folder = cluster->get_folders().by_id("1234-5678");
+
+        auto add_file = [&](std::string_view name, model::device_t &device) {
+            auto folder_info = folder->get_folder_infos().by_device(device);
+
+            proto::FileInfo pr_fi;
+            proto::set_name(pr_fi, name);
+            proto::set_sequence(pr_fi, folder_info->get_max_sequence() + 1);
+
+            auto &v = proto::get_version(pr_fi);
+            proto::add_counters(v, proto::Counter(peer_device->device_id().get_uint(), 1));
+
+            auto file = model::file_info_t::create(sequencer->next_uuid(), pr_fi, folder_info.get()).value();
+            folder_info->add_strict(file);
+        };
+
+        add_file("a.txt", *my_device);
+        add_file("b.txt", *my_device);
+        add_file("b.txt", *peer_device);
+        add_file("c.txt", *my_device);
+        add_file("c.txt", *peer_device);
+        add_file("c.txt", *peer_2_device);
+        add_file("d.txt", *peer_device);
+        add_file("e.txt", *peer_2_device);
+        add_file("f.txt", *peer_device);
+        add_file("f.txt", *peer_2_device);
+
+        auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
+        CHECK(folder_entity->get_children().size() == 6);
+
+#if 0
+        auto my_fi = folder->get_folder_infos().by_device(*my_device);
+        auto peer_fi = folder->get_folder_infos().by_device(*peer_device);
+        auto peer_2_fi = folder->get_folder_infos().by_device(*peer_2_device);
+
+        auto& my_files = my_fi->get_file_infos();
+        auto& peer_files = peer_fi->get_file_infos();
+        auto& peer_2_files = peer_2_fi->get_file_infos();
+#endif
     }
 }

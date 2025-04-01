@@ -20,8 +20,8 @@ using path_t = std::vector<std::string>;
 using file_entity_ptr_t = model::intrusive_ptr_t<file_entity_t>;
 
 struct visit_info_t {
-    path_t path;
     file_entity_ptr_t file;
+    path_t path;
 };
 
 folder_entity_t::folder_entity_t(model::folder_ptr_t folder_) : entity_t(nullptr), folder(*folder_.get()) {
@@ -56,12 +56,17 @@ folder_entity_t::folder_entity_t(model::folder_ptr_t folder_) : entity_t(nullptr
                 string_path.emplace_back(std::move(name));
             }
 
+            auto child = file_entity_ptr_t(new file_entity_t(file, string_path.back()));
             auto info = visit_info_t{
+                std::move(child),
                 std::move(string_path),
-                new file_entity_t(file, string_path.back()),
             };
             visited_files.emplace(name, std::move(info));
         }
+    }
+
+    for (auto &it : visited_files) {
+        children.emplace(std::move(it.second.file));
     }
 }
 

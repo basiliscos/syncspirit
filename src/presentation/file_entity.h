@@ -13,9 +13,6 @@ struct SYNCSPIRIT_API file_entity_t : entity_t {
     file_entity_t(model::file_info_t &sample_file, std::string_view own_name);
 
     void set_parent(entity_t *entry);
-
-  private:
-    std::string own_name;
 };
 
 } // namespace syncspirit::presentation
