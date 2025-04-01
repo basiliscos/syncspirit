@@ -1,22 +1,49 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
 
 #pragma once
 
 #include "arc.hpp"
+#include <cstdint>
 
 namespace syncspirit::model {
 
-struct augmentation_t : arc_base_t<augmentation_t> {
+struct ref_countable_base_t {
+    inline ref_countable_base_t() : counter{0} {}
+    inline ref_countable_base_t(ref_countable_base_t &) : counter{0} {}
+    inline virtual ~ref_countable_base_t() = default;
+    inline std::uint32_t use_count() const noexcept { return counter; }
+
+    mutable std::uint32_t counter;
+};
+
+template <typename T> struct ref_countable_t : virtual ref_countable_base_t {};
+
+template <typename T> inline void intrusive_ptr_add_ref(const ref_countable_t<T> *ptr) noexcept { ++ptr->counter; }
+
+inline void intrusive_ptr_add_ref(const ref_countable_base_t *ptr) noexcept { ++ptr->counter; }
+
+template <typename T> void intrusive_ptr_release(const ref_countable_t<T> *ptr) noexcept {
+    if (--ptr->counter == 0) {
+        delete dynamic_cast<const T *>(ptr);
+    }
+}
+
+inline void intrusive_ptr_release(const ref_countable_base_t *ptr) noexcept {
+    if (--ptr->counter == 0) {
+        delete ptr;
+    }
+}
+
+struct augmentation_t : ref_countable_t<augmentation_t> {
     augmentation_t() = default;
     inline virtual void on_update() noexcept {};
     inline virtual void on_delete() noexcept {};
-    virtual ~augmentation_t() = default;
 };
 
 using augmentation_ptr_t = intrusive_ptr_t<augmentation_t>;
 
-template <typename T> struct augmentable_t : arc_base_t<T> {
+template <typename T> struct augmentable_t : ref_countable_t<T> {
 
     ~augmentable_t() {
         if (extension) {

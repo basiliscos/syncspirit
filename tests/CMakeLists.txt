@@ -4,7 +4,6 @@ include(GenerateExportHeader)
 find_package(
     Boost
     COMPONENTS
-        program_options
         system
     REQUIRED
 )
@@ -89,6 +88,7 @@ create_test(053-scan_task.cpp)
 create_test(054-updates_streamer.cpp)
 create_test(055-resolver.cpp)
 create_test(060-bep.cpp)
+create_test(061-presentation.cpp)
 create_test(070-db.cpp)
 create_test(071-fs_actor.cpp)
 create_test(072-global_discovery.cpp)
