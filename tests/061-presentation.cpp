@@ -33,8 +33,8 @@ TEST_CASE("presentation", "[presentation]") {
 
     auto builder = diff_builder_t(*cluster);
 
-    SECTION("folder") {
-        SECTION("single folder, shared with nobody") {
+    SECTION("empty folder") {
+        SECTION("shared with nobody") {
             REQUIRE(builder.upsert_folder("1234-5678", "some/path", "my-label").apply());
             auto folder = cluster->get_folders().by_id("1234-5678");
             CHECK(folder->use_count() == 2);
@@ -93,6 +93,24 @@ TEST_CASE("presentation", "[presentation]") {
                 auto my_fi = folder->get_folder_infos().by_device(*my_device);
                 CHECK(&self_presense->get_folder_info() == my_fi);
             }
+        }
+
+        SECTION("shared with a peer") {
+            REQUIRE(builder.upsert_folder("1234-5678", "some/path", "my-label").apply());
+            REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
+            auto folder = cluster->get_folders().by_id("1234-5678");
+            auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
+
+            auto my_presense = folder_entity->get_presense<folder_presence_t>(*my_device);
+            auto peer_presense = folder_entity->get_presense<folder_presence_t>(*peer_device);
+            REQUIRE(my_presense);
+            REQUIRE(peer_presense);
+
+            CHECK(!folder_entity->get_presense<folder_presence_t>(*peer_2_device));
+            auto my_fi = folder->get_folder_infos().by_device(*my_device);
+            auto peer_fi = folder->get_folder_infos().by_device(*peer_device);
+            CHECK(&my_presense->get_folder_info() == my_fi);
+            CHECK(&peer_presense->get_folder_info() == peer_fi);
         }
     }
 }
