@@ -62,24 +62,32 @@ TEST_CASE("presentation", "[presentation]") {
                 CHECK(updated == 1);
                 CHECK(deleted == 0);
 
-                cluster->get_folders().clear();
-                REQUIRE(folder->use_count() == 1);
+                REQUIRE(folder->use_count() == 2);
                 REQUIRE(folder_entity->use_count() == 2);
 
                 folder_entity.reset();
                 CHECK(updated == 1);
                 CHECK(deleted == 0);
 
-                folder.reset();
-                CHECK(updated == 1);
-                CHECK(deleted == 1);
+                SECTION("direct remvoal") {
+                    folder.reset();
+                    cluster->get_folders().clear();
+                    CHECK(updated == 1);
+                    CHECK(deleted == 1);
+                }
+                SECTION("remove via diff") {
+                    REQUIRE(builder.remove_folder(*folder).apply());
+                    folder.reset();
+                    CHECK(updated == 1);
+                    CHECK(deleted == 1);
+                }
             }
 
             SECTION("presence") {
-                CHECK(!folder_entity->get_presense(*peer_device));
-                CHECK(!folder_entity->get_presense(*peer_2_device));
+                CHECK(!folder_entity->get_presense<folder_presence_t>(*peer_device));
+                CHECK(!folder_entity->get_presense<folder_presence_t>(*peer_2_device));
 
-                auto self_presense = folder_entity->get_presense(*my_device);
+                auto self_presense = folder_entity->get_presense<folder_presence_t>(*my_device);
                 CHECK(self_presense);
                 auto my_fi = folder->get_folder_infos().by_device(*my_device);
                 CHECK(&self_presense->get_folder_info() == my_fi);
