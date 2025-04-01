@@ -19,6 +19,8 @@ struct SYNCSPIRIT_API presence_t : virtual model::augmentable_t<entity_t>, prote
     presence_t(entity_t &entity, model::device_ptr_t device);
     ~presence_t();
 
+    void set_parent(presence_t *value);
+
   protected:
     entity_t &entity;
     presence_t *parent;

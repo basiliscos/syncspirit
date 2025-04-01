@@ -4,6 +4,8 @@
 #include "test-utils.h"
 #include "diff-builder.h"
 #include "model/cluster.h"
+#include "presentation/cluster_file_presence.h"
+#include "presentation/file_presence.h"
 #include "presentation/folder_presence.h"
 #include "presentation/folder_entity.h"
 #include "syncspirit-config.h"
@@ -14,6 +16,8 @@ using namespace syncspirit::utils;
 using namespace syncspirit::proto;
 using namespace syncspirit::model;
 using namespace syncspirit::presentation;
+
+using F = file_presence_t::features_t;
 
 TEST_CASE("presentation", "[presentation]") {
     test::init_logging();
@@ -136,19 +140,74 @@ TEST_CASE("presentation", "[presentation]") {
             folder_info->add_strict(file);
         };
 
-        add_file("a.txt", *my_device);
-        add_file("b.txt", *my_device);
-        add_file("b.txt", *peer_device);
+        add_file("f.txt", *peer_device);
+        add_file("f.txt", *peer_2_device);
+        add_file("e.txt", *peer_2_device);
+        add_file("d.txt", *peer_device);
         add_file("c.txt", *my_device);
         add_file("c.txt", *peer_device);
         add_file("c.txt", *peer_2_device);
-        add_file("d.txt", *peer_device);
-        add_file("e.txt", *peer_2_device);
-        add_file("f.txt", *peer_device);
-        add_file("f.txt", *peer_2_device);
+        add_file("b.txt", *my_device);
+        add_file("b.txt", *peer_device);
+        add_file("a.txt", *my_device);
 
         auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
-        CHECK(folder_entity->get_children().size() == 6);
+        auto &children = folder_entity->get_children();
+        REQUIRE(children.size() == 6);
+        auto it = children.begin();
+        auto next_entry = [&]() -> presentation::entity_ptr_t {
+            if (it != children.end()) {
+                return *it++;
+            }
+            return {};
+        };
+
+        auto file_a = next_entry();
+        auto file_b = next_entry();
+        auto file_c = next_entry();
+        auto file_d = next_entry();
+        auto file_e = next_entry();
+        auto file_f = next_entry();
+        REQUIRE(!next_entry());
+
+        CHECK(file_a->get_name() == "a.txt");
+        CHECK(file_b->get_name() == "b.txt");
+        CHECK(file_c->get_name() == "c.txt");
+        CHECK(file_d->get_name() == "d.txt");
+        CHECK(file_e->get_name() == "e.txt");
+        CHECK(file_f->get_name() == "f.txt");
+
+        SECTION("all devices have a file") {
+            auto f_my = file_c->get_presense<cluster_file_presence_t>(*my_device);
+            auto f_peer = file_c->get_presense<cluster_file_presence_t>(*peer_device);
+            auto f_peer_2 = file_c->get_presense<cluster_file_presence_t>(*peer_2_device);
+
+            REQUIRE(f_my);
+            REQUIRE(f_peer);
+            REQUIRE(f_peer_2);
+            REQUIRE(f_my->get_file_info().get_folder_info()->get_device() == my_device.get());
+            REQUIRE(f_peer->get_file_info().get_folder_info()->get_device() == peer_device.get());
+            REQUIRE(f_peer_2->get_file_info().get_folder_info()->get_device() == peer_2_device.get());
+            CHECK(f_my->get_presence_feautres() & (F::cluster | F::local));
+            CHECK(f_peer->get_presence_feautres() & (F::cluster | F::peer));
+            CHECK(f_peer_2->get_presence_feautres() & (F::cluster | F::peer));
+        }
+
+        SECTION("only my device has a file") {
+            auto f_my = file_a->get_presense<cluster_file_presence_t>(*my_device);
+            auto f_peer = file_a->get_presense<file_presence_t>(*peer_device);
+            auto f_peer_2 = file_a->get_presense<file_presence_t>(*peer_2_device);
+
+            REQUIRE(f_my);
+            REQUIRE(f_peer);
+            REQUIRE(f_peer_2);
+
+            REQUIRE(f_my->get_file_info().get_folder_info()->get_device() == my_device.get());
+            CHECK(f_my->get_presence_feautres() & (F::cluster | F::local));
+            CHECK(f_peer->get_presence_feautres() & F::missing);
+            CHECK(f_peer_2->get_presence_feautres() & F::missing);
+            CHECK(f_peer == f_peer_2);
+        }
 
 #if 0
         auto my_fi = folder->get_folder_infos().by_device(*my_device);

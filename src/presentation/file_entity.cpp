@@ -2,6 +2,9 @@
 // SPDX-FileCopyrightText: 2025 Ivan Baidakou
 
 #include "file_entity.h"
+#include "local_file_presence.h"
+#include "peer_file_presence.h"
+#include "model/cluster.h"
 #include "model/folder.h"
 #include "model/folder_info.h"
 
@@ -26,5 +29,19 @@ file_entity_t::file_entity_t(model::file_info_t &sample_file, std::string_view o
         if (file) {
             presence_files.emplace_back(file.get());
         }
+    }
+
+    for (auto &it : presence_files) {
+        auto fi = it->get_folder_info();
+        auto device = it->get_folder_info()->get_device();
+        auto local = fi->get_folder()->get_cluster()->get_device() == device;
+        auto child = [&]() -> file_presence_t * {
+            if (local) {
+                return new local_file_presence_t(*this, *it);
+            } else {
+                return new peer_file_presence_t(*this, *it);
+            }
+        }();
+        records.emplace_back(record_t{device, std::move(child)});
     }
 }
