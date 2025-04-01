@@ -13,7 +13,6 @@ struct file_entity_t;
 struct SYNCSPIRIT_API file_presence_t : presence_t {
     // clang-format off
     enum features_t: std::uint32_t {
-        none    = 0b00000000,
         missing = 0b00000001,
         cluster = 0b00000010,
         peer    = 0b00000100,
@@ -26,7 +25,7 @@ struct SYNCSPIRIT_API file_presence_t : presence_t {
     std::uint32_t get_presence_feautres();
 
   protected:
-    std::uint32_t features = features_t::none;
+    std::uint32_t features = 0;
 };
 
 } // namespace syncspirit::presentation
