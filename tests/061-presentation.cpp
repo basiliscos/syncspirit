@@ -41,6 +41,7 @@ TEST_CASE("presentation", "[presentation]") {
 
             auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
             CHECK(&folder_entity->get_folder() == folder.get());
+            CHECK(folder_entity->get_children().size() == 0);
 
             SECTION("check forwarding") {
                 struct aug_sample_t : model::augmentation_t {
