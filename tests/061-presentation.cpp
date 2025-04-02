@@ -272,4 +272,56 @@ TEST_CASE("presentation", "[presentation]") {
             CHECK(f_peer_2->get_presence_feautres() & (F::cluster | F::peer | F::file));
         }
     }
+
+    SECTION("folder shared with a peer, simple hierarchy") {
+        REQUIRE(builder.upsert_folder("1234-5678", "some/path", "my-label").apply());
+        // REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
+        auto folder = cluster->get_folders().by_id("1234-5678");
+
+        auto add_file = [&](std::string_view name, model::device_t &device,
+                            proto::FileInfoType type = proto::FileInfoType::DIRECTORY) {
+            auto folder_info = folder->get_folder_infos().by_device(device);
+
+            proto::FileInfo pr_fi;
+            proto::set_name(pr_fi, name);
+            proto::set_type(pr_fi, type);
+            proto::set_sequence(pr_fi, folder_info->get_max_sequence() + 1);
+
+            auto &v = proto::get_version(pr_fi);
+            proto::add_counters(v, proto::Counter(peer_device->device_id().get_uint(), 1));
+
+            auto file = model::file_info_t::create(sequencer->next_uuid(), pr_fi, folder_info.get()).value();
+            folder_info->add_strict(file);
+        };
+
+        add_file("a", *my_device);
+        add_file("a/b", *my_device);
+        add_file("a/b/c", *my_device);
+        add_file("a/b/c/d", *my_device);
+        add_file("a/b/c/d/e.txt", *my_device, proto::FileInfoType::FILE);
+        // add_file("e/f/g.txt", *peer_device);
+        auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
+
+        auto &children = folder_entity->get_children();
+        REQUIRE(children.size() == 1);
+        auto &dir_a_entry = *children.begin();
+        REQUIRE(dir_a_entry->get_name() == "a");
+        REQUIRE(dir_a_entry->get_children().size() == 1);
+
+        auto &dir_b_entry = *dir_a_entry->get_children().begin();
+        REQUIRE(dir_b_entry->get_name() == "b");
+        REQUIRE(dir_b_entry->get_children().size() == 1);
+
+        auto &dir_c_entry = *dir_b_entry->get_children().begin();
+        REQUIRE(dir_c_entry->get_name() == "c");
+        REQUIRE(dir_c_entry->get_children().size() == 1);
+
+        auto &dir_d_entry = *dir_c_entry->get_children().begin();
+        REQUIRE(dir_d_entry->get_name() == "d");
+        REQUIRE(dir_d_entry->get_children().size() == 1);
+
+        auto &file_e_entry = *dir_d_entry->get_children().begin();
+        REQUIRE(file_e_entry->get_name() == "e.txt");
+        REQUIRE(file_e_entry->get_children().size() == 0);
+    }
 }

@@ -20,6 +20,8 @@ using entity_ptr_t = model::intrusive_ptr_t<entity_t>;
 struct presence_t;
 using presence_ptr_t = model::intrusive_ptr_t<presence_t>;
 
+struct folder_entity_t;
+
 struct SYNCSPIRIT_API entity_t : virtual model::augmentable_t<entity_t>, protected virtual model::augmentation_t {
     struct name_comparator_t {
         using is_transparent = std::true_type;
@@ -45,6 +47,8 @@ struct SYNCSPIRIT_API entity_t : virtual model::augmentable_t<entity_t>, protect
     void remove_presense(presence_t &);
 
   protected:
+    friend struct folder_entity_t;
+
     struct record_t {
         model::device_ptr_t device;
         presence_t *presence;
@@ -55,6 +59,7 @@ struct SYNCSPIRIT_API entity_t : virtual model::augmentable_t<entity_t>, protect
 
     void on_update() noexcept override;
     void on_delete() noexcept override;
+    void add_child(entity_ptr_t child);
 
     entity_t *parent;
     records_t records;

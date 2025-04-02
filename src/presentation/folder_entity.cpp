@@ -9,14 +9,20 @@
 
 #include <boost/nowide/convert.hpp>
 #include <filesystem>
-#include <unordered_map>
+#include <map>
 
 using namespace syncspirit;
 using namespace syncspirit::presentation;
 
 namespace bfs = std::filesystem;
 
-using path_t = std::vector<std::string>;
+struct path_t {
+    using components_t = std::vector<std::string>;
+    components_t components;
+    std::string parent;
+    std::string self;
+};
+
 using file_entity_ptr_t = model::intrusive_ptr_t<file_entity_t>;
 
 struct visit_info_t {
@@ -37,7 +43,7 @@ folder_entity_t::folder_entity_t(model::folder_ptr_t folder_) : entity_t(nullptr
     }
 
     // make all-files as chilren, make hierarchy
-    using visited_files_t = std::unordered_map<std::string_view, visit_info_t>;
+    using visited_files_t = std::map<std::string_view, visit_info_t>;
     auto &fi_map = folder.get_folder_infos();
     auto visited_files = visited_files_t();
     for (auto &it_fi : fi_map) {
@@ -50,23 +56,48 @@ folder_entity_t::folder_entity_t(model::folder_ptr_t folder_) : entity_t(nullptr
                 continue;
             }
             auto file_path = bfs::path(boost::nowide::widen(name));
-            auto string_path = path_t();
+            auto decomposed_path = path_t();
+            decomposed_path.self = name;
             for (auto it = file_path.begin(); it != file_path.end(); ++it) {
                 auto name = boost::nowide::narrow(it->wstring());
-                string_path.emplace_back(std::move(name));
+                decomposed_path.components.emplace_back(std::move(name));
             }
 
-            auto child = file_entity_ptr_t(new file_entity_t(file, string_path.back()));
+            if (decomposed_path.components.size() > 1) {
+                auto parent = file_path.parent_path();
+                decomposed_path.parent = boost::nowide::narrow(parent.wstring());
+            }
+            auto &own_name = decomposed_path.components.back();
+            auto child = file_entity_ptr_t(new file_entity_t(file, own_name));
             auto info = visit_info_t{
                 std::move(child),
-                std::move(string_path),
+                std::move(decomposed_path),
             };
             visited_files.emplace(name, std::move(info));
         }
     }
 
+    using file_entities_t = std::unordered_map<std::string_view, file_entity_ptr_t>;
+    auto file_entities = file_entities_t();
     for (auto &it : visited_files) {
-        children.emplace(std::move(it.second.file));
+        auto &path = it.second.path;
+        auto &entity = it.second.file;
+        auto parent = (entity_t *)(nullptr);
+        if (path.components.size() == 1) {
+            parent = this;
+
+        } else {
+            auto it_parent = file_entities.find(it.second.path.parent);
+            if (it_parent != file_entities.end()) {
+                parent = it_parent->second.get();
+            } else {
+                std::abort();
+            }
+        }
+        if (parent) {
+            parent->add_child(entity);
+        }
+        file_entities[path.self] = entity;
     }
 }
 

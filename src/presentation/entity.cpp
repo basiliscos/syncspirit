@@ -42,6 +42,11 @@ presence_t *entity_t::get_presense_raw(model::device_t &device) {
 void entity_t::on_update() noexcept { notify_update(); }
 void entity_t::on_delete() noexcept {}
 
+void entity_t::add_child(entity_ptr_t child) {
+    child->parent = this;
+    children.emplace(std::move(child));
+}
+
 using nc_t = entity_t::name_comparator_t;
 
 bool nc_t::operator()(const entity_ptr_t &lhs, const entity_ptr_t &rhs) const {
