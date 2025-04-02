@@ -17,6 +17,8 @@ struct SYNCSPIRIT_API file_presence_t : presence_t {
         cluster = 0b00000010,
         peer    = 0b00000100,
         local   = 0b00001000,
+        deleted = 0b00010000,
+        ignored = 0b00100000,
     };
     // clang-format ON
 

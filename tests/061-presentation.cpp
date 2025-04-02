@@ -175,23 +175,7 @@ TEST_CASE("presentation", "[presentation]") {
         CHECK(file_e->get_name() == "e.txt");
         CHECK(file_f->get_name() == "f.txt");
 
-        SECTION("all devices have a file") {
-            auto f_my = file_c->get_presense<cluster_file_presence_t>(*my_device);
-            auto f_peer = file_c->get_presense<cluster_file_presence_t>(*peer_device);
-            auto f_peer_2 = file_c->get_presense<cluster_file_presence_t>(*peer_2_device);
-
-            REQUIRE(f_my);
-            REQUIRE(f_peer);
-            REQUIRE(f_peer_2);
-            REQUIRE(f_my->get_file_info().get_folder_info()->get_device() == my_device.get());
-            REQUIRE(f_peer->get_file_info().get_folder_info()->get_device() == peer_device.get());
-            REQUIRE(f_peer_2->get_file_info().get_folder_info()->get_device() == peer_2_device.get());
-            CHECK(f_my->get_presence_feautres() & (F::cluster | F::local));
-            CHECK(f_peer->get_presence_feautres() & (F::cluster | F::peer));
-            CHECK(f_peer_2->get_presence_feautres() & (F::cluster | F::peer));
-        }
-
-        SECTION("only my device has a file") {
+        SECTION("only my device has a file (a.txt)") {
             auto f_my = file_a->get_presense<cluster_file_presence_t>(*my_device);
             auto f_peer = file_a->get_presense<file_presence_t>(*peer_device);
             auto f_peer_2 = file_a->get_presense<file_presence_t>(*peer_2_device);
@@ -207,14 +191,81 @@ TEST_CASE("presentation", "[presentation]") {
             CHECK(f_peer == f_peer_2);
         }
 
-#if 0
-        auto my_fi = folder->get_folder_infos().by_device(*my_device);
-        auto peer_fi = folder->get_folder_infos().by_device(*peer_device);
-        auto peer_2_fi = folder->get_folder_infos().by_device(*peer_2_device);
+        SECTION("my & peer device have a file (b.txt)") {
+            auto f_my = file_b->get_presense<cluster_file_presence_t>(*my_device);
+            auto f_peer = file_b->get_presense<file_presence_t>(*peer_device);
+            auto f_peer_2 = file_b->get_presense<file_presence_t>(*peer_2_device);
 
-        auto& my_files = my_fi->get_file_infos();
-        auto& peer_files = peer_fi->get_file_infos();
-        auto& peer_2_files = peer_2_fi->get_file_infos();
-#endif
+            REQUIRE(f_my);
+            REQUIRE(f_peer);
+            REQUIRE(f_peer_2);
+
+            REQUIRE(f_my->get_file_info().get_folder_info()->get_device() == my_device.get());
+            CHECK(f_my->get_presence_feautres() & (F::cluster | F::local));
+            CHECK(f_peer->get_presence_feautres() & (F::cluster | F::peer));
+            CHECK(f_peer_2->get_presence_feautres() & F::missing);
+        }
+
+        SECTION("all devices have a file (c.txt)") {
+            auto f_my = file_c->get_presense<cluster_file_presence_t>(*my_device);
+            auto f_peer = file_c->get_presense<cluster_file_presence_t>(*peer_device);
+            auto f_peer_2 = file_c->get_presense<cluster_file_presence_t>(*peer_2_device);
+
+            REQUIRE(f_my);
+            REQUIRE(f_peer);
+            REQUIRE(f_peer_2);
+            REQUIRE(f_my->get_file_info().get_folder_info()->get_device() == my_device.get());
+            REQUIRE(f_peer->get_file_info().get_folder_info()->get_device() == peer_device.get());
+            REQUIRE(f_peer_2->get_file_info().get_folder_info()->get_device() == peer_2_device.get());
+            CHECK(f_my->get_presence_feautres() & (F::cluster | F::local));
+            CHECK(f_peer->get_presence_feautres() & (F::cluster | F::peer));
+            CHECK(f_peer_2->get_presence_feautres() & (F::cluster | F::peer));
+        }
+
+        SECTION("only peer device has a file (d.txt)") {
+            auto f_my = file_d->get_presense<file_presence_t>(*my_device);
+            auto f_peer = file_d->get_presense<cluster_file_presence_t>(*peer_device);
+            auto f_peer_2 = file_d->get_presense<file_presence_t>(*peer_2_device);
+
+            REQUIRE(f_my);
+            REQUIRE(f_peer);
+            REQUIRE(f_peer_2);
+
+            REQUIRE(f_peer->get_file_info().get_folder_info()->get_device() == peer_device.get());
+            CHECK(f_my->get_presence_feautres() & F::missing);
+            CHECK(f_peer->get_presence_feautres() & (F::cluster | F::peer));
+            CHECK(f_peer_2->get_presence_feautres() & F::missing);
+        }
+
+        SECTION("only peer device has a file (e.txt)") {
+            auto f_my = file_e->get_presense<file_presence_t>(*my_device);
+            auto f_peer = file_e->get_presense<file_presence_t>(*peer_device);
+            auto f_peer_2 = file_e->get_presense<cluster_file_presence_t>(*peer_2_device);
+
+            REQUIRE(f_my);
+            REQUIRE(f_peer);
+            REQUIRE(f_peer_2);
+
+            REQUIRE(f_peer_2->get_file_info().get_folder_info()->get_device() == peer_2_device.get());
+            CHECK(f_my->get_presence_feautres() & F::missing);
+            CHECK(f_peer->get_presence_feautres() & F::missing);
+            CHECK(f_peer_2->get_presence_feautres() & (F::cluster | F::peer));
+        }
+
+        SECTION("only peer devices have a file (f.txt)") {
+            auto f_my = file_f->get_presense<file_presence_t>(*my_device);
+            auto f_peer = file_f->get_presense<cluster_file_presence_t>(*peer_device);
+            auto f_peer_2 = file_f->get_presense<cluster_file_presence_t>(*peer_2_device);
+
+            REQUIRE(f_my);
+            REQUIRE(f_peer);
+            REQUIRE(f_peer_2);
+
+            REQUIRE(f_peer->get_file_info().get_folder_info()->get_device() == peer_device.get());
+            REQUIRE(f_peer_2->get_file_info().get_folder_info()->get_device() == peer_2_device.get());
+            CHECK(f_my->get_presence_feautres() & F::missing);
+            CHECK(f_peer->get_presence_feautres() & (F::cluster | F::peer));
+            CHECK(f_peer_2->get_presence_feautres() & (F::cluster | F::peer));
+        }
     }
 }
