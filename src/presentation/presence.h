@@ -33,9 +33,13 @@ struct SYNCSPIRIT_API presence_t : virtual model::augmentable_t<entity_t>, prote
     ~presence_t();
 
     void set_parent(presence_t *value);
+    presence_t *get_parent();
     std::uint32_t get_presence_feautres();
 
   protected:
+    friend struct entity_t;
+
+    void set_parent(entity_t *entity);
     entity_t &entity;
     presence_t *parent;
     model::device_ptr_t device;

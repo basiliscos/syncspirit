@@ -19,6 +19,15 @@ std::string_view entity_t::get_name() const { return name; }
 
 auto entity_t::get_children() -> children_t & { return children; }
 
+entity_t *entity_t::get_parent() { return parent; }
+
+void entity_t::set_parent(entity_t *value) {
+    parent = value;
+    for (auto &r : records) {
+        r.presence->set_parent(value);
+    }
+}
+
 void entity_t::remove_presense(presence_t &item) {
     auto predicate = [&item](const record_t &record) { return record.presence == &item; };
     auto it = std::find_if(records.begin(), records.end(), predicate);
@@ -43,7 +52,7 @@ void entity_t::on_update() noexcept { notify_update(); }
 void entity_t::on_delete() noexcept {}
 
 void entity_t::add_child(entity_ptr_t child) {
-    child->parent = this;
+    child->set_parent(this);
     children.emplace(std::move(child));
 }
 

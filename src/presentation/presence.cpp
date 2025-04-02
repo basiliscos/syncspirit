@@ -7,10 +7,17 @@
 using namespace syncspirit;
 using namespace syncspirit::presentation;
 
-presence_t::presence_t(entity_t &entity_, model::device_ptr_t device_) : entity{entity_}, device{std::move(device_)} {}
+presence_t::presence_t(entity_t &entity_, model::device_ptr_t device_)
+    : entity{entity_}, device{std::move(device_)}, parent{nullptr} {}
 
 presence_t::~presence_t() { entity.remove_presense(*this); }
 
-void presence_t::set_parent(presence_t *value) { parent = value; }
+presence_t *presence_t::get_parent() { return parent; }
 
 auto presence_t::get_presence_feautres() -> std::uint32_t { return features; }
+
+void presence_t::set_parent(entity_t *value) {
+    if (value && device) {
+        parent = value->get_presense<presence_t>(*device);
+    }
+}

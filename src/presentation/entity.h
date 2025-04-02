@@ -43,6 +43,7 @@ struct SYNCSPIRIT_API entity_t : virtual model::augmentable_t<entity_t>, protect
     }
 
     children_t &get_children();
+    entity_t *get_parent();
     void remove_child(entity_t &);
     void remove_presense(presence_t &);
 
@@ -60,6 +61,7 @@ struct SYNCSPIRIT_API entity_t : virtual model::augmentable_t<entity_t>, protect
     void on_update() noexcept override;
     void on_delete() noexcept override;
     void add_child(entity_ptr_t child);
+    void set_parent(entity_t *parent);
 
     entity_t *parent;
     records_t records;
