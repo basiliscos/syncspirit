@@ -223,7 +223,6 @@ add_library(syncspirit_core
     src/presentation/entity.cpp
     src/presentation/cluster_file_presence.cpp
     src/presentation/file_entity.cpp
-    src/presentation/file_presence.cpp
     src/presentation/folder_entity.cpp
     src/presentation/folder_presence.cpp
     src/presentation/local_file_presence.cpp

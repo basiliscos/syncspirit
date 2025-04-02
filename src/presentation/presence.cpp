@@ -12,3 +12,5 @@ presence_t::presence_t(entity_t &entity_, model::device_ptr_t device_) : entity{
 presence_t::~presence_t() { entity.remove_presense(*this); }
 
 void presence_t::set_parent(presence_t *value) { parent = value; }
+
+auto presence_t::get_presence_feautres() -> std::uint32_t { return features; }
