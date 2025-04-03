@@ -35,17 +35,7 @@ file_entity_t::file_entity_t(model::file_info_t &sample_file, std::string_view o
     records.emplace_back(record_t{{}, new missing_file_presence_t(*this)});
 
     for (auto &it : presence_files) {
-        auto fi = it->get_folder_info();
-        auto device = it->get_folder_info()->get_device();
-        auto local = fi->get_folder()->get_cluster()->get_device() == device;
-        auto child = [&]() -> file_presence_t * {
-            if (local) {
-                return new local_file_presence_t(*this, *it);
-            } else {
-                return new peer_file_presence_t(*this, *it);
-            }
-        }();
-        records.emplace_back(record_t{device, child});
+        on_insert(*it);
     }
 }
 
@@ -57,4 +47,18 @@ file_entity_t::~file_entity_t() {
         }
     }
     records.clear();
+}
+
+void file_entity_t::on_insert(model::file_info_t &file_info) {
+    auto fi = file_info.get_folder_info();
+    auto device = fi->get_device();
+    auto local = fi->get_folder()->get_cluster()->get_device() == device;
+    auto child = [&]() -> file_presence_t * {
+        if (local) {
+            return new local_file_presence_t(*this, file_info);
+        } else {
+            return new peer_file_presence_t(*this, file_info);
+        }
+    }();
+    records.emplace_back(record_t{device, child});
 }

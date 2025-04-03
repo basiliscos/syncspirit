@@ -18,14 +18,14 @@ using presence_ptr_t = model::intrusive_ptr_t<presence_t>;
 struct SYNCSPIRIT_API presence_t : virtual model::augmentable_t<entity_t>, protected virtual model::augmentation_t {
     // clang-format off
     enum features_t: std::uint32_t {
-        file    = 0b0000000000000001,
-        folder  = 0b0000000000000010,
-        missing = 0b0000000000000100,
-        cluster = 0b0000000000001000,
-        peer    = 0b0000000000010000,
-        local   = 0b0000000000100000,
-        deleted = 0b0000000001000000,
-        ignored = 0b0000000010000000,
+        file    = 1 << 1,
+        folder  = 1 << 2,
+        missing = 1 << 3,
+        cluster = 1 << 4,
+        peer    = 1 << 5,
+        local   = 1 << 6,
+        deleted = 1 << 7,
+        ignored = 1 << 8,
     };
     // clang-format ON
 
