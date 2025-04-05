@@ -9,7 +9,7 @@ using namespace syncspirit::presentation;
 
 folder_presence_t::folder_presence_t(folder_entity_t &entity_, model::folder_info_t &fi)
     : presence_t(&entity_, fi.get_device()), folder_info{fi} {
-    fi.set_augmentation(this);
+    link(&fi);
     features = features_t::folder;
 }
 

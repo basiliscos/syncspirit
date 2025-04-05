@@ -12,7 +12,7 @@ using namespace syncspirit::presentation;
 
 cluster_file_presence_t::cluster_file_presence_t(file_entity_t &entity, model::file_info_t &file_info_)
     : file_presence_t(&entity, file_info_.get_folder_info()->get_device()), file_info{file_info_} {
-    file_info.set_augmentation(this);
+    link(&file_info);
 }
 
 auto cluster_file_presence_t::get_file_info() -> model::file_info_t & { return file_info; }

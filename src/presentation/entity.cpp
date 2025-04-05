@@ -77,6 +77,8 @@ void entity_t::add_child(entity_t &child) {
 void entity_t::remove_child(entity_t &child) {
     auto it = children.equal_range(&child).first;
     assert(it != children.end());
+    child.clear_children();
+    child.set_augmentation({});
     model::intrusive_ptr_release(&child);
     child.parent = nullptr;
     children.erase(it);

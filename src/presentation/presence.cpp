@@ -8,7 +8,7 @@ using namespace syncspirit;
 using namespace syncspirit::presentation;
 
 presence_t::presence_t(entity_t *entity_, model::device_ptr_t device_)
-    : entity{entity_}, device{std::move(device_)}, parent{nullptr} {
+    : entity{entity_}, device{std::move(device_)}, parent{nullptr}, augmentable{nullptr} {
     if (entity) {
         model::intrusive_ptr_add_ref(entity);
     }
@@ -27,11 +27,16 @@ void presence_t::set_parent(entity_t *value) {
 }
 
 void presence_t::clear_presense() noexcept {
+    if (augmentable) {
+        augmentable->set_augmentation({});
+    }
     if (entity) {
         entity->remove_presense(*this);
         model::intrusive_ptr_release(entity);
         entity = nullptr;
     }
 }
+
+void presence_t::link(augmentable_t *augmentable) noexcept { augmentable->set_augmentation(this); }
 
 void presence_t::on_delete() noexcept { clear_presense(); }

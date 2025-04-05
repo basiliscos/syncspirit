@@ -187,20 +187,20 @@ TEST_CASE("presentation", "[presentation]") {
         auto &children = folder_entity->get_children();
         REQUIRE(children.size() == 6);
         auto it = children.begin();
-        auto next_entry = [&]() -> presentation::entity_ptr_t {
+        auto next_entity = [&]() -> presentation::entity_ptr_t {
             if (it != children.end()) {
                 return *it++;
             }
             return {};
         };
 
-        auto file_a = next_entry();
-        auto file_b = next_entry();
-        auto file_c = next_entry();
-        auto file_d = next_entry();
-        auto file_e = next_entry();
-        auto file_f = next_entry();
-        REQUIRE(!next_entry());
+        auto file_a = next_entity();
+        auto file_b = next_entity();
+        auto file_c = next_entity();
+        auto file_d = next_entity();
+        auto file_e = next_entity();
+        auto file_f = next_entity();
+        REQUIRE(!next_entity());
 
         CHECK(file_a->get_path().get_own_name() == "a.txt");
         CHECK(file_b->get_path().get_own_name() == "b.txt");
@@ -375,56 +375,56 @@ TEST_CASE("presentation", "[presentation]") {
 
             auto &children = folder_entity->get_children();
             REQUIRE(children.size() == 1);
-            auto &dir_a_entry = *children.begin();
-            REQUIRE(dir_a_entry->get_path().get_own_name() == "a");
-            REQUIRE(dir_a_entry->get_children().size() == 1);
-            CHECK(dir_a_entry->get_parent() == folder_entity);
-            auto p_dir_a_my = dir_a_entry->get_presense<file_presence_t>(*my_device);
-            auto p_dir_a_peer = dir_a_entry->get_presense<file_presence_t>(*peer_device);
+            auto &dir_a_entity = *children.begin();
+            REQUIRE(dir_a_entity->get_path().get_own_name() == "a");
+            REQUIRE(dir_a_entity->get_children().size() == 1);
+            CHECK(dir_a_entity->get_parent() == folder_entity);
+            auto p_dir_a_my = dir_a_entity->get_presense<file_presence_t>(*my_device);
+            auto p_dir_a_peer = dir_a_entity->get_presense<file_presence_t>(*peer_device);
             CHECK(p_dir_a_my->get_presence_feautres() & (F::file | F::local));
             CHECK(p_dir_a_peer->get_presence_feautres() & (F::file | F::peer));
             CHECK(p_dir_a_my->get_parent() == p_folder_my);
             CHECK(p_dir_a_peer->get_parent() == p_folder_peer);
 
-            auto &dir_b_entry = *dir_a_entry->get_children().begin();
-            REQUIRE(dir_b_entry->get_path().get_own_name() == "b");
-            REQUIRE(dir_b_entry->get_children().size() == 1);
-            CHECK(dir_b_entry->get_parent() == dir_a_entry);
-            auto p_dir_b_my = dir_b_entry->get_presense<file_presence_t>(*my_device);
-            auto p_dir_b_peer = dir_b_entry->get_presense<file_presence_t>(*peer_device);
+            auto &dir_b_entity = *dir_a_entity->get_children().begin();
+            REQUIRE(dir_b_entity->get_path().get_own_name() == "b");
+            REQUIRE(dir_b_entity->get_children().size() == 1);
+            CHECK(dir_b_entity->get_parent() == dir_a_entity);
+            auto p_dir_b_my = dir_b_entity->get_presense<file_presence_t>(*my_device);
+            auto p_dir_b_peer = dir_b_entity->get_presense<file_presence_t>(*peer_device);
             CHECK(p_dir_b_my->get_presence_feautres() & (F::file | F::local));
             CHECK(p_dir_b_peer->get_presence_feautres() & (F::file | F::peer));
             CHECK(p_dir_b_my->get_parent() == p_dir_a_my);
             CHECK(p_dir_b_peer->get_parent() == p_dir_a_peer);
 
-            auto &dir_c_entry = *dir_b_entry->get_children().begin();
-            REQUIRE(dir_c_entry->get_path().get_own_name() == "c");
-            REQUIRE(dir_c_entry->get_children().size() == 1);
-            CHECK(dir_c_entry->get_parent() == dir_b_entry);
-            auto p_dir_c_my = dir_c_entry->get_presense<file_presence_t>(*my_device);
-            auto p_dir_c_peer = dir_c_entry->get_presense<file_presence_t>(*peer_device);
+            auto &dir_c_entity = *dir_b_entity->get_children().begin();
+            REQUIRE(dir_c_entity->get_path().get_own_name() == "c");
+            REQUIRE(dir_c_entity->get_children().size() == 1);
+            CHECK(dir_c_entity->get_parent() == dir_b_entity);
+            auto p_dir_c_my = dir_c_entity->get_presense<file_presence_t>(*my_device);
+            auto p_dir_c_peer = dir_c_entity->get_presense<file_presence_t>(*peer_device);
             CHECK(p_dir_c_my->get_presence_feautres() & (F::file | F::local));
             CHECK(p_dir_c_peer->get_presence_feautres() & (F::file | F::peer));
             CHECK(p_dir_c_my->get_parent() == p_dir_b_my);
             CHECK(p_dir_c_peer->get_parent() == p_dir_b_peer);
 
-            auto &dir_d_entry = *dir_c_entry->get_children().begin();
-            REQUIRE(dir_d_entry->get_path().get_own_name() == "d");
-            REQUIRE(dir_d_entry->get_children().size() == 1);
-            CHECK(dir_d_entry->get_parent() == dir_c_entry);
-            auto p_dir_d_my = dir_d_entry->get_presense<file_presence_t>(*my_device);
-            auto p_dir_d_peer = dir_d_entry->get_presense<file_presence_t>(*peer_device);
+            auto &dir_d_entity = *dir_c_entity->get_children().begin();
+            REQUIRE(dir_d_entity->get_path().get_own_name() == "d");
+            REQUIRE(dir_d_entity->get_children().size() == 1);
+            CHECK(dir_d_entity->get_parent() == dir_c_entity);
+            auto p_dir_d_my = dir_d_entity->get_presense<file_presence_t>(*my_device);
+            auto p_dir_d_peer = dir_d_entity->get_presense<file_presence_t>(*peer_device);
             CHECK(p_dir_d_my->get_presence_feautres() & (F::file | F::local));
             CHECK(p_dir_d_peer->get_presence_feautres() & (F::file | F::missing));
             CHECK(p_dir_d_my->get_parent() == p_dir_c_my);
             CHECK(!p_dir_d_peer->get_parent());
 
-            auto &file_e_entry = *dir_d_entry->get_children().begin();
-            REQUIRE(file_e_entry->get_path().get_own_name() == "e.txt");
-            REQUIRE(file_e_entry->get_children().size() == 0);
-            CHECK(file_e_entry->get_parent() == dir_d_entry);
-            auto p_file_my = file_e_entry->get_presense<file_presence_t>(*my_device);
-            auto p_file_peer = file_e_entry->get_presense<file_presence_t>(*peer_device);
+            auto &file_e_entity = *dir_d_entity->get_children().begin();
+            REQUIRE(file_e_entity->get_path().get_own_name() == "e.txt");
+            REQUIRE(file_e_entity->get_children().size() == 0);
+            CHECK(file_e_entity->get_parent() == dir_d_entity);
+            auto p_file_my = file_e_entity->get_presense<file_presence_t>(*my_device);
+            auto p_file_peer = file_e_entity->get_presense<file_presence_t>(*peer_device);
             CHECK(p_file_my->get_presence_feautres() & (F::file | F::local));
             CHECK(p_file_peer->get_presence_feautres() & (F::file | F::missing));
             CHECK(p_file_my->get_parent() == p_dir_d_my);
@@ -450,23 +450,23 @@ TEST_CASE("presentation", "[presentation]") {
 
             auto &children = folder_entity->get_children();
             REQUIRE(children.size() == 1);
-            auto &dir_a_entry = *children.begin();
-            REQUIRE(dir_a_entry->get_path().get_own_name() == "a");
-            REQUIRE(dir_a_entry->get_children().size() == 1);
-            CHECK(dir_a_entry->get_parent() == folder_entity);
-            auto p_dir_a_my = dir_a_entry->get_presense<file_presence_t>(*my_device);
-            auto p_dir_a_peer = dir_a_entry->get_presense<file_presence_t>(*peer_device);
+            auto &dir_a_entity = *children.begin();
+            REQUIRE(dir_a_entity->get_path().get_own_name() == "a");
+            REQUIRE(dir_a_entity->get_children().size() == 1);
+            CHECK(dir_a_entity->get_parent() == folder_entity);
+            auto p_dir_a_my = dir_a_entity->get_presense<file_presence_t>(*my_device);
+            auto p_dir_a_peer = dir_a_entity->get_presense<file_presence_t>(*peer_device);
             CHECK(p_dir_a_my->get_presence_feautres() & (F::file | F::missing));
             CHECK(p_dir_a_peer->get_presence_feautres() & (F::file | F::peer));
             CHECK(!p_dir_a_my->get_parent());
             CHECK(p_dir_a_peer->get_parent() == p_folder_peer);
 
-            auto &dir_b_entry = *dir_a_entry->get_children().begin();
-            REQUIRE(dir_b_entry->get_path().get_own_name() == "b");
-            REQUIRE(dir_b_entry->get_children().size() == 0);
-            CHECK(dir_b_entry->get_parent() == dir_a_entry);
-            auto p_dir_b_my = dir_b_entry->get_presense<file_presence_t>(*my_device);
-            auto p_dir_b_peer = dir_b_entry->get_presense<file_presence_t>(*peer_device);
+            auto &dir_b_entity = *dir_a_entity->get_children().begin();
+            REQUIRE(dir_b_entity->get_path().get_own_name() == "b");
+            REQUIRE(dir_b_entity->get_children().size() == 0);
+            CHECK(dir_b_entity->get_parent() == dir_a_entity);
+            auto p_dir_b_my = dir_b_entity->get_presense<file_presence_t>(*my_device);
+            auto p_dir_b_peer = dir_b_entity->get_presense<file_presence_t>(*peer_device);
             CHECK(p_dir_b_my->get_presence_feautres() & (F::file | F::missing));
             CHECK(p_dir_b_peer->get_presence_feautres() & (F::file | F::peer));
             CHECK(!p_dir_b_my->get_parent());
@@ -474,13 +474,13 @@ TEST_CASE("presentation", "[presentation]") {
 
             auto file_c_peer = add_file("a/b/c", *peer_device);
             folder_entity->on_insert(*file_c_peer);
-            REQUIRE(dir_b_entry->get_children().size() == 1);
-            auto &dir_c_entry = *dir_b_entry->get_children().begin();
-            REQUIRE(dir_c_entry->get_path().get_own_name() == "c");
-            REQUIRE(dir_c_entry->get_children().size() == 0);
-            CHECK(dir_c_entry->get_parent() == dir_b_entry);
-            auto p_dir_c_my = dir_c_entry->get_presense<file_presence_t>(*my_device);
-            auto p_dir_c_peer = dir_c_entry->get_presense<file_presence_t>(*peer_device);
+            REQUIRE(dir_b_entity->get_children().size() == 1);
+            auto &dir_c_entity = *dir_b_entity->get_children().begin();
+            REQUIRE(dir_c_entity->get_path().get_own_name() == "c");
+            REQUIRE(dir_c_entity->get_children().size() == 0);
+            CHECK(dir_c_entity->get_parent() == dir_b_entity);
+            auto p_dir_c_my = dir_c_entity->get_presense<file_presence_t>(*my_device);
+            auto p_dir_c_peer = dir_c_entity->get_presense<file_presence_t>(*peer_device);
             CHECK(p_dir_c_my->get_presence_feautres() & (F::file | F::local));
             CHECK(p_dir_c_peer->get_presence_feautres() & (F::file | F::peer));
             CHECK(!p_dir_c_my->get_parent());
@@ -489,7 +489,7 @@ TEST_CASE("presentation", "[presentation]") {
             auto file_a_my = add_file("a", *my_device);
             folder_entity->on_insert(*file_a_my);
             REQUIRE(children.size() == 1);
-            p_dir_a_my = dir_a_entry->get_presense<file_presence_t>(*my_device);
+            p_dir_a_my = dir_a_entity->get_presense<file_presence_t>(*my_device);
             CHECK(p_dir_a_my->get_parent() == p_folder_my);
         }
         SECTION("orphans") {
@@ -507,18 +507,18 @@ TEST_CASE("presentation", "[presentation]") {
                 folder_entity->on_insert(*dir_a_my);
 
                 REQUIRE(children.size() == 1);
-                auto &dir_a_entry = *children.begin();
-                REQUIRE(dir_a_entry->get_path().get_own_name() == "a");
-                REQUIRE(dir_a_entry->get_children().size() == 1);
-                CHECK(dir_a_entry->get_parent() == folder_entity);
-                auto p_dir_a_my = dir_a_entry->get_presense<file_presence_t>(*my_device);
+                auto &dir_a_entity = *children.begin();
+                REQUIRE(dir_a_entity->get_path().get_own_name() == "a");
+                REQUIRE(dir_a_entity->get_children().size() == 1);
+                CHECK(dir_a_entity->get_parent() == folder_entity);
+                auto p_dir_a_my = dir_a_entity->get_presense<file_presence_t>(*my_device);
                 CHECK(p_dir_a_my->get_presence_feautres() & (F::file | F::local));
 
-                auto &dir_b_entry = *dir_a_entry->get_children().begin();
-                REQUIRE(dir_b_entry->get_path().get_own_name() == "b");
-                REQUIRE(dir_b_entry->get_children().size() == 0);
-                CHECK(dir_b_entry->get_parent() == dir_a_entry);
-                auto p_dir_b_my = dir_b_entry->get_presense<file_presence_t>(*my_device);
+                auto &dir_b_entity = *dir_a_entity->get_children().begin();
+                REQUIRE(dir_b_entity->get_path().get_own_name() == "b");
+                REQUIRE(dir_b_entity->get_children().size() == 0);
+                CHECK(dir_b_entity->get_parent() == dir_a_entity);
+                auto p_dir_b_my = dir_b_entity->get_presense<file_presence_t>(*my_device);
                 CHECK(p_dir_b_my->get_presence_feautres() & (F::file | F::local));
             }
             SECTION("lazy") {
@@ -536,20 +536,20 @@ TEST_CASE("presentation", "[presentation]") {
                 auto &children = folder_entity->get_children();
                 REQUIRE(children.size() == 1);
 
-                auto &dir_a_entry = *children.begin();
-                REQUIRE(dir_a_entry->get_path().get_own_name() == "a");
-                REQUIRE(dir_a_entry->get_children().size() == 1);
-                CHECK(dir_a_entry->get_parent() == folder_entity);
+                auto &dir_a_entity = *children.begin();
+                REQUIRE(dir_a_entity->get_path().get_own_name() == "a");
+                REQUIRE(dir_a_entity->get_children().size() == 1);
+                CHECK(dir_a_entity->get_parent() == folder_entity);
 
-                auto &dir_b_entry = *dir_a_entry->get_children().begin();
-                REQUIRE(dir_b_entry->get_path().get_own_name() == "b");
-                REQUIRE(dir_b_entry->get_children().size() == 1);
-                CHECK(dir_b_entry->get_parent() == dir_a_entry);
+                auto &dir_b_entity = *dir_a_entity->get_children().begin();
+                REQUIRE(dir_b_entity->get_path().get_own_name() == "b");
+                REQUIRE(dir_b_entity->get_children().size() == 1);
+                CHECK(dir_b_entity->get_parent() == dir_a_entity);
 
-                auto &dir_c_entry = *dir_b_entry->get_children().begin();
-                REQUIRE(dir_c_entry->get_path().get_own_name() == "c");
-                REQUIRE(dir_c_entry->get_children().size() == 0);
-                CHECK(dir_c_entry->get_parent() == dir_b_entry);
+                auto &dir_c_entity = *dir_b_entity->get_children().begin();
+                REQUIRE(dir_c_entity->get_path().get_own_name() == "c");
+                REQUIRE(dir_c_entity->get_children().size() == 0);
+                CHECK(dir_c_entity->get_parent() == dir_b_entity);
             }
         }
         SECTION("removal") {
@@ -613,16 +613,74 @@ TEST_CASE("presentation", "[presentation]") {
                 REQUIRE(folder_entity->get_presense<folder_presence_t>(*peer_device));
                 REQUIRE(folder_entity->get_children().size() == 1);
 
-                auto &dir_a_entry = *folder_entity->get_children().begin();
-                REQUIRE(dir_a_entry->get_path().get_own_name() == "a");
-                REQUIRE(dir_a_entry->get_children().size() == 1);
+                auto &dir_a_entity = *folder_entity->get_children().begin();
+                REQUIRE(dir_a_entity->get_path().get_own_name() == "a");
+                REQUIRE(dir_a_entity->get_children().size() == 1);
 
                 REQUIRE(builder.unshare_folder(*fi_peer).apply());
 
                 CHECK(folder_entity->get_presense<folder_presence_t>(*my_device));
                 CHECK(!folder_entity->get_presense<folder_presence_t>(*peer_device));
 
-                REQUIRE(dir_a_entry->get_children().size() == 0);
+                REQUIRE(dir_a_entity->get_children().size() == 0);
+            }
+            SECTION("folder info with a file hierarchy removal (3)") {
+                using strings_t = std::vector<std::string_view>;
+
+                struct sample_aug_t : model::augmentation_t {
+                    sample_aug_t(strings_t &strings_, std::string_view name_) : strings{strings_}, name{name_} {}
+                    ~sample_aug_t() { strings.emplace_back(name); }
+
+                    strings_t &strings;
+                    std::string_view name;
+                };
+
+                auto strings = strings_t();
+                auto augment = [&](entity_t *presense, std::string_view name) {
+                    auto aug = model::augmentation_ptr_t();
+                    aug = new sample_aug_t(strings, name);
+                    presense->set_augmentation(aug);
+                };
+                {
+                    auto fi_peer = folder->get_folder_infos().by_device(*peer_device).get();
+                    add_file("a", *peer_device);
+                    add_file("a/b", *peer_device);
+                    add_file("a/b/c", *peer_device);
+
+                    auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
+                    CHECK(!folder_entity->get_parent());
+
+                    auto &dir_a_entity = *folder_entity->get_children().begin();
+                    REQUIRE(dir_a_entity->get_path().get_own_name() == "a");
+                    REQUIRE(dir_a_entity->get_children().size() == 1);
+
+                    auto &dir_b_entity = *dir_a_entity->get_children().begin();
+                    REQUIRE(dir_b_entity->get_path().get_own_name() == "b");
+                    REQUIRE(dir_a_entity->get_children().size() == 1);
+
+                    auto &file_c_entity = *dir_b_entity->get_children().begin();
+                    REQUIRE(file_c_entity->get_path().get_own_name() == "c");
+                    REQUIRE(file_c_entity->get_children().size() == 0);
+
+                    augment(dir_a_entity, "a");
+                    augment(dir_b_entity, "a/b");
+                    augment(file_c_entity, "a/b/c");
+
+                    REQUIRE(folder_entity->get_presense<folder_presence_t>(*my_device));
+
+                    auto p_folder_peer = folder_entity->get_presense<folder_presence_t>(*peer_device);
+                    REQUIRE(p_folder_peer);
+
+                    REQUIRE(builder.unshare_folder(*fi_peer).apply());
+
+                    CHECK(folder_entity->get_presense<folder_presence_t>(*my_device));
+                    CHECK(!folder_entity->get_presense<folder_presence_t>(*peer_device));
+                }
+
+                REQUIRE(strings.size() == 3);
+                CHECK(strings[0] == "a/b/c");
+                CHECK(strings[1] == "a/b");
+                CHECK(strings[2] == "a");
             }
             SECTION("folder info with an orphan removal") {
                 auto fi_peer = folder->get_folder_infos().by_device(*peer_device).get();

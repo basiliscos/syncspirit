@@ -40,9 +40,11 @@ struct SYNCSPIRIT_API presence_t : virtual model::augmentable_t, protected virtu
   protected:
     void on_delete() noexcept override;
     void clear_presense() noexcept;
+    void link(augmentable_t* augmentable) noexcept;
 
     entity_t *entity;
     presence_t *parent;
+    augmentable_t* augmentable;
     model::device_ptr_t device;
     std::uint32_t features = 0;
 };
