@@ -6,7 +6,7 @@
 #include <cstdint>
 #include <optional>
 #include <boost/outcome.hpp>
-#include "misc/augmentation.hpp"
+#include "misc/augmentation.h"
 #include "device.h"
 #include "folder_info.h"
 #include "misc/uuid.h"
@@ -26,7 +26,7 @@ struct folder_t;
 
 using folder_ptr_t = intrusive_ptr_t<folder_t>;
 
-struct SYNCSPIRIT_API folder_t final : augmentable_t<folder_t>, folder_data_t {
+struct SYNCSPIRIT_API folder_t final : augmentable_t, folder_data_t {
     static outcome::result<folder_ptr_t> create(utils::bytes_view_t key, const db::Folder &folder) noexcept;
     static outcome::result<folder_ptr_t> create(const bu::uuid &uuid, const db::Folder &folder) noexcept;
 

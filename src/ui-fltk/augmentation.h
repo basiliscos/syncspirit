@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "model/misc/augmentation.hpp"
+#include "model/misc/augmentation.h"
 #include "model/file_info.h"
 #include "entry_stats.h"
 #include <set>

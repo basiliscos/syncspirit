@@ -4,7 +4,7 @@
 #pragma once
 
 #include "utils/bytes.h"
-#include "misc/augmentation.hpp"
+#include "misc/augmentation.h"
 #include "misc/map.hpp"
 #include "syncspirit-export.h"
 #include <boost/outcome.hpp>
@@ -17,7 +17,7 @@ struct ignored_folder_t;
 
 using ignored_folder_ptr_t = intrusive_ptr_t<ignored_folder_t>;
 
-struct SYNCSPIRIT_API ignored_folder_t final : augmentable_t<ignored_folder_t> {
+struct SYNCSPIRIT_API ignored_folder_t final : augmentable_t {
     static outcome::result<ignored_folder_ptr_t> create(std::string_view id, std::string_view label) noexcept;
     static outcome::result<ignored_folder_ptr_t> create(utils::bytes_view_t key, utils::bytes_view_t data) noexcept;
 

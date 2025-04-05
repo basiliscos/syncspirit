@@ -6,7 +6,7 @@
 #include <cstdint>
 #include "syncspirit-export.h"
 #include <boost/outcome.hpp>
-#include "misc/augmentation.hpp"
+#include "misc/augmentation.h"
 #include "misc/map.hpp"
 
 namespace syncspirit::model {
@@ -25,7 +25,7 @@ using remote_folder_info_t_ptr_t = intrusive_ptr_t<remote_folder_info_t>;
 struct folder_info_t;
 using folder_info_ptr_t = intrusive_ptr_t<folder_info_t>;
 
-struct SYNCSPIRIT_API remote_folder_info_t final : augmentable_t<remote_folder_info_t> {
+struct SYNCSPIRIT_API remote_folder_info_t final : augmentable_t {
 
     static outcome::result<remote_folder_info_t_ptr_t> create(std::uint64_t index_id, std::int64_t max_sequence,
                                                               device_t &device_, folder_t &folder_) noexcept;

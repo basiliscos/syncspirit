@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "misc/augmentation.hpp"
+#include "misc/augmentation.h"
 #include "misc/map.hpp"
 #include "misc/uuid.h"
 #include "device_id.h"
@@ -20,7 +20,7 @@ struct pending_folder_t;
 
 using pending_folder_ptr_t = intrusive_ptr_t<pending_folder_t>;
 
-struct SYNCSPIRIT_API pending_folder_t final : augmentable_t<pending_folder_t>, folder_data_t {
+struct SYNCSPIRIT_API pending_folder_t final : augmentable_t, folder_data_t {
 
     static outcome::result<pending_folder_ptr_t> create(utils::bytes_view_t key,
                                                         const db::PendingFolder &data) noexcept;

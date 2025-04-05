@@ -15,7 +15,7 @@ using entity_ptr_t = model::intrusive_ptr_t<entity_t>;
 struct presence_t;
 using presence_ptr_t = model::intrusive_ptr_t<presence_t>;
 
-struct SYNCSPIRIT_API presence_t : virtual model::augmentable_t<entity_t>, protected virtual model::augmentation_t {
+struct SYNCSPIRIT_API presence_t : virtual model::augmentable_t, protected virtual model::augmentation_t {
     // clang-format off
     enum features_t: std::uint32_t {
         file    = 1 << 1,

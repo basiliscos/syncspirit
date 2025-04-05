@@ -4,7 +4,7 @@
 #pragma once
 
 #include <boost/asio.hpp>
-#include "misc/augmentation.hpp"
+#include "misc/augmentation.h"
 #include "misc/map.hpp"
 #include "misc/error_code.h"
 
@@ -51,8 +51,7 @@ struct SYNCSPIRIT_API some_device_base_t {
     unsigned char hash[data_length];
 };
 
-template <char prefix>
-struct SYNCSPIRIT_API some_device_t final : some_device_base_t, augmentable_t<some_device_t<prefix>> {
+template <char prefix> struct SYNCSPIRIT_API some_device_t final : some_device_base_t, augmentable_t {
     using ptr_t = intrusive_ptr_t<some_device_t>;
 
     static outcome::result<ptr_t> create(const device_id_t &id, const db::SomeDevice &db) noexcept {
