@@ -9,24 +9,24 @@
 #include "model/folder.h"
 #include "model/folder_info.h"
 
-#include <boost/container/small_vector.hpp>
+#include <memory_resource>
+#include <array>
 
 using namespace syncspirit;
 using namespace syncspirit::presentation;
 
-static constexpr size_t FILES_ON_STACK = 16;
+file_entity_t::file_entity_t(model::file_info_t &sample_file, path_t path_) : entity_t(std::move(path_)) {
+    using presence_files_t = std::pmr::vector<model::file_info_t *>;
 
-using presence_files_t = boost::container::small_vector<model::file_info_t *, FILES_ON_STACK>;
+    auto buffer = std::array<std::byte, 32 * sizeof(model::file_info_t *)>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto presence_files = presence_files_t(&pool);
 
-file_entity_t::file_entity_t(model::file_info_t &sample_file, std::string_view own_name_) : entity_t(nullptr) {
-    this->name = own_name_;
-    auto presence_files = presence_files_t();
-    auto path = sample_file.get_name();
     auto &fi_map = sample_file.get_folder_info()->get_folder()->get_folder_infos();
     for (auto &it_fi : fi_map) {
         auto &folder_info = it_fi.item;
         auto &files_map = folder_info->get_file_infos();
-        auto file = files_map.by_name(path);
+        auto file = files_map.by_name(path.get_full_name());
         if (file) {
             presence_files.emplace_back(file.get());
         }
@@ -60,5 +60,6 @@ void file_entity_t::on_insert(model::file_info_t &file_info) {
             return new peer_file_presence_t(*this, file_info);
         }
     }();
+    child->set_parent(parent);
     records.emplace_back(record_t{device, child});
 }

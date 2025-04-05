@@ -4,6 +4,7 @@
 #pragma once
 
 #include "entity.h"
+#include "orphans.h"
 #include "model/file_info.h"
 
 namespace syncspirit::presentation {
@@ -18,6 +19,7 @@ struct SYNCSPIRIT_API folder_entity_t : entity_t {
 
   private:
     model::folder_t &folder;
+    orphans_t orphans;
 };
 
 using folder_entity_ptr_t = model::intrusive_ptr_t<folder_entity_t>;

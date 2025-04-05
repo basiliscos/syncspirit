@@ -11,11 +11,11 @@
 using namespace syncspirit;
 using namespace syncspirit::presentation;
 
-entity_t::entity_t(entity_t *parent_) : parent{parent_} {}
+entity_t::entity_t(path_t path_, entity_t *parent_) : parent{parent_}, path(std::move(path_)) {}
 
 entity_t::~entity_t() {}
 
-std::string_view entity_t::get_name() const { return name; }
+auto entity_t::get_path() const -> const path_t & { return path; }
 
 auto entity_t::get_children() -> children_t & { return children; }
 
@@ -66,7 +66,7 @@ bool nc_t::operator()(const entity_ptr_t &lhs, const entity_ptr_t &rhs) const {
     } else if (rd && !ld) {
         return false;
     }
-    return lhs->get_name() < rhs->get_name();
+    return lhs->get_path().get_full_name() < rhs->get_path().get_full_name();
 }
 
 bool nc_t::operator()(const entity_ptr_t &lhs, const std::string_view rhs) const {
@@ -74,7 +74,7 @@ bool nc_t::operator()(const entity_ptr_t &lhs, const std::string_view rhs) const
     if (!ld) {
         return false;
     }
-    return lhs->get_name() < rhs;
+    return lhs->get_path().get_full_name() < rhs;
 }
 
 bool nc_t::operator()(const std::string_view lhs, const entity_ptr_t &rhs) const {
@@ -82,5 +82,5 @@ bool nc_t::operator()(const std::string_view lhs, const entity_ptr_t &rhs) const
     if (!rd) {
         return true;
     }
-    return lhs < rhs->get_name();
+    return lhs < rhs->get_path().get_full_name();
 }

@@ -5,6 +5,7 @@
 
 #include "model/misc/augmentation.hpp"
 #include "model/device.h"
+#include "path.h"
 #include "syncspirit-export.h"
 
 #include <string_view>
@@ -29,12 +30,14 @@ struct SYNCSPIRIT_API entity_t : virtual model::augmentable_t<entity_t>, protect
         bool operator()(const entity_ptr_t &lhs, const std::string_view rhs) const;
         bool operator()(const std::string_view lhs, const entity_ptr_t &rhs) const;
     };
-
+    struct string_comparator_t : std::less<void> {
+        using is_transparent = std::true_type;
+    };
     using children_t = std::set<entity_ptr_t, name_comparator_t>;
 
-    entity_t(entity_t *parent);
+    entity_t(path_t path, entity_t *parent = nullptr);
     virtual ~entity_t();
-    virtual std::string_view get_name() const;
+    const path_t &get_path() const;
 
     template <typename Presence>
         requires std::is_base_of<presence_t, Presence>::value
@@ -65,7 +68,7 @@ struct SYNCSPIRIT_API entity_t : virtual model::augmentable_t<entity_t>, protect
 
     entity_t *parent;
     records_t records;
-    std::string name;
+    path_t path;
     children_t children;
 };
 

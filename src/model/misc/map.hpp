@@ -3,7 +3,6 @@
 
 #pragma once
 
-#include <algorithm>
 #include <tuple>
 #include <utility>
 #include "utils/bytes.h"
