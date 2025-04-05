@@ -14,12 +14,7 @@ presence_t::presence_t(entity_t *entity_, model::device_ptr_t device_)
     }
 }
 
-presence_t::~presence_t() {
-    if (entity) {
-        entity->remove_presense(*this);
-        model::intrusive_ptr_release(entity);
-    }
-}
+presence_t::~presence_t() { clear_presense(); }
 
 presence_t *presence_t::get_parent() { return parent; }
 
@@ -30,3 +25,13 @@ void presence_t::set_parent(entity_t *value) {
         parent = value->get_presense<presence_t>(*device);
     }
 }
+
+void presence_t::clear_presense() noexcept {
+    if (entity) {
+        entity->remove_presense(*this);
+        model::intrusive_ptr_release(entity);
+        entity = nullptr;
+    }
+}
+
+void presence_t::on_delete() noexcept { clear_presense(); }

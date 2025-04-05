@@ -352,7 +352,6 @@ TEST_CASE("presentation", "[presentation]") {
             folder_info->add_strict(file);
             return file;
         };
-
         SECTION("create hierarchy up-front") {
             REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
             add_file("a", *my_device);
@@ -431,7 +430,6 @@ TEST_CASE("presentation", "[presentation]") {
             CHECK(p_file_my->get_parent() == p_dir_d_my);
             CHECK(!p_file_peer->get_parent());
         }
-
         SECTION("dynamically create hierarchy") {
             auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
             CHECK(!folder_entity->get_parent());
@@ -495,6 +493,7 @@ TEST_CASE("presentation", "[presentation]") {
             CHECK(p_dir_a_my->get_parent() == p_folder_my);
         }
         SECTION("orphans") {
+
             SECTION("simple") {
                 add_file("a/b", *my_device);
 
@@ -551,6 +550,94 @@ TEST_CASE("presentation", "[presentation]") {
                 REQUIRE(dir_c_entry->get_path().get_own_name() == "c");
                 REQUIRE(dir_c_entry->get_children().size() == 0);
                 CHECK(dir_c_entry->get_parent() == dir_b_entry);
+            }
+        }
+        SECTION("removal") {
+            REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
+            SECTION("empty folder info removal") {
+                auto fi_peer = folder->get_folder_infos().by_device(*peer_device).get();
+
+                auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
+                CHECK(!folder_entity->get_parent());
+
+                REQUIRE(folder_entity->get_presense<folder_presence_t>(*my_device));
+                REQUIRE(folder_entity->get_presense<folder_presence_t>(*peer_device));
+
+                REQUIRE(builder.unshare_folder(*fi_peer).apply());
+
+                CHECK(folder_entity->get_presense<folder_presence_t>(*my_device));
+                CHECK(!folder_entity->get_presense<folder_presence_t>(*peer_device));
+            }
+            SECTION("folder info with a file removal") {
+                auto fi_peer = folder->get_folder_infos().by_device(*peer_device).get();
+                add_file("a", *peer_device);
+
+                auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
+                CHECK(!folder_entity->get_parent());
+
+                REQUIRE(folder_entity->get_presense<folder_presence_t>(*my_device));
+                REQUIRE(folder_entity->get_presense<folder_presence_t>(*peer_device));
+
+                REQUIRE(builder.unshare_folder(*fi_peer).apply());
+
+                CHECK(folder_entity->get_presense<folder_presence_t>(*my_device));
+                CHECK(!folder_entity->get_presense<folder_presence_t>(*peer_device));
+            }
+            SECTION("folder info with a file hierarchy removal") {
+                auto fi_peer = folder->get_folder_infos().by_device(*peer_device).get();
+                add_file("a", *peer_device);
+                add_file("a/b", *peer_device);
+                add_file("a/b/c", *peer_device);
+
+                auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
+                CHECK(!folder_entity->get_parent());
+
+                REQUIRE(folder_entity->get_presense<folder_presence_t>(*my_device));
+                REQUIRE(folder_entity->get_presense<folder_presence_t>(*peer_device));
+
+                REQUIRE(builder.unshare_folder(*fi_peer).apply());
+
+                CHECK(folder_entity->get_presense<folder_presence_t>(*my_device));
+                CHECK(!folder_entity->get_presense<folder_presence_t>(*peer_device));
+            }
+            SECTION("folder info with a file hierarchy removal (2)") {
+                auto fi_peer = folder->get_folder_infos().by_device(*peer_device).get();
+                add_file("a", *my_device);
+                add_file("a", *peer_device);
+                add_file("a/b", *peer_device);
+
+                auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
+                CHECK(!folder_entity->get_parent());
+
+                REQUIRE(folder_entity->get_presense<folder_presence_t>(*my_device));
+                REQUIRE(folder_entity->get_presense<folder_presence_t>(*peer_device));
+                REQUIRE(folder_entity->get_children().size() == 1);
+
+                auto &dir_a_entry = *folder_entity->get_children().begin();
+                REQUIRE(dir_a_entry->get_path().get_own_name() == "a");
+                REQUIRE(dir_a_entry->get_children().size() == 1);
+
+                REQUIRE(builder.unshare_folder(*fi_peer).apply());
+
+                CHECK(folder_entity->get_presense<folder_presence_t>(*my_device));
+                CHECK(!folder_entity->get_presense<folder_presence_t>(*peer_device));
+
+                REQUIRE(dir_a_entry->get_children().size() == 0);
+            }
+            SECTION("folder info with an orphan removal") {
+                auto fi_peer = folder->get_folder_infos().by_device(*peer_device).get();
+                add_file("a/b", *peer_device);
+
+                auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
+                CHECK(!folder_entity->get_parent());
+
+                REQUIRE(folder_entity->get_presense<folder_presence_t>(*my_device));
+                REQUIRE(folder_entity->get_presense<folder_presence_t>(*peer_device));
+
+                REQUIRE(builder.unshare_folder(*fi_peer).apply());
+
+                CHECK(folder_entity->get_presense<folder_presence_t>(*my_device));
+                CHECK(!folder_entity->get_presense<folder_presence_t>(*peer_device));
             }
         }
     }

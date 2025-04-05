@@ -8,7 +8,6 @@
 #include "model/file_info.h"
 
 #include <boost/nowide/convert.hpp>
-#include <filesystem>
 #include <map>
 
 using namespace syncspirit;
@@ -53,7 +52,7 @@ static void process_files(new_files_t &new_files, orphans_t &orphans, folder_ent
             }
         }
         if (parent) {
-            parent->add_child(entity);
+            parent->add_child(*entity);
         }
         file_entities[path.get_full_name()] = entity;
     }
@@ -104,7 +103,7 @@ void folder_entity_t::on_insert(model::file_info_t &file_info) {
         auto &children = entity->children;
         auto it = children.equal_range(piece).first;
         if (it != children.end()) {
-            entity = it->get();
+            entity = *it;
         } else {
             break;
         }
@@ -115,7 +114,7 @@ void folder_entity_t::on_insert(model::file_info_t &file_info) {
     bool has_parent = i + 1 == path.get_pieces_size();
     if (has_parent) {
         child.reset(new file_entity_t(file_info, std::move(path)));
-        entity->add_child(child);
+        entity->add_child(*child);
     } else if (i == path.get_pieces_size()) {
         static_cast<file_entity_t *>(entity)->on_insert(file_info);
     } else {

@@ -38,6 +38,9 @@ struct SYNCSPIRIT_API presence_t : virtual model::augmentable_t<entity_t>, prote
     std::uint32_t get_presence_feautres();
 
   protected:
+    void on_delete() noexcept override;
+    void clear_presense() noexcept;
+
     entity_t *entity;
     presence_t *parent;
     model::device_ptr_t device;

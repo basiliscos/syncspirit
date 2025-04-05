@@ -27,17 +27,13 @@ struct SYNCSPIRIT_API entity_t : virtual model::augmentable_t<entity_t>, protect
     struct name_comparator_t {
         using is_transparent = std::true_type;
         bool operator()(const entity_t *lhs, const entity_t *rhs) const;
-        bool operator()(const entity_ptr_t &lhs, const entity_t *rhs) const;
-        bool operator()(const entity_ptr_t &lhs, const entity_ptr_t &rhs) const;
-        bool operator()(const entity_ptr_t &lhs, const std::string_view rhs) const;
         bool operator()(const entity_t *lhs, const std::string_view rhs) const;
-        bool operator()(const std::string_view lhs, const entity_ptr_t &rhs) const;
         bool operator()(const std::string_view lhs, const entity_t *rhs) const;
     };
     struct string_comparator_t : std::less<void> {
         using is_transparent = std::true_type;
     };
-    using children_t = std::set<entity_ptr_t, name_comparator_t>;
+    using children_t = std::set<entity_t *, name_comparator_t>;
 
     entity_t(path_t path, entity_t *parent = nullptr);
     virtual ~entity_t();
@@ -51,7 +47,7 @@ struct SYNCSPIRIT_API entity_t : virtual model::augmentable_t<entity_t>, protect
 
     children_t &get_children();
     entity_t *get_parent();
-    void add_child(entity_ptr_t child);
+    void add_child(entity_t &child);
     void remove_child(entity_t &child);
     void remove_presense(presence_t &);
 
@@ -65,6 +61,8 @@ struct SYNCSPIRIT_API entity_t : virtual model::augmentable_t<entity_t>, protect
     using records_t = std::vector<record_t>;
 
     presence_t *get_presense_raw(model::device_t &device);
+
+    void clear_children();
 
     void on_update() noexcept override;
     void on_delete() noexcept override;
