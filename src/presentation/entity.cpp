@@ -3,9 +3,6 @@
 
 #include "entity.h"
 #include "presence.h"
-
-#include "model/folder.h"
-
 #include <cassert>
 
 using namespace syncspirit;
@@ -33,6 +30,15 @@ void entity_t::remove_presense(presence_t &item) {
     auto it = std::find_if(records.begin(), records.end(), predicate);
     assert(it != records.end());
     records.erase(it);
+
+#if 0
+    if (parent) {
+        if (records.empty() || !records.front().device) {
+            remove_child(*this);
+        }
+        parent = nullptr;
+    }
+#endif
 }
 
 presence_t *entity_t::get_presense_raw(model::device_t &device) {
@@ -56,9 +62,14 @@ void entity_t::add_child(entity_ptr_t child) {
     children.emplace(std::move(child));
 }
 
+void entity_t::remove_child(entity_t &child) {
+    auto it = children.equal_range(&child).first;
+    children.erase(it);
+}
+
 using nc_t = entity_t::name_comparator_t;
 
-bool nc_t::operator()(const entity_ptr_t &lhs, const entity_ptr_t &rhs) const {
+bool nc_t::operator()(const entity_t *lhs, const entity_t *rhs) const {
     auto ld = lhs->children.size() > 0;
     auto rd = rhs->children.size() > 0;
     if (ld && !rd) {
@@ -69,7 +80,13 @@ bool nc_t::operator()(const entity_ptr_t &lhs, const entity_ptr_t &rhs) const {
     return lhs->get_path().get_full_name() < rhs->get_path().get_full_name();
 }
 
-bool nc_t::operator()(const entity_ptr_t &lhs, const std::string_view rhs) const {
+bool nc_t::operator()(const entity_ptr_t &lhs, const entity_ptr_t &rhs) const {
+    return operator()(lhs.get(), rhs.get());
+}
+
+bool nc_t::operator()(const entity_ptr_t &lhs, const entity_t *rhs) const { return operator()(lhs.get(), rhs); }
+
+bool nc_t::operator()(const entity_t *lhs, const std::string_view rhs) const {
     auto ld = lhs->children.size() > 0;
     if (!ld) {
         return false;
@@ -77,10 +94,14 @@ bool nc_t::operator()(const entity_ptr_t &lhs, const std::string_view rhs) const
     return lhs->get_path().get_full_name() < rhs;
 }
 
-bool nc_t::operator()(const std::string_view lhs, const entity_ptr_t &rhs) const {
+bool nc_t::operator()(const entity_ptr_t &lhs, const std::string_view rhs) const { return operator()(lhs.get(), rhs); }
+
+bool nc_t::operator()(const std::string_view lhs, const entity_t *rhs) const {
     auto rd = rhs->children.size() > 0;
     if (!rd) {
         return true;
     }
     return lhs < rhs->get_path().get_full_name();
 }
+
+bool nc_t::operator()(const std::string_view lhs, const entity_ptr_t &rhs) const { return operator()(lhs, rhs.get()); }

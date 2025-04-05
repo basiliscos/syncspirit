@@ -7,6 +7,9 @@
 using namespace syncspirit;
 using namespace syncspirit::presentation;
 
-missing_file_presence_t::missing_file_presence_t(file_entity_t &entity) : file_presence_t(entity, {}) {
+missing_file_presence_t::missing_file_presence_t(file_entity_t &entity_) : file_presence_t({}, {}) {
     features = features_t::missing | features_t::file;
+    entity = &entity_;
 }
+
+missing_file_presence_t::~missing_file_presence_t() { entity = nullptr; }

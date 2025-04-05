@@ -14,6 +14,9 @@ struct SYNCSPIRIT_API file_entity_t : entity_t {
     ~file_entity_t();
     void set_parent(entity_t *entry);
     void on_insert(model::file_info_t &file_info);
+
+  private:
+    presence_ptr_t missing_file;
 };
 
 } // namespace syncspirit::presentation

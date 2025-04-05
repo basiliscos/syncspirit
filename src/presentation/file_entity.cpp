@@ -32,7 +32,8 @@ file_entity_t::file_entity_t(model::file_info_t &sample_file, path_t path_) : en
         }
     }
 
-    records.emplace_back(record_t{{}, new missing_file_presence_t(*this)});
+    missing_file = new missing_file_presence_t(*this);
+    records.emplace_back(record_t{{}, missing_file.get()});
 
     for (auto &it : presence_files) {
         on_insert(*it);
@@ -40,13 +41,8 @@ file_entity_t::file_entity_t(model::file_info_t &sample_file, path_t path_) : en
 }
 
 file_entity_t::~file_entity_t() {
-    for (auto &r : records) {
-        auto file = static_cast<file_presence_t *>(r.presence);
-        if (file->get_presence_feautres() & file_presence_t::features_t::missing) {
-            delete file;
-        }
-    }
-    records.clear();
+    missing_file.reset();
+    // records.clear();
 }
 
 void file_entity_t::on_insert(model::file_info_t &file_info) {

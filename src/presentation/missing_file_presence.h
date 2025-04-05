@@ -12,6 +12,7 @@ struct file_entity_t;
 
 struct SYNCSPIRIT_API missing_file_presence_t : file_presence_t {
     missing_file_presence_t(file_entity_t &entity);
+    ~missing_file_presence_t();
 };
 
 } // namespace syncspirit::presentation

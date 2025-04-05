@@ -26,9 +26,13 @@ struct folder_entity_t;
 struct SYNCSPIRIT_API entity_t : virtual model::augmentable_t<entity_t>, protected virtual model::augmentation_t {
     struct name_comparator_t {
         using is_transparent = std::true_type;
+        bool operator()(const entity_t *lhs, const entity_t *rhs) const;
+        bool operator()(const entity_ptr_t &lhs, const entity_t *rhs) const;
         bool operator()(const entity_ptr_t &lhs, const entity_ptr_t &rhs) const;
         bool operator()(const entity_ptr_t &lhs, const std::string_view rhs) const;
+        bool operator()(const entity_t *lhs, const std::string_view rhs) const;
         bool operator()(const std::string_view lhs, const entity_ptr_t &rhs) const;
+        bool operator()(const std::string_view lhs, const entity_t *rhs) const;
     };
     struct string_comparator_t : std::less<void> {
         using is_transparent = std::true_type;
@@ -48,7 +52,7 @@ struct SYNCSPIRIT_API entity_t : virtual model::augmentable_t<entity_t>, protect
     children_t &get_children();
     entity_t *get_parent();
     void add_child(entity_ptr_t child);
-    void remove_child(entity_t &);
+    void remove_child(entity_t &child);
     void remove_presense(presence_t &);
 
   protected:

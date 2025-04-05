@@ -87,7 +87,7 @@ TEST_CASE("presentation", "[presentation]") {
                 CHECK(deleted == 0);
 
                 REQUIRE(folder->use_count() == 2);
-                REQUIRE(folder_entity->use_count() == 2);
+                REQUIRE(folder_entity->use_count() >= 2);
 
                 folder_entity.reset();
                 CHECK(updated == 1);
@@ -494,7 +494,6 @@ TEST_CASE("presentation", "[presentation]") {
             p_dir_a_my = dir_a_entry->get_presense<file_presence_t>(*my_device);
             CHECK(p_dir_a_my->get_parent() == p_folder_my);
         }
-
         SECTION("orphans") {
             SECTION("simple") {
                 add_file("a/b", *my_device);

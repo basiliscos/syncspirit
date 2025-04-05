@@ -29,7 +29,7 @@ struct SYNCSPIRIT_API presence_t : virtual model::augmentable_t<entity_t>, prote
     };
     // clang-format ON
 
-    presence_t(entity_t &entity, model::device_ptr_t device);
+    presence_t(entity_t *entity, model::device_ptr_t device);
     ~presence_t();
 
     void set_parent(presence_t *value);
@@ -38,7 +38,7 @@ struct SYNCSPIRIT_API presence_t : virtual model::augmentable_t<entity_t>, prote
     std::uint32_t get_presence_feautres();
 
   protected:
-    entity_t &entity;
+    entity_t *entity;
     presence_t *parent;
     model::device_ptr_t device;
     std::uint32_t features = 0;
