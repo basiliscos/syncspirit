@@ -29,13 +29,13 @@ struct SYNCSPIRIT_API presence_t : virtual model::augmentable_t, protected virtu
     };
     // clang-format ON
 
-    presence_t(entity_t *entity, model::device_ptr_t device);
+    presence_t(entity_t *entity, model::device_ptr_t device) noexcept ;
     ~presence_t();
 
-    void set_parent(presence_t *value);
-    presence_t *get_parent();
-    void set_parent(entity_t *entity);
-    std::uint32_t get_presence_feautres();
+    void set_parent(presence_t *value) noexcept ;
+    presence_t *get_parent() noexcept ;
+    void set_parent(entity_t *entity) noexcept ;
+    std::uint32_t get_presence_feautres() noexcept ;
 
   protected:
     void on_delete() noexcept override;

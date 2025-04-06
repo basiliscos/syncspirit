@@ -58,7 +58,7 @@ static void process_files(new_files_t &new_files, orphans_t &orphans, folder_ent
     }
 }
 
-folder_entity_t::folder_entity_t(model::folder_ptr_t folder_) : entity_t({}), folder(*folder_.get()) {
+folder_entity_t::folder_entity_t(model::folder_ptr_t folder_) noexcept : entity_t({}), folder(*folder_.get()) {
     folder.set_augmentation(this);
 
     // make folder_infos as presence
@@ -79,7 +79,7 @@ folder_entity_t::folder_entity_t(model::folder_ptr_t folder_) : entity_t({}), fo
     process_files(new_files, orphans, this);
 }
 
-void folder_entity_t::on_insert(model::folder_info_t &folder_info) {
+void folder_entity_t::on_insert(model::folder_info_t &folder_info) noexcept {
     auto device = folder_info.get_device();
     for (auto &r : records) {
         if (r.device == device) {
@@ -94,7 +94,7 @@ void folder_entity_t::on_insert(model::folder_info_t &folder_info) {
     process_files(new_files, orphans, this);
 }
 
-void folder_entity_t::on_insert(model::file_info_t &file_info) {
+void folder_entity_t::on_insert(model::file_info_t &file_info) noexcept {
     auto path = path_t(file_info.get_name());
 
     auto entity = static_cast<entity_t *>(this);
@@ -126,4 +126,4 @@ void folder_entity_t::on_insert(model::file_info_t &file_info) {
     }
 }
 
-auto folder_entity_t::get_folder() -> model::folder_t & { return folder; }
+auto folder_entity_t::get_folder() noexcept -> model::folder_t & { return folder; }

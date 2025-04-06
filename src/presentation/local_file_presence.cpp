@@ -6,7 +6,7 @@
 using namespace syncspirit;
 using namespace syncspirit::presentation;
 
-local_file_presence_t::local_file_presence_t(file_entity_t &entity, model::file_info_t &file_info_)
+local_file_presence_t::local_file_presence_t(file_entity_t &entity, model::file_info_t &file_info_) noexcept
     : cluster_file_presence_t(entity, file_info_) {
     features = features_t::cluster | features_t::local | features_t::file;
 }

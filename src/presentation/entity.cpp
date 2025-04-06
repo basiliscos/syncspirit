@@ -8,31 +8,31 @@
 using namespace syncspirit;
 using namespace syncspirit::presentation;
 
-entity_t::entity_t(path_t path_, entity_t *parent_) : parent{parent_}, path(std::move(path_)) {}
+entity_t::entity_t(path_t path_, entity_t *parent_) noexcept : parent{parent_}, path(std::move(path_)) {}
 
 entity_t::~entity_t() { clear_children(); }
 
-void entity_t::clear_children() {
+void entity_t::clear_children() noexcept {
     while (children.size()) {
         auto child = *children.begin();
         remove_child(*child);
     }
 }
 
-auto entity_t::get_path() const -> const path_t & { return path; }
+auto entity_t::get_path() const noexcept -> const path_t & { return path; }
 
-auto entity_t::get_children() -> children_t & { return children; }
+auto entity_t::get_children() noexcept -> children_t & { return children; }
 
-entity_t *entity_t::get_parent() { return parent; }
+entity_t *entity_t::get_parent() noexcept { return parent; }
 
-void entity_t::set_parent(entity_t *value) {
+void entity_t::set_parent(entity_t *value) noexcept {
     parent = value;
     for (auto &r : records) {
         r.presence->set_parent(value);
     }
 }
 
-void entity_t::remove_presense(presence_t &item) {
+void entity_t::remove_presense(presence_t &item) noexcept {
     auto predicate = [&item](const record_t &record) { return record.presence == &item; };
     auto it = std::find_if(records.begin(), records.end(), predicate);
     assert(it != records.end());
@@ -52,7 +52,7 @@ void entity_t::remove_presense(presence_t &item) {
     }
 }
 
-presence_t *entity_t::get_presense_raw(model::device_t &device) {
+presence_t *entity_t::get_presense_raw(model::device_t &device) noexcept {
     presence_t *fallback = nullptr;
     for (auto &record : records) {
         auto d = record.device.get();
@@ -68,13 +68,13 @@ presence_t *entity_t::get_presense_raw(model::device_t &device) {
 void entity_t::on_update() noexcept { notify_update(); }
 void entity_t::on_delete() noexcept { clear_children(); }
 
-void entity_t::add_child(entity_t &child) {
+void entity_t::add_child(entity_t &child) noexcept {
     child.set_parent(this);
     model::intrusive_ptr_add_ref(&child);
     children.emplace(&child);
 }
 
-void entity_t::remove_child(entity_t &child) {
+void entity_t::remove_child(entity_t &child) noexcept {
     auto it = children.equal_range(&child).first;
     assert(it != children.end());
     child.clear_children();
@@ -86,7 +86,7 @@ void entity_t::remove_child(entity_t &child) {
 
 using nc_t = entity_t::name_comparator_t;
 
-bool nc_t::operator()(const entity_t *lhs, const entity_t *rhs) const {
+bool nc_t::operator()(const entity_t *lhs, const entity_t *rhs) const noexcept {
     auto ld = lhs->children.size() > 0;
     auto rd = rhs->children.size() > 0;
     if (ld && !rd) {
@@ -97,7 +97,7 @@ bool nc_t::operator()(const entity_t *lhs, const entity_t *rhs) const {
     return lhs->get_path().get_full_name() < rhs->get_path().get_full_name();
 }
 
-bool nc_t::operator()(const entity_t *lhs, const std::string_view rhs) const {
+bool nc_t::operator()(const entity_t *lhs, const std::string_view rhs) const noexcept {
     auto ld = lhs->children.size() > 0;
     if (!ld) {
         return false;
@@ -105,7 +105,7 @@ bool nc_t::operator()(const entity_t *lhs, const std::string_view rhs) const {
     return lhs->get_path().get_full_name() < rhs;
 }
 
-bool nc_t::operator()(const std::string_view lhs, const entity_t *rhs) const {
+bool nc_t::operator()(const std::string_view lhs, const entity_t *rhs) const noexcept {
     auto rd = rhs->children.size() > 0;
     if (!rd) {
         return true;

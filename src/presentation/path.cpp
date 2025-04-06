@@ -13,7 +13,7 @@ using namespace boost::nowide;
 
 namespace syncspirit::presentation {
 
-path_t::path_t(std::string_view full_name) : name(full_name) {
+path_t::path_t(std::string_view full_name) noexcept : name(full_name) {
     auto file_path = bfs::path(widen(full_name));
     auto prev = std::uint32_t{0};
     auto tmp = std::vector<char>(full_name.size() * 4);
@@ -26,11 +26,11 @@ path_t::path_t(std::string_view full_name) : name(full_name) {
     }
 }
 
-std::size_t path_t::get_pieces_size() const { return pieces.size() + (!name.empty() ? 1 : 0); }
+std::size_t path_t::get_pieces_size() const noexcept { return pieces.size() + (!name.empty() ? 1 : 0); }
 
-std::string_view path_t::get_full_name() const { return name; }
+std::string_view path_t::get_full_name() const noexcept { return name; }
 
-std::string_view path_t::get_parent_name() const {
+std::string_view path_t::get_parent_name() const noexcept {
     if (pieces.size()) {
         auto last_offset = pieces.back();
         auto view = std::string_view(name);
@@ -39,7 +39,7 @@ std::string_view path_t::get_parent_name() const {
     return {};
 }
 
-std::string_view path_t::get_own_name() const {
+std::string_view path_t::get_own_name() const noexcept {
     if (pieces.size()) {
         auto last_offset = pieces.back();
         auto view = std::string_view(name);
@@ -48,17 +48,17 @@ std::string_view path_t::get_own_name() const {
     return name;
 }
 
-auto path_t::begin() const -> iterator_t { return iterator_t(this); };
+auto path_t::begin() const noexcept -> iterator_t { return iterator_t(this); };
 
-auto path_t::end() const -> iterator_t { return iterator_t(); }
+auto path_t::end() const noexcept -> iterator_t { return iterator_t(); }
 
 using I = path_t::iterator_t;
 
-I::iterator_t() : position{-1}, path{nullptr} {}
+I::iterator_t() noexcept : position{-1}, path{nullptr} {}
 
-I::iterator_t(const path_t *path_) : position{0}, path{path_} {}
+I::iterator_t(const path_t *path_) noexcept : position{0}, path{path_} {}
 
-auto I::operator*() const -> reference {
+auto I::operator*() const noexcept -> reference {
     assert(path);
     assert(position >= 0);
     assert(position <= path->pieces.size());
@@ -70,7 +70,7 @@ auto I::operator*() const -> reference {
     return view.substr(b, s);
 }
 
-I &I::operator++() {
+I &I::operator++() noexcept {
     assert(path);
     auto sz = path->pieces.size();
 
@@ -83,6 +83,6 @@ I &I::operator++() {
     return *this;
 }
 
-bool I::operator==(iterator_t other) { return (path == other.path) && position == other.position; }
+bool I::operator==(iterator_t other) noexcept { return (path == other.path) && position == other.position; }
 
 } // namespace syncspirit::presentation

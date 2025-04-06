@@ -17,8 +17,8 @@ using entity_ptr_t = model::intrusive_ptr_t<entity_t>;
 namespace details {
 namespace mi = boost::multi_index;
 
-std::string_view get_path(const entity_ptr_t &);
-std::string_view get_parent(const entity_ptr_t &);
+std::string_view get_path(const entity_ptr_t &) noexcept;
+std::string_view get_parent(const entity_ptr_t &) noexcept;
 
 // clang-format off
 using orphans_map_t = mi::multi_index_container<
@@ -38,8 +38,8 @@ using orphans_map_t = mi::multi_index_container<
 
 struct orphans_t : private details::orphans_map_t {
     ~orphans_t();
-    void push(entity_ptr_t);
-    void reap_children(entity_ptr_t);
+    void push(entity_ptr_t) noexcept;
+    void reap_children(entity_ptr_t) noexcept;
 };
 
 } // namespace syncspirit::presentation

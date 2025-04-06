@@ -18,28 +18,28 @@ struct SYNCSPIRIT_API path_t {
         using pointer = element_type *;
         using reference = element_type;
 
-        iterator_t();
-        iterator_t(const path_t *path);
-        reference operator*() const;
-        iterator_t &operator++();
-        bool operator==(iterator_t);
+        iterator_t() noexcept;
+        iterator_t(const path_t *path) noexcept;
+        reference operator*() const noexcept;
+        iterator_t &operator++() noexcept;
+        bool operator==(iterator_t) noexcept;
 
         std::int32_t position;
         const path_t *path;
     };
 
-    path_t() = default;
-    path_t(std::string_view full_name);
-    path_t(path_t &&) = default;
+    path_t() noexcept = default;
+    path_t(std::string_view full_name) noexcept;
+    path_t(path_t &&) noexcept = default;
 
-    iterator_t begin() const;
-    iterator_t end() const;
+    iterator_t begin() const noexcept;
+    iterator_t end() const noexcept;
 
-    std::size_t get_pieces_size() const;
+    std::size_t get_pieces_size() const noexcept;
 
-    std::string_view get_full_name() const;
-    std::string_view get_own_name() const;
-    std::string_view get_parent_name() const;
+    std::string_view get_full_name() const noexcept;
+    std::string_view get_own_name() const noexcept;
+    std::string_view get_parent_name() const noexcept;
 
   private:
     using pieces_t = std::vector<std::uint32_t>;

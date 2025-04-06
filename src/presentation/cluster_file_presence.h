@@ -12,9 +12,9 @@ namespace syncspirit::presentation {
 struct file_entity_t;
 
 struct SYNCSPIRIT_API cluster_file_presence_t : file_presence_t {
-    cluster_file_presence_t(file_entity_t &entity, model::file_info_t &file_info);
+    cluster_file_presence_t(file_entity_t &entity, model::file_info_t &file_info) noexcept;
 
-    model::file_info_t &get_file_info();
+    model::file_info_t &get_file_info() noexcept;
 
   protected:
     model::file_info_t &file_info;

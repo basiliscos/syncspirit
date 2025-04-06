@@ -8,7 +8,7 @@
 namespace syncspirit::presentation {
 
 struct SYNCSPIRIT_API local_file_presence_t : cluster_file_presence_t {
-    local_file_presence_t(file_entity_t &entity, model::file_info_t &file_info);
+    local_file_presence_t(file_entity_t &entity, model::file_info_t &file_info) noexcept;
 };
 
 } // namespace syncspirit::presentation

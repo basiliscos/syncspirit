@@ -10,10 +10,10 @@
 namespace syncspirit::presentation {
 
 struct SYNCSPIRIT_API file_entity_t : entity_t {
-    file_entity_t(model::file_info_t &sample_file, path_t path);
+    file_entity_t(model::file_info_t &sample_file, path_t path) noexcept;
     ~file_entity_t();
-    void set_parent(entity_t *entry);
-    void on_insert(model::file_info_t &file_info);
+    void set_parent(entity_t *entry) noexcept;
+    void on_insert(model::file_info_t &file_info) noexcept;
 
   private:
     presence_ptr_t missing_file;

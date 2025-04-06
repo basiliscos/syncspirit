@@ -12,10 +12,10 @@ namespace syncspirit::presentation {
 struct folder_presence_t;
 
 struct SYNCSPIRIT_API folder_entity_t : entity_t {
-    folder_entity_t(model::folder_ptr_t folder);
-    model::folder_t &get_folder();
-    void on_insert(model::folder_info_t &folder_info);
-    void on_insert(model::file_info_t &file_info);
+    folder_entity_t(model::folder_ptr_t folder) noexcept;
+    model::folder_t &get_folder() noexcept;
+    void on_insert(model::folder_info_t &folder_info) noexcept;
+    void on_insert(model::file_info_t &file_info) noexcept;
 
   private:
     model::folder_t &folder;

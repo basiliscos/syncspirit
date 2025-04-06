@@ -7,10 +7,10 @@
 
 using namespace syncspirit::presentation;
 
-folder_presence_t::folder_presence_t(folder_entity_t &entity_, model::folder_info_t &fi)
+folder_presence_t::folder_presence_t(folder_entity_t &entity_, model::folder_info_t &fi) noexcept
     : presence_t(&entity_, fi.get_device()), folder_info{fi} {
     link(&fi);
     features = features_t::folder;
 }
 
-auto folder_presence_t::get_folder_info() -> model::folder_info_t & { return folder_info; }
+auto folder_presence_t::get_folder_info() noexcept -> model::folder_info_t & { return folder_info; }
