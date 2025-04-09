@@ -864,15 +864,33 @@ TEST_CASE("statistics", "[presentation]") {
             }
         }
         SECTION("two files do not intersect") {
-            add_file("dir", *my_device);
-            add_file("dir/a.txt", *my_device, 5, proto::FileInfoType::FILE, my_device->device_id().get_uint(), 1);
-            add_file("dir", *peer_device);
-            add_file("dir/b.txt", *peer_device, 6, proto::FileInfoType::FILE, peer_device->device_id().get_uint(), 1);
-            auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
-            CHECK(folder_entity->get_stats() == statistics_t{3, 11});
+            SECTION("simple hierarchy") {
+                add_file("dir", *my_device);
+                add_file("dir/a.txt", *my_device, 5, proto::FileInfoType::FILE, my_device->device_id().get_uint(), 1);
+                add_file("dir", *peer_device);
+                add_file("dir/b.txt", *peer_device, 6, proto::FileInfoType::FILE, peer_device->device_id().get_uint(),
+                         1);
+                auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
+                CHECK(folder_entity->get_stats() == statistics_t{3, 11});
 
-            REQUIRE(builder.unshare_folder(*fi_peer).apply());
-            CHECK(folder_entity->get_stats() == statistics_t{2, 5});
+                REQUIRE(builder.unshare_folder(*fi_peer).apply());
+                CHECK(folder_entity->get_stats() == statistics_t{2, 5});
+            }
+            SECTION("complex hierarchy") {
+                add_file("dir", *my_device);
+                add_file("dir/a.txt", *my_device, 5, proto::FileInfoType::FILE, my_device->device_id().get_uint(), 1);
+                add_file("dir", *peer_device);
+                add_file("dir/b", *peer_device);
+                add_file("dir/b/c", *peer_device);
+                add_file("dir/b/c/d", *peer_device);
+                add_file("dir/b/c/d/x.txt", *peer_device, 6, proto::FileInfoType::FILE,
+                         peer_device->device_id().get_uint(), 1);
+                auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
+                CHECK(folder_entity->get_stats() == statistics_t{6, 11});
+
+                REQUIRE(builder.unshare_folder(*fi_peer).apply());
+                CHECK(folder_entity->get_stats() == statistics_t{2, 5});
+            }
         }
     }
 }

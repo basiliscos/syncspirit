@@ -119,6 +119,11 @@ void entity_t::remove_child(entity_t &child) noexcept {
     child.set_augmentation({});
     model::intrusive_ptr_release(&child);
     child.parent = nullptr;
+    auto current = this;
+    while (current) {
+        current->statistics -= child.get_stats();
+        current = current->parent;
+    }
     children.erase(it);
 }
 
