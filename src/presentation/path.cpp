@@ -15,9 +15,11 @@ namespace syncspirit::presentation {
 
 path_t::path_t(std::string_view full_name) noexcept : name(full_name) {
     auto file_path = bfs::path(widen(full_name));
-    auto prev = std::uint32_t{0};
     auto tmp = std::vector<char>(full_name.size() * 4);
     auto it = file_path.begin();
+    auto root_name = it->wstring();
+    auto ptr = narrow(tmp.data(), tmp.size(), root_name.data());
+    auto prev = std::strlen(tmp.data());
     for (++it; it != file_path.end(); ++it) {
         auto sub_name = it->wstring();
         auto ptr = narrow(tmp.data(), tmp.size(), sub_name.data());
@@ -34,7 +36,7 @@ std::string_view path_t::get_parent_name() const noexcept {
     if (pieces.size()) {
         auto last_offset = pieces.back();
         auto view = std::string_view(name);
-        return view.substr(0, last_offset);
+        return view.substr(0, last_offset - 1);
     }
     return {};
 }
@@ -43,7 +45,7 @@ std::string_view path_t::get_own_name() const noexcept {
     if (pieces.size()) {
         auto last_offset = pieces.back();
         auto view = std::string_view(name);
-        return view.substr(last_offset + 1);
+        return view.substr(last_offset);
     }
     return name;
 }
@@ -63,8 +65,8 @@ auto I::operator*() const noexcept -> reference {
     assert(position >= 0);
     assert(position <= path->pieces.size());
 
-    auto b = position ? path->pieces[position - 1] + 1 : 0;
-    auto e = position < path->pieces.size() ? path->pieces[position] : std::string::npos;
+    auto b = position ? path->pieces[position - 1] : 0;
+    auto e = position < path->pieces.size() ? path->pieces[position] - 1 : std::string::npos;
     auto s = e - b;
     auto view = std::string_view(path->name);
     return view.substr(b, s);

@@ -18,7 +18,9 @@ presence_t::~presence_t() { clear_presense(); }
 
 presence_t *presence_t::get_parent() noexcept { return parent; }
 
-auto presence_t::get_presence_feautres() noexcept -> std::uint32_t { return features; }
+auto presence_t::get_presence_feautres() const noexcept -> std::uint32_t { return features; }
+
+const statistics_t &presence_t::get_stats() const noexcept { return statistics; }
 
 void presence_t::set_parent(entity_t *value) noexcept {
     if (value && device) {
@@ -40,3 +42,11 @@ void presence_t::clear_presense() noexcept {
 void presence_t::link(augmentable_t *augmentable) noexcept { augmentable->set_augmentation(this); }
 
 void presence_t::on_delete() noexcept { clear_presense(); }
+
+void presence_t::commit() noexcept {
+    if (parent) {
+        parent->statistics += statistics;
+    }
+}
+
+const presence_t *presence_t::determine_best(const presence_t *other) const { return other; }

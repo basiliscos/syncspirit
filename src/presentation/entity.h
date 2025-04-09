@@ -6,6 +6,7 @@
 #include "model/misc/augmentation.h"
 #include "model/device.h"
 #include "path.h"
+#include "statistics.h"
 #include "syncspirit-export.h"
 
 #include <string_view>
@@ -50,6 +51,7 @@ struct SYNCSPIRIT_API entity_t : virtual model::augmentable_t, protected virtual
     void add_child(entity_t &child) noexcept;
     void remove_child(entity_t &child) noexcept;
     void remove_presense(presence_t &) noexcept;
+    const statistics_t &get_stats() noexcept;
 
   protected:
     friend struct folder_entity_t;
@@ -67,11 +69,14 @@ struct SYNCSPIRIT_API entity_t : virtual model::augmentable_t, protected virtual
     void on_update() noexcept override;
     void on_delete() noexcept override;
     void set_parent(entity_t *parent) noexcept;
+    void commit() noexcept;
 
     entity_t *parent;
     records_t records;
     path_t path;
     children_t children;
+    statistics_t statistics;
+    int cluster_record;
 };
 
 } // namespace syncspirit::presentation

@@ -19,22 +19,45 @@ using namespace syncspirit::presentation;
 
 using F = file_presence_t::features_t;
 
+namespace Catch {
+template <> struct StringMaker<statistics_t> {
+    static std::string convert(const statistics_t &value) {
+        return fmt::format("stats(entities = {}, size = {})", value.entities, value.size);
+    }
+};
+} // namespace Catch
+
 TEST_CASE("path", "[presentation]") {
     using pieces_t = std::vector<std::string_view>;
+    SECTION("a/bb/c.txt") {
+        auto p = path_t("a/bb/c.txt");
+        CHECK(p.get_parent_name() == "a/bb");
+        CHECK(p.get_own_name() == "c.txt");
 
-    auto p1 = path_t("a/bb/c.txt");
-    CHECK(p1.get_parent_name() == "a/bb");
-    CHECK(p1.get_own_name() == "c.txt");
+        auto pieces = pieces_t();
+        for (auto p : p) {
+            pieces.emplace_back(p);
+        }
 
-    auto pieces = pieces_t();
-    for (auto p : p1) {
-        pieces.emplace_back(p);
+        CHECK(pieces.size() == 3);
+        CHECK(pieces[0] == "a");
+        CHECK(pieces[1] == "bb");
+        CHECK(pieces[2] == "c.txt");
     }
+    SECTION("dir/file.bin") {
+        auto p = path_t("dir/file.bin");
+        CHECK(p.get_parent_name() == "dir");
+        CHECK(p.get_own_name() == "file.bin");
 
-    CHECK(pieces.size() == 3);
-    CHECK(pieces[0] == "a");
-    CHECK(pieces[1] == "bb");
-    CHECK(pieces[2] == "c.txt");
+        auto pieces = pieces_t();
+        for (auto p : p) {
+            pieces.emplace_back(p);
+        }
+
+        CHECK(pieces.size() == 2);
+        CHECK(pieces[0] == "dir");
+        CHECK(pieces[1] == "file.bin");
+    }
 }
 
 TEST_CASE("presentation", "[presentation]") {
@@ -696,6 +719,132 @@ TEST_CASE("presentation", "[presentation]") {
                 CHECK(folder_entity->get_presense<folder_presence_t>(*my_device));
                 CHECK(!folder_entity->get_presense<folder_presence_t>(*peer_device));
             }
+        }
+    }
+}
+
+TEST_CASE("statistics", "[presentation]") {
+    auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
+    auto peer_id = device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
+    auto peer_2_id =
+        model::device_id_t::from_string("LYXKCHX-VI3NYZR-ALCJBHF-WMZYSPK-QG6QJA3-MPFYMSO-U56GTUK-NA2MIAW").value();
+    auto my_device = device_t::create(my_id, "my-device").value();
+    auto peer_device = device_t::create(peer_id, "peer-device").value();
+    auto peer_2_device = device_t::create(peer_2_id, "peer-device-2").value();
+
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
+    auto sequencer = make_sequencer(4);
+    cluster->get_devices().put(my_device);
+    cluster->get_devices().put(peer_device);
+    cluster->get_devices().put(peer_2_device);
+
+    auto builder = diff_builder_t(*cluster);
+    REQUIRE(builder.upsert_folder("1234-5678", "some/path", "my-label").apply());
+    auto folder = cluster->get_folders().by_id("1234-5678");
+
+    auto add_file = [&](std::string_view name, model::device_t &device, std::int32_t file_size = 0,
+                        proto::FileInfoType type = proto::FileInfoType::DIRECTORY, std::uint64_t modified_by = 0,
+                        std::uint64_t modified_v = 0) {
+        auto folder_info = folder->get_folder_infos().by_device(device);
+
+        proto::FileInfo pr_fi;
+        proto::set_name(pr_fi, name);
+        proto::set_type(pr_fi, type);
+        proto::set_sequence(pr_fi, folder_info->get_max_sequence() + 1);
+
+        if (file_size) {
+            proto::set_size(pr_fi, file_size);
+            proto::set_block_size(pr_fi, file_size);
+            assert(type == proto::FileInfoType::FILE);
+            auto bytes = utils::bytes_t(file_size);
+            auto b_hash = utils::sha256_digest(bytes).value();
+            auto &b = proto::add_blocks(pr_fi);
+            proto::set_size(b, file_size);
+        }
+
+        auto &v = proto::get_version(pr_fi);
+        auto modified_device = modified_by == 0 ? device.device_id().get_uint() : modified_by;
+        auto modified_version = modified_v == 0 ? 1 : modified_v;
+        proto::add_counters(v, proto::Counter(modified_device, modified_version));
+        proto::set_modified_s(pr_fi, modified_version);
+
+        auto file = model::file_info_t::create(sequencer->next_uuid(), pr_fi, folder_info.get()).value();
+        folder_info->add_strict(file);
+        return file;
+    };
+
+    SECTION("emtpy folder") {
+        auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
+        CHECK(folder_entity->get_stats() == statistics_t{});
+    }
+
+    SECTION("shared with nobody folder") {
+        SECTION("single file") {
+            add_file("a.txt", *my_device, 5, proto::FileInfoType::FILE);
+            auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
+            CHECK(folder_entity->get_stats() == statistics_t{1, 5});
+        }
+
+        SECTION("two files") {
+            SECTION("flat hierarchy") {
+                add_file("a.txt", *my_device, 5, proto::FileInfoType::FILE);
+                add_file("b.txt", *my_device, 4, proto::FileInfoType::FILE);
+                auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
+                CHECK(folder_entity->get_stats() == statistics_t{2, 9});
+            }
+
+            SECTION("some hierarchy") {
+                add_file("a", *my_device, 0, proto::FileInfoType::DIRECTORY);
+                add_file("a/b", *my_device, 0, proto::FileInfoType::DIRECTORY);
+                add_file("a/b/c.txt", *my_device, 5, proto::FileInfoType::FILE);
+                add_file("a/d.txt", *my_device, 4, proto::FileInfoType::FILE);
+                auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
+                CHECK(folder_entity->get_stats() == statistics_t{4, 9});
+            }
+        }
+    }
+
+    SECTION("shared with a peer") {
+        REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
+        SECTION("single file") {
+            SECTION("same file") {
+                add_file("a.txt", *my_device, 5, proto::FileInfoType::FILE, my_device->device_id().get_uint(), 1);
+                add_file("a.txt", *peer_device, 5, proto::FileInfoType::FILE, my_device->device_id().get_uint(), 1);
+                auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
+                CHECK(folder_entity->get_stats() == statistics_t{1, 5});
+            }
+            SECTION("peer has newer") {
+                add_file("a.txt", *my_device, 5, proto::FileInfoType::FILE, peer_device->device_id().get_uint(), 1);
+                add_file("a.txt", *peer_device, 6, proto::FileInfoType::FILE, peer_device->device_id().get_uint(), 2);
+                auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
+                CHECK(folder_entity->get_stats() == statistics_t{1, 6});
+            }
+            SECTION("me has newer") {
+                add_file("a.txt", *my_device, 5, proto::FileInfoType::FILE, my_device->device_id().get_uint(), 2);
+                add_file("a.txt", *peer_device, 6, proto::FileInfoType::FILE, my_device->device_id().get_uint(), 1);
+                auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
+                CHECK(folder_entity->get_stats() == statistics_t{1, 5});
+            }
+            SECTION("coflicted file (peer has newer)") {
+                add_file("a.txt", *my_device, 5, proto::FileInfoType::FILE, my_device->device_id().get_uint(), 1);
+                add_file("a.txt", *peer_device, 6, proto::FileInfoType::FILE, peer_device->device_id().get_uint(), 2);
+                auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
+                CHECK(folder_entity->get_stats() == statistics_t{1, 6});
+            }
+            SECTION("coflicted file (me has newer)") {
+                add_file("a.txt", *my_device, 5, proto::FileInfoType::FILE, my_device->device_id().get_uint(), 2);
+                add_file("a.txt", *peer_device, 6, proto::FileInfoType::FILE, peer_device->device_id().get_uint(), 1);
+                auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
+                CHECK(folder_entity->get_stats() == statistics_t{1, 5});
+            }
+        }
+        SECTION("two files do not intersect") {
+            add_file("dir", *my_device);
+            add_file("dir/a.txt", *my_device, 5, proto::FileInfoType::FILE, my_device->device_id().get_uint(), 1);
+            add_file("dir", *peer_device);
+            add_file("dir/b.txt", *peer_device, 6, proto::FileInfoType::FILE, peer_device->device_id().get_uint(), 1);
+            auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
+            CHECK(folder_entity->get_stats() == statistics_t{3, 11});
         }
     }
 }

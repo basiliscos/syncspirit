@@ -5,6 +5,7 @@
 
 #include "model/misc/arc.hpp"
 #include "model/device.h"
+#include "statistics.h"
 #include "syncspirit-export.h"
 
 namespace syncspirit::presentation {
@@ -35,7 +36,11 @@ struct SYNCSPIRIT_API presence_t : virtual model::augmentable_t, protected virtu
     void set_parent(presence_t *value) noexcept ;
     presence_t *get_parent() noexcept ;
     void set_parent(entity_t *entity) noexcept ;
-    std::uint32_t get_presence_feautres() noexcept ;
+    std::uint32_t get_presence_feautres() const noexcept ;
+    const statistics_t& get_stats() const noexcept ;
+
+    virtual const presence_t* determine_best(const presence_t*) const;
+    void commit() noexcept;
 
   protected:
     void on_delete() noexcept override;
@@ -47,6 +52,7 @@ struct SYNCSPIRIT_API presence_t : virtual model::augmentable_t, protected virtu
     augmentable_t* augmentable;
     model::device_ptr_t device;
     std::uint32_t features = 0;
+    statistics_t statistics;
 };
 
 } // namespace syncspirit::presentation

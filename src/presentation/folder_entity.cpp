@@ -77,6 +77,7 @@ folder_entity_t::folder_entity_t(model::folder_ptr_t folder_) noexcept : entity_
         process(it_fi.item.get(), children, new_files);
     }
     process_files(new_files, orphans, this);
+    commit();
 }
 
 void folder_entity_t::on_insert(model::folder_info_t &folder_info) noexcept {

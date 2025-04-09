@@ -8,7 +8,8 @@
 using namespace syncspirit;
 using namespace syncspirit::presentation;
 
-entity_t::entity_t(path_t path_, entity_t *parent_) noexcept : parent{parent_}, path(std::move(path_)) {}
+entity_t::entity_t(path_t path_, entity_t *parent_) noexcept
+    : parent{parent_}, path(std::move(path_)), cluster_record{-1} {}
 
 entity_t::~entity_t() { clear_children(); }
 
@@ -82,6 +83,27 @@ void entity_t::remove_child(entity_t &child) noexcept {
     model::intrusive_ptr_release(&child);
     child.parent = nullptr;
     children.erase(it);
+}
+
+const statistics_t &entity_t::get_stats() noexcept { return statistics; }
+
+void entity_t::commit() noexcept {
+    for (auto child : children) {
+        child->commit();
+        statistics += child->get_stats();
+    }
+    auto best = const_cast<const presence_t *>(records.front().presence);
+    for (auto &[_, presence] : records) {
+        presence->commit();
+        best = presence->determine_best(best);
+    }
+    if (children.empty()) {
+        statistics = best->get_stats();
+    } else {
+        if (parent) { // for file/dir entity
+            ++statistics.entities;
+        }
+    }
 }
 
 using nc_t = entity_t::name_comparator_t;
