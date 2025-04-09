@@ -37,7 +37,26 @@ void entity_t::remove_presense(presence_t &item) noexcept {
     auto predicate = [&item](const record_t &record) { return record.presence == &item; };
     auto it = std::find_if(records.begin(), records.end(), predicate);
     assert(it != records.end());
+    bool need_restat = false;
+    auto stats = statistics;
+    if (best_device && it->device == best_device) {
+        stats -= it->presence->get_stats();
+        need_restat = true;
+    }
     records.erase(it);
+    if (need_restat) {
+        if (auto best = recalc_best(); best) {
+            stats += best->get_stats();
+        }
+    }
+    if (stats != statistics) {
+        auto diff = stats - statistics;
+        auto current = this;
+        while (current) {
+            current->statistics += diff;
+            current = current->parent;
+        }
+    }
 
     bool remove_self = records.empty() && parent;
     if (records.size() == 1) {
@@ -51,6 +70,24 @@ void entity_t::remove_presense(presence_t &item) noexcept {
         parent->remove_child(*this);
         parent = nullptr;
     }
+}
+
+auto entity_t::recalc_best() noexcept -> const presence_t * {
+    auto best = (const presence_t *)(nullptr);
+    best_device.reset();
+    if (children.empty()) {
+        auto &first = records.front();
+        best_device = first.device;
+        best = first.presence;
+        for (size_t i = 1; i < records.size(); ++i) {
+            auto &[device, presence] = records[i];
+            best = presence->determine_best(best);
+            if (best == presence) {
+                best_device = device;
+            }
+        }
+    }
+    return best;
 }
 
 presence_t *entity_t::get_presense_raw(model::device_t &device) noexcept {
@@ -92,13 +129,12 @@ void entity_t::commit() noexcept {
         child->commit();
         statistics += child->get_stats();
     }
-    auto best = const_cast<const presence_t *>(records.front().presence);
-    for (auto &[_, presence] : records) {
+    auto &first = records.front();
+    for (auto &[device, presence] : records) {
         presence->commit();
-        best = presence->determine_best(best);
     }
     if (children.empty()) {
-        statistics = best->get_stats();
+        statistics = recalc_best()->get_stats();
     } else {
         if (parent) { // for file/dir entity
             ++statistics.entities;

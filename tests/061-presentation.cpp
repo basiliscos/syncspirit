@@ -741,6 +741,7 @@ TEST_CASE("statistics", "[presentation]") {
     auto builder = diff_builder_t(*cluster);
     REQUIRE(builder.upsert_folder("1234-5678", "some/path", "my-label").apply());
     auto folder = cluster->get_folders().by_id("1234-5678");
+    auto &blocks = cluster->get_blocks();
 
     auto add_file = [&](std::string_view name, model::device_t &device, std::int32_t file_size = 0,
                         proto::FileInfoType type = proto::FileInfoType::DIRECTORY, std::uint64_t modified_by = 0,
@@ -752,6 +753,7 @@ TEST_CASE("statistics", "[presentation]") {
         proto::set_type(pr_fi, type);
         proto::set_sequence(pr_fi, folder_info->get_max_sequence() + 1);
 
+        auto block = model::block_info_ptr_t();
         if (file_size) {
             proto::set_size(pr_fi, file_size);
             proto::set_block_size(pr_fi, file_size);
@@ -760,6 +762,11 @@ TEST_CASE("statistics", "[presentation]") {
             auto b_hash = utils::sha256_digest(bytes).value();
             auto &b = proto::add_blocks(pr_fi);
             proto::set_size(b, file_size);
+            block = blocks.by_hash(b_hash);
+            if (!block) {
+                block = model::block_info_t::create(b).value();
+                blocks.put(block);
+            }
         }
 
         auto &v = proto::get_version(pr_fi);
@@ -769,6 +776,9 @@ TEST_CASE("statistics", "[presentation]") {
         proto::set_modified_s(pr_fi, modified_version);
 
         auto file = model::file_info_t::create(sequencer->next_uuid(), pr_fi, folder_info.get()).value();
+        if (block) {
+            file->assign_block(block, 0);
+        }
         folder_info->add_strict(file);
         return file;
     };
@@ -806,11 +816,15 @@ TEST_CASE("statistics", "[presentation]") {
 
     SECTION("shared with a peer") {
         REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
+        auto fi_peer = folder->get_folder_infos().by_device(*peer_device).get();
         SECTION("single file") {
             SECTION("same file") {
                 add_file("a.txt", *my_device, 5, proto::FileInfoType::FILE, my_device->device_id().get_uint(), 1);
                 add_file("a.txt", *peer_device, 5, proto::FileInfoType::FILE, my_device->device_id().get_uint(), 1);
                 auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
+                CHECK(folder_entity->get_stats() == statistics_t{1, 5});
+
+                REQUIRE(builder.unshare_folder(*fi_peer).apply());
                 CHECK(folder_entity->get_stats() == statistics_t{1, 5});
             }
             SECTION("peer has newer") {
@@ -818,23 +832,34 @@ TEST_CASE("statistics", "[presentation]") {
                 add_file("a.txt", *peer_device, 6, proto::FileInfoType::FILE, peer_device->device_id().get_uint(), 2);
                 auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
                 CHECK(folder_entity->get_stats() == statistics_t{1, 6});
+
+                REQUIRE(builder.unshare_folder(*fi_peer).apply());
+                CHECK(folder_entity->get_stats() == statistics_t{1, 5});
             }
             SECTION("me has newer") {
                 add_file("a.txt", *my_device, 5, proto::FileInfoType::FILE, my_device->device_id().get_uint(), 2);
                 add_file("a.txt", *peer_device, 6, proto::FileInfoType::FILE, my_device->device_id().get_uint(), 1);
                 auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
                 CHECK(folder_entity->get_stats() == statistics_t{1, 5});
+
+                REQUIRE(builder.unshare_folder(*fi_peer).apply());
+                CHECK(folder_entity->get_stats() == statistics_t{1, 5});
             }
             SECTION("coflicted file (peer has newer)") {
                 add_file("a.txt", *my_device, 5, proto::FileInfoType::FILE, my_device->device_id().get_uint(), 1);
                 add_file("a.txt", *peer_device, 6, proto::FileInfoType::FILE, peer_device->device_id().get_uint(), 2);
                 auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
-                CHECK(folder_entity->get_stats() == statistics_t{1, 6});
+
+                REQUIRE(builder.unshare_folder(*fi_peer).apply());
+                CHECK(folder_entity->get_stats() == statistics_t{1, 5});
             }
             SECTION("coflicted file (me has newer)") {
                 add_file("a.txt", *my_device, 5, proto::FileInfoType::FILE, my_device->device_id().get_uint(), 2);
                 add_file("a.txt", *peer_device, 6, proto::FileInfoType::FILE, peer_device->device_id().get_uint(), 1);
                 auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
+                CHECK(folder_entity->get_stats() == statistics_t{1, 5});
+
+                REQUIRE(builder.unshare_folder(*fi_peer).apply());
                 CHECK(folder_entity->get_stats() == statistics_t{1, 5});
             }
         }
@@ -845,6 +870,9 @@ TEST_CASE("statistics", "[presentation]") {
             add_file("dir/b.txt", *peer_device, 6, proto::FileInfoType::FILE, peer_device->device_id().get_uint(), 1);
             auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
             CHECK(folder_entity->get_stats() == statistics_t{3, 11});
+
+            REQUIRE(builder.unshare_folder(*fi_peer).apply());
+            CHECK(folder_entity->get_stats() == statistics_t{2, 5});
         }
     }
 }

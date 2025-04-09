@@ -70,6 +70,7 @@ struct SYNCSPIRIT_API entity_t : virtual model::augmentable_t, protected virtual
     void on_delete() noexcept override;
     void set_parent(entity_t *parent) noexcept;
     void commit() noexcept;
+    const presence_t *recalc_best() noexcept;
 
     entity_t *parent;
     records_t records;
@@ -77,6 +78,7 @@ struct SYNCSPIRIT_API entity_t : virtual model::augmentable_t, protected virtual
     children_t children;
     statistics_t statistics;
     int cluster_record;
+    model::device_ptr_t best_device;
 };
 
 } // namespace syncspirit::presentation
