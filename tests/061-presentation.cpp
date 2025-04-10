@@ -893,6 +893,91 @@ TEST_CASE("statistics", "[presentation]") {
             }
         }
     }
+
+    SECTION("dynamically add files") {
+        auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
+        SECTION("for local device") {
+            SECTION("no orphans") {
+                auto f_a = add_file("a", *my_device, 0, proto::FileInfoType::DIRECTORY);
+                folder_entity->on_insert(*f_a);
+                CHECK(folder_entity->get_stats() == statistics_t{1, 0});
+
+                auto f_b = add_file("a/b", *my_device, 0, proto::FileInfoType::DIRECTORY);
+                folder_entity->on_insert(*f_b);
+                CHECK(folder_entity->get_stats() == statistics_t{2, 0});
+
+                auto f_c = add_file("a/b/c.txt", *my_device, 5, proto::FileInfoType::FILE);
+                folder_entity->on_insert(*f_c);
+                CHECK(folder_entity->get_stats() == statistics_t{3, 5});
+            }
+            SECTION("with orphans") {
+                auto f_c = add_file("a/b/c.txt", *my_device, 5, proto::FileInfoType::FILE);
+                folder_entity->on_insert(*f_c);
+                CHECK(folder_entity->get_stats() == statistics_t{0, 0});
+
+                auto f_b = add_file("a/b", *my_device, 0, proto::FileInfoType::DIRECTORY);
+                folder_entity->on_insert(*f_b);
+                CHECK(folder_entity->get_stats() == statistics_t{0, 0});
+
+                auto f_a = add_file("a", *my_device, 0, proto::FileInfoType::DIRECTORY);
+                folder_entity->on_insert(*f_a);
+                CHECK(folder_entity->get_stats() == statistics_t{3, 5});
+            }
+        }
+        SECTION("for local & peer device") {
+            REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
+            SECTION("no orphans") {
+                auto f_a_my = add_file("a", *my_device, 0, proto::FileInfoType::DIRECTORY);
+                folder_entity->on_insert(*f_a_my);
+                CHECK(folder_entity->get_stats() == statistics_t{1, 0});
+
+                auto f_a_peer = add_file("a", *peer_device, 0, proto::FileInfoType::DIRECTORY);
+                folder_entity->on_insert(*f_a_peer);
+                CHECK(folder_entity->get_stats() == statistics_t{1, 0});
+
+                auto f_b_peer = add_file("a/b", *peer_device, 0, proto::FileInfoType::DIRECTORY);
+                folder_entity->on_insert(*f_b_peer);
+                CHECK(folder_entity->get_stats() == statistics_t{2, 0});
+
+                auto f_b_my = add_file("a/b", *my_device, 0, proto::FileInfoType::DIRECTORY);
+                folder_entity->on_insert(*f_b_my);
+                CHECK(folder_entity->get_stats() == statistics_t{2, 0});
+
+                auto f_c = add_file("a/b/c.txt", *peer_device, 5, proto::FileInfoType::FILE);
+                folder_entity->on_insert(*f_c);
+                CHECK(folder_entity->get_stats() == statistics_t{3, 5});
+            }
+#if 0
+            SECTION("with orphans") {
+                auto f_c_peer = add_file("a/b/c.txt", *peer_device, 5, proto::FileInfoType::FILE,
+                                         my_device->device_id().get_uint(), 1);
+                folder_entity->on_insert(*f_c_peer);
+                CHECK(folder_entity->get_stats() == statistics_t{0, 0});
+
+                auto f_c_my = add_file("a/b/c.txt", *my_device, 5, proto::FileInfoType::FILE,
+                                       my_device->device_id().get_uint(), 1);
+                folder_entity->on_insert(*f_c_my);
+                CHECK(folder_entity->get_stats() == statistics_t{0, 0});
+
+                auto f_b_peer = add_file("a/b", *peer_device, 0, proto::FileInfoType::DIRECTORY);
+                folder_entity->on_insert(*f_b_peer);
+                CHECK(folder_entity->get_stats() == statistics_t{0, 0});
+
+                auto f_b_my = add_file("a/b", *my_device, 0, proto::FileInfoType::DIRECTORY);
+                folder_entity->on_insert(*f_b_my);
+                CHECK(folder_entity->get_stats() == statistics_t{0, 0});
+
+                auto f_a_peer = add_file("a", *peer_device, 0, proto::FileInfoType::DIRECTORY);
+                folder_entity->on_insert(*f_a_peer);
+                CHECK(folder_entity->get_stats() == statistics_t{3, 5});
+
+                auto f_a_my = add_file("a", *my_device, 0, proto::FileInfoType::DIRECTORY);
+                folder_entity->on_insert(*f_a_my);
+                CHECK(folder_entity->get_stats() == statistics_t{3, 5});
+            }
+#endif
+        }
+    }
 }
 
 static bool _init = []() -> bool {

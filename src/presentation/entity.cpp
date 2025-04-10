@@ -33,6 +33,14 @@ void entity_t::set_parent(entity_t *value) noexcept {
     }
 }
 
+void entity_t::push_stats(const statistics_t &diff) noexcept {
+    auto current = this;
+    while (current) {
+        current->statistics += diff;
+        current = current->parent;
+    }
+}
+
 void entity_t::remove_presense(presence_t &item) noexcept {
     auto predicate = [&item](const record_t &record) { return record.presence == &item; };
     auto it = std::find_if(records.begin(), records.end(), predicate);
@@ -51,11 +59,7 @@ void entity_t::remove_presense(presence_t &item) noexcept {
     }
     if (stats != statistics) {
         auto diff = stats - statistics;
-        auto current = this;
-        while (current) {
-            current->statistics += diff;
-            current = current->parent;
-        }
+        push_stats(diff);
     }
 
     bool remove_self = records.empty() && parent;
@@ -119,11 +123,7 @@ void entity_t::remove_child(entity_t &child) noexcept {
     child.set_augmentation({});
     model::intrusive_ptr_release(&child);
     child.parent = nullptr;
-    auto current = this;
-    while (current) {
-        current->statistics -= child.get_stats();
-        current = current->parent;
-    }
+    push_stats(-child.get_stats());
     children.erase(it);
 }
 

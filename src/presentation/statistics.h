@@ -31,6 +31,7 @@ struct statistics_t {
             size - o.size,
         };
     }
+    inline statistics_t operator-() const noexcept { return {-entities, -size}; }
 };
 
 }; // namespace syncspirit::presentation

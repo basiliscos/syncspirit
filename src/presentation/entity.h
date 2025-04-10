@@ -70,6 +70,7 @@ struct SYNCSPIRIT_API entity_t : virtual model::augmentable_t, protected virtual
     void on_delete() noexcept override;
     void set_parent(entity_t *parent) noexcept;
     void commit() noexcept;
+    void push_stats(const statistics_t &diff) noexcept;
     const presence_t *recalc_best() noexcept;
 
     entity_t *parent;

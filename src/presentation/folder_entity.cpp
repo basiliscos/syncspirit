@@ -116,14 +116,14 @@ void folder_entity_t::on_insert(model::file_info_t &file_info) noexcept {
     if (has_parent) {
         child.reset(new file_entity_t(file_info, std::move(path)));
         entity->add_child(*child);
+        orphans.reap_children(child);
+        child->commit();
+        push_stats(child->get_stats());
     } else if (i == path.get_pieces_size()) {
         static_cast<file_entity_t *>(entity)->on_insert(file_info);
     } else {
         child.reset(new file_entity_t(file_info, std::move(path)));
         orphans.push(child);
-    }
-    if (child && has_parent) {
-        orphans.reap_children(child);
     }
 }
 
