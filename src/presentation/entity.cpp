@@ -111,9 +111,9 @@ void entity_t::on_update() noexcept { notify_update(); }
 void entity_t::on_delete() noexcept { clear_children(); }
 
 void entity_t::add_child(entity_t &child) noexcept {
-    child.set_parent(this);
     model::intrusive_ptr_add_ref(&child);
     children.emplace(&child);
+    child.set_parent(this);
 }
 
 void entity_t::remove_child(entity_t &child) noexcept {
@@ -134,9 +134,11 @@ void entity_t::commit() noexcept {
         child->commit();
         statistics += child->get_stats();
     }
-    auto &first = records.front();
-    for (auto &[device, presence] : records) {
-        presence->commit();
+    if (records.size()) {
+        auto &first = records.front();
+        for (auto &[device, presence] : records) {
+            presence->commit();
+        }
     }
     if (children.empty()) {
         statistics = recalc_best()->get_stats();
@@ -157,7 +159,7 @@ bool nc_t::operator()(const entity_t *lhs, const entity_t *rhs) const noexcept {
     } else if (rd && !ld) {
         return false;
     }
-    return lhs->get_path().get_full_name() < rhs->get_path().get_full_name();
+    return lhs->get_path().get_own_name() < rhs->get_path().get_own_name();
 }
 
 bool nc_t::operator()(const entity_t *lhs, const std::string_view rhs) const noexcept {
@@ -165,7 +167,7 @@ bool nc_t::operator()(const entity_t *lhs, const std::string_view rhs) const noe
     if (!ld) {
         return false;
     }
-    return lhs->get_path().get_full_name() < rhs;
+    return lhs->get_path().get_own_name() < rhs;
 }
 
 bool nc_t::operator()(const std::string_view lhs, const entity_t *rhs) const noexcept {
@@ -173,5 +175,5 @@ bool nc_t::operator()(const std::string_view lhs, const entity_t *rhs) const noe
     if (!rd) {
         return true;
     }
-    return lhs < rhs->get_path().get_full_name();
+    return lhs < rhs->get_path().get_own_name();
 }

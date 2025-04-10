@@ -40,6 +40,7 @@ struct orphans_t : private details::orphans_map_t {
     ~orphans_t();
     void push(entity_ptr_t) noexcept;
     void reap_children(entity_ptr_t) noexcept;
+    entity_ptr_t get_by_path(std::string_view path) noexcept;
 };
 
 } // namespace syncspirit::presentation

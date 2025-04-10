@@ -48,6 +48,12 @@ file_entity_t::~file_entity_t() {
 void file_entity_t::on_insert(model::file_info_t &file_info) noexcept {
     auto fi = file_info.get_folder_info();
     auto device = fi->get_device();
+    for (auto &r : records) {
+        if (r.device == device) {
+            return;
+        }
+    }
+
     auto local = fi->get_folder()->get_cluster()->get_device() == device;
     auto child = [&]() -> file_presence_t * {
         if (local) {
@@ -58,4 +64,11 @@ void file_entity_t::on_insert(model::file_info_t &file_info) noexcept {
     }();
     child->set_parent(parent);
     records.emplace_back(record_t{device, child});
+    for (auto &c : children) {
+        for (auto &r : c->records) {
+            if (r.device == device) {
+                r.presence->set_parent(child);
+            }
+        }
+    }
 }

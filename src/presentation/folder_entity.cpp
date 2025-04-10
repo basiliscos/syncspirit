@@ -122,8 +122,13 @@ void folder_entity_t::on_insert(model::file_info_t &file_info) noexcept {
     } else if (i == path.get_pieces_size()) {
         static_cast<file_entity_t *>(entity)->on_insert(file_info);
     } else {
-        child.reset(new file_entity_t(file_info, std::move(path)));
-        orphans.push(child);
+        auto orphan = orphans.get_by_path(path.get_full_name());
+        if (orphan) {
+            static_cast<file_entity_t *>(orphan.get())->on_insert(file_info);
+        } else {
+            child.reset(new file_entity_t(file_info, std::move(path)));
+            orphans.push(child);
+        }
     }
 }
 

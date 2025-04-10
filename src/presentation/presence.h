@@ -33,8 +33,8 @@ struct SYNCSPIRIT_API presence_t : virtual model::augmentable_t, protected virtu
     presence_t(entity_t *entity, model::device_ptr_t device) noexcept ;
     ~presence_t();
 
-    void set_parent(presence_t *value) noexcept ;
     presence_t *get_parent() noexcept ;
+    void set_parent(presence_t *value) noexcept ;
     void set_parent(entity_t *entity) noexcept ;
     std::uint32_t get_presence_feautres() const noexcept ;
     const statistics_t& get_stats() const noexcept ;

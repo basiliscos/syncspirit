@@ -28,6 +28,11 @@ void presence_t::set_parent(entity_t *value) noexcept {
     }
 }
 
+void presence_t::set_parent(presence_t *value) noexcept {
+    assert(entity->get_parent() == value->entity);
+    parent = value;
+}
+
 void presence_t::clear_presense() noexcept {
     if (augmentable) {
         augmentable->set_augmentation({});

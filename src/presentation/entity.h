@@ -22,6 +22,7 @@ using entity_ptr_t = model::intrusive_ptr_t<entity_t>;
 struct presence_t;
 using presence_ptr_t = model::intrusive_ptr_t<presence_t>;
 
+struct file_entity_t;
 struct folder_entity_t;
 
 struct SYNCSPIRIT_API entity_t : virtual model::augmentable_t, protected virtual model::augmentation_t {
@@ -54,6 +55,7 @@ struct SYNCSPIRIT_API entity_t : virtual model::augmentable_t, protected virtual
     const statistics_t &get_stats() noexcept;
 
   protected:
+    friend struct file_entity_t;
     friend struct folder_entity_t;
 
     struct record_t {

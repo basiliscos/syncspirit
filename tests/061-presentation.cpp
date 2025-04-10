@@ -496,6 +496,7 @@ TEST_CASE("presentation", "[presentation]") {
 
             auto file_c_peer = add_file("a/b/c", *peer_device);
             folder_entity->on_insert(*file_c_peer);
+            folder_entity->on_insert(*file_c_peer); // should be ignored
             REQUIRE(dir_b_entity->get_children().size() == 1);
             auto &dir_c_entity = *dir_b_entity->get_children().begin();
             REQUIRE(dir_c_entity->get_path().get_own_name() == "c");
@@ -515,7 +516,6 @@ TEST_CASE("presentation", "[presentation]") {
             CHECK(p_dir_a_my->get_parent() == p_folder_my);
         }
         SECTION("orphans") {
-
             SECTION("simple") {
                 add_file("a/b", *my_device);
 
@@ -572,6 +572,46 @@ TEST_CASE("presentation", "[presentation]") {
                 REQUIRE(dir_c_entity->get_path().get_own_name() == "c");
                 REQUIRE(dir_c_entity->get_children().size() == 0);
                 CHECK(dir_c_entity->get_parent() == dir_b_entity);
+            }
+            SECTION("lazy, with peer") {
+                REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
+                auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
+                auto f_b_my = add_file("a/b.bin", *my_device);
+                auto f_b_peer = add_file("a/b.bin", *peer_device);
+                folder_entity->on_insert(*f_b_my);
+                folder_entity->on_insert(*f_b_peer);
+
+                auto f_a_my = add_file("a", *my_device);
+                folder_entity->on_insert(*f_a_my);
+
+                auto f_a_peer = add_file("a", *peer_device);
+                folder_entity->on_insert(*f_a_peer);
+
+                auto &children = folder_entity->get_children();
+                REQUIRE(children.size() == 1);
+
+                auto &dir_a_entity = *children.begin();
+                REQUIRE(dir_a_entity->get_path().get_own_name() == "a");
+                REQUIRE(dir_a_entity->get_children().size() == 1);
+                CHECK(dir_a_entity->get_parent() == folder_entity);
+
+                auto p_dir_a_my = dir_a_entity->get_presense<file_presence_t>(*my_device);
+                auto p_dir_a_peer = dir_a_entity->get_presense<file_presence_t>(*peer_device);
+                CHECK(p_dir_a_my->get_presence_feautres() & (F::file | F::local));
+                CHECK(p_dir_a_peer->get_presence_feautres() & (F::file | F::peer));
+                CHECK(p_dir_a_my->get_parent());
+
+                auto &file_b_entity = *dir_a_entity->get_children().begin();
+                REQUIRE(file_b_entity->get_path().get_own_name() == "b.bin");
+                REQUIRE(file_b_entity->get_children().size() == 0);
+                CHECK(file_b_entity->get_parent() == dir_a_entity);
+
+                auto p_file_my = file_b_entity->get_presense<file_presence_t>(*my_device);
+                auto p_file_peer = file_b_entity->get_presense<file_presence_t>(*peer_device);
+                CHECK(p_file_my->get_presence_feautres() & (F::file | F::local));
+                CHECK(p_file_peer->get_presence_feautres() & (F::file | F::peer));
+                CHECK(p_file_my->get_parent() == p_dir_a_my);
+                CHECK(p_file_peer->get_parent() == p_dir_a_peer);
             }
         }
         SECTION("removal") {
@@ -947,7 +987,6 @@ TEST_CASE("statistics", "[presentation]") {
                 folder_entity->on_insert(*f_c);
                 CHECK(folder_entity->get_stats() == statistics_t{3, 5});
             }
-#if 0
             SECTION("with orphans") {
                 auto f_c_peer = add_file("a/b/c.txt", *peer_device, 5, proto::FileInfoType::FILE,
                                          my_device->device_id().get_uint(), 1);
@@ -975,7 +1014,6 @@ TEST_CASE("statistics", "[presentation]") {
                 folder_entity->on_insert(*f_a_my);
                 CHECK(folder_entity->get_stats() == statistics_t{3, 5});
             }
-#endif
         }
     }
 }

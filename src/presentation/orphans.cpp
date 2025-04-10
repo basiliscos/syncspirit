@@ -45,4 +45,13 @@ void orphans_t::reap_children(entity_ptr_t parent) noexcept {
     }
 }
 
+entity_ptr_t orphans_t::get_by_path(std::string_view path) noexcept {
+    auto &by_name = get<0>();
+    auto it = by_name.find(path);
+    if (it != by_name.end()) {
+        return *it;
+    }
+    return {};
+}
+
 } // namespace syncspirit::presentation
