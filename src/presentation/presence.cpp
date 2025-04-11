@@ -48,10 +48,4 @@ void presence_t::link(augmentable_t *augmentable) noexcept { augmentable->set_au
 
 void presence_t::on_delete() noexcept { clear_presense(); }
 
-void presence_t::commit() noexcept {
-    if (parent) {
-        parent->statistics += statistics;
-    }
-}
-
 const presence_t *presence_t::determine_best(const presence_t *other) const { return other; }

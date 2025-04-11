@@ -40,6 +40,7 @@ struct SYNCSPIRIT_API path_t {
     std::string_view get_full_name() const noexcept;
     std::string_view get_own_name() const noexcept;
     std::string_view get_parent_name() const noexcept;
+    bool contains(const path_t &other) const noexcept;
 
   private:
     using pieces_t = std::vector<std::uint32_t>;

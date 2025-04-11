@@ -77,7 +77,7 @@ folder_entity_t::folder_entity_t(model::folder_ptr_t folder_) noexcept : entity_
         process(it_fi.item.get(), children, new_files);
     }
     process_files(new_files, orphans, this);
-    commit();
+    commit(path);
 }
 
 void folder_entity_t::on_insert(model::folder_info_t &folder_info) noexcept {
@@ -117,8 +117,9 @@ void folder_entity_t::on_insert(model::file_info_t &file_info) noexcept {
         child.reset(new file_entity_t(file_info, std::move(path)));
         entity->add_child(*child);
         orphans.reap_children(child);
-        child->commit();
-        push_stats(child->get_stats());
+        child->commit(child->get_path());
+        auto device = file_info.get_folder_info()->get_device();
+        entity->push_stats(child->get_stats(), device);
     } else if (i == path.get_pieces_size()) {
         static_cast<file_entity_t *>(entity)->on_insert(file_info);
     } else {

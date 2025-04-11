@@ -40,9 +40,9 @@ struct SYNCSPIRIT_API presence_t : model::proxy_t {
     const statistics_t& get_stats() const noexcept ;
 
     virtual const presence_t* determine_best(const presence_t*) const;
-    void commit() noexcept;
 
   protected:
+    friend struct entity_t;
     void on_delete() noexcept override;
     void clear_presense() noexcept;
     void link(augmentable_t* augmentable) noexcept;

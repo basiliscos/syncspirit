@@ -71,8 +71,8 @@ struct SYNCSPIRIT_API entity_t : model::proxy_t {
     void on_update() noexcept override;
     void on_delete() noexcept override;
     void set_parent(entity_t *parent) noexcept;
-    void commit() noexcept;
-    void push_stats(const statistics_t &diff) noexcept;
+    void commit(const path_t &path) noexcept;
+    void push_stats(const statistics_t &diff, const model::device_t *source) noexcept;
     const presence_t *recalc_best() noexcept;
 
     entity_t *parent;

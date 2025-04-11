@@ -54,6 +54,11 @@ auto path_t::begin() const noexcept -> iterator_t { return iterator_t(this); };
 
 auto path_t::end() const noexcept -> iterator_t { return iterator_t(); }
 
+bool path_t::contains(const path_t &other) const noexcept {
+    auto view = std::string_view(other.name);
+    return view.find(name) == 0;
+}
+
 using I = path_t::iterator_t;
 
 I::iterator_t() noexcept : position{-1}, path{nullptr} {}

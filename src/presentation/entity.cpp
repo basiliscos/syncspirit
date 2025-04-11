@@ -33,10 +33,16 @@ void entity_t::set_parent(entity_t *value) noexcept {
     }
 }
 
-void entity_t::push_stats(const statistics_t &diff) noexcept {
+void entity_t::push_stats(const statistics_t &diff, const model::device_t *source) noexcept {
     auto current = this;
     while (current) {
         current->statistics += diff;
+        for (auto &r : current->records) {
+            if (r.device == source) {
+                r.presence->statistics += diff;
+                break;
+            }
+        }
         current = current->parent;
     }
 }
@@ -45,6 +51,28 @@ void entity_t::remove_presense(presence_t &item) noexcept {
     auto predicate = [&item](const record_t &record) { return record.presence == &item; };
     auto it = std::find_if(records.begin(), records.end(), predicate);
     assert(it != records.end());
+    if (children.size()) {
+        bool rescan_children = true;
+        while (rescan_children) {
+            bool scan = true;
+            for (auto it = children.begin(); scan && it != children.end();) {
+                auto &c = *it;
+                bool advance_it = true;
+                for (auto &r : c->records) {
+                    if (r.device == item.device) {
+                        r.presence->clear_presense();
+                        advance_it = false;
+                        scan = false;
+                        break;
+                    }
+                }
+                if (advance_it) {
+                    ++it;
+                }
+            }
+            rescan_children = !scan;
+        }
+    }
     bool need_restat = false;
     auto stats = statistics;
     if (best_device && it->device == best_device) {
@@ -59,7 +87,7 @@ void entity_t::remove_presense(presence_t &item) noexcept {
     }
     if (stats != statistics) {
         auto diff = stats - statistics;
-        push_stats(diff);
+        push_stats(diff, item.device.get());
     }
 
     bool remove_self = records.empty() && parent;
@@ -122,22 +150,33 @@ void entity_t::remove_child(entity_t &child) noexcept {
     child.clear_children();
     child.set_augmentation({});
     model::intrusive_ptr_release(&child);
+
+    for (auto &r : records) {
+        auto p = r.presence->parent;
+        while (p) {
+            p->statistics -= r.presence->statistics;
+            p = p->parent;
+        }
+    }
     child.parent = nullptr;
-    push_stats(-child.get_stats());
+    push_stats(-child.get_stats(), nullptr);
     children.erase(it);
 }
 
 const statistics_t &entity_t::get_stats() noexcept { return statistics; }
 
-void entity_t::commit() noexcept {
+void entity_t::commit(const path_t &path) noexcept {
     for (auto child : children) {
-        child->commit();
+        child->commit(path);
         statistics += child->get_stats();
     }
     if (records.size()) {
         auto &first = records.front();
         for (auto &[device, presence] : records) {
-            presence->commit();
+            auto parent = presence->parent;
+            if (parent && path.contains(parent->entity->path)) {
+                parent->statistics += presence->statistics;
+            }
         }
     }
     if (children.empty()) {
