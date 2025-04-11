@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "model/misc/augmentation.h"
+#include "model/misc/proxy.h"
 #include "model/device.h"
 #include "path.h"
 #include "statistics.h"
@@ -25,7 +25,7 @@ using presence_ptr_t = model::intrusive_ptr_t<presence_t>;
 struct file_entity_t;
 struct folder_entity_t;
 
-struct SYNCSPIRIT_API entity_t : virtual model::augmentable_t, protected virtual model::augmentation_t {
+struct SYNCSPIRIT_API entity_t : model::proxy_t {
     struct name_comparator_t {
         using is_transparent = std::true_type;
         bool operator()(const entity_t *lhs, const entity_t *rhs) const noexcept;
