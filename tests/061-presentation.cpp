@@ -1127,7 +1127,6 @@ TEST_CASE("statistics", "[presentation]") {
         }
     }
 
-#if 0
     SECTION("file updates") {
         REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
 
@@ -1183,7 +1182,6 @@ TEST_CASE("statistics", "[presentation]") {
         CHECK(p_a_my->get_stats() == statistics_t{3, 10});
         CHECK(p_a_peer->get_stats() == statistics_t{3, 10});
     }
-#endif
 }
 
 static bool _init = []() -> bool {
