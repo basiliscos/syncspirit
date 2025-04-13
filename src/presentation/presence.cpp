@@ -49,3 +49,5 @@ void presence_t::link(augmentable_t *augmentable) noexcept { augmentable->set_au
 void presence_t::on_delete() noexcept { clear_presense(); }
 
 const presence_t *presence_t::determine_best(const presence_t *other) const { return other; }
+
+statistics_t presence_t::get_own_stats() const noexcept { return {0, 0}; }

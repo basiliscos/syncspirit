@@ -45,30 +45,31 @@ file_entity_t::~file_entity_t() {
     // records.clear();
 }
 
-void file_entity_t::on_insert(model::file_info_t &file_info) noexcept {
+auto file_entity_t::on_insert(model::file_info_t &file_info) noexcept -> file_presence_t * {
     auto fi = file_info.get_folder_info();
     auto device = fi->get_device();
     for (auto &r : records) {
         if (r.device == device) {
-            return;
+            return static_cast<file_presence_t *>(r.presence);
         }
     }
 
     auto local = fi->get_folder()->get_cluster()->get_device() == device;
-    auto child = [&]() -> file_presence_t * {
+    auto presence = [&]() -> file_presence_t * {
         if (local) {
             return new local_file_presence_t(*this, file_info);
         } else {
             return new peer_file_presence_t(*this, file_info);
         }
     }();
-    child->set_parent(parent);
-    records.emplace_back(record_t{device, child});
+    presence->set_parent(parent);
+    records.emplace_back(record_t{device, presence});
     for (auto &c : children) {
         for (auto &r : c->records) {
             if (r.device == device) {
-                r.presence->set_parent(child);
+                r.presence->set_parent(presence);
             }
         }
     }
+    return presence;
 }

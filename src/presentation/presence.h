@@ -40,6 +40,7 @@ struct SYNCSPIRIT_API presence_t : model::proxy_t {
     const statistics_t& get_stats() const noexcept ;
 
     virtual const presence_t* determine_best(const presence_t*) const;
+    virtual statistics_t get_own_stats() const noexcept;
 
   protected:
     friend struct entity_t;

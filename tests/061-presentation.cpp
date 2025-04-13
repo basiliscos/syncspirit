@@ -1040,6 +1040,63 @@ TEST_CASE("statistics", "[presentation]") {
                 folder_entity->on_insert(*f_c);
                 CHECK(folder_entity->get_stats() == statistics_t{3, 5});
             }
+            SECTION("simple hierarchy") {
+                auto f_a_my = add_file("a", *my_device, 0, proto::FileInfoType::DIRECTORY);
+                folder_entity->on_insert(*f_a_my);
+                CHECK(folder_entity->get_stats() == statistics_t{1, 0});
+
+                auto dir_a = *folder_entity->get_children().begin();
+                CHECK(dir_a->get_stats() == statistics_t{1, 0});
+
+                auto p_a_my = dir_a->get_presense<cluster_file_presence_t>(*my_device);
+                CHECK(p_a_my->get_stats() == statistics_t{1, 0});
+
+                auto p_a_peer = dir_a->get_presense<cluster_file_presence_t>(*peer_device);
+                CHECK(p_a_peer->get_stats() == statistics_t{0, 0});
+
+                auto f_x_my = add_file("a/x.txt", *my_device, 5, proto::FileInfoType::FILE);
+                folder_entity->on_insert(*f_x_my);
+                CHECK(folder_entity->get_stats() == statistics_t{2, 5});
+                CHECK(dir_a->get_stats() == statistics_t{2, 5});
+                CHECK(p_a_my->get_stats() == statistics_t{2, 5});
+                CHECK(p_a_peer->get_stats() == statistics_t{0, 0});
+
+                auto e_x = *dir_a->get_children().begin();
+                CHECK(e_x->get_stats() == statistics_t{1, 5});
+                auto p_x_my = e_x->get_presense<cluster_file_presence_t>(*my_device);
+                CHECK(p_x_my->get_stats() == statistics_t{1, 5});
+
+                auto f_a_peer = add_file("a", *peer_device, 0, proto::FileInfoType::DIRECTORY);
+                folder_entity->on_insert(*f_a_peer);
+                CHECK(folder_entity->get_stats() == statistics_t{2, 5});
+                CHECK(dir_a->get_stats() == statistics_t{2, 5});
+                CHECK(p_a_my->get_stats() == statistics_t{2, 5});
+                CHECK(p_x_my->get_stats() == statistics_t{1, 5});
+
+                p_a_peer = dir_a->get_presense<cluster_file_presence_t>(*peer_device);
+                CHECK(p_a_peer->get_stats() == statistics_t{1, 0});
+
+                auto p_x_peer = e_x->get_presense<cluster_file_presence_t>(*peer_device);
+                CHECK(p_x_peer->get_presence_feautres() & (F::missing | F::file));
+                CHECK(p_x_peer->get_stats() == statistics_t{0, 0});
+
+                auto pr_x = f_x_my->as_proto(true);
+                auto fi_peer = folder->get_folder_infos().by_device(*peer_device);
+                auto file_c_peer = model::file_info_t::create(sequencer->next_uuid(), pr_x, fi_peer.get()).value();
+                auto block = *blocks.begin();
+                file_c_peer->assign_block(block.item, 0);
+                fi_peer->add_strict(file_c_peer);
+                folder_entity->on_insert(*file_c_peer);
+
+                CHECK(folder_entity->get_stats() == statistics_t{2, 5});
+                CHECK(dir_a->get_stats() == statistics_t{2, 5});
+                CHECK(p_a_my->get_stats() == statistics_t{2, 5});
+                CHECK(p_x_my->get_stats() == statistics_t{1, 5});
+                CHECK(p_a_peer->get_stats() == statistics_t{2, 5});
+
+                p_x_peer = e_x->get_presense<cluster_file_presence_t>(*peer_device);
+                CHECK(p_x_peer->get_stats() == statistics_t{1, 5});
+            }
             SECTION("with orphans") {
                 auto f_c_peer = add_file("a/b/c.txt", *peer_device, 5, proto::FileInfoType::FILE,
                                          my_device->device_id().get_uint(), 1);
@@ -1083,15 +1140,27 @@ TEST_CASE("statistics", "[presentation]") {
         auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
         CHECK(folder_entity->get_stats() == statistics_t{3, 5});
 
+        REQUIRE(folder_entity->get_children().size() == 1);
+        auto dir_a = *folder_entity->get_children().begin();
+        CHECK(dir_a->get_stats() == statistics_t{3, 5});
+
+        auto p_a_my = dir_a->get_presense<cluster_file_presence_t>(*my_device);
+        CHECK(p_a_my->get_stats() == statistics_t{3, 5});
+
+        auto p_a_peer = dir_a->get_presense<cluster_file_presence_t>(*peer_device);
+        CHECK(p_a_peer->get_stats() == statistics_t{2, 0});
+
         auto pr_fi = [&]() {
             auto pr_fi = f_c_my->as_proto(false);
             auto block = model::block_info_ptr_t();
             proto::set_size(pr_fi, 10);
             proto::set_block_size(pr_fi, 10);
             auto bytes = utils::bytes_t(10);
+            std::fill_n(bytes.data(), bytes.size(), '1');
             auto b_hash = utils::sha256_digest(bytes).value();
             auto &b = proto::add_blocks(pr_fi);
             proto::set_size(b, 10);
+            proto::set_hash(b, b_hash);
             block = blocks.by_hash(b_hash);
             block = model::block_info_t::create(b).value();
             blocks.put(block);
@@ -1099,6 +1168,20 @@ TEST_CASE("statistics", "[presentation]") {
         }();
         REQUIRE(builder.local_update("1234-5678", pr_fi).apply());
         CHECK(folder_entity->get_stats() == statistics_t{3, 10});
+        CHECK(dir_a->get_stats() == statistics_t{3, 10});
+        CHECK(p_a_my->get_stats() == statistics_t{3, 10});
+        CHECK(p_a_peer->get_stats() == statistics_t{2, 0});
+
+        auto fi_peer = folder->get_folder_infos().by_device(*peer_device);
+        auto file_c_peer = model::file_info_t::create(sequencer->next_uuid(), pr_fi, fi_peer.get()).value();
+        auto block = *blocks.begin();
+        file_c_peer->assign_block(block.item, 0);
+        fi_peer->add_strict(file_c_peer);
+        folder_entity->on_insert(*file_c_peer);
+        CHECK(folder_entity->get_stats() == statistics_t{3, 10});
+        CHECK(dir_a->get_stats() == statistics_t{3, 10});
+        CHECK(p_a_my->get_stats() == statistics_t{3, 10});
+        CHECK(p_a_peer->get_stats() == statistics_t{3, 10});
     }
 #endif
 }

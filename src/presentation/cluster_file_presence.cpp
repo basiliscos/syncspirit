@@ -14,7 +14,7 @@ using namespace syncspirit::presentation;
 cluster_file_presence_t::cluster_file_presence_t(file_entity_t &entity, model::file_info_t &file_info_) noexcept
     : file_presence_t(&entity, file_info_.get_folder_info()->get_device()), file_info{file_info_} {
     link(&file_info);
-    statistics = {1, file_info.get_size()};
+    statistics = get_own_stats();
 }
 
 auto cluster_file_presence_t::get_file_info() noexcept -> model::file_info_t & { return file_info; }
@@ -26,4 +26,15 @@ const presence_t *cluster_file_presence_t::determine_best(const presence_t *othe
     auto o = static_cast<const cluster_file_presence_t *>(other);
     auto r = model::compare(file_info, o->file_info);
     return r >= 0 ? this : o;
+}
+
+statistics_t cluster_file_presence_t::get_own_stats() const noexcept { return {1, file_info.get_size()}; }
+
+void cluster_file_presence_t::on_update() noexcept {
+#if 0
+    auto new_stats = refresh_stats();
+    auto diff = new_stats - statistics;
+    entity->push_stats(diff, file_info.get_folder_info()->get_device());
+#endif
+    std::abort();
 }

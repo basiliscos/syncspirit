@@ -33,10 +33,12 @@ void entity_t::set_parent(entity_t *value) noexcept {
     }
 }
 
-void entity_t::push_stats(const statistics_t &diff, const model::device_t *source) noexcept {
+void entity_t::push_stats(const statistics_t &diff, const model::device_t *source, bool best) noexcept {
     auto current = this;
     while (current) {
-        current->statistics += diff;
+        if (best) {
+            current->statistics += diff;
+        }
         for (auto &r : current->records) {
             if (r.device == source) {
                 r.presence->statistics += diff;
@@ -87,7 +89,7 @@ void entity_t::remove_presense(presence_t &item) noexcept {
     }
     if (stats != statistics) {
         auto diff = stats - statistics;
-        push_stats(diff, item.device.get());
+        push_stats(diff, item.device.get(), true);
     }
 
     bool remove_self = records.empty() && parent;
@@ -159,7 +161,7 @@ void entity_t::remove_child(entity_t &child) noexcept {
         }
     }
     child.parent = nullptr;
-    push_stats(-child.get_stats(), nullptr);
+    push_stats(-child.get_stats(), nullptr, true);
     children.erase(it);
 }
 

@@ -21,6 +21,7 @@ using entity_ptr_t = model::intrusive_ptr_t<entity_t>;
 
 struct presence_t;
 using presence_ptr_t = model::intrusive_ptr_t<presence_t>;
+struct cluster_file_presence_t;
 
 struct file_entity_t;
 struct folder_entity_t;
@@ -57,6 +58,7 @@ struct SYNCSPIRIT_API entity_t : model::proxy_t {
   protected:
     friend struct file_entity_t;
     friend struct folder_entity_t;
+    friend struct cluster_file_presence_t;
 
     struct record_t {
         model::device_ptr_t device;
@@ -72,7 +74,7 @@ struct SYNCSPIRIT_API entity_t : model::proxy_t {
     void on_delete() noexcept override;
     void set_parent(entity_t *parent) noexcept;
     void commit(const path_t &path) noexcept;
-    void push_stats(const statistics_t &diff, const model::device_t *source) noexcept;
+    void push_stats(const statistics_t &diff, const model::device_t *source, bool best) noexcept;
     const presence_t *recalc_best() noexcept;
 
     entity_t *parent;

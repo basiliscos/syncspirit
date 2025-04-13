@@ -3,6 +3,7 @@
 
 #include "folder_entity.h"
 #include "folder_presence.h"
+#include "file_presence.h"
 #include "file_entity.h"
 #include "model/folder.h"
 #include "model/file_info.h"
@@ -113,15 +114,40 @@ void folder_entity_t::on_insert(model::file_info_t &file_info) noexcept {
 
     auto child = file_entity_ptr_t();
     bool has_parent = i + 1 == path.get_pieces_size();
+    auto diff = statistics_t{};
     if (has_parent) {
         child.reset(new file_entity_t(file_info, std::move(path)));
         entity->add_child(*child);
         orphans.reap_children(child);
         child->commit(child->get_path());
+        diff = child->get_stats();
         auto device = file_info.get_folder_info()->get_device();
-        entity->push_stats(child->get_stats(), device);
+        entity->push_stats(diff, device, true);
     } else if (i == path.get_pieces_size()) {
-        static_cast<file_entity_t *>(entity)->on_insert(file_info);
+        auto device = file_info.get_folder_info()->get_device();
+        auto presence_diff = statistics_t{};
+        auto entry_diff = statistics_t{};
+        for (auto &[d, presence] : records) {
+            if (d == device) {
+                presence_diff = -presence->get_own_stats();
+            }
+            if (d == best_device) {
+                entry_diff = -presence->get_stats();
+            }
+        }
+        auto file_entity = static_cast<file_entity_t *>(entity);
+        auto file_presence = file_entity->on_insert(file_info);
+        presence_diff += file_presence->get_own_stats();
+        if (auto parent = entity->parent; parent) {
+            parent->push_stats(presence_diff, device, false);
+        }
+        auto prev_best = best_device;
+        auto best_presence = entity->recalc_best();
+        if (best_device != prev_best) {
+            assert(best_presence == file_presence);
+            entry_diff += best_presence->get_stats();
+            entity->push_stats(entry_diff, nullptr, true);
+        }
     } else {
         auto orphan = orphans.get_by_path(path.get_full_name());
         if (orphan) {
