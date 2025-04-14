@@ -25,7 +25,7 @@ struct statistics_t {
         return *this;
     }
 
-    inline statistics_t operator-(const statistics_t &o) noexcept {
+    inline statistics_t operator-(const statistics_t &o) const noexcept {
         return {
             entities - o.entities,
             size - o.size,

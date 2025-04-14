@@ -1171,16 +1171,54 @@ TEST_CASE("statistics", "[presentation]") {
         CHECK(p_a_my->get_stats() == statistics_t{3, 10});
         CHECK(p_a_peer->get_stats() == statistics_t{2, 0});
 
+        // peer copies
         auto fi_peer = folder->get_folder_infos().by_device(*peer_device);
         auto file_c_peer = model::file_info_t::create(sequencer->next_uuid(), pr_fi, fi_peer.get()).value();
-        auto block = *blocks.begin();
-        file_c_peer->assign_block(block.item, 0);
-        fi_peer->add_strict(file_c_peer);
-        folder_entity->on_insert(*file_c_peer);
-        CHECK(folder_entity->get_stats() == statistics_t{3, 10});
-        CHECK(dir_a->get_stats() == statistics_t{3, 10});
-        CHECK(p_a_my->get_stats() == statistics_t{3, 10});
-        CHECK(p_a_peer->get_stats() == statistics_t{3, 10});
+        {
+            auto block = *blocks.begin();
+            file_c_peer->assign_block(block.item, 0);
+            fi_peer->add_strict(file_c_peer);
+            folder_entity->on_insert(*file_c_peer);
+            CHECK(folder_entity->get_stats() == statistics_t{3, 10});
+            CHECK(dir_a->get_stats() == statistics_t{3, 10});
+            CHECK(p_a_my->get_stats() == statistics_t{3, 10});
+            CHECK(p_a_peer->get_stats() == statistics_t{3, 10});
+        }
+
+        // peer updates
+        {
+            auto pr_fi = [&]() {
+                auto pr_fi = f_c_my->as_proto(false);
+                auto block = model::block_info_ptr_t();
+                proto::set_size(pr_fi, 15);
+                proto::set_block_size(pr_fi, 15);
+                auto bytes = utils::bytes_t(15);
+                std::fill_n(bytes.data(), bytes.size(), '2');
+                auto b_hash = utils::sha256_digest(bytes).value();
+                auto &b = proto::add_blocks(pr_fi);
+                proto::set_size(b, 15);
+                proto::set_hash(b, b_hash);
+                block = blocks.by_hash(b_hash);
+                block = model::block_info_t::create(b).value();
+                blocks.put(block);
+                return pr_fi;
+            }();
+            auto fi_peer_2 = folder->get_folder_infos().by_device(*peer_device);
+            bu::uuid file_uuid;
+            assign(file_uuid, file_c_peer->get_uuid());
+            auto file_c_peer_2 = model::file_info_t::create(file_uuid, pr_fi, fi_peer.get()).value();
+            auto block = *blocks.begin();
+            file_c_peer_2->assign_block(block.item, 0);
+            fi_peer_2->add_strict(file_c_peer);
+
+            file_c_peer->update(*file_c_peer_2);
+            file_c_peer->notify_update();
+
+            CHECK(folder_entity->get_stats() == statistics_t{3, 15});
+            CHECK(dir_a->get_stats() == statistics_t{3, 15});
+            CHECK(p_a_my->get_stats() == statistics_t{3, 10});
+            CHECK(p_a_peer->get_stats() == statistics_t{3, 15});
+        }
     }
 }
 

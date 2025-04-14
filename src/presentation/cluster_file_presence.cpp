@@ -31,9 +31,17 @@ const presence_t *cluster_file_presence_t::determine_best(const presence_t *othe
 statistics_t cluster_file_presence_t::get_own_stats() const noexcept { return {1, file_info.get_size()}; }
 
 void cluster_file_presence_t::on_update() noexcept {
-    auto new_stats = get_own_stats();
-    auto diff = new_stats - statistics;
+    auto presence_diff = get_own_stats() - statistics;
+    auto entity_stats = entity->get_stats();
     auto device = file_info.get_folder_info()->get_device();
-    auto best_updated = device == entity->best_device;
-    entity->push_stats(diff, device, best_updated);
+    auto best_device = entity->best_device.get();
+    auto best_presence = entity->recalc_best();
+    auto best_changed = entity->best_device != best_device && entity->best_device == device;
+    auto best_updated = !best_changed && device == entity->best_device;
+    entity->push_stats(presence_diff, device, best_updated);
+    if (best_changed) {
+        assert(best_presence == this);
+        auto entity_diff = get_stats() - entity_stats;
+        entity->push_stats(entity_diff, {}, true);
+    }
 }
