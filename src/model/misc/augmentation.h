@@ -38,6 +38,8 @@ struct SYNCSPIRIT_API augmentation_t : ref_countable_t {
 using augmentation_ptr_t = intrusive_ptr_t<augmentation_t>;
 
 struct SYNCSPIRIT_API augmentable_t : ref_countable_t {
+    augmentable_t() = default;
+    augmentable_t(const augmentable_t &) = delete;
     ~augmentable_t();
 
     void set_augmentation(augmentation_t &value) noexcept;
