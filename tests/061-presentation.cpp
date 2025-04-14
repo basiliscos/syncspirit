@@ -1189,6 +1189,8 @@ TEST_CASE("statistics", "[presentation]") {
         {
             auto pr_fi = [&]() {
                 auto pr_fi = f_c_my->as_proto(false);
+                auto &v = proto::get_version(pr_fi);
+                proto::add_counters(v, proto::Counter(peer_device->device_id().get_uint(), 2));
                 auto block = model::block_info_ptr_t();
                 proto::set_size(pr_fi, 15);
                 proto::set_block_size(pr_fi, 15);
@@ -1217,6 +1219,34 @@ TEST_CASE("statistics", "[presentation]") {
             CHECK(folder_entity->get_stats() == statistics_t{3, 15});
             CHECK(dir_a->get_stats() == statistics_t{3, 15});
             CHECK(p_a_my->get_stats() == statistics_t{3, 10});
+            CHECK(p_a_peer->get_stats() == statistics_t{3, 15});
+        }
+
+        // local copy
+        {
+            auto pr_fi = [&]() { return file_c_peer->as_proto(true); }();
+            REQUIRE(builder.local_update("1234-5678", pr_fi).apply());
+            CHECK(folder_entity->get_stats() == statistics_t{3, 15});
+            CHECK(dir_a->get_stats() == statistics_t{3, 15});
+            CHECK(p_a_my->get_stats() == statistics_t{3, 15});
+            CHECK(p_a_peer->get_stats() == statistics_t{3, 15});
+        }
+
+        // local update
+        {
+            auto pr_fi = [&]() {
+                auto pr_fi = file_c_peer->as_proto(false);
+                proto::clear_blocks(pr_fi);
+                proto::set_deleted(pr_fi, true);
+                proto::set_size(pr_fi, 0);
+                auto &v = proto::get_version(pr_fi);
+                proto::add_counters(v, proto::Counter(my_device->device_id().get_uint(), 3));
+                return pr_fi;
+            }();
+            REQUIRE(builder.local_update("1234-5678", pr_fi).apply());
+            CHECK(folder_entity->get_stats() == statistics_t{3, 0});
+            CHECK(dir_a->get_stats() == statistics_t{3, 0});
+            CHECK(p_a_my->get_stats() == statistics_t{3, 0});
             CHECK(p_a_peer->get_stats() == statistics_t{3, 15});
         }
     }
