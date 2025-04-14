@@ -29,6 +29,7 @@ file_entity_t::file_entity_t(model::file_info_t &sample_file, path_t path_) noex
         auto file = files_map.by_name(path.get_full_name());
         if (file) {
             presence_files.emplace_back(file.get());
+            has_dir = has_dir || file->is_dir();
         }
     }
 

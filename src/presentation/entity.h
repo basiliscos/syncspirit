@@ -80,6 +80,7 @@ struct SYNCSPIRIT_API entity_t : model::proxy_t {
     entity_t *parent;
     records_t records;
     path_t path;
+    bool has_dir;
     children_t children;
     statistics_t statistics;
     int cluster_record;

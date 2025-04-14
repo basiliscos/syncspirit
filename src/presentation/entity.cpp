@@ -9,7 +9,7 @@ using namespace syncspirit;
 using namespace syncspirit::presentation;
 
 entity_t::entity_t(path_t path_, entity_t *parent_) noexcept
-    : parent{parent_}, path(std::move(path_)), cluster_record{-1} {}
+    : parent{parent_}, path(std::move(path_)), has_dir{false}, cluster_record{-1} {}
 
 entity_t::~entity_t() { clear_children(); }
 
@@ -193,8 +193,8 @@ void entity_t::commit(const path_t &path) noexcept {
 using nc_t = entity_t::name_comparator_t;
 
 bool nc_t::operator()(const entity_t *lhs, const entity_t *rhs) const noexcept {
-    auto ld = lhs->children.size() > 0;
-    auto rd = rhs->children.size() > 0;
+    auto ld = lhs->has_dir;
+    auto rd = rhs->has_dir;
     if (ld && !rd) {
         return true;
     } else if (rd && !ld) {
@@ -204,7 +204,7 @@ bool nc_t::operator()(const entity_t *lhs, const entity_t *rhs) const noexcept {
 }
 
 bool nc_t::operator()(const entity_t *lhs, const std::string_view rhs) const noexcept {
-    auto ld = lhs->children.size() > 0;
+    auto ld = lhs->has_dir;
     if (!ld) {
         return false;
     }
@@ -212,7 +212,7 @@ bool nc_t::operator()(const entity_t *lhs, const std::string_view rhs) const noe
 }
 
 bool nc_t::operator()(const std::string_view lhs, const entity_t *rhs) const noexcept {
-    auto rd = rhs->children.size() > 0;
+    auto rd = rhs->has_dir;
     if (!rd) {
         return true;
     }
