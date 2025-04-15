@@ -15,12 +15,14 @@ cluster_file_presence_t::cluster_file_presence_t(file_entity_t &entity, model::f
     : file_presence_t(&entity, file_info_.get_folder_info()->get_device()), file_info{file_info_} {
     link(&file_info);
     statistics = get_own_stats();
+    features |= features_t::cluster;
+    features |= (file_info.is_dir() ? features_t::directory : features_t::file);
 }
 
 auto cluster_file_presence_t::get_file_info() noexcept -> model::file_info_t & { return file_info; }
 
 const presence_t *cluster_file_presence_t::determine_best(const presence_t *other) const {
-    if (!(other->get_presence_feautres() & features_t::cluster)) {
+    if (!(other->get_features() & features_t::cluster)) {
         return this;
     }
     auto o = static_cast<const cluster_file_presence_t *>(other);

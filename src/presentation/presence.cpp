@@ -17,14 +17,15 @@ presence_t::presence_t(entity_t *entity_, model::device_ptr_t device_) noexcept
 presence_t::~presence_t() { clear_presense(); }
 
 presence_t *presence_t::get_parent() noexcept { return parent; }
+entity_t *presence_t::get_entity() noexcept { return entity; }
 
-auto presence_t::get_presence_feautres() const noexcept -> std::uint32_t { return features; }
+auto presence_t::get_features() const noexcept -> std::uint32_t { return features; }
 
 const statistics_t &presence_t::get_stats() const noexcept { return statistics; }
 
 void presence_t::set_parent(entity_t *value) noexcept {
     if (value && device) {
-        parent = value->get_presense<presence_t>(*device);
+        parent = value->get_presence<presence_t>(*device);
     }
 }
 

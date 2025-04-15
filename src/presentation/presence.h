@@ -19,14 +19,15 @@ using presence_ptr_t = model::intrusive_ptr_t<presence_t>;
 struct SYNCSPIRIT_API presence_t : model::proxy_t {
     // clang-format off
     enum features_t: std::uint32_t {
-        file    = 1 << 1,
-        folder  = 1 << 2,
-        missing = 1 << 3,
-        cluster = 1 << 4,
-        peer    = 1 << 5,
-        local   = 1 << 6,
-        deleted = 1 << 7,
-        ignored = 1 << 8,
+        folder    = 1 << 1,
+        file      = 1 << 2,
+        directory = 1 << 3,
+        missing   = 1 << 4,
+        cluster   = 1 << 5,
+        peer      = 1 << 6,
+        local     = 1 << 7,
+        deleted   = 1 << 8,
+        ignored   = 1 << 9,
     };
     // clang-format ON
 
@@ -34,10 +35,12 @@ struct SYNCSPIRIT_API presence_t : model::proxy_t {
     ~presence_t();
 
     presence_t *get_parent() noexcept ;
+    entity_t* get_entity() noexcept;
     void set_parent(presence_t *value) noexcept ;
     void set_parent(entity_t *entity) noexcept ;
-    std::uint32_t get_presence_feautres() const noexcept ;
+    std::uint32_t get_features() const noexcept ;
     const statistics_t& get_stats() const noexcept ;
+    inline model::device_t* get_device() const noexcept { return device.get() ;}
 
     virtual const presence_t* determine_best(const presence_t*) const;
     virtual statistics_t get_own_stats() const noexcept;

@@ -124,7 +124,7 @@ auto entity_t::recalc_best() noexcept -> const presence_t * {
     return best;
 }
 
-presence_t *entity_t::get_presense_raw(model::device_t &device) noexcept {
+presence_t *entity_t::get_presence(model::device_t &device) noexcept {
     presence_t *fallback = nullptr;
     for (auto &record : records) {
         auto d = record.device.get();
