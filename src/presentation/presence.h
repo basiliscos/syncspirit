@@ -28,6 +28,8 @@ struct SYNCSPIRIT_API presence_t : model::proxy_t {
         local     = 1 << 7,
         deleted   = 1 << 8,
         ignored   = 1 << 9,
+        symblink  = 1 << 10,
+        in_sync   = 1 << 11,
     };
     // clang-format ON
 

@@ -17,6 +17,12 @@ cluster_file_presence_t::cluster_file_presence_t(file_entity_t &entity, model::f
     statistics = get_own_stats();
     features |= features_t::cluster;
     features |= (file_info.is_dir() ? features_t::directory : features_t::file);
+    if (file_info.is_deleted()) {
+        features |= features_t::deleted;
+    }
+    if (file_info.is_link()) {
+        features |= features_t::symblink;
+    }
 }
 
 auto cluster_file_presence_t::get_file_info() noexcept -> model::file_info_t & { return file_info; }
