@@ -8,6 +8,6 @@
 
 namespace syncspirit::model {
 
-struct SYNCSPIRIT_API proxy_t : model::augmentable_t, protected model::augmentation_t {};
+struct SYNCSPIRIT_API proxy_t : model::augmentable_t, model::augmentation_t {};
 
 } // namespace syncspirit::model

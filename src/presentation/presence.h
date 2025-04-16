@@ -31,6 +31,7 @@ struct SYNCSPIRIT_API presence_t : model::proxy_t {
         symblink  = 1 << 10,
         in_sync   = 1 << 11,
     };
+    static constexpr std::uint32_t mask = 0xFFFFFFFF;
     // clang-format ON
 
     presence_t(entity_t *entity, model::device_ptr_t device) noexcept ;
