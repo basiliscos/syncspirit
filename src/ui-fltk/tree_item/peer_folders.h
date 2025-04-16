@@ -1,3 +1,4 @@
+#if 0
 // SPDX-License-Identifier: GPL-3.0-or-later
 // SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
 
@@ -19,3 +20,4 @@ struct peer_folders_t : tree_item_t {
 };
 
 } // namespace syncspirit::fltk::tree_item
+#endif

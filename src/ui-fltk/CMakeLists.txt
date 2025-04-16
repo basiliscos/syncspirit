@@ -38,21 +38,20 @@ add_executable(syncspirit-fltk WIN32 MACOSX_BUNDLE
     table_widget/label.cpp
     table_widget/path.cpp
     tree_item/devices.cpp
-    tree_item/entry.cpp
-    tree_item/file_entry.cpp
     tree_item/folder.cpp
     tree_item/folders.cpp
     tree_item/ignored_device.cpp
     tree_item/ignored_devices.cpp
-    tree_item/local_entry.cpp
+    tree_item/local_cluster_presence.cpp
+    tree_item/missing_item_presence.cpp
     tree_item/peer_device.cpp
-    tree_item/peer_entry.cpp
     tree_item/peer_folder.cpp
     tree_item/peer_folders.cpp
     tree_item/pending_device.cpp
     tree_item/pending_devices.cpp
     tree_item/pending_folder.cpp
     tree_item/pending_folders.cpp
+    tree_item/presence_item.cpp
     tree_item/self_device.cpp
     tree_item/settings.cpp
     $<$<PLATFORM_ID:Windows>:app.rc>

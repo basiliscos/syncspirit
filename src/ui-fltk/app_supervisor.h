@@ -34,7 +34,7 @@ struct main_window_t;
 struct tree_item_t;
 struct augmentation_entry_base_t;
 
-enum class color_context_t { unknown, deleted, link, actualized, outdated, conflicted };
+enum class color_context_t { unknown, deleted, link, actualized, outdated, conflicted, missing };
 
 struct db_info_viewer_t {
     virtual void view(const net::payload::db_info_response_t &) = 0;
@@ -97,12 +97,6 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
     using parent_t = rf::supervisor_fltk_t;
     using config_t = app_supervisor_config_t;
     template <typename Actor> using config_builder_t = app_supervisor_config_builder_t<Actor>;
-
-    struct entries_comparator_t {
-        using aug_t = augmentation_entry_base_t;
-        bool operator()(const aug_t *lhs, const aug_t *rhs) const;
-    };
-    using updated_entries_t = std::set<augmentation_entry_base_t *, entries_comparator_t>;
 
     explicit app_supervisor_t(config_t &config);
     app_supervisor_t(const app_supervisor_t &) = delete;
@@ -175,6 +169,8 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
     void request_load_model();
     r::address_ptr_t &get_coordinator_address();
 
+    std::uint32_t mask_nodes() const noexcept;
+
   private:
     using clock_t = std::chrono::high_resolution_clock;
     using time_point_t = typename clock_t::time_point;
@@ -221,7 +217,9 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
     main_window_t *main_window;
     std::size_t loaded_blocks;
     std::size_t loaded_files;
+#if 0
     updated_entries_t *updated_entries;
+#endif
     const model::diff::load::load_cluster_t *load_cluster;
 
     friend struct db_info_viewer_guard_t;

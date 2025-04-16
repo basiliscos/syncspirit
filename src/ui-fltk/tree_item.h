@@ -70,8 +70,10 @@ struct tree_item_t : Fl_Tree_Item {
 struct dynamic_item_t : tree_item_t {
     using parent_t = tree_item_t;
     using parent_t::parent_t;
+#if 0
     virtual dynamic_item_t *create(augmentation_entry_t &) = 0;
-    virtual void show_deleted(bool value) = 0;
+#endif
+    virtual void show(std::uint32_t mask, bool recurse = true) = 0;
     virtual void refresh_children() = 0;
 };
 

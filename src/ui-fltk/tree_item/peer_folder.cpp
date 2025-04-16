@@ -1,3 +1,4 @@
+#if 0
 // SPDX-License-Identifier: GPL-3.0-or-later
 // SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
 
@@ -89,3 +90,4 @@ bool peer_folder_t::on_select() {
 
     return true;
 }
+#endif

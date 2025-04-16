@@ -1,3 +1,4 @@
+#if 0
 // SPDX-License-Identifier: GPL-3.0-or-later
 // SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
 
@@ -56,3 +57,4 @@ void peer_folders_t::remove_child(tree_item_t *item) {
         tree()->redraw();
     }
 }
+#endif

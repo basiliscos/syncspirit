@@ -9,7 +9,6 @@
 #include "tree_item/folders.h"
 #include "tree_item/ignored_devices.h"
 #include "tree_item/peer_device.h"
-#include "tree_item/entry.h"
 #include "tree_item/pending_devices.h"
 #include "tree_item/pending_folders.h"
 #include "tree_item/peer_folders.h"
@@ -29,6 +28,7 @@
 #include "model/diff/modify/update_peer.h"
 #include "model/diff/modify/share_folder.h"
 #include "model/diff/peer/update_folder.h"
+#include "presentation/folder_entity.h"
 #include "utils/format.hpp"
 #include "utils/io.h"
 
@@ -38,6 +38,7 @@
 #include <functional>
 
 using namespace syncspirit::fltk;
+using namespace syncspirit::presentation;
 
 namespace {
 namespace resource {
@@ -80,38 +81,6 @@ struct callback_impl_t final : callback_t {
 
     callback_fn_t fn;
 };
-
-using aec_t = app_supervisor_t::entries_comparator_t;
-bool aec_t::operator()(const aug_t *lhs, const aug_t *rhs) const {
-    if (lhs == rhs) {
-        return false;
-    }
-
-    auto lf = lhs->get_folder();
-    auto rf = rhs->get_folder();
-    auto lid = lf->get_folder()->get_id();
-    auto rid = rf->get_folder()->get_id();
-    if (lid != rid) {
-        return lid > rid;
-    }
-
-    auto ld = lf->get_device();
-    auto rd = rf->get_device();
-    if (ld != rd) {
-        return ld > rd;
-    }
-
-    auto l_file = lhs->get_file();
-    auto r_file = rhs->get_file();
-    if (!l_file && r_file) {
-        return false;
-    }
-    if (l_file && !r_file) {
-        return true;
-    }
-
-    return l_file->get_name() > r_file->get_name();
-}
 
 static void ui_idle_means_ready(void *data) {
     auto sup = reinterpret_cast<app_supervisor_t *>(data);
@@ -212,8 +181,10 @@ void app_supervisor_t::on_model_response(model::message::model_response_t &res) 
 void app_supervisor_t::on_model_update(model::message::model_update_t &message) noexcept {
     LOG_TRACE(log, "on_model_update");
     bool has_been_loaded = cluster->get_devices().size();
+#if 0
     auto updated = updated_entries_t();
     this->updated_entries = &updated;
+#endif
     auto &diff = *message.payload.diff;
 
     if (!has_been_loaded) {
@@ -249,15 +220,19 @@ void app_supervisor_t::on_model_update(model::message::model_update_t &message) 
     if (!has_been_loaded) {
         main_window->set_splash_text("populating model (3/3)...");
     }
+#if 0
     for (auto &entry : updated) {
         entry->apply_update();
     }
+#endif
     if (!has_been_loaded && cluster->get_devices().size()) {
         main_window->on_loading_done();
         main_window->set_splash_text("UI has been initialized");
         Fl::add_idle(ui_idle_means_ready, this);
     }
+#if 0
     this->updated_entries = nullptr;
+#endif
 }
 
 std::string app_supervisor_t::get_uptime() noexcept {
@@ -303,8 +278,10 @@ void app_supervisor_t::add_sink(spdlog::sink_ptr ui_sink_) {
 }
 
 void app_supervisor_t::postpone_update(augmentation_entry_base_t &entry) {
+#if 0
     assert(updated_entries);
     updated_entries->emplace(&entry);
+#endif
 }
 
 auto app_supervisor_t::request_db_info(db_info_viewer_t *viewer) -> db_info_viewer_guard_t {
@@ -401,14 +378,22 @@ auto app_supervisor_t::operator()(const model::diff::load::load_cluster_t &diff,
     auto folders_node = static_cast<tree_item::folders_t *>(folders);
     for (auto &it : cluster->get_folders()) {
         auto &folder = it.item;
+        auto text = fmt::format("building model of cluster folder '{}'({}) ...", folder->get_label(), folder->get_id());
+        main_window->set_splash_text(text);
+        auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
+        folders_node->add_folder(*folder_entity);
+    }
+#if 0
+    for (auto &it : cluster->get_folders()) {
+        auto &folder = it.item;
         auto text = fmt::format("populating local folder '{}'({})...", folder->get_label(), folder->get_id());
         main_window->set_splash_text(text);
         auto augmentation = folders_node->add_folder(*folder);
         folder->set_augmentation(augmentation);
     }
+#endif
 
-    auto r = diff.visit_next(*this, custom);
-    return r;
+    return diff.visit_next(*this, custom);
 }
 
 auto app_supervisor_t::operator()(const model::diff::local::io_failure_t &diff, void *custom) noexcept
@@ -422,9 +407,11 @@ auto app_supervisor_t::operator()(const model::diff::local::io_failure_t &diff, 
 auto app_supervisor_t::operator()(const model::diff::local::scan_start_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     auto folder = cluster->get_folders().by_id(diff.folder_id);
+#if 0
     auto augmentation = static_cast<augmentation_t *>(folder->get_augmentation().get());
     auto folder_node = static_cast<tree_item::folder_t *>(augmentation->get_owner());
     folder_node->reset_stats();
+#endif
     return diff.visit_next(*this, custom);
 }
 
@@ -476,6 +463,7 @@ auto app_supervisor_t::operator()(const model::diff::modify::add_ignored_device_
 
 auto app_supervisor_t::operator()(const model::diff::advance::advance_t &diff, void *custom) noexcept
     -> outcome::result<void> {
+#if 0
     auto folder = cluster->get_folders().by_id(diff.folder_id);
     if (folder && !folder->is_suspended()) {
         auto &folder_infos = folder->get_folder_infos();
@@ -504,11 +492,13 @@ auto app_supervisor_t::operator()(const model::diff::advance::advance_t &diff, v
             }
         }
     }
+#endif
     return diff.visit_next(*this, custom);
 }
 
 auto app_supervisor_t::operator()(const model::diff::modify::upsert_folder_t &diff, void *custom) noexcept
     -> outcome::result<void> {
+#if 0
     auto folder_id = db::get_id(diff.db);
     auto &folder = *cluster->get_folders().by_id(folder_id);
     if (!folder.get_augmentation()) {
@@ -516,12 +506,14 @@ auto app_supervisor_t::operator()(const model::diff::modify::upsert_folder_t &di
         auto augmentation = folders_node->add_folder(folder);
         folder.set_augmentation(augmentation);
     }
+#endif
     return diff.visit_next(*this, custom);
 }
 
 auto app_supervisor_t::operator()(const model::diff::modify::upsert_folder_info_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     auto r = diff.visit_next(*this, custom);
+#if 0
     auto &folder = *cluster->get_folders().by_id(diff.folder_id);
     auto &device = *cluster->get_devices().by_sha256(diff.device_id);
     if (&device != cluster->get_device()) {
@@ -533,11 +525,13 @@ auto app_supervisor_t::operator()(const model::diff::modify::upsert_folder_info_
             folders_node->add_folder(*folder_info);
         }
     }
+#endif
     return r;
 }
 
 auto app_supervisor_t::operator()(const model::diff::peer::update_folder_t &diff, void *custom) noexcept
     -> outcome::result<void> {
+#if 0
     auto folder = cluster->get_folders().by_id(diff.folder_id);
     auto peer = cluster->get_devices().by_sha256(diff.peer_id);
     auto folder_info = folder->get_folder_infos().by_device(*peer);
@@ -554,6 +548,7 @@ auto app_supervisor_t::operator()(const model::diff::peer::update_folder_t &diff
         augmentation->augment_pending();
         augmentation->on_update();
     }
+#endif
     return diff.visit_next(*this, custom);
 }
 
@@ -602,17 +597,17 @@ void app_supervisor_t::write_config(const config::main_t &cfg) noexcept {
 }
 
 void app_supervisor_t::set_show_deleted(bool value) {
-    log->debug("display deleted = {}", value);
     app_config.fltk_config.display_deleted = value;
-
+    auto mask = mask_nodes();
+    log->debug("display deleted = {}, mask: {:#x}", value, mask);
     for (auto &it_f : cluster->get_folders()) {
         for (auto &it : it_f.item->get_folder_infos()) {
             auto generic_augmentation = it.item->get_augmentation();
             if (generic_augmentation) {
-                auto augmentation = static_cast<augmentation_base_t *>(generic_augmentation.get());
-                auto entry = static_cast<tree_item::entry_t *>(augmentation->get_owner());
-                if (entry) {
-                    entry->show_deleted(value);
+                auto presence = static_cast<presentation::presence_t*>(generic_augmentation.get());
+                auto item = dynamic_cast<tree_item::presence_item_t *>(presence->get_augmentation().get());
+                if (item) {
+                    item->show(mask, true);
                 }
             }
         }
@@ -627,6 +622,7 @@ void app_supervisor_t::set_show_colorized(bool value) {
     log->debug("display colorized = {}", value);
     app_config.fltk_config.display_colorized = value;
 
+#if 0
     auto refresher = refresher_t{};
     for (auto &it_f : cluster->get_folders()) {
         for (auto &it : it_f.item->get_folder_infos()) {
@@ -640,12 +636,15 @@ void app_supervisor_t::set_show_colorized(bool value) {
             }
         }
     }
+#endif
 }
 
 Fl_Color app_supervisor_t::get_color(color_context_t context) const {
     if (app_config.fltk_config.display_colorized) {
         using C = color_context_t;
         switch (context) {
+        case C::missing:
+            return FL_DARK_RED;
         case C::deleted:
             return FL_DARK1;
         case C::link:
@@ -661,4 +660,14 @@ Fl_Color app_supervisor_t::get_color(color_context_t context) const {
         }
     }
     return FL_BLACK;
+}
+
+
+std::uint32_t app_supervisor_t::mask_nodes() const noexcept {
+    using F = syncspirit::presentation::presence_t::features_t;
+    auto r = std::uint32_t{0};
+   if (!app_config.fltk_config.display_deleted) {
+       r |= F::deleted;
+   }
+   return r;
 }

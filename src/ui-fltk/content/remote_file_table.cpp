@@ -34,6 +34,7 @@ auto make_checkbox(Fl_Widget &container, bool value) -> widgetable_ptr_t { retur
 
 remote_file_table_t::remote_file_table_t(tree_item_t &container_, int x, int y, int w, int h)
     : parent_t(x, y, w, h), container{container_}, displayed_versions{0} {
+#if 0
     auto aug = static_cast<augmentation_entry_base_t *>(container.augmentation.get());
     auto &entry = *aug->get_file();
     auto data = table_rows_t();
@@ -77,9 +78,12 @@ remote_file_table_t::remote_file_table_t(tree_item_t &container_, int x, int y, 
     assign_rows(std::move(data));
 
     refresh();
+#endif
+    std::abort();
 }
 
 void remote_file_table_t::refresh() {
+#if 0
     auto aug = static_cast<augmentation_entry_base_t *>(container.augmentation.get());
     auto &stats = aug->get_stats();
     auto &entry = *aug->get_file();
@@ -136,4 +140,5 @@ void remote_file_table_t::refresh() {
     local_entries_cell->update(fmt::format("{}", stats.scanned_entries));
 
     redraw();
+#endif
 }

@@ -3,14 +3,15 @@
 
 #pragma once
 
-#include "local_entry.h"
+#include "presence_item.h"
+#include "presentation/folder_entity.h"
 
 namespace syncspirit::fltk::tree_item {
 
-struct folder_t final : local_entry_t {
-    using parent_t = local_entry_t;
+struct folder_t final : presence_item_t {
+    using parent_t = presence_item_t;
 
-    folder_t(model::folder_t &folder, app_supervisor_t &supervisor, Fl_Tree *tree);
+    folder_t(presentation::folder_presence_t &folder, app_supervisor_t &supervisor, Fl_Tree *tree);
     void update_label() override;
     bool on_select() override;
 

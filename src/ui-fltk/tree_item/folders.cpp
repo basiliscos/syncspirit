@@ -6,6 +6,7 @@
 #include "../content/folder_table.h"
 #include "../table_widget/label.h"
 #include "utils/base32.h"
+#include "presentation/folder_presence.h"
 #include <algorithm>
 #include <cctype>
 #include <boost/nowide/convert.hpp>
@@ -158,9 +159,11 @@ void folders_t::update_label() {
     this->label(l.data());
 }
 
-augmentation_ptr_t folders_t::add_folder(model::folder_t &folder_info) {
+auto folders_t::add_folder(presentation::folder_entity_t &folder_entity) -> augmentation_ptr_t {
     auto augmentation = within_tree([&]() {
-        auto item = new folder_t(folder_info, supervisor, tree());
+        auto self = supervisor.get_cluster()->get_device();
+        auto presence = folder_entity.get_presence<presentation::folder_presence_t>(*self);
+        auto item = new folder_t(*presence, supervisor, tree());
         return insert_by_label(item)->get_proxy();
     });
     update_label();
@@ -173,6 +176,7 @@ void folders_t::remove_child(tree_item_t *child) {
 }
 
 void folders_t::select_folder(std::string_view folder_id) {
+#if 0
     auto t = tree();
     for (int i = 0; i < children(); ++i) {
         auto node = static_cast<folder_t *>(child(i));
@@ -186,6 +190,7 @@ void folders_t::select_folder(std::string_view folder_id) {
             break;
         }
     }
+#endif
 }
 
 bool folders_t::on_select() {
