@@ -505,7 +505,6 @@ auto app_supervisor_t::operator()(const model::diff::modify::upsert_folder_t &di
 auto app_supervisor_t::operator()(const model::diff::modify::upsert_folder_info_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     auto r = diff.visit_next(*this, custom);
-#if 0
     auto &folder = *cluster->get_folders().by_id(diff.folder_id);
     auto &device = *cluster->get_devices().by_sha256(diff.device_id);
     if (&device != cluster->get_device()) {
@@ -517,7 +516,6 @@ auto app_supervisor_t::operator()(const model::diff::modify::upsert_folder_info_
             folders_node->add_folder(*folder_info);
         }
     }
-#endif
     return r;
 }
 

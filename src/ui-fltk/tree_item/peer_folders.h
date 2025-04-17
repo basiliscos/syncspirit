@@ -13,7 +13,7 @@ struct peer_folders_t : tree_item_t {
 
     void update_label() override;
 
-    augmentation_ptr_t add_folder(model::folder_info_t &folder);
+    void add_folder(model::folder_info_t &folder);
     void remove_child(tree_item_t *child) override;
     model::device_t &peer;
 };
