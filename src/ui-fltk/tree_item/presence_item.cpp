@@ -114,9 +114,11 @@ void presence_item_t::do_show(std::uint32_t mask, bool refresh_label) {
 
 void presence_item_t::do_hide() {
     auto host = parent();
-    auto index = host->find_child(this);
-    if (index >= 0) {
-        host->deparent(index);
+    if (host) {
+        auto index = host->find_child(this);
+        if (index >= 0) {
+            host->deparent(index);
+        }
     }
 }
 
