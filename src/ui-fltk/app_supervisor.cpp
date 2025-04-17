@@ -386,16 +386,6 @@ auto app_supervisor_t::operator()(const model::diff::load::load_cluster_t &diff,
         device.set_augmentation(ignored_devices_node->add_device(device));
     }
 
-#if 0
-    for (auto &it : cluster->get_folders()) {
-        auto &folder = it.item;
-        auto text = fmt::format("populating local folder '{}'({})...", folder->get_label(), folder->get_id());
-        main_window->set_splash_text(text);
-        auto augmentation = folders_node->add_folder(*folder);
-        folder->set_augmentation(augmentation);
-    }
-#endif
-
     return diff.visit_next(*this, custom);
 }
 
@@ -501,15 +491,14 @@ auto app_supervisor_t::operator()(const model::diff::advance::advance_t &diff, v
 
 auto app_supervisor_t::operator()(const model::diff::modify::upsert_folder_t &diff, void *custom) noexcept
     -> outcome::result<void> {
-#if 0
     auto folder_id = db::get_id(diff.db);
-    auto &folder = *cluster->get_folders().by_id(folder_id);
-    if (!folder.get_augmentation()) {
+    auto folder = cluster->get_folders().by_id(folder_id);
+    if (!folder->get_augmentation()) {
         auto folders_node = static_cast<tree_item::folders_t *>(folders);
-        auto augmentation = folders_node->add_folder(folder);
-        folder.set_augmentation(augmentation);
+        auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
+        folders_node->add_folder(*folder_entity);
+        folder->set_augmentation(folder_entity);
     }
-#endif
     return diff.visit_next(*this, custom);
 }
 

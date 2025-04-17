@@ -176,21 +176,19 @@ void folders_t::remove_child(tree_item_t *child) {
 }
 
 void folders_t::select_folder(std::string_view folder_id) {
-#if 0
     auto t = tree();
     for (int i = 0; i < children(); ++i) {
-        auto node = static_cast<folder_t *>(child(i));
-        auto aug = static_cast<augmentation_entry_base_t *>(node->get_proxy().get());
-        if (aug->get_folder()->get_folder()->get_id() == folder_id) {
+        auto folder = static_cast<folder_t *>(child(i));
+        auto &fp = static_cast<presentation::folder_presence_t &>(folder->get_presence());
+        if (fp.get_folder_info().get_folder()->get_id() == folder_id) {
             while (auto selected = t->first_selected_item()) {
                 t->deselect(selected);
             }
-            t->select(node, 1);
+            t->select(folder, 1);
             t->redraw();
             break;
         }
     }
-#endif
 }
 
 bool folders_t::on_select() {
