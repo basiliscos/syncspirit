@@ -20,6 +20,18 @@ presence_item_t::~presence_item_t() {
     if (p) {
         do_hide();
     }
+
+    // will be de-allocated by augmentation, not by fltk
+    auto child_count = children();
+    int i = 0;
+    while (i < children()) {
+        auto c = child(i);
+        if (dynamic_cast<presence_item_t *>(c)) {
+            deparent(i);
+        } else {
+            ++i;
+        }
+    }
 }
 
 void presence_item_t::on_open() {
