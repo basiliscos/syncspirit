@@ -117,7 +117,11 @@ void presence_item_t::do_hide() {
     if (host) {
         auto index = host->find_child(this);
         if (index >= 0) {
+            if (is_selected()) {
+                select_other();
+            }
             host->deparent(index);
+            tree()->redraw();
         }
     }
 }
