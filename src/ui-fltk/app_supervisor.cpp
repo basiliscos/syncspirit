@@ -601,8 +601,12 @@ void app_supervisor_t::write_config(const config::main_t &cfg) noexcept {
 
 void app_supervisor_t::set_show_deleted(bool value) {
     app_config.fltk_config.display_deleted = value;
+    redisplay_folder_nodes(false);
+}
+
+void app_supervisor_t::redisplay_folder_nodes(bool refresh_labels) {
     auto mask = mask_nodes();
-    log->debug("display deleted = {}, mask: {:#x}", value, mask);
+    log->debug("redisplay_folder_nodes, mask: {:#x}", mask);
     for (auto &it_f : cluster->get_folders()) {
         for (auto &it : it_f.item->get_folder_infos()) {
             auto generic_augmentation = it.item->get_augmentation();
@@ -610,7 +614,7 @@ void app_supervisor_t::set_show_deleted(bool value) {
                 auto presence = static_cast<presentation::presence_t *>(generic_augmentation.get());
                 auto item = dynamic_cast<tree_item::presence_item_t *>(presence->get_augmentation().get());
                 if (item) {
-                    item->show(mask, true);
+                    item->show(mask, refresh_labels, true);
                 }
             }
         }
@@ -618,28 +622,9 @@ void app_supervisor_t::set_show_deleted(bool value) {
 }
 
 void app_supervisor_t::set_show_colorized(bool value) {
-    struct refresher_t final : node_visitor_t {
-        void visit(tree_item_t &node, void *) const override { node.update_label(); }
-    };
-
     log->debug("display colorized = {}", value);
     app_config.fltk_config.display_colorized = value;
-
-#if 0
-    auto refresher = refresher_t{};
-    for (auto &it_f : cluster->get_folders()) {
-        for (auto &it : it_f.item->get_folder_infos()) {
-            auto generic_augmentation = it.item->get_augmentation();
-            if (generic_augmentation) {
-                auto augmentation = static_cast<augmentation_base_t *>(generic_augmentation.get());
-                auto entry = static_cast<tree_item::entry_t *>(augmentation->get_owner());
-                if (entry) {
-                    entry->apply(refresher, {});
-                }
-            }
-        }
-    }
-#endif
+    redisplay_folder_nodes(true);
 }
 
 std::uint32_t app_supervisor_t::mask_nodes() const noexcept {

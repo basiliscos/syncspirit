@@ -15,14 +15,14 @@ struct presence_item_t : dynamic_item_t, model::augmentation_t {
     presence_item_t(presentation::presence_t &presence, app_supervisor_t &supervisor, Fl_Tree *tree);
     ~presence_item_t();
 
-    void show(std::uint32_t hide_mask, bool recurse) override;
+    void show(std::uint32_t hide_mask, bool refresh_labels, bool recurse) override;
     void refresh_children() override;
     void on_open() override;
     presentation::presence_t &get_presence();
 
   protected:
     Fl_Color get_color() const;
-    void do_show(std::uint32_t mask);
+    void do_show(std::uint32_t mask, bool refresh_label);
     void do_hide();
     int get_position(std::uint32_t cut_mask);
     void populate_dummy_child();

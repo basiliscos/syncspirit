@@ -61,7 +61,7 @@ void presence_item_t::on_open() {
         if (node) {
             auto tmp_node = insert(prefs(), "", position++);
             replace_child(tmp_node, node);
-            node->show(hide_mask, false);
+            node->show(hide_mask, false, false);
         }
     }
     tree()->redraw();
@@ -92,7 +92,7 @@ int presence_item_t::get_position(std::uint32_t cut_mask) {
     return position;
 }
 
-void presence_item_t::do_show(std::uint32_t mask) {
+void presence_item_t::do_show(std::uint32_t mask, bool refresh_label) {
     auto host = parent();
     if (!host) {
         auto parent = presence.get_parent();
@@ -107,6 +107,9 @@ void presence_item_t::do_show(std::uint32_t mask) {
             }
         }
     }
+    if (refresh_label) {
+        update_label();
+    }
 }
 
 void presence_item_t::do_hide() {
@@ -117,10 +120,10 @@ void presence_item_t::do_hide() {
     }
 }
 
-void presence_item_t::show(std::uint32_t hide_mask, bool recurse) {
+void presence_item_t::show(std::uint32_t hide_mask, bool refresh_labels, bool recurse) {
     auto hide = presence.get_features() & hide_mask;
     if (!hide) {
-        do_show(hide_mask);
+        do_show(hide_mask, refresh_labels);
     } else {
         do_hide();
     }
@@ -129,7 +132,7 @@ void presence_item_t::show(std::uint32_t hide_mask, bool recurse) {
         for (auto &child : children) {
             auto p = child->get_presence(*presence.get_device());
             auto item = dynamic_cast<presence_item_t *>(p->get_augmentation().get());
-            item->show(hide_mask, recurse);
+            item->show(hide_mask, refresh_labels, recurse);
         }
     }
     tree()->redraw();

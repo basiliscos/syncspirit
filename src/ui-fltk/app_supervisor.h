@@ -175,6 +175,7 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
     void on_model_response(model::message::model_response_t &res) noexcept;
     void on_model_update(model::message::model_update_t &message) noexcept;
     void on_db_info_response(net::message::db_info_response_t &res) noexcept;
+    void redisplay_folder_nodes(bool refresh_labels);
 
     outcome::result<void> operator()(const model::diff::advance::advance_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::load::load_cluster_t &, void *) noexcept override;
