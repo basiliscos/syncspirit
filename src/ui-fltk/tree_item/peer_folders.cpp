@@ -20,7 +20,7 @@ peer_folders_t::peer_folders_t(model::device_t &peer_, app_supervisor_t &supervi
     for (auto it : folders) {
         auto &f = *it.item;
         if (auto fi = f.is_shared_with(peer); fi) {
-            auto folder_entity = static_cast<presentation::folder_entity_t*>(f.get_augmentation().get());
+            auto folder_entity = static_cast<presentation::folder_entity_t *>(f.get_augmentation().get());
             auto folder_presence = folder_entity->get_presence<presentation::folder_presence_t>(peer);
             auto folder = new folder_t(*folder_presence, supervisor, tree);
             insert_by_label(folder);

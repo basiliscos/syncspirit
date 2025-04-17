@@ -607,7 +607,7 @@ void app_supervisor_t::set_show_deleted(bool value) {
         for (auto &it : it_f.item->get_folder_infos()) {
             auto generic_augmentation = it.item->get_augmentation();
             if (generic_augmentation) {
-                auto presence = static_cast<presentation::presence_t*>(generic_augmentation.get());
+                auto presence = static_cast<presentation::presence_t *>(generic_augmentation.get());
                 auto item = dynamic_cast<tree_item::presence_item_t *>(presence->get_augmentation().get());
                 if (item) {
                     item->show(mask, true);
@@ -642,35 +642,11 @@ void app_supervisor_t::set_show_colorized(bool value) {
 #endif
 }
 
-Fl_Color app_supervisor_t::get_color(color_context_t context) const {
-    if (app_config.fltk_config.display_colorized) {
-        using C = color_context_t;
-        switch (context) {
-        case C::missing:
-            return FL_DARK_RED;
-        case C::deleted:
-            return FL_DARK1;
-        case C::link:
-            return FL_DARK_BLUE;
-        case C::actualized:
-            return FL_DARK_GREEN;
-        case C::outdated:
-            return FL_DARK_YELLOW;
-        case C::conflicted:
-            return FL_RED;
-        default:
-            return FL_BLACK;
-        }
-    }
-    return FL_BLACK;
-}
-
-
 std::uint32_t app_supervisor_t::mask_nodes() const noexcept {
     using F = syncspirit::presentation::presence_t::features_t;
     auto r = std::uint32_t{0};
-   if (!app_config.fltk_config.display_deleted) {
-       r |= F::deleted;
-   }
-   return r;
+    if (!app_config.fltk_config.display_deleted) {
+        r |= F::deleted;
+    }
+    return r;
 }

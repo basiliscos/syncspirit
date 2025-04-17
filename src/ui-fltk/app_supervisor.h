@@ -34,8 +34,6 @@ struct main_window_t;
 struct tree_item_t;
 struct augmentation_entry_base_t;
 
-enum class color_context_t { unknown, deleted, link, actualized, outdated, conflicted, missing };
-
 struct db_info_viewer_t {
     virtual void view(const net::payload::db_info_response_t &) = 0;
 };
@@ -150,8 +148,6 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
             fn();
         }
     }
-
-    Fl_Color get_color(color_context_t context) const;
 
     void set_main_window(main_window_t *window);
     main_window_t *get_main_window();

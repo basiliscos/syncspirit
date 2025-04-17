@@ -45,7 +45,6 @@ add_executable(syncspirit-fltk WIN32 MACOSX_BUNDLE
     tree_item/local_cluster_presence.cpp
     tree_item/missing_item_presence.cpp
     tree_item/peer_device.cpp
-    tree_item/peer_folder.cpp
     tree_item/peer_folders.cpp
     tree_item/pending_device.cpp
     tree_item/pending_devices.cpp

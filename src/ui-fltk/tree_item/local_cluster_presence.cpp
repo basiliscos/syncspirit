@@ -9,8 +9,9 @@ using namespace syncspirit::fltk::tree_item;
 
 using F = syncspirit::presentation::presence_t::features_t;
 
-local_cluster_presence_t::local_cluster_presence_t(presentation::presence_t &presence_, app_supervisor_t &supervisor, Fl_Tree *tree):
-    parent_t(presence_, supervisor, tree) {
+local_cluster_presence_t::local_cluster_presence_t(presentation::presence_t &presence_, app_supervisor_t &supervisor,
+                                                   Fl_Tree *tree)
+    : parent_t(presence_, supervisor, tree) {
     auto f = presence_.get_features();
     assert(f & (F::local | F::cluster));
     update_label();
@@ -22,16 +23,7 @@ local_cluster_presence_t::local_cluster_presence_t(presentation::presence_t &pre
 void local_cluster_presence_t::update_label() {
     auto &p = static_cast<presentation::cluster_file_presence_t &>(presence);
     auto name = p.get_entity()->get_path().get_own_name();
-    auto color_ctx = [&]() -> color_context_t {
-        auto f = presence.get_features();
-        if (f & F::deleted) {
-            return color_context_t::deleted;
-        } else if (f & F::symblink) {
-            return color_context_t::link;
-        }
-        return color_context_t::unknown;
-    }();
-    auto color = supervisor.get_color(color_ctx);
+    auto color = get_color();
     labelfgcolor(color);
     label(name.data());
 }

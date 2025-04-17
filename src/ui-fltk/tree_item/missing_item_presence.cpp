@@ -7,8 +7,9 @@
 using namespace syncspirit::fltk;
 using namespace syncspirit::fltk::tree_item;
 
-missing_item_presence_t::missing_item_presence_t(presentation::presence_t &presence_, app_supervisor_t &supervisor, Fl_Tree *tree):
-    parent_t(presence_, supervisor, tree) {
+missing_item_presence_t::missing_item_presence_t(presentation::presence_t &presence_, app_supervisor_t &supervisor,
+                                                 Fl_Tree *tree)
+    : parent_t(presence_, supervisor, tree) {
     using F = presentation::presence_t::features_t;
     assert(presence_.get_features() & F::missing);
     update_label();
@@ -19,9 +20,8 @@ missing_item_presence_t::missing_item_presence_t(presentation::presence_t &prese
 
 void missing_item_presence_t::update_label() {
     auto &p = static_cast<presentation::cluster_file_presence_t &>(presence);
-    auto color = supervisor.get_color(color_context_t::missing);
-    labelfgcolor(color);
-
+    auto color = get_color();
     auto name = p.get_entity()->get_path().get_own_name();
+    labelfgcolor(color);
     label(name.data());
 }

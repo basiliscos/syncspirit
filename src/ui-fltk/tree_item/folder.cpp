@@ -42,7 +42,6 @@ void folder_t::update_label() {
     char synchronizing_buff[32];
     auto scanning = std::string_view();
     auto synchronizing = std::string_view();
-    auto color_context = color_context_t::unknown;
 #if 0
     if (folder.is_scanning()) {
         auto share = (stats.entries) ? 100.0 * stats.scanned_entries / stats.entries : 0;
@@ -59,7 +58,7 @@ void folder_t::update_label() {
     auto buff = (char *)alloca(sz);
     auto eob = fmt::format_to(buff, "{}, {}{}{}", folder_label, id, synchronizing, scanning);
     *eob = 0;
-    labelfgcolor(supervisor.get_color(color_context));
+    labelfgcolor(get_color());
     label(buff);
 }
 
@@ -172,9 +171,9 @@ struct table_t : content::folder_table_t {
     }
 
     void refresh() override {
-        auto& folder_item = static_cast<folder_t&>(container);
-        auto& fp =static_cast<presentation::folder_presence_t&>(folder_item.get_presence());
-        auto& folder_info = fp.get_folder_info();
+        auto &folder_item = static_cast<folder_t &>(container);
+        auto &fp = static_cast<presentation::folder_presence_t &>(folder_item.get_presence());
+        auto &folder_info = fp.get_folder_info();
         serialization_context_t ctx;
         description.get_folder()->serialize(ctx.folder);
 
@@ -212,7 +211,7 @@ struct table_t : content::folder_table_t {
         scan_finish_cell->update(scan_finish);
 
         auto max_sequence = description.get_max_sequence();
-        auto& stats = fp.get_stats();
+        auto &stats = fp.get_stats();
         entries_cell->update(fmt::format("{}", stats.entities));
         entries_size_cell->update(get_file_size(stats.size));
         max_sequence_cell->update(fmt::format("{}", max_sequence));
@@ -231,7 +230,7 @@ bool folder_t::on_select() {
         auto shared_with = devices_ptr_t(new model::devices_map_t{});
         auto non_shared_with = devices_ptr_t(new model::devices_map_t{});
 
-        auto& fp =static_cast<presentation::folder_presence_t&>(presence);
+        auto &fp = static_cast<presentation::folder_presence_t &>(presence);
         auto &folder_info = fp.get_folder_info();
 
         int x = prev->x(), y = prev->y(), w = prev->w(), h = prev->h();
