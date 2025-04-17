@@ -347,6 +347,16 @@ auto app_supervisor_t::operator()(const model::diff::load::load_cluster_t &diff,
     if (!devices) {
         return diff.visit_next(*this, custom);
     }
+    auto folders_node = static_cast<tree_item::folders_t *>(folders);
+    for (auto &it : cluster->get_folders()) {
+        auto &folder = it.item;
+        auto text = fmt::format("building model of cluster folder '{}'({}) ...", folder->get_label(), folder->get_id());
+        main_window->set_splash_text(text);
+        auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
+        folders_node->add_folder(*folder_entity);
+        folder->set_augmentation(folder_entity);
+    }
+
     auto devices_node = static_cast<tree_item::devices_t *>(devices);
 
     auto &self_device = cluster->get_device();
@@ -354,6 +364,7 @@ auto app_supervisor_t::operator()(const model::diff::load::load_cluster_t &diff,
     auto tree = self_node->get_owner()->tree();
     tree->select(self_node->get_owner());
     self_device->set_augmentation(*self_node);
+
     for (auto &it : cluster->get_devices()) {
         auto &device = *it.item;
         if (device.device_id() != cluster->get_device()->device_id()) {
@@ -375,14 +386,6 @@ auto app_supervisor_t::operator()(const model::diff::load::load_cluster_t &diff,
         device.set_augmentation(ignored_devices_node->add_device(device));
     }
 
-    auto folders_node = static_cast<tree_item::folders_t *>(folders);
-    for (auto &it : cluster->get_folders()) {
-        auto &folder = it.item;
-        auto text = fmt::format("building model of cluster folder '{}'({}) ...", folder->get_label(), folder->get_id());
-        main_window->set_splash_text(text);
-        auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
-        folders_node->add_folder(*folder_entity);
-    }
 #if 0
     for (auto &it : cluster->get_folders()) {
         auto &folder = it.item;

@@ -496,11 +496,9 @@ peer_device_t::peer_device_t(model::device_t &peer_, app_supervisor_t &superviso
             break;
         }
     }
-#if 0
     if (has_folders) {
         get_folders();
     }
-#endif
 
     bool has_pending_folders = false;
     auto &pending_folders = cluster.get_pending_folders();
@@ -554,7 +552,6 @@ std::string_view peer_device_t::get_state() {
     }();
 }
 
-#if 0
 tree_item_t *peer_device_t::get_folders() {
     if (!folders) {
         folders = within_tree([&]() {
@@ -565,7 +562,6 @@ tree_item_t *peer_device_t::get_folders() {
     }
     return folders;
 }
-#endif
 
 tree_item_t *peer_device_t::get_pending_folders() {
     if (!pending_folders) {

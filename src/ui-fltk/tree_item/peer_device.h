@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
 
 #pragma once
 
@@ -20,9 +20,7 @@ struct peer_device_t : tree_item_t {
     bool on_select() override;
     void remove_child(tree_item_t *child) override;
 
-#if 0
     tree_item_t *get_folders();
-#endif
     tree_item_t *get_pending_folders();
 
     model::device_t &peer;
