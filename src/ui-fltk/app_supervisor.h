@@ -156,6 +156,7 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
     void set_pending_devices(tree_item_t *node);
     void set_ignored_devices(tree_item_t *node);
     void set_show_deleted(bool value);
+    void set_show_missing(bool value);
     void set_show_colorized(bool value);
     void postpone_update(augmentation_entry_base_t &);
 

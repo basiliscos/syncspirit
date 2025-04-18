@@ -586,11 +586,6 @@ void app_supervisor_t::write_config(const config::main_t &cfg) noexcept {
     app_config_original = app_config = cfg;
 }
 
-void app_supervisor_t::set_show_deleted(bool value) {
-    app_config.fltk_config.display_deleted = value;
-    redisplay_folder_nodes(false);
-}
-
 void app_supervisor_t::redisplay_folder_nodes(bool refresh_labels) {
     auto mask = mask_nodes();
     log->debug("redisplay_folder_nodes, mask: {:#x}", mask);
@@ -608,6 +603,16 @@ void app_supervisor_t::redisplay_folder_nodes(bool refresh_labels) {
     }
 }
 
+void app_supervisor_t::set_show_deleted(bool value) {
+    app_config.fltk_config.display_deleted = value;
+    redisplay_folder_nodes(false);
+}
+
+void app_supervisor_t::set_show_missing(bool value) {
+    app_config.fltk_config.display_missing = value;
+    redisplay_folder_nodes(false);
+}
+
 void app_supervisor_t::set_show_colorized(bool value) {
     log->debug("display colorized = {}", value);
     app_config.fltk_config.display_colorized = value;
@@ -619,6 +624,9 @@ std::uint32_t app_supervisor_t::mask_nodes() const noexcept {
     auto r = std::uint32_t{0};
     if (!app_config.fltk_config.display_deleted) {
         r |= F::deleted;
+    }
+    if (!app_config.fltk_config.display_missing) {
+        r |= F::missing;
     }
     return r;
 }
