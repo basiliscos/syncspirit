@@ -133,7 +133,7 @@ void presence_item_t::show(std::uint32_t hide_mask, bool refresh_labels, bool re
     } else {
         do_hide();
     }
-    if (recurse && expanded) {
+    if (!hide && recurse && expanded) {
         auto &children = presence.get_entity()->get_children();
         for (auto &child : children) {
             auto p = child->get_presence(*presence.get_device());
