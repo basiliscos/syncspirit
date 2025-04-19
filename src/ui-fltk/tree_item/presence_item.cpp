@@ -5,12 +5,13 @@
 #include "local_cluster_presence.h"
 #include "missing_item_presence.h"
 
+using namespace syncspirit::presentation;
 using namespace syncspirit::fltk;
 using namespace syncspirit::fltk::tree_item;
 
-using F = syncspirit::presentation::presence_t::features_t;
+using F = presence_t::features_t;
 
-presence_item_t::presence_item_t(presentation::presence_t &presence_, app_supervisor_t &supervisor, Fl_Tree *tree)
+presence_item_t::presence_item_t(presence_t &presence_, app_supervisor_t &supervisor, Fl_Tree *tree)
     : parent_t(supervisor, tree, false), presence{presence_}, expanded{false} {
     presence.set_augmentation(*this);
 }
@@ -34,6 +35,18 @@ presence_item_t::~presence_item_t() {
     }
 }
 
+static auto make_item(presence_item_t *parent, presence_t &presence) -> presence_item_t * {
+    auto f = presence.get_features();
+    if (f & (F::cluster | F::local)) {
+        if ((f & F::directory) || (f & F::file)) {
+            return new local_cluster_presence_t(presence, parent->supervisor, parent->tree());
+        }
+    } else if (f & F::missing) {
+        return new missing_item_presence_t(parent, presence);
+    }
+    return nullptr;
+}
+
 void presence_item_t::on_open() {
     if (expanded || !children()) {
         return;
@@ -46,18 +59,8 @@ void presence_item_t::on_open() {
     int position = 0;
     auto hide_mask = supervisor.mask_nodes();
     for (auto &child : presence.get_entity()->get_children()) {
-        using F = presentation::presence_t::features_t;
-
         auto p = child->get_presence(*presence.get_device());
-        auto f = p->get_features();
-        auto node = (presence_item_t *)(nullptr);
-        if (f & (F::cluster | F::local)) {
-            if ((f & F::directory) || (f & F::file)) {
-                node = new local_cluster_presence_t(*p, supervisor, tree());
-            }
-        } else if (f & F::missing) {
-            node = new missing_item_presence_t(*p, supervisor, tree());
-        }
+        auto node = make_item(this, *p);
         if (node) {
             auto tmp_node = insert(prefs(), "", position++);
             replace_child(tmp_node, node);
@@ -78,7 +81,7 @@ void presence_item_t::populate_dummy_child() {
 auto presence_item_t::get_presence() -> presentation::presence_t & { return presence; }
 
 int presence_item_t::get_position(std::uint32_t cut_mask) {
-    auto &container = presence.get_parent()->get_entity()->get_children();
+    auto &container = presence.get_entity()->get_parent()->get_children();
     int position = 0;
     for (auto &it : container) {
         auto p = it->get_presence(*presence.get_device());
@@ -95,15 +98,20 @@ int presence_item_t::get_position(std::uint32_t cut_mask) {
 void presence_item_t::do_show(std::uint32_t mask, bool refresh_label) {
     auto host = parent();
     if (!host) {
-        auto parent = presence.get_parent();
-        if (parent) {
-            host = static_cast<presence_item_t *>(parent->get_augmentation().get());
-            if (host) {
-                auto index = host->find_child(this);
-                if (index == -1) {
-                    auto position = get_position(mask);
-                    host->reparent(this, position);
-                }
+        auto host = [&]() -> presence_item_t * {
+            auto parent = presence.get_parent();
+            if (parent) {
+                return static_cast<presence_item_t *>(parent->get_augmentation().get());
+            } else if (presence.get_features() & F::missing) {
+                return static_cast<missing_item_presence_t *>(this)->host;
+            }
+            return nullptr;
+        }();
+        if (host) {
+            auto index = host->find_child(this);
+            if (index == -1) {
+                auto position = get_position(mask);
+                host->reparent(this, position);
             }
         }
     }
@@ -137,8 +145,15 @@ void presence_item_t::show(std::uint32_t hide_mask, bool refresh_labels, bool re
         auto &children = presence.get_entity()->get_children();
         for (auto &child : children) {
             auto p = child->get_presence(*presence.get_device());
-            auto item = dynamic_cast<presence_item_t *>(p->get_augmentation().get());
-            item->show(hide_mask, refresh_labels, recurse);
+            auto item = (presence_item_t *)(nullptr);
+            if (auto augmentation = p->get_augmentation().get(); augmentation) {
+                item = dynamic_cast<presence_item_t *>(augmentation);
+            } else {
+                item = make_item(this, *p);
+            }
+            if (item) {
+                item->show(hide_mask, refresh_labels, recurse);
+            }
         }
     }
     tree()->redraw();

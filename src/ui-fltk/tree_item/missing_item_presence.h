@@ -10,8 +10,10 @@ namespace syncspirit::fltk::tree_item {
 struct missing_item_presence_t final : presence_item_t {
     using parent_t = presence_item_t;
 
-    missing_item_presence_t(presentation::presence_t &presence, app_supervisor_t &supervisor, Fl_Tree *tree);
+    missing_item_presence_t(presence_item_t *host, presentation::presence_t &presence);
+
     void update_label() override;
+    presence_item_t *host;
 };
 
 } // namespace syncspirit::fltk::tree_item
