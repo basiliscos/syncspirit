@@ -1286,6 +1286,32 @@ TEST_CASE("statistics", "[presentation]") {
             CHECK(p_a_peer->get_stats() == statistics_t{3, 15});
         }
     }
+    SECTION("file deletion & insertion") {
+        auto f_a = add_file("a", *my_device, 5, proto::FileInfoType::FILE);
+
+        auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
+        CHECK(folder_entity->get_stats() == statistics_t{1, 5});
+
+        REQUIRE(folder_entity->get_children().size() == 1);
+        auto e_a = *folder_entity->get_children().begin();
+        CHECK(e_a->get_stats() == statistics_t{1, 5});
+
+        auto p_a_my = e_a->get_presence(*my_device);
+        CHECK(p_a_my->get_stats() == statistics_t{1, 5});
+        CHECK(!(p_a_my->get_features() & F::deleted));
+
+        auto pr_fi = [&]() {
+            auto pr_fi = f_a->as_proto(false);
+            auto block = model::block_info_ptr_t();
+            proto::set_size(pr_fi, 0);
+            proto::set_block_size(pr_fi, 0);
+            proto::set_deleted(pr_fi, true);
+            return pr_fi;
+        }();
+        REQUIRE(builder.local_update("1234-5678", pr_fi).apply());
+        CHECK(p_a_my->get_stats() == statistics_t{1, 0});
+        CHECK(p_a_my->get_features() & F::deleted);
+    }
 }
 
 static bool _init = []() -> bool {

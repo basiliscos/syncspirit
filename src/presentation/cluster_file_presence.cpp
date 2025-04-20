@@ -11,11 +11,17 @@
 using namespace syncspirit;
 using namespace syncspirit::presentation;
 
-cluster_file_presence_t::cluster_file_presence_t(file_entity_t &entity, model::file_info_t &file_info_) noexcept
-    : file_presence_t(&entity, file_info_.get_folder_info()->get_device()), file_info{file_info_} {
+cluster_file_presence_t::cluster_file_presence_t(std::uint32_t default_features_, file_entity_t &entity,
+                                                 model::file_info_t &file_info_) noexcept
+    : file_presence_t(&entity, file_info_.get_folder_info()->get_device()), file_info{file_info_},
+      default_features{default_features_} {
     link(&file_info);
     statistics = get_own_stats();
-    features |= features_t::cluster;
+    refresh_features();
+}
+
+void cluster_file_presence_t::refresh_features() noexcept {
+    features = default_features | features_t::cluster;
     features |= (file_info.is_dir() ? features_t::directory : features_t::file);
     if (file_info.is_deleted()) {
         features |= features_t::deleted;
@@ -39,6 +45,7 @@ const presence_t *cluster_file_presence_t::determine_best(const presence_t *othe
 statistics_t cluster_file_presence_t::get_own_stats() const noexcept { return {1, file_info.get_size()}; }
 
 void cluster_file_presence_t::on_update() noexcept {
+    refresh_features();
     auto presence_diff = get_own_stats() - statistics;
     auto entity_stats = entity->get_stats();
     auto device = file_info.get_folder_info()->get_device();
