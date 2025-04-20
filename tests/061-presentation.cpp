@@ -526,6 +526,20 @@ TEST_CASE("presentation", "[presentation]") {
             p_dir_a_my = dir_a_entity->get_presence<file_presence_t>(*my_device);
             CHECK(p_dir_a_my->get_parent() == p_folder_my);
         }
+        SECTION("dynamically create hierarchy-2") {
+            auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
+            CHECK(!folder_entity->get_parent());
+
+            auto file_1 = add_file("a-file", *my_device, proto::FileInfoType::FILE);
+            auto e_file_1 = folder_entity->on_insert(*file_1);
+            REQUIRE(e_file_1);
+            CHECK(e_file_1->get_path().get_full_name() == file_1->get_name());
+
+            auto file_2 = add_file("a-file-2", *my_device, proto::FileInfoType::FILE);
+            auto e_file_2 = folder_entity->on_insert(*file_2);
+            REQUIRE(e_file_2);
+            CHECK(e_file_2->get_path().get_full_name() == file_2->get_name());
+        }
         SECTION("orphans") {
             SECTION("simple") {
                 add_file("a/b", *my_device);

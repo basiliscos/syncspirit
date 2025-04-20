@@ -96,7 +96,7 @@ void folder_entity_t::on_insert(model::folder_info_t &folder_info) noexcept {
     process_files(new_files, orphans, this);
 }
 
-void folder_entity_t::on_insert(model::file_info_t &file_info) noexcept {
+entity_t* folder_entity_t::on_insert(model::file_info_t &file_info) noexcept {
     auto path = path_t(file_info.get_name());
 
     auto entity = static_cast<entity_t *>(this);
@@ -123,6 +123,7 @@ void folder_entity_t::on_insert(model::file_info_t &file_info) noexcept {
         diff = child->get_stats();
         auto device = file_info.get_folder_info()->get_device();
         entity->push_stats(diff, device, true);
+        return child.get();
     } else if (i == path.get_pieces_size()) {
         auto device = file_info.get_folder_info()->get_device();
         auto presence_diff = statistics_t{};
@@ -148,6 +149,7 @@ void folder_entity_t::on_insert(model::file_info_t &file_info) noexcept {
             entry_diff += best_presence->get_stats();
             entity->push_stats(entry_diff, nullptr, true);
         }
+        return entity;
     } else {
         auto orphan = orphans.get_by_path(path.get_full_name());
         if (orphan) {
@@ -157,6 +159,7 @@ void folder_entity_t::on_insert(model::file_info_t &file_info) noexcept {
             orphans.push(child);
         }
     }
+    return {};
 }
 
 auto folder_entity_t::get_folder() noexcept -> model::folder_t & { return folder; }
