@@ -36,9 +36,12 @@
 #include <sstream>
 #include <iomanip>
 #include <functional>
+#include <limits>
 
 using namespace syncspirit::fltk;
 using namespace syncspirit::presentation;
+
+static auto MAX_DEPTH = std::numeric_limits<std::int32_t>::max();
 
 namespace {
 namespace resource {
@@ -456,36 +459,37 @@ auto app_supervisor_t::operator()(const model::diff::modify::add_ignored_device_
 
 auto app_supervisor_t::operator()(const model::diff::advance::advance_t &diff, void *custom) noexcept
     -> outcome::result<void> {
-#if 0
     auto folder = cluster->get_folders().by_id(diff.folder_id);
-    if (folder && !folder->is_suspended()) {
+    auto augmentation = folder->get_augmentation().get();
+    auto folder_entity = static_cast<presentation::folder_entity_t *>(augmentation);
+    if (folder_entity) {
         auto &folder_infos = folder->get_folder_infos();
         auto local_fi = folder_infos.by_device(*cluster->get_device());
         auto file_name = proto::get_name(diff.proto_local);
         auto local_file = local_fi->get_file_infos().by_name(file_name);
         if (local_file) {
-            auto generic_augmentation = local_fi->get_augmentation();
-            auto augmentation = static_cast<augmentation_entry_root_t *>(generic_augmentation.get());
-            if (!local_file->get_augmentation()) {
-                augmentation->track(*local_file);
-                augmentation->augment_pending();
-            }
-            // displayed nodes "actuality" status might change
-            for (auto it : folder_infos) {
-                auto &remote_fi = it.item;
-                if (remote_fi->get_device() != local_fi->get_device()) {
-                    auto remote_file = remote_fi->get_file_infos().by_name(file_name);
-                    if (remote_file) {
-                        auto aug = remote_file->get_augmentation();
+            auto entity = folder_entity->on_insert(*local_file);
+            if (entity) {
+                auto parent = entity->get_parent();
+                auto mask = mask_nodes();
+                for (auto &it : folder_infos) {
+                    auto &fi = it.item;
+                    auto presence = parent->get_presence(*fi->get_device());
+                    if (presence) {
+                        auto aug = presence->get_augmentation().get();
                         if (aug) {
-                            aug->on_update();
+                            auto item = static_cast<tree_item::presence_item_t *>(aug);
+                            if (item->is_expanded()) {
+                                item->show(mask, true, 1);
+                            } else if (item->children() == 0) {
+                                item->populate_dummy_child();
+                            }
                         }
                     }
                 }
             }
         }
     }
-#endif
     return diff.visit_next(*this, custom);
 }
 
@@ -596,7 +600,7 @@ void app_supervisor_t::redisplay_folder_nodes(bool refresh_labels) {
                 auto presence = static_cast<presentation::presence_t *>(generic_augmentation.get());
                 auto item = dynamic_cast<tree_item::presence_item_t *>(presence->get_augmentation().get());
                 if (item) {
-                    item->show(mask, refresh_labels, true);
+                    item->show(mask, refresh_labels, MAX_DEPTH);
                 }
             }
         }

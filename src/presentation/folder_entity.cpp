@@ -103,7 +103,7 @@ entity_t *folder_entity_t::on_insert(model::file_info_t &file_info) noexcept {
     size_t i = 0;
     for (auto piece : path) {
         auto &children = entity->children;
-        auto it = children.equal_range(piece).first;
+        auto it = children.find(piece);
         if (it != children.end()) {
             entity = *it;
         } else {

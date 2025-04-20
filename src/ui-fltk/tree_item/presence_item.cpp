@@ -58,8 +58,7 @@ void presence_item_t::on_open() {
 
     int position = 0;
     auto hide_mask = supervisor.mask_nodes();
-    for (auto &child : presence.get_entity()->get_children()) {
-        auto p = child->get_presence(*presence.get_device());
+    for (auto p : presence.get_entity()->get_child_presences(*presence.get_device())) {
         auto node = make_item(this, *p);
         if (node) {
             auto tmp_node = insert(prefs(), "", position++);
@@ -81,10 +80,9 @@ void presence_item_t::populate_dummy_child() {
 auto presence_item_t::get_presence() -> presentation::presence_t & { return presence; }
 
 int presence_item_t::get_position(std::uint32_t cut_mask) {
-    auto &container = presence.get_entity()->get_parent()->get_children();
+    auto &container = presence.get_entity()->get_parent()->get_child_presences(*presence.get_device());
     int position = 0;
-    for (auto &it : container) {
-        auto p = it->get_presence(*presence.get_device());
+    for (auto p : container) {
         if (p == &presence) {
             break;
         }
@@ -134,17 +132,17 @@ void presence_item_t::do_hide() {
     }
 }
 
-void presence_item_t::show(std::uint32_t hide_mask, bool refresh_labels, bool recurse) {
+void presence_item_t::show(std::uint32_t hide_mask, bool refresh_labels, int32_t depth) {
+    assert(depth >= 0);
     auto hide = presence.get_features() & hide_mask;
     if (!hide) {
         do_show(hide_mask, refresh_labels);
     } else {
         do_hide();
     }
-    if (!hide && recurse && expanded) {
-        auto &children = presence.get_entity()->get_children();
-        for (auto &child : children) {
-            auto p = child->get_presence(*presence.get_device());
+    if (!hide && depth >= 1 && expanded) {
+        auto &children = presence.get_entity()->get_child_presences(*presence.get_device());
+        for (auto p : children) {
             auto item = (presence_item_t *)(nullptr);
             if (auto augmentation = p->get_augmentation().get(); augmentation) {
                 item = dynamic_cast<presence_item_t *>(augmentation);
@@ -152,7 +150,7 @@ void presence_item_t::show(std::uint32_t hide_mask, bool refresh_labels, bool re
                 item = make_item(this, *p);
             }
             if (item) {
-                item->show(hide_mask, refresh_labels, recurse);
+                item->show(hide_mask, refresh_labels, depth - 1);
             }
         }
     }
@@ -177,5 +175,7 @@ Fl_Color presence_item_t::get_color() const {
     }
     return FL_BLACK;
 }
+
+bool presence_item_t::is_expanded() const { return expanded; }
 
 void presence_item_t::refresh_children() {}

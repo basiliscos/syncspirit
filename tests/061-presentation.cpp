@@ -534,6 +534,11 @@ TEST_CASE("presentation", "[presentation]") {
             REQUIRE(e_file_1);
             CHECK(e_file_1->get_path().get_full_name() == file_1->get_name());
 
+            auto file_3 = add_file("a-file-3", *my_device, proto::FileInfoType::FILE);
+            auto e_file_3 = folder_entity->on_insert(*file_3);
+            REQUIRE(e_file_3);
+            CHECK(e_file_3->get_path().get_full_name() == file_3->get_name());
+
             auto file_2 = add_file("a-file-2", *my_device, proto::FileInfoType::FILE);
             auto e_file_2 = folder_entity->on_insert(*file_2);
             REQUIRE(e_file_2);

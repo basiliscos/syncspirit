@@ -162,8 +162,9 @@ void folders_t::update_label() {
 auto folders_t::add_folder(presentation::folder_entity_t &folder_entity) -> augmentation_ptr_t {
     auto augmentation = within_tree([&]() {
         auto self = supervisor.get_cluster()->get_device();
-        auto presence = folder_entity.get_presence<presentation::folder_presence_t>(*self);
-        auto item = new folder_t(*presence, supervisor, tree());
+        auto presence = folder_entity.get_presence(*self);
+        auto folder_presence = static_cast<presentation::folder_presence_t *>(presence);
+        auto item = new folder_t(*folder_presence, supervisor, tree());
         return insert_by_label(item)->get_proxy();
     });
     update_label();
