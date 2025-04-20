@@ -4,6 +4,7 @@
 #include "entity.h"
 #include "presence.h"
 #include <cassert>
+#include <utility>
 
 using namespace syncspirit;
 using namespace syncspirit::presentation;
@@ -114,7 +115,7 @@ auto entity_t::recalc_best() noexcept -> const presence_t * {
         best_device = first.device;
         best = first.presence;
         for (size_t i = 1; i < records.size(); ++i) {
-            auto &[device, presence] = records[i];
+            auto &[device, presence, _] = records[i];
             best = presence->determine_best(best);
             if (best == presence) {
                 best_device = device;
@@ -159,6 +160,7 @@ void entity_t::remove_child(entity_t &child) noexcept {
             p->statistics -= r.presence->statistics;
             p = p->parent;
         }
+        r.child_presences.clear();
     }
     child.parent = nullptr;
     push_stats(-child.get_stats(), nullptr, true);
@@ -174,7 +176,7 @@ void entity_t::commit(const path_t &path) noexcept {
     }
     if (records.size()) {
         auto &first = records.front();
-        for (auto &[device, presence] : records) {
+        for (auto &[device, presence, child_presences] : records) {
             auto parent = presence->parent;
             if (parent && path.contains(parent->entity->path)) {
                 parent->statistics += presence->statistics;
@@ -187,6 +189,42 @@ void entity_t::commit(const path_t &path) noexcept {
         if (parent) { // for file/dir entity
             ++statistics.entities;
         }
+    }
+}
+
+auto entity_t::get_child_presences(model::device_t &device) noexcept -> child_presences_t & {
+    for (auto &r : records) {
+        if (r.device == &device) {
+            auto &presences = r.child_presences;
+            actualize_on_demand(presences, device);
+            return presences;
+        }
+    }
+    assert(0 && "should not happen");
+}
+
+void entity_t::actualize_on_demand(child_presences_t &r, model::device_t &device) noexcept {
+    if (r.size() != children.size()) {
+        r.clear();
+        r.reserve(children.size());
+        for (auto &c : children) {
+            auto p = c->get_presence(device);
+            r.emplace_back(p);
+        }
+        auto comparator = [](const presence_t *l, const presence_t *r) {
+            using F = presence_t::features_t;
+            auto ld = l->get_features() & F::directory;
+            auto rd = r->get_features() & F::directory;
+            if (ld && !rd) {
+                return true;
+            } else if (!rd && !rd) {
+                return false;
+            }
+            auto l_name = l->entity->get_path().get_own_name();
+            auto r_name = r->entity->get_path().get_own_name();
+            return l_name < r_name;
+        };
+        std::sort(r.begin(), r.end(), comparator);
     }
 }
 

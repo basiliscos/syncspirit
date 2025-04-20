@@ -8,7 +8,6 @@
 #include "presentation/file_presence.h"
 #include "presentation/folder_presence.h"
 #include "presentation/folder_entity.h"
-#include "presentation/missing_file_presence.h"
 #include "syncspirit-config.h"
 
 using namespace syncspirit;
@@ -539,6 +538,23 @@ TEST_CASE("presentation", "[presentation]") {
             auto e_file_2 = folder_entity->on_insert(*file_2);
             REQUIRE(e_file_2);
             CHECK(e_file_2->get_path().get_full_name() == file_2->get_name());
+        }
+        SECTION("presence & entity hierarchy order") {
+            auto file_1 = add_file("file-a", *my_device, proto::FileInfoType::FILE);
+            auto file_2 = add_file("file-b", *my_device, proto::FileInfoType::DIRECTORY);
+
+            auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
+            auto &children = folder_entity->get_children();
+            auto it_children = children.begin();
+            auto &c1 = *it_children++;
+            auto &c2 = *it_children++;
+            CHECK(c1->get_path().get_full_name() == "file-a");
+            CHECK(c2->get_path().get_full_name() == "file-b");
+
+            auto &p_children = folder_entity->get_child_presences(*my_device);
+            REQUIRE(p_children.size() == 2);
+            CHECK(p_children[0]->get_entity()->get_path().get_full_name() == "file-b");
+            CHECK(p_children[1]->get_entity()->get_path().get_full_name() == "file-a");
         }
         SECTION("orphans") {
             SECTION("simple") {

@@ -123,14 +123,18 @@ entity_t *folder_entity_t::on_insert(model::file_info_t &file_info) noexcept {
         diff = child->get_stats();
         auto device = file_info.get_folder_info()->get_device();
         entity->push_stats(diff, device, true);
+        for (auto &[d, presence, cp] : records) {
+            cp.clear();
+        }
         return child.get();
     } else if (i == path.get_pieces_size()) {
         auto device = file_info.get_folder_info()->get_device();
         auto presence_diff = statistics_t{};
         auto entry_diff = statistics_t{};
-        for (auto &[d, presence] : records) {
+        for (auto &[d, presence, cp] : records) {
             if (d == device) {
                 presence_diff = -presence->get_own_stats();
+                cp.clear();
             }
             if (d == best_device) {
                 entry_diff = -presence->get_stats();
