@@ -42,11 +42,6 @@ struct SYNCSPIRIT_API entity_t : model::proxy_t {
     virtual ~entity_t();
     const path_t &get_path() const noexcept;
 
-    template <typename Presence>
-        requires std::is_base_of<presence_t, Presence>::value
-    Presence *get_presence(model::device_t &device) noexcept {
-        return static_cast<Presence *>(get_presence(device));
-    }
     presence_t *get_presence(model::device_t &device) noexcept;
 
     children_t &get_children() noexcept;

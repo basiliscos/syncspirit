@@ -96,7 +96,7 @@ void folder_entity_t::on_insert(model::folder_info_t &folder_info) noexcept {
     process_files(new_files, orphans, this);
 }
 
-entity_t* folder_entity_t::on_insert(model::file_info_t &file_info) noexcept {
+entity_t *folder_entity_t::on_insert(model::file_info_t &file_info) noexcept {
     auto path = path_t(file_info.get_name());
 
     auto entity = static_cast<entity_t *>(this);

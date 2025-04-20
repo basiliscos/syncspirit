@@ -25,7 +25,7 @@ const statistics_t &presence_t::get_stats() const noexcept { return statistics; 
 
 void presence_t::set_parent(entity_t *value) noexcept {
     if (value && device) {
-        parent = value->get_presence<presence_t>(*device);
+        parent = value->get_presence(*device);
     }
 }
 
