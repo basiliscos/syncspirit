@@ -110,6 +110,8 @@ void presence_item_t::do_show(std::uint32_t mask, bool refresh_label) {
             if (index == -1) {
                 auto position = get_position(mask);
                 host->reparent(this, position);
+                update_label();
+                refresh_label = false;
             }
         }
     }
