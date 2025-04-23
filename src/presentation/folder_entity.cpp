@@ -114,7 +114,7 @@ entity_t *folder_entity_t::on_insert(model::file_info_t &file_info) noexcept {
 
     auto child = file_entity_ptr_t();
     bool has_parent = i + 1 == path.get_pieces_size();
-    auto diff = statistics_t{};
+    auto diff = entity_stats_t{};
     if (has_parent) {
         child.reset(new file_entity_t(file_info, std::move(path)));
         entity->add_child(*child);
@@ -122,15 +122,15 @@ entity_t *folder_entity_t::on_insert(model::file_info_t &file_info) noexcept {
         child->commit(child->get_path());
         diff = child->get_stats();
         auto device = file_info.get_folder_info()->get_device();
-        entity->push_stats(diff, device, true);
+        entity->push_stats({diff, 0}, device, true);
         for (auto &[d, presence, cp] : records) {
             cp.clear();
         }
         return child.get();
     } else if (i == path.get_pieces_size()) {
         auto device = file_info.get_folder_info()->get_device();
-        auto presence_diff = statistics_t{};
-        auto entry_diff = statistics_t{};
+        auto presence_diff = presence_stats_t{};
+        auto entry_diff = entity_stats_t{};
         for (auto &[d, presence, cp] : records) {
             if (d == device) {
                 presence_diff = -presence->get_own_stats();
@@ -151,7 +151,7 @@ entity_t *folder_entity_t::on_insert(model::file_info_t &file_info) noexcept {
         if (best_device != prev_best) {
             assert(best_presence == file_presence);
             entry_diff += best_presence->get_stats();
-            entity->push_stats(entry_diff, nullptr, true);
+            entity->push_stats({entry_diff, 0}, nullptr, true);
         }
         return entity;
     } else {

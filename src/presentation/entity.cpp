@@ -34,11 +34,12 @@ void entity_t::set_parent(entity_t *value) noexcept {
     }
 }
 
-void entity_t::push_stats(const statistics_t &diff, const model::device_t *source, bool best) noexcept {
+void entity_t::push_stats(const presence_stats_t &diff, const model::device_t *source, bool best) noexcept {
     auto current = this;
     while (current) {
         if (best) {
             current->statistics += diff;
+            ++current->generation;
         }
         for (auto &r : current->records) {
             if (r.device == source) {
@@ -79,7 +80,7 @@ void entity_t::remove_presense(presence_t &item) noexcept {
     bool need_restat = false;
     auto stats = statistics;
     if (best_device && it->device == best_device) {
-        stats -= it->presence->get_stats();
+        stats -= it->presence->get_stats(false);
         need_restat = true;
     }
     records.erase(it);
@@ -90,7 +91,7 @@ void entity_t::remove_presense(presence_t &item) noexcept {
     }
     if (stats != statistics) {
         auto diff = stats - statistics;
-        push_stats(diff, item.device.get(), true);
+        push_stats({diff, 0}, item.device.get(), true);
     }
 
     bool remove_self = records.empty() && parent;
@@ -163,11 +164,11 @@ void entity_t::remove_child(entity_t &child) noexcept {
         r.child_presences.clear();
     }
     child.parent = nullptr;
-    push_stats(-child.get_stats(), nullptr, true);
+    push_stats({-child.get_stats(), 0}, nullptr, true);
     children.erase(it);
 }
 
-const statistics_t &entity_t::get_stats() noexcept { return statistics; }
+const entity_stats_t &entity_t::get_stats() noexcept { return statistics; }
 
 void entity_t::commit(const path_t &path) noexcept {
     for (auto child : children) {
@@ -190,6 +191,7 @@ void entity_t::commit(const path_t &path) noexcept {
             ++statistics.entities;
         }
     }
+    ++generation;
 }
 
 auto entity_t::get_child_presences(model::device_t &device) noexcept -> child_presences_t & {

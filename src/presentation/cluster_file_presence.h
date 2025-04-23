@@ -18,7 +18,8 @@ struct SYNCSPIRIT_API cluster_file_presence_t : file_presence_t {
     model::file_info_t &get_file_info() noexcept;
     const presence_t *determine_best(const presence_t *) const override;
 
-    statistics_t get_own_stats() const noexcept override final;
+    presence_stats_t get_own_stats() const noexcept override final;
+    const presence_stats_t &get_stats(bool sync) const noexcept override final;
 
   protected:
     void on_update() noexcept override;

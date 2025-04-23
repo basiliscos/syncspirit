@@ -7,31 +7,61 @@
 
 namespace syncspirit::presentation {
 
-struct statistics_t {
+struct entity_stats_t {
     std::int64_t entities = 0;
     std::int64_t size = 0;
 
-    bool operator==(const statistics_t &) const noexcept = default;
+    bool operator==(const entity_stats_t &) const noexcept = default;
 
-    inline statistics_t &operator+=(const statistics_t &o) noexcept {
+    inline entity_stats_t &operator+=(const entity_stats_t &o) noexcept {
         entities += o.entities;
         size += o.size;
         return *this;
     }
 
-    inline statistics_t &operator-=(const statistics_t &o) noexcept {
+    inline entity_stats_t &operator-=(const entity_stats_t &o) noexcept {
         entities -= o.entities;
         size -= o.size;
         return *this;
     }
 
-    inline statistics_t operator-(const statistics_t &o) const noexcept {
+    inline entity_stats_t operator-(const entity_stats_t &o) const noexcept {
         return {
             entities - o.entities,
             size - o.size,
         };
     }
-    inline statistics_t operator-() const noexcept { return {-entities, -size}; }
+    inline entity_stats_t operator-() const noexcept { return {-entities, -size}; }
+};
+
+struct presence_stats_t : entity_stats_t {
+    std::int64_t cluster_entries = 0;
+
+    bool operator==(const presence_stats_t &) const noexcept = default;
+
+    inline presence_stats_t &operator+=(const presence_stats_t &o) noexcept {
+        static_cast<entity_stats_t &>(*this) += o;
+        cluster_entries += o.cluster_entries;
+        return *this;
+    }
+
+    inline presence_stats_t &operator-=(const presence_stats_t &o) noexcept {
+        static_cast<entity_stats_t &>(*this) += o;
+        cluster_entries -= o.cluster_entries;
+        return *this;
+    }
+
+    inline presence_stats_t operator-(const presence_stats_t &o) const noexcept {
+        auto &self = static_cast<const entity_stats_t &>(*this);
+        return {
+            {self - o},
+            cluster_entries - o.cluster_entries,
+        };
+    }
+    inline presence_stats_t operator-() const noexcept {
+        auto &self = static_cast<const entity_stats_t &>(*this);
+        return {-self, -cluster_entries};
+    }
 };
 
 }; // namespace syncspirit::presentation

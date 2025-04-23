@@ -51,9 +51,10 @@ struct SYNCSPIRIT_API entity_t : model::proxy_t {
     void add_child(entity_t &child) noexcept;
     void remove_child(entity_t &child) noexcept;
     void remove_presense(presence_t &) noexcept;
-    const statistics_t &get_stats() noexcept;
+    const entity_stats_t &get_stats() noexcept;
 
   protected:
+    friend struct presence_t;
     friend struct file_entity_t;
     friend struct folder_entity_t;
     friend struct cluster_file_presence_t;
@@ -71,7 +72,7 @@ struct SYNCSPIRIT_API entity_t : model::proxy_t {
     void on_delete() noexcept override;
     void set_parent(entity_t *parent) noexcept;
     void commit(const path_t &path) noexcept;
-    void push_stats(const statistics_t &diff, const model::device_t *source, bool best) noexcept;
+    void push_stats(const presence_stats_t &diff, const model::device_t *source, bool best) noexcept;
     void actualize_on_demand(child_presences_t &, model::device_t &device) noexcept;
     const presence_t *recalc_best() noexcept;
 
@@ -80,7 +81,8 @@ struct SYNCSPIRIT_API entity_t : model::proxy_t {
     path_t path;
     bool has_dir;
     children_t children;
-    statistics_t statistics;
+    entity_stats_t statistics;
+    std::uint32_t generation = 0;
     int cluster_record;
     model::device_ptr_t best_device;
 };

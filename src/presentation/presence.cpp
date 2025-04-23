@@ -21,7 +21,7 @@ entity_t *presence_t::get_entity() noexcept { return entity; }
 
 auto presence_t::get_features() const noexcept -> std::uint32_t { return features; }
 
-const statistics_t &presence_t::get_stats() const noexcept { return statistics; }
+const presence_stats_t &presence_t::get_stats(bool) const noexcept { return statistics; }
 
 void presence_t::set_parent(entity_t *value) noexcept {
     if (value && device) {
@@ -51,4 +51,4 @@ void presence_t::on_delete() noexcept { clear_presense(); }
 
 const presence_t *presence_t::determine_best(const presence_t *other) const { return other; }
 
-statistics_t presence_t::get_own_stats() const noexcept { return {0, 0}; }
+presence_stats_t presence_t::get_own_stats() const noexcept { return {0, 0}; }

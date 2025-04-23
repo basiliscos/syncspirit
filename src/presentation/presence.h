@@ -19,18 +19,18 @@ using presence_ptr_t = model::intrusive_ptr_t<presence_t>;
 struct SYNCSPIRIT_API presence_t : model::proxy_t {
     // clang-format off
     enum features_t: std::uint32_t {
-        folder    = 1 << 1,
-        file      = 1 << 2,
-        directory = 1 << 3,
-        missing   = 1 << 4,
-        cluster   = 1 << 5,
-        peer      = 1 << 6,
-        local     = 1 << 7,
-        deleted   = 1 << 8,
-        ignored   = 1 << 9,
-        symblink  = 1 << 10,
-        in_sync   = 1 << 11,
-        conflict  = 1 << 12,
+        folder          = 1 << 1,
+        file            = 1 << 2,
+        directory       = 1 << 3,
+        missing         = 1 << 4,
+        cluster         = 1 << 5,
+        peer            = 1 << 6,
+        local           = 1 << 7,
+        deleted         = 1 << 8,
+        ignored         = 1 << 9,
+        symblink        = 1 << 10,
+        in_sync         = 1 << 11,
+        conflict        = 1 << 12,
     };
     static constexpr std::uint32_t mask = 0xFFFFFFFF;
     // clang-format ON
@@ -43,11 +43,11 @@ struct SYNCSPIRIT_API presence_t : model::proxy_t {
     void set_parent(presence_t *value) noexcept ;
     void set_parent(entity_t *entity) noexcept ;
     std::uint32_t get_features() const noexcept ;
-    const statistics_t& get_stats() const noexcept ;
+    virtual const presence_stats_t& get_stats(bool sync = true) const noexcept ;
     inline model::device_t* get_device() const noexcept { return device.get() ;}
 
     virtual const presence_t* determine_best(const presence_t*) const;
-    virtual statistics_t get_own_stats() const noexcept;
+    virtual presence_stats_t get_own_stats() const noexcept;
 
   protected:
     friend struct entity_t;
@@ -59,8 +59,9 @@ struct SYNCSPIRIT_API presence_t : model::proxy_t {
     presence_t *parent;
     augmentable_t* augmentable;
     model::device_ptr_t device;
-    std::uint32_t features = 0;
-    statistics_t statistics;
+    mutable std::uint32_t features = 0;
+    mutable std::uint32_t entity_generation = 0;
+    mutable presence_stats_t statistics;
 };
 
 } // namespace syncspirit::presentation
