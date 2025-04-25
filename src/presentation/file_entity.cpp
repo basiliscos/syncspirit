@@ -63,7 +63,11 @@ auto file_entity_t::on_insert(model::file_info_t &file_info) noexcept -> file_pr
             return new peer_file_presence_t(*this, file_info);
         }
     }();
-    presence->set_parent(parent);
+    auto parent_presence = presence->set_parent(parent);
+    while (parent_presence) {
+        --parent_presence->entity_generation;
+        parent_presence = parent_presence->parent;
+    }
     records.emplace_back(record_t{device, presence});
     for (auto &c : children) {
         for (auto &r : c->records) {

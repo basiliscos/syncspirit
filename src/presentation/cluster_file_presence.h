@@ -24,6 +24,7 @@ struct SYNCSPIRIT_API cluster_file_presence_t : file_presence_t {
   protected:
     void on_update() noexcept override;
     void refresh_features() noexcept;
+    void sync_with_entity() const noexcept;
 
     model::file_info_t &file_info;
     std::uint32_t default_features = 0;

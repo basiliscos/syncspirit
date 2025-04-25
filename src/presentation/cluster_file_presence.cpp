@@ -7,6 +7,7 @@
 #include "model/file_info.h"
 #include "model/folder_info.h"
 #include "model/misc/resolver.h"
+#include "proto/proto-helpers-bep.h"
 
 using namespace syncspirit;
 using namespace syncspirit::presentation;
@@ -45,25 +46,42 @@ const presence_t *cluster_file_presence_t::determine_best(const presence_t *othe
 presence_stats_t cluster_file_presence_t::get_own_stats() const noexcept { return {1, file_info.get_size(), 0}; }
 
 const presence_stats_t &cluster_file_presence_t::get_stats(bool sync) const noexcept {
-#if 0
     if (sync) {
-        if (entity_generation != entity->generation) {
+        sync_with_entity();
+    }
+    return statistics;
+}
+
+void cluster_file_presence_t::sync_with_entity() const noexcept {
+    if (entity_generation != entity->generation) {
+        entity_generation = entity->generation;
+        statistics.cluster_entries = 0;
+
+        for (auto &child_entity : entity->get_children()) {
+            auto child_presence = child_entity->get_presence(*device);
+            if (child_presence->features & features_t::cluster) {
+                auto child = static_cast<cluster_file_presence_t *>(child_presence);
+                child->sync_with_entity();
+                statistics.cluster_entries += child->statistics.cluster_entries;
+            }
+        }
+
+        if (features & features_t::file) {
             auto best_version = proto::Counter();
-            for (auto [d, presence, _]: entity->records) {
+            for (auto [d, presence, _] : entity->records) {
                 if ((d == entity->best_device) && (presence->get_features() & features_t::cluster)) {
-                    auto best = static_cast<cluster_file_presence_t*>(presence);
+                    auto best = static_cast<cluster_file_presence_t *>(presence);
                     best_version = best->file_info.get_version()->get_best();
                     break;
                 }
             }
             if (file_info.get_version()->get_best() == best_version) {
-                statistics.cluster_entries = 1;
+                ++statistics.cluster_entries;
             }
-            entity_generation = entity->generation;
+        } else if (features & features_t::directory) {
+            ++statistics.cluster_entries;
         }
     }
-#endif
-    return statistics;
 }
 
 void cluster_file_presence_t::on_update() noexcept {

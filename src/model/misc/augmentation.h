@@ -49,7 +49,7 @@ struct SYNCSPIRIT_API augmentable_t : ref_countable_t {
 
     void notify_update() noexcept;
 
-  private:
+  protected:
     augmentation_ptr_t extension;
 };
 

@@ -23,10 +23,11 @@ auto presence_t::get_features() const noexcept -> std::uint32_t { return feature
 
 const presence_stats_t &presence_t::get_stats(bool) const noexcept { return statistics; }
 
-void presence_t::set_parent(entity_t *value) noexcept {
+presence_t *presence_t::set_parent(entity_t *value) noexcept {
     if (value && device) {
         parent = value->get_presence(*device);
     }
+    return parent;
 }
 
 void presence_t::set_parent(presence_t *value) noexcept {

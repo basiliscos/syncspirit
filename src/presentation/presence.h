@@ -16,6 +16,9 @@ using entity_ptr_t = model::intrusive_ptr_t<entity_t>;
 struct presence_t;
 using presence_ptr_t = model::intrusive_ptr_t<presence_t>;
 
+struct file_entity_t;
+struct cluster_file_presence_t;
+
 struct SYNCSPIRIT_API presence_t : model::proxy_t {
     // clang-format off
     enum features_t: std::uint32_t {
@@ -41,7 +44,7 @@ struct SYNCSPIRIT_API presence_t : model::proxy_t {
     presence_t *get_parent() noexcept ;
     entity_t* get_entity() noexcept;
     void set_parent(presence_t *value) noexcept ;
-    void set_parent(entity_t *entity) noexcept ;
+    presence_t* set_parent(entity_t *entity) noexcept ;
     std::uint32_t get_features() const noexcept ;
     virtual const presence_stats_t& get_stats(bool sync = true) const noexcept ;
     inline model::device_t* get_device() const noexcept { return device.get() ;}
@@ -51,6 +54,9 @@ struct SYNCSPIRIT_API presence_t : model::proxy_t {
 
   protected:
     friend struct entity_t;
+    friend struct cluster_file_presence_t;
+    friend struct file_entity_t;
+
     void on_delete() noexcept override;
     void clear_presense() noexcept;
     void link(augmentable_t* augmentable) noexcept;

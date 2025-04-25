@@ -44,6 +44,7 @@ void entity_t::push_stats(const presence_stats_t &diff, const model::device_t *s
         for (auto &r : current->records) {
             if (r.device == source) {
                 r.presence->statistics += diff;
+                r.presence->entity_generation--;
                 break;
             }
         }
