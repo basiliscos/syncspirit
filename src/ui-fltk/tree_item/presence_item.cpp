@@ -169,10 +169,13 @@ Fl_Color presence_item_t::get_color() const {
             return FL_DARK1;
         } else if (f & F::symblink) {
             return FL_DARK_BLUE;
-        } else if (f & F::in_sync) {
-            return FL_DARK_GREEN;
         } else if (f & F::conflict) {
             return FL_RED;
+        }
+        auto &stats = presence.get_stats(true);
+        auto in_sync = stats.cluster_entries == stats.entities;
+        if (in_sync) {
+            return FL_GREEN;
         }
     }
     return FL_BLACK;

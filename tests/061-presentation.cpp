@@ -816,6 +816,77 @@ TEST_CASE("presentation", "[presentation]") {
     }
 }
 
+TEST_CASE("statistics, update", "[presentation]") {
+    auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
+    auto my_device = device_t::create(my_id, "my-device").value();
+
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
+    auto sequencer = make_sequencer(4);
+    cluster->get_devices().put(my_device);
+
+    auto builder = diff_builder_t(*cluster);
+    REQUIRE(builder.upsert_folder("1234-5678", "some/path", "my-label").apply());
+    auto folder = cluster->get_folders().by_id("1234-5678");
+    auto &blocks = cluster->get_blocks();
+
+    auto add_file = [&](std::string_view name, model::device_t &device, std::int32_t file_size = 0,
+                        proto::FileInfoType type = proto::FileInfoType::DIRECTORY, std::uint64_t modified_by = 0,
+                        std::uint64_t modified_v = 0) {
+        auto folder_info = folder->get_folder_infos().by_device(device);
+
+        proto::FileInfo pr_fi;
+        proto::set_name(pr_fi, name);
+        proto::set_type(pr_fi, type);
+        proto::set_sequence(pr_fi, folder_info->get_max_sequence() + 1);
+
+        auto block = model::block_info_ptr_t();
+        if (file_size) {
+            proto::set_size(pr_fi, file_size);
+            proto::set_block_size(pr_fi, file_size);
+            assert(type == proto::FileInfoType::FILE);
+            auto bytes = utils::bytes_t(file_size);
+            auto b_hash = utils::sha256_digest(bytes).value();
+            auto &b = proto::add_blocks(pr_fi);
+            proto::set_size(b, file_size);
+            block = blocks.by_hash(b_hash);
+            if (!block) {
+                block = model::block_info_t::create(b).value();
+                blocks.put(block);
+            }
+        }
+
+        auto &v = proto::get_version(pr_fi);
+        auto modified_device = modified_by == 0 ? device.device_id().get_uint() : modified_by;
+        auto modified_version = modified_v == 0 ? 1 : modified_v;
+        proto::add_counters(v, proto::Counter(modified_device, modified_version));
+        proto::set_modified_s(pr_fi, modified_version);
+
+        auto file = model::file_info_t::create(sequencer->next_uuid(), pr_fi, folder_info.get()).value();
+        if (block) {
+            file->assign_block(block, 0);
+        }
+        folder_info->add_strict(file);
+        return file;
+    };
+
+    auto f_a_my = add_file("a", *my_device, 0, proto::FileInfoType::DIRECTORY);
+    auto f_c_my = add_file("a/b.txt", *my_device, 5, proto::FileInfoType::FILE);
+
+    auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
+    CHECK(folder_entity->get_stats() == entity_stats_t{2, 5});
+
+    REQUIRE(folder_entity->get_children().size() == 1);
+    auto dir_a = *folder_entity->get_children().begin();
+    CHECK(dir_a->get_stats() == entity_stats_t{2, 5});
+
+    auto p_a_my = dir_a->get_presence(*my_device);
+    CHECK(p_a_my->get_stats() == presence_stats_t{2, 5, 2});
+
+    f_a_my->get_augmentation()->on_update();
+    CHECK(p_a_my->get_stats() == presence_stats_t{2, 5, 2});
+    CHECK(folder_entity->get_stats() == entity_stats_t{2, 5});
+}
+
 TEST_CASE("statistics", "[presentation]") {
     auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
     auto peer_id = device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
@@ -886,6 +957,9 @@ TEST_CASE("statistics", "[presentation]") {
             add_file("a.txt", *my_device, 5, proto::FileInfoType::FILE);
             auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
             CHECK(folder_entity->get_stats() == entity_stats_t{1, 5});
+
+            auto folder_my = folder_entity->get_presence(*my_device);
+            CHECK(folder_my->get_stats() == presence_stats_t{{1, 5}, 1});
         }
 
         SECTION("two files") {
@@ -895,14 +969,17 @@ TEST_CASE("statistics", "[presentation]") {
                 auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
                 CHECK(folder_entity->get_stats() == entity_stats_t{2, 9});
             }
-
             SECTION("some hierarchy") {
                 add_file("a", *my_device, 0, proto::FileInfoType::DIRECTORY);
                 add_file("a/b", *my_device, 0, proto::FileInfoType::DIRECTORY);
                 add_file("a/b/c.txt", *my_device, 5, proto::FileInfoType::FILE);
                 add_file("a/d.txt", *my_device, 4, proto::FileInfoType::FILE);
+
                 auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
                 CHECK(folder_entity->get_stats() == entity_stats_t{4, 9});
+
+                auto folder_my = folder_entity->get_presence(*my_device);
+                CHECK(folder_my->get_stats() == presence_stats_t{{4, 9}, 4});
 
                 auto dir_a = *folder_entity->get_children().begin();
                 auto p_a = dir_a->get_presence(*my_device);
@@ -1192,6 +1269,12 @@ TEST_CASE("statistics", "[presentation]") {
         auto p_a_peer = dir_a->get_presence(*peer_device);
         CHECK(p_a_peer->get_stats() == presence_stats_t{2, 0, 2});
 
+        auto p_b_my = dir_a->get_child_presences(*my_device).front();
+        CHECK(p_b_my->get_stats() == presence_stats_t{2, 5, 2});
+
+        auto p_c_my = p_b_my->get_entity()->get_child_presences(*my_device).front();
+        CHECK(p_c_my->get_stats() == presence_stats_t{1, 5, 1});
+
         auto pr_fi = [&]() {
             auto pr_fi = f_c_my->as_proto(false);
             auto block = model::block_info_ptr_t();
@@ -1212,6 +1295,7 @@ TEST_CASE("statistics", "[presentation]") {
         CHECK(folder_entity->get_stats() == entity_stats_t{3, 10});
         CHECK(dir_a->get_stats() == entity_stats_t{3, 10});
         CHECK(p_a_my->get_stats() == presence_stats_t{3, 10, 3});
+        CHECK(p_c_my->get_stats() == presence_stats_t{1, 10, 1});
         CHECK(p_a_peer->get_stats() == presence_stats_t{2, 0, 2});
 
         // peer copies
@@ -1228,6 +1312,7 @@ TEST_CASE("statistics", "[presentation]") {
             CHECK(dir_a->get_stats() == entity_stats_t{3, 10});
             CHECK(p_a_my->get_stats() == presence_stats_t{3, 10, 3});
             CHECK(p_a_peer->get_stats() == presence_stats_t{3, 10, 3});
+            CHECK(p_c_my->get_stats() == presence_stats_t{1, 10, 1});
         }
 
         // peer updates

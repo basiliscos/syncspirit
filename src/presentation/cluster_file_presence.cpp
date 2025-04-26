@@ -7,7 +7,6 @@
 #include "model/file_info.h"
 #include "model/folder_info.h"
 #include "model/misc/resolver.h"
-#include "proto/proto-helpers-bep.h"
 
 using namespace syncspirit;
 using namespace syncspirit::presentation;
@@ -17,7 +16,7 @@ cluster_file_presence_t::cluster_file_presence_t(std::uint32_t default_features_
     : file_presence_t(&entity, file_info_.get_folder_info()->get_device()), file_info{file_info_},
       default_features{default_features_} {
     link(&file_info);
-    statistics = get_own_stats();
+    statistics = own_statistics = refresh_own_stats();
     refresh_features();
 }
 
@@ -43,50 +42,11 @@ const presence_t *cluster_file_presence_t::determine_best(const presence_t *othe
     return r >= 0 ? this : o;
 }
 
-presence_stats_t cluster_file_presence_t::get_own_stats() const noexcept { return {1, file_info.get_size(), 0}; }
-
-const presence_stats_t &cluster_file_presence_t::get_stats(bool sync) const noexcept {
-    if (sync) {
-        sync_with_entity();
-    }
-    return statistics;
-}
-
-void cluster_file_presence_t::sync_with_entity() const noexcept {
-    if (entity_generation != entity->generation) {
-        entity_generation = entity->generation;
-        statistics.cluster_entries = 0;
-
-        for (auto &child_entity : entity->get_children()) {
-            auto child_presence = child_entity->get_presence(*device);
-            if (child_presence->features & features_t::cluster) {
-                auto child = static_cast<cluster_file_presence_t *>(child_presence);
-                child->sync_with_entity();
-                statistics.cluster_entries += child->statistics.cluster_entries;
-            }
-        }
-
-        if (features & features_t::file) {
-            auto best_version = proto::Counter();
-            for (auto [d, presence, _] : entity->records) {
-                if ((d == entity->best_device) && (presence->get_features() & features_t::cluster)) {
-                    auto best = static_cast<cluster_file_presence_t *>(presence);
-                    best_version = best->file_info.get_version()->get_best();
-                    break;
-                }
-            }
-            if (file_info.get_version()->get_best() == best_version) {
-                ++statistics.cluster_entries;
-            }
-        } else if (features & features_t::directory) {
-            ++statistics.cluster_entries;
-        }
-    }
-}
+presence_stats_t cluster_file_presence_t::refresh_own_stats() noexcept { return {1, file_info.get_size(), 0}; }
 
 void cluster_file_presence_t::on_update() noexcept {
     refresh_features();
-    auto presence_diff = get_own_stats() - statistics;
+    auto presence_diff = refresh_own_stats() - own_statistics;
     auto entity_stats = entity->get_stats();
     auto device = file_info.get_folder_info()->get_device();
     auto best_device = entity->best_device.get();
@@ -94,6 +54,7 @@ void cluster_file_presence_t::on_update() noexcept {
     auto best_changed = entity->best_device != best_device && entity->best_device == device;
     auto best_updated = !best_changed && device == entity->best_device;
     entity->push_stats(presence_diff, device, best_updated);
+    own_statistics += presence_diff;
     if (best_changed) {
         assert(best_presence == this);
         auto entity_diff = get_stats(true) - presence_stats_t{entity_stats, 0};

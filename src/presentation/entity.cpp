@@ -39,13 +39,20 @@ void entity_t::push_stats(const presence_stats_t &diff, const model::device_t *s
     while (current) {
         if (best) {
             current->statistics += diff;
+            // assert(current->statistics.entities >= 0);
+            // assert(current->statistics.size >= 0);
             ++current->generation;
         }
-        for (auto &r : current->records) {
-            if (r.device == source) {
-                r.presence->statistics += diff;
-                r.presence->entity_generation--;
-                break;
+        if (source) {
+            for (auto &r : current->records) {
+                if (r.device == source) {
+                    r.presence->statistics += diff;
+                    r.presence->entity_generation--;
+                    // assert(r.presence->statistics.entities >= 0);
+                    // assert(r.presence->statistics.cluster_entries >= 0);
+                    // assert(r.presence->statistics.size >= 0);
+                    break;
+                }
             }
         }
         current = current->parent;
