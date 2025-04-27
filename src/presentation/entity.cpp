@@ -229,7 +229,7 @@ void entity_t::actualize_on_demand(child_presences_t &r, model::device_t &device
             auto rd = r->get_features() & F::directory;
             if (ld && !rd) {
                 return true;
-            } else if (!rd && !rd) {
+            } else if (!ld && rd) {
                 return false;
             }
             auto l_name = l->entity->get_path().get_own_name();
