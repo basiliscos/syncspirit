@@ -46,12 +46,13 @@ file_entity_t::~file_entity_t() {
     // records.clear();
 }
 
-auto file_entity_t::on_insert(model::file_info_t &file_info) noexcept -> file_presence_t * {
+auto file_entity_t::on_insert(model::file_info_t &file_info) noexcept
+    -> std::pair<file_presence_t *, presence_stats_t> {
     auto fi = file_info.get_folder_info();
     auto device = fi->get_device();
     for (auto &r : records) {
         if (r.device == device) {
-            return static_cast<file_presence_t *>(r.presence);
+            return {static_cast<file_presence_t *>(r.presence), {}};
         }
     }
 
@@ -69,12 +70,18 @@ auto file_entity_t::on_insert(model::file_info_t &file_info) noexcept -> file_pr
         parent_presence = parent_presence->parent;
     }
     records.emplace_back(record_t{device, presence});
+    auto diff = presence->get_own_stats();
     for (auto &c : children) {
-        for (auto &r : c->records) {
-            if (r.device == device) {
-                r.presence->set_parent(presence);
+        for (auto &[d, p, _] : c->records) {
+            if (d == device) {
+                if (p->parent != presence) {
+                    p->set_parent(presence);
+                    auto child_stats = p->get_stats(false);
+                    diff += child_stats;
+                    presence->statistics += child_stats;
+                }
             }
         }
     }
-    return presence;
+    return {presence, diff};
 }

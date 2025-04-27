@@ -15,7 +15,7 @@ struct SYNCSPIRIT_API file_entity_t : entity_t {
     file_entity_t(model::file_info_t &sample_file, path_t path) noexcept;
     ~file_entity_t();
     void set_parent(entity_t *entry) noexcept;
-    file_presence_t *on_insert(model::file_info_t &file_info) noexcept;
+    auto on_insert(model::file_info_t &file_info) noexcept -> std::pair<file_presence_t *, presence_stats_t>;
 
   private:
     presence_ptr_t missing_file;

@@ -9,6 +9,8 @@
 using namespace syncspirit;
 using namespace syncspirit::presentation;
 
+using F = presence_t::features_t;
+
 entity_t::entity_t(path_t path_, entity_t *parent_) noexcept
     : parent{parent_}, path(std::move(path_)), has_dir{false}, cluster_record{-1} {}
 
@@ -39,18 +41,18 @@ void entity_t::push_stats(const presence_stats_t &diff, const model::device_t *s
     while (current) {
         if (best) {
             current->statistics += diff;
-            // assert(current->statistics.entities >= 0);
-            // assert(current->statistics.size >= 0);
+            assert(current->statistics.entities >= 0);
+            assert(current->statistics.size >= 0);
             ++current->generation;
         }
         if (source) {
-            for (auto &r : current->records) {
-                if (r.device == source) {
-                    r.presence->statistics += diff;
-                    r.presence->entity_generation--;
-                    // assert(r.presence->statistics.entities >= 0);
-                    // assert(r.presence->statistics.cluster_entries >= 0);
-                    // assert(r.presence->statistics.size >= 0);
+            for (auto &[device, p, _] : current->records) {
+                if (device == source) {
+                    p->statistics += diff;
+                    p->entity_generation--;
+                    assert(p->statistics.entities >= 0);
+                    assert(p->statistics.cluster_entries >= 0 || p->entity_generation != current->generation);
+                    assert(p->statistics.size >= 0);
                     break;
                 }
             }
@@ -88,7 +90,7 @@ void entity_t::remove_presense(presence_t &item) noexcept {
     bool need_restat = false;
     auto stats = statistics;
     if (best_device && it->device == best_device) {
-        stats -= it->presence->get_stats(false);
+        stats -= it->presence->get_own_stats();
         need_restat = true;
     }
     records.erase(it);
@@ -211,6 +213,7 @@ auto entity_t::get_child_presences(model::device_t &device) noexcept -> child_pr
         }
     }
     assert(0 && "should not happen");
+    std::abort();
 }
 
 void entity_t::actualize_on_demand(child_presences_t &r, model::device_t &device) noexcept {
@@ -222,7 +225,6 @@ void entity_t::actualize_on_demand(child_presences_t &r, model::device_t &device
             r.emplace_back(p);
         }
         auto comparator = [](const presence_t *l, const presence_t *r) {
-            using F = presence_t::features_t;
             auto ld = l->get_features() & F::directory;
             auto rd = r->get_features() & F::directory;
             if (ld && !rd) {

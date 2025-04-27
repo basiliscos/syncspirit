@@ -141,8 +141,8 @@ entity_t *folder_entity_t::on_insert(model::file_info_t &file_info) noexcept {
             }
         }
         auto file_entity = static_cast<file_entity_t *>(entity);
-        auto file_presence = file_entity->on_insert(file_info);
-        presence_diff += file_presence->get_own_stats();
+        auto [file_presence, file_diff] = file_entity->on_insert(file_info);
+        presence_diff += file_diff;
         if (auto parent = entity->parent; parent) {
             parent->push_stats(presence_diff, device, false);
         }
