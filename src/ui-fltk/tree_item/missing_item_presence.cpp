@@ -17,6 +17,8 @@ missing_item_presence_t::missing_item_presence_t(presence_item_t *host_, present
     }
 }
 
+auto missing_item_presence_t::get_device() -> model::device_t * { return host->get_presence().get_device(); }
+
 void missing_item_presence_t::update_label() {
     auto &p = static_cast<presentation::cluster_file_presence_t &>(presence);
     auto color = get_color();

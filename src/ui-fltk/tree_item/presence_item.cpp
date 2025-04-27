@@ -79,8 +79,10 @@ void presence_item_t::populate_dummy_child() {
 
 auto presence_item_t::get_presence() -> presentation::presence_t & { return presence; }
 
+auto presence_item_t::get_device() -> model::device_t * { return presence.get_device(); }
+
 int presence_item_t::get_position(std::uint32_t cut_mask) {
-    auto &container = presence.get_entity()->get_parent()->get_child_presences(*presence.get_device());
+    auto &container = presence.get_entity()->get_parent()->get_child_presences(*get_device());
     int position = 0;
     for (auto p : container) {
         if (p == &presence) {
@@ -172,10 +174,11 @@ Fl_Color presence_item_t::get_color() const {
         } else if (f & F::conflict) {
             return FL_RED;
         }
-        auto &stats = presence.get_stats(true);
-        auto in_sync = stats.cluster_entries == stats.entities;
+        auto &ps = presence.get_stats(true);
+        auto &s = presence.get_entity()->get_stats();
+        auto in_sync = ps.cluster_entries == s.entities;
         if (in_sync) {
-            return FL_GREEN;
+            return FL_DARK_GREEN;
         }
     }
     return FL_BLACK;
