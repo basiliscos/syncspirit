@@ -93,7 +93,6 @@ TEST_CASE("presentation", "[presentation]") {
     cluster->get_devices().put(peer_2_device);
 
     auto builder = diff_builder_t(*cluster);
-
     SECTION("empty folder") {
         SECTION("shared with nobody") {
             REQUIRE(builder.upsert_folder("1234-5678", "some/path", "my-label").apply());
@@ -893,7 +892,9 @@ TEST_CASE("statistics", "[presentation]") {
     auto peer_2_id =
         model::device_id_t::from_string("LYXKCHX-VI3NYZR-ALCJBHF-WMZYSPK-QG6QJA3-MPFYMSO-U56GTUK-NA2MIAW").value();
     auto my_device = device_t::create(my_id, "my-device").value();
+    auto my_device_id = my_device->device_id().get_uint();
     auto peer_device = device_t::create(peer_id, "peer-device").value();
+    auto peer_device_id = peer_device->device_id().get_uint();
     auto peer_2_device = device_t::create(peer_2_id, "peer-device-2").value();
 
     auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
@@ -1227,19 +1228,19 @@ TEST_CASE("statistics", "[presentation]") {
                 folder_entity->on_insert(*f_c_my);
                 CHECK(folder_entity->get_stats() == entity_stats_t{0, 0});
 
-                auto f_b_peer = add_file("a/b", *peer_device, 0, proto::FileInfoType::DIRECTORY);
+                auto f_b_peer = add_file("a/b", *peer_device, 0, proto::FileInfoType::DIRECTORY, my_device_id, 1);
                 folder_entity->on_insert(*f_b_peer);
                 CHECK(folder_entity->get_stats() == entity_stats_t{0, 0});
 
-                auto f_b_my = add_file("a/b", *my_device, 0, proto::FileInfoType::DIRECTORY);
+                auto f_b_my = add_file("a/b", *my_device, 0, proto::FileInfoType::DIRECTORY, my_device_id, 1);
                 folder_entity->on_insert(*f_b_my);
                 CHECK(folder_entity->get_stats() == entity_stats_t{0, 0});
 
-                auto f_a_peer = add_file("a", *peer_device, 0, proto::FileInfoType::DIRECTORY);
+                auto f_a_peer = add_file("a", *peer_device, 0, proto::FileInfoType::DIRECTORY, my_device_id, 1);
                 folder_entity->on_insert(*f_a_peer);
                 CHECK(folder_entity->get_stats() == entity_stats_t{3, 5});
 
-                auto f_a_my = add_file("a", *my_device, 0, proto::FileInfoType::DIRECTORY);
+                auto f_a_my = add_file("a", *my_device, 0, proto::FileInfoType::DIRECTORY, my_device_id, 1);
                 folder_entity->on_insert(*f_a_my);
                 CHECK(folder_entity->get_stats() == entity_stats_t{3, 5});
 
@@ -1271,11 +1272,11 @@ TEST_CASE("statistics", "[presentation]") {
     SECTION("file updates") {
         REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
 
-        auto f_a_my = add_file("a", *my_device, 0, proto::FileInfoType::DIRECTORY);
-        auto f_a_peer = add_file("a", *peer_device, 0, proto::FileInfoType::DIRECTORY);
-        auto f_b_peer = add_file("a/b", *peer_device, 0, proto::FileInfoType::DIRECTORY);
-        auto f_b_my = add_file("a/b", *my_device, 0, proto::FileInfoType::DIRECTORY);
-        auto f_c_my = add_file("a/b/c.txt", *my_device, 5, proto::FileInfoType::FILE);
+        auto f_a_my = add_file("a", *my_device, 0, proto::FileInfoType::DIRECTORY, my_device_id, 1);
+        auto f_a_peer = add_file("a", *peer_device, 0, proto::FileInfoType::DIRECTORY, my_device_id, 1);
+        auto f_b_peer = add_file("a/b", *peer_device, 0, proto::FileInfoType::DIRECTORY, my_device_id, 1);
+        auto f_b_my = add_file("a/b", *my_device, 0, proto::FileInfoType::DIRECTORY, my_device_id, 1);
+        auto f_c_my = add_file("a/b/c.txt", *my_device, 5, proto::FileInfoType::FILE, my_device_id, 1);
 
         auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
         CHECK(folder_entity->get_stats() == entity_stats_t{3, 5});
@@ -1376,7 +1377,6 @@ TEST_CASE("statistics", "[presentation]") {
 
         // local copy
         {
-            auto pr_fi = [&]() { return file_c_peer->as_proto(true); }();
             REQUIRE(builder.remote_copy(*file_c_peer).apply());
             CHECK(folder_entity->get_stats() == entity_stats_t{3, 15});
             CHECK(dir_a->get_stats() == entity_stats_t{3, 15});
@@ -1428,6 +1428,35 @@ TEST_CASE("statistics", "[presentation]") {
         REQUIRE(builder.local_update("1234-5678", pr_fi).apply());
         CHECK(p_a_my->get_stats() == presence_stats_t{1, 0, 1});
         CHECK(p_a_my->get_features() & F::deleted);
+    }
+
+    SECTION("folder updates & cluster entities") {
+        REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
+        auto f_a_peer = add_file("a", *peer_device, 0, proto::FileInfoType::DIRECTORY);
+        REQUIRE(builder.remote_copy(*f_a_peer).apply());
+
+        auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
+        CHECK(folder_entity->get_stats() == entity_stats_t{1, 0});
+
+        REQUIRE(folder_entity->get_children().size() == 1);
+        auto dir_a = *folder_entity->get_children().begin();
+        CHECK(dir_a->get_stats() == entity_stats_t{1, 0});
+
+        auto p_a_my = dir_a->get_presence(*my_device);
+        CHECK(p_a_my->get_stats() == presence_stats_t{1, 0, 1});
+
+        auto p_a_peer = dir_a->get_presence(*peer_device);
+        CHECK(p_a_peer->get_stats() == presence_stats_t{1, 0, 1});
+
+        auto pr_fi = [&]() {
+            auto pr_fi = f_a_peer->as_proto(false);
+            proto::set_deleted(pr_fi, true);
+            return pr_fi;
+        }();
+        REQUIRE(builder.local_update("1234-5678", pr_fi).apply());
+        CHECK(p_a_my->get_stats() == presence_stats_t{1, 0, 1});
+        CHECK(dir_a->get_stats() == entity_stats_t{1, 0});
+        CHECK(p_a_peer->get_stats() == presence_stats_t{1, 0, 0});
     }
 }
 

@@ -96,7 +96,7 @@ void entity_t::remove_presense(presence_t &item) noexcept {
     records.erase(it);
     if (need_restat) {
         if (auto best = recalc_best(); best) {
-            stats += best->get_stats();
+            stats += best->get_own_stats();
         }
     }
     if (stats != statistics) {
@@ -120,16 +120,20 @@ void entity_t::remove_presense(presence_t &item) noexcept {
 
 auto entity_t::recalc_best() noexcept -> const presence_t * {
     auto best = (const presence_t *)(nullptr);
-    best_device.reset();
-    if (children.empty()) {
-        auto &first = records.front();
-        best_device = first.device;
-        best = first.presence;
-        for (size_t i = 1; i < records.size(); ++i) {
-            auto &[device, presence, _] = records[i];
-            best = presence->determine_best(best);
-            if (best == presence) {
-                best_device = device;
+    if (parent) {
+        best_device.reset();
+        for (auto &[d, p, _] : records) {
+            if (!d) {
+                continue;
+            }
+            if (!best) {
+                best = p;
+                best_device = d;
+            } else {
+                best = p->determine_best(best);
+                if (best == p) {
+                    best_device = d;
+                }
             }
         }
     }
@@ -194,12 +198,9 @@ void entity_t::commit(const path_t &path) noexcept {
             }
         }
     }
-    if (children.empty()) {
-        statistics = recalc_best()->get_stats();
-    } else {
-        if (parent) { // for file/dir entity
-            ++statistics.entities;
-        }
+    auto best = recalc_best();
+    if (best) {
+        statistics += best->get_own_stats();
     }
     ++generation;
 }

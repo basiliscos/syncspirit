@@ -94,6 +94,8 @@ void folder_entity_t::on_insert(model::folder_info_t &folder_info) noexcept {
     auto new_files = new_files_t();
     process(&folder_info, children, new_files);
     process_files(new_files, orphans, this);
+    statistics = {};
+    commit(path);
 }
 
 entity_t *folder_entity_t::on_insert(model::file_info_t &file_info) noexcept {
