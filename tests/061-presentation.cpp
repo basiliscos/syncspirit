@@ -562,7 +562,7 @@ TEST_CASE("presentation", "[presentation]") {
             CHECK(c1->get_path().get_full_name() == "file-a");
             CHECK(c2->get_path().get_full_name() == "file-b");
 
-            auto &p_children = folder_entity->get_child_presences(*my_device);
+            auto &p_children = folder_entity->get_presence(*my_device)->get_children();
             REQUIRE(p_children.size() == 2);
             CHECK(p_children[0]->get_entity()->get_path().get_full_name() == "file-b");
             CHECK(p_children[1]->get_entity()->get_path().get_full_name() == "file-a");
@@ -1291,10 +1291,10 @@ TEST_CASE("statistics", "[presentation]") {
         auto p_a_peer = dir_a->get_presence(*peer_device);
         CHECK(p_a_peer->get_stats() == presence_stats_t{2, 0, 2});
 
-        auto p_b_my = dir_a->get_child_presences(*my_device).front();
+        auto p_b_my = dir_a->get_presence(*my_device)->get_children().front();
         CHECK(p_b_my->get_stats() == presence_stats_t{2, 5, 2});
 
-        auto p_c_my = p_b_my->get_entity()->get_child_presences(*my_device).front();
+        auto p_c_my = p_b_my->get_entity()->get_presence(*my_device)->get_children().front();
         CHECK(p_c_my->get_stats() == presence_stats_t{1, 5, 1});
 
         auto pr_fi = [&]() {

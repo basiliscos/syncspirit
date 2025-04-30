@@ -8,6 +8,8 @@
 using namespace syncspirit;
 using namespace syncspirit::presentation;
 
+using F = presence_t::features_t;
+
 presence_t::presence_t(entity_t *entity_, model::device_ptr_t device_) noexcept
     : entity{entity_}, device{std::move(device_)}, parent{nullptr}, augmentable{nullptr} {
     if (entity) {
@@ -95,4 +97,30 @@ void presence_t::sync_with_entity() const noexcept {
             ++statistics.cluster_entries;
         }
     }
+}
+
+auto presence_t::get_children() noexcept -> children_t& {
+    auto& e_children = entity->children;
+    if (children.size() != e_children.size()) {
+        children.clear();
+        children.reserve(e_children.size());
+        for (auto &c : e_children) {
+            auto p = c->get_presence(*device);
+            children.emplace_back(p);
+        }
+        auto comparator = [](const presence_t *l, const presence_t *r) {
+            auto ld = l->get_features() & F::directory;
+            auto rd = r->get_features() & F::directory;
+            if (ld && !rd) {
+                return true;
+            } else if (!ld && rd) {
+                return false;
+            }
+            auto l_name = l->entity->get_path().get_own_name();
+            auto r_name = r->entity->get_path().get_own_name();
+            return l_name < r_name;
+        };
+        std::sort(children.begin(), children.end(), comparator);
+    }
+    return children;
 }

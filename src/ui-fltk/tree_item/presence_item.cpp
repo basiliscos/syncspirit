@@ -58,7 +58,7 @@ void presence_item_t::on_open() {
 
     int position = 0;
     auto hide_mask = supervisor.mask_nodes();
-    for (auto p : presence.get_entity()->get_child_presences(*presence.get_device())) {
+    for (auto p : presence.get_children()) {
         auto node = make_item(this, *p);
         if (node) {
             auto tmp_node = insert(prefs(), "", position++);
@@ -82,7 +82,7 @@ auto presence_item_t::get_presence() -> presentation::presence_t & { return pres
 auto presence_item_t::get_device() -> model::device_t * { return presence.get_device(); }
 
 int presence_item_t::get_position(std::uint32_t cut_mask) {
-    auto &container = presence.get_entity()->get_parent()->get_child_presences(*get_device());
+    auto &container = presence.get_children();
     int position = 0;
     for (auto p : container) {
         if (p == &presence) {
@@ -145,7 +145,7 @@ void presence_item_t::show(std::uint32_t hide_mask, bool refresh_labels, int32_t
         do_hide();
     }
     if (!hide && depth >= 1 && expanded) {
-        auto &children = presence.get_entity()->get_child_presences(*presence.get_device());
+        auto &children = presence.get_children();
         for (auto p : children) {
             auto item = (presence_item_t *)(nullptr);
             if (auto augmentation = p->get_augmentation().get(); augmentation) {

@@ -204,41 +204,6 @@ void entity_t::commit(const path_t &path) noexcept {
     ++generation;
 }
 
-auto entity_t::get_child_presences(model::device_t &device) noexcept -> child_presences_t & {
-    for (auto &[p, child_presences] : records) {
-        if (p->device == &device) {
-            actualize_on_demand(child_presences, device);
-            return child_presences;
-        }
-    }
-    assert(0 && "should not happen");
-    std::abort();
-}
-
-void entity_t::actualize_on_demand(child_presences_t &r, model::device_t &device) noexcept {
-    if (r.size() != children.size()) {
-        r.clear();
-        r.reserve(children.size());
-        for (auto &c : children) {
-            auto p = c->get_presence(device);
-            r.emplace_back(p);
-        }
-        auto comparator = [](const presence_t *l, const presence_t *r) {
-            auto ld = l->get_features() & F::directory;
-            auto rd = r->get_features() & F::directory;
-            if (ld && !rd) {
-                return true;
-            } else if (!ld && rd) {
-                return false;
-            }
-            auto l_name = l->entity->get_path().get_own_name();
-            auto r_name = r->entity->get_path().get_own_name();
-            return l_name < r_name;
-        };
-        std::sort(r.begin(), r.end(), comparator);
-    }
-}
-
 using nc_t = entity_t::name_comparator_t;
 
 bool nc_t::operator()(const entity_t *lhs, const entity_t *rhs) const noexcept {

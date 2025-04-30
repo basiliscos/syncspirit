@@ -44,7 +44,6 @@ struct SYNCSPIRIT_API entity_t : model::proxy_t {
     const path_t &get_path() const noexcept;
 
     presence_t *get_presence(model::device_t &device) noexcept;
-    child_presences_t &get_child_presences(model::device_t &device) noexcept;
 
     children_t &get_children() noexcept;
     entity_t *get_parent() noexcept;
@@ -72,7 +71,6 @@ struct SYNCSPIRIT_API entity_t : model::proxy_t {
     void set_parent(entity_t *parent) noexcept;
     void commit(const path_t &path) noexcept;
     void push_stats(const presence_stats_t &diff, const model::device_t *source, bool best) noexcept;
-    void actualize_on_demand(child_presences_t &, model::device_t &device) noexcept;
     const presence_t *recalc_best() noexcept;
 
     entity_t *parent;

@@ -20,6 +20,8 @@ struct file_entity_t;
 struct cluster_file_presence_t;
 
 struct SYNCSPIRIT_API presence_t : model::proxy_t {
+    using children_t = std::vector<presence_t *>;
+
     // clang-format off
     enum features_t: std::uint32_t {
         folder          = 1 << 0,
@@ -51,6 +53,8 @@ struct SYNCSPIRIT_API presence_t : model::proxy_t {
 
     virtual const presence_t* determine_best(const presence_t*) const;
 
+    children_t& get_children() noexcept;
+
   protected:
     friend struct entity_t;
     friend struct cluster_file_presence_t;
@@ -65,10 +69,12 @@ struct SYNCSPIRIT_API presence_t : model::proxy_t {
     presence_t *parent;
     augmentable_t* augmentable;
     model::device_ptr_t device;
+    children_t children;
     mutable std::uint32_t features = 0;
     mutable std::uint32_t entity_generation = 0;
     mutable presence_stats_t statistics;
     mutable presence_stats_t own_statistics;
+
 };
 
 } // namespace syncspirit::presentation
