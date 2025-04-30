@@ -68,7 +68,7 @@ folder_entity_t::folder_entity_t(model::folder_ptr_t folder_) noexcept : entity_
     for (auto &it : folders_map) {
         auto &folder_info = *it.item;
         auto p = new folder_presence_t(*this, folder_info);
-        records.emplace_back(record_t{folder_info.get_device(), p});
+        records.emplace_back(record_t{p});
     }
 
     // make all-files as chilren, make hierarchy
@@ -83,13 +83,13 @@ folder_entity_t::folder_entity_t(model::folder_ptr_t folder_) noexcept : entity_
 
 void folder_entity_t::on_insert(model::folder_info_t &folder_info) noexcept {
     auto device = folder_info.get_device();
-    for (auto &r : records) {
-        if (r.device == device) {
+    for (auto &[p, _] : records) {
+        if (p->get_device() == device) {
             return;
         }
     }
     auto p = new folder_presence_t(*this, folder_info);
-    records.emplace_back(record_t{folder_info.get_device(), p});
+    records.emplace_back(record_t{p});
 
     auto new_files = new_files_t();
     process(&folder_info, children, new_files);
@@ -125,20 +125,20 @@ entity_t *folder_entity_t::on_insert(model::file_info_t &file_info) noexcept {
         diff = child->get_stats();
         auto device = file_info.get_folder_info()->get_device();
         entity->push_stats({diff, 0}, device, true);
-        for (auto &[d, presence, cp] : records) {
-            cp.clear();
+        for (auto &[presence, child_presences] : records) {
+            child_presences.clear();
         }
         return child.get();
     } else if (i == path.get_pieces_size()) {
         auto device = file_info.get_folder_info()->get_device();
         auto presence_diff = presence_stats_t{};
         auto entry_diff = entity_stats_t{};
-        for (auto &[d, presence, cp] : records) {
-            if (d == device) {
+        for (auto &[presence, child_presences] : records) {
+            if (presence->get_device() == device) {
                 presence_diff = -presence->get_own_stats();
-                cp.clear();
+                child_presences.clear();
             }
-            if (d == best_device) {
+            if (presence->get_device() == best_device) {
                 entry_diff = -presence->get_stats();
             }
         }

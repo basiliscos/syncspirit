@@ -46,8 +46,8 @@ void entity_t::push_stats(const presence_stats_t &diff, const model::device_t *s
             ++current->generation;
         }
         if (source) {
-            for (auto &[device, p, _] : current->records) {
-                if (device == source) {
+            for (auto &[p, _] : current->records) {
+                if (p->device == source) {
                     p->statistics += diff;
                     p->entity_generation--;
                     assert(p->statistics.entities >= 0);
@@ -72,9 +72,9 @@ void entity_t::remove_presense(presence_t &item) noexcept {
             for (auto it = children.begin(); scan && it != children.end();) {
                 auto &c = *it;
                 bool advance_it = true;
-                for (auto &r : c->records) {
-                    if (r.device == item.device) {
-                        r.presence->clear_presense();
+                for (auto [p, _] : c->records) {
+                    if (p->device == item.device) {
+                        p->clear_presense();
                         advance_it = false;
                         scan = false;
                         break;
@@ -89,7 +89,7 @@ void entity_t::remove_presense(presence_t &item) noexcept {
     }
     bool need_restat = false;
     auto stats = statistics;
-    if (best_device && it->device == best_device) {
+    if (best_device && it->presence->device == best_device) {
         stats -= it->presence->get_own_stats();
         need_restat = true;
     }
@@ -106,9 +106,9 @@ void entity_t::remove_presense(presence_t &item) noexcept {
 
     bool remove_self = records.empty() && parent;
     if (records.size() == 1) {
-        auto &r = records.front();
-        if (!r.device) {
-            remove_presense(*r.presence);
+        auto &[p, _] = records.front();
+        if (!p->device) {
+            remove_presense(*p);
         }
     }
     if (remove_self) {
@@ -122,17 +122,17 @@ auto entity_t::recalc_best() noexcept -> const presence_t * {
     auto best = (const presence_t *)(nullptr);
     if (parent) {
         best_device.reset();
-        for (auto &[d, p, _] : records) {
-            if (!d) {
+        for (auto &[p, _] : records) {
+            if (!p->device) {
                 continue;
             }
             if (!best) {
                 best = p;
-                best_device = d;
+                best_device = p->device;
             } else {
                 best = p->determine_best(best);
                 if (best == p) {
-                    best_device = d;
+                    best_device = p->device;
                 }
             }
         }
@@ -142,12 +142,11 @@ auto entity_t::recalc_best() noexcept -> const presence_t * {
 
 presence_t *entity_t::get_presence(model::device_t &device) noexcept {
     presence_t *fallback = nullptr;
-    for (auto &record : records) {
-        auto d = record.device.get();
-        if (d == &device) {
-            return record.presence;
-        } else if (!d) {
-            fallback = record.presence;
+    for (auto &[p, _] : records) {
+        if (p->device == &device) {
+            return p;
+        } else if (!p->device) {
+            fallback = p;
         }
     }
     return fallback;
@@ -191,7 +190,7 @@ void entity_t::commit(const path_t &path) noexcept {
     }
     if (records.size()) {
         auto &first = records.front();
-        for (auto &[device, presence, child_presences] : records) {
+        for (auto &[presence, child_presences] : records) {
             auto parent = presence->parent;
             if (parent && path.contains(parent->entity->path)) {
                 parent->statistics += presence->statistics;
@@ -206,11 +205,10 @@ void entity_t::commit(const path_t &path) noexcept {
 }
 
 auto entity_t::get_child_presences(model::device_t &device) noexcept -> child_presences_t & {
-    for (auto &r : records) {
-        if (r.device == &device) {
-            auto &presences = r.child_presences;
-            actualize_on_demand(presences, device);
-            return presences;
+    for (auto &[p, child_presences] : records) {
+        if (p->device == &device) {
+            actualize_on_demand(child_presences, device);
+            return child_presences;
         }
     }
     assert(0 && "should not happen");

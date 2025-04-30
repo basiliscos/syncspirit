@@ -60,7 +60,6 @@ struct SYNCSPIRIT_API entity_t : model::proxy_t {
     friend struct cluster_file_presence_t;
 
     struct record_t {
-        model::device_ptr_t device;
         presence_t *presence;
         child_presences_t child_presences;
     };

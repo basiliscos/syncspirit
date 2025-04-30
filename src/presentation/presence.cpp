@@ -77,8 +77,9 @@ void presence_t::sync_with_entity() const noexcept {
 
         if (features & (features_t::file | features_t::directory)) {
             auto best_version = proto::Counter();
-            for (auto [d, presence, _] : entity->records) {
-                if ((d == entity->best_device) && (presence->get_features() & features_t::cluster)) {
+            for (auto &[presence, _] : entity->records) {
+                if ((presence->get_device() == entity->best_device) &&
+                    (presence->get_features() & features_t::cluster)) {
                     auto best = static_cast<cluster_file_presence_t *>(presence);
                     best_version = best->get_file_info().get_version()->get_best();
                     break;

@@ -1458,6 +1458,90 @@ TEST_CASE("statistics", "[presentation]") {
         CHECK(dir_a->get_stats() == entity_stats_t{1, 0});
         CHECK(p_a_peer->get_stats() == presence_stats_t{1, 0, 0});
     }
+
+    SECTION("yet not resolved conficts") {
+        REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
+        SECTION("static") {
+            SECTION("local win") {
+                auto f_a_my = add_file("content.txt", *my_device, 5, proto::FileInfoType::FILE, my_device_id, 10);
+                auto f_a_peer = add_file("content.txt", *peer_device, 6, proto::FileInfoType::FILE, peer_device_id, 9);
+                auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
+                CHECK(folder_entity->get_stats() == entity_stats_t{1, 5});
+                REQUIRE(folder_entity->get_children().size() == 1);
+
+                auto file_entity = *folder_entity->get_children().begin();
+                CHECK(file_entity->get_stats() == entity_stats_t{1, 5});
+
+                auto p_my = file_entity->get_presence(*my_device);
+                CHECK(p_my->get_stats() == presence_stats_t{1, 5, 1});
+
+                auto p_a_peer = file_entity->get_presence(*peer_device);
+                CHECK(p_a_peer->get_stats() == presence_stats_t{1, 6, 0});
+            }
+            SECTION("remote win") {
+                auto f_a_my = add_file("content.txt", *my_device, 5, proto::FileInfoType::FILE, my_device_id, 9);
+                auto f_a_peer = add_file("content.txt", *peer_device, 6, proto::FileInfoType::FILE, peer_device_id, 10);
+                auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
+                CHECK(folder_entity->get_stats() == entity_stats_t{1, 6});
+                REQUIRE(folder_entity->get_children().size() == 1);
+
+                auto file_entity = *folder_entity->get_children().begin();
+                CHECK(file_entity->get_stats() == entity_stats_t{1, 6});
+
+                auto p_my = file_entity->get_presence(*my_device);
+                CHECK(p_my->get_stats() == presence_stats_t{1, 5, 0});
+
+                auto p_a_peer = file_entity->get_presence(*peer_device);
+                CHECK(p_a_peer->get_stats() == presence_stats_t{1, 6, 1});
+            }
+        }
+        SECTION("dynamic") {
+            auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
+            SECTION("local win") {
+                auto f_a_my = add_file("content-2.txt", *my_device, 5, proto::FileInfoType::FILE, my_device_id, 10);
+                auto f_a_peer =
+                    add_file("content-2.txt", *peer_device, 6, proto::FileInfoType::FILE, peer_device_id, 9);
+
+                folder_entity->on_insert(*f_a_my);
+                folder_entity->on_insert(*f_a_peer);
+
+                REQUIRE(folder_entity->get_children().size() == 1);
+                auto file_entity = *folder_entity->get_children().begin();
+                CHECK(file_entity->get_stats() == entity_stats_t{1, 5});
+
+                auto p_my = file_entity->get_presence(*my_device);
+                CHECK(p_my->get_stats() == presence_stats_t{1, 5, 1});
+
+                auto p_a_peer = file_entity->get_presence(*peer_device);
+                CHECK(p_a_peer->get_stats() == presence_stats_t{1, 6, 0});
+            }
+#if 0
+            SECTION("remote win") {
+                auto f_a_my = add_file("content-3.txt", *my_device, 5, proto::FileInfoType::FILE, my_device_id, 9);
+                auto f_a_peer = add_file("content-3.txt", *peer_device, 6, proto::FileInfoType::FILE, peer_device_id, 10);
+
+                folder_entity->on_insert(*f_a_my);
+                folder_entity->on_insert(*f_a_peer);
+
+                auto p_folder_my = folder_entity->get_presence(*my_device);
+                CHECK(p_folder_my->get_stats() == presence_stats_t{1, 5, 0});
+                auto p_folder_peer = folder_entity->get_presence(*peer_device);
+                CHECK(p_folder_peer->get_stats() == presence_stats_t{1, 6, 1});
+
+                REQUIRE(folder_entity->get_children().size() == 1);
+                auto file_entity = *folder_entity->get_children().begin();
+                CHECK(file_entity->get_stats() == entity_stats_t{1, 6});
+
+
+                auto p_my = file_entity->get_presence(*my_device);
+                CHECK(p_my->get_stats() == presence_stats_t{1, 5, 0});
+
+                auto p_a_peer = file_entity->get_presence(*peer_device);
+                CHECK(p_a_peer->get_stats() == presence_stats_t{1, 6, 1});
+            }
+#endif
+        }
+    }
 }
 
 static bool _init = []() -> bool {
