@@ -75,7 +75,6 @@ struct SYNCSPIRIT_API entity_t : model::proxy_t {
     children_t children;
     entity_stats_t statistics;
     std::uint32_t generation = 0;
-    int cluster_record;
     model::device_ptr_t best_device;
 };
 

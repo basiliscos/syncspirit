@@ -12,7 +12,7 @@ using namespace syncspirit::presentation;
 using F = presence_t::features_t;
 
 entity_t::entity_t(path_t path_, entity_t *parent_) noexcept
-    : parent{parent_}, path(std::move(path_)), has_dir{false}, cluster_record{-1} {}
+    : parent{parent_}, path(std::move(path_)), has_dir{false} {}
 
 entity_t::~entity_t() { clear_children(); }
 
