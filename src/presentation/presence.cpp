@@ -79,10 +79,9 @@ void presence_t::sync_with_entity() const noexcept {
 
         if (features & (features_t::file | features_t::directory)) {
             auto best_version = proto::Counter();
-            for (auto &[presence, _] : entity->records) {
-                if ((presence->get_device() == entity->best_device) &&
-                    (presence->get_features() & features_t::cluster)) {
-                    auto best = static_cast<cluster_file_presence_t *>(presence);
+            for (auto p : entity->records) {
+                if ((p->get_device() == entity->best_device) && (p->get_features() & features_t::cluster)) {
+                    auto best = static_cast<cluster_file_presence_t *>(p);
                     best_version = best->get_file_info().get_version()->get_best();
                     break;
                 }
@@ -99,8 +98,8 @@ void presence_t::sync_with_entity() const noexcept {
     }
 }
 
-auto presence_t::get_children() noexcept -> children_t& {
-    auto& e_children = entity->children;
+auto presence_t::get_children() noexcept -> children_t & {
+    auto &e_children = entity->children;
     if (children.size() != e_children.size()) {
         children.clear();
         children.reserve(e_children.size());

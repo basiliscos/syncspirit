@@ -34,7 +34,7 @@ file_entity_t::file_entity_t(model::file_info_t &sample_file, path_t path_) noex
     }
 
     missing_file = new missing_file_presence_t(*this);
-    records.emplace_back(record_t{missing_file.get()});
+    records.emplace_back(missing_file.get());
 
     for (auto &it : presence_files) {
         on_insert(*it);
@@ -50,7 +50,7 @@ auto file_entity_t::on_insert(model::file_info_t &file_info) noexcept
     -> std::pair<file_presence_t *, presence_stats_t> {
     auto fi = file_info.get_folder_info();
     auto device = fi->get_device();
-    for (auto &[p, _] : records) {
+    for (auto p : records) {
         if (p->device == device) {
             return {static_cast<file_presence_t *>(p), {}};
         }
@@ -69,10 +69,10 @@ auto file_entity_t::on_insert(model::file_info_t &file_info) noexcept
         --parent_presence->entity_generation;
         parent_presence = parent_presence->parent;
     }
-    records.emplace_back(record_t{presence});
+    records.emplace_back(presence);
     auto diff = presence->get_own_stats();
     for (auto &c : children) {
-        for (auto &[p, _] : c->records) {
+        for (auto p : c->records) {
             if (p->device == device) {
                 if (p->parent != presence) {
                     p->set_parent(presence);

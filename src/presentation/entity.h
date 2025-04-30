@@ -58,14 +58,9 @@ struct SYNCSPIRIT_API entity_t : model::proxy_t {
     friend struct folder_entity_t;
     friend struct cluster_file_presence_t;
 
-    struct record_t {
-        presence_t *presence;
-        child_presences_t child_presences;
-    };
-    using records_t = std::vector<record_t>;
+    using records_t = std::vector<presence_t *>;
 
     void clear_children() noexcept;
-
     void on_update() noexcept override;
     void on_delete() noexcept override;
     void set_parent(entity_t *parent) noexcept;

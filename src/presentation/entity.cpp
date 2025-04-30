@@ -31,8 +31,8 @@ entity_t *entity_t::get_parent() noexcept { return parent; }
 
 void entity_t::set_parent(entity_t *value) noexcept {
     parent = value;
-    for (auto &r : records) {
-        r.presence->set_parent(value);
+    for (auto presence : records) {
+        presence->set_parent(value);
     }
 }
 
@@ -46,7 +46,7 @@ void entity_t::push_stats(const presence_stats_t &diff, const model::device_t *s
             ++current->generation;
         }
         if (source) {
-            for (auto &[p, _] : current->records) {
+            for (auto p : current->records) {
                 if (p->device == source) {
                     p->statistics += diff;
                     p->entity_generation--;
@@ -62,7 +62,7 @@ void entity_t::push_stats(const presence_stats_t &diff, const model::device_t *s
 }
 
 void entity_t::remove_presense(presence_t &item) noexcept {
-    auto predicate = [&item](const record_t &record) { return record.presence == &item; };
+    auto predicate = [&item](const presence_t *presence) { return presence == &item; };
     auto it = std::find_if(records.begin(), records.end(), predicate);
     assert(it != records.end());
     if (children.size()) {
@@ -72,7 +72,7 @@ void entity_t::remove_presense(presence_t &item) noexcept {
             for (auto it = children.begin(); scan && it != children.end();) {
                 auto &c = *it;
                 bool advance_it = true;
-                for (auto [p, _] : c->records) {
+                for (auto p : c->records) {
                     if (p->device == item.device) {
                         p->clear_presense();
                         advance_it = false;
@@ -89,8 +89,8 @@ void entity_t::remove_presense(presence_t &item) noexcept {
     }
     bool need_restat = false;
     auto stats = statistics;
-    if (best_device && it->presence->device == best_device) {
-        stats -= it->presence->get_own_stats();
+    if (best_device && item.device == best_device) {
+        stats -= item.get_own_stats();
         need_restat = true;
     }
     records.erase(it);
@@ -106,7 +106,7 @@ void entity_t::remove_presense(presence_t &item) noexcept {
 
     bool remove_self = records.empty() && parent;
     if (records.size() == 1) {
-        auto &[p, _] = records.front();
+        auto p = records.front();
         if (!p->device) {
             remove_presense(*p);
         }
@@ -122,7 +122,7 @@ auto entity_t::recalc_best() noexcept -> const presence_t * {
     auto best = (const presence_t *)(nullptr);
     if (parent) {
         best_device.reset();
-        for (auto &[p, _] : records) {
+        for (auto p : records) {
             if (!p->device) {
                 continue;
             }
@@ -142,7 +142,7 @@ auto entity_t::recalc_best() noexcept -> const presence_t * {
 
 presence_t *entity_t::get_presence(model::device_t &device) noexcept {
     presence_t *fallback = nullptr;
-    for (auto &[p, _] : records) {
+    for (auto p : records) {
         if (p->device == &device) {
             return p;
         } else if (!p->device) {
@@ -168,13 +168,13 @@ void entity_t::remove_child(entity_t &child) noexcept {
     child.set_augmentation({});
     model::intrusive_ptr_release(&child);
 
-    for (auto &r : records) {
-        auto p = r.presence->parent;
+    for (auto r : records) {
+        auto p = r->parent;
         while (p) {
-            p->statistics -= r.presence->statistics;
+            p->statistics -= r->statistics;
             p = p->parent;
         }
-        r.child_presences.clear();
+        r->children.clear();
     }
     child.parent = nullptr;
     push_stats({-child.get_stats(), 0}, nullptr, true);
@@ -190,10 +190,10 @@ void entity_t::commit(const path_t &path) noexcept {
     }
     if (records.size()) {
         auto &first = records.front();
-        for (auto &[presence, child_presences] : records) {
-            auto parent = presence->parent;
+        for (auto p : records) {
+            auto parent = p->parent;
             if (parent && path.contains(parent->entity->path)) {
-                parent->statistics += presence->statistics;
+                parent->statistics += p->statistics;
             }
         }
     }
