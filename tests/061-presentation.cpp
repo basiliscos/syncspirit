@@ -86,15 +86,18 @@ TEST_CASE("path", "[presentation]") {
     }
 }
 
-TEST_CASE("presentation", "[presentation]") {
-    auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
-    auto peer_id = device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
-    auto peer_2_id =
-        model::device_id_t::from_string("LYXKCHX-VI3NYZR-ALCJBHF-WMZYSPK-QG6QJA3-MPFYMSO-U56GTUK-NA2MIAW").value();
-    auto my_device = device_t::create(my_id, "my-device").value();
-    auto peer_device = device_t::create(peer_id, "peer-device").value();
-    auto peer_2_device = device_t::create(peer_2_id, "peer-device-2").value();
+auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
+auto peer_id = device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
+auto peer_2_id =
+    model::device_id_t::from_string("LYXKCHX-VI3NYZR-ALCJBHF-WMZYSPK-QG6QJA3-MPFYMSO-U56GTUK-NA2MIAW").value();
+auto my_device = device_t::create(my_id, "my-device").value();
+auto peer_device = device_t::create(peer_id, "peer-device").value();
+auto peer_2_device = device_t::create(peer_2_id, "peer-device-2").value();
 
+auto my_device_id = my_device->device_id().get_uint();
+auto peer_device_id = peer_device->device_id().get_uint();
+
+TEST_CASE("presentation", "[presentation]") {
     auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
     auto sequencer = make_sequencer(4);
     cluster->get_devices().put(my_device);
@@ -887,16 +890,6 @@ TEST_CASE("statistics, update", "[presentation]") {
 }
 
 TEST_CASE("statistics", "[presentation]") {
-    auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
-    auto peer_id = device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
-    auto peer_2_id =
-        model::device_id_t::from_string("LYXKCHX-VI3NYZR-ALCJBHF-WMZYSPK-QG6QJA3-MPFYMSO-U56GTUK-NA2MIAW").value();
-    auto my_device = device_t::create(my_id, "my-device").value();
-    auto my_device_id = my_device->device_id().get_uint();
-    auto peer_device = device_t::create(peer_id, "peer-device").value();
-    auto peer_device_id = peer_device->device_id().get_uint();
-    auto peer_2_device = device_t::create(peer_2_id, "peer-device-2").value();
-
     auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
     auto sequencer = make_sequencer(4);
     cluster->get_devices().put(my_device);
