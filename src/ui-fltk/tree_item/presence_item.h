@@ -27,7 +27,7 @@ struct presence_item_t : dynamic_item_t, model::augmentation_t {
     void do_show(std::uint32_t mask, bool refresh_label);
     void do_hide();
     int get_position(std::uint32_t cut_mask);
-    virtual model::device_t *get_device();
+    virtual const model::device_t *get_device() const;
 
     presentation::presence_t &presence;
     bool expanded;

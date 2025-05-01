@@ -100,7 +100,7 @@ void entity_t::remove_presense(presence_t &item) noexcept {
     }
     if (stats != statistics) {
         auto diff = stats - statistics;
-        push_stats({diff, 0}, item.device.get(), true);
+        push_stats({diff, 0}, item.device, true);
     }
 
     bool remove_self = records.empty() && parent;

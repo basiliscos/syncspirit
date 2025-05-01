@@ -13,7 +13,7 @@ struct missing_item_presence_t final : presence_item_t {
     missing_item_presence_t(presence_item_t *host, presentation::presence_t &presence);
 
     void update_label() override;
-    model::device_t *get_device() override;
+    const model::device_t *get_device() const override;
 
     presence_item_t *host;
 };

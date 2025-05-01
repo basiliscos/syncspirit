@@ -39,7 +39,7 @@ struct SYNCSPIRIT_API presence_t : model::proxy_t {
     static constexpr std::uint32_t mask = 0xFFFFFFFF;
     // clang-format ON
 
-    presence_t(entity_t *entity, model::device_ptr_t device) noexcept ;
+    presence_t(entity_t *entity, model::device_t* device) noexcept ;
     ~presence_t();
 
     presence_t *get_parent() noexcept ;
@@ -49,7 +49,7 @@ struct SYNCSPIRIT_API presence_t : model::proxy_t {
     std::uint32_t get_features() const noexcept ;
     virtual const presence_stats_t& get_stats(bool sync = true) const noexcept ;
     const presence_stats_t& get_own_stats() const noexcept;
-    inline model::device_t* get_device() const noexcept { return device.get() ;}
+    inline const model::device_t* get_device() const noexcept { return device; }
 
     virtual const presence_t* determine_best(const presence_t*) const;
 
@@ -68,7 +68,7 @@ struct SYNCSPIRIT_API presence_t : model::proxy_t {
     entity_t *entity;
     presence_t *parent;
     augmentable_t* augmentable;
-    model::device_ptr_t device;
+    model::device_t* device;
     children_t children;
     mutable std::uint32_t features = 0;
     mutable std::uint32_t entity_generation = 0;

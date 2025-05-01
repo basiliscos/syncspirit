@@ -79,7 +79,7 @@ void presence_item_t::populate_dummy_child() {
 
 auto presence_item_t::get_presence() -> presentation::presence_t & { return presence; }
 
-auto presence_item_t::get_device() -> model::device_t * { return presence.get_device(); }
+auto presence_item_t::get_device() const -> const model::device_t * { return presence.get_device(); }
 
 int presence_item_t::get_position(std::uint32_t cut_mask) {
     auto &container = presence.get_children();

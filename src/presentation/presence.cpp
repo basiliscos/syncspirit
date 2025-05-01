@@ -10,8 +10,8 @@ using namespace syncspirit::presentation;
 
 using F = presence_t::features_t;
 
-presence_t::presence_t(entity_t *entity_, model::device_ptr_t device_) noexcept
-    : entity{entity_}, device{std::move(device_)}, parent{nullptr}, augmentable{nullptr} {
+presence_t::presence_t(entity_t *entity_, model::device_t *device_) noexcept
+    : entity{entity_}, device{device_}, parent{nullptr}, augmentable{nullptr} {
     if (entity) {
         model::intrusive_ptr_add_ref(entity);
     }
