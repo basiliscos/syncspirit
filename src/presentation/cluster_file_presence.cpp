@@ -49,14 +49,14 @@ void cluster_file_presence_t::on_update() noexcept {
     auto presence_diff = refresh_own_stats() - own_statistics;
     auto entity_stats = entity->get_stats();
     auto device = file_info.get_folder_info()->get_device();
-    auto best_device = entity->best_device.get();
-    auto best_presence = entity->recalc_best();
-    auto best_changed = entity->best_device != best_device && entity->best_device == device;
-    auto best_updated = !best_changed && device == entity->best_device;
+    auto prev_best = entity->best;
+    auto new_best = entity->recalc_best();
+    auto best_changed = prev_best != new_best && new_best->device == device;
+    auto best_updated = !best_changed && device == new_best->device;
     entity->push_stats(presence_diff, device, best_updated);
     own_statistics += presence_diff;
     if (best_changed) {
-        assert(best_presence == this);
+        assert(new_best == this);
         auto entity_diff = get_stats(true) - presence_stats_t{entity_stats, 0};
         entity->push_stats(entity_diff, {}, true);
     }

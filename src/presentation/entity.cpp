@@ -11,8 +11,7 @@ using namespace syncspirit::presentation;
 
 using F = presence_t::features_t;
 
-entity_t::entity_t(path_t path_, entity_t *parent_) noexcept
-    : parent{parent_}, path(std::move(path_)), has_dir{false} {}
+entity_t::entity_t(path_t path_, entity_t *parent_) noexcept : parent{parent_}, path(std::move(path_)), best{nullptr} {}
 
 entity_t::~entity_t() { clear_children(); }
 
@@ -89,7 +88,7 @@ void entity_t::remove_presense(presence_t &item) noexcept {
     }
     bool need_restat = false;
     auto stats = statistics;
-    if (best_device && item.device == best_device) {
+    if (&item == best) {
         stats -= item.get_own_stats();
         need_restat = true;
     }
@@ -121,22 +120,19 @@ void entity_t::remove_presense(presence_t &item) noexcept {
 auto entity_t::recalc_best() noexcept -> const presence_t * {
     auto best = (const presence_t *)(nullptr);
     if (parent) {
-        best_device.reset();
+        best = {};
         for (auto p : records) {
             if (!p->device) {
                 continue;
             }
             if (!best) {
                 best = p;
-                best_device = p->device;
             } else {
                 best = p->determine_best(best);
-                if (best == p) {
-                    best_device = p->device;
-                }
             }
         }
     }
+    this->best = best;
     return best;
 }
 

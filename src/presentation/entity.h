@@ -71,11 +71,10 @@ struct SYNCSPIRIT_API entity_t : model::proxy_t {
     entity_t *parent;
     records_t records;
     path_t path;
-    bool has_dir;
     children_t children;
     entity_stats_t statistics;
     std::uint32_t generation = 0;
-    model::device_ptr_t best_device;
+    const presence_t *best;
 };
 
 } // namespace syncspirit::presentation
