@@ -155,13 +155,13 @@ entity_t *folder_entity_t::on_insert(model::file_info_t &file_info) noexcept {
         auto prev_best = entity->best;
         auto new_best = entity->recalc_best();
         if (new_best != prev_best) {
-            auto entry_diff = entity_stats_t{};
+            auto entity_diff = entity_stats_t{};
             if (prev_best) {
-                entry_diff -= prev_best->get_own_stats();
+                entity_diff -= prev_best->get_own_stats();
             }
             assert(new_best == file_presence);
-            entry_diff += new_best->get_own_stats();
-            entity->push_stats({entry_diff, 0}, nullptr, true);
+            entity_diff += new_best->get_own_stats();
+            entity->push_stats({entity_diff, 0}, nullptr, true);
         }
         return entity;
     } else {

@@ -34,6 +34,15 @@ template <> struct StringMaker<entity_stats_t> {
 
 } // namespace Catch
 
+struct aug_sample_t : model::augmentation_t {
+    aug_sample_t(int &deleted_, int &updated_) : deleted{deleted_}, updated{updated_} {}
+    void on_update() noexcept { ++updated; };
+    void on_delete() noexcept { ++deleted; };
+
+    int &deleted;
+    int &updated;
+};
+
 TEST_CASE("path", "[presentation]") {
     using pieces_t = std::vector<std::string_view>;
     SECTION("a/bb/c.txt") {
@@ -105,15 +114,6 @@ TEST_CASE("presentation", "[presentation]") {
             CHECK(!folder_entity->get_parent());
 
             SECTION("check forwarding") {
-                struct aug_sample_t : model::augmentation_t {
-                    aug_sample_t(int &deleted_, int &updated_) : deleted{deleted_}, updated{updated_} {}
-                    void on_update() noexcept { ++updated; };
-                    void on_delete() noexcept { ++deleted; };
-
-                    int &deleted;
-                    int &updated;
-                };
-
                 int deleted = 0;
                 int updated = 0;
                 auto aug = model::augmentation_ptr_t(new aug_sample_t(deleted, updated));
