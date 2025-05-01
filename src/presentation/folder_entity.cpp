@@ -122,12 +122,18 @@ entity_t *folder_entity_t::on_insert(model::file_info_t &file_info) noexcept {
         entity->add_child(*child);
         orphans.reap_children(child);
         child->commit(child->get_path());
-        diff = child->get_stats();
-        auto device = file_info.get_folder_info()->get_device();
-        entity->push_stats({diff, 0}, device, true);
-        for (auto p : records) {
-            p->get_children().clear();
+
+        for (auto p : child->records) {
+            auto device = p->get_device();
+            if (device) {
+                auto best = child->best == p;
+                auto diff = p->get_stats();
+                entity->push_stats(diff, p->get_device(), false);
+                p->get_children().clear();
+            }
         }
+        entity->push_stats({child->get_stats(), 0}, nullptr, true);
+
         recalc_best();
         return child.get();
     } else if (i == path.get_pieces_size()) {
