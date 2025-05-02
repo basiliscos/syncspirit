@@ -5,12 +5,17 @@
 #include "model/cluster.h"
 #include "../cluster_visitor.h"
 #include "proto/proto-helpers-bep.h"
+#include <memory_resource>
 
 using namespace syncspirit::model::diff::advance;
 
 local_update_t::local_update_t(const cluster_t &cluster, sequencer_t &sequencer, proto::FileInfo proto_file_,
                                std::string_view folder_id_) noexcept
     : advance_t(folder_id_, cluster.get_device()->device_id().get_sha256(), advance_action_t::local_update) {
+
+    auto buffer = std::array<std::byte, 256>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<std::string>(&pool);
 
     auto &device = *cluster.get_devices().by_sha256(peer_id);
     auto folder = cluster.get_folders().by_id(folder_id);
@@ -20,7 +25,7 @@ local_update_t::local_update_t(const cluster_t &cluster, sequencer_t &sequencer,
     auto &local_folder_infos = folder->get_folder_infos();
     auto local_folder_info = local_folder_infos.by_device_id(self_id);
     auto &local_files = local_folder_info->get_file_infos();
-    auto name = std::string(proto::get_name(proto_file_));
+    auto name = std::pmr::string(proto::get_name(proto_file_), allocator);
     auto local_file = local_files.by_name(name);
     proto::set_modified_by(proto_file_, self.device_id().get_uint());
 
