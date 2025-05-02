@@ -9,6 +9,7 @@
 #include "presentation/folder_presence.h"
 #include "presentation/folder_entity.h"
 #include "syncspirit-config.h"
+#include <memory_resource>
 
 using namespace syncspirit;
 using namespace syncspirit::test;
@@ -1529,24 +1530,22 @@ TEST_CASE("statistics", "[presentation]") {
             }
         }
     }
-
-#if 0
     SECTION("updates propagation") {
-        struct aug_t : model::augmentation_t {
-            aug_t() : deleted{0}, updated{0} {}
-            void on_update() noexcept { ++updated; };
-            void on_delete() noexcept { ++deleted; };
+        using entity_ptr_allocator_t = std::pmr::polymorphic_allocator<const entity_t *>;
+        using entity_allocator_t = std::pmr::polymorphic_allocator<entity_ptr_t>;
+        using sorted_entities_t = std::set<const entity_t *, entity_t::name_comparator_t, entity_ptr_allocator_t>;
+        using unsorted_entities_t = std::set<entity_ptr_t, std::less<entity_ptr_t>, entity_allocator_t>;
+        struct monitor_t final : entities_monitor_t {
+            monitor_t(unsorted_entities_t &deleted_, sorted_entities_t &updated_)
+                : deleted{deleted_}, updated{updated_} {}
+            void on_delete(entity_t &entity) noexcept override { deleted.emplace(entity_ptr_t{&entity}); }
+            void on_update(const entity_t &entity) noexcept override { updated.insert(&entity); }
 
-            int deleted;
-            int updated;
+            unsorted_entities_t &deleted;
+            sorted_entities_t &updated;
         };
-        using aug_ptr_t = model::intrusive_ptr_t<aug_t>;
-
-        REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
 
         auto f_a_my = add_file("a", *my_device, 0, proto::FileInfoType::DIRECTORY, my_device_id, 1);
-        auto f_a_peer = add_file("a", *peer_device, 0, proto::FileInfoType::DIRECTORY, my_device_id, 1);
-        auto f_b_peer = add_file("a/b", *peer_device, 0, proto::FileInfoType::DIRECTORY, my_device_id, 1);
         auto f_b_my = add_file("a/b", *my_device, 0, proto::FileInfoType::DIRECTORY, my_device_id, 1);
         auto f_c_my = add_file("a/b/c.txt", *my_device, 5, proto::FileInfoType::FILE, my_device_id, 1);
 
@@ -1555,65 +1554,79 @@ TEST_CASE("statistics", "[presentation]") {
 
         REQUIRE(folder_entity->get_children().size() == 1);
         auto dir_a = *folder_entity->get_children().begin();
+        auto dir_b = *dir_a->get_children().begin();
+        auto file_c = *dir_b->get_children().begin();
 
-        auto p_a_my = dir_a->get_presence(*my_device);
-        auto p_a_peer = dir_a->get_presence(*peer_device);
-        auto p_b_my = dir_a->get_presence(*my_device)->get_children().front();
-        auto p_b_peer = dir_a->get_presence(*peer_device)->get_children().front();
-        auto p_c_my = p_b_my->get_entity()->get_presence(*my_device)->get_children().front();
+        auto buffer = std::array<std::byte, 1024>();
+        auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+        auto allocator = std::pmr::polymorphic_allocator<std::string>(&pool);
 
-        auto a_a_my = aug_ptr_t(new aug_t());
-        auto a_a_peer = aug_ptr_t(new aug_t());
-        auto a_b_my = aug_ptr_t(new aug_t());
-        auto a_b_peer = aug_ptr_t(new aug_t());
-        auto a_c_my = aug_ptr_t(new aug_t());
+        auto updated_entities = sorted_entities_t(allocator);
+        auto deleted_entities = unsorted_entities_t(allocator);
+        auto monitor = monitor_t(deleted_entities, updated_entities);
+        auto monitor_guard = folder_entity->monitor(&monitor);
 
-        p_a_my->set_augmentation(a_a_my);
-        p_a_peer->set_augmentation(a_a_peer);
-        p_b_my->set_augmentation(a_b_my);
-        p_b_peer->set_augmentation(a_b_peer);
-        p_c_my->set_augmentation(a_c_my);
+        SECTION("file update") {
+            auto pr_fi = [&]() {
+                auto pr_fi = f_c_my->as_proto(false);
+                auto block = model::block_info_ptr_t();
+                proto::set_size(pr_fi, 6);
+                proto::set_block_size(pr_fi, 6);
+                auto bytes = utils::bytes_t(6);
+                std::fill_n(bytes.data(), bytes.size(), '1');
+                auto b_hash = utils::sha256_digest(bytes).value();
+                auto &b = proto::add_blocks(pr_fi);
+                proto::set_size(b, 6);
+                proto::set_hash(b, b_hash);
+                block = blocks.by_hash(b_hash);
+                block = model::block_info_t::create(b).value();
+                blocks.put(block);
+                return pr_fi;
+            }();
+            REQUIRE(builder.local_update("1234-5678", pr_fi).apply());
+            REQUIRE(deleted_entities.size() == 0);
+            REQUIRE(updated_entities.size() == 1);
+            REQUIRE(*updated_entities.begin() == file_c);
+            updated_entities.clear();
+        }
 
-        CHECK(a_a_my->updated == 0);
-        CHECK(a_a_my->deleted == 0);
-        CHECK(a_a_peer->updated == 0);
-        CHECK(a_a_peer->deleted == 0);
-        CHECK(a_b_my->updated == 0);
-        CHECK(a_b_my->deleted == 0);
-        CHECK(a_b_peer->updated == 0);
-        CHECK(a_b_peer->deleted == 0);
-        CHECK(a_c_my->updated == 0);
-        CHECK(a_c_my->deleted == 0);
+        auto f_d_my = add_file("a/b/d.txt", *my_device, 7, proto::FileInfoType::FILE, my_device_id, 1);
+        folder_entity->on_insert(*f_d_my);
 
-        auto pr_fi = [&]() {
-            auto pr_fi = f_c_my->as_proto(false);
-            auto block = model::block_info_ptr_t();
-            proto::set_size(pr_fi, 6);
-            proto::set_block_size(pr_fi, 6);
-            auto bytes = utils::bytes_t(6);
-            std::fill_n(bytes.data(), bytes.size(), '1');
-            auto b_hash = utils::sha256_digest(bytes).value();
-            auto &b = proto::add_blocks(pr_fi);
-            proto::set_size(b, 6);
-            proto::set_hash(b, b_hash);
-            block = blocks.by_hash(b_hash);
-            block = model::block_info_t::create(b).value();
-            blocks.put(block);
-            return pr_fi;
-        }();
-        REQUIRE(builder.local_update("1234-5678", pr_fi).apply());
-        CHECK(a_a_my->updated == 1);
-        CHECK(a_a_my->deleted == 0);
-        CHECK(a_a_peer->updated == 1);
-        CHECK(a_a_peer->deleted == 0);
-        CHECK(a_b_my->updated == 1);
-        CHECK(a_b_my->deleted == 0);
-        CHECK(a_b_peer->updated == 1);
-        CHECK(a_b_peer->deleted == 0);
-        CHECK(a_c_my->updated == 0);
-        CHECK(a_c_my->deleted == 0);
+        auto file_d = *(++dir_b->get_children().begin());
+        REQUIRE(deleted_entities.size() == 0);
+        REQUIRE(updated_entities.size() == 1);
+        REQUIRE(*updated_entities.begin() == file_d);
+        updated_entities.clear();
+
+        REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
+        auto fi_peer = folder->get_folder_infos().by_device(*peer_device);
+        folder_entity->on_insert(*fi_peer);
+        REQUIRE(deleted_entities.size() == 0);
+        REQUIRE(updated_entities.size() == 1);
+        REQUIRE(*updated_entities.begin() == folder_entity);
+        updated_entities.clear();
+
+        auto f_a_peer = add_file("a", *peer_device, 0, proto::FileInfoType::DIRECTORY, my_device_id, 1);
+        folder_entity->on_insert(*f_a_peer);
+        REQUIRE(deleted_entities.size() == 0);
+        REQUIRE(updated_entities.size() == 1);
+        REQUIRE(*updated_entities.begin() == dir_a);
+        updated_entities.clear();
+
+        auto f_x_peer = add_file("x", *peer_device, 0, proto::FileInfoType::DIRECTORY, peer_device_id, 1);
+        auto f_y_peer = add_file("x/y", *peer_device, 0, proto::FileInfoType::DIRECTORY, peer_device_id, 1);
+        folder_entity->on_insert(*f_x_peer);
+        folder_entity->on_insert(*f_y_peer);
+        REQUIRE(deleted_entities.size() == 0);
+        REQUIRE(updated_entities.size() == 2);
+        updated_entities.clear();
+
+        f_x_peer.reset();
+        f_y_peer.reset();
+        REQUIRE(builder.unshare_folder(*fi_peer).apply());
+        REQUIRE(deleted_entities.size() == 2);
     }
-#endif
 }
 
 static bool _init = []() -> bool {

@@ -60,4 +60,7 @@ void cluster_file_presence_t::on_update() noexcept {
         auto entity_diff = get_stats(true) - presence_stats_t{entity_stats, 0};
         entity->push_stats(entity_diff, {}, true);
     }
+    if (auto monitor = entity->get_monitor(); monitor) {
+        monitor->on_update(*entity);
+    }
 }

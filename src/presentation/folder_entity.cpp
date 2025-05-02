@@ -78,7 +78,7 @@ folder_entity_t::folder_entity_t(model::folder_ptr_t folder_) noexcept : entity_
         process(it_fi.item.get(), children, new_files);
     }
     process_files(new_files, orphans, this);
-    commit(path);
+    commit(path, nullptr);
 }
 
 void folder_entity_t::on_insert(model::folder_info_t &folder_info) noexcept {
@@ -95,11 +95,12 @@ void folder_entity_t::on_insert(model::folder_info_t &folder_info) noexcept {
     process(&folder_info, children, new_files);
     process_files(new_files, orphans, this);
     statistics = {};
-    commit(path);
+    commit(path, device);
 }
 
 entity_t *folder_entity_t::on_insert(model::file_info_t &file_info) noexcept {
     auto path = path_t(file_info.get_name());
+    auto device = file_info.get_folder_info()->get_device();
 
     auto entity = static_cast<entity_t *>(this);
     size_t i = 0;
@@ -121,7 +122,7 @@ entity_t *folder_entity_t::on_insert(model::file_info_t &file_info) noexcept {
         child.reset(new file_entity_t(file_info, std::move(path)));
         entity->add_child(*child);
         orphans.reap_children(child);
-        child->commit(child->get_path());
+        child->commit(child->get_path(), device);
 
         for (auto p : child->records) {
             auto device = p->get_device();
@@ -133,11 +134,9 @@ entity_t *folder_entity_t::on_insert(model::file_info_t &file_info) noexcept {
             }
         }
         entity->push_stats({child->get_stats(), 0}, nullptr, true);
-
         recalc_best();
         return child.get();
     } else if (i == path.get_pieces_size()) {
-        auto device = file_info.get_folder_info()->get_device();
         auto presence_diff = presence_stats_t{};
         for (auto p : records) {
             if (p->get_device() == device) {
@@ -162,6 +161,9 @@ entity_t *folder_entity_t::on_insert(model::file_info_t &file_info) noexcept {
             assert(new_best == file_presence);
             entity_diff += new_best->get_own_stats();
             entity->push_stats({entity_diff, 0}, nullptr, true);
+        }
+        if (auto monitor = get_monitor(); monitor) {
+            monitor->on_update(*entity);
         }
         return entity;
     } else {

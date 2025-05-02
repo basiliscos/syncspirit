@@ -11,7 +11,8 @@ using namespace syncspirit::presentation;
 
 using F = presence_t::features_t;
 
-entity_t::entity_t(path_t path_, entity_t *parent_) noexcept : parent{parent_}, path(std::move(path_)), best{nullptr} {}
+entity_t::entity_t(path_t path_, entity_t *parent_) noexcept
+    : parent{parent_}, path(std::move(path_)), best{nullptr}, entities_monitor{nullptr} {}
 
 entity_t::~entity_t() { clear_children(); }
 
@@ -171,30 +172,54 @@ void entity_t::remove_child(entity_t &child) noexcept {
     }
     child.parent = nullptr;
     push_stats({-child.get_stats(), 0}, nullptr, true);
+
+    if (auto monitor = get_monitor(); monitor) {
+        monitor->on_delete(child);
+    }
+
     children.erase(it);
 }
 
 const entity_stats_t &entity_t::get_stats() noexcept { return statistics; }
 
-void entity_t::commit(const path_t &path) noexcept {
-    for (auto child : children) {
-        child->commit(path);
-        statistics += child->get_stats();
-    }
-    if (records.size()) {
-        auto &first = records.front();
-        for (auto p : records) {
-            auto parent = p->parent;
-            if (parent && path.contains(parent->entity->path)) {
-                parent->statistics += p->statistics;
-            }
+void entity_t::commit(const path_t &path, const model::device_t *device) noexcept {
+    bool do_recurse = (device == nullptr);
+    if (!do_recurse) {
+        for (size_t i = 0; (i < records.size()) && !do_recurse; ++i) {
+            auto p = records[i];
+            if (p->device == device) {
+                do_recurse = true;
+            };
         }
     }
+    if (!do_recurse) {
+        return;
+    }
+
+    for (auto child : children) {
+        child->commit(path, device);
+        statistics += child->get_stats();
+    }
+    for (auto p : records) {
+        auto parent = p->parent;
+        if (parent && path.contains(parent->entity->path)) {
+            parent->statistics += p->statistics;
+        }
+    }
+
     auto best = recalc_best();
     if (best) {
         statistics += best->get_own_stats();
     }
     ++generation;
+    if (auto monitor = get_monitor(); monitor) {
+        monitor->on_update(*this);
+    }
+}
+
+auto entity_t::monitor(entities_monitor_t *monitor_) noexcept -> monitor_guard_t {
+    this->entities_monitor = monitor_;
+    return monitor_guard_t(this);
 }
 
 using nc_t = entity_t::name_comparator_t;
@@ -210,3 +235,9 @@ bool nc_t::operator()(const entity_t *lhs, const std::string_view rhs) const noe
 bool nc_t::operator()(const std::string_view lhs, const entity_t *rhs) const noexcept {
     return lhs < rhs->get_path().get_own_name();
 }
+
+using mg_t = entity_t::monitor_guard_t;
+
+mg_t::monitor_guard_t(entity_t *entity_) noexcept : entity{entity_} {}
+
+mg_t::~monitor_guard_t() { entity->entities_monitor = {}; }

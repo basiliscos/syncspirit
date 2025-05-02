@@ -26,8 +26,22 @@ struct cluster_file_presence_t;
 struct file_entity_t;
 struct folder_entity_t;
 
+struct SYNCSPIRIT_API entities_monitor_t {
+    virtual void on_update(const entity_t &entity) noexcept = 0;
+    virtual void on_delete(entity_t &entity) noexcept = 0;
+};
+
 struct SYNCSPIRIT_API entity_t : model::augmentable_t {
-    struct name_comparator_t {
+    struct SYNCSPIRIT_API monitor_guard_t {
+        monitor_guard_t(entity_t *entity) noexcept;
+        monitor_guard_t(const monitor_guard_t &) = delete;
+        monitor_guard_t(monitor_guard_t &&) = default;
+        ~monitor_guard_t();
+
+      private:
+        entity_t *entity;
+    };
+    struct SYNCSPIRIT_API name_comparator_t {
         using is_transparent = std::true_type;
         bool operator()(const entity_t *lhs, const entity_t *rhs) const noexcept;
         bool operator()(const entity_t *lhs, const std::string_view rhs) const noexcept;
@@ -51,6 +65,7 @@ struct SYNCSPIRIT_API entity_t : model::augmentable_t {
     void remove_child(entity_t &child) noexcept;
     void remove_presense(presence_t &) noexcept;
     const entity_stats_t &get_stats() noexcept;
+    [[nodiscard]] monitor_guard_t monitor(entities_monitor_t *) noexcept;
 
   protected:
     friend struct presence_t;
@@ -62,9 +77,17 @@ struct SYNCSPIRIT_API entity_t : model::augmentable_t {
 
     void clear_children() noexcept;
     void set_parent(entity_t *parent) noexcept;
-    void commit(const path_t &path) noexcept;
+    void commit(const path_t &path, const model::device_t *device) noexcept;
     void push_stats(const presence_stats_t &diff, const model::device_t *source, bool best) noexcept;
     const presence_t *recalc_best() noexcept;
+
+    inline entities_monitor_t *get_monitor() noexcept {
+        auto e = this;
+        while (e->parent) {
+            e = e->parent;
+        }
+        return e->entities_monitor;
+    }
 
     entity_t *parent;
     records_t records;
@@ -73,6 +96,7 @@ struct SYNCSPIRIT_API entity_t : model::augmentable_t {
     entity_stats_t statistics;
     std::uint32_t generation = 0;
     const presence_t *best;
+    entities_monitor_t *entities_monitor;
 };
 
 } // namespace syncspirit::presentation

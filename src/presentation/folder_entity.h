@@ -18,6 +18,7 @@ struct SYNCSPIRIT_API folder_entity_t final : entity_t, model::augmentation_t {
     entity_t *on_insert(model::file_info_t &file_info) noexcept;
     void on_update() noexcept override;
     void on_delete() noexcept override;
+
   private:
     model::folder_t &folder;
     orphans_t orphans;
