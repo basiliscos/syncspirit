@@ -26,7 +26,7 @@ struct cluster_file_presence_t;
 struct file_entity_t;
 struct folder_entity_t;
 
-struct SYNCSPIRIT_API entity_t : model::proxy_t {
+struct SYNCSPIRIT_API entity_t : model::augmentable_t {
     struct name_comparator_t {
         using is_transparent = std::true_type;
         bool operator()(const entity_t *lhs, const entity_t *rhs) const noexcept;
@@ -61,8 +61,6 @@ struct SYNCSPIRIT_API entity_t : model::proxy_t {
     using records_t = std::vector<presence_t *>;
 
     void clear_children() noexcept;
-    void on_update() noexcept override;
-    void on_delete() noexcept override;
     void set_parent(entity_t *parent) noexcept;
     void commit(const path_t &path) noexcept;
     void push_stats(const presence_stats_t &diff, const model::device_t *source, bool best) noexcept;

@@ -148,9 +148,6 @@ presence_t *entity_t::get_presence(model::device_t &device) noexcept {
     return fallback;
 }
 
-void entity_t::on_update() noexcept { notify_update(); }
-void entity_t::on_delete() noexcept { clear_children(); }
-
 void entity_t::add_child(entity_t &child) noexcept {
     model::intrusive_ptr_add_ref(&child);
     children.emplace(&child);

@@ -1529,6 +1529,91 @@ TEST_CASE("statistics", "[presentation]") {
             }
         }
     }
+
+#if 0
+    SECTION("updates propagation") {
+        struct aug_t : model::augmentation_t {
+            aug_t() : deleted{0}, updated{0} {}
+            void on_update() noexcept { ++updated; };
+            void on_delete() noexcept { ++deleted; };
+
+            int deleted;
+            int updated;
+        };
+        using aug_ptr_t = model::intrusive_ptr_t<aug_t>;
+
+        REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
+
+        auto f_a_my = add_file("a", *my_device, 0, proto::FileInfoType::DIRECTORY, my_device_id, 1);
+        auto f_a_peer = add_file("a", *peer_device, 0, proto::FileInfoType::DIRECTORY, my_device_id, 1);
+        auto f_b_peer = add_file("a/b", *peer_device, 0, proto::FileInfoType::DIRECTORY, my_device_id, 1);
+        auto f_b_my = add_file("a/b", *my_device, 0, proto::FileInfoType::DIRECTORY, my_device_id, 1);
+        auto f_c_my = add_file("a/b/c.txt", *my_device, 5, proto::FileInfoType::FILE, my_device_id, 1);
+
+        auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
+        CHECK(folder_entity->get_stats() == entity_stats_t{3, 5});
+
+        REQUIRE(folder_entity->get_children().size() == 1);
+        auto dir_a = *folder_entity->get_children().begin();
+
+        auto p_a_my = dir_a->get_presence(*my_device);
+        auto p_a_peer = dir_a->get_presence(*peer_device);
+        auto p_b_my = dir_a->get_presence(*my_device)->get_children().front();
+        auto p_b_peer = dir_a->get_presence(*peer_device)->get_children().front();
+        auto p_c_my = p_b_my->get_entity()->get_presence(*my_device)->get_children().front();
+
+        auto a_a_my = aug_ptr_t(new aug_t());
+        auto a_a_peer = aug_ptr_t(new aug_t());
+        auto a_b_my = aug_ptr_t(new aug_t());
+        auto a_b_peer = aug_ptr_t(new aug_t());
+        auto a_c_my = aug_ptr_t(new aug_t());
+
+        p_a_my->set_augmentation(a_a_my);
+        p_a_peer->set_augmentation(a_a_peer);
+        p_b_my->set_augmentation(a_b_my);
+        p_b_peer->set_augmentation(a_b_peer);
+        p_c_my->set_augmentation(a_c_my);
+
+        CHECK(a_a_my->updated == 0);
+        CHECK(a_a_my->deleted == 0);
+        CHECK(a_a_peer->updated == 0);
+        CHECK(a_a_peer->deleted == 0);
+        CHECK(a_b_my->updated == 0);
+        CHECK(a_b_my->deleted == 0);
+        CHECK(a_b_peer->updated == 0);
+        CHECK(a_b_peer->deleted == 0);
+        CHECK(a_c_my->updated == 0);
+        CHECK(a_c_my->deleted == 0);
+
+        auto pr_fi = [&]() {
+            auto pr_fi = f_c_my->as_proto(false);
+            auto block = model::block_info_ptr_t();
+            proto::set_size(pr_fi, 6);
+            proto::set_block_size(pr_fi, 6);
+            auto bytes = utils::bytes_t(6);
+            std::fill_n(bytes.data(), bytes.size(), '1');
+            auto b_hash = utils::sha256_digest(bytes).value();
+            auto &b = proto::add_blocks(pr_fi);
+            proto::set_size(b, 6);
+            proto::set_hash(b, b_hash);
+            block = blocks.by_hash(b_hash);
+            block = model::block_info_t::create(b).value();
+            blocks.put(block);
+            return pr_fi;
+        }();
+        REQUIRE(builder.local_update("1234-5678", pr_fi).apply());
+        CHECK(a_a_my->updated == 1);
+        CHECK(a_a_my->deleted == 0);
+        CHECK(a_a_peer->updated == 1);
+        CHECK(a_a_peer->deleted == 0);
+        CHECK(a_b_my->updated == 1);
+        CHECK(a_b_my->deleted == 0);
+        CHECK(a_b_peer->updated == 1);
+        CHECK(a_b_peer->deleted == 0);
+        CHECK(a_c_my->updated == 0);
+        CHECK(a_c_my->deleted == 0);
+    }
+#endif
 }
 
 static bool _init = []() -> bool {
