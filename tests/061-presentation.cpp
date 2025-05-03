@@ -1530,7 +1530,7 @@ TEST_CASE("statistics", "[presentation]") {
     SECTION("updates propagation") {
         using entity_ptr_allocator_t = std::pmr::polymorphic_allocator<const entity_t *>;
         using entity_allocator_t = std::pmr::polymorphic_allocator<entity_ptr_t>;
-        using sorted_entities_t = std::set<const entity_t *, entity_t::name_comparator_t, entity_ptr_allocator_t>;
+        using sorted_entities_t = std::set<const entity_t *, entity_t::entity_comparator_t, entity_ptr_allocator_t>;
         using unsorted_entities_t = std::set<entity_ptr_t, std::less<entity_ptr_t>, entity_allocator_t>;
         struct monitor_t final : entities_monitor_t {
             monitor_t(unsorted_entities_t &deleted_, sorted_entities_t &updated_)

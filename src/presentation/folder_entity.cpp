@@ -64,11 +64,11 @@ folder_entity_t::folder_entity_t(model::folder_ptr_t folder_) noexcept : entity_
 
     // make folder_infos as presence
     auto &folders_map = folder.get_folder_infos();
-    records.reserve(folders_map.size());
+    presences.reserve(folders_map.size());
     for (auto &it : folders_map) {
         auto &folder_info = *it.item;
         auto p = new folder_presence_t(*this, folder_info);
-        records.emplace_back(p);
+        presences.emplace_back(p);
     }
 
     // make all-files as chilren, make hierarchy
@@ -83,13 +83,13 @@ folder_entity_t::folder_entity_t(model::folder_ptr_t folder_) noexcept : entity_
 
 void folder_entity_t::on_insert(model::folder_info_t &folder_info) noexcept {
     auto device = folder_info.get_device();
-    for (auto p : records) {
+    for (auto p : presences) {
         if (p->get_device() == device) {
             return;
         }
     }
     auto p = new folder_presence_t(*this, folder_info);
-    records.emplace_back(p);
+    presences.emplace_back(p);
 
     auto new_files = new_files_t();
     process(&folder_info, children, new_files);
@@ -124,7 +124,7 @@ entity_t *folder_entity_t::on_insert(model::file_info_t &file_info) noexcept {
         orphans.reap_children(child);
         child->commit(child->get_path(), device);
 
-        for (auto p : child->records) {
+        for (auto p : child->presences) {
             auto device = p->get_device();
             if (device) {
                 auto best = child->best == p;
@@ -138,7 +138,7 @@ entity_t *folder_entity_t::on_insert(model::file_info_t &file_info) noexcept {
         return child.get();
     } else if (i == path.get_pieces_size()) {
         auto presence_diff = presence_stats_t{};
-        for (auto p : records) {
+        for (auto p : presences) {
             if (p->get_device() == device) {
                 presence_diff = -p->get_own_stats();
                 p->get_children().clear();

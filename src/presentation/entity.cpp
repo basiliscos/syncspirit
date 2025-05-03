@@ -27,11 +27,9 @@ auto entity_t::get_path() const noexcept -> const path_t & { return path; }
 
 auto entity_t::get_children() noexcept -> children_t & { return children; }
 
-entity_t *entity_t::get_parent() noexcept { return parent; }
-
 void entity_t::set_parent(entity_t *value) noexcept {
     parent = value;
-    for (auto presence : records) {
+    for (auto presence : presences) {
         presence->set_parent(value);
     }
 }
@@ -48,7 +46,7 @@ void entity_t::push_stats(const presence_stats_t &diff, const model::device_t *s
             ++current->generation;
         }
         if (source) {
-            for (auto p : current->records) {
+            for (auto p : current->presences) {
                 if (p->device == source) {
                     p->entity_generation--;
                     assert(p->statistics.size >= 0);
@@ -68,8 +66,8 @@ void entity_t::push_stats(const presence_stats_t &diff, const model::device_t *s
 
 void entity_t::remove_presense(presence_t &item) noexcept {
     auto predicate = [&item](const presence_t *presence) { return presence == &item; };
-    auto it = std::find_if(records.begin(), records.end(), predicate);
-    assert(it != records.end());
+    auto it = std::find_if(presences.begin(), presences.end(), predicate);
+    assert(it != presences.end());
     if (children.size()) {
         bool rescan_children = true;
         while (rescan_children) {
@@ -77,7 +75,7 @@ void entity_t::remove_presense(presence_t &item) noexcept {
             for (auto it = children.begin(); scan && it != children.end();) {
                 auto &c = *it;
                 bool advance_it = true;
-                for (auto p : c->records) {
+                for (auto p : c->presences) {
                     if (p->device == item.device) {
                         p->clear_presense();
                         advance_it = false;
@@ -101,7 +99,7 @@ void entity_t::remove_presense(presence_t &item) noexcept {
         ++own_stats.cluster_entries;
     }
     push_stats(-own_stats, item.device, false);
-    records.erase(it);
+    presences.erase(it);
     if (need_restat) {
         if (auto best = recalc_best(); best) {
             stats += best->get_own_stats();
@@ -112,9 +110,9 @@ void entity_t::remove_presense(presence_t &item) noexcept {
         push_stats({diff, 0}, {}, true);
     };
 
-    bool remove_self = records.empty() && parent;
-    if (records.size() == 1) {
-        auto p = records.front();
+    bool remove_self = presences.empty() && parent;
+    if (presences.size() == 1) {
+        auto p = presences.front();
         if (!p->device) {
             remove_presense(*p);
         }
@@ -130,7 +128,7 @@ auto entity_t::recalc_best() noexcept -> const presence_t * {
     auto best = (const presence_t *)(nullptr);
     if (parent) {
         best = {};
-        for (auto p : records) {
+        for (auto p : presences) {
             if (!p->device) {
                 continue;
             }
@@ -147,7 +145,7 @@ auto entity_t::recalc_best() noexcept -> const presence_t * {
 
 presence_t *entity_t::get_presence(model::device_t &device) noexcept {
     presence_t *fallback = nullptr;
-    for (auto p : records) {
+    for (auto p : presences) {
         if (p->device == &device) {
             return p;
         } else if (!p->device) {
@@ -170,7 +168,7 @@ void entity_t::remove_child(entity_t &child) noexcept {
     child.set_augmentation({});
     model::intrusive_ptr_release(&child);
 
-    for (auto r : records) {
+    for (auto r : presences) {
         r->children.clear();
     }
     child.parent = nullptr;
@@ -188,8 +186,8 @@ const entity_stats_t &entity_t::get_stats() noexcept { return statistics; }
 void entity_t::commit(const path_t &path, const model::device_t *device) noexcept {
     bool do_recurse = (device == nullptr);
     if (!do_recurse) {
-        for (size_t i = 0; (i < records.size()) && !do_recurse; ++i) {
-            auto p = records[i];
+        for (size_t i = 0; (i < presences.size()) && !do_recurse; ++i) {
+            auto p = presences[i];
             if (p->device == device) {
                 do_recurse = true;
             };
@@ -203,7 +201,7 @@ void entity_t::commit(const path_t &path, const model::device_t *device) noexcep
         child->commit(path, device);
         statistics += child->get_stats();
     }
-    for (auto p : records) {
+    for (auto p : presences) {
         auto parent = p->parent;
         if (parent && path.contains(parent->entity->path)) {
             parent->statistics += p->statistics;
@@ -225,11 +223,12 @@ auto entity_t::monitor(entities_monitor_t *monitor_) noexcept -> monitor_guard_t
     return monitor_guard_t(this);
 }
 
-using nc_t = entity_t::name_comparator_t;
-
-bool nc_t::operator()(const entity_t *lhs, const entity_t *rhs) const noexcept {
+using ec_t = entity_t::entity_comparator_t;
+bool ec_t::operator()(const entity_t *lhs, const entity_t *rhs) const noexcept {
     return lhs->get_path().get_own_name() < rhs->get_path().get_own_name();
 }
+
+using nc_t = entity_t::name_comparator_t;
 
 bool nc_t::operator()(const entity_t *lhs, const std::string_view rhs) const noexcept {
     return lhs->get_path().get_own_name() < rhs;

@@ -41,9 +41,12 @@ struct SYNCSPIRIT_API entity_t : model::augmentable_t {
       private:
         entity_t *entity;
     };
-    struct SYNCSPIRIT_API name_comparator_t {
-        using is_transparent = std::true_type;
+    struct SYNCSPIRIT_API entity_comparator_t {
         bool operator()(const entity_t *lhs, const entity_t *rhs) const noexcept;
+    };
+    struct SYNCSPIRIT_API name_comparator_t : entity_comparator_t {
+        using is_transparent = std::true_type;
+        using entity_comparator_t::operator();
         bool operator()(const entity_t *lhs, const std::string_view rhs) const noexcept;
         bool operator()(const std::string_view lhs, const entity_t *rhs) const noexcept;
     };
@@ -52,6 +55,7 @@ struct SYNCSPIRIT_API entity_t : model::augmentable_t {
     };
     using children_t = std::set<entity_t *, name_comparator_t>;
     using child_presences_t = std::vector<presence_t *>;
+    using presences_t = std::vector<presence_t *>;
 
     entity_t(path_t path, entity_t *parent = nullptr) noexcept;
     virtual ~entity_t();
@@ -60,7 +64,10 @@ struct SYNCSPIRIT_API entity_t : model::augmentable_t {
     presence_t *get_presence(model::device_t &device) noexcept;
 
     children_t &get_children() noexcept;
-    entity_t *get_parent() noexcept;
+
+    inline entity_t *get_parent() noexcept { return parent; }
+    inline const entity_t *get_parent() const noexcept { return parent; }
+
     void add_child(entity_t &child) noexcept;
     void remove_child(entity_t &child) noexcept;
     void remove_presense(presence_t &) noexcept;
@@ -72,8 +79,6 @@ struct SYNCSPIRIT_API entity_t : model::augmentable_t {
     friend struct file_entity_t;
     friend struct folder_entity_t;
     friend struct cluster_file_presence_t;
-
-    using records_t = std::vector<presence_t *>;
 
     void clear_children() noexcept;
     void set_parent(entity_t *parent) noexcept;
@@ -90,7 +95,7 @@ struct SYNCSPIRIT_API entity_t : model::augmentable_t {
     }
 
     entity_t *parent;
-    records_t records;
+    presences_t presences;
     path_t path;
     children_t children;
     entity_stats_t statistics;
