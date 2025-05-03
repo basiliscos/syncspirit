@@ -11,6 +11,7 @@ namespace syncspirit::fltk::tree_item {
 
 struct presence_item_t : dynamic_item_t, model::augmentation_t {
     using parent_t = dynamic_item_t;
+    using parent_t::on_update;
 
     presence_item_t(presentation::presence_t &presence, app_supervisor_t &supervisor, Fl_Tree *tree);
     ~presence_item_t();

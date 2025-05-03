@@ -223,6 +223,8 @@ auto entity_t::monitor(entities_monitor_t *monitor_) noexcept -> monitor_guard_t
     return monitor_guard_t(this);
 }
 
+auto entity_t::get_presences() const noexcept -> const presences_t & { return presences; }
+
 using ec_t = entity_t::entity_comparator_t;
 bool ec_t::operator()(const entity_t *lhs, const entity_t *rhs) const noexcept {
     return lhs->get_path().get_own_name() < rhs->get_path().get_own_name();
@@ -242,4 +244,10 @@ using mg_t = entity_t::monitor_guard_t;
 
 mg_t::monitor_guard_t(entity_t *entity_) noexcept : entity{entity_} {}
 
-mg_t::~monitor_guard_t() { entity->entities_monitor = {}; }
+mg_t::monitor_guard_t(monitor_guard_t &&other) noexcept : entity{nullptr} { std::swap(entity, other.entity); }
+
+mg_t::~monitor_guard_t() {
+    if (entity) {
+        entity->entities_monitor = {};
+    }
+}

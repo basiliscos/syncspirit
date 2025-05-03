@@ -28,6 +28,7 @@
 #include "model/diff/modify/update_peer.h"
 #include "model/diff/modify/share_folder.h"
 #include "model/diff/peer/update_folder.h"
+#include "presentation/entity.h"
 #include "presentation/folder_entity.h"
 #include "utils/format.hpp"
 #include "utils/io.h"
@@ -37,6 +38,7 @@
 #include <iomanip>
 #include <functional>
 #include <limits>
+#include <memory_resource>
 
 using namespace syncspirit::fltk;
 using namespace syncspirit::presentation;
@@ -48,6 +50,26 @@ namespace resource {
 r::plugin::resource_id_t model = 0;
 }
 } // namespace
+
+using entity_ptr_allocator_t = std::pmr::polymorphic_allocator<const entity_t *>;
+using entity_allocator_t = std::pmr::polymorphic_allocator<entity_ptr_t>;
+using sorted_entities_t = std::set<const entity_t *, entity_t::entity_comparator_t, entity_ptr_allocator_t>;
+using unsorted_entities_t = std::set<entity_ptr_t, std::less<entity_ptr_t>, entity_allocator_t>;
+
+struct app_monitor_t final : entities_monitor_t {
+    app_monitor_t(unsorted_entities_t &deleted_, sorted_entities_t &updated_) : deleted{deleted_}, updated{updated_} {}
+    void on_delete(entity_t &entity) noexcept override { deleted.emplace(entity_ptr_t{&entity}); }
+    void on_update(const entity_t &entity) noexcept override {
+        auto current = &entity;
+        while (current) {
+            updated.insert(current);
+            current = current->get_parent();
+        }
+    }
+
+    unsorted_entities_t &deleted;
+    sorted_entities_t &updated;
+};
 
 db_info_viewer_guard_t::db_info_viewer_guard_t(main_window_t *main_window_) : main_window{main_window_} {}
 db_info_viewer_guard_t::db_info_viewer_guard_t(db_info_viewer_guard_t &&other) { *this = std::move(other); }
@@ -182,13 +204,31 @@ void app_supervisor_t::on_model_response(model::message::model_response_t &res) 
 }
 
 void app_supervisor_t::on_model_update(model::message::model_update_t &message) noexcept {
+    using guard_allocator_t = std::pmr::polymorphic_allocator<entity_t::monitor_guard_t>;
+    using guards_t = std::vector<entity_t::monitor_guard_t, guard_allocator_t>;
+
     LOG_TRACE(log, "on_model_update");
     bool has_been_loaded = cluster->get_devices().size();
-#if 0
-    auto updated = updated_entries_t();
-    this->updated_entries = &updated;
-#endif
+
+    auto buffer = std::array<std::byte, 16 * 1024>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<std::string>(&pool);
+
+    auto updated_entities = sorted_entities_t(allocator);
+    auto deleted_entities = unsorted_entities_t(allocator);
+    auto monitor = app_monitor_t(deleted_entities, updated_entities);
+
     auto &diff = *message.payload.diff;
+    auto &folders = cluster->get_folders();
+    auto guards = guards_t();
+    guards.reserve(folders.size());
+    for (auto &it : folders) {
+        auto augmentation = (*it.item).get_augmentation().get();
+        if (augmentation) {
+            auto folder_entity = static_cast<presentation::folder_entity_t *>(augmentation);
+            guards.emplace_back(folder_entity->monitor(&monitor));
+        }
+    }
 
     if (!has_been_loaded) {
         main_window->set_splash_text("populating model (1/3)...");
@@ -223,19 +263,25 @@ void app_supervisor_t::on_model_update(model::message::model_update_t &message) 
     if (!has_been_loaded) {
         main_window->set_splash_text("populating model (3/3)...");
     }
-#if 0
-    for (auto &entry : updated) {
-        entry->apply_update();
+
+    for (auto &entity : deleted_entities) {
+        updated_entities.erase(entity.get());
     }
-#endif
+    for (auto entity : updated_entities) {
+        for (auto p : entity->get_presences()) {
+            auto augmentation = p->get_augmentation().get();
+            if (augmentation) {
+                auto item = static_cast<tree_item::presence_item_t *>(augmentation);
+                item->on_update();
+            }
+        }
+    }
+
     if (!has_been_loaded && cluster->get_devices().size()) {
         main_window->on_loading_done();
         main_window->set_splash_text("UI has been initialized");
         Fl::add_idle(ui_idle_means_ready, this);
     }
-#if 0
-    this->updated_entries = nullptr;
-#endif
 }
 
 std::string app_supervisor_t::get_uptime() noexcept {

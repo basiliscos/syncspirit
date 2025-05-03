@@ -33,9 +33,9 @@ struct SYNCSPIRIT_API entities_monitor_t {
 
 struct SYNCSPIRIT_API entity_t : model::augmentable_t {
     struct SYNCSPIRIT_API monitor_guard_t {
-        monitor_guard_t(entity_t *entity) noexcept;
+        monitor_guard_t(entity_t *entity = nullptr) noexcept;
         monitor_guard_t(const monitor_guard_t &) = delete;
-        monitor_guard_t(monitor_guard_t &&) = default;
+        monitor_guard_t(monitor_guard_t &&) noexcept;
         ~monitor_guard_t();
 
       private:
@@ -72,6 +72,7 @@ struct SYNCSPIRIT_API entity_t : model::augmentable_t {
     void remove_child(entity_t &child) noexcept;
     void remove_presense(presence_t &) noexcept;
     const entity_stats_t &get_stats() noexcept;
+    const presences_t &get_presences() const noexcept;
     [[nodiscard]] monitor_guard_t monitor(entities_monitor_t *) noexcept;
 
   protected:
