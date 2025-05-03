@@ -148,7 +148,6 @@ TEST_CASE("presentation", "[presentation]") {
                     CHECK(deleted == 1);
                 }
             }
-
             SECTION("presence") {
                 CHECK(!folder_entity->get_presence(*peer_device));
                 CHECK(!folder_entity->get_presence(*peer_2_device));
@@ -162,7 +161,6 @@ TEST_CASE("presentation", "[presentation]") {
                 CHECK(&self_presense->get_folder_info() == my_fi);
             }
         }
-
         SECTION("shared with a peer") {
             REQUIRE(builder.upsert_folder("1234-5678", "some/path", "my-label").apply());
             REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
@@ -373,7 +371,6 @@ TEST_CASE("presentation", "[presentation]") {
             CHECK(f_peer_2->get_parent() == peer_2_folder_presence);
         }
     }
-
     SECTION("folder shared with a peer, simple hierarchy") {
         REQUIRE(builder.upsert_folder("1234-5678", "some/path", "my-label").apply());
         auto folder = cluster->get_folders().by_id("1234-5678");

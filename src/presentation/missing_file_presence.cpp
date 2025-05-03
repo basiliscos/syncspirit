@@ -12,4 +12,7 @@ missing_file_presence_t::missing_file_presence_t(file_entity_t &entity_) noexcep
     entity = &entity_;
 }
 
-missing_file_presence_t::~missing_file_presence_t() { entity = nullptr; }
+missing_file_presence_t::~missing_file_presence_t() {
+    entity = nullptr;
+    statistics = {};
+}

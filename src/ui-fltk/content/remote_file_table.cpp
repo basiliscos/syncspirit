@@ -2,9 +2,11 @@
 // SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
 
 #include "remote_file_table.h"
+
 #include "../table_widget/checkbox.h"
 #include "../utils.hpp"
 #include "proto/proto-helpers-bep.h"
+#include "presentation/cluster_file_presence.h"
 
 using namespace syncspirit::fltk;
 using namespace syncspirit::fltk::content;
@@ -32,11 +34,13 @@ auto make_checkbox(Fl_Widget &container, bool value) -> widgetable_ptr_t { retur
 
 } // namespace
 
-remote_file_table_t::remote_file_table_t(tree_item_t &container_, int x, int y, int w, int h)
+remote_file_table_t::remote_file_table_t(tree_item::presence_item_t &container_, int x, int y, int w, int h)
     : parent_t(x, y, w, h), container{container_}, displayed_versions{0} {
-#if 0
-    auto aug = static_cast<augmentation_entry_base_t *>(container.augmentation.get());
-    auto &entry = *aug->get_file();
+
+    auto &presence = container.get_presence();
+    assert(presence.get_features() & presentation::presence_t::features_t::cluster);
+    auto &cluster_presence = static_cast<presentation::cluster_file_presence_t &>(presence);
+    auto &entity = cluster_presence.get_file_info();
     auto data = table_rows_t();
 
     name_cell = new static_string_provider_t("");
@@ -64,34 +68,33 @@ remote_file_table_t::remote_file_table_t(tree_item_t &container_, int x, int y, 
     data.push_back({"modified_s", modified_s_cell});
     data.push_back({"modified_ns", modified_ns_cell});
     data.push_back({"modified_by", modified_by_cell});
-    data.push_back({"is_directory", make_checkbox(*this, entry.is_dir())});
-    data.push_back({"is_file", make_checkbox(*this, entry.is_file())});
-    data.push_back({"is_link", make_checkbox(*this, entry.is_link())});
-    data.push_back({"is_invalid", make_checkbox(*this, entry.is_invalid())});
-    data.push_back({"is_deleted", make_checkbox(*this, entry.is_deleted())});
-    data.push_back({"no_permissions", make_checkbox(*this, entry.has_no_permissions())});
+    data.push_back({"is_directory", make_checkbox(*this, entity.is_dir())});
+    data.push_back({"is_file", make_checkbox(*this, entity.is_file())});
+    data.push_back({"is_link", make_checkbox(*this, entity.is_link())});
+    data.push_back({"is_invalid", make_checkbox(*this, entity.is_invalid())});
+    data.push_back({"is_deleted", make_checkbox(*this, entity.is_deleted())});
+    data.push_back({"no_permissions", make_checkbox(*this, entity.has_no_permissions())});
     data.push_back({"symlink_target", symlink_target_cell});
     data.push_back({"entries", entries_cell});
     data.push_back({"entries size", entries_size_cell});
-    data.push_back({"local entries", local_entries_cell});
+    data.push_back({"zzz cluster entries", local_entries_cell});
 
     assign_rows(std::move(data));
 
     refresh();
-#endif
-    std::abort();
 }
 
 void remote_file_table_t::refresh() {
-#if 0
-    auto aug = static_cast<augmentation_entry_base_t *>(container.augmentation.get());
-    auto &stats = aug->get_stats();
-    auto &entry = *aug->get_file();
+    auto &presence = container.get_presence();
+    assert(presence.get_features() & presentation::presence_t::features_t::cluster);
+    auto &cluster_presence = static_cast<presentation::cluster_file_presence_t &>(presence);
+    auto &entry = cluster_presence.get_file_info();
     auto &devices = container.supervisor.get_cluster()->get_devices();
     auto data = table_rows_t();
     auto modified_s = entry.get_modified_s();
     auto modified_date = model::pt::from_time_t(modified_s);
     auto version = entry.get_version();
+    auto &stats = presence.get_stats();
 
     name_cell->update(entry.get_name());
     modified_cell->update(model::pt::to_simple_string(modified_date));
@@ -135,10 +138,9 @@ void remote_file_table_t::refresh() {
     modified_ns_cell->update(fmt::format("{}", entry.get_modified_ns()));
     modified_by_cell->update(fmt::format("{}", modified_by_device));
     symlink_target_cell->update(entry.get_link_target());
-    entries_cell->update(fmt::format("{}", stats.entries));
-    entries_size_cell->update(get_file_size(stats.entries_size));
-    local_entries_cell->update(fmt::format("{}", stats.scanned_entries));
+    entries_cell->update(fmt::format("{}", stats.entities));
+    entries_size_cell->update(get_file_size(stats.size));
+    local_entries_cell->update(fmt::format("{}", stats.cluster_entries));
 
     redraw();
-#endif
 }

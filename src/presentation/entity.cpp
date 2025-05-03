@@ -40,6 +40,8 @@ void entity_t::push_stats(const presence_stats_t &diff, const model::device_t *s
     auto current = this;
     while (current) {
         if (best) {
+            assert(current->statistics.entities >= 0);
+            assert(current->statistics.size >= 0);
             current->statistics += diff;
             assert(current->statistics.entities >= 0);
             assert(current->statistics.size >= 0);
@@ -48,8 +50,11 @@ void entity_t::push_stats(const presence_stats_t &diff, const model::device_t *s
         if (source) {
             for (auto p : current->records) {
                 if (p->device == source) {
-                    p->statistics += diff;
                     p->entity_generation--;
+                    assert(p->statistics.entities >= 0);
+                    assert(p->statistics.cluster_entries >= 0 || p->entity_generation != current->generation);
+                    assert(p->statistics.size >= 0);
+                    p->statistics += diff;
                     assert(p->statistics.entities >= 0);
                     assert(p->statistics.cluster_entries >= 0 || p->entity_generation != current->generation);
                     assert(p->statistics.size >= 0);
@@ -89,10 +94,13 @@ void entity_t::remove_presense(presence_t &item) noexcept {
     }
     bool need_restat = false;
     auto stats = statistics;
+    auto own_stats = item.get_own_stats();
     if (&item == best) {
-        stats -= item.get_own_stats();
+        stats -= own_stats;
         need_restat = true;
+        ++own_stats.cluster_entries;
     }
+    push_stats(-own_stats, item.device, false);
     records.erase(it);
     if (need_restat) {
         if (auto best = recalc_best(); best) {
@@ -101,8 +109,8 @@ void entity_t::remove_presense(presence_t &item) noexcept {
     }
     if (stats != statistics) {
         auto diff = stats - statistics;
-        push_stats({diff, 0}, item.device, true);
-    }
+        push_stats({diff, 0}, {}, true);
+    };
 
     bool remove_self = records.empty() && parent;
     if (records.size() == 1) {
@@ -163,11 +171,6 @@ void entity_t::remove_child(entity_t &child) noexcept {
     model::intrusive_ptr_release(&child);
 
     for (auto r : records) {
-        auto p = r->parent;
-        while (p) {
-            p->statistics -= r->statistics;
-            p = p->parent;
-        }
         r->children.clear();
     }
     child.parent = nullptr;

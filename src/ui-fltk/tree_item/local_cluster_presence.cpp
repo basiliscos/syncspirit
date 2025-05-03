@@ -3,6 +3,7 @@
 
 #include "local_cluster_presence.h"
 #include "presentation/cluster_file_presence.h"
+#include "../content/remote_file_table.h"
 
 using namespace syncspirit::fltk;
 using namespace syncspirit::fltk::tree_item;
@@ -26,4 +27,13 @@ void local_cluster_presence_t::update_label() {
     auto color = get_color();
     labelfgcolor(color);
     label(name.data());
+}
+
+bool local_cluster_presence_t::on_select() {
+    content = supervisor.replace_content([&](content_t *content) -> content_t * {
+        auto prev = content->get_widget();
+        int x = prev->x(), y = prev->y(), w = prev->w(), h = prev->h();
+        return new content::remote_file_table_t(*this, x, y, w, h);
+    });
+    return true;
 }
