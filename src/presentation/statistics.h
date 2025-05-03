@@ -9,7 +9,7 @@ namespace syncspirit::presentation {
 
 struct entity_stats_t {
     std::int64_t size = 0;
-    std::int64_t entities = 0;
+    std::int32_t entities = 0;
 
     bool operator==(const entity_stats_t &) const noexcept = default;
 
@@ -35,7 +35,7 @@ struct entity_stats_t {
 };
 
 struct presence_stats_t : entity_stats_t {
-    std::int64_t cluster_entries = 0;
+    std::int32_t cluster_entries = 0;
 
     bool operator==(const presence_stats_t &) const noexcept = default;
 
