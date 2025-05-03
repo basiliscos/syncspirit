@@ -326,13 +326,6 @@ void app_supervisor_t::add_sink(spdlog::sink_ptr ui_sink_) {
     dist_sink->add_sink(ui_sink);
 }
 
-void app_supervisor_t::postpone_update(augmentation_entry_base_t &entry) {
-#if 0
-    assert(updated_entries);
-    updated_entries->emplace(&entry);
-#endif
-}
-
 auto app_supervisor_t::request_db_info(db_info_viewer_t *viewer) -> db_info_viewer_guard_t {
     log->trace("request_db_info");
     request<net::payload::db_info_request_t>(coordinator).send(init_timeout * 5 / 6);

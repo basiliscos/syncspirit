@@ -158,7 +158,6 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
     void set_show_deleted(bool value);
     void set_show_missing(bool value);
     void set_show_colorized(bool value);
-    void postpone_update(augmentation_entry_base_t &);
 
     callback_ptr_t call_select_folder(std::string_view folder_id);
     callback_ptr_t call_share_folders(std::string_view folder_id, std::vector<utils::bytes_t> devices);
