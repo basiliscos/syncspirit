@@ -81,11 +81,12 @@ auto presence_item_t::get_presence() -> presentation::presence_t & { return pres
 
 auto presence_item_t::get_device() const -> const model::device_t * { return presence.get_device(); }
 
-int presence_item_t::get_position(std::uint32_t cut_mask) {
+int presence_item_t::get_position(const presence_item_t &child, std::uint32_t cut_mask) {
     auto &container = presence.get_children();
+    auto child_presence = &child.presence;
     int position = 0;
     for (auto p : container) {
-        if (p == &presence) {
+        if (p == child_presence) {
             break;
         }
         if (!(p->get_features() & cut_mask)) {
@@ -110,7 +111,7 @@ void presence_item_t::do_show(std::uint32_t mask, bool refresh_label) {
         if (host) {
             auto index = host->find_child(this);
             if (index == -1) {
-                auto position = get_position(mask);
+                auto position = host->get_position(*this, mask);
                 host->reparent(this, position);
                 update_label();
                 refresh_label = false;
