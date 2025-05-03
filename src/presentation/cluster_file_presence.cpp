@@ -42,7 +42,7 @@ const presence_t *cluster_file_presence_t::determine_best(const presence_t *othe
     return r >= 0 ? this : o;
 }
 
-presence_stats_t cluster_file_presence_t::refresh_own_stats() noexcept { return {1, file_info.get_size(), 0}; }
+presence_stats_t cluster_file_presence_t::refresh_own_stats() noexcept { return {file_info.get_size(), 1, 0}; }
 
 void cluster_file_presence_t::on_update() noexcept {
     refresh_features();

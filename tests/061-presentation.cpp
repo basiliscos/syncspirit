@@ -873,18 +873,18 @@ TEST_CASE("statistics, update", "[presentation]") {
     auto f_c_my = add_file("a/b.txt", *my_device, 5, proto::FileInfoType::FILE);
 
     auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
-    CHECK(folder_entity->get_stats() == entity_stats_t{2, 5});
+    CHECK(folder_entity->get_stats() == entity_stats_t{5, 2});
 
     REQUIRE(folder_entity->get_children().size() == 1);
     auto dir_a = *folder_entity->get_children().begin();
-    CHECK(dir_a->get_stats() == entity_stats_t{2, 5});
+    CHECK(dir_a->get_stats() == entity_stats_t{5, 2});
 
     auto p_a_my = dir_a->get_presence(*my_device);
-    CHECK(p_a_my->get_stats() == presence_stats_t{2, 5, 2});
+    CHECK(p_a_my->get_stats() == presence_stats_t{5, 2, 2});
 
     f_a_my->get_augmentation()->on_update();
-    CHECK(p_a_my->get_stats() == presence_stats_t{2, 5, 2});
-    CHECK(folder_entity->get_stats() == entity_stats_t{2, 5});
+    CHECK(p_a_my->get_stats() == presence_stats_t{5, 2, 2});
+    CHECK(folder_entity->get_stats() == entity_stats_t{5, 2});
 }
 
 TEST_CASE("statistics", "[presentation]") {
@@ -947,17 +947,17 @@ TEST_CASE("statistics", "[presentation]") {
         SECTION("single file") {
             add_file("a.txt", *my_device, 5, proto::FileInfoType::FILE);
             auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
-            CHECK(folder_entity->get_stats() == entity_stats_t{1, 5});
+            CHECK(folder_entity->get_stats() == entity_stats_t{5, 1});
 
             auto folder_my = folder_entity->get_presence(*my_device);
-            CHECK(folder_my->get_stats() == presence_stats_t{{1, 5}, 1});
+            CHECK(folder_my->get_stats() == presence_stats_t{5, 1, 1});
         }
         SECTION("two files") {
             SECTION("flat hierarchy") {
                 add_file("a.txt", *my_device, 5, proto::FileInfoType::FILE);
                 add_file("b.txt", *my_device, 4, proto::FileInfoType::FILE);
                 auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
-                CHECK(folder_entity->get_stats() == entity_stats_t{2, 9});
+                CHECK(folder_entity->get_stats() == entity_stats_t{9, 2});
             }
             SECTION("some hierarchy") {
                 add_file("a", *my_device, 0, proto::FileInfoType::DIRECTORY);
@@ -966,10 +966,10 @@ TEST_CASE("statistics", "[presentation]") {
                 add_file("a/d.txt", *my_device, 4, proto::FileInfoType::FILE);
 
                 auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
-                CHECK(folder_entity->get_stats() == entity_stats_t{4, 9});
+                CHECK(folder_entity->get_stats() == entity_stats_t{9, 4});
 
                 auto folder_my = folder_entity->get_presence(*my_device);
-                CHECK(folder_my->get_stats() == presence_stats_t{{4, 9}, 4});
+                CHECK(folder_my->get_stats() == presence_stats_t{9, 4, 4});
 
                 auto dir_a = *folder_entity->get_children().begin();
                 auto p_a = dir_a->get_presence(*my_device);
@@ -981,14 +981,14 @@ TEST_CASE("statistics", "[presentation]") {
                 auto p_c = f_c->get_presence(*my_device);
                 auto p_d = f_d->get_presence(*my_device);
 
-                CHECK(dir_a->get_stats() == entity_stats_t{4, 9});
-                CHECK(p_a->get_stats() == presence_stats_t{{4, 9}, 4});
-                CHECK(dir_b->get_stats() == entity_stats_t{2, 5});
-                CHECK(p_b->get_stats() == presence_stats_t{{2, 5}, 2});
-                CHECK(f_c->get_stats() == entity_stats_t{1, 5});
-                CHECK(p_c->get_stats() == presence_stats_t{{1, 5}, 1});
-                CHECK(f_d->get_stats() == entity_stats_t{1, 4});
-                CHECK(p_d->get_stats() == presence_stats_t{{1, 4}, 1});
+                CHECK(dir_a->get_stats() == entity_stats_t{9, 4});
+                CHECK(p_a->get_stats() == presence_stats_t{9, 4, 4});
+                CHECK(dir_b->get_stats() == entity_stats_t{5, 2});
+                CHECK(p_b->get_stats() == presence_stats_t{5, 2, 2});
+                CHECK(f_c->get_stats() == entity_stats_t{5, 1});
+                CHECK(p_c->get_stats() == presence_stats_t{5, 1, 1});
+                CHECK(f_d->get_stats() == entity_stats_t{4, 1});
+                CHECK(p_d->get_stats() == presence_stats_t{4, 1, 1});
             }
         }
     }
@@ -1001,28 +1001,28 @@ TEST_CASE("statistics", "[presentation]") {
                 add_file("a.txt", *my_device, 5, proto::FileInfoType::FILE, my_device_id, 1);
                 add_file("a.txt", *peer_device, 5, proto::FileInfoType::FILE, my_device_id, 1);
                 auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
-                CHECK(folder_entity->get_stats() == entity_stats_t{1, 5});
+                CHECK(folder_entity->get_stats() == entity_stats_t{5, 1});
 
                 REQUIRE(builder.unshare_folder(*fi_peer).apply());
-                CHECK(folder_entity->get_stats() == entity_stats_t{1, 5});
+                CHECK(folder_entity->get_stats() == entity_stats_t{5, 1});
             }
             SECTION("peer has newer") {
                 add_file("a.txt", *my_device, 5, proto::FileInfoType::FILE, peer_device_id, 1);
                 add_file("a.txt", *peer_device, 6, proto::FileInfoType::FILE, peer_device_id, 2);
                 auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
-                CHECK(folder_entity->get_stats() == entity_stats_t{1, 6});
+                CHECK(folder_entity->get_stats() == entity_stats_t{6, 1});
 
                 REQUIRE(builder.unshare_folder(*fi_peer).apply());
-                CHECK(folder_entity->get_stats() == entity_stats_t{1, 5});
+                CHECK(folder_entity->get_stats() == entity_stats_t{5, 1});
             }
             SECTION("me has newer") {
                 add_file("a.txt", *my_device, 5, proto::FileInfoType::FILE, my_device_id, 2);
                 add_file("a.txt", *peer_device, 6, proto::FileInfoType::FILE, my_device_id, 1);
                 auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
-                CHECK(folder_entity->get_stats() == entity_stats_t{1, 5});
+                CHECK(folder_entity->get_stats() == entity_stats_t{5, 1});
 
                 REQUIRE(builder.unshare_folder(*fi_peer).apply());
-                CHECK(folder_entity->get_stats() == entity_stats_t{1, 5});
+                CHECK(folder_entity->get_stats() == entity_stats_t{5, 1});
             }
             SECTION("coflicted file (peer has newer)") {
                 add_file("a.txt", *my_device, 5, proto::FileInfoType::FILE, my_device_id, 1);
@@ -1030,16 +1030,16 @@ TEST_CASE("statistics", "[presentation]") {
                 auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
 
                 REQUIRE(builder.unshare_folder(*fi_peer).apply());
-                CHECK(folder_entity->get_stats() == entity_stats_t{1, 5});
+                CHECK(folder_entity->get_stats() == entity_stats_t{5, 1});
             }
             SECTION("coflicted file (me has newer)") {
                 add_file("a.txt", *my_device, 5, proto::FileInfoType::FILE, my_device_id, 2);
                 add_file("a.txt", *peer_device, 6, proto::FileInfoType::FILE, peer_device_id, 1);
                 auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
-                CHECK(folder_entity->get_stats() == entity_stats_t{1, 5});
+                CHECK(folder_entity->get_stats() == entity_stats_t{5, 1});
 
                 REQUIRE(builder.unshare_folder(*fi_peer).apply());
-                CHECK(folder_entity->get_stats() == entity_stats_t{1, 5});
+                CHECK(folder_entity->get_stats() == entity_stats_t{5, 1});
             }
         }
         SECTION("two files do not intersect") {
@@ -1049,10 +1049,10 @@ TEST_CASE("statistics", "[presentation]") {
                 add_file("dir", *peer_device);
                 add_file("dir/b.txt", *peer_device, 6, proto::FileInfoType::FILE, peer_device_id, 1);
                 auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
-                CHECK(folder_entity->get_stats() == entity_stats_t{3, 11});
+                CHECK(folder_entity->get_stats() == entity_stats_t{11, 3});
 
                 REQUIRE(builder.unshare_folder(*fi_peer).apply());
-                CHECK(folder_entity->get_stats() == entity_stats_t{2, 5});
+                CHECK(folder_entity->get_stats() == entity_stats_t{5, 2});
             }
             SECTION("complex hierarchy") {
                 add_file("dir", *my_device);
@@ -1063,10 +1063,10 @@ TEST_CASE("statistics", "[presentation]") {
                 add_file("dir/b/c/d", *peer_device);
                 add_file("dir/b/c/d/x.txt", *peer_device, 6, proto::FileInfoType::FILE, peer_device_id, 1);
                 auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
-                CHECK(folder_entity->get_stats() == entity_stats_t{6, 11});
+                CHECK(folder_entity->get_stats() == entity_stats_t{11, 6});
 
                 REQUIRE(builder.unshare_folder(*fi_peer).apply());
-                CHECK(folder_entity->get_stats() == entity_stats_t{2, 5});
+                CHECK(folder_entity->get_stats() == entity_stats_t{5, 2});
             }
         }
     }
@@ -1077,39 +1077,39 @@ TEST_CASE("statistics", "[presentation]") {
             SECTION("no orphans") {
                 auto f_a = add_file("a", *my_device, 0, proto::FileInfoType::DIRECTORY);
                 folder_entity->on_insert(*f_a);
-                CHECK(folder_entity->get_stats() == entity_stats_t{1, 0});
+                CHECK(folder_entity->get_stats() == entity_stats_t{0, 1});
 
                 REQUIRE(folder_entity->get_children().size() == 1);
                 auto dir_a = *folder_entity->get_children().begin();
-                CHECK(dir_a->get_stats() == entity_stats_t{1, 0});
+                CHECK(dir_a->get_stats() == entity_stats_t{0, 1});
                 auto p_a = dir_a->get_presence(*my_device);
-                CHECK(p_a->get_stats() == presence_stats_t{1, 0, 1});
+                CHECK(p_a->get_stats() == presence_stats_t{0, 1, 1});
 
                 auto f_b = add_file("a/b", *my_device, 0, proto::FileInfoType::DIRECTORY);
                 folder_entity->on_insert(*f_b);
-                CHECK(folder_entity->get_stats() == entity_stats_t{2, 0});
+                CHECK(folder_entity->get_stats() == entity_stats_t{0, 2});
 
                 auto dir_b = *dir_a->get_children().begin();
-                CHECK(dir_a->get_stats() == entity_stats_t{2, 0});
-                CHECK(p_a->get_stats() == presence_stats_t{2, 0, 2});
-                CHECK(folder_entity->get_stats() == entity_stats_t{2, 0});
+                CHECK(dir_a->get_stats() == entity_stats_t{0, 2});
+                CHECK(p_a->get_stats() == presence_stats_t{0, 2, 2});
+                CHECK(folder_entity->get_stats() == entity_stats_t{0, 2});
 
                 auto p_b = dir_b->get_presence(*my_device);
-                CHECK(p_b->get_stats() == presence_stats_t{1, 0, 1});
-                CHECK(dir_b->get_stats() == entity_stats_t{1, 0});
+                CHECK(p_b->get_stats() == presence_stats_t{0, 1, 1});
+                CHECK(dir_b->get_stats() == entity_stats_t{0, 1});
 
                 auto f_c = add_file("a/b/c.txt", *my_device, 5, proto::FileInfoType::FILE);
                 folder_entity->on_insert(*f_c);
-                CHECK(folder_entity->get_stats() == entity_stats_t{3, 5});
-                CHECK(dir_a->get_stats() == entity_stats_t{3, 5});
-                CHECK(p_a->get_stats() == presence_stats_t{3, 5, 3});
-                CHECK(dir_b->get_stats() == entity_stats_t{2, 5});
-                CHECK(p_b->get_stats() == presence_stats_t{2, 5, 2});
+                CHECK(folder_entity->get_stats() == entity_stats_t{5, 3});
+                CHECK(dir_a->get_stats() == entity_stats_t{5, 3});
+                CHECK(p_a->get_stats() == presence_stats_t{5, 3, 3});
+                CHECK(dir_b->get_stats() == entity_stats_t{5, 2});
+                CHECK(p_b->get_stats() == presence_stats_t{5, 2, 2});
 
                 auto file_c = *dir_b->get_children().begin();
-                CHECK(file_c->get_stats() == entity_stats_t{1, 5});
+                CHECK(file_c->get_stats() == entity_stats_t{5, 1});
                 auto p_c = file_c->get_presence(*my_device);
-                CHECK(p_c->get_stats() == presence_stats_t{1, 5, 1});
+                CHECK(p_c->get_stats() == presence_stats_t{5, 1, 1});
             }
 
             SECTION("with orphans") {
@@ -1123,7 +1123,7 @@ TEST_CASE("statistics", "[presentation]") {
 
                 auto f_a = add_file("a", *my_device, 0, proto::FileInfoType::DIRECTORY);
                 folder_entity->on_insert(*f_a);
-                CHECK(folder_entity->get_stats() == entity_stats_t{3, 5});
+                CHECK(folder_entity->get_stats() == entity_stats_t{5, 3});
             }
         }
         SECTION("for local & peer device") {
@@ -1131,59 +1131,59 @@ TEST_CASE("statistics", "[presentation]") {
             SECTION("no orphans") {
                 auto f_a_my = add_file("a", *my_device, 0, proto::FileInfoType::DIRECTORY);
                 folder_entity->on_insert(*f_a_my);
-                CHECK(folder_entity->get_stats() == entity_stats_t{1, 0});
+                CHECK(folder_entity->get_stats() == entity_stats_t{0, 1});
 
                 auto f_a_peer = add_file("a", *peer_device, 0, proto::FileInfoType::DIRECTORY);
                 folder_entity->on_insert(*f_a_peer);
-                CHECK(folder_entity->get_stats() == entity_stats_t{1, 0});
+                CHECK(folder_entity->get_stats() == entity_stats_t{0, 1});
 
                 auto f_b_peer = add_file("a/b", *peer_device, 0, proto::FileInfoType::DIRECTORY);
                 folder_entity->on_insert(*f_b_peer);
-                CHECK(folder_entity->get_stats() == entity_stats_t{2, 0});
+                CHECK(folder_entity->get_stats() == entity_stats_t{0, 2});
 
                 auto f_b_my = add_file("a/b", *my_device, 0, proto::FileInfoType::DIRECTORY);
                 folder_entity->on_insert(*f_b_my);
-                CHECK(folder_entity->get_stats() == entity_stats_t{2, 0});
+                CHECK(folder_entity->get_stats() == entity_stats_t{0, 2});
 
                 auto f_c = add_file("a/b/c.txt", *peer_device, 5, proto::FileInfoType::FILE);
                 folder_entity->on_insert(*f_c);
-                CHECK(folder_entity->get_stats() == entity_stats_t{3, 5});
+                CHECK(folder_entity->get_stats() == entity_stats_t{5, 3});
             }
             SECTION("simple hierarchy") {
                 auto f_a_my = add_file("a", *my_device, 0, proto::FileInfoType::DIRECTORY, my_device_id, 2);
                 folder_entity->on_insert(*f_a_my);
-                CHECK(folder_entity->get_stats() == entity_stats_t{1, 0});
+                CHECK(folder_entity->get_stats() == entity_stats_t{0, 1});
 
                 auto dir_a = *folder_entity->get_children().begin();
-                CHECK(dir_a->get_stats() == entity_stats_t{1, 0});
+                CHECK(dir_a->get_stats() == entity_stats_t{0, 1});
 
                 auto p_a_my = dir_a->get_presence(*my_device);
-                CHECK(p_a_my->get_stats() == presence_stats_t{1, 0, 1});
+                CHECK(p_a_my->get_stats() == presence_stats_t{0, 1, 1});
 
                 auto p_a_peer = dir_a->get_presence(*peer_device);
                 CHECK(p_a_peer->get_stats() == presence_stats_t{0, 0, 0});
 
                 auto f_x_my = add_file("a/x.txt", *my_device, 5, proto::FileInfoType::FILE, my_device_id, 2);
                 folder_entity->on_insert(*f_x_my);
-                CHECK(folder_entity->get_stats() == entity_stats_t{2, 5});
-                CHECK(dir_a->get_stats() == entity_stats_t{2, 5});
-                CHECK(p_a_my->get_stats() == presence_stats_t{2, 5, 2});
+                CHECK(folder_entity->get_stats() == entity_stats_t{5, 2});
+                CHECK(dir_a->get_stats() == entity_stats_t{5, 2});
+                CHECK(p_a_my->get_stats() == presence_stats_t{5, 2, 2});
                 CHECK(p_a_peer->get_stats() == presence_stats_t{0, 0});
 
                 auto e_x = *dir_a->get_children().begin();
-                CHECK(e_x->get_stats() == entity_stats_t{1, 5});
+                CHECK(e_x->get_stats() == entity_stats_t{5, 1});
                 auto p_x_my = e_x->get_presence(*my_device);
-                CHECK(p_x_my->get_stats() == presence_stats_t{1, 5, 1});
+                CHECK(p_x_my->get_stats() == presence_stats_t{5, 1, 1});
 
                 auto f_a_peer = add_file("a", *peer_device, 0, proto::FileInfoType::DIRECTORY, my_device_id, 1);
                 folder_entity->on_insert(*f_a_peer);
-                CHECK(folder_entity->get_stats() == entity_stats_t{2, 5});
-                CHECK(dir_a->get_stats() == entity_stats_t{2, 5});
-                CHECK(p_a_my->get_stats() == presence_stats_t{2, 5, 2});
-                CHECK(p_x_my->get_stats() == presence_stats_t{1, 5, 1});
+                CHECK(folder_entity->get_stats() == entity_stats_t{5, 2});
+                CHECK(dir_a->get_stats() == entity_stats_t{5, 2});
+                CHECK(p_a_my->get_stats() == presence_stats_t{5, 2, 2});
+                CHECK(p_x_my->get_stats() == presence_stats_t{5, 1, 1});
 
                 p_a_peer = dir_a->get_presence(*peer_device);
-                CHECK(p_a_peer->get_stats() == entity_stats_t{1, 0});
+                CHECK(p_a_peer->get_stats() == entity_stats_t{0, 1});
 
                 auto p_x_peer = e_x->get_presence(*peer_device);
                 CHECK(p_x_peer->get_features() & (F::missing | F::file));
@@ -1197,14 +1197,14 @@ TEST_CASE("statistics", "[presentation]") {
                 fi_peer->add_strict(file_x_peer);
                 folder_entity->on_insert(*file_x_peer);
 
-                CHECK(folder_entity->get_stats() == entity_stats_t{2, 5});
-                CHECK(dir_a->get_stats() == entity_stats_t{2, 5});
-                CHECK(p_a_my->get_stats() == presence_stats_t{2, 5, 2});
-                CHECK(p_x_my->get_stats() == presence_stats_t{1, 5, 1});
-                CHECK(p_a_peer->get_stats() == presence_stats_t{2, 5, 1});
+                CHECK(folder_entity->get_stats() == entity_stats_t{5, 2});
+                CHECK(dir_a->get_stats() == entity_stats_t{5, 2});
+                CHECK(p_a_my->get_stats() == presence_stats_t{5, 2, 2});
+                CHECK(p_x_my->get_stats() == presence_stats_t{5, 1, 1});
+                CHECK(p_a_peer->get_stats() == presence_stats_t{5, 2, 1});
 
                 p_x_peer = e_x->get_presence(*peer_device);
-                CHECK(p_x_peer->get_stats() == presence_stats_t{1, 5, 1});
+                CHECK(p_x_peer->get_stats() == presence_stats_t{5, 1, 1});
             }
             SECTION("with orphans") {
                 auto f_c_peer = add_file("a/b/c.txt", *peer_device, 5, proto::FileInfoType::FILE, my_device_id, 1);
@@ -1225,33 +1225,33 @@ TEST_CASE("statistics", "[presentation]") {
 
                 auto f_a_peer = add_file("a", *peer_device, 0, proto::FileInfoType::DIRECTORY, my_device_id, 1);
                 folder_entity->on_insert(*f_a_peer);
-                CHECK(folder_entity->get_stats() == entity_stats_t{3, 5});
+                CHECK(folder_entity->get_stats() == entity_stats_t{5, 3});
 
                 auto f_a_my = add_file("a", *my_device, 0, proto::FileInfoType::DIRECTORY, my_device_id, 1);
                 folder_entity->on_insert(*f_a_my);
-                CHECK(folder_entity->get_stats() == entity_stats_t{3, 5});
+                CHECK(folder_entity->get_stats() == entity_stats_t{5, 3});
 
                 auto dir_a = *folder_entity->get_children().begin();
                 auto dir_b = *dir_a->get_children().begin();
                 auto file_c = *dir_b->get_children().begin();
 
                 auto p_a_my = dir_a->get_presence(*my_device);
-                CHECK(p_a_my->get_stats() == presence_stats_t{3, 5, 3});
+                CHECK(p_a_my->get_stats() == presence_stats_t{5, 3, 3});
 
                 auto p_a_peer = dir_a->get_presence(*peer_device);
-                CHECK(p_a_peer->get_stats() == presence_stats_t{3, 5, 3});
+                CHECK(p_a_peer->get_stats() == presence_stats_t{5, 3, 3});
 
                 auto p_b_my = dir_b->get_presence(*my_device);
-                CHECK(p_b_my->get_stats() == presence_stats_t{2, 5, 2});
+                CHECK(p_b_my->get_stats() == presence_stats_t{5, 2, 2});
 
                 auto p_b_peer = dir_b->get_presence(*peer_device);
-                CHECK(p_b_peer->get_stats() == presence_stats_t{2, 5, 2});
+                CHECK(p_b_peer->get_stats() == presence_stats_t{5, 2, 2});
 
                 auto p_c_my = file_c->get_presence(*my_device);
-                CHECK(p_c_my->get_stats() == presence_stats_t{1, 5, 1});
+                CHECK(p_c_my->get_stats() == presence_stats_t{5, 1, 1});
 
                 auto p_c_peer = file_c->get_presence(*peer_device);
-                CHECK(p_c_peer->get_stats() == presence_stats_t{1, 5, 1});
+                CHECK(p_c_peer->get_stats() == presence_stats_t{5, 1, 1});
             }
         }
     }
@@ -1266,23 +1266,23 @@ TEST_CASE("statistics", "[presentation]") {
         auto f_c_my = add_file("a/b/c.txt", *my_device, 5, proto::FileInfoType::FILE, my_device_id, 1);
 
         auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
-        CHECK(folder_entity->get_stats() == entity_stats_t{3, 5});
+        CHECK(folder_entity->get_stats() == entity_stats_t{5, 3});
 
         REQUIRE(folder_entity->get_children().size() == 1);
         auto dir_a = *folder_entity->get_children().begin();
-        CHECK(dir_a->get_stats() == entity_stats_t{3, 5});
+        CHECK(dir_a->get_stats() == entity_stats_t{5, 3});
 
         auto p_a_my = dir_a->get_presence(*my_device);
-        CHECK(p_a_my->get_stats() == presence_stats_t{3, 5, 3});
+        CHECK(p_a_my->get_stats() == presence_stats_t{5, 3, 3});
 
         auto p_a_peer = dir_a->get_presence(*peer_device);
-        CHECK(p_a_peer->get_stats() == presence_stats_t{2, 0, 2});
+        CHECK(p_a_peer->get_stats() == presence_stats_t{0, 2, 2});
 
         auto p_b_my = dir_a->get_presence(*my_device)->get_children().front();
-        CHECK(p_b_my->get_stats() == presence_stats_t{2, 5, 2});
+        CHECK(p_b_my->get_stats() == presence_stats_t{5, 2, 2});
 
         auto p_c_my = p_b_my->get_entity()->get_presence(*my_device)->get_children().front();
-        CHECK(p_c_my->get_stats() == presence_stats_t{1, 5, 1});
+        CHECK(p_c_my->get_stats() == presence_stats_t{5, 1, 1});
 
         auto pr_fi = [&]() {
             auto pr_fi = f_c_my->as_proto(false);
@@ -1301,11 +1301,11 @@ TEST_CASE("statistics", "[presentation]") {
             return pr_fi;
         }();
         REQUIRE(builder.local_update("1234-5678", pr_fi).apply());
-        CHECK(folder_entity->get_stats() == entity_stats_t{3, 10});
-        CHECK(dir_a->get_stats() == entity_stats_t{3, 10});
-        CHECK(p_a_my->get_stats() == presence_stats_t{3, 10, 3});
-        CHECK(p_c_my->get_stats() == presence_stats_t{1, 10, 1});
-        CHECK(p_a_peer->get_stats() == presence_stats_t{2, 0, 2});
+        CHECK(folder_entity->get_stats() == entity_stats_t{10, 3});
+        CHECK(dir_a->get_stats() == entity_stats_t{10, 3});
+        CHECK(p_a_my->get_stats() == presence_stats_t{10, 3, 3});
+        CHECK(p_c_my->get_stats() == presence_stats_t{10, 1, 1});
+        CHECK(p_a_peer->get_stats() == presence_stats_t{0, 2, 2});
 
         // peer copies
         auto fi_peer = folder->get_folder_infos().by_device(*peer_device);
@@ -1317,11 +1317,11 @@ TEST_CASE("statistics", "[presentation]") {
             file_c_peer->assign_block(block.item, 0);
             fi_peer->add_strict(file_c_peer);
             folder_entity->on_insert(*file_c_peer);
-            CHECK(folder_entity->get_stats() == entity_stats_t{3, 10});
-            CHECK(dir_a->get_stats() == entity_stats_t{3, 10});
-            CHECK(p_a_my->get_stats() == presence_stats_t{3, 10, 3});
-            CHECK(p_a_peer->get_stats() == presence_stats_t{3, 10, 3});
-            CHECK(p_c_my->get_stats() == presence_stats_t{1, 10, 1});
+            CHECK(folder_entity->get_stats() == entity_stats_t{10, 3});
+            CHECK(dir_a->get_stats() == entity_stats_t{10, 3});
+            CHECK(p_a_my->get_stats() == presence_stats_t{10, 3, 3});
+            CHECK(p_a_peer->get_stats() == presence_stats_t{10, 3, 3});
+            CHECK(p_c_my->get_stats() == presence_stats_t{10, 1, 1});
         }
 
         // peer updates
@@ -1356,19 +1356,19 @@ TEST_CASE("statistics", "[presentation]") {
             file_c_peer->update(*file_c_peer_2);
             file_c_peer->notify_update();
 
-            CHECK(folder_entity->get_stats() == entity_stats_t{3, 15});
-            CHECK(dir_a->get_stats() == entity_stats_t{3, 15});
-            CHECK(p_a_my->get_stats() == presence_stats_t{3, 10, 2});
-            CHECK(p_a_peer->get_stats() == presence_stats_t{3, 15, 3});
+            CHECK(folder_entity->get_stats() == entity_stats_t{15, 3});
+            CHECK(dir_a->get_stats() == entity_stats_t{15, 3});
+            CHECK(p_a_my->get_stats() == presence_stats_t{10, 3, 2});
+            CHECK(p_a_peer->get_stats() == presence_stats_t{15, 3, 3});
         }
 
         // local copy
         {
             REQUIRE(builder.remote_copy(*file_c_peer).apply());
-            CHECK(folder_entity->get_stats() == entity_stats_t{3, 15});
-            CHECK(dir_a->get_stats() == entity_stats_t{3, 15});
-            CHECK(p_a_my->get_stats() == presence_stats_t{3, 15, 3});
-            CHECK(p_a_peer->get_stats() == presence_stats_t{3, 15, 3});
+            CHECK(folder_entity->get_stats() == entity_stats_t{15, 3});
+            CHECK(dir_a->get_stats() == entity_stats_t{15, 3});
+            CHECK(p_a_my->get_stats() == presence_stats_t{15, 3, 3});
+            CHECK(p_a_peer->get_stats() == presence_stats_t{15, 3, 3});
         }
 
         // local update
@@ -1383,10 +1383,10 @@ TEST_CASE("statistics", "[presentation]") {
                 return pr_fi;
             }();
             REQUIRE(builder.local_update("1234-5678", pr_fi).apply());
-            CHECK(folder_entity->get_stats() == entity_stats_t{3, 0});
-            CHECK(dir_a->get_stats() == entity_stats_t{3, 0});
-            CHECK(p_a_my->get_stats() == presence_stats_t{3, 0, 3});
-            CHECK(p_a_peer->get_stats() == presence_stats_t{3, 15, 2});
+            CHECK(folder_entity->get_stats() == entity_stats_t{0, 3});
+            CHECK(dir_a->get_stats() == entity_stats_t{0, 3});
+            CHECK(p_a_my->get_stats() == presence_stats_t{0, 3, 3});
+            CHECK(p_a_peer->get_stats() == presence_stats_t{15, 3, 2});
         }
     }
 
@@ -1394,14 +1394,14 @@ TEST_CASE("statistics", "[presentation]") {
         auto f_a = add_file("a", *my_device, 5, proto::FileInfoType::FILE);
 
         auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
-        CHECK(folder_entity->get_stats() == entity_stats_t{1, 5});
+        CHECK(folder_entity->get_stats() == entity_stats_t{5, 1});
 
         REQUIRE(folder_entity->get_children().size() == 1);
         auto e_a = *folder_entity->get_children().begin();
-        CHECK(e_a->get_stats() == entity_stats_t{1, 5});
+        CHECK(e_a->get_stats() == entity_stats_t{5, 1});
 
         auto p_a_my = e_a->get_presence(*my_device);
-        CHECK(p_a_my->get_stats() == presence_stats_t{1, 5, 1});
+        CHECK(p_a_my->get_stats() == presence_stats_t{5, 1, 1});
         CHECK(!(p_a_my->get_features() & F::deleted));
 
         auto pr_fi = [&]() {
@@ -1413,7 +1413,7 @@ TEST_CASE("statistics", "[presentation]") {
             return pr_fi;
         }();
         REQUIRE(builder.local_update("1234-5678", pr_fi).apply());
-        CHECK(p_a_my->get_stats() == presence_stats_t{1, 0, 1});
+        CHECK(p_a_my->get_stats() == presence_stats_t{0, 1, 1});
         CHECK(p_a_my->get_features() & F::deleted);
     }
 
@@ -1423,17 +1423,17 @@ TEST_CASE("statistics", "[presentation]") {
         REQUIRE(builder.remote_copy(*f_a_peer).apply());
 
         auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
-        CHECK(folder_entity->get_stats() == entity_stats_t{1, 0});
+        CHECK(folder_entity->get_stats() == entity_stats_t{0, 1});
 
         REQUIRE(folder_entity->get_children().size() == 1);
         auto dir_a = *folder_entity->get_children().begin();
-        CHECK(dir_a->get_stats() == entity_stats_t{1, 0});
+        CHECK(dir_a->get_stats() == entity_stats_t{0, 1});
 
         auto p_a_my = dir_a->get_presence(*my_device);
-        CHECK(p_a_my->get_stats() == presence_stats_t{1, 0, 1});
+        CHECK(p_a_my->get_stats() == presence_stats_t{0, 1, 1});
 
         auto p_a_peer = dir_a->get_presence(*peer_device);
-        CHECK(p_a_peer->get_stats() == presence_stats_t{1, 0, 1});
+        CHECK(p_a_peer->get_stats() == presence_stats_t{0, 1, 1});
 
         auto pr_fi = [&]() {
             auto pr_fi = f_a_peer->as_proto(false);
@@ -1441,9 +1441,9 @@ TEST_CASE("statistics", "[presentation]") {
             return pr_fi;
         }();
         REQUIRE(builder.local_update("1234-5678", pr_fi).apply());
-        CHECK(p_a_my->get_stats() == presence_stats_t{1, 0, 1});
-        CHECK(dir_a->get_stats() == entity_stats_t{1, 0});
-        CHECK(p_a_peer->get_stats() == presence_stats_t{1, 0, 0});
+        CHECK(p_a_my->get_stats() == presence_stats_t{0, 1, 1});
+        CHECK(dir_a->get_stats() == entity_stats_t{0, 1});
+        CHECK(p_a_peer->get_stats() == presence_stats_t{0, 1, 0});
     }
 
     SECTION("yet not resolved conficts") {
@@ -1453,33 +1453,33 @@ TEST_CASE("statistics", "[presentation]") {
                 auto f_a_my = add_file("content.txt", *my_device, 5, proto::FileInfoType::FILE, my_device_id, 10);
                 auto f_a_peer = add_file("content.txt", *peer_device, 6, proto::FileInfoType::FILE, peer_device_id, 9);
                 auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
-                CHECK(folder_entity->get_stats() == entity_stats_t{1, 5});
+                CHECK(folder_entity->get_stats() == entity_stats_t{5, 1});
                 REQUIRE(folder_entity->get_children().size() == 1);
 
                 auto file_entity = *folder_entity->get_children().begin();
-                CHECK(file_entity->get_stats() == entity_stats_t{1, 5});
+                CHECK(file_entity->get_stats() == entity_stats_t{5, 1});
 
                 auto p_my = file_entity->get_presence(*my_device);
-                CHECK(p_my->get_stats() == presence_stats_t{1, 5, 1});
+                CHECK(p_my->get_stats() == presence_stats_t{5, 1, 1});
 
                 auto p_a_peer = file_entity->get_presence(*peer_device);
-                CHECK(p_a_peer->get_stats() == presence_stats_t{1, 6, 0});
+                CHECK(p_a_peer->get_stats() == presence_stats_t{6, 1, 0});
             }
             SECTION("remote win") {
                 auto f_a_my = add_file("content.txt", *my_device, 5, proto::FileInfoType::FILE, my_device_id, 9);
                 auto f_a_peer = add_file("content.txt", *peer_device, 6, proto::FileInfoType::FILE, peer_device_id, 10);
                 auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
-                CHECK(folder_entity->get_stats() == entity_stats_t{1, 6});
+                CHECK(folder_entity->get_stats() == entity_stats_t{6, 1});
                 REQUIRE(folder_entity->get_children().size() == 1);
 
                 auto file_entity = *folder_entity->get_children().begin();
-                CHECK(file_entity->get_stats() == entity_stats_t{1, 6});
+                CHECK(file_entity->get_stats() == entity_stats_t{6, 1});
 
                 auto p_my = file_entity->get_presence(*my_device);
-                CHECK(p_my->get_stats() == presence_stats_t{1, 5, 0});
+                CHECK(p_my->get_stats() == presence_stats_t{5, 1, 0});
 
                 auto p_a_peer = file_entity->get_presence(*peer_device);
-                CHECK(p_a_peer->get_stats() == presence_stats_t{1, 6, 1});
+                CHECK(p_a_peer->get_stats() == presence_stats_t{6, 1, 1});
             }
         }
         SECTION("dynamic") {
@@ -1494,13 +1494,13 @@ TEST_CASE("statistics", "[presentation]") {
 
                 REQUIRE(folder_entity->get_children().size() == 1);
                 auto file_entity = *folder_entity->get_children().begin();
-                CHECK(file_entity->get_stats() == entity_stats_t{1, 5});
+                CHECK(file_entity->get_stats() == entity_stats_t{5, 1});
 
                 auto p_my = file_entity->get_presence(*my_device);
-                CHECK(p_my->get_stats() == presence_stats_t{1, 5, 1});
+                CHECK(p_my->get_stats() == presence_stats_t{5, 1, 1});
 
                 auto p_a_peer = file_entity->get_presence(*peer_device);
-                CHECK(p_a_peer->get_stats() == presence_stats_t{1, 6, 0});
+                CHECK(p_a_peer->get_stats() == presence_stats_t{6, 1, 0});
             }
             SECTION("remote win") {
                 auto f_a_my = add_file("content-3.txt", *my_device, 5, proto::FileInfoType::FILE, my_device_id, 9);
@@ -1511,19 +1511,19 @@ TEST_CASE("statistics", "[presentation]") {
                 folder_entity->on_insert(*f_a_peer);
 
                 auto p_folder_my = folder_entity->get_presence(*my_device);
-                CHECK(p_folder_my->get_stats() == presence_stats_t{1, 5, 0});
+                CHECK(p_folder_my->get_stats() == presence_stats_t{5, 1, 0});
                 auto p_folder_peer = folder_entity->get_presence(*peer_device);
-                CHECK(p_folder_peer->get_stats() == presence_stats_t{1, 6, 1});
+                CHECK(p_folder_peer->get_stats() == presence_stats_t{6, 1, 1});
 
                 REQUIRE(folder_entity->get_children().size() == 1);
                 auto file_entity = *folder_entity->get_children().begin();
-                CHECK(file_entity->get_stats() == entity_stats_t{1, 6});
+                CHECK(file_entity->get_stats() == entity_stats_t{6, 1});
 
                 auto p_my = file_entity->get_presence(*my_device);
-                CHECK(p_my->get_stats() == presence_stats_t{1, 5, 0});
+                CHECK(p_my->get_stats() == presence_stats_t{5, 1, 0});
 
                 auto p_a_peer = file_entity->get_presence(*peer_device);
-                CHECK(p_a_peer->get_stats() == presence_stats_t{1, 6, 1});
+                CHECK(p_a_peer->get_stats() == presence_stats_t{6, 1, 1});
             }
         }
     }
@@ -1547,7 +1547,7 @@ TEST_CASE("statistics", "[presentation]") {
         auto f_c_my = add_file("a/b/c.txt", *my_device, 5, proto::FileInfoType::FILE, my_device_id, 1);
 
         auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
-        CHECK(folder_entity->get_stats() == entity_stats_t{3, 5});
+        CHECK(folder_entity->get_stats() == entity_stats_t{5, 3});
 
         REQUIRE(folder_entity->get_children().size() == 1);
         auto dir_a = *folder_entity->get_children().begin();

@@ -40,10 +40,7 @@ file_entity_t::file_entity_t(model::file_info_t &sample_file, path_t path_) noex
     }
 }
 
-file_entity_t::~file_entity_t() {
-    missing_file.reset();
-    // records.clear();
-}
+file_entity_t::~file_entity_t() { missing_file.reset(); }
 
 auto file_entity_t::on_insert(model::file_info_t &file_info) noexcept
     -> std::pair<file_presence_t *, presence_stats_t> {

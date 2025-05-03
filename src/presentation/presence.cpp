@@ -54,8 +54,8 @@ void presence_t::clear_presense() noexcept {
         model::intrusive_ptr_release(entity);
         entity = nullptr;
     }
-    assert(statistics.entities == 0);
     assert(statistics.size == 0);
+    assert(statistics.entities == 0);
 }
 
 void presence_t::link(augmentable_t *augmentable) noexcept { augmentable->set_augmentation(this); }

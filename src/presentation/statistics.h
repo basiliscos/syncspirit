@@ -8,30 +8,30 @@
 namespace syncspirit::presentation {
 
 struct entity_stats_t {
-    std::int64_t entities = 0;
     std::int64_t size = 0;
+    std::int64_t entities = 0;
 
     bool operator==(const entity_stats_t &) const noexcept = default;
 
     inline entity_stats_t &operator+=(const entity_stats_t &o) noexcept {
-        entities += o.entities;
         size += o.size;
+        entities += o.entities;
         return *this;
     }
 
     inline entity_stats_t &operator-=(const entity_stats_t &o) noexcept {
-        entities -= o.entities;
         size -= o.size;
+        entities -= o.entities;
         return *this;
     }
 
     inline entity_stats_t operator-(const entity_stats_t &o) const noexcept {
         return {
-            entities - o.entities,
             size - o.size,
+            entities - o.entities,
         };
     }
-    inline entity_stats_t operator-() const noexcept { return {-entities, -size}; }
+    inline entity_stats_t operator-() const noexcept { return {-size, -entities}; }
 };
 
 struct presence_stats_t : entity_stats_t {
