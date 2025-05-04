@@ -13,17 +13,19 @@ struct presence_item_t : dynamic_item_t, model::augmentation_t {
     using parent_t = dynamic_item_t;
     using parent_t::on_update;
 
-    presence_item_t(presentation::presence_t &presence, app_supervisor_t &supervisor, Fl_Tree *tree);
+    presence_item_t(presentation::presence_t &presence, app_supervisor_t &supervisor, Fl_Tree *tree,
+                    bool augment = true);
     ~presence_item_t();
 
-    void show(std::uint32_t hide_mask, bool refresh_labels, std::int32_t depth) override;
+    bool show(std::uint32_t hide_mask, bool refresh_labels, std::int32_t depth) override;
     bool is_expanded() const;
     void refresh_children() override;
     void on_open() override;
     presentation::presence_t &get_presence();
-    void populate_dummy_child();
+    void show_child(presentation::presence_t &child_presence, std::uint32_t mask);
 
   protected:
+    void populate_dummy_child();
     Fl_Color get_color() const;
     void do_show(std::uint32_t mask, bool refresh_label);
     void do_hide();

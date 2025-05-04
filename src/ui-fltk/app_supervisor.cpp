@@ -511,18 +511,15 @@ auto app_supervisor_t::operator()(const model::diff::advance::advance_t &diff, v
             if (entity) {
                 auto parent = entity->get_parent();
                 auto mask = mask_nodes();
-                for (auto &it : folder_infos) {
-                    auto &fi = it.item;
-                    auto presence = parent->get_presence(*fi->get_device());
-                    if (presence) {
-                        auto aug = presence->get_augmentation().get();
+                for (auto presence : entity->get_presences()) {
+                    using F = presence_t::features_t;
+                    if (!(presence->get_features() & F::missing)) {
+                        auto parent_presence = presence->get_parent();
+                        auto aug = parent_presence->get_augmentation().get();
                         if (aug) {
-                            auto item = static_cast<tree_item::presence_item_t *>(aug);
-                            if (item->is_expanded()) {
-                                item->show(mask, true, 1);
-                            } else if (item->children() == 0) {
-                                item->populate_dummy_child();
-                            }
+                            auto parent_item = static_cast<tree_item::presence_item_t *>(aug);
+                            parent_item->show_child(*presence, mask);
+                            parent_item->tree()->redraw();
                         }
                     }
                 }

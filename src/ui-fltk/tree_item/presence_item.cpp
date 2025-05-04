@@ -11,9 +11,12 @@ using namespace syncspirit::fltk::tree_item;
 
 using F = presence_t::features_t;
 
-presence_item_t::presence_item_t(presence_t &presence_, app_supervisor_t &supervisor, Fl_Tree *tree)
+presence_item_t::presence_item_t(presence_t &presence_, app_supervisor_t &supervisor, Fl_Tree *tree, bool augment)
     : parent_t(supervisor, tree, false), presence{presence_}, expanded{false} {
-    presence.set_augmentation(*this);
+    if (augment) {
+        assert(!presence.get_augmentation());
+        presence.set_augmentation(*this);
+    }
 }
 
 presence_item_t::~presence_item_t() {
@@ -27,8 +30,12 @@ presence_item_t::~presence_item_t() {
     int i = 0;
     while (i < children()) {
         auto c = child(i);
-        if (dynamic_cast<presence_item_t *>(c)) {
+        auto pi = dynamic_cast<presence_item_t *>(c);
+        if (pi) {
             deparent(i);
+            if (pi->presence.get_features() & F::missing) {
+                delete c;
+            }
         } else {
             ++i;
         }
@@ -137,7 +144,7 @@ void presence_item_t::do_hide() {
     }
 }
 
-void presence_item_t::show(std::uint32_t hide_mask, bool refresh_labels, int32_t depth) {
+bool presence_item_t::show(std::uint32_t hide_mask, bool refresh_labels, int32_t depth) {
     assert(depth >= 0);
     auto hide = presence.get_features() & hide_mask;
     if (!hide) {
@@ -147,19 +154,79 @@ void presence_item_t::show(std::uint32_t hide_mask, bool refresh_labels, int32_t
     }
     if (!hide && depth >= 1 && expanded) {
         auto &children = presence.get_children();
+        auto c = (presence_item_t *)(nullptr);
+        for (int i = 0, j = 0; i < (int)children.size(); ++i) {
+            auto p = children[i];
+            auto item = (presence_item_t *)(nullptr);
+            if (j < this->children() && !c) {
+                c = dynamic_cast<presence_item_t *>(child(j));
+            }
+            if (c) {
+                if (&c->presence == p) {
+                    item = c;
+                } else {
+                    auto r = presence_t::compare(p, &c->presence);
+                    if (r) {
+                        c = {};
+                        delete deparent(j);
+                    }
+                }
+            }
+            if (!item) {
+                item = make_item(this, *p);
+                ++j;
+            }
+            auto shown = item->show(hide_mask, refresh_labels, depth - 1);
+            if (item == c) {
+                c = {};
+                if (shown) {
+                    ++j;
+                }
+            }
+        }
+#if 0
         for (auto p : children) {
             auto item = (presence_item_t *)(nullptr);
             if (auto augmentation = p->get_augmentation().get(); augmentation) {
                 item = dynamic_cast<presence_item_t *>(augmentation);
-            } else {
+            } else if (p->get_features() & F::missing) {
                 item = make_item(this, *p);
             }
             if (item) {
                 item->show(hide_mask, refresh_labels, depth - 1);
             }
         }
+#endif
     }
     tree()->redraw();
+    return !hide;
+}
+
+void presence_item_t::show_child(presentation::presence_t &child_presence, std::uint32_t mask) {
+    auto aug = child_presence.get_augmentation().get();
+    if (is_expanded()) {
+        for (int i = 0; i < this->children(); ++i) {
+            auto c = static_cast<presence_item_t *>(child(i));
+            auto &p = c->get_presence();
+            if (p.get_entity() == child_presence.get_entity()) {
+                if (&p != &child_presence) {
+                    deparent(i);
+                    if (p.get_features() & F::missing) {
+                        delete c;
+                    }
+                    auto node = make_item(this, child_presence);
+                    auto tmp_node = insert(prefs(), "", i);
+                    replace_child(tmp_node, node);
+                    node->show(mask, true, 0);
+                    // supervisor.get_logger()->warn("zzz {}", p.get_entity()->get_path().get_full_name());
+                }
+                // c->show(mask, true, 0);
+                break;
+            }
+        }
+    } else if (children() == 0) {
+        populate_dummy_child();
+    }
 }
 
 Fl_Color presence_item_t::get_color() const {

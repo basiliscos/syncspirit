@@ -70,7 +70,7 @@ struct tree_item_t : Fl_Tree_Item {
 struct dynamic_item_t : tree_item_t {
     using parent_t = tree_item_t;
     using parent_t::parent_t;
-    virtual void show(std::uint32_t mask, bool refresh_labels, std::int32_t depth) = 0;
+    virtual bool show(std::uint32_t mask, bool refresh_labels, std::int32_t depth) = 0;
     virtual void refresh_children() = 0;
 };
 
