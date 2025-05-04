@@ -55,6 +55,8 @@ struct SYNCSPIRIT_API presence_t : model::proxy_t {
 
     children_t& get_children() noexcept;
 
+    static bool compare(const presence_t *l, const presence_t *r) noexcept;
+
   protected:
     friend struct entity_t;
     friend struct cluster_file_presence_t;

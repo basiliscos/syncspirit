@@ -45,7 +45,7 @@ struct SYNCSPIRIT_API augmentable_t : ref_countable_t {
     void set_augmentation(augmentation_t &value) noexcept;
     void set_augmentation(augmentation_ptr_t value) noexcept;
 
-    augmentation_ptr_t get_augmentation() noexcept;
+    augmentation_ptr_t &get_augmentation() noexcept;
 
     void notify_update() noexcept;
 

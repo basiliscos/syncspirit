@@ -1174,6 +1174,12 @@ TEST_CASE("statistics", "[presentation]") {
                 CHECK(e_x->get_stats() == entity_stats_t{5, 1});
                 auto p_x_my = e_x->get_presence(*my_device);
                 CHECK(p_x_my->get_stats() == presence_stats_t{5, 1, 1});
+                CHECK(p_x_my->get_parent() == p_a_my);
+                CHECK(p_a_my->get_children().size() == 1);
+                CHECK(p_a_my->get_children()[0] == p_x_my);
+
+                CHECK(p_a_peer->get_children().size() == 1);
+                CHECK(p_a_peer->get_children()[0]->get_features() & F::missing);
 
                 auto f_a_peer = add_file("a", *peer_device, 0, proto::FileInfoType::DIRECTORY, my_device_id, 1);
                 folder_entity->on_insert(*f_a_peer);
@@ -1195,6 +1201,9 @@ TEST_CASE("statistics", "[presentation]") {
                 auto block = *blocks.begin();
                 file_x_peer->assign_block(block.item, 0);
                 fi_peer->add_strict(file_x_peer);
+
+                CHECK(p_a_peer->get_children().size() == 1);
+                CHECK(p_a_peer->get_children()[0]->get_features() & F::missing);
                 folder_entity->on_insert(*file_x_peer);
 
                 CHECK(folder_entity->get_stats() == entity_stats_t{5, 2});
@@ -1205,6 +1214,8 @@ TEST_CASE("statistics", "[presentation]") {
 
                 p_x_peer = e_x->get_presence(*peer_device);
                 CHECK(p_x_peer->get_stats() == presence_stats_t{5, 1, 1});
+                CHECK(p_a_peer->get_children().size() == 1);
+                CHECK(p_a_peer->get_children()[0] == p_x_peer);
             }
             SECTION("with orphans") {
                 auto f_c_peer = add_file("a/b/c.txt", *peer_device, 5, proto::FileInfoType::FILE, my_device_id, 1);

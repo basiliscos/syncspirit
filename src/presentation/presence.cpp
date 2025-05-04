@@ -100,6 +100,19 @@ void presence_t::sync_with_entity() const noexcept {
     }
 }
 
+bool presence_t::compare(const presence_t *l, const presence_t *r) noexcept {
+    auto ld = l->get_features() & F::directory;
+    auto rd = r->get_features() & F::directory;
+    if (ld && !rd) {
+        return true;
+    } else if (!ld && rd) {
+        return false;
+    }
+    auto l_name = l->entity->get_path().get_own_name();
+    auto r_name = r->entity->get_path().get_own_name();
+    return l_name < r_name;
+}
+
 auto presence_t::get_children() noexcept -> children_t & {
     auto &e_children = entity->children;
     if (children.size() != e_children.size()) {
@@ -109,19 +122,7 @@ auto presence_t::get_children() noexcept -> children_t & {
             auto p = c->get_presence(*device);
             children.emplace_back(p);
         }
-        auto comparator = [](const presence_t *l, const presence_t *r) {
-            auto ld = l->get_features() & F::directory;
-            auto rd = r->get_features() & F::directory;
-            if (ld && !rd) {
-                return true;
-            } else if (!ld && rd) {
-                return false;
-            }
-            auto l_name = l->entity->get_path().get_own_name();
-            auto r_name = r->entity->get_path().get_own_name();
-            return l_name < r_name;
-        };
-        std::sort(children.begin(), children.end(), comparator);
+        std::sort(children.begin(), children.end(), compare);
     }
     return children;
 }

@@ -14,7 +14,7 @@ augmentable_t::~augmentable_t() {
 void augmentable_t::set_augmentation(augmentation_t &value) noexcept { extension = &value; }
 void augmentable_t::set_augmentation(augmentation_ptr_t value) noexcept { extension = std::move(value); }
 
-augmentation_ptr_t augmentable_t::get_augmentation() noexcept { return extension; }
+augmentation_ptr_t &augmentable_t::get_augmentation() noexcept { return extension; }
 
 void augmentable_t::notify_update() noexcept {
     if (extension) {
