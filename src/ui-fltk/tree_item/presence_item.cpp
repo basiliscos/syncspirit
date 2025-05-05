@@ -4,6 +4,9 @@
 #include "presence_item.h"
 #include "local_cluster_presence.h"
 #include "missing_item_presence.h"
+#include "presentation/folder_presence.h"
+#include "../symbols.h"
+
 #include <memory_resource>
 #include <iterator>
 #include <format>
@@ -240,15 +243,23 @@ void presence_item_t::update_label() {
     auto color = get_color();
     auto name = presence.get_entity()->get_path().get_own_name();
     auto features = presence.get_features();
-    auto node_label = string_t(name, allocator);
+    auto node_label = string_t(allocator);
+    if (features & F::folder) {
+        auto& folder_presence = static_cast<presentation::folder_presence_t&>(presence);
+        auto folder = folder_presence.get_folder_info().get_folder();
+        auto folder_label = folder->get_label();
+        auto folder_id = folder->get_id();
+        std::format_to(std::back_inserter(node_label), "{}, {}", folder_label, folder_id);
+    } else {
+        node_label = string_t(name, allocator);
+    }
 
-    if (features & F::directory) {
+    if (features & (F::directory | F::folder)) {
         auto &ps = presence.get_stats(true);
         auto &es = presence.get_entity()->get_stats();
         if (ps.size && (ps.cluster_entries != es.entities)) {
-            double share = (double)(ps.cluster_entries) / es.entities;
-            node_label = {};
-            std::format_to(std::back_inserter(node_label), "{} ({:.2f}%)", name, share * 100);
+            double share = (100.0 * ps.cluster_entries) / es.entities;
+            std::format_to(std::back_inserter(node_label), " ({}{:.2f}%)", symbols::synchronizing, share);
         }
     }
 

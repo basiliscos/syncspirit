@@ -12,7 +12,6 @@ struct folder_t final : presence_item_t {
     using parent_t = presence_item_t;
 
     folder_t(presentation::folder_presence_t &folder, app_supervisor_t &supervisor, Fl_Tree *tree);
-    void update_label() override;
     bool on_select() override;
 
     void reset_stats();

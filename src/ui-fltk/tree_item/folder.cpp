@@ -31,6 +31,7 @@ folder_t::folder_t(presentation::folder_presence_t &presence, app_supervisor_t &
     populate_dummy_child();
 }
 
+#if 0
 void folder_t::update_label() {
     auto &folder_presence = static_cast<presentation::folder_presence_t &>(presence);
     auto &stats = folder_presence.get_stats();
@@ -61,6 +62,7 @@ void folder_t::update_label() {
     labelfgcolor(get_color());
     label(buff);
 }
+#endif
 
 static constexpr int padding = 2;
 
