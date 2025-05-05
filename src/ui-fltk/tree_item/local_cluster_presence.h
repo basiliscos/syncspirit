@@ -11,7 +11,6 @@ struct local_cluster_presence_t final : presence_item_t {
     using parent_t = presence_item_t;
 
     local_cluster_presence_t(presentation::presence_t &presence, app_supervisor_t &supervisor, Fl_Tree *tree);
-    void update_label() override;
     bool on_select() override;
 };
 

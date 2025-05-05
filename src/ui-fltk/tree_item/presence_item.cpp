@@ -4,6 +4,9 @@
 #include "presence_item.h"
 #include "local_cluster_presence.h"
 #include "missing_item_presence.h"
+#include <memory_resource>
+#include <iterator>
+#include <format>
 
 using namespace syncspirit::presentation;
 using namespace syncspirit::fltk;
@@ -218,15 +221,39 @@ void presence_item_t::show_child(presentation::presence_t &child_presence, std::
                     auto tmp_node = insert(prefs(), "", i);
                     replace_child(tmp_node, node);
                     node->show(mask, true, 0);
-                    // supervisor.get_logger()->warn("zzz {}", p.get_entity()->get_path().get_full_name());
                 }
-                // c->show(mask, true, 0);
                 break;
             }
         }
     } else if (children() == 0) {
         populate_dummy_child();
     }
+}
+
+void presence_item_t::update_label() {
+    using allocator_t = std::pmr::polymorphic_allocator<char>;
+    using string_t = std::basic_string<char, std::char_traits<char>, allocator_t>;
+    auto buffer = std::array<std::byte, 256>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = allocator_t(&pool);
+
+    auto color = get_color();
+    auto name = presence.get_entity()->get_path().get_own_name();
+    auto features = presence.get_features();
+    auto node_label = string_t(name, allocator);
+
+    if (features & F::directory) {
+        auto &ps = presence.get_stats(true);
+        auto &es = presence.get_entity()->get_stats();
+        if (ps.size && (ps.cluster_entries != es.entities)) {
+            double share = (double)(ps.cluster_entries) / es.entities;
+            node_label = {};
+            std::format_to(std::back_inserter(node_label), "{} ({:.2f}%)", name, share * 100);
+        }
+    }
+
+    labelfgcolor(color);
+    label(node_label.data());
 }
 
 Fl_Color presence_item_t::get_color() const {

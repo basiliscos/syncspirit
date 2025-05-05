@@ -2,7 +2,6 @@
 // SPDX-FileCopyrightText: 2025 Ivan Baidakou
 
 #include "local_cluster_presence.h"
-#include "presentation/cluster_file_presence.h"
 #include "../content/remote_file_table.h"
 
 using namespace syncspirit::fltk;
@@ -19,14 +18,6 @@ local_cluster_presence_t::local_cluster_presence_t(presentation::presence_t &pre
     if (f & F::directory) {
         populate_dummy_child();
     }
-}
-
-void local_cluster_presence_t::update_label() {
-    auto &p = static_cast<presentation::cluster_file_presence_t &>(presence);
-    auto name = p.get_entity()->get_path().get_own_name();
-    auto color = get_color();
-    labelfgcolor(color);
-    label(name.data());
 }
 
 bool local_cluster_presence_t::on_select() {

@@ -2,7 +2,6 @@
 // SPDX-FileCopyrightText: 2025 Ivan Baidakou
 
 #include "missing_item_presence.h"
-#include "presentation/cluster_file_presence.h"
 
 using namespace syncspirit::fltk;
 using namespace syncspirit::fltk::tree_item;
@@ -19,12 +18,4 @@ missing_item_presence_t::missing_item_presence_t(presence_item_t *host_, present
 
 auto missing_item_presence_t::get_device() const -> const model::device_t * {
     return host->get_presence().get_device();
-}
-
-void missing_item_presence_t::update_label() {
-    auto &p = static_cast<presentation::cluster_file_presence_t &>(presence);
-    auto color = get_color();
-    auto name = p.get_entity()->get_path().get_own_name();
-    labelfgcolor(color);
-    label(name.data());
 }
