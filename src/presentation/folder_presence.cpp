@@ -3,7 +3,7 @@
 
 #include "folder_presence.h"
 #include "folder_entity.h"
-#include "model/folder_info.h"
+#include "model/cluster.h"
 
 using namespace syncspirit::presentation;
 
@@ -11,6 +11,9 @@ folder_presence_t::folder_presence_t(folder_entity_t &entity_, model::folder_inf
     : presence_t(&entity_, fi.get_device()), folder_info{fi} {
     link(&fi);
     features = features_t::folder;
+    if (fi.get_device() == entity_.get_folder().get_cluster()->get_device()) {
+        features |= features_t::local;
+    }
 }
 
 folder_presence_t::~folder_presence_t() {}

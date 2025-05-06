@@ -11,30 +11,32 @@
 using namespace syncspirit;
 using namespace syncspirit::presentation;
 
+using F = presence_t::features_t;
+
 cluster_file_presence_t::cluster_file_presence_t(std::uint32_t default_features_, file_entity_t &entity,
                                                  model::file_info_t &file_info_) noexcept
     : file_presence_t(&entity, file_info_.get_folder_info()->get_device()), file_info{file_info_},
       default_features{default_features_} {
     link(&file_info);
-    statistics = own_statistics = refresh_own_stats();
     refresh_features();
+    statistics = own_statistics = refresh_own_stats();
 }
 
 void cluster_file_presence_t::refresh_features() noexcept {
-    features = default_features | features_t::cluster;
-    features |= (file_info.is_dir() ? features_t::directory : features_t::file);
+    features = default_features | F::cluster;
+    features |= (file_info.is_dir() ? F::directory : F::file);
     if (file_info.is_deleted()) {
-        features |= features_t::deleted;
+        features |= F::deleted;
     }
     if (file_info.is_link()) {
-        features |= features_t::symblink;
+        features |= F::symblink;
     }
 }
 
 auto cluster_file_presence_t::get_file_info() noexcept -> model::file_info_t & { return file_info; }
 
 const presence_t *cluster_file_presence_t::determine_best(const presence_t *other) const {
-    if (!(other->get_features() & features_t::cluster)) {
+    if (!(other->get_features() & F::cluster)) {
         return this;
     }
     auto o = static_cast<const cluster_file_presence_t *>(other);
@@ -42,7 +44,10 @@ const presence_t *cluster_file_presence_t::determine_best(const presence_t *othe
     return r >= 0 ? this : o;
 }
 
-presence_stats_t cluster_file_presence_t::refresh_own_stats() noexcept { return {file_info.get_size(), 1, 0}; }
+presence_stats_t cluster_file_presence_t::refresh_own_stats() noexcept {
+    std::int32_t local = ((features & F::local) && file_info.is_locally_available()) ? 1 : 0;
+    return {file_info.get_size(), 1, 0, local};
+}
 
 void cluster_file_presence_t::on_update() noexcept {
     refresh_features();

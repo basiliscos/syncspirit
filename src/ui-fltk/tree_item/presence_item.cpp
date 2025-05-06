@@ -245,7 +245,7 @@ void presence_item_t::update_label() {
     auto features = presence.get_features();
     auto node_label = string_t(allocator);
     if (features & F::folder) {
-        auto& folder_presence = static_cast<presentation::folder_presence_t&>(presence);
+        auto &folder_presence = static_cast<presentation::folder_presence_t &>(presence);
         auto folder = folder_presence.get_folder_info().get_folder();
         auto folder_label = folder->get_label();
         auto folder_id = folder->get_id();
@@ -260,6 +260,10 @@ void presence_item_t::update_label() {
         if (ps.size && (ps.cluster_entries != es.entities)) {
             double share = (100.0 * ps.cluster_entries) / es.entities;
             std::format_to(std::back_inserter(node_label), " ({}{:.2f}%)", symbols::synchronizing, share);
+        }
+        if (features & F::local && (ps.local_entries != ps.entities)) {
+            double share = (100.0 * ps.local_entries) / es.entities;
+            std::format_to(std::back_inserter(node_label), " ({}{:.2f}%)", symbols::scanning, share);
         }
     }
 

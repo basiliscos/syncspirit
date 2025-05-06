@@ -31,39 +31,6 @@ folder_t::folder_t(presentation::folder_presence_t &presence, app_supervisor_t &
     populate_dummy_child();
 }
 
-#if 0
-void folder_t::update_label() {
-    auto &folder_presence = static_cast<presentation::folder_presence_t &>(presence);
-    auto &stats = folder_presence.get_stats();
-    auto &folder_info = folder_presence.get_folder_info();
-    auto &folder = *folder_info.get_folder();
-    auto id = folder.get_id();
-    auto folder_label = folder.get_label();
-    char scanning_buff[32];
-    char synchronizing_buff[32];
-    auto scanning = std::string_view();
-    auto synchronizing = std::string_view();
-#if 0
-    if (folder.is_scanning()) {
-        auto share = (stats.entries) ? 100.0 * stats.scanned_entries / stats.entries : 0;
-        auto eob = fmt::format_to(scanning_buff, " ({} {}%)", symbols::scanning, (int)share);
-        scanning = std::string_view(scanning_buff, eob);
-        color_context = color_context_t::outdated;
-    }
-    if (folder.is_synchronizing()) {
-        auto eob = fmt::format_to(synchronizing_buff, " {}", symbols::synchronizing);
-        synchronizing = std::string_view(synchronizing_buff, eob);
-    }
-#endif
-    auto sz = folder_label.size() + id.size() + synchronizing.size() + scanning.size() + 16;
-    auto buff = (char *)alloca(sz);
-    auto eob = fmt::format_to(buff, "{}, {}{}{}", folder_label, id, synchronizing, scanning);
-    *eob = 0;
-    labelfgcolor(get_color());
-    label(buff);
-}
-#endif
-
 static constexpr int padding = 2;
 
 namespace {

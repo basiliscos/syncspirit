@@ -36,18 +36,21 @@ struct entity_stats_t {
 
 struct presence_stats_t : entity_stats_t {
     std::int32_t cluster_entries = 0;
+    std::int32_t local_entries = 0;
 
     bool operator==(const presence_stats_t &) const noexcept = default;
 
     inline presence_stats_t &operator+=(const presence_stats_t &o) noexcept {
         static_cast<entity_stats_t &>(*this) += o;
         cluster_entries += o.cluster_entries;
+        local_entries += o.local_entries;
         return *this;
     }
 
     inline presence_stats_t &operator-=(const presence_stats_t &o) noexcept {
         static_cast<entity_stats_t &>(*this) += o;
         cluster_entries -= o.cluster_entries;
+        local_entries -= o.local_entries;
         return *this;
     }
 
@@ -56,11 +59,12 @@ struct presence_stats_t : entity_stats_t {
         return {
             {self - o},
             cluster_entries - o.cluster_entries,
+            local_entries - o.local_entries,
         };
     }
     inline presence_stats_t operator-() const noexcept {
         auto &self = static_cast<const entity_stats_t &>(*this);
-        return {-self, -cluster_entries};
+        return {-self, -cluster_entries, -local_entries};
     }
 };
 
