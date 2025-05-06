@@ -9,7 +9,8 @@
 #include "model/file_info.h"
 
 #include <boost/nowide/convert.hpp>
-#include <map>
+#include <unordered_map>
+#include <vector>
 
 using namespace syncspirit;
 using namespace syncspirit::presentation;
@@ -17,11 +18,12 @@ using namespace syncspirit::presentation;
 namespace bfs = std::filesystem;
 
 using file_entity_ptr_t = model::intrusive_ptr_t<file_entity_t>;
-using new_files_t = std::map<std::string_view, file_entity_ptr_t>;
+using new_files_t = std::unordered_map<std::string_view, file_entity_ptr_t>;
 using file_entities_t = std::unordered_map<std::string_view, file_entity_ptr_t>;
 
 static void process(model::folder_info_t *folder_info, entity_t::children_t &files, new_files_t &new_files) {
     auto &files_map = folder_info->get_file_infos();
+    new_files.reserve(files_map.size());
     for (auto &it_file : files_map) {
         auto &file = *it_file.item;
         auto name = file.get_name();
@@ -34,10 +36,20 @@ static void process(model::folder_info_t *folder_info, entity_t::children_t &fil
     }
 }
 
-static void process_files(new_files_t &new_files, orphans_t &orphans, folder_entity_t *self) {
+static void process_files(new_files_t &&new_files, orphans_t &orphans, folder_entity_t *self) {
+    using entities_vector_t = std::vector<file_entity_ptr_t>;
+    auto entities = entities_vector_t();
+    entities.reserve(new_files.size());
+    for (auto &[_, file_entry] : new_files) {
+        entities.emplace_back((std::move(file_entry)));
+    }
+    auto comparator = [](const file_entity_ptr_t &lhs, const file_entity_ptr_t &rhs) {
+        return lhs->get_path().get_full_name() < rhs->get_path().get_full_name();
+    };
+    std::sort(entities.begin(), entities.end(), comparator);
+
     auto file_entities = file_entities_t();
-    for (auto &it : new_files) {
-        auto &entity = it.second;
+    for (auto &entity : entities) {
         auto &path = entity->get_path();
         auto parent = (entity_t *)(nullptr);
         if (path.get_pieces_size() == 1) {
@@ -77,7 +89,7 @@ folder_entity_t::folder_entity_t(model::folder_ptr_t folder_) noexcept : entity_
     for (auto &it_fi : fi_map) {
         process(it_fi.item.get(), children, new_files);
     }
-    process_files(new_files, orphans, this);
+    process_files(std::move(new_files), orphans, this);
     commit(path, nullptr);
 }
 
@@ -93,7 +105,7 @@ void folder_entity_t::on_insert(model::folder_info_t &folder_info) noexcept {
 
     auto new_files = new_files_t();
     process(&folder_info, children, new_files);
-    process_files(new_files, orphans, this);
+    process_files(std::move(new_files), orphans, this);
     statistics = {};
     commit(path, device);
 }

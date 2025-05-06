@@ -7,9 +7,9 @@
 #include "presentation/folder_presence.h"
 #include "../symbols.h"
 
+#include <fmt/format.h>
 #include <memory_resource>
 #include <iterator>
-#include <format>
 
 using namespace syncspirit::presentation;
 using namespace syncspirit::fltk;
@@ -249,7 +249,7 @@ void presence_item_t::update_label() {
         auto folder = folder_presence.get_folder_info().get_folder();
         auto folder_label = folder->get_label();
         auto folder_id = folder->get_id();
-        std::format_to(std::back_inserter(node_label), "{}, {}", folder_label, folder_id);
+        fmt::format_to(std::back_inserter(node_label), "{}, {}", folder_label, folder_id);
     } else {
         node_label = string_t(name, allocator);
     }
@@ -259,11 +259,11 @@ void presence_item_t::update_label() {
         auto &es = presence.get_entity()->get_stats();
         if (ps.size && (ps.cluster_entries != es.entities)) {
             double share = (100.0 * ps.cluster_entries) / es.entities;
-            std::format_to(std::back_inserter(node_label), " ({}{:.2f}%)", symbols::synchronizing, share);
+            fmt::format_to(std::back_inserter(node_label), " ({}{:.2f}%)", symbols::synchronizing, share);
         }
         if (features & F::local && (ps.local_entries != ps.entities)) {
             double share = (100.0 * ps.local_entries) / es.entities;
-            std::format_to(std::back_inserter(node_label), " ({}{:.2f}%)", symbols::scanning, share);
+            fmt::format_to(std::back_inserter(node_label), " ({}{:.2f}%)", symbols::scanning, share);
         }
     }
 
