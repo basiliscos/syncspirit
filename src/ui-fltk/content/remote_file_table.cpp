@@ -140,7 +140,7 @@ void remote_file_table_t::refresh() {
     symlink_target_cell->update(entry.get_link_target());
     entries_cell->update(fmt::format("{}", stats.entities));
     entries_size_cell->update(get_file_size(stats.size));
-    local_entries_cell->update(fmt::format("{}", stats.cluster_entries));
+    local_entries_cell->update(fmt::format("{}/{}", stats.entities, stats.local_entries));
 
     redraw();
 }

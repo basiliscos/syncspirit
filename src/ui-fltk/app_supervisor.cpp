@@ -39,6 +39,7 @@
 #include <functional>
 #include <limits>
 #include <memory_resource>
+#include <unordered_set>
 
 using namespace syncspirit::fltk;
 using namespace syncspirit::presentation;
@@ -51,13 +52,11 @@ r::plugin::resource_id_t model = 0;
 }
 } // namespace
 
-using entity_ptr_allocator_t = std::pmr::polymorphic_allocator<const entity_t *>;
-using entity_allocator_t = std::pmr::polymorphic_allocator<entity_ptr_t>;
-using sorted_entities_t = std::set<const entity_t *, entity_t::entity_comparator_t, entity_ptr_allocator_t>;
-using unsorted_entities_t = std::set<entity_ptr_t, std::less<entity_ptr_t>, entity_allocator_t>;
+using entities_ptrs_t = std::pmr::unordered_set<const entity_t *>;
+using entities_t = std::pmr::unordered_set<entity_ptr_t>;
 
 struct app_monitor_t final : entities_monitor_t {
-    app_monitor_t(unsorted_entities_t &deleted_, sorted_entities_t &updated_) : deleted{deleted_}, updated{updated_} {}
+    app_monitor_t(entities_t &deleted_, entities_ptrs_t &updated_) : deleted{deleted_}, updated{updated_} {}
     void on_delete(entity_t &entity) noexcept override { deleted.emplace(entity_ptr_t{&entity}); }
     void on_update(const entity_t &entity) noexcept override {
         auto current = &entity;
@@ -67,8 +66,8 @@ struct app_monitor_t final : entities_monitor_t {
         }
     }
 
-    unsorted_entities_t &deleted;
-    sorted_entities_t &updated;
+    entities_t &deleted;
+    entities_ptrs_t &updated;
 };
 
 db_info_viewer_guard_t::db_info_viewer_guard_t(main_window_t *main_window_) : main_window{main_window_} {}
@@ -214,8 +213,8 @@ void app_supervisor_t::on_model_update(model::message::model_update_t &message) 
     auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
     auto allocator = std::pmr::polymorphic_allocator<std::string>(&pool);
 
-    auto updated_entities = sorted_entities_t(allocator);
-    auto deleted_entities = unsorted_entities_t(allocator);
+    auto updated_entities = entities_ptrs_t(allocator);
+    auto deleted_entities = entities_t(allocator);
     auto monitor = app_monitor_t(deleted_entities, updated_entities);
 
     auto &diff = *message.payload.diff;

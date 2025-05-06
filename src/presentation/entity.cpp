@@ -227,10 +227,14 @@ auto entity_t::get_presences() const noexcept -> const presences_t & { return pr
 
 using ec_t = entity_t::entity_comparator_t;
 bool ec_t::operator()(const entity_t *lhs, const entity_t *rhs) const noexcept {
-    return lhs->get_path().get_own_name() < rhs->get_path().get_own_name();
+    return lhs->get_path().get_full_name() < rhs->get_path().get_full_name();
 }
 
 using nc_t = entity_t::name_comparator_t;
+
+bool nc_t::operator()(const entity_t *lhs, const entity_t *rhs) const noexcept {
+    return lhs->get_path().get_own_name() < rhs->get_path().get_own_name();
+}
 
 bool nc_t::operator()(const entity_t *lhs, const std::string_view rhs) const noexcept {
     return lhs->get_path().get_own_name() < rhs;

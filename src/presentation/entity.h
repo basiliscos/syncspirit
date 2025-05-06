@@ -44,9 +44,9 @@ struct SYNCSPIRIT_API entity_t : model::augmentable_t {
     struct SYNCSPIRIT_API entity_comparator_t {
         bool operator()(const entity_t *lhs, const entity_t *rhs) const noexcept;
     };
-    struct SYNCSPIRIT_API name_comparator_t : entity_comparator_t {
+    struct SYNCSPIRIT_API name_comparator_t {
         using is_transparent = std::true_type;
-        using entity_comparator_t::operator();
+        bool operator()(const entity_t *lhs, const entity_t *rhs) const noexcept;
         bool operator()(const entity_t *lhs, const std::string_view rhs) const noexcept;
         bool operator()(const std::string_view lhs, const entity_t *rhs) const noexcept;
     };
