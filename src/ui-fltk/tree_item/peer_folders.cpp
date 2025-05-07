@@ -20,11 +20,14 @@ peer_folders_t::peer_folders_t(model::device_t &peer_, app_supervisor_t &supervi
     for (auto it : folders) {
         auto &f = *it.item;
         if (auto fi = f.is_shared_with(peer); fi) {
-            auto folder_entity = static_cast<presentation::folder_entity_t *>(f.get_augmentation().get());
-            auto presence = folder_entity->get_presence(peer);
-            auto folder_presence = static_cast<presentation::folder_presence_t *>(presence);
-            auto folder = new folder_t(*folder_presence, supervisor, tree);
-            insert_by_label(folder);
+            auto &augmentation = f.get_augmentation();
+            if (augmentation) {
+                auto folder_entity = static_cast<presentation::folder_entity_t *>(augmentation.get());
+                auto presence = folder_entity->get_presence(peer);
+                auto folder_presence = static_cast<presentation::folder_presence_t *>(presence);
+                auto folder = new folder_t(*folder_presence, supervisor, tree);
+                insert_by_label(folder);
+            }
         }
     }
 }
@@ -43,14 +46,9 @@ void peer_folders_t::update_label() {
     tree()->redraw();
 }
 
-void peer_folders_t::add_folder(model::folder_info_t &folder_info) {
+void peer_folders_t::add_folder(presentation::folder_presence_t &presence) {
     return within_tree([&]() {
-        auto f_aug = folder_info.get_folder()->get_augmentation().get();
-        auto folder_entity = static_cast<presentation::folder_entity_t *>(f_aug);
-        folder_entity->on_insert(folder_info);
-        auto presence = folder_entity->get_presence(peer);
-        auto folder_presence = static_cast<presentation::folder_presence_t *>(presence);
-        auto folder = new folder_t(*folder_presence, supervisor, tree());
+        auto folder = new folder_t(presence, supervisor, tree());
         insert_by_label(folder);
         update_label();
         return;

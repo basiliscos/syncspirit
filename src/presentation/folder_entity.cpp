@@ -93,11 +93,11 @@ folder_entity_t::folder_entity_t(model::folder_ptr_t folder_) noexcept : entity_
     commit(path, nullptr);
 }
 
-void folder_entity_t::on_insert(model::folder_info_t &folder_info) noexcept {
+auto folder_entity_t::on_insert(model::folder_info_t &folder_info) noexcept -> folder_presence_t * {
     auto device = folder_info.get_device();
     for (auto p : presences) {
         if (p->get_device() == device) {
-            return;
+            return {};
         }
     }
     auto p = new folder_presence_t(*this, folder_info);
@@ -108,6 +108,7 @@ void folder_entity_t::on_insert(model::folder_info_t &folder_info) noexcept {
     process_files(std::move(new_files), orphans, this);
     statistics = {};
     commit(path, device);
+    return p;
 }
 
 entity_t *folder_entity_t::on_insert(model::file_info_t &file_info) noexcept {
