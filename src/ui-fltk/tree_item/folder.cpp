@@ -92,6 +92,10 @@ struct table_t : content::folder_table_t {
     table_t(tree_item_t &container_, const model::folder_info_t &description, int x, int y, int w, int h)
         : parent_t(container_, description, x, y, w, h) {
 
+        auto &folder_item = static_cast<folder_t &>(container);
+        auto &fp = static_cast<presentation::folder_presence_t &>(folder_item.get_presence());
+        is_local = fp.get_features() & presentation::presence_t::features_t::local;
+
         entries_cell = new static_string_provider_t();
         entries_size_cell = new static_string_provider_t();
         max_sequence_cell = new static_string_provider_t();
@@ -102,82 +106,92 @@ struct table_t : content::folder_table_t {
         data.push_back({"", make_title(*this, "edit existing folder")});
         data.push_back({"path", make_path(*this, true)});
         data.push_back({"id", make_id(*this, true)});
-        data.push_back({"label", make_label(*this, false)});
-        data.push_back({"type", make_folder_type(*this, false)});
-        data.push_back({"pull order", make_pull_order(*this, false)});
-        data.push_back({"entries", entries_cell});
+        data.push_back({"label", make_label(*this, !is_local)});
+        if (is_local) {
+            data.push_back({"type", make_folder_type(*this, false)});
+            data.push_back({"pull order", make_pull_order(*this, false)});
+        }
+        data.push_back({"cluster/local entries", entries_cell});
         data.push_back({"entries size", entries_size_cell});
         data.push_back({"max sequence", max_sequence_cell});
         data.push_back({"index", make_index(*this, true)});
-        data.push_back({"scan start", scan_start_cell});
-        data.push_back({"scan finish", scan_finish_cell});
-        data.push_back({"rescan interval", make_rescan_interval(*this, false)});
-        data.push_back({"ignore permissions", make_ignore_permissions(*this, false)});
-        data.push_back({"ignore delete", make_ignore_delete(*this, false)});
-        data.push_back({"disable temp indixes", make_disable_tmp(*this, false)});
-        data.push_back({"scheduled", make_scheduled(*this, false)});
-        data.push_back({"paused", make_paused(*this, false)});
-
-        int shared_count = 0;
-        for (auto it : *shared_with) {
-            auto &device = it.item;
-            auto widget = make_shared_with(*this, device, false);
-            data.push_back({"shared_with", widget});
-            ++shared_count;
+        if (is_local) {
+            data.push_back({"scan start", scan_start_cell});
+            data.push_back({"scan finish", scan_finish_cell});
+            data.push_back({"rescan interval", make_rescan_interval(*this, false)});
+            data.push_back({"ignore permissions", make_ignore_permissions(*this, false)});
+            data.push_back({"ignore delete", make_ignore_delete(*this, false)});
+            data.push_back({"disable temp indixes", make_disable_tmp(*this, false)});
+            data.push_back({"scheduled", make_scheduled(*this, false)});
+            data.push_back({"paused", make_paused(*this, false)});
         }
-        if (!shared_count) {
-            auto widget = make_shared_with(*this, {}, false);
-            data.push_back({"shared_with", widget});
-        }
-        data.push_back({"", notice = make_notice(*this)});
-        data.push_back({"actions", make_actions(*this)});
 
-        initially_shared_with = *shared_with;
-        initially_non_shared_with = *non_shared_with;
+        if (is_local) {
+            int shared_count = 0;
+            for (auto it : *shared_with) {
+                auto &device = it.item;
+                auto widget = make_shared_with(*this, device, false);
+                data.push_back({"shared_with", widget});
+                ++shared_count;
+            }
+            if (!shared_count) {
+                auto widget = make_shared_with(*this, {}, false);
+                data.push_back({"shared_with", widget});
+            }
+            data.push_back({"", notice = make_notice(*this)});
+            data.push_back({"actions", make_actions(*this)});
+
+            initially_shared_with = *shared_with;
+            initially_non_shared_with = *non_shared_with;
+        }
+
         assign_rows(std::move(data));
-
         refresh();
     }
 
     void refresh() override {
         auto &folder_item = static_cast<folder_t &>(container);
         auto &fp = static_cast<presentation::folder_presence_t &>(folder_item.get_presence());
-        auto &folder_info = fp.get_folder_info();
-        serialization_context_t ctx;
-        description.get_folder()->serialize(ctx.folder);
+        auto is_local = fp.get_features() & presentation::presence_t::features_t::local;
 
-        auto copy_data = db::encode(ctx.folder);
-        error = {};
-        auto valid = store(&ctx);
+        if (is_local) {
+            auto &folder_info = fp.get_folder_info();
+            serialization_context_t ctx;
+            description.get_folder()->serialize(ctx.folder);
 
-        // clang-format off
-        auto is_same = (copy_data == db::encode(ctx.folder))
-                    && (initially_shared_with == ctx.shared_with);
-        // clang-format on
-        if (!is_same) {
-            if (valid) {
-                apply_button->activate();
+            auto copy_data = db::encode(ctx.folder);
+            error = {};
+            auto valid = store(&ctx);
+
+            // clang-format off
+            auto is_same = (copy_data == db::encode(ctx.folder))
+                        && (initially_shared_with == ctx.shared_with);
+            // clang-format on
+            if (!is_same) {
+                if (valid) {
+                    apply_button->activate();
+                }
+                reset_button->activate();
+                rescan_button->deactivate();
+            } else {
+                apply_button->deactivate();
+                auto &folders = container.supervisor.get_cluster()->get_folders();
+                auto folder_id = db::get_id(ctx.folder);
+                auto folder = folders.by_id(folder_id);
+                if (!folder->is_scanning()) {
+                    rescan_button->activate();
+                }
+                reset_button->deactivate();
             }
-            reset_button->activate();
-            rescan_button->deactivate();
-        } else {
-            apply_button->deactivate();
-            auto &folders = container.supervisor.get_cluster()->get_folders();
-            auto folder_id = db::get_id(ctx.folder);
-            auto folder = folders.by_id(folder_id);
-            if (!folder->is_scanning()) {
-                rescan_button->activate();
-            }
-            reset_button->deactivate();
+
+            auto folder = description.get_folder();
+            auto &date_start = folder->get_scan_start();
+            auto &date_finish = folder->get_scan_finish();
+            auto scan_start = date_start.is_not_a_date_time() ? "-" : model::pt::to_simple_string(date_start);
+            auto scan_finish = date_finish.is_not_a_date_time() ? "-" : model::pt::to_simple_string(date_finish);
+            scan_start_cell->update(scan_start);
+            scan_finish_cell->update(scan_finish);
         }
-
-        auto folder = description.get_folder();
-        auto &date_start = folder->get_scan_start();
-        auto &date_finish = folder->get_scan_finish();
-        auto scan_start = date_start.is_not_a_date_time() ? "-" : model::pt::to_simple_string(date_start);
-        auto scan_finish = date_finish.is_not_a_date_time() ? "-" : model::pt::to_simple_string(date_finish);
-        scan_start_cell->update(scan_start);
-        scan_finish_cell->update(scan_finish);
 
         auto max_sequence = description.get_max_sequence();
         auto &stats = fp.get_stats();
@@ -185,9 +199,13 @@ struct table_t : content::folder_table_t {
         entries_size_cell->update(get_file_size(stats.size));
         max_sequence_cell->update(fmt::format("{}", max_sequence));
 
-        notice->reset();
+        if (is_local) {
+            notice->reset();
+        }
         redraw();
     }
+
+    bool is_local;
 };
 
 } // namespace
