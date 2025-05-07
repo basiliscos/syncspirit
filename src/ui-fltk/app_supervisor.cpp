@@ -438,17 +438,6 @@ auto app_supervisor_t::operator()(const model::diff::local::io_failure_t &diff, 
     return diff.visit_next(*this, custom);
 }
 
-auto app_supervisor_t::operator()(const model::diff::local::scan_start_t &diff, void *custom) noexcept
-    -> outcome::result<void> {
-    auto folder = cluster->get_folders().by_id(diff.folder_id);
-#if 0
-    auto augmentation = static_cast<augmentation_t *>(folder->get_augmentation().get());
-    auto folder_node = static_cast<tree_item::folder_t *>(augmentation->get_owner());
-    folder_node->reset_stats();
-#endif
-    return diff.visit_next(*this, custom);
-}
-
 auto app_supervisor_t::operator()(const model::diff::modify::update_peer_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     auto device = cluster->get_devices().by_sha256(diff.peer_id);

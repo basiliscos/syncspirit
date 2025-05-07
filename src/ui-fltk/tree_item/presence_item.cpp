@@ -190,19 +190,6 @@ bool presence_item_t::show(std::uint32_t hide_mask, bool refresh_labels, int32_t
                 }
             }
         }
-#if 0
-        for (auto p : children) {
-            auto item = (presence_item_t *)(nullptr);
-            if (auto augmentation = p->get_augmentation().get(); augmentation) {
-                item = dynamic_cast<presence_item_t *>(augmentation);
-            } else if (p->get_features() & F::missing) {
-                item = make_item(this, *p);
-            }
-            if (item) {
-                item->show(hide_mask, refresh_labels, depth - 1);
-            }
-        }
-#endif
     }
     tree()->redraw();
     return !hide;

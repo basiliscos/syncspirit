@@ -207,21 +207,3 @@ bool folder_t::on_select() {
     });
     return true;
 }
-
-void folder_t::reset_stats() {
-#if 0
-    using queue_t = std::deque<augmentation_entry_base_t *>;
-    auto queue = queue_t();
-    auto root = static_cast<augmentation_entry_base_t *>(get_proxy().get());
-    queue.push_back(root);
-    while (!queue.empty()) {
-        auto it = queue.front();
-        queue.pop_front();
-        it->reset_stats();
-        for (auto &c : it->get_children()) {
-            queue.emplace_back(c.get());
-        }
-    }
-    std::abort();
-#endif
-}

@@ -180,7 +180,6 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
     outcome::result<void> operator()(const model::diff::advance::advance_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::load::load_cluster_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::local::io_failure_t &, void *) noexcept override;
-    outcome::result<void> operator()(const model::diff::local::scan_start_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::add_pending_folders_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::add_pending_device_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::add_ignored_device_t &, void *) noexcept override;
@@ -214,9 +213,6 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
     main_window_t *main_window;
     std::size_t loaded_blocks;
     std::size_t loaded_files;
-#if 0
-    updated_entries_t *updated_entries;
-#endif
     const model::diff::load::load_cluster_t *load_cluster;
 
     friend struct db_info_viewer_guard_t;
