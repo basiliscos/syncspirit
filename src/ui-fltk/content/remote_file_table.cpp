@@ -77,7 +77,7 @@ remote_file_table_t::remote_file_table_t(tree_item::presence_item_t &container_,
     data.push_back({"symlink_target", symlink_target_cell});
     data.push_back({"entries", entries_cell});
     data.push_back({"entries size", entries_size_cell});
-    data.push_back({"zzz cluster entries", local_entries_cell});
+    data.push_back({"cluster/local entries", local_entries_cell});
 
     assign_rows(std::move(data));
 
@@ -140,7 +140,7 @@ void remote_file_table_t::refresh() {
     symlink_target_cell->update(entry.get_link_target());
     entries_cell->update(fmt::format("{}", stats.entities));
     entries_size_cell->update(get_file_size(stats.size));
-    local_entries_cell->update(fmt::format("{}/{}", stats.entities, stats.local_entries));
+    local_entries_cell->update(fmt::format("{}/{}", stats.cluster_entries, stats.entities));
 
     redraw();
 }
