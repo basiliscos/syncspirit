@@ -28,23 +28,15 @@ presence_item_t::presence_item_t(presence_t &presence_, app_supervisor_t &superv
 presence_item_t::~presence_item_t() {
     auto p = parent();
     if (p) {
-        do_hide();
+        auto self = do_hide();
+        self.detach();
     }
 
     // will be de-allocated by augmentation, not by fltk
     auto child_count = children();
     int i = 0;
-    while (i < children()) {
-        auto c = child(i);
-        auto pi = dynamic_cast<presence_item_t *>(c);
-        if (pi) {
-            deparent(i);
-            if (pi->presence.get_features() & F::missing) {
-                delete c;
-            }
-        } else {
-            ++i;
-        }
+    while (children()) {
+        safe_detach(i);
     }
 }
 
@@ -52,7 +44,6 @@ static auto make_item(presence_item_t *parent, presence_t &presence) -> presence
     if (auto &aug = presence.get_augmentation(); aug) {
         return static_cast<presence_item_t *>(aug.get());
     }
-    spdlog::warn("zzz making item for : {}", presence.get_entity()->get_path().get_full_name());
     auto f = presence.get_features();
     if (f & (F::cluster | F::local)) {
         if ((f & F::directory) || (f & F::file)) {
@@ -140,18 +131,24 @@ void presence_item_t::do_show(std::uint32_t mask, bool refresh_label) {
     }
 }
 
-void presence_item_t::do_hide() {
+presence_item_ptr_t presence_item_t::do_hide() {
     auto host = parent();
+    auto r = presence_item_ptr_t(this);
     if (host) {
         auto index = host->find_child(this);
         if (index >= 0) {
             if (is_selected()) {
                 select_other();
             }
-            host->deparent(index);
-            tree()->redraw();
+            if ((presence.get_features() & F::folder)) {
+                host->deparent(index);
+            } else {
+                dynamic_cast<presence_item_t *>(host)->safe_detach(index);
+            }
+            host->tree()->redraw();
         }
     }
+    return r;
 }
 
 bool presence_item_t::show(std::uint32_t hide_mask, bool refresh_labels, int32_t depth) {
@@ -166,16 +163,17 @@ bool presence_item_t::show(std::uint32_t hide_mask, bool refresh_labels, int32_t
             hide = best->get_features() & hide_mask;
         }
     }
-    if (!hide) {
-        do_show(hide_mask, refresh_labels);
-    } else {
+    if (hide) {
         do_hide();
+        return false;
     }
-    if (!hide && depth >= 1 && expanded) {
+    do_show(hide_mask, refresh_labels);
+    if (depth >= 1 && expanded) {
         auto &children = presence.get_children();
         auto c = (presence_item_t *)(nullptr);
         for (int i = 0, j = 0; i < (int)children.size(); ++i) {
             auto p = children[i];
+            auto child_holder = presence_item_ptr_t();
             auto item = (presence_item_t *)(nullptr);
             if (j < this->children() && !c) {
                 c = dynamic_cast<presence_item_t *>(child(j));
@@ -186,10 +184,7 @@ bool presence_item_t::show(std::uint32_t hide_mask, bool refresh_labels, int32_t
                 } else {
                     auto r = presence_t::compare(p, &c->presence);
                     if (r) {
-                        auto node = deparent(j);
-                        if (c->presence.get_features() & F::missing) {
-                            delete c;
-                        }
+                        child_holder = safe_detach(j);
                         c = {};
                     }
                 }
@@ -208,7 +203,7 @@ bool presence_item_t::show(std::uint32_t hide_mask, bool refresh_labels, int32_t
         }
     }
     tree()->redraw();
-    return !hide;
+    return true;
 }
 
 void presence_item_t::show_child(presentation::presence_t &child_presence, std::uint32_t mask) {
@@ -299,6 +294,18 @@ Fl_Color presence_item_t::get_color() const {
         }
     }
     return FL_BLACK;
+}
+
+presence_item_ptr_t presence_item_t::safe_detach(int child_index) {
+    auto item = (presence_item_t *)(nullptr);
+    auto child = deparent(child_index);
+    if (child) {
+        item = dynamic_cast<presence_item_t *>(child);
+        if (!item) {
+            delete child;
+        }
+    }
+    return item;
 }
 
 bool presence_item_t::is_expanded() const { return expanded; }

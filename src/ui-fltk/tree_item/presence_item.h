@@ -7,7 +7,13 @@
 #include "presentation/presence.h"
 #include "presentation/entity.h"
 
+#include <memory>
+
 namespace syncspirit::fltk::tree_item {
+
+struct presence_item_t;
+
+using presence_item_ptr_t = model::intrusive_ptr_t<presence_item_t>;
 
 struct presence_item_t : dynamic_item_t, model::augmentation_t {
     using parent_t = dynamic_item_t;
@@ -29,9 +35,11 @@ struct presence_item_t : dynamic_item_t, model::augmentation_t {
     void populate_dummy_child();
     Fl_Color get_color() const;
     void do_show(std::uint32_t mask, bool refresh_label);
-    void do_hide();
+    presence_item_ptr_t do_hide();
     int get_position(const presence_item_t &child, std::uint32_t cut_mask);
     virtual const model::device_t *get_device() const;
+
+    presence_item_ptr_t safe_detach(int child_index);
 
     presentation::presence_t &presence;
     bool expanded;
