@@ -1594,7 +1594,8 @@ TEST_CASE("statistics", "[presentation]") {
             REQUIRE(builder.local_update("1234-5678", pr_fi).apply());
             REQUIRE(deleted_entities.size() == 0);
             REQUIRE(updated_entities.size() == 1);
-            REQUIRE(*updated_entities.begin() == file_c);
+            auto it = updated_entities.begin();
+            REQUIRE(*it++ == file_c);
             updated_entities.clear();
         }
 

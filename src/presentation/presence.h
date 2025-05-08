@@ -62,6 +62,7 @@ struct SYNCSPIRIT_API presence_t : model::proxy_t {
     friend struct cluster_file_presence_t;
     friend struct file_entity_t;
 
+    void on_update() noexcept override;
     void on_delete() noexcept override;
     void clear_presense() noexcept;
     void link(augmentable_t* augmentable) noexcept;

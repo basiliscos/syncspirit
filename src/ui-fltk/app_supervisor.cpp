@@ -55,6 +55,8 @@ r::plugin::resource_id_t model = 0;
 
 using entities_ptrs_t = std::pmr::unordered_set<const entity_t *>;
 using entities_t = std::pmr::unordered_set<entity_ptr_t>;
+using guards_t = std::pmr::vector<entity_t::monitor_guard_t>;
+using shared_device_t = std::pmr::vector<syncspirit::model::device_t *>;
 
 struct app_monitor_t final : entities_monitor_t {
     app_monitor_t(entities_t &deleted_, entities_ptrs_t &updated_) : deleted{deleted_}, updated{updated_} {}
@@ -69,6 +71,11 @@ struct app_monitor_t final : entities_monitor_t {
 
     entities_t &deleted;
     entities_ptrs_t &updated;
+};
+
+struct visitor_context_t {
+    guards_t &guards;
+    app_monitor_t &monitor;
 };
 
 db_info_viewer_guard_t::db_info_viewer_guard_t(main_window_t *main_window_) : main_window{main_window_} {}
@@ -204,9 +211,6 @@ void app_supervisor_t::on_model_response(model::message::model_response_t &res) 
 }
 
 void app_supervisor_t::on_model_update(model::message::model_update_t &message) noexcept {
-    using guard_allocator_t = std::pmr::polymorphic_allocator<entity_t::monitor_guard_t>;
-    using guards_t = std::vector<entity_t::monitor_guard_t, guard_allocator_t>;
-
     LOG_TRACE(log, "on_model_update");
     bool has_been_loaded = cluster->get_devices().size();
 
@@ -242,7 +246,12 @@ void app_supervisor_t::on_model_update(model::message::model_update_t &message) 
     if (!has_been_loaded) {
         main_window->set_splash_text("populating model (2/3)...");
     }
-    r = diff.visit(*this, nullptr);
+
+    auto context = visitor_context_t{
+        guards,
+        monitor,
+    };
+    r = diff.visit(*this, &context);
     if (!r) {
         LOG_ERROR(log, "error visiting cluster diff: {}", r.assume_error().message());
         return;
@@ -527,6 +536,8 @@ auto app_supervisor_t::operator()(const model::diff::modify::upsert_folder_t &di
         auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
         folders_node->add_folder(*folder_entity);
         folder->set_augmentation(folder_entity);
+        auto ctx = static_cast<visitor_context_t *>(custom);
+        ctx->guards.emplace_back(folder_entity->monitor(&ctx->monitor));
     }
     return diff.visit_next(*this, custom);
 }
@@ -536,8 +547,8 @@ auto app_supervisor_t::operator()(const model::diff::modify::upsert_folder_info_
     auto r = diff.visit_next(*this, custom);
     auto &folder = *cluster->get_folders().by_id(diff.folder_id);
     auto &device = *cluster->get_devices().by_sha256(diff.device_id);
+    auto folder_info = folder.is_shared_with(device);
     if (&device != cluster->get_device()) {
-        auto folder_info = folder.is_shared_with(device);
         auto augmentation = folder.get_augmentation().get();
         auto folder_entity = static_cast<presentation::folder_entity_t *>(augmentation);
         auto folder_presence = folder_entity->on_insert(*folder_info);
@@ -553,24 +564,53 @@ auto app_supervisor_t::operator()(const model::diff::modify::upsert_folder_info_
 
 auto app_supervisor_t::operator()(const model::diff::peer::update_folder_t &diff, void *custom) noexcept
     -> outcome::result<void> {
-#if 0
+    auto buffer = std::array<std::byte, 128>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<std::string>(&pool);
+    auto shared_devices = shared_device_t(allocator);
+
     auto folder = cluster->get_folders().by_id(diff.folder_id);
-    auto peer = cluster->get_devices().by_sha256(diff.peer_id);
-    auto folder_info = folder->get_folder_infos().by_device(*peer);
-    if (auto generic_augmentation = folder_info->get_augmentation(); generic_augmentation) {
-        auto augmentation = static_cast<augmentation_entry_root_t *>(generic_augmentation.get());
-        auto &files_map = folder_info->get_file_infos();
-        for (auto &file : diff.files) {
-            auto file_name = proto::get_name(file);
-            auto file_info = files_map.by_name(file_name);
-            if (!file_info->get_augmentation()) {
-                augmentation->track(*file_info);
+    auto &devices_map = cluster->get_devices();
+
+    for (auto &it : devices_map) {
+        auto &device = it.item;
+        if (folder->is_shared_with(*device)) {
+            shared_devices.emplace_back(device.get());
+        }
+    }
+
+    auto peer = devices_map.by_sha256(diff.peer_id);
+    auto &files_map = folder->get_folder_infos().by_device(*peer)->get_file_infos();
+    auto folder_aug = folder->get_augmentation().get();
+    auto folder_entity = static_cast<presentation::folder_entity_t *>(folder_aug);
+    auto mask = mask_nodes();
+    for (auto &file : diff.files) {
+        auto file_name = proto::get_name(file);
+        auto file_info = files_map.by_name(file_name);
+        auto augmentation = file_info->get_augmentation().get();
+        if (!augmentation) {
+            auto entity = folder_entity->on_insert(*file_info);
+            if (entity) {
+                auto parent_entity = entity->get_parent();
+                if (parent_entity) {
+                    for (auto device : shared_devices) {
+                        auto presence = entity->get_presence(*device);
+                        auto parent = presence->get_parent();
+                        if (!parent) {
+                            parent = parent_entity->get_presence(*device);
+                        }
+                        if (parent) {
+                            auto parent_aug = parent->get_augmentation().get();
+                            if (parent_aug) {
+                                auto parent_item = static_cast<tree_item::presence_item_t *>(parent_aug);
+                                parent_item->show_child(*presence, mask);
+                            }
+                        }
+                    }
+                }
             }
         }
-        augmentation->augment_pending();
-        augmentation->on_update();
     }
-#endif
     return diff.visit_next(*this, custom);
 }
 

@@ -163,7 +163,6 @@ auto advance_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) c
               local_file->get_name(), proto::get_blocks_size(proto_local), sequence);
 
     local_file->notify_update();
-    local_folder->notify_update();
 
     return applicator_t::apply_sibling(cluster, controller);
 }

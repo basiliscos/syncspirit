@@ -61,6 +61,11 @@ void presence_t::clear_presense() noexcept {
 void presence_t::link(augmentable_t *augmentable) noexcept { augmentable->set_augmentation(this); }
 
 void presence_t::on_delete() noexcept { clear_presense(); }
+void presence_t::on_update() noexcept {
+    if (auto monitor = entity->get_monitor(); monitor) {
+        monitor->on_update(*entity);
+    }
+}
 
 const presence_t *presence_t::determine_best(const presence_t *other) const { return other; }
 
