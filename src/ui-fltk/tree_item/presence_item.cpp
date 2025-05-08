@@ -182,8 +182,8 @@ bool presence_item_t::show(std::uint32_t hide_mask, bool refresh_labels, int32_t
                 if (&c->presence == p) {
                     item = c;
                 } else {
-                    auto r = presence_t::compare(p, &c->presence);
-                    if (r) {
+                    auto same_name = p->get_entity() == c->presence.get_entity();
+                    if (same_name) {
                         child_holder = safe_detach(j);
                         c = {};
                     }
