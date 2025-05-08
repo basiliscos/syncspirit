@@ -61,7 +61,7 @@ struct SYNCSPIRIT_API entity_t : model::augmentable_t {
     virtual ~entity_t();
     const path_t &get_path() const noexcept;
 
-    presence_t *get_presence(model::device_t &device) noexcept;
+    presence_t *get_presence(const model::device_t *device) noexcept;
 
     children_t &get_children() noexcept;
 

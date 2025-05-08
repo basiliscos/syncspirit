@@ -143,10 +143,10 @@ auto entity_t::recalc_best() noexcept -> const presence_t * {
     return best;
 }
 
-presence_t *entity_t::get_presence(model::device_t &device) noexcept {
+presence_t *entity_t::get_presence(const model::device_t *device) noexcept {
     presence_t *fallback = nullptr;
     for (auto p : presences) {
-        if (p->device == &device) {
+        if (p->device == device) {
             return p;
         } else if (!p->device) {
             fallback = p;

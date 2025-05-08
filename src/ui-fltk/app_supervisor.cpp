@@ -594,10 +594,10 @@ auto app_supervisor_t::operator()(const model::diff::peer::update_folder_t &diff
                 auto parent_entity = entity->get_parent();
                 if (parent_entity) {
                     for (auto device : shared_devices) {
-                        auto presence = entity->get_presence(*device);
+                        auto presence = entity->get_presence(device);
                         auto parent = presence->get_parent();
                         if (!parent) {
-                            parent = parent_entity->get_presence(*device);
+                            parent = parent_entity->get_presence(device);
                         }
                         if (parent) {
                             auto parent_aug = parent->get_augmentation().get();

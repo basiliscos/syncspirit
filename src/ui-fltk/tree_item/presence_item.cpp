@@ -49,6 +49,10 @@ presence_item_t::~presence_item_t() {
 }
 
 static auto make_item(presence_item_t *parent, presence_t &presence) -> presence_item_t * {
+    if (auto &aug = presence.get_augmentation(); aug) {
+        return static_cast<presence_item_t *>(aug.get());
+    }
+    spdlog::warn("zzz making item for : {}", presence.get_entity()->get_path().get_full_name());
     auto f = presence.get_features();
     if (f & (F::cluster | F::local)) {
         if ((f & F::directory) || (f & F::file)) {
@@ -182,8 +186,11 @@ bool presence_item_t::show(std::uint32_t hide_mask, bool refresh_labels, int32_t
                 } else {
                     auto r = presence_t::compare(p, &c->presence);
                     if (r) {
+                        auto node = deparent(j);
+                        if (c->presence.get_features() & F::missing) {
+                            delete c;
+                        }
                         c = {};
-                        delete deparent(j);
                     }
                 }
             }
@@ -222,6 +229,7 @@ void presence_item_t::show_child(presentation::presence_t &child_presence, std::
                     node->show(mask, true, 0);
                     if (need_open) {
                         node->on_open();
+                        node->open();
                     }
                 }
                 break;
