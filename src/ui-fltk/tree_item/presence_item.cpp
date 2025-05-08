@@ -152,7 +152,16 @@ void presence_item_t::do_hide() {
 
 bool presence_item_t::show(std::uint32_t hide_mask, bool refresh_labels, int32_t depth) {
     assert(depth >= 0);
-    auto hide = presence.get_features() & hide_mask;
+    auto features = presence.get_features();
+    auto hide = features & hide_mask;
+
+    // don't show missing & deleted
+    if (!hide && features & F::missing) {
+        auto best = presence.get_entity()->get_best();
+        if (best) {
+            hide = best->get_features() & hide_mask;
+        }
+    }
     if (!hide) {
         do_show(hide_mask, refresh_labels);
     } else {
@@ -203,7 +212,7 @@ void presence_item_t::show_child(presentation::presence_t &child_presence, std::
             auto &p = c->get_presence();
             if (p.get_entity() == child_presence.get_entity()) {
                 if (&p != &child_presence) {
-                    deparent(i);
+                    bool need_open = c->is_expanded();
                     if (p.get_features() & F::missing) {
                         delete c;
                     }
@@ -211,6 +220,9 @@ void presence_item_t::show_child(presentation::presence_t &child_presence, std::
                     auto tmp_node = insert(prefs(), "", i);
                     replace_child(tmp_node, node);
                     node->show(mask, true, 0);
+                    if (need_open) {
+                        node->on_open();
+                    }
                 }
                 break;
             }

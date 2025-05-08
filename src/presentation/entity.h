@@ -67,6 +67,7 @@ struct SYNCSPIRIT_API entity_t : model::augmentable_t {
 
     inline entity_t *get_parent() noexcept { return parent; }
     inline const entity_t *get_parent() const noexcept { return parent; }
+    inline const presence_t *get_best() const noexcept { return best; }
 
     void add_child(entity_t &child) noexcept;
     void remove_child(entity_t &child) noexcept;
