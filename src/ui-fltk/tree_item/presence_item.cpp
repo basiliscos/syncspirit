@@ -234,7 +234,7 @@ void presence_item_t::show_child(presentation::presence_t &child_presence, std::
                     if (need_open) {
                         node->open();
                         node->expanded = true;
-                    } else if (child_presence.get_features() & F::directory) {
+                    } else if (child_presence.get_children().size()) {
                         node->populate_dummy_child();
                     }
                 }
@@ -320,5 +320,3 @@ presence_item_ptr_t presence_item_t::safe_detach(int child_index) {
 }
 
 bool presence_item_t::is_expanded() const { return expanded; }
-
-void presence_item_t::refresh_children() {}

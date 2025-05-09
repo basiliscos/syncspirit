@@ -25,7 +25,6 @@ struct presence_item_t : dynamic_item_t, model::augmentation_t {
 
     bool show(std::uint32_t hide_mask, bool refresh_labels, std::int32_t depth) override;
     bool is_expanded() const;
-    void refresh_children() override;
     void on_open() override;
     presentation::presence_t &get_presence();
     void show_child(presentation::presence_t &child_presence, std::uint32_t mask);
