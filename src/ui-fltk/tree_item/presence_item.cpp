@@ -60,8 +60,7 @@ void presence_item_t::on_open() {
         return;
     }
 
-    auto dummy = child(0);
-    Fl_Tree_Item::remove_child(dummy);
+    safe_detach(0);
     expanded = true;
 
     int position = 0;
@@ -71,6 +70,9 @@ void presence_item_t::on_open() {
         if (node) {
             auto tmp_node = insert(prefs(), "", position++);
             replace_child(tmp_node, node);
+            if (p->get_features() & F::directory) {
+                node->populate_dummy_child();
+            }
             node->show(hide_mask, false, false);
         }
     }
@@ -175,6 +177,7 @@ bool presence_item_t::show(std::uint32_t hide_mask, bool refresh_labels, int32_t
             auto p = children[i];
             auto child_holder = presence_item_ptr_t();
             auto item = (presence_item_t *)(nullptr);
+            bool same_name = false;
             if (j < this->children() && !c) {
                 c = dynamic_cast<presence_item_t *>(child(j));
             }
@@ -214,17 +217,25 @@ void presence_item_t::show_child(presentation::presence_t &child_presence, std::
             auto &p = c->get_presence();
             if (p.get_entity() == child_presence.get_entity()) {
                 if (&p != &child_presence) {
+                    auto child_holder = presence_item_ptr_t();
                     bool need_open = c->is_expanded();
                     if (p.get_features() & F::missing) {
-                        delete c;
+                        child_holder = safe_detach(i);
                     }
                     auto node = make_item(this, child_presence);
+                    for (int j = 0; child_holder && child_holder->children(); ++j) {
+                        auto n = child_holder->deparent(0);
+                        node->reparent(n, j);
+                    }
+
                     auto tmp_node = insert(prefs(), "", i);
                     replace_child(tmp_node, node);
                     node->show(mask, true, 0);
                     if (need_open) {
-                        node->on_open();
                         node->open();
+                        node->expanded = true;
+                    } else if (child_presence.get_features() & F::directory) {
+                        node->populate_dummy_child();
                     }
                 }
                 break;

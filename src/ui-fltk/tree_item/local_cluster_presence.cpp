@@ -15,9 +15,6 @@ local_cluster_presence_t::local_cluster_presence_t(presentation::presence_t &pre
     auto f = presence_.get_features();
     assert(f & (F::local | F::cluster));
     update_label();
-    if (f & F::directory) {
-        populate_dummy_child();
-    }
 }
 
 bool local_cluster_presence_t::on_select() {
