@@ -106,8 +106,19 @@ void presence_t::sync_with_entity() const noexcept {
 }
 
 bool presence_t::compare(const presence_t *l, const presence_t *r) noexcept {
-    auto ld = l->get_features() & F::directory;
-    auto rd = r->get_features() & F::directory;
+    auto lf = l->get_features();
+    if (lf & F::missing) {
+        l = l->entity->best;
+        lf = l->get_features();
+    }
+    auto rf = r->get_features();
+    if (rf & F::missing) {
+        r = r->entity->best;
+        rf = r->get_features();
+    }
+
+    auto ld = lf & F::directory;
+    auto rd = rf & F::directory;
     if (ld && !rd) {
         return true;
     } else if (!ld && rd) {

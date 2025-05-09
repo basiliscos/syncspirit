@@ -552,6 +552,7 @@ TEST_CASE("presentation", "[presentation]") {
             CHECK(e_file_2->get_path().get_full_name() == file_2->get_name());
         }
         SECTION("presence & entity hierarchy order") {
+            REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
             auto file_1 = add_file("file-a", *my_device, proto::FileInfoType::FILE);
             auto file_2 = add_file("file-b", *my_device, proto::FileInfoType::DIRECTORY);
 
@@ -563,10 +564,15 @@ TEST_CASE("presentation", "[presentation]") {
             CHECK(c1->get_path().get_full_name() == "file-a");
             CHECK(c2->get_path().get_full_name() == "file-b");
 
-            auto &p_children = folder_entity->get_presence(&*my_device)->get_children();
-            REQUIRE(p_children.size() == 2);
-            CHECK(p_children[0]->get_entity()->get_path().get_full_name() == "file-b");
-            CHECK(p_children[1]->get_entity()->get_path().get_full_name() == "file-a");
+            auto &p_my_children = folder_entity->get_presence(&*my_device)->get_children();
+            REQUIRE(p_my_children.size() == 2);
+            CHECK(p_my_children[0]->get_entity()->get_path().get_full_name() == "file-b");
+            CHECK(p_my_children[1]->get_entity()->get_path().get_full_name() == "file-a");
+
+            auto &p_peer_children = folder_entity->get_presence(&*peer_device)->get_children();
+            REQUIRE(p_peer_children.size() == 2);
+            CHECK(p_peer_children[0]->get_entity()->get_path().get_full_name() == "file-b");
+            CHECK(p_peer_children[1]->get_entity()->get_path().get_full_name() == "file-a");
         }
         SECTION("orphans") {
             SECTION("simple") {
