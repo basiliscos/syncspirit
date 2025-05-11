@@ -217,8 +217,8 @@ bool folder_t::on_select() {
         auto shared_with = devices_ptr_t(new model::devices_map_t{});
         auto non_shared_with = devices_ptr_t(new model::devices_map_t{});
 
-        auto &fp = static_cast<presentation::folder_presence_t &>(presence);
-        auto &folder_info = fp.get_folder_info();
+        auto fp = static_cast<presentation::folder_presence_t *>(presence);
+        auto &folder_info = fp->get_folder_info();
 
         int x = prev->x(), y = prev->y(), w = prev->w(), h = prev->h();
         return new table_t(*this, folder_info, x, y, w, h);

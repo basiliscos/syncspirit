@@ -60,7 +60,12 @@ using shared_device_t = std::pmr::vector<syncspirit::model::device_t *>;
 
 struct app_monitor_t final : entities_monitor_t {
     app_monitor_t(entities_t &deleted_, entities_ptrs_t &updated_) : deleted{deleted_}, updated{updated_} {}
-    void on_delete(entity_t &entity) noexcept override { deleted.emplace(entity_ptr_t{&entity}); }
+    void on_delete(entity_t &entity) noexcept override {
+        deleted.emplace(entity_ptr_t{&entity});
+        if (auto parent = entity.get_parent(); parent) {
+            on_update(*parent);
+        }
+    }
     void on_update(const entity_t &entity) noexcept override {
         auto current = &entity;
         while (current) {

@@ -171,13 +171,13 @@ void entity_t::remove_child(entity_t &child) noexcept {
     for (auto r : presences) {
         r->children.clear();
     }
-    child.parent = nullptr;
     push_stats({-child.get_stats(), 0}, nullptr, true);
 
     if (auto monitor = get_monitor(); monitor) {
         monitor->on_delete(child);
     }
 
+    child.parent = nullptr;
     children.erase(it);
 }
 

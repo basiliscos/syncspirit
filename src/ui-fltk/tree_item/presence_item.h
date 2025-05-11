@@ -7,8 +7,6 @@
 #include "presentation/presence.h"
 #include "presentation/entity.h"
 
-#include <memory>
-
 namespace syncspirit::fltk::tree_item {
 
 struct presence_item_t;
@@ -29,6 +27,7 @@ struct presence_item_t : dynamic_item_t, model::augmentation_t {
     presentation::presence_t &get_presence();
     void show_child(presentation::presence_t &child_presence, std::uint32_t mask);
     void update_label() override;
+    presence_item_ptr_t safe_detach(int child_index);
 
   protected:
     void populate_dummy_child();
@@ -38,9 +37,7 @@ struct presence_item_t : dynamic_item_t, model::augmentation_t {
     int get_position(const presence_item_t &child, std::uint32_t cut_mask);
     virtual const model::device_t *get_device() const;
 
-    presence_item_ptr_t safe_detach(int child_index);
-
-    presentation::presence_t &presence;
+    presentation::presence_t *presence;
     bool expanded;
 };
 

@@ -18,10 +18,10 @@ using namespace syncspirit::fltk::tree_item;
 using F = presence_t::features_t;
 
 presence_item_t::presence_item_t(presence_t &presence_, app_supervisor_t &supervisor, Fl_Tree *tree, bool augment)
-    : parent_t(supervisor, tree, false), presence{presence_}, expanded{false} {
+    : parent_t(supervisor, tree, false), presence{&presence_}, expanded{false} {
     if (augment) {
-        assert(!presence.get_augmentation());
-        presence.set_augmentation(*this);
+        assert(!presence->get_augmentation());
+        presence->set_augmentation(*this);
     }
 }
 
@@ -34,9 +34,8 @@ presence_item_t::~presence_item_t() {
 
     // will be de-allocated by augmentation, not by fltk
     auto child_count = children();
-    int i = 0;
-    while (children()) {
-        safe_detach(i);
+    while (children() > 0) {
+        safe_detach(0);
     }
 }
 
@@ -65,7 +64,7 @@ void presence_item_t::on_open() {
 
     int position = 0;
     auto hide_mask = supervisor.mask_nodes();
-    for (auto p : presence.get_children()) {
+    for (auto p : presence->get_children()) {
         auto node = make_item(this, *p);
         if (node) {
             auto tmp_node = insert(prefs(), "", position++);
@@ -80,23 +79,23 @@ void presence_item_t::on_open() {
 }
 
 void presence_item_t::populate_dummy_child() {
-    if (presence.get_entity()->get_children().size() > 0) {
+    if (presence->get_entity()->get_children().size() > 0) {
         auto t = tree();
         add(prefs(), "[dummy]", new tree_item_t(supervisor, t, false));
         t->close(this, 0);
     }
 }
 
-auto presence_item_t::get_presence() -> presentation::presence_t & { return presence; }
+auto presence_item_t::get_presence() -> presentation::presence_t & { return *presence; }
 
-auto presence_item_t::get_device() const -> const model::device_t * { return presence.get_device(); }
+auto presence_item_t::get_device() const -> const model::device_t * { return presence->get_device(); }
 
 int presence_item_t::get_position(const presence_item_t &child, std::uint32_t cut_mask) {
-    auto &container = presence.get_children();
+    auto &container = presence->get_children();
     auto child_presence = &child.presence;
     int position = 0;
     for (auto p : container) {
-        if (p == child_presence) {
+        if (&p == child_presence) {
             break;
         }
         if (!(p->get_features() & cut_mask)) {
@@ -110,10 +109,10 @@ void presence_item_t::do_show(std::uint32_t mask, bool refresh_label) {
     auto host = parent();
     if (!host) {
         auto host = [&]() -> presence_item_t * {
-            auto parent = presence.get_parent();
+            auto parent = presence->get_parent();
             if (parent) {
                 return static_cast<presence_item_t *>(parent->get_augmentation().get());
-            } else if (presence.get_features() & F::missing) {
+            } else if (presence->get_features() & F::missing) {
                 return static_cast<missing_item_presence_t *>(this)->host;
             }
             return nullptr;
@@ -142,7 +141,7 @@ presence_item_ptr_t presence_item_t::do_hide() {
             if (is_selected()) {
                 select_other();
             }
-            if ((presence.get_features() & F::folder)) {
+            if ((presence->get_features() & F::folder)) {
                 host->deparent(index);
             } else {
                 dynamic_cast<presence_item_t *>(host)->safe_detach(index);
@@ -155,12 +154,12 @@ presence_item_ptr_t presence_item_t::do_hide() {
 
 bool presence_item_t::show(std::uint32_t hide_mask, bool refresh_labels, int32_t depth) {
     assert(depth >= 0);
-    auto features = presence.get_features();
+    auto features = presence->get_features();
     auto hide = features & hide_mask;
 
     // don't show missing & deleted
     if (!hide && features & F::missing) {
-        auto best = presence.get_entity()->get_best();
+        auto best = presence->get_entity()->get_best();
         if (best) {
             hide = best->get_features() & hide_mask;
         }
@@ -171,7 +170,7 @@ bool presence_item_t::show(std::uint32_t hide_mask, bool refresh_labels, int32_t
     }
     do_show(hide_mask, refresh_labels);
     if (depth >= 1 && expanded) {
-        auto &children = presence.get_children();
+        auto &children = presence->get_children();
         auto c = (presence_item_t *)(nullptr);
         for (int i = 0, j = 0; i < (int)children.size(); ++i) {
             auto p = children[i];
@@ -182,10 +181,10 @@ bool presence_item_t::show(std::uint32_t hide_mask, bool refresh_labels, int32_t
                 c = dynamic_cast<presence_item_t *>(child(j));
             }
             if (c) {
-                if (&c->presence == p) {
+                if (c->presence == p) {
                     item = c;
                 } else {
-                    auto same_name = p->get_entity() == c->presence.get_entity();
+                    auto same_name = p->get_entity() == c->presence->get_entity();
                     if (same_name) {
                         child_holder = safe_detach(j);
                         c = {};
@@ -254,12 +253,12 @@ void presence_item_t::update_label() {
     auto allocator = allocator_t(&pool);
 
     auto color = get_color();
-    auto name = presence.get_entity()->get_path().get_own_name();
-    auto features = presence.get_features();
+    auto name = presence->get_entity()->get_path().get_own_name();
+    auto features = presence->get_features();
     auto node_label = string_t(allocator);
     if (features & F::folder) {
-        auto &folder_presence = static_cast<presentation::folder_presence_t &>(presence);
-        auto folder = folder_presence.get_folder_info().get_folder();
+        auto folder_presence = static_cast<presentation::folder_presence_t *>(presence);
+        auto folder = folder_presence->get_folder_info().get_folder();
         auto folder_label = folder->get_label();
         auto folder_id = folder->get_id();
         fmt::format_to(std::back_inserter(node_label), "{}, {}", folder_label, folder_id);
@@ -268,8 +267,8 @@ void presence_item_t::update_label() {
     }
 
     if (features & (F::directory | F::folder)) {
-        auto &ps = presence.get_stats(true);
-        auto &es = presence.get_entity()->get_stats();
+        auto &ps = presence->get_stats(true);
+        auto &es = presence->get_entity()->get_stats();
         if (ps.size && (ps.cluster_entries != es.entities)) {
             double share = (100.0 * ps.cluster_entries) / es.entities;
             fmt::format_to(std::back_inserter(node_label), " ({}{:.2f}%)", symbols::synchronizing, share);
@@ -287,7 +286,7 @@ void presence_item_t::update_label() {
 Fl_Color presence_item_t::get_color() const {
     auto &cfg = supervisor.get_app_config().fltk_config;
     if (cfg.display_colorized) {
-        auto f = presence.get_features();
+        auto f = presence->get_features();
         if (f & F::missing) {
             return FL_DARK_RED;
         } else if (f & F::deleted) {
@@ -297,8 +296,8 @@ Fl_Color presence_item_t::get_color() const {
         } else if (f & F::conflict) {
             return FL_RED;
         }
-        auto &ps = presence.get_stats(true);
-        auto &s = presence.get_entity()->get_stats();
+        auto &ps = presence->get_stats(true);
+        auto &s = presence->get_entity()->get_stats();
         auto in_sync = ps.cluster_entries == s.entities;
         if (in_sync) {
             return FL_DARK_GREEN;
