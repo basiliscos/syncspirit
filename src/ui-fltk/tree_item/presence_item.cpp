@@ -17,6 +17,20 @@ using namespace syncspirit::fltk::tree_item;
 
 using F = presence_t::features_t;
 
+inline static bool is_hidden(presence_t *presence, std::uint32_t hide_mask) {
+    auto features = presence->get_features();
+    auto hide = features & hide_mask;
+
+    // don't show missing & deleted
+    if (!hide && features & F::missing) {
+        auto best = presence->get_entity()->get_best();
+        if (best) {
+            hide = best->get_features() & hide_mask;
+        }
+    }
+    return hide;
+}
+
 presence_item_t::presence_item_t(presence_t &presence_, app_supervisor_t &supervisor, Fl_Tree *tree, bool augment)
     : parent_t(supervisor, tree, false), presence{&presence_}, expanded{false} {
     if (augment) {
@@ -65,14 +79,16 @@ void presence_item_t::on_open() {
     int position = 0;
     auto hide_mask = supervisor.mask_nodes();
     for (auto p : presence->get_children()) {
-        auto node = make_item(this, *p);
-        if (node) {
-            auto tmp_node = insert(prefs(), "", position++);
-            replace_child(tmp_node, node);
-            if (p->get_features() & F::directory) {
-                node->populate_dummy_child();
+        if (!is_hidden(p, hide_mask)) {
+            auto node = make_item(this, *p);
+            if (node) {
+                auto tmp_node = insert(prefs(), "", position++);
+                replace_child(tmp_node, node);
+                if (p->get_features() & F::directory) {
+                    node->populate_dummy_child();
+                }
+                node->show(hide_mask, false, false);
             }
-            node->show(hide_mask, false, false);
         }
     }
     tree()->redraw();
@@ -92,10 +108,9 @@ auto presence_item_t::get_device() const -> const model::device_t * { return pre
 
 int presence_item_t::get_position(const presence_item_t &child, std::uint32_t cut_mask) {
     auto &container = presence->get_children();
-    auto child_presence = &child.presence;
     int position = 0;
     for (auto p : container) {
-        if (&p == child_presence) {
+        if (p == child.presence) {
             break;
         }
         if (!(p->get_features() & cut_mask)) {
@@ -154,17 +169,7 @@ presence_item_ptr_t presence_item_t::do_hide() {
 
 bool presence_item_t::show(std::uint32_t hide_mask, bool refresh_labels, int32_t depth) {
     assert(depth >= 0);
-    auto features = presence->get_features();
-    auto hide = features & hide_mask;
-
-    // don't show missing & deleted
-    if (!hide && features & F::missing) {
-        auto best = presence->get_entity()->get_best();
-        if (best) {
-            hide = best->get_features() & hide_mask;
-        }
-    }
-    if (hide) {
+    if (is_hidden(presence, hide_mask)) {
         do_hide();
         return false;
     }
