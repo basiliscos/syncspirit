@@ -65,8 +65,7 @@ void entity_t::push_stats(const presence_stats_t &diff, const model::device_t *s
 }
 
 void entity_t::remove_presense(presence_t &item) noexcept {
-    auto predicate = [&item](const presence_t *presence) { return presence == &item; };
-    auto it = std::find_if(presences.begin(), presences.end(), predicate);
+    auto it = std::find(presences.begin(), presences.end(), &item);
     assert(it != presences.end());
     if (children.size()) {
         bool rescan_children = true;
@@ -224,11 +223,6 @@ auto entity_t::monitor(entities_monitor_t *monitor_) noexcept -> monitor_guard_t
 }
 
 auto entity_t::get_presences() const noexcept -> const presences_t & { return presences; }
-
-using ec_t = entity_t::entity_comparator_t;
-bool ec_t::operator()(const entity_t *lhs, const entity_t *rhs) const noexcept {
-    return lhs->get_path().get_full_name() < rhs->get_path().get_full_name();
-}
 
 using nc_t = entity_t::name_comparator_t;
 
