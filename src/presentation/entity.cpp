@@ -17,9 +17,9 @@ entity_t::entity_t(path_t path_, entity_t *parent_) noexcept
 entity_t::~entity_t() { clear_children(); }
 
 void entity_t::clear_children() noexcept {
-    while (children.size()) {
-        auto child = *children.begin();
-        remove_child(*child);
+    for (auto it = children.begin(); it != children.end();) {
+        remove_child(**it);
+        it = children.erase(it);
     }
 }
 
@@ -67,25 +67,32 @@ void entity_t::push_stats(const presence_stats_t &diff, const model::device_t *s
 void entity_t::remove_presense(presence_t &item) noexcept {
     auto it = std::find(presences.begin(), presences.end(), &item);
     assert(it != presences.end());
+    for (auto it = children.begin(); it != children.end();) {
+        auto c = *it;
+        bool found = false;
+        for (auto p : c->presences) {
+            if (p->device == item.device) {
+                found = true;
+                // critical to stop "child-from-parent" removal propagation
+                it = children.erase(it);
+                p->clear_presense();
+                if (c->presences.empty()) {
+                    remove_child(*c);
+                } else {
+                    children.emplace_hint(it, c);
+                }
+                break;
+            }
+        }
+        if (!found) {
+            ++it;
+        }
+    }
+
     if (children.size()) {
         bool rescan_children = true;
         while (rescan_children) {
             bool scan = true;
-            for (auto it = children.begin(); scan && it != children.end();) {
-                auto &c = *it;
-                bool advance_it = true;
-                for (auto p : c->presences) {
-                    if (p->device == item.device) {
-                        p->clear_presense();
-                        advance_it = false;
-                        scan = false;
-                        break;
-                    }
-                }
-                if (advance_it) {
-                    ++it;
-                }
-            }
             rescan_children = !scan;
         }
     }
@@ -109,17 +116,16 @@ void entity_t::remove_presense(presence_t &item) noexcept {
         push_stats({diff, 0}, {}, true);
     };
 
-    bool remove_self = presences.empty() && parent;
-    if (presences.size() == 1) {
-        auto p = presences.front();
-        if (!p->device) {
-            remove_presense(*p);
+    if ((presences.size() == 1) && (presences.front()->get_features() & F::missing)) {
+        remove_presense(*presences.front());
+        if (parent) {
+            auto &siblings = parent->children;
+            auto it = siblings.find(this);
+            if (it != siblings.end()) {
+                parent->remove_child(*this);
+                siblings.erase(it);
+            }
         }
-    }
-    if (remove_self) {
-        clear_children();
-        parent->remove_child(*this);
-        parent = nullptr;
     }
 }
 
@@ -161,11 +167,8 @@ void entity_t::add_child(entity_t &child) noexcept {
 }
 
 void entity_t::remove_child(entity_t &child) noexcept {
-    auto it = children.equal_range(&child).first;
-    assert(it != children.end());
     child.clear_children();
     child.set_augmentation({});
-    model::intrusive_ptr_release(&child);
 
     for (auto r : presences) {
         r->children.clear();
@@ -177,7 +180,7 @@ void entity_t::remove_child(entity_t &child) noexcept {
     }
 
     child.parent = nullptr;
-    children.erase(it);
+    model::intrusive_ptr_release(&child);
 }
 
 const entity_stats_t &entity_t::get_stats() noexcept { return statistics; }
