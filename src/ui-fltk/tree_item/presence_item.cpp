@@ -68,6 +68,17 @@ static auto make_item(presence_item_t *parent, presence_t &presence) -> presence
     return nullptr;
 }
 
+static auto get_host(presence_item_t *self) -> presence_item_t * {
+    auto presence = &self->get_presence();
+    auto parent = presence->get_parent();
+    if (parent) {
+        return static_cast<presence_item_t *>(parent->get_augmentation().get());
+    } else if (presence->get_features() & F::missing) {
+        return static_cast<missing_item_presence_t *>(self)->host;
+    }
+    return nullptr;
+}
+
 void presence_item_t::on_open() {
     if (expanded || !children()) {
         return;
@@ -78,13 +89,13 @@ void presence_item_t::on_open() {
 
     int position = 0;
     auto hide_mask = supervisor.mask_nodes();
-    for (auto p : presence->get_children()) {
-        if (!is_hidden(p, hide_mask)) {
-            auto node = make_item(this, *p);
+    for (auto c : presence->get_children()) {
+        if (!is_hidden(c, hide_mask)) {
+            auto node = make_item(this, *c);
             if (node) {
                 auto tmp_node = insert(prefs(), "", position++);
                 replace_child(tmp_node, node);
-                if (p->get_features() & F::directory) {
+                if (c->get_features() & F::directory) {
                     node->populate_dummy_child();
                 }
                 node->show(hide_mask, false, false);
@@ -113,38 +124,11 @@ int presence_item_t::get_position(const presence_item_t &child, std::uint32_t cu
         if (p == child.presence) {
             break;
         }
-        if (!(p->get_features() & cut_mask)) {
+        if (!is_hidden(p, cut_mask)) {
             ++position;
         }
     }
     return position;
-}
-
-void presence_item_t::do_show(std::uint32_t mask, bool refresh_label) {
-    auto host = parent();
-    if (!host) {
-        auto host = [&]() -> presence_item_t * {
-            auto parent = presence->get_parent();
-            if (parent) {
-                return static_cast<presence_item_t *>(parent->get_augmentation().get());
-            } else if (presence->get_features() & F::missing) {
-                return static_cast<missing_item_presence_t *>(this)->host;
-            }
-            return nullptr;
-        }();
-        if (host) {
-            auto index = host->find_child(this);
-            if (index == -1) {
-                auto position = host->get_position(*this, mask);
-                host->reparent(this, position);
-                update_label();
-                refresh_label = false;
-            }
-        }
-    }
-    if (refresh_label) {
-        update_label();
-    }
 }
 
 presence_item_ptr_t presence_item_t::do_hide() {
@@ -168,44 +152,47 @@ presence_item_ptr_t presence_item_t::do_hide() {
 }
 
 bool presence_item_t::show(std::uint32_t hide_mask, bool refresh_labels, int32_t depth) {
+    using nodes_storage_t = std::unordered_map<presentation::entity_t *, presence_item_t *>;
     assert(depth >= 0);
     if (is_hidden(presence, hide_mask)) {
         do_hide();
         return false;
     }
-    do_show(hide_mask, refresh_labels);
+    if (refresh_labels) {
+        update_label();
+    }
     if (depth >= 1 && expanded) {
+        auto nodes = nodes_storage_t();
+        auto deleter = [](nodes_storage_t *nodes) {
+            for (auto it : *nodes) {
+                delete it.second;
+            }
+        };
+        auto nodes_guard = std::unique_ptr<nodes_storage_t, decltype(deleter)>(&nodes, deleter);
+        while (children()) {
+            auto child = deparent(0);
+            auto node = dynamic_cast<presence_item_t *>(child);
+            if (!node) {
+                delete child;
+            }
+            nodes.emplace(node->get_presence().get_entity(), node);
+        }
+        auto get_or_create_child = [&](presence_t *presence) -> presence_item_t * {
+            auto it = nodes.find(presence->get_entity());
+            if (it != nodes.end() && it->second->presence == presence) {
+                auto ptr = it->second;
+                nodes.erase(it);
+                return ptr;
+            }
+            return make_item(this, *presence);
+        };
         auto &children = presence->get_children();
-        auto c = (presence_item_t *)(nullptr);
         for (int i = 0, j = 0; i < (int)children.size(); ++i) {
-            auto p = children[i];
-            auto child_holder = presence_item_ptr_t();
-            auto item = (presence_item_t *)(nullptr);
-            bool same_name = false;
-            if (j < this->children() && !c) {
-                c = dynamic_cast<presence_item_t *>(child(j));
-            }
-            if (c) {
-                if (c->presence == p) {
-                    item = c;
-                } else {
-                    auto same_name = p->get_entity() == c->presence->get_entity();
-                    if (same_name) {
-                        child_holder = safe_detach(j);
-                        c = {};
-                    }
-                }
-            }
-            if (!item) {
-                item = make_item(this, *p);
-                ++j;
-            }
-            auto shown = item->show(hide_mask, refresh_labels, depth - 1);
-            if (item == c) {
-                c = {};
-                if (shown) {
-                    ++j;
-                }
+            auto c = children[i];
+            if (!is_hidden(c, hide_mask)) {
+                auto item = get_or_create_child(c);
+                reparent(item, j++);
+                item->show(hide_mask, refresh_labels, depth - 1);
             }
         }
     }
