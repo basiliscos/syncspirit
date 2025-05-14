@@ -1639,6 +1639,13 @@ TEST_CASE("statistics", "[presentation]") {
         f_y_peer.reset();
         REQUIRE(builder.unshare_folder(*fi_peer).apply());
         REQUIRE(deleted_entities.size() == 2);
+
+        deleted_entities.clear();
+        REQUIRE(builder.remove_folder(*folder).apply());
+        REQUIRE(deleted_entities.size() == 3);
+
+        folder.reset();
+        REQUIRE(deleted_entities.size() == 5);
     }
 }
 

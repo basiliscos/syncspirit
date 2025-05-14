@@ -194,4 +194,9 @@ entity_t *folder_entity_t::on_insert(model::file_info_t &file_info) noexcept {
 auto folder_entity_t::get_folder() noexcept -> model::folder_t & { return folder; }
 
 void folder_entity_t::on_update() noexcept { notify_update(); }
-void folder_entity_t::on_delete() noexcept { clear_children(); }
+void folder_entity_t::on_delete() noexcept {
+    clear_children();
+    if (auto monitor = get_monitor(); monitor) {
+        monitor->on_delete(*this);
+    }
+}

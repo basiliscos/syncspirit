@@ -11,11 +11,10 @@ folder_presence_t::folder_presence_t(folder_entity_t &entity_, model::folder_inf
     : presence_t(&entity_, fi.get_device()), folder_info{fi} {
     link(&fi);
     features = features_t::folder;
-    if (fi.get_device() == entity_.get_folder().get_cluster()->get_device()) {
-        features |= features_t::local;
-    }
+    auto local = fi.get_device() == entity_.get_folder().get_cluster()->get_device();
+    features |= (local ? features_t::local : features_t::peer);
 }
 
-folder_presence_t::~folder_presence_t() {}
+folder_presence_t::~folder_presence_t() { statistics = {}; }
 
 auto folder_presence_t::get_folder_info() noexcept -> model::folder_info_t & { return folder_info; }

@@ -14,7 +14,12 @@ using F = presence_t::features_t;
 entity_t::entity_t(path_t path_, entity_t *parent_) noexcept
     : parent{parent_}, path(std::move(path_)), best{nullptr}, entities_monitor{nullptr} {}
 
-entity_t::~entity_t() { clear_children(); }
+entity_t::~entity_t() {
+    clear_children();
+    while (!presences.empty()) {
+        presences.front()->clear_presense();
+    }
+}
 
 void entity_t::clear_children() noexcept {
     for (auto it = children.begin(); it != children.end();) {
@@ -89,13 +94,6 @@ void entity_t::remove_presense(presence_t &item) noexcept {
         }
     }
 
-    if (children.size()) {
-        bool rescan_children = true;
-        while (rescan_children) {
-            bool scan = true;
-            rescan_children = !scan;
-        }
-    }
     bool need_restat = false;
     auto stats = statistics;
     auto own_stats = item.get_own_stats();
@@ -173,13 +171,16 @@ void entity_t::remove_child(entity_t &child) noexcept {
     for (auto r : presences) {
         r->children.clear();
     }
-    push_stats({-child.get_stats(), 0}, nullptr, true);
+    // push_stats({-child.get_stats(), 0}, nullptr, true);
+    auto &child_presences = child.presences;
+    while (!child_presences.empty()) {
+        child_presences.front()->clear_presense();
+    }
 
     if (auto monitor = get_monitor(); monitor) {
         monitor->on_delete(child);
     }
-
-    child.parent = nullptr;
+    // child.parent = nullptr;
     model::intrusive_ptr_release(&child);
 }
 

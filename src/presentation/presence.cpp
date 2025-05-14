@@ -51,11 +51,14 @@ void presence_t::clear_presense() noexcept {
     }
     if (entity) {
         entity->remove_presense(*this);
-        model::intrusive_ptr_release(entity);
+        if (!(features & F::missing)) {
+            auto ex_entity = entity;
+            model::intrusive_ptr_release(ex_entity);
+        }
+        assert(statistics.size == 0);
+        assert(statistics.entities == 0);
         entity = nullptr;
     }
-    assert(statistics.size == 0);
-    assert(statistics.entities == 0);
 }
 
 void presence_t::link(augmentable_t *augmentable) noexcept { augmentable->set_augmentation(this); }
