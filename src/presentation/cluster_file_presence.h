@@ -15,7 +15,7 @@ struct SYNCSPIRIT_API cluster_file_presence_t : file_presence_t {
     cluster_file_presence_t(std::uint32_t default_features, file_entity_t &entity,
                             model::file_info_t &file_info) noexcept;
 
-    model::file_info_t &get_file_info() noexcept;
+    const model::file_info_t &get_file_info() const noexcept;
     const presence_t *determine_best(const presence_t *) const override;
 
   protected:

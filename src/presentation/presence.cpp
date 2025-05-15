@@ -35,7 +35,7 @@ const presence_stats_t &presence_t::get_own_stats() const noexcept { return own_
 
 presence_t *presence_t::set_parent(entity_t *value) noexcept {
     if (value && device) {
-        parent = value->get_presence(device);
+        parent = const_cast<presence_t *>(value->get_presence(device));
     }
     return parent;
 }
@@ -79,7 +79,7 @@ void presence_t::sync_with_entity() const noexcept {
         statistics.cluster_entries = 0;
 
         for (auto &child_entity : entity->get_children()) {
-            auto child_presence = child_entity->get_presence(device);
+            auto child_presence = const_cast<presence_t *>(child_entity->get_presence(device));
             if (child_presence->features & features_t::cluster) {
                 auto child = static_cast<cluster_file_presence_t *>(child_presence);
                 child->sync_with_entity();
@@ -138,7 +138,7 @@ auto presence_t::get_children() noexcept -> children_t & {
         children.clear();
         children.reserve(e_children.size());
         for (auto &c : e_children) {
-            auto p = c->get_presence(device);
+            auto p = const_cast<presence_t *>(c->get_presence(device));
             children.emplace_back(p);
         }
         std::sort(children.begin(), children.end(), compare);

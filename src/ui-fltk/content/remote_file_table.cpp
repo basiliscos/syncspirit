@@ -11,8 +11,11 @@
 #include <memory_resource>
 #include <algorithm>
 
+using namespace syncspirit::presentation;
 using namespace syncspirit::fltk;
 using namespace syncspirit::fltk::content;
+
+using F = presence_t::features_t;
 
 static constexpr size_t max_history_records = 5;
 
@@ -37,13 +40,21 @@ auto make_checkbox(Fl_Widget &container, bool value) -> widgetable_ptr_t { retur
 
 } // namespace
 
+static presence_t *resolve_presence(presence_t *source) {
+    if (source->get_features() & F::missing) {
+        auto best = source->get_entity()->get_best();
+        return const_cast<presence_t *>(best);
+    }
+    return source;
+}
+
 remote_file_table_t::remote_file_table_t(tree_item::presence_item_t &container_, int x, int y, int w, int h)
     : parent_t(x, y, w, h), container{container_}, displayed_versions{0} {
 
-    auto &presence = container.get_presence();
-    assert(presence.get_features() & presentation::presence_t::features_t::cluster);
-    auto &cluster_presence = static_cast<presentation::cluster_file_presence_t &>(presence);
-    auto &entity = cluster_presence.get_file_info();
+    auto presence = resolve_presence(&container.get_presence());
+    assert(presence->get_features() & F::cluster);
+    auto cluster_presence = static_cast<cluster_file_presence_t *>(presence);
+    auto &entity = cluster_presence->get_file_info();
     auto data = table_rows_t();
 
     name_cell = new static_string_provider_t("");
@@ -94,17 +105,17 @@ void remote_file_table_t::refresh() {
     auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
     auto allocator = allocator_t(&pool);
 
-    auto &presence = container.get_presence();
-    assert(presence.get_features() & presentation::presence_t::features_t::cluster);
-    auto &cluster_presence = static_cast<presentation::cluster_file_presence_t &>(presence);
-    auto &file_info = cluster_presence.get_file_info();
+    auto presence = resolve_presence(&container.get_presence());
+    assert(presence->get_features() & F::cluster);
+    auto cluster_presence = static_cast<cluster_file_presence_t *>(presence);
+    auto &file_info = cluster_presence->get_file_info();
     auto device = file_info.get_folder_info()->get_device();
     auto &devices = container.supervisor.get_cluster()->get_devices();
     auto data = table_rows_t();
     auto modified_s = file_info.get_modified_s();
     auto modified_date = model::pt::from_time_t(modified_s);
     auto version = file_info.get_version();
-    auto &stats = presence.get_stats();
+    auto &stats = presence->get_stats();
 
     name_cell->update(file_info.get_name());
     device_cell->update(fmt::format("{} ({})", device->get_name(), device->device_id().get_short()));

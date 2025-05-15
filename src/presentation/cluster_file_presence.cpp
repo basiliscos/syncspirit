@@ -33,7 +33,7 @@ void cluster_file_presence_t::refresh_features() noexcept {
     }
 }
 
-auto cluster_file_presence_t::get_file_info() noexcept -> model::file_info_t & { return file_info; }
+auto cluster_file_presence_t::get_file_info() const noexcept -> const model::file_info_t & { return file_info; }
 
 const presence_t *cluster_file_presence_t::determine_best(const presence_t *other) const {
     if (!(other->get_features() & F::cluster)) {

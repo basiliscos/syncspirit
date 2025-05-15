@@ -14,6 +14,7 @@ struct missing_item_presence_t final : presence_item_t {
     ~missing_item_presence_t();
 
     const model::device_t *get_device() const override;
+    bool on_select() override;
     void on_delete() noexcept override;
 
     presence_item_t *host;
