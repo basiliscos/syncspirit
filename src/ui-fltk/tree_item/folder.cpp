@@ -24,13 +24,6 @@ using namespace model::diff;
 using namespace syncspirit::fltk;
 using namespace syncspirit::fltk::tree_item;
 
-folder_t::folder_t(presentation::folder_presence_t &presence, app_supervisor_t &supervisor, Fl_Tree *tree)
-    : parent_t(presence, supervisor, tree) {
-    auto cluster = supervisor.get_cluster();
-    update_label();
-    populate_dummy_child();
-}
-
 static constexpr int padding = 2;
 
 namespace {
@@ -209,6 +202,26 @@ struct table_t : content::folder_table_t {
 };
 
 } // namespace
+
+folder_t::folder_t(presentation::folder_presence_t &presence, app_supervisor_t &supervisor, Fl_Tree *tree)
+    : parent_t(presence, supervisor, tree) {
+    auto cluster = supervisor.get_cluster();
+    update_label();
+    populate_dummy_child();
+}
+
+folder_t::~folder_t() {
+    if (auto p = parent(); p) {
+        auto index = p->find_child(this);
+        if (index >= 0) {
+            if (is_selected()) {
+                select_other();
+            }
+            p->deparent(index);
+            static_cast<tree_item_t *>(p)->update_label();
+        }
+    }
+}
 
 bool folder_t::on_select() {
     content = supervisor.replace_content([&](content_t *content) -> content_t * {
