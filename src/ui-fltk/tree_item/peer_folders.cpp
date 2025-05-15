@@ -13,8 +13,6 @@ using namespace syncspirit::fltk::tree_item;
 
 peer_folders_t::peer_folders_t(model::device_t &peer_, app_supervisor_t &supervisor, Fl_Tree *tree)
     : parent_t(supervisor, tree, false), peer{peer_} {
-    update_label();
-    tree->close(this, 0);
     auto cluster = supervisor.get_cluster();
     auto &folders = cluster->get_folders();
     for (auto it : folders) {
@@ -30,20 +28,13 @@ peer_folders_t::peer_folders_t(model::device_t &peer_, app_supervisor_t &supervi
             }
         }
     }
+    update_label();
+    tree->close(this, 0);
 }
 
 void peer_folders_t::update_label() {
-    auto cluster = supervisor.get_cluster();
-    auto &folders = cluster->get_folders();
-    int count = 0;
-    for (auto it : folders) {
-        if (it.item->is_shared_with(peer)) {
-            ++count;
-        }
-    }
-    auto l = fmt::format("folders ({})", count);
-    label(l.data());
-    tree()->redraw();
+    auto l = fmt::format("folders ({})", children());
+    this->label(l.data());
 }
 
 void peer_folders_t::add_folder(presentation::folder_presence_t &presence) {
