@@ -8,10 +8,13 @@
 #include "proto/proto-helpers-bep.h"
 #include "presentation/cluster_file_presence.h"
 
+#include <memory_resource>
+#include <algorithm>
+
 using namespace syncspirit::fltk;
 using namespace syncspirit::fltk::content;
 
-static constexpr int max_history_records = 5;
+static constexpr size_t max_history_records = 5;
 
 namespace {
 
@@ -44,6 +47,7 @@ remote_file_table_t::remote_file_table_t(tree_item::presence_item_t &container_,
     auto data = table_rows_t();
 
     name_cell = new static_string_provider_t("");
+    device_cell = new static_string_provider_t("");
     modified_cell = new static_string_provider_t("");
     sequence_cell = new static_string_provider_t("");
     size_cell = new static_string_provider_t("");
@@ -52,13 +56,13 @@ remote_file_table_t::remote_file_table_t(tree_item::presence_item_t &container_,
     permissions_cell = new static_string_provider_t("");
     modified_s_cell = new static_string_provider_t("");
     modified_ns_cell = new static_string_provider_t("");
-    modified_by_cell = new static_string_provider_t("");
     symlink_target_cell = new static_string_provider_t("");
     entries_cell = new static_string_provider_t("");
     entries_size_cell = new static_string_provider_t("");
     local_entries_cell = new static_string_provider_t("");
 
     data.push_back({"name", name_cell});
+    data.push_back({"device", device_cell});
     data.push_back({"modified", modified_cell});
     data.push_back({"sequence", sequence_cell});
     data.push_back({"size", size_cell});
@@ -67,7 +71,6 @@ remote_file_table_t::remote_file_table_t(tree_item::presence_item_t &container_,
     data.push_back({"permissions", permissions_cell});
     data.push_back({"modified_s", modified_s_cell});
     data.push_back({"modified_ns", modified_ns_cell});
-    data.push_back({"modified_by", modified_by_cell});
     data.push_back({"is_directory", make_checkbox(*this, entity.is_dir())});
     data.push_back({"is_file", make_checkbox(*this, entity.is_file())});
     data.push_back({"is_link", make_checkbox(*this, entity.is_link())});
@@ -85,59 +88,71 @@ remote_file_table_t::remote_file_table_t(tree_item::presence_item_t &container_,
 }
 
 void remote_file_table_t::refresh() {
+    using allocator_t = std::pmr::polymorphic_allocator<char>;
+    using counters_t = std::pmr::vector<proto::Counter>;
+    auto buffer = std::array<std::byte, 1024>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = allocator_t(&pool);
+
     auto &presence = container.get_presence();
     assert(presence.get_features() & presentation::presence_t::features_t::cluster);
     auto &cluster_presence = static_cast<presentation::cluster_file_presence_t &>(presence);
-    auto &entry = cluster_presence.get_file_info();
+    auto &file_info = cluster_presence.get_file_info();
+    auto device = file_info.get_folder_info()->get_device();
     auto &devices = container.supervisor.get_cluster()->get_devices();
     auto data = table_rows_t();
-    auto modified_s = entry.get_modified_s();
+    auto modified_s = file_info.get_modified_s();
     auto modified_date = model::pt::from_time_t(modified_s);
-    auto version = entry.get_version();
+    auto version = file_info.get_version();
     auto &stats = presence.get_stats();
 
-    name_cell->update(entry.get_name());
+    name_cell->update(file_info.get_name());
+    device_cell->update(fmt::format("{} ({})", device->get_name(), device->device_id().get_short()));
     modified_cell->update(model::pt::to_simple_string(modified_date));
-    sequence_cell->update(fmt::format("{}", entry.get_sequence()));
-    size_cell->update(get_file_size(entry.get_size()));
+    sequence_cell->update(fmt::format("{}", file_info.get_sequence()));
+    size_cell->update(get_file_size(file_info.get_size()));
 
     for (int i = 0; i < static_cast<int>(displayed_versions); ++i) {
-        remove_row(4);
+        remove_row(5);
     }
-    displayed_versions = version->counters_size();
-    auto modified_by_value = entry.get_modified_by();
-    auto modified_by_device = std::string_view();
-    auto modified_by_device_holder = std::string();
 
+    auto &model_counters = version->get_counters();
+    auto sorted_counters = counters_t(model_counters.begin(), model_counters.end(), allocator);
+    auto sorter = [](const proto::Counter &lhs, const proto::Counter &rhs) -> bool {
+        return proto::get_value(lhs) > proto::get_value(rhs);
+    };
+    std::sort(sorted_counters.begin(), sorted_counters.end(), sorter);
+
+    displayed_versions = std::min(version->counters_size(), max_history_records);
     for (size_t i = 0; i < displayed_versions; ++i) {
-        auto &counter = version->get_counter(i);
-        auto modification_device = std::string_view("*unknown*");
+        auto &counter = sorted_counters[i];
+        auto value = proto::get_value(counter);
+        auto device_id = proto::get_id(counter);
+        auto device_short = model::device_id_t::make_short(device_id);
+        auto device_str = std::pmr::string(allocator);
         for (auto &it : devices) {
-            auto &device = *it.item;
-            auto &device_id = device.device_id();
-            if (device_id.matches(proto::get_id(counter))) {
-                modification_device = device.get_name();
-            }
-            if (device_id.matches(modified_by_value)) {
-                modified_by_device = device.get_name();
+            auto &peer = *it.item;
+            auto &peer_id = peer.device_id();
+            if (peer.device_id().get_uint() == device_id) {
+                fmt::format_to(std::back_inserter(device_str), "{}, {}", peer.get_name(), device_short);
+                break;
             }
         }
-        auto value = fmt::format("({}) {}", proto::get_value(counter), modification_device);
-        insert_row("modification", new static_string_provider_t(std::move(value)), 4);
+        if (device_str.empty()) {
+            device_str = std::pmr::string(device_short, allocator);
+        }
+
+        auto label = std::pmr::string(allocator);
+        fmt::format_to(std::back_inserter(label), "({}) {}", value, device_str);
+        insert_row("modification", new static_string_provider_t(std::move(label)), 5 + i);
     }
 
-    if (modified_by_device.empty()) {
-        modified_by_device_holder = model::device_id_t::make_short(modified_by_value);
-        modified_by_device = modified_by_device_holder;
-    }
-
-    block_size_cell->update(std::to_string(entry.get_block_size()));
-    blocks_cell->update(std::to_string(entry.get_blocks().size()));
-    permissions_cell->update(fmt::format("0{:o}", entry.get_permissions()));
+    block_size_cell->update(std::to_string(file_info.get_block_size()));
+    blocks_cell->update(std::to_string(file_info.get_blocks().size()));
+    permissions_cell->update(fmt::format("0{:o}", file_info.get_permissions()));
     modified_s_cell->update(fmt::format("{}", modified_s));
-    modified_ns_cell->update(fmt::format("{}", entry.get_modified_ns()));
-    modified_by_cell->update(fmt::format("{}", modified_by_device));
-    symlink_target_cell->update(entry.get_link_target());
+    modified_ns_cell->update(fmt::format("{}", file_info.get_modified_ns()));
+    symlink_target_cell->update(file_info.get_link_target());
     entries_cell->update(fmt::format("{}", stats.entities));
     entries_size_cell->update(get_file_size(stats.size));
     local_entries_cell->update(fmt::format("{}/{}", stats.cluster_entries, stats.entities));

@@ -13,6 +13,7 @@ namespace syncspirit::model {
 struct device_t;
 
 struct SYNCSPIRIT_API version_t final : arc_base_t<version_t> {
+    using counters_t = std::vector<proto::Counter>;
     version_t(const proto::Vector &) noexcept;
     version_t(const device_t &) noexcept;
 
@@ -26,9 +27,9 @@ struct SYNCSPIRIT_API version_t final : arc_base_t<version_t> {
     bool contains(const version_t &other) noexcept;
     bool identical_to(const version_t &) noexcept;
     size_t counters_size() const;
+    const counters_t &get_counters() noexcept;
 
   private:
-    using counters_t = std::vector<proto::Counter>;
     counters_t counters;
     size_t best_index;
 };

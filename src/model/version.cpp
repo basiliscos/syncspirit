@@ -120,3 +120,5 @@ auto version_t::get_counter(size_t index) noexcept -> const proto::Counter & {
     assert(index <= counters.size());
     return counters[index];
 }
+
+auto version_t::get_counters() noexcept -> const counters_t & { return counters; }
