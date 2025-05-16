@@ -9,6 +9,7 @@ namespace syncspirit::config {
 struct fltk_config_t {
     spdlog::level::level_enum level;
     bool display_deleted;
+    bool display_missing;
     bool display_colorized;
     int main_window_width;
     int main_window_height;

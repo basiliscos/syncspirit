@@ -14,6 +14,7 @@ extern const std::string_view discovering;
 extern const std::string_view scanning;
 extern const std::string_view synchronizing;
 extern const std::string_view deleted;
+extern const std::string_view missing;
 extern const std::string_view colorize;
 
 std::string_view get_description(std::string_view symbol);

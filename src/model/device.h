@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "misc/augmentation.hpp"
+#include "misc/augmentation.h"
 #include "misc/map.hpp"
 #include "device_id.h"
 #include "remote_folder_info.h"
@@ -28,7 +28,7 @@ using file_iterator_ptr_t = intrusive_ptr_t<file_iterator_t>;
 
 enum class device_state_t { offline, discovering, connecting, online };
 
-struct SYNCSPIRIT_API device_t : augmentable_t<device_t> {
+struct SYNCSPIRIT_API device_t : augmentable_t {
     using uris_t = utils::uri_container_t;
     using name_option_t = std::optional<std::string>;
     using tcp = boost::asio::ip::tcp;

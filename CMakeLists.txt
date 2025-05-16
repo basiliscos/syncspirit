@@ -177,6 +177,7 @@ add_library(syncspirit_core
     src/model/diff/peer/cluster_update.cpp
     src/model/diff/peer/rx_tx.cpp
     src/model/diff/peer/update_folder.cpp
+    src/model/misc/augmentation.cpp
     src/model/misc/block_iterator.cpp
     src/model/misc/error_code.cpp
     src/model/misc/file_block.cpp
@@ -220,6 +221,17 @@ add_library(syncspirit_core
     src/net/sink_actor.cpp
     src/net/ssdp_actor.cpp
     src/net/upnp_actor.cpp
+    src/presentation/entity.cpp
+    src/presentation/cluster_file_presence.cpp
+    src/presentation/file_entity.cpp
+    src/presentation/folder_entity.cpp
+    src/presentation/folder_presence.cpp
+    src/presentation/local_file_presence.cpp
+    src/presentation/missing_file_presence.cpp
+    src/presentation/orphans.cpp
+    src/presentation/path.cpp
+    src/presentation/peer_file_presence.cpp
+    src/presentation/presence.cpp
     src/proto/bep_support.cpp
     src/proto/discovery_support.cpp
     src/proto/luhn32.cpp

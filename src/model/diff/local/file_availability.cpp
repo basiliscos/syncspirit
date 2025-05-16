@@ -7,7 +7,7 @@
 using namespace syncspirit::model::diff::local;
 
 file_availability_t::file_availability_t(file_info_ptr_t file_) noexcept : file{file_} {
-    LOG_DEBUG(log, "blocks_availability_t, file = {}", file->get_name());
+    LOG_DEBUG(log, "file_availability_t, file = {}", file->get_name());
     folder_id = file_->get_folder_info()->get_folder()->get_id();
     version.reset(new version_t(file->get_version()->as_proto()));
 }

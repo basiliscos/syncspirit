@@ -2,10 +2,11 @@
 // SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
 
 #include "folders.h"
-#include "folder.h"
+#include "presence_item/folder.h"
 #include "../content/folder_table.h"
 #include "../table_widget/label.h"
 #include "utils/base32.h"
+#include "presentation/folder_presence.h"
 #include <algorithm>
 #include <cctype>
 #include <boost/nowide/convert.hpp>
@@ -15,6 +16,7 @@ using namespace syncspirit;
 using namespace syncspirit::model::diff;
 using namespace syncspirit::fltk;
 using namespace syncspirit::fltk::tree_item;
+using namespace syncspirit::fltk::presence_item;
 
 static constexpr int padding = 2;
 
@@ -158,9 +160,12 @@ void folders_t::update_label() {
     this->label(l.data());
 }
 
-augmentation_ptr_t folders_t::add_folder(model::folder_t &folder_info) {
+auto folders_t::add_folder(presentation::folder_entity_t &folder_entity) -> augmentation_ptr_t {
     auto augmentation = within_tree([&]() {
-        auto item = new folder_t(folder_info, supervisor, tree());
+        auto self = supervisor.get_cluster()->get_device();
+        auto presence = folder_entity.get_presence(self.get());
+        auto folder_presence = static_cast<presentation::folder_presence_t *>(presence);
+        auto item = new folder_t(*folder_presence, supervisor, tree());
         return insert_by_label(item)->get_proxy();
     });
     update_label();
@@ -175,13 +180,13 @@ void folders_t::remove_child(tree_item_t *child) {
 void folders_t::select_folder(std::string_view folder_id) {
     auto t = tree();
     for (int i = 0; i < children(); ++i) {
-        auto node = static_cast<folder_t *>(child(i));
-        auto aug = static_cast<augmentation_entry_base_t *>(node->get_proxy().get());
-        if (aug->get_folder()->get_folder()->get_id() == folder_id) {
+        auto folder = static_cast<folder_t *>(child(i));
+        auto &fp = static_cast<presentation::folder_presence_t &>(folder->get_presence());
+        if (fp.get_folder_info().get_folder()->get_id() == folder_id) {
             while (auto selected = t->first_selected_item()) {
                 t->deselect(selected);
             }
-            t->select(node, 1);
+            t->select(folder, 1);
             t->redraw();
             break;
         }

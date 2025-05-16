@@ -10,7 +10,7 @@
 #include <filesystem>
 #include <boost/outcome.hpp>
 #include <boost/multi_index/ordered_index.hpp>
-#include "misc/augmentation.hpp"
+#include "misc/augmentation.h"
 #include "misc/map.hpp"
 #include "misc/uuid.h"
 #include "block_info.h"
@@ -32,7 +32,7 @@ struct blocks_iterator_t;
 struct file_info_t;
 using file_info_ptr_t = intrusive_ptr_t<file_info_t>;
 
-struct SYNCSPIRIT_API file_info_t final : augmentable_t<file_info_t> {
+struct SYNCSPIRIT_API file_info_t final : augmentable_t {
 
     // clang-format off
     enum flags_t {

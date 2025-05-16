@@ -64,6 +64,7 @@ auto upsert_folder_info_t::apply_impl(cluster_t &cluster, apply_controller_t &co
     if (auto iterator = fi->get_device()->get_iterator(); iterator) {
         iterator->on_upsert(fi);
     }
+    folder->notify_update();
 
     return applicator_t::apply_sibling(cluster, controller);
 }

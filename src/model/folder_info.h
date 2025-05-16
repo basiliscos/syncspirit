@@ -4,7 +4,7 @@
 #pragma once
 
 #include <cstdint>
-#include "misc/augmentation.hpp"
+#include "misc/augmentation.h"
 #include "device.h"
 #include "file_info.h"
 #include "proto/proto-fwd.hpp"
@@ -22,7 +22,7 @@ using folder_ptr_t = intrusive_ptr_t<folder_t>;
 struct folder_info_t;
 using folder_info_ptr_t = intrusive_ptr_t<folder_info_t>;
 
-struct SYNCSPIRIT_API folder_info_t final : augmentable_t<folder_info_t> {
+struct SYNCSPIRIT_API folder_info_t final : augmentable_t {
 
     struct decomposed_key_t {
         static constexpr size_t folder_data_length = uuid_length + 1;

@@ -18,6 +18,13 @@ static void set_show_deleted(Fl_Widget *widget, void *data) {
     toolbar->supervisor.set_show_deleted(value);
 }
 
+static void set_show_missing(Fl_Widget *widget, void *data) {
+    auto toolbar = reinterpret_cast<toolbar_t *>(data);
+    auto button = static_cast<Fl_Toggle_Button *>(widget);
+    auto value = button->value() ? true : false;
+    toolbar->supervisor.set_show_missing(value);
+}
+
 static void set_show_colorized(Fl_Widget *widget, void *data) {
     auto toolbar = reinterpret_cast<toolbar_t *>(data);
     auto button = static_cast<Fl_Toggle_Button *>(widget);
@@ -36,6 +43,15 @@ toolbar_t::toolbar_t(app_supervisor_t &supervisor_, int x, int y, int w, int)
         button->tooltip("show deleted");
         button->callback(set_show_deleted, this);
         bool value = supervisor.get_app_config().fltk_config.display_deleted;
+        button->value(value ? 1 : 0);
+        xx += ww + padding;
+    }();
+
+    [&]() {
+        auto button = new Fl_Toggle_Button(xx, yy, ww, button_h, symbols::missing.data());
+        button->tooltip("show missing");
+        button->callback(set_show_missing, this);
+        bool value = supervisor.get_app_config().fltk_config.display_missing;
         button->value(value ? 1 : 0);
         xx += ww + padding;
     }();

@@ -34,8 +34,6 @@ struct main_window_t;
 struct tree_item_t;
 struct augmentation_entry_base_t;
 
-enum class color_context_t { unknown, deleted, link, actualized, outdated, conflicted };
-
 struct db_info_viewer_t {
     virtual void view(const net::payload::db_info_response_t &) = 0;
 };
@@ -98,12 +96,6 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
     using config_t = app_supervisor_config_t;
     template <typename Actor> using config_builder_t = app_supervisor_config_builder_t<Actor>;
 
-    struct entries_comparator_t {
-        using aug_t = augmentation_entry_base_t;
-        bool operator()(const aug_t *lhs, const aug_t *rhs) const;
-    };
-    using updated_entries_t = std::set<augmentation_entry_base_t *, entries_comparator_t>;
-
     explicit app_supervisor_t(config_t &config);
     app_supervisor_t(const app_supervisor_t &) = delete;
     ~app_supervisor_t();
@@ -157,8 +149,6 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
         }
     }
 
-    Fl_Color get_color(color_context_t context) const;
-
     void set_main_window(main_window_t *window);
     main_window_t *get_main_window();
     void set_devices(tree_item_t *node);
@@ -166,14 +156,16 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
     void set_pending_devices(tree_item_t *node);
     void set_ignored_devices(tree_item_t *node);
     void set_show_deleted(bool value);
+    void set_show_missing(bool value);
     void set_show_colorized(bool value);
-    void postpone_update(augmentation_entry_base_t &);
 
     callback_ptr_t call_select_folder(std::string_view folder_id);
     callback_ptr_t call_share_folders(std::string_view folder_id, std::vector<utils::bytes_t> devices);
     db_info_viewer_guard_t request_db_info(db_info_viewer_t *viewer);
     void request_load_model();
     r::address_ptr_t &get_coordinator_address();
+
+    std::uint32_t mask_nodes() const noexcept;
 
   private:
     using clock_t = std::chrono::high_resolution_clock;
@@ -183,11 +175,11 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
     void on_model_response(model::message::model_response_t &res) noexcept;
     void on_model_update(model::message::model_update_t &message) noexcept;
     void on_db_info_response(net::message::db_info_response_t &res) noexcept;
+    void redisplay_folder_nodes(bool refresh_labels);
 
     outcome::result<void> operator()(const model::diff::advance::advance_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::load::load_cluster_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::local::io_failure_t &, void *) noexcept override;
-    outcome::result<void> operator()(const model::diff::local::scan_start_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::add_pending_folders_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::add_pending_device_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::add_ignored_device_t &, void *) noexcept override;
@@ -221,7 +213,6 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
     main_window_t *main_window;
     std::size_t loaded_blocks;
     std::size_t loaded_files;
-    updated_entries_t *updated_entries;
     const model::diff::load::load_cluster_t *load_cluster;
 
     friend struct db_info_viewer_guard_t;
