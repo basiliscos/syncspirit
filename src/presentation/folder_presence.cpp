@@ -15,6 +15,4 @@ folder_presence_t::folder_presence_t(folder_entity_t &entity_, model::folder_inf
     features |= (local ? features_t::local : features_t::peer);
 }
 
-folder_presence_t::~folder_presence_t() { statistics = {}; }
-
 auto folder_presence_t::get_folder_info() noexcept -> model::folder_info_t & { return folder_info; }
