@@ -21,8 +21,8 @@ presence_t::~presence_t() { clear_presense(); }
 
 presence_t *presence_t::get_parent() noexcept { return parent; }
 entity_t *presence_t::get_entity() noexcept { return entity; }
-
 auto presence_t::get_features() const noexcept -> std::uint32_t { return features; }
+const presence_stats_t &presence_t::get_own_stats() const noexcept { return own_statistics; }
 
 const presence_stats_t &presence_t::get_stats(bool sync) const noexcept {
     if (sync) {
@@ -30,8 +30,6 @@ const presence_stats_t &presence_t::get_stats(bool sync) const noexcept {
     }
     return statistics;
 }
-
-const presence_stats_t &presence_t::get_own_stats() const noexcept { return own_statistics; }
 
 presence_t *presence_t::set_parent(entity_t *value) noexcept {
     if (value && device) {
@@ -73,36 +71,36 @@ void presence_t::on_update() noexcept {
 const presence_t *presence_t::determine_best(const presence_t *other) const { return other; }
 
 void presence_t::sync_with_entity() const noexcept {
-    static constexpr auto mask = features_t::cluster | features_t::folder;
+    static constexpr auto mask = F::cluster | F::folder;
     if (entity_generation != entity->generation && (features & mask)) {
         entity_generation = entity->generation;
         statistics.cluster_entries = 0;
 
         for (auto &child_entity : entity->get_children()) {
             auto child_presence = const_cast<presence_t *>(child_entity->get_presence(device));
-            if (child_presence->features & features_t::cluster) {
+            if (child_presence->features & F::cluster) {
                 auto child = static_cast<cluster_file_presence_t *>(child_presence);
                 child->sync_with_entity();
                 statistics.cluster_entries += child->statistics.cluster_entries;
             }
         }
 
-        if (features & (features_t::file | features_t::directory)) {
+        if (features & (F::file | F::directory)) {
             auto best_version = proto::Counter();
             for (auto p : entity->presences) {
-                if ((p == entity->best) && (p->get_features() & features_t::cluster)) {
+                if ((p == entity->best) && (p->get_features() & F::cluster)) {
                     auto best = static_cast<cluster_file_presence_t *>(p);
                     best_version = best->get_file_info().get_version()->get_best();
                     break;
                 }
             }
-            assert(features & features_t::cluster);
+            assert(features & F::cluster);
             auto const_self = static_cast<const cluster_file_presence_t *>(this);
             auto self = const_cast<cluster_file_presence_t *>(const_self);
             if (self->get_file_info().get_version()->get_best() == best_version) {
                 ++statistics.cluster_entries;
             }
-        } else if (features & features_t::directory) {
+        } else if (features & F::directory) {
             ++statistics.cluster_entries;
         }
     }
