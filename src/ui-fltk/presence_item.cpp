@@ -31,6 +31,32 @@ inline static bool is_hidden(presence_t *presence, std::uint32_t hide_mask) {
     return hide;
 }
 
+static auto make_item(presence_item_t *parent, presence_t &presence) -> presence_item_t * {
+    if (auto &aug = presence.get_augmentation(); aug) {
+        return static_cast<presence_item_t *>(aug.get());
+    }
+    auto f = presence.get_features();
+    if (f & F::cluster) {
+        if ((f & F::directory) || (f & F::file)) {
+            return new cluster_t(presence, parent->supervisor, parent->tree());
+        }
+    } else if (f & F::missing) {
+        return new missing_t(parent, presence);
+    }
+    return nullptr;
+}
+
+static auto get_host(presence_item_t *self) -> presence_item_t * {
+    auto presence = &self->get_presence();
+    auto parent = presence->get_parent();
+    if (parent) {
+        return static_cast<presence_item_t *>(parent->get_augmentation().get());
+    } else if (presence->get_features() & F::missing) {
+        return static_cast<missing_t *>(self)->host;
+    }
+    return nullptr;
+}
+
 presence_item_t::presence_item_t(presence_t &presence_, app_supervisor_t &supervisor, Fl_Tree *tree, bool augment)
     : parent_t(supervisor, tree, false), presence{&presence_}, expanded{false} {
     if (augment) {
@@ -51,32 +77,6 @@ presence_item_t::~presence_item_t() {
     while (children() > 0) {
         safe_detach(0);
     }
-}
-
-static auto make_item(presence_item_t *parent, presence_t &presence) -> presence_item_t * {
-    if (auto &aug = presence.get_augmentation(); aug) {
-        return static_cast<presence_item_t *>(aug.get());
-    }
-    auto f = presence.get_features();
-    if (f & (F::cluster | F::local)) {
-        if ((f & F::directory) || (f & F::file)) {
-            return new cluster_t(presence, parent->supervisor, parent->tree());
-        }
-    } else if (f & F::missing) {
-        return new missing_t(parent, presence);
-    }
-    return nullptr;
-}
-
-static auto get_host(presence_item_t *self) -> presence_item_t * {
-    auto presence = &self->get_presence();
-    auto parent = presence->get_parent();
-    if (parent) {
-        return static_cast<presence_item_t *>(parent->get_augmentation().get());
-    } else if (presence->get_features() & F::missing) {
-        return static_cast<missing_t *>(self)->host;
-    }
-    return nullptr;
 }
 
 void presence_item_t::on_open() {

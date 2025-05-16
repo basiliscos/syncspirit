@@ -14,7 +14,7 @@ static const auto offline_raw = u8"▽";
 static const auto connecting_raw = u8"→";
 static const auto discovering_raw = u8"…";
 static const auto deleted_raw = u8"☠";
-static const auto missing_raw = u8"-";
+static const auto missing_raw = u8"⚙";
 static const auto colorize_raw = u8"★";
 
 // https://www.vertex42.com/ExcelTips/unicode-symbols.html
@@ -29,7 +29,6 @@ static const auto colorize_raw = u8"★";
 // ∞
 // ∴
 // ↑
-// ≈
 
 const std::string_view scanning = UTF8_CAST(scanning_raw);
 const std::string_view synchronizing = UTF8_CAST(synchronizing_raw);
