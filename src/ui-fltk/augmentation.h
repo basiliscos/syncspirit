@@ -4,9 +4,6 @@
 #pragma once
 
 #include "model/misc/augmentation.h"
-#include "model/file_info.h"
-#include "entry_stats.h"
-#include <set>
 
 namespace syncspirit::fltk {
 
