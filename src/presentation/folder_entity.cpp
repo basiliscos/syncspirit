@@ -8,7 +8,6 @@
 #include "model/folder.h"
 #include "model/file_info.h"
 
-#include <boost/nowide/convert.hpp>
 #include <unordered_map>
 #include <vector>
 
