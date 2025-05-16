@@ -64,7 +64,6 @@ struct SYNCSPIRIT_API entity_t : model::augmentable_t {
     inline const presence_t *get_best() const noexcept { return best; }
 
     void add_child(entity_t &child) noexcept;
-    void remove_child(entity_t &child) noexcept;
     void remove_presense(presence_t &) noexcept;
     const entity_stats_t &get_stats() noexcept;
     const presences_t &get_presences() const noexcept;
@@ -76,6 +75,7 @@ struct SYNCSPIRIT_API entity_t : model::augmentable_t {
     friend struct folder_entity_t;
     friend struct cluster_file_presence_t;
 
+    void detach_child(entity_t &child) noexcept;
     void clear_children() noexcept;
     void set_parent(entity_t *parent) noexcept;
     void commit(const path_t &path, const model::device_t *device) noexcept;

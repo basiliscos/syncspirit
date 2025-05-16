@@ -40,8 +40,6 @@ file_entity_t::file_entity_t(model::file_info_t &sample_file, path_t path_) noex
     }
 }
 
-file_entity_t::~file_entity_t() { missing_file.reset(); }
-
 auto file_entity_t::on_insert(model::file_info_t &file_info) noexcept
     -> std::pair<file_presence_t *, presence_stats_t> {
     auto fi = file_info.get_folder_info();
@@ -52,9 +50,9 @@ auto file_entity_t::on_insert(model::file_info_t &file_info) noexcept
         }
     }
 
-    auto local = fi->get_folder()->get_cluster()->get_device() == device;
+    auto is_local = fi->get_folder()->get_cluster()->get_device() == device;
     auto presence = [&]() -> file_presence_t * {
-        if (local) {
+        if (is_local) {
             return new local_file_presence_t(*this, file_info);
         } else {
             return new peer_file_presence_t(*this, file_info);

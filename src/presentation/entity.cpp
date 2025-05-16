@@ -23,14 +23,10 @@ entity_t::~entity_t() {
 
 void entity_t::clear_children() noexcept {
     for (auto it = children.begin(); it != children.end();) {
-        remove_child(**it);
+        detach_child(**it);
         it = children.erase(it);
     }
 }
-
-auto entity_t::get_path() const noexcept -> const path_t & { return path; }
-
-auto entity_t::get_children() noexcept -> children_t & { return children; }
 
 void entity_t::set_parent(entity_t *value) noexcept {
     parent = value;
@@ -82,7 +78,7 @@ void entity_t::remove_presense(presence_t &item) noexcept {
                 it = children.erase(it);
                 p->clear_presense();
                 if (c->presences.empty()) {
-                    remove_child(*c);
+                    detach_child(*c);
                 } else {
                     children.emplace_hint(it, c);
                 }
@@ -120,7 +116,7 @@ void entity_t::remove_presense(presence_t &item) noexcept {
             auto &siblings = parent->children;
             auto it = siblings.find(this);
             if (it != siblings.end()) {
-                parent->remove_child(*this);
+                parent->detach_child(*this);
                 siblings.erase(it);
             }
         }
@@ -164,7 +160,7 @@ void entity_t::add_child(entity_t &child) noexcept {
     child.set_parent(this);
 }
 
-void entity_t::remove_child(entity_t &child) noexcept {
+void entity_t::detach_child(entity_t &child) noexcept {
     child.clear_children();
     child.set_augmentation({});
 
@@ -183,8 +179,6 @@ void entity_t::remove_child(entity_t &child) noexcept {
     // child.parent = nullptr;
     model::intrusive_ptr_release(&child);
 }
-
-const entity_stats_t &entity_t::get_stats() noexcept { return statistics; }
 
 void entity_t::commit(const path_t &path, const model::device_t *device) noexcept {
     bool do_recurse = (device == nullptr);
@@ -227,6 +221,12 @@ auto entity_t::monitor(entities_monitor_t *monitor_) noexcept -> monitor_guard_t
 }
 
 auto entity_t::get_presences() const noexcept -> const presences_t & { return presences; }
+
+const entity_stats_t &entity_t::get_stats() noexcept { return statistics; }
+
+auto entity_t::get_path() const noexcept -> const path_t & { return path; }
+
+auto entity_t::get_children() noexcept -> children_t & { return children; }
 
 using nc_t = entity_t::name_comparator_t;
 
