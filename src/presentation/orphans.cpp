@@ -3,7 +3,8 @@
 
 #include "orphans.h"
 #include "entity.h"
-#include <list>
+#include <deque>
+#include <memory_resource>
 
 namespace syncspirit::presentation {
 
@@ -20,10 +21,14 @@ orphans_t::~orphans_t() {}
 void orphans_t::push(entity_ptr_t entity) noexcept { emplace(std::move(entity)); }
 
 void orphans_t::reap_children(entity_ptr_t parent) noexcept {
-    using queue_t = std::list<entity_t *>;
+    auto buffer = std::array<std::byte, 256>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    using queue_t = std::pmr::deque<entity_t *>;
+    auto allocator = std::pmr::polymorphic_allocator<entity_t *>(&pool);
+
     auto &by_parent_name = get<1>();
     auto &by_name = get<0>();
-    auto queue = queue_t();
+    auto queue = queue_t(allocator);
     queue.emplace_back(parent.get());
 
     while (!queue.empty()) {
