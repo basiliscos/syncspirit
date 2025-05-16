@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
 
 #include "peer_folders.h"
-#include "folder.h"
+#include "presence_item/folder.h"
 #include "presentation/folder_entity.h"
 #include "presentation/folder_presence.h"
 
@@ -10,6 +10,7 @@ using namespace syncspirit;
 using namespace syncspirit::model::diff;
 using namespace syncspirit::fltk;
 using namespace syncspirit::fltk::tree_item;
+using namespace syncspirit::fltk::presence_item;
 
 peer_folders_t::peer_folders_t(model::device_t &peer_, app_supervisor_t &supervisor, Fl_Tree *tree)
     : parent_t(supervisor, tree, false), peer{peer_} {

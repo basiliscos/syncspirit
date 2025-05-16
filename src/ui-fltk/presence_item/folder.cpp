@@ -2,13 +2,13 @@
 // SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
 
 #include "folder.h"
-#include "../symbols.h"
-#include "../table_widget/checkbox.h"
-#include "../table_widget/choice.h"
-#include "../table_widget/input.h"
-#include "../table_widget/label.h"
-#include "../content/folder_table.h"
-#include "../utils.hpp"
+#include "symbols.h"
+#include "table_widget/checkbox.h"
+#include "table_widget/choice.h"
+#include "table_widget/input.h"
+#include "table_widget/label.h"
+#include "content/folder_table.h"
+#include "utils.hpp"
 #include "presentation/folder_presence.h"
 #include <boost/smart_ptr/local_shared_ptr.hpp>
 #include <spdlog/fmt/fmt.h>
@@ -22,7 +22,7 @@
 using namespace syncspirit;
 using namespace model::diff;
 using namespace syncspirit::fltk;
-using namespace syncspirit::fltk::tree_item;
+using namespace syncspirit::fltk::presence_item;
 
 static constexpr int padding = 2;
 

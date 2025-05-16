@@ -2,10 +2,10 @@
 // SPDX-FileCopyrightText: 2025 Ivan Baidakou
 
 #include "presence_item.h"
-#include "local_cluster_presence.h"
-#include "missing_item_presence.h"
+#include "presence_item/cluster.h"
+#include "presence_item/missing.h"
 #include "presentation/folder_presence.h"
-#include "../symbols.h"
+#include "symbols.h"
 
 #include <fmt/format.h>
 #include <memory_resource>
@@ -60,10 +60,10 @@ static auto make_item(presence_item_t *parent, presence_t &presence) -> presence
     auto f = presence.get_features();
     if (f & (F::cluster | F::local)) {
         if ((f & F::directory) || (f & F::file)) {
-            return new local_cluster_presence_t(presence, parent->supervisor, parent->tree());
+            return new cluster_t(presence, parent->supervisor, parent->tree());
         }
     } else if (f & F::missing) {
-        return new missing_item_presence_t(parent, presence);
+        return new missing_t(parent, presence);
     }
     return nullptr;
 }
@@ -74,7 +74,7 @@ static auto get_host(presence_item_t *self) -> presence_item_t * {
     if (parent) {
         return static_cast<presence_item_t *>(parent->get_augmentation().get());
     } else if (presence->get_features() & F::missing) {
-        return static_cast<missing_item_presence_t *>(self)->host;
+        return static_cast<missing_t *>(self)->host;
     }
     return nullptr;
 }

@@ -7,10 +7,10 @@
 
 namespace syncspirit::fltk::tree_item {
 
-struct local_cluster_presence_t final : presence_item_t {
+struct cluster_t final : presence_item_t {
     using parent_t = presence_item_t;
 
-    local_cluster_presence_t(presentation::presence_t &presence, app_supervisor_t &supervisor, Fl_Tree *tree);
+    cluster_t(presentation::presence_t &presence, app_supervisor_t &supervisor, Fl_Tree *tree);
     bool on_select() override;
 };
 

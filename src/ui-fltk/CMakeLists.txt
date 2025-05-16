@@ -17,6 +17,7 @@ add_executable(syncspirit-fltk WIN32 MACOSX_BUNDLE
     log_utils.cpp
     main.cpp
     main_window.cpp
+    presence_item.cpp
     qr_button.cpp
     static_table.cpp
     symbols.cpp
@@ -29,8 +30,11 @@ add_executable(syncspirit-fltk WIN32 MACOSX_BUNDLE
     config/properties.cpp
     config/property.cpp
     config/table.cpp
+    content/file_table.cpp
     content/folder_table.cpp
-    content/remote_file_table.cpp
+    presence_item/cluster.cpp
+    presence_item/folder.cpp
+    presence_item/missing.cpp
     table_widget/checkbox.cpp
     table_widget/choice.cpp
     table_widget/input.cpp
@@ -38,19 +42,15 @@ add_executable(syncspirit-fltk WIN32 MACOSX_BUNDLE
     table_widget/label.cpp
     table_widget/path.cpp
     tree_item/devices.cpp
-    tree_item/folder.cpp
     tree_item/folders.cpp
     tree_item/ignored_device.cpp
     tree_item/ignored_devices.cpp
-    tree_item/local_cluster_presence.cpp
-    tree_item/missing_item_presence.cpp
     tree_item/peer_device.cpp
     tree_item/peer_folders.cpp
     tree_item/pending_device.cpp
     tree_item/pending_devices.cpp
     tree_item/pending_folder.cpp
     tree_item/pending_folders.cpp
-    tree_item/presence_item.cpp
     tree_item/self_device.cpp
     tree_item/settings.cpp
     $<$<PLATFORM_ID:Windows>:app.rc>
@@ -65,10 +65,11 @@ target_link_libraries(syncspirit-fltk
     libqrencode::libqrencode
 )
 target_include_directories(syncspirit-fltk PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/
+    ${CMAKE_CURRENT_BINARY_DIR}/fltk
     ${syncspirit_SOURCE_DIR}/misc
     ${syncspirit_SOURCE_DIR}/src
     ${syncspirit_SOURCE_DIR}/lib/fltk
-    ${CMAKE_CURRENT_BINARY_DIR}/fltk
 )
 
 install_executable("syncspirit-fltk")

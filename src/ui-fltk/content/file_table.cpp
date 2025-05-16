@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
 
-#include "remote_file_table.h"
+#include "file_table.h"
 
-#include "../table_widget/checkbox.h"
-#include "../utils.hpp"
+#include "table_widget/checkbox.h"
+#include "utils.hpp"
 #include "proto/proto-helpers-bep.h"
 #include "presentation/cluster_file_presence.h"
 
@@ -48,7 +48,7 @@ static presence_t *resolve_presence(presence_t *source) {
     return source;
 }
 
-remote_file_table_t::remote_file_table_t(tree_item::presence_item_t &container_, int x, int y, int w, int h)
+file_table_t::file_table_t(presence_item_t &container_, int x, int y, int w, int h)
     : parent_t(x, y, w, h), container{container_}, displayed_versions{0} {
 
     auto presence = resolve_presence(&container.get_presence());
@@ -98,7 +98,7 @@ remote_file_table_t::remote_file_table_t(tree_item::presence_item_t &container_,
     refresh();
 }
 
-void remote_file_table_t::refresh() {
+void file_table_t::refresh() {
     using allocator_t = std::pmr::polymorphic_allocator<char>;
     using counters_t = std::pmr::vector<proto::Counter>;
     auto buffer = std::array<std::byte, 1024>();

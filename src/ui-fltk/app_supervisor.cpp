@@ -4,8 +4,8 @@
 #include "app_supervisor.h"
 #include "augmentation.h"
 #include "main_window.h"
+#include "presence_item/folder.h"
 #include "tree_item/devices.h"
-#include "tree_item/folder.h"
 #include "tree_item/folders.h"
 #include "tree_item/ignored_devices.h"
 #include "tree_item/peer_device.h"
@@ -285,7 +285,7 @@ void app_supervisor_t::on_model_update(model::message::model_update_t &message) 
         for (auto p : entity->get_presences()) {
             auto augmentation = p->get_augmentation().get();
             if (augmentation) {
-                auto item = static_cast<tree_item::presence_item_t *>(augmentation);
+                auto item = static_cast<presence_item_t *>(augmentation);
                 item->on_update();
             }
         }
@@ -520,7 +520,7 @@ auto app_supervisor_t::operator()(const model::diff::advance::advance_t &diff, v
                         auto parent_presence = presence->get_parent();
                         auto aug = parent_presence->get_augmentation().get();
                         if (aug) {
-                            auto parent_item = static_cast<tree_item::presence_item_t *>(aug);
+                            auto parent_item = static_cast<presence_item_t *>(aug);
                             parent_item->show_child(*presence, mask);
                             parent_item->tree()->redraw();
                         }
@@ -607,7 +607,7 @@ auto app_supervisor_t::operator()(const model::diff::peer::update_folder_t &diff
                         if (parent) {
                             auto parent_aug = parent->get_augmentation().get();
                             if (parent_aug) {
-                                auto parent_item = static_cast<tree_item::presence_item_t *>(parent_aug);
+                                auto parent_item = static_cast<presence_item_t *>(parent_aug);
                                 parent_item->show_child(*presence, mask);
                             }
                         }
@@ -671,7 +671,7 @@ void app_supervisor_t::redisplay_folder_nodes(bool refresh_labels) {
             auto generic_augmentation = it.item->get_augmentation();
             if (generic_augmentation) {
                 auto presence = static_cast<presentation::presence_t *>(generic_augmentation.get());
-                auto item = dynamic_cast<tree_item::presence_item_t *>(presence->get_augmentation().get());
+                auto item = dynamic_cast<presence_item_t *>(presence->get_augmentation().get());
                 if (item) {
                     item->show(mask, refresh_labels, MAX_DEPTH);
                 }

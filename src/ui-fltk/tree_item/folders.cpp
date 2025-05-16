@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
 
 #include "folders.h"
-#include "folder.h"
+#include "presence_item/folder.h"
 #include "../content/folder_table.h"
 #include "../table_widget/label.h"
 #include "utils/base32.h"
@@ -16,6 +16,7 @@ using namespace syncspirit;
 using namespace syncspirit::model::diff;
 using namespace syncspirit::fltk;
 using namespace syncspirit::fltk::tree_item;
+using namespace syncspirit::fltk::presence_item;
 
 static constexpr int padding = 2;
 

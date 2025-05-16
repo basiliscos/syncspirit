@@ -3,11 +3,11 @@
 
 #pragma once
 
-#include "../tree_item.h"
+#include "tree_item.h"
 #include "presentation/presence.h"
 #include "presentation/entity.h"
 
-namespace syncspirit::fltk::tree_item {
+namespace syncspirit::fltk {
 
 struct presence_item_t;
 
@@ -41,4 +41,4 @@ struct presence_item_t : dynamic_item_t, model::augmentation_t {
     bool expanded;
 };
 
-} // namespace syncspirit::fltk::tree_item
+} // namespace syncspirit::fltk

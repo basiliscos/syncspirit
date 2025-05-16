@@ -6,7 +6,7 @@
 #include "presence_item.h"
 #include "presentation/folder_entity.h"
 
-namespace syncspirit::fltk::tree_item {
+namespace syncspirit::fltk::presence_item {
 
 struct folder_t final : presence_item_t {
     using parent_t = presence_item_t;
@@ -16,4 +16,4 @@ struct folder_t final : presence_item_t {
     bool on_select() override;
 };
 
-} // namespace syncspirit::fltk::tree_item
+} // namespace syncspirit::fltk::presence_item
