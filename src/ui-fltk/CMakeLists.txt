@@ -33,6 +33,7 @@ add_executable(syncspirit-fltk WIN32 MACOSX_BUNDLE
     content/file_table.cpp
     content/folder_table.cpp
     presence_item/cluster.cpp
+    presence_item/file.cpp
     presence_item/folder.cpp
     presence_item/missing.cpp
     table_widget/checkbox.cpp

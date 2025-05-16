@@ -3,14 +3,15 @@
 
 #pragma once
 
-#include "file.h"
+#include "presence_item.h"
 
 namespace syncspirit::fltk::tree_item {
 
-struct cluster_t final : file_t {
-    using parent_t = file_t;
+struct file_t : presence_item_t {
+    using parent_t = presence_item_t;
+    using parent_t::parent_t;
 
-    cluster_t(presentation::presence_t &presence, app_supervisor_t &supervisor, Fl_Tree *tree);
+    bool on_select() override;
 };
 
 } // namespace syncspirit::fltk::tree_item
