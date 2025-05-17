@@ -48,7 +48,7 @@ template <> struct fmt::formatter<syncspirit::model::device_id_t> {
 
     constexpr auto parse(format_parse_context &ctx) -> format_parse_context::iterator { return ctx.begin(); }
 
-    auto format(const device_id_t &device_id, format_context &ctx) -> format_context::iterator {
+    auto format(const device_id_t &device_id, format_context &ctx) const -> format_context::iterator {
         return fmt::format_to(ctx.out(), "{}", device_id.get_short());
     }
 };
@@ -58,7 +58,7 @@ template <> struct fmt::formatter<syncspirit::utils::uri_t> {
 
     constexpr auto parse(format_parse_context &ctx) -> format_parse_context::iterator { return ctx.begin(); }
 
-    auto format(const object_t &url, format_context &ctx) -> format_context::iterator {
+    auto format(const object_t &url, format_context &ctx) const -> format_context::iterator {
         return fmt::format_to(ctx.out(), "{}", std::string_view(url.buffer()));
     }
 };
@@ -78,7 +78,7 @@ template <> struct fmt::formatter<syncspirit::model::device_t> {
 
     constexpr auto parse(format_parse_context &ctx) -> format_parse_context::iterator { return ctx.begin(); }
 
-    auto format(const device_t &device, format_context &ctx) -> format_context::iterator {
+    auto format(const device_t &device, format_context &ctx) const -> format_context::iterator {
         return fmt::format_to(ctx.out(), "{}", device.device_id());
     }
 };
@@ -88,7 +88,7 @@ template <> struct fmt::formatter<syncspirit::model::device_ptr_t> {
 
     constexpr auto parse(format_parse_context &ctx) -> format_parse_context::iterator { return ctx.begin(); }
 
-    auto format(const device_t &device, format_context &ctx) -> format_context::iterator {
+    auto format(const device_t &device, format_context &ctx) const -> format_context::iterator {
         return fmt::format_to(ctx.out(), "{}", *device);
     }
 };

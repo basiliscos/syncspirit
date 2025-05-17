@@ -127,6 +127,7 @@ after the core completion.
 # changes
 
 ## 0.4.1 (xx-xxx-xxxx)
+ - [core, fltk] support merged cluster folder model
  - [core] support `folder_type` folder setting (send only, receive only, send & receive)
  - [core] support `pull_older` folder setting (alphabetic, by size, by modification date)
  - [core, bep] support `ignore_deletes` folder flag

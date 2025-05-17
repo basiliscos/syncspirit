@@ -7,6 +7,7 @@
 #include <charconv>
 #include <boost/nowide/convert.hpp>
 #include <filesystem>
+#include <fmt/ranges.h>
 
 namespace syncspirit::fltk::config {
 

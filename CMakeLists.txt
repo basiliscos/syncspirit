@@ -260,8 +260,8 @@ generate_export_header(syncspirit_core
     EXPORT_FILE_NAME include/syncspirit-export.h
 )
 FetchContent_Declare(MDBX
-    URL https://libmdbx.dqdkfa.ru/release/libmdbx-amalgamated-0.13.5.tar.xz
-    URL_HASH SHA256=bb5bb2a6d3c1c9d5846d5a0ca66e2d766e3360fa83761f898b1726bb2bfc3445
+    URL https://libmdbx.dqdkfa.ru/release/libmdbx-amalgamated-0.14.1.tar.xz
+    URL_HASH SHA256=2edb8b59db5b2b021c7634010f8dbdbbf948eda609942dd300510c6e93bd5d25
     PATCH_COMMAND ${CMAKE_COMMAND} -E
         chdir ${CMAKE_CURRENT_BINARY_DIR}
         patch -u _deps/mdbx-src/mdbx.c -i ${CMAKE_CURRENT_SOURCE_DIR}/misc/mdbx-win32.patch
@@ -280,14 +280,9 @@ FetchContent_Declare(MDBX
     set(MDBX_ALLOY_BUILD true CACHE BOOL "MDBX_ALLOY_BUILD")
 FetchContent_MakeAvailable(MDBX)
 
-
-# To support WinXP there is need of that commit. When cares will be released
-# and pushed to conan center, the ready receive capn be used
 FetchContent_Declare(C_ARES
-    GIT_REPOSITORY https://github.com/c-ares/c-ares.git
-    GIT_TAG        7978cf75a82f9860da241227169a4d7f1d1f549a
-    # URL https://github.com/c-ares/c-ares/archive/refs/tags/v1.34.4.tar.gz
-    # URL_HASH SHA256=a35f7c4cdbdfaf0a69a9a50029e95ffe403daf605fade05c649d18333592222d
+    URL https://github.com/c-ares/c-ares/releases/download/v1.34.5/c-ares-1.34.5.tar.gz
+    URL_HASH SHA256=7d935790e9af081c25c495fd13c2cfcda4792983418e96358ef6e7320ee06346
 )
     set(CARES_STATIC      true  CACHE BOOL "CARES_STATIC")
     set(CARES_SHARED      false CACHE BOOL "CARES_SHARED")

@@ -12,6 +12,7 @@
 #include "model/diff/contact/unknown_connected.h"
 #include "model/diff/modify/add_pending_device.h"
 #include "model/messages.h"
+#include <fmt/ranges.h>
 
 using namespace syncspirit;
 using namespace syncspirit::net;

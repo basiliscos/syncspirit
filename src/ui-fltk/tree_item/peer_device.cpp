@@ -13,6 +13,7 @@
 
 #include <boost/asio.hpp>
 #include <vector>
+#include <fmt/ranges.h>
 
 #include <FL/Fl_Tile.H>
 #include <FL/Fl_Button.H>
