@@ -30,6 +30,7 @@ struct presence_item_t : dynamic_item_t, model::augmentation_t {
     presence_item_ptr_t safe_detach(int child_index);
 
   protected:
+    void insert_node(presence_item_ptr_t node, int position);
     void populate_dummy_child();
     Fl_Color get_color() const;
     void do_show(std::uint32_t mask, bool refresh_label);

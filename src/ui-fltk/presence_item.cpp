@@ -31,7 +31,7 @@ inline static bool is_hidden(presence_t *presence, std::uint32_t hide_mask) {
     return hide;
 }
 
-static auto make_item(presence_item_t *parent, presence_t &presence) -> presence_item_t * {
+static auto make_item(presence_item_t *parent, presence_t &presence) -> presence_item_ptr_t {
     if (auto &aug = presence.get_augmentation(); aug) {
         return static_cast<presence_item_t *>(aug.get());
     }
@@ -43,7 +43,7 @@ static auto make_item(presence_item_t *parent, presence_t &presence) -> presence
     } else if (f & F::missing) {
         return new missing_t(parent, presence);
     }
-    return nullptr;
+    return {};
 }
 
 static auto get_host(presence_item_t *self) -> presence_item_t * {
@@ -93,11 +93,7 @@ void presence_item_t::on_open() {
         if (!is_hidden(c, hide_mask)) {
             auto node = make_item(this, *c);
             if (node) {
-                auto tmp_node = insert(prefs(), "", position++);
-                replace_child(tmp_node, node);
-                if (c->get_features() & F::directory) {
-                    node->populate_dummy_child();
-                }
+                insert_node(node, position++);
                 node->show(hide_mask, false, false);
             }
         }
@@ -152,7 +148,7 @@ presence_item_ptr_t presence_item_t::do_hide() {
 }
 
 bool presence_item_t::show(std::uint32_t hide_mask, bool refresh_labels, int32_t depth) {
-    using nodes_storage_t = std::unordered_map<presentation::entity_t *, presence_item_t *>;
+    using nodes_storage_t = std::unordered_map<presentation::entity_t *, presence_item_ptr_t>;
     assert(depth >= 0);
     if (is_hidden(presence, hide_mask)) {
         do_hide();
@@ -161,28 +157,18 @@ bool presence_item_t::show(std::uint32_t hide_mask, bool refresh_labels, int32_t
     if (refresh_labels) {
         update_label();
     }
+    auto nodes = nodes_storage_t();
     if (depth >= 1 && expanded) {
-        auto nodes = nodes_storage_t();
-        auto deleter = [](nodes_storage_t *nodes) {
-            for (auto it : *nodes) {
-                delete it.second;
-            }
-        };
-        auto nodes_guard = std::unique_ptr<nodes_storage_t, decltype(deleter)>(&nodes, deleter);
         while (children()) {
-            auto child = deparent(0);
-            auto node = dynamic_cast<presence_item_t *>(child);
-            if (!node) {
-                delete child;
-            }
-            nodes.emplace(node->get_presence().get_entity(), node);
+            auto node = safe_detach(0);
+            nodes.emplace(node->get_presence().get_entity(), std::move(node));
         }
-        auto get_or_create_child = [&](presence_t *presence) -> presence_item_t * {
+        auto get_or_create_child = [&](presence_t *presence) -> presence_item_ptr_t {
             auto it = nodes.find(presence->get_entity());
             if (it != nodes.end() && it->second->presence == presence) {
-                auto ptr = it->second;
+                auto node = std::move(it->second);
                 nodes.erase(it);
-                return ptr;
+                return node;
             }
             return make_item(this, *presence);
         };
@@ -190,7 +176,7 @@ bool presence_item_t::show(std::uint32_t hide_mask, bool refresh_labels, int32_t
         for (int i = 0, j = 0; i < (int)children.size(); ++i) {
             auto c = children[i];
             if (!is_hidden(c, hide_mask)) {
-                auto item = get_or_create_child(c);
+                auto item = get_or_create_child(c).detach();
                 reparent(item, j++);
                 item->show(hide_mask, refresh_labels, depth - 1);
             }
@@ -218,15 +204,11 @@ void presence_item_t::show_child(presentation::presence_t &child_presence, std::
                         auto n = child_holder->deparent(0);
                         node->reparent(n, j);
                     }
-
-                    auto tmp_node = insert(prefs(), "", i);
-                    replace_child(tmp_node, node);
+                    insert_node(node, i);
                     node->show(mask, true, 0);
                     if (need_open) {
                         node->open();
                         node->expanded = true;
-                    } else if (child_presence.get_children().size()) {
-                        node->populate_dummy_child();
                     }
                 }
                 break;
@@ -299,15 +281,28 @@ Fl_Color presence_item_t::get_color() const {
 }
 
 presence_item_ptr_t presence_item_t::safe_detach(int child_index) {
-    auto item = (presence_item_t *)(nullptr);
+    auto item = presence_item_ptr_t();
     auto child = deparent(child_index);
     if (child) {
-        item = dynamic_cast<presence_item_t *>(child);
-        if (!item) {
+        auto presence_item = dynamic_cast<presence_item_t *>(child);
+        if (!presence_item) {
             delete child;
         }
+        item = presence_item_ptr_t(presence_item, false);
     }
     return item;
+}
+
+void presence_item_t::insert_node(presence_item_ptr_t node, int position) {
+    auto tmp_node = insert(prefs(), "", position);
+    auto ptr = node.detach();
+    auto p = ptr->presence;
+    if (p->get_features() & F::directory && ptr->children() == 0) {
+        if (p->get_children().size() > 0) {
+            ptr->populate_dummy_child();
+        }
+    }
+    replace_child(tmp_node, ptr);
 }
 
 bool presence_item_t::is_expanded() const { return expanded; }

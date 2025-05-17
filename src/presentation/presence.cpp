@@ -11,7 +11,7 @@ using namespace syncspirit::presentation;
 using F = presence_t::features_t;
 
 presence_t::presence_t(entity_t *entity_, model::device_t *device_) noexcept
-    : entity{entity_}, device{device_}, parent{nullptr}, augmentable{nullptr} {
+    : entity{entity_}, device{device_}, parent{nullptr} {
     if (entity) {
         model::intrusive_ptr_add_ref(entity);
     }
@@ -44,8 +44,9 @@ void presence_t::set_parent(presence_t *value) noexcept {
 }
 
 void presence_t::clear_presense() noexcept {
-    if (augmentable) {
-        augmentable->set_augmentation({});
+    if (extension) {
+        extension->on_delete();
+        extension = {};
     }
     if (entity) {
         entity->remove_presense(*this);

@@ -70,7 +70,6 @@ struct SYNCSPIRIT_API presence_t : model::proxy_t {
 
     entity_t *entity;
     presence_t *parent;
-    augmentable_t* augmentable;
     model::device_t* device;
     children_t children;
     mutable std::uint32_t features = 0;

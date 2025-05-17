@@ -3,7 +3,6 @@
 
 #include "missing.h"
 #include "presentation/missing_file_presence.h"
-#include "content/file_table.h"
 
 using namespace syncspirit::fltk;
 using namespace syncspirit::fltk::tree_item;

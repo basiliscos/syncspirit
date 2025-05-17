@@ -2,7 +2,6 @@
 // SPDX-FileCopyrightText: 2025 Ivan Baidakou
 
 #include "cluster.h"
-#include "content/file_table.h"
 
 using namespace syncspirit::fltk;
 using namespace syncspirit::fltk::tree_item;
