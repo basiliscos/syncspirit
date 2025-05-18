@@ -42,14 +42,23 @@ auto file_infos_t::apply_impl(cluster_t &cluster, apply_controller_t &controller
             return option.assume_error();
         }
         auto &fi = option.assume_value();
-        folder_info->add_relaxed(fi);
 
         auto blocks_count = db::get_blocks_size(db);
-        for (int i = 0; i < blocks_count; ++i) {
+        auto confirmed_blocks = size_t{0};
+        for (size_t i = 0; i < blocks_count; ++i) {
             auto block_hash = db::get_blocks(db, i);
             auto block = blocks.by_hash(block_hash);
-            assert(block);
-            fi->assign_block(std::move(block), (size_t)i);
+            if (block) {
+                fi->assign_block(std::move(block), i);
+                ++confirmed_blocks;
+            } else {
+                break;
+            }
+        }
+        if (blocks_count == confirmed_blocks) {
+            folder_info->add_relaxed(fi);
+        } else {
+            LOG_WARN(log, "1+ block(s) are missing for file '{}', discarding the file", fi->get_name());
         }
     }
     return applicator_t::apply_sibling(cluster, controller);

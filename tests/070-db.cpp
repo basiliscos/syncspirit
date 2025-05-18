@@ -1072,8 +1072,6 @@ void test_db_migration_1_2() {
             REQUIRE(save(*fi_my));
             REQUIRE(save(*fi_peer));
             REQUIRE(txn.commit());
-
-            {}
         }
     };
     struct F2 : fixture_t {
@@ -1098,6 +1096,60 @@ void test_db_migration_1_2() {
     F2(F1().run()).run();
 }
 
+void test_corrupted_file() {
+    struct F : fixture_t {
+        void main() noexcept override {
+            auto folder_id = "1234-5678";
+            auto builder = diff_builder_t(*cluster);
+            builder.upsert_folder(folder_id, "/my/path").apply(*sup);
+            CHECK(static_cast<r::actor_base_t *>(db_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
+
+            auto pr_file = proto::FileInfo();
+            proto::set_name(pr_file, "a.txt");
+            proto::set_size(pr_file, 5ul);
+
+            auto hash = utils::sha256_digest(as_bytes("12345")).value();
+            auto &pr_block = proto::add_blocks(pr_file);
+            proto::set_size(pr_block, 5ul);
+            proto::set_hash(pr_block, hash);
+
+            builder.local_update(folder_id, pr_file).apply(*sup);
+            auto &block = *cluster->get_blocks().begin()->item;
+
+            auto folder = cluster->get_folders().by_id(folder_id);
+            auto fi = folder->get_folder_infos().by_device(*my_device);
+            ;
+            auto file = fi->get_file_infos().by_name("a.txt");
+            REQUIRE(file);
+
+            auto &db_env = db_actor->access<env>();
+            auto txn_opt = db::make_transaction(db::transaction_type_t::RW, db_env);
+            REQUIRE(txn_opt);
+            auto &txn = txn_opt.value();
+            auto key = block.get_key();
+            REQUIRE(db::remove(key, txn));
+            REQUIRE(!txn.commit().has_error());
+
+            sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
+            sup->do_process();
+            REQUIRE(reply);
+            REQUIRE(!reply->payload.ee);
+
+            auto cluster_clone = make_cluster(false);
+            {
+                REQUIRE(reply->payload.res.diff->apply(*cluster_clone, get_apply_controller()));
+                auto &folder_infos = cluster_clone->get_folders().by_id(folder_id)->get_folder_infos();
+                auto folder_info = folder_infos.by_device(*my_device);
+                CHECK(folder_info->get_file_infos().size() == 0);
+                auto &blocks = cluster_clone->get_blocks();
+                CHECK(blocks.size() == 0);
+            }
+        }
+    };
+
+    F().run();
+}
+
 int _init() {
     REGISTER_TEST_CASE(test_db_population, "test_db_population", "[db]");
     REGISTER_TEST_CASE(test_loading_empty_db, "test_loading_empty_db", "[db]");
@@ -1115,6 +1167,7 @@ int _init() {
     REGISTER_TEST_CASE(test_update_peer, "test_update_peer", "[db]");
     REGISTER_TEST_CASE(test_peer_3_folders_6_files, "test_peer_3_folders_6_files", "[db]");
     REGISTER_TEST_CASE(test_db_migration_1_2, "test_db_migration_1_2", "[db]");
+    REGISTER_TEST_CASE(test_corrupted_file, "test_corrupted_file", "[db]");
     return 1;
 }
 
