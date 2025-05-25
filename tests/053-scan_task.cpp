@@ -91,6 +91,8 @@ SECTION("some dirs, no files") {
     auto task = scan_task_t(cluster, folder->get_id(), config);
     auto dir = root_path / "some-dir";
     bfs::create_directories(dir);
+    auto modified = to_unix(bfs::last_write_time(dir));
+
     auto r = task.advance();
     CHECK(std::get_if<bool>(&r));
     CHECK(*std::get_if<bool>(&r) == true);
@@ -101,6 +103,11 @@ SECTION("some dirs, no files") {
     CHECK(uf->path.filename() == "some-dir");
     CHECK(proto::get_size(uf->metadata) == 0);
     CHECK(proto::get_type(uf->metadata) == proto::FileInfoType::DIRECTORY);
+    CHECK(proto::get_modified_s(uf->metadata) == modified);
+
+    auto status = bfs::status(dir);
+    auto perms = static_cast<uint32_t>(status.permissions());
+    CHECK(proto::get_permissions(uf->metadata) == perms);
 
     r = task.advance();
     CHECK(std::get_if<bool>(&r));

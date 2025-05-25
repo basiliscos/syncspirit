@@ -136,9 +136,22 @@ scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
                 continue;
             }
 
+            auto file_type = status.type();
             proto::FileInfo metadata;
             proto::set_name(metadata, rp);
-            if (status.type() == bfs::file_type::regular) {
+
+            if (file_type == bfs::file_type::regular || file_type == bfs::file_type::directory) {
+                auto modification_time = bfs::last_write_time(child, ec);
+                if (ec) {
+                    errors.push_back(scan_error_t{dir, ec});
+                    continue;
+                }
+                proto::set_modified_s(metadata, to_unix(modification_time));
+
+                auto permissions = static_cast<uint32_t>(status.permissions());
+                proto::set_permissions(metadata, permissions);
+            }
+            if (file_type == bfs::file_type::regular) {
                 proto::set_type(metadata, proto::FileInfoType::FILE);
                 auto sz = bfs::file_size(child, ec);
                 if (ec) {
@@ -146,17 +159,10 @@ scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
                     continue;
                 }
                 proto::set_size(metadata, sz);
-
-                auto modification_time = bfs::last_write_time(child, ec);
-                if (ec) {
-                    errors.push_back(scan_error_t{dir, ec});
-                    continue;
-                }
-                proto::set_modified_s(metadata, to_unix(modification_time));
-            } else if (status.type() == bfs::file_type::directory) {
+            } else if (file_type == bfs::file_type::directory) {
                 proto::set_type(metadata, proto::FileInfoType::DIRECTORY);
                 dirs_queue.push_back(child);
-            } else if (status.type() == bfs::file_type::symlink) {
+            } else if (file_type == bfs::file_type::symlink) {
                 auto target = bfs::read_symlink(child, ec);
                 if (ec) {
                     errors.push_back(scan_error_t{dir, ec});
@@ -169,8 +175,6 @@ scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
                 continue;
             }
 
-            auto permissions = static_cast<uint32_t>(status.permissions());
-            proto::set_permissions(metadata, permissions);
             unknown_files_queue.push_back(unknown_file_t{child, std::move(metadata)});
         }
     }
