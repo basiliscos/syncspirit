@@ -6,8 +6,15 @@
 #include "scan_actor.h"
 #include "scan_scheduler.h"
 #include "file_actor.h"
+#include "model/diff/load/load_cluster.h"
+#include "model/diff/advance/advance.h"
+#include "model/diff/modify/upsert_folder.h"
+#include "model/diff/modify/upsert_folder_info.h"
+#include "model/diff/peer/update_folder.h"
+#include "presentation/folder_entity.h"
 
 using namespace syncspirit::fs;
+using namespace syncspirit::presentation;
 
 namespace {
 namespace resource {
@@ -114,4 +121,83 @@ void fs_supervisor_t::on_model_update(model::message::model_update_t &message) n
         auto ee = make_error(r.assume_error());
         return do_shutdown(ee);
     }
+
+    r = diff.visit(*this, nullptr);
+    if (!r) {
+        LOG_ERROR(log, "{}, error visiting model: {}", identity, r.assume_error().message());
+        do_shutdown(make_error(r.assume_error()));
+    }
+}
+
+auto fs_supervisor_t::operator()(const model::diff::load::load_cluster_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    for (auto &it : cluster->get_folders()) {
+        auto &folder = it.item;
+        auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
+        folder->set_augmentation(folder_entity);
+    }
+    return diff.visit_next(*this, custom);
+}
+
+auto fs_supervisor_t::operator()(const model::diff::modify::upsert_folder_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    auto folder_id = db::get_id(diff.db);
+    auto folder = cluster->get_folders().by_id(folder_id);
+    if (!folder->get_augmentation()) {
+        auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
+        folder->set_augmentation(folder_entity);
+    }
+    return diff.visit_next(*this, custom);
+}
+
+auto fs_supervisor_t::operator()(const model::diff::modify::upsert_folder_info_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    auto r = diff.visit_next(*this, custom);
+    auto &folder = *cluster->get_folders().by_id(diff.folder_id);
+    auto &device = *cluster->get_devices().by_sha256(diff.device_id);
+    auto folder_info = folder.is_shared_with(device);
+    if (&device != cluster->get_device()) {
+        auto augmentation = folder.get_augmentation().get();
+        auto folder_entity = static_cast<presentation::folder_entity_t *>(augmentation);
+        folder_entity->on_insert(*folder_info);
+    }
+    return r;
+}
+
+auto fs_supervisor_t::operator()(const model::diff::advance::advance_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    auto folder = cluster->get_folders().by_id(diff.folder_id);
+    auto augmentation = folder->get_augmentation().get();
+    auto folder_entity = static_cast<presentation::folder_entity_t *>(augmentation);
+    if (folder_entity) {
+        auto &folder_infos = folder->get_folder_infos();
+        auto local_fi = folder_infos.by_device(*cluster->get_device());
+        auto file_name = proto::get_name(diff.proto_local);
+        auto local_file = local_fi->get_file_infos().by_name(file_name);
+        if (local_file) {
+            folder_entity->on_insert(*local_file);
+        }
+    }
+    return diff.visit_next(*this, custom);
+}
+
+auto fs_supervisor_t::operator()(const model::diff::peer::update_folder_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    auto folder = cluster->get_folders().by_id(diff.folder_id);
+    auto folder_aug = folder->get_augmentation().get();
+    auto folder_entity = static_cast<presentation::folder_entity_t *>(folder_aug);
+
+    auto &devices_map = cluster->get_devices();
+    auto peer = devices_map.by_sha256(diff.peer_id);
+    auto &files_map = folder->get_folder_infos().by_device(*peer)->get_file_infos();
+
+    for (auto &file : diff.files) {
+        auto file_name = proto::get_name(file);
+        auto file_info = files_map.by_name(file_name);
+        auto augmentation = file_info->get_augmentation().get();
+        if (!augmentation) {
+            folder_entity->on_insert(*file_info);
+        }
+    }
+    return diff.visit_next(*this, custom);
 }

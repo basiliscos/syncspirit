@@ -96,6 +96,7 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t {
     void remove_blocks() noexcept;
     void assign_block(const model::block_info_ptr_t &block, size_t index) noexcept;
 
+    inline proto::FileInfoType get_type() const noexcept { return type; }
     inline bool is_file() const noexcept { return type == proto::FileInfoType::FILE; }
     inline bool is_dir() const noexcept { return type == proto::FileInfoType::DIRECTORY; }
     inline bool is_link() const noexcept { return type == proto::FileInfoType::SYMLINK; }

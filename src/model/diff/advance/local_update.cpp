@@ -22,24 +22,79 @@ local_update_t::local_update_t(const cluster_t &cluster, sequencer_t &sequencer,
     auto &self = *cluster.get_device();
     auto self_id = self.device_id().get_sha256();
 
-    auto &local_folder_infos = folder->get_folder_infos();
-    auto local_folder_info = local_folder_infos.by_device_id(self_id);
+    auto &folder_infos = folder->get_folder_infos();
+    auto local_folder_info = folder_infos.by_device_id(self_id);
     auto &local_files = local_folder_info->get_file_infos();
     auto name = std::pmr::string(proto::get_name(proto_file_), allocator);
     auto local_file = local_files.by_name(name);
-    proto::set_modified_by(proto_file_, self.device_id().get_uint());
 
-    initialize(cluster, sequencer, std::move(proto_file_), name);
-
-    auto version = version_ptr_t();
-    if (local_file) {
-        version = local_file->get_version();
-        version->update(device);
+    if (auto original_file = get_original(folder_infos, device, proto_file_); original_file) {
+        initialize(cluster, sequencer, original_file->as_proto(true), name);
     } else {
-        version.reset(new version_t(device));
+        proto::set_modified_by(proto_file_, self.device_id().get_uint());
+        initialize(cluster, sequencer, std::move(proto_file_), name);
+        auto version = version_ptr_t();
+        if (local_file) {
+            version = local_file->get_version();
+            version->update(device);
+        } else {
+            version.reset(new version_t(device));
+        }
+        auto &proto_version = proto::get_version(proto_local);
+        version->to_proto(proto_version);
     }
-    auto &proto_version = proto::get_version(proto_local);
-    version->to_proto(proto_version);
+}
+
+auto local_update_t::get_original(const model::folder_infos_map_t &fis, const model::device_t &self,
+                                  const proto::FileInfo &local_file) const noexcept -> model::file_info_ptr_t {
+    auto r = model::file_info_ptr_t();
+    auto name = proto::get_name(local_file);
+    auto local_type = proto::get_type(local_file);
+    auto local_deleted = proto::get_deleted(local_file);
+    auto local_invalid = proto::get_invalid(local_file);
+    auto local_perms = proto::get_permissions(local_file);
+    auto local_size = proto::get_size(local_file);
+    auto local_blocks_sz = proto::get_blocks_size(local_file);
+
+    for (auto &it_fi : fis) {
+        auto fi = it_fi.item.get();
+        auto peer_file = model::file_info_ptr_t();
+        if (fi->get_device() != &self) {
+            auto &peer_files = fi->get_file_infos();
+            auto candidate = peer_files.by_name(name);
+            if (candidate) {
+                if (candidate->get_size() == local_size) {
+                    auto &peer_blocks = candidate->get_blocks();
+                    bool matches = local_type == candidate->get_type() && local_deleted == candidate->is_deleted() &&
+                                   local_invalid == candidate->is_invalid() &&
+                                   local_perms == candidate->get_permissions() && local_blocks_sz == peer_blocks.size();
+                    if (matches) {
+                        for (size_t i = 0; i < peer_blocks.size(); ++i) {
+                            auto &pb = peer_blocks[i];
+                            auto &lb = proto::get_blocks(local_file, i);
+                            if (pb->get_hash() != proto::get_hash(lb)) {
+                                matches = false;
+                                break;
+                            }
+                        }
+                    }
+                    if (matches) {
+                        peer_file = std::move(candidate);
+                    }
+                }
+            }
+        }
+        if (peer_file) {
+            if (!r) {
+                r = std::move(peer_file);
+            } else {
+                if (model::compare(*peer_file, *r) > 1) {
+                    r = std::move(peer_file);
+                }
+            }
+        }
+    }
+    return r;
 }
 
 auto local_update_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
