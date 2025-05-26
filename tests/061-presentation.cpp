@@ -1647,6 +1647,46 @@ TEST_CASE("statistics", "[presentation]") {
         folder.reset();
         REQUIRE(deleted_entities.size() == 5);
     }
+
+    SECTION("detached presentation") {
+        REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
+        auto f_a_peer = add_file("a", *peer_device, 0, proto::FileInfoType::DIRECTORY, my_device_id, 1);
+        auto f_b_peer = add_file("a/b", *peer_device, 0, proto::FileInfoType::DIRECTORY, my_device_id, 1);
+        auto f_c_peer = add_file("a/b/c.txt", *peer_device, 0, proto::FileInfoType::FILE, my_device_id, 1);
+        auto f_c_my = add_file("a/b/c.txt", *my_device, 0, proto::FileInfoType::FILE, my_device_id, 1);
+
+        auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
+        CHECK(folder_entity->get_stats() == entity_stats_t{0, 3});
+
+        REQUIRE(folder_entity->get_children().size() == 1);
+        auto dir_a = *folder_entity->get_children().begin();
+        auto dir_b = *dir_a->get_children().begin();
+        auto file_c = *dir_b->get_children().begin();
+
+        SECTION("destroy detached") {
+            CHECK(dir_a->get_presence(my_device.get())->get_features() & F::missing);
+            CHECK(dir_b->get_presence(my_device.get())->get_features() & F::missing);
+            CHECK(file_c->get_presence(my_device.get())->get_features() & F::local);
+        }
+        SECTION("attach") {
+            auto f_b_my = add_file("a/b", *my_device, 0, proto::FileInfoType::DIRECTORY, my_device_id, 1);
+            auto f_a_my = add_file("a", *my_device, 0, proto::FileInfoType::DIRECTORY, my_device_id, 1);
+
+            folder_entity->on_insert(*f_b_my);
+            folder_entity->on_insert(*f_a_my);
+
+            auto p_a_my = dir_a->get_presence(my_device.get());
+            auto p_b_my = dir_b->get_presence(my_device.get());
+            auto p_f_my = file_c->get_presence(my_device.get());
+            CHECK(p_a_my->get_features() & F::local);
+            CHECK(p_b_my->get_features() & F::local);
+            CHECK(p_f_my->get_features() & F::local);
+
+            CHECK(p_a_my->get_stats() == presence_stats_t{0, 3, 3, 3});
+            CHECK(p_b_my->get_stats() == presence_stats_t{0, 2, 2, 2});
+            CHECK(p_f_my->get_stats() == presence_stats_t{0, 1, 1, 1});
+        }
+    }
 }
 
 static bool _init = []() -> bool {

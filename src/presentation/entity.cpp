@@ -47,8 +47,10 @@ void entity_t::push_stats(const presence_stats_t &diff, const model::device_t *s
             ++current->generation;
         }
         if (source) {
+            bool found = false;
             for (auto p : current->presences) {
                 if (p->device == source) {
+                    found = true;
                     p->entity_generation--;
                     assert(p->statistics.size >= 0);
                     assert(p->statistics.entities >= 0);
@@ -59,6 +61,9 @@ void entity_t::push_stats(const presence_stats_t &diff, const model::device_t *s
                     assert(p->statistics.cluster_entries >= 0 || p->entity_generation != current->generation);
                     break;
                 }
+            }
+            if (!found) { // detached presence
+                return;
             }
         }
         current = current->parent;
@@ -143,15 +148,15 @@ auto entity_t::recalc_best() noexcept -> const presence_t * {
 }
 
 presence_t *entity_t::get_presence(const model::device_t *device) noexcept {
-    presence_t *fallback = nullptr;
+    presence_t *r = nullptr;
     for (auto p : presences) {
         if (p->device == device) {
             return p;
         } else if (!p->device) {
-            fallback = p;
+            r = p;
         }
     }
-    return fallback;
+    return r;
 }
 
 void entity_t::add_child(entity_t &child) noexcept {
