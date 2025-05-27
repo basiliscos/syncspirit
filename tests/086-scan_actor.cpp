@@ -717,29 +717,137 @@ void test_importing() {
                 auto file = files_my.by_name(path.filename().string());
                 REQUIRE(file->get_version()->as_proto() == v);
             }
-            SECTION("deleted file") {
-                auto path = root_path / "c.bin";
-                auto pr_fi = proto::FileInfo();
-                proto::set_name(pr_fi, path.filename().string());
-                proto::set_type(pr_fi, proto::FileInfoType::DIRECTORY);
-                proto::set_deleted(pr_fi, true);
+            SECTION("deleted") {
+                SECTION("single deleted file") {
+                    auto path = root_path / "c.bin";
+                    auto pr_fi = proto::FileInfo();
+                    proto::set_name(pr_fi, path.filename().string());
+                    proto::set_type(pr_fi, proto::FileInfoType::DIRECTORY);
+                    proto::set_deleted(pr_fi, true);
 
-                auto &v = proto::get_version(pr_fi);
-                auto &counter = proto::add_counters(v);
-                proto::set_id(counter, 1);
-                proto::set_value(counter, 1);
-                proto::set_sequence(pr_fi, fi_peer->get_max_sequence() + 1);
+                    auto &v = proto::get_version(pr_fi);
+                    auto &counter = proto::add_counters(v);
+                    proto::set_id(counter, 1);
+                    proto::set_value(counter, 1);
+                    proto::set_sequence(pr_fi, fi_peer->get_max_sequence() + 1);
 
-                builder->make_index(sha256, folder->get_id()).add(pr_fi, peer_device).finish().apply(*sup);
+                    builder->make_index(sha256, folder->get_id()).add(pr_fi, peer_device).finish().apply(*sup);
 
-                builder->scan_start(folder->get_id()).apply(*sup);
+                    builder->scan_start(folder->get_id()).apply(*sup);
 
-                auto fi_my = folder->get_folder_infos().by_device(*my_device);
-                auto &files_my = fi_my->get_file_infos();
-                REQUIRE(files_my.size() == 1);
-                auto file = files_my.by_name(path.filename().string());
-                REQUIRE(file->get_version()->as_proto() == v);
-                CHECK(!bfs::exists(path));
+                    auto fi_my = folder->get_folder_infos().by_device(*my_device);
+                    auto &files_my = fi_my->get_file_infos();
+                    REQUIRE(files_my.size() == 1);
+                    auto file = files_my.by_name(path.filename().string());
+                    REQUIRE(file->get_version()->as_proto() == v);
+                    CHECK(!bfs::exists(path));
+                }
+                SECTION("deleted file inside deleted dir") {
+                    auto path = root_path / "d" / "file.bin";
+                    auto pr_dir = [&]() -> proto::FileInfo {
+                        auto f = proto::FileInfo();
+                        proto::set_name(f, "d");
+                        proto::set_type(f, proto::FileInfoType::DIRECTORY);
+                        proto::set_deleted(f, true);
+                        auto &v = proto::get_version(f);
+                        auto &counter = proto::add_counters(v);
+                        proto::set_id(counter, 1);
+                        proto::set_value(counter, 1);
+                        proto::set_sequence(f, fi_peer->get_max_sequence() + 1);
+                        return f;
+                    }();
+                    auto pr_file = [&]() -> proto::FileInfo {
+                        auto f = proto::FileInfo();
+                        proto::set_name(f, "d/file.bin");
+                        proto::set_type(f, proto::FileInfoType::FILE);
+                        proto::set_deleted(f, true);
+                        auto &v = proto::get_version(f);
+                        auto &counter = proto::add_counters(v);
+                        proto::set_id(counter, 1);
+                        proto::set_value(counter, 1);
+                        proto::set_sequence(f, fi_peer->get_max_sequence() + 2);
+                        return f;
+                    }();
+
+                    builder->make_index(sha256, folder->get_id())
+                        .add(pr_dir, peer_device)
+                        .add(pr_file, peer_device)
+                        .finish()
+                        .apply(*sup);
+
+                    auto fi_my = folder->get_folder_infos().by_device(*my_device);
+                    auto &files_my = fi_my->get_file_infos();
+                    SECTION("prohibid creation of local deleted file") {
+                        SECTION("dir is a file, locally") {
+                            write_file(root_path / "d", "");
+                            builder->scan_start(folder->get_id()).apply(*sup);
+                            bfs::remove(root_path / "d");
+                        }
+#ifndef SYNCSPIRIT_WIN
+                        SECTION("dir does exists, but it is non-readable") {
+                            bfs::create_directory(root_path / "d");
+                            bfs::permissions(root_path / "d", bfs::perms::none);
+                            builder->scan_start(folder->get_id()).apply(*sup);
+                            bfs::remove(root_path / "d");
+                        }
+#endif
+                        CHECK(!files_my.by_name("d/file.bin"));
+                    }
+                    SECTION("allow creation of local deleted file") {
+                        SECTION("dir does not exists") {
+                            builder->scan_start(folder->get_id()).apply(*sup);
+                            auto dir = files_my.by_name("d");
+                            CHECK(dir);
+                        }
+                        SECTION("dir does exists & it is r/w") {
+                            bfs::create_directory(root_path / "d");
+                            builder->scan_start(folder->get_id()).apply(*sup);
+                        }
+                        REQUIRE(files_my.size() >= 1);
+                        auto file = files_my.by_name("d/file.bin");
+                        CHECK(file);
+                        CHECK(!bfs::exists(path));
+                    }
+                }
+                SECTION("prohibit creation of deleted record") {
+                    auto path = root_path / "e" / "file.bin";
+                    auto pr_dir = [&]() -> proto::FileInfo {
+                        auto f = proto::FileInfo();
+                        proto::set_name(f, "e");
+                        proto::set_type(f, proto::FileInfoType::DIRECTORY);
+                        proto::set_deleted(f, false);
+                        auto &v = proto::get_version(f);
+                        auto &counter = proto::add_counters(v);
+                        proto::set_id(counter, 1);
+                        proto::set_value(counter, 1);
+                        proto::set_sequence(f, fi_peer->get_max_sequence() + 1);
+                        return f;
+                    }();
+                    auto pr_file = [&]() -> proto::FileInfo {
+                        auto f = proto::FileInfo();
+                        proto::set_name(f, "e/file.bin");
+                        proto::set_type(f, proto::FileInfoType::FILE);
+                        proto::set_deleted(f, true);
+                        auto &v = proto::get_version(f);
+                        auto &counter = proto::add_counters(v);
+                        proto::set_id(counter, 1);
+                        proto::set_value(counter, 1);
+                        proto::set_sequence(f, fi_peer->get_max_sequence() + 2);
+                        return f;
+                    }();
+
+                    builder->make_index(sha256, folder->get_id())
+                        .add(pr_dir, peer_device)
+                        .add(pr_file, peer_device)
+                        .finish()
+                        .apply(*sup);
+
+                    builder->scan_start(folder->get_id()).apply(*sup);
+
+                    auto fi_my = folder->get_folder_infos().by_device(*my_device);
+                    auto &files_my = fi_my->get_file_infos();
+                    REQUIRE(files_my.size() == 0);
+                }
             }
         }
     };

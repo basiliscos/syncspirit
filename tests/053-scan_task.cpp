@@ -72,7 +72,8 @@ TEST_CASE("scan_task", "[fs]") {
 
     auto &seen = task.get_seen_paths();
     REQUIRE(seen.size() == 1);
-    CHECK(*seen.begin() == "");
+    CHECK(seen.begin()->first == "");
+    CHECK(seen.begin()->second == root_path);
 }
 #endif
 

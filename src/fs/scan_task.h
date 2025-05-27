@@ -18,7 +18,7 @@
 #include <list>
 #include <variant>
 #include <cstdint>
-#include <unordered_set>
+#include <unordered_map>
 
 namespace syncspirit::fs {
 
@@ -73,7 +73,7 @@ struct SYNCSPIRIT_API scan_task_t : boost::intrusive_ref_counter<scan_task_t, bo
     using path_queue_t = std::list<bfs::path>;
     using files_queue_t = std::list<file_info_t>;
     using unknown_files_queue_t = std::list<unknown_file_t>;
-    using seen_paths_t = std::unordered_set<std::string, utils::string_hash_t, utils::string_eq_t>;
+    using seen_paths_t = std::unordered_map<std::string, bfs::path, utils::string_hash_t, utils::string_eq_t>;
 
     struct send_guard_t {
         send_guard_t(scan_task_t &task, r::actor_base_t &actor, r::address_ptr_t coordinator) noexcept;

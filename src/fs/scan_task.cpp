@@ -68,7 +68,7 @@ scan_result_t scan_task_t::advance() noexcept {
     }
     if (files.size() != 0) {
         auto file = files.begin()->item;
-        seen_paths.emplace(file->get_name());
+        seen_paths.insert({std::string(file->get_name()), file->get_path()});
         files.remove(file);
         if (file->is_deleted()) {
             return unchanged_meta_t{std::move(file)};
@@ -94,7 +94,7 @@ scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
     auto record_path = [&](const bfs::path &file) {
         auto relative = relativize(file, root);
         auto str = boost::nowide::narrow(relative.generic_wstring());
-        seen_paths.emplace(std::move(str));
+        seen_paths.insert({std::move(str), file});
     };
 
     scan_errors_t errors;
@@ -109,11 +109,11 @@ scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
             auto &file = *it.item;
             bool remove = str.empty() || (file.get_name().find(str) == 0);
             if (remove) {
-                seen_paths.insert(std::string(file.get_name()));
+                seen_paths.insert({std::string(file.get_name()), file.get_path()});
                 removed.put(it.item);
             }
         }
-        seen_paths.insert(str);
+        seen_paths.insert({str, dir});
         errors.push_back(scan_error_t{dir, ec});
     } else {
         for (; it != bfs::directory_iterator(); ++it) {
@@ -297,7 +297,7 @@ scan_result_t scan_task_t::advance_unknown_file(unknown_file_t &file) noexcept {
         auto &files = folder_info->get_file_infos();
         auto f = files.by_name(relative_path);
         if (f) {
-            seen_paths.emplace(f->get_name());
+            seen_paths.insert({std::string(f->get_name()), path});
             if (!peer_file) {
                 peer_file = std::move(f);
                 peer_counter = peer_file->get_version()->get_best();

@@ -360,10 +360,12 @@ void scan_actor_t::post_scan(scan_task_t &task) noexcept {
             queue.pop_front();
             auto best = entity->get_best();
             if (best) {
+                auto file_name = entity->get_path().get_full_name();
+                auto it = seen.end();
                 auto f = best->get_features();
                 if (f & F::deleted) {
-                    auto file_name = entity->get_path().get_full_name();
-                    if (seen.count(file_name) == 0 && !self_files.by_name(file_name)) {
+                    it = seen.find(file_name);
+                    if ((it == seen.end()) && !self_files.by_name(file_name)) {
                         using local_update_t = model::diff::advance::local_update_t;
                         auto presence = static_cast<const presentation::cluster_file_presence_t *>(best);
                         auto &peer_file = presence->get_file_info();
@@ -373,9 +375,30 @@ void scan_actor_t::post_scan(scan_task_t &task) noexcept {
                     }
                 }
                 if (f & F::directory) {
-                    auto &children = entity->get_children();
-                    auto inserter = std::back_insert_iterator(queue);
-                    std::copy(children.begin(), children.end(), inserter);
+                    if (it == seen.end()) {
+                        it = seen.find(file_name);
+                    }
+                    auto recurse = [&]() -> bool {
+                        bool creation_allowed = false;
+                        if (it != seen.end()) {
+                            auto &path = it->second;
+                            auto ec = sys::error_code();
+                            auto status = bfs::status(path, ec);
+                            if (!ec) {
+                                using perms_t = bfs::perms;
+                                creation_allowed = (status.type() == bfs::file_type::directory) &&
+                                                   ((status.permissions() & perms_t::owner_write) != perms_t::none);
+                            }
+                        } else {
+                            creation_allowed = f & F::deleted;
+                        }
+                        return creation_allowed;
+                    }();
+                    if (recurse) {
+                        auto &children = entity->get_children();
+                        auto inserter = std::back_insert_iterator(queue);
+                        std::copy(children.begin(), children.end(), inserter);
+                    }
                 }
             }
         }
