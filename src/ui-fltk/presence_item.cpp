@@ -189,6 +189,7 @@ bool presence_item_t::show(std::uint32_t hide_mask, bool refresh_labels, int32_t
 void presence_item_t::show_child(presentation::presence_t &child_presence, std::uint32_t mask) {
     auto aug = child_presence.get_augmentation().get();
     if (is_expanded()) {
+        bool found = false;
         for (int i = 0; i < this->children(); ++i) {
             auto c = static_cast<presence_item_t *>(child(i));
             auto &p = c->get_presence();
@@ -211,8 +212,12 @@ void presence_item_t::show_child(presentation::presence_t &child_presence, std::
                         node->expanded = true;
                     }
                 }
+                found = true;
                 break;
             }
+        }
+        if (!found) {
+            show(mask, true, 1);
         }
     } else if (children() == 0) {
         populate_dummy_child();
