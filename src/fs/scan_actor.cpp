@@ -9,8 +9,15 @@
 #include "model/diff/local/file_availability.h"
 #include "model/diff/local/scan_finish.h"
 #include "model/diff/local/scan_start.h"
+#include "presentation/cluster_file_presence.h"
+#include "presentation/folder_entity.h"
+#include "presentation/presence.h"
 #include "net/names.h"
+
 #include <algorithm>
+#include <memory_resource>
+#include <list>
+#include <iterator>
 
 namespace sys = boost::system;
 using namespace syncspirit::fs;
@@ -163,6 +170,7 @@ void scan_actor_t::on_scan(message::scan_progress_t &message) noexcept {
         guard.send_progress();
     } else if (completed) {
         LOG_DEBUG(log, "completed scanning of {}", folder_id);
+        post_scan(*task);
         auto now = clock_t::local_time();
         task->push(new model::diff::local::scan_finish_t(folder_id, now));
         guard.send_by_force();
@@ -289,7 +297,6 @@ void scan_actor_t::commit_new_file(new_chunk_iterator_t &info) noexcept {
 
     // file.clear_blocks();
     for (auto &b : hashes) {
-
         auto block_info = proto::BlockInfo{offset, b.size, b.digest, b.weak};
         proto::add_blocks(file, std::move(block_info));
         offset += b.size;
@@ -325,5 +332,75 @@ void scan_actor_t::on_hash_new(hasher::message::digest_response_t &res) noexcept
     if (info.is_complete()) {
         commit_new_file(info);
         send<payload::scan_progress_t>(address, info.get_task());
+    }
+}
+
+void scan_actor_t::post_scan(scan_task_t &task) noexcept {
+    auto folder_id = task.get_folder_id();
+    auto folder = cluster->get_folders().by_id(folder_id);
+    auto self_fi = folder->get_folder_infos().by_device(*cluster->get_device());
+    auto &self_files = self_fi->get_file_infos();
+    auto aug = folder->get_augmentation();
+    auto folder_entity = dynamic_cast<presentation::folder_entity_t *>(aug.get());
+    auto &seen = task.get_seen_paths();
+    if (folder_entity) {
+        using queue_t = std::pmr::list<presentation::entity_t *>;
+        using F = syncspirit::presentation::presence_t::features_t;
+        auto buffer = std::array<std::byte, 10 * 1024>();
+        auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+        auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+        auto queue = queue_t(allocator);
+        {
+            auto &top_level_children = folder_entity->get_children();
+            auto inserter = std::back_insert_iterator(queue);
+            std::copy(top_level_children.begin(), top_level_children.end(), inserter);
+        }
+        while (!queue.empty()) {
+            auto entity = queue.front();
+            queue.pop_front();
+            auto best = entity->get_best();
+            if (best) {
+                auto file_name = entity->get_path().get_full_name();
+                auto it = seen.end();
+                auto f = best->get_features();
+                if (f & F::deleted) {
+                    it = seen.find(file_name);
+                    if ((it == seen.end()) && !self_files.by_name(file_name)) {
+                        using local_update_t = model::diff::advance::local_update_t;
+                        auto presence = static_cast<const presentation::cluster_file_presence_t *>(best);
+                        auto &peer_file = presence->get_file_info();
+                        auto pr_file = peer_file.as_proto(true);
+                        LOG_DEBUG(log, "assuming deleted '{}' in the folder '{}'", file_name, folder_id);
+                        task.push(new local_update_t(*cluster, *sequencer, std::move(pr_file), folder_id));
+                    }
+                }
+                if (f & F::directory) {
+                    if (it == seen.end()) {
+                        it = seen.find(file_name);
+                    }
+                    auto recurse = [&]() -> bool {
+                        bool creation_allowed = false;
+                        if (it != seen.end()) {
+                            auto &path = it->second;
+                            auto ec = sys::error_code();
+                            auto status = bfs::status(path, ec);
+                            if (!ec) {
+                                using perms_t = bfs::perms;
+                                creation_allowed = (status.type() == bfs::file_type::directory) &&
+                                                   ((status.permissions() & perms_t::owner_write) != perms_t::none);
+                            }
+                        } else {
+                            creation_allowed = f & F::deleted;
+                        }
+                        return creation_allowed;
+                    }();
+                    if (recurse) {
+                        auto &children = entity->get_children();
+                        auto inserter = std::back_insert_iterator(queue);
+                        std::copy(children.begin(), children.end(), inserter);
+                    }
+                }
+            }
+        }
     }
 }

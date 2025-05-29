@@ -69,6 +69,11 @@ TEST_CASE("scan_task", "[fs]") {
     auto &err = errs->at(0);
     CHECK(err.ec);
     CHECK(err.path == root_path);
+
+    auto &seen = task.get_seen_paths();
+    REQUIRE(seen.size() == 1);
+    CHECK(seen.begin()->first == "");
+    CHECK(seen.begin()->second == root_path);
 }
 #endif
 
@@ -87,6 +92,8 @@ SECTION("some dirs, no files") {
     auto task = scan_task_t(cluster, folder->get_id(), config);
     auto dir = root_path / "some-dir";
     bfs::create_directories(dir);
+    auto modified = to_unix(bfs::last_write_time(dir));
+
     auto r = task.advance();
     CHECK(std::get_if<bool>(&r));
     CHECK(*std::get_if<bool>(&r) == true);
@@ -97,6 +104,11 @@ SECTION("some dirs, no files") {
     CHECK(uf->path.filename() == "some-dir");
     CHECK(proto::get_size(uf->metadata) == 0);
     CHECK(proto::get_type(uf->metadata) == proto::FileInfoType::DIRECTORY);
+    CHECK(proto::get_modified_s(uf->metadata) == modified);
+
+    auto status = bfs::status(dir);
+    auto perms = static_cast<uint32_t>(status.permissions());
+    CHECK(proto::get_permissions(uf->metadata) == perms);
 
     r = task.advance();
     CHECK(std::get_if<bool>(&r));
@@ -105,6 +117,9 @@ SECTION("some dirs, no files") {
     r = task.advance();
     CHECK(std::get_if<bool>(&r));
     CHECK(*std::get_if<bool>(&r) == false);
+
+    auto &seen = task.get_seen_paths();
+    CHECK(seen.count("some-dir"));
 }
 
 SECTION("no dirs, unknown files") {
@@ -124,6 +139,9 @@ SECTION("no dirs, unknown files") {
     r = task.advance();
     REQUIRE(std::get_if<bool>(&r));
     CHECK(*std::get_if<bool>(&r) == false);
+
+    auto &seen = task.get_seen_paths();
+    CHECK(seen.count("some-file"));
 }
 
 #ifndef SYNCSPIRIT_WIN
@@ -147,6 +165,9 @@ SECTION("no dirs, symlink to non-existing target") {
     r = task.advance();
     REQUIRE(std::get_if<bool>(&r));
     CHECK(*std::get_if<bool>(&r) == false);
+
+    auto &seen = task.get_seen_paths();
+    CHECK(seen.count("symlink"));
 }
 #endif
 }
@@ -190,6 +211,9 @@ SECTION("regular files") {
         r = task.advance();
         CHECK(std::get_if<bool>(&r));
         CHECK(*std::get_if<bool>(&r) == false);
+
+        auto &seen = task.get_seen_paths();
+        CHECK(seen.count("a.txt"));
     }
 
     SECTION("meta is not changed (dir)") {
@@ -219,6 +243,9 @@ SECTION("regular files") {
         r = task.advance();
         CHECK(std::get_if<bool>(&r));
         CHECK(*std::get_if<bool>(&r) == false);
+
+        auto &seen = task.get_seen_paths();
+        CHECK(seen.count("a-dir"));
     }
 
     SECTION("meta is not changed (dir + file inside)") {
@@ -270,6 +297,10 @@ SECTION("regular files") {
         r = task.advance();
         CHECK(std::get_if<bool>(&r));
         CHECK(*std::get_if<bool>(&r) == false);
+
+        auto &seen = task.get_seen_paths();
+        CHECK(seen.count("a-dir-2"));
+        CHECK(seen.count("a-dir-2/a.txt"));
     }
 
     SECTION("file has been removed") {
@@ -293,6 +324,8 @@ SECTION("regular files") {
         r = task.advance();
         CHECK(std::get_if<bool>(&r));
         CHECK(*std::get_if<bool>(&r) == false);
+        auto &seen = task.get_seen_paths();
+        CHECK(seen.count(file->get_name()));
     }
 
     SECTION("dir has been removed") {
@@ -315,6 +348,9 @@ SECTION("regular files") {
         r = task.advance();
         CHECK(std::get_if<bool>(&r));
         CHECK(*std::get_if<bool>(&r) == false);
+
+        auto &seen = task.get_seen_paths();
+        CHECK(seen.count("a-dir"));
     }
 
     SECTION("removed file does not exist => unchanged meta") {
@@ -336,6 +372,9 @@ SECTION("regular files") {
         r = task.advance();
         CHECK(std::get_if<bool>(&r));
         CHECK(*std::get_if<bool>(&r) == false);
+
+        auto &seen = task.get_seen_paths();
+        CHECK(seen.count(file->get_name()));
     }
 
     SECTION("removed dir does not exist => unchanged meta") {
@@ -358,6 +397,9 @@ SECTION("regular files") {
         r = task.advance();
         CHECK(std::get_if<bool>(&r));
         CHECK(*std::get_if<bool>(&r) == false);
+
+        auto &seen = task.get_seen_paths();
+        CHECK(seen.count(file->get_name()));
     }
 
     SECTION("root dir does not exist & deleted file => unchanged meta") {
@@ -380,6 +422,9 @@ SECTION("regular files") {
         r = task.advance();
         CHECK(std::get_if<bool>(&r));
         CHECK(*std::get_if<bool>(&r) == false);
+
+        auto &seen = task.get_seen_paths();
+        CHECK(seen.count(file->get_name()));
     }
 
     SECTION("meta is changed") {
@@ -474,6 +519,9 @@ SECTION("regular files") {
         r = task->advance();
         CHECK(std::get_if<bool>(&r));
         CHECK(*std::get_if<bool>(&r) == false);
+
+        auto &seen = task->get_seen_paths();
+        CHECK(seen.count(file->get_name()));
     }
 
     SECTION("tmp") {
@@ -503,6 +551,9 @@ SECTION("regular files") {
             r = task.advance();
             CHECK(std::get_if<bool>(&r));
             CHECK(*std::get_if<bool>(&r) == false);
+
+            auto &seen = task.get_seen_paths();
+            CHECK(seen.count("a.txt"));
         }
 
         SECTION("size mismatch -> remove & ignore") {
@@ -524,6 +575,9 @@ SECTION("regular files") {
             CHECK(std::get_if<bool>(&r));
             CHECK(*std::get_if<bool>(&r) == false);
             CHECK(!bfs::exists(path));
+
+            auto &seen = task.get_seen_paths();
+            CHECK(seen.count("a.txt"));
         }
 
         SECTION("size mismatch for global source -> remove & ignore") {
@@ -551,6 +605,9 @@ SECTION("regular files") {
             CHECK(std::get_if<bool>(&r));
             CHECK(*std::get_if<bool>(&r) == false);
             CHECK(!bfs::exists(path));
+
+            auto &seen = task.get_seen_paths();
+            CHECK(seen.count("a.txt"));
         }
 
         SECTION("no source -> remove") {
@@ -569,6 +626,9 @@ SECTION("regular files") {
             CHECK(std::get_if<bool>(&r));
             CHECK(*std::get_if<bool>(&r) == false);
             CHECK(!bfs::exists(path));
+
+            auto &seen = task.get_seen_paths();
+            CHECK(!seen.count("a.txt"));
         }
     }
     SECTION("tmp & non-tmp: both are returned") {
@@ -620,6 +680,10 @@ SECTION("regular files") {
         r = task.advance();
         CHECK(std::get_if<bool>(&r));
         CHECK(*std::get_if<bool>(&r) == false);
+
+        auto &seen = task.get_seen_paths();
+        CHECK(seen.count(path.filename().string()));
+        CHECK(seen.count(path_tmp.filename().string()));
     }
 
     SECTION("cannot read file error") {
@@ -645,6 +709,9 @@ SECTION("regular files") {
         r = task.advance();
         CHECK(std::get_if<bool>(&r));
         CHECK(*std::get_if<bool>(&r) == false);
+
+        auto &seen = task.get_seen_paths();
+        CHECK(seen.count(path.filename().string()));
     }
 
     SECTION("cannot read dir, error") {
@@ -683,6 +750,10 @@ SECTION("regular files") {
             REQUIRE(std::get_if<bool>(&r));
             CHECK(*std::get_if<bool>(&r) == false);
             bfs::permissions(parent, bfs::perms::all);
+
+            auto &seen = task.get_seen_paths();
+            CHECK(seen.count("some"));
+            CHECK(seen.count("some/a.txt"));
         }
     }
 }
@@ -723,6 +794,9 @@ SECTION("symlink file") {
         r = task.advance();
         CHECK(std::get_if<bool>(&r));
         CHECK(*std::get_if<bool>(&r) == false);
+
+        auto &seen = task.get_seen_paths();
+        CHECK(seen.count("a.txt"));
     }
 
     SECTION("symlink does exists") {
@@ -767,6 +841,9 @@ SECTION("symlink file") {
         r = task.advance();
         CHECK(std::get_if<bool>(&r));
         CHECK(*std::get_if<bool>(&r) == false);
+
+        auto &seen = task.get_seen_paths();
+        CHECK(seen.count("a.txt"));
     }
 
     SECTION("symlink to root") {
@@ -793,6 +870,9 @@ SECTION("symlink file") {
         r = task.advance();
         CHECK(std::get_if<bool>(&r));
         CHECK(*std::get_if<bool>(&r) == false);
+
+        auto &seen = task.get_seen_paths();
+        CHECK(seen.count("a.txt"));
     }
 
     SECTION("symlink points to something different") {
@@ -818,6 +898,9 @@ SECTION("symlink file") {
         r = task.advance();
         CHECK(std::get_if<bool>(&r));
         CHECK(*std::get_if<bool>(&r) == false);
+
+        auto &seen = task.get_seen_paths();
+        CHECK(seen.count("a.txt"));
     }
 }
 #endif

@@ -7,13 +7,11 @@
 #include "diff-builder.h"
 
 #include "model/cluster.h"
-#include "model/diff/local/io_failure.h"
 #include "hasher/hasher_proxy_actor.h"
 #include "hasher/hasher_actor.h"
 #include "fs/scan_actor.h"
 #include "fs/utils.h"
 #include "net/names.h"
-#include "utils/error_code.h"
 
 using namespace syncspirit;
 using namespace syncspirit::test;
@@ -47,7 +45,7 @@ struct fixture_t {
         cluster->get_devices().put(peer_device);
 
         r::system_context_t ctx;
-        sup = ctx.create_supervisor<supervisor_t>().timeout(timeout).create_registry().finish();
+        sup = ctx.create_supervisor<supervisor_t>().make_presentation(true).timeout(timeout).create_registry().finish();
         sup->cluster = cluster;
 
         auto folder_id = "1234-5678";
@@ -651,12 +649,218 @@ void test_suspending() {
     F().run();
 };
 
+void test_importing() {
+    struct F : fixture_t {
+        F() { files_scan_iteration_limit = 1; }
+        void main() noexcept override {
+            auto sha256 = peer_device->device_id().get_sha256();
+            auto fi_peer = folder->get_folder_infos().by_device(*peer_device);
+            SECTION("non-empty file") {
+                auto path = root_path / "a.bin";
+                write_file(path, "12345");
+                auto status = bfs::status(path);
+                auto permissions = static_cast<uint32_t>(status.permissions());
+
+                auto pr_fi = proto::FileInfo();
+                proto::set_name(pr_fi, path.filename().string());
+                proto::set_type(pr_fi, proto::FileInfoType::FILE);
+                proto::set_size(pr_fi, 5);
+                proto::set_block_size(pr_fi, 5);
+                proto::set_permissions(pr_fi, permissions);
+
+                auto &v = proto::get_version(pr_fi);
+                auto &counter = proto::add_counters(v);
+                proto::set_id(counter, 1);
+                proto::set_value(counter, 1);
+                proto::set_sequence(pr_fi, fi_peer->get_max_sequence() + 1);
+
+                auto data_1 = as_owned_bytes("12345");
+                auto data_1_h = utils::sha256_digest(data_1).value();
+                auto &b1 = proto::add_blocks(pr_fi);
+                proto::set_hash(b1, data_1_h);
+                proto::set_size(b1, data_1.size());
+
+                builder->make_index(sha256, folder->get_id()).add(pr_fi, peer_device).finish().apply(*sup);
+
+                builder->scan_start(folder->get_id()).apply(*sup);
+
+                auto fi_my = folder->get_folder_infos().by_device(*my_device);
+                auto &files_my = fi_my->get_file_infos();
+                REQUIRE(files_my.size() == 1);
+                auto file = files_my.by_name(path.filename().string());
+                REQUIRE(file->get_version()->as_proto() == v);
+            }
+            SECTION("empty file") {
+                auto path = root_path / "b.bin";
+                write_file(path, "");
+                auto status = bfs::status(path);
+                auto permissions = static_cast<uint32_t>(status.permissions());
+
+                auto pr_fi = proto::FileInfo();
+                proto::set_name(pr_fi, path.filename().string());
+                proto::set_type(pr_fi, proto::FileInfoType::FILE);
+                proto::set_permissions(pr_fi, permissions);
+
+                auto &v = proto::get_version(pr_fi);
+                auto &counter = proto::add_counters(v);
+                proto::set_id(counter, 1);
+                proto::set_value(counter, 1);
+                proto::set_sequence(pr_fi, fi_peer->get_max_sequence() + 1);
+
+                builder->make_index(sha256, folder->get_id()).add(pr_fi, peer_device).finish().apply(*sup);
+
+                builder->scan_start(folder->get_id()).apply(*sup);
+
+                auto fi_my = folder->get_folder_infos().by_device(*my_device);
+                auto &files_my = fi_my->get_file_infos();
+                REQUIRE(files_my.size() == 1);
+                auto file = files_my.by_name(path.filename().string());
+                REQUIRE(file->get_version()->as_proto() == v);
+            }
+            SECTION("deleted") {
+                SECTION("single deleted file") {
+                    auto path = root_path / "c.bin";
+                    auto pr_fi = proto::FileInfo();
+                    proto::set_name(pr_fi, path.filename().string());
+                    proto::set_type(pr_fi, proto::FileInfoType::DIRECTORY);
+                    proto::set_deleted(pr_fi, true);
+
+                    auto &v = proto::get_version(pr_fi);
+                    auto &counter = proto::add_counters(v);
+                    proto::set_id(counter, 1);
+                    proto::set_value(counter, 1);
+                    proto::set_sequence(pr_fi, fi_peer->get_max_sequence() + 1);
+
+                    builder->make_index(sha256, folder->get_id()).add(pr_fi, peer_device).finish().apply(*sup);
+
+                    builder->scan_start(folder->get_id()).apply(*sup);
+
+                    auto fi_my = folder->get_folder_infos().by_device(*my_device);
+                    auto &files_my = fi_my->get_file_infos();
+                    REQUIRE(files_my.size() == 1);
+                    auto file = files_my.by_name(path.filename().string());
+                    REQUIRE(file->get_version()->as_proto() == v);
+                    CHECK(!bfs::exists(path));
+                }
+                SECTION("deleted file inside deleted dir") {
+                    auto path = root_path / "d" / "file.bin";
+                    auto pr_dir = [&]() -> proto::FileInfo {
+                        auto f = proto::FileInfo();
+                        proto::set_name(f, "d");
+                        proto::set_type(f, proto::FileInfoType::DIRECTORY);
+                        proto::set_deleted(f, true);
+                        auto &v = proto::get_version(f);
+                        auto &counter = proto::add_counters(v);
+                        proto::set_id(counter, 1);
+                        proto::set_value(counter, 1);
+                        proto::set_sequence(f, fi_peer->get_max_sequence() + 1);
+                        return f;
+                    }();
+                    auto pr_file = [&]() -> proto::FileInfo {
+                        auto f = proto::FileInfo();
+                        proto::set_name(f, "d/file.bin");
+                        proto::set_type(f, proto::FileInfoType::FILE);
+                        proto::set_deleted(f, true);
+                        auto &v = proto::get_version(f);
+                        auto &counter = proto::add_counters(v);
+                        proto::set_id(counter, 1);
+                        proto::set_value(counter, 1);
+                        proto::set_sequence(f, fi_peer->get_max_sequence() + 2);
+                        return f;
+                    }();
+
+                    builder->make_index(sha256, folder->get_id())
+                        .add(pr_dir, peer_device)
+                        .add(pr_file, peer_device)
+                        .finish()
+                        .apply(*sup);
+
+                    auto fi_my = folder->get_folder_infos().by_device(*my_device);
+                    auto &files_my = fi_my->get_file_infos();
+                    SECTION("prohibid creation of local deleted file") {
+                        SECTION("dir is a file, locally") {
+                            write_file(root_path / "d", "");
+                            builder->scan_start(folder->get_id()).apply(*sup);
+                            bfs::remove(root_path / "d");
+                        }
+#ifndef SYNCSPIRIT_WIN
+                        SECTION("dir does exists, but it is non-readable") {
+                            bfs::create_directory(root_path / "d");
+                            bfs::permissions(root_path / "d", bfs::perms::none);
+                            builder->scan_start(folder->get_id()).apply(*sup);
+                            bfs::remove(root_path / "d");
+                        }
+#endif
+                        CHECK(!files_my.by_name("d/file.bin"));
+                    }
+                    SECTION("allow creation of local deleted file") {
+                        SECTION("dir does not exists") {
+                            builder->scan_start(folder->get_id()).apply(*sup);
+                            auto dir = files_my.by_name("d");
+                            CHECK(dir);
+                        }
+                        SECTION("dir does exists & it is r/w") {
+                            bfs::create_directory(root_path / "d");
+                            builder->scan_start(folder->get_id()).apply(*sup);
+                        }
+                        REQUIRE(files_my.size() >= 1);
+                        auto file = files_my.by_name("d/file.bin");
+                        CHECK(file);
+                        CHECK(!bfs::exists(path));
+                    }
+                }
+                SECTION("prohibit creation of deleted record") {
+                    auto path = root_path / "e" / "file.bin";
+                    auto pr_dir = [&]() -> proto::FileInfo {
+                        auto f = proto::FileInfo();
+                        proto::set_name(f, "e");
+                        proto::set_type(f, proto::FileInfoType::DIRECTORY);
+                        proto::set_deleted(f, false);
+                        auto &v = proto::get_version(f);
+                        auto &counter = proto::add_counters(v);
+                        proto::set_id(counter, 1);
+                        proto::set_value(counter, 1);
+                        proto::set_sequence(f, fi_peer->get_max_sequence() + 1);
+                        return f;
+                    }();
+                    auto pr_file = [&]() -> proto::FileInfo {
+                        auto f = proto::FileInfo();
+                        proto::set_name(f, "e/file.bin");
+                        proto::set_type(f, proto::FileInfoType::FILE);
+                        proto::set_deleted(f, true);
+                        auto &v = proto::get_version(f);
+                        auto &counter = proto::add_counters(v);
+                        proto::set_id(counter, 1);
+                        proto::set_value(counter, 1);
+                        proto::set_sequence(f, fi_peer->get_max_sequence() + 2);
+                        return f;
+                    }();
+
+                    builder->make_index(sha256, folder->get_id())
+                        .add(pr_dir, peer_device)
+                        .add(pr_file, peer_device)
+                        .finish()
+                        .apply(*sup);
+
+                    builder->scan_start(folder->get_id()).apply(*sup);
+
+                    auto fi_my = folder->get_folder_infos().by_device(*my_device);
+                    auto &files_my = fi_my->get_file_infos();
+                    REQUIRE(files_my.size() == 0);
+                }
+            }
+        }
+    };
+    F().run();
+};
+
 int _init() {
     REGISTER_TEST_CASE(test_meta_changes, "test_meta_changes", "[fs]");
     REGISTER_TEST_CASE(test_new_files, "test_new_files", "[fs]");
     REGISTER_TEST_CASE(test_remove_file, "test_remove_file", "[fs]");
     REGISTER_TEST_CASE(test_synchronization, "test_synchronization", "[fs]");
     REGISTER_TEST_CASE(test_suspending, "test_suspending", "[fs]");
+    REGISTER_TEST_CASE(test_importing, "test_importing", "[fs]");
     return 1;
 }
 

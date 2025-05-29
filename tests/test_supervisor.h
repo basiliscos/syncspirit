@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #pragma once
 
@@ -22,6 +22,7 @@ struct supervisor_config_t : r::supervisor_config_t {
     using parent_t::parent_t;
     bool auto_finish = true;
     bool auto_ack_blocks = true;
+    bool make_presentation = false;
 };
 
 template <typename Supervisor> struct supervisor_config_builder_t : r::supervisor_config_builder_t<Supervisor> {
@@ -39,9 +40,13 @@ template <typename Supervisor> struct supervisor_config_builder_t : r::superviso
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    /** \brief defines actor's startup policy */
     builder_t &&auto_ack_blocks(bool value) && noexcept {
         parent_t::config.auto_ack_blocks = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+
+    builder_t &&make_presentation(bool value) && noexcept {
+        parent_t::config.make_presentation = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };
@@ -74,6 +79,10 @@ struct SYNCSPIRIT_TEST_API supervisor_t : r::supervisor_t,
     outcome::result<void> operator()(const model::diff::modify::finish_file_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::append_block_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::clone_block_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::modify::upsert_folder_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::modify::upsert_folder_info_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::advance::advance_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::peer::update_folder_t &, void *) noexcept override;
 
     utils::logger_t log;
     model::cluster_ptr_t cluster;
@@ -84,6 +93,7 @@ struct SYNCSPIRIT_TEST_API supervisor_t : r::supervisor_t,
     timers_t timers;
     bool auto_finish;
     bool auto_ack_blocks;
+    bool make_presentation;
     io_errors_t io_errors;
     r::address_ptr_t sink;
 };

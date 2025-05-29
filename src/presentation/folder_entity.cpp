@@ -83,10 +83,9 @@ folder_entity_t::folder_entity_t(model::folder_ptr_t folder_) noexcept : entity_
     }
 
     // make all-files as chilren, make hierarchy
-    auto &fi_map = folder.get_folder_infos();
     auto new_files = new_files_t();
-    for (auto &it_fi : fi_map) {
-        process(it_fi.item.get(), children, new_files);
+    for (auto &it : folders_map) {
+        process(it.item.get(), children, new_files);
     }
     process_files(std::move(new_files), orphans, this);
     commit(path, nullptr);

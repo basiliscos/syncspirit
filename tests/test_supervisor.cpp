@@ -1,11 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "test_supervisor.h"
 #include "model/diff/modify/clone_block.h"
 #include "model/diff/modify/append_block.h"
 #include "model/diff/modify/finish_file.h"
+#include "model/diff/modify/upsert_folder.h"
+#include "model/diff/modify/upsert_folder_info.h"
 #include "model/diff/advance/remote_copy.h"
+#include "model/diff/peer/update_folder.h"
+#include "presentation/folder_entity.h"
+#include "proto/proto-helpers-bep.h"
+#include "proto/proto-helpers-db.h"
 #include "net/names.h"
 
 namespace to {
@@ -27,10 +33,12 @@ inline auto rotor::actor_base_t::access<to::on_timer_trigger, request_id_t, bool
 
 using namespace syncspirit::net;
 using namespace syncspirit::test;
+using namespace syncspirit::presentation;
 
 supervisor_t::supervisor_t(config_t &cfg) : parent_t(cfg) {
     auto_finish = cfg.auto_finish;
     auto_ack_blocks = cfg.auto_ack_blocks;
+    make_presentation = cfg.make_presentation;
     sequencer = model::make_sequencer(1234);
 }
 
@@ -160,6 +168,77 @@ auto supervisor_t::operator()(const model::diff::modify::clone_block_t &diff, vo
     -> outcome::result<void> {
     if (auto_ack_blocks) {
         send<model::payload::model_update_t>(address, diff.ack(), this);
+    }
+    return diff.visit_next(*this, custom);
+}
+
+auto supervisor_t::operator()(const model::diff::modify::upsert_folder_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    if (make_presentation) {
+        auto folder_id = db::get_id(diff.db);
+        auto folder = cluster->get_folders().by_id(folder_id);
+        if (!folder->get_augmentation()) {
+            auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
+            folder->set_augmentation(folder_entity);
+        }
+    }
+    return diff.visit_next(*this, custom);
+}
+
+auto supervisor_t::operator()(const model::diff::modify::upsert_folder_info_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    auto r = diff.visit_next(*this, custom);
+    if (make_presentation) {
+        auto &folder = *cluster->get_folders().by_id(diff.folder_id);
+        auto &device = *cluster->get_devices().by_sha256(diff.device_id);
+        auto folder_info = folder.is_shared_with(device);
+        if (&device != cluster->get_device()) {
+            auto augmentation = folder.get_augmentation().get();
+            auto folder_entity = static_cast<presentation::folder_entity_t *>(augmentation);
+            folder_entity->on_insert(*folder_info);
+        }
+    }
+    return r;
+}
+
+auto supervisor_t::operator()(const model::diff::advance::advance_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    if (make_presentation) {
+        auto folder = cluster->get_folders().by_id(diff.folder_id);
+        auto augmentation = folder->get_augmentation().get();
+        auto folder_entity = static_cast<presentation::folder_entity_t *>(augmentation);
+        if (folder_entity) {
+            auto &folder_infos = folder->get_folder_infos();
+            auto local_fi = folder_infos.by_device(*cluster->get_device());
+            auto file_name = proto::get_name(diff.proto_local);
+            auto local_file = local_fi->get_file_infos().by_name(file_name);
+            if (local_file) {
+                folder_entity->on_insert(*local_file);
+            }
+        }
+    }
+    return diff.visit_next(*this, custom);
+}
+
+auto supervisor_t::operator()(const model::diff::peer::update_folder_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    if (make_presentation) {
+        auto folder = cluster->get_folders().by_id(diff.folder_id);
+        auto folder_aug = folder->get_augmentation().get();
+        auto folder_entity = static_cast<presentation::folder_entity_t *>(folder_aug);
+
+        auto &devices_map = cluster->get_devices();
+        auto peer = devices_map.by_sha256(diff.peer_id);
+        auto &files_map = folder->get_folder_infos().by_device(*peer)->get_file_infos();
+
+        for (auto &file : diff.files) {
+            auto file_name = proto::get_name(file);
+            auto file_info = files_map.by_name(file_name);
+            auto augmentation = file_info->get_augmentation().get();
+            if (!augmentation) {
+                folder_entity->on_insert(*file_info);
+            }
+        }
     }
     return diff.visit_next(*this, custom);
 }

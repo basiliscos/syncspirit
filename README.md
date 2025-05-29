@@ -61,8 +61,6 @@ This list is probably incomplete. Here are the most important changes:
 
 - [ ] [untrusted devices encryption](https://docs.syncthing.net/specs/untrusted.html)
 
-- [ ] encrypted folders
-
 # run
 
 (headless ui-daemon only, atm)
@@ -127,6 +125,8 @@ after the core completion.
 # changes
 
 ## 0.4.1 (xx-xxx-xxxx)
+ - [core] possibility to import directories outside of syncthing, including
+         partial import, see [faq](faq.md)
  - [core, fltk] support merged cluster folder model
  - [core] support `folder_type` folder setting (send only, receive only, send & receive)
  - [core] support `pull_older` folder setting (alphabetic, by size, by modification date)

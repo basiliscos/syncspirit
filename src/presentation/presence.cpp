@@ -33,7 +33,10 @@ const presence_stats_t &presence_t::get_stats(bool sync) const noexcept {
 
 presence_t *presence_t::set_parent(entity_t *value) noexcept {
     if (value && device) {
-        parent = const_cast<presence_t *>(value->get_presence(device));
+        auto p = value->get_presence(device);
+        if (p && p->device == device) {
+            parent = p;
+        }
     }
     return parent;
 }
