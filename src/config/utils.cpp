@@ -168,21 +168,25 @@ config_result_t get_config(std::istream &config, const bfs::path &config_path) {
         }
         c.debug = debug.value();
 
-        auto url = t["announce_url"].value<std::string>();
-        if (!url) {
+        auto url_announce_str = t["announce_url"].value<std::string>();
+        if (!url_announce_str) {
             return "global_discovery/announce_url is incorrect or missing";
         }
-        auto announce_url = utils::parse(url.value().c_str());
+        auto announce_url = utils::parse(url_announce_str.value().c_str());
         if (!announce_url) {
             return "global_discovery/announce_url is not url";
         }
         c.announce_url = announce_url;
 
-        auto device_id = t["device_id"].value<std::string>();
-        if (!device_id) {
-            return "global_discovery/device_id is incorrect or missing";
+        auto url_lookup_str = t["lookup_url"].value<std::string>();
+        if (!url_lookup_str) {
+            return "global_discovery/lookup_url is incorrect or missing";
         }
-        c.device_id = device_id.value();
+        auto lookup_url = utils::parse(url_lookup_str.value().c_str());
+        if (!lookup_url) {
+            return "global_discovery/lookup_url is not url";
+        }
+        c.lookup_url = lookup_url;
 
         auto cert_file = t["cert_file"].value<std::string>();
         if (!cert_file) {
@@ -560,7 +564,7 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
                                  {"enabled", cfg.global_announce_config.enabled},
                                  {"debug", cfg.global_announce_config.debug},
                                  {"announce_url", cfg.global_announce_config.announce_url->buffer().data()},
-                                 {"device_id", cfg.global_announce_config.device_id},
+                                 {"lookup_url", cfg.global_announce_config.lookup_url->buffer().data()},
                                  {"cert_file", cfg.global_announce_config.cert_file},
                                  {"key_file", cfg.global_announce_config.key_file},
                                  {"rx_buff_size", cfg.global_announce_config.rx_buff_size},
@@ -675,10 +679,10 @@ outcome::result<main_t> generate_config(const bfs::path &config_path) {
         30000   /* frequency */
     };
     cfg.global_announce_config = global_announce_config_t{
-        true,                                                   /* enabled */
-        false,                                                  /* debug */
-        utils::parse("https://discovery.syncthing.net/v2/"),    /* announce_url */
-        "LYXKCHX-VI3NYZR-ALCJBHF-WMZYSPK-QG6QJA3-MPFYMSO-U56GTUK-NA2MIAW",
+        true,                                                           /* enabled */
+        false,                                                          /* debug */
+        utils::parse("https://discovery-announce-v4.syncthing.net/v2"), /* announce_url */
+        utils::parse("https://discovery-lookup.syncthing.net/v2"),      /* lookup_url */
         cert_file,
         key_file,
         32 * 1024,

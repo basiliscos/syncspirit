@@ -82,7 +82,6 @@ struct SYNCSPIRIT_API net_supervisor_t : public ra::supervisor_asio_t,
     config::main_t app_config;
     size_t cluster_copies;
     model::diff::cluster_diff_ptr_t load_diff;
-    model::device_id_t global_device;
     r::address_ptr_t db_addr;
     model::cluster_ptr_t cluster;
     utils::key_pair_t ssl_pair;

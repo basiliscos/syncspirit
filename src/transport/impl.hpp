@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #pragma once
 
@@ -186,7 +186,7 @@ template <> struct base_impl_t<ssl_socket_t> {
                     log->trace("peer device_id = {}", actual_peer);
                 }
 
-                if (role == ssl::stream_base::handshake_type::client) {
+                if (role == ssl::stream_base::handshake_type::client && expected_peer) {
                     if (actual_peer != expected_peer) {
                         log->warn("unexpected peer device_id. Got: {}, expected: {}", actual_peer.get_value(),
                                   expected_peer.get_value());

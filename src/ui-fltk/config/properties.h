@@ -283,23 +283,22 @@ struct announce_url_t final : impl::url_t {
     void reflect_to(syncspirit::config::main_t &main) override;
 };
 
+struct lookup_url_t final : impl::url_t {
+    using parent_t = impl::url_t;
+
+    static const char *explanation_;
+
+    lookup_url_t(std::string value, std::string default_value);
+
+    void reflect_to(syncspirit::config::main_t &main) override;
+};
+
 struct cert_file_t final : impl::path_t {
     using parent_t = impl::path_t;
 
     static const char *explanation_;
 
     cert_file_t(std::string value, std::string default_value);
-
-    void reflect_to(syncspirit::config::main_t &main) override;
-};
-
-struct device_id_t final : impl::string_t {
-    using parent_t = impl::string_t;
-
-    static const char *explanation_;
-
-    device_id_t(std::string value, std::string default_value);
-    error_ptr_t validate_value() noexcept override;
 
     void reflect_to(syncspirit::config::main_t &main) override;
 };

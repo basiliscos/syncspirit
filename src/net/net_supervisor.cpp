@@ -57,16 +57,6 @@ net_supervisor_t::net_supervisor_t(net_supervisor_t::config_t &cfg)
     device = new model::local_device_t(device_id, app_config.device_name, cn.value());
     auto simultaneous_writes = app_config.bep_config.blocks_simultaneous_write;
     cluster = new model::cluster_t(device, static_cast<int32_t>(simultaneous_writes));
-
-    auto &gcfg = app_config.global_announce_config;
-    if (gcfg.enabled) {
-        auto global_device_opt = model::device_id_t::from_string(gcfg.device_id);
-        if (!global_device_opt) {
-            LOG_CRITICAL(log, "invalid global device id :: {}", gcfg.device_id);
-            throw "invalid global device id";
-        }
-        global_device = std::move(global_device_opt.value());
-    }
 }
 
 void net_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
@@ -264,7 +254,7 @@ void net_supervisor_t::launch_net() noexcept {
                 .cluster(cluster)
                 .ssl_pair(&ssl_pair)
                 .announce_url(gcfg.announce_url)
-                .device_id(std::move(global_device))
+                .lookup_url(gcfg.lookup_url)
                 .rx_buff_size(gcfg.rx_buff_size)
                 .io_timeout(gcfg.timeout)
                 .debug(gcfg.debug)
