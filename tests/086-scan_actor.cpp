@@ -4,11 +4,11 @@
 #include "test-utils.h"
 #include "access.h"
 #include "test_supervisor.h"
+#include "managed_hasher.h"
 #include "diff-builder.h"
 
 #include "model/cluster.h"
 #include "hasher/hasher_proxy_actor.h"
-#include "hasher/hasher_actor.h"
 #include "fs/scan_actor.h"
 #include "fs/utils.h"
 #include "net/names.h"
@@ -66,7 +66,7 @@ struct fixture_t {
 
         CHECK(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::OPERATIONAL);
 
-        sup->create_actor<hasher_actor_t>().index(1).timeout(timeout).finish();
+        hasher = sup->create_actor<managed_hasher_t>().index(1).auto_reply(true).timeout(timeout).finish().get();
         auto proxy_addr = sup->create_actor<hasher::hasher_proxy_actor_t>()
                               .timeout(timeout)
                               .hasher_threads(1)
@@ -102,6 +102,7 @@ struct fixture_t {
     builder_ptr_t builder;
     r::pt::time_duration timeout = r::pt::millisec{10};
     r::intrusive_ptr_t<supervisor_t> sup;
+    managed_hasher_t *hasher;
     cluster_ptr_t cluster;
     device_ptr_t my_device;
     bfs::path root_path;
@@ -854,6 +855,52 @@ void test_importing() {
     F().run();
 };
 
+void test_races() {
+    struct F : fixture_t {
+        F() { files_scan_iteration_limit = 1; }
+        void main() noexcept override {
+            auto sha256 = peer_device->device_id().get_sha256();
+            auto fi_peer = folder->get_folder_infos().by_device(*peer_device);
+            SECTION("non-finished/flushed file") {
+                auto path = root_path / "a.bin.syncspirit-tmp";
+                write_file(path, "12345");
+                auto status = bfs::status(path);
+                auto permissions = static_cast<uint32_t>(status.permissions());
+
+                auto pr_fi = proto::FileInfo();
+                proto::set_name(pr_fi, "a.bin");
+                proto::set_type(pr_fi, proto::FileInfoType::FILE);
+                proto::set_size(pr_fi, 5);
+                proto::set_block_size(pr_fi, 5);
+                proto::set_permissions(pr_fi, permissions);
+
+                auto &v = proto::get_version(pr_fi);
+                auto &counter = proto::add_counters(v);
+                proto::set_id(counter, 1);
+                proto::set_value(counter, 1);
+                proto::set_sequence(pr_fi, fi_peer->get_max_sequence() + 1);
+
+                auto data_1 = as_owned_bytes("12345");
+                auto data_1_h = utils::sha256_digest(data_1).value();
+                auto &b1 = proto::add_blocks(pr_fi);
+                proto::set_hash(b1, data_1_h);
+                proto::set_size(b1, data_1.size());
+
+                builder->make_index(sha256, folder->get_id())
+                    .add(pr_fi, peer_device)
+                    .finish()
+                    .local_update(folder->get_id(), pr_fi)
+                    .apply(*sup);
+                auto folder_peer = folder->get_folder_infos().by_device(*peer_device);
+                auto file_peer = folder_peer->get_file_infos().by_name("a.bin");
+                file_peer->mark_local_available(0);
+                builder->scan_start(folder->get_id()).apply(*sup);
+            }
+        }
+    };
+    F().run();
+}
+
 int _init() {
     REGISTER_TEST_CASE(test_meta_changes, "test_meta_changes", "[fs]");
     REGISTER_TEST_CASE(test_new_files, "test_new_files", "[fs]");
@@ -861,6 +908,7 @@ int _init() {
     REGISTER_TEST_CASE(test_synchronization, "test_synchronization", "[fs]");
     REGISTER_TEST_CASE(test_suspending, "test_suspending", "[fs]");
     REGISTER_TEST_CASE(test_importing, "test_importing", "[fs]");
+    REGISTER_TEST_CASE(test_races, "test_races", "[fs]");
     return 1;
 }
 

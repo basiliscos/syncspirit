@@ -35,18 +35,23 @@ struct SYNCSPIRIT_TEST_API managed_hasher_t : r::actor_base_t {
 
     using validation_request_t = hasher::message::validation_request_t;
     using validation_request_ptr_t = model::intrusive_ptr_t<validation_request_t>;
-    using queue_t = std::deque<validation_request_ptr_t>;
+    using digest_request_t = hasher::message::digest_request_t;
+    using digest_request_ptr_t = model::intrusive_ptr_t<digest_request_t>;
+    using validation_queue_t = std::deque<validation_request_ptr_t>;
+    using digest_queue_t = std::deque<digest_request_ptr_t>;
 
     managed_hasher_t(config_t &cfg);
 
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
     void on_validation(validation_request_t &req) noexcept;
+    void on_digest(digest_request_t &req) noexcept;
     void process_requests() noexcept;
 
     uint32_t index;
     bool auto_reply;
     utils::logger_t log;
-    queue_t queue;
+    validation_queue_t validation_queue;
+    digest_queue_t digest_queue;
 };
 
 } // namespace syncspirit::test

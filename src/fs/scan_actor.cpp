@@ -251,9 +251,9 @@ void scan_actor_t::on_hash(hasher::message::digest_response_t &res) noexcept {
     auto &info = msg->payload;
     info.ack_hashing();
 
+    auto file = info.get_file();
     if (res.payload.ee) {
         auto &ee = res.payload.ee;
-        auto file = info.get_file();
         LOG_ERROR(log, "on_hash, file: {}, block = {}, error: {}", file->get_full_name(), rp.block_index,
                   ee->message());
         return do_shutdown(ee);
@@ -270,7 +270,11 @@ void scan_actor_t::on_hash(hasher::message::digest_response_t &res) noexcept {
     queued_next = !can_process_more;
     if (info.is_complete()) {
         if (info.has_valid_blocks()) {
-            task.push(new model::diff::local::blocks_availability_t(*info.get_file(), info.valid_blocks()));
+            if (!file->is_locally_available()) {
+                task.push(new model::diff::local::blocks_availability_t(*file, info.valid_blocks()));
+            } else {
+                LOG_DEBUG(log, "file '{}' is yet to be flushed, ignoring it", file->get_name());
+            }
         } else {
             auto &file = *info.get_file();
             LOG_DEBUG(log, "removing temporal of '{}' as it corrupted", file.get_full_name());
