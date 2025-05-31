@@ -91,7 +91,7 @@ file_table_t::file_table_t(presence_item_t &container_, int x, int y, int w, int
     data.push_back({"symlink_target", symlink_target_cell});
     data.push_back({"entries", entries_cell});
     data.push_back({"entries size", entries_size_cell});
-    data.push_back({"cluster/local entries", local_entries_cell});
+    data.push_back({"cluster/local/avail", local_entries_cell});
 
     assign_rows(std::move(data));
 
@@ -166,7 +166,9 @@ void file_table_t::refresh() {
     symlink_target_cell->update(file_info.get_link_target());
     entries_cell->update(fmt::format("{}", stats.entities));
     entries_size_cell->update(get_file_size(stats.size));
-    local_entries_cell->update(fmt::format("{}/{}", stats.cluster_entries, stats.entities));
+
+    auto entries_stats = fmt::format("{}/{}/{}", stats.cluster_entries, stats.entities, stats.local_entries);
+    local_entries_cell->update(entries_stats);
 
     redraw();
 }
