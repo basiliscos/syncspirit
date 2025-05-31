@@ -355,6 +355,7 @@ auto file_actor_t::operator()(const model::diff::modify::clone_block_t &diff, vo
 
 auto file_actor_t::open_file_rw(const std::filesystem::path &path, model::file_info_ptr_t info) noexcept
     -> outcome::result<file_ptr_t> {
+    LOG_TRACE(log, "open_file (r/w, by path), path = {}", path.string());
     auto item = rw_cache.get(path.string());
     if (item) {
         return item;
@@ -386,7 +387,7 @@ auto file_actor_t::open_file_rw(const std::filesystem::path &path, model::file_i
 }
 
 auto file_actor_t::open_file_ro(const bfs::path &path, bool use_cache) noexcept -> outcome::result<file_ptr_t> {
-    LOG_TRACE(log, "open_file (by path), path = {}", path.string());
+    LOG_TRACE(log, "open_file (r/o, by path), path = {}", path.string());
     if (use_cache) {
         auto file = rw_cache.get(path.string());
         if (file) {

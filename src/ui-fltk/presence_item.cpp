@@ -10,6 +10,7 @@
 #include <fmt/format.h>
 #include <memory_resource>
 #include <iterator>
+#include <cassert>
 
 using namespace syncspirit::presentation;
 using namespace syncspirit::fltk;
@@ -191,6 +192,7 @@ void presence_item_t::show_child(presentation::presence_t &child_presence, std::
     if (is_expanded()) {
         bool found = false;
         for (int i = 0; i < this->children(); ++i) {
+            assert(dynamic_cast<presence_item_t *>(child(i)));
             auto c = static_cast<presence_item_t *>(child(i));
             auto &p = c->get_presence();
             if (p.get_entity() == child_presence.get_entity()) {
@@ -210,7 +212,7 @@ void presence_item_t::show_child(presentation::presence_t &child_presence, std::
                     node->show(mask, true, 0);
                     if (need_expand || need_open) {
                         node->open();
-                        node->expanded = true;
+                        node->on_open();
                     }
                     if (!need_open) {
                         node->close();
@@ -306,7 +308,7 @@ void presence_item_t::insert_node(presence_item_ptr_t node, int position) {
     auto tmp_node = insert(prefs(), "", position);
     auto ptr = node.detach();
     auto p = ptr->presence;
-    if (p->get_features() & F::directory && ptr->children() == 0) {
+    if (p->get_features() & F::directory && ptr->children() == 0 && !ptr->is_expanded()) {
         if (p->get_children().size() > 0) {
             ptr->populate_dummy_child();
         }

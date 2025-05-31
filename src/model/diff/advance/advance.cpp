@@ -140,7 +140,8 @@ auto advance_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) c
         local_file = std::move(prev_file);
     }
 
-    if (proto::get_size(proto_local)) {
+    auto size = proto::get_size(proto_local);
+    if (size) {
         auto &blocks_map = cluster.get_blocks();
         auto blocks_count = proto::get_blocks_size(proto_local);
         for (size_t i = 0; i < blocks_count; ++i) {
@@ -159,8 +160,8 @@ auto advance_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) c
     local_file->set_sequence(sequence);
     local_folder->add_strict(local_file);
 
-    LOG_TRACE(log, "advance_t ({}), folder = {}, name = {}, blocks = {}, seq. = {}", stringify(action), folder_id,
-              local_file->get_name(), proto::get_blocks_size(proto_local), sequence);
+    LOG_TRACE(log, "advance_t ({}), folder = {}, name = {}, size = {}, blocks = {}, seq. = {}", stringify(action),
+              folder_id, local_file->get_name(), size, proto::get_blocks_size(proto_local), sequence);
 
     local_file->notify_update();
 
