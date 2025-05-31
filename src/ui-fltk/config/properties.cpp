@@ -290,7 +290,7 @@ lookup_url_t::lookup_url_t(std::string value, std::string default_value)
     : parent_t("lookup_url", explanation_, std::move(value), std::move(default_value)) {}
 
 void lookup_url_t::reflect_to(syncspirit::config::main_t &main) {
-    main.global_announce_config.lookup_url= utils::parse(value);
+    main.global_announce_config.lookup_url = utils::parse(value);
 }
 
 const char *lookup_url_t::explanation_ = "url of syncthing/private lookup/discovery server";
@@ -301,7 +301,6 @@ cert_file_t::cert_file_t(std::string value, std::string default_value)
 void cert_file_t::reflect_to(syncspirit::config::main_t &main) { main.global_announce_config.cert_file = value; }
 
 const char *cert_file_t::explanation_ = "this device certificate location";
-
 
 key_file_t::key_file_t(std::string value, std::string default_value)
     : parent_t("key_file", explanation_, std::move(value), std::move(default_value)) {}

@@ -196,7 +196,8 @@ void presence_item_t::show_child(presentation::presence_t &child_presence, std::
             if (p.get_entity() == child_presence.get_entity()) {
                 if (&p != &child_presence) {
                     auto child_holder = presence_item_ptr_t();
-                    bool need_open = c->is_expanded();
+                    bool need_expand = c->is_expanded();
+                    bool need_open = c->is_open();
                     if (p.get_features() & F::missing) {
                         child_holder = safe_detach(i);
                     }
@@ -207,9 +208,12 @@ void presence_item_t::show_child(presentation::presence_t &child_presence, std::
                     }
                     insert_node(node, i);
                     node->show(mask, true, 0);
-                    if (need_open) {
+                    if (need_expand || need_open) {
                         node->open();
                         node->expanded = true;
+                    }
+                    if (!need_open) {
+                        node->close();
                     }
                 }
                 found = true;

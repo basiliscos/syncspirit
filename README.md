@@ -125,9 +125,9 @@ after the core completion.
 # changes
 
 ## 0.4.1 (xx-xxx-xxxx)
+ - [core, fltk] support merged cluster folder model
  - [core] possibility to import directories outside of syncthing, including
          partial import, see [faq](faq.md)
- - [core, fltk] support merged cluster folder model
  - [core] fix compatibility with global discovery [v3 protocol](https://docs.syncthing.net/specs/globaldisco-v3.html)
  - [core] support `folder_type` folder setting (send only, receive only, send & receive)
  - [core] support `pull_older` folder setting (alphabetic, by size, by modification date)
