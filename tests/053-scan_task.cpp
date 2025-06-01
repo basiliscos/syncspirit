@@ -590,6 +590,10 @@ SECTION("regular files") {
             auto file_peer = file_info_t::create(sequencer->next_uuid(), pr_file, folder_peer).value();
             REQUIRE(folder_peer->add_strict(file_peer));
 
+            // check that local files will not be considered sa removed
+            auto file_my = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
+            REQUIRE(folder_my->add_strict(file_my));
+
             auto task = scan_task_t(cluster, folder->get_id(), rw_cache, config);
             auto r = task.advance();
             CHECK(std::get_if<bool>(&r));
