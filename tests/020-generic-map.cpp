@@ -37,6 +37,8 @@ TEST_CASE("lru cache", "[model]") {
     SECTION("string item") {
         mru_list_t<std::string> list(3);
         list.put("a");
+        CHECK(list.get("a") == "a");
+
         list.put("b");
         list.put("c");
 

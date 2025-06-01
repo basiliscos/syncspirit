@@ -18,6 +18,7 @@ TEST_CASE("scan_task", "[fs]") {
     auto root_path = unique_path();
     bfs::create_directories(root_path);
     path_guard_t path_quard{root_path};
+    auto rw_cache = fs::file_cache_ptr_t(new fs::file_cache_t(5));
 
     config::fs_config_t config{3600, 10, 1024 * 1024, 100};
     auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
@@ -59,7 +60,7 @@ TEST_CASE("scan_task", "[fs]") {
     auto folder_info = folder_info_t::create(sequencer->next_uuid(), db_folder_info, my_device, folder).value();
     folder->get_folder_infos().put(folder_info);
 
-    auto task = scan_task_t(cluster, folder->get_id(), config);
+    auto task = scan_task_t(cluster, folder->get_id(), rw_cache, config);
     auto r = task.advance();
     CHECK(std::get_if<scan_errors_t>(&r));
 
@@ -78,7 +79,7 @@ TEST_CASE("scan_task", "[fs]") {
 #endif
 
 SECTION("no dirs, no files") {
-    auto task = scan_task_t(cluster, folder->get_id(), config);
+    auto task = scan_task_t(cluster, folder->get_id(), rw_cache, config);
     auto r = task.advance();
     CHECK(std::get_if<bool>(&r));
     CHECK(*std::get_if<bool>(&r) == true);
@@ -89,7 +90,7 @@ SECTION("no dirs, no files") {
 }
 
 SECTION("some dirs, no files") {
-    auto task = scan_task_t(cluster, folder->get_id(), config);
+    auto task = scan_task_t(cluster, folder->get_id(), rw_cache, config);
     auto dir = root_path / "some-dir";
     bfs::create_directories(dir);
     auto modified = to_unix(bfs::last_write_time(dir));
@@ -123,7 +124,7 @@ SECTION("some dirs, no files") {
 }
 
 SECTION("no dirs, unknown files") {
-    auto task = scan_task_t(cluster, folder->get_id(), config);
+    auto task = scan_task_t(cluster, folder->get_id(), rw_cache, config);
     write_file(root_path / "some-file", "");
     auto r = task.advance();
     CHECK(std::get_if<bool>(&r));
@@ -146,7 +147,7 @@ SECTION("no dirs, unknown files") {
 
 #ifndef SYNCSPIRIT_WIN
 SECTION("no dirs, symlink to non-existing target") {
-    auto task = scan_task_t(cluster, folder->get_id(), config);
+    auto task = scan_task_t(cluster, folder->get_id(), rw_cache, config);
     auto file_path = root_path / "symlink";
     bfs::create_symlink(bfs::path("/some/where"), file_path);
 
@@ -198,7 +199,7 @@ SECTION("regular files") {
         auto file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
         REQUIRE(folder_my->add_strict(file));
 
-        auto task = scan_task_t(cluster, folder->get_id(), config);
+        auto task = scan_task_t(cluster, folder->get_id(), rw_cache, config);
         auto r = task.advance();
         CHECK(std::get_if<bool>(&r));
         CHECK(*std::get_if<bool>(&r) == true);
@@ -226,7 +227,7 @@ SECTION("regular files") {
         auto file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
         REQUIRE(folder_my->add_strict(file));
 
-        auto task = scan_task_t(cluster, folder->get_id(), config);
+        auto task = scan_task_t(cluster, folder->get_id(), rw_cache, config);
         auto r = task.advance();
         CHECK(std::get_if<bool>(&r));
         CHECK(*std::get_if<bool>(&r) == true);
@@ -275,7 +276,7 @@ SECTION("regular files") {
         auto info_dir = file_info_t::create(sequencer->next_uuid(), pr_dir, folder_my).value();
         REQUIRE(folder_my->add_strict(info_dir));
 
-        auto task = scan_task_t(cluster, folder->get_id(), config);
+        auto task = scan_task_t(cluster, folder->get_id(), rw_cache, config);
         auto r = task.advance();
         CHECK(std::get_if<bool>(&r));
         CHECK(*std::get_if<bool>(&r) == true);
@@ -311,7 +312,7 @@ SECTION("regular files") {
         auto file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
         REQUIRE(folder_my->add_strict(file));
 
-        auto task = scan_task_t(cluster, folder->get_id(), config);
+        auto task = scan_task_t(cluster, folder->get_id(), rw_cache, config);
         auto r = task.advance();
         CHECK(std::get_if<bool>(&r));
         CHECK(*std::get_if<bool>(&r) == true);
@@ -335,7 +336,7 @@ SECTION("regular files") {
         auto file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
         REQUIRE(folder_my->add_strict(file));
 
-        auto task = scan_task_t(cluster, folder->get_id(), config);
+        auto task = scan_task_t(cluster, folder->get_id(), rw_cache, config);
         auto r = task.advance();
         CHECK(std::get_if<bool>(&r));
         CHECK(*std::get_if<bool>(&r) == true);
@@ -359,7 +360,7 @@ SECTION("regular files") {
         auto file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
         REQUIRE(folder_my->add_strict(file));
 
-        auto task = scan_task_t(cluster, folder->get_id(), config);
+        auto task = scan_task_t(cluster, folder->get_id(), rw_cache, config);
         auto r = task.advance();
         CHECK(std::get_if<bool>(&r));
         CHECK(*std::get_if<bool>(&r) == true);
@@ -384,7 +385,7 @@ SECTION("regular files") {
         auto file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
         REQUIRE(folder_my->add_strict(file));
 
-        auto task = scan_task_t(cluster, folder->get_id(), config);
+        auto task = scan_task_t(cluster, folder->get_id(), rw_cache, config);
         auto r = task.advance();
         CHECK(std::get_if<bool>(&r));
         CHECK(*std::get_if<bool>(&r) == true);
@@ -409,7 +410,7 @@ SECTION("regular files") {
         auto file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
         REQUIRE(folder_my->add_strict(file));
 
-        auto task = scan_task_t(cluster, folder->get_id(), config);
+        auto task = scan_task_t(cluster, folder->get_id(), rw_cache, config);
         auto r = task.advance();
         REQUIRE(std::get_if<bool>(&r));
         CHECK(*std::get_if<bool>(&r) == true);
@@ -448,7 +449,7 @@ SECTION("regular files") {
             file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
             REQUIRE(folder_my->add_strict(file));
 
-            task = new scan_task_t(cluster, folder->get_id(), config);
+            task = new scan_task_t(cluster, folder->get_id(), rw_cache, config);
 
             r = task->advance();
             CHECK(std::get_if<bool>(&r));
@@ -477,7 +478,7 @@ SECTION("regular files") {
             file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
             REQUIRE(folder_my->add_strict(file));
 
-            task = new scan_task_t(cluster, folder->get_id(), config);
+            task = new scan_task_t(cluster, folder->get_id(), rw_cache, config);
 
             r = task->advance();
             CHECK(std::get_if<bool>(&r));
@@ -504,7 +505,7 @@ SECTION("regular files") {
             file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
             REQUIRE(folder_my->add_strict(file));
 
-            task = new scan_task_t(cluster, folder->get_id(), config);
+            task = new scan_task_t(cluster, folder->get_id(), rw_cache, config);
 
             r = task->advance();
             CHECK(std::get_if<bool>(&r));
@@ -537,7 +538,7 @@ SECTION("regular files") {
             auto file_peer = file_info_t::create(sequencer->next_uuid(), pr_file, folder_peer).value();
             REQUIRE(folder_peer->add_strict(file_peer));
 
-            auto task = scan_task_t(cluster, folder->get_id(), config);
+            auto task = scan_task_t(cluster, folder->get_id(), rw_cache, config);
             auto r = task.advance();
             CHECK(std::get_if<bool>(&r));
             CHECK(*std::get_if<bool>(&r) == true);
@@ -556,13 +557,40 @@ SECTION("regular files") {
             CHECK(seen.count("a.txt"));
         }
 
+        SECTION("file is in rw cache, skip it") {
+            write_file(path, "12345");
+
+            auto cache = fs::file_cache_ptr_t(new fs::file_cache_t(50));
+            auto file_peer = file_info_t::create(sequencer->next_uuid(), pr_file, folder_peer).value();
+            REQUIRE(folder_peer->add_strict(file_peer));
+            auto file = fs::file_ptr_t(new fs::file_t(fs::file_t::open_write(file_peer).value()));
+            cache->put(file);
+            REQUIRE(cache->get((root_path / "a.txt").generic_string()));
+
+            auto task = scan_task_t(cluster, folder->get_id(), cache, config);
+            auto r = task.advance();
+            CHECK(std::get_if<bool>(&r));
+            CHECK(*std::get_if<bool>(&r) == true);
+
+            r = task.advance();
+            CHECK(std::get_if<bool>(&r));
+            CHECK(*std::get_if<bool>(&r) == true);
+
+            r = task.advance();
+            CHECK(std::get_if<bool>(&r));
+            CHECK(*std::get_if<bool>(&r) == false);
+
+            auto &seen = task.get_seen_paths();
+            CHECK(seen.count(path.filename().generic_string()));
+        }
+
         SECTION("size mismatch -> remove & ignore") {
             write_file(path, "123456");
 
             auto file_peer = file_info_t::create(sequencer->next_uuid(), pr_file, folder_peer).value();
             REQUIRE(folder_peer->add_strict(file_peer));
 
-            auto task = scan_task_t(cluster, folder->get_id(), config);
+            auto task = scan_task_t(cluster, folder->get_id(), rw_cache, config);
             auto r = task.advance();
             CHECK(std::get_if<bool>(&r));
             CHECK(*std::get_if<bool>(&r) == true);
@@ -592,7 +620,7 @@ SECTION("regular files") {
             auto file_peer2 = file_info_t::create(sequencer->next_uuid(), pr_file, folder_peer2).value();
             REQUIRE(folder_peer2->add_strict(file_peer2));
 
-            auto task = scan_task_t(cluster, folder->get_id(), config);
+            auto task = scan_task_t(cluster, folder->get_id(), rw_cache, config);
             auto r = task.advance();
             CHECK(std::get_if<bool>(&r));
             CHECK(*std::get_if<bool>(&r) == true);
@@ -613,7 +641,7 @@ SECTION("regular files") {
         SECTION("no source -> remove") {
             write_file(path, "123456");
 
-            auto task = scan_task_t(cluster, folder->get_id(), config);
+            auto task = scan_task_t(cluster, folder->get_id(), rw_cache, config);
             auto r = task.advance();
             CHECK(std::get_if<bool>(&r));
             CHECK(*std::get_if<bool>(&r) == true);
@@ -652,7 +680,7 @@ SECTION("regular files") {
         REQUIRE(folder_my->add_strict(file_my));
         REQUIRE(folder_peer->add_strict(file_peer));
 
-        auto task = scan_task_t(cluster, folder->get_id(), config);
+        auto task = scan_task_t(cluster, folder->get_id(), rw_cache, config);
         auto r = task.advance();
         CHECK(std::get_if<bool>(&r));
         CHECK(*std::get_if<bool>(&r) == true);
@@ -694,7 +722,7 @@ SECTION("regular files") {
         auto file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
         REQUIRE(folder_my->add_strict(file));
 
-        auto task = scan_task_t(cluster, folder->get_id(), config);
+        auto task = scan_task_t(cluster, folder->get_id(), rw_cache, config);
         auto r = task.advance();
         CHECK(std::get_if<bool>(&r));
         CHECK(*std::get_if<bool>(&r) == true);
@@ -726,7 +754,7 @@ SECTION("regular files") {
             auto file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
             REQUIRE(folder_my->add_strict(file));
 
-            auto task = scan_task_t(cluster, folder->get_id(), config);
+            auto task = scan_task_t(cluster, folder->get_id(), rw_cache, config);
             auto r = task.advance();
             CHECK(std::get_if<bool>(&r));
             CHECK(*std::get_if<bool>(&r) == true);
@@ -781,7 +809,7 @@ SECTION("symlink file") {
         auto file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
         REQUIRE(folder_my->add_strict(file));
 
-        auto task = scan_task_t(cluster, folder->get_id(), config);
+        auto task = scan_task_t(cluster, folder->get_id(), rw_cache, config);
         auto r = task.advance();
         CHECK(std::get_if<bool>(&r));
         CHECK(*std::get_if<bool>(&r) == true);
@@ -819,7 +847,7 @@ SECTION("symlink file") {
         REQUIRE(folder_my->add_strict(file));
         REQUIRE(folder_my->add_strict(dir));
 
-        auto task = scan_task_t(cluster, folder->get_id(), config);
+        auto task = scan_task_t(cluster, folder->get_id(), rw_cache, config);
         auto r = task.advance();
         CHECK(std::get_if<bool>(&r));
         CHECK(*std::get_if<bool>(&r) == true);
@@ -857,7 +885,7 @@ SECTION("symlink file") {
         auto file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
         REQUIRE(folder_my->add_strict(file));
 
-        auto task = scan_task_t(cluster, folder->get_id(), config);
+        auto task = scan_task_t(cluster, folder->get_id(), rw_cache, config);
         auto r = task.advance();
         CHECK(std::get_if<bool>(&r));
         CHECK(*std::get_if<bool>(&r) == true);
@@ -885,7 +913,7 @@ SECTION("symlink file") {
         auto file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
         REQUIRE(folder_my->add_strict(file));
 
-        auto task = scan_task_t(cluster, folder->get_id(), config);
+        auto task = scan_task_t(cluster, folder->get_id(), rw_cache, config);
         auto r = task.advance();
         CHECK(std::get_if<bool>(&r));
         CHECK(*std::get_if<bool>(&r) == true);

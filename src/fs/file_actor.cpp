@@ -36,8 +36,8 @@ file_actor_t::write_guard_t::~write_guard_t() {
 }
 
 file_actor_t::file_actor_t(config_t &cfg)
-    : r::actor_base_t{cfg}, cluster{cfg.cluster}, sequencer(cfg.sequencer), rw_cache(cfg.mru_size),
-      ro_cache(cfg.mru_size) {
+    : r::actor_base_t{cfg}, cluster{cfg.cluster}, sequencer(cfg.sequencer), rw_cache(std::move(cfg.rw_cache)),
+      ro_cache(rw_cache->get_max_items()) {
     assert(sequencer);
 }
 
@@ -65,7 +65,7 @@ void file_actor_t::on_start() noexcept {
 void file_actor_t::shutdown_start() noexcept {
     LOG_TRACE(log, "shutdown_start");
     r::actor_base_t::shutdown_start();
-    rw_cache.clear();
+    rw_cache->clear();
 }
 
 void file_actor_t::on_model_update(model::message::model_update_t &message) noexcept {
@@ -247,7 +247,7 @@ auto file_actor_t::operator()(const model::diff::modify::finish_file_t &diff, vo
             return ec;
         }
     }
-    auto backend = rw_cache.get(path);
+    auto backend = rw_cache->get(path);
     if (!backend) {
         LOG_DEBUG(log, "attempt to flush non-opened file {}, re-open it as temporal", path);
         auto path_tmp = make_temporal(file->get_path());
@@ -260,7 +260,7 @@ auto file_actor_t::operator()(const model::diff::modify::finish_file_t &diff, vo
         backend = std::move(result.assume_value());
     }
 
-    rw_cache.remove(backend);
+    rw_cache->remove(backend);
     auto ok = backend->close(true, local_path);
     if (!ok) {
         auto &ec = ok.assume_error();
@@ -306,9 +306,9 @@ auto file_actor_t::get_source_for_cloning(model::file_info_ptr_t &source, const 
 
     auto source_tmp = make_temporal(source_path);
 
-    if (auto cached = rw_cache.get(source_path.string()); cached) {
+    if (auto cached = rw_cache->get(source_path.string()); cached) {
         return cached;
-    } else if (auto cached = rw_cache.get(source_tmp.string()); cached) {
+    } else if (auto cached = rw_cache->get(source_tmp.string()); cached) {
         return cached;
     } else if (auto cached = ro_cache.get(source_tmp.string()); cached) {
         return cached;
@@ -356,7 +356,7 @@ auto file_actor_t::operator()(const model::diff::modify::clone_block_t &diff, vo
 auto file_actor_t::open_file_rw(const std::filesystem::path &path, model::file_info_ptr_t info) noexcept
     -> outcome::result<file_ptr_t> {
     LOG_TRACE(log, "open_file (r/w, by path), path = {}", path.string());
-    auto item = rw_cache.get(path.string());
+    auto item = rw_cache->get(path.string());
     if (item) {
         return item;
     }
@@ -382,14 +382,14 @@ auto file_actor_t::open_file_rw(const std::filesystem::path &path, model::file_i
         return option.assume_error();
     }
     auto ptr = file_ptr_t(new file_t(std::move(option.assume_value())));
-    rw_cache.put(ptr);
+    rw_cache->put(ptr);
     return ptr;
 }
 
 auto file_actor_t::open_file_ro(const bfs::path &path, bool use_cache) noexcept -> outcome::result<file_ptr_t> {
     LOG_TRACE(log, "open_file (r/o, by path), path = {}", path.string());
     if (use_cache) {
-        auto file = rw_cache.get(path.string());
+        auto file = rw_cache->get(path.string());
         if (file) {
             return file;
         }

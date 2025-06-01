@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #pragma once
 
@@ -23,6 +23,7 @@ struct SYNCSPIRIT_API scan_actor_config_t : r::actor_config_t {
     config::fs_config_t fs_config;
     model::cluster_ptr_t cluster;
     model::sequencer_ptr_t sequencer;
+    file_cache_ptr_t rw_cache;
     uint32_t requested_hashes_limit;
 };
 
@@ -48,6 +49,11 @@ template <typename Actor> struct scan_actor_config_builder_t : r::actor_config_b
 
     builder_t &&sequencer(model::sequencer_ptr_t value) && noexcept {
         parent_t::config.sequencer = std::move(value);
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+
+    builder_t &&rw_cache(file_cache_ptr_t value) && noexcept {
+        parent_t::config.rw_cache = std::move(value);
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };
@@ -83,6 +89,7 @@ struct SYNCSPIRIT_API scan_actor_t : public r::actor_base_t, private model::diff
     model::cluster_ptr_t cluster;
     model::sequencer_ptr_t sequencer;
     config::fs_config_t fs_config;
+    file_cache_ptr_t rw_cache;
     r::address_ptr_t hasher_proxy;
     r::address_ptr_t new_files; /* for routing */
     utils::logger_t log;

@@ -26,8 +26,9 @@ template <class> inline constexpr bool always_false_v = false;
 
 scan_actor_t::scan_actor_t(config_t &cfg)
     : r::actor_base_t{cfg}, cluster{cfg.cluster}, sequencer{cfg.sequencer}, fs_config{cfg.fs_config},
-      requested_hashes_limit{cfg.requested_hashes_limit} {
+      rw_cache(cfg.rw_cache), requested_hashes_limit{cfg.requested_hashes_limit} {
     assert(sequencer);
+    assert(rw_cache);
 }
 
 void scan_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
@@ -71,7 +72,7 @@ void scan_actor_t::shutdown_finish() noexcept {
 auto scan_actor_t::operator()(const model::diff::local::scan_start_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     LOG_DEBUG(log, "initiating scan of {}", diff.folder_id);
-    auto task = scan_task_ptr_t(new scan_task_t(cluster, diff.folder_id, fs_config));
+    auto task = scan_task_ptr_t(new scan_task_t(cluster, diff.folder_id, rw_cache, fs_config));
     send<payload::scan_progress_t>(address, std::move(task));
     return diff.visit_next(*this, custom);
 }

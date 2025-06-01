@@ -89,8 +89,8 @@ struct SYNCSPIRIT_API scan_task_t : boost::intrusive_ref_counter<scan_task_t, bo
         bool manage_progress;
     };
 
-    scan_task_t(model::cluster_ptr_t cluster, std::string_view folder_id, const config::fs_config_t &config) noexcept;
-    ~scan_task_t();
+    scan_task_t(model::cluster_ptr_t cluster, std::string_view folder_id, file_cache_ptr_t rw_cache,
+                const config::fs_config_t &config) noexcept;
 
     void push(model::diff::cluster_diff_t *model_update, std::int64_t bytes_consumed = 0) noexcept;
     send_guard_t guard(r::actor_base_t &actor, r::address_ptr_t coordinator) noexcept;
@@ -108,6 +108,7 @@ struct SYNCSPIRIT_API scan_task_t : boost::intrusive_ref_counter<scan_task_t, bo
     std::string folder_id;
     model::folder_ptr_t folder;
     model::cluster_ptr_t cluster;
+    file_cache_ptr_t rw_cache;
     model::file_infos_map_t files;
     utils::logger_t log;
     config::fs_config_t config;

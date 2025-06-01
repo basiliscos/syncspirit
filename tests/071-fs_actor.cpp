@@ -72,9 +72,10 @@ struct fixture_t {
         sup->do_process();
         CHECK(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::OPERATIONAL);
 
+        rw_cache.reset(new fs::file_cache_t(2));
         auto sha256 = peer_device->device_id().get_sha256();
         file_actor = sup->create_actor<fs::file_actor_t>()
-                         .mru_size(2)
+                         .rw_cache(rw_cache)
                          .cluster(cluster)
                          .sequencer(sup->sequencer)
                          .timeout(timeout)
@@ -123,6 +124,7 @@ struct fixture_t {
     msg_ptr_t reply;
     blk_res_ptr_t block_reply;
     std::string_view folder_id = "1234-5678";
+    fs::file_cache_ptr_t rw_cache;
 };
 } // namespace
 

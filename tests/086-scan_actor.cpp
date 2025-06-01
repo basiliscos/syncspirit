@@ -77,9 +77,11 @@ struct fixture_t {
         sup->do_process();
 
         auto fs_config = config::fs_config_t{3600, 10, 1024 * 1024, files_scan_iteration_limit};
+        rw_cache.reset(new fs::file_cache_t(5));
 
         target = sup->create_actor<fs::scan_actor_t>()
                      .timeout(timeout)
+                     .rw_cache(rw_cache)
                      .cluster(cluster)
                      .sequencer(make_sequencer(77))
                      .fs_config(fs_config)
@@ -114,6 +116,7 @@ struct fixture_t {
     model::file_infos_map_t *files;
     model::file_infos_map_t *files_peer;
     model::device_ptr_t peer_device;
+    fs::file_cache_ptr_t rw_cache;
 };
 
 void test_meta_changes() {
@@ -861,40 +864,56 @@ void test_races() {
         void main() noexcept override {
             auto sha256 = peer_device->device_id().get_sha256();
             auto fi_peer = folder->get_folder_infos().by_device(*peer_device);
-            SECTION("non-finished/flushed file") {
+            auto fi_my = folder->get_folder_infos().by_device(*my_device);
+            auto pr_fi = proto::FileInfo();
+            proto::set_name(pr_fi, "a.bin");
+            proto::set_type(pr_fi, proto::FileInfoType::FILE);
+            proto::set_size(pr_fi, 5);
+            proto::set_block_size(pr_fi, 5);
+
+            auto &v = proto::get_version(pr_fi);
+            auto &counter = proto::add_counters(v);
+            proto::set_id(counter, 1);
+            proto::set_value(counter, 1);
+            proto::set_sequence(pr_fi, fi_peer->get_max_sequence() + 1);
+
+            auto data_1 = as_owned_bytes("12345");
+            auto data_1_h = utils::sha256_digest(data_1).value();
+            auto &b1 = proto::add_blocks(pr_fi);
+            proto::set_hash(b1, data_1_h);
+            proto::set_size(b1, data_1.size());
+
+            builder->make_index(sha256, folder->get_id()).add(pr_fi, peer_device).finish().apply(*sup);
+
+            auto file_peer = fi_peer->get_file_infos().by_name("a.bin");
+            SECTION("non-finished/flushed new file") {
+                auto file = fs::file_t::open_write(file_peer).assume_value();
+                REQUIRE(bfs::exists(file.get_path()));
+                auto file_ptr = fs::file_ptr_t(new fs::file_t(std::move(file)));
+                rw_cache->put(file_ptr);
+                hasher->auto_reply = false;
+                builder->scan_start(folder->get_id()).apply(*sup);
+                CHECK(fi_my->get_file_infos().size() == 0);
+                rw_cache->clear();
+                CHECK(hasher->digest_queue.size() == 0);
+                CHECK(hasher->validation_queue.size() == 0);
+            }
+            SECTION("non-finished/flushed existing file") {
                 auto path = root_path / "a.bin.syncspirit-tmp";
                 write_file(path, "12345");
-                auto status = bfs::status(path);
-                auto permissions = static_cast<uint32_t>(status.permissions());
+                builder->local_update(folder->get_id(), pr_fi).apply(*sup);
+                CHECK(fi_my->get_file_infos().size() == 1);
 
-                auto pr_fi = proto::FileInfo();
-                proto::set_name(pr_fi, "a.bin");
-                proto::set_type(pr_fi, proto::FileInfoType::FILE);
-                proto::set_size(pr_fi, 5);
-                proto::set_block_size(pr_fi, 5);
-                proto::set_permissions(pr_fi, permissions);
+                auto file_my = fi_my->get_file_infos().by_name("a.bin");
+                auto v1 = file_my->get_version()->as_proto();
 
-                auto &v = proto::get_version(pr_fi);
-                auto &counter = proto::add_counters(v);
-                proto::set_id(counter, 1);
-                proto::set_value(counter, 1);
-                proto::set_sequence(pr_fi, fi_peer->get_max_sequence() + 1);
-
-                auto data_1 = as_owned_bytes("12345");
-                auto data_1_h = utils::sha256_digest(data_1).value();
-                auto &b1 = proto::add_blocks(pr_fi);
-                proto::set_hash(b1, data_1_h);
-                proto::set_size(b1, data_1.size());
-
-                builder->make_index(sha256, folder->get_id())
-                    .add(pr_fi, peer_device)
-                    .finish()
-                    .local_update(folder->get_id(), pr_fi)
-                    .apply(*sup);
-                auto folder_peer = folder->get_folder_infos().by_device(*peer_device);
-                auto file_peer = folder_peer->get_file_infos().by_name("a.bin");
                 file_peer->mark_local_available(0);
+                hasher->auto_reply = true;
                 builder->scan_start(folder->get_id()).apply(*sup);
+                bfs::remove(path);
+
+                auto v2 = file_my->get_version()->as_proto();
+                CHECK(v1 == v2);
             }
         }
     };

@@ -32,7 +32,7 @@ auto file_t::open_write(model::file_info_ptr_t model) noexcept -> outcome::resul
     auto tmp = model->get_size() > 0;
     auto path = tmp ? make_temporal(model->get_path()) : model->get_path();
     path.make_preferred();
-    auto path_str = path.string();
+    auto path_str = path.generic_string();
 
     bool need_resize = true;
     auto expected_size = (uint64_t)model->get_size();
@@ -77,11 +77,11 @@ file_t::file_t(utils::fstream_t backend_, model::file_info_ptr_t model_, bfs::pa
     : backend{new utils::fstream_t(std::move(backend_))}, model{std::move(model_)}, path{std::move(path_)},
       temporal{temporal_} {
     auto model_path = model->get_path();
-    path_str = model_path.string();
+    path_str = model_path.generic_string();
 }
 
 file_t::file_t(utils::fstream_t backend_, bfs::path path_) noexcept
-    : backend{new utils::fstream_t(std::move(backend_))}, path{std::move(path_)}, path_str{path.string()},
+    : backend{new utils::fstream_t(std::move(backend_))}, path{std::move(path_)}, path_str{path.generic_string()},
       temporal{false} {}
 
 file_t::file_t(file_t &&other) noexcept : backend{nullptr} { *this = std::move(other); }

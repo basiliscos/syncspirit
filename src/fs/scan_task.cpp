@@ -9,9 +9,9 @@
 
 using namespace syncspirit::fs;
 
-scan_task_t::scan_task_t(model::cluster_ptr_t cluster_, std::string_view folder_id_,
+scan_task_t::scan_task_t(model::cluster_ptr_t cluster_, std::string_view folder_id_, file_cache_ptr_t rw_cache_,
                          const config::fs_config_t &config_) noexcept
-    : folder_id{folder_id_}, cluster{cluster_}, config{config_}, current_diff{nullptr} {
+    : folder_id{folder_id_}, cluster{cluster_}, rw_cache{rw_cache_}, config{config_}, current_diff{nullptr} {
     auto &fm = cluster->get_folders();
     folder = fm.by_id(folder_id);
     if (!folder) {
@@ -40,8 +40,6 @@ scan_task_t::scan_task_t(model::cluster_ptr_t cluster_, std::string_view folder_
 
     log = utils::get_logger("fs.scan_task");
 }
-
-scan_task_t::~scan_task_t() {}
 
 const std::string &scan_task_t::get_folder_id() const noexcept { return folder_id; }
 
@@ -126,6 +124,9 @@ scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
                 continue;
             }
             auto rp = relativize(child, root).generic_string();
+            if (rw_cache->get(rp)) {
+                continue;
+            }
             auto file = files.by_name(rp);
             if (file) {
                 files_queue.push_back(file);
@@ -278,38 +279,47 @@ scan_result_t scan_task_t::advance_unknown_file(unknown_file_t &file) noexcept {
     if (!is_temporal(file.path.filename())) {
         return unknown_file_t{std::move(path), std::move(file.metadata)};
     }
-
-    auto peer_file = model::file_info_ptr_t{};
-    auto peer_counter = proto::Counter();
+    auto name = path.filename();
+    auto name_str = name.generic_string();
+    auto new_name = name_str.substr(0, name_str.size() - tmp_suffix.size());
+    auto clean_path = path.parent_path() / new_name;
+    if (rw_cache->get(clean_path.generic_string())) {
+        return true;
+    }
     auto relative_path = [&]() -> std::string {
         auto rp = relativize(path, root);
-        auto name = path.filename();
-        auto name_str = name.string();
-        auto new_name = name_str.substr(0, name_str.size() - tmp_suffix.size());
         auto new_path = rp.parent_path() / new_name;
         return new_path.generic_string();
     }();
+    auto local_file = model::file_info_ptr_t{};
+    auto peer_file = model::file_info_ptr_t{};
+    auto peer_counter = proto::Counter();
     for (auto &it : folder->get_folder_infos()) {
         auto &folder_info = it.item;
-        if (folder_info->get_device() == cluster->get_device()) {
-            continue;
-        }
         auto &files = folder_info->get_file_infos();
         auto f = files.by_name(relative_path);
         if (f) {
             seen_paths.insert({std::string(f->get_name()), path});
-            if (!peer_file) {
-                peer_file = std::move(f);
-                peer_counter = peer_file->get_version()->get_best();
+            if (folder_info->get_device() == cluster->get_device()) {
+                local_file = std::move(f);
             } else {
-                auto &c = f->get_version()->get_best();
-                if (proto::get_value(peer_counter) < proto::get_value(c)) {
-                    peer_counter = c;
+                if (!peer_file) {
                     peer_file = std::move(f);
-                    break;
+                    peer_counter = peer_file->get_version()->get_best();
+                } else {
+                    auto &c = f->get_version()->get_best();
+                    if (proto::get_value(peer_counter) < proto::get_value(c)) {
+                        peer_counter = c;
+                        peer_file = std::move(f);
+                        break;
+                    }
                 }
             }
         }
+    }
+
+    if (local_file) {
+        files.remove(local_file);
     }
 
     sys::error_code ec;

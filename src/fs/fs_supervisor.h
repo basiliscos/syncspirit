@@ -11,6 +11,7 @@
 #include "model/diff/cluster_visitor.h"
 #include "model/misc/sequencer.h"
 #include "syncspirit-export.h"
+#include "file.h"
 #include <rotor/thread.hpp>
 
 namespace syncspirit {
@@ -83,6 +84,7 @@ struct SYNCSPIRIT_API fs_supervisor_t : rth::supervisor_thread_t,
     r::actor_ptr_t file_actor;
     model_request_ptr_t model_request;
     launchers_t launchers;
+    file_cache_ptr_t rw_cache;
 };
 
 } // namespace fs

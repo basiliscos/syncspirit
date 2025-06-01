@@ -66,8 +66,8 @@ template <typename Item> class mru_list_t {
     }
 
     void clear() noexcept { il.clear(); }
+    std::size_t get_max_items() const noexcept { return max_items; };
 
-  private:
     item_list_t il;
     std::size_t max_items;
 };

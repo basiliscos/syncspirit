@@ -6,7 +6,9 @@
 #include <filesystem>
 #include <memory>
 #include <boost/outcome.hpp>
+#include <boost/smart_ptr/local_shared_ptr.hpp>
 #include "model/file_info.h"
+#include "model/misc/lru_cache.hpp"
 #include "utils/io.h"
 #include "utils/bytes.h"
 #include "syncspirit-export.h"
@@ -57,5 +59,20 @@ struct SYNCSPIRIT_API file_t : model::arc_base_t<file_t> {
 };
 
 using file_ptr_t = model::intrusive_ptr_t<file_t>;
+
+} // namespace syncspirit::fs
+
+namespace syncspirit::model::details {
+
+template <> inline std::string_view get_lru_key<syncspirit::fs::file_ptr_t>(const fs::file_ptr_t &item) {
+    return item->get_path_view();
+}
+
+} // namespace syncspirit::model::details
+
+namespace syncspirit::fs {
+
+using file_cache_t = model::mru_list_t<file_ptr_t>;
+using file_cache_ptr_t = boost::local_shared_ptr<file_cache_t>;
 
 } // namespace syncspirit::fs

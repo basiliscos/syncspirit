@@ -23,7 +23,9 @@ r::plugin::resource_id_t model = 0;
 } // namespace
 
 fs_supervisor_t::fs_supervisor_t(config_t &cfg)
-    : parent_t(cfg), sequencer(cfg.sequencer), fs_config{cfg.fs_config}, hasher_threads{cfg.hasher_threads} {}
+    : parent_t(cfg), sequencer(cfg.sequencer), fs_config{cfg.fs_config}, hasher_threads{cfg.hasher_threads} {
+    rw_cache.reset(new file_cache_t(fs_config.mru_size));
+}
 
 void fs_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     parent_t::configure(plugin);
@@ -58,7 +60,7 @@ void fs_supervisor_t::launch() noexcept {
         return create_actor<file_actor_t>()
             .cluster(cluster)
             .sequencer(sequencer)
-            .mru_size(fs_config.mru_size)
+            .rw_cache(rw_cache)
             .timeout(timeout)
             .spawner_address(spawner)
             .finish();
