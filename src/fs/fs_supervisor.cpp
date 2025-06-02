@@ -70,6 +70,7 @@ void fs_supervisor_t::launch() noexcept {
     auto timeout = shutdown_timeout * 9 / 10;
     scan_actor = create_actor<scan_actor_t>()
                      .fs_config(fs_config)
+                     .rw_cache(rw_cache)
                      .cluster(cluster)
                      .sequencer(sequencer)
                      .requested_hashes_limit(hasher_threads * 2)
