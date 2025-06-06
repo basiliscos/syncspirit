@@ -218,7 +218,9 @@ folder_t::~folder_t() {
                 select_other();
             }
             p->deparent(index);
-            static_cast<tree_item_t *>(p)->update_label();
+            if (auto ti = static_cast<tree_item_t *>(p); ti) {
+                ti->update_label();
+            }
         }
     }
 }
