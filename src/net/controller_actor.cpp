@@ -22,6 +22,7 @@
 #include "model/diff/modify/upsert_folder.h"
 #include "model/diff/peer/cluster_update.h"
 #include "model/diff/peer/update_folder.h"
+#include "model/misc/resolver.h"
 #include "proto/bep_support.h"
 #include "utils/error_code.h"
 #include "utils/format.hpp"
@@ -376,14 +377,15 @@ void controller_actor_t::preprocess_block(model::file_block_t &file_block) noexc
     auto block = file_block.block();
     acquire_block(file_block);
 
+    auto hash = block->get_hash();
     if (file_block.is_locally_available()) {
-        LOG_TRACE(log, "cloning locally available block, file = {}, block index = {} / {}", file->get_full_name(),
-                  file_block.block_index(), file->get_blocks().size() - 1);
+        LOG_TRACE(log, "cloning locally available block '{}', file = {}, block index = {} / {}", hash,
+                  file->get_full_name(), file_block.block_index(), file->get_blocks().size() - 1);
         auto diff = cluster_diff_ptr_t(new modify::clone_block_t(file_block));
         push_block_write(std::move(diff));
     } else {
         auto sz = block->get_size();
-        LOG_TRACE(log, "request_block on file '{}'; block index = {} / {}, sz = {}, request pool sz = {}",
+        LOG_TRACE(log, "request_block '{}' on file '{}'; block index = {} / {}, sz = {}, request pool sz = {}", hash,
                   file->get_full_name(), file_block.block_index(), file->get_blocks().size() - 1, sz, request_pool);
         request<payload::block_request_t>(peer_addr, file, file_block.block_index()).send(request_timeout);
         ++rx_blocks_requested;
@@ -591,8 +593,12 @@ auto controller_actor_t::operator()(const model::diff::modify::block_ack_t &diff
             auto file = folder_info->get_file_infos().by_name(diff.file_name);
             if (file) {
                 if (file->is_locally_available()) {
-                    LOG_TRACE(log, "on_block_update, finalizing {}", file->get_name());
-                    push(new model::diff::modify::finish_file_t(*file));
+                    if (resolve(*file) != model::advance_action_t::ignore) {
+                        LOG_TRACE(log, "on_block_update, finalizing '{}'", file->get_name());
+                        push(new model::diff::modify::finish_file_t(*file));
+                    } else {
+                        LOG_DEBUG(log, "on_block_update, already have actual '{}', noop", file->get_name());
+                    }
                 }
             }
         }
@@ -828,10 +834,22 @@ void controller_actor_t::on_validation(hasher::message::validation_response_t &r
             } else {
                 auto &data = block_res->payload.res.data;
                 auto index = payload.block_index;
-                LOG_TRACE(log, "{}, got block {}, write requests left = {}", file->get_name(), index,
-                          cluster->get_write_requests());
-                auto diff = cluster_diff_ptr_t(new modify::append_block_t(*file, index, std::move(data)));
-                push_block_write(std::move(diff));
+                auto already_have = false;
+                for (auto &fb : file_block.block()->get_file_blocks()) {
+                    if (fb.is_locally_available()) {
+                        already_have = true;
+                        break;
+                    }
+                }
+                LOG_TRACE(log, "{}, got block {}, already have: {}, write requests left = {}", file->get_name(), index,
+                          already_have ? "y" : "n", cluster->get_write_requests());
+                if (already_have) {
+                    try_next = true;
+                    do_release_block = true;
+                } else {
+                    auto diff = cluster_diff_ptr_t(new modify::append_block_t(*file, index, std::move(data)));
+                    push_block_write(std::move(diff));
+                }
             }
         }
     }

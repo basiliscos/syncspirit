@@ -36,7 +36,7 @@ TEST_CASE("scan_task", "[fs]") {
 
     auto db_folder = db::Folder();
     db::set_id(db_folder, "some-id");
-    db::set_label(db_folder, "zzz");
+    db::set_label(db_folder, "my-label");
     db::set_path(db_folder, root_path.string());
 
     auto folder = folder_t::create(sequencer->next_uuid(), db_folder).value();
@@ -405,7 +405,7 @@ SECTION("regular files") {
 
     SECTION("root dir does not exist & deleted file => unchanged meta") {
         proto::set_deleted(pr_file, true);
-        folder->set_path(root_path / "zzz");
+        folder->set_path(root_path / "subdir");
 
         auto file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
         REQUIRE(folder_my->add_strict(file));

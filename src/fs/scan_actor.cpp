@@ -96,7 +96,7 @@ void scan_actor_t::on_scan(message::scan_progress_t &message) noexcept {
     auto folder = cluster->get_folders().by_id(folder_id);
     bool stop_processing = false;
     bool completed = false;
-    if (folder->is_synchronizing() || folder->is_suspended()) {
+    if (folder->is_suspended()) {
         LOG_DEBUG(log, "cancelling folder '{}' scanning", folder_id);
         stop_processing = true;
         completed = true;
@@ -271,10 +271,22 @@ void scan_actor_t::on_hash(hasher::message::digest_response_t &res) noexcept {
     queued_next = !can_process_more;
     if (info.is_complete()) {
         if (info.has_valid_blocks()) {
-            if (!file->is_locally_available()) {
+            auto &valid_blocks = info.valid_blocks();
+            std::uint_fast32_t valid_blocks_count = 0;
+            for (size_t i = 0; i < valid_blocks.size(); ++i) {
+                auto is_valid = valid_blocks[i];
+                if (is_valid) {
+                    if (file->is_locally_available(i)) {
+                        is_valid = false;
+                    } else {
+                        ++valid_blocks_count;
+                    }
+                }
+            }
+            if (valid_blocks_count) {
                 task.push(new model::diff::local::blocks_availability_t(*file, info.valid_blocks()));
             } else {
-                LOG_DEBUG(log, "file '{}' is yet to be flushed, ignoring it", file->get_name());
+                LOG_DEBUG(log, "file '{}' has no unknown local blocks, ingnoring", file->get_name());
             }
         } else {
             auto &file = *info.get_file();
@@ -348,7 +360,7 @@ void scan_actor_t::post_scan(scan_task_t &task) noexcept {
     auto aug = folder->get_augmentation();
     auto folder_entity = dynamic_cast<presentation::folder_entity_t *>(aug.get());
     auto &seen = task.get_seen_paths();
-    if (folder_entity) {
+    if (folder_entity && !folder->is_synchronizing()) {
         using queue_t = std::pmr::list<presentation::entity_t *>;
         using F = syncspirit::presentation::presence_t::features_t;
         auto buffer = std::array<std::byte, 10 * 1024>();

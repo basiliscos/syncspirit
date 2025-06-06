@@ -622,21 +622,6 @@ void test_remove_file() {
     F().run();
 };
 
-void test_synchronization() {
-    struct F : fixture_t {
-        void main() noexcept override {
-            sys::error_code ec;
-            auto file_path = root_path / "file.ext";
-            write_file(file_path, "12345");
-            builder->scan_start(folder->get_id()).synchronization_start(folder->get_id()).apply(*sup);
-            REQUIRE(!folder->get_scan_finish().is_not_a_date_time());
-            REQUIRE(!folder->is_scanning());
-            REQUIRE(files->size() == 0);
-        }
-    };
-    F().run();
-};
-
 void test_suspending() {
     struct F : fixture_t {
         F() { files_scan_iteration_limit = 1; }
@@ -868,7 +853,6 @@ void test_races() {
             auto pr_fi = proto::FileInfo();
             proto::set_name(pr_fi, "a.bin");
             proto::set_type(pr_fi, proto::FileInfoType::FILE);
-            proto::set_size(pr_fi, 5);
             proto::set_block_size(pr_fi, 5);
 
             auto &v = proto::get_version(pr_fi);
@@ -883,37 +867,92 @@ void test_races() {
             proto::set_hash(b1, data_1_h);
             proto::set_size(b1, data_1.size());
 
-            builder->make_index(sha256, folder->get_id()).add(pr_fi, peer_device).finish().apply(*sup);
+            SECTION("one-block-file") {
+                proto::set_size(pr_fi, 5);
+                builder->make_index(sha256, folder->get_id()).add(pr_fi, peer_device).finish().apply(*sup);
 
-            auto file_peer = fi_peer->get_file_infos().by_name("a.bin");
-            SECTION("non-finished/flushed new file") {
-                auto file = fs::file_t::open_write(file_peer).assume_value();
-                REQUIRE(bfs::exists(file.get_path()));
-                auto file_ptr = fs::file_ptr_t(new fs::file_t(std::move(file)));
-                rw_cache->put(file_ptr);
-                hasher->auto_reply = false;
-                builder->scan_start(folder->get_id()).apply(*sup);
-                CHECK(fi_my->get_file_infos().size() == 0);
-                rw_cache->clear();
-                CHECK(hasher->digest_queue.size() == 0);
-                CHECK(hasher->validation_queue.size() == 0);
+                auto file_peer = fi_peer->get_file_infos().by_name("a.bin");
+                SECTION("non-finished/flushed new file") {
+                    auto file = fs::file_t::open_write(file_peer).assume_value();
+                    REQUIRE(bfs::exists(file.get_path()));
+                    auto file_ptr = fs::file_ptr_t(new fs::file_t(std::move(file)));
+                    rw_cache->put(file_ptr);
+                    hasher->auto_reply = false;
+                    builder->scan_start(folder->get_id()).apply(*sup);
+                    CHECK(fi_my->get_file_infos().size() == 0);
+                    rw_cache->clear();
+                    CHECK(hasher->digest_queue.size() == 0);
+                    CHECK(hasher->validation_queue.size() == 0);
+                }
+                SECTION("non-finished/flushed existing file") {
+                    auto path = root_path / "a.bin.syncspirit-tmp";
+                    write_file(path, "12345");
+                    builder->local_update(folder->get_id(), pr_fi).apply(*sup);
+                    CHECK(fi_my->get_file_infos().size() == 1);
+
+                    auto file_my = fi_my->get_file_infos().by_name("a.bin");
+                    auto v1 = file_my->get_version()->as_proto();
+
+                    file_peer->mark_local_available(0);
+                    hasher->auto_reply = true;
+                    builder->scan_start(folder->get_id()).apply(*sup);
+                    bfs::remove(path);
+
+                    auto v2 = file_my->get_version()->as_proto();
+                    CHECK(v1 == v2);
+                }
             }
-            SECTION("non-finished/flushed existing file") {
-                auto path = root_path / "a.bin.syncspirit-tmp";
-                write_file(path, "12345");
-                builder->local_update(folder->get_id(), pr_fi).apply(*sup);
-                CHECK(fi_my->get_file_infos().size() == 1);
+            SECTION("multi blocks file") {
+                proto::set_size(pr_fi, 10);
+                auto data_2 = as_owned_bytes("67890");
+                auto data_2_h = utils::sha256_digest(data_2).value();
+                auto &b2 = proto::add_blocks(pr_fi);
+                proto::set_hash(b2, data_2_h);
+                proto::set_size(b2, data_2.size());
+                proto::set_offset(b2, 5);
 
-                auto file_my = fi_my->get_file_infos().by_name("a.bin");
-                auto v1 = file_my->get_version()->as_proto();
+                builder->make_index(sha256, folder->get_id()).add(pr_fi, peer_device).finish().apply(*sup);
 
-                file_peer->mark_local_available(0);
-                hasher->auto_reply = true;
-                builder->scan_start(folder->get_id()).apply(*sup);
-                bfs::remove(path);
+                auto file_peer = fi_peer->get_file_infos().by_name("a.bin");
+                SECTION("non-finished/flushed new file") {
+                    auto file = fs::file_t::open_write(file_peer).assume_value();
+                    REQUIRE(bfs::exists(file.get_path()));
+                    auto file_ptr = fs::file_ptr_t(new fs::file_t(std::move(file)));
+                    rw_cache->put(file_ptr);
+                    hasher->auto_reply = false;
+                    builder->scan_start(folder->get_id()).apply(*sup);
+                    CHECK(fi_my->get_file_infos().size() == 0);
+                    rw_cache->clear();
+                    CHECK(hasher->digest_queue.size() == 0);
+                    CHECK(hasher->validation_queue.size() == 0);
+                    hasher->auto_reply = true;
+                }
+                SECTION("finished, but not flushed new file") {
+                    auto path = root_path / "a.bin.syncspirit-tmp";
+                    write_file(path, "1234567890");
 
-                auto v2 = file_my->get_version()->as_proto();
-                CHECK(v1 == v2);
+                    builder->scan_start(folder->get_id()).apply(*sup);
+                    auto file_my = fi_my->get_file_infos().by_name("a.bin");
+                    CHECK(!file_my);
+                    CHECK(file_peer->is_locally_available());
+                }
+                SECTION("non-finished/flushed existing file") {
+                    auto path = root_path / "a.bin.syncspirit-tmp";
+                    write_file(path, "1234500000");
+                    builder->local_update(folder->get_id(), pr_fi).apply(*sup);
+                    CHECK(fi_my->get_file_infos().size() == 1);
+
+                    auto file_my = fi_my->get_file_infos().by_name("a.bin");
+                    auto v1 = file_my->get_version()->as_proto();
+
+                    file_peer->mark_local_available(0);
+                    hasher->auto_reply = true;
+                    builder->scan_start(folder->get_id()).apply(*sup);
+                    bfs::remove(path);
+
+                    auto v2 = file_my->get_version()->as_proto();
+                    CHECK(v1 == v2);
+                }
             }
         }
     };
@@ -924,7 +963,6 @@ int _init() {
     REGISTER_TEST_CASE(test_meta_changes, "test_meta_changes", "[fs]");
     REGISTER_TEST_CASE(test_new_files, "test_new_files", "[fs]");
     REGISTER_TEST_CASE(test_remove_file, "test_remove_file", "[fs]");
-    REGISTER_TEST_CASE(test_synchronization, "test_synchronization", "[fs]");
     REGISTER_TEST_CASE(test_suspending, "test_suspending", "[fs]");
     REGISTER_TEST_CASE(test_importing, "test_importing", "[fs]");
     REGISTER_TEST_CASE(test_races, "test_races", "[fs]");

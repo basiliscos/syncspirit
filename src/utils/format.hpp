@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #pragma once
 
@@ -7,6 +7,7 @@
 #include "model/device.h"
 #include "model/device_id.h"
 #include "utils/platform.h"
+#include "utils/bytes.h"
 #include <filesystem>
 
 #include <fmt/format.h>
@@ -60,6 +61,30 @@ template <> struct fmt::formatter<syncspirit::utils::uri_t> {
 
     auto format(const object_t &url, format_context &ctx) const -> format_context::iterator {
         return fmt::format_to(ctx.out(), "{}", std::string_view(url.buffer()));
+    }
+};
+
+template <> struct fmt::formatter<syncspirit::utils::bytes_view_t> {
+    using object_t = syncspirit::utils::bytes_view_t;
+
+    constexpr auto parse(format_parse_context &ctx) -> format_parse_context::iterator { return ctx.begin(); }
+
+    auto format(object_t bytes, format_context &ctx) const -> format_context::iterator {
+        auto sz = bytes.size();
+        if (sz > 16) {
+            for (size_t i = 0; i < 8; ++i) {
+                fmt::format_to(ctx.out(), "{:x}", bytes[i]);
+            }
+            fmt::format_to(ctx.out(), "...");
+            for (size_t i = sz - 5; i < sz; ++i) {
+                fmt::format_to(ctx.out(), "{:x}", bytes[i]);
+            }
+        } else {
+            for (auto b : bytes) {
+                fmt::format_to(ctx.out(), "{:x}", b);
+            }
+        }
+        return ctx.out();
     }
 };
 

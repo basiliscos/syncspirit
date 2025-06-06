@@ -1171,7 +1171,7 @@ void test_downloading_errors() {
                 peer_actor->push_block(ec, 0);
             }
             SECTION("hash mismatch, do not shutdown") {
-                peer_actor->push_block(as_owned_bytes("zzz"), 0);
+                peer_actor->push_block(as_owned_bytes("123"), 0);
                 peer_actor->push_block(data_2, 1); // needed to terminate/shutdown controller
             }
 
@@ -2117,6 +2117,86 @@ void test_change_folder_type() {
     F(true, 10).run();
 }
 
+void test_races() {
+    struct F : fixture_t {
+        using fixture_t::fixture_t;
+        void main(diff_builder_t &) noexcept override {
+            auto builder = diff_builder_t(*cluster);
+            auto sha256 = peer_device->device_id().get_sha256();
+
+            auto &folder_infos = folder_1->get_folder_infos();
+            auto folder_1_id = folder_1->get_id();
+            auto folder_my = folder_infos.by_device(*my_device);
+            auto folder_peer = folder_infos.by_device(*peer_device);
+
+            auto max_seq = folder_peer->get_max_sequence() + 10;
+
+            builder.configure_cluster(sha256)
+                .add(sha256, folder_1_id, folder_peer->get_index(), max_seq)
+                .finish()
+                .apply(*sup);
+
+            auto file_name = std::string_view("some-file");
+            auto pr_file = proto::FileInfo();
+            proto::set_name(pr_file, file_name);
+            proto::set_type(pr_file, proto::FileInfoType::FILE);
+            proto::set_sequence(pr_file, max_seq - 1);
+            proto::set_size(pr_file, 10);
+            proto::set_block_size(pr_file, 5);
+
+            auto &v = proto::get_version(pr_file);
+            auto &counter = proto::add_counters(v);
+            proto::set_id(counter, 1);
+            proto::set_value(counter, 1);
+
+            auto data_1 = as_owned_bytes("12345");
+            auto data_1_h = utils::sha256_digest(data_1).value();
+            auto &b1 = proto::add_blocks(pr_file);
+            proto::set_hash(b1, data_1_h);
+            proto::set_size(b1, data_1.size());
+
+            auto data_2 = as_owned_bytes("67890");
+            auto data_2_h = utils::sha256_digest(data_2).value();
+            auto &b2 = proto::add_blocks(pr_file);
+            proto::set_hash(b2, data_2_h);
+            proto::set_size(b2, data_2.size());
+            proto::set_offset(b2, 5);
+
+            builder.make_index(sha256, folder_1_id).add(pr_file, peer_device).finish().apply(*sup);
+
+            SECTION("make file externally available before blocks arrive") {
+                builder.local_update(folder_1_id, pr_file).apply(*sup);
+
+                peer_actor->push_block(data_2, 1, file_name);
+                peer_actor->push_block(data_1, 0, file_name);
+                peer_actor->process_block_requests();
+                sup->do_process();
+            }
+            SECTION("make file externally available before file finishes") {
+                cluster->modify_write_requests(10);
+
+                sup->auto_ack_blocks = false;
+                peer_actor->push_block(data_2, 1, file_name);
+                peer_actor->push_block(data_1, 0, file_name);
+                peer_actor->process_block_requests();
+                sup->do_process();
+
+                builder.local_update(folder_1_id, pr_file).apply(*sup);
+
+                auto diff = sup->delayed_ack_holder;
+                REQUIRE(diff);
+                sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff));
+                sup->do_process();
+            }
+            auto file = folder_my->get_file_infos().by_name(file_name);
+            REQUIRE(file);
+            CHECK(file->is_locally_available());
+            CHECK(file->get_size() == 10);
+        }
+    };
+    F(true, 10).run();
+};
+
 int _init() {
     REGISTER_TEST_CASE(test_startup, "test_startup", "[net]");
     REGISTER_TEST_CASE(test_overwhelm, "test_overwhelm", "[net]");
@@ -2134,6 +2214,7 @@ int _init() {
     REGISTER_TEST_CASE(test_conflicts, "test_conflicts", "[net]");
     REGISTER_TEST_CASE(test_download_interrupting, "test_download_interrupting", "[net]");
     REGISTER_TEST_CASE(test_change_folder_type, "test_change_folder_type", "[net]");
+    REGISTER_TEST_CASE(test_races, "test_races", "[net]");
     return 1;
 }
 

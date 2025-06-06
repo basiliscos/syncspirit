@@ -319,6 +319,11 @@ TEST_CASE("file iterator, single folder", "[model]") {
             REQUIRE(
                 builder.make_index(peer_id.get_sha256(), folder->get_id()).add(pr_fi, peer_device).finish().apply());
 
+            SECTION("has not bee scanned") {
+                auto peer_file = peer_files.begin()->item;
+                file_iterator->recheck(*peer_file);
+                CHECK(file_iterator->next() == R{nullptr, A::ignore});
+            }
             SECTION("has been scanned") {
                 my_file->mark_local();
 
@@ -329,8 +334,6 @@ TEST_CASE("file iterator, single folder", "[model]") {
                 CHECK(file_iterator->next() == R{nullptr, A::ignore});
                 REQUIRE(builder.apply());
             }
-
-            SECTION("has not bee scanned") { CHECK(file_iterator->next() == R{nullptr, A::ignore}); }
         }
 
         SECTION("have local, local is newer") {
