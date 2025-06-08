@@ -8,14 +8,16 @@ using namespace syncspirit::model;
 
 void orphaned_blocks_t::record(file_info_t &file) { file_for_removal.emplace(&file); }
 
-auto orphaned_blocks_t::deduce() const -> set_t {
-    using set_view_t = std::set<utils::bytes_view_t, utils::bytes_comparator_t>;
-    set_view_t processed;
-    set_t r;
+auto orphaned_blocks_t::deduce(const set_t &white_listed) const -> set_t {
+    auto processed = view_set_t();
+    auto r = set_t();
     for (auto &file : file_for_removal) {
         auto &blocks = file->get_blocks();
         for (auto &b : blocks) {
             auto key = b->get_key();
+            if (white_listed.contains(b->get_hash())) {
+                continue;
+            }
             if (processed.contains(b->get_key())) {
                 continue;
             }
