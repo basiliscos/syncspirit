@@ -105,7 +105,16 @@ static auto construct(sequencer_t &sequencer, folder_info_ptr_t &folder_info, sy
     uuids.reserve(files.size());
     auto &fm = folder_info->get_file_infos();
     auto orphaned_candidates = orphaned_blocks_t{};
+    auto white_listed_blocks = orphaned_blocks_t::set_t{};
     for (const auto &f : files) {
+        auto blocks_sz = proto::get_blocks_size(f);
+        for (size_t i = 0; i < blocks_sz; ++i) {
+            auto &b = proto::get_blocks(f, i);
+            auto hash = proto::get_hash(b);
+            auto strict_hash = block_info_t::make_strict_hash(hash);
+            auto owned_hash = utils::bytes_t(strict_hash.get_hash());
+            white_listed_blocks.emplace(owned_hash);
+        }
         auto file = file_info_ptr_t{};
         bu::uuid file_uuid;
         auto prev_file = fm.by_name(proto::get_name(f));
@@ -118,7 +127,7 @@ static auto construct(sequencer_t &sequencer, folder_info_ptr_t &folder_info, sy
         uuids.emplace_back(file_uuid);
     }
 
-    auto orphaned_blocks = orphaned_candidates.deduce();
+    auto orphaned_blocks = orphaned_candidates.deduce(white_listed_blocks);
     if (!orphaned_blocks.empty()) {
         for (auto &b : new_blocks) {
             auto hash = proto::get_hash(b);
