@@ -70,6 +70,7 @@ struct SYNCSPIRIT_API file_actor_t : public r::actor_base_t, private model::diff
     void on_model_update(model::message::model_update_t &message) noexcept;
     void on_block_request(message::block_request_t &message) noexcept;
     void on_controller_up(net::message::controller_up_t& message) noexcept;
+    void on_controller_down(net::message::controller_down_t& message) noexcept;
 
     outcome::result<file_ptr_t> get_source_for_cloning(model::file_info_ptr_t &source,
                                                        const file_ptr_t &target_backend) noexcept;

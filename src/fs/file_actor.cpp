@@ -18,6 +18,12 @@
 using namespace syncspirit::fs;
 using namespace syncspirit::proto;
 
+namespace {
+namespace resource {
+r::plugin::resource_id_t controller = 0;
+} // namespace resource
+}
+
 file_actor_t::write_guard_t::write_guard_t(file_actor_t &actor_,
                                            const model::diff::modify::block_transaction_t &txn_) noexcept
     : actor{actor_}, txn{txn_}, success{false} {}
@@ -54,6 +60,7 @@ void file_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
                 auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
                 plugin->subscribe_actor(&file_actor_t::on_controller_up, coordinator);
+                plugin->subscribe_actor(&file_actor_t::on_controller_down, coordinator);
             }
         });
     });
@@ -117,7 +124,13 @@ void file_actor_t::on_block_request(message::block_request_t &message) noexcept 
 }
 
 void file_actor_t::on_controller_up(net::message::controller_up_t& message) noexcept {
-    LOG_DEBUG(log, "on_controller_up, peer: {}", message.payload.peer.get_short());
+    LOG_DEBUG(log, "on_controller_up, {}", (const void*)message.payload.controller.get());
+    resources->acquire(resource::controller);
+}
+
+void file_actor_t::on_controller_down(net::message::controller_down_t& message) noexcept {
+    LOG_DEBUG(log, "on_controller_down, {}", (const void*)message.payload.controller.get());
+    resources->release(resource::controller);
 }
 
 auto file_actor_t::reflect(model::file_info_ptr_t &file_ptr, const bfs::path &path) noexcept -> outcome::result<void> {

@@ -53,6 +53,7 @@ namespace syncspirit::net {
 namespace {
 namespace resource {
 r::plugin::resource_id_t db = 0;
+r::plugin::resource_id_t controller = 1;
 }
 } // namespace
 
@@ -98,6 +99,8 @@ void db_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 plugin->subscribe_actor(&db_actor_t::on_model_load_release);
                 plugin->subscribe_actor(&db_actor_t::on_model_update, coordinator);
                 plugin->subscribe_actor(&db_actor_t::on_db_info, coordinator);
+                plugin->subscribe_actor(&db_actor_t::on_controller_up, coordinator);
+                plugin->subscribe_actor(&db_actor_t::on_controller_down, coordinator);
             }
         });
     });
@@ -231,6 +234,16 @@ void db_actor_t::on_db_info(message::db_info_request_t &request) noexcept {
     };
 
     reply_to(request, info);
+}
+
+void db_actor_t::on_controller_up(net::message::controller_up_t& message) noexcept {
+    LOG_DEBUG(log, "on_controller_up, {}", (const void*)message.payload.controller.get());
+    resources->acquire(resource::controller);
+}
+
+void db_actor_t::on_controller_down(net::message::controller_down_t& message) noexcept {
+    LOG_DEBUG(log, "on_controller_down, {}", (const void*)message.payload.controller.get());
+    resources->release(resource::controller);
 }
 
 void db_actor_t::on_cluster_load(message::load_cluster_request_t &request) noexcept {
