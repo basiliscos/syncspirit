@@ -46,9 +46,17 @@ void peer_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.set_identity(id, false);
         log = utils::get_logger(identity);
     });
+    plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
+        p.discover_name(names::coordinator, coordinator, false).link(false).callback([&](auto phase, auto &ee) {
+            if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {
+                auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
+                auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
+                plugin->subscribe_actor(&peer_actor_t::on_controller_up, coordinator);
+                plugin->subscribe_actor(&peer_actor_t::on_controller_down, coordinator);
+            }
+        });
+    });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
-        p.subscribe_actor(&peer_actor_t::on_start_reading);
-        p.subscribe_actor(&peer_actor_t::on_termination);
         p.subscribe_actor(&peer_actor_t::on_block_request);
         p.subscribe_actor(&peer_actor_t::on_transfer);
     });
@@ -222,7 +230,7 @@ void peer_actor_t::shutdown_start() noexcept {
         r::actor_base_t::cancel_timer(*rx_timer_request);
     }
     if (controller) {
-        send<payload::termination_t>(controller, shutdown_reason);
+        send<payload::peer_down_t>(controller, shutdown_reason);
     }
 
     proto::Close close;
@@ -243,7 +251,7 @@ void peer_actor_t::shutdown_finish() noexcept {
     }
     block_requests.clear();
     if (controller) {
-        send<payload::termination_t>(controller, shutdown_reason);
+        send<payload::peer_down_t>(controller, shutdown_reason);
     }
     r::actor_base_t::shutdown_finish();
     auto sha256 = peer_device_id.get_sha256();
@@ -278,21 +286,20 @@ void peer_actor_t::cancel_io() noexcept {
     }
 }
 
-void peer_actor_t::on_start_reading(message::start_reading_t &message) noexcept {
-    bool start = message.payload.start;
-    LOG_TRACE(log, "on_start_reading, start = ", start);
+void peer_actor_t::on_controller_up(message::controller_up_t &message) noexcept {
+    LOG_TRACE(log, "on_controller_up");
     controller = message.payload.controller;
-    if (start) {
-        read_action = &peer_actor_t::read_controlled;
-        read_more();
-    }
+    read_action = &peer_actor_t::read_controlled;
+    read_more();
 }
 
-void peer_actor_t::on_termination(message::termination_signal_t &message) noexcept {
-    if (!shutdown_reason) {
+void peer_actor_t::on_controller_down(message::controller_down_t &message) noexcept {
+    auto for_me = message.payload.peer == address;
+    LOG_TRACE(log, "on_controller_down, for_me = {}", (for_me ? "yes" : "no"));
+    if (for_me && !shutdown_reason) {
         auto &ee = message.payload.ee;
         auto reason = ee->message();
-        LOG_DEBUG(log, "on_termination: {}", reason);
+        LOG_DEBUG(log, "on_controller_down: {}", reason);
         do_shutdown(ee);
     }
 }

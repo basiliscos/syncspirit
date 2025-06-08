@@ -128,7 +128,7 @@ void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     plugin.with_casted<r::plugin::link_client_plugin_t>([&](auto &p) { p.link(peer_addr, false); });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&controller_actor_t::on_forward);
-        p.subscribe_actor(&controller_actor_t::on_termination);
+        p.subscribe_actor(&controller_actor_t::on_peer_down);
         p.subscribe_actor(&controller_actor_t::on_block);
         p.subscribe_actor(&controller_actor_t::on_transfer_pop);
         p.subscribe_actor(&controller_actor_t::on_transfer_push);
@@ -145,7 +145,7 @@ void controller_actor_t::on_start() noexcept {
         return do_shutdown();
     }
 
-    send<payload::start_reading_t>(peer_addr, get_address(), true);
+    send<payload::controller_up_t>(coordinator, address, peer->device_id());
     send_cluster_config();
     resources->acquire(resource::peer);
     LOG_INFO(log, "is online (connection: {})", connection_id);
@@ -154,9 +154,7 @@ void controller_actor_t::on_start() noexcept {
 
 void controller_actor_t::shutdown_start() noexcept {
     LOG_TRACE(log, "shutdown_start");
-    if (peer_addr) {
-        send<payload::termination_t>(peer_addr, shutdown_reason);
-    }
+    send<payload::controller_down_t>(coordinator, address, peer_addr, shutdown_reason);
     r::actor_base_t::shutdown_start();
 }
 
@@ -214,7 +212,7 @@ void controller_actor_t::on_transfer_pop(message::transfer_pop_t &message) noexc
     push_pending();
 }
 
-void controller_actor_t::on_termination(message::termination_signal_t &message) noexcept {
+void controller_actor_t::on_peer_down(message::peer_down_t &message) noexcept {
     if (resources->has(resource::peer)) {
         resources->release(resource::peer);
         peer_addr.reset();

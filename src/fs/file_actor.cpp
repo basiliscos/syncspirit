@@ -49,7 +49,13 @@ void file_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
         p.register_name(net::names::fs_actor, address);
-        p.discover_name(net::names::coordinator, coordinator, true).link(false);
+        p.discover_name(net::names::coordinator, coordinator, false).link(false).callback([&](auto phase, auto &ee) {
+            if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {
+                auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
+                auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
+                plugin->subscribe_actor(&file_actor_t::on_controller_up, coordinator);
+            }
+        });
     });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&file_actor_t::on_block_request);
@@ -108,6 +114,10 @@ void file_actor_t::on_block_request(message::block_request_t &message) noexcept 
         }
     }
     send<payload::block_response_t>(dest, std::move(req), ec, std::move(data));
+}
+
+void file_actor_t::on_controller_up(net::message::controller_up_t& message) noexcept {
+    LOG_DEBUG(log, "on_controller_up, peer: {}", message.payload.peer.get_short());
 }
 
 auto file_actor_t::reflect(model::file_info_ptr_t &file_ptr, const bfs::path &path) noexcept -> outcome::result<void> {

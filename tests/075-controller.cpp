@@ -28,6 +28,7 @@ namespace {
 
 struct sample_peer_config_t : public r::actor_config_t {
     model::device_id_t peer_device_id;
+    r::address_ptr_t coordinator;
     bool auto_share = false;
 };
 
@@ -38,6 +39,10 @@ template <typename Actor> struct sample_peer_config_builder_t : r::actor_config_
 
     builder_t &&peer_device_id(const model::device_id_t &value) && noexcept {
         parent_t::config.peer_device_id = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+    builder_t &&coordinator(const r::address_ptr_t &value) && noexcept {
+        parent_t::config.coordinator = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
     builder_t &&auto_share(bool value) && noexcept {
@@ -66,16 +71,25 @@ struct sample_peer_t : r::actor_base_t {
     using uploaded_blocks_t = std::list<proto::Response>;
 
     sample_peer_t(config_t &config)
-        : r::actor_base_t{config}, auto_share(config.auto_share), peer_device{config.peer_device_id} {
+        : r::actor_base_t{config}, auto_share(config.auto_share), coordinator(config.coordinator),
+          peer_device{config.peer_device_id} {
         log = utils::get_logger("test.sample_peer");
     }
 
     void configure(r::plugin::plugin_base_t &plugin) noexcept override {
         r::actor_base_t::configure(plugin);
         plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) { p.set_identity("sample_peer", false); });
+        plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
+            p.discover_name(names::coordinator, coordinator, false).link(false).callback([&](auto phase, auto &ee) {
+                if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {
+                    auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
+                    auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
+                    plugin->subscribe_actor(&sample_peer_t::on_controller_up, coordinator);
+                    plugin->subscribe_actor(&sample_peer_t::on_controller_down, coordinator);
+                }
+            });
+        });
         plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
-            p.subscribe_actor(&sample_peer_t::on_start_reading);
-            p.subscribe_actor(&sample_peer_t::on_termination);
             p.subscribe_actor(&sample_peer_t::on_transfer);
             p.subscribe_actor(&sample_peer_t::on_block_request);
         });
@@ -84,7 +98,7 @@ struct sample_peer_t : r::actor_base_t {
     void shutdown_start() noexcept override {
         LOG_TRACE(log, "{}, shutdown_start", identity);
         if (controller) {
-            send<net::payload::termination_t>(controller, shutdown_reason);
+            send<net::payload::peer_down_t>(controller, shutdown_reason);
         }
         r::actor_base_t::shutdown_start();
     }
@@ -93,20 +107,20 @@ struct sample_peer_t : r::actor_base_t {
         r::actor_base_t::shutdown_finish();
         LOG_TRACE(log, "{}, shutdown_finish, blocks requested = {}", identity, blocks_requested);
         if (controller) {
-            send<net::payload::termination_t>(controller, shutdown_reason);
+            send<net::payload::peer_down_t>(controller, shutdown_reason);
         }
     }
 
-    void on_start_reading(net::message::start_reading_t &msg) noexcept {
-        LOG_TRACE(log, "{}, on_start_reading", identity);
+    void on_controller_up(net::message::controller_up_t &msg) noexcept {
+        LOG_TRACE(log, "{}, on_controller_up", identity);
         controller = msg.payload.controller;
-        reading = msg.payload.start;
+        reading = true;
     }
 
-    void on_termination(net::message::termination_signal_t &msg) noexcept {
-        LOG_TRACE(log, "{}, on_termination", identity);
-
-        if (!shutdown_reason) {
+    void on_controller_down(net::message::controller_down_t &msg) noexcept {
+        auto for_me = msg.payload.peer == address;
+        LOG_TRACE(log, "on_controller_down, for_me = {}", (for_me ? "yes" : "no"));
+        if (for_me && !shutdown_reason) {
             auto &ee = msg.payload.ee;
             auto reason = ee->message();
             LOG_TRACE(log, "{}, on_termination: {}", identity, reason);
@@ -215,6 +229,7 @@ struct sample_peer_t : r::actor_base_t {
     bool reading = false;
     bool auto_share = false;
     remote_messages_t messages;
+    r::address_ptr_t coordinator;
     r::address_ptr_t controller;
     model::device_id_t peer_device;
     utils::logger_t log;
@@ -240,7 +255,11 @@ struct fixture_t {
     }
 
     void _start_target(std::string connection_id) {
-        peer_actor = sup->create_actor<sample_peer_t>().auto_share(auto_share).timeout(timeout).finish();
+        peer_actor = sup->create_actor<sample_peer_t>()
+                         .coordinator(sup->get_address())
+                         .auto_share(auto_share)
+                         .timeout(timeout)
+                         .finish();
 
         auto diff = model::diff::contact::peer_state_t::create(*cluster, peer_device->device_id().get_sha256(),
                                                                peer_actor->get_address(), device_state_t::online,

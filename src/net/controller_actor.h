@@ -151,7 +151,7 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     using synchronizing_files_t = std::unordered_map<utils::bytes_view_t, model::file_info_t::guard_ptr_t>;
     using updates_streamer_ptr_t = std::unique_ptr<model::updates_streamer_t>;
 
-    void on_termination(message::termination_signal_t &message) noexcept;
+    void on_peer_down(message::peer_down_t &message) noexcept;
     void on_forward(message::forwarded_message_t &message) noexcept;
     void on_block(message::block_response_t &message) noexcept;
     void on_validation(hasher::message::validation_response_t &res) noexcept;
