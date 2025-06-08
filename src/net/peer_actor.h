@@ -111,7 +111,7 @@ struct SYNCSPIRIT_API peer_actor_t : public r::actor_base_t {
     using clock_t = std::chrono::steady_clock;
 
     void on_controller_up(message::controller_up_t &) noexcept;
-    void on_controller_down(message::controller_down_t &) noexcept;
+    void on_controller_predown(message::controller_predown_t &) noexcept;
     void on_block_request(message::block_request_t &) noexcept;
     void on_transfer(message::transfer_data_t &message) noexcept;
 

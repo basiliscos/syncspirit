@@ -52,7 +52,7 @@ void peer_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
                 auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
                 plugin->subscribe_actor(&peer_actor_t::on_controller_up, coordinator);
-                plugin->subscribe_actor(&peer_actor_t::on_controller_down, coordinator);
+                plugin->subscribe_actor(&peer_actor_t::on_controller_predown, coordinator);
             }
         });
     });
@@ -287,19 +287,22 @@ void peer_actor_t::cancel_io() noexcept {
 }
 
 void peer_actor_t::on_controller_up(message::controller_up_t &message) noexcept {
-    LOG_TRACE(log, "on_controller_up");
-    controller = message.payload.controller;
-    read_action = &peer_actor_t::read_controlled;
-    read_more();
+    auto &peer = message.payload.peer;
+    if (peer == peer_device_id) {
+        LOG_TRACE(log, "on_controller_up");
+        controller = message.payload.controller;
+        read_action = &peer_actor_t::read_controlled;
+        read_more();
+    }
 }
 
-void peer_actor_t::on_controller_down(message::controller_down_t &message) noexcept {
+void peer_actor_t::on_controller_predown(message::controller_predown_t &message) noexcept {
     auto for_me = message.payload.peer == address;
-    LOG_TRACE(log, "on_controller_down, for_me = {}", (for_me ? "yes" : "no"));
+    LOG_TRACE(log, "on_controller_predown, for_me = {}", (for_me ? "yes" : "no"));
     if (for_me && !shutdown_reason) {
         auto &ee = message.payload.ee;
         auto reason = ee->message();
-        LOG_DEBUG(log, "on_controller_down: {}", reason);
+        LOG_DEBUG(log, "on_controller_predown: {}", reason);
         do_shutdown(ee);
     }
 }

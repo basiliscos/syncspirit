@@ -72,8 +72,8 @@ struct SYNCSPIRIT_API db_actor_t : public r::actor_base_t, private model::diff::
     void on_model_load_release(model::message::model_update_t &) noexcept;
     void on_model_update(model::message::model_update_t &) noexcept;
     void on_db_info(message::db_info_request_t &) noexcept;
-    void on_controller_up(net::message::controller_up_t& message) noexcept;
-    void on_controller_down(net::message::controller_down_t& message) noexcept;
+    void on_controller_up(net::message::controller_up_t &message) noexcept;
+    void on_controller_down(net::message::controller_down_t &message) noexcept;
     void extracted(const model::folder_info_t &folder_info);
     outcome::result<void> save_folder_info(const model::folder_info_t &, void *) noexcept;
     outcome::result<void> remove(const model::diff::modify::generic_remove_t &, void *) noexcept;

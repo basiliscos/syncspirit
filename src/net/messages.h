@@ -118,6 +118,11 @@ struct controller_up_t {
 struct controller_down_t {
     r::address_ptr_t controller;
     r::address_ptr_t peer;
+};
+
+struct controller_predown_t {
+    r::address_ptr_t controller;
+    r::address_ptr_t peer;
     r::extended_error_ptr_t ee;
 };
 
@@ -202,6 +207,7 @@ using load_cluster_request_t = r::request_traits_t<payload::load_cluster_request
 using load_cluster_response_t = r::request_traits_t<payload::load_cluster_request_t>::response::message_t;
 
 using controller_up_t = r::message_t<payload::controller_up_t>;
+using controller_predown_t = r::message_t<payload::controller_predown_t>;
 using controller_down_t = r::message_t<payload::controller_down_t>;
 using peer_down_t = r::message_t<payload::peer_down_t>;
 using forwarded_message_t = r::message_t<payload::forwarded_message_t>;

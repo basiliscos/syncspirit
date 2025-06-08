@@ -22,7 +22,7 @@ namespace {
 namespace resource {
 r::plugin::resource_id_t controller = 0;
 } // namespace resource
-}
+} // namespace
 
 file_actor_t::write_guard_t::write_guard_t(file_actor_t &actor_,
                                            const model::diff::modify::block_transaction_t &txn_) noexcept
@@ -123,13 +123,13 @@ void file_actor_t::on_block_request(message::block_request_t &message) noexcept 
     send<payload::block_response_t>(dest, std::move(req), ec, std::move(data));
 }
 
-void file_actor_t::on_controller_up(net::message::controller_up_t& message) noexcept {
-    LOG_DEBUG(log, "on_controller_up, {}", (const void*)message.payload.controller.get());
+void file_actor_t::on_controller_up(net::message::controller_up_t &message) noexcept {
+    LOG_DEBUG(log, "on_controller_up, {}", (const void *)message.payload.controller.get());
     resources->acquire(resource::controller);
 }
 
-void file_actor_t::on_controller_down(net::message::controller_down_t& message) noexcept {
-    LOG_DEBUG(log, "on_controller_down, {}", (const void*)message.payload.controller.get());
+void file_actor_t::on_controller_down(net::message::controller_down_t &message) noexcept {
+    LOG_DEBUG(log, "on_controller_down, {}", (const void *)message.payload.controller.get());
     resources->release(resource::controller);
 }
 

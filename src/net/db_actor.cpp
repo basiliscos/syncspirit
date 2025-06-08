@@ -54,7 +54,7 @@ namespace {
 namespace resource {
 r::plugin::resource_id_t db = 0;
 r::plugin::resource_id_t controller = 1;
-}
+} // namespace resource
 } // namespace
 
 #if 0
@@ -236,13 +236,13 @@ void db_actor_t::on_db_info(message::db_info_request_t &request) noexcept {
     reply_to(request, info);
 }
 
-void db_actor_t::on_controller_up(net::message::controller_up_t& message) noexcept {
-    LOG_DEBUG(log, "on_controller_up, {}", (const void*)message.payload.controller.get());
+void db_actor_t::on_controller_up(net::message::controller_up_t &message) noexcept {
+    LOG_DEBUG(log, "on_controller_up, {}", (const void *)message.payload.controller.get());
     resources->acquire(resource::controller);
 }
 
-void db_actor_t::on_controller_down(net::message::controller_down_t& message) noexcept {
-    LOG_DEBUG(log, "on_controller_down, {}", (const void*)message.payload.controller.get());
+void db_actor_t::on_controller_down(net::message::controller_down_t &message) noexcept {
+    LOG_DEBUG(log, "on_controller_down, {}", (const void *)message.payload.controller.get());
     resources->release(resource::controller);
 }
 

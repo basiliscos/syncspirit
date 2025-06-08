@@ -85,7 +85,7 @@ struct sample_peer_t : r::actor_base_t {
                     auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
                     auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
                     plugin->subscribe_actor(&sample_peer_t::on_controller_up, coordinator);
-                    plugin->subscribe_actor(&sample_peer_t::on_controller_down, coordinator);
+                    plugin->subscribe_actor(&sample_peer_t::on_controller_predown, coordinator);
                 }
             });
         });
@@ -117,9 +117,9 @@ struct sample_peer_t : r::actor_base_t {
         reading = true;
     }
 
-    void on_controller_down(net::message::controller_down_t &msg) noexcept {
+    void on_controller_predown(net::message::controller_predown_t &msg) noexcept {
         auto for_me = msg.payload.peer == address;
-        LOG_TRACE(log, "on_controller_down, for_me = {}", (for_me ? "yes" : "no"));
+        LOG_TRACE(log, "on_controller_predown, for_me = {}", (for_me ? "yes" : "no"));
         if (for_me && !shutdown_reason) {
             auto &ee = msg.payload.ee;
             auto reason = ee->message();

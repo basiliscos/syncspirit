@@ -154,7 +154,7 @@ void controller_actor_t::on_start() noexcept {
 
 void controller_actor_t::shutdown_start() noexcept {
     LOG_TRACE(log, "shutdown_start");
-    send<payload::controller_down_t>(coordinator, address, peer_addr, shutdown_reason);
+    send<payload::controller_predown_t>(coordinator, address, peer_addr, shutdown_reason);
     r::actor_base_t::shutdown_start();
 }
 
@@ -164,6 +164,7 @@ void controller_actor_t::shutdown_finish() noexcept {
     file_iterator.reset();
     synchronizing_folders.clear();
     send_diff();
+    send<payload::controller_down_t>(coordinator, address, peer_addr);
     r::actor_base_t::shutdown_finish();
 }
 
