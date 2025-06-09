@@ -17,6 +17,7 @@
 #include "fs/messages.h"
 
 #include <unordered_map>
+#include <optional>
 #include <deque>
 
 namespace syncspirit {
@@ -160,6 +161,8 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     void on_transfer_push(message::transfer_push_t &message) noexcept;
     void on_transfer_pop(message::transfer_pop_t &message) noexcept;
     void on_block_response(fs::message::block_response_t &message) noexcept;
+    bool on_unlink_request(r::message::unlink_request_t &message) noexcept;
+    void on_fs_ack_timer(r::request_id_t, bool cancelled) noexcept;
 
     void on_message(proto::ClusterConfig &message) noexcept;
     void on_message(proto::Index &message) noexcept;
@@ -236,6 +239,7 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     synchronizing_folders_t synchronizing_folders;
     synchronizing_files_t synchronizing_files;
     block_write_queue_t block_write_queue;
+    std::optional<r::request_id_t> fs_ack_timer;
 };
 
 } // namespace net

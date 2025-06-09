@@ -1361,6 +1361,9 @@ void test_download_resuming() {
 
             target->do_shutdown();
             sup->do_process();
+            // auto fs_timer_id = sup->timers.back()->request_id;
+            // sup->do_invoke_timer(fs_timer_id);
+            // sup->do_process();
 
             CHECK(!folder_1->is_synchronizing());
             for (auto &it : cluster->get_blocks()) {

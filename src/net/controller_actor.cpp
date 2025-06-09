@@ -37,6 +37,7 @@ namespace {
 namespace resource {
 r::plugin::resource_id_t peer = 0;
 r::plugin::resource_id_t hash = 1;
+r::plugin::resource_id_t fs = 2;
 } // namespace resource
 
 struct context_t {
@@ -115,8 +116,14 @@ void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         open_reading = p.create_address();
     });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
-        p.discover_name(names::fs_actor, fs_addr, false).link();
         p.discover_name(names::hasher_proxy, hasher_proxy, false).link();
+        p.discover_name(names::fs_actor, fs_addr, false).link(false).callback([&](auto phase, auto &ee) {
+            if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {
+                auto p = get_plugin(r::plugin::link_client_plugin_t::class_identity);
+                auto plugin = static_cast<r::plugin::link_client_plugin_t *>(p);
+                plugin->on_unlink([&](auto &msg) { return on_unlink_request(msg); });
+            }
+        });
         p.discover_name(names::coordinator, coordinator, false).link(false).callback([&](auto phase, auto &ee) {
             if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {
                 auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
@@ -153,8 +160,12 @@ void controller_actor_t::on_start() noexcept {
 }
 
 void controller_actor_t::shutdown_start() noexcept {
-    LOG_TRACE(log, "shutdown_start");
+    auto fs_requests = resources->has(resource::fs);
+    LOG_TRACE(log, "shutdown_start, ongoing fs requests = {}", fs_requests);
     send<payload::controller_predown_t>(coordinator, address, peer_addr, shutdown_reason);
+    if (fs_requests) {
+        fs_ack_timer = start_timer(shutdown_timeout * 8 / 9, *this, &controller_actor_t::on_fs_ack_timer);
+    }
     r::actor_base_t::shutdown_start();
 }
 
@@ -585,28 +596,33 @@ auto controller_actor_t::operator()(const model::diff::modify::mark_reachable_t 
 
 auto controller_actor_t::operator()(const model::diff::modify::block_ack_t &diff, void *custom) noexcept
     -> outcome::result<void> {
-    auto folder = cluster->get_folders().by_id(diff.folder_id);
-    if (folder) {
-        auto folder_info = folder->get_folder_infos().by_device_id(diff.device_id);
-        if (folder_info) {
-            auto file = folder_info->get_file_infos().by_name(diff.file_name);
-            if (file) {
-                if (file->is_locally_available()) {
-                    if (resolve(*file) != model::advance_action_t::ignore) {
-                        LOG_TRACE(log, "on_block_update, finalizing '{}'", file->get_name());
-                        push(new model::diff::modify::finish_file_t(*file));
-                    } else {
-                        LOG_DEBUG(log, "on_block_update, already have actual '{}', noop", file->get_name());
+    if (diff.device_id == peer->device_id().get_sha256()) {
+        if (resources->has(resource::fs)) {
+            resources->release(resource::fs);
+        }
+        auto folder = cluster->get_folders().by_id(diff.folder_id);
+        if (folder) {
+            auto folder_info = folder->get_folder_infos().by_device_id(diff.device_id);
+            if (folder_info) {
+                auto file = folder_info->get_file_infos().by_name(diff.file_name);
+                if (file) {
+                    if (file->is_locally_available()) {
+                        if (resolve(*file) != model::advance_action_t::ignore) {
+                            LOG_TRACE(log, "on_block_update, finalizing '{}'", file->get_name());
+                            push(new model::diff::modify::finish_file_t(*file));
+                        } else {
+                            LOG_DEBUG(log, "on_block_update, already have actual '{}', noop", file->get_name());
+                        }
                     }
                 }
             }
         }
+        release_block(diff.folder_id, diff.block_hash);
+        cluster->modify_write_requests(1);
+        pull_ready();
+        process_block_write();
+        send_diff();
     }
-    release_block(diff.folder_id, diff.block_hash);
-    cluster->modify_write_requests(1);
-    pull_ready();
-    process_block_write();
-    send_diff();
 
     return diff.visit_next(*this, custom);
 }
@@ -864,6 +880,31 @@ void controller_actor_t::on_validation(hasher::message::validation_response_t &r
     }
 }
 
+bool controller_actor_t::on_unlink_request(r::message::unlink_request_t &message) noexcept {
+    if (message.payload.request_payload.server_addr == fs_addr) {
+        auto count = resources->has(resource::fs);
+        LOG_DEBUG(log, "unlink request from {}, forgetting fs requests = {}", names::fs_actor, count);
+        while (resources->has(resource::fs)) {
+            resources->release(resource::fs);
+        }
+        if (fs_ack_timer) {
+            cancel_timer(*fs_ack_timer);
+            fs_ack_timer.reset();
+        }
+    }
+    return false; // handled by plugin
+}
+
+void controller_actor_t::on_fs_ack_timer(r::request_id_t, bool cancelled) noexcept {
+    if (!cancelled) {
+        auto count = resources->has(resource::fs);
+        LOG_WARN(log, "forgetting {} fs requests", count);
+        while (resources->has(resource::fs)) {
+            resources->release(resource::fs);
+        }
+    }
+}
+
 void controller_actor_t::push_block_write(model::diff::cluster_diff_ptr_t diff) noexcept {
     block_write_queue.emplace_back(std::move(diff));
     process_block_write();
@@ -883,6 +924,9 @@ void controller_actor_t::process_block_write() noexcept {
         send_diff();
         LOG_TRACE(log, "{} block writes sent, requests left = {}", sent, requests_left);
         cluster->modify_write_requests(-sent);
+        for (int i = 0; i < sent; ++i) {
+            resources->acquire(resource::fs);
+        }
     }
 }
 
