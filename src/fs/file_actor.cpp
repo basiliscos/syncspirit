@@ -63,6 +63,7 @@ void file_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 plugin->subscribe_actor(&file_actor_t::on_controller_down, coordinator);
             }
         });
+        p.discover_name(net::names::db, db, true);
     });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&file_actor_t::on_block_request);

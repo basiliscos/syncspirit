@@ -230,7 +230,7 @@ void controller_actor_t::on_peer_down(message::peer_down_t &message) noexcept {
         peer_addr.reset();
     }
     auto &ee = message.payload.ee;
-    LOG_TRACE(log, "on_termination reason: {}", ee->message());
+    LOG_TRACE(log, "on_peer_down reason: {}", ee->message());
     do_shutdown(ee);
 }
 

@@ -5,8 +5,7 @@
 
 #include "syncspirit-export.h"
 
-namespace syncspirit {
-namespace net {
+namespace syncspirit::net {
 
 struct SYNCSPIRIT_API names {
     static const char *peer_supervisor;
@@ -16,11 +15,11 @@ struct SYNCSPIRIT_API names {
     static const char *http10;
     static const char *http11_gda;
     static const char *http11_relay;
+    static const char *db;
     static const char *hasher_proxy;
     static const char *fs_actor;
     static const char *fs_scanner;
     static const char *fs_scheduler;
 };
 
-} // namespace net
-}; // namespace syncspirit
+} // namespace syncspirit::net

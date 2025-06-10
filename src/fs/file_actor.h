@@ -90,6 +90,7 @@ struct SYNCSPIRIT_API file_actor_t : public r::actor_base_t, private model::diff
     model::sequencer_ptr_t sequencer;
     utils::logger_t log;
     r::address_ptr_t coordinator;
+    r::address_ptr_t db;
     file_cache_ptr_t rw_cache;
     file_cache_t ro_cache;
 };
