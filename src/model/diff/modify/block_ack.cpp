@@ -5,11 +5,14 @@
 #include "model/file_info.h"
 #include "model/cluster.h"
 #include "model/diff/cluster_visitor.h"
+#include "utils/bytes.h"
+#include "utils/format.hpp"
 
 using namespace syncspirit::model::diff::modify;
 
 block_ack_t::block_ack_t(const block_transaction_t &txn) noexcept : parent_t(txn) {
-    LOG_DEBUG(log, "block_ack_t, file = {}, folder = {}, block = {}", file_name, folder_id, block_index);
+    LOG_DEBUG(log, "block_ack_t, file = {}, folder = {}, block_index = {}, block = {}", file_name, folder_id,
+              block_index, block_hash);
 }
 
 auto block_ack_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
@@ -21,7 +24,7 @@ auto block_ack_t::apply_impl(cluster_t &cluster, apply_controller_t &controller)
         if (folder_info) {
             auto file = folder_info->get_file_infos().by_name(file_name);
             if (file) {
-                LOG_TRACE(log, "block_ack_t, '{}' block # {}", file->get_full_name(), block_index);
+                LOG_TRACE(log, "block_ack_t, '{}' block #{} (hash: {})", file->get_path(), block_index, block_hash);
                 file->mark_local_available(block_index);
                 success = true;
             }

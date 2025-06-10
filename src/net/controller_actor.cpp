@@ -74,7 +74,9 @@ void C::folder_synchronization_t::start_fetching(model::block_info_t *block) noe
 
 void C::folder_synchronization_t::finish_fetching(utils::bytes_view_t hash) noexcept {
     auto it = blocks.find(hash);
-    it->second->unlock();
+    auto &block = *it->second;
+    block.unlock();
+    assert(!block.is_locked());
     blocks.erase(it);
     if (blocks.size() == 0 && synchronizing) {
         finish_sync();
@@ -838,6 +840,10 @@ void controller_actor_t::on_validation(hasher::message::validation_response_t &r
     if (!file) {
         LOG_DEBUG(log, "on_block, file '{}' is not longer available in '{}'", payload.file_name, payload.folder_id);
         do_release_block = true;
+    } else if (!peer_addr) {
+        LOG_DEBUG(log, "on_block, file: '{}', hash: {}, peer is no longer available", payload.file_name,
+                  file_block.block()->get_hash());
+        do_release_block = true;
     } else {
         auto folder = file->get_folder_info()->get_folder();
         if (ee) {
@@ -961,10 +967,12 @@ auto controller_actor_t::get_sync_info(std::string_view folder_id) noexcept -> f
 void controller_actor_t::acquire_block(const model::file_block_t &file_block) noexcept {
     auto block = file_block.block();
     auto folder = file_block.file()->get_folder_info()->get_folder();
+    LOG_TRACE(log, "acquire block '{}'", block->get_hash());
     get_sync_info(folder)->start_fetching(block);
 }
 
 void controller_actor_t::release_block(std::string_view folder_id, utils::bytes_view_t hash) noexcept {
+    LOG_TRACE(log, "release block '{}'", hash);
     get_sync_info(folder_id)->finish_fetching(hash);
 }
 

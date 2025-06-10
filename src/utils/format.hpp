@@ -71,12 +71,12 @@ template <> struct fmt::formatter<syncspirit::utils::bytes_view_t> {
 
     auto format(object_t bytes, format_context &ctx) const -> format_context::iterator {
         auto sz = bytes.size();
-        if (sz > 16) {
-            for (size_t i = 0; i < 8; ++i) {
+        if (sz >= 10) {
+            for (size_t i = 0; i < 6; ++i) {
                 fmt::format_to(ctx.out(), "{:x}", bytes[i]);
             }
-            fmt::format_to(ctx.out(), "...");
-            for (size_t i = sz - 5; i < sz; ++i) {
+            fmt::format_to(ctx.out(), "..");
+            for (size_t i = sz - 2; i < sz; ++i) {
                 fmt::format_to(ctx.out(), "{:x}", bytes[i]);
             }
         } else {
@@ -85,6 +85,17 @@ template <> struct fmt::formatter<syncspirit::utils::bytes_view_t> {
             }
         }
         return ctx.out();
+    }
+};
+
+template <> struct fmt::formatter<syncspirit::utils::bytes_t> {
+    using object_t = syncspirit::utils::bytes_t;
+
+    constexpr auto parse(format_parse_context &ctx) -> format_parse_context::iterator { return ctx.begin(); }
+
+    auto format(const object_t &bytes, format_context &ctx) const -> format_context::iterator {
+        auto view = syncspirit::utils::bytes_view_t(bytes);
+        return fmt::format_to(ctx.out(), "{}", view);
     }
 };
 
