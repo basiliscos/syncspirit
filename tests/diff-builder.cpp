@@ -143,6 +143,11 @@ diff_builder_t &diff_builder_t::apply(rotor::supervisor_t &sup) noexcept {
     return *this;
 }
 
+void diff_builder_t::send(rotor::supervisor_t &sup) noexcept {
+    assert(cluster_diff);
+    sup.send<model::payload::model_update_t>(receiver, std::move(cluster_diff), nullptr);
+}
+
 auto diff_builder_t::apply() noexcept -> outcome::result<void> {
     auto r = outcome::result<void>(outcome::success());
     bool do_try = true;

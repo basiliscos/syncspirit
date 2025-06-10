@@ -57,6 +57,7 @@ struct sample_peer_t : r::actor_base_t {
 
     using remote_message_t = r::intrusive_ptr_t<net::message::forwarded_message_t>;
     using remote_messages_t = std::list<remote_message_t>;
+    using shutdown_start_callback_t = std::function<void()>;
 
     struct block_response_t {
         std::string name;
@@ -99,6 +100,9 @@ struct sample_peer_t : r::actor_base_t {
         LOG_TRACE(log, "{}, shutdown_start", identity);
         if (controller) {
             send<net::payload::peer_down_t>(controller, shutdown_reason);
+        }
+        if (shutdown_start_callback) {
+            shutdown_start_callback();
         }
         r::actor_base_t::shutdown_start();
     }
@@ -237,6 +241,7 @@ struct sample_peer_t : r::actor_base_t {
     block_responses_t block_responses;
     uploaded_blocks_t uploaded_blocks;
     allowed_index_updates_t allowed_index_updates;
+    shutdown_start_callback_t shutdown_start_callback;
 };
 
 struct fixture_t {
@@ -1708,6 +1713,46 @@ void test_peer_removal() {
     F(true, 10).run();
 }
 
+void test_peer_down() {
+    struct F : fixture_t {
+        using fixture_t::fixture_t;
+        void main(diff_builder_t &) noexcept override {
+            sup->do_process();
+
+            auto builder = diff_builder_t(*cluster, sup->get_address());
+            auto sha256 = peer_device->device_id().get_sha256();
+
+            auto cc = proto::ClusterConfig{};
+            auto &folder = proto::add_folders(cc);
+            proto::set_id(folder, folder_1->get_id());
+            auto &d_peer = proto::add_devices(folder);
+            proto::set_id(d_peer, peer_device->device_id().get_sha256());
+            proto::set_max_sequence(d_peer, 15);
+            proto::set_index_id(d_peer, 12345);
+
+            peer_actor->forward(cc);
+            sup->do_process();
+
+            builder.share_folder(sha256, folder_1->get_id()).apply(*sup);
+            auto folder_peer = folder_1->get_folder_infos().by_device(*peer_device);
+            REQUIRE(folder_peer->get_index() == proto::get_index_id(d_peer));
+
+            peer_actor->shutdown_start_callback = [&]() {
+                proto::FileInfo pr_file_info;
+                auto file_name = std::string_view("link");
+                proto::set_name(pr_file_info, file_name);
+                proto::set_type(pr_file_info, proto::FileInfoType::SYMLINK);
+                proto::set_symlink_target(pr_file_info, "/some/where");
+
+                builder.local_update(folder_1->get_id(), pr_file_info).send(*sup);
+            };
+            peer_actor->do_shutdown();
+            sup->do_process();
+        }
+    };
+    F(false, 10, false).run();
+}
+
 void test_conflicts() {
     struct F : fixture_t {
         using fixture_t::fixture_t;
@@ -2232,6 +2277,7 @@ int _init() {
     REGISTER_TEST_CASE(test_initiate_peer_sharing, "test_initiate_peer_sharing", "[net]");
     REGISTER_TEST_CASE(test_sending_index_updates, "test_sending_index_updates", "[net]");
     REGISTER_TEST_CASE(test_uploading, "test_uploading", "[net]");
+    REGISTER_TEST_CASE(test_peer_down, "test_peer_down", "[net]");
     REGISTER_TEST_CASE(test_peer_removal, "test_peer_removal", "[net]");
     REGISTER_TEST_CASE(test_conflicts, "test_conflicts", "[net]");
     REGISTER_TEST_CASE(test_download_interrupting, "test_download_interrupting", "[net]");

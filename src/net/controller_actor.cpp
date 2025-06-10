@@ -189,7 +189,7 @@ void controller_actor_t::send_cluster_config() noexcept {
 }
 
 void controller_actor_t::send_new_indices() noexcept {
-    if (updates_streamer) {
+    if (updates_streamer && peer_addr) {
         auto &remote_folders = peer->get_remote_folder_infos();
         for (auto it : cluster->get_folders()) {
             auto &folder = *it.item;
@@ -238,7 +238,7 @@ void controller_actor_t::push_pending() noexcept {
     using pair_t = std::pair<model::folder_info_t *, proto::IndexUpdate>;
     using indices_t = std::vector<pair_t>;
 
-    if (!updates_streamer) {
+    if (!updates_streamer || !peer_addr) {
         return;
     }
 
@@ -382,6 +382,11 @@ OUTER:
 
 void controller_actor_t::preprocess_block(model::file_block_t &file_block) noexcept {
     using namespace model::diff;
+    if (!peer_addr) {
+        LOG_TRACE(log, "ignoring block, as there is no peer");
+        return;
+    }
+
     auto file = file_block.file();
     assert(file);
     auto block = file_block.block();
@@ -732,11 +737,13 @@ void controller_actor_t::on_message(proto::Request &req) noexcept {
     }
 
     if (code != proto::ErrorCode::NO_BEP_ERROR) {
-        proto::set_id(res, proto::get_id(req));
-        proto::set_code(res, code);
-        auto data = proto::serialize(res, peer->get_compression());
-        outgoing_buffer += static_cast<uint32_t>(data.size());
-        send<payload::transfer_data_t>(peer_addr, std::move(data));
+        if (peer_addr) {
+            proto::set_id(res, proto::get_id(req));
+            proto::set_code(res, code);
+            auto data = proto::serialize(res, peer->get_compression());
+            outgoing_buffer += static_cast<uint32_t>(data.size());
+            send<payload::transfer_data_t>(peer_addr, std::move(data));
+        }
     } else {
         ++tx_blocks_requested;
         send<fs::payload::block_request_t>(fs_addr, std::move(req), address);
@@ -749,6 +756,10 @@ void controller_actor_t::on_message(proto::DownloadProgress &) noexcept {
 
 void controller_actor_t::on_block_response(fs::message::block_response_t &message) noexcept {
     --tx_blocks_requested;
+    if (!peer_addr) {
+        return;
+    }
+
     auto &p = message.payload;
     proto::Response res;
     proto::set_id(res, proto::get_id(p.remote_request));
