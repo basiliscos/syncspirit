@@ -65,6 +65,7 @@ C::folder_synchronization_t::~folder_synchronization_t() {
 void C::folder_synchronization_t::reset() noexcept { folder.reset(); }
 
 void C::folder_synchronization_t::start_fetching(model::block_info_t *block) noexcept {
+    assert(!block->is_locked());
     block->lock();
     if (blocks.empty() && !synchronizing) {
         start_sync();
@@ -99,7 +100,7 @@ controller_actor_t::controller_actor_t(config_t &config)
       rx_blocks_requested{0}, tx_blocks_requested{0}, outgoing_buffer{0},
       outgoing_buffer_max{config.outgoing_buffer_max}, request_pool{config.request_pool},
       blocks_max_requested{config.blocks_max_requested}, advances_per_iteration{config.advances_per_iteration},
-      default_path(std::move(config.default_path)) {
+      default_path(std::move(config.default_path)), announced{false} {
     {
         assert(cluster);
         assert(sequencer);
@@ -158,6 +159,7 @@ void controller_actor_t::on_start() noexcept {
     send_cluster_config();
     resources->acquire(resource::peer);
     LOG_INFO(log, "is online (connection: {})", connection_id);
+    announced = true;
     file_iterator = peer->create_iterator(*cluster);
 }
 
@@ -177,7 +179,9 @@ void controller_actor_t::shutdown_finish() noexcept {
     file_iterator.reset();
     synchronizing_folders.clear();
     send_diff();
-    send<payload::controller_down_t>(coordinator, address, peer_address);
+    if (announced) {
+        send<payload::controller_down_t>(coordinator, address, peer_address);
+    }
     r::actor_base_t::shutdown_finish();
 }
 

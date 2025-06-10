@@ -156,7 +156,7 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
         if (peer_address) {
             send<M>(peer_address, std::forward<Args>(args)...);
         } else {
-            LOG_TRACE(log, "peer is no longer available, send has been ingored");
+            LOG_DEBUG(log, "peer is no longer available, send has been ingored");
         }
     }
 
@@ -248,6 +248,7 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     synchronizing_files_t synchronizing_files;
     block_write_queue_t block_write_queue;
     std::optional<r::request_id_t> fs_ack_timer;
+    bool announced;
 };
 
 } // namespace net
