@@ -152,6 +152,14 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     using synchronizing_files_t = std::unordered_map<utils::bytes_view_t, model::file_info_t::guard_ptr_t>;
     using updates_streamer_ptr_t = std::unique_ptr<model::updates_streamer_t>;
 
+    template <typename M, typename... Args> void send_to_peer(Args &&...args) noexcept {
+        if (peer_address) {
+            send<M>(peer_address, std::forward<Args>(args)...);
+        } else {
+            LOG_TRACE(log, "peer is no longer available, send has been ingored");
+        }
+    }
+
     void on_peer_down(message::peer_down_t &message) noexcept;
     void on_forward(message::forwarded_message_t &message) noexcept;
     void on_block(message::block_response_t &message) noexcept;
@@ -209,7 +217,7 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     model::device_ptr_t peer;
     std::string connection_id;
     r::address_ptr_t coordinator;
-    r::address_ptr_t peer_addr;
+    r::address_ptr_t peer_address;
     r::address_ptr_t hasher_proxy;
     r::address_ptr_t fs_addr;
     r::address_ptr_t open_reading; /* for routing */
