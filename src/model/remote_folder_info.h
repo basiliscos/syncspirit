@@ -44,7 +44,7 @@ struct SYNCSPIRIT_API remote_folder_info_t final : augmentable_t {
     std::uint64_t index_id;
     std::int64_t max_sequence;
     device_t *device;
-    folder_t *folder;
+    folder_ptr_t folder;
 };
 
 struct SYNCSPIRIT_API remote_folder_infos_map_t : public generic_map_t<remote_folder_info_t_ptr_t, 1> {
