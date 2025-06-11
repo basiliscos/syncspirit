@@ -105,6 +105,9 @@ void main_window_t::on_loading_done() {
     activate();
 }
 
-void main_window_t::detach_supervisor() { supervisor = nullptr; }
+void main_window_t::detach_supervisor() {
+    clear();
+    supervisor = nullptr;
+}
 
 app_supervisor_t *main_window_t::get_supervisor() { return supervisor; }
