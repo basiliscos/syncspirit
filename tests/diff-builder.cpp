@@ -162,6 +162,11 @@ auto diff_builder_t::apply() noexcept -> outcome::result<void> {
     return r;
 }
 
+auto diff_builder_t::extract() noexcept -> model::diff::cluster_diff_ptr_t {
+    assert(cluster_diff);
+    return std::move(cluster_diff);
+}
+
 diff_builder_t &diff_builder_t::then() noexcept {
     auto r = apply();
     if (!r) {

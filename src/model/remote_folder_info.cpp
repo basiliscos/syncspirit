@@ -10,6 +10,8 @@ auto remote_folder_info_t::create(std::uint64_t index_id, std::int64_t max_seque
     return outcome::success(ptr);
 }
 
+remote_folder_info_t::~remote_folder_info_t() {}
+
 remote_folder_info_t::remote_folder_info_t(std::uint64_t index_id_, std::int64_t max_sequence_, device_t &device_,
                                            folder_t &folder_) noexcept
     : index_id{index_id_}, max_sequence{max_sequence_}, device{&device_}, folder{&folder_} {}

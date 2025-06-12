@@ -5,9 +5,9 @@
 
 #include <cstdint>
 #include "syncspirit-export.h"
-#include <boost/outcome.hpp>
 #include "misc/augmentation.h"
 #include "misc/map.hpp"
+#include <boost/outcome.hpp>
 
 namespace syncspirit::model {
 
@@ -30,6 +30,7 @@ struct SYNCSPIRIT_API remote_folder_info_t final : augmentable_t {
     static outcome::result<remote_folder_info_t_ptr_t> create(std::uint64_t index_id, std::int64_t max_sequence,
                                                               device_t &device_, folder_t &folder_) noexcept;
 
+    ~remote_folder_info_t();
     std::string_view get_key() const noexcept;
 
     inline std::uint64_t get_index() const noexcept { return index_id; }
