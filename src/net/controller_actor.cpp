@@ -66,6 +66,7 @@ void C::folder_synchronization_t::reset() noexcept { folder.reset(); }
 
 void C::folder_synchronization_t::start_fetching(model::block_info_t *block) noexcept {
     assert(!block->is_locked());
+    assert(blocks.find(block->get_hash()) == blocks.end());
     block->lock();
     if (blocks.empty() && !synchronizing) {
         start_sync();
@@ -971,7 +972,7 @@ auto controller_actor_t::get_sync_info(std::string_view folder_id) noexcept -> f
 void controller_actor_t::acquire_block(const model::file_block_t &file_block) noexcept {
     auto block = file_block.block();
     auto folder = file_block.file()->get_folder_info()->get_folder();
-    LOG_TRACE(log, "acquire block '{}'", block->get_hash());
+    LOG_TRACE(log, "acquire block '{}', {}", block->get_hash(), (const void *)block);
     get_sync_info(folder)->start_fetching(block);
 }
 
