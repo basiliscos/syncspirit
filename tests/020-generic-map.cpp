@@ -104,11 +104,16 @@ TEST_CASE("generic map ops") {
     auto i1 = item_t{k, 1};
     auto i2 = item_t{k, 2};
 
-    map.put(i1);
+    CHECK(map.put(i1));
     CHECK(map.get(k).value == 1);
     CHECK(map.get(kv).value == 1);
 
-    map.put(i2);
+    CHECK(map.put(i2, true));
+    CHECK(map.get(k).value == 2);
+    CHECK(map.get(kv).value == 2);
+    REQUIRE(map.size() == 1);
+
+    CHECK(!map.put(i1, false));
     CHECK(map.get(k).value == 2);
     CHECK(map.get(kv).value == 2);
     REQUIRE(map.size() == 1);

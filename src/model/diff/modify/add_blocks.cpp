@@ -4,6 +4,7 @@
 #include "add_blocks.h"
 #include "model/cluster.h"
 #include "model/diff/cluster_visitor.h"
+#include "utils/format.hpp"
 
 using namespace syncspirit::model::diff::modify;
 
@@ -20,7 +21,9 @@ auto add_blocks_t::apply_impl(cluster_t &cluster, apply_controller_t &controller
             return opt.assume_error();
         }
         auto block = std::move(opt.assume_value());
-        bm.put(block);
+        if (!bm.put(block, false)) {
+            LOG_WARN(log, "add_blocks_t, failed to insert block '{}', already exists", block->get_hash());
+        }
     }
     return applicator_t::apply_sibling(cluster, controller);
 }

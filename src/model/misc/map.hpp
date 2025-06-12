@@ -103,13 +103,14 @@ template <typename Item, typename WrappedItem> struct generalized_map_t {
     using const_iterator_t = decltype(std::declval<map_t>().template get<0>().cbegin());
     using sequence_t = std::make_index_sequence<N>;
 
-    void put(const Item &item) noexcept {
+    bool put(const Item &item, bool replace = true) noexcept {
         auto r = key2item.emplace(item, make_key(item));
-        if (!r.second) {
+        if (!r.second && replace) {
             remove(item);
             r = key2item.emplace(item, make_key(item));
             assert(r.second);
         }
+        return r.second;
     }
 
     void remove(const Item &item) noexcept {
