@@ -320,3 +320,5 @@ void presence_item_t::insert_node(presence_item_ptr_t node, int position) {
 }
 
 bool presence_item_t::is_expanded() const { return expanded; }
+
+void presence_item_t::on_delete() noexcept { presence = {}; }
