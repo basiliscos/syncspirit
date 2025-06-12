@@ -11,8 +11,8 @@
 using namespace syncspirit::model::diff::modify;
 
 block_ack_t::block_ack_t(const block_transaction_t &txn) noexcept : parent_t(txn) {
-    LOG_DEBUG(log, "block_ack_t, file = {}, folder = {}, block: #{} (hash: {})", file_name, folder_id,
-              block_index, block_hash);
+    LOG_DEBUG(log, "block_ack_t, file = {}, folder = {}, block: #{} (hash: {})", file_name, folder_id, block_index,
+              block_hash);
 }
 
 auto block_ack_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept

@@ -203,7 +203,8 @@ void db_actor_t::on_start() noexcept {
 }
 
 void db_actor_t::shutdown_finish() noexcept {
-    if (txn_holder) {
+    if (txn_holder && uncommitted) {
+        uncommitted = db_config.uncommitted_threshold;
         auto r = commit_on_demand();
         if (!r) {
             auto &err = r.assume_error();
