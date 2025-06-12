@@ -11,7 +11,7 @@
 using namespace syncspirit::model::diff::modify;
 
 block_ack_t::block_ack_t(const block_transaction_t &txn) noexcept : parent_t(txn) {
-    LOG_DEBUG(log, "block_ack_t, file = {}, folder = {}, block_index = {}, block = {}", file_name, folder_id,
+    LOG_DEBUG(log, "block_ack_t, file = {}, folder = {}, block: #{} (hash: {})", file_name, folder_id,
               block_index, block_hash);
 }
 
@@ -24,14 +24,17 @@ auto block_ack_t::apply_impl(cluster_t &cluster, apply_controller_t &controller)
         if (folder_info) {
             auto file = folder_info->get_file_infos().by_name(file_name);
             if (file) {
-                LOG_TRACE(log, "block_ack_t, '{}' block #{} (hash: {})", file->get_path(), block_index, block_hash);
-                file->mark_local_available(block_index);
-                success = true;
+                if (!file->is_locally_available(block_index)) {
+                    LOG_TRACE(log, "block_ack_t, '{}' block #{} (hash: {})", file->get_path(), block_index, block_hash);
+                    file->mark_local_available(block_index);
+                    success = true;
+                }
             }
         }
     }
     if (!success) {
-        LOG_TRACE(log, "block_ack_t failed, folder = '{}', file = '{}', block # {}", folder_id, file_name, block_index);
+        LOG_TRACE(log, "block_ack_t failed, folder = '{}', file = '{}', block: #{} (hash: {})", folder_id, file_name,
+                  block_index, block_hash);
     }
     return applicator_t::apply_sibling(cluster, controller);
 }
