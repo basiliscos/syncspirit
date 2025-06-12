@@ -417,10 +417,10 @@ auto file_actor_t::open_file_rw(const std::filesystem::path &path, model::file_i
 }
 
 auto file_actor_t::open_file_ro(const bfs::path &path, bool use_cache) noexcept -> outcome::result<file_ptr_t> {
-    LOG_TRACE(log, "open_file (r/o, by path), path = {}", path.string());
     if (use_cache) {
         auto file = rw_cache->get(path.string());
         if (file) {
+            LOG_TRACE(log, "open_file (r/o, by path, cache hit), path = {}", path.string());
             return file;
         }
     }
@@ -429,5 +429,6 @@ auto file_actor_t::open_file_ro(const bfs::path &path, bool use_cache) noexcept 
     if (!opt) {
         return opt.assume_error();
     }
+    LOG_TRACE(log, "open_file (r/o, by path), path = {}", path.string());
     return file_ptr_t(new file_t(std::move(opt.assume_value())));
 }
