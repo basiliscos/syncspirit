@@ -19,8 +19,8 @@ auto file_infos_t::apply_impl(cluster_t &cluster, apply_controller_t &controller
     using folder_info_by_id_t = std::unordered_map<utils::bytes_view_t, folder_info_ptr_t>;
     auto all_fi = folder_info_by_id_t{};
     auto &folders = cluster.get_folders();
-    for (auto f : folders) {
-        for (auto it : f.item->get_folder_infos()) {
+    for (auto &f : folders) {
+        for (auto &it : f.item->get_folder_infos()) {
             auto &f = it.item;
             all_fi[f->get_uuid()] = f;
         }
@@ -31,11 +31,7 @@ auto file_infos_t::apply_impl(cluster_t &cluster, apply_controller_t &controller
         auto &db = pair.second;
         auto folder_info_uuid = key.subspan(1, uuid_length);
         auto folder_info = all_fi[folder_info_uuid];
-        if (!folder_info) {
-            auto name = db::get_name(db);
-            LOG_WARN(log, "cannot restore file '{}', missing folder, corrupted db?", name);
-            continue;
-        }
+        assert(folder_info);
 
         auto option = file_info_t::create(key, db, folder_info);
         if (!option) {
@@ -44,22 +40,13 @@ auto file_infos_t::apply_impl(cluster_t &cluster, apply_controller_t &controller
         auto &fi = option.assume_value();
 
         auto blocks_count = db::get_blocks_size(db);
-        auto confirmed_blocks = size_t{0};
         for (size_t i = 0; i < blocks_count; ++i) {
             auto block_hash = db::get_blocks(db, i);
             auto block = blocks.by_hash(block_hash);
-            if (block) {
-                fi->assign_block(std::move(block), i);
-                ++confirmed_blocks;
-            } else {
-                break;
-            }
+            assert(block);
+            fi->assign_block(std::move(block), i);
         }
-        if (blocks_count == confirmed_blocks) {
-            folder_info->add_relaxed(fi);
-        } else {
-            LOG_WARN(log, "1+ block(s) are missing for file '{}', discarding the file", fi->get_name());
-        }
+        folder_info->add_relaxed(fi);
     }
     return applicator_t::apply_sibling(cluster, controller);
 }
