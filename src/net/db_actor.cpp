@@ -390,21 +390,22 @@ void db_actor_t::on_cluster_load(message::load_cluster_request_t &request) noexc
                     auto block_hash = db::get_blocks(db_fi, i);
                     auto it = known_hashes.find(block_hash);
                     if (it == known_hashes.end()) {
-                        LOG_WARN(log, "block #{} '{}' is missing file '{}'", i, block_hash, name);
+                        LOG_INFO(log, "block #{} '{}' is missing file '{}', assuming corruped", i, block_hash, name);
                         success = false;
                         break;
                     }
                 }
 
                 auto key = ptr->key;
-                auto folder_info_uuid_raw = key.subspan(1, model::uuid_length);
-                auto b = reinterpret_cast<const char *>(folder_info_uuid_raw.data());
-                auto e = b + folder_info_uuid_raw.size();
-                auto folder_info_uuid = folder_infos_uuids_t::value_type(b, e, allocator);
-                if (folder_infos_uuids.count(folder_info_uuid) == 0) {
-                    LOG_INFO(log, "cannot restore file '{}', missing folder", name);
-                    success = false;
-                } else {
+                if (success) {
+                    auto folder_info_uuid_raw = key.subspan(1, model::uuid_length);
+                    auto b = reinterpret_cast<const char *>(folder_info_uuid_raw.data());
+                    auto e = b + folder_info_uuid_raw.size();
+                    auto folder_info_uuid = folder_infos_uuids_t::value_type(b, e, allocator);
+                    if (folder_infos_uuids.count(folder_info_uuid) == 0) {
+                        LOG_INFO(log, "cannot restore file '{}', missing folder, assuming corruped", name);
+                        success = false;
+                    }
                 }
                 if (success) {
                     items.emplace_back(item_t{key, std::move(db_fi)});
