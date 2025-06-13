@@ -6,6 +6,7 @@
 #include "fs/utils.h"
 #include "diff-builder.h"
 #include "net/messages.h"
+#include "net/names.h"
 #include "test_supervisor.h"
 #include "access.h"
 #include "model/cluster.h"
@@ -38,6 +39,8 @@ struct fixture_t {
 
     virtual supervisor_t::configure_callback_t configure() noexcept {
         return [&](r::plugin::plugin_base_t &plugin) {
+            plugin.template with_casted<r::plugin::registry_plugin_t>(
+                [&](auto &p) { p.register_name(net::names::db, sup->get_address()); });
             plugin.template with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
                 p.subscribe_actor(r::lambda<msg_t>([&](msg_t &msg) { reply = &msg; }));
                 p.subscribe_actor(r::lambda<blk_res_t>([&](blk_res_t &msg) { block_reply = &msg; }));

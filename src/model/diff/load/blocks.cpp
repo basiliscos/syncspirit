@@ -4,8 +4,6 @@
 #include "blocks.h"
 #include "model/cluster.h"
 #include "model/diff/apply_controller.h"
-#include "model/misc/error_code.h"
-#include "proto/proto-helpers-db.h"
 
 using namespace syncspirit::model::diff::load;
 
@@ -17,11 +15,7 @@ auto blocks_t::apply_forward(cluster_t &cluster, apply_controller_t &controller)
 auto blocks_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept -> outcome::result<void> {
     auto &blocks_map = cluster.get_blocks();
     for (auto &pair : blocks) {
-        auto db_block = db::BlockInfo();
-        if (auto left = db::decode(pair.value, db_block); left) {
-            return make_error_code(error_code_t::block_deserialization_failure);
-        }
-        auto block = block_info_t::create(pair.key, db_block);
+        auto block = block_info_t::create(pair.key, pair.db_block);
         if (block.has_error()) {
             return block.assume_error();
         }

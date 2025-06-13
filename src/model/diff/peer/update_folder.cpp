@@ -7,7 +7,9 @@
 #include "model/diff/modify/remove_blocks.h"
 #include "model/diff/cluster_visitor.h"
 #include "model/misc/error_code.h"
-#include "proto/proto-helpers.h"
+#include "proto/proto-helpers-bep.h"
+
+#include <memory_resource>
 
 using namespace syncspirit;
 using namespace syncspirit::model;
@@ -146,6 +148,11 @@ static auto construct(sequencer_t &sequencer, folder_info_ptr_t &folder_info, sy
 
 static auto instantiate(const cluster_t &cluster, sequencer_t &sequencer, const device_t &source,
                         const syncspirit::proto::IndexBase &message) noexcept -> outcome::result<diff_t> {
+    auto buffer = std::array<std::byte, 10 * 1024>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    using unique_blocks_t = std::pmr::unordered_set<std::pmr::string>;
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+
     auto folder_id = proto::get_folder(message);
     auto folder = cluster.get_folders().by_id(folder_id);
     if (!folder) {
@@ -160,8 +167,9 @@ static auto instantiate(const cluster_t &cluster, sequencer_t &sequencer, const 
 
     auto log = update_folder_t::get_log();
     auto &blocks = cluster.get_blocks();
-    update_folder_t::files_t files;
-    update_folder_t::blocks_t new_blocks;
+    auto files = update_folder_t::files_t();
+    auto unique_new_blocks = unique_blocks_t(allocator);
+    auto new_blocks = update_folder_t::blocks_t();
     auto prev_sequence = fi->get_max_sequence();
     auto files_count = proto::get_files_size(message);
     files.reserve(files_count);
@@ -193,8 +201,15 @@ static auto instantiate(const cluster_t &cluster, sequencer_t &sequencer, const 
             size_by_blocks += proto::get_size(b);
             auto hash = proto::get_hash(b);
             auto strict_hash = block_info_t::make_strict_hash(hash);
-            if (!blocks.by_hash(strict_hash.get_hash())) {
-                new_blocks.emplace_back(b);
+            auto h = strict_hash.get_hash();
+            if (!blocks.by_hash(h)) {
+                auto from = reinterpret_cast<const char *>(h.data());
+                auto to = from + h.size();
+                auto hash_str = std::pmr::string(from, to, allocator);
+                auto result = unique_new_blocks.emplace(hash_str);
+                if (result.second) {
+                    new_blocks.emplace_back(b);
+                }
             }
         }
         if (is_downloadable && file_size != size_by_blocks) {

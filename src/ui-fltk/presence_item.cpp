@@ -78,6 +78,9 @@ presence_item_t::~presence_item_t() {
     while (children() > 0) {
         safe_detach(0);
     }
+    if (presence) {
+        presence->get_augmentation().detach();
+    }
 }
 
 void presence_item_t::on_open() {
@@ -317,3 +320,5 @@ void presence_item_t::insert_node(presence_item_ptr_t node, int position) {
 }
 
 bool presence_item_t::is_expanded() const { return expanded; }
+
+void presence_item_t::on_delete() noexcept { presence = {}; }

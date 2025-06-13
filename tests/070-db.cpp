@@ -84,6 +84,8 @@ struct fixture_t {
         return cluster;
     }
 
+    virtual config::db_config_t make_config() noexcept { return config::db_config_t{1024 * 1024, 0, 64, 32}; }
+
     virtual fixture_t &run() noexcept {
         cluster = make_cluster();
 
@@ -96,17 +98,7 @@ struct fixture_t {
         sup->do_process();
         CHECK(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::OPERATIONAL);
 
-        auto db_config = config::db_config_t{1024 * 1024, 0, 64, 32};
-        db_actor = sup->create_actor<db_actor_t>()
-                       .cluster(cluster)
-                       .db_dir(root_path.string())
-                       .db_config(db_config)
-                       .timeout(timeout)
-                       .finish();
-        sup->do_process();
-
-        CHECK(static_cast<r::actor_base_t *>(db_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
-        db_addr = db_actor->get_address();
+        launch_db();
         main();
         reply.reset();
 
@@ -115,6 +107,19 @@ struct fixture_t {
 
         CHECK(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::SHUT_DOWN);
         return *this;
+    }
+
+    virtual void launch_db() {
+        db_actor = sup->create_actor<db_actor_t>()
+                       .cluster(cluster)
+                       .db_dir(root_path.string())
+                       .db_config(make_config())
+                       .timeout(timeout)
+                       .finish();
+        sup->do_process();
+
+        CHECK(static_cast<r::actor_base_t *>(db_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
+        db_addr = db_actor->get_address();
     }
 
     virtual void main() noexcept {}
@@ -1118,7 +1123,7 @@ void test_corrupted_file() {
 
             auto folder = cluster->get_folders().by_id(folder_id);
             auto fi = folder->get_folder_infos().by_device(*my_device);
-            ;
+
             auto file = fi->get_file_infos().by_name("a.txt");
             REQUIRE(file);
 
@@ -1126,29 +1131,108 @@ void test_corrupted_file() {
             auto txn_opt = db::make_transaction(db::transaction_type_t::RW, db_env);
             REQUIRE(txn_opt);
             auto &txn = txn_opt.value();
-            auto key = block.get_key();
-            REQUIRE(db::remove(key, txn));
-            REQUIRE(!txn.commit().has_error());
 
-            sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
-            sup->do_process();
-            REQUIRE(reply);
-            REQUIRE(!reply->payload.ee);
+            auto diff = model::diff::cluster_diff_ptr_t();
+            SECTION("missing block") {
+                auto key = block.get_key();
+                REQUIRE(db::remove(key, txn));
+                REQUIRE(!txn.commit().has_error());
 
-            auto cluster_clone = make_cluster(false);
-            {
-                REQUIRE(reply->payload.res.diff->apply(*cluster_clone, get_apply_controller()));
+                sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
+                sup->do_process();
+                REQUIRE(reply);
+                REQUIRE(!reply->payload.ee);
+
+                auto cluster_clone = make_cluster(false);
+                diff = reply->payload.res.diff;
+                REQUIRE(diff->apply(*cluster_clone, get_apply_controller()));
                 auto &folder_infos = cluster_clone->get_folders().by_id(folder_id)->get_folder_infos();
                 auto folder_info = folder_infos.by_device(*my_device);
                 CHECK(folder_info->get_file_infos().size() == 0);
                 auto &blocks = cluster_clone->get_blocks();
                 CHECK(blocks.size() == 0);
             }
+
+            SECTION("missing folder") {
+                auto key = fi->get_key();
+                REQUIRE(db::remove(key, txn));
+                REQUIRE(!txn.commit().has_error());
+
+                sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
+                sup->do_process();
+                REQUIRE(reply);
+                REQUIRE(!reply->payload.ee);
+
+                auto cluster_clone = make_cluster(false);
+                diff = reply->payload.res.diff;
+                REQUIRE(diff->apply(*cluster_clone, get_apply_controller()));
+                auto &folder_infos = cluster_clone->get_folders().by_id(folder_id)->get_folder_infos();
+                REQUIRE(folder_infos.size() == 0);
+                auto &blocks = cluster_clone->get_blocks();
+                CHECK(blocks.size() == 1);
+            }
+
+            REQUIRE(diff);
+            sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff));
+            sup->do_process();
+
+            txn_opt = db::make_transaction(db::transaction_type_t::RW, db_env);
+            REQUIRE(txn_opt);
+
+            auto files_opt = db::load(db::prefix::file_info, txn);
+            REQUIRE(files_opt);
+            CHECK(files_opt.value().size() == 0);
         }
     };
 
     F().run();
 }
+
+void test_flush_on_shutdown() {
+    struct F : fixture_t {
+
+        config::db_config_t make_config() noexcept override { return config::db_config_t{1024 * 1024, 100, 64, 32}; }
+
+        void main() noexcept override {
+
+            auto folder_id = "1234-5678";
+
+            auto pr_file = proto::FileInfo();
+            proto::set_name(pr_file, "a.txt");
+            proto::set_size(pr_file, 5ul);
+
+            auto hash = utils::sha256_digest(as_bytes("12345")).value();
+            auto &pr_block = proto::add_blocks(pr_file);
+            proto::set_size(pr_block, 5ul);
+            proto::set_hash(pr_block, hash);
+
+            auto builder = diff_builder_t(*cluster);
+            builder.upsert_folder(folder_id, "/my/path").apply(*sup).local_update(folder_id, pr_file).apply(*sup);
+
+            db_actor->do_shutdown();
+            sup->do_process();
+
+            launch_db();
+
+            SECTION("loaded data") {
+                sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
+                sup->do_process();
+                REQUIRE(reply);
+                REQUIRE(!reply->payload.ee);
+                auto cluster_clone = make_cluster();
+                REQUIRE(reply->payload.res.diff->apply(*cluster_clone, get_apply_controller()));
+
+                auto folder = cluster_clone->get_folders().by_id(folder_id);
+                auto folder_my = folder->get_folder_infos().by_device(*my_device);
+                auto file = folder_my->get_file_infos().by_name("a.txt");
+                REQUIRE(file);
+                CHECK(file->get_blocks().size() == 1);
+                CHECK(cluster_clone->get_blocks().size() == 1);
+            }
+        }
+    };
+    F().run();
+};
 
 int _init() {
     REGISTER_TEST_CASE(test_db_population, "test_db_population", "[db]");
@@ -1168,6 +1252,7 @@ int _init() {
     REGISTER_TEST_CASE(test_peer_3_folders_6_files, "test_peer_3_folders_6_files", "[db]");
     REGISTER_TEST_CASE(test_db_migration_1_2, "test_db_migration_1_2", "[db]");
     REGISTER_TEST_CASE(test_corrupted_file, "test_corrupted_file", "[db]");
+    REGISTER_TEST_CASE(test_flush_on_shutdown, "test_flush_on_shutdown", "[db]");
     return 1;
 }
 

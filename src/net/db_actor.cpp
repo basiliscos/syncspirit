@@ -20,6 +20,7 @@
 #include "model/diff/load/load_cluster.h"
 #include "model/diff/load/pending_devices.h"
 #include "model/diff/load/pending_folders.h"
+#include "model/diff/load/remove_corrupted_files.h"
 #include "model/diff/modify/add_blocks.h"
 #include "model/diff/modify/add_ignored_device.h"
 #include "model/diff/modify/add_pending_device.h"
@@ -39,21 +40,18 @@
 #include "model/diff/peer/cluster_update.h"
 #include "model/diff/cluster_visitor.h"
 #include "model/misc/error_code.h"
+#include "utils/format.hpp"
 #include <string_view>
 #include <cstring>
-
-#ifdef WIN32_LEAN_AND_MEAN
-#include <malloc.h>
-#else
-#include <alloca.h>
-#endif
+#include <memory_resource>
 
 namespace syncspirit::net {
 
 namespace {
 namespace resource {
 r::plugin::resource_id_t db = 0;
-}
+r::plugin::resource_id_t controller = 1;
+} // namespace resource
 } // namespace
 
 #if 0
@@ -87,10 +85,11 @@ db_actor_t::~db_actor_t() {
 void db_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
-        p.set_identity("net.db", false);
+        p.set_identity(names::db, false);
         log = utils::get_logger(identity);
     });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
+        p.register_name(names::db, get_address());
         p.discover_name(names::coordinator, coordinator, false).link(false).callback([&](auto phase, auto &ee) {
             if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {
                 auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
@@ -98,6 +97,8 @@ void db_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 plugin->subscribe_actor(&db_actor_t::on_model_load_release);
                 plugin->subscribe_actor(&db_actor_t::on_model_update, coordinator);
                 plugin->subscribe_actor(&db_actor_t::on_db_info, coordinator);
+                plugin->subscribe_actor(&db_actor_t::on_controller_up, coordinator);
+                plugin->subscribe_actor(&db_actor_t::on_controller_down, coordinator);
             }
         });
     });
@@ -199,7 +200,8 @@ void db_actor_t::on_start() noexcept {
 }
 
 void db_actor_t::shutdown_finish() noexcept {
-    if (txn_holder) {
+    if (txn_holder && uncommitted) {
+        uncommitted = db_config.uncommitted_threshold;
         auto r = commit_on_demand();
         if (!r) {
             auto &err = r.assume_error();
@@ -233,9 +235,28 @@ void db_actor_t::on_db_info(message::db_info_request_t &request) noexcept {
     reply_to(request, info);
 }
 
+void db_actor_t::on_controller_up(net::message::controller_up_t &message) noexcept {
+    LOG_DEBUG(log, "on_controller_up, {}", (const void *)message.payload.controller.get());
+    resources->acquire(resource::controller);
+}
+
+void db_actor_t::on_controller_down(net::message::controller_down_t &message) noexcept {
+    LOG_DEBUG(log, "on_controller_down, {}", (const void *)message.payload.controller.get());
+    resources->release(resource::controller);
+}
+
 void db_actor_t::on_cluster_load(message::load_cluster_request_t &request) noexcept {
-    LOG_TRACE(log, "on_cluster_load");
     using namespace model::diff;
+    using folder_infos_uuids_t = std::pmr::unordered_set<std::pmr::string>;
+    using known_hashes_t = std::unordered_set<utils::bytes_view_t>;
+
+    auto buffer = std::array<std::byte, 10 * 1024>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+    auto folder_infos_uuids = folder_infos_uuids_t(allocator);
+    auto known_hashes = known_hashes_t();
+
+    LOG_TRACE(log, "on_cluster_load");
 
     auto txn_opt = db::make_transaction(db::transaction_type_t::RO, env);
     if (!txn_opt) {
@@ -273,6 +294,23 @@ void db_actor_t::on_cluster_load(message::load_cluster_request_t &request) noexc
     if (!folder_infos_opt) {
         return reply_with_error(request, make_error(folder_infos_opt.error()));
     }
+    auto folder_infos_raw = std::move(folder_infos_opt.value());
+    auto folder_infos = load::folder_infos_t::container_t();
+    for (auto &pair : folder_infos_raw) {
+        using item_t = load::folder_infos_t::item_t;
+        auto decomposed = model::folder_info_t::decompose_key(pair.key);
+        auto &uuid = decomposed.folder_info_id;
+        auto b = reinterpret_cast<const char *>(uuid.data());
+        auto e = b + uuid.size();
+        auto folder_uuid = std::pmr::string(b, e, allocator);
+        folder_infos_uuids.emplace(std::move(folder_uuid));
+        auto db_fi = db::FolderInfo();
+        if (auto left = db::decode(pair.value, db_fi); left) {
+            auto ec = make_error_code(model::error_code_t::folder_info_deserialization_failure);
+            return reply_with_error(request, make_error(ec));
+        }
+        folder_infos.emplace_back(item_t{pair.key, std::move(db_fi)});
+    }
 
     auto file_infos_opt = db::load(db::prefix::file_info, txn);
     if (!file_infos_opt) {
@@ -295,13 +333,27 @@ void db_actor_t::on_cluster_load(message::load_cluster_request_t &request) noexc
 
     auto current = diff->assign_child(new load::devices_t(std::move(devices_opt.value())));
     if (blocks.size()) {
+        known_hashes.reserve(blocks.size());
         auto max_blocks = db_config.max_blocks_per_diff;
         auto ptr = blocks.data();
         auto end = ptr + blocks.size();
         while (ptr < end) {
             auto chunk_end = std::min(ptr + max_blocks, end);
-            auto slice = decltype(blocks)(ptr, chunk_end);
-            ptr = chunk_end;
+            auto slice = load::blocks_t::container_t();
+            auto number = chunk_end - ptr;
+            slice.reserve(number);
+            while (ptr < chunk_end) {
+                auto &pair = *ptr;
+                auto db_block = db::BlockInfo();
+                if (auto left = db::decode(pair.value, db_block); left) {
+                    auto ec = make_error_code(model::error_code_t::block_deserialization_failure);
+                    return reply_with_error(request, make_error(ec));
+                }
+                auto hash = pair.key.subspan(1);
+                known_hashes.emplace(hash);
+                slice.emplace_back(pair.key, std::move(db_block));
+                ++ptr;
+            }
             current = current->assign_sibling(new load::blocks_t(std::move(slice)));
         }
     }
@@ -309,7 +361,9 @@ void db_actor_t::on_cluster_load(message::load_cluster_request_t &request) noexc
     current = current->assign_sibling(new load::ignored_devices_t(std::move(ignored_devices_opt.value())))
                   ->assign_sibling(new load::ignored_folders_t(std::move(ignored_folders_opt.value())))
                   ->assign_sibling(new load::folders_t(std::move(folders_opt.value())))
-                  ->assign_sibling(new load::folder_infos_t(std::move(folder_infos_opt.value())));
+                  ->assign_sibling(new load::folder_infos_t(std::move(folder_infos)));
+
+    auto corrupted_files = load::remove_corrupted_files_t::unique_keys_t();
 
     if (files.size()) {
         auto max_files = db_config.max_files_per_diff;
@@ -322,22 +376,55 @@ void db_actor_t::on_cluster_load(message::load_cluster_request_t &request) noexc
             items.reserve(count);
             while (ptr != chunk_end) {
                 using item_t = decltype(items)::value_type;
-                auto key = ptr->key;
                 auto data = ptr->value;
                 auto db_fi = db::FileInfo();
                 if (auto left = db::decode(ptr->value, db_fi); left) {
                     auto ec = make_error_code(model::error_code_t::file_info_deserialization_failure);
                     return reply_with_error(request, make_error(ec));
                 }
-                items.emplace_back(item_t{key, std::move(db_fi)});
+
+                auto success = true;
+                auto name = db::get_name(db_fi);
+                auto blocks_count = db::get_blocks_size(db_fi);
+                for (size_t i = 0; i < blocks_count; ++i) {
+                    auto block_hash = db::get_blocks(db_fi, i);
+                    auto it = known_hashes.find(block_hash);
+                    if (it == known_hashes.end()) {
+                        LOG_INFO(log, "block #{} '{}' is missing file '{}', assuming corruped", i, block_hash, name);
+                        success = false;
+                        break;
+                    }
+                }
+
+                auto key = ptr->key;
+                if (success) {
+                    auto folder_info_uuid_raw = key.subspan(1, model::uuid_length);
+                    auto b = reinterpret_cast<const char *>(folder_info_uuid_raw.data());
+                    auto e = b + folder_info_uuid_raw.size();
+                    auto folder_info_uuid = folder_infos_uuids_t::value_type(b, e, allocator);
+                    if (folder_infos_uuids.count(folder_info_uuid) == 0) {
+                        LOG_INFO(log, "cannot restore file '{}', missing folder, assuming corruped", name);
+                        success = false;
+                    }
+                }
+                if (success) {
+                    items.emplace_back(item_t{key, std::move(db_fi)});
+                } else {
+                    corrupted_files.emplace(utils::bytes_t(key));
+                }
                 ++ptr;
             }
             current = current->assign_sibling(new load::file_infos_t(std::move(items)));
         }
     }
 
-    current->assign_sibling(new load::pending_devices_t(std::move(pending_devices_opt.value())))
-        ->assign_sibling(new load::pending_folders_t(std::move(pending_folders_opt.value())));
+    current = current->assign_sibling(new load::pending_devices_t(std::move(pending_devices_opt.value())))
+                  ->assign_sibling(new load::pending_folders_t(std::move(pending_folders_opt.value())));
+
+    if (corrupted_files.size()) {
+        LOG_WARN(log, "{} corrupted files will be removed", corrupted_files.size());
+        current = current->assign_sibling(new load::remove_corrupted_files_t(std::move(corrupted_files)));
+    }
 
     reply_to(request, diff);
 }
@@ -589,6 +676,11 @@ auto db_actor_t::operator()(const model::diff::modify::add_pending_device_t &dif
         return r.assume_error();
     }
     return force_commit();
+}
+
+auto db_actor_t::operator()(const model::diff::load::remove_corrupted_files_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    return remove(static_cast<const model::diff::modify::generic_remove_t &>(diff), custom);
 }
 
 auto db_actor_t::operator()(const model::diff::modify::remove_blocks_t &diff, void *custom) noexcept

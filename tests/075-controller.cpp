@@ -28,6 +28,7 @@ namespace {
 
 struct sample_peer_config_t : public r::actor_config_t {
     model::device_id_t peer_device_id;
+    r::address_ptr_t coordinator;
     bool auto_share = false;
 };
 
@@ -38,6 +39,10 @@ template <typename Actor> struct sample_peer_config_builder_t : r::actor_config_
 
     builder_t &&peer_device_id(const model::device_id_t &value) && noexcept {
         parent_t::config.peer_device_id = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+    builder_t &&coordinator(const r::address_ptr_t &value) && noexcept {
+        parent_t::config.coordinator = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
     builder_t &&auto_share(bool value) && noexcept {
@@ -52,6 +57,7 @@ struct sample_peer_t : r::actor_base_t {
 
     using remote_message_t = r::intrusive_ptr_t<net::message::forwarded_message_t>;
     using remote_messages_t = std::list<remote_message_t>;
+    using shutdown_start_callback_t = std::function<void()>;
 
     struct block_response_t {
         std::string name;
@@ -66,16 +72,25 @@ struct sample_peer_t : r::actor_base_t {
     using uploaded_blocks_t = std::list<proto::Response>;
 
     sample_peer_t(config_t &config)
-        : r::actor_base_t{config}, auto_share(config.auto_share), peer_device{config.peer_device_id} {
+        : r::actor_base_t{config}, auto_share(config.auto_share), coordinator(config.coordinator),
+          peer_device{config.peer_device_id} {
         log = utils::get_logger("test.sample_peer");
     }
 
     void configure(r::plugin::plugin_base_t &plugin) noexcept override {
         r::actor_base_t::configure(plugin);
         plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) { p.set_identity("sample_peer", false); });
+        plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
+            p.discover_name(names::coordinator, coordinator, false).link(false).callback([&](auto phase, auto &ee) {
+                if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {
+                    auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
+                    auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
+                    plugin->subscribe_actor(&sample_peer_t::on_controller_up, coordinator);
+                    plugin->subscribe_actor(&sample_peer_t::on_controller_predown, coordinator);
+                }
+            });
+        });
         plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
-            p.subscribe_actor(&sample_peer_t::on_start_reading);
-            p.subscribe_actor(&sample_peer_t::on_termination);
             p.subscribe_actor(&sample_peer_t::on_transfer);
             p.subscribe_actor(&sample_peer_t::on_block_request);
         });
@@ -84,7 +99,10 @@ struct sample_peer_t : r::actor_base_t {
     void shutdown_start() noexcept override {
         LOG_TRACE(log, "{}, shutdown_start", identity);
         if (controller) {
-            send<net::payload::termination_t>(controller, shutdown_reason);
+            send<net::payload::peer_down_t>(controller, shutdown_reason);
+        }
+        if (shutdown_start_callback) {
+            shutdown_start_callback();
         }
         r::actor_base_t::shutdown_start();
     }
@@ -93,20 +111,20 @@ struct sample_peer_t : r::actor_base_t {
         r::actor_base_t::shutdown_finish();
         LOG_TRACE(log, "{}, shutdown_finish, blocks requested = {}", identity, blocks_requested);
         if (controller) {
-            send<net::payload::termination_t>(controller, shutdown_reason);
+            send<net::payload::peer_down_t>(controller, shutdown_reason);
         }
     }
 
-    void on_start_reading(net::message::start_reading_t &msg) noexcept {
-        LOG_TRACE(log, "{}, on_start_reading", identity);
+    void on_controller_up(net::message::controller_up_t &msg) noexcept {
+        LOG_TRACE(log, "{}, on_controller_up", identity);
         controller = msg.payload.controller;
-        reading = msg.payload.start;
+        reading = true;
     }
 
-    void on_termination(net::message::termination_signal_t &msg) noexcept {
-        LOG_TRACE(log, "{}, on_termination", identity);
-
-        if (!shutdown_reason) {
+    void on_controller_predown(net::message::controller_predown_t &msg) noexcept {
+        auto for_me = msg.payload.peer == address;
+        LOG_TRACE(log, "on_controller_predown, for_me = {}", (for_me ? "yes" : "no"));
+        if (for_me && !shutdown_reason) {
             auto &ee = msg.payload.ee;
             auto reason = ee->message();
             LOG_TRACE(log, "{}, on_termination: {}", identity, reason);
@@ -215,6 +233,7 @@ struct sample_peer_t : r::actor_base_t {
     bool reading = false;
     bool auto_share = false;
     remote_messages_t messages;
+    r::address_ptr_t coordinator;
     r::address_ptr_t controller;
     model::device_id_t peer_device;
     utils::logger_t log;
@@ -222,6 +241,7 @@ struct sample_peer_t : r::actor_base_t {
     block_responses_t block_responses;
     uploaded_blocks_t uploaded_blocks;
     allowed_index_updates_t allowed_index_updates;
+    shutdown_start_callback_t shutdown_start_callback;
 };
 
 struct fixture_t {
@@ -240,7 +260,11 @@ struct fixture_t {
     }
 
     void _start_target(std::string connection_id) {
-        peer_actor = sup->create_actor<sample_peer_t>().auto_share(auto_share).timeout(timeout).finish();
+        peer_actor = sup->create_actor<sample_peer_t>()
+                         .coordinator(sup->get_address())
+                         .auto_share(auto_share)
+                         .timeout(timeout)
+                         .finish();
 
         auto diff = model::diff::contact::peer_state_t::create(*cluster, peer_device->device_id().get_sha256(),
                                                                peer_actor->get_address(), device_state_t::online,
@@ -1342,6 +1366,9 @@ void test_download_resuming() {
 
             target->do_shutdown();
             sup->do_process();
+            // auto fs_timer_id = sup->timers.back()->request_id;
+            // sup->do_invoke_timer(fs_timer_id);
+            // sup->do_process();
 
             CHECK(!folder_1->is_synchronizing());
             for (auto &it : cluster->get_blocks()) {
@@ -1684,6 +1711,46 @@ void test_peer_removal() {
         }
     };
     F(true, 10).run();
+}
+
+void test_peer_down() {
+    struct F : fixture_t {
+        using fixture_t::fixture_t;
+        void main(diff_builder_t &) noexcept override {
+            sup->do_process();
+
+            auto builder = diff_builder_t(*cluster, sup->get_address());
+            auto sha256 = peer_device->device_id().get_sha256();
+
+            auto cc = proto::ClusterConfig{};
+            auto &folder = proto::add_folders(cc);
+            proto::set_id(folder, folder_1->get_id());
+            auto &d_peer = proto::add_devices(folder);
+            proto::set_id(d_peer, peer_device->device_id().get_sha256());
+            proto::set_max_sequence(d_peer, 15);
+            proto::set_index_id(d_peer, 12345);
+
+            peer_actor->forward(cc);
+            sup->do_process();
+
+            builder.share_folder(sha256, folder_1->get_id()).apply(*sup);
+            auto folder_peer = folder_1->get_folder_infos().by_device(*peer_device);
+            REQUIRE(folder_peer->get_index() == proto::get_index_id(d_peer));
+
+            peer_actor->shutdown_start_callback = [&]() {
+                proto::FileInfo pr_file_info;
+                auto file_name = std::string_view("link");
+                proto::set_name(pr_file_info, file_name);
+                proto::set_type(pr_file_info, proto::FileInfoType::SYMLINK);
+                proto::set_symlink_target(pr_file_info, "/some/where");
+
+                builder.local_update(folder_1->get_id(), pr_file_info).send(*sup);
+            };
+            peer_actor->do_shutdown();
+            sup->do_process();
+        }
+    };
+    F(false, 10, false).run();
 }
 
 void test_conflicts() {
@@ -2210,6 +2277,7 @@ int _init() {
     REGISTER_TEST_CASE(test_initiate_peer_sharing, "test_initiate_peer_sharing", "[net]");
     REGISTER_TEST_CASE(test_sending_index_updates, "test_sending_index_updates", "[net]");
     REGISTER_TEST_CASE(test_uploading, "test_uploading", "[net]");
+    REGISTER_TEST_CASE(test_peer_down, "test_peer_down", "[net]");
     REGISTER_TEST_CASE(test_peer_removal, "test_peer_removal", "[net]");
     REGISTER_TEST_CASE(test_conflicts, "test_conflicts", "[net]");
     REGISTER_TEST_CASE(test_download_interrupting, "test_download_interrupting", "[net]");

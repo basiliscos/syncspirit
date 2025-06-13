@@ -136,6 +136,7 @@ add_library(syncspirit_core
     src/model/diff/load/load_cluster.cpp
     src/model/diff/load/pending_devices.cpp
     src/model/diff/load/pending_folders.cpp
+    src/model/diff/load/remove_corrupted_files.cpp
     src/model/diff/local/blocks_availability.cpp
     src/model/diff/local/custom.cpp
     src/model/diff/local/file_availability.cpp

@@ -135,14 +135,11 @@ app_supervisor_t::app_supervisor_t(config_t &config)
 }
 
 app_supervisor_t::~app_supervisor_t() {
-    cluster.reset();
     if (ui_sink) {
         dist_sink->remove_sink(ui_sink);
         ui_sink.reset();
     }
-    if (main_window) {
-        main_window->detach_supervisor();
-    }
+    detach_main_window();
     spdlog::debug("~app_supervisor_t()");
 }
 
@@ -183,8 +180,6 @@ void app_supervisor_t::shutdown_finish() noexcept {
     LOG_TRACE(log, "shutdown_finish");
     if (main_window) {
         main_window->on_shutdown();
-        main_window->detach_supervisor();
-        main_window = nullptr;
     }
     std::stringstream out;
     std::stringstream out_orig;
@@ -706,4 +701,12 @@ std::uint32_t app_supervisor_t::mask_nodes() const noexcept {
         r |= F::missing;
     }
     return r;
+}
+
+void app_supervisor_t::detach_main_window() noexcept {
+    cluster.reset();
+    if (main_window) {
+        main_window->detach_supervisor();
+        main_window = nullptr;
+    }
 }

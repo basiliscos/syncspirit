@@ -91,13 +91,13 @@ TEST_CASE("loading cluster (base)", "[model]") {
 
         auto block = block_info_t::create(bi).assume_value();
         auto key = block->get_key();
+        auto db_block = db::BlockInfo{0, block->get_size()};
 
         auto target_block = block_info_ptr_t();
 
         SECTION("via diff") {
-            auto data = block->serialize();
-            diff::load::container_t blocks;
-            blocks.emplace_back(diff::load::pair_t{key, data});
+            auto blocks = diff::load::blocks_t::container_t();
+            blocks.emplace_back(key, db_block);
             auto diff = diff::cluster_diff_ptr_t(new diff::load::blocks_t(blocks));
             REQUIRE(diff->apply(*cluster, get_apply_controller()));
             auto &blocks_map = cluster->get_blocks();
@@ -255,10 +255,10 @@ TEST_CASE("loading cluster (folder info)", "[model]") {
     auto target = folder_info_ptr_t();
 
     SECTION("via diff") {
-        diff::load::container_t folders;
-        auto data = fi->serialize();
-        folders.emplace_back(diff::load::pair_t{fi->get_key(), data});
-        auto diff = diff::cluster_diff_ptr_t(new diff::load::folder_infos_t(folders));
+        auto folders = diff::load::folder_infos_t::container_t();
+        auto key = fi->get_key();
+        folders.emplace_back(fi->get_key(), db_fi);
+        auto diff = diff::cluster_diff_ptr_t(new diff::load::folder_infos_t(std::move(folders)));
         REQUIRE(diff->apply(*cluster, get_apply_controller()));
         auto &map = folder->get_folder_infos();
         REQUIRE(map.size() == 1);

@@ -110,12 +110,23 @@ struct load_cluster_request_t {
     using response_t = load_cluster_response_t;
 };
 
-struct start_reading_t {
+struct controller_up_t {
     r::address_ptr_t controller;
-    bool start;
+    model::device_id_t peer;
 };
 
-struct termination_t {
+struct controller_down_t {
+    r::address_ptr_t controller;
+    r::address_ptr_t peer;
+};
+
+struct controller_predown_t {
+    r::address_ptr_t controller;
+    r::address_ptr_t peer;
+    r::extended_error_ptr_t ee;
+};
+
+struct peer_down_t {
     r::extended_error_ptr_t ee;
 };
 
@@ -195,9 +206,11 @@ using http_close_connection_t = r::message_t<payload::http_close_connection_t>;
 using load_cluster_request_t = r::request_traits_t<payload::load_cluster_request_t>::request::message_t;
 using load_cluster_response_t = r::request_traits_t<payload::load_cluster_request_t>::response::message_t;
 
-using start_reading_t = r::message_t<payload::start_reading_t>;
+using controller_up_t = r::message_t<payload::controller_up_t>;
+using controller_predown_t = r::message_t<payload::controller_predown_t>;
+using controller_down_t = r::message_t<payload::controller_down_t>;
+using peer_down_t = r::message_t<payload::peer_down_t>;
 using forwarded_message_t = r::message_t<payload::forwarded_message_t>;
-using termination_signal_t = r::message_t<payload::termination_t>;
 using transfer_data_t = r::message_t<payload::transfer_data_t>;
 using transfer_push_t = r::message_t<payload::transfer_push_t>;
 using transfer_pop_t = r::message_t<payload::transfer_pop_t>;

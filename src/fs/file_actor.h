@@ -5,6 +5,7 @@
 
 #include "file.h"
 #include "messages.h"
+#include "net/messages.h"
 #include "model/cluster.h"
 #include "model/messages.h"
 #include "model/diff/cluster_visitor.h"
@@ -68,6 +69,8 @@ struct SYNCSPIRIT_API file_actor_t : public r::actor_base_t, private model::diff
 
     void on_model_update(model::message::model_update_t &message) noexcept;
     void on_block_request(message::block_request_t &message) noexcept;
+    void on_controller_up(net::message::controller_up_t &message) noexcept;
+    void on_controller_down(net::message::controller_down_t &message) noexcept;
 
     outcome::result<file_ptr_t> get_source_for_cloning(model::file_info_ptr_t &source,
                                                        const file_ptr_t &target_backend) noexcept;
@@ -87,6 +90,7 @@ struct SYNCSPIRIT_API file_actor_t : public r::actor_base_t, private model::diff
     model::sequencer_ptr_t sequencer;
     utils::logger_t log;
     r::address_ptr_t coordinator;
+    r::address_ptr_t db;
     file_cache_ptr_t rw_cache;
     file_cache_t ro_cache;
 };

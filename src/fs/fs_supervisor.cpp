@@ -115,6 +115,12 @@ void fs_supervisor_t::on_start() noexcept {
     r::actor_base_t::on_start();
 }
 
+void fs_supervisor_t::on_child_shutdown(actor_base_t *actor) noexcept {
+    parent_t::on_child_shutdown(actor);
+    auto &reason = actor->get_shutdown_reason();
+    LOG_TRACE(log, "on_child_shutdown, '{}' due to {} ", actor->get_identity(), reason->message());
+}
+
 void fs_supervisor_t::on_model_update(model::message::model_update_t &message) noexcept {
     LOG_TRACE(log, "on_model_update");
     auto &diff = *message.payload.diff;

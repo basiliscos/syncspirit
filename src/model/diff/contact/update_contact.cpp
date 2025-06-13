@@ -31,7 +31,11 @@ update_contact_t::update_contact_t(const model::cluster_t &cluster, const model:
 
     set_t set;
     std::copy(begin(uris_), end(uris_), std::inserter(set, set.begin()));
-    std::copy(set.begin(), set.end(), std::back_insert_iterator(this->uris));
+
+    this->uris.reserve(set.size());
+    for (auto &url : set) {
+        this->uris.emplace_back(url->clone());
+    }
 }
 
 auto update_contact_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
@@ -39,7 +43,12 @@ auto update_contact_t::apply_impl(cluster_t &cluster, apply_controller_t &contro
     if (known) {
         auto &devices = cluster.get_devices();
         auto device = devices.by_sha256(this->device.get_sha256());
-        device->assign_uris(uris);
+        auto uris_clone = utils::uri_container_t();
+        uris_clone.reserve(uris.size());
+        for (auto &url : uris) {
+            uris_clone.emplace_back(url->clone());
+        }
+        device->assign_uris(std::move(uris_clone));
     }
     return applicator_t::apply_sibling(cluster, controller);
 }

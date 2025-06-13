@@ -18,6 +18,12 @@
 using namespace syncspirit::fs;
 using namespace syncspirit::proto;
 
+namespace {
+namespace resource {
+r::plugin::resource_id_t controller = 0;
+} // namespace resource
+} // namespace
+
 file_actor_t::write_guard_t::write_guard_t(file_actor_t &actor_,
                                            const model::diff::modify::block_transaction_t &txn_) noexcept
     : actor{actor_}, txn{txn_}, success{false} {}
@@ -49,7 +55,15 @@ void file_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
         p.register_name(net::names::fs_actor, address);
-        p.discover_name(net::names::coordinator, coordinator, true).link(false);
+        p.discover_name(net::names::coordinator, coordinator, false).link(false).callback([&](auto phase, auto &ee) {
+            if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {
+                auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
+                auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
+                plugin->subscribe_actor(&file_actor_t::on_controller_up, coordinator);
+                plugin->subscribe_actor(&file_actor_t::on_controller_down, coordinator);
+            }
+        });
+        p.discover_name(net::names::db, db, true);
     });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&file_actor_t::on_block_request);
@@ -108,6 +122,16 @@ void file_actor_t::on_block_request(message::block_request_t &message) noexcept 
         }
     }
     send<payload::block_response_t>(dest, std::move(req), ec, std::move(data));
+}
+
+void file_actor_t::on_controller_up(net::message::controller_up_t &message) noexcept {
+    LOG_DEBUG(log, "on_controller_up, {}", (const void *)message.payload.controller.get());
+    resources->acquire(resource::controller);
+}
+
+void file_actor_t::on_controller_down(net::message::controller_down_t &message) noexcept {
+    LOG_DEBUG(log, "on_controller_down, {}", (const void *)message.payload.controller.get());
+    resources->release(resource::controller);
 }
 
 auto file_actor_t::reflect(model::file_info_ptr_t &file_ptr, const bfs::path &path) noexcept -> outcome::result<void> {
@@ -226,52 +250,58 @@ auto file_actor_t::operator()(const model::diff::advance::remote_win_t &diff, vo
 auto file_actor_t::operator()(const model::diff::modify::finish_file_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     auto folder = cluster->get_folders().by_id(diff.folder_id);
-    auto file_info = folder->get_folder_infos().by_device_id(diff.peer_id);
-    auto file = file_info->get_file_infos().by_name(diff.file_name);
-    auto local_path = file->get_path();
-    auto path = local_path.string();
-    auto action = diff.action;
+    if (folder) {
+        auto file_info = folder->get_folder_infos().by_device_id(diff.peer_id);
+        if (file_info) {
+            auto file = file_info->get_file_infos().by_name(diff.file_name);
+            if (file) {
+                auto local_path = file->get_path();
+                auto path = local_path.string();
+                auto action = diff.action;
 
-    if (action == model::advance_action_t::resolve_remote_win) {
-        auto &self = *cluster->get_device();
-        auto local_fi = folder->get_folder_infos().by_device(self);
-        auto local_file = local_fi->get_file_infos().by_name(diff.file_name);
-        auto conflicting_name = local_file->make_conflicting_name();
-        auto target_path = folder->get_path() / conflicting_name;
-        auto ec = sys::error_code{};
-        path = file->get_path().string();
-        LOG_DEBUG(log, "renaming {} -> {}", file->get_name(), conflicting_name);
-        bfs::rename(path, target_path);
-        if (ec) {
-            LOG_ERROR(log, "cannot rename file: {}: {}", path, ec.message());
-            return ec;
+                if (action == model::advance_action_t::resolve_remote_win) {
+                    auto &self = *cluster->get_device();
+                    auto local_fi = folder->get_folder_infos().by_device(self);
+                    auto local_file = local_fi->get_file_infos().by_name(diff.file_name);
+                    auto conflicting_name = local_file->make_conflicting_name();
+                    auto target_path = folder->get_path() / conflicting_name;
+                    auto ec = sys::error_code{};
+                    path = file->get_path().string();
+                    LOG_DEBUG(log, "renaming {} -> {}", file->get_name(), conflicting_name);
+                    bfs::rename(path, target_path);
+                    if (ec) {
+                        LOG_ERROR(log, "cannot rename file: {}: {}", path, ec.message());
+                        return ec;
+                    }
+                }
+                auto backend = rw_cache->get(path);
+                if (!backend) {
+                    LOG_DEBUG(log, "attempt to flush non-opened file {}, re-open it as temporal", path);
+                    auto path_tmp = make_temporal(file->get_path());
+                    auto result = open_file_rw(path_tmp, file);
+                    if (!result) {
+                        auto &ec = result.assume_error();
+                        LOG_ERROR(log, "cannot open file: {}: {}", path_tmp.string(), ec.message());
+                        return ec;
+                    }
+                    backend = std::move(result.assume_value());
+                }
+
+                rw_cache->remove(backend);
+                auto ok = backend->close(true, local_path);
+                if (!ok) {
+                    auto &ec = ok.assume_error();
+                    LOG_ERROR(log, "cannot close file: {}: {}", path, ec.message());
+                    return ec;
+                }
+
+                LOG_INFO(log, "file {} ({} bytes) is now locally available", path, file->get_size());
+
+                auto ack = model::diff::advance::advance_t::create(action, *file, *sequencer);
+                send<model::payload::model_update_t>(coordinator, std::move(ack), this);
+            }
         }
     }
-    auto backend = rw_cache->get(path);
-    if (!backend) {
-        LOG_DEBUG(log, "attempt to flush non-opened file {}, re-open it as temporal", path);
-        auto path_tmp = make_temporal(file->get_path());
-        auto result = open_file_rw(path_tmp, file);
-        if (!result) {
-            auto &ec = result.assume_error();
-            LOG_ERROR(log, "cannot open file: {}: {}", path_tmp.string(), ec.message());
-            return ec;
-        }
-        backend = std::move(result.assume_value());
-    }
-
-    rw_cache->remove(backend);
-    auto ok = backend->close(true, local_path);
-    if (!ok) {
-        auto &ec = ok.assume_error();
-        LOG_ERROR(log, "cannot close file: {}: {}", path, ec.message());
-        return ec;
-    }
-
-    LOG_INFO(log, "file {} ({} bytes) is now locally available", path, file->get_size());
-
-    auto ack = model::diff::advance::advance_t::create(action, *file, *sequencer);
-    send<model::payload::model_update_t>(coordinator, std::move(ack), this);
     return diff.visit_next(*this, custom);
 }
 
@@ -387,10 +417,10 @@ auto file_actor_t::open_file_rw(const std::filesystem::path &path, model::file_i
 }
 
 auto file_actor_t::open_file_ro(const bfs::path &path, bool use_cache) noexcept -> outcome::result<file_ptr_t> {
-    LOG_TRACE(log, "open_file (r/o, by path), path = {}", path.string());
     if (use_cache) {
         auto file = rw_cache->get(path.string());
         if (file) {
+            LOG_TRACE(log, "open_file (r/o, by path, cache hit), path = {}", path.string());
             return file;
         }
     }
@@ -399,5 +429,6 @@ auto file_actor_t::open_file_ro(const bfs::path &path, bool use_cache) noexcept 
     if (!opt) {
         return opt.assume_error();
     }
+    LOG_TRACE(log, "open_file (r/o, by path), path = {}", path.string());
     return file_ptr_t(new file_t(std::move(opt.assume_value())));
 }

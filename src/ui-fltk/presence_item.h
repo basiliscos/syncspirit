@@ -28,6 +28,7 @@ struct presence_item_t : dynamic_item_t, model::augmentation_t {
     void show_child(presentation::presence_t &child_presence, std::uint32_t mask);
     void update_label() override;
     presence_item_ptr_t safe_detach(int child_index);
+    void on_delete() noexcept override;
 
   protected:
     void insert_node(presence_item_ptr_t node, int position);

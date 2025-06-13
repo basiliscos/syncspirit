@@ -17,6 +17,7 @@
 #include "fs/messages.h"
 
 #include <unordered_map>
+#include <optional>
 #include <deque>
 
 namespace syncspirit {
@@ -151,7 +152,15 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     using synchronizing_files_t = std::unordered_map<utils::bytes_view_t, model::file_info_t::guard_ptr_t>;
     using updates_streamer_ptr_t = std::unique_ptr<model::updates_streamer_t>;
 
-    void on_termination(message::termination_signal_t &message) noexcept;
+    template <typename M, typename... Args> void send_to_peer(Args &&...args) noexcept {
+        if (peer_address) {
+            send<M>(peer_address, std::forward<Args>(args)...);
+        } else {
+            LOG_DEBUG(log, "peer is no longer available, send has been ingored");
+        }
+    }
+
+    void on_peer_down(message::peer_down_t &message) noexcept;
     void on_forward(message::forwarded_message_t &message) noexcept;
     void on_block(message::block_response_t &message) noexcept;
     void on_validation(hasher::message::validation_response_t &res) noexcept;
@@ -160,6 +169,8 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     void on_transfer_push(message::transfer_push_t &message) noexcept;
     void on_transfer_pop(message::transfer_pop_t &message) noexcept;
     void on_block_response(fs::message::block_response_t &message) noexcept;
+    bool on_unlink_request(r::message::unlink_request_t &message) noexcept;
+    void on_fs_ack_timer(r::request_id_t, bool cancelled) noexcept;
 
     void on_message(proto::ClusterConfig &message) noexcept;
     void on_message(proto::Index &message) noexcept;
@@ -206,7 +217,7 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     model::device_ptr_t peer;
     std::string connection_id;
     r::address_ptr_t coordinator;
-    r::address_ptr_t peer_addr;
+    r::address_ptr_t peer_address;
     r::address_ptr_t hasher_proxy;
     r::address_ptr_t fs_addr;
     r::address_ptr_t open_reading; /* for routing */
@@ -236,6 +247,8 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     synchronizing_folders_t synchronizing_folders;
     synchronizing_files_t synchronizing_files;
     block_write_queue_t block_write_queue;
+    std::optional<r::request_id_t> fs_ack_timer;
+    bool announced;
 };
 
 } // namespace net
