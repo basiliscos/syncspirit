@@ -352,9 +352,9 @@ void db_actor_t::on_cluster_load(message::load_cluster_request_t &request) noexc
                 auto hash = pair.key.subspan(1);
                 known_hashes.emplace(hash);
                 slice.emplace_back(pair.key, std::move(db_block));
-                ptr = chunk_end;
-                current = current->assign_sibling(new load::blocks_t(std::move(slice)));
+                ++ptr;
             }
+            current = current->assign_sibling(new load::blocks_t(std::move(slice)));
         }
     }
 
