@@ -21,8 +21,9 @@ using namespace syncspirit::net;
 using configure_callback_t = std::function<void(r::plugin::plugin_base_t &)>;
 using finish_callback_t = std::function<void()>;
 using response_callback_t = std::function<void(message::http_response_t &message)>;
+using url_callback_t = std::function<utils::uri_ptr_t(std::string_view)>;
 
-auto timeout = r::pt::time_duration{r::pt::millisec{2000}};
+auto timeout = r::pt::time_duration{r::pt::millisec{200}};
 auto host = "127.0.0.1";
 
 struct supervisor_t : ra::supervisor_asio_t {
@@ -69,9 +70,7 @@ struct client_actor_t : r::actor_base_t {
         using rx_buff_t = payload::http_request_t::rx_buff_ptr_t;
         static constexpr std::uint32_t rx_buff_size = 1024;
 
-        auto url_str = fmt::format("http://{}{}", server_endpoint, path);
-        auto url = utils::parse(url_str);
-        LOG_DEBUG(log, "making request {}", url);
+        auto url = url_callback(path);
         auto tx_buff = utils::bytes_t();
 
         http::request<http::empty_body> req;
@@ -99,10 +98,10 @@ struct client_actor_t : r::actor_base_t {
         }
     }
 
-    asio::ip::tcp::endpoint server_endpoint;
     r::address_ptr_t http_client;
     utils::logger_t log;
     std::optional<r::request_id_t> http_request;
+    url_callback_t url_callback;
     response_callback_t response_callback;
 };
 using client_actor_ptr_t = r::intrusive_ptr_t<client_actor_t>;
@@ -151,7 +150,8 @@ struct fixture_t {
         acceptor.async_accept(peer_sock, [this](auto ec) { on_accept(ec); });
 
         client_actor = sup->create_actor<client_actor_t>().timeout(timeout).finish();
-        client_actor->server_endpoint = listening_ep;
+        client_actor->response_callback = [this](auto &res) { return on_response(res); };
+        client_actor->url_callback = [this](auto path) { return make_url(path); };
         io_ctx.run_for(1ms);
 
         sup->do_process();
@@ -169,9 +169,24 @@ struct fixture_t {
         CHECK(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::SHUT_DOWN);
     }
 
+    virtual utils::uri_ptr_t make_url(std::string_view path) {
+        auto url_str = fmt::format("http://{}{}", listening_ep, path);
+        auto url = utils::parse(url_str);
+        LOG_DEBUG(log, "making request url {}", url);
+        return url;
+    }
+
     virtual void finish() {
         LOG_DEBUG(log, "finish");
-        acceptor.cancel();
+        auto ec = sys::error_code();
+        acceptor.cancel(ec);
+        if (ec) {
+            LOG_DEBUG(log, "error cancelling acceptor: {}", ec.message());
+        }
+        peer_sock.cancel(ec);
+        if (ec) {
+            LOG_DEBUG(log, "error cancelling peer: {}", ec.message());
+        }
     }
 
     virtual void main() noexcept {}
@@ -294,11 +309,63 @@ void test_403_fail() {
     F().run();
 }
 
+void test_network_error() {
+    struct F : fixture_t {
+        void main() noexcept override {
+            client_actor->make_request("/bla-bla");
+            sup->do_process();
+            io_ctx.run();
+        }
+
+        utils::uri_ptr_t make_url(std::string_view path) override {
+            auto wrong_ep = decltype(listening_ep)(listening_ep.address(), 0);
+            auto url_str = fmt::format("http://{}{}", wrong_ep, path);
+            auto url = utils::parse(url_str);
+            LOG_DEBUG(log, "making request url {}", url);
+            return url;
+        }
+
+        void on_response(message::http_response_t &message) noexcept override {
+            LOG_DEBUG(log, "on_response");
+            auto &ee = message.payload.ee;
+            CHECK(ee);
+            CHECK(ee->ec);
+            CHECK(ee->ec.message() != "zzz");
+            acceptor.cancel();
+        }
+    };
+    F().run();
+}
+
+void test_response_timeout() {
+    struct F : fixture_t {
+        void main() noexcept override {
+            client_actor->make_request("/timeout");
+            sup->do_process();
+            io_ctx.run();
+        }
+
+        message_opt_t handle_request(std::string_view path) noexcept override { return {}; }
+
+        void on_response(message::http_response_t &message) noexcept override {
+            LOG_DEBUG(log, "on_response");
+            auto &ee = message.payload.ee;
+            CHECK(ee);
+            CHECK(ee->ec);
+            CHECK(ee->ec == r::make_error_code(r::error_code_t::request_timeout));
+            acceptor.cancel();
+        }
+    };
+    F().run();
+}
+
 int _init() {
     test::init_logging();
     REGISTER_TEST_CASE(test_http_start_and_shutdown, "test_http_start_and_shutdown", "[http]");
     REGISTER_TEST_CASE(test_200_ok, "test_200_ok", "[http]");
     REGISTER_TEST_CASE(test_403_fail, "test_403_fail", "[http]");
+    REGISTER_TEST_CASE(test_network_error, "test_network_error", "[http]");
+    REGISTER_TEST_CASE(test_response_timeout, "test_response_timeout", "[http]");
     return 1;
 }
 

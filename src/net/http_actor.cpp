@@ -221,17 +221,19 @@ void http_actor_t::write_request() noexcept {
     resources->acquire(resource::io);
 }
 
-void http_actor_t::on_request_sent(std::size_t /* bytes */) noexcept {
+void http_actor_t::on_request_sent(std::size_t bytes) noexcept {
+    LOG_TRACE(log, "on_request_sent ({} bytes)", bytes);
     resources->release(resource::io);
     if (!need_response || stop_io) {
         return process();
     }
 
-    auto &payload = *queue.front()->payload.request_payload;
+    auto request = queue.front();
+    auto &payload = *request->payload.request_payload;
     auto &rx_buff = payload.rx_buff;
     rx_buff->prepare(payload.rx_buff_size);
-    transport::io_fn_t on_read = [&](auto arg) { this->on_request_read(arg); };
-    transport::error_fn_t on_error = [&](auto arg) { this->on_io_error(arg); };
+    transport::io_fn_t on_read = [this, request](auto arg) { this->on_request_read(arg); };
+    transport::error_fn_t on_error = [this, request](auto arg) { this->on_io_error(arg); };
     transport->async_read(*rx_buff, http_response, on_read, on_error);
     resources->acquire(resource::io);
 }
@@ -314,8 +316,10 @@ void http_actor_t::on_timer(r::request_id_t, bool cancelled) noexcept {
 
     bool do_cancel_io = false;
     if (!cancelled) {
+        LOG_DEBUG(log, "on_timer, cancelling ongoing request");
         auto ec = r::make_error_code(r::error_code_t::request_timeout);
         reply_with_error(*queue.front(), make_error(ec));
+        transport->cancel();
         queue.pop_front();
         need_response = false;
         if (!kept_alive) {
