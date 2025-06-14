@@ -6,9 +6,9 @@
 
 #include "net/http_actor.h"
 #include "net/resolver_actor.h"
+#include "net/names.h"
 #include "utils/beast_support.h"
 #include "utils/format.hpp"
-#include <chrono>
 #include <optional>
 
 using namespace std::chrono_literals;
@@ -126,7 +126,7 @@ struct fixture_t {
         sup->do_process();
         CHECK(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::OPERATIONAL);
 
-        resolver_actor = sup->create_actor<resolver_actor_t>().resolve_timeout(timeout / 2).timeout(timeout).finish();
+        resolver_actor = make_resolver();
         sup->do_process();
         CHECK(static_cast<r::actor_base_t *>(resolver_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
 
@@ -241,6 +241,10 @@ struct fixture_t {
     }
 
     virtual void on_response(message::http_response_t &message) noexcept { LOG_DEBUG(log, "on_response"); }
+
+    virtual r::actor_ptr_t make_resolver() noexcept {
+        return sup->create_actor<resolver_actor_t>().resolve_timeout(timeout / 2).timeout(timeout).finish();
+    }
 
     asio::io_context io_ctx{1};
     ra::system_context_asio_t ctx;
@@ -359,6 +363,43 @@ void test_response_timeout() {
     F().run();
 }
 
+void test_resolve_timeout() {
+    struct F : fixture_t {
+
+        r::actor_ptr_t make_resolver() noexcept override {
+            struct sample_resolver_actor_t : r::actor_base_t {
+                using r::actor_base_t::actor_base_t;
+
+                void configure(r::plugin::plugin_base_t &plugin) noexcept override {
+                    r::actor_base_t::configure(plugin);
+                    plugin.with_casted<r::plugin::address_maker_plugin_t>(
+                        [&](auto &p) { p.set_identity(names::resolver, false); });
+                    plugin.with_casted<r::plugin::registry_plugin_t>(
+                        [&](auto &p) { p.register_name(names::resolver, get_address()); });
+                }
+            };
+            return sup->create_actor<sample_resolver_actor_t>().timeout(timeout).finish();
+        }
+
+        void main() noexcept override {
+            client_actor->make_request("/resolve-timeout");
+            sup->do_process();
+            io_ctx.run();
+        }
+
+        void on_response(message::http_response_t &message) noexcept override {
+            LOG_DEBUG(log, "on_response");
+            auto &ee = message.payload.ee;
+            CHECK(ee);
+            CHECK(ee->ec);
+            CHECK(ee->ec);
+            CHECK(ee->ec == r::make_error_code(r::error_code_t::request_timeout));
+            acceptor.cancel();
+        }
+    };
+    F().run();
+}
+
 int _init() {
     test::init_logging();
     REGISTER_TEST_CASE(test_http_start_and_shutdown, "test_http_start_and_shutdown", "[http]");
@@ -366,6 +407,7 @@ int _init() {
     REGISTER_TEST_CASE(test_403_fail, "test_403_fail", "[http]");
     REGISTER_TEST_CASE(test_network_error, "test_network_error", "[http]");
     REGISTER_TEST_CASE(test_response_timeout, "test_response_timeout", "[http]");
+    REGISTER_TEST_CASE(test_resolve_timeout, "test_resolve_timeout", "[http]");
     return 1;
 }
 
