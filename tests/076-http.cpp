@@ -313,6 +313,36 @@ void test_403_fail() {
     F().run();
 }
 
+void test_garbage() {
+    struct F : fixture_t {
+        void on_read(const sys::error_code &ec, std::size_t bytes) noexcept override {
+            if (ec) {
+                LOG_DEBUG(log, "on_read, ec: {}", ec.message());
+                return;
+            }
+            auto path = request.target();
+            LOG_DEBUG(log, "on_read, {} bytes, target = {}", bytes, path);
+            auto buff = asio::buffer("garbage-garbage-garbage!");
+            boost::asio::async_write(peer_sock, buff, [this](auto ec, auto bytes) { on_write(false, ec, bytes); });
+        }
+
+        void main() noexcept override {
+            client_actor->make_request("/garbage");
+            sup->do_process();
+            io_ctx.run();
+        }
+
+        void on_response(message::http_response_t &message) noexcept override {
+            LOG_DEBUG(log, "on_response");
+            auto &ee = message.payload.ee;
+            CHECK(ee);
+            CHECK(ee->ec);
+            CHECK(ee->ec.message() != "");
+        }
+    };
+    F().run();
+}
+
 void test_network_error() {
     struct F : fixture_t {
         void main() noexcept override {
@@ -334,7 +364,7 @@ void test_network_error() {
             auto &ee = message.payload.ee;
             CHECK(ee);
             CHECK(ee->ec);
-            CHECK(ee->ec.message() != "zzz");
+            CHECK(ee->ec.message() != "");
             acceptor.cancel();
         }
     };
@@ -448,6 +478,7 @@ int _init() {
     REGISTER_TEST_CASE(test_http_start_and_shutdown, "test_http_start_and_shutdown", "[http]");
     REGISTER_TEST_CASE(test_200_ok, "test_200_ok", "[http]");
     REGISTER_TEST_CASE(test_403_fail, "test_403_fail", "[http]");
+    REGISTER_TEST_CASE(test_garbage, "test_garbage", "[http]");
     REGISTER_TEST_CASE(test_network_error, "test_network_error", "[http]");
     REGISTER_TEST_CASE(test_response_timeout, "test_response_timeout", "[http]");
     REGISTER_TEST_CASE(test_resolve_timeout, "test_resolve_timeout", "[http]");
