@@ -241,18 +241,14 @@ struct fixture_t {
     boost::beast::flat_buffer rx_buff;
 };
 
-#if 0
 void test_http_start_and_shutdown() {
     struct F : fixture_t {
-        void main() noexcept override {
-
-        }
+        void main() noexcept override {}
     };
     F().run();
 }
-#endif
 
-void test_success() {
+void test_200_ok() {
     struct F : fixture_t {
         void main() noexcept override {
             client_actor->make_request("/success");
@@ -269,10 +265,40 @@ void test_success() {
     F().run();
 }
 
+void test_403_fail() {
+    struct F : fixture_t {
+        void main() noexcept override {
+            client_actor->make_request("/non-authorized");
+            sup->do_process();
+            io_ctx.run();
+        }
+
+        message_opt_t handle_request(std::string_view path) noexcept override {
+            if (path == "/non-authorized") {
+                http::response<http::empty_body> res{http::status::forbidden, request.version()};
+                res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+                res.set(http::field::content_type, "text/html");
+                res.keep_alive(request.keep_alive());
+                res.prepare_payload();
+                return res;
+            }
+            return {};
+        }
+
+        void on_response(message::http_response_t &message) noexcept override {
+            LOG_DEBUG(log, "on_response");
+            auto &res = message.payload.res;
+            CHECK(res->response.result_int() == 403);
+        }
+    };
+    F().run();
+}
+
 int _init() {
     test::init_logging();
-    // REGISTER_TEST_CASE(test_http_start_and_shutdown, "test_http_start_and_shutdown", "[http]");
-    REGISTER_TEST_CASE(test_success, "test_success", "[http]");
+    REGISTER_TEST_CASE(test_http_start_and_shutdown, "test_http_start_and_shutdown", "[http]");
+    REGISTER_TEST_CASE(test_200_ok, "test_200_ok", "[http]");
+    REGISTER_TEST_CASE(test_403_fail, "test_403_fail", "[http]");
     return 1;
 }
 
