@@ -365,9 +365,8 @@ void test_response_timeout() {
 
 void test_resolve_timeout() {
     struct F : fixture_t {
-
         r::actor_ptr_t make_resolver() noexcept override {
-            struct sample_resolver_actor_t : r::actor_base_t {
+            struct sample_resolver_t : r::actor_base_t {
                 using r::actor_base_t::actor_base_t;
 
                 void configure(r::plugin::plugin_base_t &plugin) noexcept override {
@@ -378,7 +377,7 @@ void test_resolve_timeout() {
                         [&](auto &p) { p.register_name(names::resolver, get_address()); });
                 }
             };
-            return sup->create_actor<sample_resolver_actor_t>().timeout(timeout).finish();
+            return sup->create_actor<sample_resolver_t>().timeout(timeout).finish();
         }
 
         void main() noexcept override {
@@ -400,6 +399,50 @@ void test_resolve_timeout() {
     F().run();
 }
 
+void test_resolve_fail() {
+    static constexpr auto err = (int)std::errc::address_family_not_supported;
+    struct F : fixture_t {
+        r::actor_ptr_t make_resolver() noexcept override {
+            struct sample_resolver_t : r::actor_base_t {
+                using r::actor_base_t::actor_base_t;
+
+                void configure(r::plugin::plugin_base_t &plugin) noexcept override {
+                    r::actor_base_t::configure(plugin);
+                    plugin.with_casted<r::plugin::address_maker_plugin_t>(
+                        [&](auto &p) { p.set_identity(names::resolver, false); });
+                    plugin.with_casted<r::plugin::registry_plugin_t>(
+                        [&](auto &p) { p.register_name(names::resolver, get_address()); });
+                    plugin.with_casted<r::plugin::starter_plugin_t>(
+                        [&](auto &p) { p.subscribe_actor(&sample_resolver_t::on_request); });
+                }
+
+                void on_request(message::resolve_request_t &req) noexcept {
+                    auto ec = std::error_code(err, std::system_category());
+                    reply_with_error(req, make_error(ec));
+                }
+            };
+            return sup->create_actor<sample_resolver_t>().timeout(timeout).finish();
+        }
+
+        void main() noexcept override {
+            client_actor->make_request("/resolve-timeout");
+            sup->do_process();
+            io_ctx.run();
+        }
+
+        void on_response(message::http_response_t &message) noexcept override {
+            LOG_DEBUG(log, "on_response");
+            auto &ee = message.payload.ee;
+            CHECK(ee);
+            CHECK(ee->ec);
+            CHECK(ee->ec);
+            CHECK(ee->ec == std::error_code(err, std::system_category()));
+            acceptor.cancel();
+        }
+    };
+    F().run();
+}
+
 int _init() {
     test::init_logging();
     REGISTER_TEST_CASE(test_http_start_and_shutdown, "test_http_start_and_shutdown", "[http]");
@@ -408,6 +451,7 @@ int _init() {
     REGISTER_TEST_CASE(test_network_error, "test_network_error", "[http]");
     REGISTER_TEST_CASE(test_response_timeout, "test_response_timeout", "[http]");
     REGISTER_TEST_CASE(test_resolve_timeout, "test_resolve_timeout", "[http]");
+    REGISTER_TEST_CASE(test_resolve_fail, "test_resolve_fail", "[http]");
     return 1;
 }
 
