@@ -152,7 +152,8 @@ void http_actor_t::on_resolve(message::resolve_response_t &res) noexcept {
         return;
     }
 
-    auto &payload = queue.front()->payload.request_payload;
+    auto request = queue.front();
+    auto &payload = request->payload.request_payload;
     auto &ssl_ctx = payload->ssl_context;
     auto sup = static_cast<ra::supervisor_asio_t *>(supervisor);
     transport::transport_config_t cfg{std::move(ssl_ctx), payload->url, *sup, {}, true};
@@ -169,8 +170,8 @@ void http_actor_t::on_resolve(message::resolve_response_t &res) noexcept {
     auto port = res.payload.req->payload.request_payload->port;
     auto endpoints = utils::make_endpoints<tcp, tcp::endpoint>(ips, port);
 
-    transport::connect_fn_t on_connect = [&](const auto &arg) { this->on_connect(arg); };
-    transport::error_fn_t on_error = [&](auto arg) { this->on_io_error(arg); };
+    transport::connect_fn_t on_connect = [this, request](const auto &arg) { this->on_connect(arg); };
+    transport::error_fn_t on_error = [this, request](auto arg) { this->on_io_error(arg); };
     transport->async_connect(std::move(endpoints), on_connect, on_error);
     resources->acquire(resource::io);
     spawn_timer();
@@ -184,7 +185,9 @@ void http_actor_t::on_connect(const tcp::endpoint &) noexcept {
         return process();
     }
 
-    if (queue.front()->payload.request_payload->local_ip) {
+    auto request = queue.front();
+    auto &payload = request->payload.request_payload;
+    if (payload->local_ip) {
         sys::error_code ec;
         local_address = transport->local_address(ec);
         if (ec) {
@@ -199,14 +202,15 @@ void http_actor_t::on_connect(const tcp::endpoint &) noexcept {
         }
     }
 
-    transport::handshake_fn_t handshake_fn([&](auto &&...args) { on_handshake(args...); });
-    transport::error_fn_t error_fn([&](auto arg) { on_handshake_error(arg); });
+    transport::handshake_fn_t handshake_fn([this, request](auto &&...args) { on_handshake(args...); });
+    transport::error_fn_t error_fn([this, request](auto arg) { on_handshake_error(arg); });
     transport->async_handshake(handshake_fn, error_fn);
     resources->acquire(resource::io);
 }
 
 void http_actor_t::write_request() noexcept {
-    auto &payload = *queue.front()->payload.request_payload;
+    auto request = queue.front();
+    auto &payload = *request->payload.request_payload;
     auto &url = payload.url;
     auto &data = payload.data;
     LOG_TRACE(log, "sending {} bytes to {} ", data.size(), url);
@@ -215,8 +219,8 @@ void http_actor_t::write_request() noexcept {
         std::string_view write_data{(const char *)buff.data(), data.size()};
         LOG_DEBUG(log, "request ({}):\n{}", data.size(), write_data);
     }
-    transport::io_fn_t on_write = [&](auto arg) { this->on_request_sent(arg); };
-    transport::error_fn_t on_error = [&](auto arg) { this->on_io_error(arg); };
+    transport::io_fn_t on_write = [this, request](auto arg) { this->on_request_sent(arg); };
+    transport::error_fn_t on_error = [this, request](auto arg) { this->on_io_error(arg); };
     transport->async_send(buff, on_write, on_error);
     resources->acquire(resource::io);
 }
