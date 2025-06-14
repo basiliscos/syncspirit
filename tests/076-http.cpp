@@ -22,6 +22,7 @@ using configure_callback_t = std::function<void(r::plugin::plugin_base_t &)>;
 using finish_callback_t = std::function<void()>;
 using response_callback_t = std::function<void(message::http_response_t &message)>;
 using url_callback_t = std::function<utils::uri_ptr_t(std::string_view)>;
+using keep_alive_callback_t = std::function<bool()>;
 
 auto timeout = r::pt::time_duration{r::pt::millisec{200}};
 auto host = "127.0.0.1";
@@ -72,12 +73,13 @@ struct client_actor_t : r::actor_base_t {
 
         auto url = url_callback(path);
         auto tx_buff = utils::bytes_t();
+        auto keep_alive = keep_alive_callback();
 
         http::request<http::empty_body> req;
         req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
         req.method(http::verb::get);
         req.version(11);
-        req.keep_alive(false);
+        req.keep_alive(keep_alive);
         req.target(url->encoded_target());
         req.set(http::field::host, url->host());
 
@@ -103,6 +105,7 @@ struct client_actor_t : r::actor_base_t {
     std::optional<r::request_id_t> http_request;
     url_callback_t url_callback;
     response_callback_t response_callback;
+    keep_alive_callback_t keep_alive_callback;
 };
 using client_actor_ptr_t = r::intrusive_ptr_t<client_actor_t>;
 
@@ -135,7 +138,7 @@ struct fixture_t {
                          .request_timeout(timeout / 2)
                          .timeout(timeout)
                          .registry_name("http")
-                         .keep_alive(false)
+                         .keep_alive(request_keep_alive())
                          .finish();
         sup->do_process();
 
@@ -152,6 +155,7 @@ struct fixture_t {
         client_actor = sup->create_actor<client_actor_t>().timeout(timeout).finish();
         client_actor->response_callback = [this](auto &res) { return on_response(res); };
         client_actor->url_callback = [this](auto path) { return make_url(path); };
+        client_actor->keep_alive_callback = [this]() { return request_keep_alive(); };
         io_ctx.run_for(1ms);
 
         sup->do_process();
@@ -189,6 +193,8 @@ struct fixture_t {
         }
     }
 
+    virtual bool request_keep_alive() noexcept { return false; }
+
     virtual void main() noexcept {}
 
     virtual void on_accept(const sys::error_code &ec) noexcept {
@@ -197,6 +203,11 @@ struct fixture_t {
             return;
         }
         LOG_INFO(log, "on_accept, peer = {}", peer_sock.remote_endpoint());
+        async_read();
+    }
+
+    virtual void async_read() {
+        LOG_TRACE(log, "async_read...");
         auto handler = boost::beast::bind_front_handler(&fixture_t::on_read, this);
         http::async_read(peer_sock, rx_buff, request, std::move(handler));
     }
@@ -204,20 +215,21 @@ struct fixture_t {
     virtual void on_read(const sys::error_code &ec, std::size_t bytes) noexcept {
         if (ec) {
             LOG_DEBUG(log, "on_read, ec: {}", ec.message());
-            return;
-        }
-        auto path = request.target();
-        LOG_DEBUG(log, "on_read, {} bytes, target = {}", bytes, path);
-        auto res_opt = handle_request(path);
-        if (res_opt) {
-            LOG_DEBUG(log, "on_read, have some responce, going to send it");
+        } else {
+            auto path = request.target();
+            LOG_DEBUG(log, "on_read, {} bytes, target = {}", bytes, path);
+            auto res_opt = handle_request(path);
+            if (res_opt) {
+                auto &msg = *res_opt;
+                bool keep_alive = msg.keep_alive();
+                LOG_DEBUG(log, "on_read, have some responce, going to send it (keep alive = {})", keep_alive);
 
-            auto &msg = *res_opt;
-            bool keep_alive = msg.keep_alive();
-
-            auto handler = boost::beast::bind_front_handler(&fixture_t::on_write, this, keep_alive);
-            boost::beast::async_write(peer_sock, std::move(msg), std::move(handler));
+                auto handler = boost::beast::bind_front_handler(&fixture_t::on_write, this, keep_alive);
+                boost::beast::async_write(peer_sock, std::move(msg), std::move(handler));
+            }
         }
+        rx_buff.clear();
+        request.clear();
     }
 
     virtual void on_write(bool keep_alive, const sys::error_code &ec, std::size_t bytes) noexcept {
@@ -229,7 +241,7 @@ struct fixture_t {
     }
 
     virtual message_opt_t handle_request(std::string_view path) noexcept {
-        if (path == "/success") {
+        if (path.find("/success") != std::string::npos) {
             http::response<http::empty_body> res{http::status::ok, request.version()};
             res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
             res.set(http::field::content_type, "text/html");
@@ -277,9 +289,40 @@ void test_200_ok() {
 
         void on_response(message::http_response_t &message) noexcept override {
             LOG_DEBUG(log, "on_response");
+            auto &ee = message.payload.ee;
+            REQUIRE(!ee);
+
             auto &res = message.payload.res;
             CHECK(res->response.result_int() == 200);
         }
+    };
+    F().run();
+}
+
+void test_200_keep_alive() {
+    struct F : fixture_t {
+        bool request_keep_alive() noexcept override { return true; }
+
+        void main() noexcept override {
+            client_actor->make_request("/success-1");
+            sup->do_process();
+            io_ctx.run();
+            CHECK(responces == 2);
+        }
+
+        void on_response(message::http_response_t &message) noexcept override {
+            LOG_DEBUG(log, "on_response ({})", ++responces);
+            auto &ee = message.payload.ee;
+            REQUIRE(!ee);
+            auto &res = message.payload.res;
+            CHECK(res->response.result_int() == 200);
+            if (responces < 2) {
+                async_read();
+                client_actor->make_request("/success-2");
+            }
+        }
+
+        int responces = 0;
     };
     F().run();
 }
@@ -477,6 +520,7 @@ int _init() {
     test::init_logging();
     REGISTER_TEST_CASE(test_http_start_and_shutdown, "test_http_start_and_shutdown", "[http]");
     REGISTER_TEST_CASE(test_200_ok, "test_200_ok", "[http]");
+    REGISTER_TEST_CASE(test_200_keep_alive, "test_200_keep_alive", "[http]");
     REGISTER_TEST_CASE(test_403_fail, "test_403_fail", "[http]");
     REGISTER_TEST_CASE(test_garbage, "test_garbage", "[http]");
     REGISTER_TEST_CASE(test_network_error, "test_network_error", "[http]");
