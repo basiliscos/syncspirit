@@ -93,6 +93,12 @@ struct client_actor_t : r::actor_base_t {
                            .send(timeout);
     }
 
+    void cancel_request() {
+        assert(http_request.has_value());
+        send<message::http_cancel_t::payload_t>(http_client, *http_request, get_address());
+        http_request.reset();
+    }
+
     void on_response(message::http_response_t &message) noexcept {
         LOG_DEBUG(log, "on_response");
         if (response_callback) {
@@ -508,9 +514,66 @@ void test_resolve_fail() {
             auto &ee = message.payload.ee;
             CHECK(ee);
             CHECK(ee->ec);
-            CHECK(ee->ec);
             CHECK(ee->ec == std::error_code(err, std::system_category()));
             acceptor.cancel();
+        }
+    };
+    F().run();
+}
+
+void test_cancellation_1() {
+    static constexpr auto err = (int)std::errc::operation_canceled;
+    struct F : fixture_t {
+        void main() noexcept override {
+            client_actor->make_request("/cancellable");
+            sup->do_process();
+            io_ctx.run();
+        }
+
+        message_opt_t handle_request(std::string_view path) noexcept override {
+            client_actor->cancel_request();
+            return {};
+        }
+
+        void on_response(message::http_response_t &message) noexcept override {
+            LOG_DEBUG(log, "on_response");
+            auto &ee = message.payload.ee;
+            CHECK(ee);
+            CHECK(ee->ec);
+            CHECK(ee->ec.message() != "");
+        }
+    };
+    F().run();
+}
+
+void test_cancellation_2() {
+    static constexpr auto err = (int)std::errc::operation_canceled;
+    struct F : fixture_t {
+
+        void on_accept(const sys::error_code &ec) noexcept override {
+            client_actor->cancel_request();
+            LOG_INFO(log, "on_accept, cancelling request...");
+            if (ec) {
+                LOG_DEBUG(log, "on_accept, ec: {}", ec.message());
+                return;
+            }
+            LOG_INFO(log, "on_accept, peer = {}", peer_sock.remote_endpoint());
+            async_read();
+        }
+
+        void main() noexcept override {
+            client_actor->make_request("/success-cancellable");
+            sup->do_process();
+            io_ctx.run();
+        }
+
+        void on_response(message::http_response_t &message) noexcept override {
+            LOG_DEBUG(log, "on_response");
+            auto &ee = message.payload.ee;
+            CHECK(ee);
+            CHECK(ee->ec);
+            CHECK(ee->ec.message() != "");
+            peer_sock.cancel();
         }
     };
     F().run();
@@ -527,6 +590,8 @@ int _init() {
     REGISTER_TEST_CASE(test_response_timeout, "test_response_timeout", "[http]");
     REGISTER_TEST_CASE(test_resolve_timeout, "test_resolve_timeout", "[http]");
     REGISTER_TEST_CASE(test_resolve_fail, "test_resolve_fail", "[http]");
+    REGISTER_TEST_CASE(test_cancellation_1, "test_cancellation_1", "[http]");
+    REGISTER_TEST_CASE(test_cancellation_2, "test_cancellation_2", "[http]");
     return 1;
 }
 

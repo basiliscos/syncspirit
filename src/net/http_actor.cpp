@@ -51,6 +51,7 @@ void http_actor_t::on_cancel(message::http_cancel_t &req) noexcept {
     }
 
     auto &request_id = req.payload.id;
+    cancel_request = true;
     if (request_id == queue.front()->payload.id) {
         if (resolve_request) {
             send<message::resolve_cancel_t::payload_t>(resolver, *resolve_request, get_address());
@@ -91,6 +92,7 @@ void http_actor_t::process() noexcept {
 
     http_response.clear();
     need_response = true;
+    cancel_request = false;
     response_size = 0;
     auto &url = queue.front()->payload.request_payload->url;
 
@@ -213,16 +215,25 @@ void http_actor_t::write_request() noexcept {
     auto &payload = *request->payload.request_payload;
     auto &url = payload.url;
     auto &data = payload.data;
-    LOG_TRACE(log, "sending {} bytes to {} ", data.size(), url);
-    auto buff = asio::buffer(data.data(), data.size());
-    if (payload.debug) {
-        std::string_view write_data{(const char *)buff.data(), data.size()};
-        LOG_DEBUG(log, "request ({}):\n{}", data.size(), write_data);
+    if (cancel_request) {
+        LOG_TRACE(log, "request to '{}' has been cancelled", url);
+        auto ec = r::make_error_code(r::error_code_t::cancelled);
+        reply_with_error(*queue.front(), make_error(ec));
+        queue.pop_front();
+        need_response = false;
+        cancel_io();
+    } else {
+        LOG_TRACE(log, "sending {} bytes to {}", data.size(), url);
+        auto buff = asio::buffer(data.data(), data.size());
+        if (payload.debug) {
+            std::string_view write_data{(const char *)buff.data(), data.size()};
+            LOG_DEBUG(log, "request ({}):\n{}", data.size(), write_data);
+        }
+        transport::io_fn_t on_write = [this, request](auto arg) { this->on_request_sent(arg); };
+        transport::error_fn_t on_error = [this, request](auto arg) { this->on_io_error(arg); };
+        transport->async_send(buff, on_write, on_error);
+        resources->acquire(resource::io);
     }
-    transport::io_fn_t on_write = [this, request](auto arg) { this->on_request_sent(arg); };
-    transport::error_fn_t on_error = [this, request](auto arg) { this->on_io_error(arg); };
-    transport->async_send(buff, on_write, on_error);
-    resources->acquire(resource::io);
 }
 
 void http_actor_t::on_request_sent(std::size_t bytes) noexcept {
