@@ -27,6 +27,8 @@ using keep_alive_callback_t = std::function<bool()>;
 auto timeout = r::pt::time_duration{r::pt::millisec{200}};
 auto host = "127.0.0.1";
 
+struct fixture_t;
+
 struct supervisor_t : ra::supervisor_asio_t {
     using ra::supervisor_asio_t::supervisor_asio_t;
 
@@ -49,6 +51,7 @@ struct supervisor_t : ra::supervisor_asio_t {
     utils::logger_t log;
     configure_callback_t configure_callback;
     finish_callback_t finish_callback;
+    fixture_t *fixture;
 };
 using supervisor_ptr_t = r::intrusive_ptr_t<supervisor_t>;
 
@@ -131,6 +134,7 @@ struct fixture_t {
             plugin.template with_casted<r::plugin::starter_plugin_t>([&](auto &p) {});
         };
         sup->finish_callback = [&]() { finish(); };
+        sup->fixture = this;
         sup->start();
         sup->do_process();
         CHECK(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::OPERATIONAL);
@@ -522,7 +526,6 @@ void test_resolve_fail() {
 }
 
 void test_cancellation_1() {
-    static constexpr auto err = (int)std::errc::operation_canceled;
     struct F : fixture_t {
         void main() noexcept override {
             client_actor->make_request("/cancellable");
@@ -547,9 +550,7 @@ void test_cancellation_1() {
 }
 
 void test_cancellation_2() {
-    static constexpr auto err = (int)std::errc::operation_canceled;
     struct F : fixture_t {
-
         void on_accept(const sys::error_code &ec) noexcept override {
             client_actor->cancel_request();
             LOG_INFO(log, "on_accept, cancelling request...");
@@ -579,6 +580,48 @@ void test_cancellation_2() {
     F().run();
 }
 
+void test_cancellation_3() {
+    struct F : fixture_t {
+        r::actor_ptr_t make_resolver() noexcept override {
+            struct sample_resolver_t : r::actor_base_t {
+                using r::actor_base_t::actor_base_t;
+
+                void configure(r::plugin::plugin_base_t &plugin) noexcept override {
+                    r::actor_base_t::configure(plugin);
+                    plugin.with_casted<r::plugin::address_maker_plugin_t>(
+                        [&](auto &p) { p.set_identity(names::resolver, false); });
+                    plugin.with_casted<r::plugin::registry_plugin_t>(
+                        [&](auto &p) { p.register_name(names::resolver, get_address()); });
+                    plugin.with_casted<r::plugin::starter_plugin_t>(
+                        [&](auto &p) { p.subscribe_actor(&sample_resolver_t::on_request); });
+                }
+
+                void on_request(message::resolve_request_t &req) noexcept {
+                    auto &sup = static_cast<supervisor_t &>(get_supervisor());
+                    sup.fixture->client_actor->cancel_request();
+                }
+            };
+            return sup->create_actor<sample_resolver_t>().timeout(timeout).finish();
+        }
+
+        void main() noexcept override {
+            client_actor->make_request("/success-cancellable");
+            sup->do_process();
+            io_ctx.run();
+        }
+
+        void on_response(message::http_response_t &message) noexcept override {
+            LOG_DEBUG(log, "on_response");
+            auto &ee = message.payload.ee;
+            CHECK(ee);
+            CHECK(ee->ec);
+            CHECK(ee->ec.message() != "");
+            acceptor.cancel();
+        }
+    };
+    F().run();
+}
+
 int _init() {
     test::init_logging();
     REGISTER_TEST_CASE(test_http_start_and_shutdown, "test_http_start_and_shutdown", "[http]");
@@ -592,6 +635,7 @@ int _init() {
     REGISTER_TEST_CASE(test_resolve_fail, "test_resolve_fail", "[http]");
     REGISTER_TEST_CASE(test_cancellation_1, "test_cancellation_1", "[http]");
     REGISTER_TEST_CASE(test_cancellation_2, "test_cancellation_2", "[http]");
+    REGISTER_TEST_CASE(test_cancellation_3, "test_cancellation_3", "[http]");
     return 1;
 }
 
