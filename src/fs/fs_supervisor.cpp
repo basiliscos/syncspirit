@@ -39,6 +39,7 @@ void fs_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
                 auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
                 plugin->subscribe_actor(&fs_supervisor_t::on_model_update, coordinator);
+                plugin->subscribe_actor(&fs_supervisor_t::on_app_ready, coordinator);
                 request<model::payload::model_request_t>(coordinator).send(init_timeout);
                 resources->acquire(resource::model);
             }
@@ -107,6 +108,10 @@ void fs_supervisor_t::on_model_response(model::message::model_response_t &res) n
     if (model_request) {
         reply_to(*model_request, cluster);
     }
+}
+
+void fs_supervisor_t::on_app_ready(model::message::app_ready_t &) noexcept {
+    LOG_TRACE(log, "on_app_ready");
     launch();
 }
 
@@ -145,6 +150,7 @@ auto fs_supervisor_t::operator()(const model::diff::load::load_cluster_t &diff, 
         auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
         folder->set_augmentation(folder_entity);
     }
+    send<syncspirit::model::payload::thread_ready_t>(coordinator);
     return diff.visit_next(*this, custom);
 }
 

@@ -260,7 +260,7 @@ int main(int argc, char **argv) {
         auto strand = std::make_shared<asio::io_context::strand>(io_context);
         auto timeout = pt::milliseconds{cfg.timeout};
 
-        auto cluster_copies = 1ul;
+        auto independent_threads = 2ul;
         auto seed = (size_t)std::time(nullptr);
         auto sequencer = model::make_sequencer(seed);
 
@@ -271,7 +271,7 @@ int main(int argc, char **argv) {
                            .create_registry()
                            .guard_context(true)
                            .sequencer(sequencer)
-                           .cluster_copies(cluster_copies)
+                           .independent_threads(independent_threads)
                            .shutdown_flag(shutdown_flag, r::pt::millisec{50})
                            .finish();
         sup_net->start();

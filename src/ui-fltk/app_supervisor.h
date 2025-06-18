@@ -174,6 +174,7 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
 
     void on_model_response(model::message::model_response_t &res) noexcept;
     void on_model_update(model::message::model_update_t &message) noexcept;
+    void on_app_ready(model::message::app_ready_t &) noexcept;
     void on_db_info_response(net::message::db_info_response_t &res) noexcept;
     void redisplay_folder_nodes(bool refresh_labels);
     void detach_main_window() noexcept;

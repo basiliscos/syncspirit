@@ -175,6 +175,7 @@ struct fixture_t : private model::diff::cluster_visitor_t {
         auto bep_config = config::bep_config_t();
         bep_config.rx_buff_size = 1024;
         bep_config.rx_timeout = rx_timeout;
+        bep_config.stats_interval = 0;
         LOG_INFO(log, "crearing actor, timeout = {}", rx_timeout);
 
         return sup->create_actor<actor_ptr_t::element_type>()

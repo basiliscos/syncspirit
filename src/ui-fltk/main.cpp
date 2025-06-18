@@ -246,7 +246,7 @@ int main(int argc, char **argv) {
         ra::system_context_ptr_t sys_context{new asio_sys_context_t{io_context}};
         auto strand = std::make_shared<asio::io_context::strand>(io_context);
         auto timeout = pt::milliseconds{cfg.timeout};
-        auto cluster_copies = 2ul;
+        auto independent_threads = 3ul;
         auto seed = (size_t)std::time(nullptr);
         auto sequencer = model::make_sequencer(seed);
 
@@ -257,7 +257,7 @@ int main(int argc, char **argv) {
                            .create_registry()
                            .guard_context(true)
                            .sequencer(sequencer)
-                           .cluster_copies(cluster_copies)
+                           .independent_threads(independent_threads)
                            .shutdown_flag(shutdown_flag, r::pt::millisec{50})
                            .finish();
         // warm-up

@@ -135,6 +135,7 @@ after the core completion.
  - [core, bep] support device `auto-accept` folder flag
  - [core, bep] support device `introducer` and `skip_introduction_removals` markers
  - [core, bep] support outgoing messages to be compressed using lz4
+ - [core] syncrhonize threads/app startup
  - [impl] degoogle: use [protopuf](https://github.com/PragmaTwice/protopuf) instead of protobuf
 
 ## 0.4.0 (22-Feb-2025)

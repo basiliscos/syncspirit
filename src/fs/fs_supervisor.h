@@ -67,6 +67,7 @@ struct SYNCSPIRIT_API fs_supervisor_t : rth::supervisor_thread_t,
     void on_model_request(model::message::model_request_t &req) noexcept;
     void on_model_response(model::message::model_response_t &res) noexcept;
     void on_model_update(model::message::model_update_t &message) noexcept;
+    void on_app_ready(model::message::app_ready_t &) noexcept;
     void launch() noexcept;
 
     outcome::result<void> operator()(const model::diff::load::load_cluster_t &, void *) noexcept override;

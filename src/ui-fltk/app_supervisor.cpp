@@ -119,12 +119,6 @@ struct callback_impl_t final : callback_t {
     callback_fn_t fn;
 };
 
-static void ui_idle_means_ready(void *data) {
-    auto sup = reinterpret_cast<app_supervisor_t *>(data);
-    sup->send<syncspirit::model::payload::ui_ready_t>(sup->get_coordinator_address());
-    Fl::remove_idle(ui_idle_means_ready, data);
-}
-
 app_supervisor_t::app_supervisor_t(config_t &config)
     : parent_t(config), dist_sink(std::move(config.dist_sink)), config_path{std::move(config.config_path)},
       app_config(std::move(config.app_config)), app_config_original{app_config}, content{nullptr}, devices{nullptr},
@@ -161,6 +155,7 @@ void app_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
                 auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
                 plugin->subscribe_actor(&app_supervisor_t::on_model_update, coordinator);
+                plugin->subscribe_actor(&app_supervisor_t::on_app_ready, coordinator);
                 request_load_model();
             }
         });
@@ -287,10 +282,13 @@ void app_supervisor_t::on_model_update(model::message::model_update_t &message) 
     }
 
     if (!has_been_loaded && cluster->get_devices().size()) {
-        main_window->on_loading_done();
         main_window->set_splash_text("UI has been initialized");
-        Fl::add_idle(ui_idle_means_ready, this);
     }
+}
+
+void app_supervisor_t::on_app_ready(model::message::app_ready_t &) noexcept {
+    LOG_TRACE(log, "on_app_ready");
+    main_window->on_loading_done();
 }
 
 std::string app_supervisor_t::get_uptime() noexcept {
@@ -436,6 +434,8 @@ auto app_supervisor_t::operator()(const model::diff::load::load_cluster_t &diff,
         auto &device = *it.item;
         device.set_augmentation(ignored_devices_node->add_device(device));
     }
+
+    send<syncspirit::model::payload::thread_ready_t>(coordinator);
 
     return diff.visit_next(*this, custom);
 }
@@ -630,7 +630,7 @@ auto app_supervisor_t::apply(const model::diff::load::file_infos_t &diff, model:
     loaded_files += diff.container.size();
     auto share = (100. * loaded_files) / load_cluster->files_count;
     auto msg = fmt::format("({}%) loaded {} of {} files", (int)share, loaded_files, load_cluster->files_count);
-    log->debug(msg);
+    // log->debug(msg);
     main_window->set_splash_text(msg);
     auto r = apply_controller_t::apply(diff, cluster);
     return r;

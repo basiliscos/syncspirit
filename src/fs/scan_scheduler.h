@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
 
 #pragma once
 
@@ -39,7 +39,7 @@ struct SYNCSPIRIT_API scan_scheduler_t : public r::actor_base_t, private model::
     explicit scan_scheduler_t(config_t &cfg);
 
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
-    void on_ui_ready(model::message::ui_ready_t &) noexcept;
+    void on_start() noexcept override;
 
   private:
     struct next_schedule_t {
