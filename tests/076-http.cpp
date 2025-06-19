@@ -622,6 +622,32 @@ void test_cancellation_3() {
     F().run();
 }
 
+void test_cancellation_4() {
+    struct F : fixture_t {
+        void main() noexcept override {
+            client_actor->make_request("/success");
+            sup->do_process();
+            io_ctx.run();
+        }
+
+        message_opt_t handle_request(std::string_view path) noexcept override {
+            LOG_DEBUG(log, "cancelling request...");
+            client_actor->cancel_request();
+            sup->do_process();
+            return fixture_t::handle_request(path);
+        }
+
+        void on_response(message::http_response_t &message) noexcept override {
+            LOG_DEBUG(log, "on_response");
+            auto &ee = message.payload.ee;
+            CHECK(ee);
+            CHECK(ee->ec);
+            CHECK(ee->ec.message() != "");
+        }
+    };
+    F().run();
+}
+
 int _init() {
     test::init_logging();
     REGISTER_TEST_CASE(test_http_start_and_shutdown, "test_http_start_and_shutdown", "[http]");
@@ -636,6 +662,7 @@ int _init() {
     REGISTER_TEST_CASE(test_cancellation_1, "test_cancellation_1", "[http]");
     REGISTER_TEST_CASE(test_cancellation_2, "test_cancellation_2", "[http]");
     REGISTER_TEST_CASE(test_cancellation_3, "test_cancellation_3", "[http]");
+    REGISTER_TEST_CASE(test_cancellation_4, "test_cancellation_4", "[http]");
     return 1;
 }
 

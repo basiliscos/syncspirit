@@ -270,9 +270,9 @@ void http_actor_t::on_request_read(std::size_t bytes) noexcept {
     if (req.payload.request_payload->debug) {
         auto &body = http_response.body();
         for (auto &f : http_response) {
-            LOG_DEBUG(log, "{} : {}", f.name_string(), f.value());
+            LOG_DEBUG(log, "(header) {} : {}", f.name_string(), f.value());
         }
-        LOG_DEBUG(log, "response (bytes: {}, code: {}):\n{}\n", bytes, http_response.result_int(), body);
+        LOG_DEBUG(log, "response (bytes: {}, code: {}): (body)\n{}\n", bytes, http_response.result_int(), body);
     }
     if (keep_alive && http_response.keep_alive()) {
         kept_alive = true;
