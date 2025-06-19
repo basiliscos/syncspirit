@@ -46,7 +46,10 @@ TEST_CASE("folder update (Index)", "[model]") {
 
     auto ec = builder.make_index(sha256, "1234-5678").add(pr_fi, peer_device).fail();
     REQUIRE(ec);
-    CHECK(ec == make_error_code(error_code_t::mismatch_file_size));
+
+    auto expected_ec = make_error_code(error_code_t::mismatch_file_size);
+    REQUIRE(ec.value() == expected_ec.value());
+    REQUIRE(ec.message() == expected_ec.message());
 };
 
 TEST_CASE("update folder-2 (via Index)", "[model]") {
@@ -87,7 +90,10 @@ TEST_CASE("update folder-2 (via Index)", "[model]") {
         SECTION("invalid cases") {
             auto ec = builder.make_index(sha256, "1234-5678").add(pr_file, peer_device, false).fail();
             REQUIRE(ec);
-            CHECK(ec == model::make_error_code(model::error_code_t::missing_version));
+
+            auto expected_ec = make_error_code(error_code_t::missing_version);
+            REQUIRE(ec.value() == expected_ec.value());
+            REQUIRE(ec.message() == expected_ec.message());
         }
 
         SECTION("valid cases") {
@@ -131,13 +137,17 @@ TEST_CASE("update folder-2 (via Index)", "[model]") {
     SECTION("folder does not exists") {
         auto ec = builder.make_index(sha256, "1234-5678-xxx").fail();
         REQUIRE(ec);
-        CHECK(ec == model::make_error_code(model::error_code_t::folder_does_not_exist));
+        auto expected_ec = make_error_code(error_code_t::folder_does_not_exist);
+        REQUIRE(ec.value() == expected_ec.value());
+        REQUIRE(ec.message() == expected_ec.message());
     }
 
     SECTION("folder is not shared") {
         auto ec = builder.make_index(sha256, "5555-4444").fail();
         REQUIRE(ec);
-        CHECK(ec == model::make_error_code(model::error_code_t::folder_is_not_shared));
+        auto expected_ec = make_error_code(error_code_t::folder_is_not_shared);
+        REQUIRE(ec.value() == expected_ec.value());
+        REQUIRE(ec.message() == expected_ec.message());
     }
 
     SECTION("blocks are not expected") {
@@ -155,7 +165,9 @@ TEST_CASE("update folder-2 (via Index)", "[model]") {
 
         auto ec = builder.make_index(sha256, "1234-5678").add(pr_file, peer_device).fail();
         REQUIRE(ec);
-        CHECK(ec == model::make_error_code(model::error_code_t::unexpected_blocks));
+        auto expected_ec = make_error_code(model::error_code_t::unexpected_blocks);
+        REQUIRE(ec.value() == expected_ec.value());
+        REQUIRE(ec.message() == expected_ec.message());
     }
 }
 

@@ -845,7 +845,9 @@ TEST_CASE("device introduction", "[model]") {
                           .add(sha256_1, folder_1_id, 5, 4)
                           .add(sha256_2, folder_1_id, 55, 444, "some-invalid-url%%!")
                           .fail();
-            REQUIRE(ec == utils::make_error_code(utils::error_code_t::malformed_url));
+            auto expected_ec = utils::make_error_code(utils::error_code_t::malformed_url);
+            REQUIRE(ec.value() == expected_ec.value());
+            REQUIRE(ec.message() == expected_ec.message());
         }
     }
 
