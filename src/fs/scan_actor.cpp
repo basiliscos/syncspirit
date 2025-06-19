@@ -274,7 +274,7 @@ void scan_actor_t::on_hash(hasher::message::digest_response_t &res) noexcept {
             auto &valid_blocks = info.valid_blocks();
             std::uint_fast32_t valid_blocks_count = 0;
             for (size_t i = 0; i < valid_blocks.size(); ++i) {
-                auto is_valid = valid_blocks[i];
+                auto is_valid = (bool)valid_blocks[i];
                 if (is_valid) {
                     if (file->is_locally_available(i)) {
                         is_valid = false;
