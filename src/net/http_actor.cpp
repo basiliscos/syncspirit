@@ -245,6 +245,15 @@ void http_actor_t::on_request_sent(std::size_t bytes) noexcept {
 
     auto request = queue.front();
     auto &payload = *request->payload.request_payload;
+    auto &url = payload.url;
+    if (cancel_request) {
+        LOG_TRACE(log, "request to '{}' has been cancelled", url);
+        auto ec = r::make_error_code(r::error_code_t::cancelled);
+        reply_with_error(*queue.front(), make_error(ec));
+        queue.pop_front();
+        return process();
+    }
+
     auto &rx_buff = payload.rx_buff;
     rx_buff->prepare(payload.rx_buff_size);
     transport::io_fn_t on_read = [this, request](auto arg) { this->on_request_read(arg); };

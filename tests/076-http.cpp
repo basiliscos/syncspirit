@@ -559,7 +559,7 @@ void test_cancellation_2() {
                 return;
             }
             LOG_INFO(log, "on_accept, peer = {}", peer_sock.remote_endpoint());
-            async_read();
+            // async_read();
         }
 
         void main() noexcept override {
@@ -571,7 +571,7 @@ void test_cancellation_2() {
         void on_response(message::http_response_t &message) noexcept override {
             LOG_DEBUG(log, "on_response");
             auto &ee = message.payload.ee;
-            CHECK(ee);
+            REQUIRE(ee);
             CHECK(ee->ec);
             CHECK(ee->ec.message() != "");
             peer_sock.cancel();
@@ -613,7 +613,7 @@ void test_cancellation_3() {
         void on_response(message::http_response_t &message) noexcept override {
             LOG_DEBUG(log, "on_response");
             auto &ee = message.payload.ee;
-            CHECK(ee);
+            REQUIRE(ee);
             CHECK(ee->ec);
             CHECK(ee->ec.message() != "");
             acceptor.cancel();
