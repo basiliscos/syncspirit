@@ -39,7 +39,7 @@ find_package(rotor COMPONENTS asio thread REQUIRED)
 find_package(lz4 REQUIRED)
 find_package(fmt REQUIRED)
 find_package(spdlog REQUIRED)
-#find_package(protopuf REQUIRED)
+find_package(protopuf REQUIRED)
 find_package(pugixml REQUIRED)
 find_package(tomlplusplus REQUIRED)
 find_package(nlohmann_json REQUIRED)
@@ -291,13 +291,6 @@ FetchContent_Declare(C_ARES
     set(CARES_THREADS     false CACHE BOOL "CARES_THREADS")
 FetchContent_MakeAvailable(C_ARES)
 
-FetchContent_Declare(PROTOPUF
-    URL https://github.com/PragmaTwice/protopuf/archive/refs/tags/v3.1.0.tar.gz
-    URL_HASH SHA256=094ead00fe10c52725ae8c6871da907215e0ae752ed017d98907a9b410e52318
-)
-    set(BUILD_TESTS      false CACHE BOOL "BUILD_TESTS")
-FetchContent_MakeAvailable(PROTOPUF)
-
 target_include_directories(syncspirit_core PUBLIC
     ${OPENSSL_INCLUDE_DIR}
     ${CMAKE_CURRENT_BINARY_DIR}
@@ -307,8 +300,7 @@ target_include_directories(syncspirit_core PUBLIC
 
 target_link_libraries(syncspirit_core
     PUBLIC
-#        protopuf::protopuf
-        protopuf
+        protopuf::protopuf
         rotor::asio
         rotor::thread
         pugixml::pugixml

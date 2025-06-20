@@ -25,7 +25,7 @@ log_panel_t *widget;
 struct syncspirit::fltk::fltk_sink_t final : base_sink_t {
     fltk_sink_t() {}
     fltk_sink_t(const fltk_sink_t &) = delete;
-    fltk_sink_t(fltk_sink_t &&) = default;
+    fltk_sink_t(fltk_sink_t &&) = delete;
 
     void forward(log_record_ptr_t record) override {
         auto lock = std::unique_lock(incoming_mutex);
