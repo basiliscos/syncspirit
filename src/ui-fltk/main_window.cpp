@@ -8,14 +8,19 @@
 #include "tree_view.h"
 #include "tree_item.h"
 #include "toolbar.h"
+#include "constants.h"
 
 #include <FL/Fl_Box.H>
 #include <FL/Fl_Tile.H>
+#include <fmt/format.h>
 
+using namespace syncspirit;
 using namespace syncspirit::fltk;
 
+static auto app_name = fmt::format("syncspirit-fltk {}", constants::client_version);
+
 main_window_t::main_window_t(app_supervisor_t &supervisor_, int w_, int h_)
-    : parent_t(w_, h_, "syncspirit-fltk"), supervisor{&supervisor_} {
+    : parent_t(w_, h_, app_name.data()), supervisor{&supervisor_} {
 
 #ifdef _WIN32
     auto icon = LoadIcon(fl_display, MAKEINTRESOURCE(ID_SYNCSPIRIT_ICON));
