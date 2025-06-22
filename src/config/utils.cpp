@@ -340,7 +340,7 @@ config_result_t get_config(std::istream &config, const bfs::path &config_path) {
         }
         c.advances_per_iteration = advances_per_iteration.value();
 
-        auto stats_interval = t["stats_interval"].value<std::uint32_t>();
+        auto stats_interval = t["stats_interval"].value<std::int32_t>();
         if (!stats_interval) {
             return "bep/stats_interval is incorrect or missing";
         }

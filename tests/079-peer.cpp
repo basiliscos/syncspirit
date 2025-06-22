@@ -32,6 +32,7 @@ namespace r = rotor;
 namespace ra = r::asio;
 
 using configure_callback_t = std::function<void(r::plugin::plugin_base_t &)>;
+using shutdown_callback_t = std::function<void()>;
 
 auto timeout = r::pt::time_duration{r::pt::millisec{1500}};
 auto host = "127.0.0.1";
@@ -70,6 +71,7 @@ struct supervisor_t : ra::supervisor_asio_t {
 
     asio::ip::tcp::acceptor *acceptor = nullptr;
     configure_callback_t configure_callback;
+    shutdown_callback_t shutdown_callback;
 };
 
 using supervisor_ptr_t = r::intrusive_ptr_t<supervisor_t>;
@@ -89,6 +91,7 @@ struct fixture_t : private model::diff::cluster_visitor_t {
         known_peer = add_peer;
         auto strand = std::make_shared<asio::io_context::strand>(io_ctx);
         sup = ctx.create_supervisor<supervisor_t>().strand(strand).timeout(timeout).create_registry().finish();
+        sup->shutdown_callback = [this]() { on_shutdown(); };
         sup->configure_callback = [&](r::plugin::plugin_base_t &plugin) {
             plugin.template with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
                 using cluster_diff_ptr_t = r::intrusive_ptr_t<model::message::model_update_t>;
@@ -175,7 +178,7 @@ struct fixture_t : private model::diff::cluster_visitor_t {
         auto bep_config = config::bep_config_t();
         bep_config.rx_buff_size = 1024;
         bep_config.rx_timeout = rx_timeout;
-        bep_config.stats_interval = 0;
+        bep_config.stats_interval = -1;
         LOG_INFO(log, "crearing actor, timeout = {}", rx_timeout);
 
         return sup->create_actor<actor_ptr_t::element_type>()
@@ -239,6 +242,8 @@ struct fixture_t : private model::diff::cluster_visitor_t {
         client_trans->async_recv(rx_buff_, on_read, on_error);
         client_trans->async_send(tx_buff_, on_write, on_error);
     }
+
+    virtual void on_shutdown() noexcept {}
 
     cluster_ptr_t cluster;
     supervisor_ptr_t sup;
@@ -307,6 +312,10 @@ void test_hello_from_unknown() {
 
             auto delta = pt::microsec_clock::local_time() - peer->get_last_seen();
             CHECK(delta.seconds() <= 2);
+            CHECK((my_device->get_rx_bytes() > 0 || my_device->get_tx_bytes() > 0));
+        }
+
+        void on_shutdown() noexcept override {
             CHECK(my_device->get_rx_bytes() > 0);
             CHECK(my_device->get_tx_bytes() > 0);
         }
@@ -336,6 +345,10 @@ void test_hello_from_known_unknown() {
 
             auto delta = pt::microsec_clock::local_time() - peer->get_last_seen();
             CHECK(delta.seconds() <= 2);
+            CHECK((my_device->get_rx_bytes() > 0 || my_device->get_tx_bytes() > 0));
+        }
+
+        void on_shutdown() noexcept override {
             CHECK(my_device->get_rx_bytes() > 0);
             CHECK(my_device->get_tx_bytes() > 0);
         }

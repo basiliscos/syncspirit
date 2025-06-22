@@ -111,7 +111,7 @@ bool folder_t::is_scanning() const noexcept {
     if (scan_finish.is_not_a_date_time()) {
         return true;
     }
-    return scan_start > scan_finish;
+    return scan_start >= scan_finish;
 }
 
 bool folder_t::is_synchronizing() const noexcept { return synchronizing > 0; }

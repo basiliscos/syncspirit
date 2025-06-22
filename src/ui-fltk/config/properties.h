@@ -11,12 +11,21 @@ namespace syncspirit::fltk::config {
 namespace bfs = std::filesystem;
 
 namespace impl {
+
 struct positive_integer_t : property_t {
     positive_integer_t(std::string label, std::string explanation, std::uint64_t value, std::uint64_t default_value);
 
     error_ptr_t validate_value() noexcept override;
 
     std::uint64_t native_value;
+};
+
+struct integer_t : property_t {
+    integer_t(std::string label, std::string explanation, std::int64_t value, std::int64_t default_value);
+
+    error_ptr_t validate_value() noexcept override;
+
+    std::int64_t native_value;
 };
 
 struct string_t : property_t {
@@ -136,12 +145,12 @@ struct tx_timeout_t final : impl::positive_integer_t {
     void reflect_to(syncspirit::config::main_t &main) override;
 };
 
-struct stats_interval_t final : impl::positive_integer_t {
-    using parent_t = impl::positive_integer_t;
+struct stats_interval_t final : impl::integer_t {
+    using parent_t = impl::integer_t;
 
     static const char *explanation_;
 
-    stats_interval_t(std::uint64_t value, std::uint64_t default_value);
+    stats_interval_t(std::int64_t value, std::int64_t default_value);
     void reflect_to(syncspirit::config::main_t &main) override;
 };
 

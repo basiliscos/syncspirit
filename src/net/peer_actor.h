@@ -137,7 +137,7 @@ struct SYNCSPIRIT_API peer_actor_t : public r::actor_base_t {
     void handle_close(proto::Close &&) noexcept;
     void handle_response(proto::Response &&) noexcept;
 
-    void emit_io_stats() noexcept;
+    void emit_io_stats(bool force = false) noexcept;
 
     model::cluster_ptr_t cluster;
     utils::logger_t log;

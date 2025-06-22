@@ -39,6 +39,27 @@ error_ptr_t positive_integer_t::validate_value() noexcept {
     return {};
 }
 
+integer_t::integer_t(std::string label, std::string explanation, int64_t value, int64_t default_value)
+    : property_t(std::move(label), std::move(explanation), std::to_string(value), std::to_string(default_value),
+                 property_kind_t::positive_integer),
+      native_value{value} {}
+
+error_ptr_t integer_t::validate_value() noexcept {
+    std::int64_t r;
+    auto [ptr, ec] = std::from_chars(value.data(), value.data() + value.size(), r);
+
+    if (ec == std::errc::invalid_argument) {
+        return error_ptr_t(new std::string("not a number"));
+    } else if (ec == std::errc::result_out_of_range) {
+        return error_ptr_t(new std::string("too large number"));
+    }
+    assert(ec == std::errc());
+
+    // all ok
+    native_value = r;
+    return {};
+}
+
 string_t::string_t(std::string label, std::string explanation, std::string value, std::string default_value)
     : property_t(std::move(label), std::move(explanation), std::move(value), std::move(default_value),
                  property_kind_t::text) {}
@@ -159,7 +180,7 @@ void tx_timeout_t::reflect_to(syncspirit::config::main_t &main) { main.bep_confi
 
 const char *tx_timeout_t::explanation_ = "tx max time, milliseconds";
 
-stats_interval_t::stats_interval_t(std::uint64_t value, std::uint64_t default_value)
+stats_interval_t::stats_interval_t(std::int64_t value, std::int64_t default_value)
     : parent_t("tx_timeout", explanation_, value, default_value) {}
 
 void stats_interval_t::reflect_to(syncspirit::config::main_t &main) { main.bep_config.stats_interval = native_value; }

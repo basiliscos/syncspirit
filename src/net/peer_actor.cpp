@@ -264,6 +264,7 @@ void peer_actor_t::shutdown_finish() noexcept {
             send<model::payload::model_update_t>(coordinator, std::move(diff));
         }
     }
+    emit_io_stats(true);
 }
 
 void peer_actor_t::cancel_timer() noexcept {
@@ -517,10 +518,10 @@ void peer_actor_t::on_rx_timeout(r::request_id_t, bool cancelled) noexcept {
     }
 }
 
-void peer_actor_t::emit_io_stats() noexcept {
+void peer_actor_t::emit_io_stats(bool force) noexcept {
     using namespace std::chrono;
     auto now = clock_t::now();
-    if (now > last_stats + milliseconds{bep_config.stats_interval}) {
+    if (force || (now > last_stats + milliseconds{bep_config.stats_interval})) {
         auto diff = model::diff::cluster_diff_ptr_t();
         last_stats = now;
         diff.reset(new model::diff::peer::rx_tx_t(peer_device_id.get_sha256(), rx_bytes, tx_bytes));
