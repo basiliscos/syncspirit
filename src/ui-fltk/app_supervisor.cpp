@@ -552,11 +552,13 @@ auto app_supervisor_t::operator()(const model::diff::modify::upsert_folder_info_
         auto augmentation = folder.get_augmentation().get();
         auto folder_entity = static_cast<presentation::folder_entity_t *>(augmentation);
         auto folder_presence = folder_entity->on_insert(*folder_info);
-        auto devices_node = static_cast<tree_item::devices_t *>(devices);
-        auto peer_node = devices_node->get_peer(device);
-        auto folders_node = static_cast<tree_item::peer_folders_t *>(peer_node->get_folders());
-        if (!folder_presence->get_augmentation()) {
-            folders_node->add_folder(*folder_presence);
+        if (folder_presence) {
+            auto devices_node = static_cast<tree_item::devices_t *>(devices);
+            auto peer_node = devices_node->get_peer(device);
+            auto folders_node = static_cast<tree_item::peer_folders_t *>(peer_node->get_folders());
+            if (!folder_presence->get_augmentation()) {
+                folders_node->add_folder(*folder_presence);
+            }
         }
     }
     return r;
