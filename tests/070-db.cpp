@@ -45,6 +45,7 @@ struct fixture_t {
         test::init_logging();
         bfs::create_directory(root_path);
     }
+    fixture_t(fixture_t &source) = delete;
 
     fixture_t(fixture_t &&source) noexcept
         : root_path(std::move(source.root_path)), path_quard(std::move(source.path_quard)) {}

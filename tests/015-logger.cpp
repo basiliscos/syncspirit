@@ -7,6 +7,7 @@
 #include <spdlog/sinks/dist_sink.h>
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
+#include <boost/nowide/convert.hpp>
 
 namespace st = syncspirit::test;
 namespace bfs = std::filesystem;
@@ -61,7 +62,7 @@ TEST_CASE("file sink", "[log]") {
     auto path_guard = st::path_guard_t{dir};
     bfs::create_directory(dir);
     auto log_file = dir / "log.txt";
-    auto log_file_str = log_file.string();
+    auto log_file_str = boost::nowide::narrow(log_file.wstring());
 
     auto sink_config = fmt::format("file:{}", log_file_str);
     config::log_configs_t cfg{{"default", L::trace, {sink_config}}};

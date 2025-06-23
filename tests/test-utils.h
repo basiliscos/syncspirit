@@ -22,25 +22,12 @@ namespace bfs = std::filesystem;
 namespace sys = boost::system;
 
 struct SYNCSPIRIT_TEST_API path_guard_t {
-    bfs::path &path;
-    path_guard_t(bfs::path &path_) : path{path_} {}
-    ~path_guard_t() {
-        if (!getenv("SYNCSPIRIT_TEST_KEEP_PATH")) {
-            sys::error_code ec;
-
-            if (bfs::exists(path, ec)) {
-                bfs::permissions(path, bfs::perms::owner_all, ec);
-                if (ec) {
-                    printf("error setting permissions : %s: %s\n", path.string().c_str(), ec.message().c_str());
-                }
-            }
-
-            bfs::remove_all(path, ec);
-            if (ec) {
-                printf("error removing %s : %s\n", path.string().c_str(), ec.message().c_str());
-            }
-        }
-    }
+    bfs::path path;
+    path_guard_t();
+    path_guard_t(const bfs::path &path_);
+    path_guard_t(path_guard_t &) = delete;
+    path_guard_t(path_guard_t &&other);
+    ~path_guard_t();
 };
 
 SYNCSPIRIT_TEST_API utils::bytes_view_t as_bytes(std::string_view);
