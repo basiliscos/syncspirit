@@ -8,6 +8,7 @@
 #include "model/cluster.h"
 #include "fs/scan_scheduler.h"
 #include "net/names.h"
+#include <chrono>
 
 using namespace syncspirit;
 using namespace syncspirit::test;
@@ -97,6 +98,8 @@ void test_1_folder() {
                     REQUIRE(!folder->is_scanning());
 
                     REQUIRE(sup->timers.size() == 1);
+                    std::this_thread::sleep_for(std::chrono::milliseconds{1});
+
                     sup->do_invoke_timer((*sup->timers.begin())->request_id);
                     sup->do_process();
                     REQUIRE(folder->is_scanning());
@@ -109,6 +112,7 @@ void test_1_folder() {
 
                     builder.synchronization_finish(folder_id).apply(*sup);
                     REQUIRE(sup->timers.size() == 1);
+                    std::this_thread::sleep_for(std::chrono::milliseconds{1});
                     sup->do_invoke_timer((*sup->timers.begin())->request_id);
                     sup->do_process();
                     REQUIRE(folder->is_scanning());
@@ -153,6 +157,8 @@ void test_2_folders() {
                 .apply(*sup);
 
             REQUIRE(sup->timers.size() == 1);
+            std::this_thread::sleep_for(std::chrono::milliseconds{1});
+
             sup->do_invoke_timer((*sup->timers.begin())->request_id);
             sup->do_process();
 
