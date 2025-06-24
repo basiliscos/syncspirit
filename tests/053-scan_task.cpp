@@ -5,6 +5,7 @@
 #include "fs/scan_task.h"
 #include "fs/utils.h"
 #include "model/misc/sequencer.h"
+#include <boost/nowide/convert.hpp>
 
 using namespace syncspirit;
 using namespace syncspirit::test;
@@ -558,14 +559,23 @@ SECTION("regular files") {
         }
 
         SECTION("file is in rw cache, skip it") {
-            write_file(path, "12345");
+            bfs::remove_all(path);
+            auto path_str_utf8 = std::u8string(u8"путь/ля-ля.txt");
+            auto path_str = std::string(reinterpret_cast<const char *>(path_str_utf8.data()), path_str_utf8.size());
+            auto path_wstr = boost::nowide::widen(path_str);
+            auto file_path = path.parent_path() / path_wstr;
+
+            bfs::create_directories(file_path.parent_path());
+            write_file(file_path, "12345");
+            proto::set_name(pr_file, path_str);
 
             auto cache = fs::file_cache_ptr_t(new fs::file_cache_t(50));
             auto file_peer = file_info_t::create(sequencer->next_uuid(), pr_file, folder_peer).value();
-            REQUIRE(folder_peer->add_strict(file_peer));
+            auto ok = folder_peer->add_strict(file_peer);
+            REQUIRE(ok);
             auto file = fs::file_ptr_t(new fs::file_t(fs::file_t::open_write(file_peer).value()));
             cache->put(file);
-            REQUIRE(cache->get((root_path / "a.txt").generic_string()));
+            REQUIRE(cache->get(model::details::relativized_path_t{root_path.filename() / path_wstr}));
 
             auto task = scan_task_t(cluster, folder->get_id(), cache, config);
             auto r = task.advance();
@@ -573,8 +583,9 @@ SECTION("regular files") {
             CHECK(*std::get_if<bool>(&r) == true);
 
             r = task.advance();
-            CHECK(std::get_if<bool>(&r));
-            CHECK(*std::get_if<bool>(&r) == true);
+            REQUIRE(std::get_if<unknown_file_t>(&r));
+            auto& uf = std::get<unknown_file_t>(r);
+            CHECK(uf.path.filename() == file_path.parent_path().filename());
 
             r = task.advance();
             CHECK(std::get_if<bool>(&r));
@@ -582,6 +593,7 @@ SECTION("regular files") {
 
             auto &seen = task.get_seen_paths();
             CHECK(seen.count(path.filename().generic_string()));
+            bfs::remove_all(file_path);
         }
 
         SECTION("size mismatch -> remove & ignore") {

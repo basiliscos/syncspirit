@@ -53,12 +53,18 @@ bfs::path locate_path(const char *test_file) {
 
 std::string read_file(const bfs::path &path) {
     sys::error_code ec;
+#ifndef SYNCSPIRIT_WIN
     auto file_path = path.string();
     auto file_path_c = file_path.c_str();
     auto in = fopen(file_path_c, "rb");
+#else
+    auto file_path = path.wstring();
+    auto file_path_c = file_path.c_str();
+    auto in = _wfopen(file_path_c, L"rb");
+#endif
     if (!in) {
         auto ec = sys::error_code{errno, sys::generic_category()};
-        std::cout << "can't open " << file_path_c << " : " << ec.message() << "\n";
+        std::cout << "can't open " << path.generic_string() << " : " << ec.message() << "\n";
         return "";
     }
 

@@ -257,7 +257,10 @@ void test_append_block() {
             proto::FileInfo pr_source;
             auto next_sequence = 7ul;
 
-            proto::set_name(pr_source, "q.txt");
+            auto path_str_utf8 = std::u8string(u8"путявка/инфо.txt");
+            auto path_str = std::string(reinterpret_cast<const char *>(path_str_utf8.data()), path_str_utf8.size());
+
+            proto::set_name(pr_source, path_str);
             proto::set_modified_s(pr_source, modified);
             proto::set_block_size(pr_source, 5);
 
@@ -308,7 +311,7 @@ void test_append_block() {
                     .apply(*sup);
 
                 auto file = folder_my->get_file_infos().by_name(proto::get_name(pr_source));
-                auto path = root_path / std::string(file->get_name());
+                auto path = root_path / boost::nowide::widen(file->get_name());
                 REQUIRE(bfs::exists(path));
                 REQUIRE(bfs::file_size(path) == 5);
                 auto data = read_file(path);
@@ -322,7 +325,8 @@ void test_append_block() {
 
                 builder.append_block(*peer_file, 0, as_owned_bytes("12345")).apply(*sup);
 
-                auto filename = std::string(peer_file->get_name()) + ".syncspirit-tmp";
+                auto wfilename = boost::nowide::widen(peer_file->get_name()) + L".syncspirit-tmp";
+                auto filename = boost::nowide::narrow(wfilename);
                 auto path = root_path / filename;
 #ifndef SYNCSPIRIT_WIN
                 REQUIRE(bfs::exists(path));
@@ -335,8 +339,7 @@ void test_append_block() {
                 SECTION("add 2nd block") {
                     builder.finish_file(*peer_file).apply(*sup);
 
-                    filename = std::string(peer_file->get_name());
-                    path = root_path / filename;
+                    path = root_path / boost::nowide::widen(path_str);
                     REQUIRE(bfs::exists(path));
                     REQUIRE(bfs::file_size(path) == 10);
                     auto data = read_file(path);
