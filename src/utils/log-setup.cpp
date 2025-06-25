@@ -127,6 +127,8 @@ outcome::result<void> init_loggers(const config::log_configs_t &configs) noexcep
     return outcome::success();
 }
 
+void finalize_loggers() noexcept { spdlog::drop_all(); }
+
 static const char *bootstrap_sink = "syncspirit-bootstrap.log";
 
 bootstrap_guard_t::bootstrap_guard_t(dist_sink_t dist_sink_, spdlog::sinks::sink *sink_)

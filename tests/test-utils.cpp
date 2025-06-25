@@ -30,6 +30,7 @@ path_guard_t::~path_guard_t() {
                 }
             }
 
+            ec = {};
             bfs::remove_all(path, ec);
             if (ec) {
                 printf("error removing %s : %s\n", path.string().c_str(), ec.message().c_str());

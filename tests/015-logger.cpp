@@ -59,7 +59,7 @@ TEST_CASE("hierarchy", "[log]") {
 
 TEST_CASE("file sink", "[log]") {
     auto dir = bfs::absolute(bfs::current_path() / st::unique_path());
-    auto path_guard = st::path_guard_t{dir};
+    auto path_guard = st::path_guard_t(dir);
     bfs::create_directories(dir);
     auto log_file = dir / L"папка" / L"журнал.txt";
     auto log_file_str = boost::nowide::narrow(log_file.wstring());
@@ -71,7 +71,7 @@ TEST_CASE("file sink", "[log]") {
     l->info("lorem ipsum dolor");
     l->flush();
 
-    spdlog::drop_all(); // to cleanup on win32
+    utils::finalize_loggers(); // to cleanup on win32
     auto data = st::read_file(log_file);
     CHECK(log_file_str != "");
     CHECK(!data.empty());
