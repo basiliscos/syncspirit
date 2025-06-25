@@ -89,7 +89,7 @@ struct fixture_t {
         file_addr = file_actor->get_address();
 
         auto builder = diff_builder_t(*cluster);
-        builder.upsert_folder(folder_id, root_path.string(), "my-label")
+        builder.upsert_folder(folder_id, root_path, "my-label")
             .apply(*sup)
             .update_peer(peer_device->device_id(), "some_name", "some-cn", true)
             .apply(*sup)
@@ -193,8 +193,8 @@ void test_remote_copy() {
 
                 auto file = folder_my->get_file_infos().by_name(proto::get_name(pr_fi));
 
-                auto& path = file->get_path();
-                auto tmp_path = path.parent_path() / (path.filename().wstring()  + L".syncspirit-tmp");
+                auto &path = file->get_path();
+                auto tmp_path = path.parent_path() / (path.filename().wstring() + L".syncspirit-tmp");
                 REQUIRE(bfs::exists(tmp_path));
                 REQUIRE(bfs::file_size(tmp_path) == 5);
             }
@@ -216,7 +216,7 @@ void test_remote_copy() {
                 SECTION("existing file") {
                     bfs::path target = root_path / "content";
                     proto::set_type(pr_fi, proto::FileInfoType::SYMLINK);
-                    proto::set_symlink_target(pr_fi, target.string());
+                    proto::set_symlink_target(pr_fi, boost::nowide::narrow(target.wstring()));
 
                     write_file(target, "zzz");
 
@@ -234,7 +234,7 @@ void test_remote_copy() {
                 SECTION("non-existing file") {
                     bfs::path target = root_path / "non-existing-content";
                     proto::set_type(pr_fi, proto::FileInfoType::SYMLINK);
-                    proto::set_symlink_target(pr_fi, target.string());
+                    proto::set_symlink_target(pr_fi, boost::nowide::narrow(target.wstring()));
 
                     auto peer_file = make_file();
                     builder.remote_copy(*peer_file).apply(*sup);
@@ -250,12 +250,24 @@ void test_remote_copy() {
             }
 
             SECTION("deleted file") {
+                auto name = bfs::path(L"папка") / L"файл.bin";
+                pr_fi = {};
+                proto::set_name(pr_fi, boost::nowide::narrow(name.generic_wstring()));
+                proto::set_modified_s(pr_fi, modified);
+                proto::set_sequence(pr_fi, folder_peer->get_max_sequence() + 1);
                 proto::set_deleted(pr_fi, true);
-                bfs::path target = root_path / proto::get_name(pr_fi);
+
+                auto &v = proto::get_version(pr_fi);
+                proto::add_counters(v, proto::Counter(peer_device->device_id().get_uint(), 1));
+
+                bfs::path target = root_path / name;
+                bfs::create_directories(target.parent_path());
                 write_file(target, "zzz");
                 REQUIRE(bfs::exists(target));
 
                 auto peer_file = make_file();
+                CHECK(peer_file->get_path() == target);
+                REQUIRE(bfs::exists(peer_file->get_path()));
                 builder.remote_copy(*peer_file).apply(*sup);
 
                 auto file = folder_my->get_file_infos().by_name(proto::get_name(pr_fi));

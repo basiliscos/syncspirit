@@ -807,6 +807,8 @@ SECTION("regular files") {
             CHECK(seen.count("some"));
             CHECK(seen.count("some/a.txt"));
         }
+        bfs::permissions(parent, bfs::perms::all, ec);
+        bfs::permissions(path, bfs::perms::all, ec);
     }
 }
 

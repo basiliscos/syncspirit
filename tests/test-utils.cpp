@@ -148,7 +148,7 @@ bfs::path unique_path() {
     std::transform(random_name.begin(), random_name.end(), random_name.begin(),
                    [](unsigned char c) { return std::tolower(c); });
     auto name = std::wstring(L"tmp-") + boost::nowide::widen(random_name);
-    return bfs::absolute(bfs::current_path() /  bfs::path(name));
+    return bfs::absolute(bfs::current_path() / bfs::path(name));
 }
 
 utils::bytes_view_t as_bytes(std::string_view str) {

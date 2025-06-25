@@ -177,7 +177,7 @@ diff_builder_t &diff_builder_t::then() noexcept {
     return *this;
 }
 
-diff_builder_t &diff_builder_t::upsert_folder(std::string_view id, const bfs::path& path, std::string_view label,
+diff_builder_t &diff_builder_t::upsert_folder(std::string_view id, const bfs::path &path, std::string_view label,
                                               std::uint64_t index_id) noexcept {
     db::Folder db_folder;
     db::set_id(db_folder, id);

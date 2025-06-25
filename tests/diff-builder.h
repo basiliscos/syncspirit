@@ -68,7 +68,7 @@ struct SYNCSPIRIT_TEST_API diff_builder_t : private model::diff::apply_controlle
     diff_builder_t &then() noexcept;
     index_maker_t make_index(utils::bytes_view_t sha256, std::string_view folder_id) noexcept;
 
-    diff_builder_t &upsert_folder(std::string_view id, const bfs::path& path, std::string_view label = "",
+    diff_builder_t &upsert_folder(std::string_view id, const bfs::path &path, std::string_view label = "",
                                   std::uint64_t index_id = 0) noexcept;
     diff_builder_t &upsert_folder(const db::Folder &data, std::uint64_t index_id = 0) noexcept;
     diff_builder_t &update_peer(const model::device_id_t &device, std::string_view name = "",
