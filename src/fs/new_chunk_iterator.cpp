@@ -3,6 +3,7 @@
 
 #include "new_chunk_iterator.h"
 #include "utils.h"
+#include "proto/proto-helpers-bep.h"
 #include <algorithm>
 
 using namespace syncspirit::fs;

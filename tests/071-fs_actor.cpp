@@ -13,6 +13,7 @@
 #include "model/misc/resolver.h"
 #include "access.h"
 #include <filesystem>
+#include <boost/nowide/convert.hpp>
 
 using namespace syncspirit;
 using namespace syncspirit::db;
@@ -212,23 +213,40 @@ void test_remote_copy() {
             }
 
             SECTION("symlink") {
-                bfs::path target = root_path / "some-existing-file";
-                write_file(target, "zzz");
+                SECTION("existing file") {
+                    bfs::path target = root_path / "content";
+                    proto::set_type(pr_fi, proto::FileInfoType::SYMLINK);
+                    proto::set_symlink_target(pr_fi, target.string());
 
-                proto::set_type(pr_fi, proto::FileInfoType::SYMLINK);
-                proto::set_symlink_target(pr_fi, target.string());
+                    write_file(target, "zzz");
 
-                auto peer_file = make_file();
-                builder.remote_copy(*peer_file).apply(*sup);
+                    auto peer_file = make_file();
+                    builder.remote_copy(*peer_file).apply(*sup);
 
-                auto file = folder_my->get_file_infos().by_name(proto::get_name(pr_fi));
-
-                auto &path = file->get_path();
-                CHECK(!bfs::exists(path));
+                    auto file = folder_my->get_file_infos().by_name(proto::get_name(pr_fi));
+                    auto &path = file->get_path();
 #ifndef SYNCSPIRIT_WIN
-                CHECK(bfs::is_symlink(path));
-                CHECK(bfs::read_symlink(path) == target);
+                    CHECK(bfs::exists(path));
+                    CHECK(bfs::is_symlink(path));
+                    CHECK(bfs::read_symlink(path) == target);
 #endif
+                }
+                SECTION("non-existing file") {
+                    bfs::path target = root_path / "non-existing-content";
+                    proto::set_type(pr_fi, proto::FileInfoType::SYMLINK);
+                    proto::set_symlink_target(pr_fi, target.string());
+
+                    auto peer_file = make_file();
+                    builder.remote_copy(*peer_file).apply(*sup);
+
+                    auto file = folder_my->get_file_infos().by_name(proto::get_name(pr_fi));
+                    auto &path = file->get_path();
+                    CHECK(!bfs::exists(path));
+#ifndef SYNCSPIRIT_WIN
+                    CHECK(bfs::is_symlink(path));
+                    CHECK(bfs::read_symlink(path) == target);
+#endif
+                }
             }
 
             SECTION("deleted file") {
@@ -257,8 +275,9 @@ void test_append_block() {
             proto::FileInfo pr_source;
             auto next_sequence = 7ul;
 
-            auto path_str_utf8 = std::u8string(u8"путявка/инфо.txt");
-            auto path_str = std::string(reinterpret_cast<const char *>(path_str_utf8.data()), path_str_utf8.size());
+            auto path_rel = bfs::path(L"путявка") / bfs::path(L"инфо.txt");
+            auto path_wstr = path_rel.generic_wstring();
+            auto path_str = boost::nowide::narrow(path_wstr);
 
             proto::set_name(pr_source, path_str);
             proto::set_modified_s(pr_source, modified);

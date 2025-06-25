@@ -101,6 +101,7 @@ add_library(syncspirit_core
     src/fs/chunk_iterator.cpp
     src/fs/file.cpp
     src/fs/file_actor.cpp
+    src/fs/file_cache.cpp
     src/fs/fs_supervisor.cpp
     src/fs/new_chunk_iterator.cpp
     src/fs/scan_actor.cpp

@@ -5,6 +5,7 @@
 #include "utils.h"
 #include "model/messages.h"
 #include "fs/messages.h"
+#include "proto/proto-helpers-bep.h"
 #include <boost/nowide/convert.hpp>
 
 using namespace syncspirit::fs;
@@ -23,9 +24,10 @@ scan_task_t::scan_task_t(model::cluster_ptr_t cluster_, std::string_view folder_
         return;
     }
 
-    auto path = folder->get_path();
-    dirs_queue.push_back(path);
+    auto &path = folder->get_path();
+    assert(path.is_absolute());
 
+    dirs_queue.push_back(path);
     root = path;
 
     auto &orig_files = my_folder->get_file_infos();
@@ -123,10 +125,10 @@ scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
                 errors.push_back(scan_error_t{child, ec});
                 continue;
             }
-            auto rp = relativize(child, root).generic_string();
-            if (rw_cache->get(rp)) {
+            if (rw_cache->get(child)) {
                 continue;
             }
+            auto rp = relativize(child, root).generic_string();
             auto file = files.by_name(rp);
             if (file) {
                 files_queue.push_back(file);
@@ -280,10 +282,10 @@ scan_result_t scan_task_t::advance_unknown_file(unknown_file_t &file) noexcept {
         return unknown_file_t{std::move(path), std::move(file.metadata)};
     }
     auto name = path.filename();
-    auto name_str = name.generic_string();
+    auto name_str = name.generic_wstring();
     auto new_name = name_str.substr(0, name_str.size() - tmp_suffix.size());
     auto clean_path = path.parent_path() / new_name;
-    if (rw_cache->get(clean_path.generic_string())) {
+    if (rw_cache->get(clean_path)) {
         return true;
     }
     auto relative_path = [&]() -> std::string {

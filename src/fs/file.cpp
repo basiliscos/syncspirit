@@ -8,6 +8,7 @@
 #include <cassert>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <boost/nowide/convert.hpp>
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
 #include <io.h>
@@ -77,12 +78,16 @@ file_t::file_t(utils::fstream_t backend_, model::file_info_ptr_t model_, bfs::pa
     : backend{new utils::fstream_t(std::move(backend_))}, model{std::move(model_)}, path{std::move(path_)},
       temporal{temporal_} {
     auto model_path = model->get_path();
-    path_str = model_path.generic_string();
+    model_path.make_preferred();
+    path.make_preferred();
+    path_str = boost::nowide::narrow(model_path.generic_wstring());
 }
 
 file_t::file_t(utils::fstream_t backend_, bfs::path path_) noexcept
-    : backend{new utils::fstream_t(std::move(backend_))}, path{std::move(path_)}, path_str{path.generic_string()},
-      temporal{false} {}
+    : backend{new utils::fstream_t(std::move(backend_))}, path{std::move(path_)}, temporal{false} {
+    path.make_preferred();
+    path_str = boost::nowide::narrow(path.generic_wstring());
+}
 
 file_t::file_t(file_t &&other) noexcept : backend{nullptr} { *this = std::move(other); }
 

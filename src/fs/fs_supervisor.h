@@ -11,7 +11,7 @@
 #include "model/diff/cluster_visitor.h"
 #include "model/misc/sequencer.h"
 #include "syncspirit-export.h"
-#include "file.h"
+#include "file_cache.h"
 #include <rotor/thread.hpp>
 
 namespace syncspirit {

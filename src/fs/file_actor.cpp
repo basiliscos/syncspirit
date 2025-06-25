@@ -14,6 +14,7 @@
 #include "utils/io.h"
 #include "utils/format.hpp"
 #include "utils/platform.h"
+#include "proto/proto-helpers-bep.h"
 
 using namespace syncspirit::fs;
 using namespace syncspirit::proto;
@@ -255,8 +256,7 @@ auto file_actor_t::operator()(const model::diff::modify::finish_file_t &diff, vo
         if (file_info) {
             auto file = file_info->get_file_infos().by_name(diff.file_name);
             if (file) {
-                auto local_path = file->get_path();
-                auto path = local_path.string();
+                auto &local_path = file->get_path();
                 auto action = diff.action;
 
                 if (action == model::advance_action_t::resolve_remote_win) {
@@ -266,17 +266,17 @@ auto file_actor_t::operator()(const model::diff::modify::finish_file_t &diff, vo
                     auto conflicting_name = local_file->make_conflicting_name();
                     auto target_path = folder->get_path() / conflicting_name;
                     auto ec = sys::error_code{};
-                    path = file->get_path().string();
                     LOG_DEBUG(log, "renaming {} -> {}", file->get_name(), conflicting_name);
-                    bfs::rename(path, target_path);
+                    bfs::rename(local_path, target_path);
                     if (ec) {
-                        LOG_ERROR(log, "cannot rename file: {}: {}", path, ec.message());
+                        LOG_ERROR(log, "cannot rename file: {}: {}", local_path.generic_string(), ec.message());
                         return ec;
                     }
                 }
-                auto backend = rw_cache->get(path);
+                auto backend = rw_cache->get(local_path);
                 if (!backend) {
-                    LOG_DEBUG(log, "attempt to flush non-opened file {}, re-open it as temporal", path);
+                    LOG_DEBUG(log, "attempt to flush non-opened file {}, re-open it as temporal",
+                              local_path.generic_string());
                     auto path_tmp = make_temporal(file->get_path());
                     auto result = open_file_rw(path_tmp, file);
                     if (!result) {
@@ -291,11 +291,11 @@ auto file_actor_t::operator()(const model::diff::modify::finish_file_t &diff, vo
                 auto ok = backend->close(true, local_path);
                 if (!ok) {
                     auto &ec = ok.assume_error();
-                    LOG_ERROR(log, "cannot close file: {}: {}", path, ec.message());
+                    LOG_ERROR(log, "cannot close file: {}: {}", local_path.generic_string(), ec.message());
                     return ec;
                 }
 
-                LOG_INFO(log, "file {} ({} bytes) is now locally available", path, file->get_size());
+                LOG_INFO(log, "file {} ({} bytes) is now locally available", file->get_name(), file->get_size());
 
                 auto ack = model::diff::advance::advance_t::create(action, *file, *sequencer);
                 send<model::payload::model_update_t>(coordinator, std::move(ack), this);
@@ -336,13 +336,13 @@ auto file_actor_t::get_source_for_cloning(model::file_info_ptr_t &source, const 
 
     auto source_tmp = make_temporal(source_path);
 
-    if (auto cached = rw_cache->get(source_path.string()); cached) {
+    if (auto cached = rw_cache->get(source_path); cached) {
         return cached;
-    } else if (auto cached = rw_cache->get(source_tmp.string()); cached) {
+    } else if (auto cached = rw_cache->get(source_tmp); cached) {
         return cached;
-    } else if (auto cached = ro_cache.get(source_tmp.string()); cached) {
+    } else if (auto cached = ro_cache.get(source_tmp); cached) {
         return cached;
-    } else if (auto cached = ro_cache.get(source_tmp.string()); cached) {
+    } else if (auto cached = ro_cache.get(source_tmp); cached) {
         return cached;
     } else if (auto opt = open_file_ro(source_tmp, false)) {
         return opt.assume_value();
@@ -386,7 +386,7 @@ auto file_actor_t::operator()(const model::diff::modify::clone_block_t &diff, vo
 auto file_actor_t::open_file_rw(const std::filesystem::path &path, model::file_info_ptr_t info) noexcept
     -> outcome::result<file_ptr_t> {
     LOG_TRACE(log, "open_file (r/w, by path), path = {}", path.string());
-    auto item = rw_cache->get(path.string());
+    auto item = rw_cache->get(path);
     if (item) {
         return item;
     }
@@ -418,7 +418,7 @@ auto file_actor_t::open_file_rw(const std::filesystem::path &path, model::file_i
 
 auto file_actor_t::open_file_ro(const bfs::path &path, bool use_cache) noexcept -> outcome::result<file_ptr_t> {
     if (use_cache) {
-        auto file = rw_cache->get(path.string());
+        auto file = rw_cache->get(path);
         if (file) {
             LOG_TRACE(log, "open_file (r/o, by path, cache hit), path = {}", path.string());
             return file;

@@ -53,18 +53,20 @@ bfs::path locate_path(const char *test_file) {
 
 std::string read_file(const bfs::path &path) {
     sys::error_code ec;
+    auto copy = path;
+    copy.make_preferred();
 #ifndef SYNCSPIRIT_WIN
     auto file_path = path.string();
     auto file_path_c = file_path.c_str();
     auto in = fopen(file_path_c, "rb");
 #else
-    auto file_path = path.wstring();
+    auto file_path = copy.wstring();
     auto file_path_c = file_path.c_str();
     auto in = _wfopen(file_path_c, L"rb");
 #endif
     if (!in) {
         auto ec = sys::error_code{errno, sys::generic_category()};
-        std::cout << "can't open " << path.generic_string() << " : " << ec.message() << "\n";
+        std::cout << "(test/read) can't open " << copy.string() << " : " << ec.message() << "\n";
         return "";
     }
 
@@ -79,13 +81,22 @@ std::string read_file(const bfs::path &path) {
     return std::string(buffer.data(), filesize);
 }
 
-void write_file(const bfs::path &path, std::string_view content) {
-    bfs::create_directories(path.parent_path());
-    auto file_path = path.string();
-    auto out = fopen(file_path.c_str(), "wb");
+void write_file(const bfs::path &path_, std::string_view content) {
+    bfs::create_directories(path_.parent_path());
+    auto copy = path_;
+    copy.make_preferred();
+#ifndef SYNCSPIRIT_WIN
+    auto file_path = copy.string();
+    auto file_path_c = file_path.c_str();
+    auto out = fopen(file_path_c, "wb");
+#else
+    auto file_path = copy.wstring();
+    auto file_path_c = file_path.c_str();
+    auto out = _wfopen(file_path_c, L"wb");
+#endif
     if (!out) {
         auto ec = sys::error_code{errno, sys::generic_category()};
-        std::cout << "can't open " << file_path << " : " << ec.message() << "\n";
+        std::cout << "(test/write) can't open " << copy.string() << " : " << ec.message() << "\n";
         std::abort();
     }
     if (content.size()) {
@@ -136,7 +147,7 @@ bfs::path unique_path() {
     std::transform(random_name.begin(), random_name.end(), random_name.begin(),
                    [](unsigned char c) { return std::tolower(c); });
     auto name = std::string("tmp-") + random_name;
-    return bfs::path(name);
+    return bfs::absolute(bfs::path(name));
 }
 
 utils::bytes_view_t as_bytes(std::string_view str) {
