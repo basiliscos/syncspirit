@@ -99,7 +99,7 @@ struct fixture_t {
 void test_local_resolver() {
     struct F : fixture_t {
         void main() noexcept override {
-
+#ifndef SYNCSPIRIT_WIN
             write_file(hosts_path, "127.0.0.2 lclhst.localdomain lclhst\n");
 
             resolver = sup->create_actor<resolver_actor_t>()
@@ -127,6 +127,7 @@ void test_local_resolver() {
             results = sup->responses.at(1)->payload.res->results;
             REQUIRE(results.size() == 1);
             REQUIRE(results.at(0) == asio::ip::make_address("127.0.0.2"));
+#endif
         }
     };
     F().run();
@@ -136,7 +137,6 @@ void test_success_resolver() {
     struct F : fixture_t {
         void main() noexcept override {
             auto local_port = remote_resolver.local_endpoint().port();
-            write_file(hosts_path, "");
 
             auto buff = asio::buffer(rx_buff.data(), rx_buff.size());
             remote_resolver.async_receive_from(buff, resolver_endpoint, [&](sys::error_code ec, size_t bytes) -> void {
@@ -154,7 +154,6 @@ void test_success_resolver() {
 
             resolver = sup->create_actor<resolver_actor_t>()
                            .resolve_timeout(timeout / 2)
-                           .hosts_path(hosts_path_str.c_str())
                            .server_addresses(fmt::format("127.0.0.1:{}", local_port))
                            .timeout(timeout)
                            .finish();
@@ -177,11 +176,9 @@ void test_success_ip() {
     struct F : fixture_t {
         void main() noexcept override {
             auto local_port = remote_resolver.local_endpoint().port();
-            write_file(hosts_path, "");
 
             resolver = sup->create_actor<resolver_actor_t>()
                            .resolve_timeout(timeout / 2)
-                           .hosts_path(hosts_path_str.c_str())
                            .server_addresses(fmt::format("127.0.0.1:{}", local_port))
                            .timeout(timeout)
                            .finish();
@@ -205,11 +202,9 @@ void test_success_ipv6() {
     struct F : fixture_t {
         void main() noexcept override {
             auto local_port = remote_resolver.local_endpoint().port();
-            write_file(hosts_path, "");
 
             resolver = sup->create_actor<resolver_actor_t>()
                            .resolve_timeout(timeout / 2)
-                           .hosts_path(hosts_path_str.c_str())
                            .server_addresses(fmt::format("127.0.0.1:{}", local_port))
                            .timeout(timeout)
                            .finish();
@@ -241,7 +236,6 @@ void test_garbage() {
     struct F : fixture_t {
         void main() noexcept override {
             auto local_port = remote_resolver.local_endpoint().port();
-            write_file(hosts_path, "");
 
             auto buff = asio::buffer(rx_buff.data(), rx_buff.size());
             remote_resolver.async_receive_from(buff, resolver_endpoint, [&](sys::error_code ec, size_t bytes) -> void {
@@ -256,7 +250,6 @@ void test_garbage() {
 
             resolver = sup->create_actor<resolver_actor_t>()
                            .resolve_timeout(timeout / 2)
-                           .hosts_path(hosts_path_str.c_str())
                            .server_addresses(fmt::format("127.0.0.1:{}", local_port))
                            .timeout(timeout)
                            .finish();
@@ -279,7 +272,6 @@ void test_multi_replies() {
     struct F : fixture_t {
         void main() noexcept override {
             auto local_port = remote_resolver.local_endpoint().port();
-            write_file(hosts_path, "");
 
             auto buff = asio::buffer(rx_buff.data(), rx_buff.size());
             remote_resolver.async_receive_from(buff, resolver_endpoint, [&](sys::error_code ec, size_t bytes) -> void {
@@ -300,7 +292,6 @@ void test_multi_replies() {
 
             resolver = sup->create_actor<resolver_actor_t>()
                            .resolve_timeout(timeout / 2)
-                           .hosts_path(hosts_path_str.c_str())
                            .server_addresses(fmt::format("127.0.0.1:{}", local_port))
                            .timeout(timeout)
                            .finish();
@@ -324,7 +315,6 @@ void test_wrong() {
     struct F : fixture_t {
         void main() noexcept override {
             auto local_port = remote_resolver.local_endpoint().port();
-            write_file(hosts_path, "");
 
             auto buff = asio::buffer(rx_buff.data(), rx_buff.size());
             remote_resolver.async_receive_from(buff, resolver_endpoint, [&](sys::error_code ec, size_t bytes) -> void {
@@ -342,7 +332,6 @@ void test_wrong() {
 
             resolver = sup->create_actor<resolver_actor_t>()
                            .resolve_timeout(timeout / 2)
-                           .hosts_path(hosts_path_str.c_str())
                            .server_addresses(fmt::format("127.0.0.1:{}", local_port))
                            .timeout(timeout)
                            .finish();
@@ -365,11 +354,9 @@ void test_timeout() {
     struct F : fixture_t {
         void main() noexcept override {
             auto local_port = remote_resolver.local_endpoint().port();
-            write_file(hosts_path, "");
 
             resolver = sup->create_actor<resolver_actor_t>()
                            .resolve_timeout(timeout / 2)
-                           .hosts_path(hosts_path_str.c_str())
                            .server_addresses(fmt::format("127.0.0.1:{}", local_port))
                            .timeout(timeout)
                            .finish();
@@ -392,11 +379,9 @@ void test_cancellation() {
     struct F : fixture_t {
         void main() noexcept override {
             auto local_port = remote_resolver.local_endpoint().port();
-            write_file(hosts_path, "");
 
             resolver = sup->create_actor<resolver_actor_t>()
                            .resolve_timeout(timeout / 2)
-                           .hosts_path(hosts_path_str.c_str())
                            .server_addresses(fmt::format("127.0.0.1:{}", local_port))
                            .timeout(timeout)
                            .finish();

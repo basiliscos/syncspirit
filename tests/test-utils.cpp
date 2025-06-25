@@ -8,6 +8,7 @@
 #include <random>
 #include <cstdint>
 #include <spdlog/sinks/stdout_color_sinks.h>
+#include <boost/nowide/convert.hpp>
 
 int main(int argc, char *argv[]) { return Catch::Session().run(argc, argv); }
 
@@ -146,8 +147,8 @@ bfs::path unique_path() {
     auto random_name = utils::base32::encode(view);
     std::transform(random_name.begin(), random_name.end(), random_name.begin(),
                    [](unsigned char c) { return std::tolower(c); });
-    auto name = std::string("tmp-") + random_name;
-    return bfs::absolute(bfs::path(name));
+    auto name = std::wstring(L"tmp-") + boost::nowide::widen(random_name);
+    return bfs::absolute(bfs::current_path() /  bfs::path(name));
 }
 
 utils::bytes_view_t as_bytes(std::string_view str) {

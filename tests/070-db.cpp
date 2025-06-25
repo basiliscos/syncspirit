@@ -113,7 +113,7 @@ struct fixture_t {
     virtual void launch_db() {
         db_actor = sup->create_actor<db_actor_t>()
                        .cluster(cluster)
-                       .db_dir(root_path.string())
+                       .db_dir(root_path)
                        .db_config(make_config())
                        .timeout(timeout)
                        .finish();

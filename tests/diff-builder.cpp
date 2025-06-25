@@ -30,6 +30,7 @@
 #include "model/diff/modify/upsert_folder.h"
 #include "model/diff/peer/cluster_update.h"
 #include "model/diff/peer/update_folder.h"
+#include <boost/nowide/convert.hpp>
 
 using namespace syncspirit::test;
 using namespace syncspirit::model;
@@ -176,12 +177,12 @@ diff_builder_t &diff_builder_t::then() noexcept {
     return *this;
 }
 
-diff_builder_t &diff_builder_t::upsert_folder(std::string_view id, std::string_view path, std::string_view label,
+diff_builder_t &diff_builder_t::upsert_folder(std::string_view id, const bfs::path& path, std::string_view label,
                                               std::uint64_t index_id) noexcept {
     db::Folder db_folder;
     db::set_id(db_folder, id);
     db::set_label(db_folder, label);
-    db::set_path(db_folder, path);
+    db::set_path(db_folder, boost::nowide::narrow(path.generic_wstring()));
     db::set_folder_type(db_folder, db::FolderType::send_and_receive);
     auto opt = diff::modify::upsert_folder_t::create(cluster, *sequencer, std::move(db_folder), index_id);
     return assign(opt.value().get());

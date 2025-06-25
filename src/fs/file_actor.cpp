@@ -15,6 +15,7 @@
 #include "utils/format.hpp"
 #include "utils/platform.h"
 #include "proto/proto-helpers-bep.h"
+#include <boost/nowide/convert.hpp>
 
 using namespace syncspirit::fs;
 using namespace syncspirit::proto;

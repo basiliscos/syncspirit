@@ -193,10 +193,10 @@ void test_remote_copy() {
 
                 auto file = folder_my->get_file_infos().by_name(proto::get_name(pr_fi));
 
-                auto filename = std::string(file->get_name()) + ".syncspirit-tmp";
-                auto path = root_path / filename;
-                REQUIRE(bfs::exists(path));
-                REQUIRE(bfs::file_size(path) == 5);
+                auto& path = file->get_path();
+                auto tmp_path = path.parent_path() / (path.filename().wstring()  + L".syncspirit-tmp");
+                REQUIRE(bfs::exists(tmp_path));
+                REQUIRE(bfs::file_size(tmp_path) == 5);
             }
 
             SECTION("directory") {

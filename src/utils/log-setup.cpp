@@ -28,7 +28,12 @@ static sink_option_t make_sink(std::string_view name) noexcept {
     } else if (name == "stderr") {
         return std::make_shared<spdlog::sinks::stderr_color_sink_mt>();
     } else if (name.size() > 5 && name.substr(0, 5) == "file:") {
-        auto path = std::string(name.substr(5));
+        auto tail = name.substr(5);
+#if defined(WIN32)
+        auto path = boost::nowide::widen(tail);
+#else
+        auto path = std::string(tail);
+#endif
         return std::make_shared<spdlog::sinks::basic_file_sink_mt>(path);
     }
     return utils::make_error_code(error_code_t::unknown_sink);
