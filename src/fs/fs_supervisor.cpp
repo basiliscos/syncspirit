@@ -12,6 +12,8 @@
 #include "model/diff/modify/upsert_folder_info.h"
 #include "model/diff/peer/update_folder.h"
 #include "presentation/folder_entity.h"
+#include "proto/proto-helpers-bep.h"
+#include "proto/proto-helpers-db.h"
 
 using namespace syncspirit::fs;
 using namespace syncspirit::presentation;

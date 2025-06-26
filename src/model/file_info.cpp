@@ -320,6 +320,7 @@ bool file_info_t::is_partly_available() const noexcept { return missing_blocks <
 const std::filesystem::path &file_info_t::get_path() const noexcept {
     if (!path) {
         path = folder_info->get_folder()->get_path() / boost::nowide::widen(name);
+        path->make_preferred();
     }
     return path.value();
 }

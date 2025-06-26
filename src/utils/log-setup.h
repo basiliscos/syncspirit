@@ -30,6 +30,7 @@ struct SYNCSPIRIT_API bootstrap_guard_t {
 using bootstrap_guard_ptr_t = std::unique_ptr<bootstrap_guard_t>;
 
 SYNCSPIRIT_API outcome::result<void> init_loggers(const config::log_configs_t &configs) noexcept;
+SYNCSPIRIT_API void finalize_loggers() noexcept;
 
 SYNCSPIRIT_API dist_sink_t create_root_logger() noexcept;
 SYNCSPIRIT_API bootstrap_guard_ptr_t bootstrap(dist_sink_t &, const bfs::path &dir) noexcept;

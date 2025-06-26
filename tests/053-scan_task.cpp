@@ -560,10 +560,10 @@ SECTION("regular files") {
 
         SECTION("file is in rw cache, skip it") {
             bfs::remove_all(path);
-            auto path_str_utf8 = std::u8string(u8"путь/ля-ля.txt");
-            auto path_str = std::string(reinterpret_cast<const char *>(path_str_utf8.data()), path_str_utf8.size());
-            auto path_wstr = boost::nowide::widen(path_str);
-            auto file_path = path.parent_path() / path_wstr;
+            auto path_rel = bfs::path(L"путь") / bfs::path(L"ля-ля.txt");
+            auto path_wstr = path_rel.wstring();
+            auto path_str = boost::nowide::narrow(path_rel.wstring());
+            auto file_path = path.parent_path() / path_rel;
 
             bfs::create_directories(file_path.parent_path());
             write_file(file_path, "12345");
@@ -575,7 +575,7 @@ SECTION("regular files") {
             REQUIRE(ok);
             auto file = fs::file_ptr_t(new fs::file_t(fs::file_t::open_write(file_peer).value()));
             cache->put(file);
-            REQUIRE(cache->get(model::details::relativized_path_t{root_path.filename() / path_wstr}));
+            REQUIRE(cache->get(file_path));
 
             auto task = scan_task_t(cluster, folder->get_id(), cache, config);
             auto r = task.advance();
@@ -584,15 +584,23 @@ SECTION("regular files") {
 
             r = task.advance();
             REQUIRE(std::get_if<unknown_file_t>(&r));
-            auto& uf = std::get<unknown_file_t>(r);
+            auto &uf = std::get<unknown_file_t>(r);
             CHECK(uf.path.filename() == file_path.parent_path().filename());
+
+            r = task.advance();
+            CHECK(std::get_if<bool>(&r));
+            CHECK(*std::get_if<bool>(&r) == true);
+
+            r = task.advance();
+            CHECK(std::get_if<bool>(&r));
+            CHECK(*std::get_if<bool>(&r) == true);
 
             r = task.advance();
             CHECK(std::get_if<bool>(&r));
             CHECK(*std::get_if<bool>(&r) == false);
 
             auto &seen = task.get_seen_paths();
-            CHECK(seen.count(path.filename().generic_string()));
+            CHECK(seen.count(bfs::path(path_wstr).generic_string()));
             bfs::remove_all(file_path);
         }
 
@@ -799,6 +807,8 @@ SECTION("regular files") {
             CHECK(seen.count("some"));
             CHECK(seen.count("some/a.txt"));
         }
+        bfs::permissions(parent, bfs::perms::all, ec);
+        bfs::permissions(path, bfs::perms::all, ec);
     }
 }
 

@@ -9,8 +9,8 @@
 #include "config/fs.h"
 #include "utils/log.h"
 #include "utils/string_comparator.hpp"
-#include "file.h"
-#include "proto/proto-helpers.h"
+#include "file_cache.h"
+#include "proto/proto-fwd.hpp"
 #include <rotor.hpp>
 #include <boost/intrusive_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ref_counter.hpp>

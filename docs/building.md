@@ -155,6 +155,8 @@ pugixml/*:no_exceptions=True
 rotor/*:enable_asio=True
 rotor/*:enable_thread=True
 rotor/*:enable_fltk=True
+spdlog/*:wchar_filenames=True
+spdlog/*:shared=False
 ```
 
 Then make a build

@@ -393,6 +393,6 @@ int main(int argc, char **argv) {
 
     spdlog::info("normal exit");
     bootstrap_guard.reset();
-    spdlog::drop_all();
+    utils::finalize_loggers();
     return 0;
 }

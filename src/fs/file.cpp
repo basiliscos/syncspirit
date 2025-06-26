@@ -8,6 +8,7 @@
 #include <cassert>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <boost/nowide/convert.hpp>
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
 #include <io.h>
@@ -18,13 +19,11 @@
 using namespace syncspirit::fs;
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
-#define SS_STAT_FN(PATH, BUFF) _stat((PATH), (BUFF))
-#define SS_STAT_BUFF struct _stat
-#define SS_TRUNCATE(FD, SIZE) _chsize_s((FD), (SIZE))
+#define SS_STAT_FN(PATH, BUFF) _wstat64((PATH).wstring().data(), (BUFF))
+#define SS_STAT_BUFF struct __stat64
 #else
-#define SS_STAT_FN(PATH, BUFF) stat((PATH), (BUFF))
+#define SS_STAT_FN(PATH, BUFF) stat(boost::nowide::narrow((PATH).generic_wstring()).data(), (BUFF))
 #define SS_STAT_BUFF struct stat
-#define SS_TRUNCATE(FD, SIZE) ftruncate((FD), (SIZE))
 #endif
 
 auto file_t::open_write(model::file_info_ptr_t model) noexcept -> outcome::result<file_t> {
@@ -32,13 +31,12 @@ auto file_t::open_write(model::file_info_ptr_t model) noexcept -> outcome::resul
     auto tmp = model->get_size() > 0;
     auto path = tmp ? make_temporal(model->get_path()) : model->get_path();
     path.make_preferred();
-    auto path_str = path.generic_string();
 
     bool need_resize = true;
     auto expected_size = (uint64_t)model->get_size();
 
     SS_STAT_BUFF stat_info;
-    auto r = SS_STAT_FN(path_str.c_str(), &stat_info);
+    auto r = SS_STAT_FN(path, &stat_info);
     if (r == 0) {
         need_resize = static_cast<uint64_t>(stat_info.st_size) == expected_size;
     }
@@ -48,7 +46,7 @@ auto file_t::open_write(model::file_info_ptr_t model) noexcept -> outcome::resul
             auto file = utils::fstream_t(path, mode | mode_t::trunc);
             mode = mode & ~mode_t::trunc;
         }
-        auto ec = std::error_code{};
+        auto ec = std::error_code();
         bfs::resize_file(path, expected_size, ec);
         if (ec) {
             return ec;
@@ -77,12 +75,16 @@ file_t::file_t(utils::fstream_t backend_, model::file_info_ptr_t model_, bfs::pa
     : backend{new utils::fstream_t(std::move(backend_))}, model{std::move(model_)}, path{std::move(path_)},
       temporal{temporal_} {
     auto model_path = model->get_path();
-    path_str = model_path.generic_string();
+    model_path.make_preferred();
+    path.make_preferred();
+    path_str = boost::nowide::narrow(model_path.generic_wstring());
 }
 
 file_t::file_t(utils::fstream_t backend_, bfs::path path_) noexcept
-    : backend{new utils::fstream_t(std::move(backend_))}, path{std::move(path_)}, path_str{path.generic_string()},
-      temporal{false} {}
+    : backend{new utils::fstream_t(std::move(backend_))}, path{std::move(path_)}, temporal{false} {
+    path.make_preferred();
+    path_str = boost::nowide::narrow(path.generic_wstring());
+}
 
 file_t::file_t(file_t &&other) noexcept : backend{nullptr} { *this = std::move(other); }
 

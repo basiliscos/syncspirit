@@ -13,6 +13,7 @@
 #include "presentation/folder_entity.h"
 #include "presentation/presence.h"
 #include "net/names.h"
+#include "proto/proto-helpers-bep.h"
 
 #include <algorithm>
 #include <memory_resource>

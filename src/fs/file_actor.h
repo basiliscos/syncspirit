@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "file.h"
+#include "file_cache.h"
 #include "messages.h"
 #include "net/messages.h"
 #include "model/cluster.h"

@@ -53,7 +53,7 @@ struct fixture_t {
         sup->start();
         sup->do_process();
         builder = std::make_unique<diff_builder_t>(*cluster);
-        builder->upsert_folder(folder_id, root_path.string())
+        builder->upsert_folder(folder_id, root_path)
             .apply(*sup)
             .share_folder(peer_id.get_sha256(), folder_id)
             .apply(*sup);
@@ -131,8 +131,8 @@ void test_meta_changes() {
                 }
 #ifndef SYNCSPIRIT_WIN
                 SECTION("just 1 subdir, which cannot be read") {
-                    auto subdir = root_path / "abc";
-                    CHECK(bfs::create_directories(subdir / "def", ec));
+                    auto subdir = root_path / L"abc";
+                    CHECK(bfs::create_directories(subdir / L"def", ec));
                     auto guard = test::path_guard_t(subdir);
                     bfs::permissions(subdir, bfs::perms::none);
                     bfs::permissions(subdir, bfs::perms::owner_read, ec);
@@ -146,7 +146,7 @@ void test_meta_changes() {
 
                         auto &errs = sup->io_errors;
                         REQUIRE(errs.size() == 1);
-                        REQUIRE(errs.at(0).path == (subdir / "def"));
+                        REQUIRE(errs.at(0).path == (subdir / L"def"));
                         REQUIRE(errs.at(0).ec);
                     }
                 }
@@ -269,6 +269,7 @@ void test_meta_changes() {
                 }
                 REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
             }
+
             SECTION("incomplete file exists") {
                 proto::set_size(pr_fi, 10);
                 proto::set_block_size(pr_fi, 5);
@@ -280,7 +281,8 @@ void test_meta_changes() {
                 REQUIRE(folder_info_peer->add_strict(file));
 
                 // auto file = files->by_name(pr_fi.name());
-                auto path = file->get_path().string() + ".syncspirit-tmp";
+                auto filename = file->get_path().filename().wstring() + L".syncspirit-tmp";
+                auto path = file->get_path().parent_path() / filename;
                 auto content = "12345\0\0\0\0\0";
                 write_file(path, std::string(content, 10));
 
@@ -343,7 +345,6 @@ void test_meta_changes() {
 #endif
                 REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
             }
-
             SECTION("local (previous) file exists") {
                 proto::set_size(pr_fi, 15);
                 proto::set_block_size(pr_fi, 5);
@@ -366,8 +367,10 @@ void test_meta_changes() {
                 REQUIRE(folder_info_peer->add_strict(file_peer));
 
                 auto file = files->by_name(file_name);
-                auto path_my = file->get_path().string();
-                auto path_peer = file->get_path().string() + ".syncspirit-tmp";
+                auto &path = file->get_path();
+                auto filename = path.filename().wstring() + L".syncspirit-tmp";
+                auto path_my = path;
+                auto path_peer = path_my.parent_path() / filename;
                 write_file(path_my, "12345");
                 bfs::last_write_time(path_my, from_unix(modified));
 
@@ -397,7 +400,7 @@ void test_meta_changes() {
                 proto::set_value(counter, 2);
 
                 auto file = files->by_name(file_name);
-                auto path_my = file->get_path().string();
+                auto path_my = file->get_path();
                 write_file(path_my, "12345");
                 bfs::last_write_time(path_my, from_unix(modified));
 
@@ -873,7 +876,10 @@ void test_races() {
 
                 auto file_peer = fi_peer->get_file_infos().by_name("a.bin");
                 SECTION("non-finished/flushed new file") {
-                    auto file = fs::file_t::open_write(file_peer).assume_value();
+                    auto file_opt = fs::file_t::open_write(file_peer);
+                    REQUIRE(file_opt);
+                    // CHECK(file_opt.assume_error().message() == "zzz");
+                    auto &file = file_opt.assume_value();
                     REQUIRE(bfs::exists(file.get_path()));
                     auto file_ptr = fs::file_ptr_t(new fs::file_t(std::move(file)));
                     rw_cache->put(file_ptr);

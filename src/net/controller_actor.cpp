@@ -24,6 +24,8 @@
 #include "model/diff/peer/update_folder.h"
 #include "model/misc/resolver.h"
 #include "proto/bep_support.h"
+#include "proto/proto-helpers-bep.h"
+#include "proto/proto-helpers-db.h"
 #include "utils/error_code.h"
 #include "utils/format.hpp"
 

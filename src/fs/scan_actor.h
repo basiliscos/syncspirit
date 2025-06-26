@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "file_cache.h"
 #include "model/cluster.h"
 #include "model/messages.h"
 #include "model/misc/sequencer.h"
