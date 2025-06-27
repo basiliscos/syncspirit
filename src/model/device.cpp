@@ -110,6 +110,8 @@ void device_t::update_state(device_state_t new_state, std::string_view connectio
                 connection_id = connection_id_;
             }
         }
+    } else if (state < new_state) {
+        connection_id = connection_id_;
     } else {
         connection_id = {};
     }

@@ -227,9 +227,9 @@ void controller_actor_t::on_transfer_push(message::transfer_push_t &message) noe
 
 void controller_actor_t::on_transfer_pop(message::transfer_pop_t &message) noexcept {
     auto sz = message.payload.bytes;
+    LOG_TRACE(log, "on_transfer_pop, sz = {} (-{})", outgoing_buffer, sz);
     assert(outgoing_buffer >= sz);
     outgoing_buffer -= sz;
-    LOG_TRACE(log, "on_transfer_pop, sz = {} (-{})", outgoing_buffer, sz);
     push_pending();
 }
 

@@ -292,7 +292,6 @@ void peer_actor_t::on_controller_up(message::controller_up_t &message) noexcept 
     if (peer == peer_device_id) {
         LOG_TRACE(log, "on_controller_up");
         controller = message.payload.controller;
-        read_action = &peer_actor_t::read_controlled;
         read_more();
     }
 }
@@ -355,7 +354,7 @@ void peer_actor_t::read_controlled(proto::message::message_t &&msg) noexcept {
             using T = std::decay_t<decltype(msg)>;
             type = proto::message::get_bep_type<T>();
             if constexpr (std::is_same_v<T, proto::Hello>) {
-                LOG_WARN(log, "{}, hello, unexpected_message");
+                LOG_WARN(log, "hello, unexpected_message");
                 auto ec = utils::make_error_code(utils::bep_error_code_t::unexpected_message);
                 return do_shutdown(make_error(ec));
             } else if constexpr (std::is_same_v<T, proto::Ping>) {
@@ -424,6 +423,8 @@ void peer_actor_t::handle_hello(proto::Hello &&msg) noexcept {
 
     if (diff) {
         send<model::payload::model_update_t>(coordinator, std::move(diff));
+        read_action = &peer_actor_t::read_controlled;
+        read_more();
     }
 }
 
