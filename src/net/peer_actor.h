@@ -105,6 +105,7 @@ struct SYNCSPIRIT_API peer_actor_t : public r::actor_base_t {
     using tx_item_t = model::intrusive_ptr_t<confidential::payload::tx_item_t>;
     using tx_message_t = confidential::message::tx_item_t;
     using tx_queue_t = std::list<tx_item_t>;
+    using tx_size_ptr_t = payload::controller_up_t::tx_size_ptr_t;
     using read_action_t = void (peer_actor_t::*)(proto::message::message_t &&msg);
     using block_request_ptr_t = r::intrusive_ptr_t<message::block_request_t>;
     using block_requests_t = std::list<block_request_ptr_t>;
@@ -120,7 +121,7 @@ struct SYNCSPIRIT_API peer_actor_t : public r::actor_base_t {
     void on_read(std::size_t bytes) noexcept;
     void on_timer(r::request_id_t, bool cancelled) noexcept;
     void read_more() noexcept;
-    void push_write(utils::bytes_t buff, bool signal, bool final) noexcept;
+    void push_write(utils::bytes_t buff, bool final) noexcept;
     void process_tx_queue() noexcept;
     void cancel_timer() noexcept;
     void cancel_io() noexcept;
@@ -161,6 +162,7 @@ struct SYNCSPIRIT_API peer_actor_t : public r::actor_base_t {
     block_requests_t block_requests;
     std::size_t rx_bytes;
     std::size_t tx_bytes;
+    tx_size_ptr_t tx_bytes_in_progress;
     clock_t::time_point last_stats;
     bool finished = false;
     bool io_error = false;

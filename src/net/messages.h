@@ -9,9 +9,11 @@
 #include <boost/asio/ssl.hpp>
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
+#include <boost/smart_ptr/local_shared_ptr.hpp>
 
 #include <memory>
 #include <optional>
+#include <cstdint>
 
 #include "model/diff/cluster_diff.h"
 #include "model/file_info.h"
@@ -111,14 +113,20 @@ struct load_cluster_request_t {
 };
 
 struct controller_up_t {
+    using tx_size_t = std::uint32_t;
+    using tx_size_ptr_t = boost::local_shared_ptr<tx_size_t>;
+
     r::address_ptr_t controller;
     model::device_id_t peer;
+    tx_size_ptr_t tx_size;
 };
 
 struct controller_down_t {
     r::address_ptr_t controller;
     r::address_ptr_t peer;
 };
+
+struct tx_signal_t {};
 
 struct controller_predown_t {
     r::address_ptr_t controller;
@@ -167,14 +175,6 @@ struct transfer_data_t {
     utils::bytes_t data;
 };
 
-struct transfer_push_t {
-    uint32_t bytes;
-};
-
-struct transfer_pop_t {
-    uint32_t bytes;
-};
-
 struct db_info_response_t {
     uint32_t page_size = 0;
     uint32_t tree_depth = 0;
@@ -209,11 +209,10 @@ using load_cluster_response_t = r::request_traits_t<payload::load_cluster_reques
 using controller_up_t = r::message_t<payload::controller_up_t>;
 using controller_predown_t = r::message_t<payload::controller_predown_t>;
 using controller_down_t = r::message_t<payload::controller_down_t>;
+using tx_signal_t = r::message_t<payload::tx_signal_t>;
 using peer_down_t = r::message_t<payload::peer_down_t>;
 using forwarded_message_t = r::message_t<payload::forwarded_message_t>;
 using transfer_data_t = r::message_t<payload::transfer_data_t>;
-using transfer_push_t = r::message_t<payload::transfer_push_t>;
-using transfer_pop_t = r::message_t<payload::transfer_pop_t>;
 
 using block_request_t = r::request_traits_t<payload::block_request_t>::request::message_t;
 using block_response_t = r::request_traits_t<payload::block_request_t>::response::message_t;

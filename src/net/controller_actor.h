@@ -151,14 +151,9 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     using synchronizing_folders_t = std::unordered_map<model::folder_ptr_t, folder_synchronization_ptr_t>;
     using synchronizing_files_t = std::unordered_map<utils::bytes_view_t, model::file_info_t::guard_ptr_t>;
     using updates_streamer_ptr_t = std::unique_ptr<model::updates_streamer_t>;
+    using tx_size_ptr_t = payload::controller_up_t::tx_size_ptr_t;
 
-    template <typename M, typename... Args> void send_to_peer(Args &&...args) noexcept {
-        if (peer_address) {
-            send<M>(peer_address, std::forward<Args>(args)...);
-        } else {
-            LOG_DEBUG(log, "peer is no longer available, send has been ingored");
-        }
-    }
+    void send_to_peer(utils::bytes_t data) noexcept;
 
     void on_peer_down(message::peer_down_t &message) noexcept;
     void on_forward(message::forwarded_message_t &message) noexcept;
@@ -166,8 +161,7 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     void on_validation(hasher::message::validation_response_t &res) noexcept;
     void preprocess_block(model::file_block_t &block) noexcept;
     void on_model_update(model::message::model_update_t &message) noexcept;
-    void on_transfer_push(message::transfer_push_t &message) noexcept;
-    void on_transfer_pop(message::transfer_pop_t &message) noexcept;
+    void on_tx_signal(net::message::tx_signal_t &message) noexcept;
     void on_block_response(fs::message::block_response_t &message) noexcept;
     bool on_unlink_request(r::message::unlink_request_t &message) noexcept;
     void on_fs_ack_timer(r::request_id_t, bool cancelled) noexcept;
@@ -224,9 +218,9 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     pt::time_duration request_timeout;
     model::ignored_folders_map_t *ignored_folders;
     // generic
+    tx_size_ptr_t outgoing_buffer;
     std::uint_fast32_t rx_blocks_requested;
     std::uint_fast32_t tx_blocks_requested;
-    uint32_t outgoing_buffer;
     uint32_t outgoing_buffer_max;
 
     // diff

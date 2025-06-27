@@ -48,10 +48,6 @@ struct supervisor_t : ra::supervisor_asio_t {
             p.register_name(names::coordinator, get_address());
             p.register_name(names::peer_supervisor, get_address());
         });
-        plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
-            p.subscribe_actor(&supervisor_t::on_transfer_pop);
-            p.subscribe_actor(&supervisor_t::on_transfer_push);
-        });
 
         if (configure_callback) {
             configure_callback(plugin);
@@ -76,23 +72,11 @@ struct supervisor_t : ra::supervisor_asio_t {
         }
     }
 
-    void on_transfer_push(net::message::transfer_push_t &message) noexcept {
-        spdlog::debug("sup, tx push {} bytes", message.payload.bytes);
-        tx_push_bytes += message.payload.bytes;
-    }
-
-    void on_transfer_pop(net::message::transfer_pop_t &message) noexcept {
-        spdlog::debug("sup, tx pop {} bytes", message.payload.bytes);
-        tx_pop_bytes += message.payload.bytes;
-    }
-
     auto get_state() noexcept { return state; }
 
     asio::ip::tcp::acceptor *acceptor = nullptr;
     configure_callback_t configure_callback;
     shutdown_callback_t shutdown_callback;
-    std::size_t tx_push_bytes = 0;
-    std::size_t tx_pop_bytes = 0;
 };
 
 using supervisor_ptr_t = r::intrusive_ptr_t<supervisor_t>;
@@ -367,10 +351,14 @@ void test_online_on_hello() {
 
 void test_hello_read_then_write() {
     struct F : fixture_t {
+        using tx_size_ptr_t = net::payload::controller_up_t::tx_size_ptr_t;
+
         r::actor_ptr_t peer_actor;
         bool seen_online = false;
+        tx_size_ptr_t outgoing_buff;
 
         void main() noexcept override {
+            outgoing_buff.reset(new std::uint32_t(0));
             peer_actor = create_actor();
             read_hello();
         }
@@ -381,7 +369,7 @@ void test_hello_read_then_write() {
             CHECK(peer->get_state() == device_state_t::connecting);
 
             auto coordinator = sup->get_address();
-            sup->send<net::payload::controller_up_t>(coordinator, coordinator, peer_id);
+            sup->send<net::payload::controller_up_t>(coordinator, coordinator, peer_id, outgoing_buff);
 
             send_hello();
         }
@@ -398,8 +386,7 @@ void test_hello_read_then_write() {
             CHECK(seen_online);
             auto peer = cluster->get_devices().by_sha256(peer_device->device_id().get_sha256());
             CHECK(peer->get_state() == device_state_t::offline);
-            CHECK(sup->tx_push_bytes > 0);
-            CHECK(sup->tx_push_bytes == sup->tx_pop_bytes);
+            CHECK(*outgoing_buff == 0);
         }
     };
     F().run();

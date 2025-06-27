@@ -100,15 +100,16 @@ void C::folder_synchronization_t::finish_sync() noexcept {
 controller_actor_t::controller_actor_t(config_t &config)
     : r::actor_base_t{config}, sequencer{std::move(config.sequencer)}, cluster{config.cluster}, peer{config.peer},
       connection_id{config.connection_id}, peer_address{config.peer_addr}, request_timeout{config.request_timeout},
-      rx_blocks_requested{0}, tx_blocks_requested{0}, outgoing_buffer{0},
-      outgoing_buffer_max{config.outgoing_buffer_max}, request_pool{config.request_pool},
-      blocks_max_requested{config.blocks_max_requested}, advances_per_iteration{config.advances_per_iteration},
-      default_path(std::move(config.default_path)), announced{false} {
+      rx_blocks_requested{0}, tx_blocks_requested{0}, outgoing_buffer_max{config.outgoing_buffer_max},
+      request_pool{config.request_pool}, blocks_max_requested{config.blocks_max_requested},
+      advances_per_iteration{config.advances_per_iteration}, default_path(std::move(config.default_path)),
+      announced{false} {
     {
         assert(cluster);
         assert(sequencer);
         current_diff = nullptr;
         planned_pulls = 0;
+        outgoing_buffer.reset(new std::uint32_t(0));
     }
 }
 
@@ -143,10 +144,9 @@ void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.subscribe_actor(&controller_actor_t::on_forward);
         p.subscribe_actor(&controller_actor_t::on_peer_down);
         p.subscribe_actor(&controller_actor_t::on_block);
-        p.subscribe_actor(&controller_actor_t::on_transfer_pop);
-        p.subscribe_actor(&controller_actor_t::on_transfer_push);
         p.subscribe_actor(&controller_actor_t::on_validation);
         p.subscribe_actor(&controller_actor_t::on_block_response);
+        p.subscribe_actor(&controller_actor_t::on_tx_signal);
     });
 }
 
@@ -158,7 +158,7 @@ void controller_actor_t::on_start() noexcept {
         return do_shutdown();
     }
 
-    send<payload::controller_up_t>(coordinator, address, peer->device_id());
+    send<payload::controller_up_t>(coordinator, address, peer->device_id(), outgoing_buffer);
     send_cluster_config();
     resources->acquire(resource::peer);
     LOG_INFO(log, "is online (connection: {})", connection_id);
@@ -192,8 +192,7 @@ void controller_actor_t::send_cluster_config() noexcept {
     LOG_TRACE(log, "sending cluster config");
     auto cluster_config = cluster->generate(*peer);
     auto bytes = proto::serialize(cluster_config, peer->get_compression());
-    outgoing_buffer += static_cast<uint32_t>(bytes.size());
-    send_to_peer<payload::transfer_data_t>(std::move(bytes));
+    send_to_peer(std::move(bytes));
     send_new_indices();
 }
 
@@ -211,25 +210,15 @@ void controller_actor_t::send_new_indices() noexcept {
                     proto::Index index;
                     proto::set_folder(index, folder.get_id());
                     auto data = proto::serialize(index, peer->get_compression());
-                    outgoing_buffer += static_cast<uint32_t>(data.size());
-                    send_to_peer<payload::transfer_data_t>(std::move(data));
+                    send_to_peer(std::move(data));
                 }
             }
         }
     }
 }
 
-void controller_actor_t::on_transfer_push(message::transfer_push_t &message) noexcept {
-    auto sz = message.payload.bytes;
-    outgoing_buffer += sz;
-    LOG_TRACE(log, "on_transfer_push, sz = {} (+{})", outgoing_buffer, sz);
-}
-
-void controller_actor_t::on_transfer_pop(message::transfer_pop_t &message) noexcept {
-    auto sz = message.payload.bytes;
-    LOG_TRACE(log, "on_transfer_pop, sz = {} (-{})", outgoing_buffer, sz);
-    assert(outgoing_buffer >= sz);
-    outgoing_buffer -= sz;
+void controller_actor_t::on_tx_signal(message::tx_signal_t &) noexcept {
+    LOG_TRACE(log, "on_tx_signal, outgoing buff size is {} bytes", *outgoing_buffer);
     push_pending();
 }
 
@@ -265,8 +254,8 @@ void controller_actor_t::push_pending() noexcept {
         return index;
     };
 
-    auto expected_sz = decltype(outgoing_buffer){0};
-    while (expected_sz < outgoing_buffer_max - outgoing_buffer) {
+    auto expected_sz = std::uint32_t(0);
+    while (expected_sz < outgoing_buffer_max - *outgoing_buffer) {
         if (auto file_info = updates_streamer->next(); file_info) {
             expected_sz += file_info->expected_meta_size();
             auto &index = get_index(*file_info);
@@ -282,8 +271,7 @@ void controller_actor_t::push_pending() noexcept {
         auto &index = p.second;
         if (proto::get_files_size(index) > 0) {
             auto data = proto::serialize(index, peer->get_compression());
-            outgoing_buffer += static_cast<uint32_t>(data.size());
-            send_to_peer<payload::transfer_data_t>(std::move(data));
+            send_to_peer(std::move(data));
         }
     }
 }
@@ -750,8 +738,7 @@ void controller_actor_t::on_message(proto::Request &req) noexcept {
             proto::set_id(res, proto::get_id(req));
             proto::set_code(res, code);
             auto data = proto::serialize(res, peer->get_compression());
-            outgoing_buffer += static_cast<uint32_t>(data.size());
-            send_to_peer<payload::transfer_data_t>(std::move(data));
+            send_to_peer(std::move(data));
         }
     } else {
         ++tx_blocks_requested;
@@ -779,8 +766,7 @@ void controller_actor_t::on_block_response(fs::message::block_response_t &messag
     }
 
     auto data = proto::serialize(res, peer->get_compression());
-    outgoing_buffer += static_cast<uint32_t>(data.size());
-    send_to_peer<payload::transfer_data_t>(std::move(data));
+    send_to_peer(std::move(data));
 }
 
 void controller_actor_t::on_block(message::block_response_t &message) noexcept {
@@ -1005,5 +991,14 @@ void controller_actor_t::cancel_sync(model::file_info_t *file) noexcept {
     auto it = synchronizing_files.find(file->get_key());
     if (it != synchronizing_files.end()) {
         synchronizing_files.erase(it);
+    }
+}
+
+void controller_actor_t::send_to_peer(utils::bytes_t data) noexcept {
+    if (peer_address) {
+        *outgoing_buffer += static_cast<uint32_t>(data.size());
+        send<payload::transfer_data_t>(peer_address, std::move(data));
+    } else {
+        LOG_DEBUG(log, "peer is no longer available, send has been ingored");
     }
 }

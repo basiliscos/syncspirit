@@ -67,7 +67,7 @@ void peer_actor_t::on_start() noexcept {
     LOG_TRACE(log, "on_start");
 
     auto buff = proto::make_hello_message(device_name);
-    push_write(std::move(buff), true, false);
+    push_write(std::move(buff), false);
 
     read_more();
     read_action = &peer_actor_t::read_hello;
@@ -118,12 +118,9 @@ void peer_actor_t::process_tx_queue() noexcept {
     }
 }
 
-void peer_actor_t::push_write(utils::bytes_t buff, bool signal, bool final) noexcept {
+void peer_actor_t::push_write(utils::bytes_t buff, bool final) noexcept {
     if (io_error) {
         return;
-    }
-    if (signal && controller) {
-        send<payload::transfer_push_t>(controller, buff.size());
     }
     tx_item_t item = new confidential::payload::tx_item_t{std::move(buff), final};
     tx_queue.emplace_back(std::move(item));
@@ -136,6 +133,7 @@ void peer_actor_t::push_write(utils::bytes_t buff, bool signal, bool final) noex
 }
 
 void peer_actor_t::read_more() noexcept {
+    assert(!resources->has(resource::io_read));
     if (state > r::state_t::OPERATIONAL) {
         return;
     }
@@ -157,8 +155,13 @@ void peer_actor_t::on_write(std::size_t sz) noexcept {
     resources->release(resource::io_write);
     LOG_TRACE(log, "on_write, {} bytes", sz);
     if (controller) {
-        send<payload::transfer_pop_t>(controller, (uint32_t)sz);
+        auto reported = std::min(static_cast<std::uint32_t>(sz), *tx_bytes_in_progress);
+        if (reported) {
+            *tx_bytes_in_progress -= reported;
+            send<payload::tx_signal_t>(controller);
+        }
     }
+
     tx_bytes += sz;
     emit_io_stats();
 
@@ -237,7 +240,7 @@ void peer_actor_t::shutdown_start() noexcept {
     proto::set_reason(close, shutdown_reason->message());
     auto buff = proto::serialize(close);
     tx_queue.clear();
-    push_write(std::move(buff), true, true);
+    push_write(std::move(buff), true);
     LOG_TRACE(log, "going to send close message");
 
     r::actor_base_t::shutdown_start();
@@ -291,8 +294,9 @@ void peer_actor_t::on_controller_up(message::controller_up_t &message) noexcept 
     auto &peer = message.payload.peer;
     if (peer == peer_device_id) {
         LOG_TRACE(log, "on_controller_up");
-        controller = message.payload.controller;
-        read_more();
+        auto &p = message.payload;
+        controller = p.controller;
+        tx_bytes_in_progress = p.tx_size;
     }
 }
 
@@ -319,14 +323,14 @@ void peer_actor_t::on_block_request(message::block_request_t &message) noexcept 
     proto::set_hash(req, p.block_hash);
 
     auto buff = proto::serialize(req);
-    push_write(std::move(buff), true, false);
+    push_write(std::move(buff), false);
     block_requests.emplace_back(&message);
 }
 
 void peer_actor_t::on_transfer(message::transfer_data_t &message) noexcept {
     LOG_TRACE(log, "on_transfer");
 
-    push_write(std::move(message.payload.data), false, false);
+    push_write(std::move(message.payload.data), false);
 }
 
 void peer_actor_t::read_hello(proto::message::message_t &&msg) noexcept {
@@ -493,7 +497,7 @@ void peer_actor_t::on_tx_timeout(r::request_id_t, bool cancelled) noexcept {
     if (!cancelled) {
         proto::Ping ping;
         auto buff = proto::serialize(ping);
-        push_write(std::move(buff), true, false);
+        push_write(std::move(buff), false);
         reset_tx_timer();
     }
 }
