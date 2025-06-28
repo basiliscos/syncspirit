@@ -335,8 +335,9 @@ scan_result_t scan_task_t::advance_unknown_file(unknown_file_t &file) noexcept {
     if (ec) {
         LOG_DEBUG(log, "removing outdated temporally {}, cannot get last modification: {}", path.string(),
                   ec.message());
-        bfs::remove(path, ec);
-        return file_error_t{path, ec};
+        auto ec_rm = sys::error_code();
+        bfs::remove(path, ec_rm);
+        return file_error_t{path, ec_rm ? ec_rm : ec};
     }
     auto modified_at = to_unix(modified_time);
     auto now = std::time(nullptr);

@@ -152,6 +152,7 @@ void scan_actor_t::on_scan(message::scan_progress_t &message) noexcept {
                 } else if constexpr (std::is_same_v<T, orphaned_removed_t>) {
                     // NO-OP
                 } else if constexpr (std::is_same_v<T, file_error_t>) {
+                    LOG_WARN(log, "(ignrored) error '{}': {}", r.path.generic_string(), r.ec.message());
 #if 0
                     auto diff = model::diff::cluster_diff_ptr_t{};
                     diff = new model::diff::modify::lock_file_t(*r.file, false);
@@ -159,8 +160,8 @@ void scan_actor_t::on_scan(message::scan_progress_t &message) noexcept {
                     auto path = make_temporal(r.file->get_path());
                     scan_errors_t errors{scan_error_t{path, r.ec}};
                     send<model::payload::io_error_t>(coordinator, std::move(errors));
-#endif
                     std::abort();
+#endif
                 } else {
                     static_assert(always_false_v<T>, "non-exhaustive visitor!");
                 }

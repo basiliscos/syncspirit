@@ -558,6 +558,35 @@ SECTION("regular files") {
             CHECK(seen.count("a.txt"));
         }
 
+        SECTION("cannot read -> error") {
+            write_file(path, "12345");
+
+            auto file_peer = file_info_t::create(sequencer->next_uuid(), pr_file, folder_peer).value();
+            REQUIRE(folder_peer->add_strict(file_peer));
+
+            auto task = scan_task_t(cluster, folder->get_id(), rw_cache, config);
+            auto r = task.advance();
+            CHECK(std::get_if<bool>(&r));
+            CHECK(*std::get_if<bool>(&r) == true);
+
+            bfs::remove(path);
+
+            r = task.advance();
+            REQUIRE(std::get_if<file_error_t>(&r));
+            auto ref = std::get_if<file_error_t>(&r);
+            CHECK(ref->path == path);
+            CHECK(ref->ec);
+
+            r = task.advance();
+            CHECK(std::get_if<bool>(&r));
+            CHECK(*std::get_if<bool>(&r) == false);
+
+            bfs::permissions(path.parent_path(), bfs::perms::all);
+
+            auto &seen = task.get_seen_paths();
+            CHECK(seen.count("a.txt"));
+        }
+
         SECTION("file is in rw cache, skip it") {
             bfs::remove_all(path);
             auto path_rel = bfs::path(L"путь") / bfs::path(L"ля-ля.txt");
