@@ -17,18 +17,16 @@
  - [pugixml](https://github.com/zeux/pugixml)
  - [tomlplusplus](https://github.com/marzer/tomlplusplus)
  - [c-ares](https://c-ares.org/)
- - [fltk](https://www.fltk.org/) (for fltk-ui)
+ - [fltk][] (for fltk-ui)
 
-The [conan](https://conan.io/) package manager (v2.0+) is used with
-[cmake](https://cmake.org/) build system.
+The [conan][] package manager (v2.0+) is used with [cmake][] build system.
 
-`syncspirit` can be build with [conan](https://conan.io/) or just with bare
-[cmake](https://cmake.org/) build system. [conan](https://conan.io/) is
-responsible for installing and building dependencies, with bare [cmake](https://cmake.org/)
-it should be done manually (e.g. use system-provided libraries).
+`syncspirit` can be build with [conan][] or just with bare [cmake][] build
+system. [conan][] is responsible for installing and building dependencies, with
+bare [cmake][] it should be done manually (e.g. use system-provided libraries).
 
-Please note, that [fltk](https://www.fltk.org/) library should be build as
-shared library; otherwise applications will not work correctly.
+Please note, that [fltk][] library should be build as shared library; otherwise
+applications will not work correctly.
 
 ## generic build
 
@@ -174,7 +172,7 @@ make -j`nproc`
 
 ### mxe
 
-Download [mxe](https://mxe.cc); make sure all requirements are met.
+Download [mxe][]; make sure all requirements are met.
 
 Your `settings.mk` should contain something like:
 
@@ -256,7 +254,7 @@ make -j`nproc`
 
 ### mxe & windows xp
 
-Download [mxe](https://mxe.cc); make sure all requirements are met.
+Download [mxe][]; make sure all requirements are met.
 
 Your `settings.mk` should contain something like:
 
@@ -492,3 +490,8 @@ conan install --build=missing --output-folder . -s build_type=Debug \
 cmake  .. -G "Unix Makefiles" -DCMAKE_TOOLCHAIN_FILE=conan_toolchain.cmake \
     -DCMAKE_BUILD_TYPE=Debug -DSYNCSPIRIT_BUILD_TESTS=on \
     -DCMAKE_CXX_FLAGS="-fuse-ld=mold"
+
+[cmake]: https://cmake.org/
+[conan]: https://conan.io/
+[fltk]: https://www.fltk.org/
+[mxe]: https://mxe.cc
