@@ -298,8 +298,8 @@ void peer_actor_t::on_controller_up(message::controller_up_t &message) noexcept 
         controller = p.controller;
         tx_bytes_in_progress = p.tx_size;
 
-        while(!received_queue.empty()) {
-            auto& msg = received_queue.front();
+        while (!received_queue.empty()) {
+            auto &msg = received_queue.front();
             auto fwd = payload::forwarded_message_t{std::move(msg)};
             send<payload::forwarded_message_t>(controller, std::move(fwd));
             received_queue.pop_front();

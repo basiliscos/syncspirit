@@ -119,9 +119,12 @@ diff_builder_t &index_maker_t::finish() noexcept {
     return builder;
 }
 
-diff_builder_t::diff_builder_t(model::cluster_t &cluster_, r::address_ptr_t receiver_) noexcept
-    : cluster{cluster_}, receiver{receiver_} {
-    sequencer = model::make_sequencer(0);
+diff_builder_t::diff_builder_t(model::cluster_t &cluster_, r::address_ptr_t receiver_,
+                               model::sequencer_ptr_t sequencer_) noexcept
+    : cluster{cluster_}, receiver{receiver_}, sequencer{sequencer_} {
+    if (!sequencer) {
+        sequencer = model::make_sequencer(0);
+    }
 }
 
 diff_builder_t &diff_builder_t::apply(rotor::supervisor_t &sup) noexcept {

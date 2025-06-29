@@ -35,7 +35,6 @@ struct fixture_t {
     fixture_t() noexcept : root_path{unique_path()}, path_guard{root_path} {
         test::init_logging();
         bfs::create_directory(root_path);
-        sequencer = make_sequencer(67);
     }
 
     virtual supervisor_t::configure_callback_t configure() noexcept {
@@ -85,6 +84,8 @@ struct fixture_t {
                          .timeout(timeout)
                          .finish();
         sup->do_process();
+        sequencer = sup->sequencer;
+
         CHECK(static_cast<r::actor_base_t *>(file_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
         file_addr = file_actor->get_address();
 
@@ -434,7 +435,7 @@ void test_clone_block() {
                 return file;
             };
 
-            auto builder = diff_builder_t(*cluster, file_addr);
+            auto builder = diff_builder_t(*cluster, file_addr, sequencer);
 
             SECTION("source & target are different files") {
                 proto::FileInfo pr_target;
@@ -458,6 +459,41 @@ void test_clone_block() {
 
                     auto target_file = folder_peer->get_file_infos().by_name(proto::get_name(pr_target));
                     auto block = source_file->get_blocks()[0];
+                    auto file_block = model::file_block_t(block.get(), target_file.get(), 0);
+                    builder.clone_block(file_block).apply(*sup).finish_file(*target).apply(*sup);
+
+                    auto path = root_path / std::string(target_file->get_name());
+                    REQUIRE(bfs::exists(path));
+                    REQUIRE(bfs::file_size(path) == 5);
+                    auto data = read_file(path);
+                    CHECK(data == "12345");
+                    CHECK(to_unix(bfs::last_write_time(path)) == 1641828421);
+                }
+
+                SECTION("single block target file, from diffrent folder") {
+                    proto::set_size(pr_source, 5);
+                    proto::set_size(pr_target, 5);
+                    proto::set_modified_s(pr_target, modified);
+
+                    auto folder_2_id = "my-folder-2";
+                    auto folder_2_dir = root_path;
+                    bfs::create_directories(folder_2_dir);
+
+                    REQUIRE(builder.upsert_folder(folder_2_id, folder_2_dir, "my-label-2").apply());
+                    REQUIRE(cluster->get_folders().size() == 2);
+                    auto fi_2_my = cluster->get_folders().by_id(folder_2_id)->get_folder_infos().by_device(*my_device);
+
+                    proto::set_sequence(pr_source, ++next_sequence);
+                    auto source = file_info_t::create(sequencer->next_uuid(), pr_source, fi_2_my).value();
+                    source->assign_block(blocks[0], 0);
+                    fi_2_my->add_strict(source);
+                    source->mark_local_available(0);
+
+                    auto target = make_file(pr_target, 1);
+                    write_file(root_path / boost::nowide::widen(source->get_name()), "12345");
+
+                    auto target_file = folder_peer->get_file_infos().by_name(proto::get_name(pr_target));
+                    auto block = source->get_blocks()[0];
                     auto file_block = model::file_block_t(block.get(), target_file.get(), 0);
                     builder.clone_block(file_block).apply(*sup).finish_file(*target).apply(*sup);
 

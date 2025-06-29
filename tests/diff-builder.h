@@ -59,7 +59,7 @@ struct SYNCSPIRIT_TEST_API diff_builder_t : private model::diff::apply_controlle
     using blocks_t = std::vector<proto::BlockInfo>;
     using apply_controller_t::apply;
 
-    diff_builder_t(model::cluster_t &, r::address_ptr_t receiver = {}) noexcept;
+    diff_builder_t(model::cluster_t &, r::address_ptr_t receiver = {}, model::sequencer_ptr_t sequencer = {}) noexcept;
     cluster_configurer_t configure_cluster(utils::bytes_view_t sha256, const bfs::path &default_location = {}) noexcept;
     diff_builder_t &apply(r::supervisor_t &sup) noexcept;
     void send(r::supervisor_t &sup) noexcept;

@@ -359,7 +359,8 @@ auto file_actor_t::operator()(const model::diff::modify::clone_block_t &diff, vo
     auto target_folder_info = folder->get_folder_infos().by_device_id(diff.device_id);
     auto target = target_folder_info->get_file_infos().by_name(diff.file_name);
 
-    auto source_folder_info = folder->get_folder_infos().by_device_id(diff.source_device_id);
+    auto source_folder = cluster->get_folders().by_id(diff.source_folder_id);
+    auto source_folder_info = source_folder->get_folder_infos().by_device_id(diff.source_device_id);
     auto source = source_folder_info->get_file_infos().by_name(diff.source_file_name);
 
     auto &target_path = target->get_path();
