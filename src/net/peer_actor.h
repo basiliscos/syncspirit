@@ -110,6 +110,7 @@ struct SYNCSPIRIT_API peer_actor_t : public r::actor_base_t {
     using block_request_ptr_t = r::intrusive_ptr_t<message::block_request_t>;
     using block_requests_t = std::list<block_request_ptr_t>;
     using clock_t = std::chrono::steady_clock;
+    using received_queue_t = std::list<payload::forwarded_message_t>;
 
     void on_controller_up(message::controller_up_t &) noexcept;
     void on_controller_predown(message::controller_predown_t &) noexcept;
@@ -164,6 +165,7 @@ struct SYNCSPIRIT_API peer_actor_t : public r::actor_base_t {
     std::size_t tx_bytes;
     tx_size_ptr_t tx_bytes_in_progress;
     clock_t::time_point last_stats;
+    received_queue_t received_queue;
     bool finished = false;
     bool io_error = false;
 };

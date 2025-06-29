@@ -75,7 +75,7 @@ void peer_actor_t::on_start() noexcept {
 }
 
 void peer_actor_t::on_io_error(const sys::error_code &ec, rotor::plugin::resource_id_t resource) noexcept {
-    LOG_TRACE(log, "on_io_error: {}", ec.message());
+    LOG_TRACE(log, "on_io_error: {}, resource: {}", ec.message(), static_cast<int>(resource));
     resources->release(resource);
     if (ec != asio::error::operation_aborted) {
         LOG_WARN(log, "on_io_error: {}", ec.message());
@@ -297,6 +297,13 @@ void peer_actor_t::on_controller_up(message::controller_up_t &message) noexcept 
         auto &p = message.payload;
         controller = p.controller;
         tx_bytes_in_progress = p.tx_size;
+
+        while(!received_queue.empty()) {
+            auto& msg = received_queue.front();
+            auto fwd = payload::forwarded_message_t{std::move(msg)};
+            send<payload::forwarded_message_t>(controller, std::move(fwd));
+            received_queue.pop_front();
+        }
     }
 }
 
@@ -368,8 +375,12 @@ void peer_actor_t::read_controlled(proto::message::message_t &&msg) noexcept {
             } else if constexpr (std::is_same_v<T, proto::Response>) {
                 handle_response(std::move(msg));
             } else {
-                auto fwd = payload::forwarded_message_t{std::move(msg)};
-                send<payload::forwarded_message_t>(controller, std::move(fwd));
+                if (controller) {
+                    auto fwd = payload::forwarded_message_t{std::move(msg)};
+                    send<payload::forwarded_message_t>(controller, std::move(fwd));
+                } else {
+                    received_queue.emplace_back(std::move(msg));
+                }
                 reset_rx_timer();
             }
         },
