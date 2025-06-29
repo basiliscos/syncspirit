@@ -80,7 +80,7 @@ struct self_table_t final : static_table_t, db_info_viewer_t {
         data.push_back({"send", tx_cell});
         data.push_back({"mdbx entries", mdbx_entries_cell});
         data.push_back({"mdbx pages", mdbx_pages_cell});
-        data.push_back({"mdbx size, Kb", mdbx_size_cell});
+        data.push_back({"mdbx size", mdbx_size_cell});
         data.push_back({"app version", new static_string_provider_t(app_version)});
         data.push_back({"mdbx version", new static_string_provider_t(mdbx_version)});
         data.push_back({"boost version", new static_string_provider_t(boost_version)});
@@ -117,7 +117,7 @@ struct self_table_t final : static_table_t, db_info_viewer_t {
             tx_bytes = static_cast<std::int64_t>(self->get_tx_bytes());
         }
         auto pages = db_info.leaf_pages + db_info.ms_branch_pages + db_info.overflow_pages;
-        auto size = pages * db_info.page_size / 1024;
+        auto size = get_file_size(pages * db_info.page_size);
 
         device_id_short_cell->update(device_id_short);
         device_id_cell->update(device_id);
