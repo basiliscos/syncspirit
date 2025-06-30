@@ -23,6 +23,7 @@
 #include <spdlog/fmt/bin_to_hex.h>
 #include <spdlog/spdlog.h>
 #include <boost/nowide/convert.hpp>
+#include <memory_resource>
 
 using namespace syncspirit;
 using namespace syncspirit::model::diff::peer;
@@ -44,6 +45,9 @@ auto cluster_update_t::create(const bfs::path &default_path, const cluster_t &cl
 
 cluster_update_t::cluster_update_t(const bfs::path &default_path, const cluster_t &cluster, sequencer_t &sequencer,
                                    const device_t &source, const message_t &message) noexcept {
+    using folder_device_set_t = std::pmr::unordered_set<std::pmr::string>;
+    using allocator_t = std::pmr::polymorphic_allocator<char>;
+    using fmt_buff_t = fmt::basic_memory_buffer<char, fmt::inline_buffer_size, allocator_t>;
     struct introduced_device_t {
         db::Device device;
         model::device_id_t device_id;
@@ -78,6 +82,11 @@ cluster_update_t::cluster_update_t(const bfs::path &default_path, const cluster_
     auto introduced_devices = introduced_devices_t();
     auto upserted_folder_infos = upserted_folder_infos_t();
     auto upserted_folders = upserted_folders_t();
+
+    auto buffer = std::array<std::byte, 16 * 1024>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = allocator_t(&pool);
+    auto folder_device_set = folder_device_set_t(allocator);
 
     auto add_pending = [&](const proto::Folder &f, const proto::Device &d) noexcept {
         auto folder_id = proto::get_id(f);
@@ -239,7 +248,6 @@ cluster_update_t::cluster_update_t(const bfs::path &default_path, const cluster_
         for (int j = 0; j < devices_count; ++j) {
             auto &d = proto::get_devices(f, j);
             auto device_sha = proto::get_id(d);
-            auto device = devices.by_sha256(device_sha);
             auto device_opt = model::device_id_t::from_sha256(device_sha);
             if (!device_opt) {
                 auto device_hex = spdlog::to_hex(device_sha.begin(), device_sha.end());
@@ -247,12 +255,24 @@ cluster_update_t::cluster_update_t(const bfs::path &default_path, const cluster_
                 ec = make_error_code(utils::error_code_t::malformed_url);
                 return;
             }
+
             auto index_id = proto::get_index_id(d);
             auto &device_id = *device_opt;
+            auto fmt_buff = fmt_buff_t(allocator);
+            fmt::format_to(std::back_inserter(fmt_buff), "{}-{}", folder_id, device_id.get_value());
+            auto folder_device_id = std::pmr::string(fmt_buff.begin(), fmt_buff.end(), allocator);
+            if (folder_device_set.count(folder_device_id)) {
+                LOG_WARN(log, "cluster_update_t, folder/device ({}/{}) has been seen, ignoring index = {:#x}",
+                         folder_id, device_id.get_short(), index_id);
+                continue;
+            }
+            folder_device_set.emplace(std::move(folder_device_id));
+
             auto max_sequence = proto::get_max_sequence(d);
             LOG_DEBUG(log, "cluster_update_t, shared with device = '{}', index = {:#x}, max seq. = {}", device_id,
                       index_id, max_sequence);
 
+            auto device = devices.by_sha256(device_sha);
             if (!device) {
                 continue;
             }
