@@ -28,6 +28,7 @@
 #include "model/diff/modify/remove_ignored_device.h"
 #include "model/diff/modify/remove_pending_device.h"
 #include "model/diff/modify/upsert_folder.h"
+#include "model/diff/modify/upsert_folder_info.h"
 #include "model/diff/peer/cluster_update.h"
 #include "model/diff/peer/update_folder.h"
 #include <boost/nowide/convert.hpp>
@@ -194,6 +195,12 @@ diff_builder_t &diff_builder_t::upsert_folder(std::string_view id, const bfs::pa
 diff_builder_t &diff_builder_t::upsert_folder(const db::Folder &data, std::uint64_t index_id) noexcept {
     auto opt = diff::modify::upsert_folder_t::create(cluster, *sequencer, data, index_id);
     return assign(opt.value().get());
+}
+
+diff_builder_t &diff_builder_t::upsert_folder_info(model::folder_info_t &prev, std::uint64_t new_index_id) noexcept {
+    auto ptr = model::diff::cluster_diff_ptr_t();
+    ptr.reset(new diff::modify::upsert_folder_info_t(prev, new_index_id));
+    return assign(ptr.get());
 }
 
 diff_builder_t &diff_builder_t::update_peer(const model::device_id_t &device, std::string_view name,

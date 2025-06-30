@@ -72,6 +72,7 @@ auto file_iterator_t::prepare_folder(folder_info_ptr_t peer_folder) noexcept -> 
     auto folder = peer_folder->get_folder();
     auto order = folder->get_pull_order();
     auto set = std::make_unique<queue_t>(file_comparator_t{order});
+    auto seen_index = std::uint64_t{0};
     auto seen_sequence = std::int64_t{0};
     bool can_receive = folder->get_folder_type() != db::FolderType::send;
 
@@ -82,11 +83,13 @@ auto file_iterator_t::prepare_folder(folder_info_ptr_t peer_folder) noexcept -> 
                 set->emplace(f);
             }
         }
+        seen_index = peer_folder->get_index();
         seen_sequence = peer_folder->get_max_sequence();
     }
 
     auto it = set->begin();
-    folders_list.emplace_back(folder_iterator_t{peer_folder, std::move(set), seen_sequence, it, can_receive});
+    folders_list.emplace_back(
+        folder_iterator_t{peer_folder, std::move(set), seen_index, seen_sequence, it, can_receive});
     return folders_list.back();
 }
 
@@ -133,8 +136,12 @@ void file_iterator_t::on_upsert(folder_info_ptr_t peer_folder) noexcept {
 
 void file_iterator_t::populate(folder_iterator_t &it) noexcept {
     auto peer_folder = it.peer_folder.get();
-    auto &files_map = peer_folder->get_file_infos();
     auto seen_sequence = it.seen_sequence;
+    if (peer_folder->get_index() != it.seen_index) {
+        it.seen_sequence = 0;
+        it.files_queue->clear();
+    }
+    auto &files_map = peer_folder->get_file_infos();
     auto max_sequence = peer_folder->get_max_sequence();
     auto [from, to] = files_map.range(seen_sequence + 1, max_sequence);
     for (auto fit = from; fit != to; ++fit) {

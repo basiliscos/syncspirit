@@ -45,6 +45,7 @@ struct SYNCSPIRIT_API file_iterator_t : arc_base_t<file_iterator_t> {
         using it_t = typename queue_t::iterator;
         model::folder_info_ptr_t peer_folder;
         queue_ptr_t files_queue;
+        std::uint64_t seen_index;
         std::int64_t seen_sequence;
         it_t it;
         bool can_receive;

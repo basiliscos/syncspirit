@@ -529,6 +529,23 @@ TEST_CASE("file iterator, create, share, iterae, unshare, share, iterate", "[mod
     REQUIRE(f);
     CHECK(action == A::remote_copy);
     CHECK(f->get_name() == "a.txt");
+
+    peer_device->release_iterator(file_iterator);
+    file_iterator = peer_device->create_iterator(*cluster);
+    std::tie(f, action) = file_iterator->next();
+    REQUIRE(f);
+    CHECK(action == A::remote_copy);
+    CHECK(f->get_name() == "a.txt");
+
+    auto folder_peer = folder->get_folder_infos().by_device(*peer_device);
+    peer_device->release_iterator(file_iterator);
+    file_iterator = peer_device->create_iterator(*cluster);
+    REQUIRE(builder.upsert_folder_info(*folder_peer, folder_peer->get_index() + 1).apply());
+
+    folder_peer = folder->get_folder_infos().by_device(*peer_device);
+    file_iterator->on_upsert(folder_peer);
+    std::tie(f, action) = file_iterator->next();
+    CHECK(!f);
 }
 
 TEST_CASE("file pull order", "[model]") {
