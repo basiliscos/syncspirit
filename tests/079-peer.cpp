@@ -204,7 +204,7 @@ struct fixture_t : private model::diff::cluster_visitor_t {
             .bep_config(bep_config)
             .transport(peer_trans)
             .peer_device_id(peer_device->device_id())
-            .peer_state(state)
+            .peer_state(std::move(state))
             .device_name("peer-device")
             .uri(url->clone())
             .autoshutdown_supervisor(true)
