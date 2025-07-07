@@ -39,7 +39,7 @@ template <typename Actor> struct peer_actor_config_builder_t : r::actor_config_b
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&peer_state(model::device_state_t &value) && noexcept {
+    builder_t &&peer_state(model::device_state_t &&value) && noexcept {
         parent_t::config.peer_state = std::move(value);
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }

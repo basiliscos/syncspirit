@@ -66,14 +66,18 @@ void peer_supervisor_t::on_model_update(model::message::model_update_t &msg) noe
 }
 
 void peer_supervisor_t::on_peer_ready(message::peer_connected_t &msg) noexcept {
-    LOG_TRACE(log, "on_peer_ready");
     auto timeout = r::pt::milliseconds{bep_config.connect_timeout};
     auto &p = msg.payload;
     auto &d = p.peer_device_id;
+    LOG_TRACE(log, "on_peer_ready, peer = {}", d.get_short());
     auto peer = cluster->get_devices().by_sha256(d.get_sha256());
     if (peer && peer->get_state().is_online()) {
         LOG_DEBUG(log, "peer '{}' is already online, ignoring request", d.get_short());
         return;
+    }
+    auto diff = model::diff::contact::peer_state_t::create(*cluster, d.get_sha256(), {}, p.peer_state);
+    if (diff) {
+        send<model::payload::model_update_t>(coordinator, std::move(diff));
     }
     create_actor<peer_actor_t>()
         .transport(std::move(p.transport))
@@ -82,6 +86,7 @@ void peer_supervisor_t::on_peer_ready(message::peer_connected_t &msg) noexcept {
         .bep_config(bep_config)
         .coordinator(coordinator)
         .uri(p.uri->clone())
+        .peer_state(p.peer_state.clone())
         .timeout(timeout)
         .cluster(cluster)
         .finish();
