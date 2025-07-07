@@ -22,7 +22,7 @@ struct SYNCSPIRIT_API device_state_t {
 
     device_state_t &operator=(device_state_t &&) = default;
     device_state_t &operator=(const device_state_t &) = delete;
-    bool operator==(const device_state_t &) const noexcept = default;
+    bool operator==(const device_state_t &) const noexcept;
     bool operator<(const device_state_t &) const noexcept;
     bool can_roollback_to(const device_state_t &) const noexcept;
 

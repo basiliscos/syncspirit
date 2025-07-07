@@ -108,10 +108,7 @@ TEST_CASE("device-state", "[model]") {
         CHECK(s2.can_roollback_to(s1));
         CHECK(*s2.get_url() == *utils::parse("tcp://127.0.0.1:1234"));
 
-        auto s2_clone = s2.clone();
-        CHECK(s2 != s2_clone);
-        CHECK(s2.get_url() != s2_clone.get_url());
-        CHECK(*s2.get_url() == *s2_clone.get_url());
+        CHECK(s2 == s2.clone());
     }
 
     SECTION("tcp & relay onlines") {
@@ -126,5 +123,9 @@ TEST_CASE("device-state", "[model]") {
         CHECK(s2_2 < s2_3);
         CHECK(!(s2_1 < s2_3));
         CHECK(!(s2_3 < s2_1));
+        CHECK(s2_1 == s2_1);
+        CHECK(s2_1 != s2_2);
+        CHECK(s2_1 != s0_1);
+        CHECK(s2_1 == s2_1.clone());
     }
 }

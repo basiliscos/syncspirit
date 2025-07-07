@@ -26,6 +26,19 @@ bool device_state_t::operator<(const device_state_t &other) const noexcept {
     return connection_state < other.connection_state;
 }
 
+bool device_state_t::operator==(const device_state_t &other) const noexcept {
+    if (token != other.token || connection_state != other.connection_state) {
+        return false;
+    }
+    if (connection_state != connection_state_t::online) {
+        return true;
+    }
+    if ((online_url && !other.online_url) || (!online_url && other.online_url)) {
+        return false;
+    }
+    return *online_url == *other.online_url;
+}
+
 bool device_state_t::can_roollback_to(const device_state_t &other) const noexcept {
     return other.token == token && (other < *this);
 }
