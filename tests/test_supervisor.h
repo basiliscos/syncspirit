@@ -52,7 +52,7 @@ template <typename Supervisor> struct supervisor_config_builder_t : r::superviso
 };
 
 struct SYNCSPIRIT_TEST_API supervisor_t : r::supervisor_t,
-                                          private model::diff::cluster_visitor_t,
+                                          protected model::diff::cluster_visitor_t,
                                           private model::diff::apply_controller_t {
     using config_t = supervisor_config_t;
     template <typename Actor> using config_builder_t = supervisor_config_builder_t<Actor>;

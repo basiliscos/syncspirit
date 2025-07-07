@@ -6,6 +6,7 @@
 #include "misc/augmentation.h"
 #include "misc/map.hpp"
 #include "device_id.h"
+#include "device_state.h"
 #include "remote_folder_info.h"
 #include "utils/uri.h"
 #include "utils/bytes.h"
@@ -26,8 +27,6 @@ struct cluster_t;
 using device_ptr_t = intrusive_ptr_t<device_t>;
 using file_iterator_ptr_t = intrusive_ptr_t<file_iterator_t>;
 
-enum class device_state_t { offline, discovering, connecting, online };
-
 struct SYNCSPIRIT_API device_t : augmentable_t {
     using uris_t = utils::uri_container_t;
     using name_option_t = std::optional<std::string>;
@@ -45,15 +44,13 @@ struct SYNCSPIRIT_API device_t : augmentable_t {
     utils::bytes_t serialize(db::Device &device) const noexcept;
     utils::bytes_t serialize() const noexcept;
     inline bool is_dynamic() const noexcept { return static_uris.empty(); }
-    inline device_state_t get_state() const noexcept { return state; }
-    void update_state(device_state_t new_state, std::string_view connection_id) noexcept;
-    void update_contact(const tcp::endpoint &endpoint, std::string_view client_name,
-                        std::string_view client_version) noexcept;
+    inline const device_state_t &get_state() const noexcept { return state; }
+    void update_state(device_state_t &&) noexcept;
+    void update_contact(std::string_view client_name, std::string_view client_version) noexcept;
     inline device_id_t &device_id() noexcept { return id; }
     inline const device_id_t &device_id() const noexcept { return id; }
     inline std::string_view get_name() const noexcept { return name; }
     inline const name_option_t get_cert_name() const noexcept { return cert_name; }
-    inline const tcp::endpoint &get_endpoint() const noexcept { return endpoint; }
     inline std::string_view get_client_name() const noexcept { return client_name; }
     inline std::string_view get_client_version() const noexcept { return client_version; }
     inline proto::Compression get_compression() const noexcept { return compression; }
@@ -95,11 +92,9 @@ struct SYNCSPIRIT_API device_t : augmentable_t {
     bool auto_accept;
     bool paused;
     bool skip_introduction_removals;
-    device_state_t state = device_state_t::offline;
-    tcp::endpoint endpoint;
+    device_state_t state;
     std::string client_name;
     std::string client_version;
-    std::string connection_id;
 
     file_iterator_ptr_t iterator;
 

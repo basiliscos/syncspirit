@@ -192,6 +192,7 @@ add_library(syncspirit_core
     src/model/cluster.cpp
     src/model/device.cpp
     src/model/device_id.cpp
+    src/model/device_state.cpp
     src/model/file_info.cpp
     src/model/folder.cpp
     src/model/folder_data.cpp

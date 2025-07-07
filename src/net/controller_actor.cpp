@@ -99,7 +99,7 @@ void C::folder_synchronization_t::finish_sync() noexcept {
 
 controller_actor_t::controller_actor_t(config_t &config)
     : r::actor_base_t{config}, sequencer{std::move(config.sequencer)}, cluster{config.cluster}, peer{config.peer},
-      connection_id{config.connection_id}, peer_address{config.peer_addr}, request_timeout{config.request_timeout},
+      peer_state{peer->get_state().clone()}, peer_address{config.peer_addr}, request_timeout{config.request_timeout},
       rx_blocks_requested{0}, tx_blocks_requested{0}, outgoing_buffer_max{config.outgoing_buffer_max},
       request_pool{config.request_pool}, blocks_max_requested{config.blocks_max_requested},
       advances_per_iteration{config.advances_per_iteration}, default_path(std::move(config.default_path)),
@@ -107,6 +107,7 @@ controller_actor_t::controller_actor_t(config_t &config)
     {
         assert(cluster);
         assert(sequencer);
+        assert(peer_state.is_online());
         current_diff = nullptr;
         planned_pulls = 0;
         outgoing_buffer.reset(new std::uint32_t(0));
@@ -153,15 +154,17 @@ void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 void controller_actor_t::on_start() noexcept {
     r::actor_base_t::on_start();
     LOG_TRACE(log, "on_start");
-    if (!owns_best_connection()) {
-        LOG_DEBUG(log, "there is a better connection to peer than me ({}), shut self down", connection_id);
+    auto my_url = peer_state.get_url();
+    if (peer_state < peer->get_state()) {
+        auto other_url = peer->get_state().get_url();
+        LOG_DEBUG(log, "there is a better connection ({}) to peer than me ({}), shut self down", my_url, other_url);
         return do_shutdown();
     }
 
     send<payload::controller_up_t>(coordinator, address, peer->device_id(), outgoing_buffer);
     send_cluster_config();
     resources->acquire(resource::peer);
-    LOG_INFO(log, "is online (connection: {})", connection_id);
+    LOG_INFO(log, "is online (connection: {})", my_url);
     announced = true;
     file_iterator = peer->create_iterator(*cluster);
 }
@@ -494,9 +497,11 @@ auto controller_actor_t::operator()(const model::diff::advance::advance_t &diff,
 
 auto controller_actor_t::operator()(const model::diff::contact::peer_state_t &diff, void *custom) noexcept
     -> outcome::result<void> {
-    if (diff.state == model::device_state_t::online && diff.peer_id == peer->device_id().get_sha256()) {
-        if (!owns_best_connection()) {
-            LOG_DEBUG(log, "there is a better connection to peer than me ({}), shut self down", connection_id);
+    if (diff.peer_id == peer->device_id().get_sha256()) {
+        if (peer_state < diff.state) {
+            auto my_url = peer_state.get_url();
+            auto other_url = diff.state.get_url();
+            LOG_DEBUG(log, "there is a better connection ({}) to peer than me ({}), shut self down", my_url, other_url);
             do_shutdown();
         }
     }
@@ -981,8 +986,6 @@ auto controller_actor_t::pull_signal_t::visit(model::diff::cluster_visitor_t &vi
     }
     return r;
 }
-
-bool controller_actor_t::owns_best_connection() noexcept { return peer->get_connection_id() == connection_id; }
 
 void controller_actor_t::cancel_sync(model::file_info_t *file) noexcept {
     if (block_iterator && block_iterator->get_source() == file) {

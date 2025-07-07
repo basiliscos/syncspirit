@@ -26,14 +26,14 @@ TEST_CASE("peer state update", "[model]") {
 
     rotor::address_ptr_t addr;
     auto builder = diff_builder_t(*cluster);
-    REQUIRE(peer_device->get_state() == model::device_state_t::offline);
+    REQUIRE(peer_device->get_state().get_connection_state() == model::connection_state_t::offline);
 
-    auto connection_id = std::string("tcp://1.1.1.1:1");
-    REQUIRE(builder.update_state(*peer_device, addr, device_state_t::online, connection_id).apply());
-    CHECK(peer_device->get_state() == model::device_state_t::online);
+    auto state_1 = peer_device->get_state().connecting().connected().online("tcp://1.2.3.4:5678");
+    REQUIRE(builder.update_state(*peer_device, addr, state_1).apply());
+    REQUIRE(peer_device->get_state().is_online());
 
-    REQUIRE(builder.update_state(*peer_device, addr, device_state_t::offline, connection_id).apply());
-    CHECK(peer_device->get_state() == model::device_state_t::offline);
+    REQUIRE(builder.update_state(*peer_device, addr, state_1.offline()).apply());
+    REQUIRE(peer_device->get_state().is_offline());
 }
 
 TEST_CASE("with file", "[model]") {

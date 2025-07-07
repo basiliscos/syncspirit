@@ -802,10 +802,9 @@ void test_peer_going_offline() {
             db::Device db_peer;
             auto peer = cluster->get_devices().by_sha256(sha256);
             REQUIRE(db::get_last_seen(db_peer) == 0);
-            auto connection_id = std::string("tcp://1.1.1.1:1");
-            peer->update_state(device_state_t::online, connection_id);
+            peer->update_state(peer->get_state().connecting().connected().online("tcp://1.1.1.1:1"));
 
-            builder.update_state(*peer, {}, device_state_t::offline, connection_id).apply(*sup);
+            builder.update_state(*peer, {}, peer->get_state().offline()).apply(*sup);
 
             sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
             sup->do_process();

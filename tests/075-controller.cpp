@@ -27,9 +27,11 @@ using namespace syncspirit::hasher;
 namespace {
 
 struct sample_peer_config_t : public r::actor_config_t {
-    model::device_id_t peer_device_id;
+    model::device_ptr_t peer_device;
     r::address_ptr_t coordinator;
+    std::string url;
     bool auto_share = false;
+    model::cluster_ptr_t cluster;
 };
 
 template <typename Actor> struct sample_peer_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -37,8 +39,8 @@ template <typename Actor> struct sample_peer_config_builder_t : r::actor_config_
     using parent_t = r::actor_config_builder_t<Actor>;
     using parent_t::parent_t;
 
-    builder_t &&peer_device_id(const model::device_id_t &value) && noexcept {
-        parent_t::config.peer_device_id = value;
+    builder_t &&peer_device(const model::device_ptr_t &value) && noexcept {
+        parent_t::config.peer_device = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
     builder_t &&coordinator(const r::address_ptr_t &value) && noexcept {
@@ -47,6 +49,14 @@ template <typename Actor> struct sample_peer_config_builder_t : r::actor_config_
     }
     builder_t &&auto_share(bool value) && noexcept {
         parent_t::config.auto_share = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+    builder_t &&cluster(const model::cluster_ptr_t &value) && noexcept {
+        parent_t::config.cluster = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+    builder_t &&url(std::string_view value) && noexcept {
+        parent_t::config.url = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };
@@ -73,8 +83,12 @@ struct sample_peer_t : r::actor_base_t {
 
     sample_peer_t(config_t &config)
         : r::actor_base_t{config}, auto_share(config.auto_share), coordinator(config.coordinator),
-          peer_device{config.peer_device_id} {
+          peer_device{config.peer_device}, cluster{config.cluster}, url(config.url),
+          peer_state{model::device_state_t::make_offline()} {
         log = utils::get_logger("test.sample_peer");
+        assert(cluster);
+        assert(peer_device);
+        assert(!url.empty());
     }
 
     void configure(r::plugin::plugin_base_t &plugin) noexcept override {
@@ -96,6 +110,16 @@ struct sample_peer_t : r::actor_base_t {
         });
     }
 
+    void on_start() noexcept override {
+        r::actor_base_t::on_start();
+        peer_state = peer_state.connecting().connected().online(url);
+        auto diff = model::diff::contact::peer_state_t::create(*cluster, peer_device->device_id().get_sha256(),
+                                                               get_address(), peer_state);
+        assert(diff);
+        auto sup_addr = supervisor->get_address();
+        send<model::payload::model_update_t>(sup_addr, std::move(diff), nullptr);
+    }
+
     void shutdown_start() noexcept override {
         LOG_TRACE(log, "{}, shutdown_start", identity);
         if (controller) {
@@ -112,6 +136,11 @@ struct sample_peer_t : r::actor_base_t {
         LOG_TRACE(log, "{}, shutdown_finish, blocks requested = {}", identity, blocks_requested);
         if (controller) {
             send<net::payload::peer_down_t>(controller, shutdown_reason);
+        }
+        auto sha256 = peer_device->device_id().get_sha256();
+        auto diff = model::diff::contact::peer_state_t::create(*cluster, sha256, address, peer_state.offline());
+        if (diff) {
+            send<model::payload::model_update_t>(coordinator, std::move(diff));
         }
     }
 
@@ -232,10 +261,13 @@ struct sample_peer_t : r::actor_base_t {
     int blocks_requested = 0;
     bool reading = false;
     bool auto_share = false;
+    model::cluster_ptr_t cluster;
+    std::string url;
     remote_messages_t messages;
     r::address_ptr_t coordinator;
     r::address_ptr_t controller;
-    model::device_id_t peer_device;
+    model::device_ptr_t peer_device;
+    model::device_state_t peer_state;
     utils::logger_t log;
     block_requests_t block_requests;
     block_responses_t block_responses;
@@ -259,22 +291,21 @@ struct fixture_t {
         test::init_logging();
     }
 
-    void _start_target(std::string connection_id) {
+    void _start_target(std::string_view url) {
         peer_actor = sup->create_actor<sample_peer_t>()
+                         .cluster(cluster)
+                         .peer_device(peer_device)
+                         .url(url)
                          .coordinator(sup->get_address())
                          .auto_share(auto_share)
                          .timeout(timeout)
                          .finish();
 
-        auto diff = model::diff::contact::peer_state_t::create(*cluster, peer_device->device_id().get_sha256(),
-                                                               peer_actor->get_address(), device_state_t::online,
-                                                               connection_id);
-        sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
+        sup->do_process();
 
         target = sup->create_actor<controller_actor_t>()
                      .peer(peer_device)
                      .peer_addr(peer_actor->get_address())
-                     .connection_id(connection_id)
                      .request_pool(1024)
                      .outgoing_buffer_max(1024'000)
                      .cluster(cluster)
@@ -290,7 +321,7 @@ struct fixture_t {
         target_addr = target->get_address();
     }
 
-    virtual void start_target() noexcept { _start_target("test-common://1.2.3.4:5"); }
+    virtual void start_target() noexcept { _start_target("relay://1.2.3.4:5"); }
 
     virtual void _tune_peer(db::Device &) noexcept {}
 
@@ -447,7 +478,7 @@ void test_overwhelm() {
             auto ex_peer = peer_actor;
             auto ex_target = target;
 
-            _start_target("best://1.2.3.4:5");
+            _start_target("tcp://1.2.3.4:5");
             sup->do_process();
 
             REQUIRE(ex_peer != peer_actor);

@@ -26,6 +26,7 @@ using namespace syncspirit::test;
 using namespace syncspirit::model;
 using namespace syncspirit::net;
 using namespace std::chrono_literals;
+using Catch::Matchers::StartsWith;
 
 namespace asio = boost::asio;
 namespace sys = boost::system;
@@ -154,8 +155,9 @@ struct fixture_t : private model::diff::cluster_visitor_t {
         auto addresses_ptr = std::make_shared<decltype(addresses)>(addresses);
 
         transport::error_fn_t on_error = [&](auto &ec) { on_client_error(ec); };
-        transport::connect_fn_t on_connect = [addresses_ptr, this](const tcp::endpoint &) {
-            LOG_INFO(log, "active/connected");
+        transport::connect_fn_t on_connect = [addresses_ptr, this](const tcp::endpoint &ep) {
+            LOG_INFO(log, "active/connected {}", ep);
+            this->peer_ep = ep;
             try_main();
         };
 
@@ -177,13 +179,17 @@ struct fixture_t : private model::diff::cluster_visitor_t {
     virtual void main() noexcept {}
 
     virtual actor_ptr_t create_actor(uint32_t rx_timeout = 2000) noexcept {
+        auto url_str = fmt::format("tcp+active://{}", peer_ep);
+        auto state = device_state_t::make_offline();
+        auto builder = diff_builder_t(*cluster);
         if (known_peer) {
-            auto peer_proto = "tcp";
-            tcp::endpoint peer_endpoint = {};
-            auto connection_id = fmt::format("{}://{}", peer_proto, peer_endpoint);
-            auto builder = diff_builder_t(*cluster);
-            builder.update_state(*peer_device, {}, model::device_state_t::connecting, connection_id).apply(*sup);
+            state = peer_device->get_state().clone();
         }
+        state = state.connecting().connected();
+        if (known_peer) {
+            builder.update_state(*peer_device, {}, state.clone()).apply(*sup);
+        }
+        auto url = utils::parse(url_str);
 
         auto bep_config = config::bep_config_t();
         bep_config.rx_buff_size = 1024;
@@ -198,8 +204,9 @@ struct fixture_t : private model::diff::cluster_visitor_t {
             .bep_config(bep_config)
             .transport(peer_trans)
             .peer_device_id(peer_device->device_id())
+            .peer_state(state)
             .device_name("peer-device")
-            .peer_proto("tcp")
+            .uri(url->clone())
             .autoshutdown_supervisor(true)
             .finish();
     }
@@ -266,7 +273,12 @@ struct fixture_t : private model::diff::cluster_visitor_t {
         return outcome::success();
     }
 
-    virtual void on_shutdown() noexcept {}
+    virtual void on_shutdown() noexcept {
+        auto peer = cluster->get_devices().by_sha256(peer_device->device_id().get_sha256());
+        if (peer) {
+            CHECK(peer->get_state().is_offline());
+        }
+    }
 
     cluster_ptr_t cluster;
     supervisor_ptr_t sup;
@@ -278,6 +290,7 @@ struct fixture_t : private model::diff::cluster_visitor_t {
     utils::key_pair_t peer_keys;
     utils::key_pair_t my_keys;
     model::device_ptr_t peer_device;
+    tcp::endpoint peer_ep;
     model::device_ptr_t my_device;
     transport::stream_sp_t peer_trans;
     transport::stream_sp_t client_trans;
@@ -296,11 +309,6 @@ void test_shutdown_on_hello_timeout() {
             fixture_t::run(add_peer);
             CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
         }
-
-        void on_shutdown() noexcept override {
-            auto peer = cluster->get_devices().by_sha256(peer_device->device_id().get_sha256());
-            CHECK(peer->get_state() == device_state_t::offline);
-        }
     };
     F().run();
 }
@@ -316,12 +324,12 @@ void test_no_send_hello_timeout() {
         void on_hello(proto::Hello &) noexcept override {
             auto peer_id = peer_device->device_id();
             auto peer = cluster->get_devices().by_sha256(peer_id.get_sha256());
-            CHECK(peer->get_state() == device_state_t::connecting);
+            CHECK(peer->get_state().is_connected());
         }
 
         void on_shutdown() noexcept override {
             auto peer = cluster->get_devices().by_sha256(peer_device->device_id().get_sha256());
-            CHECK(peer->get_state() == device_state_t::offline);
+            CHECK(peer->get_state().is_offline());
         }
     };
     F().run();
@@ -336,19 +344,18 @@ void test_online_on_hello() {
 
         void on_hello(proto::Hello &) noexcept override {
             auto peer = cluster->get_devices().by_sha256(peer_device->device_id().get_sha256());
-            CHECK(peer->get_state() == device_state_t::online);
+            CHECK(peer->get_state().is_online());
             sup->do_shutdown();
             sup->do_process();
         }
 
         void on_shutdown() noexcept override {
             auto peer = cluster->get_devices().by_sha256(peer_device->device_id().get_sha256());
-            CHECK(peer->get_state() == device_state_t::offline);
+            CHECK(peer->get_state().is_offline());
         }
     };
     F().run();
 }
-
 void test_hello_read_then_write() {
     struct F : fixture_t {
         using tx_size_ptr_t = net::payload::controller_up_t::tx_size_ptr_t;
@@ -366,7 +373,7 @@ void test_hello_read_then_write() {
         void on_hello(proto::Hello &) noexcept override {
             auto peer_id = peer_device->device_id();
             auto peer = cluster->get_devices().by_sha256(peer_id.get_sha256());
-            CHECK(peer->get_state() == device_state_t::connecting);
+            CHECK(peer->get_state().is_connected());
 
             auto coordinator = sup->get_address();
             sup->send<net::payload::controller_up_t>(coordinator, coordinator, peer_id, outgoing_buff);
@@ -375,7 +382,7 @@ void test_hello_read_then_write() {
         }
 
         outcome::result<void> operator()(const model::diff::contact::peer_state_t &diff, void *) noexcept override {
-            if (diff.state == device_state_t::online) {
+            if (diff.state.is_online()) {
                 seen_online = true;
                 sup->do_shutdown();
             }
@@ -385,7 +392,7 @@ void test_hello_read_then_write() {
         void on_shutdown() noexcept override {
             CHECK(seen_online);
             auto peer = cluster->get_devices().by_sha256(peer_device->device_id().get_sha256());
-            CHECK(peer->get_state() == device_state_t::offline);
+            CHECK(peer->get_state().is_offline());
             CHECK(*outgoing_buff == 0);
         }
     };
@@ -408,7 +415,7 @@ void test_hello_from_unknown() {
             CHECK(peer->get_name() == "self-name");
             CHECK(peer->get_client_name() == constants::client_name);
             CHECK(peer->get_client_version() == constants::client_version);
-            CHECK(peer->get_address() == "tcp://0.0.0.0:0");
+            REQUIRE_THAT(std::string(peer->get_address()), StartsWith("tcp://"));
 
             auto delta = pt::microsec_clock::local_time() - peer->get_last_seen();
             CHECK(delta.seconds() <= 2);
@@ -441,7 +448,7 @@ void test_hello_from_known_unknown() {
             CHECK(peer->get_name() == "self-name");
             CHECK(peer->get_client_name() == constants::client_name);
             CHECK(peer->get_client_version() == constants::client_version);
-            CHECK(peer->get_address() == "tcp://0.0.0.0:0");
+            REQUIRE_THAT(std::string(peer->get_address()), StartsWith("tcp://"));
 
             auto delta = pt::microsec_clock::local_time() - peer->get_last_seen();
             CHECK(delta.seconds() <= 2);
@@ -474,7 +481,7 @@ void test_hello_from_ignored() {
             CHECK(peer->get_name() == "self-name");
             CHECK(peer->get_client_name() == constants::client_name);
             CHECK(peer->get_client_version() == constants::client_version);
-            CHECK(peer->get_address() == "tcp://0.0.0.0:0");
+            REQUIRE_THAT(std::string(peer->get_address()), StartsWith("tcp://"));
 
             auto delta = pt::microsec_clock::local_time() - peer->get_last_seen();
             CHECK(delta.seconds() <= 2);

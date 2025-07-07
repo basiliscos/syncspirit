@@ -273,10 +273,9 @@ diff_builder_t &diff_builder_t::remove_folder(const model::folder_t &folder) noe
 }
 
 diff_builder_t &diff_builder_t::update_state(const model::device_t &peer, const r::address_ptr_t &peer_addr,
-                                             model::device_state_t state, std::string_view connection_id) noexcept {
-    assert(!(state == model::device_state_t::online && connection_id.empty()));
-    auto diff = model::diff::contact::peer_state_t::create(cluster, peer.device_id().get_sha256(), peer_addr, state,
-                                                           std::string(connection_id));
+                                             const model::device_state_t &state) noexcept {
+    auto diff = model::diff::contact::peer_state_t::create(cluster, peer.device_id().get_sha256(), peer_addr, state);
+    assert(diff);
     return assign(diff.get());
 }
 

@@ -3,8 +3,6 @@
 
 #include "peer_actor.h"
 #include "names.h"
-#include "constants.h"
-#include "utils/tls.h"
 #include "utils/error_code.h"
 #include "utils/format.hpp"
 #include "utils/time.h"
@@ -33,16 +31,17 @@ r::plugin::resource_id_t finalization = 5;
 
 peer_actor_t::peer_actor_t(config_t &config)
     : r::actor_base_t{config}, cluster{config.cluster}, device_name{config.device_name}, bep_config{config.bep_config},
-      coordinator{config.coordinator}, peer_device_id{config.peer_device_id}, transport(std::move(config.transport)),
-      peer_endpoint{config.peer_endpoint}, peer_proto(std::move(config.peer_proto)), rx_bytes{0}, tx_bytes{0} {
+      coordinator{config.coordinator}, peer_device_id{config.peer_device_id}, peer_state{std::move(config.peer_state)},
+      transport(std::move(config.transport)), url(config.uri), rx_bytes{0}, tx_bytes{0} {
     rx_buff.resize(config.bep_config.rx_buff_size);
+    assert(url);
 }
 
 void peer_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
 
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
-        auto id = fmt::format("{}/{}/{}", peer_device_id.get_short(), peer_proto, peer_endpoint);
+        auto id = fmt::format("{}/{}", peer_device_id.get_short(), url);
         p.set_identity(id, false);
         log = utils::get_logger(identity);
     });
@@ -258,14 +257,11 @@ void peer_actor_t::shutdown_finish() noexcept {
     }
     r::actor_base_t::shutdown_finish();
     auto sha256 = peer_device_id.get_sha256();
-    auto device = cluster->get_devices().by_sha256(sha256);
-    if (device && device->get_state() != model::device_state_t::offline) {
-        auto state = model::device_state_t::offline;
-        auto connection_id = fmt::format("{}://{}", peer_proto, peer_endpoint);
-        auto diff = model::diff::contact::peer_state_t::create(*cluster, sha256, address, state, connection_id);
-        if (diff) {
-            send<model::payload::model_update_t>(coordinator, std::move(diff));
-        }
+    auto diff = model::diff::contact::peer_state_t::create(*cluster, sha256, address, peer_state.offline());
+    if (diff) {
+        send<model::payload::model_update_t>(coordinator, std::move(diff));
+    } else {
+        LOG_DEBUG(log, "skipping peer state update");
     }
     emit_io_stats(true);
 }
@@ -403,7 +399,10 @@ void peer_actor_t::handle_hello(proto::Hello &&msg) noexcept {
     auto diff = cluster_diff_ptr_t();
     auto db = db::SomeDevice();
     auto fill_db_and_shutdown = [&]() {
-        auto address = fmt::format("{}://{}", peer_proto, peer_endpoint);
+        auto scheme = url->scheme();
+        auto proto = (scheme.find("tcp") == 0) ? "tcp" : "relay";
+        auto endpoint = url->encoded_authority();
+        auto address = fmt::format("{}://{}", proto, endpoint);
         db::set_name(db, device_name);
         db::set_client_name(db, client_name);
         db::set_client_version(db, client_version);
@@ -414,14 +413,12 @@ void peer_actor_t::handle_hello(proto::Hello &&msg) noexcept {
     };
 
     if (auto known_peer = cluster->get_devices().by_sha256(sha_s256); known_peer) {
-        if (known_peer->get_state() == model::device_state_t::online) {
+        if (known_peer->get_state().is_online()) {
             auto ec = utils::make_error_code(utils::error_code_t::already_connected);
             return do_shutdown(make_error(ec));
         }
-        auto state = model::device_state_t::online;
-        auto connection_id = fmt::format("{}://{}", peer_proto, peer_endpoint);
-        diff = contact::peer_state_t::create(*cluster, sha_s256, get_address(), state, std::move(connection_id),
-                                             cert_name, peer_endpoint, client_name, client_version);
+        diff = contact::peer_state_t::create(*cluster, sha_s256, get_address(), peer_state.online(url->c_str()),
+                                             cert_name, client_name, client_version);
     } else if (auto peer = cluster->get_ignored_devices().by_sha256(sha_s256)) {
         fill_db_and_shutdown();
         diff = new model::diff::contact::ignored_connected_t(*cluster, peer_device_id, std::move(db));

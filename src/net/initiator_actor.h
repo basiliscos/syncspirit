@@ -114,6 +114,7 @@ struct SYNCSPIRIT_API initiator_actor_t : r::actor_base_t {
     void join_session() noexcept;
     void request_relay_connection() noexcept;
     void resolve(const utils::uri_ptr_t &uri) noexcept;
+    void send_state() noexcept;
 
     void on_resolve(message::resolve_response_t &res) noexcept;
     void on_connect(const tcp::endpoint &) noexcept;
@@ -125,6 +126,7 @@ struct SYNCSPIRIT_API initiator_actor_t : r::actor_base_t {
     void on_write(size_t bytes) noexcept;
 
     model::device_id_t peer_device_id;
+    model::device_state_t peer_state;
     utils::uri_container_t uris;
     utils::bytes_t relay_rx;
     utils::bytes_t relay_tx;
@@ -147,7 +149,6 @@ struct SYNCSPIRIT_API initiator_actor_t : r::actor_base_t {
     bool connected = false;
     role_t role = role_t::passive;
     utils::bytes_t rx_buff;
-    bool success = false;
     bool relaying = false;
 };
 
@@ -156,8 +157,8 @@ namespace payload {
 struct peer_connected_t {
     transport::stream_sp_t transport;
     model::device_id_t peer_device_id;
-    tcp::endpoint remote_endpoint;
-    std::string proto;
+    model::device_state_t peer_state;
+    utils::uri_ptr_t uri;
     r::message_ptr_t custom;
 };
 

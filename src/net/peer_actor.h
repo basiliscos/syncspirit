@@ -21,12 +21,12 @@ namespace net {
 struct peer_actor_config_t : public r::actor_config_t {
     std::string_view device_name;
     model::device_id_t peer_device_id;
+    model::device_state_t peer_state = model::device_state_t::make_offline();
     config::bep_config_t bep_config;
     transport::stream_sp_t transport;
     r::address_ptr_t coordinator;
     model::cluster_ptr_t cluster;
-    tcp::endpoint peer_endpoint;
-    std::string peer_proto;
+    utils::uri_ptr_t uri;
 };
 
 template <typename Actor> struct peer_actor_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -36,6 +36,11 @@ template <typename Actor> struct peer_actor_config_builder_t : r::actor_config_b
 
     builder_t &&peer_device_id(const model::device_id_t &value) && noexcept {
         parent_t::config.peer_device_id = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+
+    builder_t &&peer_state(model::device_state_t &value) && noexcept {
+        parent_t::config.peer_state = std::move(value);
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
@@ -64,13 +69,8 @@ template <typename Actor> struct peer_actor_config_builder_t : r::actor_config_b
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&peer_endpoint(const tcp::endpoint &value) && noexcept {
-        parent_t::config.peer_endpoint = value;
-        return std::move(*static_cast<typename parent_t::builder_t *>(this));
-    }
-
-    builder_t &&peer_proto(std::string value) && noexcept {
-        parent_t::config.peer_proto = value;
+    builder_t &&uri(utils::uri_ptr_t &&value) && noexcept {
+        parent_t::config.uri = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };
@@ -147,7 +147,9 @@ struct SYNCSPIRIT_API peer_actor_t : public r::actor_base_t {
     config::bep_config_t bep_config;
     r::address_ptr_t coordinator;
     model::device_id_t peer_device_id;
+    model::device_state_t peer_state;
     transport::stream_sp_t transport;
+    utils::uri_ptr_t url;
     std::optional<r::request_id_t> timer_request;
     std::optional<r::request_id_t> tx_timer_request;
     std::optional<r::request_id_t> rx_timer_request;
@@ -156,8 +158,6 @@ struct SYNCSPIRIT_API peer_actor_t : public r::actor_base_t {
     fmt::memory_buffer rx_buff;
     std::size_t rx_idx = 0;
     std::string cert_name;
-    tcp::endpoint peer_endpoint;
-    std::string peer_proto;
     read_action_t read_action;
     r::address_ptr_t controller;
     block_requests_t block_requests;
