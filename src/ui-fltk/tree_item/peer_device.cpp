@@ -139,8 +139,9 @@ struct my_table_t : static_table_t {
             reset_button->deactivate();
         }
 
-        auto last_seen = peer.get_endpoint().port() ? "now" : model::pt::to_simple_string(peer.get_last_seen());
-        auto endpoint = peer.get_endpoint().port() ? fmt::format("{}", peer.get_endpoint()) : "";
+        auto &peer_state = peer.get_state();
+        auto last_seen = peer_state.is_online() ? "now" : model::pt::to_simple_string(peer.get_last_seen());
+        auto endpoint = std::string(peer_state.is_online() ? peer_state.get_url()->c_str() : "");
 
         last_seen_cell->update(std::move(last_seen));
         endpoint_cell->update(std::move(endpoint));
@@ -540,16 +541,15 @@ bool peer_device_t::on_select() {
 
 std::string_view peer_device_t::get_state() {
     return [this]() -> std::string_view {
-        switch (peer.get_state()) {
-        case model::device_state_t::online:
+        auto &state = peer.get_state();
+        if (state.is_online()) {
             return symbols::online;
-        case model::device_state_t::discovering:
+        } else if (state.is_unknown() || state.is_discovering()) {
             return symbols::discovering;
-        case model::device_state_t::connecting:
+        } else if (state.is_connecting() || state.is_connected()) {
             return symbols::connecting;
-        default:
-            return symbols::offline;
         }
+        return symbols::offline;
     }();
 }
 
