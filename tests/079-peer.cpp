@@ -36,7 +36,7 @@ namespace ra = r::asio;
 using configure_callback_t = std::function<void(r::plugin::plugin_base_t &)>;
 using shutdown_callback_t = std::function<void()>;
 
-auto timeout = r::pt::time_duration{r::pt::millisec{1500}};
+auto timeout = r::pt::time_duration{r::pt::millisec{500}};
 auto host = "127.0.0.1";
 
 struct supervisor_t : ra::supervisor_asio_t {
@@ -58,7 +58,7 @@ struct supervisor_t : ra::supervisor_asio_t {
     void on_child_shutdown(actor_base_t *actor) noexcept override {
         if (actor) {
             spdlog::info("child shutdown: {}, reason: {}", actor->get_identity(),
-                         actor->get_shutdown_reason()->message());
+                         actor->get_shutdown_reason()->message().substr(0, 30));
         }
         parent_t::on_child_shutdown(actor);
     }
@@ -72,6 +72,8 @@ struct supervisor_t : ra::supervisor_asio_t {
             shutdown_callback();
         }
     }
+
+    using parent_t::make_error;
 
     auto get_state() noexcept { return state; }
 
@@ -356,6 +358,7 @@ void test_online_on_hello() {
     };
     F().run();
 }
+
 void test_hello_read_then_write() {
     struct F : fixture_t {
         using tx_size_ptr_t = net::payload::controller_up_t::tx_size_ptr_t;
@@ -491,6 +494,61 @@ void test_hello_from_ignored() {
     F().run(false);
 }
 
+void test_cancel_write() {
+    struct F : fixture_t {
+        using tx_size_ptr_t = net::payload::controller_up_t::tx_size_ptr_t;
+
+        r::actor_ptr_t peer_actor;
+        bool seen_online = false;
+        tx_size_ptr_t outgoing_buff;
+
+        void main() noexcept override {
+            outgoing_buff.reset(new std::uint32_t(0));
+            peer_actor = create_actor();
+            read_hello();
+        }
+
+        void on_hello(proto::Hello &) noexcept override {
+            auto peer_id = peer_device->device_id();
+            auto peer = cluster->get_devices().by_sha256(peer_id.get_sha256());
+            CHECK(peer->get_state().is_connected());
+
+            auto coordinator = sup->get_address();
+            sup->send<net::payload::controller_up_t>(coordinator, coordinator, peer_id, outgoing_buff);
+
+            send_hello();
+        }
+
+        outcome::result<void> operator()(const model::diff::contact::peer_state_t &diff, void *) noexcept override {
+            if (diff.state.is_online()) {
+                seen_online = true;
+                auto coordinator = sup->get_address();
+                auto peer_addr = peer_actor->get_address();
+                auto length = GENERATE(0, 10 * 1024 * 1024);
+                if (length) {
+                    auto str = std::string(length, '-');
+                    auto data = as_owned_bytes(str);
+                    sup->send<net::payload::transfer_data_t>(peer_addr, std::move(data));
+                }
+
+                auto ec = r::make_error_code(r::error_code_t::cancelled);
+                auto ee = sup->make_error(ec);
+
+                sup->send<net::payload::controller_predown_t>(coordinator, coordinator, peer_addr, ee);
+            }
+            return outcome::success();
+        }
+
+        void on_shutdown() noexcept override {
+            CHECK(seen_online);
+            auto peer = cluster->get_devices().by_sha256(peer_device->device_id().get_sha256());
+            CHECK(peer->get_state().is_offline());
+            CHECK(*outgoing_buff == 0);
+        }
+    };
+    F().run();
+}
+
 int _init() {
     REGISTER_TEST_CASE(test_shutdown_on_hello_timeout, "test_shutdown_on_hello_timeout", "[peer]");
     REGISTER_TEST_CASE(test_no_send_hello_timeout, "test_no_send_hello_timeout", "[peer]");
@@ -499,6 +557,7 @@ int _init() {
     REGISTER_TEST_CASE(test_hello_from_unknown, "test_hello_from_unknown", "[peer]");
     REGISTER_TEST_CASE(test_hello_from_known_unknown, "test_hello_from_known_unknown", "[peer]");
     REGISTER_TEST_CASE(test_hello_from_ignored, "test_hello_from_ignored", "[peer]");
+    REGISTER_TEST_CASE(test_cancel_write, "test_cancel_write", "[peer]");
     return 1;
 }
 

@@ -124,7 +124,6 @@ struct SYNCSPIRIT_API peer_actor_t : public r::actor_base_t {
     void read_more() noexcept;
     void push_write(utils::bytes_t buff, bool final) noexcept;
     void process_tx_queue() noexcept;
-    void cancel_timer() noexcept;
     void cancel_io() noexcept;
     void on_tx_timeout(r::request_id_t, bool cancelled) noexcept;
     void on_rx_timeout(r::request_id_t, bool cancelled) noexcept;
@@ -150,7 +149,6 @@ struct SYNCSPIRIT_API peer_actor_t : public r::actor_base_t {
     model::device_state_t peer_state;
     transport::stream_sp_t transport;
     utils::uri_ptr_t url;
-    std::optional<r::request_id_t> timer_request;
     std::optional<r::request_id_t> tx_timer_request;
     std::optional<r::request_id_t> rx_timer_request;
     tx_queue_t tx_queue;

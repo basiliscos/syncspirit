@@ -14,6 +14,9 @@
 #include "model/diff/contact/unknown_connected.h"
 #include "model/diff/modify/add_pending_device.h"
 #include "model/diff/peer/rx_tx.h"
+#include "net/messages.h"
+
+#include <algorithm>
 
 using namespace syncspirit::net;
 using namespace syncspirit;
@@ -22,10 +25,9 @@ namespace {
 namespace resource {
 r::plugin::resource_id_t io_read = 0;
 r::plugin::resource_id_t io_write = 1;
-r::plugin::resource_id_t io_timer = 2;
-r::plugin::resource_id_t tx_timer = 3;
-r::plugin::resource_id_t rx_timer = 4;
-r::plugin::resource_id_t finalization = 5;
+r::plugin::resource_id_t tx_timer = 2;
+r::plugin::resource_id_t rx_timer = 3;
+r::plugin::resource_id_t finalization = 4;
 } // namespace resource
 } // namespace
 
@@ -79,8 +81,6 @@ void peer_actor_t::on_io_error(const sys::error_code &ec, rotor::plugin::resourc
     if (ec != asio::error::operation_aborted) {
         LOG_WARN(log, "on_io_error: {}", ec.message());
     }
-    cancel_timer();
-    cancel_io();
     if (resources->has(resource::finalization)) {
         resources->release(resource::finalization);
     }
@@ -198,7 +198,6 @@ void peer_actor_t::on_read(std::size_t bytes) noexcept {
         return read_more();
     }
 
-    cancel_timer();
     assert(value.consumed <= rx_idx);
     rx_idx -= value.consumed;
     if (rx_idx) {
@@ -210,21 +209,9 @@ void peer_actor_t::on_read(std::size_t bytes) noexcept {
     // LOG_TRACE(log, "on_read, rx_idx = {} ", rx_idx);
 }
 
-void peer_actor_t::on_timer(r::request_id_t, bool cancelled) noexcept {
-    resources->release(resource::io_timer);
-    LOG_TRACE(log, "on_timer_trigger, cancelled = {}", cancelled);
-    if (!cancelled) {
-        cancel_io();
-        auto ec = r::make_error_code(r::shutdown_code_t::normal);
-        do_shutdown(make_error(ec));
-    }
-}
-
 void peer_actor_t::shutdown_start() noexcept {
     LOG_TRACE(log, "shutdown_start");
-    if (resources->has(resource::io_timer)) {
-        cancel_timer();
-    }
+
     if (tx_timer_request) {
         r::actor_base_t::cancel_timer(*tx_timer_request);
     }
@@ -234,6 +221,10 @@ void peer_actor_t::shutdown_start() noexcept {
     if (controller) {
         send<payload::peer_down_t>(controller, shutdown_reason);
     }
+
+    auto timeout = shutdown_timeout * 8 / 9;
+    tx_timer_request = start_timer(timeout, *this, &peer_actor_t::on_tx_timeout);
+    resources->acquire(resource::tx_timer);
 
     proto::Close close;
     proto::set_reason(close, shutdown_reason->message());
@@ -264,13 +255,6 @@ void peer_actor_t::shutdown_finish() noexcept {
         LOG_DEBUG(log, "skipping peer state update");
     }
     emit_io_stats(true);
-}
-
-void peer_actor_t::cancel_timer() noexcept {
-    if (resources->has(resource::io_timer)) {
-        r::actor_base_t::cancel_timer(*timer_request);
-        timer_request.reset();
-    }
 }
 
 void peer_actor_t::cancel_io() noexcept {
@@ -309,7 +293,10 @@ void peer_actor_t::on_controller_predown(message::controller_predown_t &message)
     if (for_me && !shutdown_reason) {
         auto &ee = message.payload.ee;
         auto reason = ee->message();
-        LOG_DEBUG(log, "on_controller_predown: {}", reason);
+        auto root = ee->root()->message();
+        auto max_size = std::min(size_t(30), root.size());
+        auto tail = std::string_view(root).substr(0, max_size);
+        LOG_DEBUG(log, "on_controller_predown, root reason: {}", tail);
         do_shutdown(ee);
     }
 }
@@ -502,6 +489,12 @@ void peer_actor_t::reset_tx_timer() noexcept {
 void peer_actor_t::on_tx_timeout(r::request_id_t, bool cancelled) noexcept {
     resources->release(resource::tx_timer);
     tx_timer_request.reset();
+    if (resources->has(resource::finalization)) {
+        LOG_WARN(log, "on_tx_timeout, during finalization");
+        cancel_io();
+        resources->release(resource::finalization);
+        return;
+    }
     if (!cancelled) {
         proto::Ping ping;
         auto buff = proto::serialize(ping);
