@@ -106,7 +106,7 @@ struct SYNCSPIRIT_API peer_actor_t : public r::actor_base_t {
     using tx_message_t = confidential::message::tx_item_t;
     using tx_queue_t = std::list<tx_item_t>;
     using tx_size_ptr_t = payload::controller_up_t::tx_size_ptr_t;
-    using read_action_t = void (peer_actor_t::*)(proto::message::message_t &&msg);
+    using read_action_t = bool (peer_actor_t::*)(proto::message::message_t &&msg);
     using block_request_ptr_t = r::intrusive_ptr_t<message::block_request_t>;
     using block_requests_t = std::list<block_request_ptr_t>;
     using clock_t = std::chrono::steady_clock;
@@ -130,10 +130,10 @@ struct SYNCSPIRIT_API peer_actor_t : public r::actor_base_t {
 
     void reset_tx_timer() noexcept;
     void reset_rx_timer() noexcept;
-    void read_hello(proto::message::message_t &&msg) noexcept;
-    void read_controlled(proto::message::message_t &&msg) noexcept;
+    bool read_hello(proto::message::message_t &&msg) noexcept;
+    bool read_controlled(proto::message::message_t &&msg) noexcept;
 
-    void handle_hello(proto::Hello &&) noexcept;
+    bool handle_hello(proto::Hello &&) noexcept;
     void handle_ping(proto::Ping &&) noexcept;
     void handle_close(proto::Close &&) noexcept;
     void handle_response(proto::Response &&) noexcept;

@@ -185,28 +185,42 @@ void peer_actor_t::on_read(std::size_t bytes) noexcept {
     LOG_TRACE(log, "on_read, {} bytes, total = {}", bytes, rx_idx);
     rx_bytes += bytes;
 
-    auto buff = utils::bytes_view_t((unsigned char *)rx_buff.data(), rx_idx);
-    auto result = proto::parse_bep(buff);
-    if (result.has_error()) {
-        auto &ec = result.error();
-        LOG_WARN(log, "on_read, error parsing message: {}", ec.message());
-        return do_shutdown(make_error(ec));
-    }
-    auto &value = result.value();
-    if (!value.consumed) {
-        // log->trace("on_read :: incomplete message");
-        return read_more();
+    bool try_parse = true;
+    auto initial_ptr = (unsigned char *)rx_buff.data();
+    auto ptr = initial_ptr;
+    auto size_left = rx_idx;
+    bool read_next = true;
+    while (try_parse && size_left) {
+        auto buff = utils::bytes_view_t(ptr, size_left);
+        auto result = proto::parse_bep(buff);
+        if (result.has_error()) {
+            auto &ec = result.error();
+            LOG_WARN(log, "on_read, error parsing message: {}", ec.message());
+            return do_shutdown(make_error(ec));
+        }
+        auto &value = result.value();
+        if (!value.consumed) {
+            try_parse = false;
+        } else {
+            ptr += value.consumed;
+            size_left -= value.consumed;
+            read_next = try_parse = (this->*read_action)(std::move(value.message));
+        }
     }
 
-    assert(value.consumed <= rx_idx);
-    rx_idx -= value.consumed;
-    if (rx_idx) {
-        auto ptr = rx_buff.data();
-        std::memcpy(ptr, ptr + value.consumed, rx_idx);
+    auto consumed = ptr - initial_ptr;
+    assert(consumed <= rx_idx);
+    if (consumed) {
+        rx_idx -= consumed;
+        if (rx_idx) {
+            auto ptr = rx_buff.data();
+            std::memcpy(ptr, ptr + consumed, rx_idx);
+        }
     }
-    (this->*read_action)(std::move(value.message));
+    if (read_next) {
+        read_more();
+    }
     emit_io_stats();
-    // LOG_TRACE(log, "on_read, rx_idx = {} ", rx_idx);
 }
 
 void peer_actor_t::shutdown_start() noexcept {
@@ -323,23 +337,24 @@ void peer_actor_t::on_transfer(message::transfer_data_t &message) noexcept {
     push_write(std::move(message.payload.data), false);
 }
 
-void peer_actor_t::read_hello(proto::message::message_t &&msg) noexcept {
+bool peer_actor_t::read_hello(proto::message::message_t &&msg) noexcept {
     LOG_TRACE(log, "read_hello");
-    std::visit(
-        [&](auto &&msg) {
+    return std::visit(
+        [&](auto &&msg) -> bool {
             using T = std::decay_t<decltype(msg)>;
             if constexpr (std::is_same_v<T, proto::Hello>) {
                 return handle_hello(std::move(msg));
             } else {
                 LOG_WARN(log, "read_hello, unexpected_message");
                 auto ec = utils::make_error_code(utils::bep_error_code_t::unexpected_message);
-                return do_shutdown(make_error(ec));
+                do_shutdown(make_error(ec));
+                return false;
             }
         },
         msg);
 }
 
-void peer_actor_t::read_controlled(proto::message::message_t &&msg) noexcept {
+bool peer_actor_t::read_controlled(proto::message::message_t &&msg) noexcept {
     using MT = proto::MessageType;
     LOG_TRACE(log, "read_controlled");
     auto type = MT::UNKNOWN;
@@ -370,13 +385,10 @@ void peer_actor_t::read_controlled(proto::message::message_t &&msg) noexcept {
         msg);
     LOG_DEBUG(log, "read_controlled, type = {}", (int)type);
     bool continue_reading = !((type == MT::HELLO) || (type == MT::UNKNOWN) || (type == MT::CLOSE));
-    if (continue_reading) {
-        read_action = &peer_actor_t::read_controlled;
-        read_more();
-    }
+    return continue_reading;
 }
 
-void peer_actor_t::handle_hello(proto::Hello &&msg) noexcept {
+bool peer_actor_t::handle_hello(proto::Hello &&msg) noexcept {
     using namespace model::diff;
     auto device_name = proto::get_device_name(msg);
     auto client_name = proto::get_client_name(msg);
@@ -402,7 +414,8 @@ void peer_actor_t::handle_hello(proto::Hello &&msg) noexcept {
     if (auto known_peer = cluster->get_devices().by_sha256(sha_s256); known_peer) {
         if (known_peer->get_state().is_online()) {
             auto ec = utils::make_error_code(utils::error_code_t::already_connected);
-            return do_shutdown(make_error(ec));
+            do_shutdown(make_error(ec));
+            return false;
         }
         diff = contact::peer_state_t::create(*cluster, sha_s256, get_address(), peer_state.online(url->c_str()),
                                              cert_name, client_name, client_version);
@@ -420,11 +433,13 @@ void peer_actor_t::handle_hello(proto::Hello &&msg) noexcept {
         diff = new model::diff::contact::unknown_connected_t(*cluster, peer_device_id, std::move(db));
     }
 
+    bool continue_reading = false;
     if (diff) {
+        continue_reading = true;
         send<model::payload::model_update_t>(coordinator, std::move(diff));
         read_action = &peer_actor_t::read_controlled;
-        read_more();
     }
+    return continue_reading;
 }
 
 void peer_actor_t::handle_ping(proto::Ping &&) noexcept { log->trace("handle_ping"); }
