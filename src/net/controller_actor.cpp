@@ -208,12 +208,17 @@ void controller_actor_t::send_new_indices() noexcept {
             if (peer_folder) {
                 auto local_folder = folder.get_folder_infos().by_device(*cluster->get_device());
                 auto remote_folder = remote_folders.by_folder(folder);
-                if (remote_folder && remote_folder->get_index() != local_folder->get_index()) {
-                    LOG_DEBUG(log, "sending new index for folder '{}' ({})", folder.get_label(), folder.get_id());
-                    proto::Index index;
-                    proto::set_folder(index, folder.get_id());
-                    auto data = proto::serialize(index, peer->get_compression());
-                    send_to_peer(std::move(data));
+                if (remote_folder) {
+                    if (remote_folder->get_index() != local_folder->get_index()) {
+                        LOG_DEBUG(log, "peer still has wrong index for '{}' ({} vs {}), sending nothing",
+                                  folder.get_id(), remote_folder->get_index(), local_folder->get_index());
+                    } else if (remote_folder->get_max_sequence() == 0) {
+                        LOG_DEBUG(log, "sending new index for folder '{}' ({})", folder.get_label(), folder.get_id());
+                        proto::Index index;
+                        proto::set_folder(index, folder.get_id());
+                        auto data = proto::serialize(index, peer->get_compression());
+                        send_to_peer(std::move(data));
+                    }
                 }
             }
         }
