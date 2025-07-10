@@ -170,6 +170,9 @@ void peer_actor_t::on_write(std::size_t sz) noexcept {
         if (resources->has(resource::finalization)) {
             resources->release(resource::finalization);
         }
+        if (tx_timer_request) {
+            cancel_timer(*tx_timer_request);
+        }
         cancel_io();
     } else {
         tx_item.reset();
@@ -507,7 +510,6 @@ void peer_actor_t::on_tx_timeout(r::request_id_t, bool cancelled) noexcept {
     if (resources->has(resource::finalization)) {
         LOG_WARN(log, "on_tx_timeout, during finalization");
         cancel_io();
-        resources->release(resource::finalization);
         return;
     }
     if (!cancelled) {
