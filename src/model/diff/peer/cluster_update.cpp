@@ -48,6 +48,7 @@ cluster_update_t::cluster_update_t(const bfs::path &default_path, const cluster_
     using folder_device_set_t = std::pmr::unordered_set<std::pmr::string>;
     using allocator_t = std::pmr::polymorphic_allocator<char>;
     using fmt_buff_t = fmt::basic_memory_buffer<char, fmt::inline_buffer_size, allocator_t>;
+    using fi_set_t = std::pmr::unordered_set<model::folder_info_ptr_t>;
     struct introduced_device_t {
         db::Device device;
         model::device_id_t device_id;
@@ -65,12 +66,17 @@ cluster_update_t::cluster_update_t(const bfs::path &default_path, const cluster_
     peer_id = sha256;
     LOG_DEBUG(log, "cluster_update_t, source = {}", source.device_id().get_short());
 
+    auto buffer = std::array<std::byte, 16 * 1024>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = allocator_t(&pool);
+    auto folder_device_set = folder_device_set_t(allocator);
+
     auto &known_pending_folders = cluster.get_pending_folders();
     auto new_pending_folders = diff::modify::add_pending_folders_t::container_t{};
     auto remote_folders = diff::modify::add_remote_folder_infos_t::container_t{};
     uuid_folder_infos_map_t reset_folders;
     uuid_folder_infos_map_t removed_folders;
-    folder_infos_map_t reshared_folders;
+    auto reshared_folders = fi_set_t(allocator);
     keys_t removed_pending_folders;
     keys_t confirmed_pending_folders;
     keys_view_t confirmed_folders;
@@ -82,11 +88,6 @@ cluster_update_t::cluster_update_t(const bfs::path &default_path, const cluster_
     auto introduced_devices = introduced_devices_t();
     auto upserted_folder_infos = upserted_folder_infos_t();
     auto upserted_folders = upserted_folders_t();
-
-    auto buffer = std::array<std::byte, 16 * 1024>();
-    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
-    auto allocator = allocator_t(&pool);
-    auto folder_device_set = folder_device_set_t(allocator);
 
     auto add_pending = [&](const proto::Folder &f, const proto::Device &d) noexcept {
         auto folder_id = proto::get_id(f);
@@ -408,7 +409,7 @@ cluster_update_t::cluster_update_t(const bfs::path &default_path, const cluster_
         if (folder_info) {
             if (!confirmed_folders.contains(folder_info->get_key())) {
                 removed_folders.emplace(folder_info->get_uuid(), folder_info.get());
-                reshared_folders.put(folder_info);
+                reshared_folders.emplace(folder_info);
             }
         }
     }
@@ -477,9 +478,8 @@ cluster_update_t::cluster_update_t(const bfs::path &default_path, const cluster_
         update_current(ptr);
     }
     if (reshared_folders.size()) {
-        for (auto &it : reshared_folders) {
-            auto &f = *it.item;
-            update_current(new modify::upsert_folder_info_t(f, 0));
+        for (auto &f : reshared_folders) {
+            update_current(new modify::upsert_folder_info_t(*f, 0));
         }
     }
     if (!new_pending_folders.empty()) {

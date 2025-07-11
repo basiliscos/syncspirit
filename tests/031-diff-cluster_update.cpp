@@ -582,12 +582,8 @@ TEST_CASE("cluster update with unknown devices", "[model]") {
 TEST_CASE("cluster update nothing shared", "[model]") {
     auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
     auto my_device = device_t::create(my_id, "my-device").value();
-    auto peer_id_1 =
-        device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
-    auto peer_id_2 =
-        device_id_t::from_string("EAMTZPW-Q4QYERN-D57DHFS-AUP2OMG-PAHOR3R-ZWLKGAA-WQC5SVW-UJ5NXQA").value();
-
-    auto peer_device = device_t::create(peer_id_1, "peer-device").value();
+    auto peer_id = device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
+    auto peer_device = device_t::create(peer_id, "peer-device").value();
     auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
     auto sequencer = model::make_sequencer(5);
     cluster->get_devices().put(my_device);
@@ -600,47 +596,35 @@ TEST_CASE("cluster update nothing shared", "[model]") {
     auto b1 = block_info_t::create(bi1).assume_value();
     blocks_map.put(b1);
 
-    db::Folder db_folder;
-    db::set_id(db_folder, "some-id");
-    db::set_label(db_folder, "my-label");
-    db::set_path(db_folder, "/my/path");
-    auto folder = folder_t::create(sequencer->next_uuid(), db_folder).value();
+    auto sha256 = peer_id.get_sha256();
+    auto folder_1_id = std::string_view("1234-5678");
+    auto folder_2_id = std::string_view("5678-7233");
 
-    cluster->get_folders().put(folder);
+    proto::FileInfo pr_fi_peer = [&]() {
+        auto f = proto::FileInfo();
+        proto::set_name(f, "a/c.txt");
+        proto::set_size(f, 5ul);
+        proto::set_block_size(f, 5ul);
+        proto::set_sequence(f, 5);
+        proto::add_blocks(f, bi1);
+        auto &v = proto::get_version(f);
+        proto::add_counters(v, proto::Counter(peer_device->device_id().get_uint(), 0));
+        return f;
+    }();
 
-    auto folder_info_my = folder_info_ptr_t();
-    auto folder_info_peer = folder_info_ptr_t();
-    {
-        db::FolderInfo db_fi;
-        db::set_index_id(db_fi, 5ul);
-        db::set_max_sequence(db_fi, 10l);
-        folder_info_my = folder_info_t::create(sequencer->next_uuid(), db_fi, my_device, folder).value();
-        folder->get_folder_infos().put(folder_info_my);
-    }
-    {
-        db::FolderInfo db_fi;
-        db::set_index_id(db_fi, 6ul);
-        db::set_max_sequence(db_fi, 0l);
-        folder_info_peer = folder_info_t::create(sequencer->next_uuid(), db_fi, peer_device, folder).value();
-        folder->get_folder_infos().put(folder_info_peer);
+    auto builder = diff_builder_t(*cluster);
+    REQUIRE(builder.upsert_folder(folder_1_id, "/p1").upsert_folder(folder_2_id, "/p1").apply());
+    REQUIRE(builder.share_folder(sha256, folder_1_id).share_folder(sha256, folder_2_id).apply());
+    REQUIRE(builder.make_index(sha256, folder_1_id).add(pr_fi_peer, peer_device, false).finish().apply());
+    REQUIRE(builder.make_index(sha256, folder_2_id).add(pr_fi_peer, peer_device, false).finish().apply());
 
-        proto::FileInfo pr_fi_peer = [&]() {
-            auto f = proto::FileInfo();
-            proto::set_name(f, "a/c.txt");
-            proto::set_size(f, 5ul);
-            proto::set_block_size(f, 5ul);
-            proto::set_sequence(f, 5);
-            auto &v = proto::get_version(f);
-            proto::add_counters(v, proto::Counter(peer_device->device_id().get_uint(), 0));
-            return f;
-        }();
-
-        auto fi_peer = file_info_t::create(sequencer->next_uuid(), pr_fi_peer, folder_info_peer).value();
-        fi_peer->assign_block(b1, 0);
-        REQUIRE(folder_info_peer->add_strict(fi_peer));
-
-        REQUIRE(folder_info_peer->get_file_infos().size() == 1);
-    }
+    REQUIRE(blocks_map.size() == 1);
+    auto folder_1 = cluster->get_folders().by_id(folder_1_id);
+    auto folder_2 = cluster->get_folders().by_id(folder_2_id);
+    auto folder_1_peer = folder_1->get_folder_infos().by_device(*peer_device);
+    auto folder_2_peer = folder_2->get_folder_infos().by_device(*peer_device);
+    REQUIRE(folder_1_peer->get_file_infos().size() == 1);
+    REQUIRE(folder_2_peer->get_file_infos().size() == 1);
 
     auto cc = std::make_unique<proto::ClusterConfig>();
     auto diff_opt = diff::peer::cluster_update_t::create({}, *cluster, *sequencer, *peer_device, *cc);
@@ -649,9 +633,12 @@ TEST_CASE("cluster update nothing shared", "[model]") {
     REQUIRE(opt);
 
     CHECK(blocks_map.size() == 0);
-    CHECK(folder_info_peer->get_file_infos().size() == 0);
-    CHECK(folder->is_shared_with(*peer_device));
-    CHECK(folder->is_shared_with(*peer_device)->get_file_infos().size() == 0);
+    CHECK(folder_1_peer->get_file_infos().size() == 0);
+    CHECK(folder_1->is_shared_with(*peer_device));
+    CHECK(folder_1->is_shared_with(*peer_device)->get_file_infos().size() == 0);
+    CHECK(folder_2_peer->get_file_infos().size() == 0);
+    CHECK(folder_2->is_shared_with(*peer_device));
+    CHECK(folder_2->is_shared_with(*peer_device)->get_file_infos().size() == 0);
 }
 
 TEST_CASE("non-shared pending folder", "[model]") {
