@@ -192,6 +192,7 @@ add_library(syncspirit_core
     src/model/cluster.cpp
     src/model/device.cpp
     src/model/device_id.cpp
+    src/model/device_state.cpp
     src/model/file_info.cpp
     src/model/folder.cpp
     src/model/folder_data.cpp
@@ -256,6 +257,14 @@ add_library(syncspirit_core
     src/utils/tls.cpp
     src/utils/uri.cpp
 )
+
+set_source_files_properties(
+    src/proto/bep_support.cpp
+    src/proto/proto-helpers-bep.cpp
+    src/proto/proto-helpers-db.cpp
+    PROPERTIES COMPILE_FLAGS "-Os -fPIC"
+)
+
 generate_export_header(syncspirit_core
     EXPORT_MACRO_NAME SYNCSPIRIT_API
     EXPORT_FILE_NAME include/syncspirit-export.h

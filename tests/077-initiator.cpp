@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
+#include "model/diff/contact/peer_state.h"
 #include "test-utils.h"
 #include "access.h"
 
@@ -8,6 +9,7 @@
 #include "utils/format.hpp"
 #include "model/cluster.h"
 #include "model/messages.h"
+#include "model/diff/cluster_visitor.h"
 #include "net/names.h"
 #include "net/initiator_actor.h"
 #include "net/resolver_actor.h"
@@ -59,7 +61,7 @@ struct supervisor_t : ra::supervisor_asio_t {
 using supervisor_ptr_t = r::intrusive_ptr_t<supervisor_t>;
 using actor_ptr_t = r::intrusive_ptr_t<initiator_actor_t>;
 
-struct fixture_t {
+struct fixture_t : diff::cluster_visitor_t, diff::apply_controller_t {
     using acceptor_t = asio::ip::tcp::acceptor;
     using ready_ptr_t = r::intrusive_ptr_t<net::message::peer_connected_t>;
     using diff_ptr_t = r::intrusive_ptr_t<model::message::model_update_t>;
@@ -77,6 +79,13 @@ struct fixture_t {
         }
     }
 
+    outcome::result<void> operator()(const model::diff::contact::peer_state_t &diff, void *custom) noexcept override {
+        if (diff.state.is_connecting()) {
+            ++seen_connecting;
+        }
+        return diff.visit_next(*this, custom);
+    }
+
     void run() noexcept {
         auto strand = std::make_shared<asio::io_context::strand>(io_ctx);
         sup = ctx.create_supervisor<supervisor_t>().strand(strand).timeout(timeout).create_registry().finish();
@@ -89,8 +98,20 @@ struct fixture_t {
                     LOG_INFO(log, "received message::peer_connected_t");
                 }));
                 p.subscribe_actor(r::lambda<diff_t>([&](diff_t &msg) {
-                    diff_msgs.emplace_back(&msg);
                     LOG_INFO(log, "received diff message");
+                    auto &diff = msg.payload.diff;
+
+                    auto r = diff->apply(*cluster, *this);
+                    if (!r) {
+                        LOG_ERROR(log, "error updating model: {}", r.assume_error().message());
+                        std::abort();
+                    }
+
+                    r = diff->visit(*this, nullptr);
+                    if (!r) {
+                        LOG_ERROR(log, "error visiting model: {}", r.assume_error().message());
+                        std::abort();
+                    }
                 }));
             });
         };
@@ -228,11 +249,12 @@ struct fixture_t {
     model::device_ptr_t peer_device;
     transport::stream_sp_t peer_trans;
     ready_ptr_t connected_message;
-    diff_msgs_t diff_msgs;
     utils::bytes_t relay_session;
     bool use_model = true;
 
     bool valid_handshake = false;
+
+    uint32_t seen_connecting = 0;
 };
 
 void test_connect_timeout() {
@@ -258,6 +280,7 @@ void test_connect_unsupported_proto() {
             io_ctx.run();
             CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
             CHECK(!connected_message);
+            CHECK(seen_connecting == 1);
         }
     };
     F().run();
@@ -273,11 +296,8 @@ void test_handshake_timeout() {
             io_ctx.run();
             CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
             CHECK(!connected_message);
-            REQUIRE(diff_msgs.size() == 2);
-            CHECK(diff_msgs[0]->payload.diff->apply(*cluster, get_apply_controller()));
-            CHECK(peer_device->get_state() == device_state_t::connecting);
-            CHECK(diff_msgs[1]->payload.diff->apply(*cluster, get_apply_controller()));
-            CHECK(peer_device->get_state() == device_state_t::offline);
+            CHECK(peer_device->get_state().is_offline());
+            CHECK(seen_connecting == 1);
         }
     };
     F().run();
@@ -296,11 +316,8 @@ void test_handshake_garbage() {
             io_ctx.run();
             CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
             CHECK(!connected_message);
-            REQUIRE(diff_msgs.size() == 2);
-            CHECK(diff_msgs[0]->payload.diff->apply(*cluster, get_apply_controller()));
-            CHECK(peer_device->get_state() == device_state_t::connecting);
-            CHECK(diff_msgs[1]->payload.diff->apply(*cluster, get_apply_controller()));
-            CHECK(peer_device->get_state() == device_state_t::offline);
+            CHECK(peer_device->get_state().is_offline());
+            CHECK(seen_connecting == 1);
         }
     };
     F().run();
@@ -318,6 +335,8 @@ void test_connection_refused() {
             io_ctx.run();
             CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
             CHECK(!connected_message);
+            CHECK(peer_device->get_state().is_offline());
+            CHECK(seen_connecting == 1);
         }
     };
     F().run();
@@ -336,6 +355,8 @@ void test_connection_refused_no_model() {
             io_ctx.run();
             CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
             CHECK(!connected_message);
+            CHECK(peer_device->get_state().is_offline());
+            CHECK(seen_connecting == 0);
         }
     };
     F().run();
@@ -351,6 +372,8 @@ void test_resolve_failure() {
             io_ctx.run();
             CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
             CHECK(!connected_message);
+            CHECK(peer_device->get_state().is_offline());
+            CHECK(seen_connecting == 1);
         }
     };
     F().run();
@@ -363,15 +386,20 @@ void test_success() {
             io_ctx.run();
             CHECK(sup->get_state() == r::state_t::OPERATIONAL);
             REQUIRE(connected_message);
-            CHECK(connected_message->payload.proto == "tcp");
-            CHECK(connected_message->payload.peer_device_id == peer_device->device_id());
+            auto &p = connected_message->payload;
+            CHECK(p.uri->scheme() == "tcp+active");
+            CHECK(p.peer_device_id == peer_device->device_id());
+            CHECK(p.peer_state.is_connected());
             CHECK(valid_handshake);
+
+            CHECK(peer_device->get_state().is_connecting());
+            CHECK(seen_connecting == 1);
+
             sup->do_shutdown();
             sup->do_process();
             CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
-            REQUIRE(diff_msgs.size() == 1);
-            CHECK(diff_msgs[0]->payload.diff->apply(*cluster, get_apply_controller()));
-            CHECK(peer_device->get_state() == device_state_t::connecting);
+            CHECK(peer_device->get_state().is_connecting());
+            CHECK(seen_connecting == 1);
         }
     };
     F().run();
@@ -386,12 +414,16 @@ void test_success_no_model() {
             io_ctx.run();
             CHECK(sup->get_state() == r::state_t::OPERATIONAL);
             CHECK(connected_message);
-            CHECK(connected_message->payload.peer_device_id == peer_device->device_id());
+            auto &p = connected_message->payload;
+            CHECK(p.uri->scheme() == "tcp+active");
+            CHECK(p.peer_device_id == peer_device->device_id());
+            CHECK(p.peer_state.is_connected());
             CHECK(valid_handshake);
             sup->do_shutdown();
             sup->do_process();
             CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
-            REQUIRE(diff_msgs.size() == 0);
+            CHECK(peer_device->get_state().is_offline());
+            CHECK(seen_connecting == 0);
         }
     };
     F().run();
@@ -402,12 +434,13 @@ struct passive_fixture_t : fixture_t {
     bool active_connect_invoked = false;
 
     void active_connect() override {
-        LOG_TRACE(log, "active_connect");
+        LOG_TRACE(log, "active_connect-1");
         if (!act || active_connect_invoked) {
             return;
         }
         active_connect_invoked = true;
         active_connect_impl();
+        LOG_TRACE(log, "active_connect-2");
     }
 
     virtual void active_connect_impl() { fixture_t::active_connect(); }
@@ -427,12 +460,17 @@ void test_passive_success() {
             io_ctx.run();
             CHECK(sup->get_state() == r::state_t::OPERATIONAL);
             REQUIRE(connected_message);
-            CHECK(connected_message->payload.proto == "tcp");
-            CHECK(connected_message->payload.peer_device_id == peer_device->device_id());
+            auto &p = connected_message->payload;
+            CHECK(p.uri->scheme() == "tcp+passive");
+            CHECK(p.peer_device_id == peer_device->device_id());
+            CHECK(p.peer_state.is_connected());
             CHECK(valid_handshake);
+            CHECK(seen_connecting == 1);
+            CHECK(peer_device->get_state().is_connecting());
             sup->do_shutdown();
             sup->do_process();
             CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
+            CHECK(peer_device->get_state().is_connecting());
         }
     };
     F().run();
@@ -462,6 +500,8 @@ void test_passive_garbage() {
             io_ctx.run();
             CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
             CHECK(!connected_message);
+            CHECK(seen_connecting == 0);
+            CHECK(peer_device->get_state().is_offline());
         }
     };
     F().run();
@@ -477,6 +517,8 @@ void test_passive_timeout() {
             io_ctx.run();
             CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
             CHECK(!connected_message);
+            CHECK(seen_connecting == 0);
+            CHECK(peer_device->get_state().is_offline());
         }
     };
     F().run();
@@ -538,13 +580,18 @@ void test_relay_passive_success() {
             io_ctx.run();
             CHECK(sup->get_state() == r::state_t::OPERATIONAL);
             REQUIRE(connected_message);
-            CHECK(connected_message->payload.proto == "relay");
-            CHECK(connected_message->payload.peer_device_id == peer_device->device_id());
+
+            auto &p = connected_message->payload;
+            CHECK(p.uri->scheme() == "relay+passive");
+            CHECK(p.peer_device_id == peer_device->device_id());
+            CHECK(p.peer_state.is_connected());
             CHECK(valid_handshake);
+            CHECK(seen_connecting == 1);
+            CHECK(peer_device->get_state().is_connecting());
             sup->do_shutdown();
             sup->do_process();
             CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
-            CHECK(diff_msgs.size() == 0);
+            CHECK(peer_device->get_state().is_connecting());
         }
     };
     F().run();
@@ -567,10 +614,13 @@ void test_relay_passive_garbage() {
             CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
             CHECK(!connected_message);
             CHECK(!valid_handshake);
+            CHECK(seen_connecting == 0);
+            CHECK(peer_device->get_state().is_offline());
+
             sup->do_shutdown();
             sup->do_process();
             CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
-            CHECK(diff_msgs.size() == 0);
+            CHECK(peer_device->get_state().is_offline());
         }
     };
     F().run();
@@ -588,10 +638,13 @@ void test_relay_passive_wrong_message() {
             CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
             CHECK(!connected_message);
             CHECK(!valid_handshake);
+            CHECK(seen_connecting == 0);
+            CHECK(peer_device->get_state().is_offline());
+
             sup->do_shutdown();
             sup->do_process();
             CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
-            CHECK(diff_msgs.size() == 0);
+            CHECK(peer_device->get_state().is_offline());
         }
     };
     F().run();
@@ -609,10 +662,13 @@ void test_relay_passive_unsuccessful_join() {
             CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
             CHECK(!connected_message);
             CHECK(!valid_handshake);
+            CHECK(seen_connecting == 0);
+            CHECK(peer_device->get_state().is_offline());
+
             sup->do_shutdown();
             sup->do_process();
             CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
-            CHECK(diff_msgs.size() == 0);
+            CHECK(peer_device->get_state().is_offline());
         }
     };
     F().run();
@@ -630,10 +686,13 @@ void test_relay_malformed_uri() {
             CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
             CHECK(!connected_message);
             CHECK(!valid_handshake);
+            CHECK(seen_connecting == 1);
+            CHECK(peer_device->get_state().is_offline());
+
             sup->do_shutdown();
             sup->do_process();
             CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
-            CHECK(diff_msgs.size() == 2);
+            CHECK(peer_device->get_state().is_offline());
         }
     };
     F().run();
@@ -652,10 +711,13 @@ void test_relay_active_wrong_relay_device_id() {
             CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
             CHECK(!connected_message);
             CHECK(!valid_handshake);
+            CHECK(seen_connecting == 1);
+            CHECK(peer_device->get_state().is_offline());
+
             sup->do_shutdown();
             sup->do_process();
             CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
-            CHECK(diff_msgs.size() == 2);
+            CHECK(peer_device->get_state().is_offline());
         }
     };
     F().run();
@@ -761,16 +823,17 @@ void test_relay_active_success() {
             auto act = create_actor();
             io_ctx.run();
             CHECK(sup->get_state() == r::state_t::OPERATIONAL);
-            REQUIRE(connected_message);
-            CHECK(connected_message->payload.proto == "relay");
-            CHECK(connected_message->payload.peer_device_id == peer_device->device_id());
+            CHECK(connected_message);
+            auto &p = connected_message->payload;
+            CHECK(p.uri->scheme() == "relay+active");
+            CHECK(p.peer_device_id == peer_device->device_id());
+            CHECK(p.peer_state.is_connected());
             CHECK(valid_handshake);
             sup->do_shutdown();
             sup->do_process();
             CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
-            REQUIRE(diff_msgs.size() == 1);
-            CHECK(diff_msgs[0]->payload.diff->apply(*cluster, get_apply_controller()));
-            CHECK(peer_device->get_state() == device_state_t::connecting);
+            CHECK(peer_device->get_state().is_connecting());
+            CHECK(seen_connecting == 1);
         }
     };
     F().run();
@@ -800,7 +863,8 @@ void test_relay_active_not_enabled() {
             sup->do_shutdown();
             sup->do_process();
             CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
-            CHECK(peer_device->get_state() == device_state_t::offline);
+            CHECK(peer_device->get_state().is_offline());
+            CHECK(seen_connecting == 1);
         }
     };
     F().run();
@@ -825,8 +889,8 @@ void test_relay_wrong_device() {
             CHECK(valid_handshake);
             sup->do_shutdown();
             sup->do_process();
-            CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
-            CHECK(diff_msgs.size() == 2);
+            CHECK(peer_device->get_state().is_offline());
+            CHECK(seen_connecting == 1);
         }
     };
     F().run();
@@ -849,8 +913,8 @@ void test_relay_non_connectable() {
             CHECK(!connected_message);
             sup->do_shutdown();
             sup->do_process();
-            CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
-            CHECK(diff_msgs.size() == 2);
+            CHECK(peer_device->get_state().is_offline());
+            CHECK(seen_connecting == 1);
         }
     };
     F().run();
@@ -876,7 +940,8 @@ void test_relay_garbage_reply() {
             sup->do_shutdown();
             sup->do_process();
             CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
-            CHECK(diff_msgs.size() == 2);
+            CHECK(peer_device->get_state().is_offline());
+            CHECK(seen_connecting == 1);
         }
     };
     F().run();
@@ -896,7 +961,8 @@ void test_relay_non_invitation_reply() {
             sup->do_shutdown();
             sup->do_process();
             CHECK(sup->get_state() == r::state_t::SHUT_DOWN);
-            CHECK(diff_msgs.size() == 2);
+            CHECK(peer_device->get_state().is_offline());
+            CHECK(seen_connecting == 1);
         }
     };
     F().run();

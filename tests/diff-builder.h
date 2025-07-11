@@ -87,7 +87,7 @@ struct SYNCSPIRIT_TEST_API diff_builder_t : private model::diff::apply_controlle
     diff_builder_t &remove_folder(const model::folder_t &folder) noexcept;
     diff_builder_t &remove_peer(const model::device_t &peer) noexcept;
     diff_builder_t &update_state(const model::device_t &peer, const r::address_ptr_t &peer_addr,
-                                 model::device_state_t state, std::string_view connection_id = {}) noexcept;
+                                 const model::device_state_t &state) noexcept;
     diff_builder_t &update_contact(const model::device_id_t &device, const utils::uri_container_t &uris) noexcept;
     diff_builder_t &add_ignored_device(const model::device_id_t &device, db::SomeDevice db_device) noexcept;
     diff_builder_t &add_unknown_device(const model::device_id_t &device, db::SomeDevice db_device) noexcept;

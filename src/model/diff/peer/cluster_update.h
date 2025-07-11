@@ -3,11 +3,11 @@
 
 #pragma once
 
-#include "proto/bep_support.h"
 #include "model/device.h"
 #include "model/misc/sequencer.h"
 #include "model/diff/cluster_diff.h"
-#include "config/main.h"
+
+#include <filesystem>
 
 namespace syncspirit::model::diff::peer {
 

@@ -207,6 +207,7 @@ template <> struct base_impl_t<ssl_socket_t> {
 template <typename Sock, typename Owner> inline void generic_async_send(Owner owner, asio::const_buffer buff) noexcept {
     auto &sock = owner->backend->sock;
     asio::async_write(sock, buff, [owner = std::move(owner)](auto ec, auto bytes) mutable {
+        // sock.async_write_some(buff, [owner = std::move(owner)](auto ec, auto bytes) mutable {
         auto &strand = owner->backend->strand;
         if (ec) {
             strand.post([ec = ec, owner = std::move(owner)]() mutable {

@@ -66,14 +66,18 @@ void peer_supervisor_t::on_model_update(model::message::model_update_t &msg) noe
 }
 
 void peer_supervisor_t::on_peer_ready(message::peer_connected_t &msg) noexcept {
-    LOG_TRACE(log, "on_peer_ready");
     auto timeout = r::pt::milliseconds{bep_config.connect_timeout};
     auto &p = msg.payload;
     auto &d = p.peer_device_id;
+    LOG_TRACE(log, "on_peer_ready, peer = {}", d.get_short());
     auto peer = cluster->get_devices().by_sha256(d.get_sha256());
-    if (peer && peer->get_state() == model::device_state_t::online) {
+    if (peer && peer->get_state().is_online()) {
         LOG_DEBUG(log, "peer '{}' is already online, ignoring request", d.get_short());
         return;
+    }
+    auto diff = model::diff::contact::peer_state_t::create(*cluster, d.get_sha256(), {}, p.peer_state);
+    if (diff) {
+        send<model::payload::model_update_t>(coordinator, std::move(diff));
     }
     create_actor<peer_actor_t>()
         .transport(std::move(p.transport))
@@ -81,8 +85,8 @@ void peer_supervisor_t::on_peer_ready(message::peer_connected_t &msg) noexcept {
         .device_name(device_name)
         .bep_config(bep_config)
         .coordinator(coordinator)
-        .peer_endpoint(p.remote_endpoint)
-        .peer_proto(p.proto)
+        .uri(p.uri->clone())
+        .peer_state(p.peer_state.clone())
         .timeout(timeout)
         .cluster(cluster)
         .finish();
@@ -92,7 +96,17 @@ void peer_supervisor_t::on_connected(message::peer_connected_t &msg) noexcept {
     LOG_TRACE(log, "on_connected");
     auto &p = msg.payload;
     auto req = static_cast<message::connect_request_t *>(p.custom.get());
-    reply_to(*req, std::move(p.transport), std::move(p.remote_endpoint));
+    auto ec = sys::error_code();
+    auto port = p.uri->port_number();
+    auto host = p.uri->encoded_host();
+    auto ip = asio::ip::make_address(host, ec);
+    if (ec) {
+        LOG_WARN(log, "cannot make ip address from '{}': {}", host, ec.message());
+        reply_with_error(*req, make_error(ec));
+        return;
+    }
+    auto ep = tcp::endpoint(ip, port);
+    reply_to(*req, std::move(p.transport), std::move(ep));
 }
 
 void peer_supervisor_t::on_connect(message::connect_request_t &msg) noexcept {
@@ -135,7 +149,7 @@ auto peer_supervisor_t::operator()(const model::diff::contact::relay_connect_req
     -> outcome::result<void> {
 
     auto peer = cluster->get_devices().by_sha256(diff.peer.get_sha256());
-    if (peer->get_state() == model::device_state_t::offline) {
+    if (peer->get_state().is_offline()) {
         LOG_DEBUG(log, "initiating relay connection with {}", peer->device_id());
         auto timeout = r::pt::milliseconds{bep_config.connect_timeout};
         auto uri_str = fmt::format("tcp://{}", diff.relay);
@@ -160,7 +174,7 @@ auto peer_supervisor_t::operator()(const model::diff::contact::dial_request_t &d
     -> outcome::result<void> {
     auto &devices = cluster->get_devices();
     auto peer = devices.by_sha256(diff.peer_id);
-    if (peer && peer->get_state() != model::device_state_t::online) {
+    if (peer && !peer->get_state().is_online()) {
         auto &uris = peer->get_uris();
         LOG_DEBUG(log, "initiating connection with {} ({} addresses)", peer->device_id(), uris.size());
         assert(uris.size());

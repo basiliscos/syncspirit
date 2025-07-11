@@ -21,12 +21,12 @@ namespace net {
 struct peer_actor_config_t : public r::actor_config_t {
     std::string_view device_name;
     model::device_id_t peer_device_id;
+    model::device_state_t peer_state = model::device_state_t::make_offline();
     config::bep_config_t bep_config;
     transport::stream_sp_t transport;
     r::address_ptr_t coordinator;
     model::cluster_ptr_t cluster;
-    tcp::endpoint peer_endpoint;
-    std::string peer_proto;
+    utils::uri_ptr_t uri;
 };
 
 template <typename Actor> struct peer_actor_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -36,6 +36,11 @@ template <typename Actor> struct peer_actor_config_builder_t : r::actor_config_b
 
     builder_t &&peer_device_id(const model::device_id_t &value) && noexcept {
         parent_t::config.peer_device_id = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+
+    builder_t &&peer_state(model::device_state_t &&value) && noexcept {
+        parent_t::config.peer_state = std::move(value);
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
@@ -64,13 +69,8 @@ template <typename Actor> struct peer_actor_config_builder_t : r::actor_config_b
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&peer_endpoint(const tcp::endpoint &value) && noexcept {
-        parent_t::config.peer_endpoint = value;
-        return std::move(*static_cast<typename parent_t::builder_t *>(this));
-    }
-
-    builder_t &&peer_proto(std::string value) && noexcept {
-        parent_t::config.peer_proto = value;
+    builder_t &&uri(utils::uri_ptr_t &&value) && noexcept {
+        parent_t::config.uri = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };
@@ -106,7 +106,7 @@ struct SYNCSPIRIT_API peer_actor_t : public r::actor_base_t {
     using tx_message_t = confidential::message::tx_item_t;
     using tx_queue_t = std::list<tx_item_t>;
     using tx_size_ptr_t = payload::controller_up_t::tx_size_ptr_t;
-    using read_action_t = void (peer_actor_t::*)(proto::message::message_t &&msg);
+    using read_action_t = bool (peer_actor_t::*)(proto::message::message_t &&msg);
     using block_request_ptr_t = r::intrusive_ptr_t<message::block_request_t>;
     using block_requests_t = std::list<block_request_ptr_t>;
     using clock_t = std::chrono::steady_clock;
@@ -124,17 +124,16 @@ struct SYNCSPIRIT_API peer_actor_t : public r::actor_base_t {
     void read_more() noexcept;
     void push_write(utils::bytes_t buff, bool final) noexcept;
     void process_tx_queue() noexcept;
-    void cancel_timer() noexcept;
     void cancel_io() noexcept;
     void on_tx_timeout(r::request_id_t, bool cancelled) noexcept;
     void on_rx_timeout(r::request_id_t, bool cancelled) noexcept;
 
     void reset_tx_timer() noexcept;
     void reset_rx_timer() noexcept;
-    void read_hello(proto::message::message_t &&msg) noexcept;
-    void read_controlled(proto::message::message_t &&msg) noexcept;
+    bool read_hello(proto::message::message_t &&msg) noexcept;
+    bool read_controlled(proto::message::message_t &&msg) noexcept;
 
-    void handle_hello(proto::Hello &&) noexcept;
+    bool handle_hello(proto::Hello &&) noexcept;
     void handle_ping(proto::Ping &&) noexcept;
     void handle_close(proto::Close &&) noexcept;
     void handle_response(proto::Response &&) noexcept;
@@ -147,8 +146,9 @@ struct SYNCSPIRIT_API peer_actor_t : public r::actor_base_t {
     config::bep_config_t bep_config;
     r::address_ptr_t coordinator;
     model::device_id_t peer_device_id;
+    model::device_state_t peer_state;
     transport::stream_sp_t transport;
-    std::optional<r::request_id_t> timer_request;
+    utils::uri_ptr_t url;
     std::optional<r::request_id_t> tx_timer_request;
     std::optional<r::request_id_t> rx_timer_request;
     tx_queue_t tx_queue;
@@ -156,8 +156,6 @@ struct SYNCSPIRIT_API peer_actor_t : public r::actor_base_t {
     fmt::memory_buffer rx_buff;
     std::size_t rx_idx = 0;
     std::string cert_name;
-    tcp::endpoint peer_endpoint;
-    std::string peer_proto;
     read_action_t read_action;
     r::address_ptr_t controller;
     block_requests_t block_requests;

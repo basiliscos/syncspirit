@@ -17,7 +17,7 @@ upsert_folder_info_t::upsert_folder_info_t(const bu::uuid &uuid_, const model::d
                                            std::uint64_t index_id_) noexcept
     : uuid{uuid_}, device_id(device_id_.get_sha256()), introducer_device_key(introducer_device_id.get_key()),
       folder_id{folder_id_}, index_id{index_id_} {
-    LOG_DEBUG(log, "upsert_folder_info_t, folder = {}, index = {}", folder_id, index_id);
+    LOG_DEBUG(log, "upsert_folder_info_t, folder = {}, index = {:#x}", folder_id, index_id);
 }
 
 upsert_folder_info_t::upsert_folder_info_t(const model::folder_info_t &original, std::uint64_t new_index_id) noexcept

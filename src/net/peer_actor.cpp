@@ -3,8 +3,6 @@
 
 #include "peer_actor.h"
 #include "names.h"
-#include "constants.h"
-#include "utils/tls.h"
 #include "utils/error_code.h"
 #include "utils/format.hpp"
 #include "utils/time.h"
@@ -16,33 +14,40 @@
 #include "model/diff/contact/unknown_connected.h"
 #include "model/diff/modify/add_pending_device.h"
 #include "model/diff/peer/rx_tx.h"
+#include "net/messages.h"
+
+#include <algorithm>
+#include <iterator>
 
 using namespace syncspirit::net;
 using namespace syncspirit;
 
 namespace {
+
+static constexpr std::size_t MAX_TX_CHUNK = 1024 * 1024;
+
 namespace resource {
 r::plugin::resource_id_t io_read = 0;
 r::plugin::resource_id_t io_write = 1;
-r::plugin::resource_id_t io_timer = 2;
-r::plugin::resource_id_t tx_timer = 3;
-r::plugin::resource_id_t rx_timer = 4;
-r::plugin::resource_id_t finalization = 5;
+r::plugin::resource_id_t tx_timer = 2;
+r::plugin::resource_id_t rx_timer = 3;
+r::plugin::resource_id_t finalization = 4;
 } // namespace resource
 } // namespace
 
 peer_actor_t::peer_actor_t(config_t &config)
     : r::actor_base_t{config}, cluster{config.cluster}, device_name{config.device_name}, bep_config{config.bep_config},
-      coordinator{config.coordinator}, peer_device_id{config.peer_device_id}, transport(std::move(config.transport)),
-      peer_endpoint{config.peer_endpoint}, peer_proto(std::move(config.peer_proto)), rx_bytes{0}, tx_bytes{0} {
+      coordinator{config.coordinator}, peer_device_id{config.peer_device_id}, peer_state{std::move(config.peer_state)},
+      transport(std::move(config.transport)), url(config.uri), rx_bytes{0}, tx_bytes{0} {
     rx_buff.resize(config.bep_config.rx_buff_size);
+    assert(url);
 }
 
 void peer_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
 
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
-        auto id = fmt::format("{}/{}/{}", peer_device_id.get_short(), peer_proto, peer_endpoint);
+        auto id = fmt::format("{}/{}", peer_device_id.get_short(), url);
         p.set_identity(id, false);
         log = utils::get_logger(identity);
     });
@@ -80,8 +85,6 @@ void peer_actor_t::on_io_error(const sys::error_code &ec, rotor::plugin::resourc
     if (ec != asio::error::operation_aborted) {
         LOG_WARN(log, "on_io_error: {}", ec.message());
     }
-    cancel_timer();
-    cancel_io();
     if (resources->has(resource::finalization)) {
         resources->release(resource::finalization);
     }
@@ -122,13 +125,27 @@ void peer_actor_t::push_write(utils::bytes_t buff, bool final) noexcept {
     if (io_error) {
         return;
     }
-    tx_item_t item = new confidential::payload::tx_item_t{std::move(buff), final};
-    tx_queue.emplace_back(std::move(item));
-    if (!tx_item) {
-        process_tx_queue();
+
+    bool merged = false;
+    if (!final && tx_item && !tx_queue.empty()) {
+        auto &last = tx_queue.back();
+        auto &prev = last->buff;
+        if (prev.size() < MAX_TX_CHUNK) {
+            merged = true;
+            prev.reserve(prev.size() + buff.size());
+            std::copy(buff.begin(), buff.end(), std::back_insert_iterator(prev));
+            LOG_TRACE(log, "merged tx buff, size = {}, queue size = {}", prev.size(), tx_queue.size());
+        }
     }
-    if (final) {
-        resources->acquire(resource::finalization);
+    if (!merged) {
+        tx_item_t item = new confidential::payload::tx_item_t{std::move(buff), final};
+        tx_queue.emplace_back(std::move(item));
+        if (!tx_item) {
+            process_tx_queue();
+        }
+        if (final) {
+            resources->acquire(resource::finalization);
+        }
     }
 }
 
@@ -171,6 +188,9 @@ void peer_actor_t::on_write(std::size_t sz) noexcept {
         if (resources->has(resource::finalization)) {
             resources->release(resource::finalization);
         }
+        if (tx_timer_request) {
+            cancel_timer(*tx_timer_request);
+        }
         cancel_io();
     } else {
         tx_item.reset();
@@ -186,46 +206,47 @@ void peer_actor_t::on_read(std::size_t bytes) noexcept {
     LOG_TRACE(log, "on_read, {} bytes, total = {}", bytes, rx_idx);
     rx_bytes += bytes;
 
-    auto buff = utils::bytes_view_t((unsigned char *)rx_buff.data(), rx_idx);
-    auto result = proto::parse_bep(buff);
-    if (result.has_error()) {
-        auto &ec = result.error();
-        LOG_WARN(log, "on_read, error parsing message: {}", ec.message());
-        return do_shutdown(make_error(ec));
-    }
-    auto &value = result.value();
-    if (!value.consumed) {
-        // log->trace("on_read :: incomplete message");
-        return read_more();
+    bool try_parse = true;
+    auto initial_ptr = (unsigned char *)rx_buff.data();
+    auto ptr = initial_ptr;
+    auto size_left = rx_idx;
+    bool read_next = true;
+    while (try_parse && size_left) {
+        auto buff = utils::bytes_view_t(ptr, size_left);
+        auto result = proto::parse_bep(buff);
+        if (result.has_error()) {
+            auto &ec = result.error();
+            LOG_WARN(log, "on_read, error parsing message: {}", ec.message());
+            return do_shutdown(make_error(ec));
+        }
+        auto &value = result.value();
+        if (!value.consumed) {
+            try_parse = false;
+        } else {
+            ptr += value.consumed;
+            size_left -= value.consumed;
+            read_next = try_parse = (this->*read_action)(std::move(value.message));
+        }
     }
 
-    cancel_timer();
-    assert(value.consumed <= rx_idx);
-    rx_idx -= value.consumed;
-    if (rx_idx) {
-        auto ptr = rx_buff.data();
-        std::memcpy(ptr, ptr + value.consumed, rx_idx);
+    auto consumed = ptr - initial_ptr;
+    assert(consumed <= rx_idx);
+    if (consumed) {
+        rx_idx -= consumed;
+        if (rx_idx) {
+            auto ptr = rx_buff.data();
+            std::memcpy(ptr, ptr + consumed, rx_idx);
+        }
     }
-    (this->*read_action)(std::move(value.message));
+    if (read_next && !resources->has(resource::finalization)) {
+        read_more();
+    }
     emit_io_stats();
-    // LOG_TRACE(log, "on_read, rx_idx = {} ", rx_idx);
-}
-
-void peer_actor_t::on_timer(r::request_id_t, bool cancelled) noexcept {
-    resources->release(resource::io_timer);
-    LOG_TRACE(log, "on_timer_trigger, cancelled = {}", cancelled);
-    if (!cancelled) {
-        cancel_io();
-        auto ec = r::make_error_code(r::shutdown_code_t::normal);
-        do_shutdown(make_error(ec));
-    }
 }
 
 void peer_actor_t::shutdown_start() noexcept {
     LOG_TRACE(log, "shutdown_start");
-    if (resources->has(resource::io_timer)) {
-        cancel_timer();
-    }
+
     if (tx_timer_request) {
         r::actor_base_t::cancel_timer(*tx_timer_request);
     }
@@ -235,6 +256,10 @@ void peer_actor_t::shutdown_start() noexcept {
     if (controller) {
         send<payload::peer_down_t>(controller, shutdown_reason);
     }
+
+    auto timeout = shutdown_timeout * 8 / 9;
+    tx_timer_request = start_timer(timeout, *this, &peer_actor_t::on_tx_timeout);
+    resources->acquire(resource::tx_timer);
 
     proto::Close close;
     proto::set_reason(close, shutdown_reason->message());
@@ -258,23 +283,13 @@ void peer_actor_t::shutdown_finish() noexcept {
     }
     r::actor_base_t::shutdown_finish();
     auto sha256 = peer_device_id.get_sha256();
-    auto device = cluster->get_devices().by_sha256(sha256);
-    if (device && device->get_state() != model::device_state_t::offline) {
-        auto state = model::device_state_t::offline;
-        auto connection_id = fmt::format("{}://{}", peer_proto, peer_endpoint);
-        auto diff = model::diff::contact::peer_state_t::create(*cluster, sha256, address, state, connection_id);
-        if (diff) {
-            send<model::payload::model_update_t>(coordinator, std::move(diff));
-        }
+    auto diff = model::diff::contact::peer_state_t::create(*cluster, sha256, address, peer_state.offline());
+    if (diff) {
+        send<model::payload::model_update_t>(coordinator, std::move(diff));
+    } else {
+        LOG_DEBUG(log, "skipping peer state update");
     }
     emit_io_stats(true);
-}
-
-void peer_actor_t::cancel_timer() noexcept {
-    if (resources->has(resource::io_timer)) {
-        r::actor_base_t::cancel_timer(*timer_request);
-        timer_request.reset();
-    }
 }
 
 void peer_actor_t::cancel_io() noexcept {
@@ -313,7 +328,10 @@ void peer_actor_t::on_controller_predown(message::controller_predown_t &message)
     if (for_me && !shutdown_reason) {
         auto &ee = message.payload.ee;
         auto reason = ee->message();
-        LOG_DEBUG(log, "on_controller_predown: {}", reason);
+        auto root = ee->root()->message();
+        auto max_size = std::min(size_t(30), root.size());
+        auto tail = std::string_view(root).substr(0, max_size);
+        LOG_DEBUG(log, "on_controller_predown, root reason: {}", tail);
         do_shutdown(ee);
     }
 }
@@ -340,23 +358,24 @@ void peer_actor_t::on_transfer(message::transfer_data_t &message) noexcept {
     push_write(std::move(message.payload.data), false);
 }
 
-void peer_actor_t::read_hello(proto::message::message_t &&msg) noexcept {
+bool peer_actor_t::read_hello(proto::message::message_t &&msg) noexcept {
     LOG_TRACE(log, "read_hello");
-    std::visit(
-        [&](auto &&msg) {
+    return std::visit(
+        [&](auto &&msg) -> bool {
             using T = std::decay_t<decltype(msg)>;
             if constexpr (std::is_same_v<T, proto::Hello>) {
                 return handle_hello(std::move(msg));
             } else {
                 LOG_WARN(log, "read_hello, unexpected_message");
                 auto ec = utils::make_error_code(utils::bep_error_code_t::unexpected_message);
-                return do_shutdown(make_error(ec));
+                do_shutdown(make_error(ec));
+                return false;
             }
         },
         msg);
 }
 
-void peer_actor_t::read_controlled(proto::message::message_t &&msg) noexcept {
+bool peer_actor_t::read_controlled(proto::message::message_t &&msg) noexcept {
     using MT = proto::MessageType;
     LOG_TRACE(log, "read_controlled");
     auto type = MT::UNKNOWN;
@@ -387,13 +406,10 @@ void peer_actor_t::read_controlled(proto::message::message_t &&msg) noexcept {
         msg);
     LOG_DEBUG(log, "read_controlled, type = {}", (int)type);
     bool continue_reading = !((type == MT::HELLO) || (type == MT::UNKNOWN) || (type == MT::CLOSE));
-    if (continue_reading) {
-        read_action = &peer_actor_t::read_controlled;
-        read_more();
-    }
+    return continue_reading;
 }
 
-void peer_actor_t::handle_hello(proto::Hello &&msg) noexcept {
+bool peer_actor_t::handle_hello(proto::Hello &&msg) noexcept {
     using namespace model::diff;
     auto device_name = proto::get_device_name(msg);
     auto client_name = proto::get_client_name(msg);
@@ -403,7 +419,10 @@ void peer_actor_t::handle_hello(proto::Hello &&msg) noexcept {
     auto diff = cluster_diff_ptr_t();
     auto db = db::SomeDevice();
     auto fill_db_and_shutdown = [&]() {
-        auto address = fmt::format("{}://{}", peer_proto, peer_endpoint);
+        auto scheme = url->scheme();
+        auto proto = (scheme.find("tcp") == 0) ? "tcp" : "relay";
+        auto endpoint = url->encoded_authority();
+        auto address = fmt::format("{}://{}", proto, endpoint);
         db::set_name(db, device_name);
         db::set_client_name(db, client_name);
         db::set_client_version(db, client_version);
@@ -414,14 +433,13 @@ void peer_actor_t::handle_hello(proto::Hello &&msg) noexcept {
     };
 
     if (auto known_peer = cluster->get_devices().by_sha256(sha_s256); known_peer) {
-        if (known_peer->get_state() == model::device_state_t::online) {
+        if (known_peer->get_state().is_online()) {
             auto ec = utils::make_error_code(utils::error_code_t::already_connected);
-            return do_shutdown(make_error(ec));
+            do_shutdown(make_error(ec));
+            return false;
         }
-        auto state = model::device_state_t::online;
-        auto connection_id = fmt::format("{}://{}", peer_proto, peer_endpoint);
-        diff = contact::peer_state_t::create(*cluster, sha_s256, get_address(), state, std::move(connection_id),
-                                             cert_name, peer_endpoint, client_name, client_version);
+        diff = contact::peer_state_t::create(*cluster, sha_s256, get_address(), peer_state.online(url->c_str()),
+                                             cert_name, client_name, client_version);
     } else if (auto peer = cluster->get_ignored_devices().by_sha256(sha_s256)) {
         fill_db_and_shutdown();
         diff = new model::diff::contact::ignored_connected_t(*cluster, peer_device_id, std::move(db));
@@ -436,11 +454,13 @@ void peer_actor_t::handle_hello(proto::Hello &&msg) noexcept {
         diff = new model::diff::contact::unknown_connected_t(*cluster, peer_device_id, std::move(db));
     }
 
+    bool continue_reading = false;
     if (diff) {
+        continue_reading = true;
         send<model::payload::model_update_t>(coordinator, std::move(diff));
         read_action = &peer_actor_t::read_controlled;
-        read_more();
     }
+    return continue_reading;
 }
 
 void peer_actor_t::handle_ping(proto::Ping &&) noexcept { log->trace("handle_ping"); }
@@ -505,6 +525,11 @@ void peer_actor_t::reset_tx_timer() noexcept {
 void peer_actor_t::on_tx_timeout(r::request_id_t, bool cancelled) noexcept {
     resources->release(resource::tx_timer);
     tx_timer_request.reset();
+    if (resources->has(resource::finalization)) {
+        LOG_WARN(log, "on_tx_timeout, during finalization");
+        cancel_io();
+        return;
+    }
     if (!cancelled) {
         proto::Ping ping;
         auto buff = proto::serialize(ping);

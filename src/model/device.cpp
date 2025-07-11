@@ -69,7 +69,7 @@ outcome::result<device_ptr_t> device_t::create(const device_id_t &device_id, std
 device_t::device_t(const device_id_t &device_id_, std::string_view name_, std::string_view cert_name_) noexcept
     : id(std::move(device_id_)), name{name_}, compression{proto::Compression::METADATA}, cert_name{cert_name_},
       introducer{false}, auto_accept{false}, paused{false}, skip_introduction_removals{false},
-      state{device_state_t::offline}, last_seen{pt::from_time_t(0)}, rx_bytes{0}, tx_bytes{0} {}
+      state{device_state_t::make_offline()}, last_seen{pt::from_time_t(0)}, rx_bytes{0}, tx_bytes{0} {}
 
 device_t::~device_t() {}
 
@@ -99,28 +99,14 @@ auto device_t::serialize() const noexcept -> utils::bytes_t {
     return serialize(r);
 }
 
-void device_t::update_state(device_state_t new_state, std::string_view connection_id_) noexcept {
-    if (state == device_state_t::online || new_state == device_state_t::online) {
+void device_t::update_state(device_state_t &&new_state) noexcept {
+    if (new_state.is_online() || state.is_online()) {
         last_seen = pt::microsec_clock::local_time();
-        if (new_state == device_state_t::online) {
-            assert(!connection_id_.empty());
-            bool new_wins = (connection_id.empty()) || (connection_id_.size() < connection_id.size()) ||
-                            (connection_id_ < connection_id);
-            if (new_wins) {
-                connection_id = connection_id_;
-            }
-        }
-    } else if (state < new_state) {
-        connection_id = connection_id_;
-    } else {
-        connection_id = {};
     }
-    state = new_state;
+    state = std::move(new_state);
 }
 
-void device_t::update_contact(const tcp::endpoint &endpoint_, std::string_view client_name_,
-                              std::string_view client_version_) noexcept {
-    endpoint = endpoint_;
+void device_t::update_contact(std::string_view client_name_, std::string_view client_version_) noexcept {
     client_name = client_name_;
     client_version = client_version_;
 }
@@ -133,7 +119,7 @@ void device_t::assign_uris(const uris_t &uris_) noexcept { uris = uris_; }
 
 auto device_t::create_iterator(cluster_t &cluster) noexcept -> file_iterator_ptr_t {
     assert(!iterator);
-    iterator = new file_iterator_t(cluster, this);
+    iterator.reset(new file_iterator_t(cluster, this));
     return iterator;
 }
 
@@ -145,12 +131,8 @@ void device_t::release_iterator(file_iterator_ptr_t &it) noexcept {
 
 file_iterator_t *device_t::get_iterator() noexcept { return iterator.get(); }
 
-std::string_view device_t::get_connection_id() noexcept { return connection_id; }
-
 local_device_t::local_device_t(const device_id_t &device_id, std::string_view name, std::string_view cert_name) noexcept
-    : device_t(device_id, name, cert_name) {
-    state = device_state_t::online;
-}
+    : device_t(device_id, name, cert_name) {}
 
 utils::bytes_view_t local_device_t::get_key() const noexcept { return local_device_id.get_key(); }
 

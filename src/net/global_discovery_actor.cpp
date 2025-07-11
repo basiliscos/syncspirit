@@ -169,6 +169,21 @@ void global_discovery_actor_t::on_discovery_response(message::http_response_t &m
     auto it = discovering_devices.find(sha256);
     discovering_devices.erase(it);
 
+    auto peer = cluster->get_devices().by_sha256(sha256);
+    if (!peer) {
+        auto device_id = model::device_id_t::from_sha256(sha256).value();
+        LOG_DEBUG(log, "on_discovery_response, device '{}' is no longer exist", device_id);
+        return;
+    }
+
+    auto &device_id = peer->device_id();
+    auto &state = peer->get_state();
+    if (!state.is_discovering()) {
+        LOG_DEBUG(log, "device '{}' is no longer discovering, ignoring response", device_id);
+        return;
+    }
+
+    auto reply_diff = model::diff::cluster_diff_ptr_t{};
     auto &ee = message.payload.ee;
     bool found = false;
     if (ee) {
@@ -181,30 +196,24 @@ void global_discovery_actor_t::on_discovery_response(message::http_response_t &m
             auto &body = http_res.body();
             LOG_WARN(log, "parsing discovery error = {}, body({}):\n {}", reason, body.size(), body);
         } else {
-            auto device_id = model::device_id_t::from_sha256(sha256).value();
             auto &uris = res.value();
             if (!uris.empty()) {
                 LOG_DEBUG(log, "on_discovery_response, found some URIs for {}", device_id);
                 found = true;
-                if (cluster->get_devices().by_sha256(sha256)) {
-                    auto diff = model::diff::cluster_diff_ptr_t{};
-                    diff = new contact::update_contact_t(*cluster, device_id, uris);
-                    send<model::payload::model_update_t>(coordinator, std::move(diff), this);
-                } else {
-                    LOG_DEBUG(log, "on_discovery_response, device '{}' is no longer exist", device_id);
-                }
+                reply_diff = new contact::update_contact_t(*cluster, peer->device_id(), uris);
             } else {
                 LOG_DEBUG(log, "on_discovery_response, no known URIs for {}", device_id);
             }
         }
     }
-    if (!found) {
-        using state_t = model::device_state_t;
-        auto diff = model::diff::contact::peer_state_t::create(*cluster, sha256, nullptr, state_t::offline);
-        if (diff) {
-            send<model::payload::model_update_t>(coordinator, std::move(diff));
-        }
+    auto change_state_diff = model::diff::contact::peer_state_t::create(*cluster, sha256, {}, state.offline());
+    assert(change_state_diff);
+    if (reply_diff) {
+        reply_diff->assign_sibling(change_state_diff.get());
+    } else {
+        reply_diff = std::move(change_state_diff);
     }
+    send<model::payload::model_update_t>(coordinator, std::move(reply_diff));
 }
 
 void global_discovery_actor_t::on_model_update(model::message::model_update_t &message) noexcept {
@@ -263,18 +272,18 @@ auto global_discovery_actor_t::operator()(const model::diff::contact::update_con
 
 auto global_discovery_actor_t::operator()(const model::diff::contact::peer_state_t &diff, void *custom) noexcept
     -> outcome::result<void> {
-    if ((state != r::state_t::OPERATIONAL) || (diff.state != model::device_state_t::discovering)) {
+    auto sha256 = diff.peer_id;
+    auto peer = cluster->get_devices().by_sha256(sha256);
+    if ((state != r::state_t::OPERATIONAL) || !peer || !peer->get_state().is_unknown()) {
         return diff.visit_next(*this, custom);
     }
 
-    auto sha256 = diff.peer_id;
     if (discovering_devices.count(sha256)) {
         auto device_id = model::device_id_t::from_sha256(sha256).value();
         LOG_TRACE(log, "device '{}' is already discovering, skip", device_id.get_short());
         return diff.visit_next(*this, custom);
     }
 
-    auto peer = cluster->get_devices().by_sha256(sha256);
     if (!peer) {
         LOG_ERROR(log, "no peer device '{}'", peer->device_id());
     } else {
@@ -288,6 +297,9 @@ auto global_discovery_actor_t::operator()(const model::diff::contact::peer_state
         discovering_devices.emplace(sha256);
         auto msg = reinterpret_cast<model::message::model_update_t *>(custom);
         make_request(addr_discovery, r.value(), lookup_device_id, std::move(tx_buff), msg);
+        auto diff = model::diff::contact::peer_state_t::create(*cluster, sha256, {}, peer->get_state().discover());
+        assert(diff);
+        send<model::payload::model_update_t>(coordinator, std::move(diff));
     }
     return diff.visit_next(*this, custom);
 }

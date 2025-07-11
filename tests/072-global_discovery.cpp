@@ -212,31 +212,32 @@ void test_peer_discovery() {
                 res.body() = j.dump();
 
                 http_actor->responses.push_back(new net::payload::http_response_t(std::move(res), 0));
-                builder.update_state(*peer_device, {}, model::device_state_t::discovering).apply(*sup);
+                builder.update_state(*peer_device, {}, peer_device->get_state().unknown()).apply(*sup);
 
                 REQUIRE(peer_device->get_uris().size() == 1);
                 CHECK(peer_device->get_uris()[0]->buffer() == "tcp://127.0.0.2");
-                REQUIRE(peer_device->get_state() == model::device_state_t::discovering);
+                REQUIRE(peer_device->get_state().is_offline());
 
                 // 2nd attempt
                 peer_device->assign_uris({});
                 res = {};
                 res.body() = j.dump();
                 http_actor->responses.push_back(new net::payload::http_response_t(std::move(res), 0));
-                builder.update_state(*peer_device, {}, model::device_state_t::discovering).apply(*sup);
+                builder.update_state(*peer_device, {}, peer_device->get_state().unknown()).apply(*sup);
 
                 REQUIRE(peer_device->get_uris().size() == 1);
                 CHECK(peer_device->get_uris()[0]->buffer() == "tcp://127.0.0.2");
-                REQUIRE(peer_device->get_state() == model::device_state_t::discovering);
+                REQUIRE(peer_device->get_state().is_offline());
 
                 // 3nd attempt (empty urls)
                 j["addresses"] = json::array();
                 peer_device->assign_uris({});
                 res = {};
                 res.body() = j.dump();
-                builder.update_state(*peer_device, {}, model::device_state_t::discovering).apply(*sup);
+                builder.update_state(*peer_device, {}, peer_device->get_state().unknown()).apply(*sup);
+
                 REQUIRE(peer_device->get_uris().size() == 0);
-                REQUIRE(peer_device->get_state() == model::device_state_t::offline);
+                REQUIRE(peer_device->get_state().is_offline());
 
                 REQUIRE(http_actor->requests.size() >= 1);
                 auto &req = http_actor->requests.back();
@@ -245,11 +246,11 @@ void test_peer_discovery() {
 
             SECTION("gargbage in response") {
                 http_actor->responses.push_back(new net::payload::http_response_t(std::move(res), 0));
-                builder.update_state(*peer_device, {}, model::device_state_t::discovering).apply(*sup);
+                builder.update_state(*peer_device, {}, peer_device->get_state().unknown()).apply(*sup);
 
                 REQUIRE(peer_device->get_uris().size() == 0);
                 CHECK(static_cast<r::actor_base_t *>(gda.get())->access<to::state>() == r::state_t::OPERATIONAL);
-                REQUIRE(peer_device->get_state() == model::device_state_t::offline);
+                REQUIRE(peer_device->get_state().is_offline());
             }
         }
     };
