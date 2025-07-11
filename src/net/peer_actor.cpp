@@ -17,11 +17,15 @@
 #include "net/messages.h"
 
 #include <algorithm>
+#include <iterator>
 
 using namespace syncspirit::net;
 using namespace syncspirit;
 
 namespace {
+
+static constexpr std::size_t MAX_TX_CHUNK = 1024 * 1024;
+
 namespace resource {
 r::plugin::resource_id_t io_read = 0;
 r::plugin::resource_id_t io_write = 1;
@@ -121,13 +125,27 @@ void peer_actor_t::push_write(utils::bytes_t buff, bool final) noexcept {
     if (io_error) {
         return;
     }
-    tx_item_t item = new confidential::payload::tx_item_t{std::move(buff), final};
-    tx_queue.emplace_back(std::move(item));
-    if (!tx_item) {
-        process_tx_queue();
+
+    bool merged = false;
+    if (!final && tx_item && !tx_queue.empty()) {
+        auto &last = tx_queue.back();
+        auto &prev = last->buff;
+        if (prev.size() < MAX_TX_CHUNK) {
+            merged = true;
+            prev.reserve(prev.size() + buff.size());
+            std::copy(buff.begin(), buff.end(), std::back_insert_iterator(prev));
+            LOG_TRACE(log, "merged tx buff, size = {}, queue size = {}", prev.size(), tx_queue.size());
+        }
     }
-    if (final) {
-        resources->acquire(resource::finalization);
+    if (!merged) {
+        tx_item_t item = new confidential::payload::tx_item_t{std::move(buff), final};
+        tx_queue.emplace_back(std::move(item));
+        if (!tx_item) {
+            process_tx_queue();
+        }
+        if (final) {
+            resources->acquire(resource::finalization);
+        }
     }
 }
 
@@ -220,7 +238,7 @@ void peer_actor_t::on_read(std::size_t bytes) noexcept {
             std::memcpy(ptr, ptr + consumed, rx_idx);
         }
     }
-    if (read_next) {
+    if (read_next && !resources->has(resource::finalization)) {
         read_more();
     }
     emit_io_stats();
