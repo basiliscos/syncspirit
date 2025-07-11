@@ -186,7 +186,7 @@ static auto instantiate(const cluster_t &cluster, sequencer_t &sequencer, const 
         }
         auto sequence = proto::get_sequence(f);
         if (sequence <= prev_sequence) {
-            LOG_WARN(log, "file '{}' has incorrect sequence", name, sequence);
+            LOG_WARN(log, "file '{}' has incorrect sequence (prev: {}, new: {})", name, prev_sequence, sequence);
             return make_error_code(error_code_t::invalid_sequence);
         }
 
