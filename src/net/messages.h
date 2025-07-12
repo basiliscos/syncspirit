@@ -145,7 +145,7 @@ struct block_response_t {
     utils::bytes_t data;
 };
 
-struct block_request_t {
+struct SYNCSPIRIT_API block_request_t {
     using response_t = block_response_t;
     std::string folder_id;
     std::string file_name;

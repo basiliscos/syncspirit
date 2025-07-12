@@ -22,7 +22,7 @@ auto add_blocks_t::apply_impl(cluster_t &cluster, apply_controller_t &controller
         }
         auto block = std::move(opt.assume_value());
         if (!bm.put(block, false)) {
-            LOG_WARN(log, "add_blocks_t, failed to insert block '{}', already exists", block->get_hash());
+            LOG_TRACE(log, "add_blocks_t, failed to insert block '{}', already exists", block->get_hash());
         }
     }
     return applicator_t::apply_sibling(cluster, controller);

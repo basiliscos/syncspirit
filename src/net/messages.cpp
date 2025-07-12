@@ -14,8 +14,13 @@ block_request_t::block_request_t(const model::file_info_ptr_t &file_, size_t blo
     block_index = block_index_;
     auto block = file_->get_blocks()[block_index_].get();
     block_hash = block->get_hash();
-    block_offset = block->get_file_blocks().front().get_offset();
     block_size = block->get_size();
+
+    for (auto &fb : block->get_file_blocks()) {
+        if (fb.file() == file_.get()) {
+            block_offset = fb.get_offset();
+        }
+    }
 }
 
 auto block_request_t::get_block(model::cluster_t &cluster, model::device_t &peer) noexcept -> model::file_block_t {

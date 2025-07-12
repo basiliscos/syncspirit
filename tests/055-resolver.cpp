@@ -16,7 +16,6 @@ using namespace syncspirit::model;
 using A = advance_action_t;
 
 TEST_CASE("resolver", "[model]") {
-    test::init_logging();
     auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
     auto peer_id = device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
     auto peer_2_id =
@@ -400,7 +399,6 @@ TEST_CASE("resolver", "[model]") {
 }
 
 TEST_CASE("resolver, reserved names", "[model]") {
-    test::init_logging();
     auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
     auto peer_id = device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
     auto my_device = device_t::create(my_id, "my-device").value();
@@ -560,3 +558,10 @@ TEST_CASE("resolver, reserved names", "[model]") {
     }
 #endif
 }
+
+int _init() {
+    test::init_logging();
+    return 1;
+}
+
+static int v = _init();
