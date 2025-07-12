@@ -4,6 +4,7 @@
 #pragma once
 
 #include "syncspirit-export.h"
+#include <filesystem>
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
 
@@ -16,10 +17,13 @@
 
 namespace syncspirit::utils {
 
+namespace bfs = std::filesystem;
+
 struct SYNCSPIRIT_API platform_t {
     static void startup();
     static void shutdown() noexcept;
     static bool symlinks_supported() noexcept;
+    static bool path_supported(const bfs::path &) noexcept;
 };
 
 } // namespace syncspirit::utils

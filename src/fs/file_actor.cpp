@@ -216,7 +216,7 @@ auto file_actor_t::reflect(model::file_info_ptr_t &file_ptr, const bfs::path &pa
                 LOG_TRACE(log, "no need to create symlink {} -> {}", path.string(), target.string());
             }
         } else {
-            LOG_TRACE(log, "symlinks are not supported by platform, no I/O for {}", path.string());
+            LOG_WARN(log, "symlinks are not supported by platform, no I/O for {}", path.string());
         }
     }
 

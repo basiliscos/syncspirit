@@ -5,6 +5,8 @@
 #include "model/cluster.h"
 #include "model/folder_info.h"
 #include "proto/proto-helpers-bep.h"
+#include "utils/platform.h"
+#include <boost/nowide/convert.hpp>
 
 namespace syncspirit::model {
 
@@ -118,6 +120,13 @@ static advance_action_t resolve(const file_info_t &remote, const file_info_t *lo
 }
 
 advance_action_t resolve(const file_info_t &remote) noexcept {
+    using P = utils::platform_t;
+    if (remote.is_link() && !P::symlinks_supported()) {
+        return advance_action_t::ignore;
+    }
+    if (!P::path_supported(bfs::path(boost::nowide::widen(remote.get_name())))) {
+        return advance_action_t::ignore;
+    }
     auto folder = remote.get_folder_info()->get_folder();
     auto self = folder->get_cluster()->get_device();
     auto local_folder = folder->get_folder_infos().by_device(*self);

@@ -6,6 +6,7 @@
 #include "access.h"
 #include "model/cluster.h"
 #include "model/misc/resolver.h"
+#include <boost/nowide/convert.hpp>
 
 using namespace syncspirit;
 using namespace syncspirit::test;
@@ -396,4 +397,166 @@ TEST_CASE("resolver", "[model]") {
             CHECK(action == A::ignore);
         }
     }
+}
+
+TEST_CASE("resolver, reserved names", "[model]") {
+    test::init_logging();
+    auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
+    auto peer_id = device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
+    auto my_device = device_t::create(my_id, "my-device").value();
+    auto peer_device = device_t::create(peer_id, "peer-device").value();
+
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
+    auto sequencer = make_sequencer(4);
+    cluster->get_devices().put(my_device);
+    cluster->get_devices().put(peer_device);
+
+    auto &folders = cluster->get_folders();
+    auto builder = diff_builder_t(*cluster);
+    REQUIRE(builder.upsert_folder("1234-5678", "some/path", "my-label").apply());
+    REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
+
+    auto folder = folders.by_id("1234-5678");
+    auto &folder_infos = folder->get_folder_infos();
+    auto folder_my = folder_infos.by_device(*my_device);
+    auto folder_peer = folder_infos.by_device(*peer_device);
+
+    auto pr_remote = proto::FileInfo();
+    auto &peer_v = proto::get_version(pr_remote);
+    auto &peer_c1 = proto::add_counters(peer_v);
+    proto::set_id(peer_c1, 1);
+    proto::set_value(peer_c1, 2);
+
+    proto::set_sequence(pr_remote, 2);
+
+    SECTION("valid name => copy") {
+        proto::set_name(pr_remote, "a.txt");
+        auto file_remote = file_info_t::create(sequencer->next_uuid(), pr_remote, folder_peer).value();
+        folder_peer->add_strict(file_remote);
+        auto action = resolve(*file_remote);
+        CHECK(action == A::remote_copy);
+    }
+    SECTION("symlinks are not supported") {
+        proto::set_name(pr_remote, "b.txt");
+        proto::set_type(pr_remote, proto::FileInfoType::SYMLINK);
+        proto::set_symlink_target(pr_remote, "b.txt");
+        auto file_remote = file_info_t::create(sequencer->next_uuid(), pr_remote, folder_peer).value();
+        folder_peer->add_strict(file_remote);
+        auto action = resolve(*file_remote);
+#ifndef SYNCSPIRIT_WIN
+        CHECK(action == A::remote_copy);
+#else
+        CHECK(action == A::ignore);
+#endif
+    }
+#ifdef SYNCSPIRIT_WIN
+    SECTION("prohibed char in path (1)") {
+        proto::set_name(pr_remote, "a/|/b.txt");
+        auto file_remote = file_info_t::create(sequencer->next_uuid(), pr_remote, folder_peer).value();
+        folder_peer->add_strict(file_remote);
+        auto action = resolve(*file_remote);
+        CHECK(action == A::ignore);
+    }
+    SECTION("prohibed char in path (2)") {
+        auto name = std::string("a/x/b.txt");
+        name[2] = 0;
+        proto::set_name(pr_remote, name);
+        auto file_remote = file_info_t::create(sequencer->next_uuid(), pr_remote, folder_peer).value();
+        folder_peer->add_strict(file_remote);
+        auto action = resolve(*file_remote);
+        CHECK(action == A::ignore);
+    }
+    SECTION("aux.c") {
+        proto::set_name(pr_remote, "aux.c");
+        auto file_remote = file_info_t::create(sequencer->next_uuid(), pr_remote, folder_peer).value();
+        folder_peer->add_strict(file_remote);
+        auto action = resolve(*file_remote);
+        CHECK(action == A::ignore);
+    }
+    SECTION("aUx.c") {
+        proto::set_name(pr_remote, "aux.c");
+        auto file_remote = file_info_t::create(sequencer->next_uuid(), pr_remote, folder_peer).value();
+        folder_peer->add_strict(file_remote);
+        auto action = resolve(*file_remote);
+        CHECK(action == A::ignore);
+    }
+    SECTION("aux") {
+        proto::set_name(pr_remote, "aux");
+        auto file_remote = file_info_t::create(sequencer->next_uuid(), pr_remote, folder_peer).value();
+        folder_peer->add_strict(file_remote);
+        auto action = resolve(*file_remote);
+        CHECK(action == A::ignore);
+    }
+    SECTION("auxX.c") {
+        proto::set_name(pr_remote, "auxX.c");
+        auto file_remote = file_info_t::create(sequencer->next_uuid(), pr_remote, folder_peer).value();
+        folder_peer->add_strict(file_remote);
+        auto action = resolve(*file_remote);
+        CHECK(action == A::remote_copy);
+    }
+    SECTION("con.com") {
+        proto::set_name(pr_remote, "con.com");
+        auto file_remote = file_info_t::create(sequencer->next_uuid(), pr_remote, folder_peer).value();
+        folder_peer->add_strict(file_remote);
+        auto action = resolve(*file_remote);
+        CHECK(action == A::ignore);
+    }
+    SECTION("/path/con.txt/tail") {
+        proto::set_name(pr_remote, "/path/con.txt/tail");
+        auto file_remote = file_info_t::create(sequencer->next_uuid(), pr_remote, folder_peer).value();
+        folder_peer->add_strict(file_remote);
+        auto action = resolve(*file_remote);
+        CHECK(action == A::ignore);
+    }
+    SECTION("com9") {
+        proto::set_name(pr_remote, "com9");
+        auto file_remote = file_info_t::create(sequencer->next_uuid(), pr_remote, folder_peer).value();
+        folder_peer->add_strict(file_remote);
+        auto action = resolve(*file_remote);
+        CHECK(action == A::ignore);
+    }
+    SECTION("com^2") {
+        auto name = L"com²";
+        proto::set_name(pr_remote, boost::nowide::narrow(name));
+        auto file_remote = file_info_t::create(sequencer->next_uuid(), pr_remote, folder_peer).value();
+        folder_peer->add_strict(file_remote);
+        auto action = resolve(*file_remote);
+        CHECK(action == A::ignore);
+    }
+    SECTION("/LPt7/tail") {
+        proto::set_name(pr_remote, "/LPt7/tail");
+        auto file_remote = file_info_t::create(sequencer->next_uuid(), pr_remote, folder_peer).value();
+        folder_peer->add_strict(file_remote);
+        auto action = resolve(*file_remote);
+        CHECK(action == A::ignore);
+    }
+    SECTION("/LPt77/tail") {
+        proto::set_name(pr_remote, "/LPt77/tail");
+        auto file_remote = file_info_t::create(sequencer->next_uuid(), pr_remote, folder_peer).value();
+        folder_peer->add_strict(file_remote);
+        auto action = resolve(*file_remote);
+        CHECK(action == A::remote_copy);
+    }
+    SECTION("nuL") {
+        proto::set_name(pr_remote, "nuL");
+        auto file_remote = file_info_t::create(sequencer->next_uuid(), pr_remote, folder_peer).value();
+        folder_peer->add_strict(file_remote);
+        auto action = resolve(*file_remote);
+        CHECK(action == A::ignore);
+    }
+    SECTION("Prn") {
+        proto::set_name(pr_remote, "Prn");
+        auto file_remote = file_info_t::create(sequencer->next_uuid(), pr_remote, folder_peer).value();
+        folder_peer->add_strict(file_remote);
+        auto action = resolve(*file_remote);
+        CHECK(action == A::ignore);
+    }
+    SECTION("p/api.rst") {
+        proto::set_name(pr_remote, "p/api.rst");
+        auto file_remote = file_info_t::create(sequencer->next_uuid(), pr_remote, folder_peer).value();
+        folder_peer->add_strict(file_remote);
+        auto action = resolve(*file_remote);
+        CHECK(action == A::remote_copy);
+    }
+#endif
 }
