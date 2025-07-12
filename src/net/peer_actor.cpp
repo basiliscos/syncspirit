@@ -76,7 +76,6 @@ void peer_actor_t::on_start() noexcept {
 
     read_more();
     read_action = &peer_actor_t::read_hello;
-    reset_rx_timer();
 }
 
 void peer_actor_t::on_io_error(const sys::error_code &ec, rotor::plugin::resource_id_t resource) noexcept {
@@ -166,6 +165,7 @@ void peer_actor_t::read_more() noexcept {
     auto buff = asio::buffer(rx_buff.data() + rx_idx, rx_buff.size() - rx_idx);
     LOG_TRACE(log, "read_more");
     transport->async_recv(buff, on_read, on_error);
+    reset_rx_timer();
 }
 
 void peer_actor_t::on_write(std::size_t sz) noexcept {
@@ -203,6 +203,10 @@ void peer_actor_t::on_read(std::size_t bytes) noexcept {
     resources->release(resource::io_read);
     rx_idx += bytes;
 
+    if (rx_timer_request) {
+        r::actor_base_t::cancel_timer(*rx_timer_request);
+    }
+
     LOG_TRACE(log, "on_read, {} bytes, total = {}", bytes, rx_idx);
     rx_bytes += bytes;
 
@@ -238,6 +242,7 @@ void peer_actor_t::on_read(std::size_t bytes) noexcept {
             std::memcpy(ptr, ptr + consumed, rx_idx);
         }
     }
+
     if (read_next && !resources->has(resource::finalization)) {
         read_more();
     }
@@ -400,7 +405,6 @@ bool peer_actor_t::read_controlled(proto::message::message_t &&msg) noexcept {
                 } else {
                     received_queue.emplace_back(std::move(msg));
                 }
-                reset_rx_timer();
             }
         },
         msg);
@@ -540,9 +544,7 @@ void peer_actor_t::on_tx_timeout(r::request_id_t, bool cancelled) noexcept {
 
 void peer_actor_t::reset_rx_timer() noexcept {
     if (state == r::state_t::OPERATIONAL) {
-        if (rx_timer_request) {
-            r::actor_base_t::cancel_timer(*rx_timer_request);
-        }
+        assert(!resources->has(resource::rx_timer));
         auto timeout = pt::milliseconds(bep_config.rx_timeout);
         rx_timer_request = start_timer(timeout, *this, &peer_actor_t::on_rx_timeout);
         resources->acquire(resource::rx_timer);
