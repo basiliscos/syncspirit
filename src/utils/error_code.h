@@ -75,6 +75,7 @@ enum class error_code_t {
     invalid_deviceid,
     cares_failure,
     peer_has_been_removed,
+    nonunique_filename,
 };
 
 enum class bep_error_code_t {

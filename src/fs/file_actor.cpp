@@ -10,10 +10,13 @@
 #include "model/diff/advance/remote_copy.h"
 #include "model/diff/advance/remote_win.h"
 #include "model/diff/modify/finish_file.h"
+#include "model/diff/modify/mark_reachable.h"
+#include "presentation/presence.h"
 #include "utils.h"
 #include "utils/io.h"
 #include "utils/format.hpp"
 #include "utils/platform.h"
+#include "utils/error_code.h"
 #include "proto/proto-helpers-bep.h"
 #include <boost/nowide/convert.hpp>
 
@@ -154,6 +157,12 @@ auto file_actor_t::reflect(model::file_info_ptr_t &file_ptr, const bfs::path &pa
         return outcome::success();
     }
 
+    auto augmentation = file_ptr.get()->get_augmentation();
+    auto presence = static_cast<presentation::presence_t *>(augmentation.get());
+    if (!presence->is_unique()) {
+        return utils::make_error_code(utils::error_code_t::nonunique_filename);
+    }
+
     auto parent = path.parent_path();
 
     bool exists = bfs::exists(parent, ec);
@@ -230,7 +239,14 @@ auto file_actor_t::operator()(const model::diff::advance::remote_copy_t &diff, v
     auto name = get_name(diff.proto_source);
     auto file = file_info->get_file_infos().by_name(name);
     auto r = reflect(file, file->get_path());
-    return r ? diff.visit_next(*this, custom) : r;
+    if (!r) {
+        auto msg = r.error().message();
+        LOG_ERROR(log, "cannot reflect (create) file '{}': {}", file->get_name(), msg);
+        auto diff = model::diff::cluster_diff_ptr_t();
+        diff = new model::diff::modify::mark_reachable_t(*file, false);
+        send<model::payload::model_update_t>(coordinator, std::move(diff), this);
+    }
+    return diff.visit_next(*this, custom);
 }
 
 auto file_actor_t::operator()(const model::diff::advance::remote_win_t &diff, void *custom) noexcept
@@ -246,7 +262,14 @@ auto file_actor_t::operator()(const model::diff::advance::remote_win_t &diff, vo
     LOG_DEBUG(log, "renaming {} -> {}", source_path, target_path);
     auto ec = sys::error_code{};
     bfs::rename(source_path, target_path);
-    return !ec ? diff.visit_next(*this, custom) : ec;
+
+    if (ec) {
+        LOG_ERROR(log, "cannot rename file '{}': {}", file->get_name(), ec.message());
+        auto diff = model::diff::cluster_diff_ptr_t();
+        diff = new model::diff::modify::mark_reachable_t(*file, false);
+        send<model::payload::model_update_t>(coordinator, std::move(diff), this);
+    }
+    return diff.visit_next(*this, custom);
 }
 
 auto file_actor_t::operator()(const model::diff::modify::finish_file_t &diff, void *custom) noexcept
@@ -387,6 +410,12 @@ auto file_actor_t::operator()(const model::diff::modify::clone_block_t &diff, vo
 
 auto file_actor_t::open_file_rw(const std::filesystem::path &path, model::file_info_ptr_t info) noexcept
     -> outcome::result<file_ptr_t> {
+    auto augmentation = info.get()->get_augmentation();
+    auto presence = static_cast<presentation::presence_t *>(augmentation.get());
+    if (!presence->is_unique()) {
+        return utils::make_error_code(utils::error_code_t::nonunique_filename);
+    }
+
     LOG_TRACE(log, "open_file (r/w, by path), path = {}", path.string());
     auto item = rw_cache->get(path);
     if (item) {

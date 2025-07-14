@@ -57,6 +57,8 @@ struct SYNCSPIRIT_API presence_t : model::proxy_t {
 
     static bool compare(const presence_t *l, const presence_t *r) noexcept;
 
+    bool is_unique() const noexcept;
+
   protected:
     friend struct entity_t;
     friend struct cluster_file_presence_t;

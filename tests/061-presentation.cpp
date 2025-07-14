@@ -1689,6 +1689,76 @@ TEST_CASE("statistics", "[presentation]") {
     }
 }
 
+TEST_CASE("file uniqueness", "[presentation]") {
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
+    auto sequencer = make_sequencer(4);
+    cluster->get_devices().put(my_device);
+
+    auto builder = diff_builder_t(*cluster);
+    REQUIRE(builder.upsert_folder("1234-5678", "some/path", "my-label").apply());
+    auto folder = cluster->get_folders().by_id("1234-5678");
+    auto &blocks = cluster->get_blocks();
+
+    auto add_file = [&](std::string_view name, bool deleted = false) {
+        auto folder_info = folder->get_folder_infos().by_device(*my_device);
+
+        proto::FileInfo pr_fi;
+        proto::set_name(pr_fi, name);
+        proto::set_sequence(pr_fi, folder_info->get_max_sequence() + 1);
+        proto::set_deleted(pr_fi, deleted);
+
+        auto &v = proto::get_version(pr_fi);
+        auto modified_device = my_device->device_id().get_uint();
+        auto modified_version = 1;
+        proto::add_counters(v, proto::Counter(modified_device, modified_version));
+        proto::set_modified_s(pr_fi, modified_version);
+
+        auto file = model::file_info_t::create(sequencer->next_uuid(), pr_fi, folder_info.get()).value();
+        folder_info->add_strict(file);
+        return file;
+    };
+
+    auto file_a1 = add_file("a.bin");
+    auto file_a2 = add_file("A.bin");
+    auto file_b = add_file("b.bin");
+    auto file_c1 = add_file("файл-1.bin");
+    auto file_c2 = add_file("фаЙл-1.bin");
+    auto file_d = add_file("фаил-2.bin");
+    auto file_e1 = add_file("Файл-3.bin");
+    auto file_e2 = add_file("ФАЙЛ-3.bin", true);
+
+    auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
+
+    auto p_file_a1 = static_cast<presentation::file_presence_t *>(file_a1->get_augmentation().get());
+    auto p_file_a2 = static_cast<presentation::file_presence_t *>(file_a2->get_augmentation().get());
+    auto p_file_b = static_cast<presentation::file_presence_t *>(file_b->get_augmentation().get());
+    auto p_file_c1 = static_cast<presentation::file_presence_t *>(file_c1->get_augmentation().get());
+    auto p_file_c2 = static_cast<presentation::file_presence_t *>(file_c2->get_augmentation().get());
+    auto p_file_d = static_cast<presentation::file_presence_t *>(file_d->get_augmentation().get());
+    auto p_file_e1 = static_cast<presentation::file_presence_t *>(file_e1->get_augmentation().get());
+    auto p_file_e2 = static_cast<presentation::file_presence_t *>(file_e2->get_augmentation().get());
+
+#ifdef SYNCSPIRIT_WIN
+    CHECK(!p_file_a1->is_unique());
+    CHECK(!p_file_a2->is_unique());
+    CHECK(p_file_b->is_unique());
+    CHECK(!p_file_c1->is_unique());
+    CHECK(!p_file_c2->is_unique());
+    CHECK(p_file_d->is_unique());
+    CHECK(p_file_e1->is_unique());
+    CHECK(p_file_e2->is_unique());
+#else
+    CHECK(p_file_a1->is_unique());
+    CHECK(p_file_a2->is_unique());
+    CHECK(p_file_b->is_unique());
+    CHECK(p_file_c1->is_unique());
+    CHECK(p_file_c2->is_unique());
+    CHECK(p_file_d->is_unique());
+    CHECK(p_file_e1->is_unique());
+    CHECK(p_file_e2->is_unique());
+#endif
+}
+
 static bool _init = []() -> bool {
     test::init_logging();
     return true;

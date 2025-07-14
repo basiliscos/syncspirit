@@ -301,6 +301,13 @@ FetchContent_Declare(C_ARES
     set(CARES_THREADS     false CACHE BOOL "CARES_THREADS")
 FetchContent_MakeAvailable(C_ARES)
 
+FetchContent_Declare(UNI_ALGO
+    URL https://github.com/uni-algo/uni-algo/archive/refs/tags/v1.2.0.tar.gz
+    URL_HASH SHA256=f2a1539cd8635bc6088d05144a73ecfe7b4d74ee0361fabed6f87f9f19e74ca9
+)
+FetchContent_MakeAvailable(UNI_ALGO)
+
+
 target_include_directories(syncspirit_core PUBLIC
     ${OPENSSL_INCLUDE_DIR}
     ${CMAKE_CURRENT_BINARY_DIR}
@@ -331,6 +338,7 @@ target_link_libraries(syncspirit_core
     PRIVATE
         ZLIB::ZLIB
         c-ares::cares
+        uni-algo::uni-algo
 )
 install_executable("syncspirit_core")
 

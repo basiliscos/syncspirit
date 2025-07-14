@@ -5,6 +5,10 @@
 #include "presence.h"
 #include "cluster_file_presence.h"
 
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+#include <uni_algo/case.h>
+#endif
+
 using namespace syncspirit;
 using namespace syncspirit::presentation;
 
@@ -146,4 +150,24 @@ auto presence_t::get_children() noexcept -> children_t & {
         std::sort(children.begin(), children.end(), compare);
     }
     return children;
+}
+
+bool presence_t::is_unique() const noexcept {
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+    using una::caseless::compare_utf8;
+    if (!(features & F::deleted)) {
+        if (parent && parent->entity) {
+            auto my_name = entity->get_path().get_own_name();
+            for (auto c : parent->get_children()) {
+                if (c != this && !(c->features & F::deleted)) {
+                    auto other_name = c->entity->get_path().get_own_name();
+                    if (compare_utf8(my_name, other_name) == 0) {
+                        return false;
+                    }
+                }
+            }
+        }
+    }
+#endif
+    return true;
 }

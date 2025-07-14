@@ -32,10 +32,7 @@ struct fixture_t {
     using blk_res_t = fs::message::block_response_t;
     using blk_res_ptr_t = r::intrusive_ptr_t<blk_res_t>;
 
-    fixture_t() noexcept : root_path{unique_path()}, path_guard{root_path} {
-        test::init_logging();
-        bfs::create_directory(root_path);
-    }
+    fixture_t() noexcept : root_path{unique_path()}, path_guard{root_path} { bfs::create_directory(root_path); }
 
     virtual supervisor_t::configure_callback_t configure() noexcept {
         return [&](r::plugin::plugin_base_t &plugin) {
@@ -67,6 +64,7 @@ struct fixture_t {
                   .auto_ack_blocks(false)
                   .timeout(timeout)
                   .create_registry()
+                  .make_presentation(true)
                   .finish();
         sup->cluster = cluster;
         sup->configure_callback = configure();
@@ -136,21 +134,24 @@ struct fixture_t {
 void test_remote_copy() {
     struct F : fixture_t {
         void main() noexcept override {
+            auto builder = diff_builder_t(*cluster, file_addr, sequencer);
+            auto sha256 = peer_device->device_id().get_sha256();
+
+            auto next_sequence = folder_peer->get_max_sequence() + 1;
             proto::FileInfo pr_fi;
             std::int64_t modified = 1641828421;
             proto::set_name(pr_fi, "q.txt");
             proto::set_modified_s(pr_fi, modified);
-            proto::set_sequence(pr_fi, folder_peer->get_max_sequence() + 1);
+            proto::set_sequence(pr_fi, next_sequence);
 
             auto &v = proto::get_version(pr_fi);
             proto::add_counters(v, proto::Counter(peer_device->device_id().get_uint(), 1));
 
-            auto builder = diff_builder_t(*cluster, file_addr);
-
             auto make_file = [&]() {
-                auto file = file_info_t::create(sequencer->next_uuid(), pr_fi, folder_peer).value();
-                REQUIRE(folder_peer->add_strict(file));
-                return file;
+                auto copy = pr_fi;
+                proto::set_sequence(copy, ++next_sequence);
+                builder.make_index(sha256, folder_id).add(copy, peer_device, false).finish().apply(*sup);
+                return folder_peer->get_file_infos().by_name(proto::get_name(copy));
             };
 
             SECTION("empty regular file") {
@@ -184,12 +185,8 @@ void test_remote_copy() {
                 auto &b = proto::add_blocks(pr_fi);
                 proto::set_hash(b, block_hash);
                 proto::set_size(b, 5);
-                auto bi = block_info_t::create(b).value();
-                auto &blocks_map = cluster->get_blocks();
-                blocks_map.put(bi);
 
                 auto peer_file = make_file();
-                peer_file->assign_block(bi, 0);
                 builder.remote_copy(*peer_file).apply(*sup);
 
                 auto file = folder_my->get_file_infos().by_name(proto::get_name(pr_fi));
@@ -287,6 +284,8 @@ void test_append_block() {
             std::int64_t modified = 1641828421;
             proto::FileInfo pr_source;
             auto next_sequence = 7ul;
+            auto builder = diff_builder_t(*cluster, file_addr, sequencer);
+            auto sha256 = peer_device->device_id().get_sha256();
 
             auto path_rel = bfs::path(L"путявка") / bfs::path(L"инфо.txt");
             auto path_wstr = path_rel.generic_wstring();
@@ -316,23 +315,16 @@ void test_append_block() {
             auto blocks = std::vector<block_info_ptr_t>{b, b2};
 
             auto make_file = [&](size_t block_count) {
-                proto::set_sequence(pr_source, ++next_sequence);
-
                 auto copy = pr_source;
-                auto &v2 = proto::get_version(copy);
-                auto version = model::version_t(v2);
-                version.update(*peer_device);
-                version.to_proto(v2);
-
-                auto file = file_info_t::create(sequencer->next_uuid(), copy, folder_peer).value();
+                proto::set_sequence(copy, ++next_sequence);
                 for (size_t i = 0; i < block_count; ++i) {
-                    file->assign_block(blocks[i], i);
+                    auto offset = i * blocks[i]->get_size();
+                    proto::add_blocks(copy, blocks[i]->as_bep(offset));
                 }
-                REQUIRE(folder_peer->add_strict(file));
-                return file;
-            };
 
-            auto builder = diff_builder_t(*cluster, file_addr);
+                builder.make_index(sha256, folder_id).add(copy, peer_device, false).finish().apply(*sup);
+                return folder_peer->get_file_infos().by_name(proto::get_name(copy));
+            };
 
             SECTION("file with 1 block") {
                 proto::set_size(pr_source, 5);
@@ -396,6 +388,7 @@ void test_append_block() {
 void test_clone_block() {
     struct F : fixture_t {
         void main() noexcept override {
+            auto builder = diff_builder_t(*cluster, file_addr, sequencer);
 
             auto hash_1 = utils::sha256_digest(as_bytes("12345")).value();
             auto bi = proto::BlockInfo();
@@ -423,19 +416,19 @@ void test_clone_block() {
             proto::add_counters(v, proto::Counter(peer_device->device_id().get_uint(), 1));
 
             auto next_sequence = 7ul;
+            auto sha256 = peer_device->device_id().get_sha256();
 
             auto make_file = [&](const proto::FileInfo &fi, size_t count) {
                 auto copy = fi;
                 proto::set_sequence(copy, ++next_sequence);
-                auto file = file_info_t::create(sequencer->next_uuid(), copy, folder_peer).value();
                 for (size_t i = 0; i < count; ++i) {
-                    file->assign_block(blocks[i], i);
+                    auto offset = i * blocks[i]->get_size();
+                    proto::add_blocks(copy, blocks[i]->as_bep(offset));
                 }
-                REQUIRE(folder_peer->add_strict(file));
-                return file;
-            };
 
-            auto builder = diff_builder_t(*cluster, file_addr, sequencer);
+                builder.make_index(sha256, folder_id).add(copy, peer_device, false).finish().apply(*sup);
+                return folder_peer->get_file_infos().by_name(proto::get_name(copy));
+            };
 
             SECTION("source & target are different files") {
                 proto::FileInfo pr_target;
@@ -469,7 +462,6 @@ void test_clone_block() {
                     CHECK(data == "12345");
                     CHECK(to_unix(bfs::last_write_time(path)) == 1641828421);
                 }
-
                 SECTION("single block target file, from diffrent folder") {
                     proto::set_size(pr_source, 5);
                     proto::set_size(pr_target, 5);
@@ -536,10 +528,8 @@ void test_clone_block() {
                     proto::set_size(pr_target, 10);
                     auto target = make_file(pr_target, 2);
 
-                    proto::set_sequence(pr_source, folder_peer->get_max_sequence() + 1);
-                    auto source = file_info_t::create(sequencer->next_uuid(), pr_source, folder_peer).value();
-                    source->assign_block(blocks[1], 0);
-                    REQUIRE(folder_peer->add_strict(source));
+                    proto::add_blocks(pr_source, blocks[1]->as_bep(0));
+                    auto source = make_file(pr_source, 0);
 
                     auto source_file = folder_peer->get_file_infos().by_name(proto::get_name(pr_source));
                     auto target_file = folder_peer->get_file_infos().by_name(proto::get_name(pr_target));
@@ -560,15 +550,13 @@ void test_clone_block() {
                     CHECK(data == "1234567890");
                 }
             }
-
             SECTION("source & target are is the same file") {
                 proto::set_sequence(pr_source, folder_peer->get_max_sequence() + 1);
                 proto::set_size(pr_source, 10);
 
-                auto source = file_info_t::create(sequencer->next_uuid(), pr_source, folder_peer).value();
-                source->assign_block(blocks[0], 0);
-                source->assign_block(blocks[0], 1);
-                REQUIRE(folder_peer->add_strict(source));
+                proto::add_blocks(pr_source, blocks[0]->as_bep(0));
+                proto::add_blocks(pr_source, blocks[0]->as_bep(blocks[0]->get_size()));
+                auto source = make_file(pr_source, 0);
 
                 auto source_file = folder_peer->get_file_infos().by_name(proto::get_name(pr_source));
                 auto target_file = source_file;
@@ -682,13 +670,16 @@ void test_conflicts() {
     struct F : fixture_t {
         void main() noexcept override {
             auto builder = diff_builder_t(*cluster, file_addr);
-            auto &blocks_map = cluster->get_blocks();
 
             proto::FileInfo pr_fi;
             std::int64_t modified = 1641828421;
             proto::set_name(pr_fi, "q.txt");
             proto::set_modified_s(pr_fi, modified);
             proto::set_sequence(pr_fi, folder_peer->get_max_sequence() + 1);
+
+            auto sha256 = peer_device->device_id().get_sha256();
+            auto folder_peer = folder->get_folder_infos().by_device(*peer_device);
+            auto folder_my = folder->get_folder_infos().by_device(*my_device);
 
             SECTION("non-empty (via file_finish)") {
                 proto::set_block_size(pr_fi, 5);
@@ -699,20 +690,16 @@ void test_conflicts() {
                     auto hash = utils::sha256_digest(as_bytes("12345")).value();
                     proto::set_hash(block, hash);
                     proto::set_size(block, 5);
-                    auto bi = block_info_t::create(block).value();
-                    return bi;
+                    return block;
                 }();
-                blocks_map.put(peer_block);
 
                 auto my_block = []() {
                     auto block = proto::BlockInfo();
                     auto hash = utils::sha256_digest(as_bytes("67890")).value();
                     proto::set_hash(block, hash);
                     proto::set_size(block, 5);
-                    auto bi = block_info_t::create(block).value();
-                    return bi;
+                    return block;
                 }();
-                blocks_map.put(my_block);
 
                 SECTION("remote win") {
                     auto peer_file = [&]() {
@@ -720,30 +707,19 @@ void test_conflicts() {
                         auto &c = proto::add_counters(v);
                         proto::set_id(c, peer_device->device_id().get_uint());
                         proto::set_value(c, 10);
-                        proto::add_blocks(pr_fi, peer_block->as_bep(0));
+                        proto::add_blocks(pr_fi, peer_block);
                         proto::set_modified_s(pr_fi, 1734690000);
-
-                        auto file = file_info_t::create(sequencer->next_uuid(), pr_fi, folder_peer).value();
-                        REQUIRE(folder_peer->add_strict(file));
-                        auto vv = &proto::get_version(pr_fi);
-                        proto::clear_counters(*vv);
-                        proto::clear_blocks(pr_fi);
-                        file->assign_block(peer_block, 0);
-                        return file;
+                        builder.make_index(sha256, folder_id).add(pr_fi, peer_device, false).finish().apply(*sup);
+                        return folder_peer->get_file_infos().by_name("q.txt");
                     }();
 
                     auto my_file = [&]() {
-                        proto:
-                            auto &v = proto::get_version(pr_fi);
-                            proto::add_counters(v, proto::Counter(my_device->device_id().get_uint(), 5));
-                            proto::set_modified_s(pr_fi, 1734600000);
-                            proto::add_blocks(pr_fi, my_block->as_bep(0));
-                            auto file = file_info_t::create(sequencer->next_uuid(), pr_fi, folder_my).value();
-                            REQUIRE(folder_my->add_strict(file));
-                            file->mark_local();
-
-                            file->assign_block(my_block, 0);
-                            return file;
+                        auto &v = proto::get_version(pr_fi);
+                        proto::add_counters(v, proto::Counter(my_device->device_id().get_uint(), 5));
+                        proto::set_modified_s(pr_fi, 1734600000);
+                        proto::add_blocks(pr_fi, my_block);
+                        builder.local_update(folder_id, pr_fi).apply(*sup);
+                        return folder_my->get_file_infos().by_name("q.txt");
                     }();
 
                     bfs::path kept_file = root_path / proto::get_name(pr_fi);
@@ -761,26 +737,22 @@ void test_conflicts() {
                     CHECK(read_file(conflict_file) == "12345");
                 }
             }
-            SECTION("remote win emtpy (file vs directory)") {
-                auto peer_file = [&]() {
-                    auto &v = proto::get_version(pr_fi);
-                    proto::add_counters(v, proto::Counter(peer_device->device_id().get_uint(), 10));
-                    proto::set_modified_s(pr_fi, 1734690000);
-                    auto file = file_info_t::create(sequencer->next_uuid(), pr_fi, folder_peer).value();
-                    REQUIRE(folder_peer->add_strict(file));
-                    auto vv = &proto::get_version(pr_fi);
-                    proto::clear_counters(*vv);
-                    return file;
-                }();
 
+            SECTION("remote win emtpy (file vs directory)") {
                 auto my_file = [&]() {
                     auto &v = proto::get_version(pr_fi);
                     proto::add_counters(v, proto::Counter(my_device->device_id().get_uint(), 5));
                     proto::set_modified_s(pr_fi, 1734600000);
-                    auto file = file_info_t::create(sequencer->next_uuid(), pr_fi, folder_my).value();
-                    REQUIRE(folder_my->add_strict(file));
-                    file->mark_local();
-                    return file;
+                    builder.local_update(folder_id, pr_fi).apply(*sup);
+                    return folder_my->get_file_infos().by_name("q.txt");
+                }();
+
+                auto peer_file = [&]() {
+                    auto &v = proto::get_version(pr_fi);
+                    proto::add_counters(v, proto::Counter(peer_device->device_id().get_uint(), 10));
+                    proto::set_modified_s(pr_fi, 1734690000);
+                    builder.make_index(sha256, folder_id).add(pr_fi, peer_device, false).finish().apply(*sup);
+                    return folder_peer->get_file_infos().by_name("q.txt");
                 }();
 
                 bfs::path kept_file = root_path / proto::get_name(pr_fi);
@@ -798,13 +770,63 @@ void test_conflicts() {
     };
     F().run();
 }
+void test_uniqueness() {
+    struct F : fixture_t {
+        void main() noexcept override {
+            auto builder = diff_builder_t(*cluster, file_addr);
+
+            auto name_1 = boost::nowide::narrow(L"Файл");
+            auto name_2 = boost::nowide::narrow(L"ФАЙЛ");
+
+            proto::FileInfo pr_fi_1;
+            proto::set_name(pr_fi_1, name_1);
+            proto::set_modified_s(pr_fi_1, 1734690000);
+            proto::set_sequence(pr_fi_1, folder_peer->get_max_sequence() + 1);
+
+            auto pr_fi_2 = pr_fi_1;
+            proto::set_name(pr_fi_2, name_2);
+            proto::set_sequence(pr_fi_2, folder_peer->get_max_sequence() + 2);
+
+            auto sha256 = peer_device->device_id().get_sha256();
+            builder.make_index(sha256, folder_id)
+                .add(pr_fi_1, peer_device)
+                .add(pr_fi_2, peer_device)
+                .finish()
+                .apply(*sup);
+
+            auto folder_peer = folder->get_folder_infos().by_device(*peer_device);
+            auto file_1 = folder_peer->get_file_infos().by_name(name_1);
+            auto file_2 = folder_peer->get_file_infos().by_name(name_2);
+
+            builder.advance(*file_1).advance(*file_2).apply(*sup);
+
+            auto children = 0;
+            for (auto it = bfs::directory_iterator(root_path); it != bfs::directory_iterator(); ++it) {
+                ++children;
+            }
+
+#ifdef SYNCSPIRIT_WIN
+            CHECK(file_1->is_unreachable());
+            CHECK(file_2->is_unreachable());
+            CHECK(children == 0);
+#else
+            CHECK(!file_1->is_unreachable());
+            CHECK(!file_2->is_unreachable());
+            CHECK(children == 2);
+#endif
+        }
+    };
+    F().run();
+}
 
 int _init() {
+    test::init_logging();
     REGISTER_TEST_CASE(test_remote_copy, "test_remote_copy", "[fs]");
     REGISTER_TEST_CASE(test_append_block, "test_append_block", "[fs]");
     REGISTER_TEST_CASE(test_clone_block, "test_clone_block", "[fs]");
     REGISTER_TEST_CASE(test_requesting_block, "test_requesting_block", "[fs]");
     REGISTER_TEST_CASE(test_conflicts, "test_conflicts", "[fs]");
+    REGISTER_TEST_CASE(test_uniqueness, "test_uniqueness", "[fs]");
     return 1;
 }
 

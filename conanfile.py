@@ -8,7 +8,6 @@ class SyncspiritRecipe(ConanFile):
     }
 
     def requirements(self):
-        # self.requires("c-ares/1.28.1")
         self.requires("freetype/2.12.1", headers=True, libs=True, transitive_libs=True, force=True)
 
         self.requires("fltk/1.3.9")
@@ -24,6 +23,7 @@ class SyncspiritRecipe(ConanFile):
         self.requires("zlib/1.3.1")
 #        self.requires("c-ares/1.34.5")
         self.requires("catch2/3.3.1")
+#        self.requires("uni-algo/1.2.0")
         self.requires("boost/1.86.0", headers=True, libs=True, transitive_libs=True, force=True)
 
     def build_requirements(self):
