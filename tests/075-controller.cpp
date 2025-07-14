@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
+#include "model/diff/modify/append_block.h"
 #include "test-utils.h"
 #include "access.h"
 #include "test_supervisor.h"
@@ -356,8 +357,7 @@ struct fixture_t {
             REQUIRE(builder.share_folder(peer_id.get_sha256(), folder_id_1).apply());
         }
 
-        r::system_context_t ctx;
-        sup = ctx.create_supervisor<supervisor_t>().timeout(timeout).create_registry().finish();
+        sup = create_supervisor();
         sup->cluster = cluster;
 
         sup->configure_callback = [&](r::plugin::plugin_base_t &plugin) {
@@ -412,6 +412,10 @@ struct fixture_t {
     virtual void main(diff_builder_t &) noexcept {}
 
     virtual std::uint32_t get_blocks_max_requested() { return 8; }
+
+    virtual r::intrusive_ptr_t<supervisor_t> create_supervisor() {
+        return ctx.create_supervisor<supervisor_t>().timeout(timeout).create_registry().finish();
+    }
 
     bool auto_start;
     bool auto_share;
@@ -1159,6 +1163,26 @@ void test_downloading_errors() {
     struct F : fixture_t {
         using fixture_t::fixture_t;
 
+        struct custom_supervisor_t : supervisor_t {
+            using parent_t = supervisor_t;
+            using parent_t::parent_t;
+
+            bool reject_blocks = false;
+
+            outcome::result<void> operator()(const model::diff::modify::append_block_t &diff,
+                                             void *custom) noexcept override {
+                if (!reject_blocks) {
+                    return parent_t::operator()(diff, custom);
+                }
+                send<model::payload::model_update_t>(address, diff.rej(), this);
+                return outcome::success();
+            }
+        };
+
+        r::intrusive_ptr_t<supervisor_t> create_supervisor() override {
+            return ctx.create_supervisor<custom_supervisor_t>().timeout(timeout).create_registry().finish();
+        }
+
         std::uint32_t get_blocks_max_requested() override { return 1; }
 
         void main(diff_builder_t &) noexcept override {
@@ -1226,6 +1250,12 @@ void test_downloading_errors() {
             SECTION("hash mismatch, do not shutdown") {
                 peer_actor->push_block(as_owned_bytes("123"), 0);
                 peer_actor->push_block(data_2, 1); // needed to terminate/shutdown controller
+            }
+            SECTION("rejecting blocks") {
+                auto custom_sup = static_cast<custom_supervisor_t *>(sup.get());
+                custom_sup->reject_blocks = true;
+                peer_actor->push_block(data_1, 0);
+                peer_actor->push_block(data_2, 1);
             }
 
             sup->do_process();

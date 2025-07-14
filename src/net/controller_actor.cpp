@@ -641,7 +641,31 @@ auto controller_actor_t::operator()(const model::diff::modify::block_ack_t &diff
 
 auto controller_actor_t::operator()(const model::diff::modify::block_rej_t &diff, void *custom) noexcept
     -> outcome::result<void> {
-    LOG_ERROR(log, "on block rej, not implemented");
+    if (diff.device_id == peer->device_id().get_sha256()) {
+        if (resources->has(resource::fs)) {
+            resources->release(resource::fs);
+        }
+        auto folder = cluster->get_folders().by_id(diff.folder_id);
+        if (folder) {
+            auto folder_info = folder->get_folder_infos().by_device_id(diff.device_id);
+            if (folder_info) {
+                auto file = folder_info->get_file_infos().by_name(diff.file_name);
+                if (file) {
+                    auto &hash = diff.block_hash;
+                    LOG_DEBUG(log, "block '{}' has been rejected, marked file {} as unreachable", hash,
+                              file->get_name());
+                    file->mark_unreachable(true);
+                    push(new model::diff::modify::mark_reachable_t(*file, false));
+                    cancel_sync(file.get());
+                }
+            }
+        }
+        release_block(diff.folder_id, diff.block_hash);
+        cluster->modify_write_requests(1);
+        pull_ready();
+        process_block_write();
+        send_diff();
+    }
     return diff.visit_next(*this, custom);
 }
 
