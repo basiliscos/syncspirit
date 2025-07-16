@@ -27,8 +27,6 @@ namespace bfs = std::filesystem;
 namespace {
 
 struct fixture_t {
-    using msg_t = net::message::load_cluster_response_t;
-    using msg_ptr_t = r::intrusive_ptr_t<msg_t>;
     using blk_res_t = fs::message::block_response_t;
     using blk_res_ptr_t = r::intrusive_ptr_t<blk_res_t>;
 
@@ -38,10 +36,8 @@ struct fixture_t {
         return [&](r::plugin::plugin_base_t &plugin) {
             plugin.template with_casted<r::plugin::registry_plugin_t>(
                 [&](auto &p) { p.register_name(net::names::db, sup->get_address()); });
-            plugin.template with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
-                p.subscribe_actor(r::lambda<msg_t>([&](msg_t &msg) { reply = &msg; }));
-                p.subscribe_actor(r::lambda<blk_res_t>([&](blk_res_t &msg) { block_reply = &msg; }));
-            });
+            plugin.template with_casted<r::plugin::starter_plugin_t>(
+                [&](auto &p) { p.subscribe_actor(r::lambda<blk_res_t>([&](blk_res_t &msg) { block_reply = &msg; })); });
         };
     }
 
@@ -100,7 +96,6 @@ struct fixture_t {
         folder_peer = folder->get_folder_infos().by_device(*peer_device);
 
         main();
-        reply.reset();
 
         sup->shutdown();
         sup->do_process();
@@ -124,7 +119,6 @@ struct fixture_t {
     bfs::path root_path;
     path_guard_t path_guard;
     r::system_context_t ctx;
-    msg_ptr_t reply;
     blk_res_ptr_t block_reply;
     std::string_view folder_id = "1234-5678";
     fs::file_cache_ptr_t rw_cache;

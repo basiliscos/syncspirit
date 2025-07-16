@@ -65,7 +65,7 @@ void file_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
                 auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
                 plugin->subscribe_actor(&file_actor_t::on_controller_up, coordinator);
-                plugin->subscribe_actor(&file_actor_t::on_controller_down, coordinator);
+                plugin->subscribe_actor(&file_actor_t::on_controller_predown, coordinator);
             }
         });
         p.discover_name(net::names::db, db, true);
@@ -83,6 +83,7 @@ void file_actor_t::on_start() noexcept {
 
 void file_actor_t::shutdown_start() noexcept {
     LOG_TRACE(log, "shutdown_start");
+    send<net::payload::fs_predown_t>(coordinator);
     r::actor_base_t::shutdown_start();
     rw_cache->clear();
 }
@@ -134,9 +135,12 @@ void file_actor_t::on_controller_up(net::message::controller_up_t &message) noex
     resources->acquire(resource::controller);
 }
 
-void file_actor_t::on_controller_down(net::message::controller_down_t &message) noexcept {
-    LOG_DEBUG(log, "on_controller_down, {}", (const void *)message.payload.controller.get());
-    resources->release(resource::controller);
+void file_actor_t::on_controller_predown(net::message::controller_predown_t &message) noexcept {
+    auto &p = message.payload;
+    LOG_DEBUG(log, "on_controller_predown, {}, started: {}", (const void *)p.controller.get(), p.started);
+    if (p.started) {
+        resources->release(resource::controller);
+    }
 }
 
 auto file_actor_t::reflect(model::file_info_ptr_t &file_ptr, const bfs::path &path) noexcept -> outcome::result<void> {

@@ -157,7 +157,7 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     void on_model_update(model::message::model_update_t &message) noexcept;
     void on_tx_signal(net::message::tx_signal_t &message) noexcept;
     void on_block_response(fs::message::block_response_t &message) noexcept;
-    bool on_unlink_request(r::message::unlink_request_t &message) noexcept;
+    void on_fs_predown(message::fs_predown_t &message) noexcept;
     void on_fs_ack_timer(r::request_id_t, bool cancelled) noexcept;
 
     void on_message(proto::ClusterConfig &message) noexcept;

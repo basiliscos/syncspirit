@@ -256,7 +256,7 @@ void db_actor_t::on_cluster_load(message::load_cluster_request_t &request) noexc
     auto folder_infos_uuids = folder_infos_uuids_t(allocator);
     auto known_hashes = known_hashes_t();
 
-    LOG_TRACE(log, "on_cluster_load");
+    LOG_TRACE(log, "on_cluster_load (begin)");
 
     auto txn_opt = db::make_transaction(db::transaction_type_t::RO, env);
     if (!txn_opt) {
@@ -328,6 +328,8 @@ void db_actor_t::on_cluster_load(message::load_cluster_request_t &request) noexc
         return reply_with_error(request, make_error(pending_folders_opt.error()));
     }
 
+    LOG_TRACE(log, "on_cluster_load, all raw bytes has been loaded");
+
     auto diff = model::diff::cluster_diff_ptr_t{};
     diff.reset(new load::load_cluster_t(std::move(txn), blocks.size(), files.size()));
 
@@ -365,6 +367,7 @@ void db_actor_t::on_cluster_load(message::load_cluster_request_t &request) noexc
 
     auto corrupted_files = load::remove_corrupted_files_t::unique_keys_t();
 
+    LOG_TRACE(log, "on_cluster_load, unpacking {} files", files.size());
     if (files.size()) {
         auto max_files = db_config.max_files_per_diff;
         auto ptr = files.data();
@@ -425,6 +428,8 @@ void db_actor_t::on_cluster_load(message::load_cluster_request_t &request) noexc
         LOG_WARN(log, "{} corrupted files will be removed", corrupted_files.size());
         current = current->assign_sibling(new load::remove_corrupted_files_t(std::move(corrupted_files)));
     }
+
+    LOG_TRACE(log, "on_cluster_load (end)");
 
     reply_to(request, diff);
 }

@@ -125,18 +125,13 @@ void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
         p.discover_name(names::hasher_proxy, hasher_proxy, false).link();
-        p.discover_name(names::fs_actor, fs_addr, false).link(false).callback([&](auto phase, auto &ee) {
-            if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {
-                auto p = get_plugin(r::plugin::link_client_plugin_t::class_identity);
-                auto plugin = static_cast<r::plugin::link_client_plugin_t *>(p);
-                plugin->on_unlink([&](auto &msg) { return on_unlink_request(msg); });
-            }
-        });
+        p.discover_name(names::fs_actor, fs_addr, false).link(false);
         p.discover_name(names::coordinator, coordinator, false).link(false).callback([&](auto phase, auto &ee) {
             if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {
                 auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
                 auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
                 plugin->subscribe_actor(&controller_actor_t::on_model_update, coordinator);
+                plugin->subscribe_actor(&controller_actor_t::on_fs_predown, coordinator);
             }
         });
     });
@@ -171,8 +166,8 @@ void controller_actor_t::on_start() noexcept {
 
 void controller_actor_t::shutdown_start() noexcept {
     auto fs_requests = resources->has(resource::fs);
-    LOG_TRACE(log, "shutdown_start, ongoing fs requests = {}", fs_requests);
-    send<payload::controller_predown_t>(coordinator, address, peer_address, shutdown_reason);
+    LOG_TRACE(log, "shutdown_start, ongoing fs requests = {}, announced = {}", fs_requests, announced);
+    send<payload::controller_predown_t>(coordinator, address, peer_address, shutdown_reason, announced);
     if (fs_requests) {
         fs_ack_timer = start_timer(shutdown_timeout * 8 / 9, *this, &controller_actor_t::on_fs_ack_timer);
     }
@@ -924,19 +919,13 @@ void controller_actor_t::on_validation(hasher::message::validation_response_t &r
     }
 }
 
-bool controller_actor_t::on_unlink_request(r::message::unlink_request_t &message) noexcept {
-    if (message.payload.request_payload.server_addr == fs_addr) {
-        auto count = resources->has(resource::fs);
-        LOG_DEBUG(log, "unlink request from {}, forgetting fs requests = {}", names::fs_actor, count);
-        while (resources->has(resource::fs)) {
-            resources->release(resource::fs);
-        }
-        if (fs_ack_timer) {
-            cancel_timer(*fs_ack_timer);
-            fs_ack_timer.reset();
-        }
+void controller_actor_t::on_fs_predown(message::fs_predown_t &message) noexcept {
+    auto count = resources->has(resource::fs);
+    LOG_DEBUG(log, "on_fs_predown, forgetting fs requests = {}", count);
+    while (resources->has(resource::fs)) {
+        resources->release(resource::fs);
     }
-    return false; // handled by plugin
+    do_shutdown();
 }
 
 void controller_actor_t::on_fs_ack_timer(r::request_id_t, bool cancelled) noexcept {

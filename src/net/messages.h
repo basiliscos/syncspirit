@@ -21,8 +21,7 @@
 #include "utils/bytes.h"
 #include "utils/dns.h"
 
-namespace syncspirit {
-namespace net {
+namespace syncspirit::net {
 
 namespace r = rotor;
 namespace ra = rotor::asio;
@@ -132,6 +131,7 @@ struct controller_predown_t {
     r::address_ptr_t controller;
     r::address_ptr_t peer;
     r::extended_error_ptr_t ee;
+    bool started;
 };
 
 struct peer_down_t {
@@ -188,6 +188,8 @@ struct db_info_request_t {
     using response_t = db_info_response_t;
 };
 
+struct fs_predown_t {};
+
 } // end of namespace payload
 
 namespace message {
@@ -223,7 +225,8 @@ using connect_response_t = r::request_traits_t<payload::connect_request_t>::resp
 using db_info_request_t = r::request_traits_t<payload::db_info_request_t>::request::message_t;
 using db_info_response_t = r::request_traits_t<payload::db_info_request_t>::response::message_t;
 
+using fs_predown_t = r::message_t<payload::fs_predown_t>;
+
 } // end of namespace message
 
-} // namespace net
-} // namespace syncspirit
+} // namespace syncspirit::net
