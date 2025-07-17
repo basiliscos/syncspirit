@@ -142,6 +142,7 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t {
     void set_unlocking(bool value) noexcept;
 
     proto::FileInfo get() const noexcept;
+    bool identical_to(const proto::FileInfo &file) const noexcept;
 
     static const constexpr auto data_length = 1 + uuid_length * 2;
 

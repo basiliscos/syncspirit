@@ -84,16 +84,45 @@ TEST_CASE("update folder-2 (via Index)", "[model]") {
         proto::set_modified_s(pr_file, 1);
 
         auto &b = proto::add_blocks(pr_file);
-        proto::set_hash(b, as_bytes("123"));
+        auto b_data = as_owned_bytes("123");
+        proto::set_hash(b, utils::sha256_digest(b_data).value());
         proto::set_size(b, 5);
 
-        SECTION("invalid cases") {
+        auto b2_data = as_owned_bytes("345");
+        auto b2_hash = utils::sha256_digest(b2_data).value();
+
+        auto &blocks_map = cluster->get_blocks();
+
+        SECTION("invalid cases: already known") {
             auto ec = builder.make_index(sha256, "1234-5678").add(pr_file, peer_device, false).fail();
             REQUIRE(ec);
 
             auto expected_ec = make_error_code(error_code_t::missing_version);
             REQUIRE(ec.value() == expected_ec.value());
             REQUIRE(ec.message() == expected_ec.message());
+        }
+
+        SECTION("invalid cases: already known files") {
+            REQUIRE(builder.make_index(sha256, "1234-5678").add(pr_file, peer_device).finish().apply());
+
+            SECTION("different filename") {
+                proto::set_name(pr_file, "b.txt");
+                auto ec = builder.make_index(sha256, "1234-5678").add(pr_file, peer_device, true).fail();
+                auto expected_ec = make_error_code(error_code_t::invalid_sequence);
+                REQUIRE(ec.value() == expected_ec.value());
+            }
+            SECTION("different content") {
+                proto::set_size(pr_file, 10ul);
+
+                auto &b2 = proto::add_blocks(pr_file);
+                proto::set_hash(b2, utils::sha256_digest(b_data).value());
+                proto::set_size(b2, 5);
+                proto::set_offset(b2, 5);
+
+                auto ec = builder.make_index(sha256, "1234-5678").add(pr_file, peer_device, true).fail();
+                auto expected_ec = make_error_code(error_code_t::invalid_sequence);
+                REQUIRE(ec.value() == expected_ec.value());
+            }
         }
 
         SECTION("valid cases") {
@@ -105,6 +134,11 @@ TEST_CASE("update folder-2 (via Index)", "[model]") {
             REQUIRE(f);
 
             auto key = f->get_key();
+
+            SECTION("exactly the same file is added, and it's duplicate is ignored") {
+                REQUIRE(builder.make_index(sha256, "1234-5678").add(pr_file, peer_device).finish().apply());
+                REQUIRE(peer_files.size() == 1);
+            }
 
             SECTION("when a file with existing name is added, key & instance are kept") {
                 proto::set_sequence(pr_file, 11ul);
@@ -118,12 +152,11 @@ TEST_CASE("update folder-2 (via Index)", "[model]") {
             }
 
             SECTION("file with new blocks is added, the preivous one is removed") {
-                auto &blocks_map = cluster->get_blocks();
                 REQUIRE(blocks_map.size() == 1);
                 auto prev_block = blocks_map.begin()->item;
                 proto::set_sequence(pr_file, 11ul);
                 proto::set_modified_s(pr_file, 2);
-                proto::set_hash(b, as_bytes("345"));
+                proto::set_hash(b, b2_hash);
                 REQUIRE(builder.make_index(sha256, "1234-5678").add(pr_file, peer_device).finish().apply());
 
                 REQUIRE(peer_files.size() == 1);

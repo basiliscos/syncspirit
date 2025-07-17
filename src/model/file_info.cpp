@@ -497,6 +497,24 @@ std::string file_info_t::make_conflicting_name() const noexcept {
 
 auto file_info_t::guard() noexcept -> guard_ptr_t { return new guard_t(*this); }
 
+bool file_info_t::identical_to(const proto::FileInfo &file) const noexcept {
+    auto &v = proto::get_version(file);
+    if (version->identical_to(v)) {
+        auto blocks_sz = proto::get_blocks_size(file);
+        if (blocks_sz == blocks.size()) {
+            for (size_t i = 0; i < blocks_sz; ++i) {
+                auto &block = proto::get_blocks(file, i);
+                auto hash = proto::get_hash(block);
+                if (blocks[i]->get_hash() != hash) {
+                    return false;
+                }
+            }
+            return true;
+        }
+    }
+    return false;
+}
+
 template <> SYNCSPIRIT_API utils::bytes_view_t get_index<0>(const file_info_ptr_t &item) noexcept {
     return item->get_uuid();
 }

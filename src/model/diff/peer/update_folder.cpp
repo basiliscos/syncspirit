@@ -165,6 +165,7 @@ static auto instantiate(const cluster_t &cluster, sequencer_t &sequencer, const 
         return make_error_code(error_code_t::folder_is_not_shared);
     }
 
+    auto &prev_files = fi->get_file_infos();
     auto log = update_folder_t::get_log();
     auto &blocks = cluster.get_blocks();
     auto files = update_folder_t::files_t();
@@ -186,8 +187,18 @@ static auto instantiate(const cluster_t &cluster, sequencer_t &sequencer, const 
         }
         auto sequence = proto::get_sequence(f);
         if (sequence <= prev_sequence) {
-            LOG_WARN(log, "file '{}' has incorrect sequence (prev: {}, new: {})", name, prev_sequence, sequence);
-            return make_error_code(error_code_t::invalid_sequence);
+            LOG_DEBUG(log, "file '{}' has sequence {}, it is already known {}, try to ignore", name, sequence,
+                      prev_sequence);
+            auto prev_file = prev_files.by_name(name);
+            if (!prev_file) {
+                LOG_WARN(log, "no file '{}' has been previously seen, corrupted sequence?", name);
+                return make_error_code(error_code_t::invalid_sequence);
+            }
+            if (!prev_file->identical_to(f)) {
+                LOG_WARN(log, "no file '{}' is not identical previously seen, corrupted sequence?", name);
+                return make_error_code(error_code_t::invalid_sequence);
+            }
+            continue;
         }
 
         if (sequence <= 0) {
