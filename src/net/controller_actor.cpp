@@ -205,7 +205,7 @@ void controller_actor_t::send_new_indices() noexcept {
                 auto remote_folder = remote_folders.by_folder(folder);
                 if (remote_folder) {
                     if (remote_folder->get_index() != local_folder->get_index()) {
-                        LOG_DEBUG(log, "peer still has wrong index for '{}' ({} vs {}), sending nothing",
+                        LOG_DEBUG(log, "peer still has wrong index for '{}' ({:#x} vs {:#x}), sending nothing",
                                   folder.get_id(), remote_folder->get_index(), local_folder->get_index());
                     } else if (remote_folder->get_max_sequence() == 0) {
                         LOG_DEBUG(log, "sending new index for folder '{}' ({})", folder.get_label(), folder.get_id());

@@ -53,6 +53,7 @@ struct SYNCSPIRIT_API file_actor_t : public r::actor_base_t, private model::diff
 
     void on_start() noexcept override;
     void shutdown_start() noexcept override;
+    void shutdown_finish() noexcept override;
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
 
   private:

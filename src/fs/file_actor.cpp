@@ -83,9 +83,16 @@ void file_actor_t::on_start() noexcept {
 
 void file_actor_t::shutdown_start() noexcept {
     LOG_TRACE(log, "shutdown_start");
-    send<net::payload::fs_predown_t>(coordinator);
+    if (coordinator) {
+        send<net::payload::fs_predown_t>(coordinator);
+    }
     r::actor_base_t::shutdown_start();
+}
+
+void file_actor_t::shutdown_finish() noexcept {
+    LOG_TRACE(log, "shutdown_finish");
     rw_cache->clear();
+    r::actor_base_t::shutdown_finish();
 }
 
 void file_actor_t::on_model_update(model::message::model_update_t &message) noexcept {
