@@ -408,8 +408,10 @@ cluster_update_t::cluster_update_t(const bfs::path &default_path, const cluster_
         auto folder_info = folder->get_folder_infos().by_device(source);
         if (folder_info) {
             if (!confirmed_folders.contains(folder_info->get_key())) {
-                removed_folders.emplace(folder_info->get_uuid(), folder_info.get());
-                reshared_folders.emplace(folder_info);
+                if (folder_info->get_max_sequence()) {
+                    removed_folders.emplace(folder_info->get_uuid(), folder_info.get());
+                    reshared_folders.emplace(folder_info);
+                }
             }
         }
     }

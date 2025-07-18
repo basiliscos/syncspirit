@@ -10,6 +10,7 @@
 #include "proto/proto-helpers-bep.h"
 
 #include <memory_resource>
+#include <set>
 
 using namespace syncspirit;
 using namespace syncspirit::model;
@@ -148,9 +149,11 @@ static auto construct(sequencer_t &sequencer, folder_info_ptr_t &folder_info, sy
 
 static auto instantiate(const cluster_t &cluster, sequencer_t &sequencer, const device_t &source,
                         const syncspirit::proto::IndexBase &message) noexcept -> outcome::result<diff_t> {
+    using skipped_file_indices_t = std::pmr::set<size_t>;
+    using seen_file_names_t = std::pmr::unordered_set<std::string_view>;
+    using unique_blocks_t = std::pmr::unordered_set<std::pmr::string>;
     auto buffer = std::array<std::byte, 10 * 1024>();
     auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
-    using unique_blocks_t = std::pmr::unordered_set<std::pmr::string>;
     auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
 
     auto folder_id = proto::get_folder(message);
@@ -174,9 +177,31 @@ static auto instantiate(const cluster_t &cluster, sequencer_t &sequencer, const 
     auto prev_sequence = fi->get_max_sequence();
     auto files_count = proto::get_files_size(message);
     files.reserve(files_count);
+
+    auto seen_file_names = seen_file_names_t();
+    auto skipp_file_indices = skipped_file_indices_t();
+
+    // pass 1: skip "outdated" files and pick only recent ones
+    for (int i = files_count - 1; i >= 0; --i) {
+        auto &f = proto::get_files(message, i);
+        auto name = proto::get_name(f);
+        if (seen_file_names.count(name)) {
+            skipp_file_indices.insert(i);
+        } else {
+            seen_file_names.insert(name);
+        }
+    }
+
+    // pass 2: do actual processing
     for (int i = 0; i < files_count; ++i) {
         auto &f = proto::get_files(message, i);
         auto name = proto::get_name(f);
+
+        if (skipp_file_indices.count(i)) {
+            LOG_DEBUG(log, "skipping outdated {}-th file '{}'", i, name);
+            continue;
+        }
+
         auto is_deleted = proto::get_deleted(f);
         auto is_invalid = proto::get_invalid(f);
         auto blocks_count = proto::get_blocks_size(f);

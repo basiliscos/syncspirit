@@ -29,6 +29,8 @@ struct SYNCSPIRIT_API update_folder_t final : cluster_diff_t {
     std::string folder_id;
     utils::bytes_t peer_id;
     files_t files;
+
+  private:
     uuids_t uuids;
 };
 
