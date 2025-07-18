@@ -410,8 +410,8 @@ bool file_info_t::has_no_permissions() const noexcept { return flags & f_no_perm
 
 void file_info_t::update(const file_info_t &other) noexcept {
     using hashes_t = std::set<utils::bytes_view_t, utils::bytes_comparator_t>;
-    assert(this->get_key() == other.get_key());
     assert(this->name == other.name);
+    assert((this->get_key() == other.get_key()) || this->version->identical_to(*other.version));
     type = other.type;
     size = other.size;
     permissions = other.permissions;

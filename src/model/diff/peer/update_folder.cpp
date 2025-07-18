@@ -71,14 +71,25 @@ auto update_folder_t::apply_impl(cluster_t &cluster, apply_controller_t &control
                 file->assign_block(block, (size_t)i);
             }
         }
+        bool add_file = true;
         if (auto prev_file = fm.by_name(file->get_name()); prev_file) {
-            fm.remove(prev_file);
-            prev_file->update(*file);
-            file = std::move(prev_file);
-            file->notify_update();
+            auto prev_seq = prev_file->get_sequence();
+            auto new_seq = file->get_sequence();
+            if (prev_seq < new_seq) {
+                fm.remove(prev_file);
+                prev_file->update(*file);
+                file = std::move(prev_file);
+                file->notify_update();
+            } else if (prev_seq == new_seq) {
+                add_file = false;
+                LOG_TRACE(log, "update_folder_t, apply(); skipping update for '{}', seq. {}", new_seq,
+                          file->get_name());
+            }
         }
 
-        folder_info->add_strict(file);
+        if (add_file) {
+            folder_info->add_strict(file);
+        }
     }
 
     LOG_TRACE(log, "update_folder_t, apply(); max seq: {} -> {}", max_seq, folder_info->get_max_sequence());

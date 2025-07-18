@@ -326,6 +326,7 @@ TEST_CASE("update folder-3: duplicate files", "[model]") {
 
     REQUIRE(builder.upsert_folder("1234-5678", "/my/path").upsert_folder("5555-4444", "/p2").apply());
     auto folder = folders.by_id("1234-5678");
+
     REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
 
     auto pr_index = proto::Index();
@@ -371,15 +372,33 @@ TEST_CASE("update folder-3: duplicate files", "[model]") {
     auto &v2 = proto::get_version(pr_file_2);
     proto::add_counters(v2, c2);
 
-    REQUIRE(builder.make_index(sha256, "1234-5678")
-                .add(pr_file, peer_device, false)
-                .add(pr_file_2, peer_device, false)
-                .finish()
-                .apply());
+    SECTION("the same file, updated, in same index") {
+        REQUIRE(builder.make_index(sha256, "1234-5678")
+                    .add(pr_file, peer_device, false)
+                    .add(pr_file_2, peer_device, false)
+                    .finish()
+                    .apply());
 
-    CHECK(blocks_map.size() == 2);
-    CHECK(folder_peer->get_max_sequence() == 11ul);
-    CHECK(folder_peer->get_file_infos().size() == 1);
+        CHECK(blocks_map.size() == 2);
+        CHECK(folder_peer->get_max_sequence() == 11ul);
+        CHECK(folder_peer->get_file_infos().size() == 1);
+    }
+    SECTION("2 diffs with the exacly same file") {
+        blocks_map.clear();
+        REQUIRE(builder.unshare_folder(*folder_peer).then().share_folder(peer_id.get_sha256(), "1234-5678").apply());
+        // clang-format off
+        REQUIRE(builder
+                .make_index(sha256, "1234-5678").add(pr_file, peer_device, false).finish()
+                .make_index(sha256, "1234-5678").add(pr_file, peer_device, false).finish()
+            .apply());
+        // clang-format on
+
+        folder_peer = folder->get_folder_infos().by_device(*peer_device);
+
+        CHECK(blocks_map.size() == 1);
+        CHECK(folder_peer->get_max_sequence() == 10ul);
+        CHECK(folder_peer->get_file_infos().size() == 1);
+    }
 }
 
 int _init() {
