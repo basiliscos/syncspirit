@@ -408,7 +408,8 @@ auto file_actor_t::operator()(const model::diff::modify::clone_block_t &diff, vo
     auto source_backend_opt = get_source_for_cloning(source, target_backend);
     if (!source_backend_opt) {
         auto ec = source_backend_opt.assume_error();
-        LOG_ERROR(log, "cannot open file for cloning: {}: {}", target_path.string(), ec.message());
+        LOG_ERROR(log, "cannot open source file for cloning: {}: {}", diff.source_file_name, ec.message());
+        return ec;
     }
 
     auto &source_backend = source_backend_opt.assume_value();
