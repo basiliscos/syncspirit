@@ -134,7 +134,7 @@ static model::diff::apply_controller_t apply_controller;
 model::diff::apply_controller_t &get_apply_controller() { return apply_controller; }
 
 void init_logging() {
-    auto dist_sink = utils::create_root_logger();
+    auto [dist_sink, _] = utils::create_root_logger();
     auto console_sink = std::make_shared<spdlog::sinks::stderr_color_sink_mt>();
     dist_sink->add_sink(console_sink);
 }

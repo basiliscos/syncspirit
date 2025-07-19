@@ -20,7 +20,7 @@ namespace syncspirit::utils {
 namespace bfs = std::filesystem;
 
 struct SYNCSPIRIT_API platform_t {
-    static void startup();
+    static bool startup();
     static void shutdown() noexcept;
     static bool symlinks_supported() noexcept;
     static bool path_supported(const bfs::path &) noexcept;

@@ -17,7 +17,7 @@ using namespace syncspirit;
 using L = spdlog::level::level_enum;
 
 static bool _init = []() {
-    auto dist_sink = utils::create_root_logger();
+    auto [dist_sink, _] = utils::create_root_logger();
     auto console_sink = std::make_shared<spdlog::sinks::stderr_color_sink_mt>();
     dist_sink->add_sink(console_sink);
     dist_sink->add_sink(std::make_shared<spdlog::sinks::null_sink_mt>());

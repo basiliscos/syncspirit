@@ -3,24 +3,22 @@
 
 #include "platform.h"
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
-#include <stdexcept>
+#include <array>
 #endif
+
 using namespace syncspirit::utils;
 
-#include <array>
-
-void platform_t::startup() {
+bool platform_t::startup() {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
     auto wVersionRequested = MAKEWORD(2, 2);
     WSADATA wsaData;
 
     auto err = WSAStartup(wVersionRequested, &wsaData);
     if (err != 0) {
-        std::string msg = "WSAStartup failed with error: ";
-        msg += std::to_string(err);
-        throw std::runtime_error(msg);
+        return false;
     }
 #endif
+    return true;
 }
 
 void platform_t::shutdown() noexcept {}
