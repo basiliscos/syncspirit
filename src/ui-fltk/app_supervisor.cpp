@@ -33,6 +33,7 @@
 #include "presentation/folder_presence.h"
 #include "utils/format.hpp"
 #include "utils/io.h"
+#include "utils/log-setup.h"
 
 #include <utility>
 #include <sstream>
@@ -120,7 +121,7 @@ struct callback_impl_t final : callback_t {
 };
 
 app_supervisor_t::app_supervisor_t(config_t &config)
-    : parent_t(config), dist_sink(std::move(config.dist_sink)), config_path{std::move(config.config_path)},
+    : parent_t(config), log_sink(config.log_sink), config_path{std::move(config.config_path)},
       app_config(std::move(config.app_config)), app_config_original{app_config}, content{nullptr}, devices{nullptr},
       folders{nullptr}, pending_devices{nullptr}, ignored_devices{nullptr}, db_info_viewer{nullptr},
       main_window{nullptr}, loaded_blocks{0}, loaded_files{0} {
@@ -129,19 +130,15 @@ app_supervisor_t::app_supervisor_t(config_t &config)
 }
 
 app_supervisor_t::~app_supervisor_t() {
-    if (ui_sink) {
-        dist_sink->remove_sink(ui_sink);
-        ui_sink.reset();
-    }
     detach_main_window();
-    spdlog::debug("~app_supervisor_t()");
+    utils::get_root_logger()->debug("~app_supervisor_t()");
 }
 
-auto app_supervisor_t::get_dist_sink() -> dist_sink_t & { return dist_sink; }
 auto app_supervisor_t::get_config_path() -> const bfs::path & { return config_path; }
 auto app_supervisor_t::get_app_config() -> config::main_t & { return app_config; }
 auto app_supervisor_t::get_cluster() -> model::cluster_t * { return cluster.get(); }
 auto app_supervisor_t::get_sequencer() -> model::sequencer_t & { return *sequencer; }
+auto app_supervisor_t::get_log_sink() -> in_memory_sink_t * { return log_sink; }
 
 void app_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     parent_t::configure(plugin);
@@ -327,11 +324,6 @@ void app_supervisor_t::set_pending_devices(tree_item_t *node) { pending_devices 
 void app_supervisor_t::set_ignored_devices(tree_item_t *node) { ignored_devices = node; }
 void app_supervisor_t::set_main_window(main_window_t *window) { main_window = window; }
 main_window_t *app_supervisor_t::get_main_window() { return main_window; }
-
-void app_supervisor_t::add_sink(spdlog::sink_ptr ui_sink_) {
-    ui_sink = ui_sink_;
-    dist_sink->add_sink(ui_sink);
-}
 
 auto app_supervisor_t::request_db_info(db_info_viewer_t *viewer) -> db_info_viewer_guard_t {
     log->trace("request_db_info");

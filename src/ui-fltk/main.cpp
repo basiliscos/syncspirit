@@ -108,6 +108,7 @@ struct app_context_t {
     char **argv;
     utils::logger_t::element_type *logger;
     utils::dist_sink_t &dist_sink;
+    fltk::in_memory_sink_t *im_memory_sink;
     utils::bootstrap_guard_ptr_t &bootstrap_guard;
 };
 
@@ -139,7 +140,8 @@ int main(int argc, char **argv) {
 #endif
 
     auto [dist_sink, logger] = utils::create_root_logger();
-    dist_sink->add_sink(spdlog::sink_ptr(new fltk::im_memory_sink_t()));
+    auto in_memory_sink = std::make_shared<fltk::in_memory_sink_t>();
+    dist_sink->add_sink(spdlog::sink_ptr(in_memory_sink));
     if (auto value = std::getenv(constants::console_sink_env); value && value == std::string_view("1")) {
         auto console_sink = spdlog::sink_ptr(new spdlog::sinks::stderr_color_sink_mt());
         dist_sink->add_sink(console_sink);
@@ -148,7 +150,7 @@ int main(int argc, char **argv) {
     logger->trace("root logger has been bootstrapped");
 
     try {
-        app_context_t ctx(argc, argv, logger.get(), dist_sink, bootstrap_guard);
+        app_context_t ctx(argc, argv, logger.get(), dist_sink, in_memory_sink.get(), bootstrap_guard);
         app_main(ctx);
     } catch (const po::error &ex) {
         spdlog::critical("program options exception: {}", ex.what());
@@ -322,7 +324,7 @@ int app_main(app_context_t &app_ctx) {
     auto main_window = std::unique_ptr<fltk::main_window_t>();
     auto fltk_ctx = rf::system_context_ptr_t(new fltk_context_t());
     auto sup_fltk = fltk_ctx->create_supervisor<fltk::app_supervisor_t>()
-                        .dist_sink(app_ctx.dist_sink)
+                        .log_sink(app_ctx.im_memory_sink)
                         .config_path(config_file_path)
                         .app_config(cfg)
                         .timeout(timeout)

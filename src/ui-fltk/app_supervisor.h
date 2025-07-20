@@ -12,6 +12,7 @@
 #include "model/diff/cluster_visitor.h"
 #include "model/diff/load/load_cluster.h"
 #include "model/misc/sequencer.h"
+#include "log_sink.h"
 
 #include <spdlog/sinks/dist_sink.h>
 #include <rotor/fltk.hpp>
@@ -19,7 +20,6 @@
 #include <FL/Fl_Group.H>
 #include <filesystem>
 #include <chrono>
-#include <set>
 
 namespace syncspirit::fltk {
 
@@ -51,13 +51,11 @@ struct db_info_viewer_guard_t {
     main_window_t *main_window;
 };
 
-using dist_sink_t = std::shared_ptr<spdlog::sinks::dist_sink_mt>;
-
 struct app_supervisor_config_t : rf::supervisor_config_fltk_t {
     using parent_t = rf::supervisor_config_fltk_t;
     using parent_t::parent_t;
 
-    dist_sink_t dist_sink;
+    in_memory_sink_t *log_sink;
     bfs::path config_path;
     config::main_t app_config;
 };
@@ -67,8 +65,8 @@ template <typename Actor> struct app_supervisor_config_builder_t : rf::superviso
     using parent_t = rf::supervisor_config_fltk_builder_t<Actor>;
     using parent_t::parent_t;
 
-    builder_t &&dist_sink(dist_sink_t value) && noexcept {
-        parent_t::config.dist_sink = value;
+    builder_t &&log_sink(in_memory_sink_t *value) && noexcept {
+        parent_t::config.log_sink = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
@@ -103,16 +101,15 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
     void shutdown_finish() noexcept override;
 
-    dist_sink_t &get_dist_sink();
     const bfs::path &get_config_path();
     config::main_t &get_app_config();
     model::cluster_t *get_cluster();
     model::sequencer_t &get_sequencer();
+    in_memory_sink_t *get_log_sink();
     void write_config(const config::main_t &) noexcept;
 
     std::string get_uptime() noexcept;
     utils::logger_t &get_logger() noexcept;
-    void add_sink(spdlog::sink_ptr ui_sink);
 
     template <typename Fn> auto replace_content(Fn constructor) noexcept -> content_t * {
         if (!content) {
@@ -198,9 +195,8 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
     time_point_t started_at;
     r::address_ptr_t coordinator;
     r::address_ptr_t sink;
+    in_memory_sink_t *log_sink;
     utils::logger_t log;
-    dist_sink_t dist_sink;
-    spdlog::sink_ptr ui_sink;
     bfs::path config_path;
     config::main_t app_config;
     config::main_t app_config_original;

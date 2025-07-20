@@ -38,10 +38,10 @@ struct log_panel_t : Fl_Group {
     log_table_t *log_table;
     Fl_Box *records_counter;
     level_buttons_t level_buttons;
-    log_queue_t incoming_records;
     log_buffer_ptr_t records;
     log_buffer_ptr_t displayed_records;
     std::string filter;
+    in_memory_sink_t *sink = nullptr;
 };
 
 } // namespace syncspirit::fltk
