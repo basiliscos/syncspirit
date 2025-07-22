@@ -128,10 +128,10 @@ diff_builder_t::diff_builder_t(model::cluster_t &cluster_, r::address_ptr_t rece
     }
 }
 
-diff_builder_t &diff_builder_t::apply(rotor::supervisor_t &sup) noexcept {
+diff_builder_t &diff_builder_t::apply(rotor::supervisor_t &sup, const void *custom) noexcept {
     assert(cluster_diff);
     if (receiver) {
-        sup.send<model::payload::model_update_t>(receiver, std::move(cluster_diff), nullptr);
+        sup.send<model::payload::model_update_t>(receiver, std::move(cluster_diff), custom);
         sup.do_process();
     }
     auto &addr = sup.get_address();
@@ -139,7 +139,7 @@ diff_builder_t &diff_builder_t::apply(rotor::supervisor_t &sup) noexcept {
     while (do_try) {
         do_try = false;
         if (cluster_diff) {
-            sup.send<model::payload::model_update_t>(addr, std::move(cluster_diff), nullptr);
+            sup.send<model::payload::model_update_t>(addr, std::move(cluster_diff), custom);
             do_try = true;
         }
         sup.do_process();
@@ -148,9 +148,9 @@ diff_builder_t &diff_builder_t::apply(rotor::supervisor_t &sup) noexcept {
     return *this;
 }
 
-void diff_builder_t::send(rotor::supervisor_t &sup) noexcept {
+void diff_builder_t::send(rotor::supervisor_t &sup, const void *custom) noexcept {
     assert(cluster_diff);
-    sup.send<model::payload::model_update_t>(receiver, std::move(cluster_diff), nullptr);
+    sup.send<model::payload::model_update_t>(receiver, std::move(cluster_diff), custom);
 }
 
 auto diff_builder_t::apply() noexcept -> outcome::result<void> {

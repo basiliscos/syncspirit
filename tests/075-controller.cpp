@@ -2131,8 +2131,8 @@ void test_download_interrupting() {
                     CHECK(!cluster->get_folders().by_id(proto::get_id(folder)));
                 }
             }
-
             SECTION("block acks from fs") {
+                auto write_requests = cluster->get_write_requests();
                 sup->auto_ack_blocks = false;
                 hasher->auto_reply = true;
                 peer_actor->push_block(data_2, 1, file_name);
@@ -2162,6 +2162,26 @@ void test_download_interrupting() {
                     REQUIRE(sup->delayed_ack_holder);
                     sup->send<model::payload::model_update_t>(sup->get_address(), std::move(sup->delayed_ack_holder));
                     sup->do_process();
+                }
+                SECTION("down controller") {
+                    target->do_shutdown();
+                    sup->do_process();
+                    CHECK(static_cast<r::actor_base_t *>(target.get())->access<to::state>() ==
+                          r::state_t::SHUTTING_DOWN);
+
+                    SECTION("ack upon shutdown") {
+                        REQUIRE(sup->delayed_ack_holder);
+                        sup->send<model::payload::model_update_t>(sup->get_address(),
+                                                                  std::move(sup->delayed_ack_holder));
+                        sup->do_process();
+                    }
+                    SECTION("no ack, timeout trigger") {
+                        auto fs_timer_id = sup->timers.back()->request_id;
+                        sup->do_invoke_timer(fs_timer_id);
+                        sup->do_process();
+                    }
+
+                    CHECK(cluster->get_write_requests() == write_requests);
                 }
             }
         }
@@ -2394,7 +2414,7 @@ void test_races() {
             builder.configure_cluster(sha256)
                 .add(sha256, folder_1_id, folder_peer->get_index(), max_seq)
                 .finish()
-                .apply(*sup);
+                .apply(*sup, target.get());
 
             auto file_name = std::string_view("some-file");
             auto pr_file = proto::FileInfo();
@@ -2422,7 +2442,7 @@ void test_races() {
             proto::set_size(b2, data_2.size());
             proto::set_offset(b2, 5);
 
-            builder.make_index(sha256, folder_1_id).add(pr_file, peer_device).finish().apply(*sup);
+            builder.make_index(sha256, folder_1_id).add(pr_file, peer_device).finish().apply(*sup, target.get());
 
             SECTION("make file externally available before blocks arrive") {
                 builder.local_update(folder_1_id, pr_file).apply(*sup);

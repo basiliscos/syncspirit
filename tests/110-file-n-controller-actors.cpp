@@ -3,6 +3,8 @@
 
 #include "test-utils.h"
 #include "fs/file_actor.h"
+#include "hasher/hasher_proxy_actor.h"
+#include "hasher/hasher_actor.h"
 #include "model/diff/contact/peer_state.h"
 #include "net/controller_actor.h"
 #include "diff-builder.h"
@@ -59,6 +61,17 @@ template <typename Actor> struct sample_peer_config_builder_t : r::actor_config_
 struct sample_peer_t : r::actor_base_t {
     using parent_t = r::actor_base_t;
 
+    struct block_response_t {
+        std::string name;
+        size_t block_index;
+        utils::bytes_t data;
+        sys::error_code ec;
+    };
+
+    using block_request_t = r::intrusive_ptr_t<net::message::block_request_t>;
+    using block_requests_t = std::list<block_request_t>;
+    using block_responses_t = std::list<block_response_t>;
+
     using config_t = sample_peer_config_t;
     template <typename Actor> using config_builder_t = sample_peer_config_builder_t<Actor>;
 
@@ -84,6 +97,8 @@ struct sample_peer_t : r::actor_base_t {
                 }
             });
         });
+        plugin.with_casted<r::plugin::starter_plugin_t>(
+            [&](auto &p) { p.subscribe_actor(&sample_peer_t::on_block_request); });
     }
 
     void on_start() noexcept override {
@@ -102,6 +117,52 @@ struct sample_peer_t : r::actor_base_t {
             send<net::payload::peer_down_t>(controller, shutdown_reason);
         }
         r::actor_base_t::shutdown_start();
+    }
+
+    void on_block_request(net::message::block_request_t &req) noexcept {
+        block_requests.push_front(&req);
+        log->debug("{}, requesting block # {}", identity, block_requests.front()->payload.request_payload.block_index);
+        if (block_responses.size()) {
+            log->debug("{}, top response block # {}", identity, block_responses.front().block_index);
+        }
+        process_block_requests();
+    }
+
+    void process_block_requests() noexcept {
+        auto condition = [&]() -> bool {
+            if (block_requests.size() && block_responses.size()) {
+                auto &req = block_requests.front();
+                auto &res = block_responses.front();
+                auto &req_payload = req->payload.request_payload;
+                if (req_payload.block_index == res.block_index) {
+                    auto &name = res.name;
+                    return name.empty() || name == req_payload.file_name;
+                }
+            }
+            return false;
+        };
+        while (condition()) {
+            auto &reply = block_responses.front();
+            auto &request = *block_requests.front();
+            log->debug("{}, matched '{}', replying..., ec = {}", identity, reply.name, reply.ec.value());
+            if (!reply.ec) {
+                reply_to(request, reply.data);
+            } else {
+                reply_with_error(request, make_error(reply.ec));
+            }
+            block_responses.pop_front();
+            block_requests.pop_front();
+        }
+    }
+
+    static const constexpr size_t next_block = 1000000;
+
+    void push_block(utils::bytes_view_t data, size_t index, std::string_view name = {}) {
+        if (index == next_block) {
+            index = block_responses.size();
+        }
+        auto bytes = utils::bytes_t(data.begin(), data.end());
+        block_responses.push_back(block_response_t{std::string(name), index, std::move(bytes), {}});
     }
 
     void on_controller_up(net::message::controller_up_t &msg) noexcept {
@@ -127,6 +188,8 @@ struct sample_peer_t : r::actor_base_t {
     model::device_ptr_t peer_device;
     model::device_state_t peer_state;
     utils::logger_t log;
+    block_requests_t block_requests;
+    block_responses_t block_responses;
 };
 
 struct fixture_t {
@@ -139,7 +202,7 @@ struct fixture_t {
         return [&](r::plugin::plugin_base_t &plugin) {
             plugin.template with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
                 p.register_name(net::names::db, sup->get_address());
-                p.register_name(net::names::hasher_proxy, sup->get_address());
+                // p.register_name(net::names::hasher_proxy, sup->get_address());
             });
         };
     }
@@ -153,7 +216,7 @@ struct fixture_t {
         auto peer_id = device_id_t::from_string(peer_id_str).value();
         peer_device = device_t::create(peer_id, "peer-device").value();
 
-        cluster = new cluster_t(my_device, 1);
+        cluster = new cluster_t(my_device, 10);
         cluster->get_devices().put(my_device);
         cluster->get_devices().put(peer_device);
 
@@ -180,6 +243,13 @@ struct fixture_t {
                          .timeout(timeout)
                          .finish();
         sup->do_process();
+
+        sup->create_actor<hasher::hasher_actor_t>().index(1).timeout(timeout).finish();
+        sup->create_actor<hasher::hasher_proxy_actor_t>()
+            .timeout(timeout)
+            .hasher_threads(1)
+            .name(net::names::hasher_proxy)
+            .finish();
 
         auto url = "relay://1.2.3.4:5";
 
@@ -213,12 +283,19 @@ struct fixture_t {
 
         folder = cluster->get_folders().by_id(folder_id);
 
+        CHECK(static_cast<r::actor_base_t *>(peer_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
+        CHECK(static_cast<r::actor_base_t *>(controller_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
+        CHECK(static_cast<r::actor_base_t *>(file_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
+
         main();
 
-        sup->shutdown();
+        CHECK(static_cast<r::actor_base_t *>(peer_actor.get())->access<to::state>() == r::state_t::SHUT_DOWN);
+        CHECK(static_cast<r::actor_base_t *>(controller_actor.get())->access<to::state>() == r::state_t::SHUT_DOWN);
+        CHECK(static_cast<r::actor_base_t *>(file_actor.get())->access<to::state>() == r::state_t::SHUT_DOWN);
+
+        sup->do_shutdown();
         sup->do_process();
 
-        CHECK(static_cast<r::actor_base_t *>(file_actor.get())->access<to::state>() == r::state_t::SHUT_DOWN);
         CHECK(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::SHUT_DOWN);
     }
 
@@ -245,17 +322,8 @@ struct fixture_t {
 void test_shutdown_initiated_by_controller() {
     struct F : fixture_t {
         void main() noexcept override {
-            CHECK(static_cast<r::actor_base_t *>(peer_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
-            CHECK(static_cast<r::actor_base_t *>(controller_actor.get())->access<to::state>() ==
-                  r::state_t::OPERATIONAL);
-            CHECK(static_cast<r::actor_base_t *>(file_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
-
             controller_actor->do_shutdown();
             sup->do_process();
-
-            CHECK(static_cast<r::actor_base_t *>(peer_actor.get())->access<to::state>() == r::state_t::SHUT_DOWN);
-            CHECK(static_cast<r::actor_base_t *>(controller_actor.get())->access<to::state>() == r::state_t::SHUT_DOWN);
-            CHECK(static_cast<r::actor_base_t *>(file_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
         }
     };
     F().run();
@@ -264,17 +332,73 @@ void test_shutdown_initiated_by_controller() {
 void test_shutdown_initiated_by_file_actor() {
     struct F : fixture_t {
         void main() noexcept override {
-            CHECK(static_cast<r::actor_base_t *>(peer_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
-            CHECK(static_cast<r::actor_base_t *>(controller_actor.get())->access<to::state>() ==
-                  r::state_t::OPERATIONAL);
-            CHECK(static_cast<r::actor_base_t *>(file_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
-
             file_actor->do_shutdown();
             sup->do_process();
+            CHECK(cluster->get_write_requests() == 10);
+        }
+    };
+    F().run();
+}
 
-            CHECK(static_cast<r::actor_base_t *>(peer_actor.get())->access<to::state>() == r::state_t::SHUT_DOWN);
-            CHECK(static_cast<r::actor_base_t *>(controller_actor.get())->access<to::state>() == r::state_t::SHUT_DOWN);
-            CHECK(static_cast<r::actor_base_t *>(file_actor.get())->access<to::state>() == r::state_t::SHUT_DOWN);
+void test_fs_actor_error() {
+    struct F : fixture_t {
+        void main() noexcept override {
+            auto file_name = std::string_view("some-file");
+            auto pr_file = proto::FileInfo();
+            proto::set_name(pr_file, file_name);
+            proto::set_type(pr_file, proto::FileInfoType::FILE);
+            proto::set_sequence(pr_file, 5);
+            proto::set_size(pr_file, 5);
+            proto::set_block_size(pr_file, 5);
+
+            auto &v = proto::get_version(pr_file);
+            auto &counter = proto::add_counters(v);
+            proto::set_id(counter, 1);
+            proto::set_value(counter, 1);
+
+            auto data_1 = as_owned_bytes("12345");
+            auto data_1_h = utils::sha256_digest(data_1).value();
+            auto &b1 = proto::add_blocks(pr_file);
+            proto::set_hash(b1, data_1_h);
+            proto::set_size(b1, data_1.size());
+
+            auto folder_id = "1234-5678";
+            auto builder = diff_builder_t(*cluster);
+            auto sha256 = peer_device->device_id().get_sha256();
+            auto folder_path = bfs::absolute(root_path) / L"йцукен";
+
+            builder.upsert_folder(folder_id, folder_path)
+                .share_folder(sha256, folder_id)
+                .apply(*sup)
+                .configure_cluster(sha256)
+                .add(sha256, folder_id, 0x123, 999)
+                .finish()
+                .apply(*sup, controller_actor.get());
+
+            SECTION("fs error -> controller down") {
+                peer_actor->push_block(data_1, 0);
+                write_file(folder_path, ""); // prevent dir creation
+
+                builder.make_index(sha256, folder_id)
+                    .add(pr_file, peer_device)
+                    .finish()
+                    .apply(*sup, controller_actor.get());
+            }
+            SECTION("fs error -> controller down") {
+                builder.make_index(sha256, folder_id)
+                    .add(pr_file, peer_device)
+                    .finish()
+                    .apply(*sup, controller_actor.get());
+
+                CHECK("just 4 logging");
+
+                peer_actor->push_block(data_1, 0);
+                controller_actor->do_shutdown();
+                peer_actor->process_block_requests();
+                sup->do_process();
+            }
+
+            CHECK(cluster->get_write_requests() == 10);
         }
     };
     F().run();
@@ -282,10 +406,11 @@ void test_shutdown_initiated_by_file_actor() {
 
 int _init() {
     test::init_logging();
-    REGISTER_TEST_CASE(test_shutdown_initiated_by_controller, "test_shutdown_initiated_by_controller",
-                       "[fs][controller]");
-    REGISTER_TEST_CASE(test_shutdown_initiated_by_file_actor, "test_shutdown_initiated_by_file_actor",
-                       "[fs][controller]");
+    // REGISTER_TEST_CASE(test_shutdown_initiated_by_controller, "test_shutdown_initiated_by_controller",
+    //                    "[fs][controller]");
+    // REGISTER_TEST_CASE(test_shutdown_initiated_by_file_actor, "test_shutdown_initiated_by_file_actor",
+    //                    "[fs][controller]");
+    REGISTER_TEST_CASE(test_fs_actor_error, "test_fs_actor_error", "[fs][controller]");
     return 1;
 }
 

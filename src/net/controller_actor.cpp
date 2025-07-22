@@ -161,7 +161,6 @@ void controller_actor_t::on_start() noexcept {
     resources->acquire(resource::peer);
     LOG_INFO(log, "is online (connection: {})", my_url);
     announced = true;
-    file_iterator = peer->create_iterator(*cluster);
 }
 
 void controller_actor_t::shutdown_start() noexcept {
@@ -307,7 +306,11 @@ void controller_actor_t::send_diff() noexcept {
 void controller_actor_t::on_custom(const pull_signal_t &) noexcept { pull_next(); }
 
 void controller_actor_t::pull_next() noexcept {
-    LOG_TRACE(log, "pull_next (pull_signal_t), blocks requested = {}", rx_blocks_requested);
+    if (!file_iterator) {
+        return;
+    }
+    LOG_TRACE(log, "pull_next (pull_signal_t), blocks requested = {}, request pool = {}, cluster write reqs = {}",
+              rx_blocks_requested, request_pool, cluster->get_write_requests());
     auto advances = std::uint_fast32_t{0};
     auto can_pull_more = [&]() -> bool {
         bool ignore = (rx_blocks_requested >= blocks_max_requested || request_pool < 0) // rx buff is going to be full
@@ -441,6 +444,10 @@ auto controller_actor_t::operator()(const model::diff::peer::cluster_update_t &d
     if (ctx->from_self) {
         updates_streamer.reset(new model::updates_streamer_t(*cluster, *peer));
         send_new_indices();
+        if (!file_iterator) {
+            file_iterator = peer->create_iterator(*cluster);
+            pull_ready();
+        }
     }
     return diff.visit_next(*this, custom);
 }
@@ -471,11 +478,12 @@ auto controller_actor_t::operator()(const model::diff::advance::advance_t &diff,
         if (peer_folder) {
             auto name = proto::get_name(diff.proto_source);
             auto file = peer_folder->get_file_infos().by_name(name);
-            assert(file);
-            if (diff.peer_id == peer->device_id().get_sha256()) {
-                local_file = file->local_file();
-                if (file->get_blocks().size()) {
-                    cancel_sync(file.get());
+            if (file) {
+                if (diff.peer_id == peer->device_id().get_sha256()) {
+                    local_file = file->local_file();
+                    if (file->get_blocks().size()) {
+                        cancel_sync(file.get());
+                    }
                 }
             }
         }
@@ -523,8 +531,10 @@ auto controller_actor_t::operator()(const model::diff::modify::upsert_folder_t &
     -> outcome::result<void> {
     auto folder = cluster->get_folders().by_id(db::get_id(diff.db));
     if (folder->is_shared_with(*peer)) {
-        updates_streamer->on_remote_refresh();
-        pull_ready();
+        if (updates_streamer) {
+            updates_streamer->on_remote_refresh();
+            pull_ready();
+        }
     }
     return diff.visit_next(*this, custom);
 }
@@ -806,7 +816,11 @@ void controller_actor_t::on_block(message::block_response_t &message) noexcept {
     auto file = file_block.file();
     bool do_release_block = false;
     bool try_next = true;
-    if (!file) {
+    if (state != r::state_t::OPERATIONAL) {
+        do_release_block = true;
+        try_next = false;
+        LOG_DEBUG(log, "on_block, file = '{}',  non-operational ignoring", payload.file_name);
+    } else if (!file) {
         LOG_DEBUG(log, "on_block, file '{}' is not longer available in '{}'", payload.file_name, payload.folder_id);
         do_release_block = true;
     } else {
@@ -859,11 +873,15 @@ void controller_actor_t::on_validation(hasher::message::validation_response_t &r
     auto file = file_block.file();
     bool do_release_block = false;
     bool try_next = false;
-    if (!file) {
-        LOG_DEBUG(log, "on_block, file '{}' is not longer available in '{}'", payload.file_name, payload.folder_id);
+    if (state != r::state_t::OPERATIONAL) {
+        LOG_DEBUG(log, "on_validation, non-operational, ingoring block from '{}'", payload.file_name);
+        do_release_block = true;
+    } else if (!file) {
+        LOG_DEBUG(log, "on_validation, file '{}' is not longer available in '{}'", payload.file_name,
+                  payload.folder_id);
         do_release_block = true;
     } else if (!peer_address) {
-        LOG_DEBUG(log, "on_block, file: '{}', hash: {}, peer is no longer available", payload.file_name,
+        LOG_DEBUG(log, "on_validation, file: '{}', hash: {}, peer is no longer available", payload.file_name,
                   file_block.block()->get_hash());
         do_release_block = true;
     } else {
@@ -921,19 +939,19 @@ void controller_actor_t::on_validation(hasher::message::validation_response_t &r
 
 void controller_actor_t::on_fs_predown(message::fs_predown_t &message) noexcept {
     auto count = resources->has(resource::fs);
-    LOG_DEBUG(log, "on_fs_predown, forgetting fs requests = {}", count);
-    while (resources->has(resource::fs)) {
-        resources->release(resource::fs);
-    }
+    LOG_DEBUG(log, "on_fs_predown, has fs requests = {}", count);
     do_shutdown();
 }
 
 void controller_actor_t::on_fs_ack_timer(r::request_id_t, bool cancelled) noexcept {
     if (!cancelled) {
         auto count = resources->has(resource::fs);
-        LOG_WARN(log, "forgetting {} fs requests", count);
-        while (resources->has(resource::fs)) {
-            resources->release(resource::fs);
+        if (count) {
+            LOG_WARN(log, "forgetting {} fs requests", count);
+            while (resources->has(resource::fs)) {
+                resources->release(resource::fs);
+            }
+            cluster->modify_write_requests(static_cast<int32_t>(count));
         }
     }
 }
@@ -944,21 +962,23 @@ void controller_actor_t::push_block_write(model::diff::cluster_diff_ptr_t diff) 
 }
 
 void controller_actor_t::process_block_write() noexcept {
-    auto requests_left = cluster->get_write_requests();
-    auto sent = 0;
-    while (requests_left > 0 && !block_write_queue.empty()) {
-        auto &diff = block_write_queue.front();
-        push(diff.get());
-        --requests_left;
-        ++sent;
-        block_write_queue.pop_front();
-    }
-    if (sent) {
-        send_diff();
-        LOG_TRACE(log, "{} block writes sent, requests left = {}", sent, requests_left);
-        cluster->modify_write_requests(-sent);
-        for (int i = 0; i < sent; ++i) {
-            resources->acquire(resource::fs);
+    if (state == r::state_t::OPERATIONAL) {
+        auto requests_left = cluster->get_write_requests();
+        auto sent = 0;
+        while (requests_left > 0 && !block_write_queue.empty()) {
+            auto &diff = block_write_queue.front();
+            push(diff.get());
+            --requests_left;
+            ++sent;
+            block_write_queue.pop_front();
+        }
+        if (sent) {
+            send_diff();
+            LOG_TRACE(log, "{} block writes sent, requests left = {}", sent, requests_left);
+            cluster->modify_write_requests(-sent);
+            for (int i = 0; i < sent; ++i) {
+                resources->acquire(resource::fs);
+            }
         }
     }
 }

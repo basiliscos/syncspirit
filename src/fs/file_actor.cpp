@@ -148,6 +148,7 @@ void file_actor_t::on_controller_predown(net::message::controller_predown_t &mes
     if (p.started) {
         resources->release(resource::controller);
     }
+    do_shutdown(message.payload.ee);
 }
 
 auto file_actor_t::reflect(model::file_info_ptr_t &file_ptr, const bfs::path &path) noexcept -> outcome::result<void> {
