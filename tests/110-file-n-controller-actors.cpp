@@ -324,6 +324,12 @@ void test_shutdown_initiated_by_controller() {
         void main() noexcept override {
             controller_actor->do_shutdown();
             sup->do_process();
+
+            CHECK(static_cast<r::actor_base_t *>(file_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
+
+            file_actor->do_shutdown();
+            sup->do_process();
+            CHECK(cluster->get_write_requests() == 10);
         }
     };
     F().run();
@@ -396,6 +402,14 @@ void test_fs_actor_error() {
                 controller_actor->do_shutdown();
                 peer_actor->process_block_requests();
                 sup->do_process();
+
+                CHECK(static_cast<r::actor_base_t *>(peer_actor.get())->access<to::state>() == r::state_t::SHUT_DOWN);
+                CHECK(static_cast<r::actor_base_t *>(controller_actor.get())->access<to::state>() ==
+                      r::state_t::SHUT_DOWN);
+                CHECK(static_cast<r::actor_base_t *>(file_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
+
+                file_actor->do_shutdown();
+                sup->do_process();
             }
 
             CHECK(cluster->get_write_requests() == 10);
@@ -406,10 +420,10 @@ void test_fs_actor_error() {
 
 int _init() {
     test::init_logging();
-    // REGISTER_TEST_CASE(test_shutdown_initiated_by_controller, "test_shutdown_initiated_by_controller",
-    //                    "[fs][controller]");
-    // REGISTER_TEST_CASE(test_shutdown_initiated_by_file_actor, "test_shutdown_initiated_by_file_actor",
-    //                    "[fs][controller]");
+    REGISTER_TEST_CASE(test_shutdown_initiated_by_controller, "test_shutdown_initiated_by_controller",
+                       "[fs][controller]");
+    REGISTER_TEST_CASE(test_shutdown_initiated_by_file_actor, "test_shutdown_initiated_by_file_actor",
+                       "[fs][controller]");
     REGISTER_TEST_CASE(test_fs_actor_error, "test_fs_actor_error", "[fs][controller]");
     return 1;
 }
