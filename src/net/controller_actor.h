@@ -18,7 +18,7 @@
 
 #include <unordered_map>
 #include <optional>
-#include <deque>
+#include <list>
 
 namespace syncspirit {
 namespace net {
@@ -118,10 +118,8 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     };
 
     using peers_map_t = std::unordered_map<r::address_ptr_t, model::device_ptr_t>;
-    using unlink_request_t = r::message::unlink_request_t;
-    using unlink_request_ptr_t = r::intrusive_ptr_t<unlink_request_t>;
-    using unlink_requests_t = std::vector<unlink_request_ptr_t>;
-    using block_write_queue_t = std::deque<model::diff::cluster_diff_ptr_t>;
+    using block_write_queue_t = std::list<model::diff::cluster_diff_ptr_t>;
+    using block_read_queue_t = std::list<proto::Request>;
 
     struct folder_synchronization_t : model::arc_base_t<folder_synchronization_t> {
         using block_set_t = std::unordered_map<utils::bytes_view_t, model::block_info_ptr_t>;
@@ -228,12 +226,12 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     bfs::path default_path;
     updates_streamer_ptr_t updates_streamer;
     utils::logger_t log;
-    unlink_requests_t unlink_requests;
     model::file_iterator_ptr_t file_iterator;
     model::block_iterator_ptr_t block_iterator;
     synchronizing_folders_t synchronizing_folders;
     synchronizing_files_t synchronizing_files;
     block_write_queue_t block_write_queue;
+    block_read_queue_t block_read_queue;
     std::optional<r::request_id_t> fs_ack_timer;
     bool announced;
 };

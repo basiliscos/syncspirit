@@ -1727,12 +1727,12 @@ void test_sending_index_updates() {
 
 void test_uploading() {
     struct F : fixture_t {
+        using fixture_t::fixture_t;
 
         void _tune_peer(db::Device &device) noexcept override {
             db::set_compression(device, proto::Compression::ALWAYS);
         }
 
-        using fixture_t::fixture_t;
         void main(diff_builder_t &) noexcept override {
             auto &folder_infos = folder_1->get_folder_infos();
             auto folder_my = folder_infos.by_device(*my_device);
@@ -1805,6 +1805,84 @@ void test_uploading() {
                 CHECK(proto::get_id(peer_res) == 1);
                 CHECK(proto::get_code(peer_res) == proto::ErrorCode::NO_BEP_ERROR);
                 CHECK(proto::get_data(peer_res) == data_1);
+            }
+        }
+    };
+    F(true, 10).run();
+}
+
+void test_overload_uploading() {
+    struct F : fixture_t {
+        using fixture_t::fixture_t;
+
+        std::uint32_t get_blocks_max_requested() override { return 2; }
+
+        void main(diff_builder_t &) noexcept override {
+            static constexpr size_t BLOCKS_COUNT = 20;
+
+            auto builder = diff_builder_t(*cluster);
+            auto &folder_infos = folder_1->get_folder_infos();
+            auto folder_my = folder_infos.by_device(*my_device);
+            auto folder_peer = folder_infos.by_device(*peer_device);
+
+            auto file_name = std::string_view("data.bin");
+            auto file = proto::FileInfo();
+            proto::set_name(file, file_name);
+            proto::set_type(file, proto::FileInfoType::FILE);
+            proto::set_sequence(file, folder_my->get_max_sequence() + 1);
+            proto::set_size(file, BLOCKS_COUNT * 5);
+            proto::set_block_size(file, 5);
+
+            auto pieces = std::vector<utils::bytes_t>();
+            for (size_t i = 0; i < BLOCKS_COUNT; ++i) {
+                auto data = std::string(5, 'a' + static_cast<char>(i));
+                auto data_begin = reinterpret_cast<const unsigned char *>(data.data());
+                auto data_end = data_begin + data.size();
+                auto data_bytes = utils::bytes_t(data_begin, data_end);
+                auto data_h = utils::sha256_digest(data_bytes).value();
+                auto &b1 = proto::add_blocks(file);
+                proto::set_hash(b1, data_h);
+                proto::set_size(b1, data.size());
+                pieces.emplace_back(data_bytes);
+            }
+            auto &v = proto::get_version(file);
+            auto &counter = proto::add_counters(v);
+            proto::set_id(counter, 1);
+            proto::set_value(counter, 1);
+
+            builder.local_update(folder_1->get_id(), file).apply(*sup);
+
+            auto sha256 = peer_device->device_id().get_sha256();
+
+            builder.configure_cluster(sha256)
+                .add(sha256, folder_1->get_id(), folder_peer->get_index(), 1)
+                .add(my_device->device_id().get_sha256(), folder_1->get_id(), folder_my->get_index(), 1)
+                .finish()
+                .apply(*sup);
+
+            for (size_t i = 0; i < BLOCKS_COUNT; ++i) {
+                auto req = proto::Request();
+                proto::set_id(req, 1);
+                proto::set_folder(req, folder_1->get_id());
+                proto::set_name(req, file_name);
+                proto::set_size(req, 5);
+                proto::set_offset(req, i * 5);
+                peer_actor->forward(req);
+
+                auto &piece = pieces[i];
+                auto res = r::make_message<fs::payload::block_response_t>(target->get_address(), req, sys::error_code{},
+                                                                          piece);
+                block_responses.push_back(res);
+            }
+            sup->do_process();
+
+            auto &blocks = peer_actor->uploaded_blocks;
+            REQUIRE(blocks.size() == BLOCKS_COUNT);
+            for (size_t i = 0; i < BLOCKS_COUNT; ++i) {
+                auto &res = blocks.front();
+                auto data = proto::get_data(res);
+                CHECK(data == pieces[i]);
+                blocks.pop_front();
             }
         }
     };
@@ -2490,6 +2568,7 @@ int _init() {
     REGISTER_TEST_CASE(test_initiate_peer_sharing, "test_initiate_peer_sharing", "[net]");
     REGISTER_TEST_CASE(test_sending_index_updates, "test_sending_index_updates", "[net]");
     REGISTER_TEST_CASE(test_uploading, "test_uploading", "[net]");
+    REGISTER_TEST_CASE(test_overload_uploading, "test_overload_uploading", "[net]");
     REGISTER_TEST_CASE(test_peer_down, "test_peer_down", "[net]");
     REGISTER_TEST_CASE(test_peer_removal, "test_peer_removal", "[net]");
     REGISTER_TEST_CASE(test_conflicts, "test_conflicts", "[net]");

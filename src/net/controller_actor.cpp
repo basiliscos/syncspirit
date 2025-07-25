@@ -207,7 +207,7 @@ void controller_actor_t::send_new_indices() noexcept {
                         LOG_DEBUG(log, "peer still has wrong index for '{}' ({:#x} vs {:#x}), sending nothing",
                                   folder.get_id(), remote_folder->get_index(), local_folder->get_index());
                     } else if (remote_folder->get_max_sequence() == 0) {
-                        LOG_DEBUG(log, "sending new index for folder '{}' ({})", folder.get_label(), folder.get_id());
+                        LOG_DEBUG(log, "sending initial index for folder '{}' ({})", folder.get_label(), folder.get_id());
                         proto::Index index;
                         proto::set_folder(index, folder.get_id());
                         auto data = proto::serialize(index, peer->get_compression());
@@ -737,34 +737,35 @@ void controller_actor_t::on_message(proto::IndexUpdate &msg) noexcept {
 void controller_actor_t::on_message(proto::Request &req) noexcept {
     proto::Response res;
     auto code = proto::ErrorCode::NO_BEP_ERROR;
+    auto forward = true;
 
-    if (tx_blocks_requested > blocks_max_requested * constants::tx_blocks_max_factor) {
-        LOG_WARN(log, "peer requesting too many blocks ({}), rejecting current request", tx_blocks_requested);
-        code = proto::ErrorCode::GENERIC;
+    auto folder_id = proto::get_folder(req);
+    auto folder = cluster->get_folders().by_id(folder_id);
+    if (!folder) {
+        code = proto::ErrorCode::NO_SUCH_FILE;
     } else {
-        auto folder_id = proto::get_folder(req);
-        auto folder = cluster->get_folders().by_id(folder_id);
-        if (!folder) {
-            code = proto::ErrorCode::NO_SUCH_FILE;
+        auto &folder_infos = folder->get_folder_infos();
+        if (folder->is_suspended()) {
+            LOG_WARN(log, "folder '{}' is suspended for requests", folder->get_label());
+            code = proto::ErrorCode::GENERIC;
         } else {
-            auto &folder_infos = folder->get_folder_infos();
-            if (folder->is_suspended()) {
-                LOG_WARN(log, "folder '{}' is suspended for requests", folder->get_label());
-                code = proto::ErrorCode::GENERIC;
+            auto peer_folder = folder_infos.by_device(*peer);
+            if (!peer_folder) {
+                code = proto::ErrorCode::NO_SUCH_FILE;
             } else {
-                auto peer_folder = folder_infos.by_device(*peer);
-                if (!peer_folder) {
+                auto my_folder = folder_infos.by_device(*cluster->get_device());
+                auto name = proto::get_name(req);
+                auto file = my_folder->get_file_infos().by_name(name);
+                if (!file) {
                     code = proto::ErrorCode::NO_SUCH_FILE;
                 } else {
-                    auto my_folder = folder_infos.by_device(*cluster->get_device());
-                    auto name = proto::get_name(req);
-                    auto file = my_folder->get_file_infos().by_name(name);
-                    if (!file) {
-                        code = proto::ErrorCode::NO_SUCH_FILE;
+                    if (!file->is_file()) {
+                        LOG_WARN(log, "attempt to request non-regular file: {}", file->get_name());
+                        code = proto::ErrorCode::GENERIC;
                     } else {
-                        if (!file->is_file()) {
-                            LOG_WARN(log, "attempt to request non-regular file: {}", file->get_name());
-                            code = proto::ErrorCode::GENERIC;
+                        if (tx_blocks_requested > blocks_max_requested * constants::tx_blocks_max_factor) {
+                            LOG_DEBUG(log, "peer requesting too many blocks ({}), enqueuing...", tx_blocks_requested);
+                            forward = false;
                         }
                     }
                 }
@@ -780,8 +781,12 @@ void controller_actor_t::on_message(proto::Request &req) noexcept {
             send_to_peer(std::move(data));
         }
     } else {
-        ++tx_blocks_requested;
-        send<fs::payload::block_request_t>(fs_addr, std::move(req), address);
+        if (forward) {
+            ++tx_blocks_requested;
+            send<fs::payload::block_request_t>(fs_addr, std::move(req), address);
+        } else {
+            block_read_queue.emplace_back(std::move(req));
+        }
     }
 }
 
@@ -806,6 +811,14 @@ void controller_actor_t::on_block_response(fs::message::block_response_t &messag
 
     auto data = proto::serialize(res, peer->get_compression());
     send_to_peer(std::move(data));
+
+    auto max_block_read = blocks_max_requested * constants::tx_blocks_max_factor;
+    while (!block_read_queue.empty() && (tx_blocks_requested <= max_block_read)) {
+        auto &req = block_read_queue.front();
+        ++tx_blocks_requested;
+        send<fs::payload::block_request_t>(fs_addr, std::move(req), address);
+        block_read_queue.pop_front();
+    }
 }
 
 void controller_actor_t::on_block(message::block_response_t &message) noexcept {
