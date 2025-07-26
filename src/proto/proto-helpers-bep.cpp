@@ -117,4 +117,12 @@ utils::bytes_t encode(const Hello &object, std::size_t prefix) {
     return storage;
 }
 
+Index convert(IndexUpdate &&update) noexcept {
+    using namespace pp;
+    auto index = Index();
+    index["folder"_f] = std::move(update["folder"_f]);
+    index["files"_f] = std::move(update["files"_f]);
+    return index;
+}
+
 } // namespace syncspirit::proto

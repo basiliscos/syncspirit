@@ -185,7 +185,6 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
 
     outcome::result<void> operator()(const model::diff::advance::advance_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::contact::peer_state_t &, void *) noexcept override;
-    outcome::result<void> operator()(const model::diff::modify::add_remote_folder_infos_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::block_ack_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::block_rej_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::mark_reachable_t &, void *) noexcept override;

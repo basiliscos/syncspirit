@@ -57,6 +57,8 @@ int decode(utils::bytes_view_t, Ping &);
 int decode(utils::bytes_view_t, Request &);
 int decode(utils::bytes_view_t, Response &);
 
+Index convert(IndexUpdate &&) noexcept;
+
 /****************/
 /*** Announce ***/
 /****************/

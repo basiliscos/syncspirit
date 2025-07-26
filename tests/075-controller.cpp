@@ -633,14 +633,9 @@ void test_index_sending() {
                 sup->do_process();
 
                 auto &queue = peer_actor->messages;
-                REQUIRE(queue.size() == 2);
-                auto msg_1 = &(*queue.front()).payload;
-                auto my_index = std::get_if<proto::Index>(msg_1);
-                REQUIRE(my_index);
-                REQUIRE(proto::get_files_size(*my_index) == 0);
-
-                auto msg_2 = &(*queue.back()).payload;
-                auto my_index_update = std::get_if<proto::IndexUpdate>(msg_2);
+                REQUIRE(queue.size() == 1);
+                auto msg = &(*queue.back()).payload;
+                auto my_index_update = std::get_if<proto::Index>(msg);
                 REQUIRE(my_index_update);
                 REQUIRE(proto::get_files_size(*my_index_update) == 1);
             }
@@ -655,7 +650,11 @@ void test_index_sending() {
                 sup->do_process();
 
                 auto &queue = peer_actor->messages;
-                REQUIRE(queue.size() == 0);
+                REQUIRE(queue.size() == 1);
+                auto msg = &(*queue.back()).payload;
+                auto my_index_update = std::get_if<proto::Index>(msg);
+                REQUIRE(my_index_update);
+                REQUIRE(proto::get_files_size(*my_index_update) == 1);
             }
 
             SECTION("peer has actual view") {
@@ -747,10 +746,10 @@ void test_downloading() {
                 REQUIRE(queue.size() > 0);
 
                 auto msg = &(*queue.back()).payload;
-                auto &my_index_update = std::get<proto::IndexUpdate>(*msg);
+                auto &my_index_update = std::get<proto::Index>(*msg);
                 REQUIRE(proto::get_files_size(my_index_update) == 1);
 
-                SECTION("dont redownload file only if metadata has changed") {
+                SECTION("don't redownload file only if metadata has changed") {
                     auto index_update = proto::IndexUpdate{};
                     proto::set_folder(index_update, proto::get_folder(index));
                     proto::set_sequence(file, folder_1_peer->get_max_sequence() + 1);
@@ -1310,6 +1309,15 @@ void test_download_from_scratch() {
             sup->do_process();
 
             builder.share_folder(sha256, folder_1->get_id()).apply(*sup);
+            REQUIRE(peer_actor->messages.size() == 1);
+            {
+                auto peer_msg = &peer_actor->messages.front()->payload;
+                auto cc = std::get_if<proto::ClusterConfig>(peer_msg);
+                REQUIRE(cc);
+                REQUIRE(proto::get_folders_size(*cc) == 1);
+                auto &folder = proto::get_folders(*cc, 0);
+                CHECK(proto::get_id(folder) == folder_1->get_id());
+            }
 
             auto index = proto::Index{};
             proto::set_folder(index, folder_1->get_id());
@@ -1347,16 +1355,6 @@ void test_download_from_scratch() {
             CHECK(f->is_locally_available());
             CHECK(!f->is_locked());
 
-            REQUIRE(peer_actor->messages.size() == 1);
-            {
-                auto peer_msg = &peer_actor->messages.front()->payload;
-                auto cc = std::get_if<proto::ClusterConfig>(peer_msg);
-                REQUIRE(cc);
-                REQUIRE(proto::get_folders_size(*cc) == 1);
-                auto &folder = proto::get_folders(*cc, 0);
-                CHECK(proto::get_id(folder) == folder_1->get_id());
-            }
-
             cc = proto::ClusterConfig{};
             folder = proto::Folder();
             proto::set_id(folder, folder_1->get_id());
@@ -1379,14 +1377,10 @@ void test_download_from_scratch() {
             peer_actor->forward(cc);
             sup->do_process();
 
-            REQUIRE(peer_actor->messages.size() == 2);
+            REQUIRE(peer_actor->messages.size() == 1);
             {
                 auto peer_msg = &peer_actor->messages.front()->payload;
                 REQUIRE(std::get_if<proto::Index>(peer_msg));
-                peer_actor->messages.pop_front();
-
-                peer_msg = &peer_actor->messages.front()->payload;
-                REQUIRE(std::get_if<proto::IndexUpdate>(peer_msg));
             }
         }
     };
@@ -1657,13 +1651,7 @@ void test_initiate_peer_sharing() {
             peer_actor->messages.clear();
             sup->do_process();
 
-            REQUIRE(peer_actor->messages.size() == 1);
-            {
-                auto peer_msg = &peer_actor->messages.front()->payload;
-                auto &index_msg = std::get<proto::Index>(*peer_msg);
-                CHECK(proto::get_folder(index_msg) == folder_1->get_id());
-                CHECK(proto::get_files_size(index_msg) == 0);
-            }
+            CHECK(peer_actor->messages.size() == 0);
 
             // unshare folder_1
             auto peer_fi = folder_1->get_folder_infos().by_device(*peer_device);
@@ -1717,7 +1705,7 @@ void test_sending_index_updates() {
             builder.local_update(folder_1->get_id(), pr_file).apply(*sup);
             REQUIRE(peer_actor->messages.size() == 1);
             auto &msg = peer_actor->messages.front();
-            auto &index_update = std::get<proto::IndexUpdate>(msg->payload);
+            auto &index_update = std::get<proto::Index>(msg->payload);
             REQUIRE(proto::get_files_size(index_update) == 1);
             CHECK(proto::get_name(proto::get_files(index_update, 0)) == "a.txt");
         }
@@ -2377,7 +2365,7 @@ void test_change_folder_type() {
                 builder.apply(*sup);
                 REQUIRE(peer_actor->messages.size() >= 1);
                 auto &last_message = *peer_actor->messages.back();
-                auto &index_update_1 = std::get<proto::IndexUpdate>(last_message.payload);
+                auto &index_update_1 = std::get<proto::Index>(last_message.payload);
                 CHECK(proto::get_files_size(index_update_1) == 1);
 
                 peer_actor->messages.clear();
@@ -2408,8 +2396,8 @@ void test_change_folder_type() {
 
                         REQUIRE(peer_actor->messages.size() == 1);
                         auto &last_message = *peer_actor->messages.back();
-                        auto &index_update_2 = std::get<proto::IndexUpdate>(last_message.payload);
-                        CHECK(proto::get_files_size(index_update_2) == 1);
+                        auto &index = std::get<proto::Index>(last_message.payload);
+                        CHECK(proto::get_files_size(index) == 1);
                     }
                 }
             }
