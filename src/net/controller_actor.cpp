@@ -204,13 +204,12 @@ void controller_actor_t::send_new_indices() noexcept {
                 auto remote_folder = remote_folders.by_folder(folder);
                 if (remote_folder) {
                     if (remote_folder->get_index() != local_folder->get_index()) {
-                        LOG_DEBUG(log, "peer still has wrong index for '{}' ({:#x} vs {:#x}), sending nothing",
+                        LOG_DEBUG(log, "peer still has wrong index for '{}' ({:#x} vs {:#x}), sending initial (empty) index",
                                   folder.get_id(), remote_folder->get_index(), local_folder->get_index());
-                    } else if (remote_folder->get_max_sequence() == 0) {
-                        LOG_DEBUG(log, "sending initial index for folder '{}' ({})", folder.get_label(), folder.get_id());
-                        proto::Index index;
+                        updates_streamer->on_remote_refresh();
+                        auto index = proto::Index();
                         proto::set_folder(index, folder.get_id());
-                        auto data = proto::serialize(index, peer->get_compression());
+                        auto data = proto::serialize(index);
                         send_to_peer(std::move(data));
                     }
                 }
@@ -269,10 +268,11 @@ void controller_actor_t::push_pending() noexcept {
         }
     }
 
+    auto compression = peer->get_compression();
     for (auto &p : indices) {
         auto &index = p.second;
         if (proto::get_files_size(index) > 0) {
-            auto data = proto::serialize(index, peer->get_compression());
+            auto data = proto::serialize(index, compression);
             send_to_peer(std::move(data));
         }
     }
@@ -441,7 +441,8 @@ void controller_actor_t::on_model_update(model::message::model_update_t &message
 auto controller_actor_t::operator()(const model::diff::peer::cluster_update_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     auto ctx = reinterpret_cast<context_t *>(custom);
-    if (ctx->from_self) {
+    auto result = diff.visit_next(*this, custom);
+    if (ctx->from_self && !result.has_error()) {
         updates_streamer.reset(new model::updates_streamer_t(*cluster, *peer));
         send_new_indices();
         if (!file_iterator) {
@@ -449,7 +450,7 @@ auto controller_actor_t::operator()(const model::diff::peer::cluster_update_t &d
             pull_ready();
         }
     }
-    return diff.visit_next(*this, custom);
+    return result;
 }
 
 auto controller_actor_t::operator()(const model::diff::peer::update_folder_t &diff, void *custom) noexcept
@@ -512,17 +513,6 @@ auto controller_actor_t::operator()(const model::diff::contact::peer_state_t &di
             LOG_DEBUG(log, "there is a better connection ({}) to peer than me ({}), shut self down", my_url, other_url);
             do_shutdown();
         }
-    }
-    return diff.visit_next(*this, custom);
-}
-
-auto controller_actor_t::operator()(const model::diff::modify::add_remote_folder_infos_t &diff, void *custom) noexcept
-    -> outcome::result<void> {
-    if (diff.device_id == peer->device_id().get_sha256()) {
-        if (updates_streamer) {
-            updates_streamer->on_remote_refresh();
-        }
-        push_pending();
     }
     return diff.visit_next(*this, custom);
 }
