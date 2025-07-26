@@ -73,6 +73,8 @@ TEST_CASE("updates_streamer", "[model]") {
         auto f2 = add_file("b.txt");
 
         auto streamer = model::updates_streamer_t(*cluster, *peer_device);
+        CHECK(streamer.next() == f1);
+        CHECK(streamer.next() == f2);
         CHECK(!streamer.next());
     }
 

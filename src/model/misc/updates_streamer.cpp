@@ -30,11 +30,11 @@ void updates_streamer_t::refresh_remote() noexcept {
                 }
                 auto remote_folder = remote_folders.by_folder(folder);
                 if (remote_folder) {
-                    if (remote_folder->get_index() == local_folder->get_index()) {
-                        auto previously_seen = prev_seen[local_folder];
-                        auto seen = std::max(remote_folder->get_max_sequence(), previously_seen);
-                        seen_info[local_folder] = seen;
-                    }
+                    auto index_match = remote_folder->get_index() == local_folder->get_index();
+                    auto remote_max = index_match ? remote_folder->get_max_sequence() : 0;
+                    auto previously_seen = prev_seen[local_folder];
+                    auto seen = std::max(remote_max, previously_seen);
+                    seen_info[local_folder] = seen;
                 }
             }
         }
