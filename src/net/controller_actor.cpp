@@ -204,13 +204,9 @@ void controller_actor_t::send_new_indices() noexcept {
                 auto remote_folder = remote_folders.by_folder(folder);
                 if (remote_folder) {
                     if (remote_folder->get_index() != local_folder->get_index()) {
-                        LOG_DEBUG(log, "peer still has wrong index for '{}' ({:#x} vs {:#x}), sending initial (empty) index",
+                        LOG_DEBUG(log, "peer still has wrong index for '{}' ({:#x} vs {:#x}), refreshing",
                                   folder.get_id(), remote_folder->get_index(), local_folder->get_index());
                         updates_streamer->on_remote_refresh();
-                        auto index = proto::Index();
-                        proto::set_folder(index, folder.get_id());
-                        auto data = proto::serialize(index);
-                        send_to_peer(std::move(data));
                     }
                 }
             }
@@ -234,45 +230,58 @@ void controller_actor_t::on_peer_down(message::peer_down_t &message) noexcept {
 }
 
 void controller_actor_t::push_pending() noexcept {
-    using pair_t = std::pair<model::folder_info_t *, proto::IndexUpdate>;
-    using indices_t = std::vector<pair_t>;
+    struct update_t {
+        model::folder_info_t *folder;
+        proto::IndexUpdate index;
+        bool first;
+    };
+    using updates_t = std::vector<update_t>;
 
     if (!updates_streamer || !peer_address) {
         return;
     }
 
-    auto indices = indices_t{};
-    auto get_index = [&](model::file_info_t &file) -> proto::IndexUpdate & {
+    auto updates = updates_t{};
+    auto get_update = [&](model::file_info_t &file) -> update_t & {
         auto folder_info = file.get_folder_info();
-        for (auto &p : indices) {
-            if (p.first == folder_info) {
-                return p.second;
+        for (auto &p : updates) {
+            if (p.folder == folder_info) {
+                return p;
             }
         }
-        indices.emplace_back(folder_info, proto::IndexUpdate());
-        auto &index = indices.back().second;
-        proto::set_folder(index, folder_info->get_folder()->get_id());
-        return index;
+        auto &update = updates.emplace_back(folder_info, proto::IndexUpdate(), false);
+        proto::set_folder(update.index, folder_info->get_folder()->get_id());
+        return update;
     };
 
     auto expected_sz = std::uint32_t(0);
     while (expected_sz < outgoing_buffer_max - *outgoing_buffer) {
-        if (auto file_info = updates_streamer->next(); file_info) {
+        auto [file_info, first] = updates_streamer->next();
+        if (file_info) {
             expected_sz += file_info->expected_meta_size();
-            auto &index = get_index(*file_info);
-            proto::add_files(index, file_info->as_proto(true));
+            auto &update = get_update(*file_info);
+            proto::add_files(update.index, file_info->as_proto(true));
             LOG_TRACE(log, "pushing index update for: {}, seq = {}", file_info->get_full_name(),
                       file_info->get_sequence());
+            if (first) {
+                update.first = true;
+                LOG_TRACE(log, "(upgraded to Index)");
+            }
         } else {
             break;
         }
     }
 
     auto compression = peer->get_compression();
-    for (auto &p : indices) {
-        auto &index = p.second;
+    for (auto &u : updates) {
+        auto &index = u.index;
         if (proto::get_files_size(index) > 0) {
-            auto data = proto::serialize(index, compression);
+            auto data = utils::bytes_t();
+            if (u.first) {
+                data = proto::serialize(proto::convert(std::move(index)));
+            } else {
+                data = proto::serialize(index, compression);
+            }
             send_to_peer(std::move(data));
         }
     }

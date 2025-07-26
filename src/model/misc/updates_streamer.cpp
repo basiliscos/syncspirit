@@ -82,7 +82,7 @@ bool updates_streamer_t::on_update(file_info_t &file) noexcept {
 
 void updates_streamer_t::on_remote_refresh() noexcept { refresh_remote(); }
 
-file_info_ptr_t updates_streamer_t::next() noexcept {
+auto updates_streamer_t::next() noexcept -> update_t {
     if (streaming) {
         auto &files = streaming->unseen_files;
         auto &proj = files.sequence_projection();
@@ -90,8 +90,10 @@ file_info_ptr_t updates_streamer_t::next() noexcept {
             auto it = proj.begin();
             auto file = it->item;
             files.remove(file);
-            seen_info[streaming->folder_info] = file->get_sequence();
-            return file;
+            auto &seen_sequence = seen_info[streaming->folder_info];
+            auto initial = seen_sequence == 0;
+            seen_sequence = file->get_sequence();
+            return {file, initial};
         }
         streaming.reset();
     }
@@ -100,6 +102,7 @@ file_info_ptr_t updates_streamer_t::next() noexcept {
         if (seen_sequence < max) {
             auto [it, end] = folder_info->get_file_infos().range(seen_sequence + 1, max);
             if (it != end) {
+                auto initial = seen_sequence == 0;
                 auto file = it->item;
                 seen_info[folder_info] = file->get_sequence();
                 ++it;
@@ -111,9 +114,9 @@ file_info_ptr_t updates_streamer_t::next() noexcept {
                     }
                     streaming = streaming_info_t(folder_info, std::move(unseen_files));
                 }
-                return file;
+                return {file, initial};
             }
         }
     }
-    return {};
+    return {{}, false};
 }
