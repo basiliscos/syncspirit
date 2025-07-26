@@ -496,10 +496,10 @@ auto folder_table_t::make_ignore_delete(folder_table_t &container, bool disabled
     return new widget_t(container, disabled);
 }
 
-auto folder_table_t::make_disable_tmp(folder_table_t &container, bool disabled) -> widgetable_ptr_t {
+auto folder_table_t::make_disable_tmp(folder_table_t &container) -> widgetable_ptr_t {
     struct widget_t final : checkbox_widget_t {
         using parent_t = checkbox_widget_t;
-        widget_t(Fl_Widget &container, bool disabled_) : parent_t{container}, disabled{disabled_} {}
+        widget_t(Fl_Widget &container) : parent_t{container}, disabled{true} {}
 
         Fl_Widget *create_widget(int x, int y, int w, int h) override {
             auto r = parent_t::create_widget(x, y, w, h);
@@ -510,7 +510,8 @@ auto folder_table_t::make_disable_tmp(folder_table_t &container, bool disabled) 
         }
         void reset() override {
             auto &container = static_cast<folder_table_t &>(this->container);
-            input->value(container.description.get_folder()->are_temp_indixes_disabled());
+            // input->value(container.description.get_folder()->are_temp_indixes_disabled());
+            input->value(true);
         }
         bool store(void *data) override {
             auto ctx = reinterpret_cast<ctx_t *>(data);
@@ -519,7 +520,7 @@ auto folder_table_t::make_disable_tmp(folder_table_t &container, bool disabled) 
         }
         bool disabled;
     };
-    return new widget_t(container, disabled);
+    return new widget_t(container);
 }
 
 auto folder_table_t::make_paused(folder_table_t &container, bool disabled) -> widgetable_ptr_t {

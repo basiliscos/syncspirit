@@ -84,7 +84,7 @@ struct table_t : content::folder_table_t {
         data.push_back({"rescan interval", make_rescan_interval(*this, existing)});
         data.push_back({"ignore permissions", make_ignore_permissions(*this, existing)});
         data.push_back({"ignore delete", make_ignore_delete(*this, existing)});
-        data.push_back({"disable temp indixes", make_disable_tmp(*this, existing)});
+        data.push_back({"disable temp indixes", make_disable_tmp(*this)});
         data.push_back({"scheduled", make_scheduled(*this, existing)});
         data.push_back({"paused", make_paused(*this, existing)});
         data.push_back({"shared_with", make_shared_with(*this, fi->get_device(), true)});

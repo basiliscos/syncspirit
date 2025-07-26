@@ -82,7 +82,7 @@ struct table_t : content::folder_table_t {
         data.push_back({"rescan interval", make_rescan_interval(*this, false)});
         data.push_back({"ignore permissions", make_ignore_permissions(*this, false)});
         data.push_back({"ignore delete", make_ignore_delete(*this, false)});
-        data.push_back({"disable temp indixes", make_disable_tmp(*this, false)});
+        data.push_back({"disable temp indixes", make_disable_tmp(*this)});
         data.push_back({"scheduled", make_scheduled(*this, false)});
         data.push_back({"paused", make_paused(*this, false)});
         data.push_back({"shared_with", make_shared_with(*this, {}, false)});

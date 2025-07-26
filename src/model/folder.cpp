@@ -70,7 +70,7 @@ std::optional<proto::Folder> folder_t::generate(const model::device_t &device) c
     proto::set_read_only(r, folder_type == db::FolderType::send);
     proto::set_ignore_permissions(r, ignore_permissions);
     proto::set_ignore_delete(r, ignore_delete);
-    proto::set_disable_temp_indexes(r, disable_temp_indixes);
+    proto::set_disable_temp_indexes(r, true);
     proto::set_paused(r, paused);
     for (auto &it : folder_infos) {
         auto &fi = *it.item;

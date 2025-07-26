@@ -38,6 +38,7 @@ upsert_folder_t::upsert_folder_t(sequencer_t &sequencer, bu::uuid uuid_, db::Fol
                                  std::uint64_t index_id) noexcept
     : uuid{uuid_}, db{std::move(db_)} {
     auto folder_id = db::get_id(db);
+    db::set_disable_temp_indexes(db, true); // hard-code, ss does not support for now
     LOG_DEBUG(log, "upsert_folder_t, folder_id = {}, device = {}", folder_id, device);
 
     if (!folder_info) {
