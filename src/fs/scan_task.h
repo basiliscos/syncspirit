@@ -124,6 +124,8 @@ struct SYNCSPIRIT_API scan_task_t : boost::intrusive_ref_counter<scan_task_t, bo
     model::diff::cluster_diff_ptr_t update_diff;
     model::diff::cluster_diff_t *current_diff;
 
+    bool ignore_permissions = false;
+
     friend struct send_guard_t;
 };
 

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
+#include "access.h"
 #include "test-utils.h"
 #include "fs/scan_task.h"
 #include "fs/utils.h"
@@ -109,8 +110,13 @@ SECTION("some dirs, no files") {
     CHECK(proto::get_modified_s(uf->metadata) == modified);
 
     auto status = bfs::status(dir);
+#ifndef SYNCSPIRIT_WIN
     auto perms = static_cast<uint32_t>(status.permissions());
     CHECK(proto::get_permissions(uf->metadata) == perms);
+#else
+    CHECK(proto::get_permissions(uf->metadata) == 0666);
+    CHECK(proto::get_no_permissions(uf->metadata) == 1);
+#endif
 
     r = task.advance();
     CHECK(std::get_if<bool>(&r));
@@ -507,16 +513,43 @@ SECTION("regular files") {
             file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
             REQUIRE(folder_my->add_strict(file));
 
-            task = new scan_task_t(cluster, folder->get_id(), rw_cache, config);
+            SECTION("permissions are tracked") {
+                task = new scan_task_t(cluster, folder->get_id(), rw_cache, config);
 
-            r = task->advance();
-            CHECK(std::get_if<bool>(&r));
-            CHECK(*std::get_if<bool>(&r) == true);
+                r = task->advance();
+                CHECK(std::get_if<bool>(&r));
+                CHECK(*std::get_if<bool>(&r) == true);
 
-            r = task->advance();
-            REQUIRE(std::get_if<changed_meta_t>(&r));
-            auto ref = std::get_if<changed_meta_t>(&r);
-            CHECK(ref->file == file);
+#ifndef SYNCSPIRIT_WIN
+                r = task->advance();
+                REQUIRE(std::get_if<changed_meta_t>(&r));
+                auto ref = std::get_if<changed_meta_t>(&r);
+                CHECK(ref->file == file);
+#else
+                r = task->advance();
+                REQUIRE(std::get_if<unchanged_meta_t>(&r));
+                auto ref = std::get_if<unchanged_meta_t>(&r);
+                CHECK(ref->file == file);
+#endif
+            }
+            SECTION("permissions are ignored by folder settigns") {
+                SECTION("by folder settings") {
+                    ((model::folder_data_t *)folder.get())->access<test::to::ignore_permissions>() = true;
+                }
+                SECTION("by file") {
+                    auto &flags = file.get()->access<test::to::flags>();
+                    flags = flags | model::file_info_t::f_no_permissions;
+                }
+                task = new scan_task_t(cluster, folder->get_id(), rw_cache, config);
+                r = task->advance();
+                CHECK(std::get_if<bool>(&r));
+                CHECK(*std::get_if<bool>(&r) == true);
+
+                r = task->advance();
+                REQUIRE(std::get_if<unchanged_meta_t>(&r));
+                auto ref = std::get_if<unchanged_meta_t>(&r);
+                CHECK(ref->file == file);
+            }
         }
 
         r = task->advance();

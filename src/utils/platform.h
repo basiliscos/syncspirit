@@ -24,6 +24,7 @@ struct SYNCSPIRIT_API platform_t {
     static void shutdown() noexcept;
     static bool symlinks_supported() noexcept;
     static bool path_supported(const bfs::path &) noexcept;
+    static bool permissions_supported(const bfs::path &) noexcept;
 };
 
 } // namespace syncspirit::utils

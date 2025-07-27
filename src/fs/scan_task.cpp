@@ -5,6 +5,7 @@
 #include "utils.h"
 #include "model/messages.h"
 #include "fs/messages.h"
+#include "utils/platform.h"
 #include "proto/proto-helpers-bep.h"
 #include <boost/nowide/convert.hpp>
 
@@ -26,6 +27,8 @@ scan_task_t::scan_task_t(model::cluster_ptr_t cluster_, std::string_view folder_
 
     auto &path = folder->get_path();
     assert(path.is_absolute());
+
+    ignore_permissions = folder->are_permissions_ignored() || !utils::platform_t::permissions_supported(path);
 
     dirs_queue.push_back(path);
     root = path;
@@ -151,8 +154,13 @@ scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
                 }
                 proto::set_modified_s(metadata, to_unix(modification_time));
 
-                auto permissions = static_cast<uint32_t>(status.permissions());
-                proto::set_permissions(metadata, permissions);
+                if (ignore_permissions == false) {
+                    auto permissions = static_cast<uint32_t>(status.permissions());
+                    proto::set_permissions(metadata, permissions);
+                } else {
+                    proto::set_permissions(metadata, 0666);
+                    proto::set_no_permissions(metadata, true);
+                }
             }
             if (file_type == bfs::file_type::regular) {
                 proto::set_type(metadata, proto::FileInfoType::FILE);
@@ -230,14 +238,17 @@ scan_result_t scan_task_t::advance_regular_file(file_info_t &file) noexcept {
         changed = true;
     }
 
-    auto status = bfs::status(path, ec);
-    if (ec) {
-        return file_error_t{path, ec};
-    }
-    auto permissions = static_cast<uint32_t>(status.permissions());
-    proto::set_permissions(meta, permissions);
-    if (permissions != file->get_permissions()) {
-        changed = true;
+    if (!ignore_permissions && !file->has_no_permissions()) {
+        auto status = bfs::status(path, ec);
+        if (ec) {
+            return file_error_t{path, ec};
+        }
+
+        auto permissions = static_cast<uint32_t>(status.permissions());
+        proto::set_permissions(meta, permissions);
+        if (permissions != file->get_permissions()) {
+            changed = true;
+        }
     }
 
     if (changed) {

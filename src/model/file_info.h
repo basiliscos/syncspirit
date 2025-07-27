@@ -159,6 +159,9 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t {
 
     std::string make_conflicting_name() const noexcept;
 
+    template <typename T> auto &access() noexcept;
+    template <typename T> auto &access() const noexcept;
+
   private:
     using marks_vector_t = std::vector<bool>;
 
