@@ -23,6 +23,7 @@ using namespace syncspirit::net;
 using namespace syncspirit::fs;
 
 namespace bfs = std::filesystem;
+using perms_t = std::filesystem::perms;
 
 namespace {
 
@@ -137,6 +138,7 @@ void test_remote_copy() {
             proto::set_name(pr_fi, "q.txt");
             proto::set_modified_s(pr_fi, modified);
             proto::set_sequence(pr_fi, next_sequence);
+            proto::set_permissions(pr_fi, 0666);
 
             auto &v = proto::get_version(pr_fi);
             proto::add_counters(v, proto::Counter(peer_device->device_id().get_uint(), 1));
@@ -157,6 +159,17 @@ void test_remote_copy() {
                 REQUIRE(bfs::exists(path));
                 REQUIRE(bfs::file_size(path) == 0);
                 REQUIRE(to_unix(bfs::last_write_time(path)) == 1641828421);
+
+#ifndef SYNCSPIRIT_WIN
+                auto status = bfs::status(path);
+                auto p = status.permissions();
+                CHECK((p & perms_t::owner_read) != perms_t::none);
+                CHECK((p & perms_t::owner_write) != perms_t::none);
+                CHECK((p & perms_t::group_read) != perms_t::none);
+                CHECK((p & perms_t::group_write) != perms_t::none);
+                CHECK((p & perms_t::others_read) != perms_t::none);
+                CHECK((p & perms_t::others_write) != perms_t::none);
+#endif
             }
 
             SECTION("empty regular file a subdir") {
@@ -169,6 +182,17 @@ void test_remote_copy() {
                 auto &path = file->get_path();
                 REQUIRE(bfs::exists(path));
                 REQUIRE(bfs::file_size(path) == 0);
+
+#ifndef SYNCSPIRIT_WIN
+                auto status = bfs::status(path);
+                auto p = status.permissions();
+                CHECK((p & perms_t::owner_read) != perms_t::none);
+                CHECK((p & perms_t::owner_write) != perms_t::none);
+                CHECK((p & perms_t::group_read) != perms_t::none);
+                CHECK((p & perms_t::group_write) != perms_t::none);
+                CHECK((p & perms_t::others_read) != perms_t::none);
+                CHECK((p & perms_t::others_write) != perms_t::none);
+#endif
             }
 
             SECTION("non-empty regular file") {
@@ -189,6 +213,17 @@ void test_remote_copy() {
                 auto tmp_path = path.parent_path() / (path.filename().wstring() + L".syncspirit-tmp");
                 REQUIRE(bfs::exists(tmp_path));
                 REQUIRE(bfs::file_size(tmp_path) == 5);
+
+#ifndef SYNCSPIRIT_WIN
+                auto status = bfs::status(path);
+                auto p = status.permissions();
+                CHECK((p & perms_t::owner_read) != perms_t::none);
+                CHECK((p & perms_t::owner_write) != perms_t::none);
+                CHECK((p & perms_t::group_read) != perms_t::none);
+                CHECK((p & perms_t::group_write) != perms_t::none);
+                CHECK((p & perms_t::others_read) != perms_t::none);
+                CHECK((p & perms_t::others_write) != perms_t::none);
+#endif
             }
 
             SECTION("directory") {
