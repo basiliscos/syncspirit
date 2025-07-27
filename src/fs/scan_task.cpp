@@ -173,6 +173,7 @@ scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
                 }
                 proto::set_symlink_target(metadata, target.string());
                 proto::set_type(metadata, proto::FileInfoType::SYMLINK);
+                proto::set_no_permissions(metadata, true);
             } else {
                 LOG_WARN(log, "unknown/unimplemented file type {} : {}", (int)status.type(), bfs::path(child).string());
                 continue;

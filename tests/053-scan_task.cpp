@@ -162,6 +162,7 @@ SECTION("no dirs, symlink to non-existing target") {
     CHECK(uf->path.filename() == "symlink");
     CHECK(proto::get_size(uf->metadata) == 0);
     CHECK(proto::get_type(uf->metadata) == proto::FileInfoType::SYMLINK);
+    CHECK(proto::get_no_permissions(uf->metadata));
     CHECK(proto::get_symlink_target(uf->metadata) == "/some/where");
 
     r = task.advance();
