@@ -875,7 +875,6 @@ SECTION("regular files") {
     }
 }
 
-#ifndef SYNCSPIRIT_WIN
 SECTION("symlink file") {
     auto modified = std::time_t{1642007468};
     auto pr_file = proto::FileInfo{};
@@ -893,7 +892,9 @@ SECTION("symlink file") {
 
         auto path = root_path / "a.txt";
         auto target = bfs::path("b.txt");
+#ifndef SYNCSPIRIT_WIN
         bfs::create_symlink(target, path);
+#endif
 
         auto file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
         REQUIRE(folder_my->add_strict(file));
@@ -915,14 +916,15 @@ SECTION("symlink file") {
         auto &seen = task.get_seen_paths();
         CHECK(seen.count("a.txt"));
     }
-
     SECTION("symlink does exists") {
         proto::set_modified_s(pr_file, modified);
         proto::set_symlink_target(pr_file, "b");
 
         auto path = root_path / "a.txt";
         auto target = bfs::path("b");
+#ifndef SYNCSPIRIT_WIN
         bfs::create_symlink(target, path);
+#endif
         bfs::create_directories(root_path / target);
 
         auto pr_dir = proto::FileInfo{};
@@ -946,6 +948,7 @@ SECTION("symlink file") {
         auto ref = std::get_if<unchanged_meta_t>(&r);
         CHECK(((ref->file == dir) || (ref->file == file)));
 
+#ifndef SYNCSPIRIT_WIN
         r = task.advance();
         REQUIRE(std::get_if<unchanged_meta_t>(&r));
         ref = std::get_if<unchanged_meta_t>(&r);
@@ -954,6 +957,16 @@ SECTION("symlink file") {
         r = task.advance();
         CHECK(std::get_if<bool>(&r));
         CHECK(*std::get_if<bool>(&r) == true);
+#else
+        r = task.advance();
+        CHECK(std::get_if<bool>(&r));
+        CHECK(*std::get_if<bool>(&r) == true);
+
+        r = task.advance();
+        REQUIRE(std::get_if<unchanged_meta_t>(&r));
+        ref = std::get_if<unchanged_meta_t>(&r);
+        CHECK(((ref->file == dir) || (ref->file == file)));
+#endif
 
         r = task.advance();
         CHECK(std::get_if<bool>(&r));
@@ -969,7 +982,9 @@ SECTION("symlink file") {
 
         auto path = root_path / "a.txt";
         auto target = bfs::path("/");
+#ifndef SYNCSPIRIT_WIN
         bfs::create_symlink(target, path);
+#endif
 
         auto file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
         REQUIRE(folder_my->add_strict(file));
@@ -992,6 +1007,7 @@ SECTION("symlink file") {
         CHECK(seen.count("a.txt"));
     }
 
+#ifndef SYNCSPIRIT_WIN
     SECTION("symlink points to something different") {
         proto::set_modified_s(pr_file, modified);
 
@@ -1019,6 +1035,6 @@ SECTION("symlink file") {
         auto &seen = task.get_seen_paths();
         CHECK(seen.count("a.txt"));
     }
-}
 #endif
+}
 }

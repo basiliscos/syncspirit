@@ -73,13 +73,14 @@ scan_result_t scan_task_t::advance() noexcept {
         auto file = files.begin()->item;
         seen_paths.insert({std::string(file->get_name()), file->get_path()});
         files.remove(file);
-        if (file->is_deleted()) {
+
+        bool unchanged = file->is_deleted() || (file->is_link() && !utils::platform_t::symlinks_supported());
+        if (unchanged) {
             return unchanged_meta_t{std::move(file)};
         } else {
             return removed_t{std::move(file)};
         }
     }
-
     return false;
 }
 
