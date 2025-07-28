@@ -2,10 +2,14 @@
 // SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "access.h"
+#include "model/diff/peer/cluster_update.h"
 #include "test-utils.h"
 #include "fs/scan_task.h"
 #include "fs/utils.h"
 #include "model/misc/sequencer.h"
+#include "diff-builder.h"
+#include "test_supervisor.h"
+
 #include <boost/nowide/convert.hpp>
 
 using namespace syncspirit;
@@ -14,9 +18,9 @@ using namespace syncspirit::utils;
 using namespace syncspirit::model;
 using namespace syncspirit::fs;
 
-TEST_CASE("scan_task", "[fs]") {
-    test::init_logging();
+r::pt::time_duration timeout = r::pt::millisec{10};
 
+TEST_CASE("scan_task", "[fs]") {
     auto root_path = unique_path();
     bfs::create_directories(root_path);
     path_guard_t path_quard{root_path};
@@ -1038,3 +1042,80 @@ SECTION("symlink file") {
 #endif
 }
 }
+
+TEST_CASE("scan_task diffs aggregation, guard", "[fs]") {
+    struct my_supervisor_t : supervisor_t {
+        using supervisor_t::supervisor_t;
+
+        void on_model_update(model::message::model_update_t &msg) noexcept override {
+            ++model_updates;
+            supervisor_t::on_model_update(msg);
+        }
+
+        outcome::result<void> operator()(const diff::peer::cluster_update_t &diff, void *custom) noexcept override {
+            ++cluster_updates;
+            return diff.visit_next(*this, custom);
+        }
+
+        int model_updates = 0;
+        int cluster_updates = 0;
+    };
+
+    static constexpr int SIZE = 41;
+    auto root_path = unique_path();
+    bfs::create_directories(root_path);
+    path_guard_t path_quard{root_path};
+    auto rw_cache = fs::file_cache_ptr_t(new fs::file_cache_t(5));
+
+    config::fs_config_t config{3600, 10, 1024 * 1024, 5};
+    auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
+    auto my_device = device_t::create(my_id, "my-device").value();
+    auto peer_id = device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
+    auto peer_device = device_t::create(peer_id, "peer-device").value();
+
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
+    auto sequencer = make_sequencer(4);
+    cluster->get_devices().put(my_device);
+    cluster->get_devices().put(peer_device);
+
+    auto db_folder = db::Folder();
+    db::set_id(db_folder, "some-id");
+    db::set_label(db_folder, "my-label");
+    db::set_path(db_folder, root_path.string());
+
+    auto builder = diff_builder_t(*cluster);
+    REQUIRE(builder.upsert_folder(db_folder).apply());
+
+    auto folders = cluster->get_folders();
+    auto folder = folders.by_id("some-id");
+
+    r::system_context_t ctx;
+    auto sup = ctx.create_supervisor<my_supervisor_t>().timeout(timeout).create_registry().finish();
+    sup->cluster = cluster;
+    sup->do_process();
+
+    auto task = scan_task_t(cluster, folder->get_id(), rw_cache, config);
+    {
+        auto guard = task.guard(*sup, sup->get_address());
+        guard.send_by_force();
+        auto sha256 = peer_id.get_sha256();
+        for (int i = 0; i < SIZE; ++i) {
+            auto diff = builder.configure_cluster(sha256, {}).finish().extract();
+            task.push(diff.get());
+        }
+    }
+
+    sup->do_process();
+    CHECK(sup->model_updates == (41 / 5 + 1));
+    CHECK(sup->cluster_updates == SIZE);
+
+    sup->do_shutdown();
+    sup->do_process();
+}
+
+int _init() {
+    test::init_logging();
+    return 1;
+}
+
+static int v = _init();

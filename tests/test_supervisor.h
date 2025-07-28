@@ -68,7 +68,7 @@ struct SYNCSPIRIT_TEST_API supervisor_t : r::supervisor_t,
     void shutdown() noexcept override;
     void enqueue(r::message_ptr_t message) noexcept override;
 
-    void on_model_update(model::message::model_update_t &) noexcept;
+    virtual void on_model_update(model::message::model_update_t &) noexcept;
     void on_model_sink(model::message::model_update_t &) noexcept;
     void do_start_timer(const r::pt::time_duration &interval, r::timer_handler_base_t &handler) noexcept override;
     void do_invoke_timer(r::request_id_t timer_id) noexcept;
