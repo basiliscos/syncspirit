@@ -60,7 +60,7 @@ auto file_entity_t::on_insert(model::file_info_t &file_info) noexcept
     }();
     auto parent_presence = presence->set_parent(parent);
     if (parent_presence) {
-        parent_presence->get_children().clear();
+        parent_presence->clear_children();
     }
     while (parent_presence) {
         --parent_presence->entity_generation;

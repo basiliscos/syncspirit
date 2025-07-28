@@ -117,11 +117,13 @@ void presence_t::sync_with_entity() const noexcept {
 bool presence_t::compare(const presence_t *l, const presence_t *r) noexcept {
     auto lf = l->get_features();
     if (lf & F::missing) {
+        assert(l->entity->best);
         l = l->entity->best;
         lf = l->get_features();
     }
     auto rf = r->get_features();
     if (rf & F::missing) {
+        assert(r->entity->best);
         r = r->entity->best;
         rf = r->get_features();
     }
@@ -150,6 +152,10 @@ auto presence_t::get_children() noexcept -> children_t & {
         std::sort(children.begin(), children.end(), compare);
     }
     return children;
+}
+
+void presence_t::clear_children() noexcept {
+    children.clear();
 }
 
 bool presence_t::is_unique() const noexcept {

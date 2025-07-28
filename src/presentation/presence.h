@@ -54,6 +54,7 @@ struct SYNCSPIRIT_API presence_t : model::proxy_t {
     virtual const presence_t* determine_best(const presence_t*) const;
 
     children_t& get_children() noexcept;
+    void clear_children() noexcept;
 
     static bool compare(const presence_t *l, const presence_t *r) noexcept;
 

@@ -141,7 +141,7 @@ entity_t *folder_entity_t::on_insert(model::file_info_t &file_info) noexcept {
                 auto best = child->best == p;
                 auto diff = p->get_stats();
                 entity->push_stats(diff, p->get_device(), false);
-                p->get_children().clear();
+                p->clear_children();
             }
         }
         entity->push_stats({child->get_stats(), 0}, nullptr, true);
@@ -152,7 +152,7 @@ entity_t *folder_entity_t::on_insert(model::file_info_t &file_info) noexcept {
         for (auto p : presences) {
             if (p->get_device() == device) {
                 presence_diff = -p->get_own_stats();
-                p->get_children().clear();
+                p->clear_children();
                 break;
             }
         }
