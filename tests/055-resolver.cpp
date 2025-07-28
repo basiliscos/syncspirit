@@ -447,6 +447,16 @@ TEST_CASE("resolver, reserved names", "[model]") {
         CHECK(action == A::ignore);
 #endif
     }
+    SECTION("deleted symlinks are supported") {
+        proto::set_name(pr_remote, "b.txt");
+        proto::set_type(pr_remote, proto::FileInfoType::SYMLINK);
+        proto::set_symlink_target(pr_remote, "b.txt");
+        proto::set_deleted(pr_remote, true);
+        auto file_remote = file_info_t::create(sequencer->next_uuid(), pr_remote, folder_peer).value();
+        folder_peer->add_strict(file_remote);
+        auto action = resolve(*file_remote);
+        CHECK(action == A::remote_copy);
+    }
 #ifdef SYNCSPIRIT_WIN
     SECTION("prohibed char in path (1)") {
         proto::set_name(pr_remote, "a/|/b.txt");

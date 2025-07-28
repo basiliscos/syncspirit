@@ -121,7 +121,7 @@ static advance_action_t resolve(const file_info_t &remote, const file_info_t *lo
 
 advance_action_t resolve(const file_info_t &remote) noexcept {
     using P = utils::platform_t;
-    if (remote.is_link() && !P::symlinks_supported()) {
+    if (remote.is_link() && !remote.is_deleted() && !P::symlinks_supported()) {
         return advance_action_t::ignore;
     }
     if (!P::path_supported(bfs::path(boost::nowide::widen(remote.get_name())))) {
