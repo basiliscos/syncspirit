@@ -3,6 +3,7 @@
 
 #include "entity.h"
 #include "presence.h"
+#include "folder_entity.h"
 #include <cassert>
 #include <utility>
 
@@ -170,7 +171,7 @@ void entity_t::detach_child(entity_t &child) noexcept {
     child.set_augmentation({});
 
     for (auto r : presences) {
-        r->children.clear();
+        r->clear_children();
     }
     // push_stats({-child.get_stats(), 0}, nullptr, true);
     auto &child_presences = child.presences;
@@ -205,8 +206,10 @@ void entity_t::commit(const path_t &path, const model::device_t *device) noexcep
     }
     for (auto p : presences) {
         auto parent = p->parent;
-        if (parent && path.contains(parent->entity->path)) {
-            parent->statistics += p->statistics;
+        if (parent) {
+            if (path.contains(parent->entity->path)) {
+                parent->statistics += p->statistics;
+            }
         }
     }
 
@@ -214,6 +217,7 @@ void entity_t::commit(const path_t &path, const model::device_t *device) noexcep
     if (best) {
         statistics += best->get_own_stats();
     }
+    // TODO: move this up?
     ++generation;
     if (auto monitor = get_monitor(); monitor) {
         monitor->on_update(*this);

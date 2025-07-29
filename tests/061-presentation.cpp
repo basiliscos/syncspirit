@@ -106,6 +106,7 @@ TEST_CASE("presentation", "[presentation]") {
     cluster->get_devices().put(peer_2_device);
 
     auto builder = diff_builder_t(*cluster);
+
     SECTION("empty folder") {
         SECTION("shared with nobody") {
             REQUIRE(builder.upsert_folder("1234-5678", "some/path", "my-label").apply());
@@ -371,6 +372,7 @@ TEST_CASE("presentation", "[presentation]") {
             CHECK(f_peer_2->get_parent() == peer_2_folder_presence);
         }
     }
+
     SECTION("folder shared with a peer, simple hierarchy") {
         REQUIRE(builder.upsert_folder("1234-5678", "some/path", "my-label").apply());
         auto folder = cluster->get_folders().by_id("1234-5678");
@@ -391,6 +393,7 @@ TEST_CASE("presentation", "[presentation]") {
             folder_info->add_strict(file);
             return file;
         };
+
         SECTION("create hierarchy up-front") {
             REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
             add_file("a", *my_device);
@@ -672,6 +675,59 @@ TEST_CASE("presentation", "[presentation]") {
                 CHECK(p_file_my->get_parent() == p_dir_a_my);
                 CHECK(p_file_peer->get_parent() == p_dir_a_peer);
             }
+#if 0
+            SECTION("lazy, with peer-2") {
+                REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
+                auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
+                auto f_b_peer = add_file("a/b.bin", *peer_device);
+                auto f_c_my = add_file("a/c.bin", *my_device);
+
+                auto e_b = folder_entity->on_insert(*f_b_peer);
+                auto e_c = folder_entity->on_insert(*f_c_my);
+
+                auto f_a_my = add_file("a", *my_device);
+                auto e_a = folder_entity->on_insert(*f_a_my);
+                CHECK(e_a->get_stats() == entity_stats_t{0, 2});
+
+                REQUIRE(folder_entity->get_children().size() == 1);
+
+                auto p_a_my = e_a->get_presence(my_device.get());
+                CHECK(p_a_my ->get_children().size() == 1);
+                CHECK(p_a_my->get_stats() == presence_stats_t{0, 2, 2, 2});
+
+                auto p_c_my = p_a_my ->get_children()[0];
+                CHECK(p_c_my->get_children().size() == 0);
+                CHECK(p_c_my->get_entity()->get_path().get_full_name() == "a/c.bin");
+
+                auto f_a_peer = add_file("a", *peer_device);
+                auto e_a_2 = folder_entity->on_insert(*f_a_peer);
+                CHECK(e_a_2 == e_a);
+                CHECK(e_a->get_stats() == entity_stats_t{0, 3});
+
+                auto p_a_peer = e_a->get_presence(peer_device.get());
+                REQUIRE(p_a_peer->get_children().size() == 2);
+                CHECK(p_a_peer->get_stats() == presence_stats_t{0, 1, 1, 2});
+
+                auto p_b_peer = p_a_peer ->get_children()[0];
+                CHECK(p_b_peer->get_children().size() == 0);
+                CHECK(p_b_peer->get_entity()->get_path().get_full_name() == "a/b.bin");
+
+                CHECK(p_a_peer->get_children()[1]->get_features() & F::missing);
+                CHECK(p_a_peer->get_children()[1]->get_entity()->get_path().get_full_name() == "a/c.bin");
+
+                CHECK(p_a_my ->get_children().size() == 2);
+                CHECK(p_a_my->get_stats() == presence_stats_t{0, 3, 2, 3});
+
+                auto p_b_my = p_a_my ->get_children()[0];
+                CHECK(p_b_my->get_children().size() == 0);
+                CHECK(p_b_my->get_features() & F::missing);
+                CHECK(p_b_my->get_entity()->get_path().get_full_name() == "a/b.bin");
+
+                p_c_my = p_a_my ->get_children()[1];
+                CHECK(p_c_my->get_children().size() == 0);
+                CHECK(p_c_my->get_entity()->get_path().get_full_name() == "a/c.bin");
+            }
+#endif
         }
         SECTION("removal") {
             REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
@@ -1219,6 +1275,7 @@ TEST_CASE("statistics", "[presentation]") {
                 CHECK(p_a_peer->get_stats() == presence_stats_t{5, 2, 1, 0});
 
                 p_x_peer = e_x->get_presence(&*peer_device);
+                CHECK(p_x_peer->get_parent());
                 CHECK(p_x_peer->get_stats() == presence_stats_t{5, 1, 1, 0});
                 CHECK(p_a_peer->get_children().size() == 1);
                 CHECK(p_a_peer->get_children()[0] == p_x_peer);

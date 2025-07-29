@@ -15,6 +15,8 @@
 using namespace syncspirit;
 using namespace syncspirit::presentation;
 
+using F = presence_t::features_t;
+
 file_entity_t::file_entity_t(model::file_info_t &sample_file, path_t path_) noexcept : entity_t(std::move(path_)) {
     using presence_files_t = std::pmr::vector<model::file_info_t *>;
 
@@ -71,12 +73,17 @@ auto file_entity_t::on_insert(model::file_info_t &file_info) noexcept
     for (auto &c : children) {
         for (auto p : c->presences) {
             if (p->device == device) {
-                if (p->parent != presence) {
+                auto prev_parent = p->parent;
+                if (prev_parent != presence) {
                     p->set_parent(presence);
                     auto child_stats = p->get_stats(false);
                     diff += child_stats;
                     presence->statistics += child_stats;
+                    if (!prev_parent) {
+                        c->recalc_best();
+                    }
                 }
+                break;
             }
         }
     }

@@ -147,16 +147,16 @@ auto presence_t::get_children() noexcept -> children_t & {
         children.reserve(e_children.size());
         for (auto &c : e_children) {
             auto p = const_cast<presence_t *>(c->get_presence(device));
-            children.emplace_back(p);
+            if (p->entity->best) {
+                children.emplace_back(p);
+            }
         }
         std::sort(children.begin(), children.end(), compare);
     }
     return children;
 }
 
-void presence_t::clear_children() noexcept {
-    children.clear();
-}
+void presence_t::clear_children() noexcept { children.clear(); }
 
 bool presence_t::is_unique() const noexcept {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
