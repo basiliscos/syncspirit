@@ -116,6 +116,7 @@ struct controller_up_t {
     using tx_size_ptr_t = boost::local_shared_ptr<tx_size_t>;
 
     r::address_ptr_t controller;
+    utils::uri_ptr_t url;
     model::device_id_t peer;
     tx_size_ptr_t tx_size;
 };

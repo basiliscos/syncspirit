@@ -200,7 +200,7 @@ struct fixture_t : private model::diff::cluster_visitor_t {
         if (known_peer) {
             builder.update_state(*peer_device, {}, state.clone()).apply(*sup);
         }
-        auto url = utils::parse(url_str);
+        peer_url = utils::parse(url_str);
 
         auto bep_config = config::bep_config_t();
         bep_config.rx_buff_size = 1024;
@@ -217,7 +217,7 @@ struct fixture_t : private model::diff::cluster_visitor_t {
                          .peer_device_id(peer_device->device_id())
                          .peer_state(std::move(state))
                          .device_name("peer-device")
-                         .uri(url->clone())
+                         .uri(peer_url->clone())
                          .autoshutdown_supervisor(true)
                          .finish();
         return peer_actor;
@@ -311,6 +311,7 @@ struct fixture_t : private model::diff::cluster_visitor_t {
     model::device_ptr_t peer_device;
     tcp::endpoint peer_ep;
     peer_actor_ptr_t peer_actor;
+    utils::uri_ptr_t peer_url;
     model::device_ptr_t my_device;
     transport::stream_sp_t peer_trans;
     transport::stream_sp_t client_trans;
@@ -390,10 +391,12 @@ void test_hello_read_then_write() {
         void on_hello(proto::Hello &) noexcept override {
             auto peer_id = peer_device->device_id();
             auto peer = cluster->get_devices().by_sha256(peer_id.get_sha256());
-            CHECK(peer->get_state().is_connected());
+            auto &state = peer->get_state();
+            CHECK(state.is_connected());
 
             auto coordinator = sup->get_address();
-            sup->send<net::payload::controller_up_t>(coordinator, coordinator, peer_id, outgoing_buff);
+            sup->send<net::payload::controller_up_t>(coordinator, coordinator, peer_url->clone(), peer_id,
+                                                     outgoing_buff);
 
             send_hello();
         }
@@ -521,10 +524,12 @@ void test_cancel_write() {
         void on_hello(proto::Hello &) noexcept override {
             auto peer_id = peer_device->device_id();
             auto peer = cluster->get_devices().by_sha256(peer_id.get_sha256());
-            CHECK(peer->get_state().is_connected());
+            auto &state = peer->get_state();
+            CHECK(state.is_connected());
 
             auto coordinator = sup->get_address();
-            sup->send<net::payload::controller_up_t>(coordinator, coordinator, peer_id, outgoing_buff);
+            sup->send<net::payload::controller_up_t>(coordinator, coordinator, peer_url->clone(), peer_id,
+                                                     outgoing_buff);
 
             send_hello();
         }
@@ -571,10 +576,13 @@ void test_forwarding_messages() {
         void on_hello(proto::Hello &) noexcept override {
             auto peer_id = peer_device->device_id();
             auto coordinator = sup->get_address();
-            sup->send<net::payload::controller_up_t>(coordinator, coordinator, peer_id, outgoing_buff);
 
             auto peer = cluster->get_devices().by_sha256(peer_device->device_id().get_sha256());
-            CHECK(peer->get_state().is_online());
+            auto &state = peer->get_state();
+            CHECK(state.is_online());
+
+            sup->send<net::payload::controller_up_t>(coordinator, coordinator, peer_url->clone(), peer_id,
+                                                     outgoing_buff);
 
             files_left = GENERATE(10, 2, 1);
             tx_buff = {};
