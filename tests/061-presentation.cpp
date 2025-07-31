@@ -691,10 +691,10 @@ TEST_CASE("presentation", "[presentation]") {
                 REQUIRE(folder_entity->get_children().size() == 1);
 
                 auto p_a_my = e_a->get_presence(my_device.get());
-                CHECK(p_a_my ->get_children().size() == 1);
+                CHECK(p_a_my->get_children().size() == 1);
                 CHECK(p_a_my->get_stats() == presence_stats_t{0, 2, 2, 2});
 
-                auto p_c_my = p_a_my ->get_children()[0];
+                auto p_c_my = p_a_my->get_children()[0];
                 CHECK(p_c_my->get_children().size() == 0);
                 CHECK(p_c_my->get_entity()->get_path().get_full_name() == "a/c.bin");
 
@@ -707,22 +707,22 @@ TEST_CASE("presentation", "[presentation]") {
                 REQUIRE(p_a_peer->get_children().size() == 2);
                 CHECK(p_a_peer->get_stats() == presence_stats_t{0, 2, 2, 0});
 
-                auto p_b_peer = p_a_peer ->get_children()[0];
+                auto p_b_peer = p_a_peer->get_children()[0];
                 CHECK(p_b_peer->get_children().size() == 0);
                 CHECK(p_b_peer->get_entity()->get_path().get_full_name() == "a/b.bin");
 
                 CHECK(p_a_peer->get_children()[1]->get_features() & F::missing);
                 CHECK(p_a_peer->get_children()[1]->get_entity()->get_path().get_full_name() == "a/c.bin");
 
-                CHECK(p_a_my ->get_children().size() == 2);
+                CHECK(p_a_my->get_children().size() == 2);
                 CHECK(p_a_my->get_stats() == presence_stats_t{0, 2, 2, 2});
 
-                auto p_b_my = p_a_my ->get_children()[0];
+                auto p_b_my = p_a_my->get_children()[0];
                 CHECK(p_b_my->get_children().size() == 0);
                 CHECK(p_b_my->get_features() & F::missing);
                 CHECK(p_b_my->get_entity()->get_path().get_full_name() == "a/b.bin");
 
-                p_c_my = p_a_my ->get_children()[1];
+                p_c_my = p_a_my->get_children()[1];
                 CHECK(p_c_my->get_children().size() == 0);
                 CHECK(p_c_my->get_entity()->get_path().get_full_name() == "a/c.bin");
             }
