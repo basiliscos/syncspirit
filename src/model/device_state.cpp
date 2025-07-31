@@ -19,9 +19,23 @@ device_state_t::device_state_t(token_id_t token_, connection_state_t connection_
 
 bool device_state_t::operator<(const device_state_t &other) const noexcept {
     if (other.connection_state == connection_state && connection_state == connection_state_t::online) {
-        auto lhs_relay = online_url->scheme().find("relay") == 0;
-        auto rhs_tcp = other.online_url->scheme().find("tcp") == 0;
-        return lhs_relay && rhs_tcp;
+        auto lhs_scheme = online_url->scheme();
+        auto rhs_scheme = other.online_url->scheme();
+        auto lhs_relay = lhs_scheme.find("relay") == 0;
+        auto rhs_relay = rhs_scheme.find("relay") == 0;
+        auto lhs_tcp = lhs_scheme.find("tcp") == 0;
+        auto rhs_tcp = rhs_scheme.find("tcp") == 0;
+
+        if (lhs_relay && rhs_tcp) {
+            return true;
+        }
+        if (lhs_tcp && rhs_relay) {
+            return false;
+        }
+
+        auto lhs_port = online_url->port_number();
+        auto rhs_port = other.online_url->port_number();
+        return lhs_port < rhs_port;
     }
     return connection_state < other.connection_state;
 }
