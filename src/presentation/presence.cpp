@@ -35,19 +35,27 @@ const presence_stats_t &presence_t::get_stats(bool sync) const noexcept {
     return statistics;
 }
 
-presence_t *presence_t::set_parent(entity_t *value) noexcept {
-    if (value && device) {
-        auto p = value->get_presence(device);
-        if (p && p->device == device) {
-            parent = p;
+presence_t *presence_t::set_parent(entity_t *parent_entity, presence_t *parent_) noexcept {
+    if (parent_entity && device) {
+        if (!parent_) {
+            parent_ = parent_entity->get_presence(device);
+        }
+        if (parent_ && parent_->device == device) {
+            parent = parent_;
+            parent_entity->push_stats(get_stats(), device, false);
+            for (auto child_entity : entity->children) {
+                for (auto child_presence : child_entity->presences) {
+                    if (child_presence->device == device) {
+                        if (!child_presence->parent) {
+                            child_presence->set_parent(entity, this);
+                        }
+                        break;
+                    }
+                }
+            }
         }
     }
     return parent;
-}
-
-void presence_t::set_parent(presence_t *value) noexcept {
-    assert(entity->get_parent() == value->entity);
-    parent = value;
 }
 
 void presence_t::clear_presense() noexcept {

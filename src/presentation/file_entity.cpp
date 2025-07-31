@@ -42,13 +42,12 @@ file_entity_t::file_entity_t(model::file_info_t &sample_file, path_t path_) noex
     }
 }
 
-auto file_entity_t::on_insert(model::file_info_t &file_info) noexcept
-    -> std::pair<file_presence_t *, presence_stats_t> {
+auto file_entity_t::on_insert(model::file_info_t &file_info) noexcept -> file_presence_t * {
     auto fi = file_info.get_folder_info();
     auto device = fi->get_device();
     for (auto p : presences) {
         if (p->device == device) {
-            return {static_cast<file_presence_t *>(p), {}};
+            return static_cast<file_presence_t *>(p);
         }
     }
 
@@ -60,6 +59,7 @@ auto file_entity_t::on_insert(model::file_info_t &file_info) noexcept
             return new peer_file_presence_t(*this, file_info);
         }
     }();
+    presences.emplace_back(presence);
     auto parent_presence = presence->set_parent(parent);
     if (parent_presence) {
         parent_presence->clear_children();
@@ -68,24 +68,5 @@ auto file_entity_t::on_insert(model::file_info_t &file_info) noexcept
         --parent_presence->entity_generation;
         parent_presence = parent_presence->parent;
     }
-    presences.emplace_back(presence);
-    auto diff = presence->get_own_stats();
-    for (auto &c : children) {
-        for (auto p : c->presences) {
-            if (p->device == device) {
-                auto prev_parent = p->parent;
-                if (prev_parent != presence) {
-                    p->set_parent(presence);
-                    auto child_stats = p->get_stats(false);
-                    diff += child_stats;
-                    presence->statistics += child_stats;
-                    if (!prev_parent) {
-                        c->recalc_best();
-                    }
-                }
-                break;
-            }
-        }
-    }
-    return {presence, diff};
+    return presence;
 }

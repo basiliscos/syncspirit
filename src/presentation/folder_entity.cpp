@@ -104,7 +104,6 @@ auto folder_entity_t::on_insert(model::folder_info_t &folder_info) noexcept -> f
     auto new_files = new_files_t();
     process(&folder_info, children, new_files);
     process_files(std::move(new_files), orphans, this);
-    statistics = {};
     commit(path, device);
     return p;
 }
@@ -134,45 +133,12 @@ entity_t *folder_entity_t::on_insert(model::file_info_t &file_info) noexcept {
         entity->add_child(*child);
         orphans.reap_children(child);
         child->commit(child->get_path(), device);
-
-        for (auto p : child->presences) {
-            auto device = p->get_device();
-            if (device) {
-                auto best = child->best == p;
-                auto diff = p->get_stats();
-                entity->push_stats(diff, p->get_device(), false);
-                p->clear_children();
-            }
-        }
-        entity->push_stats({child->get_stats(), 0}, nullptr, true);
         recalc_best();
         return child.get();
     } else if (i == path.get_pieces_size()) {
-        auto presence_diff = presence_stats_t{};
-        for (auto p : presences) {
-            if (p->get_device() == device) {
-                presence_diff = -p->get_own_stats();
-                p->clear_children();
-                break;
-            }
-        }
         auto file_entity = static_cast<file_entity_t *>(entity);
-        auto [file_presence, file_diff] = file_entity->on_insert(file_info);
-        presence_diff += file_diff;
-        if (auto parent = entity->parent; parent) {
-            parent->push_stats(presence_diff, device, false);
-        }
-        auto prev_best = entity->best;
-        auto new_best = entity->recalc_best();
-        if (new_best != prev_best) {
-            auto entity_diff = entity_stats_t{};
-            if (prev_best) {
-                entity_diff -= prev_best->get_own_stats();
-            }
-            assert(new_best == file_presence);
-            entity_diff += new_best->get_own_stats();
-            entity->push_stats({entity_diff, 0}, nullptr, true);
-        }
+        auto file_presence = file_entity->on_insert(file_info);
+        entity->commit(entity->get_path(), device);
         if (auto monitor = get_monitor(); monitor) {
             monitor->on_update(*entity);
         }

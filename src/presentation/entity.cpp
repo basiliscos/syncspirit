@@ -96,25 +96,21 @@ void entity_t::remove_presense(presence_t &item) noexcept {
         }
     }
 
-    bool need_restat = false;
-    auto stats = statistics;
+    bool need_restat = &item == best;
     auto own_stats = item.get_own_stats();
-    if (&item == best) {
-        stats -= own_stats;
+    if (need_restat) {
         need_restat = true;
         ++own_stats.cluster_entries;
     }
     push_stats(-own_stats, item.device, false);
     presences.erase(it);
     if (need_restat) {
+        auto stats = -own_stats;
         if (auto best = recalc_best(); best) {
             stats += best->get_own_stats();
         }
+        push_stats(stats, {}, true);
     }
-    if (stats != statistics) {
-        auto diff = stats - statistics;
-        push_stats({diff, 0}, {}, true);
-    };
 
     if ((presences.size() == 1) && (presences.front()->get_features() & F::missing)) {
         remove_presense(*presences.front());
@@ -173,7 +169,6 @@ void entity_t::detach_child(entity_t &child) noexcept {
     for (auto r : presences) {
         r->clear_children();
     }
-    // push_stats({-child.get_stats(), 0}, nullptr, true);
     auto &child_presences = child.presences;
     while (!child_presences.empty()) {
         child_presences.front()->clear_presense();
@@ -202,20 +197,14 @@ void entity_t::commit(const path_t &path, const model::device_t *device) noexcep
 
     for (auto child : children) {
         child->commit(path, device);
-        statistics += child->get_stats();
-    }
-    for (auto p : presences) {
-        auto parent = p->parent;
-        if (parent) {
-            if (path.contains(parent->entity->path)) {
-                parent->statistics += p->statistics;
-            }
-        }
     }
 
-    auto best = recalc_best();
-    if (best) {
-        statistics += best->get_own_stats();
+    auto diff = best ? -best->get_own_stats() : presence_stats_t();
+
+    auto new_best = recalc_best();
+    if (new_best) {
+        diff += new_best->get_own_stats();
+        push_stats(diff, {}, true);
     }
     // TODO: move this up?
     ++generation;

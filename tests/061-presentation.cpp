@@ -1668,10 +1668,12 @@ TEST_CASE("statistics", "[presentation]") {
         REQUIRE(updated_entities.size() == 1);
         REQUIRE(*updated_entities.begin() == file_d);
         updated_entities.clear();
+        REQUIRE(folder_entity->get_stats() == entity_stats_t{13, 4});
 
         REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
         auto fi_peer = folder->get_folder_infos().by_device(*peer_device);
         folder_entity->on_insert(*fi_peer);
+        REQUIRE(folder_entity->get_stats() == entity_stats_t{13, 4});
         REQUIRE(deleted_entities.size() == 0);
         REQUIRE(updated_entities.size() == 1);
         REQUIRE(*updated_entities.begin() == folder_entity);
