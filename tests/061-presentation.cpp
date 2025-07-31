@@ -675,7 +675,6 @@ TEST_CASE("presentation", "[presentation]") {
                 CHECK(p_file_my->get_parent() == p_dir_a_my);
                 CHECK(p_file_peer->get_parent() == p_dir_a_peer);
             }
-#if 0
             SECTION("lazy, with peer-2") {
                 REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
                 auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
@@ -706,7 +705,7 @@ TEST_CASE("presentation", "[presentation]") {
 
                 auto p_a_peer = e_a->get_presence(peer_device.get());
                 REQUIRE(p_a_peer->get_children().size() == 2);
-                CHECK(p_a_peer->get_stats() == presence_stats_t{0, 1, 1, 2});
+                CHECK(p_a_peer->get_stats() == presence_stats_t{0, 2, 2, 0});
 
                 auto p_b_peer = p_a_peer ->get_children()[0];
                 CHECK(p_b_peer->get_children().size() == 0);
@@ -716,7 +715,7 @@ TEST_CASE("presentation", "[presentation]") {
                 CHECK(p_a_peer->get_children()[1]->get_entity()->get_path().get_full_name() == "a/c.bin");
 
                 CHECK(p_a_my ->get_children().size() == 2);
-                CHECK(p_a_my->get_stats() == presence_stats_t{0, 3, 2, 3});
+                CHECK(p_a_my->get_stats() == presence_stats_t{0, 2, 2, 2});
 
                 auto p_b_my = p_a_my ->get_children()[0];
                 CHECK(p_b_my->get_children().size() == 0);
@@ -727,7 +726,6 @@ TEST_CASE("presentation", "[presentation]") {
                 CHECK(p_c_my->get_children().size() == 0);
                 CHECK(p_c_my->get_entity()->get_path().get_full_name() == "a/c.bin");
             }
-#endif
         }
         SECTION("removal") {
             REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
