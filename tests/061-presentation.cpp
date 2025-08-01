@@ -1795,7 +1795,7 @@ TEST_CASE("file uniqueness", "[presentation]") {
     auto p_file_e1 = static_cast<presentation::file_presence_t *>(file_e1->get_augmentation().get());
     auto p_file_e2 = static_cast<presentation::file_presence_t *>(file_e2->get_augmentation().get());
 
-#ifdef SYNCSPIRIT_WIN
+#if defined(SYNCSPIRIT_WIN) || defined(SYNCSPIRIT_MAC)
     CHECK(!p_file_a1->is_unique());
     CHECK(!p_file_a2->is_unique());
     CHECK(p_file_b->is_unique());

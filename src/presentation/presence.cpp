@@ -5,7 +5,7 @@
 #include "presence.h"
 #include "cluster_file_presence.h"
 
-#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32) || defined(__APPLE__)
 #include <uni_algo/case.h>
 #endif
 
@@ -167,7 +167,7 @@ auto presence_t::get_children() noexcept -> children_t & {
 void presence_t::clear_children() noexcept { children.clear(); }
 
 bool presence_t::is_unique() const noexcept {
-#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32) || defined(__APPLE__)
     using una::caseless::compare_utf8;
     if (!(features & F::deleted)) {
         if (parent && parent->entity) {
