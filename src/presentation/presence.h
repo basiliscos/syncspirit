@@ -44,8 +44,7 @@ struct SYNCSPIRIT_API presence_t : model::proxy_t {
 
     presence_t *get_parent() noexcept ;
     entity_t* get_entity() noexcept;
-    void set_parent(presence_t *value) noexcept ;
-    presence_t* set_parent(entity_t *entity) noexcept ;
+    presence_t* set_parent(entity_t *entity, presence_t *parent = nullptr) noexcept;
     std::uint32_t get_features() const noexcept ;
     virtual const presence_stats_t& get_stats(bool sync = true) const noexcept ;
     const presence_stats_t& get_own_stats() const noexcept;
@@ -54,6 +53,7 @@ struct SYNCSPIRIT_API presence_t : model::proxy_t {
     virtual const presence_t* determine_best(const presence_t*) const;
 
     children_t& get_children() noexcept;
+    void clear_children() noexcept;
 
     static bool compare(const presence_t *l, const presence_t *r) noexcept;
 

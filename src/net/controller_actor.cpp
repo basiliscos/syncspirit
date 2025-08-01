@@ -156,7 +156,7 @@ void controller_actor_t::on_start() noexcept {
         return do_shutdown();
     }
 
-    send<payload::controller_up_t>(coordinator, address, peer->device_id(), outgoing_buffer);
+    send<payload::controller_up_t>(coordinator, address, my_url->clone(), peer->device_id(), outgoing_buffer);
     send_cluster_config();
     resources->acquire(resource::peer);
     LOG_INFO(log, "is online (connection: {})", my_url);

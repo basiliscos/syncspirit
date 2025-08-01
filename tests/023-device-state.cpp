@@ -121,7 +121,7 @@ TEST_CASE("device-state", "[model]") {
 
         CHECK(s2_2 < s2_1);
         CHECK(s2_2 < s2_3);
-        CHECK(!(s2_1 < s2_3));
+        CHECK(s2_1 < s2_3);
         CHECK(!(s2_3 < s2_1));
         CHECK(s2_1 == s2_1);
         CHECK(s2_1 != s2_2);

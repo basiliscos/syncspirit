@@ -311,8 +311,8 @@ void peer_actor_t::cancel_io() noexcept {
 }
 
 void peer_actor_t::on_controller_up(message::controller_up_t &message) noexcept {
-    auto &peer = message.payload.peer;
-    if (peer == peer_device_id) {
+    auto &p = message.payload;
+    if (p.peer == peer_device_id && *p.url == *url) {
         LOG_TRACE(log, "on_controller_up");
         auto &p = message.payload;
         controller = p.controller;

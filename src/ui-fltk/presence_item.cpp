@@ -257,7 +257,8 @@ void presence_item_t::update_label() {
     if (features & (F::directory | F::folder)) {
         auto &ps = presence->get_stats(true);
         auto &es = presence->get_entity()->get_stats();
-        if (ps.size && (ps.cluster_entries != es.entities)) {
+        auto size = ps.size || (features & F::folder);
+        if (ps.size && es.entities && (ps.cluster_entries != es.entities)) {
             double share = (100.0 * ps.cluster_entries) / es.entities;
             fmt::format_to(std::back_inserter(node_label), " ({}{:.2f}%)", symbols::synchronizing, share);
         }

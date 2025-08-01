@@ -1,10 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
+#include "access.h"
+#include "model/diff/peer/cluster_update.h"
 #include "test-utils.h"
 #include "fs/scan_task.h"
 #include "fs/utils.h"
 #include "model/misc/sequencer.h"
+#include "diff-builder.h"
+#include "test_supervisor.h"
+
 #include <boost/nowide/convert.hpp>
 
 using namespace syncspirit;
@@ -13,9 +18,9 @@ using namespace syncspirit::utils;
 using namespace syncspirit::model;
 using namespace syncspirit::fs;
 
-TEST_CASE("scan_task", "[fs]") {
-    test::init_logging();
+r::pt::time_duration timeout = r::pt::millisec{10};
 
+TEST_CASE("scan_task", "[fs]") {
     auto root_path = unique_path();
     bfs::create_directories(root_path);
     path_guard_t path_quard{root_path};
@@ -109,8 +114,13 @@ SECTION("some dirs, no files") {
     CHECK(proto::get_modified_s(uf->metadata) == modified);
 
     auto status = bfs::status(dir);
+#ifndef SYNCSPIRIT_WIN
     auto perms = static_cast<uint32_t>(status.permissions());
     CHECK(proto::get_permissions(uf->metadata) == perms);
+#else
+    CHECK(proto::get_permissions(uf->metadata) == 0666);
+    CHECK(proto::get_no_permissions(uf->metadata) == 1);
+#endif
 
     r = task.advance();
     CHECK(std::get_if<bool>(&r));
@@ -162,6 +172,7 @@ SECTION("no dirs, symlink to non-existing target") {
     CHECK(uf->path.filename() == "symlink");
     CHECK(proto::get_size(uf->metadata) == 0);
     CHECK(proto::get_type(uf->metadata) == proto::FileInfoType::SYMLINK);
+    CHECK(proto::get_no_permissions(uf->metadata));
     CHECK(proto::get_symlink_target(uf->metadata) == "/some/where");
 
     r = task.advance();
@@ -506,16 +517,43 @@ SECTION("regular files") {
             file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
             REQUIRE(folder_my->add_strict(file));
 
-            task = new scan_task_t(cluster, folder->get_id(), rw_cache, config);
+            SECTION("permissions are tracked") {
+                task = new scan_task_t(cluster, folder->get_id(), rw_cache, config);
 
-            r = task->advance();
-            CHECK(std::get_if<bool>(&r));
-            CHECK(*std::get_if<bool>(&r) == true);
+                r = task->advance();
+                CHECK(std::get_if<bool>(&r));
+                CHECK(*std::get_if<bool>(&r) == true);
 
-            r = task->advance();
-            REQUIRE(std::get_if<changed_meta_t>(&r));
-            auto ref = std::get_if<changed_meta_t>(&r);
-            CHECK(ref->file == file);
+#ifndef SYNCSPIRIT_WIN
+                r = task->advance();
+                REQUIRE(std::get_if<changed_meta_t>(&r));
+                auto ref = std::get_if<changed_meta_t>(&r);
+                CHECK(ref->file == file);
+#else
+                r = task->advance();
+                REQUIRE(std::get_if<unchanged_meta_t>(&r));
+                auto ref = std::get_if<unchanged_meta_t>(&r);
+                CHECK(ref->file == file);
+#endif
+            }
+            SECTION("permissions are ignored by folder settigns") {
+                SECTION("by folder settings") {
+                    ((model::folder_data_t *)folder.get())->access<test::to::ignore_permissions>() = true;
+                }
+                SECTION("by file") {
+                    auto &flags = file.get()->access<test::to::flags>();
+                    flags = flags | model::file_info_t::f_no_permissions;
+                }
+                task = new scan_task_t(cluster, folder->get_id(), rw_cache, config);
+                r = task->advance();
+                CHECK(std::get_if<bool>(&r));
+                CHECK(*std::get_if<bool>(&r) == true);
+
+                r = task->advance();
+                REQUIRE(std::get_if<unchanged_meta_t>(&r));
+                auto ref = std::get_if<unchanged_meta_t>(&r);
+                CHECK(ref->file == file);
+            }
         }
 
         r = task->advance();
@@ -841,7 +879,6 @@ SECTION("regular files") {
     }
 }
 
-#ifndef SYNCSPIRIT_WIN
 SECTION("symlink file") {
     auto modified = std::time_t{1642007468};
     auto pr_file = proto::FileInfo{};
@@ -859,7 +896,9 @@ SECTION("symlink file") {
 
         auto path = root_path / "a.txt";
         auto target = bfs::path("b.txt");
+#ifndef SYNCSPIRIT_WIN
         bfs::create_symlink(target, path);
+#endif
 
         auto file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
         REQUIRE(folder_my->add_strict(file));
@@ -881,14 +920,15 @@ SECTION("symlink file") {
         auto &seen = task.get_seen_paths();
         CHECK(seen.count("a.txt"));
     }
-
     SECTION("symlink does exists") {
         proto::set_modified_s(pr_file, modified);
         proto::set_symlink_target(pr_file, "b");
 
         auto path = root_path / "a.txt";
         auto target = bfs::path("b");
+#ifndef SYNCSPIRIT_WIN
         bfs::create_symlink(target, path);
+#endif
         bfs::create_directories(root_path / target);
 
         auto pr_dir = proto::FileInfo{};
@@ -912,6 +952,7 @@ SECTION("symlink file") {
         auto ref = std::get_if<unchanged_meta_t>(&r);
         CHECK(((ref->file == dir) || (ref->file == file)));
 
+#ifndef SYNCSPIRIT_WIN
         r = task.advance();
         REQUIRE(std::get_if<unchanged_meta_t>(&r));
         ref = std::get_if<unchanged_meta_t>(&r);
@@ -920,6 +961,16 @@ SECTION("symlink file") {
         r = task.advance();
         CHECK(std::get_if<bool>(&r));
         CHECK(*std::get_if<bool>(&r) == true);
+#else
+        r = task.advance();
+        CHECK(std::get_if<bool>(&r));
+        CHECK(*std::get_if<bool>(&r) == true);
+
+        r = task.advance();
+        REQUIRE(std::get_if<unchanged_meta_t>(&r));
+        ref = std::get_if<unchanged_meta_t>(&r);
+        CHECK(((ref->file == dir) || (ref->file == file)));
+#endif
 
         r = task.advance();
         CHECK(std::get_if<bool>(&r));
@@ -935,7 +986,9 @@ SECTION("symlink file") {
 
         auto path = root_path / "a.txt";
         auto target = bfs::path("/");
+#ifndef SYNCSPIRIT_WIN
         bfs::create_symlink(target, path);
+#endif
 
         auto file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
         REQUIRE(folder_my->add_strict(file));
@@ -958,6 +1011,7 @@ SECTION("symlink file") {
         CHECK(seen.count("a.txt"));
     }
 
+#ifndef SYNCSPIRIT_WIN
     SECTION("symlink points to something different") {
         proto::set_modified_s(pr_file, modified);
 
@@ -985,6 +1039,83 @@ SECTION("symlink file") {
         auto &seen = task.get_seen_paths();
         CHECK(seen.count("a.txt"));
     }
-}
 #endif
 }
+}
+
+TEST_CASE("scan_task diffs aggregation, guard", "[fs]") {
+    struct my_supervisor_t : supervisor_t {
+        using supervisor_t::supervisor_t;
+
+        void on_model_update(model::message::model_update_t &msg) noexcept override {
+            ++model_updates;
+            supervisor_t::on_model_update(msg);
+        }
+
+        outcome::result<void> operator()(const diff::peer::cluster_update_t &diff, void *custom) noexcept override {
+            ++cluster_updates;
+            return diff.visit_next(*this, custom);
+        }
+
+        int model_updates = 0;
+        int cluster_updates = 0;
+    };
+
+    static constexpr int SIZE = 41;
+    auto root_path = unique_path();
+    bfs::create_directories(root_path);
+    path_guard_t path_quard{root_path};
+    auto rw_cache = fs::file_cache_ptr_t(new fs::file_cache_t(5));
+
+    config::fs_config_t config{3600, 10, 1024 * 1024, 5};
+    auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
+    auto my_device = device_t::create(my_id, "my-device").value();
+    auto peer_id = device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
+    auto peer_device = device_t::create(peer_id, "peer-device").value();
+
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
+    auto sequencer = make_sequencer(4);
+    cluster->get_devices().put(my_device);
+    cluster->get_devices().put(peer_device);
+
+    auto db_folder = db::Folder();
+    db::set_id(db_folder, "some-id");
+    db::set_label(db_folder, "my-label");
+    db::set_path(db_folder, root_path.string());
+
+    auto builder = diff_builder_t(*cluster);
+    REQUIRE(builder.upsert_folder(db_folder).apply());
+
+    auto folders = cluster->get_folders();
+    auto folder = folders.by_id("some-id");
+
+    r::system_context_t ctx;
+    auto sup = ctx.create_supervisor<my_supervisor_t>().timeout(timeout).create_registry().finish();
+    sup->cluster = cluster;
+    sup->do_process();
+
+    auto task = scan_task_t(cluster, folder->get_id(), rw_cache, config);
+    {
+        auto guard = task.guard(*sup, sup->get_address());
+        guard.send_by_force();
+        auto sha256 = peer_id.get_sha256();
+        for (int i = 0; i < SIZE; ++i) {
+            auto diff = builder.configure_cluster(sha256, {}).finish().extract();
+            task.push(diff.get());
+        }
+    }
+
+    sup->do_process();
+    CHECK(sup->model_updates == (41 / 5 + 1));
+    CHECK(sup->cluster_updates == SIZE);
+
+    sup->do_shutdown();
+    sup->do_process();
+}
+
+int _init() {
+    test::init_logging();
+    return 1;
+}
+
+static int v = _init();

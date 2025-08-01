@@ -35,19 +35,27 @@ const presence_stats_t &presence_t::get_stats(bool sync) const noexcept {
     return statistics;
 }
 
-presence_t *presence_t::set_parent(entity_t *value) noexcept {
-    if (value && device) {
-        auto p = value->get_presence(device);
-        if (p && p->device == device) {
-            parent = p;
+presence_t *presence_t::set_parent(entity_t *parent_entity, presence_t *parent_) noexcept {
+    if (parent_entity && device) {
+        if (!parent_) {
+            parent_ = parent_entity->get_presence(device);
+        }
+        if (parent_ && parent_->device == device) {
+            parent = parent_;
+            parent_entity->push_stats(get_stats(), device, false);
+            for (auto child_entity : entity->children) {
+                for (auto child_presence : child_entity->presences) {
+                    if (child_presence->device == device) {
+                        if (!child_presence->parent) {
+                            child_presence->set_parent(entity, this);
+                        }
+                        break;
+                    }
+                }
+            }
         }
     }
     return parent;
-}
-
-void presence_t::set_parent(presence_t *value) noexcept {
-    assert(entity->get_parent() == value->entity);
-    parent = value;
 }
 
 void presence_t::clear_presense() noexcept {
@@ -117,11 +125,13 @@ void presence_t::sync_with_entity() const noexcept {
 bool presence_t::compare(const presence_t *l, const presence_t *r) noexcept {
     auto lf = l->get_features();
     if (lf & F::missing) {
+        assert(l->entity->best);
         l = l->entity->best;
         lf = l->get_features();
     }
     auto rf = r->get_features();
     if (rf & F::missing) {
+        assert(r->entity->best);
         r = r->entity->best;
         rf = r->get_features();
     }
@@ -145,12 +155,16 @@ auto presence_t::get_children() noexcept -> children_t & {
         children.reserve(e_children.size());
         for (auto &c : e_children) {
             auto p = const_cast<presence_t *>(c->get_presence(device));
-            children.emplace_back(p);
+            if (p->entity->best) {
+                children.emplace_back(p);
+            }
         }
         std::sort(children.begin(), children.end(), compare);
     }
     return children;
 }
+
+void presence_t::clear_children() noexcept { children.clear(); }
 
 bool presence_t::is_unique() const noexcept {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)

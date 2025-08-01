@@ -505,11 +505,13 @@ auto app_supervisor_t::operator()(const model::diff::advance::advance_t &diff, v
                     using F = presence_t::features_t;
                     if (!(presence->get_features() & F::missing)) {
                         auto parent_presence = presence->get_parent();
-                        auto aug = parent_presence->get_augmentation().get();
-                        if (aug) {
-                            auto parent_item = static_cast<presence_item_t *>(aug);
-                            parent_item->show_child(*presence, mask);
-                            parent_item->tree()->redraw();
+                        if (parent_presence) {
+                            auto aug = parent_presence->get_augmentation().get();
+                            if (aug) {
+                                auto parent_item = static_cast<presence_item_t *>(aug);
+                                parent_item->show_child(*presence, mask);
+                                parent_item->tree()->redraw();
+                            }
                         }
                     }
                 }

@@ -132,6 +132,8 @@ after the core completion.
  - [core] support `folder_type` folder setting (send only, receive only, send & receive)
  - [core] support `pull_older` folder setting (alphabetic, by size, by modification date)
  - [core, bep] support `disable_temp_indixes` (hardcoded to `1` for atm)
+ - [core, bep] support `ignore_permissions` folder flag, `permissions` and `no_permissions`
+               file flag
  - [core, bep] support `ignore_deletes` folder flag
  - [core, bep] support device `auto-accept` folder flag
  - [core, bep] support device `introducer` and `skip_introduction_removals` markers

@@ -5,6 +5,7 @@
 #include "utils.h"
 #include "model/messages.h"
 #include "fs/messages.h"
+#include "utils/platform.h"
 #include "proto/proto-helpers-bep.h"
 #include <boost/nowide/convert.hpp>
 
@@ -12,7 +13,8 @@ using namespace syncspirit::fs;
 
 scan_task_t::scan_task_t(model::cluster_ptr_t cluster_, std::string_view folder_id_, file_cache_ptr_t rw_cache_,
                          const config::fs_config_t &config_) noexcept
-    : folder_id{folder_id_}, cluster{cluster_}, rw_cache{rw_cache_}, config{config_}, current_diff{nullptr} {
+    : folder_id{folder_id_}, cluster{cluster_}, rw_cache{rw_cache_}, config{config_}, current_diff{nullptr},
+      diff_siblings{0} {
     auto &fm = cluster->get_folders();
     folder = fm.by_id(folder_id);
     if (!folder) {
@@ -27,6 +29,8 @@ scan_task_t::scan_task_t(model::cluster_ptr_t cluster_, std::string_view folder_
     auto &path = folder->get_path();
     assert(path.is_absolute());
 
+    ignore_permissions = folder->are_permissions_ignored() || !utils::platform_t::permissions_supported(path);
+
     dirs_queue.push_back(path);
     root = path;
 
@@ -35,8 +39,8 @@ scan_task_t::scan_task_t(model::cluster_ptr_t cluster_, std::string_view folder_
         files.put(it.item);
     }
 
+    files_limit = files_left = config.files_scan_iteration_limit;
     bytes_left = config.bytes_scan_iteration_limit;
-    files_left = config.files_scan_iteration_limit;
     assert(bytes_left > 0);
     assert(files_left > 0);
 
@@ -70,13 +74,14 @@ scan_result_t scan_task_t::advance() noexcept {
         auto file = files.begin()->item;
         seen_paths.insert({std::string(file->get_name()), file->get_path()});
         files.remove(file);
-        if (file->is_deleted()) {
+
+        bool unchanged = file->is_deleted() || (file->is_link() && !utils::platform_t::symlinks_supported());
+        if (unchanged) {
             return unchanged_meta_t{std::move(file)};
         } else {
             return removed_t{std::move(file)};
         }
     }
-
     return false;
 }
 
@@ -151,8 +156,13 @@ scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
                 }
                 proto::set_modified_s(metadata, to_unix(modification_time));
 
-                auto permissions = static_cast<uint32_t>(status.permissions());
-                proto::set_permissions(metadata, permissions);
+                if (ignore_permissions == false) {
+                    auto permissions = static_cast<uint32_t>(status.permissions());
+                    proto::set_permissions(metadata, permissions);
+                } else {
+                    proto::set_permissions(metadata, 0666);
+                    proto::set_no_permissions(metadata, true);
+                }
             }
             if (file_type == bfs::file_type::regular) {
                 proto::set_type(metadata, proto::FileInfoType::FILE);
@@ -173,6 +183,7 @@ scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
                 }
                 proto::set_symlink_target(metadata, target.string());
                 proto::set_type(metadata, proto::FileInfoType::SYMLINK);
+                proto::set_no_permissions(metadata, true);
             } else {
                 LOG_WARN(log, "unknown/unimplemented file type {} : {}", (int)status.type(), bfs::path(child).string());
                 continue;
@@ -229,14 +240,17 @@ scan_result_t scan_task_t::advance_regular_file(file_info_t &file) noexcept {
         changed = true;
     }
 
-    auto status = bfs::status(path, ec);
-    if (ec) {
-        return file_error_t{path, ec};
-    }
-    auto permissions = static_cast<uint32_t>(status.permissions());
-    proto::set_permissions(meta, permissions);
-    if (permissions != file->get_permissions()) {
-        changed = true;
+    if (!ignore_permissions && !file->has_no_permissions()) {
+        auto status = bfs::status(path, ec);
+        if (ec) {
+            return file_error_t{path, ec};
+        }
+
+        auto permissions = static_cast<uint32_t>(status.permissions());
+        proto::set_permissions(meta, permissions);
+        if (permissions != file->get_permissions()) {
+            changed = true;
+        }
     }
 
     if (changed) {
@@ -376,7 +390,14 @@ scan_result_t scan_task_t::advance_unknown_file(unknown_file_t &file) noexcept {
     return incomplete_t{peer_file, file_ptr_t(new file_t(std::move(opened_file)))};
 }
 
-void scan_task_t::push(model::diff::cluster_diff_t *update, std::int64_t bytes_consumed) noexcept {
+void scan_task_t::push(model::diff::cluster_diff_t *update, std::int64_t bytes_consumed, bool consumes_file) noexcept {
+    if (diff_siblings >= files_limit) {
+        assert(current_diff);
+        diffs.emplace_back(std::move(update_diff));
+        current_diff = {};
+        diff_siblings = 0;
+    }
+    ++diff_siblings;
     if (current_diff) {
         current_diff = current_diff->assign_sibling(update);
     } else {
@@ -384,7 +405,9 @@ void scan_task_t::push(model::diff::cluster_diff_t *update, std::int64_t bytes_c
         current_diff = update;
     }
     bytes_left -= bytes_consumed;
-    --files_left;
+    if (consumes_file) {
+        --files_left;
+    }
 }
 
 auto scan_task_t::get_seen_paths() const noexcept -> const seen_paths_t & { return seen_paths; }
@@ -406,9 +429,14 @@ scan_task_t::send_guard_t::~send_guard_t() {
     if (consume) {
         auto diff = std::move(task.update_diff);
         if (diff) {
+            for (auto &inner_diff : task.diffs) {
+                actor.send<model::payload::model_update_t>(coordinator, std::move(inner_diff), nullptr);
+            }
             task.current_diff = nullptr;
             task.bytes_left = task.config.bytes_scan_iteration_limit;
             task.files_left = task.config.files_scan_iteration_limit;
+            task.diffs.clear();
+
             actor.send<model::payload::model_update_t>(coordinator, std::move(diff), nullptr);
             if (manage_progress) {
                 auto &sup = actor.get_supervisor();

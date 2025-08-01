@@ -175,6 +175,7 @@ auto file_actor_t::reflect(model::file_info_ptr_t &file_ptr, const bfs::path &pa
     }
 
     auto parent = path.parent_path();
+    bool set_perms = false;
 
     bool exists = bfs::exists(parent, ec);
     if (!exists) {
@@ -213,12 +214,16 @@ auto file_actor_t::reflect(model::file_info_ptr_t &file_ptr, const bfs::path &pa
                 return ec;
             }
         }
+        set_perms = utils::platform_t::permissions_supported(path) && !file.has_no_permissions() &&
+                    !file.get_folder_info()->get_folder()->are_permissions_ignored();
     } else if (file.is_dir()) {
         LOG_DEBUG(log, "creating directory {}", path.string());
         bfs::create_directory(path, ec);
         if (ec) {
             return ec;
         }
+        set_perms = utils::platform_t::permissions_supported(path) && !file.has_no_permissions() &&
+                    !file.get_folder_info()->get_folder()->are_permissions_ignored();
     } else if (file.is_link()) {
         if (utils::platform_t::symlinks_supported()) {
             auto target = bfs::path(file.get_link_target());
@@ -237,6 +242,16 @@ auto file_actor_t::reflect(model::file_info_ptr_t &file_ptr, const bfs::path &pa
             }
         } else {
             LOG_WARN(log, "symlinks are not supported by platform, no I/O for {}", path.string());
+        }
+    }
+
+    if (set_perms) {
+        auto file_perms = file.get_permissions();
+        auto perms = static_cast<bfs::perms>(file_perms);
+        bfs::permissions(path, perms, ec);
+        if (ec) {
+            LOG_ERROR(log, "cannot set permissions {:#o} on file: '{}': {}", file_perms, path.string(), ec.message());
+            return ec;
         }
     }
 
