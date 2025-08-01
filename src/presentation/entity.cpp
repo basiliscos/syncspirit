@@ -37,37 +37,40 @@ void entity_t::set_parent(entity_t *value) noexcept {
 }
 
 void entity_t::push_stats(const presence_stats_t &diff, const model::device_t *source, bool best) noexcept {
-    auto current = this;
-    while (current) {
+    auto e = this;
+    auto p = (presence_t *)(nullptr);
+    while (e) {
         if (best) {
-            assert(current->statistics.size >= 0);
-            assert(current->statistics.entities >= 0);
-            current->statistics += diff;
-            assert(current->statistics.size >= 0);
-            assert(current->statistics.entities >= 0);
-            ++current->generation;
+            assert(e->statistics.size >= 0);
+            assert(e->statistics.entities >= 0);
+            e->statistics += diff;
+            assert(e->statistics.size >= 0);
+            assert(e->statistics.entities >= 0);
+            ++e->generation;
         }
         if (source) {
-            bool found = false;
-            for (auto p : current->presences) {
-                if (p->device == source) {
-                    found = true;
-                    p->entity_generation--;
-                    assert(p->statistics.size >= 0);
-                    assert(p->statistics.entities >= 0);
-                    assert(p->statistics.cluster_entries >= 0 || p->entity_generation != current->generation);
-                    p->statistics += diff;
-                    assert(p->statistics.size >= 0);
-                    assert(p->statistics.entities >= 0);
-                    assert(p->statistics.cluster_entries >= 0 || p->entity_generation != current->generation);
-                    break;
+            if (!p) {
+                for (auto pp : e->presences) {
+                    if (pp->device == source) {
+                        p = pp;
+                        break;
+                    }
                 }
             }
-            if (!found) { // detached presence
+            if (!p) { // detached presence
                 return;
             }
+            p->entity_generation--;
+            assert(p->statistics.size >= 0);
+            assert(p->statistics.entities >= 0);
+            assert(p->statistics.cluster_entries >= 0 || p->entity_generation != e->generation);
+            p->statistics += diff;
+            assert(p->statistics.size >= 0);
+            assert(p->statistics.entities >= 0);
+            assert(p->statistics.cluster_entries >= 0 || p->entity_generation != e->generation);
+            p = p->parent;
         }
-        current = current->parent;
+        e = e->parent;
     }
 }
 
