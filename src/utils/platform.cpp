@@ -153,7 +153,7 @@ bool platform_t::path_supported(const bfs::path &path) noexcept {
 }
 
 bool platform_t::permissions_supported(const bfs::path &) noexcept {
-#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32) || defined(__APPLE__)
     return false;
 #endif
     return true;

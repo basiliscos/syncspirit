@@ -834,7 +834,7 @@ void test_uniqueness() {
                 ++children;
             }
 
-#ifdef SYNCSPIRIT_WIN
+#if defined(SYNCSPIRIT_WIN) || defined(SYNCSPIRIT_MAC)
             CHECK(file_1->is_unreachable());
             CHECK(file_2->is_unreachable());
             CHECK(children == 0);
