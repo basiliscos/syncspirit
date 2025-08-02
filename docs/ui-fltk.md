@@ -2,6 +2,8 @@
 
 ## overview
 
+![overview](fltk-overview.gif)
+
 `syncspirit` fltk-frontend (aka fltk-ui) is based on cross-platform
 [fltk](https://www.fltk.org/) toolkit.
 
@@ -87,6 +89,11 @@ It is possible to determine file state from its color: missing (not yet download
 deleted, partly-sync and its percentage (for folders) and symlink.
 
 ![file color legend](fltk-13-legend.png)
+
+The peer folder information reflects global folder state too, i.e. it shows
+deleted, actual and outdated files.
+
+![peer folder info](fltk-14-peer-folder.png)
 
 
 ## bug reporting
