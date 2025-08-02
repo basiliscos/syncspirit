@@ -83,6 +83,12 @@ which deleted it.
 
 By default removed files are not displayed.
 
+It is possible to determine file state from its color: missing (not yet downloaded),
+deleted, partly-sync and its percentage (for folders) and symlink.
+
+![file color legend](fltk-13-legend.png)
+
+
 ## bug reporting
 
 1. launch the application with `--log_level trace`
