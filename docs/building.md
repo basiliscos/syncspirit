@@ -6,7 +6,8 @@
 
  - [boost](https://www.boost.org/) (at least `v1.84.0`)
  - [openssl](https://www.openssl.org/)
- - [protobuf](https://github.com/PragmaTwice/protopuf), (at least `v3.0`)
+ - [protopuf](https://github.com/PragmaTwice/protopuf), (at least `v3.0`)
+ - [uni-algo](https://github.com/uni-algo/uni-algo), (at least `v1.2.0`)
  - [zlib](https://www.zlib.net/)
  - [rotor](https://github.com/basiliscos/cpp-rotor), (at least `v0.32`)
  - [lz4](https://github.com/lz4/lz4)
