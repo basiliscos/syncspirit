@@ -123,14 +123,6 @@ struct table_t : content::folder_table_t {
             auto db_path = db::get_path(ctx.folder);
             if (db_path.empty()) {
                 error = "path should be defined";
-            } else {
-                auto path = bfs::path(boost::nowide::widen(db_path));
-                auto ec = sys::error_code{};
-                if (bfs::exists(path, ec)) {
-                    if (!bfs::is_empty(path, ec)) {
-                        error = "referred directory should be empty";
-                    }
-                }
             }
         }
 
