@@ -620,7 +620,7 @@ bool folder_table_t::on_remove_share(widgetable_t &widget, model::device_ptr_t d
     auto [_, count] = scan(widget);
     if (count > 1 && !initial) {
         parent_t::remove_row(widget);
-        removed = (bool)device;
+        removed = true;
     } else {
         redraw();
     }

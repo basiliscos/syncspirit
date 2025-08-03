@@ -12,9 +12,8 @@ simplistically speaking, it is a [syncthing](https://syncthing.net)-compatible s
 program at protocol level, which uses the [syncthing](https://syncthing.net) infrastructure (for global discovery
 and relaying).
 
-Despite being functional, `syncspirit` is much less feature-rich than [syncthing](https://syncthing.net)
+Despite being functional, `syncspirit` is less feature-rich than [syncthing](https://syncthing.net)
 and is still in heavy development
-
 
 # front-ends (aka UIs)
 
@@ -178,7 +177,6 @@ the relay is randomly chosen from the public relays [pool](https://relays.syncth
 [see](docs/building.md)
 
 # license
-
 
 This software is licensed under the [GPLv3 license](https://www.gnu.org/licenses/gpl-3.0.en.html).
 
