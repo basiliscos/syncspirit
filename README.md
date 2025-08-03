@@ -18,7 +18,7 @@ and is still in heavy development
 
 # front-ends (aka UIs)
 
-![different UIs](docs/different-uis.gif)
+![overview](docs/fltk-overview.gif)
 
 - [fltk](https://www.fltk.org/)-based gui [app](docs/ui-fltk.md)
 

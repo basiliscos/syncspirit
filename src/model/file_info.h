@@ -182,7 +182,7 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t {
     std::uint32_t modified_ns;
     std::uint64_t modified_by;
 
-    int flags = 0;
+    std::uint32_t flags = 0;
     version_ptr_t version;
     std::int64_t sequence;
     std::int32_t block_size;
