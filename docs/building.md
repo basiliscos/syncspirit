@@ -356,7 +356,7 @@ make -j`nproc` deploy_deps
 ```
 debootstrap bookworm debian-root http://deb.debian.org/debian/
 mount --bind /proc debian-root/proc/
-mount --rbind /dev ubuntu-root/dev/
+mount --rbind /dev debian-root/dev/
 
 chroot debian-root
 apt update
