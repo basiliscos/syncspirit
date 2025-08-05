@@ -123,7 +123,7 @@ after the core completion.
 
 # changes
 
-## 0.4.1 (xx-xxx-xxxx)
+## 0.4.1 (05-Aug-2025)
  - [core, fltk] support merged cluster folder model
  - [core] possibility to import directories outside of syncthing, including
          partial import, see [faq](faq.md)
