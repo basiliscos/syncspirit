@@ -2,10 +2,11 @@
 // SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
 
 #include "folders.h"
-#include "folder.h"
+#include "presence_item/folder.h"
 #include "../content/folder_table.h"
 #include "../table_widget/label.h"
 #include "utils/base32.h"
+#include "presentation/folder_presence.h"
 #include <algorithm>
 #include <cctype>
 #include <boost/nowide/convert.hpp>
@@ -15,6 +16,7 @@ using namespace syncspirit;
 using namespace syncspirit::model::diff;
 using namespace syncspirit::fltk;
 using namespace syncspirit::fltk::tree_item;
+using namespace syncspirit::fltk::presence_item;
 
 static constexpr int padding = 2;
 
@@ -73,17 +75,16 @@ struct table_t : content::folder_table_t {
         data.push_back({"", make_title(*this, "creating new folder")});
         data.push_back({"path", make_path(*this, false)});
         data.push_back({"id", make_id(*this, false)});
-        data.push_back({"label", make_label(*this)});
-        data.push_back({"type", make_folder_type(*this)});
-        data.push_back({"pull order", make_pull_order(*this)});
+        data.push_back({"label", make_label(*this, false)});
+        data.push_back({"type", make_folder_type(*this, false)});
+        data.push_back({"pull order", make_pull_order(*this, false)});
         data.push_back({"index", make_index(*this, false)});
-        data.push_back({"read only", make_read_only(*this)});
-        data.push_back({"rescan interval", make_rescan_interval(*this)});
-        data.push_back({"ignore permissions", make_ignore_permissions(*this)});
-        data.push_back({"ignore delete", make_ignore_delete(*this)});
+        data.push_back({"rescan interval", make_rescan_interval(*this, false)});
+        data.push_back({"ignore permissions", make_ignore_permissions(*this, false)});
+        data.push_back({"ignore delete", make_ignore_delete(*this, false)});
         data.push_back({"disable temp indixes", make_disable_tmp(*this)});
-        data.push_back({"scheduled", make_scheduled(*this)});
-        data.push_back({"paused", make_paused(*this)});
+        data.push_back({"scheduled", make_scheduled(*this, false)});
+        data.push_back({"paused", make_paused(*this, false)});
         data.push_back({"shared_with", make_shared_with(*this, {}, false)});
         data.push_back({"", notice = make_notice(*this)});
         data.push_back({"actions", make_actions(*this)});
@@ -100,12 +101,12 @@ struct table_t : content::folder_table_t {
         serialization_context_t ctx;
         description.get_folder()->serialize(ctx.folder);
 
-        auto copy_data = ctx.folder.SerializeAsString();
+        auto copy_data = db::encode(ctx.folder);
         error = {};
         auto valid = store(&ctx);
 
         // clang-format off
-        auto is_same = (copy_data == ctx.folder.SerializeAsString())
+        auto is_same = (copy_data == db::encode(ctx.folder))
                     && (initially_shared_with == ctx.shared_with);
         // clang-format on
         if (!is_same) {
@@ -119,16 +120,9 @@ struct table_t : content::folder_table_t {
         }
 
         if (valid) {
-            if (ctx.folder.path().empty()) {
+            auto db_path = db::get_path(ctx.folder);
+            if (db_path.empty()) {
                 error = "path should be defined";
-            } else {
-                auto path = bfs::path(boost::nowide::widen(ctx.folder.path()));
-                auto ec = sys::error_code{};
-                if (bfs::exists(path, ec)) {
-                    if (!bfs::is_empty(path, ec)) {
-                        error = "referred directory should be empty";
-                    }
-                }
             }
         }
 
@@ -158,9 +152,12 @@ void folders_t::update_label() {
     this->label(l.data());
 }
 
-augmentation_ptr_t folders_t::add_folder(model::folder_t &folder_info) {
+auto folders_t::add_folder(presentation::folder_entity_t &folder_entity) -> augmentation_ptr_t {
     auto augmentation = within_tree([&]() {
-        auto item = new folder_t(folder_info, supervisor, tree());
+        auto self = supervisor.get_cluster()->get_device();
+        auto presence = folder_entity.get_presence(self.get());
+        auto folder_presence = static_cast<presentation::folder_presence_t *>(presence);
+        auto item = new folder_t(*folder_presence, supervisor, tree());
         return insert_by_label(item)->get_proxy();
     });
     update_label();
@@ -175,13 +172,13 @@ void folders_t::remove_child(tree_item_t *child) {
 void folders_t::select_folder(std::string_view folder_id) {
     auto t = tree();
     for (int i = 0; i < children(); ++i) {
-        auto node = static_cast<folder_t *>(child(i));
-        auto aug = static_cast<augmentation_entry_base_t *>(node->get_proxy().get());
-        if (aug->get_folder()->get_folder()->get_id() == folder_id) {
+        auto folder = static_cast<folder_t *>(child(i));
+        auto &fp = static_cast<presentation::folder_presence_t &>(folder->get_presence());
+        if (fp.get_folder_info().get_folder()->get_id() == folder_id) {
             while (auto selected = t->first_selected_item()) {
                 t->deselect(selected);
             }
-            t->select(node, 1);
+            t->select(folder, 1);
             t->redraw();
             break;
         }
@@ -195,8 +192,8 @@ bool folders_t::on_select() {
         auto &sequencer = supervisor.get_sequencer();
 
         auto random_id = sequencer.next_uint64();
-        auto random_id_ptr = reinterpret_cast<const char *>(&random_id);
-        auto sample_id = utils::base32::encode(std::string_view(random_id_ptr, sizeof(random_id)));
+        auto random_id_ptr = reinterpret_cast<unsigned char *>(&random_id);
+        auto sample_id = utils::base32::encode(utils::bytes_view_t(random_id_ptr, sizeof(random_id)));
         auto lower_caser = [](unsigned char c) { return std::tolower(c); };
         std::transform(sample_id.begin(), sample_id.end(), sample_id.begin(), lower_caser);
         auto sz = sample_id.size();
@@ -204,14 +201,14 @@ bool folders_t::on_select() {
         auto &path = supervisor.get_app_config().default_location;
 
         auto db_folder = db::Folder();
-        db_folder.set_rescan_interval(3600u);
-        db_folder.set_path(boost::nowide::narrow(path.wstring()));
-        db_folder.set_id(id);
+        db::set_rescan_interval(db_folder, 3600);
+        db::set_path(db_folder, boost::nowide::narrow(path.wstring()));
+        db::set_id(db_folder, id);
         auto folder = model::folder_t::create(sequencer.next_uuid(), db_folder).value();
         folder->assign_cluster(cluster);
 
         auto db_folder_info = db::FolderInfo();
-        db_folder_info.set_index_id(sequencer.next_uint64());
+        db::set_index_id(db_folder_info, sequencer.next_uint64());
         auto fi = model::folder_info_t::create(sequencer.next_uuid(), db_folder_info, &self, folder).value();
 
         auto prev = content->get_widget();

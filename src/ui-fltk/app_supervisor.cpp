@@ -4,12 +4,11 @@
 #include "app_supervisor.h"
 #include "augmentation.h"
 #include "main_window.h"
+#include "presence_item/folder.h"
 #include "tree_item/devices.h"
-#include "tree_item/folder.h"
 #include "tree_item/folders.h"
 #include "tree_item/ignored_devices.h"
 #include "tree_item/peer_device.h"
-#include "tree_item/entry.h"
 #include "tree_item/pending_devices.h"
 #include "tree_item/pending_folders.h"
 #include "tree_item/peer_folders.h"
@@ -29,15 +28,25 @@
 #include "model/diff/modify/update_peer.h"
 #include "model/diff/modify/share_folder.h"
 #include "model/diff/peer/update_folder.h"
+#include "presentation/entity.h"
+#include "presentation/folder_entity.h"
+#include "presentation/folder_presence.h"
 #include "utils/format.hpp"
 #include "utils/io.h"
+#include "utils/log-setup.h"
 
 #include <utility>
 #include <sstream>
 #include <iomanip>
 #include <functional>
+#include <limits>
+#include <memory_resource>
+#include <unordered_set>
 
 using namespace syncspirit::fltk;
+using namespace syncspirit::presentation;
+
+static auto MAX_DEPTH = std::numeric_limits<std::int32_t>::max();
 
 namespace {
 namespace resource {
@@ -45,24 +54,60 @@ r::plugin::resource_id_t model = 0;
 }
 } // namespace
 
-db_info_viewer_guard_t::db_info_viewer_guard_t(app_supervisor_t *supervisor_) : supervisor{supervisor_} {}
+using entities_ptrs_t = std::pmr::unordered_set<const entity_t *>;
+using entities_t = std::pmr::unordered_set<entity_ptr_t>;
+using guards_t = std::pmr::vector<entity_t::monitor_guard_t>;
+using shared_device_t = std::pmr::vector<syncspirit::model::device_t *>;
+
+struct app_monitor_t final : entities_monitor_t {
+    app_monitor_t(entities_t &deleted_, entities_ptrs_t &updated_) : deleted{deleted_}, updated{updated_} {}
+    void on_delete(entity_t &entity) noexcept override {
+        deleted.emplace(entity_ptr_t{&entity});
+        if (auto parent = entity.get_parent(); parent) {
+            on_update(*parent);
+        }
+    }
+    void on_update(const entity_t &entity) noexcept override {
+        auto current = &entity;
+        while (current) {
+            updated.insert(current);
+            current = current->get_parent();
+        }
+    }
+
+    entities_t &deleted;
+    entities_ptrs_t &updated;
+};
+
+struct visitor_context_t {
+    guards_t &guards;
+    app_monitor_t &monitor;
+};
+
+db_info_viewer_guard_t::db_info_viewer_guard_t(main_window_t *main_window_) : main_window{main_window_} {}
 db_info_viewer_guard_t::db_info_viewer_guard_t(db_info_viewer_guard_t &&other) { *this = std::move(other); }
 
 db_info_viewer_guard_t &db_info_viewer_guard_t::operator=(db_info_viewer_guard_t &&other) {
-    std::swap(supervisor, other.supervisor);
+    std::swap(main_window, other.main_window);
     return *this;
 }
 
 db_info_viewer_guard_t::~db_info_viewer_guard_t() {
-    if (supervisor) {
-        supervisor->log->trace("~db_info_viewer_guard_t");
-        supervisor->db_info_viewer = nullptr;
+    if (main_window) {
+        if (auto sup = main_window->get_supervisor(); sup) {
+            sup->log->trace("~db_info_viewer_guard_t");
+            sup->db_info_viewer = nullptr;
+        }
     }
 }
 
 void db_info_viewer_guard_t::reset() {
-    supervisor->db_info_viewer = nullptr;
-    supervisor = nullptr;
+    if (main_window) {
+        if (auto sup = main_window->get_supervisor(); sup) {
+            sup->db_info_viewer = nullptr;
+        }
+        main_window = nullptr;
+    }
 }
 
 using callback_fn_t = std::function<void()>;
@@ -75,46 +120,8 @@ struct callback_impl_t final : callback_t {
     callback_fn_t fn;
 };
 
-using aec_t = app_supervisor_t::entries_comparator_t;
-bool aec_t::operator()(const aug_t *lhs, const aug_t *rhs) const {
-    if (lhs == rhs) {
-        return false;
-    }
-
-    auto lf = lhs->get_folder();
-    auto rf = rhs->get_folder();
-    auto lid = lf->get_folder()->get_id();
-    auto rid = rf->get_folder()->get_id();
-    if (lid != rid) {
-        return lid > rid;
-    }
-
-    auto ld = lf->get_device();
-    auto rd = rf->get_device();
-    if (ld != rd) {
-        return ld > rd;
-    }
-
-    auto l_file = lhs->get_file();
-    auto r_file = rhs->get_file();
-    if (!l_file && r_file) {
-        return false;
-    }
-    if (l_file && !r_file) {
-        return true;
-    }
-
-    return l_file->get_name() > r_file->get_name();
-}
-
-static void ui_idle_means_ready(void *data) {
-    auto sup = reinterpret_cast<app_supervisor_t *>(data);
-    sup->send<syncspirit::model::payload::ui_ready_t>(sup->get_coordinator_address());
-    Fl::remove_idle(ui_idle_means_ready, data);
-}
-
 app_supervisor_t::app_supervisor_t(config_t &config)
-    : parent_t(config), dist_sink(std::move(config.dist_sink)), config_path{std::move(config.config_path)},
+    : parent_t(config), log_sink(config.log_sink), config_path{std::move(config.config_path)},
       app_config(std::move(config.app_config)), app_config_original{app_config}, content{nullptr}, devices{nullptr},
       folders{nullptr}, pending_devices{nullptr}, ignored_devices{nullptr}, db_info_viewer{nullptr},
       main_window{nullptr}, loaded_blocks{0}, loaded_files{0} {
@@ -123,19 +130,15 @@ app_supervisor_t::app_supervisor_t(config_t &config)
 }
 
 app_supervisor_t::~app_supervisor_t() {
-    cluster.reset();
-    if (ui_sink) {
-        dist_sink->remove_sink(ui_sink);
-        ui_sink.reset();
-    }
-    spdlog::debug("~app_supervisor_t()");
+    detach_main_window();
+    utils::get_root_logger()->debug("~app_supervisor_t()");
 }
 
-auto app_supervisor_t::get_dist_sink() -> dist_sink_t & { return dist_sink; }
 auto app_supervisor_t::get_config_path() -> const bfs::path & { return config_path; }
 auto app_supervisor_t::get_app_config() -> config::main_t & { return app_config; }
 auto app_supervisor_t::get_cluster() -> model::cluster_t * { return cluster.get(); }
 auto app_supervisor_t::get_sequencer() -> model::sequencer_t & { return *sequencer; }
+auto app_supervisor_t::get_log_sink() -> in_memory_sink_t * { return log_sink; }
 
 void app_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     parent_t::configure(plugin);
@@ -149,6 +152,7 @@ void app_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
                 auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
                 plugin->subscribe_actor(&app_supervisor_t::on_model_update, coordinator);
+                plugin->subscribe_actor(&app_supervisor_t::on_app_ready, coordinator);
                 request_load_model();
             }
         });
@@ -201,9 +205,26 @@ void app_supervisor_t::on_model_response(model::message::model_response_t &res) 
 void app_supervisor_t::on_model_update(model::message::model_update_t &message) noexcept {
     LOG_TRACE(log, "on_model_update");
     bool has_been_loaded = cluster->get_devices().size();
-    auto updated = updated_entries_t();
-    this->updated_entries = &updated;
+
+    auto buffer = std::array<std::byte, 16 * 1024>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<std::string>(&pool);
+
+    auto updated_entities = entities_ptrs_t(allocator);
+    auto deleted_entities = entities_t(allocator);
+    auto monitor = app_monitor_t(deleted_entities, updated_entities);
+
     auto &diff = *message.payload.diff;
+    auto &folders = cluster->get_folders();
+    auto guards = guards_t();
+    guards.reserve(folders.size());
+    for (auto &it : folders) {
+        auto augmentation = (*it.item).get_augmentation().get();
+        if (augmentation) {
+            auto folder_entity = static_cast<presentation::folder_entity_t *>(augmentation);
+            guards.emplace_back(folder_entity->monitor(&monitor));
+        }
+    }
 
     if (!has_been_loaded) {
         main_window->set_splash_text("populating model (1/3)...");
@@ -211,14 +232,21 @@ void app_supervisor_t::on_model_update(model::message::model_update_t &message) 
     auto r = diff.apply(*cluster, *this);
     if (!r) {
         LOG_ERROR(log, "error applying cluster diff: {}", r.assume_error().message());
+        return;
     }
 
     if (!has_been_loaded) {
         main_window->set_splash_text("populating model (2/3)...");
     }
-    r = diff.visit(*this, nullptr);
+
+    auto context = visitor_context_t{
+        guards,
+        monitor,
+    };
+    r = diff.visit(*this, &context);
     if (!r) {
         LOG_ERROR(log, "error visiting cluster diff: {}", r.assume_error().message());
+        return;
     }
 
     auto custom = message.payload.custom;
@@ -236,15 +264,28 @@ void app_supervisor_t::on_model_update(model::message::model_update_t &message) 
     if (!has_been_loaded) {
         main_window->set_splash_text("populating model (3/3)...");
     }
-    for (auto &entry : updated) {
-        entry->apply_update();
+
+    for (auto &entity : deleted_entities) {
+        updated_entities.erase(entity.get());
     }
+    for (auto entity : updated_entities) {
+        for (auto p : entity->get_presences()) {
+            auto augmentation = p->get_augmentation().get();
+            if (augmentation) {
+                auto item = static_cast<presence_item_t *>(augmentation);
+                item->on_update();
+            }
+        }
+    }
+
     if (!has_been_loaded && cluster->get_devices().size()) {
-        main_window->on_loading_done();
         main_window->set_splash_text("UI has been initialized");
-        Fl::add_idle(ui_idle_means_ready, this);
     }
-    this->updated_entries = nullptr;
+}
+
+void app_supervisor_t::on_app_ready(model::message::app_ready_t &) noexcept {
+    LOG_TRACE(log, "on_app_ready");
+    main_window->on_loading_done();
 }
 
 std::string app_supervisor_t::get_uptime() noexcept {
@@ -282,22 +323,13 @@ void app_supervisor_t::set_folders(tree_item_t *node) { folders = node; }
 void app_supervisor_t::set_pending_devices(tree_item_t *node) { pending_devices = node; }
 void app_supervisor_t::set_ignored_devices(tree_item_t *node) { ignored_devices = node; }
 void app_supervisor_t::set_main_window(main_window_t *window) { main_window = window; }
-
-void app_supervisor_t::add_sink(spdlog::sink_ptr ui_sink_) {
-    ui_sink = ui_sink_;
-    dist_sink->add_sink(ui_sink);
-}
-
-void app_supervisor_t::postpone_update(augmentation_entry_base_t &entry) {
-    assert(updated_entries);
-    updated_entries->emplace(&entry);
-}
+main_window_t *app_supervisor_t::get_main_window() { return main_window; }
 
 auto app_supervisor_t::request_db_info(db_info_viewer_t *viewer) -> db_info_viewer_guard_t {
     log->trace("request_db_info");
     request<net::payload::db_info_request_t>(coordinator).send(init_timeout * 5 / 6);
     db_info_viewer = viewer;
-    return db_info_viewer_guard_t(this);
+    return db_info_viewer_guard_t(main_window);
 }
 
 callback_ptr_t app_supervisor_t::call_select_folder(std::string_view folder_id) {
@@ -311,11 +343,12 @@ callback_ptr_t app_supervisor_t::call_select_folder(std::string_view folder_id) 
     return cb;
 }
 
-callback_ptr_t app_supervisor_t::call_share_folders(std::string folder_id, std::vector<std::string> devices) {
+callback_ptr_t app_supervisor_t::call_share_folders(std::string_view folder_id, std::vector<utils::bytes_t> devices) {
     assert(devices.size());
-    auto fn = callback_fn_t([this, folder_id = std::move(folder_id), devices = std::move(devices)]() {
+    auto fn = callback_fn_t([this, folder_id = std::string(folder_id), devices = std::move(devices)]() {
         auto diff = model::diff::cluster_diff_ptr_t{};
         auto current = diff.get();
+        auto &self = cluster->get_device()->device_id();
         for (auto &sha256 : devices) {
             auto device = cluster->get_devices().by_sha256(sha256);
             if (!device) {
@@ -328,7 +361,7 @@ callback_ptr_t app_supervisor_t::call_share_folders(std::string folder_id, std::
                 return;
             }
             using diff_t = model::diff::modify::share_folder_t;
-            auto opt = diff_t::create(*cluster, *sequencer, *device, *folder);
+            auto opt = diff_t::create(*cluster, *sequencer, *device, self, *folder);
             if (!opt) {
                 auto message = opt.assume_error().message();
                 log->error("cannot share folder {} with {} : {}", folder_id, device->device_id(), message);
@@ -355,6 +388,16 @@ auto app_supervisor_t::operator()(const model::diff::load::load_cluster_t &diff,
     if (!devices) {
         return diff.visit_next(*this, custom);
     }
+    auto folders_node = static_cast<tree_item::folders_t *>(folders);
+    for (auto &it : cluster->get_folders()) {
+        auto &folder = it.item;
+        auto text = fmt::format("building model of cluster folder '{}'({}) ...", folder->get_label(), folder->get_id());
+        main_window->set_splash_text(text);
+        auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
+        folders_node->add_folder(*folder_entity);
+        folder->set_augmentation(folder_entity);
+    }
+
     auto devices_node = static_cast<tree_item::devices_t *>(devices);
 
     auto &self_device = cluster->get_device();
@@ -362,6 +405,7 @@ auto app_supervisor_t::operator()(const model::diff::load::load_cluster_t &diff,
     auto tree = self_node->get_owner()->tree();
     tree->select(self_node->get_owner());
     self_device->set_augmentation(*self_node);
+
     for (auto &it : cluster->get_devices()) {
         auto &device = *it.item;
         if (device.device_id() != cluster->get_device()->device_id()) {
@@ -383,17 +427,9 @@ auto app_supervisor_t::operator()(const model::diff::load::load_cluster_t &diff,
         device.set_augmentation(ignored_devices_node->add_device(device));
     }
 
-    auto folders_node = static_cast<tree_item::folders_t *>(folders);
-    for (auto &it : cluster->get_folders()) {
-        auto &folder = it.item;
-        auto text = fmt::format("populating local folder '{}'({})...", folder->get_label(), folder->get_id());
-        main_window->set_splash_text(text);
-        auto augmentation = folders_node->add_folder(*folder);
-        folder->set_augmentation(augmentation);
-    }
+    send<syncspirit::model::payload::thread_ready_t>(coordinator);
 
-    auto r = diff.visit_next(*this, custom);
-    return r;
+    return diff.visit_next(*this, custom);
 }
 
 auto app_supervisor_t::operator()(const model::diff::local::io_failure_t &diff, void *custom) noexcept
@@ -401,15 +437,6 @@ auto app_supervisor_t::operator()(const model::diff::local::io_failure_t &diff, 
     for (auto &details : diff.errors) {
         log->warn("I/O error on '{}': {}", details.path.string(), details.ec.message());
     }
-    return diff.visit_next(*this, custom);
-}
-
-auto app_supervisor_t::operator()(const model::diff::local::scan_start_t &diff, void *custom) noexcept
-    -> outcome::result<void> {
-    auto folder = cluster->get_folders().by_id(diff.folder_id);
-    auto augmentation = static_cast<augmentation_t *>(folder->get_augmentation().get());
-    auto folder_node = static_cast<tree_item::folder_t *>(augmentation->get_owner());
-    folder_node->reset_stats();
     return diff.visit_next(*this, custom);
 }
 
@@ -433,7 +460,8 @@ auto app_supervisor_t::operator()(const model::diff::modify::add_pending_folders
         auto augmentation = static_cast<augmentation_t *>(peer->get_augmentation().get());
         auto peer_node = static_cast<tree_item::peer_device_t *>(augmentation->get_owner());
         auto pending_node = static_cast<tree_item::pending_folders_t *>(peer_node->get_pending_folders());
-        auto pending_folder = pending_folders.by_id(item.db.folder().id());
+        auto folder_id = db::get_id(db::get_folder(item.db));
+        auto pending_folder = pending_folders.by_id(folder_id);
         if (pending_folder->get_augmentation()) {
             continue;
         }
@@ -461,26 +489,29 @@ auto app_supervisor_t::operator()(const model::diff::modify::add_ignored_device_
 auto app_supervisor_t::operator()(const model::diff::advance::advance_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     auto folder = cluster->get_folders().by_id(diff.folder_id);
-    if (folder && !folder->is_suspended()) {
+    auto augmentation = folder->get_augmentation().get();
+    auto folder_entity = static_cast<presentation::folder_entity_t *>(augmentation);
+    if (folder_entity) {
         auto &folder_infos = folder->get_folder_infos();
         auto local_fi = folder_infos.by_device(*cluster->get_device());
-        auto local_file = local_fi->get_file_infos().by_name(diff.proto_local.name());
+        auto file_name = proto::get_name(diff.proto_local);
+        auto local_file = local_fi->get_file_infos().by_name(file_name);
         if (local_file) {
-            auto generic_augmentation = local_fi->get_augmentation();
-            auto augmentation = static_cast<augmentation_entry_root_t *>(generic_augmentation.get());
-            if (!local_file->get_augmentation()) {
-                augmentation->track(*local_file);
-                augmentation->augment_pending();
-            }
-            // displayed nodes "actuality" status might change
-            for (auto it : folder_infos) {
-                auto &remote_fi = it.item;
-                if (remote_fi->get_device() != local_fi->get_device()) {
-                    auto remote_file = remote_fi->get_file_infos().by_name(local_file->get_name());
-                    if (remote_file) {
-                        auto aug = remote_file->get_augmentation();
-                        if (aug) {
-                            aug->on_update();
+            auto entity = folder_entity->on_insert(*local_file);
+            if (entity) {
+                auto parent = entity->get_parent();
+                auto mask = mask_nodes();
+                for (auto presence : entity->get_presences()) {
+                    using F = presence_t::features_t;
+                    if (!(presence->get_features() & F::missing)) {
+                        auto parent_presence = presence->get_parent();
+                        if (parent_presence) {
+                            auto aug = parent_presence->get_augmentation().get();
+                            if (aug) {
+                                auto parent_item = static_cast<presence_item_t *>(aug);
+                                parent_item->show_child(*presence, mask);
+                                parent_item->tree()->redraw();
+                            }
                         }
                     }
                 }
@@ -492,11 +523,15 @@ auto app_supervisor_t::operator()(const model::diff::advance::advance_t &diff, v
 
 auto app_supervisor_t::operator()(const model::diff::modify::upsert_folder_t &diff, void *custom) noexcept
     -> outcome::result<void> {
-    auto &folder = *cluster->get_folders().by_id(diff.db.id());
-    if (!folder.get_augmentation()) {
+    auto folder_id = db::get_id(diff.db);
+    auto folder = cluster->get_folders().by_id(folder_id);
+    if (!folder->get_augmentation()) {
         auto folders_node = static_cast<tree_item::folders_t *>(folders);
-        auto augmentation = folders_node->add_folder(folder);
-        folder.set_augmentation(augmentation);
+        auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
+        folders_node->add_folder(*folder_entity);
+        folder->set_augmentation(folder_entity);
+        auto ctx = static_cast<visitor_context_t *>(custom);
+        ctx->guards.emplace_back(folder_entity->monitor(&ctx->monitor));
     }
     return diff.visit_next(*this, custom);
 }
@@ -506,13 +541,18 @@ auto app_supervisor_t::operator()(const model::diff::modify::upsert_folder_info_
     auto r = diff.visit_next(*this, custom);
     auto &folder = *cluster->get_folders().by_id(diff.folder_id);
     auto &device = *cluster->get_devices().by_sha256(diff.device_id);
+    auto folder_info = folder.is_shared_with(device);
     if (&device != cluster->get_device()) {
-        auto folder_info = folder.is_shared_with(device);
-        auto devices_node = static_cast<tree_item::devices_t *>(devices);
-        auto peer_node = devices_node->get_peer(device);
-        auto folders_node = static_cast<tree_item::peer_folders_t *>(peer_node->get_folders());
-        if (!folder_info->get_augmentation()) {
-            folders_node->add_folder(*folder_info);
+        auto augmentation = folder.get_augmentation().get();
+        auto folder_entity = static_cast<presentation::folder_entity_t *>(augmentation);
+        auto folder_presence = folder_entity->on_insert(*folder_info);
+        if (folder_presence) {
+            auto devices_node = static_cast<tree_item::devices_t *>(devices);
+            auto peer_node = devices_node->get_peer(device);
+            auto folders_node = static_cast<tree_item::peer_folders_t *>(peer_node->get_folders());
+            if (!folder_presence->get_augmentation()) {
+                folders_node->add_folder(*folder_presence);
+            }
         }
     }
     return r;
@@ -520,20 +560,52 @@ auto app_supervisor_t::operator()(const model::diff::modify::upsert_folder_info_
 
 auto app_supervisor_t::operator()(const model::diff::peer::update_folder_t &diff, void *custom) noexcept
     -> outcome::result<void> {
+    auto buffer = std::array<std::byte, 128>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<std::string>(&pool);
+    auto shared_devices = shared_device_t(allocator);
+
     auto folder = cluster->get_folders().by_id(diff.folder_id);
-    auto peer = cluster->get_devices().by_sha256(diff.peer_id);
-    auto folder_info = folder->get_folder_infos().by_device(*peer);
-    if (auto generic_augmentation = folder_info->get_augmentation(); generic_augmentation) {
-        auto augmentation = static_cast<augmentation_entry_root_t *>(generic_augmentation.get());
-        auto &files_map = folder_info->get_file_infos();
-        for (auto &file : diff.files) {
-            auto file_info = files_map.by_name(file.name());
-            if (!file_info->get_augmentation()) {
-                augmentation->track(*file_info);
+    auto &devices_map = cluster->get_devices();
+
+    for (auto &it : devices_map) {
+        auto &device = it.item;
+        if (folder->is_shared_with(*device)) {
+            shared_devices.emplace_back(device.get());
+        }
+    }
+
+    auto peer = devices_map.by_sha256(diff.peer_id);
+    auto &files_map = folder->get_folder_infos().by_device(*peer)->get_file_infos();
+    auto folder_aug = folder->get_augmentation().get();
+    auto folder_entity = static_cast<presentation::folder_entity_t *>(folder_aug);
+    auto mask = mask_nodes();
+    for (auto &file : diff.files) {
+        auto file_name = proto::get_name(file);
+        auto file_info = files_map.by_name(file_name);
+        auto augmentation = file_info->get_augmentation().get();
+        if (!augmentation) {
+            auto entity = folder_entity->on_insert(*file_info);
+            if (entity) {
+                auto parent_entity = entity->get_parent();
+                if (parent_entity) {
+                    for (auto device : shared_devices) {
+                        auto presence = entity->get_presence(device);
+                        auto parent = presence->get_parent();
+                        if (!parent) {
+                            parent = parent_entity->get_presence(device);
+                        }
+                        if (parent) {
+                            auto parent_aug = parent->get_augmentation().get();
+                            if (parent_aug) {
+                                auto parent_item = static_cast<presence_item_t *>(parent_aug);
+                                parent_item->show_child(*presence, mask);
+                            }
+                        }
+                    }
+                }
             }
         }
-        augmentation->augment_pending();
-        augmentation->on_update();
     }
     return diff.visit_next(*this, custom);
 }
@@ -554,7 +626,7 @@ auto app_supervisor_t::apply(const model::diff::load::file_infos_t &diff, model:
     loaded_files += diff.container.size();
     auto share = (100. * loaded_files) / load_cluster->files_count;
     auto msg = fmt::format("({}%) loaded {} of {} files", (int)share, loaded_files, load_cluster->files_count);
-    log->debug(msg);
+    // log->debug(msg);
     main_window->set_splash_text(msg);
     auto r = apply_controller_t::apply(diff, cluster);
     return r;
@@ -582,64 +654,55 @@ void app_supervisor_t::write_config(const config::main_t &cfg) noexcept {
     app_config_original = app_config = cfg;
 }
 
-void app_supervisor_t::set_show_deleted(bool value) {
-    log->debug("display deleted = {}", value);
-    app_config.fltk_config.display_deleted = value;
-
+void app_supervisor_t::redisplay_folder_nodes(bool refresh_labels) {
+    auto mask = mask_nodes();
+    log->debug("redisplay_folder_nodes, mask: {:#x}", mask);
     for (auto &it_f : cluster->get_folders()) {
         for (auto &it : it_f.item->get_folder_infos()) {
             auto generic_augmentation = it.item->get_augmentation();
             if (generic_augmentation) {
-                auto augmentation = static_cast<augmentation_base_t *>(generic_augmentation.get());
-                auto entry = static_cast<tree_item::entry_t *>(augmentation->get_owner());
-                if (entry) {
-                    entry->show_deleted(value);
+                auto presence = static_cast<presentation::presence_t *>(generic_augmentation.get());
+                auto item = dynamic_cast<presence_item_t *>(presence->get_augmentation().get());
+                if (item) {
+                    item->show(mask, refresh_labels, MAX_DEPTH);
                 }
             }
         }
     }
+}
+
+void app_supervisor_t::set_show_deleted(bool value) {
+    app_config.fltk_config.display_deleted = value;
+    redisplay_folder_nodes(false);
+}
+
+void app_supervisor_t::set_show_missing(bool value) {
+    app_config.fltk_config.display_missing = value;
+    redisplay_folder_nodes(false);
 }
 
 void app_supervisor_t::set_show_colorized(bool value) {
-    struct refresher_t final : node_visitor_t {
-        void visit(tree_item_t &node, void *) const override { node.update_label(); }
-    };
-
     log->debug("display colorized = {}", value);
     app_config.fltk_config.display_colorized = value;
-
-    auto refresher = refresher_t{};
-    for (auto &it_f : cluster->get_folders()) {
-        for (auto &it : it_f.item->get_folder_infos()) {
-            auto generic_augmentation = it.item->get_augmentation();
-            if (generic_augmentation) {
-                auto augmentation = static_cast<augmentation_base_t *>(generic_augmentation.get());
-                auto entry = static_cast<tree_item::entry_t *>(augmentation->get_owner());
-                if (entry) {
-                    entry->apply(refresher, {});
-                }
-            }
-        }
-    }
+    redisplay_folder_nodes(true);
 }
 
-Fl_Color app_supervisor_t::get_color(color_context_t context) const {
-    if (app_config.fltk_config.display_colorized) {
-        using C = color_context_t;
-        switch (context) {
-        case C::deleted:
-            return FL_DARK1;
-        case C::link:
-            return FL_DARK_BLUE;
-        case C::actualized:
-            return FL_DARK_GREEN;
-        case C::outdated:
-            return FL_DARK_YELLOW;
-        case C::conflicted:
-            return FL_RED;
-        default:
-            return FL_BLACK;
-        }
+std::uint32_t app_supervisor_t::mask_nodes() const noexcept {
+    using F = syncspirit::presentation::presence_t::features_t;
+    auto r = std::uint32_t{0};
+    if (!app_config.fltk_config.display_deleted) {
+        r |= F::deleted;
     }
-    return FL_BLACK;
+    if (!app_config.fltk_config.display_missing) {
+        r |= F::missing;
+    }
+    return r;
+}
+
+void app_supervisor_t::detach_main_window() noexcept {
+    cluster.reset();
+    if (main_window) {
+        main_window->detach_supervisor();
+        main_window = nullptr;
+    }
 }

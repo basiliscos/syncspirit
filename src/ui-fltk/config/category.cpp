@@ -31,6 +31,7 @@ auto reflect(const main_cfg_t &config, const main_cfg_t &default_config) -> cate
             property_ptr_t(new bep::rx_timeout_t(bep.rx_timeout, bep_def.rx_timeout)),
             property_ptr_t(new bep::tx_buff_limit_t(bep.tx_buff_limit, bep_def.tx_buff_limit)),
             property_ptr_t(new bep::tx_timeout_t(bep.tx_timeout, bep_def.tx_timeout)),
+            property_ptr_t(new bep::stats_interval_t(bep.stats_interval, bep_def.stats_interval)),
             // clang-format on
         };
         return new category_t("bep", "BEP protocol/network settings", std::move(props));
@@ -87,7 +88,7 @@ auto reflect(const main_cfg_t &config, const main_cfg_t &default_config) -> cate
             property_ptr_t(new global_discovery::cert_file_t(g.cert_file, g_def.cert_file)),
             property_ptr_t(new global_discovery::key_file_t(g.key_file, g_def.key_file)),
             property_ptr_t(new global_discovery::announce_url_t(g.announce_url->buffer(), g_def.announce_url->buffer())),
-            property_ptr_t(new global_discovery::device_id_t(g.device_id, g_def.device_id)),
+            property_ptr_t(new global_discovery::lookup_url_t(g.lookup_url->buffer(), g_def.lookup_url->buffer())),
             property_ptr_t(new global_discovery::rx_buff_size_t(g.rx_buff_size, g_def.rx_buff_size)),
             property_ptr_t(new global_discovery::timeout_t(g.timeout, g_def.timeout)),
             // clang-format on

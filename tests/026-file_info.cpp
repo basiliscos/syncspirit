@@ -18,32 +18,31 @@ TEST_CASE("file-info", "[model]") {
     auto my_device = device_t::create(my_id, "my-device").value();
 
     db::Folder db_folder;
-    db_folder.set_id("1234-5678");
-    db_folder.set_label("my-label");
-    db_folder.set_path("/my/path");
+    db::set_id(db_folder, "1234-5678");
+    db::set_label(db_folder, "my-label");
+    db::set_path(db_folder, "/my/path");
     auto folder = folder_t::create(sequencer->next_uuid(), db_folder).value();
 
     db::FolderInfo db_folder_info;
-    db_folder_info.set_index_id(2);
-    db_folder_info.set_max_sequence(3);
+    db::set_index_id(db_folder_info, 2);
+    db::set_max_sequence(db_folder_info, 3);
     auto folder_info = folder_info_t::create(sequencer->next_uuid(), db_folder_info, my_device, folder).value();
 
     proto::FileInfo pr_fi;
-    pr_fi.set_name("a/b.txt");
-    pr_fi.set_size(55ul);
-    pr_fi.set_block_size(5ul);
-    pr_fi.set_sequence(6);
-    pr_fi.set_modified_s(1734680712);
-    auto &c = *pr_fi.mutable_version()->add_counters();
-    c.set_id(my_device->device_id().get_uint());
-    c.set_value(0);
+    auto name = "a/b.txt";
+    proto::set_name(pr_fi, name);
+    proto::set_size(pr_fi, 55ul);
+    proto::set_block_size(pr_fi, 5ul);
+    proto::set_sequence(pr_fi, 6);
+    proto::set_modified_s(pr_fi, 1734680712);
+    proto::add_counters(proto::get_version(pr_fi), proto::Counter(my_device->device_id().get_uint(), 0));
 
     auto fi = file_info_t::create(sequencer->next_uuid(), pr_fi, folder_info).value();
     auto map = file_infos_map_t{};
 
     map.put(fi);
-    CHECK(map.by_name(pr_fi.name()) == fi);
-    CHECK(map.by_sequence(pr_fi.sequence()) == fi);
+    CHECK(map.by_name(name) == fi);
+    CHECK(map.by_sequence(proto::get_sequence(pr_fi)) == fi);
 
     auto [begin, end] = map.range(0, 10);
     CHECK(std::distance(begin, end) == 1);
@@ -53,9 +52,9 @@ TEST_CASE("file-info", "[model]") {
     fi->set_sequence(10);
 
     map.put(fi);
-    CHECK(map.by_name(pr_fi.name()) == fi);
+    CHECK(map.by_name(proto::get_name(pr_fi)) == fi);
     CHECK(map.by_sequence(10) == fi);
-    CHECK(!map.by_sequence(pr_fi.sequence()));
+    CHECK(!map.by_sequence(proto::get_sequence(pr_fi)));
 
     auto conflict_name = fi->make_conflicting_name();
     REQUIRE_THAT(conflict_name, Matches("a.b.sync-conflict-202412(\\d){2}-(\\d){6}-KHQNO2S.txt"));

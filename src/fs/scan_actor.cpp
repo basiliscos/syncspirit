@@ -9,8 +9,16 @@
 #include "model/diff/local/file_availability.h"
 #include "model/diff/local/scan_finish.h"
 #include "model/diff/local/scan_start.h"
+#include "presentation/cluster_file_presence.h"
+#include "presentation/folder_entity.h"
+#include "presentation/presence.h"
 #include "net/names.h"
+#include "proto/proto-helpers-bep.h"
+
 #include <algorithm>
+#include <memory_resource>
+#include <list>
+#include <iterator>
 
 namespace sys = boost::system;
 using namespace syncspirit::fs;
@@ -19,8 +27,9 @@ template <class> inline constexpr bool always_false_v = false;
 
 scan_actor_t::scan_actor_t(config_t &cfg)
     : r::actor_base_t{cfg}, cluster{cfg.cluster}, sequencer{cfg.sequencer}, fs_config{cfg.fs_config},
-      requested_hashes_limit{cfg.requested_hashes_limit} {
+      rw_cache(cfg.rw_cache), requested_hashes_limit{cfg.requested_hashes_limit} {
     assert(sequencer);
+    assert(rw_cache);
 }
 
 void scan_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
@@ -64,7 +73,7 @@ void scan_actor_t::shutdown_finish() noexcept {
 auto scan_actor_t::operator()(const model::diff::local::scan_start_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     LOG_DEBUG(log, "initiating scan of {}", diff.folder_id);
-    auto task = scan_task_ptr_t(new scan_task_t(cluster, diff.folder_id, fs_config));
+    auto task = scan_task_ptr_t(new scan_task_t(cluster, diff.folder_id, rw_cache, fs_config));
     send<payload::scan_progress_t>(address, std::move(task));
     return diff.visit_next(*this, custom);
 }
@@ -88,7 +97,7 @@ void scan_actor_t::on_scan(message::scan_progress_t &message) noexcept {
     auto folder = cluster->get_folders().by_id(folder_id);
     bool stop_processing = false;
     bool completed = false;
-    if (folder->is_synchronizing() || folder->is_suspended()) {
+    if (folder->is_suspended()) {
         LOG_DEBUG(log, "cancelling folder '{}' scanning", folder_id);
         stop_processing = true;
         completed = true;
@@ -112,7 +121,7 @@ void scan_actor_t::on_scan(message::scan_progress_t &message) noexcept {
                     auto folder = file.get_folder_info()->get_folder();
                     auto folder_id = std::string(folder->get_id());
                     auto fi = file.as_proto(false);
-                    fi.set_deleted(true);
+                    proto::set_deleted(fi, true);
                     task->push(new model::diff::advance::local_update_t(*cluster, *sequencer, std::move(fi),
                                                                         std::move(folder_id)));
                 } else if constexpr (std::is_same_v<T, changed_meta_t>) {
@@ -143,6 +152,7 @@ void scan_actor_t::on_scan(message::scan_progress_t &message) noexcept {
                 } else if constexpr (std::is_same_v<T, orphaned_removed_t>) {
                     // NO-OP
                 } else if constexpr (std::is_same_v<T, file_error_t>) {
+                    LOG_WARN(log, "(ignrored) error '{}': {}", r.path.generic_string(), r.ec.message());
 #if 0
                     auto diff = model::diff::cluster_diff_ptr_t{};
                     diff = new model::diff::modify::lock_file_t(*r.file, false);
@@ -150,8 +160,8 @@ void scan_actor_t::on_scan(message::scan_progress_t &message) noexcept {
                     auto path = make_temporal(r.file->get_path());
                     scan_errors_t errors{scan_error_t{path, r.ec}};
                     send<model::payload::io_error_t>(coordinator, std::move(errors));
-#endif
                     std::abort();
+#endif
                 } else {
                     static_assert(always_false_v<T>, "non-exhaustive visitor!");
                 }
@@ -163,6 +173,7 @@ void scan_actor_t::on_scan(message::scan_progress_t &message) noexcept {
         guard.send_progress();
     } else if (completed) {
         LOG_DEBUG(log, "completed scanning of {}", folder_id);
+        post_scan(*task);
         auto now = clock_t::local_time();
         task->push(new model::diff::local::scan_finish_t(folder_id, now));
         guard.send_by_force();
@@ -173,7 +184,7 @@ auto scan_actor_t::initiate_hash(scan_task_ptr_t task, const bfs::path &path, pr
     -> scan_errors_t {
     file_ptr_t file;
     LOG_DEBUG(log, "will try to initiate hashing of {}", path.string());
-    if (metadata.type() == proto::FileInfoType::FILE) {
+    if (proto::get_type(metadata) == proto::FileInfoType::FILE) {
         auto opt = file_t::open_read(path);
         if (!opt) {
             auto &ec = opt.assume_error();
@@ -243,9 +254,9 @@ void scan_actor_t::on_hash(hasher::message::digest_response_t &res) noexcept {
     auto &info = msg->payload;
     info.ack_hashing();
 
+    auto file = info.get_file();
     if (res.payload.ee) {
         auto &ee = res.payload.ee;
-        auto file = info.get_file();
         LOG_ERROR(log, "on_hash, file: {}, block = {}, error: {}", file->get_full_name(), rp.block_index,
                   ee->message());
         return do_shutdown(ee);
@@ -262,7 +273,23 @@ void scan_actor_t::on_hash(hasher::message::digest_response_t &res) noexcept {
     queued_next = !can_process_more;
     if (info.is_complete()) {
         if (info.has_valid_blocks()) {
-            task.push(new model::diff::local::blocks_availability_t(*info.get_file(), info.valid_blocks()));
+            auto &valid_blocks = info.valid_blocks();
+            std::uint_fast32_t valid_blocks_count = 0;
+            for (size_t i = 0; i < valid_blocks.size(); ++i) {
+                auto is_valid = (bool)valid_blocks[i];
+                if (is_valid) {
+                    if (file->is_locally_available(i)) {
+                        is_valid = false;
+                    } else {
+                        ++valid_blocks_count;
+                    }
+                }
+            }
+            if (valid_blocks_count) {
+                task.push(new model::diff::local::blocks_availability_t(*file, info.valid_blocks()));
+            } else {
+                LOG_DEBUG(log, "file '{}' has no unknown local blocks, ingnoring", file->get_name());
+            }
         } else {
             auto &file = *info.get_file();
             LOG_DEBUG(log, "removing temporal of '{}' as it corrupted", file.get_full_name());
@@ -284,16 +311,13 @@ void scan_actor_t::commit_new_file(new_chunk_iterator_t &info) noexcept {
     auto &hashes = info.get_hashes();
     auto folder_id = std::string(info.get_task()->get_folder_id());
     auto &file = info.get_metadata();
-    file.set_block_size(info.get_block_size());
+    proto::set_block_size(file, info.get_block_size());
     int offset = 0;
 
-    file.clear_blocks();
+    // file.clear_blocks();
     for (auto &b : hashes) {
-        auto block = file.add_blocks();
-        block->set_hash(b.digest);
-        block->set_weak_hash(b.weak);
-        block->set_size(b.size);
-        block->set_offset(offset);
+        auto block_info = proto::BlockInfo{offset, b.size, b.digest, b.weak};
+        proto::add_blocks(file, std::move(block_info));
         offset += b.size;
     }
 
@@ -327,5 +351,75 @@ void scan_actor_t::on_hash_new(hasher::message::digest_response_t &res) noexcept
     if (info.is_complete()) {
         commit_new_file(info);
         send<payload::scan_progress_t>(address, info.get_task());
+    }
+}
+
+void scan_actor_t::post_scan(scan_task_t &task) noexcept {
+    auto folder_id = task.get_folder_id();
+    auto folder = cluster->get_folders().by_id(folder_id);
+    auto self_fi = folder->get_folder_infos().by_device(*cluster->get_device());
+    auto &self_files = self_fi->get_file_infos();
+    auto aug = folder->get_augmentation();
+    auto folder_entity = dynamic_cast<presentation::folder_entity_t *>(aug.get());
+    auto &seen = task.get_seen_paths();
+    if (folder_entity && !folder->is_synchronizing()) {
+        using queue_t = std::pmr::list<presentation::entity_t *>;
+        using F = syncspirit::presentation::presence_t::features_t;
+        auto buffer = std::array<std::byte, 10 * 1024>();
+        auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+        auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+        auto queue = queue_t(allocator);
+        {
+            auto &top_level_children = folder_entity->get_children();
+            auto inserter = std::back_insert_iterator(queue);
+            std::copy(top_level_children.begin(), top_level_children.end(), inserter);
+        }
+        while (!queue.empty()) {
+            auto entity = queue.front();
+            queue.pop_front();
+            auto best = entity->get_best();
+            if (best) {
+                auto file_name = entity->get_path().get_full_name();
+                auto it = seen.end();
+                auto f = best->get_features();
+                if (f & F::deleted) {
+                    it = seen.find(file_name);
+                    if ((it == seen.end()) && !self_files.by_name(file_name)) {
+                        using local_update_t = model::diff::advance::local_update_t;
+                        auto presence = static_cast<const presentation::cluster_file_presence_t *>(best);
+                        auto &peer_file = presence->get_file_info();
+                        auto pr_file = peer_file.as_proto(true);
+                        LOG_DEBUG(log, "assuming deleted '{}' in the folder '{}'", file_name, folder_id);
+                        task.push(new local_update_t(*cluster, *sequencer, std::move(pr_file), folder_id));
+                    }
+                }
+                if (f & F::directory) {
+                    if (it == seen.end()) {
+                        it = seen.find(file_name);
+                    }
+                    auto recurse = [&]() -> bool {
+                        bool creation_allowed = false;
+                        if (it != seen.end()) {
+                            auto &path = it->second;
+                            auto ec = sys::error_code();
+                            auto status = bfs::status(path, ec);
+                            if (!ec) {
+                                using perms_t = bfs::perms;
+                                creation_allowed = (status.type() == bfs::file_type::directory) &&
+                                                   ((status.permissions() & perms_t::owner_write) != perms_t::none);
+                            }
+                        } else {
+                            creation_allowed = f & F::deleted;
+                        }
+                        return creation_allowed;
+                    }();
+                    if (recurse) {
+                        auto &children = entity->get_children();
+                        auto inserter = std::back_insert_iterator(queue);
+                        std::copy(children.begin(), children.end(), inserter);
+                    }
+                }
+            }
+        }
     }
 }

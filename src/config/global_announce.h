@@ -12,7 +12,7 @@ struct global_announce_config_t {
     bool enabled;
     bool debug;
     utils::uri_ptr_t announce_url;
-    std::string device_id;
+    utils::uri_ptr_t lookup_url;
     std::string cert_file;
     std::string key_file;
     std::uint32_t rx_buff_size;

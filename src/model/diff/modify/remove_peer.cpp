@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
 
 #include "remove_peer.h"
 #include "unshare_folder.h"
@@ -16,8 +16,9 @@ using namespace syncspirit::model::diff::modify;
 
 using blocks_t = remove_blocks_t::unique_keys_t;
 
-remove_peer_t::remove_peer_t(const cluster_t &cluster, const device_t &peer) noexcept
-    : parent_t(), peer_key{peer.get_key()} {
+remove_peer_t::remove_peer_t(const cluster_t &cluster, const device_t &peer) noexcept : parent_t() {
+    auto key = peer.get_key();
+    peer_key = utils::bytes_t(key.begin(), key.end());
     LOG_DEBUG(log, "remove_peer_t, device = {}", peer.device_id());
     orphaned_blocks_t orphaned_blocks;
 
@@ -25,7 +26,8 @@ remove_peer_t::remove_peer_t(const cluster_t &cluster, const device_t &peer) noe
     for (auto &it : cluster.get_pending_folders()) {
         auto &uf = *it.item;
         if (uf.device_id() == peer.device_id()) {
-            removed_pending_folders.emplace(uf.get_key());
+            auto key = uf.get_key();
+            removed_pending_folders.emplace(utils::bytes_t(key.begin(), key.end()));
         }
     }
 
@@ -76,7 +78,9 @@ auto remove_peer_t::apply_impl(cluster_t &cluster, apply_controller_t &controlle
     return applicator_t::apply_sibling(cluster, controller);
 }
 
-std::string_view remove_peer_t::get_peer_sha256() const noexcept { return std::string_view(peer_key).substr(1); }
+auto remove_peer_t::get_peer_sha256() const noexcept -> utils::bytes_view_t {
+    return utils::bytes_view_t(peer_key.data() + 1, peer_key.size() - 1);
+}
 
 auto remove_peer_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {
     LOG_TRACE(log, "visiting remove_peer_t");

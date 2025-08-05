@@ -24,7 +24,8 @@ namespace bfs = std::filesystem;
 using namespace syncspirit::net;
 
 net_supervisor_t::net_supervisor_t(net_supervisor_t::config_t &cfg)
-    : parent_t{cfg}, sequencer{cfg.sequencer}, app_config{cfg.app_config}, cluster_copies{cfg.cluster_copies} {
+    : parent_t{cfg}, sequencer{cfg.sequencer}, app_config{cfg.app_config}, independent_threads{cfg.independent_threads},
+      cluster_copies{independent_threads - 1} {
     auto log = utils::get_logger(names::coordinator);
     auto &files_cfg = app_config.global_announce_config;
     auto result = utils::load_pair(files_cfg.cert_file.c_str(), files_cfg.key_file.c_str());
@@ -57,16 +58,6 @@ net_supervisor_t::net_supervisor_t(net_supervisor_t::config_t &cfg)
     device = new model::local_device_t(device_id, app_config.device_name, cn.value());
     auto simultaneous_writes = app_config.bep_config.blocks_simultaneous_write;
     cluster = new model::cluster_t(device, static_cast<int32_t>(simultaneous_writes));
-
-    auto &gcfg = app_config.global_announce_config;
-    if (gcfg.enabled) {
-        auto global_device_opt = model::device_id_t::from_string(gcfg.device_id);
-        if (!global_device_opt) {
-            LOG_CRITICAL(log, "invalid global device id :: {}", gcfg.device_id);
-            throw "invalid global device id";
-        }
-        global_device = std::move(global_device_opt.value());
-    }
 }
 
 void net_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
@@ -81,6 +72,8 @@ void net_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.subscribe_actor(&net_supervisor_t::on_model_update);
         p.subscribe_actor(&net_supervisor_t::on_load_cluster);
         p.subscribe_actor(&net_supervisor_t::on_model_request);
+        p.subscribe_actor(&net_supervisor_t::on_thread_ready);
+        p.subscribe_actor(&net_supervisor_t::on_app_ready);
         launch_early();
     });
 }
@@ -158,64 +151,25 @@ void net_supervisor_t::on_model_request(model::message::model_request_t &message
     }
 }
 
-void net_supervisor_t::on_model_update(model::message::model_update_t &message) noexcept {
-    LOG_TRACE(log, "on_model_update");
-    auto &diff = *message.payload.diff;
-    auto r = diff.apply(*cluster, *this);
-    if (!r) {
-        LOG_ERROR(log, "error applying model diff: {}", r.assume_error().message());
-        auto ee = make_error(r.assume_error());
-        do_shutdown(ee);
-    }
-    r = diff.visit(*this, nullptr);
-    if (!r) {
-        auto ee = make_error(r.assume_error());
-        do_shutdown(ee);
+void net_supervisor_t::on_thread_ready(model::message::thread_ready_t &) noexcept {
+    --independent_threads;
+    LOG_DEBUG(log, "on_thread_ready, left = {}", independent_threads);
+    if (independent_threads == 0) {
+        send<model::payload::app_ready_t>(address);
     }
 }
 
-auto net_supervisor_t::operator()(const model::diff::load::load_cluster_t &diff, void *custom) noexcept
-    -> outcome::result<void> {
-    if (!cluster->is_tainted()) {
+void net_supervisor_t::on_app_ready(model::message::app_ready_t &) noexcept {
+    LOG_DEBUG(log, "on_app_ready");
 
-        auto &ignored_devices = cluster->get_ignored_devices();
-        auto &ignored_folders = cluster->get_ignored_folders();
-        auto &pending_folders = cluster->get_pending_folders();
-        auto &pending_devices = cluster->get_pending_devices();
-        auto &devices = cluster->get_devices();
-        auto &folders = cluster->get_folders();
-        size_t files = 0;
-        for (const auto &it : folders) {
-            auto &folder_info = it.item;
-            if (!folder_info) {
-                continue;
-            }
-            auto fi = folder_info->get_folder_infos().by_device(*cluster->get_device());
-            files += fi->get_file_infos().size();
-        }
-        auto pending_folders_sz = std::distance(pending_folders.begin(), pending_folders.end());
-        LOG_DEBUG(log,
-                  "load cluster, devices = {}, folders = {}, local files = {}, blocks = {}, ignored devices = {}, "
-                  "ignored folders = {}, pending folders = {}, pending devices = {}",
-                  devices.size(), folders.size(), files, cluster->get_blocks().size(), ignored_devices.size(),
-                  ignored_folders.size(), pending_folders_sz, pending_devices.size());
-
-        create_actor<cluster_supervisor_t>()
-            .timeout(shutdown_timeout * 9 / 10)
-            .strand(strand)
-            .cluster(cluster)
-            .sequencer(sequencer)
-            .bep_config(app_config.bep_config)
-            .hasher_threads(app_config.hasher_threads)
-            .escalate_failure()
-            .finish();
-        launch_net();
-    }
-    return diff.visit_next(*this, custom);
-}
-
-void net_supervisor_t::launch_net() noexcept {
-    LOG_INFO(log, "launching network services");
+    create_actor<cluster_supervisor_t>()
+        .timeout(shutdown_timeout * 9 / 10)
+        .strand(strand)
+        .cluster(cluster)
+        .sequencer(sequencer)
+        .config(app_config)
+        .escalate_failure()
+        .finish();
 
     if (app_config.upnp_config.enabled) {
         auto factory = [this](r::supervisor_t &, const r::address_ptr_t &spawner) -> r::actor_ptr_t {
@@ -265,7 +219,7 @@ void net_supervisor_t::launch_net() noexcept {
                 .cluster(cluster)
                 .ssl_pair(&ssl_pair)
                 .announce_url(gcfg.announce_url)
-                .device_id(std::move(global_device))
+                .lookup_url(gcfg.lookup_url)
                 .rx_buff_size(gcfg.rx_buff_size)
                 .io_timeout(gcfg.timeout)
                 .debug(gcfg.debug)
@@ -315,6 +269,51 @@ void net_supervisor_t::launch_net() noexcept {
     if (dcfg.enabled) {
         create_actor<dialer_actor_t>().timeout(timeout).dialer_config(dcfg).cluster(cluster).finish();
     }
+}
+
+void net_supervisor_t::on_model_update(model::message::model_update_t &message) noexcept {
+    LOG_TRACE(log, "on_model_update");
+    auto &diff = *message.payload.diff;
+    auto r = diff.apply(*cluster, *this);
+    if (!r) {
+        LOG_ERROR(log, "error applying model diff: {}", r.assume_error().message());
+        auto ee = make_error(r.assume_error());
+        do_shutdown(ee);
+    }
+    r = diff.visit(*this, nullptr);
+    if (!r) {
+        auto ee = make_error(r.assume_error());
+        do_shutdown(ee);
+    }
+}
+
+auto net_supervisor_t::operator()(const model::diff::load::load_cluster_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    if (!cluster->is_tainted()) {
+        auto &ignored_devices = cluster->get_ignored_devices();
+        auto &ignored_folders = cluster->get_ignored_folders();
+        auto &pending_folders = cluster->get_pending_folders();
+        auto &pending_devices = cluster->get_pending_devices();
+        auto &devices = cluster->get_devices();
+        auto &folders = cluster->get_folders();
+        size_t files = 0;
+        for (const auto &it : folders) {
+            auto &folder_info = it.item;
+            if (!folder_info) {
+                continue;
+            }
+            auto fi = folder_info->get_folder_infos().by_device(*cluster->get_device());
+            files += fi->get_file_infos().size();
+        }
+        auto pending_folders_sz = std::distance(pending_folders.begin(), pending_folders.end());
+        LOG_DEBUG(log,
+                  "load cluster, devices = {}, folders = {}, local files = {}, blocks = {}, ignored devices = {}, "
+                  "ignored folders = {}, pending folders = {}, pending devices = {}",
+                  devices.size(), folders.size(), files, cluster->get_blocks().size(), ignored_devices.size(),
+                  ignored_folders.size(), pending_folders_sz, pending_devices.size());
+        send<syncspirit::model::payload::thread_ready_t>(address);
+    }
+    return diff.visit_next(*this, custom);
 }
 
 void net_supervisor_t::on_start() noexcept {

@@ -168,21 +168,25 @@ config_result_t get_config(std::istream &config, const bfs::path &config_path) {
         }
         c.debug = debug.value();
 
-        auto url = t["announce_url"].value<std::string>();
-        if (!url) {
+        auto url_announce_str = t["announce_url"].value<std::string>();
+        if (!url_announce_str) {
             return "global_discovery/announce_url is incorrect or missing";
         }
-        auto announce_url = utils::parse(url.value().c_str());
+        auto announce_url = utils::parse(url_announce_str.value().c_str());
         if (!announce_url) {
             return "global_discovery/announce_url is not url";
         }
         c.announce_url = announce_url;
 
-        auto device_id = t["device_id"].value<std::string>();
-        if (!device_id) {
-            return "global_discovery/device_id is incorrect or missing";
+        auto url_lookup_str = t["lookup_url"].value<std::string>();
+        if (!url_lookup_str) {
+            return "global_discovery/lookup_url is incorrect or missing";
         }
-        c.device_id = device_id.value();
+        auto lookup_url = utils::parse(url_lookup_str.value().c_str());
+        if (!lookup_url) {
+            return "global_discovery/lookup_url is not url";
+        }
+        c.lookup_url = lookup_url;
 
         auto cert_file = t["cert_file"].value<std::string>();
         if (!cert_file) {
@@ -335,6 +339,12 @@ config_result_t get_config(std::istream &config, const bfs::path &config_path) {
             return "bep/advances_per_iteration is incorrect or missing";
         }
         c.advances_per_iteration = advances_per_iteration.value();
+
+        auto stats_interval = t["stats_interval"].value<std::int32_t>();
+        if (!stats_interval) {
+            return "bep/stats_interval is incorrect or missing";
+        }
+        c.stats_interval = stats_interval.value();
     }
 
     // dialer
@@ -450,6 +460,12 @@ config_result_t get_config(std::istream &config, const bfs::path &config_path) {
         }
         c.display_deleted = display_deleted.value();
 
+        auto display_missing = t["display_missing"].value<bool>();
+        if (!display_missing) {
+            return "fltk/display_missing is incorrect or missing";
+        }
+        c.display_missing = display_missing.value();
+
         auto display_colorized = t["display_colorized"].value<bool>();
         if (!display_colorized) {
             return "fltk/display_colorized is incorrect or missing";
@@ -548,7 +564,7 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
                                  {"enabled", cfg.global_announce_config.enabled},
                                  {"debug", cfg.global_announce_config.debug},
                                  {"announce_url", cfg.global_announce_config.announce_url->buffer().data()},
-                                 {"device_id", cfg.global_announce_config.device_id},
+                                 {"lookup_url", cfg.global_announce_config.lookup_url->buffer().data()},
                                  {"cert_file", cfg.global_announce_config.cert_file},
                                  {"key_file", cfg.global_announce_config.key_file},
                                  {"rx_buff_size", cfg.global_announce_config.rx_buff_size},
@@ -569,6 +585,7 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
                     {"request_timeout", cfg.bep_config.request_timeout},
                     {"rx_buff_size", cfg.bep_config.rx_buff_size},
                     {"rx_timeout", cfg.bep_config.rx_timeout},
+                    {"stats_interval", cfg.bep_config.stats_interval},
                     {"tx_buff_limit", cfg.bep_config.tx_buff_limit},
                     {"tx_timeout", cfg.bep_config.tx_timeout},
                 }}},
@@ -598,6 +615,7 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
         {"fltk", toml::table{{
                      {"level", get_level(cfg.fltk_config.level)},
                      {"display_deleted", cfg.fltk_config.display_deleted},
+                     {"display_missing", cfg.fltk_config.display_missing},
                      {"display_colorized", cfg.fltk_config.display_colorized},
                      {"main_window_width", cfg.fltk_config.main_window_width},
                      {"main_window_height", cfg.fltk_config.main_window_height},
@@ -661,10 +679,10 @@ outcome::result<main_t> generate_config(const bfs::path &config_path) {
         30000   /* frequency */
     };
     cfg.global_announce_config = global_announce_config_t{
-        true,                                                   /* enabled */
-        false,                                                  /* debug */
-        utils::parse("https://discovery.syncthing.net/v2/"),    /* announce_url */
-        "LYXKCHX-VI3NYZR-ALCJBHF-WMZYSPK-QG6QJA3-MPFYMSO-U56GTUK-NA2MIAW",
+        true,                                                           /* enabled */
+        false,                                                          /* debug */
+        utils::parse("https://discovery-announce-v4.syncthing.net/v2"), /* announce_url */
+        utils::parse("https://discovery-lookup.syncthing.net/v2"),      /* lookup_url */
         cert_file,
         key_file,
         32 * 1024,
@@ -688,6 +706,7 @@ outcome::result<main_t> generate_config(const bfs::path &config_path) {
         16,                 /* blocks_max_requested */
         32,                 /* blocks_simultaneous_write */
         10,                 /* advances_per_iteration */
+        100,                /* stats_interval */
     };
     cfg.dialer_config = dialer_config_t {
         true,       /* enabled */
@@ -717,6 +736,7 @@ outcome::result<main_t> generate_config(const bfs::path &config_path) {
     cfg.fltk_config = fltk_config_t {
         spdlog::level::level_enum::info,    /* level */
         false,                              /* display_deleted */
+        true,                               /* display_missing */
         true,                               /* display_colorized */
         700,                                /* main_window_width */
         480,                                /* main_window_height */

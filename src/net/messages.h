@@ -9,20 +9,19 @@
 #include <boost/asio/ssl.hpp>
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
+#include <boost/smart_ptr/local_shared_ptr.hpp>
 
 #include <memory>
 #include <optional>
+#include <cstdint>
 
-#include <fmt/core.h>
 #include "model/diff/cluster_diff.h"
 #include "model/file_info.h"
-#include "model/folder_info.h"
 #include "transport/base.h"
-#include "proto/bep_support.h"
+#include "utils/bytes.h"
 #include "utils/dns.h"
 
-namespace syncspirit {
-namespace net {
+namespace syncspirit::net {
 
 namespace r = rotor;
 namespace ra = rotor::asio;
@@ -76,7 +75,7 @@ struct http_request_t : r::arc_base_t<http_request_t> {
     using response_t = r::intrusive_ptr_t<http_response_t>;
 
     utils::uri_ptr_t url;
-    fmt::memory_buffer data;
+    utils::bytes_t data;
     rx_buff_ptr_t rx_buff;
     std::size_t rx_buff_size;
     ssl_option_t ssl_context;
@@ -85,13 +84,13 @@ struct http_request_t : r::arc_base_t<http_request_t> {
     r::message_ptr_t custom;
 
     template <typename URI>
-    http_request_t(URI &&url_, fmt::memory_buffer &&data_, rx_buff_ptr_t rx_buff_, std::size_t rx_buff_size_,
+    http_request_t(URI &&url_, utils::bytes_t &&data_, rx_buff_ptr_t rx_buff_, std::size_t rx_buff_size_,
                    bool local_ip_, bool debug_ = false, const r::message_ptr_t &custom_ = {})
         : url{std::forward<URI>(url_)}, data{std::move(data_)}, rx_buff{rx_buff_}, rx_buff_size{rx_buff_size_},
           local_ip{local_ip_}, debug{debug_}, custom{custom_} {}
 
     template <typename URI>
-    http_request_t(URI &&url_, fmt::memory_buffer &&data_, rx_buff_ptr_t rx_buff_, std::size_t rx_buff_size_,
+    http_request_t(URI &&url_, utils::bytes_t &&data_, rx_buff_ptr_t rx_buff_, std::size_t rx_buff_size_,
                    transport::ssl_junction_t &&ssl_, bool debug = false, const r::message_ptr_t &custom_ = {})
         : http_request_t(std::forward<URI>(url_), std::move(data_), rx_buff_, rx_buff_size_, {}, debug, custom_) {
         ssl_context = ssl_option_t(std::move(ssl_));
@@ -112,24 +111,42 @@ struct load_cluster_request_t {
     using response_t = load_cluster_response_t;
 };
 
-struct start_reading_t {
+struct controller_up_t {
+    using tx_size_t = std::uint32_t;
+    using tx_size_ptr_t = boost::local_shared_ptr<tx_size_t>;
+
     r::address_ptr_t controller;
-    bool start;
+    utils::uri_ptr_t url;
+    model::device_id_t peer;
+    tx_size_ptr_t tx_size;
 };
 
-struct termination_t {
+struct controller_down_t {
+    r::address_ptr_t controller;
+    r::address_ptr_t peer;
+};
+
+struct tx_signal_t {};
+
+struct controller_predown_t {
+    r::address_ptr_t controller;
+    r::address_ptr_t peer;
+    r::extended_error_ptr_t ee;
+    bool started;
+};
+
+struct peer_down_t {
     r::extended_error_ptr_t ee;
 };
 
 using forwarded_message_t =
-    std::variant<proto::message::ClusterConfig, proto::message::Index, proto::message::IndexUpdate,
-                 proto::message::Request, proto::message::DownloadProgress>;
+    std::variant<proto::ClusterConfig, proto::Index, proto::IndexUpdate, proto::Request, proto::DownloadProgress>;
 
 struct block_response_t {
-    std::string data;
+    utils::bytes_t data;
 };
 
-struct block_request_t {
+struct SYNCSPIRIT_API block_request_t {
     using response_t = block_response_t;
     std::string folder_id;
     std::string file_name;
@@ -137,7 +154,7 @@ struct block_request_t {
     size_t block_index;
     std::int64_t block_offset;
     std::uint32_t block_size;
-    std::string block_hash;
+    utils::bytes_t block_hash;
     block_request_t(const model::file_info_ptr_t &file, size_t block_index) noexcept;
 
     model::file_block_t get_block(model::cluster_t &, model::device_t &peer) noexcept;
@@ -156,15 +173,7 @@ struct connect_request_t {
 };
 
 struct transfer_data_t {
-    fmt::memory_buffer data;
-};
-
-struct transfer_push_t {
-    uint32_t bytes;
-};
-
-struct transfer_pop_t {
-    uint32_t bytes;
+    utils::bytes_t data;
 };
 
 struct db_info_response_t {
@@ -179,6 +188,8 @@ struct db_info_response_t {
 struct db_info_request_t {
     using response_t = db_info_response_t;
 };
+
+struct fs_predown_t {};
 
 } // end of namespace payload
 
@@ -198,12 +209,13 @@ using http_close_connection_t = r::message_t<payload::http_close_connection_t>;
 using load_cluster_request_t = r::request_traits_t<payload::load_cluster_request_t>::request::message_t;
 using load_cluster_response_t = r::request_traits_t<payload::load_cluster_request_t>::response::message_t;
 
-using start_reading_t = r::message_t<payload::start_reading_t>;
+using controller_up_t = r::message_t<payload::controller_up_t>;
+using controller_predown_t = r::message_t<payload::controller_predown_t>;
+using controller_down_t = r::message_t<payload::controller_down_t>;
+using tx_signal_t = r::message_t<payload::tx_signal_t>;
+using peer_down_t = r::message_t<payload::peer_down_t>;
 using forwarded_message_t = r::message_t<payload::forwarded_message_t>;
-using termination_signal_t = r::message_t<payload::termination_t>;
 using transfer_data_t = r::message_t<payload::transfer_data_t>;
-using transfer_push_t = r::message_t<payload::transfer_push_t>;
-using transfer_pop_t = r::message_t<payload::transfer_pop_t>;
 
 using block_request_t = r::request_traits_t<payload::block_request_t>::request::message_t;
 using block_response_t = r::request_traits_t<payload::block_request_t>::response::message_t;
@@ -214,7 +226,8 @@ using connect_response_t = r::request_traits_t<payload::connect_request_t>::resp
 using db_info_request_t = r::request_traits_t<payload::db_info_request_t>::request::message_t;
 using db_info_response_t = r::request_traits_t<payload::db_info_request_t>::response::message_t;
 
+using fs_predown_t = r::message_t<payload::fs_predown_t>;
+
 } // end of namespace message
 
-} // namespace net
-} // namespace syncspirit
+} // namespace syncspirit::net

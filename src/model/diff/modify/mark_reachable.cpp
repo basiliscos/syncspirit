@@ -1,17 +1,18 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "mark_reachable.h"
 #include "../cluster_visitor.h"
 #include "model/cluster.h"
+#include "utils/format.hpp"
 
 using namespace syncspirit::model::diff::modify;
 
 mark_reachable_t::mark_reachable_t(const model::file_info_t &file, bool reachable_) noexcept
-    : folder_id{file.get_folder_info()->get_folder()->get_id()},
-      device_id{file.get_folder_info()->get_device()->device_id().get_sha256()}, file_name{file.get_name()},
-      reachable{reachable_} {
-    LOG_DEBUG(log, "mark_reachable_t, file = {}, folder = {}, device = {}, value = {}", file_name, folder_id, device_id,
+    : folder_id{file.get_folder_info()->get_folder()->get_id()}, file_name{file.get_name()}, reachable{reachable_} {
+    auto &peer = file.get_folder_info()->get_device()->device_id();
+    device_id = peer.get_sha256();
+    LOG_DEBUG(log, "mark_reachable_t, file = {}, folder = {}, device = {}, value = {}", file_name, folder_id, peer,
               reachable);
 }
 

@@ -67,7 +67,7 @@ struct my_table_t : static_table_t {
         auto &device = container.device;
         auto &supervisor = container.supervisor;
         db::Device db_dev;
-        db_dev.set_name(std::string(device.get_name()));
+        db::set_name(db_dev, device.get_name());
 
         auto diff = cluster_diff_ptr_t();
         auto &cluster = *supervisor.get_cluster();

@@ -4,6 +4,7 @@
 #pragma once
 
 #include "cluster_diff.h"
+#include "utils/bytes.h"
 
 namespace syncspirit::model {
 
@@ -17,8 +18,8 @@ struct SYNCSPIRIT_API block_diff_t : cluster_diff_t {
 
     std::string file_name;
     std::string folder_id;
-    std::string device_id;
-    std::string block_hash;
+    utils::bytes_t device_id;
+    utils::bytes_t block_hash;
     size_t block_index;
 };
 

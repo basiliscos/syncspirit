@@ -6,6 +6,7 @@
 #include "constants.h"
 #include "utils/error_code.h"
 #include "utils/beast_support.h"
+#include "utils/time.h"
 #include "model/messages.h"
 #include "model/diff/contact/update_contact.h"
 #include "model/diff/contact/relay_connect_request.h"
@@ -130,7 +131,7 @@ void relay_actor_t::request_relay_list() noexcept {
     req.set(http::field::host, uri->host());
     req.set(http::field::connection, "close");
 
-    fmt::memory_buffer tx_buff;
+    utils::bytes_t tx_buff;
     auto r = utils::serialize(req, tx_buff);
     if (!r) {
         auto &ec = r.assume_error();
@@ -188,8 +189,8 @@ void relay_actor_t::read_master() noexcept {
     master->async_recv(buff, on_read, on_error);
 }
 
-void relay_actor_t::push_master(std::string data) noexcept {
-    tx_queue.emplace_back(tx_item_t(new std::string(std::move(data))));
+void relay_actor_t::push_master(utils::bytes_t data) noexcept {
+    tx_queue.emplace_back(tx_item_t(new utils::bytes_t(std::move(data))));
     if (!resources->has(resource::io_write)) {
         write_master();
     }
@@ -239,7 +240,7 @@ void relay_actor_t::on_connect(message::connect_response_t &res) noexcept {
     rx_state |= rx_state_t::response;
     respawn_rx_timer();
 
-    auto tx = std::string{};
+    auto tx = utils::bytes_t{};
     proto::relay::serialize(proto::relay::join_relay_request_t{}, tx);
     push_master(tx);
 }
@@ -264,7 +265,7 @@ void relay_actor_t::on_read(std::size_t bytes) noexcept {
     size_t from = 0;
     auto process_op = process_t::more;
     while (process_op == process_t::more && from < rx_idx) {
-        auto start = rx_buff.data() + from;
+        auto start = (unsigned char *)(rx_buff.data() + from);
         auto sz = rx_idx - from;
         auto r = proto::relay::parse({start, sz});
         process_op = std::visit(
@@ -310,7 +311,7 @@ bool relay_actor_t::on(proto::relay::message_t &msg) noexcept {
                     err = true;
                 }
             } else if constexpr (std::is_same_v<T, proto::relay::ping_t>) {
-                auto tx = std::string{};
+                auto tx = utils::bytes_t{};
                 proto::relay::serialize(proto::relay::pong_t{}, tx);
                 push_master(tx);
             } else if constexpr (std::is_same_v<T, proto::relay::response_t>) {
@@ -387,9 +388,10 @@ bool relay_actor_t::on(proto::relay::session_invitation_t &msg) noexcept {
         diff = new model::diff::contact::relay_connect_request_t(std::move(device_id), std::move(msg.key),
                                                                  std::move(relay_ep));
     } else {
+        auto last_seen = utils::as_seconds(pt::microsec_clock::local_time());
         db::SomeDevice db;
-        db.set_name(std::string(device_id.get_short()));
-        db.set_last_seen(utils::as_seconds(pt::microsec_clock::local_time()));
+        db::set_name(db, device_id.get_short());
+        db::set_last_seen(db, last_seen);
         diff = new model::diff::modify::add_pending_device_t(device_id, db);
         diff->assign_sibling(new model::diff::contact::unknown_connected_t(*cluster, device_id, std::move(db)));
     }
@@ -456,7 +458,7 @@ void relay_actor_t::send_ping() noexcept {
         return;
     }
 
-    auto buff = std::string{};
+    auto buff = utils::bytes_t{};
     proto::relay::serialize(proto::relay::ping_t{}, buff);
     push_master(std::move(buff));
     rx_state |= rx_state_t::pong;

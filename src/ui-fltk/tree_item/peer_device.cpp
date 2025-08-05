@@ -4,8 +4,8 @@
 #include "peer_device.h"
 #include "peer_folders.h"
 #include "pending_folders.h"
-#include "../qr_button.h"
 #include "../symbols.h"
+#include "../utils.hpp"
 #include "../table_widget/checkbox.h"
 #include "model/diff/modify/remove_peer.h"
 #include "model/diff/modify/update_peer.h"
@@ -13,6 +13,7 @@
 
 #include <boost/asio.hpp>
 #include <vector>
+#include <fmt/ranges.h>
 
 #include <FL/Fl_Tile.H>
 #include <FL/Fl_Button.H>
@@ -58,6 +59,8 @@ struct my_table_t : static_table_t {
         last_seen_cell = new static_string_provider_t();
         endpoint_cell = new static_string_provider_t();
         state_cell = new static_string_provider_t();
+        rx_cell = new static_string_provider_t();
+        tx_cell = new static_string_provider_t();
         certname_cell = new static_string_provider_t();
         client_name_cell = new static_string_provider_t();
         client_version_cell = new static_string_provider_t();
@@ -67,6 +70,8 @@ struct my_table_t : static_table_t {
         data.push_back({"addresses", make_addresses(*this)});
         data.push_back({"endpoint", endpoint_cell});
         data.push_back({"state", state_cell});
+        data.push_back({"received", rx_cell});
+        data.push_back({"send", tx_cell});
         data.push_back({"cert name", certname_cell});
         data.push_back({"client name", client_name_cell});
         data.push_back({"client version", client_version_cell});
@@ -96,10 +101,9 @@ struct my_table_t : static_table_t {
     void on_apply() {
         auto data = container.peer.serialize();
         auto device = db::Device();
-        auto ok = device.ParseFromArray(data.data(), data.size());
-        assert(ok);
-        (void)ok;
-
+        auto undecoded_bytes = db::decode(data, device);
+        assert(undecoded_bytes == 0);
+        (void)undecoded_bytes;
         auto valid = store(&device);
         if (valid) {
             auto &supervisor = container.supervisor;
@@ -119,12 +123,12 @@ struct my_table_t : static_table_t {
         auto &peer = container.peer;
         auto initial_data = peer.serialize();
         auto current = db::Device();
-        auto ok = current.ParseFromArray(initial_data.data(), initial_data.size());
-        assert(ok);
-        (void)ok;
+        auto undecoded_bytes = db::decode(initial_data, current);
+        assert(undecoded_bytes == 0);
+        (void)undecoded_bytes;
         auto valid = store(&current);
 
-        auto current_data = current.SerializeAsString();
+        auto current_data = db::encode(current);
         if (initial_data != current_data) {
             if (valid) {
                 apply_button->activate();
@@ -135,15 +139,22 @@ struct my_table_t : static_table_t {
             reset_button->deactivate();
         }
 
-        auto last_seen = peer.get_endpoint().port() ? "now" : model::pt::to_simple_string(peer.get_last_seen());
-        auto endpoint = peer.get_endpoint().port() ? fmt::format("{}", peer.get_endpoint()) : "";
+        auto &peer_state = peer.get_state();
+        auto last_seen = peer_state.is_online() ? "now" : model::pt::to_simple_string(peer.get_last_seen());
+        auto endpoint = std::string(peer_state.is_online() ? peer_state.get_url()->c_str() : "");
 
         last_seen_cell->update(std::move(last_seen));
         endpoint_cell->update(std::move(endpoint));
 
         auto state_symbol = container.get_state();
         auto state = fmt::format("{} ({})", state_symbol, symbols::get_description(state_symbol));
+        auto rx = get_file_size(peer.get_rx_bytes());
+        auto tx = get_file_size(peer.get_tx_bytes());
+
         state_cell->update(std::move(state));
+        rx_cell->update(std::move(rx));
+        tx_cell->update(std::move(tx));
+
         certname_cell->update(peer.get_cert_name().value_or(""));
         client_name_cell->update(peer.get_client_name());
         client_version_cell->update(peer.get_client_version());
@@ -156,6 +167,8 @@ struct my_table_t : static_table_t {
     static_string_provider_ptr_t last_seen_cell;
     static_string_provider_ptr_t endpoint_cell;
     static_string_provider_ptr_t state_cell;
+    static_string_provider_ptr_t rx_cell;
+    static_string_provider_ptr_t tx_cell;
     static_string_provider_ptr_t certname_cell;
     static_string_provider_ptr_t client_name_cell;
     static_string_provider_ptr_t client_version_cell;
@@ -240,7 +253,7 @@ static widgetable_ptr_t make_name(my_table_t &container) {
 
         bool store(void *data) override {
             auto &device = *reinterpret_cast<db::Device *>(data);
-            device.set_name(input->value());
+            db::set_name(device, input->value());
             return true;
         };
 
@@ -262,7 +275,7 @@ static widgetable_ptr_t make_introducer(my_table_t &container) {
 
         bool store(void *data) override {
             auto &device = *reinterpret_cast<db::Device *>(data);
-            device.set_introducer(input->value());
+            db::set_introducer(device, input->value());
             return true;
         };
     };
@@ -282,7 +295,7 @@ static widgetable_ptr_t make_auto_accept(my_table_t &container) {
 
         bool store(void *data) override {
             auto &device = *reinterpret_cast<db::Device *>(data);
-            device.set_auto_accept(input->value());
+            db::set_auto_accept(device, input->value());
             return true;
         };
     };
@@ -302,7 +315,7 @@ static widgetable_ptr_t make_paused(my_table_t &container) {
 
         bool store(void *data) override {
             auto &device = *reinterpret_cast<db::Device *>(data);
-            device.set_paused(input->value());
+            db::set_paused(device, input->value());
             return true;
         };
     };
@@ -352,7 +365,8 @@ static widgetable_ptr_t make_compressions(my_table_t &container) {
 
         bool store(void *data) override {
             auto &device = *reinterpret_cast<db::Device *>(data);
-            device.set_compression(static_cast<proto::Compression>(input->value()));
+            auto value = static_cast<proto::Compression>(input->value());
+            db::set_compression(device, value);
             return true;
         };
 
@@ -407,7 +421,7 @@ static widgetable_ptr_t make_addresses(my_table_t &container) {
 
         bool store(void *data) override {
             auto &device = *reinterpret_cast<db::Device *>(data);
-            device.clear_addresses();
+            db::clear_addresses(device);
             if (input->input()->active() == 0) {
                 return true;
             } else {
@@ -434,7 +448,7 @@ static widgetable_ptr_t make_addresses(my_table_t &container) {
                     }
                 }
                 for (auto addr : addresses) {
-                    *device.add_addresses() = addr;
+                    db::add_addresses(device, addr);
                 }
                 return true;
             }
@@ -476,9 +490,11 @@ peer_device_t::peer_device_t(model::device_t &peer_, app_supervisor_t &superviso
     auto &cluster = *supervisor.get_cluster();
     bool has_folders = false;
     auto &folders = cluster.get_folders();
+    auto total_files = std::size_t{0};
     for (auto &it : folders) {
-        if (it.item->is_shared_with(peer)) {
+        if (auto fi = it.item->is_shared_with(peer); fi) {
             has_folders = true;
+            total_files += fi->get_file_infos().size();
             break;
         }
     }
@@ -497,6 +513,10 @@ peer_device_t::peer_device_t(model::device_t &peer_, app_supervisor_t &superviso
     }
     if (has_pending_folders) {
         get_pending_folders();
+    }
+
+    if ((total_files == 0) && !has_pending_folders) {
+        tree->close(this, 0);
     }
 
     update_label();
@@ -521,16 +541,15 @@ bool peer_device_t::on_select() {
 
 std::string_view peer_device_t::get_state() {
     return [this]() -> std::string_view {
-        switch (peer.get_state()) {
-        case model::device_state_t::online:
+        auto &state = peer.get_state();
+        if (state.is_online()) {
             return symbols::online;
-        case model::device_state_t::discovering:
+        } else if (state.is_unknown() || state.is_discovering()) {
             return symbols::discovering;
-        case model::device_state_t::connecting:
+        } else if (state.is_connecting() || state.is_connected()) {
             return symbols::connecting;
-        default:
-            return symbols::offline;
         }
+        return symbols::offline;
     }();
 }
 

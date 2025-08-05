@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #pragma once
 
 #include "../cluster_diff.h"
 #include "model/device.h"
 #include "model/misc/sequencer.h"
-#include "structs.pb.h"
+#include "proto/proto-fwd.hpp"
 
 namespace syncspirit::model::diff::modify {
 
@@ -23,7 +23,7 @@ struct SYNCSPIRIT_API upsert_folder_t final : cluster_diff_t {
 
   private:
     upsert_folder_t(sequencer_t &sequencer, bu::uuid uuid, db::Folder db, model::folder_info_ptr_t folder_info,
-                    const model::device_t &device, std::uint64_t index_id) noexcept;
+                    const model::device_id_t &device, std::uint64_t index_id) noexcept;
 };
 
 } // namespace syncspirit::model::diff::modify

@@ -30,9 +30,10 @@ r::plugin::resource_id_t write = 5;
 static constexpr size_t BUFF_SZ = 256;
 
 initiator_actor_t::initiator_actor_t(config_t &cfg)
-    : r::actor_base_t{cfg}, peer_device_id{cfg.peer_device_id}, relay_key(std::move(cfg.relay_session)),
-      ssl_pair{*cfg.ssl_pair}, sock(std::move(cfg.sock)), cluster{std::move(cfg.cluster)}, sink(std::move(cfg.sink)),
-      custom(std::move(cfg.custom)), router{*cfg.router}, alpn(cfg.alpn) {
+    : r::actor_base_t{cfg}, peer_device_id{cfg.peer_device_id}, peer_state{model::device_state_t::make_offline()},
+      relay_key(std::move(cfg.relay_session)), ssl_pair{*cfg.ssl_pair}, sock(std::move(cfg.sock)),
+      cluster{std::move(cfg.cluster)}, sink(std::move(cfg.sink)), custom(std::move(cfg.custom)), router{*cfg.router},
+      alpn(cfg.alpn) {
     auto tmp_identity = "net.init/unknown";
     auto log = utils::get_logger(tmp_identity);
     for (auto &uri : cfg.uris) {
@@ -96,6 +97,7 @@ void initiator_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.subscribe_actor(&initiator_actor_t::on_resolve);
         resources->acquire(resource::initializing);
         if (role == role_t::active) {
+            send_state();
             initiate_active();
         } else if (role == role_t::passive) {
             initiate_passive();
@@ -105,20 +107,7 @@ void initiator_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
         p.discover_name(names::resolver, resolver).link(false);
-        p.discover_name(names::coordinator, coordinator).link(false).callback([&](auto phase, auto &ee) {
-            if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking && role == role_t::active) {
-                auto diff = model::diff::cluster_diff_ptr_t();
-                auto state = model::device_state_t::connecting;
-                auto sha256 = peer_device_id.get_sha256();
-                auto peer = cluster && cluster->get_devices().by_sha256(sha256);
-                if (peer) {
-                    diff = model::diff::contact::peer_state_t::create(*cluster, sha256, nullptr, state);
-                    if (diff) {
-                        send<model::payload::model_update_t>(coordinator, std::move(diff));
-                    }
-                }
-            }
-        });
+        p.discover_name(names::coordinator, coordinator).link(false);
     });
 }
 
@@ -170,19 +159,24 @@ void initiator_actor_t::initiate_relay_passive() noexcept {
 void initiator_actor_t::on_start() noexcept {
     r::actor_base_t::on_start();
     LOG_TRACE(log, "on_start, alpn = {}", alpn);
-    std::string proto;
+    std::string_view proto;
+    std::string_view sub_proto;
     if (active_uri) {
         proto = active_uri->scheme();
+        sub_proto = "active";
     } else {
+        sub_proto = "passive";
         if (role == role_t::relay_passive) {
             proto = "relay";
         } else if (role == role_t::passive) {
             proto = "tcp";
         }
     }
-    send<payload::peer_connected_t>(sink, std::move(transport), peer_device_id, remote_endpoint, std::move(proto),
+    auto url = utils::parse(fmt::format("{}+{}://{}", proto, sub_proto, remote_endpoint));
+    LOG_DEBUG(log, "on_start, connected to {}", url);
+    peer_state = peer_state.connected();
+    send<payload::peer_connected_t>(sink, std::move(transport), peer_device_id, peer_state.clone(), std::move(url),
                                     std::move(custom));
-    success = true;
     do_shutdown();
 }
 
@@ -201,12 +195,11 @@ void initiator_actor_t::shutdown_start() noexcept {
 
 void initiator_actor_t::shutdown_finish() noexcept {
     LOG_TRACE(log, "shutdown_finish");
-    bool notify_offline = role == role_t::active && !success && cluster;
+    auto notify_offline = peer_state.is_connecting() && cluster;
     if (notify_offline) {
-        auto state = model::device_state_t::offline;
         auto sha256 = peer_device_id.get_sha256();
         if (auto peer = cluster->get_devices().by_sha256(sha256); peer) {
-            auto diff = model::diff::contact::peer_state_t::create(*cluster, sha256, nullptr, state);
+            auto diff = model::diff::contact::peer_state_t::create(*cluster, sha256, nullptr, peer_state.offline());
             if (diff) {
                 send<model::payload::model_update_t>(coordinator, std::move(diff));
             }
@@ -237,7 +230,7 @@ void initiator_actor_t::initiate_active_relay(const utils::uri_ptr_t &uri) noexc
     LOG_TRACE(log, "trying '{}' as active relay", uri);
     auto relay_device = proto::relay::parse_device(uri);
     if (!relay_device) {
-        LOG_WARN(log, "relay url '{}' does not contains valid device_id", uri);
+        LOG_WARN(log, "relay url '{}' does not contain valid device_id", uri);
         return initiate_active();
     }
     active_uri = uri;
@@ -353,11 +346,17 @@ void initiator_actor_t::on_handshake(bool valid_peer, utils::x509_t &cert, const
         auto ec = utils::make_error_code(utils::error_code_t::missing_cn);
         return do_shutdown(make_error(ec));
     }
-    LOG_TRACE(log, "on_handshake, valid = {}, issued by {}", valid_peer, cert_name.value());
+    LOG_TRACE(log, "on_handshake ({}), valid = {}, issued by {}", peer_device->get_short(), valid_peer,
+              cert_name.value());
+
+    if (!relaying) {
+        peer_device_id = *peer_device;
+    }
+    send_state();
+
     if (relaying) {
         request_relay_connection();
     } else {
-        peer_device_id = *peer_device;
         remote_endpoint = peer_endpoint;
         if (state <= r::state_t::OPERATIONAL) {
             resources->release(resource::initializing);
@@ -377,7 +376,7 @@ void initiator_actor_t::on_read_relay(size_t bytes) noexcept {
         return;
     }
 
-    auto buff = std::string_view(rx_buff.data(), bytes);
+    auto buff = utils::bytes_view_t(rx_buff.data(), bytes);
     auto r = proto::relay::parse(buff);
     auto wrapped = std::get_if<proto::relay::wrapped_message_t>(&r);
     if (!wrapped) {
@@ -414,7 +413,8 @@ void initiator_actor_t::request_relay_connection() noexcept {
     transport->async_recv(asio::buffer(rx_buff), read_fn, read_err_fn);
     resources->acquire(resource::read);
 
-    auto msg = proto::relay::connect_request_t{std::string(peer_device_id.get_sha256())};
+    auto sha256 = peer_device_id.get_sha256();
+    auto msg = proto::relay::connect_request_t(utils::bytes_t(sha256.begin(), sha256.end()));
     proto::relay::serialize(msg, relay_tx);
     transport::error_fn_t write_err_fn([&](auto arg) { on_io_error(arg, resource::write); });
     transport::io_fn_t write_fn = [this](size_t bytes) { on_write(bytes); };
@@ -425,7 +425,7 @@ void initiator_actor_t::request_relay_connection() noexcept {
 void initiator_actor_t::on_read_relay_active(size_t bytes) noexcept {
     LOG_TRACE(log, "on_read_relay_active, {} bytes", bytes);
     resources->release(resource::read);
-    auto buff = std::string_view(rx_buff.data(), bytes);
+    auto buff = utils::bytes_view_t(rx_buff.data(), bytes);
     auto r = proto::relay::parse(buff);
     auto wrapped = std::get_if<proto::relay::wrapped_message_t>(&r);
     if (!wrapped) {
@@ -473,4 +473,23 @@ void initiator_actor_t::on_read_relay_active(size_t bytes) noexcept {
     transport::transport_config_t cfg{{}, uri, *sup, {}, true};
     transport = transport::initiate_stream(cfg);
     resolve(uri);
+}
+
+void initiator_actor_t::send_state() noexcept {
+    if (!peer_state.is_connecting()) {
+        peer_state = peer_state.connecting();
+        auto diff = model::diff::cluster_diff_ptr_t();
+        auto sha256 = peer_device_id.get_sha256();
+        auto has_peer = cluster && cluster->get_devices().by_sha256(sha256);
+        if (has_peer) {
+            diff = model::diff::contact::peer_state_t::create(*cluster, sha256, {}, peer_state);
+        }
+        if (diff) {
+            LOG_DEBUG(log, "sending state update = {}", (int)peer_state.get_connection_state());
+            ;
+            send<model::payload::model_update_t>(coordinator, std::move(diff));
+        } else {
+            LOG_DEBUG(log, "state update is not sent, has cluster = {}, has peer = {}", (bool)cluster, (bool)has_peer);
+        }
+    }
 }

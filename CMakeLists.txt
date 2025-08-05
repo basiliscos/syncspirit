@@ -1,5 +1,5 @@
 cmake_minimum_required (VERSION 3.19)
-project (syncspirit VERSION 0.4.0)
+project (syncspirit VERSION 0.4.1)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -13,6 +13,11 @@ cmake_policy(SET CMP0135 NEW)
 
 include(GenerateExportHeader)
 include (FetchContent)
+
+if (WIN32)
+    # set(CMAKE_CROSSCOMPILING on)
+    # set(CMAKE_CROSSCOMPILING_EMULATOR "/usr/bin/wine")
+endif()
 
 set(CMAKE_POSITION_INDEPENDENT_CODE True)
 
@@ -29,12 +34,12 @@ find_package(
     REQUIRED
 )
 find_package(OpenSSL REQUIRED)
-find_package(Protobuf REQUIRED)
 find_package(ZLIB REQUIRED)
 find_package(rotor COMPONENTS asio thread REQUIRED)
 find_package(lz4 REQUIRED)
 find_package(fmt REQUIRED)
 find_package(spdlog REQUIRED)
+find_package(protopuf REQUIRED)
 find_package(pugixml REQUIRED)
 find_package(tomlplusplus REQUIRED)
 find_package(nlohmann_json REQUIRED)
@@ -84,15 +89,8 @@ function(install_executable target)
 endfunction()
 
 configure_file(misc/syncspirit-config.h.in include/syncspirit-config.h @ONLY)
-set(Protobuf_IMPORT_DIRS ${syncspirit_SOURCE_DIR}/src/protobuf)
-protobuf_generate_cpp(
-    PROTO_SRCS PROTO_HDRS
-    EXPORT_MACRO SYNCSPIRIT_API
-    src/protobuf/bep.proto
-    src/protobuf/structs.proto
-)
+
 add_library(syncspirit_core
-    ${PROTO_SRCS}
     src/constants.cpp
     src/config/utils.cpp
     src/db/cursor.cpp
@@ -103,6 +101,7 @@ add_library(syncspirit_core
     src/fs/chunk_iterator.cpp
     src/fs/file.cpp
     src/fs/file_actor.cpp
+    src/fs/file_cache.cpp
     src/fs/fs_supervisor.cpp
     src/fs/new_chunk_iterator.cpp
     src/fs/scan_actor.cpp
@@ -137,6 +136,7 @@ add_library(syncspirit_core
     src/model/diff/load/load_cluster.cpp
     src/model/diff/load/pending_devices.cpp
     src/model/diff/load/pending_folders.cpp
+    src/model/diff/load/remove_corrupted_files.cpp
     src/model/diff/local/blocks_availability.cpp
     src/model/diff/local/custom.cpp
     src/model/diff/local/file_availability.cpp
@@ -176,7 +176,9 @@ add_library(syncspirit_core
     src/model/diff/modify/upsert_folder.cpp
     src/model/diff/modify/upsert_folder_info.cpp
     src/model/diff/peer/cluster_update.cpp
+    src/model/diff/peer/rx_tx.cpp
     src/model/diff/peer/update_folder.cpp
+    src/model/misc/augmentation.cpp
     src/model/misc/block_iterator.cpp
     src/model/misc/error_code.cpp
     src/model/misc/file_block.cpp
@@ -190,6 +192,7 @@ add_library(syncspirit_core
     src/model/cluster.cpp
     src/model/device.cpp
     src/model/device_id.cpp
+    src/model/device_state.cpp
     src/model/file_info.cpp
     src/model/folder.cpp
     src/model/folder_data.cpp
@@ -220,15 +223,29 @@ add_library(syncspirit_core
     src/net/sink_actor.cpp
     src/net/ssdp_actor.cpp
     src/net/upnp_actor.cpp
+    src/presentation/entity.cpp
+    src/presentation/cluster_file_presence.cpp
+    src/presentation/file_entity.cpp
+    src/presentation/folder_entity.cpp
+    src/presentation/folder_presence.cpp
+    src/presentation/local_file_presence.cpp
+    src/presentation/missing_file_presence.cpp
+    src/presentation/orphans.cpp
+    src/presentation/path.cpp
+    src/presentation/peer_file_presence.cpp
+    src/presentation/presence.cpp
     src/proto/bep_support.cpp
     src/proto/discovery_support.cpp
     src/proto/luhn32.cpp
+    src/proto/proto-helpers-bep.cpp
+    src/proto/proto-helpers-db.cpp
     src/proto/relay_support.cpp
     src/proto/upnp_support.cpp
     src/transport/stream.cpp
     src/transport/http.cpp
     src/utils/base32.cpp
     src/utils/beast_support.cpp
+    src/utils/bytes.cpp
     src/utils/dns.cpp
     src/utils/error_code.cpp
     src/utils/location.cpp
@@ -240,20 +257,24 @@ add_library(syncspirit_core
     src/utils/tls.cpp
     src/utils/uri.cpp
 )
+
+set_source_files_properties(
+    src/proto/bep_support.cpp
+    src/proto/proto-helpers-bep.cpp
+    src/proto/proto-helpers-db.cpp
+    PROPERTIES COMPILE_FLAGS "-Os -fPIC"
+)
+
 generate_export_header(syncspirit_core
     EXPORT_MACRO_NAME SYNCSPIRIT_API
     EXPORT_FILE_NAME include/syncspirit-export.h
 )
-target_compile_options(syncspirit_core PRIVATE
-    -include ${CMAKE_CURRENT_BINARY_DIR}/include/syncspirit-export.h
-)
-
-# windows xp patch required:
-# -        CancelIoEx(ior->overlapped_fd, &item->ov);
-# +        CancelIo(ior->overlapped_fd);
 FetchContent_Declare(MDBX
-    URL https://libmdbx.dqdkfa.ru/release/libmdbx-amalgamated-0.13.4.tar.xz
-    URL_HASH SHA256=86df30ca2231c9b3ad71424bb829dca9041947f5539d4295030c653d4982c1be
+    URL https://libmdbx.dqdkfa.ru/release/libmdbx-amalgamated-0.14.1.tar.xz
+    URL_HASH SHA256=2edb8b59db5b2b021c7634010f8dbdbbf948eda609942dd300510c6e93bd5d25
+    PATCH_COMMAND ${CMAKE_COMMAND} -E
+        chdir ${CMAKE_CURRENT_BINARY_DIR}
+        patch -u _deps/mdbx-src/mdbx.c -i ${CMAKE_CURRENT_SOURCE_DIR}/misc/mdbx-win32.patch
 )
     if (WIN32)
         set(BUILD_SHARED_LIBS true CACHE BOOL "BUILD_SHARED_LIBS")
@@ -269,14 +290,9 @@ FetchContent_Declare(MDBX
     set(MDBX_ALLOY_BUILD true CACHE BOOL "MDBX_ALLOY_BUILD")
 FetchContent_MakeAvailable(MDBX)
 
-
-# To support WinXP there is need of that commit. When cares will be released
-# and pushed to conan center, the ready receive capn be used
 FetchContent_Declare(C_ARES
-    GIT_REPOSITORY https://github.com/c-ares/c-ares.git
-    GIT_TAG        7978cf75a82f9860da241227169a4d7f1d1f549a
-    # URL https://github.com/c-ares/c-ares/archive/refs/tags/v1.34.4.tar.gz
-    # URL_HASH SHA256=a35f7c4cdbdfaf0a69a9a50029e95ffe403daf605fade05c649d18333592222d
+    URL https://github.com/c-ares/c-ares/releases/download/v1.34.5/c-ares-1.34.5.tar.gz
+    URL_HASH SHA256=7d935790e9af081c25c495fd13c2cfcda4792983418e96358ef6e7320ee06346
 )
     set(CARES_STATIC      true  CACHE BOOL "CARES_STATIC")
     set(CARES_SHARED      false CACHE BOOL "CARES_SHARED")
@@ -285,8 +301,14 @@ FetchContent_Declare(C_ARES
     set(CARES_THREADS     false CACHE BOOL "CARES_THREADS")
 FetchContent_MakeAvailable(C_ARES)
 
+FetchContent_Declare(UNI_ALGO
+    URL https://github.com/uni-algo/uni-algo/archive/refs/tags/v1.2.0.tar.gz
+    URL_HASH SHA256=f2a1539cd8635bc6088d05144a73ecfe7b4d74ee0361fabed6f87f9f19e74ca9
+)
+FetchContent_MakeAvailable(UNI_ALGO)
+
+
 target_include_directories(syncspirit_core PUBLIC
-    ${Protobuf_INCLUDE_DIRS}
     ${OPENSSL_INCLUDE_DIR}
     ${CMAKE_CURRENT_BINARY_DIR}
     ${CMAKE_CURRENT_BINARY_DIR}/include
@@ -295,7 +317,7 @@ target_include_directories(syncspirit_core PUBLIC
 
 target_link_libraries(syncspirit_core
     PUBLIC
-        protobuf::libprotobuf
+        protopuf::protopuf
         rotor::asio
         rotor::thread
         pugixml::pugixml
@@ -314,7 +336,9 @@ target_link_libraries(syncspirit_core
         $<$<PLATFORM_ID:Windows>:ws2_32>
         $<$<PLATFORM_ID:Windows>:wsock32>
     PRIVATE
+        ZLIB::ZLIB
         c-ares::cares
+        uni-algo::uni-algo
 )
 install_executable("syncspirit_core")
 

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
 
 #include "remove_folder_infos.h"
 #include "reset_folder_infos.h"
@@ -10,13 +10,14 @@
 
 using namespace syncspirit::model::diff::modify;
 
-remove_folder_infos_t::remove_folder_infos_t(const folder_infos_map_t &map, orphaned_blocks_t *orphaned_blocks_) {
+remove_folder_infos_t::remove_folder_infos_t(const uuid_folder_infos_map_t &map, orphaned_blocks_t *orphaned_blocks_) {
     auto keys = unique_keys_t();
     for (auto &it : map) {
-        auto &folder_info = *it.item;
-        keys.emplace(folder_info.get_key());
+        auto &folder_info = *it.second;
+        auto key = folder_info.get_key();
+        keys.emplace(utils::bytes_t(key.data(), key.data() + key.size()));
     }
-    std::copy(keys.begin(), keys.end(), std::back_inserter(this->keys));
+    std::move(keys.begin(), keys.end(), std::back_inserter(this->keys));
     assign_child(new reset_folder_infos_t(map, orphaned_blocks_));
     LOG_DEBUG(log, "remove_folder_infos_t, count = {}", map.size());
 }
@@ -29,7 +30,7 @@ auto remove_folder_infos_t::apply_impl(cluster_t &cluster, apply_controller_t &c
     }
     for (auto &key : keys) {
         auto decomposed = folder_info_t::decompose_key(key);
-        auto folder = cluster.get_folders().get(decomposed.folder_key());
+        auto folder = cluster.get_folders().by_key(decomposed.folder_key());
         auto &folder_infos = folder->get_folder_infos();
         auto device_key = decomposed.device_key();
         auto folder_info = folder_infos.by_device_key(device_key);

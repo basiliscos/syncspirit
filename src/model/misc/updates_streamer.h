@@ -15,11 +15,13 @@
 namespace syncspirit::model {
 
 struct SYNCSPIRIT_API updates_streamer_t {
+    using update_t = std::pair<file_info_ptr_t, bool>;
+
     updates_streamer_t(cluster_t &, device_t &) noexcept;
     updates_streamer_t(const updates_streamer_t &) noexcept = delete;
     updates_streamer_t(updates_streamer_t &&) noexcept = delete;
 
-    file_info_ptr_t next() noexcept;
+    update_t next() noexcept;
 
     bool on_update(file_info_t &) noexcept;
     void on_remote_refresh() noexcept;

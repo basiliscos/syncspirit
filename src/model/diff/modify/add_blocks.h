@@ -4,7 +4,7 @@
 #pragma once
 
 #include "model/diff/cluster_diff.h"
-#include "bep.pb.h"
+#include "proto/proto-fwd.hpp"
 #include <vector>
 
 namespace syncspirit::model::diff::modify {

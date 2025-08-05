@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2023-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2023-2025 Ivan Baidakou
 
 #include "updates_streamer.h"
 #include "model/remote_folder_info.h"
@@ -20,21 +20,22 @@ void updates_streamer_t::refresh_remote() noexcept {
     auto prev_seen = std::move(seen_info);
     seen_info = {};
     for (auto &it : folders) {
-        auto &folder = it.item;
-        auto peer_folder = folder->is_shared_with(*peer);
-        if (peer_folder) {
-            auto local_folder = folder->get_folder_infos().by_device(*self);
-            if (streaming && streaming->folder_info == local_folder) {
-                streaming_folder = local_folder.get();
-            }
-            auto remote_folder = remote_folders.by_folder(*folder);
-            if (remote_folder) {
-                auto seen_sequence = std::int64_t{0};
-                if (remote_folder->get_index() == local_folder->get_index()) {
-                    auto previously_seen = prev_seen[local_folder];
-                    seen_sequence = std::max(remote_folder->get_max_sequence(), previously_seen);
+        auto &folder = *it.item;
+        if (folder.get_folder_type() != db::FolderType::receive) {
+            auto peer_folder = folder.is_shared_with(*peer);
+            if (peer_folder) {
+                auto local_folder = folder.get_folder_infos().by_device(*self);
+                if (streaming && streaming->folder_info == local_folder) {
+                    streaming_folder = local_folder.get();
                 }
-                seen_info[local_folder] = seen_sequence;
+                auto remote_folder = remote_folders.by_folder(folder);
+                if (remote_folder) {
+                    auto index_match = remote_folder->get_index() == local_folder->get_index();
+                    auto remote_max = index_match ? remote_folder->get_max_sequence() : 0;
+                    auto previously_seen = prev_seen[local_folder];
+                    auto seen = std::max(remote_max, previously_seen);
+                    seen_info[local_folder] = seen;
+                }
             }
         }
     }
@@ -81,7 +82,7 @@ bool updates_streamer_t::on_update(file_info_t &file) noexcept {
 
 void updates_streamer_t::on_remote_refresh() noexcept { refresh_remote(); }
 
-file_info_ptr_t updates_streamer_t::next() noexcept {
+auto updates_streamer_t::next() noexcept -> update_t {
     if (streaming) {
         auto &files = streaming->unseen_files;
         auto &proj = files.sequence_projection();
@@ -89,8 +90,10 @@ file_info_ptr_t updates_streamer_t::next() noexcept {
             auto it = proj.begin();
             auto file = it->item;
             files.remove(file);
-            seen_info[streaming->folder_info] = file->get_sequence();
-            return file;
+            auto &seen_sequence = seen_info[streaming->folder_info];
+            auto initial = seen_sequence == 0;
+            seen_sequence = file->get_sequence();
+            return {file, initial};
         }
         streaming.reset();
     }
@@ -99,6 +102,7 @@ file_info_ptr_t updates_streamer_t::next() noexcept {
         if (seen_sequence < max) {
             auto [it, end] = folder_info->get_file_infos().range(seen_sequence + 1, max);
             if (it != end) {
+                auto initial = seen_sequence == 0;
                 auto file = it->item;
                 seen_info[folder_info] = file->get_sequence();
                 ++it;
@@ -110,9 +114,9 @@ file_info_ptr_t updates_streamer_t::next() noexcept {
                     }
                     streaming = streaming_info_t(folder_info, std::move(unseen_files));
                 }
-                return file;
+                return {file, initial};
             }
         }
     }
-    return {};
+    return {{}, false};
 }

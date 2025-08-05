@@ -97,6 +97,7 @@ struct SYNCSPIRIT_API http_actor_t : public r::actor_base_t {
     r::address_ptr_t resolver;
     queue_t queue;
     bool need_response = false;
+    bool cancel_request = false;
     bool stop_io = false;
     transport::http_sp_t transport;
     std::optional<asio::ip::address> local_address;

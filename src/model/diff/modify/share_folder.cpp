@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "share_folder.h"
 #include "model/cluster.h"
@@ -13,7 +13,8 @@
 using namespace syncspirit::model::diff::modify;
 
 auto share_folder_t::create(cluster_t &cluster, sequencer_t &sequencer, const model::device_t &peer,
-                            const model::folder_t &folder) noexcept -> outcome::result<cluster_diff_ptr_t> {
+                            const device_id_t &introducer, const model::folder_t &folder) noexcept
+    -> outcome::result<cluster_diff_ptr_t> {
     auto folder_info = folder.get_folder_infos().by_device(peer);
     if (folder_info) {
         return make_error_code(error_code_t::folder_is_already_shared);
@@ -30,19 +31,23 @@ auto share_folder_t::create(cluster_t &cluster, sequencer_t &sequencer, const mo
         }
     }
 
-    return new share_folder_t(sequencer.next_uuid(), peer, folder.get_id(), index, pending_folder);
+    return new share_folder_t(sequencer.next_uuid(), peer, introducer, folder.get_id(), index, pending_folder);
 }
 
-share_folder_t::share_folder_t(const bu::uuid &uuid, const model::device_t &peer, std::string_view folder_id_,
-                               std::uint64_t index_id, model::pending_folder_ptr_t pf) noexcept
-    : peer_id(peer.device_id().get_sha256()), folder_id{folder_id_} {
+share_folder_t::share_folder_t(const bu::uuid &uuid, const model::device_t &peer, const device_id_t &introducer,
+                               std::string_view folder_id_, std::uint64_t index_id,
+                               model::pending_folder_ptr_t pf) noexcept
+    : folder_id{folder_id_} {
+    peer_id = peer.device_id().get_sha256();
     LOG_DEBUG(log, "share_folder_t, with peer = {}, folder_id = {}", peer.device_id(), folder_id);
-    auto current = assign_child(new upsert_folder_info_t(uuid, peer_id, folder_id, index_id));
+    auto current = assign_child(new upsert_folder_info_t(uuid, peer.device_id(), introducer, folder_id, index_id));
     if (pf) {
         using container_t = typename add_remote_folder_infos_t::container_t;
         using item_t = typename container_t::value_type;
         auto keys = remove_pending_folders_t::keys_t{};
-        keys.emplace_back(std::string{pf->get_key()});
+        auto key = pf->get_key();
+        auto bytes = utils::bytes_t(key.begin(), key.end());
+        keys.emplace_back(std::move(bytes));
         auto diff = cluster_diff_ptr_t{};
         current = current->assign_sibling(new remove_pending_folders_t(std::move(keys)));
 

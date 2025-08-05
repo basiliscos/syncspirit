@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
 
 #include "add_blocks.h"
 #include "model/cluster.h"
 #include "model/diff/cluster_visitor.h"
+#include "utils/format.hpp"
 
 using namespace syncspirit::model::diff::modify;
 
-add_blocks_t::add_blocks_t(blocks_t blocks_) noexcept : blocks{std::move(blocks_)} {
+add_blocks_t::add_blocks_t(blocks_t blocks_) noexcept : blocks(std::move(blocks_)) {
     LOG_DEBUG(log, "add_blocks_t, count = {}", blocks.size());
 }
 
@@ -20,7 +21,9 @@ auto add_blocks_t::apply_impl(cluster_t &cluster, apply_controller_t &controller
             return opt.assume_error();
         }
         auto block = std::move(opt.assume_value());
-        bm.put(block);
+        if (!bm.put(block, false)) {
+            LOG_TRACE(log, "add_blocks_t, failed to insert block '{}', already exists", block->get_hash());
+        }
     }
     return applicator_t::apply_sibling(cluster, controller);
 }

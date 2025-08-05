@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #pragma once
 
@@ -17,7 +17,7 @@ namespace r = rotor;
 struct initiator_actor_config_t : public r::actor_config_t {
     model::device_id_t peer_device_id;
     utils::uri_container_t uris;
-    std::string relay_session;
+    utils::bytes_t relay_session;
     const utils::key_pair_t *ssl_pair;
     std::optional<tcp_socket_t> sock;
     model::cluster_ptr_t cluster;
@@ -43,7 +43,7 @@ template <typename Actor> struct initiator_actor_config_builder_t : r::actor_con
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&relay_session(const std::string &value) && noexcept {
+    builder_t &&relay_session(utils::bytes_view_t value) && noexcept {
         parent_t::config.relay_session = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
@@ -114,6 +114,7 @@ struct SYNCSPIRIT_API initiator_actor_t : r::actor_base_t {
     void join_session() noexcept;
     void request_relay_connection() noexcept;
     void resolve(const utils::uri_ptr_t &uri) noexcept;
+    void send_state() noexcept;
 
     void on_resolve(message::resolve_response_t &res) noexcept;
     void on_connect(const tcp::endpoint &) noexcept;
@@ -125,10 +126,11 @@ struct SYNCSPIRIT_API initiator_actor_t : r::actor_base_t {
     void on_write(size_t bytes) noexcept;
 
     model::device_id_t peer_device_id;
+    model::device_state_t peer_state;
     utils::uri_container_t uris;
-    std::string relay_rx;
-    std::string relay_tx;
-    std::string relay_key;
+    utils::bytes_t relay_rx;
+    utils::bytes_t relay_tx;
+    utils::bytes_t relay_key;
     const utils::key_pair_t &ssl_pair;
     std::optional<tcp_socket_t> sock;
     model::cluster_ptr_t cluster;
@@ -146,8 +148,7 @@ struct SYNCSPIRIT_API initiator_actor_t : r::actor_base_t {
     tcp::endpoint remote_endpoint;
     bool connected = false;
     role_t role = role_t::passive;
-    std::string rx_buff;
-    bool success = false;
+    utils::bytes_t rx_buff;
     bool relaying = false;
 };
 
@@ -156,8 +157,8 @@ namespace payload {
 struct peer_connected_t {
     transport::stream_sp_t transport;
     model::device_id_t peer_device_id;
-    tcp::endpoint remote_endpoint;
-    std::string proto;
+    model::device_state_t peer_state;
+    utils::uri_ptr_t uri;
     r::message_ptr_t custom;
 };
 

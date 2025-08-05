@@ -8,6 +8,7 @@
 #include "model/cluster.h"
 #include "fs/scan_scheduler.h"
 #include "net/names.h"
+#include <chrono>
 
 using namespace syncspirit;
 using namespace syncspirit::test;
@@ -75,7 +76,7 @@ void test_1_folder() {
     struct F : fixture_t {
         void main() noexcept override {
             auto db_folder = db::Folder();
-            db_folder.set_id(folder_id);
+            db::set_id(db_folder, folder_id);
 
             auto builder = diff_builder_t(*cluster);
 
@@ -86,7 +87,7 @@ void test_1_folder() {
             }
 
             SECTION("non-zero rescan time") {
-                db_folder.set_rescan_interval(3600);
+                db::set_rescan_interval(db_folder, 3600);
                 builder.upsert_folder(db_folder).apply(*sup);
 
                 auto folder = cluster->get_folders().by_id(folder_id);
@@ -97,6 +98,8 @@ void test_1_folder() {
                     REQUIRE(!folder->is_scanning());
 
                     REQUIRE(sup->timers.size() == 1);
+                    std::this_thread::sleep_for(std::chrono::milliseconds{1});
+
                     sup->do_invoke_timer((*sup->timers.begin())->request_id);
                     sup->do_process();
                     REQUIRE(folder->is_scanning());
@@ -109,6 +112,7 @@ void test_1_folder() {
 
                     builder.synchronization_finish(folder_id).apply(*sup);
                     REQUIRE(sup->timers.size() == 1);
+                    std::this_thread::sleep_for(std::chrono::milliseconds{1});
                     sup->do_invoke_timer((*sup->timers.begin())->request_id);
                     sup->do_process();
                     REQUIRE(folder->is_scanning());
@@ -116,7 +120,7 @@ void test_1_folder() {
             }
 
             SECTION("suspending") {
-                db_folder.set_rescan_interval(3600);
+                db::set_rescan_interval(db_folder, 3600);
                 builder.upsert_folder(db_folder).apply(*sup);
 
                 auto folder = cluster->get_folders().by_id(folder_id);
@@ -136,11 +140,12 @@ void test_2_folders() {
             auto f2_id = "2222";
             auto db_folder_1 = db::Folder();
             auto db_folder_2 = db::Folder();
-            db_folder_1.set_id(f1_id);
-            db_folder_2.set_id(f2_id);
+            db::set_id(db_folder_1, f1_id);
+            db::set_id(db_folder_2, f2_id);
 
-            db_folder_1.set_rescan_interval(4000);
-            db_folder_2.set_rescan_interval(2000);
+            auto rescan_min = std::uint32_t(2000);
+            db::set_rescan_interval(db_folder_1, 4000);
+            db::set_rescan_interval(db_folder_2, rescan_min);
 
             auto builder = diff_builder_t(*cluster);
             builder.upsert_folder(db_folder_1)
@@ -152,6 +157,8 @@ void test_2_folders() {
                 .apply(*sup);
 
             REQUIRE(sup->timers.size() == 1);
+            std::this_thread::sleep_for(std::chrono::milliseconds{1});
+
             sup->do_invoke_timer((*sup->timers.begin())->request_id);
             sup->do_process();
 
@@ -161,7 +168,7 @@ void test_2_folders() {
             REQUIRE(!f1->is_scanning());
             REQUIRE(f2->is_scanning());
 
-            auto at = r::pt::microsec_clock::local_time() + r::pt::seconds{db_folder_2.rescan_interval() + 1};
+            auto at = r::pt::microsec_clock::local_time() + r::pt::seconds{rescan_min + 1};
             builder.scan_finish(f2_id, at).apply(*sup);
 
             REQUIRE(sup->timers.size() == 1);

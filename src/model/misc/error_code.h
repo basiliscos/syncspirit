@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #pragma once
 
@@ -45,7 +45,9 @@ enum class error_code_t {
     invalid_block_size,
     unexpected_blocks,
     missing_version,
+    mismatch_file_size,
     invalid_sequence,
+    empty_folder_name,
 };
 
 namespace detail {

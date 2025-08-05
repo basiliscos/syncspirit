@@ -14,7 +14,7 @@ namespace syncspirit::fltk::config {
 using main_cfg_t = syncspirit::config::main_t;
 using error_ptr_t = std::unique_ptr<std::string>;
 
-enum class property_kind_t { text, file, directory, positive_integer, boolean, log_sink };
+enum class property_kind_t { text, file, directory, positive_integer, integer, boolean, log_sink };
 
 struct property_t : boost::intrusive_ref_counter<property_t, boost::thread_unsafe_counter> {
     using parent_t = boost::intrusive_ref_counter<property_t, boost::thread_unsafe_counter>;

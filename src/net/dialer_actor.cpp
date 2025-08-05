@@ -41,6 +41,8 @@ void dialer_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
             }
         });
     });
+    plugin.with_casted<r::plugin::starter_plugin_t>(
+        [&](auto &p) { p.subscribe_actor(&dialer_actor_t::on_model_update); });
 }
 
 void dialer_actor_t::on_start() noexcept {
@@ -96,7 +98,7 @@ void dialer_actor_t::discover_or_dial(const model::device_ptr_t &peer_device) no
     info.last_attempt = clock_t::now();
     auto &device_id = peer_device->device_id();
     bool do_dial = false;
-    bool do_discover = false;
+    bool try_discover = false;
     bool do_update = false;
 
     if (!dynamic) {
@@ -107,25 +109,29 @@ void dialer_actor_t::discover_or_dial(const model::device_ptr_t &peer_device) no
         }
     } else {
         if (!peer_device->get_uris().size()) {
-            do_discover = true;
+            try_discover = true;
         } else if (info.skip_discovers) {
             --info.skip_discovers;
             do_dial = true;
         } else {
-            do_discover = true;
+            try_discover = true;
         }
     }
 
-    if (do_discover) {
-        auto diff =
-            model::diff::contact::peer_state_t::create(*cluster, device_id.get_sha256(), nullptr, state_t::discovering);
-        if (diff) {
-            send<model::payload::model_update_t>(coordinator, std::move(diff));
+    if (try_discover) {
+        using peer_state_t = model::diff::contact::peer_state_t;
+        using payload_t = model::payload::model_update_t;
+        auto &state = peer_device->get_state();
+        if (state.is_offline()) {
+            auto diff = peer_state_t::create(*cluster, device_id.get_sha256(), {}, state.unknown());
+            assert(diff);
+            auto msg = r::make_routed_message<payload_t>(coordinator, address, std::move(diff), this);
+            supervisor->put(std::move(msg));
         }
     }
     if (do_dial) {
         auto diff = new model::diff::contact::dial_request_t(*peer_device);
-        send<model::payload::model_update_t>(coordinator, std::move(diff), this);
+        send<model::payload::model_update_t>(coordinator, std::move(diff));
         LOG_TRACE(log, "discover_or_dial, dialing to {} (dynamic = {}, discover attempts left = {})", device_id,
                   dynamic, info.skip_discovers);
     }
@@ -133,7 +139,7 @@ void dialer_actor_t::discover_or_dial(const model::device_ptr_t &peer_device) no
         // will dial indirectly
         auto &uris = peer_device->get_static_uris();
         auto diff = new model::diff::contact::update_contact_t(*cluster, device_id, uris);
-        send<model::payload::model_update_t>(coordinator, std::move(diff), this);
+        send<model::payload::model_update_t>(coordinator, std::move(diff));
     }
 }
 
@@ -179,7 +185,7 @@ void dialer_actor_t::on_timer(r::request_id_t request_id, bool cancelled) noexce
 void dialer_actor_t::on_model_update(model::message::model_update_t &msg) noexcept {
     LOG_TRACE(log, "on_model_update");
     auto &diff = *msg.payload.diff;
-    auto r = diff.visit(*this, nullptr);
+    auto r = diff.visit(*this, const_cast<void *>(msg.payload.custom));
     if (!r) {
         auto ee = make_error(r.assume_error());
         do_shutdown(ee);
@@ -192,9 +198,15 @@ auto dialer_actor_t::operator()(const model::diff::contact::peer_state_t &diff, 
     auto peer = devices.by_sha256(diff.peer_id);
 
     if (peer) {
-        if (diff.state == state_t::offline) {
+        auto &state = peer->get_state();
+        if (state.is_offline()) {
             schedule_redial(peer);
-        } else if (diff.state == state_t::online) {
+        } else if (state.is_unknown() && custom == this) {
+            using peer_state_t = model::diff::contact::peer_state_t;
+            auto diff = peer_state_t::create(*cluster, peer->device_id().get_sha256(), {}, state.offline());
+            assert(diff);
+            send<model::payload::model_update_t>(coordinator, std::move(diff));
+        } else if (state.is_online()) {
             auto it = redial_map.find(peer);
             if (it != redial_map.end()) {
                 auto &info = it->second;
@@ -216,17 +228,16 @@ auto dialer_actor_t::operator()(const model::diff::contact::update_contact_t &di
         return diff.visit_next(*this, custom);
     }
 
-    using state_t = model::device_state_t;
-    auto state = peer->get_state();
-    if (peer->get_uris().size() && (state == state_t::offline || state == state_t::discovering)) {
+    auto &state = peer->get_state();
+    bool can_dial = peer->get_uris().size();
+    bool need_dial = state.get_connection_state() <= model::connection_state_t::discovering;
+    if (can_dial && need_dial) {
         LOG_TRACE(log, "dialing to {}", peer->device_id());
         auto diff = new model::diff::contact::dial_request_t(*peer);
         send<model::payload::model_update_t>(coordinator, std::move(diff), this);
-        if (state == state_t::discovering) {
-            auto it = redial_map.find(peer);
-            if (it != redial_map.end()) {
-                it->second.skip_discovers = skip_discovers;
-            }
+        auto it = redial_map.find(peer);
+        if (it != redial_map.end()) {
+            it->second.skip_discovers = skip_discovers;
         }
     }
 

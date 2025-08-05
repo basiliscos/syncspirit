@@ -31,11 +31,10 @@ TEST_CASE("file_info_t::local_file", "[model]") {
     auto folder_peer = folder_infos.by_device(*peer_device);
 
     auto pr_file = proto::FileInfo();
-    pr_file.set_name("a.txt");
-    auto version = pr_file.mutable_version();
-    auto c1 = version->add_counters();
-    c1->set_id(1);
-    c1->set_value(1);
+    proto::set_name(pr_file, "a.txt");
+
+    auto &v = proto::get_version(pr_file);
+    proto::add_counters(v, proto::Counter(1, 1));
 
     SECTION("no local file") {
         auto file_peer = file_info_t::create(sequencer->next_uuid(), pr_file, folder_peer).value();
@@ -43,11 +42,11 @@ TEST_CASE("file_info_t::local_file", "[model]") {
     }
 
     SECTION("there is identical local file") {
-        pr_file.set_sequence(folder_my->get_max_sequence() + 1);
+        proto::set_sequence(pr_file, folder_my->get_max_sequence() + 1);
         auto file_my = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
         REQUIRE(folder_my->add_strict(file_my));
 
-        pr_file.set_sequence(folder_peer->get_max_sequence() + 1);
+        proto::set_sequence(pr_file, folder_peer->get_max_sequence() + 1);
         auto file_peer = file_info_t::create(sequencer->next_uuid(), pr_file, folder_peer).value();
         REQUIRE(folder_peer->add_strict(file_peer));
 
@@ -75,22 +74,23 @@ TEST_CASE("file_info_t::check_consistency", "[model]") {
     auto folder_my = folder_infos.by_device(*my_device);
 
     auto pr_file = proto::FileInfo();
-    pr_file.set_name("a.txt");
-    pr_file.set_block_size(5);
-    pr_file.set_size(5);
+    proto::set_name(pr_file, "a.txt");
+    proto::set_block_size(pr_file, 5);
+    proto::set_size(pr_file, 5);
 
-    auto b = pr_file.add_blocks();
-    b->set_hash(utils::sha256_digest("12345").value());
-    b->set_weak_hash(555);
-    b->set_size(5ul);
-    auto bi = block_info_t::create(*b).value();
+    auto b_hash = utils::sha256_digest(as_bytes("12345")).value();
+    auto &b = proto::add_blocks(pr_file);
+    proto::set_hash(b, b_hash);
+    proto::set_size(b, 5);
+
+    auto bi = block_info_t::create(b).value();
     auto &blocks_map = cluster->get_blocks();
     blocks_map.put(bi);
-    auto bbb = blocks_map.get(b->hash());
+    auto bbb = blocks_map.by_hash(b_hash);
     REQUIRE(bbb);
 
     REQUIRE(builder.local_update(folder->get_id(), pr_file).apply());
-    auto file_my = folder_my->get_file_infos().by_name(pr_file.name());
+    auto file_my = folder_my->get_file_infos().by_name(proto::get_name(pr_file));
     CHECK(file_my->get_size() == 5);
 }
 
@@ -112,14 +112,16 @@ TEST_CASE("file_info_t::create, inconsistent source") {
     auto folder_my = folder_infos.by_device(*my_device);
 
     auto pr_block = proto::BlockInfo();
-    pr_block.set_size(131072);
+    proto::set_size(pr_block, 131072);
 
     auto pr_file = proto::FileInfo();
-    pr_file.set_name("a.txt");
-    *pr_file.add_blocks() = pr_block;
-    pr_file.set_block_size(131072);
-    pr_file.set_size(0);
-    pr_file.mutable_version()->add_counters()->set_id(my_device->device_id().get_uint());
+    proto::set_name(pr_file, "a.txt");
+    proto::set_block_size(pr_file, 131072);
+    proto::set_size(pr_file, 0);
+
+    auto &v = proto::get_version(pr_file);
+    proto::add_counters(v, proto::Counter(my_device->device_id().get_uint(), 1));
+    proto::add_blocks(pr_file, pr_block);
 
     auto my_file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
     CHECK(my_file->get_block_size() == 0);

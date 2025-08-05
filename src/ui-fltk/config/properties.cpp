@@ -7,6 +7,7 @@
 #include <charconv>
 #include <boost/nowide/convert.hpp>
 #include <filesystem>
+#include <fmt/ranges.h>
 
 namespace syncspirit::fltk::config {
 
@@ -35,6 +36,27 @@ error_ptr_t positive_integer_t::validate_value() noexcept {
 
     // all ok
     native_value = static_cast<std::uint64_t>(r);
+    return {};
+}
+
+integer_t::integer_t(std::string label, std::string explanation, int64_t value, int64_t default_value)
+    : property_t(std::move(label), std::move(explanation), std::to_string(value), std::to_string(default_value),
+                 property_kind_t::positive_integer),
+      native_value{value} {}
+
+error_ptr_t integer_t::validate_value() noexcept {
+    std::int64_t r;
+    auto [ptr, ec] = std::from_chars(value.data(), value.data() + value.size(), r);
+
+    if (ec == std::errc::invalid_argument) {
+        return error_ptr_t(new std::string("not a number"));
+    } else if (ec == std::errc::result_out_of_range) {
+        return error_ptr_t(new std::string("too large number"));
+    }
+    assert(ec == std::errc());
+
+    // all ok
+    native_value = r;
     return {};
 }
 
@@ -158,6 +180,13 @@ void tx_timeout_t::reflect_to(syncspirit::config::main_t &main) { main.bep_confi
 
 const char *tx_timeout_t::explanation_ = "tx max time, milliseconds";
 
+stats_interval_t::stats_interval_t(std::int64_t value, std::int64_t default_value)
+    : parent_t("tx_timeout", explanation_, value, default_value) {}
+
+void stats_interval_t::reflect_to(syncspirit::config::main_t &main) { main.bep_config.stats_interval = native_value; }
+
+const char *stats_interval_t::explanation_ = "min delay before gathering I/O stats, milliseconds";
+
 } // namespace bep
 
 namespace db {
@@ -276,7 +305,16 @@ void announce_url_t::reflect_to(syncspirit::config::main_t &main) {
     main.global_announce_config.announce_url = utils::parse(value);
 }
 
-const char *announce_url_t::explanation_ = "url of syncthing/private global announce server";
+const char *announce_url_t::explanation_ = "url of syncthing/private announce server";
+
+lookup_url_t::lookup_url_t(std::string value, std::string default_value)
+    : parent_t("lookup_url", explanation_, std::move(value), std::move(default_value)) {}
+
+void lookup_url_t::reflect_to(syncspirit::config::main_t &main) {
+    main.global_announce_config.lookup_url = utils::parse(value);
+}
+
+const char *lookup_url_t::explanation_ = "url of syncthing/private lookup/discovery server";
 
 cert_file_t::cert_file_t(std::string value, std::string default_value)
     : parent_t("cert_file", explanation_, std::move(value), std::move(default_value)) {}
@@ -284,21 +322,6 @@ cert_file_t::cert_file_t(std::string value, std::string default_value)
 void cert_file_t::reflect_to(syncspirit::config::main_t &main) { main.global_announce_config.cert_file = value; }
 
 const char *cert_file_t::explanation_ = "this device certificate location";
-
-device_id_t::device_id_t(std::string value, std::string default_value)
-    : parent_t("device_id", explanation_, std::move(value), std::move(default_value)) {}
-
-void device_id_t::reflect_to(syncspirit::config::main_t &main) { main.global_announce_config.device_id = value; }
-
-error_ptr_t device_id_t::validate_value() noexcept {
-    auto opt = model::device_id_t::from_string(value);
-    if (!opt) {
-        return error_ptr_t(new std::string("invalid device id"));
-    }
-    return {};
-}
-
-const char *device_id_t::explanation_ = "device_id of global/private discovery server";
 
 key_file_t::key_file_t(std::string value, std::string default_value)
     : parent_t("key_file", explanation_, std::move(value), std::move(default_value)) {}

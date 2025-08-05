@@ -10,12 +10,31 @@
 using namespace syncspirit::model;
 
 bool file_iterator_t::file_comparator_t::operator()(const file_info_t *l, const file_info_t *r) const {
+    using P = db::PullOrder;
+
     auto le = l->get_blocks().empty();
     auto re = r->get_blocks().empty();
 
     if (le && !re) {
         return true;
     } else if (re && !le) {
+        return false;
+    }
+
+    auto cmp = std::strong_ordering::equal;
+    if (pull_order == P::newest) {
+        cmp = r->get_modified_s() <=> l->get_modified_s();
+    } else if (pull_order == P::oldest) {
+        cmp = l->get_modified_s() <=> r->get_modified_s();
+    } else if (pull_order == P::smallest) {
+        cmp = l->get_size() <=> r->get_size();
+    } else if (pull_order == P::largest) {
+        cmp = r->get_size() <=> l->get_size();
+    }
+
+    if (cmp == std::strong_ordering::less) {
+        return true;
+    } else if (cmp == std::strong_ordering::greater) {
         return false;
     }
 
@@ -28,7 +47,6 @@ bool file_iterator_t::file_comparator_t::operator()(const file_info_t *l, const 
 file_iterator_t::file_iterator_t(cluster_t &cluster_, const device_ptr_t &peer_) noexcept
     : cluster{cluster_}, peer{peer_.get()}, folder_index{0} {
     auto &folders = cluster.get_folders();
-    comparator.reset(new file_comparator_t());
 
     for (auto &[folder, _] : folders) {
         auto peer_folder = folder->get_folder_infos().by_device(*peer);
@@ -51,18 +69,27 @@ auto file_iterator_t::find_folder(folder_t *folder) noexcept -> folder_iterator_
 
 auto file_iterator_t::prepare_folder(folder_info_ptr_t peer_folder) noexcept -> folder_iterator_t & {
     auto &files = peer_folder->get_file_infos();
-    auto set = std::make_unique<queue_t>(*comparator);
+    auto folder = peer_folder->get_folder();
+    auto order = folder->get_pull_order();
+    auto set = std::make_unique<queue_t>(file_comparator_t{order});
+    auto seen_index = std::uint64_t{0};
+    auto seen_sequence = std::int64_t{0};
+    bool can_receive = folder->get_folder_type() != db::FolderType::send;
 
-    for (auto it : files) {
-        auto f = it.item.get();
-        if (resolve(*f) != advance_action_t::ignore) {
-            set->emplace(f);
+    if (can_receive) {
+        for (auto it : files) {
+            auto f = it.item.get();
+            if (resolve(*f) != advance_action_t::ignore) {
+                set->emplace(f);
+            }
         }
+        seen_index = peer_folder->get_index();
+        seen_sequence = peer_folder->get_max_sequence();
     }
 
-    auto seen_sequence = peer_folder->get_max_sequence();
     auto it = set->begin();
-    folders_list.emplace_back(folder_iterator_t{peer_folder, std::move(set), seen_sequence, it});
+    folders_list.emplace_back(
+        folder_iterator_t{peer_folder, std::move(set), seen_index, seen_sequence, it, can_receive});
     return folders_list.back();
 }
 
@@ -99,25 +126,62 @@ auto file_iterator_t::next() noexcept -> result_t {
 
 void file_iterator_t::on_upsert(folder_info_ptr_t peer_folder) noexcept {
     auto folder = peer_folder->get_folder();
-    auto &files_map = peer_folder->get_file_infos();
     for (auto &it : folders_list) {
-        if (it.peer_folder->get_folder() == folder) {
-            auto &peer_folder = *it.peer_folder;
-            auto seen_sequence = it.seen_sequence;
-            auto max_sequence = peer_folder.get_max_sequence();
-            auto [from, to] = files_map.range(seen_sequence + 1, max_sequence);
-            for (auto fit = from; fit != to; ++fit) {
-                auto file = fit->item.get();
-                if (resolve(*file) != advance_action_t::ignore) {
-                    it.files_queue->insert(file);
-                }
-            }
-            it.seen_sequence = max_sequence;
-            it.it = it.files_queue->begin();
-            return;
+        if (it.peer_folder->get_folder() == folder && it.can_receive) {
+            return populate(it);
         }
     }
     prepare_folder(peer_folder);
+}
+
+void file_iterator_t::populate(folder_iterator_t &it) noexcept {
+    auto peer_folder = it.peer_folder.get();
+    auto seen_sequence = it.seen_sequence;
+    if (peer_folder->get_index() != it.seen_index) {
+        it.seen_sequence = 0;
+        it.files_queue->clear();
+    }
+    auto &files_map = peer_folder->get_file_infos();
+    auto max_sequence = peer_folder->get_max_sequence();
+    auto [from, to] = files_map.range(seen_sequence + 1, max_sequence);
+    for (auto fit = from; fit != to; ++fit) {
+        auto file = fit->item.get();
+        if (resolve(*file) != advance_action_t::ignore) {
+            it.files_queue->insert(file);
+        }
+    }
+    it.seen_sequence = max_sequence;
+    it.it = it.files_queue->begin();
+}
+
+void file_iterator_t::on_upsert(folder_t &folder) noexcept {
+    auto order = folder.get_pull_order();
+    for (auto &it : folders_list) {
+        if (it.peer_folder->get_folder() == &folder) {
+            auto &peer_folder = *it.peer_folder;
+            auto folder_type = peer_folder.get_folder()->get_folder_type();
+            auto can_receive = folder_type != db::FolderType::send;
+            if (can_receive) {
+                if (!it.can_receive) {
+                    it.seen_sequence = 0;
+                    populate(it);
+                } else if (it.files_queue->key_comp().pull_order != order) {
+                    auto new_set = std::make_unique<queue_t>(file_comparator_t{order});
+                    for (auto fi : *it.files_queue) {
+                        new_set->insert(fi);
+                    }
+                    it.files_queue = std::move(new_set);
+                    it.it = it.files_queue->begin();
+                }
+            } else {
+                if (it.can_receive) {
+                    it.files_queue->clear();
+                    it.it = it.files_queue->begin();
+                }
+            }
+            it.can_receive = can_receive;
+        }
+    }
 }
 
 void file_iterator_t::on_remove(folder_info_ptr_t peer_folder) noexcept {
@@ -133,8 +197,10 @@ void file_iterator_t::on_remove(folder_info_ptr_t peer_folder) noexcept {
 void file_iterator_t::recheck(file_info_t &remote) noexcept {
     for (auto &fi : folders_list) {
         if (fi.peer_folder.get() == remote.get_folder_info()) {
-            if (resolve(remote) != advance_action_t::ignore) {
-                fi.files_queue->emplace(&remote);
+            if (fi.can_receive) {
+                if (resolve(remote) != advance_action_t::ignore) {
+                    fi.files_queue->emplace(&remote);
+                }
             }
             break;
         }

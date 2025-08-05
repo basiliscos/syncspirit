@@ -18,7 +18,7 @@ TEST_CASE("generate cert/key pair, save & load", "[support][tls]") {
     REQUIRE((bool)pair);
     REQUIRE((bool)pair.value().cert);
     REQUIRE((bool)pair.value().private_key);
-    REQUIRE(pair.value().cert_data.bytes.size() > 0);
+    REQUIRE(pair.value().cert_data.size() > 0);
 
     auto &value = pair.value();
 
@@ -39,9 +39,9 @@ TEST_CASE("generate cert/key pair, save & load", "[support][tls]") {
 
     auto load_result = load_pair(cert_file_path.c_str(), key_file_path.c_str());
     REQUIRE((bool)load_result);
-    REQUIRE(load_result.value().cert_data.bytes.size() == pair.value().cert_data.bytes.size());
+    REQUIRE(load_result.value().cert_data.size() == pair.value().cert_data.size());
 
-    bool bytes_equal = load_result.value().cert_data.bytes == pair.value().cert_data.bytes;
+    bool bytes_equal = load_result.value().cert_data == pair.value().cert_data;
     REQUIRE(bytes_equal);
 
     auto cn = get_common_name(value.cert.get());
@@ -51,7 +51,8 @@ TEST_CASE("generate cert/key pair, save & load", "[support][tls]") {
 
 TEST_CASE("sha256 for certificate", "[support][tls]") {
     auto cert = read_file(locate_path("data/cert.der"));
-    auto sha_result = sha256_digest(cert);
+    auto cert_bytes = bytes_view_t((unsigned char *)cert.data(), cert.size());
+    auto sha_result = sha256_digest(cert_bytes);
     REQUIRE((bool)sha_result);
     auto &sha = sha_result.value();
     REQUIRE(1 == 1);

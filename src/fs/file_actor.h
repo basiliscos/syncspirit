@@ -1,31 +1,19 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #pragma once
 
-#include "file.h"
+#include "file_cache.h"
 #include "messages.h"
+#include "net/messages.h"
 #include "model/cluster.h"
 #include "model/messages.h"
 #include "model/diff/cluster_visitor.h"
-#include "model/misc/lru_cache.hpp"
 #include "model/misc/sequencer.h"
-#include "config/main.h"
 #include "utils/log.h"
-#include "utils.h"
 #include <rotor.hpp>
 
-namespace syncspirit {
-
-namespace model::details {
-
-template <> inline std::string_view get_lru_key<fs::file_ptr_t>(const fs::file_ptr_t &item) {
-    return item->get_path_view();
-}
-
-} // namespace model::details
-
-namespace fs {
+namespace syncspirit::fs {
 
 namespace r = rotor;
 namespace outcome = boost::outcome_v2;
@@ -33,7 +21,7 @@ namespace outcome = boost::outcome_v2;
 struct SYNCSPIRIT_API file_actor_config_t : r::actor_config_t {
     model::cluster_ptr_t cluster;
     model::sequencer_ptr_t sequencer;
-    size_t mru_size;
+    file_cache_ptr_t rw_cache;
 };
 
 template <typename Actor> struct file_actor_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -51,8 +39,8 @@ template <typename Actor> struct file_actor_config_builder_t : r::actor_config_b
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&mru_size(size_t value) && noexcept {
-        parent_t::config.mru_size = value;
+    builder_t &&rw_cache(file_cache_ptr_t value) && noexcept {
+        parent_t::config.rw_cache = std::move(value);
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };
@@ -65,11 +53,10 @@ struct SYNCSPIRIT_API file_actor_t : public r::actor_base_t, private model::diff
 
     void on_start() noexcept override;
     void shutdown_start() noexcept override;
+    void shutdown_finish() noexcept override;
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
 
   private:
-    using cache_t = model::mru_list_t<file_ptr_t>;
-
     struct write_guard_t {
         write_guard_t(file_actor_t &actor, const model::diff::modify::block_transaction_t &txn) noexcept;
         ~write_guard_t();
@@ -83,6 +70,8 @@ struct SYNCSPIRIT_API file_actor_t : public r::actor_base_t, private model::diff
 
     void on_model_update(model::message::model_update_t &message) noexcept;
     void on_block_request(message::block_request_t &message) noexcept;
+    void on_controller_up(net::message::controller_up_t &message) noexcept;
+    void on_controller_predown(net::message::controller_predown_t &message) noexcept;
 
     outcome::result<file_ptr_t> get_source_for_cloning(model::file_info_ptr_t &source,
                                                        const file_ptr_t &target_backend) noexcept;
@@ -102,9 +91,9 @@ struct SYNCSPIRIT_API file_actor_t : public r::actor_base_t, private model::diff
     model::sequencer_ptr_t sequencer;
     utils::logger_t log;
     r::address_ptr_t coordinator;
-    cache_t rw_cache;
-    cache_t ro_cache;
+    r::address_ptr_t db;
+    file_cache_ptr_t rw_cache;
+    file_cache_t ro_cache;
 };
 
-} // namespace fs
-} // namespace syncspirit
+} // namespace syncspirit::fs

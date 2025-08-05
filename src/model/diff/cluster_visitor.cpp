@@ -17,6 +17,7 @@
 #include "load/ignored_devices.h"
 #include "load/load_cluster.h"
 #include "load/pending_devices.h"
+#include "load/remove_corrupted_files.h"
 #include "local/blocks_availability.h"
 #include "local/custom.h"
 #include "local/io_failure.h"
@@ -54,6 +55,7 @@
 #include "modify/upsert_folder.h"
 #include "modify/upsert_folder_info.h"
 #include "peer/cluster_update.h"
+#include "peer/rx_tx.h"
 #include "peer/update_folder.h"
 
 using namespace syncspirit::model::diff;
@@ -130,6 +132,11 @@ auto cluster_visitor_t::operator()(const load::load_cluster_t &diff, void *custo
     return diff.visit_next(*this, custom);
 }
 
+auto cluster_visitor_t::operator()(const load::remove_corrupted_files_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    return diff.visit_next(*this, custom);
+}
+
 auto cluster_visitor_t::operator()(const local::custom_t &diff, void *custom) noexcept -> outcome::result<void> {
     return diff.visit_next(*this, custom);
 }
@@ -166,6 +173,10 @@ auto cluster_visitor_t::operator()(const local::synchronization_finish_t &diff, 
 }
 
 auto cluster_visitor_t::operator()(const peer::cluster_update_t &diff, void *custom) noexcept -> outcome::result<void> {
+    return diff.visit_next(*this, custom);
+}
+
+auto cluster_visitor_t::operator()(const peer::rx_tx_t &diff, void *custom) noexcept -> outcome::result<void> {
     return diff.visit_next(*this, custom);
 }
 

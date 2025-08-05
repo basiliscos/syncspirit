@@ -8,10 +8,36 @@
 #include <random>
 #include <cstdint>
 #include <spdlog/sinks/stdout_color_sinks.h>
+#include <boost/nowide/convert.hpp>
 
 int main(int argc, char *argv[]) { return Catch::Session().run(argc, argv); }
 
 namespace syncspirit::test {
+
+path_guard_t::path_guard_t() {}
+path_guard_t::path_guard_t(const bfs::path &path_) : path{path_} {}
+path_guard_t::path_guard_t(path_guard_t &&other) : path() { std::swap(path, other.path); }
+
+path_guard_t::~path_guard_t() {
+    if (!path.empty()) {
+        if (!getenv("SYNCSPIRIT_TEST_KEEP_PATH")) {
+            sys::error_code ec;
+
+            if (bfs::exists(path, ec)) {
+                bfs::permissions(path, bfs::perms::owner_all, ec);
+                if (ec) {
+                    printf("error setting permissions : %s: %s\n", path.string().c_str(), ec.message().c_str());
+                }
+            }
+
+            ec = {};
+            bfs::remove_all(path, ec);
+            if (ec) {
+                printf("error removing %s : %s\n", path.string().c_str(), ec.message().c_str());
+            }
+        }
+    }
+}
 
 bfs::path locate_path(const char *test_file) {
     auto path = bfs::path(test_file);
@@ -29,12 +55,20 @@ bfs::path locate_path(const char *test_file) {
 
 std::string read_file(const bfs::path &path) {
     sys::error_code ec;
+    auto copy = path;
+    copy.make_preferred();
+#ifndef SYNCSPIRIT_WIN
     auto file_path = path.string();
     auto file_path_c = file_path.c_str();
     auto in = fopen(file_path_c, "rb");
+#else
+    auto file_path = copy.wstring();
+    auto file_path_c = file_path.c_str();
+    auto in = _wfopen(file_path_c, L"rb");
+#endif
     if (!in) {
         auto ec = sys::error_code{errno, sys::generic_category()};
-        std::cout << "can't open " << file_path_c << " : " << ec.message() << "\n";
+        std::cout << "(test/read) can't open " << copy.string() << " : " << ec.message() << "\n";
         return "";
     }
 
@@ -49,13 +83,22 @@ std::string read_file(const bfs::path &path) {
     return std::string(buffer.data(), filesize);
 }
 
-void write_file(const bfs::path &path, std::string_view content) {
-    bfs::create_directories(path.parent_path());
-    auto file_path = path.string();
-    auto out = fopen(file_path.c_str(), "wb");
+void write_file(const bfs::path &path_, std::string_view content) {
+    bfs::create_directories(path_.parent_path());
+    auto copy = path_;
+    copy.make_preferred();
+#ifndef SYNCSPIRIT_WIN
+    auto file_path = copy.string();
+    auto file_path_c = file_path.c_str();
+    auto out = fopen(file_path_c, "wb");
+#else
+    auto file_path = copy.wstring();
+    auto file_path_c = file_path.c_str();
+    auto out = _wfopen(file_path_c, L"wb");
+#endif
     if (!out) {
         auto ec = sys::error_code{errno, sys::generic_category()};
-        std::cout << "can't open " << file_path << " : " << ec.message() << "\n";
+        std::cout << "(test/write) can't open " << copy.string() << " : " << ec.message() << "\n";
         std::abort();
     }
     if (content.size()) {
@@ -66,8 +109,10 @@ void write_file(const bfs::path &path, std::string_view content) {
     fclose(out);
 }
 
-std::string device_id2sha256(std::string_view device_id) {
-    return std::string(model::device_id_t::from_string(device_id).value().get_sha256());
+utils::bytes_t device_id2sha256(std::string_view device_id_) {
+    auto device_id = model::device_id_t::from_string(device_id_).value();
+    auto sha256 = device_id.get_sha256();
+    return {sha256.begin(), sha256.end()};
 }
 
 model::device_ptr_t make_device(std::string_view device_id, std::string_view name) {
@@ -89,7 +134,7 @@ static model::diff::apply_controller_t apply_controller;
 model::diff::apply_controller_t &get_apply_controller() { return apply_controller; }
 
 void init_logging() {
-    auto dist_sink = utils::create_root_logger();
+    auto [dist_sink, _] = utils::create_root_logger();
     auto console_sink = std::make_shared<spdlog::sinks::stderr_color_sink_mt>();
     dist_sink->add_sink(console_sink);
 }
@@ -99,12 +144,30 @@ static std::uniform_int_distribution<std::uint64_t> dist;
 
 bfs::path unique_path() {
     auto n = dist(rd);
-    auto view = std::string_view(reinterpret_cast<const char *>(&n), sizeof(n));
+    auto view = utils::bytes_view_t(reinterpret_cast<const unsigned char *>(&n), sizeof(n));
     auto random_name = utils::base32::encode(view);
     std::transform(random_name.begin(), random_name.end(), random_name.begin(),
                    [](unsigned char c) { return std::tolower(c); });
-    auto name = std::string("tmp-") + random_name;
-    return bfs::path(name);
+    auto name = std::wstring(L"tmp-") + boost::nowide::widen(random_name);
+    return bfs::absolute(bfs::current_path() / bfs::path(name));
+}
+
+utils::bytes_view_t as_bytes(std::string_view str) {
+    auto ptr = (const unsigned char *)str.data();
+    return {ptr, str.size()};
+}
+
+utils::bytes_t as_owned_bytes(std::string_view str) {
+    auto ptr = (const unsigned char *)str.data();
+    return {ptr, ptr + str.size()};
+}
+
+bool has_ipv6() noexcept {
+    namespace ip = boost::asio::ip;
+    namespace sys = boost::system;
+    auto ec = sys::error_code();
+    ip::make_address_v6("1:2:3::4", ec);
+    return !ec;
 }
 
 } // namespace syncspirit::test

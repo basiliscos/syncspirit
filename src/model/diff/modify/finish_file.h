@@ -16,7 +16,7 @@ struct SYNCSPIRIT_API finish_file_t final : cluster_diff_t {
     outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;
 
     std::string folder_id;
-    std::string peer_id;
+    utils::bytes_t peer_id;
     std::string file_name;
     model::advance_action_t action;
 };

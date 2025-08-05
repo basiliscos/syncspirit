@@ -1,19 +1,20 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
 
 #pragma once
 
 #include "../cluster_diff.h"
 #include "model/device.h"
+#include "model/misc/uuid.h"
+#include "proto/proto-fwd.hpp"
 #include <vector>
-#include "structs.pb.h"
 
 namespace syncspirit::model::diff::modify {
 
 struct SYNCSPIRIT_API add_pending_folders_t final : cluster_diff_t {
     struct item_t {
         db::PendingFolder db;
-        std::string peer_id;
+        utils::bytes_t peer_id;
         bu::uuid uuid;
     };
     using container_t = std::vector<item_t>;

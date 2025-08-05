@@ -28,7 +28,12 @@ static sink_option_t make_sink(std::string_view name) noexcept {
     } else if (name == "stderr") {
         return std::make_shared<spdlog::sinks::stderr_color_sink_mt>();
     } else if (name.size() > 5 && name.substr(0, 5) == "file:") {
-        auto path = std::string(name.substr(5));
+        auto tail = name.substr(5);
+#if defined(WIN32)
+        auto path = boost::nowide::widen(tail);
+#else
+        auto path = std::string(tail);
+#endif
         return std::make_shared<spdlog::sinks::basic_file_sink_mt>(path);
     }
     return utils::make_error_code(error_code_t::unknown_sink);
@@ -122,6 +127,11 @@ outcome::result<void> init_loggers(const config::log_configs_t &configs) noexcep
     return outcome::success();
 }
 
+void finalize_loggers() noexcept {
+    spdlog::shutdown();
+    spdlog::drop_all();
+}
+
 static const char *bootstrap_sink = "syncspirit-bootstrap.log";
 
 bootstrap_guard_t::bootstrap_guard_t(dist_sink_t dist_sink_, spdlog::sinks::sink *sink_)
@@ -146,7 +156,7 @@ bootstrap_guard_t::~bootstrap_guard_t() {
 
 auto bootstrap_guard_t::get_dist_sink() -> dist_sink_t { return dist_sink; }
 
-dist_sink_t create_root_logger() noexcept {
+std::pair<dist_sink_t, logger_t> create_root_logger() noexcept {
     auto dist_sink = std::make_shared<spdlog::sinks::dist_sink_mt>();
     auto logger = std::make_shared<spdlog::logger>("", dist_sink);
     logger->set_level(spdlog::level::trace);
@@ -154,8 +164,10 @@ dist_sink_t create_root_logger() noexcept {
     spdlog::set_default_logger(logger);
     spdlog::set_pattern(log_pattern);
     spdlog::set_level(spdlog::level::trace);
-    return dist_sink;
+    return {dist_sink, logger};
 }
+
+SYNCSPIRIT_API logger_t get_root_logger() noexcept { return spdlog::get(""); }
 
 auto bootstrap(dist_sink_t &dist_sink, const bfs::path &dir) noexcept -> bootstrap_guard_ptr_t {
     using F = fstream_t;

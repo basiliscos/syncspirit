@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "pending_folders.h"
-#include "../../cluster.h"
-#include "../../misc/error_code.h"
+#include "model/cluster.h"
+#include "model/misc/error_code.h"
+#include "proto/proto-helpers-db.h"
 
 using namespace syncspirit::model::diff::load;
 
@@ -11,14 +12,11 @@ auto pending_folders_t::apply_impl(cluster_t &cluster, apply_controller_t &contr
     -> outcome::result<void> {
     auto &items = cluster.get_pending_folders();
     for (auto &pair : folders) {
-        auto data = pair.value;
-        auto db = db::PendingFolder();
-        auto ok = db.ParseFromArray(data.data(), data.size());
-        if (!ok) {
+        auto db_pf = db::PendingFolder();
+        if (auto left = db::decode(pair.value, db_pf); left) {
             return make_error_code(error_code_t::pending_folder_deserialization_failure);
         }
-
-        auto option = pending_folder_t::create(pair.key, db);
+        auto option = pending_folder_t::create(pair.key, db_pf);
         if (!option) {
             return option.assume_error();
         }

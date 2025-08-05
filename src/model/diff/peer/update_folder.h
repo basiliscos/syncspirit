@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #pragma once
 
@@ -7,7 +7,7 @@
 #include "model/cluster.h"
 #include "model/misc/sequencer.h"
 #include "model/misc/orphaned_blocks.h"
-#include "bep.pb.h"
+#include "proto/proto-fwd.hpp"
 
 namespace syncspirit::model::diff::peer {
 
@@ -18,20 +18,19 @@ struct SYNCSPIRIT_API update_folder_t final : cluster_diff_t {
 
     static outcome::result<cluster_diff_ptr_t> create(const cluster_t &cluster, sequencer_t &sequencer,
                                                       const model::device_t &source,
-                                                      const proto::Index &message) noexcept;
-    static outcome::result<cluster_diff_ptr_t> create(const cluster_t &cluster, sequencer_t &sequencer,
-                                                      const model::device_t &source,
-                                                      const proto::IndexUpdate &message) noexcept;
+                                                      const proto::IndexBase &message) noexcept;
 
     outcome::result<void> apply_impl(cluster_t &, apply_controller_t &) const noexcept override;
     outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;
 
-    update_folder_t(std::string_view folder_id, std::string_view peer_id, files_t files, uuids_t uuids,
+    update_folder_t(std::string_view folder_id, utils::bytes_view_t peer_id, files_t files, uuids_t uuids,
                     blocks_t new_blocks, orphaned_blocks_t::set_t removed_blocks) noexcept;
 
     std::string folder_id;
-    std::string peer_id;
+    utils::bytes_t peer_id;
     files_t files;
+
+  private:
     uuids_t uuids;
 };
 

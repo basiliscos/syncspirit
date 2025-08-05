@@ -1,22 +1,22 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
+#include "model/diff/modify/append_block.h"
 #include "test-utils.h"
 #include "access.h"
 #include "test_supervisor.h"
+#include "managed_hasher.h"
 
 #include "model/cluster.h"
 #include "model/diff/contact/peer_state.h"
 #include "diff-builder.h"
 #include "hasher/hasher_proxy_actor.h"
-#include "hasher/hasher_actor.h"
 #include "net/controller_actor.h"
 #include "net/names.h"
 #include "fs/messages.h"
 #include "utils/error_code.h"
 #include "utils/tls.h"
 #include "proto/bep_support.h"
-#include <boost/core/demangle.hpp>
 #include <type_traits>
 
 using namespace syncspirit;
@@ -28,8 +28,11 @@ using namespace syncspirit::hasher;
 namespace {
 
 struct sample_peer_config_t : public r::actor_config_t {
-    model::device_id_t peer_device_id;
+    model::device_ptr_t peer_device;
+    r::address_ptr_t coordinator;
+    std::string url;
     bool auto_share = false;
+    model::cluster_ptr_t cluster;
 };
 
 template <typename Actor> struct sample_peer_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -37,12 +40,24 @@ template <typename Actor> struct sample_peer_config_builder_t : r::actor_config_
     using parent_t = r::actor_config_builder_t<Actor>;
     using parent_t::parent_t;
 
-    builder_t &&peer_device_id(const model::device_id_t &value) && noexcept {
-        parent_t::config.peer_device_id = value;
+    builder_t &&peer_device(const model::device_ptr_t &value) && noexcept {
+        parent_t::config.peer_device = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+    builder_t &&coordinator(const r::address_ptr_t &value) && noexcept {
+        parent_t::config.coordinator = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
     builder_t &&auto_share(bool value) && noexcept {
         parent_t::config.auto_share = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+    builder_t &&cluster(const model::cluster_ptr_t &value) && noexcept {
+        parent_t::config.cluster = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+    builder_t &&url(std::string_view value) && noexcept {
+        parent_t::config.url = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };
@@ -53,39 +68,66 @@ struct sample_peer_t : r::actor_base_t {
 
     using remote_message_t = r::intrusive_ptr_t<net::message::forwarded_message_t>;
     using remote_messages_t = std::list<remote_message_t>;
+    using shutdown_start_callback_t = std::function<void()>;
 
     struct block_response_t {
         std::string name;
         size_t block_index;
-        std::string data;
+        utils::bytes_t data;
         sys::error_code ec;
     };
     using allowed_index_updates_t = std::unordered_set<std::string>;
     using block_responses_t = std::list<block_response_t>;
     using block_request_t = r::intrusive_ptr_t<net::message::block_request_t>;
     using block_requests_t = std::list<block_request_t>;
-    using uploaded_blocks_t = std::list<proto::message::Response>;
+    using uploaded_blocks_t = std::list<proto::Response>;
 
     sample_peer_t(config_t &config)
-        : r::actor_base_t{config}, auto_share(config.auto_share), peer_device{config.peer_device_id} {
+        : r::actor_base_t{config}, auto_share(config.auto_share), coordinator(config.coordinator),
+          peer_device{config.peer_device}, cluster{config.cluster}, url(config.url),
+          peer_state{model::device_state_t::make_offline()} {
         log = utils::get_logger("test.sample_peer");
+        assert(cluster);
+        assert(peer_device);
+        assert(!url.empty());
     }
 
     void configure(r::plugin::plugin_base_t &plugin) noexcept override {
         r::actor_base_t::configure(plugin);
         plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) { p.set_identity("sample_peer", false); });
+        plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
+            p.discover_name(names::coordinator, coordinator, false).link(false).callback([&](auto phase, auto &ee) {
+                if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {
+                    auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
+                    auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
+                    plugin->subscribe_actor(&sample_peer_t::on_controller_up, coordinator);
+                    plugin->subscribe_actor(&sample_peer_t::on_controller_predown, coordinator);
+                }
+            });
+        });
         plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
-            p.subscribe_actor(&sample_peer_t::on_start_reading);
-            p.subscribe_actor(&sample_peer_t::on_termination);
             p.subscribe_actor(&sample_peer_t::on_transfer);
             p.subscribe_actor(&sample_peer_t::on_block_request);
         });
     }
 
+    void on_start() noexcept override {
+        r::actor_base_t::on_start();
+        peer_state = peer_state.connecting().connected().online(url);
+        auto diff = model::diff::contact::peer_state_t::create(*cluster, peer_device->device_id().get_sha256(),
+                                                               get_address(), peer_state);
+        assert(diff);
+        auto sup_addr = supervisor->get_address();
+        send<model::payload::model_update_t>(sup_addr, std::move(diff), nullptr);
+    }
+
     void shutdown_start() noexcept override {
         LOG_TRACE(log, "{}, shutdown_start", identity);
         if (controller) {
-            send<net::payload::termination_t>(controller, shutdown_reason);
+            send<net::payload::peer_down_t>(controller, shutdown_reason);
+        }
+        if (shutdown_start_callback) {
+            shutdown_start_callback();
         }
         r::actor_base_t::shutdown_start();
     }
@@ -94,20 +136,25 @@ struct sample_peer_t : r::actor_base_t {
         r::actor_base_t::shutdown_finish();
         LOG_TRACE(log, "{}, shutdown_finish, blocks requested = {}", identity, blocks_requested);
         if (controller) {
-            send<net::payload::termination_t>(controller, shutdown_reason);
+            send<net::payload::peer_down_t>(controller, shutdown_reason);
+        }
+        auto sha256 = peer_device->device_id().get_sha256();
+        auto diff = model::diff::contact::peer_state_t::create(*cluster, sha256, address, peer_state.offline());
+        if (diff) {
+            send<model::payload::model_update_t>(coordinator, std::move(diff));
         }
     }
 
-    void on_start_reading(net::message::start_reading_t &msg) noexcept {
-        LOG_TRACE(log, "{}, on_start_reading", identity);
+    void on_controller_up(net::message::controller_up_t &msg) noexcept {
+        LOG_TRACE(log, "{}, on_controller_up", identity);
         controller = msg.payload.controller;
-        reading = msg.payload.start;
+        reading = true;
     }
 
-    void on_termination(net::message::termination_signal_t &msg) noexcept {
-        LOG_TRACE(log, "{}, on_termination", identity);
-
-        if (!shutdown_reason) {
+    void on_controller_predown(net::message::controller_predown_t &msg) noexcept {
+        auto for_me = msg.payload.peer == address;
+        LOG_TRACE(log, "on_controller_predown, for_me = {}", (for_me ? "yes" : "no"));
+        if (for_me && !shutdown_reason) {
             auto &ee = msg.payload.ee;
             auto reason = ee->message();
             LOG_TRACE(log, "{}, on_termination: {}", identity, reason);
@@ -118,35 +165,35 @@ struct sample_peer_t : r::actor_base_t {
 
     void on_transfer(net::message::transfer_data_t &message) noexcept {
         auto &data = message.payload.data;
-        LOG_TRACE(log, "{}, on_transfer, bytes = {}", identity, data.size());
-        auto buff = boost::asio::buffer(data.data(), data.size());
-        auto result = proto::parse_bep(buff);
+        auto result = proto::parse_bep(data);
         auto orig = std::move(result.value().message);
+        auto type = proto::MessageType::UNKNOWN;
         auto variant = net::payload::forwarded_message_t();
         std::visit(
             [&](auto &msg) {
-                using boost::core::demangle;
                 using T = std::decay_t<decltype(msg)>;
-                LOG_TRACE(log, "{}, received '{}' message", identity, demangle(typeid(T).name()));
                 using V = net::payload::forwarded_message_t;
+                type = proto::message::get_bep_type<T>();
                 if constexpr (std::is_constructible_v<V, T>) {
                     variant = std::move(msg);
-                } else if constexpr (std::is_same_v<T, proto::message::Response>) {
+                } else if constexpr (std::is_same_v<T, proto::Response>) {
                     uploaded_blocks.push_back(std::move(msg));
                 }
             },
             orig);
+        LOG_TRACE(log, "{}, on_transfer, bytes = {}, type = {}", identity, data.size(), (int)type);
         auto fwd_msg = new net::message::forwarded_message_t(address, std::move(variant));
         messages.emplace_back(fwd_msg);
 
         for (auto &msg : messages) {
             auto &p = msg->payload;
-            if (auto m = std::get_if<proto::message::Index>(&p); m) {
-                allowed_index_updates.emplace((*m)->folder());
+            if (auto m = std::get_if<proto::Index>(&p); m) {
+                auto folder = proto::get_folder(*m);
+                allowed_index_updates.emplace(std::move(folder));
             }
-            if (auto m = std::get_if<proto::message::IndexUpdate>(&p); m) {
-                auto &folder_id = (*m)->folder();
-                if ((allowed_index_updates.count(folder_id) == 0) && !auto_share) {
+            if (auto m = std::get_if<proto::IndexUpdate>(&p); m) {
+                auto folder = std::string(proto::get_folder(*m));
+                if ((allowed_index_updates.count(folder) == 0) && !auto_share) {
                     LOG_WARN(log, "{}, IndexUpdate w/o previously recevied index", identity);
                     std::abort();
                 }
@@ -197,97 +244,37 @@ struct sample_peer_t : r::actor_base_t {
 
     static const constexpr size_t next_block = 1000000;
 
-    void push_block(std::string_view data, size_t index, std::string name = {}) {
+    void push_block(utils::bytes_view_t data, size_t index, std::string_view name = {}) {
         if (index == next_block) {
             index = block_responses.size();
         }
-        block_responses.push_back(block_response_t{std::move(name), index, std::string(data), {}});
+        auto bytes = utils::bytes_t(data.begin(), data.end());
+        block_responses.push_back(block_response_t{std::string(name), index, std::move(bytes), {}});
     }
 
     void push_block(sys::error_code ec, size_t index) {
         if (index == next_block) {
             index = block_responses.size();
         }
-        block_responses.push_back(block_response_t{std::string{}, index, std::string{}, ec});
+        block_responses.push_back(block_response_t{std::string{}, index, utils::bytes_t(), ec});
     }
 
     int blocks_requested = 0;
     bool reading = false;
     bool auto_share = false;
+    model::cluster_ptr_t cluster;
+    std::string url;
     remote_messages_t messages;
+    r::address_ptr_t coordinator;
     r::address_ptr_t controller;
-    model::device_id_t peer_device;
+    model::device_ptr_t peer_device;
+    model::device_state_t peer_state;
     utils::logger_t log;
     block_requests_t block_requests;
     block_responses_t block_responses;
     uploaded_blocks_t uploaded_blocks;
     allowed_index_updates_t allowed_index_updates;
-};
-
-struct hasher_config_t : hasher::hasher_actor_config_t {
-    uint32_t index;
-    bool auto_reply = true;
-};
-
-template <typename Actor> struct hasher_config_builder_t : hasher::hasher_actor_config_builder_t<Actor> {
-    using builder_t = typename Actor::template config_builder_t<Actor>;
-    using parent_t = ::hasher_actor_config_builder_t<Actor>;
-    using parent_t::parent_t;
-
-    builder_t &&auto_reply(uint32_t value) && noexcept {
-        parent_t::config.auto_reply = value;
-        return std::move(*static_cast<typename parent_t::builder_t *>(this));
-    }
-};
-
-struct managed_hasher_t : r::actor_base_t {
-    using config_t = hasher_config_t;
-    template <typename Actor> using config_builder_t = hasher_config_builder_t<Actor>;
-
-    using validation_request_t = hasher::message::validation_request_t;
-    using validation_request_ptr_t = model::intrusive_ptr_t<validation_request_t>;
-    using queue_t = std::deque<validation_request_ptr_t>;
-
-    managed_hasher_t(config_t &cfg) : r::actor_base_t{cfg}, index{cfg.index}, auto_reply{cfg.auto_reply} {}
-
-    void configure(r::plugin::plugin_base_t &plugin) noexcept override {
-        r::actor_base_t::configure(plugin);
-        plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
-            p.set_identity(fmt::format("hasher-{}", 1), false);
-            log = utils::get_logger(fmt::format("test-hasher-{}", 1));
-        });
-        plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) { p.register_name(identity, get_address()); });
-        plugin.with_casted<r::plugin::starter_plugin_t>(
-            [&](auto &p) { p.subscribe_actor(&managed_hasher_t::on_validation); });
-    }
-    void on_validation(validation_request_t &req) noexcept {
-        queue.emplace_back(&req);
-        if (auto_reply) {
-            process_requests();
-        }
-    }
-    void process_requests() noexcept {
-        static const constexpr size_t SZ = SHA256_DIGEST_LENGTH;
-
-        LOG_TRACE(log, "{}, process_requests", identity);
-        while (!queue.empty()) {
-            auto req = queue.front();
-            queue.pop_front();
-            auto &payload = *req->payload.request_payload;
-
-            char digest[SZ];
-            auto &data = payload.data;
-
-            utils::digest(data.data(), data.length(), digest);
-            bool eq = payload.hash == std::string_view(digest, SZ);
-            reply_to(*req, eq);
-        }
-    }
-
-    uint32_t index;
-    bool auto_reply;
-    utils::logger_t log;
-    queue_t queue;
+    shutdown_start_callback_t shutdown_start_callback;
 };
 
 struct fixture_t {
@@ -305,18 +292,21 @@ struct fixture_t {
         test::init_logging();
     }
 
-    void _start_target(std::string connection_id) {
-        peer_actor = sup->create_actor<sample_peer_t>().auto_share(auto_share).timeout(timeout).finish();
+    void _start_target(std::string_view url) {
+        peer_actor = sup->create_actor<sample_peer_t>()
+                         .cluster(cluster)
+                         .peer_device(peer_device)
+                         .url(url)
+                         .coordinator(sup->get_address())
+                         .auto_share(auto_share)
+                         .timeout(timeout)
+                         .finish();
 
-        auto diff = model::diff::contact::peer_state_t::create(*cluster, peer_device->device_id().get_sha256(),
-                                                               peer_actor->get_address(), device_state_t::online,
-                                                               connection_id);
-        sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
+        sup->do_process();
 
         target = sup->create_actor<controller_actor_t>()
                      .peer(peer_device)
                      .peer_addr(peer_actor->get_address())
-                     .connection_id(connection_id)
                      .request_pool(1024)
                      .outgoing_buffer_max(1024'000)
                      .cluster(cluster)
@@ -332,12 +322,17 @@ struct fixture_t {
         target_addr = target->get_address();
     }
 
-    virtual void start_target() noexcept { _start_target("test-common://1.2.3.4:5"); }
+    virtual void start_target() noexcept { _start_target("relay://1.2.3.4:5"); }
+
+    virtual void _tune_peer(db::Device &) noexcept {}
 
     virtual void run() noexcept {
-        auto peer_id =
-            device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
-        peer_device = device_t::create(peer_id, "peer-device").value();
+        auto peer_sha256_s = "VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ";
+        auto peer_id = device_id_t::from_string(peer_sha256_s).value();
+        auto peer_db = db::Device();
+        db::set_name(peer_db, "peer-device");
+        _tune_peer(peer_db);
+        peer_device = device_t::create(peer_id.get_key(), peer_db).value();
 
         auto my_id =
             device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
@@ -362,8 +357,7 @@ struct fixture_t {
             REQUIRE(builder.share_folder(peer_id.get_sha256(), folder_id_1).apply());
         }
 
-        r::system_context_t ctx;
-        sup = ctx.create_supervisor<supervisor_t>().timeout(timeout).create_registry().finish();
+        sup = create_supervisor();
         sup->cluster = cluster;
 
         sup->configure_callback = [&](r::plugin::plugin_base_t &plugin) {
@@ -402,7 +396,7 @@ struct fixture_t {
             REQUIRE(peer_actor->reading);
             REQUIRE(peer_actor->messages.size() == 1);
             auto &msg = (*peer_actor->messages.front()).payload;
-            REQUIRE(std::get_if<proto::message::ClusterConfig>(&msg));
+            REQUIRE(std::get_if<proto::ClusterConfig>(&msg));
             peer_actor->messages.pop_front();
         }
         main(builder);
@@ -418,6 +412,10 @@ struct fixture_t {
     virtual void main(diff_builder_t &) noexcept {}
 
     virtual std::uint32_t get_blocks_max_requested() { return 8; }
+
+    virtual r::intrusive_ptr_t<supervisor_t> create_supervisor() {
+        return ctx.create_supervisor<supervisor_t>().timeout(timeout).create_registry().finish();
+    }
 
     bool auto_start;
     bool auto_share;
@@ -447,14 +445,13 @@ void test_startup() {
             REQUIRE(peer_actor->reading);
             REQUIRE(peer_actor->messages.size() == 1);
             auto &msg = (*peer_actor->messages.front()).payload;
-            REQUIRE(std::get_if<proto::message::ClusterConfig>(&msg));
+            REQUIRE(std::get_if<proto::ClusterConfig>(&msg));
 
             peer_actor->messages.pop_front();
             CHECK(peer_actor->messages.empty());
 
             auto cc = proto::ClusterConfig{};
-            auto payload = proto::message::ClusterConfig(new proto::ClusterConfig(cc));
-            peer_actor->forward(std::move(payload));
+            peer_actor->forward(std::move(cc));
             sup->do_process();
 
             CHECK(static_cast<r::actor_base_t *>(target.get())->access<to::state>() == r::state_t::OPERATIONAL);
@@ -470,14 +467,13 @@ void test_overwhelm() {
 
         void main(diff_builder_t &) noexcept override {
             auto msg = &(*peer_actor->messages.front()).payload;
-            REQUIRE(std::get_if<proto::message::ClusterConfig>(msg));
+            REQUIRE(std::get_if<proto::ClusterConfig>(msg));
 
             peer_actor->messages.pop_front();
             CHECK(peer_actor->messages.empty());
 
             auto cc = proto::ClusterConfig{};
-            auto payload = proto::message::ClusterConfig(new proto::ClusterConfig(cc));
-            peer_actor->forward(std::move(payload));
+            peer_actor->forward(cc);
             sup->do_process();
 
             CHECK(static_cast<r::actor_base_t *>(target.get())->access<to::state>() == r::state_t::OPERATIONAL);
@@ -486,7 +482,7 @@ void test_overwhelm() {
             auto ex_peer = peer_actor;
             auto ex_target = target;
 
-            _start_target("best://1.2.3.4:5");
+            _start_target("tcp://1.2.3.4:5");
             sup->do_process();
 
             REQUIRE(ex_peer != peer_actor);
@@ -495,11 +491,10 @@ void test_overwhelm() {
             CHECK(static_cast<r::actor_base_t *>(ex_target.get())->access<to::state>() == r::state_t::SHUT_DOWN);
 
             msg = &(*peer_actor->messages.front()).payload;
-            REQUIRE(std::get_if<proto::message::ClusterConfig>(msg));
+            REQUIRE(std::get_if<proto::ClusterConfig>(msg));
             peer_actor->messages.pop_front();
 
-            payload = proto::message::ClusterConfig(new proto::ClusterConfig(cc));
-            peer_actor->forward(std::move(payload));
+            peer_actor->forward(std::move(cc));
             sup->do_process();
 
             CHECK(static_cast<r::actor_base_t *>(target.get())->access<to::state>() == r::state_t::OPERATIONAL);
@@ -519,10 +514,9 @@ void test_index_receiving() {
             auto index = proto::Index{};
 
             SECTION("wrong index") {
-                peer_actor->forward(proto::message::ClusterConfig(new proto::ClusterConfig(cc)));
-
-                index.set_folder("non-existing-folder");
-                peer_actor->forward(proto::message::Index(new proto::Index(index)));
+                peer_actor->forward(cc);
+                proto::set_folder(index, "non-existing-folder");
+                peer_actor->forward(index);
                 sup->do_process();
 
                 CHECK(static_cast<r::actor_base_t *>(target.get())->access<to::state>() == r::state_t::SHUT_DOWN);
@@ -530,26 +524,27 @@ void test_index_receiving() {
             }
 
             SECTION("index is applied") {
-                auto folder = cc.add_folders();
-                folder->set_id(std::string(folder_1->get_id()));
-                auto d_peer = folder->add_devices();
-                d_peer->set_id(std::string(peer_device->device_id().get_sha256()));
+                auto &folder = proto::add_folders(cc);
+                proto::set_id(folder, folder_1->get_id());
+                auto &d_peer = proto::add_devices(folder);
+                proto::set_id(d_peer, peer_device->device_id().get_sha256());
                 REQUIRE(cluster->get_pending_folders().size() == 0);
-                d_peer->set_max_sequence(10);
-                d_peer->set_index_id(folder_1_peer->get_index());
-                peer_actor->forward(proto::message::ClusterConfig(new proto::ClusterConfig(cc)));
+                proto::set_max_sequence(d_peer, 10);
+                proto::set_index_id(d_peer, folder_1_peer->get_index());
+                peer_actor->forward(cc);
 
-                index.set_folder(std::string(folder_1->get_id()));
-                auto file = index.add_files();
-                file->set_name("some-dir");
-                file->set_type(proto::FileInfoType::DIRECTORY);
-                file->set_sequence(10);
-                auto v = file->mutable_version();
-                auto c = v->add_counters();
-                c->set_id(peer_device->device_id().get_uint());
-                c->set_value(1);
+                proto::set_folder(index, folder_1->get_id());
 
-                peer_actor->forward(proto::message::Index(new proto::Index(index)));
+                auto file_name = std::string_view("some-dir");
+                auto &file = proto::add_files(index);
+                proto::set_name(file, file_name);
+                proto::set_type(file, proto::FileInfoType::DIRECTORY);
+                proto::set_sequence(file, 10);
+
+                auto &v = proto::get_version(file);
+                proto::add_counters(v, proto::Counter(peer_device->device_id().get_uint(), 1));
+
+                peer_actor->forward(index);
                 sup->do_process();
 
                 CHECK(static_cast<r::actor_base_t *>(target.get())->access<to::state>() == r::state_t::OPERATIONAL);
@@ -561,40 +556,41 @@ void test_index_receiving() {
                 REQUIRE(folder_peer);
                 CHECK(folder_peer->get_max_sequence() == 10ul);
                 REQUIRE(folder_peer->get_file_infos().size() == 1);
-                CHECK(folder_peer->get_file_infos().begin()->item->get_name() == file->name());
+                CHECK(folder_peer->get_file_infos().begin()->item->get_name() == file_name);
 
                 auto folder_my = folder_infos.by_device(*my_device);
                 REQUIRE(folder_my);
                 CHECK(folder_my->get_max_sequence() == 1ul);
                 REQUIRE(folder_my->get_file_infos().size() == 1);
-                CHECK(folder_my->get_file_infos().begin()->item->get_name() == file->name());
+                CHECK(folder_my->get_file_infos().begin()->item->get_name() == file_name);
 
                 SECTION("then index update is applied") {
                     auto index_update = proto::IndexUpdate{};
-                    index_update.set_folder(std::string(folder_1->get_id()));
-                    auto file = index_update.add_files();
-                    file->set_name("some-dir-2");
-                    file->set_type(proto::FileInfoType::DIRECTORY);
-                    file->set_sequence(folder_1_peer->get_max_sequence() + 1);
-                    auto v = file->mutable_version();
-                    auto c = v->add_counters();
-                    c->set_id(peer_device->device_id().get_uint());
-                    c->set_value(1);
+                    proto::set_folder(index_update, folder_1->get_id());
+                    auto file_name = std::string_view("some-dir-2");
+                    auto sequence = folder_1_peer->get_max_sequence() + 1;
+                    auto &file = proto::add_files(index_update);
+                    proto::set_name(file, file_name);
+                    proto::set_type(file, proto::FileInfoType::DIRECTORY);
+                    proto::set_sequence(file, sequence);
 
-                    peer_actor->forward(proto::message::IndexUpdate(new proto::IndexUpdate(index_update)));
+                    auto &v = proto::get_version(file);
+                    proto::add_counters(v, proto::Counter(peer_device->device_id().get_uint(), 1));
+
+                    peer_actor->forward(index_update);
 
                     sup->do_process();
                     CHECK(static_cast<r::actor_base_t *>(target.get())->access<to::state>() == r::state_t::OPERATIONAL);
                     CHECK(static_cast<r::actor_base_t *>(peer_actor.get())->access<to::state>() ==
                           r::state_t::OPERATIONAL);
 
-                    CHECK(folder_peer->get_max_sequence() == file->sequence());
+                    CHECK(folder_peer->get_max_sequence() == sequence);
                     REQUIRE(folder_peer->get_file_infos().size() == 2);
-                    CHECK(folder_peer->get_file_infos().by_name("some-dir-2"));
+                    CHECK(folder_peer->get_file_infos().by_name(file_name));
 
                     CHECK(folder_my->get_max_sequence() == 2ul);
                     REQUIRE(folder_my->get_file_infos().size() == 2);
-                    CHECK(folder_my->get_file_infos().by_name("some-dir-2"));
+                    CHECK(folder_my->get_file_infos().by_name(file_name));
                 }
             }
         }
@@ -608,9 +604,10 @@ void test_index_sending() {
         void main(diff_builder_t &) noexcept override {
 
             proto::FileInfo pr_file_info;
-            pr_file_info.set_name("link");
-            pr_file_info.set_type(proto::FileInfoType::SYMLINK);
-            pr_file_info.set_symlink_target("/some/where");
+            auto file_name = std::string_view("link");
+            proto::set_name(pr_file_info, file_name);
+            proto::set_type(pr_file_info, proto::FileInfoType::SYMLINK);
+            proto::set_symlink_target(pr_file_info, "/some/where");
 
             auto builder = diff_builder_t(*cluster);
             builder.local_update(folder_1->get_id(), pr_file_info);
@@ -619,58 +616,54 @@ void test_index_sending() {
             auto folder_1_my = folder_1->get_folder_infos().by_device(*my_device);
 
             auto cc = proto::ClusterConfig{};
+            auto &folder = proto::add_folders(cc);
+            proto::set_id(folder, folder_1->get_id());
+            auto &d_peer = proto::add_devices(folder);
+            proto::set_id(d_peer, peer_device->device_id().get_sha256());
+            proto::set_max_sequence(d_peer, folder_1_peer->get_max_sequence());
+            proto::set_index_id(d_peer, folder_1_peer->get_index());
 
-            auto folder = cc.add_folders();
-            folder->set_id(std::string(folder_1->get_id()));
-            auto d_peer = folder->add_devices();
-            d_peer->set_id(std::string(peer_device->device_id().get_sha256()));
-            d_peer->set_max_sequence(folder_1_peer->get_max_sequence());
-            d_peer->set_index_id(folder_1_peer->get_index());
+            SECTION("peer has outdated by sequence view (zero-sequence)") {
+                auto &d_my = proto::add_devices(folder);
+                proto::set_id(d_my, my_device->device_id().get_sha256());
+                proto::set_max_sequence(d_my, 0);
+                proto::set_index_id(d_my, folder_1_my->get_index());
 
-            SECTION("peer has outdated by sequence view") {
-                auto d_my = folder->add_devices();
-                d_my->set_id(std::string(my_device->device_id().get_sha256()));
-                d_my->set_max_sequence(folder_1_my->get_max_sequence() - 1);
-                d_my->set_index_id(folder_1_my->get_index());
-
-                peer_actor->forward(proto::message::ClusterConfig(new proto::ClusterConfig(cc)));
+                peer_actor->forward(cc);
                 sup->do_process();
 
                 auto &queue = peer_actor->messages;
                 REQUIRE(queue.size() == 1);
-                auto msg = &(*queue.front()).payload;
-                auto &my_index_update = *std::get<proto::message::IndexUpdate>(*msg);
-                REQUIRE(my_index_update.files_size() == 1);
+                auto msg = &(*queue.back()).payload;
+                auto my_index_update = std::get_if<proto::Index>(msg);
+                REQUIRE(my_index_update);
+                REQUIRE(proto::get_files_size(*my_index_update) == 1);
             }
 
             SECTION("peer has outdated by index view") {
-                auto d_my = folder->add_devices();
-                d_my->set_id(std::string(my_device->device_id().get_sha256()));
-                d_my->set_max_sequence(folder_1_my->get_max_sequence());
-                d_my->set_index_id(folder_1_my->get_index() + 5);
+                auto &d_my = proto::add_devices(folder);
+                proto::set_id(d_my, my_device->device_id().get_sha256());
+                proto::set_max_sequence(d_my, folder_1_my->get_max_sequence());
+                proto::set_index_id(d_my, folder_1_my->get_index() + 5);
 
-                peer_actor->forward(proto::message::ClusterConfig(new proto::ClusterConfig(cc)));
+                peer_actor->forward(cc);
                 sup->do_process();
 
                 auto &queue = peer_actor->messages;
-                REQUIRE(queue.size() == 2);
-                auto msg = &(*queue.front()).payload;
-                auto &my_index = *std::get<proto::message::Index>(*msg);
-                REQUIRE(my_index.files_size() == 0);
-                queue.pop_front();
-
-                msg = &(*queue.front()).payload;
-                auto &my_index_update = *std::get<proto::message::IndexUpdate>(*msg);
-                REQUIRE(my_index_update.files_size() == 1);
+                REQUIRE(queue.size() == 1);
+                auto msg = &(*queue.back()).payload;
+                auto my_index_update = std::get_if<proto::Index>(msg);
+                REQUIRE(my_index_update);
+                REQUIRE(proto::get_files_size(*my_index_update) == 1);
             }
 
             SECTION("peer has actual view") {
-                auto d_my = folder->add_devices();
-                d_my->set_id(std::string(my_device->device_id().get_sha256()));
-                d_my->set_max_sequence(folder_1_my->get_max_sequence());
-                d_my->set_index_id(folder_1_my->get_index());
+                auto &d_my = proto::add_devices(folder);
+                proto::set_id(d_my, my_device->device_id().get_sha256());
+                proto::set_max_sequence(d_my, folder_1_my->get_max_sequence());
+                proto::set_index_id(d_my, folder_1_my->get_index());
 
-                peer_actor->forward(proto::message::ClusterConfig(new proto::ClusterConfig(cc)));
+                peer_actor->forward(cc);
                 sup->do_process();
 
                 auto &queue = peer_actor->messages;
@@ -689,46 +682,50 @@ void test_downloading() {
             auto folder_my = folder_infos.by_device(*my_device);
 
             auto cc = proto::ClusterConfig{};
-            auto folder = cc.add_folders();
-            folder->set_id(std::string(folder_1->get_id()));
-            auto d_peer = folder->add_devices();
-            d_peer->set_id(std::string(peer_device->device_id().get_sha256()));
-            d_peer->set_max_sequence(10);
-            d_peer->set_index_id(folder_1_peer->get_index());
-            auto d_my = folder->add_devices();
-            d_my->set_id(std::string(my_device->device_id().get_sha256()));
-            d_my->set_max_sequence(folder_my->get_max_sequence());
-            d_my->set_index_id(folder_my->get_index());
+            auto &folder = proto::add_folders(cc);
+            proto::set_id(folder, folder_1->get_id());
+            auto d_peer = &proto::add_devices(folder);
+            proto::set_id(*d_peer, peer_device->device_id().get_sha256());
+            proto::set_max_sequence(*d_peer, 10);
+            proto::set_index_id(*d_peer, folder_1_peer->get_index());
+            auto &d_my = proto::add_devices(folder);
+            proto::set_id(d_my, my_device->device_id().get_sha256());
+            proto::set_max_sequence(d_my, folder_my->get_max_sequence());
+            proto::set_index_id(d_my, folder_my->get_index());
 
+            d_peer = &proto::get_devices(folder, 0);
             SECTION("cluster config & index has a new file => download it") {
-                peer_actor->forward(proto::message::ClusterConfig(new proto::ClusterConfig(cc)));
+                peer_actor->forward(cc);
                 auto index = proto::Index{};
-                index.set_folder(std::string(folder_1->get_id()));
-                auto file = index.add_files();
-                file->set_name("some-file");
-                file->set_type(proto::FileInfoType::FILE);
-                file->set_sequence(folder_1_peer->get_max_sequence() + 1);
-                file->set_block_size(5);
-                file->set_size(5);
-                auto version = file->mutable_version();
-                auto counter = version->add_counters();
-                counter->set_id(1ul);
-                counter->set_value(1ul);
+                proto::set_folder(index, folder_1->get_id());
+                auto file_name = std::string_view("some-file");
+                auto &file = proto::add_files(index);
+                proto::set_name(file, file_name);
+                proto::set_type(file, proto::FileInfoType::FILE);
+                proto::set_sequence(file, folder_1_peer->get_max_sequence() + 1);
+                proto::set_size(file, 5);
+                proto::set_block_size(file, 5);
 
-                auto b1 = file->add_blocks();
-                b1->set_hash(utils::sha256_digest("12345").value());
-                b1->set_offset(0);
-                b1->set_size(5);
+                auto &v = proto::get_version(file);
+                auto &counter = proto::add_counters(v);
+                proto::set_id(counter, 1);
+                proto::set_value(counter, 1);
+
+                auto data_1 = as_owned_bytes("12345");
+                auto data_1_h = utils::sha256_digest(data_1).value();
+                auto &b1 = proto::add_blocks(file);
+                proto::set_hash(b1, data_1_h);
+                proto::set_size(b1, data_1.size());
 
                 auto folder_my = folder_infos.by_device(*my_device);
                 CHECK(folder_my->get_max_sequence() == 0ul);
                 CHECK(!folder_my->get_folder()->is_synchronizing());
 
-                peer_actor->forward(proto::message::Index(new proto::Index(index)));
+                peer_actor->forward(index);
                 sup->do_process();
                 CHECK(folder_my->get_folder()->is_synchronizing());
 
-                peer_actor->push_block("12345", 0);
+                peer_actor->push_block(data_1, 0);
                 peer_actor->process_block_requests();
                 sup->do_process();
 
@@ -738,7 +735,7 @@ void test_downloading() {
                 REQUIRE(folder_my->get_file_infos().size() == 1);
                 auto f = folder_my->get_file_infos().begin()->item;
                 REQUIRE(f);
-                CHECK(f->get_name() == file->name());
+                CHECK(f->get_name() == file_name);
                 CHECK(f->get_size() == 5);
                 CHECK(f->get_blocks().size() == 1);
                 CHECK(f->is_locally_available());
@@ -749,17 +746,17 @@ void test_downloading() {
                 REQUIRE(queue.size() > 0);
 
                 auto msg = &(*queue.back()).payload;
-                auto &my_index_update = *std::get<proto::message::IndexUpdate>(*msg);
-                REQUIRE(my_index_update.files_size() == 1);
+                auto &my_index_update = std::get<proto::Index>(*msg);
+                REQUIRE(proto::get_files_size(my_index_update) == 1);
 
-                SECTION("dont redownload file only if metadata has changed") {
+                SECTION("don't redownload file only if metadata has changed") {
                     auto index_update = proto::IndexUpdate{};
-                    index_update.set_folder(index.folder());
-                    file->set_sequence(folder_1_peer->get_max_sequence() + 1);
-                    counter->set_value(2ul);
+                    proto::set_folder(index_update, proto::get_folder(index));
+                    proto::set_sequence(file, folder_1_peer->get_max_sequence() + 1);
+                    proto::set_value(counter, 2);
+                    proto::add_files(index_update, file);
 
-                    *index_update.add_files() = *file;
-                    peer_actor->forward(proto::message::IndexUpdate(new proto::IndexUpdate(index_update)));
+                    peer_actor->forward(index_update);
                     sup->do_process();
                     CHECK(peer_actor->blocks_requested == 1);
                     CHECK(folder_my->get_max_sequence() == 2ul);
@@ -770,49 +767,58 @@ void test_downloading() {
             }
 
             SECTION("download 2 files") {
-                peer_actor->forward(proto::message::ClusterConfig(new proto::ClusterConfig(cc)));
+                peer_actor->forward(cc);
                 auto index = proto::Index{};
-                index.set_folder(std::string(folder_1->get_id()));
-                auto file_1 = index.add_files();
-                file_1->set_name("file-1");
-                file_1->set_type(proto::FileInfoType::FILE);
-                file_1->set_sequence(folder_1_peer->get_max_sequence() + 1);
-                file_1->set_block_size(5);
-                file_1->set_size(5);
-                auto version_1 = file_1->mutable_version();
-                auto counter_1 = version_1->add_counters();
-                counter_1->set_id(1ul);
-                counter_1->set_value(1ul);
+                proto::set_folder(index, folder_1->get_id());
+                auto file_name_1 = std::string_view("file-1");
+                auto file_1 = &proto::add_files(index);
+                proto::set_name(*file_1, file_name_1);
+                proto::set_type(*file_1, proto::FileInfoType::FILE);
+                proto::set_sequence(*file_1, folder_1_peer->get_max_sequence() + 1);
+                proto::set_size(*file_1, 5);
+                proto::set_block_size(*file_1, 5);
 
-                auto file_2 = index.add_files();
-                file_2->set_name("file-2");
-                file_2->set_type(proto::FileInfoType::FILE);
-                file_2->set_sequence(folder_1_peer->get_max_sequence() + 2);
-                file_2->set_block_size(5);
-                file_2->set_size(5);
-                auto version_2 = file_2->mutable_version();
-                auto counter_2 = version_2->add_counters();
-                counter_2->set_id(1ul);
-                counter_2->set_value(2ul);
+                auto &v_1 = proto::get_version(*file_1);
+                auto &c_1 = proto::add_counters(v_1);
+                proto::set_id(c_1, 1);
+                proto::set_value(c_1, 1);
 
-                auto b1 = file_1->add_blocks();
-                b1->set_hash(utils::sha256_digest("12345").value());
-                b1->set_offset(0);
-                b1->set_size(5);
+                auto data_1 = as_owned_bytes("12345");
+                auto data_1_hash = utils::sha256_digest(data_1).value();
 
+                auto data_2 = as_owned_bytes("67890");
+                auto data_2_hash = utils::sha256_digest(data_2).value();
+
+                auto &b1 = proto::add_blocks(*file_1);
+                proto::set_hash(b1, data_1_hash);
+                proto::set_size(b1, 5);
+
+                auto file_name_2 = std::string_view("file-2");
+                auto file_2 = &proto::add_files(index);
+                proto::set_name(*file_2, file_name_2);
+                proto::set_type(*file_2, proto::FileInfoType::FILE);
+                proto::set_sequence(*file_2, folder_1_peer->get_max_sequence() + 2);
+                proto::set_size(*file_2, 5);
+                proto::set_block_size(*file_2, 5);
+
+                auto &v_2 = proto::get_version(*file_2);
+                auto &c_2 = proto::add_counters(v_2);
+                proto::set_id(c_2, 1);
+                proto::set_value(c_2, 2);
+
+                file_1 = &proto::get_files(index, 0);
                 SECTION("with different blocks") {
-                    auto b2 = file_2->add_blocks();
-                    b2->set_hash(utils::sha256_digest("67890").value());
-                    b2->set_offset(0);
-                    b2->set_size(5);
+                    auto &b2 = proto::add_blocks(*file_2);
+                    proto::set_hash(b2, data_2_hash);
+                    proto::set_size(b2, 5);
 
                     auto folder_my = folder_infos.by_device(*my_device);
                     CHECK(folder_my->get_max_sequence() == 0ul);
                     CHECK(!folder_my->get_folder()->is_synchronizing());
 
-                    peer_actor->forward(proto::message::Index(new proto::Index(index)));
-                    peer_actor->push_block("12345", 0, file_1->name());
-                    peer_actor->push_block("67890", 0, file_2->name());
+                    peer_actor->forward(index);
+                    peer_actor->push_block(data_1, 0, file_name_1);
+                    peer_actor->push_block(data_2, 0, file_name_2);
                     sup->do_process();
 
                     CHECK(!folder_my->get_folder()->is_synchronizing());
@@ -821,7 +827,7 @@ void test_downloading() {
                     CHECK(folder_my->get_max_sequence() == 2ul);
                     REQUIRE(folder_my->get_file_infos().size() == 2);
                     {
-                        auto f = folder_my->get_file_infos().by_name(file_1->name());
+                        auto f = folder_my->get_file_infos().by_name(file_name_1);
                         REQUIRE(f);
                         CHECK(f->get_size() == 5);
                         CHECK(f->get_blocks().size() == 1);
@@ -829,7 +835,7 @@ void test_downloading() {
                         CHECK(!f->is_locked());
                     }
                     {
-                        auto f = folder_my->get_file_infos().by_name(file_2->name());
+                        auto f = folder_my->get_file_infos().by_name(file_name_2);
                         REQUIRE(f);
                         CHECK(f->get_size() == 5);
                         CHECK(f->get_blocks().size() == 1);
@@ -839,14 +845,14 @@ void test_downloading() {
                 }
 
                 SECTION("with the same block") {
-                    *file_2->add_blocks() = *b1;
+                    proto::add_blocks(*file_2, b1);
 
                     auto folder_my = folder_infos.by_device(*my_device);
                     CHECK(folder_my->get_max_sequence() == 0ul);
                     CHECK(!folder_my->get_folder()->is_synchronizing());
 
-                    peer_actor->forward(proto::message::Index(new proto::Index(index)));
-                    peer_actor->push_block("12345", 0, file_1->name());
+                    peer_actor->forward(index);
+                    peer_actor->push_block(data_1, 0, file_name_1);
                     sup->do_process();
 
                     CHECK(!folder_my->get_folder()->is_synchronizing());
@@ -855,7 +861,7 @@ void test_downloading() {
                     CHECK(folder_my->get_max_sequence() == 2ul);
                     REQUIRE(folder_my->get_file_infos().size() == 2);
                     {
-                        auto f = folder_my->get_file_infos().by_name(file_1->name());
+                        auto f = folder_my->get_file_infos().by_name(file_name_1);
                         REQUIRE(f);
                         CHECK(f->get_size() == 5);
                         CHECK(f->get_blocks().size() == 1);
@@ -863,7 +869,7 @@ void test_downloading() {
                         CHECK(!f->is_locked());
                     }
                     {
-                        auto f = folder_my->get_file_infos().by_name(file_2->name());
+                        auto f = folder_my->get_file_infos().by_name(file_name_2);
                         REQUIRE(f);
                         CHECK(f->get_size() == 5);
                         CHECK(f->get_blocks().size() == 1);
@@ -875,16 +881,16 @@ void test_downloading() {
                 SECTION("with the same blocks") {
                     auto concurrent_writes = GENERATE(1, 5);
                     cluster->modify_write_requests(concurrent_writes);
-                    *file_2->add_blocks() = *b1;
-                    *file_2->add_blocks() = *b1;
-                    file_2->set_size(10);
+                    proto::add_blocks(*file_2, b1);
+                    proto::add_blocks(*file_2, b1);
+                    proto::set_size(*file_2, 10);
 
                     auto folder_my = folder_infos.by_device(*my_device);
                     CHECK(folder_my->get_max_sequence() == 0ul);
                     CHECK(!folder_my->get_folder()->is_synchronizing());
 
-                    peer_actor->forward(proto::message::Index(new proto::Index(index)));
-                    peer_actor->push_block("12345", 0, file_1->name());
+                    peer_actor->forward(index);
+                    peer_actor->push_block(data_1, 0, file_name_1);
                     sup->do_process();
 
                     CHECK(!folder_my->get_folder()->is_synchronizing());
@@ -893,7 +899,7 @@ void test_downloading() {
                     CHECK(folder_my->get_max_sequence() == 2ul);
                     REQUIRE(folder_my->get_file_infos().size() == 2);
                     {
-                        auto f = folder_my->get_file_infos().by_name(file_1->name());
+                        auto f = folder_my->get_file_infos().by_name(file_name_1);
                         REQUIRE(f);
                         CHECK(f->get_size() == 5);
                         CHECK(f->get_blocks().size() == 1);
@@ -901,7 +907,7 @@ void test_downloading() {
                         CHECK(!f->is_locked());
                     }
                     {
-                        auto f = folder_my->get_file_infos().by_name(file_2->name());
+                        auto f = folder_my->get_file_infos().by_name(file_name_2);
                         REQUIRE(f);
                         CHECK(f->get_size() == 10);
                         CHECK(f->get_blocks().size() == 2);
@@ -914,21 +920,23 @@ void test_downloading() {
             SECTION("don't attempt to download a file, which is deleted") {
                 auto folder_peer = folder_infos.by_device(*peer_device);
                 auto pr_fi = proto::FileInfo{};
-                pr_fi.set_name("some-file");
-                pr_fi.set_type(proto::FileInfoType::FILE);
-                pr_fi.set_sequence(folder_1_peer->get_max_sequence() + 1);
-                pr_fi.set_block_size(5);
-                pr_fi.set_size(5);
-                auto version = pr_fi.mutable_version();
-                auto counter = version->add_counters();
-                counter->set_id(1ul);
-                counter->set_value(1ul);
+                auto file_name = std::string_view("some-file");
+                proto::set_name(pr_fi, file_name);
+                proto::set_type(pr_fi, proto::FileInfoType::FILE);
+                proto::set_sequence(pr_fi, folder_1_peer->get_max_sequence() + 1);
+                proto::set_size(pr_fi, 5);
+                proto::set_block_size(pr_fi, 5);
 
-                auto b1 = pr_fi.add_blocks();
-                b1->set_hash(utils::sha256_digest("12345").value());
-                b1->set_offset(0);
-                b1->set_size(5);
-                auto b = model::block_info_t::create(*b1).value();
+                auto &version = proto::get_version(pr_fi);
+                proto::add_counters(version, proto::Counter(1, 1));
+
+                auto data_1 = as_owned_bytes("12345");
+                auto data_1_hash = utils::sha256_digest(data_1).value();
+
+                auto &b1 = proto::add_blocks(pr_fi);
+                proto::set_hash(b1, data_1_hash);
+                proto::set_size(b1, 5);
+                auto b = model::block_info_t::create(b1).value();
 
                 auto uuid = sup->sequencer->next_uuid();
                 auto file_info = model::file_info_t::create(uuid, pr_fi, folder_peer).value();
@@ -936,33 +944,31 @@ void test_downloading() {
                 REQUIRE(folder_peer->add_strict(file_info));
                 cluster->get_blocks().put(b);
 
-                d_peer->set_max_sequence(folder_1_peer->get_max_sequence() + 1);
-                peer_actor->forward(proto::message::ClusterConfig(new proto::ClusterConfig(cc)));
+                proto::set_max_sequence(*d_peer, folder_1_peer->get_max_sequence() + 1);
+                peer_actor->forward(cc);
                 sup->do_process();
                 auto blocks_requested = peer_actor->blocks_requested;
 
-                auto index = proto::IndexUpdate{};
-                index.set_folder(std::string(folder_1->get_id()));
-                auto file = index.add_files();
-                file->set_name("some-file");
-                file->set_type(proto::FileInfoType::FILE);
-                file->set_deleted(true);
-                file->set_sequence(folder_1_peer->get_max_sequence() + 1);
-                file->set_block_size(0);
-                file->set_size(0);
-                auto v = file->mutable_version();
-                auto c = v->add_counters();
-                c->set_id(peer_device->device_id().get_uint());
-                c->set_value(1);
+                auto index_update = proto::IndexUpdate{};
+                proto::set_folder(index_update, folder_1->get_id());
 
-                peer_actor->forward(proto::message::IndexUpdate(new proto::IndexUpdate(index)));
+                auto &file = proto::add_files(index_update);
+                proto::set_name(file, file_name);
+                proto::set_type(file, proto::FileInfoType::FILE);
+                proto::set_sequence(file, folder_1_peer->get_max_sequence() + 1);
+                proto::set_deleted(file, true);
+
+                auto &v = proto::get_version(file);
+                proto::add_counters(v, proto::Counter(peer_device->device_id().get_uint(), 1));
+
+                peer_actor->forward(index_update);
                 sup->do_process();
 
                 CHECK(folder_my->get_max_sequence() == 1ul);
                 REQUIRE(folder_my->get_file_infos().size() == 1);
                 auto f = folder_my->get_file_infos().begin()->item;
                 REQUIRE(f);
-                CHECK(f->get_name() == pr_fi.name());
+                CHECK(f->get_name() == file_name);
                 CHECK(f->get_size() == 0);
                 CHECK(f->get_blocks().size() == 0);
                 CHECK(f->is_locally_available());
@@ -973,32 +979,34 @@ void test_downloading() {
             }
 
             SECTION("new file via index_update => download it") {
-                peer_actor->forward(proto::message::ClusterConfig(new proto::ClusterConfig(cc)));
+                peer_actor->forward(cc);
 
                 auto index = proto::Index{};
-                index.set_folder(std::string(folder_1->get_id()));
-                peer_actor->forward(proto::message::Index(new proto::Index(index)));
+                proto::set_folder(index, folder_1->get_id());
+                peer_actor->forward(index);
 
                 auto index_update = proto::IndexUpdate{};
-                index_update.set_folder(std::string(folder_1->get_id()));
-                auto file = index_update.add_files();
-                file->set_name("some-file");
-                file->set_type(proto::FileInfoType::FILE);
-                file->set_sequence(folder_1_peer->get_max_sequence() + 1);
-                file->set_block_size(5);
-                file->set_size(5);
-                auto version = file->mutable_version();
-                auto counter = version->add_counters();
-                counter->set_id(1);
-                counter->set_value(peer_device->device_id().get_uint());
+                proto::set_folder(index_update, folder_1->get_id());
 
-                auto b1 = file->add_blocks();
-                b1->set_hash(utils::sha256_digest("12345").value());
-                b1->set_offset(0);
-                b1->set_size(5);
+                auto file_name = std::string_view("some-file");
+                auto &file = proto::add_files(index_update);
+                proto::set_name(file, file_name);
+                proto::set_type(file, proto::FileInfoType::FILE);
+                proto::set_sequence(file, folder_1_peer->get_max_sequence() + 1);
+                proto::set_block_size(file, 5);
+                proto::set_size(file, 5);
 
-                peer_actor->forward(proto::message::IndexUpdate(new proto::IndexUpdate(index_update)));
-                peer_actor->push_block("12345", 0);
+                auto &v = proto::get_version(file);
+                proto::add_counters(v, proto::Counter(1, 1));
+
+                auto data_1 = as_owned_bytes("12345");
+                auto data_1_h = utils::sha256_digest(data_1).value();
+                auto &b1 = proto::add_blocks(file);
+                proto::set_hash(b1, data_1_h);
+                proto::set_size(b1, data_1.size());
+
+                peer_actor->forward(index_update);
+                peer_actor->push_block(data_1, 0);
                 sup->do_process();
 
                 auto folder_my = folder_infos.by_device(*my_device);
@@ -1006,7 +1014,7 @@ void test_downloading() {
                 REQUIRE(folder_my->get_file_infos().size() == 1);
                 auto f = folder_my->get_file_infos().begin()->item;
                 REQUIRE(f);
-                CHECK(f->get_name() == file->name());
+                CHECK(f->get_name() == file_name);
                 CHECK(f->get_size() == 5);
                 CHECK(f->get_blocks().size() == 1);
                 CHECK(f->is_locally_available());
@@ -1018,22 +1026,23 @@ void test_downloading() {
             }
 
             SECTION("deleted file, has been restored => download it") {
-                peer_actor->forward(proto::message::ClusterConfig(new proto::ClusterConfig(cc)));
+                peer_actor->forward(cc);
                 sup->do_process();
 
                 auto index = proto::Index{};
-                index.set_folder(std::string(folder_1->get_id()));
-                auto file_1 = index.add_files();
-                file_1->set_name("some-file");
-                file_1->set_type(proto::FileInfoType::FILE);
-                file_1->set_sequence(folder_1_peer->get_max_sequence() + 1);
-                file_1->set_deleted(true);
-                auto v1 = file_1->mutable_version();
-                auto c1 = v1->add_counters();
-                c1->set_id(1u);
-                c1->set_value(1u);
+                proto::set_folder(index, folder_1->get_id());
 
-                peer_actor->forward(proto::message::Index(new proto::Index(index)));
+                auto file_name = std::string_view("file-1");
+                auto &file_1 = proto::add_files(index);
+                proto::set_name(file_1, file_name);
+                proto::set_type(file_1, proto::FileInfoType::FILE);
+                proto::set_sequence(file_1, folder_1_peer->get_max_sequence() + 1);
+                proto::set_deleted(file_1, true);
+
+                auto &v_1 = proto::get_version(file_1);
+                proto::add_counters(v_1, proto::Counter(1, 1));
+                peer_actor->forward(index);
+
                 sup->do_process();
                 CHECK(!folder_my->get_folder()->is_synchronizing());
 
@@ -1041,31 +1050,32 @@ void test_downloading() {
                 CHECK(folder_my->get_max_sequence() == 1);
 
                 auto index_update = proto::IndexUpdate{};
-                index_update.set_folder(std::string(folder_1->get_id()));
-                auto file_2 = index_update.add_files();
-                file_2->set_name("some-file");
-                file_2->set_type(proto::FileInfoType::FILE);
-                file_2->set_sequence(folder_1_peer->get_max_sequence() + 1);
-                file_2->set_block_size(128 * 1024);
-                file_2->set_size(5);
-                auto v2 = file_2->mutable_version();
-                auto c2 = v2->add_counters();
-                c2->set_id(1u);
-                c2->set_value(2u);
+                proto::set_folder(index_update, folder_1->get_id());
+                auto &file_2 = proto::add_files(index_update);
+                proto::set_name(file_2, file_name);
+                proto::set_type(file_2, proto::FileInfoType::FILE);
+                proto::set_sequence(file_2, folder_1_peer->get_max_sequence() + 1);
+                proto::set_block_size(file_2, 5);
+                proto::set_size(file_2, 5);
 
-                auto b1 = file_2->add_blocks();
-                b1->set_hash(utils::sha256_digest("12345").value());
-                b1->set_offset(0);
-                b1->set_size(5);
+                auto &v_2 = proto::get_version(file_2);
+                proto::add_counters(v_2, proto::Counter(1, 2));
 
-                peer_actor->forward(proto::message::IndexUpdate(new proto::IndexUpdate(index_update)));
-                peer_actor->push_block("12345", 0);
+                auto data_1 = as_owned_bytes("12345");
+                auto data_1_hash = utils::sha256_digest(data_1).value();
+
+                auto &b1 = proto::add_blocks(file_2);
+                proto::set_hash(b1, data_1_hash);
+                proto::set_size(b1, 5);
+
+                peer_actor->forward(index_update);
+                peer_actor->push_block(data_1, 0);
                 sup->do_process();
 
                 REQUIRE(folder_my->get_file_infos().size() == 1);
                 auto f = folder_my->get_file_infos().begin()->item;
                 REQUIRE(f);
-                CHECK(f->get_name() == file_1->name());
+                CHECK(f->get_name() == file_name);
                 CHECK(f->get_size() == 5);
                 CHECK(f->get_blocks().size() == 1);
                 CHECK(f->is_locally_available());
@@ -1074,60 +1084,70 @@ void test_downloading() {
             }
 
             SECTION("download a file, which has the same blocks locally") {
-                peer_actor->forward(proto::message::ClusterConfig(new proto::ClusterConfig(cc)));
+                peer_actor->forward(cc);
                 sup->do_process();
 
                 auto index = proto::Index{};
-                index.set_folder(std::string(folder_1->get_id()));
-                auto file_1 = index.add_files();
-                file_1->set_name("some-file");
-                file_1->set_type(proto::FileInfoType::FILE);
-                file_1->set_sequence(folder_1_peer->get_max_sequence() + 1);
-                auto v1 = file_1->mutable_version();
-                auto c1 = v1->add_counters();
-                c1->set_id(1u);
-                c1->set_value(1u);
+                proto::set_folder(index, folder_1->get_id());
 
-                file_1->set_block_size(5);
-                file_1->set_size(10);
-                auto b1 = file_1->add_blocks();
-                b1->set_hash(utils::sha256_digest("12345").value());
-                b1->set_offset(0);
-                b1->set_size(5);
-                auto bi_1 = model::block_info_t::create(*b1).value();
+                auto file_name_1 = std::string_view("file-1");
+                auto &file_1 = proto::add_files(index);
+                proto::set_name(file_1, file_name_1);
+                proto::set_type(file_1, proto::FileInfoType::FILE);
+                proto::set_sequence(file_1, folder_1_peer->get_max_sequence() + 1);
+                proto::set_block_size(file_1, 5);
+                proto::set_size(file_1, 10);
 
-                auto b2 = file_1->add_blocks();
-                b2->set_hash(utils::sha256_digest("67890").value());
-                b2->set_offset(5);
-                b2->set_size(5);
-                auto bi_2 = model::block_info_t::create(*b2).value();
+                auto &v_1 = proto::get_version(file_1);
+                proto::add_counters(v_1, proto::Counter(1, 1));
+
+                auto data_1 = as_owned_bytes("12345");
+                auto data_1_hash = utils::sha256_digest(data_1).value();
+
+                auto &b1 = proto::add_blocks(file_1);
+                proto::set_hash(b1, data_1_hash);
+                proto::set_size(b1, 5);
+                auto bi_1 = model::block_info_t::create(b1).value();
+
+                auto data_2 = as_owned_bytes("67890");
+                auto data_2_hash = utils::sha256_digest(data_2).value();
+
+                auto &b2 = proto::add_blocks(file_1);
+                proto::set_hash(b2, data_2_hash);
+                proto::set_size(b2, 5);
+                proto::set_offset(b2, 5);
+                auto bi_2 = model::block_info_t::create(b2).value();
+
                 auto &blocks = cluster->get_blocks();
                 blocks.put(bi_1);
                 blocks.put(bi_2);
 
-                auto pr_my = proto::FileInfo{};
-                pr_my.set_name("some-file.source");
-                pr_my.set_type(proto::FileInfoType::FILE);
-                pr_my.set_sequence(2ul);
-                pr_my.set_block_size(5);
-                pr_my.set_size(5);
-                pr_my.mutable_version()->add_counters()->set_id(my_device->device_id().get_uint());
+                auto file_name_my = std::string_view("file-1.source");
+                auto pr_file_my = proto::FileInfo();
+                proto::set_name(pr_file_my, file_name_my);
+                proto::set_type(pr_file_my, proto::FileInfoType::FILE);
+                proto::set_sequence(pr_file_my, 5);
+                proto::set_block_size(pr_file_my, 5);
+                proto::set_size(pr_file_my, 5);
+
+                auto &v_my = proto::get_version(pr_file_my);
+                proto::add_counters(v_my, proto::Counter(my_device->device_id().get_uint(), 1));
 
                 auto uuid = sup->sequencer->next_uuid();
-                auto file_my = model::file_info_t::create(uuid, pr_my, folder_my).value();
+                auto file_my = model::file_info_t::create(uuid, pr_file_my, folder_my).value();
                 file_my->assign_block(bi_1, 0);
                 file_my->mark_local_available(0);
                 REQUIRE(folder_my->add_strict(file_my));
 
-                peer_actor->forward(proto::message::Index(new proto::Index(index)));
-                peer_actor->push_block("67890", 1);
+                peer_actor->forward(index);
+                peer_actor->push_block(data_2, 1);
                 cluster->modify_write_requests(10);
                 sup->do_process();
 
                 REQUIRE(folder_my->get_file_infos().size() == 2);
-                auto f = folder_my->get_file_infos().by_name(file_1->name());
+                auto f = folder_my->get_file_infos().by_name(file_name_1);
                 REQUIRE(f);
-                CHECK(f->get_name() == file_1->name());
+                CHECK(f->get_name() == file_name_1);
                 CHECK(f->get_size() == 10);
                 CHECK(f->get_blocks().size() == 2);
                 CHECK(f->is_locally_available());
@@ -1142,6 +1162,26 @@ void test_downloading_errors() {
     struct F : fixture_t {
         using fixture_t::fixture_t;
 
+        struct custom_supervisor_t : supervisor_t {
+            using parent_t = supervisor_t;
+            using parent_t::parent_t;
+
+            bool reject_blocks = false;
+
+            outcome::result<void> operator()(const model::diff::modify::append_block_t &diff,
+                                             void *custom) noexcept override {
+                if (!reject_blocks) {
+                    return parent_t::operator()(diff, custom);
+                }
+                send<model::payload::model_update_t>(address, diff.rej(), this);
+                return outcome::success();
+            }
+        };
+
+        r::intrusive_ptr_t<supervisor_t> create_supervisor() override {
+            return ctx.create_supervisor<custom_supervisor_t>().timeout(timeout).create_registry().finish();
+        }
+
         std::uint32_t get_blocks_max_requested() override { return 1; }
 
         void main(diff_builder_t &) noexcept override {
@@ -1149,57 +1189,72 @@ void test_downloading_errors() {
             auto folder_my = folder_infos.by_device(*my_device);
 
             auto cc = proto::ClusterConfig{};
-            auto folder = cc.add_folders();
-            folder->set_id(std::string(folder_1->get_id()));
-            auto d_peer = folder->add_devices();
-            d_peer->set_id(std::string(peer_device->device_id().get_sha256()));
-            d_peer->set_max_sequence(folder_1_peer->get_max_sequence() + 1);
-            d_peer->set_index_id(folder_1_peer->get_index());
-            auto d_my = folder->add_devices();
-            d_my->set_id(std::string(my_device->device_id().get_sha256()));
-            d_my->set_max_sequence(folder_my->get_max_sequence());
-            d_my->set_index_id(folder_my->get_index());
+            auto &folder = proto::add_folders(cc);
+            proto::set_id(folder, folder_1->get_id());
+            auto &d_peer = proto::add_devices(folder);
+            proto::set_id(d_peer, peer_device->device_id().get_sha256());
+            proto::set_max_sequence(d_peer, folder_1_peer->get_max_sequence());
+            proto::set_index_id(d_peer, folder_1_peer->get_index());
+            auto &d_my = proto::add_devices(folder);
+            proto::set_id(d_my, my_device->device_id().get_sha256());
+            proto::set_max_sequence(d_my, folder_my->get_max_sequence());
+            proto::set_index_id(d_my, folder_my->get_index());
 
-            peer_actor->forward(proto::message::ClusterConfig(new proto::ClusterConfig(cc)));
+            peer_actor->forward(cc);
 
             auto index = proto::Index{};
-            index.set_folder(std::string(folder_1->get_id()));
-            auto file = index.add_files();
-            file->set_name("some-file");
-            file->set_type(proto::FileInfoType::FILE);
-            file->set_sequence(folder_1_peer->get_max_sequence() + 1);
-            file->set_block_size(5);
-            file->set_size(15);
-            auto version = file->mutable_version();
-            auto counter = version->add_counters();
-            counter->set_id(1ul);
-            counter->set_value(1ul);
+            proto::set_folder(index, folder_1->get_id());
+            auto file_name = std::string_view("some-file");
+            auto &file = proto::add_files(index);
+            proto::set_name(file, file_name);
+            proto::set_type(file, proto::FileInfoType::FILE);
+            proto::set_sequence(file, folder_1_peer->get_max_sequence() + 1);
+            proto::set_block_size(file, 5);
+            proto::set_size(file, 15);
 
-            auto b1 = file->add_blocks();
-            b1->set_hash(utils::sha256_digest("12345").value());
-            b1->set_offset(0);
-            b1->set_size(5);
+            auto &v = proto::get_version(file);
+            auto &counter = proto::add_counters(v);
+            proto::set_id(counter, 1);
 
-            auto b2 = file->add_blocks();
-            b2->set_hash(utils::sha256_digest("67890").value());
-            b2->set_offset(5);
-            b2->set_size(5);
+            auto data_1 = as_owned_bytes("12345");
+            auto data_1_hash = utils::sha256_digest(data_1).value();
 
-            auto b3 = file->add_blocks();
-            b3->set_hash(utils::sha256_digest("11111").value());
-            b3->set_offset(10);
-            b3->set_size(5);
+            auto data_2 = as_owned_bytes("67890");
+            auto data_2_hash = utils::sha256_digest(data_2).value();
+
+            auto data_3 = as_owned_bytes("11111");
+            auto data_3_hash = utils::sha256_digest(data_3).value();
+
+            auto &b1 = proto::add_blocks(file);
+            proto::set_hash(b1, data_1_hash);
+            proto::set_size(b1, 5);
+
+            auto &b2 = proto::add_blocks(file);
+            proto::set_hash(b2, data_2_hash);
+            proto::set_size(b2, 5);
+            proto::set_offset(b2, 5);
+
+            auto &b3 = proto::add_blocks(file);
+            proto::set_hash(b3, data_2_hash);
+            proto::set_size(b3, 5);
+            proto::set_offset(b3, 10);
 
             CHECK(folder_my->get_max_sequence() == 0ul);
-            peer_actor->forward(proto::message::Index(new proto::Index(index)));
+            peer_actor->forward(index);
 
             SECTION("general error, ok, do not shutdown") {
                 auto ec = utils::make_error_code(utils::request_error_code_t::generic);
                 peer_actor->push_block(ec, 0);
             }
             SECTION("hash mismatch, do not shutdown") {
-                peer_actor->push_block("zzz", 0);
-                peer_actor->push_block("67890", 1); // needed to terminate/shutdown controller
+                peer_actor->push_block(as_owned_bytes("123"), 0);
+                peer_actor->push_block(data_2, 1); // needed to terminate/shutdown controller
+            }
+            SECTION("rejecting blocks") {
+                auto custom_sup = static_cast<custom_supervisor_t *>(sup.get());
+                custom_sup->reject_blocks = true;
+                peer_actor->push_block(data_1, 0);
+                peer_actor->push_block(data_2, 1);
             }
 
             sup->do_process();
@@ -1235,71 +1290,97 @@ void test_download_from_scratch() {
             auto sha256 = peer_device->device_id().get_sha256();
 
             auto cc = proto::ClusterConfig{};
-            auto folder = cc.add_folders();
-            folder->set_id(std::string(folder_1->get_id()));
+            auto folder = proto::Folder();
+            proto::set_id(folder, folder_1->get_id());
             {
-                auto device = folder->add_devices();
-                device->set_id(std::string(peer_device->device_id().get_sha256()));
-                device->set_max_sequence(15);
-                device->set_index_id(12345);
+                auto &device = proto::add_devices(folder);
+                proto::set_id(device, peer_device->device_id().get_sha256());
+                proto::set_max_sequence(device, 15);
+                proto::set_index_id(device, 0x12345);
             }
             {
-                auto device = folder->add_devices();
-                device->set_id(std::string(my_device->device_id().get_sha256()));
-                device->set_max_sequence(0);
-                device->set_index_id(0);
+                auto &device = proto::add_devices(folder);
+                proto::set_id(device, my_device->device_id().get_sha256());
+                proto::set_max_sequence(device, 0);
+                proto::set_index_id(device, 0);
             }
-
-            peer_actor->forward(proto::message::ClusterConfig(new proto::ClusterConfig(cc)));
+            proto::add_folders(cc, folder);
+            peer_actor->forward(cc);
             sup->do_process();
 
             builder.share_folder(sha256, folder_1->get_id()).apply(*sup);
+            REQUIRE(peer_actor->messages.size() == 1);
+            {
+                auto peer_msg = &peer_actor->messages.front()->payload;
+                auto cc = std::get_if<proto::ClusterConfig>(peer_msg);
+                REQUIRE(cc);
+                REQUIRE(proto::get_folders_size(*cc) == 1);
+                auto &folder = proto::get_folders(*cc, 0);
+                CHECK(proto::get_id(folder) == folder_1->get_id());
+            }
 
             auto index = proto::Index{};
-            index.set_folder(std::string(folder_1->get_id()));
-            auto file = index.add_files();
-            file->set_name("some-file");
-            file->set_type(proto::FileInfoType::FILE);
-            file->set_sequence(154);
-            file->set_block_size(5);
-            file->set_size(5);
-            auto version = file->mutable_version();
-            auto counter = version->add_counters();
-            counter->set_id(1ul);
-            counter->set_value(1ul);
+            proto::set_folder(index, folder_1->get_id());
+            auto file_name = std::string_view("some-file");
+            auto &file = proto::add_files(index);
+            proto::set_name(file, file_name);
+            proto::set_type(file, proto::FileInfoType::FILE);
+            proto::set_sequence(file, 154);
+            proto::set_size(file, 5);
+            proto::set_block_size(file, 5);
 
-            auto b1 = file->add_blocks();
-            b1->set_hash(utils::sha256_digest("12345").value());
-            b1->set_offset(0);
-            b1->set_size(5);
+            auto &v = proto::get_version(file);
+            auto &counter = proto::add_counters(v);
+            proto::set_id(counter, 1);
+            proto::set_value(counter, 1);
 
-            peer_actor->forward(proto::message::Index(new proto::Index(index)));
-            peer_actor->push_block("12345", 0, file->name());
+            auto data_1 = as_owned_bytes("12345");
+            auto data_1_h = utils::sha256_digest(data_1).value();
+            auto &b1 = proto::add_blocks(file);
+            proto::set_hash(b1, data_1_h);
+            proto::set_size(b1, data_1.size());
+
+            peer_actor->forward(index);
+            peer_actor->push_block(data_1, 0, file_name);
             sup->do_process();
 
             auto folder_my = folder_1->get_folder_infos().by_device(*my_device);
             CHECK(folder_my->get_max_sequence() == 1ul);
             CHECK(!folder_my->get_folder()->is_synchronizing());
 
-            auto f = folder_my->get_file_infos().by_name(file->name());
+            auto f = folder_my->get_file_infos().by_name(file_name);
             REQUIRE(f);
             CHECK(f->get_size() == 5);
             CHECK(f->get_blocks().size() == 1);
             CHECK(f->is_locally_available());
             CHECK(!f->is_locked());
 
-            REQUIRE(peer_actor->messages.size() == 3);
+            cc = proto::ClusterConfig{};
+            folder = proto::Folder();
+            proto::set_id(folder, folder_1->get_id());
+            {
+                auto &device = proto::add_devices(folder);
+                proto::set_id(device, peer_device->device_id().get_sha256());
+                proto::set_max_sequence(device, 15);
+                proto::set_index_id(device, 0x12345);
+            }
+            {
+                auto fi_my = folder_1->get_folder_infos().by_device(*my_device);
+                auto &device = proto::add_devices(folder);
+                proto::set_id(device, my_device->device_id().get_sha256());
+                proto::set_max_sequence(device, 0);
+                proto::set_index_id(device, fi_my->get_index());
+            }
+
+            peer_actor->messages.clear();
+            proto::add_folders(cc, folder);
+            peer_actor->forward(cc);
+            sup->do_process();
+
+            REQUIRE(peer_actor->messages.size() == 1);
             {
                 auto peer_msg = &peer_actor->messages.front()->payload;
-                REQUIRE(std::get_if<proto::message::ClusterConfig>(peer_msg));
-
-                peer_actor->messages.pop_front();
-                peer_msg = &peer_actor->messages.front()->payload;
-                REQUIRE(std::get_if<proto::message::Index>(peer_msg));
-
-                peer_actor->messages.pop_front();
-                peer_msg = &peer_actor->messages.front()->payload;
-                REQUIRE(std::get_if<proto::message::IndexUpdate>(peer_msg));
+                REQUIRE(std::get_if<proto::Index>(peer_msg));
             }
         }
     };
@@ -1316,49 +1397,59 @@ void test_download_resuming() {
             auto sha256 = peer_device->device_id().get_sha256();
 
             auto cc = proto::ClusterConfig{};
-            auto folder = cc.add_folders();
-            folder->set_id(std::string(folder_1->get_id()));
-            auto d_peer = folder->add_devices();
-            d_peer->set_id(std::string(peer_device->device_id().get_sha256()));
-            d_peer->set_max_sequence(15);
-            d_peer->set_index_id(12345);
+            auto &folder = proto::add_folders(cc);
+            proto::set_id(folder, folder_1->get_id());
+            auto &d_peer = proto::add_devices(folder);
+            proto::set_id(d_peer, peer_device->device_id().get_sha256());
+            proto::set_max_sequence(d_peer, 15);
+            proto::set_index_id(d_peer, 0x12345);
 
-            peer_actor->forward(proto::message::ClusterConfig(new proto::ClusterConfig(cc)));
+            peer_actor->forward(cc);
             sup->do_process();
 
             builder.share_folder(sha256, folder_1->get_id()).apply(*sup);
             auto folder_peer = folder_1->get_folder_infos().by_device(*peer_device);
-            REQUIRE(folder_peer->get_index() == d_peer->index_id());
+            REQUIRE(folder_peer->get_index() == proto::get_index_id(d_peer));
 
             auto index = proto::Index{};
-            index.set_folder(std::string(folder_1->get_id()));
-            auto file = index.add_files();
-            file->set_name("some-file");
-            file->set_type(proto::FileInfoType::FILE);
-            file->set_sequence(154);
-            file->set_block_size(5);
-            file->set_size(10);
-            auto version = file->mutable_version();
-            auto counter = version->add_counters();
-            counter->set_id(1ul);
-            counter->set_value(1ul);
+            proto::set_folder(index, folder_1->get_id());
 
-            auto b1 = file->add_blocks();
-            b1->set_hash(utils::sha256_digest("12345").value());
-            b1->set_offset(0);
-            b1->set_size(5);
+            auto file_name = std::string_view("some-file");
+            auto &file = proto::add_files(index);
+            proto::set_name(file, file_name);
+            proto::set_type(file, proto::FileInfoType::FILE);
+            proto::set_sequence(file, 154);
+            proto::set_block_size(file, 5);
+            proto::set_size(file, 10);
 
-            auto b2 = file->add_blocks();
-            b2->set_hash(utils::sha256_digest("67890").value());
-            b2->set_offset(5);
-            b2->set_size(5);
+            auto &v = proto::get_version(file);
+            auto &counter = proto::add_counters(v);
+            proto::set_id(counter, 1);
 
-            peer_actor->forward(proto::message::Index(new proto::Index(index)));
-            peer_actor->push_block("12345", 0, file->name());
+            auto data_1 = as_owned_bytes("12345");
+            auto data_1_hash = utils::sha256_digest(data_1).value();
+
+            auto data_2 = as_owned_bytes("67890");
+            auto data_2_hash = utils::sha256_digest(data_2).value();
+
+            auto &b1 = proto::add_blocks(file);
+            proto::set_hash(b1, data_1_hash);
+            proto::set_size(b1, 5);
+
+            auto &b2 = proto::add_blocks(file);
+            proto::set_hash(b2, data_2_hash);
+            proto::set_size(b2, 5);
+            proto::set_offset(b2, 5);
+
+            peer_actor->forward(index);
+            peer_actor->push_block(data_1, 0, file_name);
             sup->do_process();
 
             target->do_shutdown();
             sup->do_process();
+            // auto fs_timer_id = sup->timers.back()->request_id;
+            // sup->do_invoke_timer(fs_timer_id);
+            // sup->do_process();
 
             CHECK(!folder_1->is_synchronizing());
             for (auto &it : cluster->get_blocks()) {
@@ -1366,15 +1457,15 @@ void test_download_resuming() {
             }
 
             start_target();
-            peer_actor->forward(proto::message::ClusterConfig(new proto::ClusterConfig(cc)));
-            peer_actor->push_block("67890", 1, file->name());
+            peer_actor->forward(cc);
+            peer_actor->push_block(data_2, 1, file_name);
             sup->do_process();
 
             auto folder_my = folder_1->get_folder_infos().by_device(*my_device);
             CHECK(folder_my->get_max_sequence() == 1ul);
             CHECK(!folder_my->get_folder()->is_synchronizing());
 
-            auto f = folder_my->get_file_infos().by_name(file->name());
+            auto f = folder_my->get_file_infos().by_name(file_name);
             REQUIRE(f);
             CHECK(f->get_size() == 10);
             CHECK(f->get_blocks().size() == 2);
@@ -1392,7 +1483,7 @@ void test_initiate_my_sharing() {
             sup->do_process();
 
             auto cc = proto::ClusterConfig{};
-            peer_actor->forward(proto::message::ClusterConfig(new proto::ClusterConfig(cc)));
+            peer_actor->forward(cc);
 
             // nothing is shared
             sup->do_process();
@@ -1402,10 +1493,9 @@ void test_initiate_my_sharing() {
 
             REQUIRE(peer_actor->messages.size() == 1);
             auto peer_msg = &peer_actor->messages.front()->payload;
-            auto peer_cluster_msg = std::get_if<proto::message::ClusterConfig>(peer_msg);
+            auto peer_cluster_msg = std::get_if<proto::ClusterConfig>(peer_msg);
             REQUIRE(peer_cluster_msg);
-            REQUIRE(*peer_cluster_msg);
-            REQUIRE((*peer_cluster_msg)->folders_size() == 0);
+            REQUIRE(proto::get_folders_size(*peer_cluster_msg) == 0);
 
             // share folder_1
             peer_actor->messages.clear();
@@ -1417,32 +1507,33 @@ void test_initiate_my_sharing() {
             REQUIRE(peer_actor->messages.size() == 1);
             {
                 auto peer_msg = &peer_actor->messages.front()->payload;
-                auto peer_cluster_msg = std::get_if<proto::message::ClusterConfig>(peer_msg);
-                REQUIRE((peer_cluster_msg && *peer_cluster_msg));
+                auto peer_cluster_msg = std::get_if<proto::ClusterConfig>(peer_msg);
+                REQUIRE((peer_cluster_msg && peer_cluster_msg));
                 auto &msg = *peer_cluster_msg;
-                REQUIRE(msg->folders_size() == 1);
-                auto f = msg->folders(0);
-                REQUIRE(f.devices_size() == 2);
+                REQUIRE(proto::get_folders_size(msg) == 1);
+                auto &f = proto::get_folders(msg, 0);
+                REQUIRE(proto::get_devices_size(f) == 2);
 
-                using f_t = std::remove_reference_t<std::remove_cv_t<decltype(f.devices(0))>>;
+                using f_t = const proto::Device;
                 auto f_my = (f_t *){};
                 auto f_peer = (f_t *){};
-                for (int i = 0; i < f.devices_size(); ++i) {
-                    auto &d = f.devices(i);
-                    if (d.id() == my_device->device_id().get_sha256()) {
+                for (int i = 0; i < proto::get_devices_size(f); ++i) {
+                    auto &d = proto::get_devices(f, i);
+                    auto id = proto::get_id(d);
+                    if (id == my_device->device_id().get_sha256()) {
                         f_my = &d;
-                    } else if (d.id() == peer_device->device_id().get_sha256()) {
+                    } else if (id == peer_device->device_id().get_sha256()) {
                         f_peer = &d;
                     }
                 }
                 REQUIRE(f_peer);
-                CHECK(!f_peer->index_id());
-                CHECK(f_peer->max_sequence() == 0);
+                CHECK(!proto::get_index_id(*f_peer));
+                CHECK(proto::get_max_sequence(*f_peer) == 0);
 
                 REQUIRE(f_my);
                 auto folder_my = folder_1->get_folder_infos().by_device(*my_device);
-                CHECK(f_my->index_id() == folder_my->get_index());
-                CHECK(f_my->max_sequence() == 0);
+                CHECK(proto::get_index_id(*f_my) == folder_my->get_index());
+                CHECK(proto::get_max_sequence(*f_my) == 0);
             }
 
             // unshare folder_1
@@ -1453,10 +1544,9 @@ void test_initiate_my_sharing() {
             REQUIRE(static_cast<r::actor_base_t *>(peer_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
             REQUIRE(peer_actor->messages.size() == 1);
             peer_msg = &peer_actor->messages.front()->payload;
-            peer_cluster_msg = std::get_if<proto::message::ClusterConfig>(peer_msg);
+            peer_cluster_msg = std::get_if<proto::ClusterConfig>(peer_msg);
             REQUIRE(peer_cluster_msg);
-            REQUIRE(*peer_cluster_msg);
-            REQUIRE((*peer_cluster_msg)->folders_size() == 0);
+            REQUIRE(proto::get_folders_size(*peer_cluster_msg) == 0);
         }
     };
     F(false, 10, false).run();
@@ -1469,22 +1559,23 @@ void test_initiate_peer_sharing() {
             sup->do_process();
 
             auto cc = proto::ClusterConfig{};
-            auto folder = cc.add_folders();
-            folder->set_id(std::string(folder_1->get_id()));
+            auto folder = proto::Folder();
+            proto::set_id(folder, folder_1->get_id());
             {
-                auto device = folder->add_devices();
-                device->set_id(std::string(peer_device->device_id().get_sha256()));
-                device->set_max_sequence(15);
-                device->set_index_id(0x12345);
+                auto &device = proto::add_devices(folder);
+                proto::set_id(device, peer_device->device_id().get_sha256());
+                proto::set_max_sequence(device, 15);
+                proto::set_index_id(device, 0x12345);
             }
             {
-                auto device = folder->add_devices();
-                device->set_id(std::string(my_device->device_id().get_sha256()));
-                device->set_max_sequence(0);
-                device->set_index_id(0x0);
+                auto &device = proto::add_devices(folder);
+                proto::set_id(device, my_device->device_id().get_sha256());
+                proto::set_max_sequence(device, 0);
+                proto::set_index_id(device, 0);
             }
 
-            peer_actor->forward(proto::message::ClusterConfig(new proto::ClusterConfig(cc)));
+            proto::add_folders(cc, folder);
+            peer_actor->forward(cc);
             sup->do_process();
 
             REQUIRE(static_cast<r::actor_base_t *>(target.get())->access<to::state>() == r::state_t::OPERATIONAL);
@@ -1493,10 +1584,9 @@ void test_initiate_peer_sharing() {
             REQUIRE(peer_actor->messages.size() == 1);
             {
                 auto peer_msg = &peer_actor->messages.front()->payload;
-                auto peer_cluster_msg = std::get_if<proto::message::ClusterConfig>(peer_msg);
+                auto peer_cluster_msg = std::get_if<proto::ClusterConfig>(peer_msg);
                 REQUIRE(peer_cluster_msg);
-                REQUIRE(*peer_cluster_msg);
-                REQUIRE((*peer_cluster_msg)->folders_size() == 0);
+                REQUIRE(proto::get_folders_size(*peer_cluster_msg) == 0);
             }
 
             // share folder_1
@@ -1507,42 +1597,61 @@ void test_initiate_peer_sharing() {
             REQUIRE(static_cast<r::actor_base_t *>(target.get())->access<to::state>() == r::state_t::OPERATIONAL);
             REQUIRE(static_cast<r::actor_base_t *>(peer_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
 
-            REQUIRE(peer_actor->messages.size() == 2);
+            auto folder_my = folder_1->get_folder_infos().by_device(*my_device);
+            REQUIRE(peer_actor->messages.size() == 1);
             {
                 auto peer_msg = &peer_actor->messages.front()->payload;
-                auto peer_cluster_msg = std::get_if<proto::message::ClusterConfig>(peer_msg);
-                REQUIRE((peer_cluster_msg && *peer_cluster_msg));
-                auto &msg = *peer_cluster_msg;
-                REQUIRE(msg->folders_size() == 1);
-                auto f = msg->folders(0);
-                REQUIRE(f.devices_size() == 2);
+                auto peer_cluster_msg = std::get_if<proto::ClusterConfig>(peer_msg);
+                REQUIRE((peer_cluster_msg && peer_cluster_msg));
 
-                using f_t = std::remove_reference_t<std::remove_cv_t<decltype(f.devices(0))>>;
+                auto &msg = *peer_cluster_msg;
+                REQUIRE(proto::get_folders_size(msg) == 1);
+                auto &f = proto::get_folders(msg, 0);
+                REQUIRE(proto::get_devices_size(f) == 2);
+
+                using f_t = const proto::Device;
                 auto f_my = (f_t *){};
                 auto f_peer = (f_t *){};
-                for (int i = 0; i < f.devices_size(); ++i) {
-                    auto &d = f.devices(i);
-                    if (d.id() == my_device->device_id().get_sha256()) {
+                for (int i = 0; i < proto::get_devices_size(f); ++i) {
+                    auto &d = proto::get_devices(f, i);
+                    auto id = proto::get_id(d);
+                    if (id == my_device->device_id().get_sha256()) {
                         f_my = &d;
-                    } else if (d.id() == peer_device->device_id().get_sha256()) {
+                    } else if (id == peer_device->device_id().get_sha256()) {
                         f_peer = &d;
                     }
                 }
                 REQUIRE(f_peer);
-                CHECK(f_peer->index_id() == 0x12345);
-                CHECK(f_peer->max_sequence() == 0);
+                CHECK(proto::get_index_id(*f_peer) == 0x12345);
+                CHECK(proto::get_max_sequence(*f_peer) == 0);
 
                 REQUIRE(f_my);
-                auto folder_my = folder_1->get_folder_infos().by_device(*my_device);
-                CHECK(f_my->index_id() == folder_my->get_index());
-                CHECK(f_my->max_sequence() == 0);
-
-                peer_actor->messages.pop_front();
-                peer_msg = &peer_actor->messages.front()->payload;
-                auto &index_msg = std::get<proto::message::Index>(*peer_msg);
-                CHECK(index_msg->folder() == folder_1->get_id());
-                CHECK(index_msg->files_size() == 0);
+                CHECK(proto::get_index_id(*f_my) == folder_my->get_index());
+                CHECK(proto::get_max_sequence(*f_my) == 0);
             }
+
+            cc = proto::ClusterConfig{};
+            folder = proto::Folder();
+            proto::set_id(folder, folder_1->get_id());
+            {
+                auto &device = proto::add_devices(folder);
+                proto::set_id(device, peer_device->device_id().get_sha256());
+                proto::set_max_sequence(device, 15);
+                proto::set_index_id(device, 0x12345);
+            }
+            {
+                auto &device = proto::add_devices(folder);
+                proto::set_id(device, my_device->device_id().get_sha256());
+                proto::set_max_sequence(device, 0);
+                proto::set_index_id(device, folder_my->get_index());
+            }
+
+            proto::add_folders(cc, folder);
+            peer_actor->forward(cc);
+            peer_actor->messages.clear();
+            sup->do_process();
+
+            CHECK(peer_actor->messages.size() == 0);
 
             // unshare folder_1
             auto peer_fi = folder_1->get_folder_infos().by_device(*peer_device);
@@ -1553,10 +1662,9 @@ void test_initiate_peer_sharing() {
             REQUIRE(peer_actor->messages.size() == 1);
             {
                 auto peer_msg = &peer_actor->messages.front()->payload;
-                auto peer_cluster_msg = std::get_if<proto::message::ClusterConfig>(peer_msg);
+                auto peer_cluster_msg = std::get_if<proto::ClusterConfig>(peer_msg);
                 REQUIRE(peer_cluster_msg);
-                REQUIRE(*peer_cluster_msg);
-                REQUIRE((*peer_cluster_msg)->folders_size() == 0);
+                REQUIRE(proto::get_folders_size(*peer_cluster_msg) == 0);
             }
         }
     };
@@ -1571,37 +1679,35 @@ void test_sending_index_updates() {
             auto folder_my = folder_infos.by_device(*my_device);
 
             auto cc = proto::ClusterConfig{};
-            auto folder = cc.add_folders();
-            folder->set_id(std::string(folder_1->get_id()));
-            auto d_peer = folder->add_devices();
-            d_peer->set_id(std::string(peer_device->device_id().get_sha256()));
-            d_peer->set_max_sequence(folder_1_peer->get_max_sequence());
-            d_peer->set_index_id(folder_1_peer->get_index());
+            auto &folder = proto::add_folders(cc);
+            proto::set_id(folder, folder_1->get_id());
+            auto &d_peer = proto::add_devices(folder);
+            proto::set_id(d_peer, peer_device->device_id().get_sha256());
+            proto::set_max_sequence(d_peer, folder_1_peer->get_max_sequence());
+            proto::set_index_id(d_peer, folder_1_peer->get_index());
+            auto &d_my = proto::add_devices(folder);
+            proto::set_id(d_my, my_device->device_id().get_sha256());
+            proto::set_max_sequence(d_my, folder_my->get_max_sequence());
+            proto::set_index_id(d_my, folder_my->get_index());
 
-            auto d_my = folder->add_devices();
-            d_my->set_id(std::string(my_device->device_id().get_sha256()));
-            d_my->set_max_sequence(folder_my->get_max_sequence());
-            d_my->set_index_id(folder_my->get_index());
+            auto index = proto::IndexUpdate{};
+            proto::set_folder(index, folder_1->get_id());
 
-            auto index = proto::Index{};
-            auto folder_id = std::string(folder_1->get_id());
-            index.set_folder(folder_id);
-
-            peer_actor->forward(proto::message::ClusterConfig(new proto::ClusterConfig(cc)));
-            peer_actor->forward(proto::message::Index(new proto::Index(index)));
+            peer_actor->forward(cc);
+            peer_actor->forward(index);
             sup->do_process();
 
             auto builder = diff_builder_t(*cluster);
             auto pr_file = proto::FileInfo();
-            pr_file.set_name("a.txt");
+            proto::set_name(pr_file, "a.txt");
 
             peer_actor->messages.clear();
-            builder.local_update(folder_id, pr_file).apply(*sup);
+            builder.local_update(folder_1->get_id(), pr_file).apply(*sup);
             REQUIRE(peer_actor->messages.size() == 1);
             auto &msg = peer_actor->messages.front();
-            auto &index_update = *std::get<proto::message::IndexUpdate>(msg->payload);
-            REQUIRE(index_update.files_size() == 1);
-            CHECK(index_update.files(0).name() == "a.txt");
+            auto &index_update = std::get<proto::Index>(msg->payload);
+            REQUIRE(proto::get_files_size(index_update) == 1);
+            CHECK(proto::get_name(proto::get_files(index_update, 0)) == "a.txt");
         }
     };
     F(true, 10).run();
@@ -1610,71 +1716,161 @@ void test_sending_index_updates() {
 void test_uploading() {
     struct F : fixture_t {
         using fixture_t::fixture_t;
+
+        void _tune_peer(db::Device &device) noexcept override {
+            db::set_compression(device, proto::Compression::ALWAYS);
+        }
+
         void main(diff_builder_t &) noexcept override {
             auto &folder_infos = folder_1->get_folder_infos();
             auto folder_my = folder_infos.by_device(*my_device);
 
             auto cc = proto::ClusterConfig{};
-            auto folder = cc.add_folders();
-            folder->set_id(std::string(folder_1->get_id()));
-            auto d_peer = folder->add_devices();
-            d_peer->set_id(std::string(peer_device->device_id().get_sha256()));
-            d_peer->set_max_sequence(folder_1_peer->get_max_sequence());
-            d_peer->set_index_id(folder_1_peer->get_index());
-            auto d_my = folder->add_devices();
-            d_my->set_id(std::string(my_device->device_id().get_sha256()));
-            d_my->set_max_sequence(folder_my->get_max_sequence());
-            d_my->set_index_id(folder_my->get_index());
+            auto &folder = proto::add_folders(cc);
+            proto::set_id(folder, folder_1->get_id());
+            auto &d_peer = proto::add_devices(folder);
+            proto::set_id(d_peer, peer_device->device_id().get_sha256());
+            proto::set_max_sequence(d_peer, folder_1_peer->get_max_sequence());
+            proto::set_index_id(d_peer, folder_1_peer->get_index());
+            auto &d_my = proto::add_devices(folder);
+            proto::set_id(d_my, my_device->device_id().get_sha256());
+            proto::set_max_sequence(d_my, folder_my->get_max_sequence());
+            proto::set_index_id(d_my, folder_my->get_index());
 
-            auto pr_fi = proto::FileInfo{};
-            pr_fi.set_name("data.bin");
-            pr_fi.set_type(proto::FileInfoType::FILE);
-            pr_fi.set_sequence(folder_1_peer->get_max_sequence());
-            pr_fi.set_block_size(5);
-            pr_fi.set_size(5);
-            auto version = pr_fi.mutable_version();
-            auto counter = version->add_counters();
-            counter->set_id(1);
-            counter->set_value(my_device->device_id().get_uint());
-            auto b1 = pr_fi.add_blocks();
-            b1->set_hash(utils::sha256_digest("12345").value());
-            b1->set_offset(0);
-            b1->set_size(5);
-            auto b = model::block_info_t::create(*b1).value();
+            auto data_sample = "/my-folder-1/my-folder-2/my-folder-3/my-folder-4/";
+            auto data = fmt::format("{0}{0}{0}{0}{0}", data_sample);
+            auto data_begin = (const unsigned char *)data.data();
+            auto data_end = (const unsigned char *)data.data() + data.size();
+
+            auto file_name = std::string_view("data.bin");
+            auto file = proto::FileInfo();
+            proto::set_name(file, file_name);
+            proto::set_type(file, proto::FileInfoType::FILE);
+            proto::set_sequence(file, folder_my->get_max_sequence() + 1);
+            proto::set_size(file, data.size());
+            proto::set_block_size(file, data.size());
+
+            auto &v = proto::get_version(file);
+            auto &counter = proto::add_counters(v);
+            proto::set_id(counter, 1);
+            proto::set_value(counter, 1);
+
+            auto data_1 = utils::bytes_t(data_begin, data_end);
+            auto data_1_h = utils::sha256_digest(data_1).value();
+            auto &b1 = proto::add_blocks(file);
+            proto::set_hash(b1, data_1_h);
+            proto::set_size(b1, data_1.size());
+
+            auto b = model::block_info_t::create(b1).value();
 
             auto uuid = sup->sequencer->next_uuid();
-            pr_fi.set_sequence(folder_my->get_max_sequence() + 1);
-            auto file_info = model::file_info_t::create(uuid, pr_fi, folder_my).value();
+            auto file_info = model::file_info_t::create(uuid, file, folder_my).value();
             file_info->assign_block(b, 0);
             REQUIRE(folder_my->add_strict(file_info));
 
             auto req = proto::Request();
-            req.set_id(1);
-            req.set_folder(std::string(folder_1->get_id()));
-            req.set_name("data.bin");
-            req.set_offset(0);
-            req.set_size(5);
+            proto::set_id(req, 1);
+            proto::set_folder(req, folder_1->get_id());
+            proto::set_name(req, file_name);
+            proto::set_size(req, data.size());
 
-            peer_actor->forward(proto::message::ClusterConfig(new proto::ClusterConfig(cc)));
+            peer_actor->forward(cc);
 
             SECTION("upload regular file, no hash") {
-                peer_actor->forward(proto::message::Request(new proto::Request(req)));
+                peer_actor->forward(req);
 
-                auto req_ptr = proto::message::Request(new proto::Request(req));
-                auto res = r::make_message<fs::payload::block_response_t>(target->get_address(), std::move(req_ptr),
-                                                                          sys::error_code{}, std::string("12345"));
+                auto res = r::make_message<fs::payload::block_response_t>(target->get_address(), req, sys::error_code{},
+                                                                          data_1);
                 block_responses.push_back(res);
 
                 sup->do_process();
                 REQUIRE(block_requests.size() == 1);
-                CHECK(block_requests[0]->payload.remote_request->id() == 1);
-                CHECK(block_requests[0]->payload.remote_request->name() == "data.bin");
+                CHECK(proto::get_id(block_requests[0]->payload.remote_request) == 1);
+                CHECK(proto::get_name(block_requests[0]->payload.remote_request) == file_name);
 
                 REQUIRE(peer_actor->uploaded_blocks.size() == 1);
-                auto &peer_res = *peer_actor->uploaded_blocks.front();
-                CHECK(peer_res.id() == 1);
-                CHECK(peer_res.code() == proto::ErrorCode::NO_BEP_ERROR);
-                CHECK(peer_res.data() == "12345");
+                auto &peer_res = peer_actor->uploaded_blocks.front();
+                CHECK(proto::get_id(peer_res) == 1);
+                CHECK(proto::get_code(peer_res) == proto::ErrorCode::NO_BEP_ERROR);
+                CHECK(proto::get_data(peer_res) == data_1);
+            }
+        }
+    };
+    F(true, 10).run();
+}
+
+void test_overload_uploading() {
+    struct F : fixture_t {
+        using fixture_t::fixture_t;
+
+        std::uint32_t get_blocks_max_requested() override { return 2; }
+
+        void main(diff_builder_t &) noexcept override {
+            static constexpr size_t BLOCKS_COUNT = 20;
+
+            auto builder = diff_builder_t(*cluster);
+            auto &folder_infos = folder_1->get_folder_infos();
+            auto folder_my = folder_infos.by_device(*my_device);
+            auto folder_peer = folder_infos.by_device(*peer_device);
+
+            auto file_name = std::string_view("data.bin");
+            auto file = proto::FileInfo();
+            proto::set_name(file, file_name);
+            proto::set_type(file, proto::FileInfoType::FILE);
+            proto::set_sequence(file, folder_my->get_max_sequence() + 1);
+            proto::set_size(file, BLOCKS_COUNT * 5);
+            proto::set_block_size(file, 5);
+
+            auto pieces = std::vector<utils::bytes_t>();
+            for (size_t i = 0; i < BLOCKS_COUNT; ++i) {
+                auto data = std::string(5, 'a' + static_cast<char>(i));
+                auto data_begin = reinterpret_cast<const unsigned char *>(data.data());
+                auto data_end = data_begin + data.size();
+                auto data_bytes = utils::bytes_t(data_begin, data_end);
+                auto data_h = utils::sha256_digest(data_bytes).value();
+                auto &b1 = proto::add_blocks(file);
+                proto::set_hash(b1, data_h);
+                proto::set_size(b1, data.size());
+                pieces.emplace_back(data_bytes);
+            }
+            auto &v = proto::get_version(file);
+            auto &counter = proto::add_counters(v);
+            proto::set_id(counter, 1);
+            proto::set_value(counter, 1);
+
+            builder.local_update(folder_1->get_id(), file).apply(*sup);
+
+            auto sha256 = peer_device->device_id().get_sha256();
+
+            builder.configure_cluster(sha256)
+                .add(sha256, folder_1->get_id(), folder_peer->get_index(), 1)
+                .add(my_device->device_id().get_sha256(), folder_1->get_id(), folder_my->get_index(), 1)
+                .finish()
+                .apply(*sup);
+
+            for (size_t i = 0; i < BLOCKS_COUNT; ++i) {
+                auto req = proto::Request();
+                proto::set_id(req, 1);
+                proto::set_folder(req, folder_1->get_id());
+                proto::set_name(req, file_name);
+                proto::set_size(req, 5);
+                proto::set_offset(req, i * 5);
+                peer_actor->forward(req);
+
+                auto &piece = pieces[i];
+                auto res = r::make_message<fs::payload::block_response_t>(target->get_address(), req, sys::error_code{},
+                                                                          piece);
+                block_responses.push_back(res);
+            }
+            sup->do_process();
+
+            auto &blocks = peer_actor->uploaded_blocks;
+            REQUIRE(blocks.size() == BLOCKS_COUNT);
+            for (size_t i = 0; i < BLOCKS_COUNT; ++i) {
+                auto &res = blocks.front();
+                auto data = proto::get_data(res);
+                CHECK(data == pieces[i]);
+                blocks.pop_front();
             }
         }
     };
@@ -1694,6 +1890,46 @@ void test_peer_removal() {
     F(true, 10).run();
 }
 
+void test_peer_down() {
+    struct F : fixture_t {
+        using fixture_t::fixture_t;
+        void main(diff_builder_t &) noexcept override {
+            sup->do_process();
+
+            auto builder = diff_builder_t(*cluster, sup->get_address());
+            auto sha256 = peer_device->device_id().get_sha256();
+
+            auto cc = proto::ClusterConfig{};
+            auto &folder = proto::add_folders(cc);
+            proto::set_id(folder, folder_1->get_id());
+            auto &d_peer = proto::add_devices(folder);
+            proto::set_id(d_peer, peer_device->device_id().get_sha256());
+            proto::set_max_sequence(d_peer, 15);
+            proto::set_index_id(d_peer, 0x12345);
+
+            peer_actor->forward(cc);
+            sup->do_process();
+
+            builder.share_folder(sha256, folder_1->get_id()).apply(*sup);
+            auto folder_peer = folder_1->get_folder_infos().by_device(*peer_device);
+            REQUIRE(folder_peer->get_index() == proto::get_index_id(d_peer));
+
+            peer_actor->shutdown_start_callback = [&]() {
+                proto::FileInfo pr_file_info;
+                auto file_name = std::string_view("link");
+                proto::set_name(pr_file_info, file_name);
+                proto::set_type(pr_file_info, proto::FileInfoType::SYMLINK);
+                proto::set_symlink_target(pr_file_info, "/some/where");
+
+                builder.local_update(folder_1->get_id(), pr_file_info).send(*sup);
+            };
+            peer_actor->do_shutdown();
+            sup->do_process();
+        }
+    };
+    F(false, 10, false).run();
+}
+
 void test_conflicts() {
     struct F : fixture_t {
         using fixture_t::fixture_t;
@@ -1704,74 +1940,101 @@ void test_conflicts() {
             auto sha256 = peer_device->device_id().get_sha256();
 
             auto cc = proto::ClusterConfig{};
-            auto folder = cc.add_folders();
-            folder->set_id(std::string(folder_1->get_id()));
-            auto d_peer = folder->add_devices();
-            d_peer->set_id(std::string(peer_device->device_id().get_sha256()));
-            d_peer->set_max_sequence(15);
-            d_peer->set_index_id(12345);
 
-            peer_actor->forward(proto::message::ClusterConfig(new proto::ClusterConfig(cc)));
+            auto folder = proto::Folder();
+            proto::set_id(folder, folder_1->get_id());
+            auto d_peer = proto::Device();
+            proto::set_id(d_peer, peer_device->device_id().get_sha256());
+            proto::set_max_sequence(d_peer, 15);
+            proto::set_index_id(d_peer, 0x12345);
+            proto::add_devices(folder, d_peer);
+
+            proto::add_folders(cc, folder);
+            peer_actor->forward(cc);
             sup->do_process();
 
             builder.share_folder(sha256, folder_1->get_id()).apply(*sup);
+            auto folder_my = folder_1->get_folder_infos().by_device(*my_device);
             auto folder_peer = folder_1->get_folder_infos().by_device(*peer_device);
-            REQUIRE(folder_peer->get_index() == d_peer->index_id());
+            REQUIRE(folder_peer->get_index() == proto::get_index_id(d_peer));
+
+            cc = proto::ClusterConfig{};
+            folder = proto::Folder();
+            proto::set_id(folder, folder_1->get_id());
+            proto::add_devices(folder, d_peer);
+            auto d_my = proto::Device();
+            proto::set_id(d_my, my_device->device_id().get_sha256());
+            proto::set_max_sequence(d_my, folder_my->get_max_sequence());
+            proto::set_index_id(d_my, folder_my->get_index());
+            proto::add_devices(folder, d_my);
+            proto::add_folders(cc, folder);
+            peer_actor->forward(cc);
+            sup->do_process();
 
             auto index = proto::Index{};
-            index.set_folder(std::string(folder_1->get_id()));
-            auto file = index.add_files();
-            file->set_name("some-file.txt");
-            file->set_type(proto::FileInfoType::FILE);
-            file->set_sequence(154);
-            file->set_block_size(5);
-            file->set_size(5);
+            proto::set_folder(index, folder_1->get_id());
 
-            auto version = file->mutable_version();
-            auto c1 = version->add_counters();
-            c1->set_id(1ul);
-            c1->set_value(1ul);
+            auto file_name = std::string_view("some-file.txt");
+            auto &file = proto::add_files(index);
+            proto::set_name(file, file_name);
+            proto::set_type(file, proto::FileInfoType::FILE);
+            proto::set_sequence(file, 154);
+            proto::set_block_size(file, 5);
+            proto::set_size(file, 5);
 
-            auto b1 = file->add_blocks();
-            b1->set_hash(utils::sha256_digest("12345").value());
-            b1->set_offset(0);
-            b1->set_size(5);
+            auto &v = proto::get_version(file);
+            auto &c_1 = proto::add_counters(v);
+            proto::set_id(c_1, 1);
+            proto::set_value(c_1, 1);
 
-            peer_actor->forward(proto::message::Index(new proto::Index(index)));
-            peer_actor->push_block("12345", 0, file->name());
+            auto data_1 = as_owned_bytes("12345");
+            auto data_1_h = utils::sha256_digest(data_1).value();
+            auto &b1 = proto::add_blocks(file);
+            proto::set_hash(b1, data_1_h);
+            proto::set_size(b1, data_1.size());
+
+            peer_actor->forward(index);
+            peer_actor->push_block(data_1, 0, file_name);
             sup->do_process();
 
             auto &folder_infos = folder_1->get_folder_infos();
             auto local_folder = folder_infos.by_device(*my_device);
-            auto local_file = local_folder->get_file_infos().by_name(file->name());
+            auto local_file = local_folder->get_file_infos().by_name(file_name);
             auto pr_file = local_file->as_proto(false);
-            auto bi_2 = pr_file.mutable_blocks()->Add();
-            bi_2->set_hash(utils::sha256_digest("67890").value());
-            bi_2->set_size(5);
-            pr_file.set_modified_s(1734680000);
+            proto::set_modified_s(pr_file, 1734680000);
+
+            auto data_2 = as_owned_bytes("67890");
+            auto data_2_h = utils::sha256_digest(data_2).value();
+            auto &b2 = proto::add_blocks(pr_file);
+            proto::set_hash(b2, data_2_h);
+            proto::set_size(b2, data_2.size());
+
             builder.local_update(folder_1->get_id(), pr_file);
             builder.apply(*sup);
 
-            file->clear_blocks();
-            file->set_sequence(155);
-            c1->set_id(peer_device->device_id().get_uint());
+            proto::clear_blocks(file);
+            proto::set_sequence(file, 155);
+            proto::set_id(c_1, peer_device->device_id().get_uint());
 
-            auto b3 = file->add_blocks();
-            b3->set_hash(utils::sha256_digest("12346").value());
-            b3->set_offset(0);
-            b3->set_size(5);
+            auto data_3 = as_owned_bytes("12346");
+            auto data_3_h = utils::sha256_digest(data_3).value();
+            auto &b3 = proto::add_blocks(pr_file);
+            proto::set_hash(b3, data_3_h);
+            proto::set_size(b3, data_3.size());
+            proto::add_blocks(file, b3);
 
             auto index_update = proto::IndexUpdate{};
-            index_update.set_folder(std::string(folder_1->get_id()));
+            proto::set_folder(index_update, folder_1->get_id());
+
+            peer_actor->messages.clear();
 
             SECTION("local win") {
-                file->set_modified_s(1734670000);
-                c1->set_value(local_file->get_version()->get_best().value() - 1);
+                proto::set_modified_s(file, 1734670000);
+                proto::set_value(c_1, proto::get_value(local_file->get_version()->get_best()) - 1);
                 auto local_seq = local_file->get_sequence();
 
-                *index_update.add_files() = *file;
-                peer_actor->messages.clear();
-                peer_actor->forward(proto::message::IndexUpdate(new proto::IndexUpdate(index_update)));
+                proto::add_files(index_update, file);
+                peer_actor->forward(index_update);
                 sup->do_process();
 
                 REQUIRE(local_folder->get_file_infos().size() == 1);
@@ -1782,12 +2045,11 @@ void test_conflicts() {
                 CHECK(peer_actor->messages.size() == 0);
             }
             SECTION("remote win") {
-                file->set_modified_s(1734690000);
-                c1->set_value(local_file->get_version()->get_best().value() + 1);
-
-                *index_update.add_files() = *file;
-                peer_actor->push_block("12346", 0, file->name());
-                peer_actor->forward(proto::message::IndexUpdate(new proto::IndexUpdate(index_update)));
+                proto::set_modified_s(file, 1734690000);
+                proto::set_value(c_1, proto::get_value(local_file->get_version()->get_best()) + 1);
+                proto::add_files(index_update, file);
+                peer_actor->push_block(data_3, 0, file_name);
+                peer_actor->forward(index_update);
                 sup->do_process();
 
                 auto local_folder = folder_infos.by_device(*my_device);
@@ -1795,21 +2057,24 @@ void test_conflicts() {
                 REQUIRE(local_conflict);
                 CHECK(local_conflict->get_size() == 5);
                 REQUIRE(local_conflict->get_blocks().size() == 1);
-                CHECK(local_conflict->get_blocks()[0]->get_hash() == bi_2->hash());
+                CHECK(local_conflict->get_blocks()[0]->get_hash() == data_2_h);
 
                 auto file = local_folder->get_file_infos().by_name(local_file->get_name());
                 REQUIRE(file);
                 CHECK(file->get_size() == 5);
                 REQUIRE(file->get_blocks().size() == 1);
-                CHECK(file->get_blocks()[0]->get_hash() == b3->hash());
+                CHECK(file->get_blocks()[0]->get_hash() == data_3_h);
 
                 CHECK(cluster->get_blocks().size() == 2);
 
                 auto &msg = peer_actor->messages.back();
-                auto &index_update_sent = *std::get<proto::message::IndexUpdate>(msg->payload);
-                REQUIRE(index_update_sent.files_size() == 2);
-                CHECK(index_update_sent.files(0).name() == local_conflict->get_name());
-                CHECK(index_update_sent.files(1).name() == file->get_name());
+                REQUIRE(peer_actor->messages.size() == 1);
+                auto &index_update_sent = std::get<proto::IndexUpdate>(msg->payload);
+                REQUIRE(proto::get_files_size(index_update_sent) == 2);
+                auto &f1 = proto::get_files(index_update_sent, 0);
+                auto &f2 = proto::get_files(index_update_sent, 1);
+                CHECK(proto::get_name(f1) == local_conflict->get_name());
+                CHECK(proto::get_name(f2) == file->get_name());
             }
         }
     };
@@ -1836,52 +2101,55 @@ void test_download_interrupting() {
             auto sha256 = peer_device->device_id().get_sha256();
 
             auto cc = proto::ClusterConfig{};
-            auto folder = cc.add_folders();
-            folder->set_id(std::string(folder_1->get_id()));
-            auto d_peer = folder->add_devices();
-            d_peer->set_id(std::string(peer_device->device_id().get_sha256()));
-            d_peer->set_max_sequence(15);
-            d_peer->set_index_id(12345);
+            auto &folder = proto::add_folders(cc);
+            proto::set_id(folder, folder_1->get_id());
+            auto &d_peer = proto::add_devices(folder);
+            proto::set_id(d_peer, peer_device->device_id().get_sha256());
+            proto::set_max_sequence(d_peer, 15);
+            proto::set_index_id(d_peer, 0x12345);
 
-            peer_actor->forward(proto::message::ClusterConfig(new proto::ClusterConfig(cc)));
+            peer_actor->forward(cc);
             sup->do_process();
 
             builder.share_folder(sha256, folder_1->get_id()).apply(*sup);
             auto folder_peer = folder_1->get_folder_infos().by_device(*peer_device);
-            REQUIRE(folder_peer->get_index() == d_peer->index_id());
+            REQUIRE(folder_peer->get_index() == proto::get_index_id(d_peer));
 
             auto index = proto::Index{};
-            index.set_folder(std::string(folder_1->get_id()));
-            auto file = index.add_files();
-            file->set_name("some-file");
-            file->set_type(proto::FileInfoType::FILE);
-            file->set_sequence(154);
-            file->set_block_size(5);
-            file->set_size(10);
-            auto version = file->mutable_version();
-            auto counter = version->add_counters();
-            counter->set_id(1ul);
-            counter->set_value(1ul);
+            proto::set_folder(index, folder_1->get_id());
+            auto file_name = std::string_view("some-file");
+            auto &file = proto::add_files(index);
+            proto::set_name(file, file_name);
+            proto::set_type(file, proto::FileInfoType::FILE);
+            proto::set_sequence(file, 154);
+            proto::set_block_size(file, 5);
+            proto::set_size(file, 10);
 
-            auto b1 = file->add_blocks();
-            b1->set_hash(utils::sha256_digest("12345").value());
-            b1->set_offset(0);
-            b1->set_size(5);
+            auto &v = proto::get_version(file);
+            auto &counter = proto::add_counters(v);
+            proto::set_id(counter, 1);
 
-            auto b2 = file->add_blocks();
-            b2->set_hash(utils::sha256_digest("67890").value());
-            b2->set_offset(5);
-            b2->set_size(5);
+            auto data_1 = as_owned_bytes("12345");
+            auto data_1_h = utils::sha256_digest(data_1).value();
+            auto &b1 = proto::add_blocks(file);
+            proto::set_hash(b1, data_1_h);
+            proto::set_size(b1, data_1.size());
 
-            peer_actor->forward(proto::message::Index(new proto::Index(index)));
+            auto data_2 = as_owned_bytes("67890");
+            auto data_2_h = utils::sha256_digest(data_2).value();
+            auto &b2 = proto::add_blocks(file);
+            proto::set_hash(b2, data_2_h);
+            proto::set_size(b2, data_2.size());
+
+            peer_actor->forward(index);
             sup->do_process();
 
             SECTION("block from peer") {
                 SECTION("folder is kept") {
                     SECTION("suspend folder") { builder.suspend(*folder_1).apply(*sup); }
                     SECTION("unshare folder") { builder.unshare_folder(*folder_peer).apply(*sup); }
-                    peer_actor->push_block("12345", 0, file->name());
-                    peer_actor->push_block("67890", 1, file->name());
+                    peer_actor->push_block(data_1, 0, file_name);
+                    peer_actor->push_block(data_2, 1, file_name);
                     peer_actor->process_block_requests();
                     sup->do_process();
                     auto folder_my = folder_1->get_folder_infos().by_device(*my_device);
@@ -1890,7 +2158,7 @@ void test_download_interrupting() {
                 SECTION("remove folder") {
                     sup->auto_ack_blocks = false;
 
-                    peer_actor->push_block("67890", 1, file->name());
+                    peer_actor->push_block(data_2, 1, file_name);
                     peer_actor->process_block_requests();
                     sup->do_process();
 
@@ -1900,16 +2168,16 @@ void test_download_interrupting() {
                     hasher->process_requests();
                     sup->do_process();
 
-                    peer_actor->push_block("12345", 0, file->name());
+                    peer_actor->push_block(data_1, 0, file_name);
                     peer_actor->process_block_requests();
                     sup->do_process();
-                    CHECK(peer_actor->blocks_requested == file->blocks_size());
-                    CHECK(!cluster->get_folders().by_id(folder->id()));
+                    CHECK(peer_actor->blocks_requested == proto::get_blocks_size(file));
+                    CHECK(!cluster->get_folders().by_id(proto::get_id(folder)));
                 }
             }
             SECTION("hash validation replies") {
                 SECTION("folder is kept") {
-                    peer_actor->push_block("12345", 0, file->name());
+                    peer_actor->push_block(data_1, 0, file_name);
                     peer_actor->process_block_requests();
                     sup->do_process();
 
@@ -1922,37 +2190,64 @@ void test_download_interrupting() {
                 }
                 SECTION("remove folder") {
                     builder.remove_folder(*folder_1).apply(*sup);
-                    peer_actor->push_block("12345", 0, file->name());
+                    peer_actor->push_block(data_1, 0, file_name);
                     peer_actor->process_block_requests();
                     hasher->process_requests();
                     sup->do_process();
-                    CHECK(!cluster->get_folders().by_id(folder->id()));
+                    CHECK(!cluster->get_folders().by_id(proto::get_id(folder)));
                 }
             }
-
             SECTION("block acks from fs") {
+                auto write_requests = cluster->get_write_requests();
                 sup->auto_ack_blocks = false;
                 hasher->auto_reply = true;
-                peer_actor->push_block("67890", 1, file->name());
-                peer_actor->push_block("12345", 0, file->name());
+                peer_actor->push_block(data_2, 1, file_name);
+                peer_actor->push_block(data_1, 0, file_name);
                 peer_actor->process_block_requests();
                 sup->do_process();
-                auto diff = sup->delayed_ack_holder;
-                REQUIRE(diff);
+                REQUIRE(sup->delayed_ack_holder);
 
                 SECTION("suspend") {
                     builder.suspend(*folder_1);
-                    sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff));
+                    sup->send<model::payload::model_update_t>(sup->get_address(), std::move(sup->delayed_ack_holder));
                     builder.apply(*sup);
                     auto folder_my = folder_1->get_folder_infos().by_device(*my_device);
                     CHECK(folder_my->get_file_infos().size() == 0);
+
+                    REQUIRE(sup->delayed_ack_holder);
+                    sup->send<model::payload::model_update_t>(sup->get_address(), std::move(sup->delayed_ack_holder));
+                    sup->do_process();
                 }
 
                 SECTION("remove") {
                     builder.remove_folder(*folder_1).apply(*sup);
-                    sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff));
+                    sup->send<model::payload::model_update_t>(sup->get_address(), std::move(sup->delayed_ack_holder));
                     sup->do_process();
-                    CHECK(!cluster->get_folders().by_id(folder->id()));
+                    CHECK(!cluster->get_folders().by_id(proto::get_id(folder)));
+
+                    REQUIRE(sup->delayed_ack_holder);
+                    sup->send<model::payload::model_update_t>(sup->get_address(), std::move(sup->delayed_ack_holder));
+                    sup->do_process();
+                }
+                SECTION("down controller") {
+                    target->do_shutdown();
+                    sup->do_process();
+                    CHECK(static_cast<r::actor_base_t *>(target.get())->access<to::state>() ==
+                          r::state_t::SHUTTING_DOWN);
+
+                    SECTION("ack upon shutdown") {
+                        REQUIRE(sup->delayed_ack_holder);
+                        sup->send<model::payload::model_update_t>(sup->get_address(),
+                                                                  std::move(sup->delayed_ack_holder));
+                        sup->do_process();
+                    }
+                    SECTION("no ack, timeout trigger") {
+                        auto fs_timer_id = sup->timers.back()->request_id;
+                        sup->do_invoke_timer(fs_timer_id);
+                        sup->do_process();
+                    }
+
+                    CHECK(cluster->get_write_requests() == write_requests);
                 }
             }
         }
@@ -1962,6 +2257,291 @@ void test_download_interrupting() {
     };
     F(false, 10, false).run();
 }
+
+void test_change_folder_type() {
+    struct F : fixture_t {
+        using fixture_t::fixture_t;
+
+        std::uint32_t get_blocks_max_requested() override { return 1; }
+
+        void main(diff_builder_t &builder) noexcept override {
+            auto &folder_infos = folder_1->get_folder_infos();
+            auto folder_my = folder_infos.by_device(*my_device);
+
+            auto cc = proto::ClusterConfig{};
+            auto &folder = proto::add_folders(cc);
+            proto::set_id(folder, folder_1->get_id());
+            auto &d_peer = proto::add_devices(folder);
+            proto::set_id(d_peer, peer_device->device_id().get_sha256());
+            proto::set_max_sequence(d_peer, folder_1_peer->get_max_sequence());
+            proto::set_index_id(d_peer, folder_1_peer->get_index());
+            auto &d_my = proto::add_devices(folder);
+            proto::set_id(d_my, my_device->device_id().get_sha256());
+            proto::set_max_sequence(d_my, folder_my->get_max_sequence());
+            proto::set_index_id(d_my, folder_my->get_index());
+
+            peer_actor->forward(cc);
+            sup->do_process();
+
+            SECTION("send & receive -> send only") {
+                auto index = proto::Index{};
+                proto::set_folder(index, folder_1->get_id());
+                auto file_name_1 = std::string_view("some-file-1");
+                auto file_name_2 = std::string_view("some-file-2");
+
+                auto &file_1 = proto::add_files(index);
+                proto::set_name(file_1, file_name_1);
+                proto::set_type(file_1, proto::FileInfoType::FILE);
+                proto::set_sequence(file_1, folder_1_peer->get_max_sequence() + 1);
+                proto::set_block_size(file_1, 5);
+                proto::set_size(file_1, 5);
+
+                auto &v_1 = proto::get_version(file_1);
+                auto &counter_1 = proto::add_counters(v_1);
+                proto::set_id(counter_1, 1);
+
+                auto data_1 = as_owned_bytes("12345");
+                auto data_1_hash = utils::sha256_digest(data_1).value();
+
+                auto data_2 = as_owned_bytes("67890");
+                auto data_2_hash = utils::sha256_digest(data_2).value();
+
+                auto &b1 = proto::add_blocks(file_1);
+                proto::set_hash(b1, data_1_hash);
+                proto::set_size(b1, 5);
+
+                auto &file_2 = proto::add_files(index);
+                proto::set_name(file_2, file_name_2);
+                proto::set_type(file_2, proto::FileInfoType::FILE);
+                proto::set_sequence(file_2, folder_1_peer->get_max_sequence() + 2);
+                proto::set_block_size(file_2, 5);
+                proto::set_size(file_2, 5);
+
+                auto &v_2 = proto::get_version(file_2);
+                auto &counter_2 = proto::add_counters(v_2);
+                proto::set_id(counter_2, 1);
+
+                auto &b2 = proto::add_blocks(file_2);
+                proto::set_hash(b2, data_2_hash);
+                proto::set_size(b2, 5);
+
+                CHECK(folder_my->get_max_sequence() == 0ul);
+                peer_actor->forward(index);
+                sup->do_process();
+
+                REQUIRE(peer_actor->blocks_requested == 1);
+
+                SECTION("folder type is kept as send/receive") {
+                    peer_actor->push_block(data_1, 0);
+                    peer_actor->process_block_requests();
+                    sup->do_process();
+                    REQUIRE(peer_actor->blocks_requested == 2);
+                }
+                SECTION("folder type changed to send only") {
+                    auto db_folder = db::Folder();
+                    folder_1->serialize(db_folder);
+                    db::set_folder_type(db_folder, db::FolderType::send);
+                    builder.upsert_folder(db_folder, folder_my->get_index()).apply(*sup);
+
+                    peer_actor->push_block(data_1, 0);
+                    peer_actor->process_block_requests();
+                    sup->do_process();
+
+                    REQUIRE(peer_actor->blocks_requested == 1);
+
+                    SECTION("folder type is send & receive again") {
+                        db::set_folder_type(db_folder, db::FolderType::send_and_receive);
+                        builder.upsert_folder(db_folder, folder_my->get_index()).apply(*sup);
+                        REQUIRE(peer_actor->blocks_requested == 2);
+                    }
+                }
+            }
+            SECTION("send & receive -> recv only") {
+                proto::FileInfo pr_file_1;
+                auto file_name_1 = std::string_view("file-name.1");
+                proto::set_name(pr_file_1, file_name_1);
+
+                builder.local_update(folder_1->get_id(), pr_file_1);
+                builder.apply(*sup);
+                REQUIRE(peer_actor->messages.size() >= 1);
+                auto &last_message = *peer_actor->messages.back();
+                auto &index_update_1 = std::get<proto::Index>(last_message.payload);
+                CHECK(proto::get_files_size(index_update_1) == 1);
+
+                peer_actor->messages.clear();
+                proto::FileInfo pr_file_2;
+                auto file_name_2 = std::string_view("file-name.2");
+                proto::set_name(pr_file_2, file_name_2);
+
+                SECTION("folder type is kept as send/receive") {
+                    builder.local_update(folder_1->get_id(), pr_file_1);
+                    builder.apply(*sup);
+                    REQUIRE(peer_actor->messages.size() == 1);
+                    auto &last_message = *peer_actor->messages.back();
+                    auto &index_update_2 = std::get<proto::IndexUpdate>(last_message.payload);
+                    CHECK(proto::get_files_size(index_update_2) == 1);
+                }
+                SECTION("folder type changed to send only") {
+                    auto db_folder = db::Folder();
+                    folder_1->serialize(db_folder);
+                    db::set_folder_type(db_folder, db::FolderType::receive);
+                    builder.upsert_folder(db_folder, folder_my->get_index()).apply(*sup);
+
+                    builder.local_update(folder_1->get_id(), pr_file_1).apply(*sup);
+                    REQUIRE(peer_actor->messages.size() == 0);
+
+                    SECTION("folder type is send & receive again") {
+                        db::set_folder_type(db_folder, db::FolderType::send_and_receive);
+                        builder.upsert_folder(db_folder, folder_my->get_index()).apply(*sup);
+
+                        REQUIRE(peer_actor->messages.size() == 1);
+                        auto &last_message = *peer_actor->messages.back();
+                        auto &index = std::get<proto::Index>(last_message.payload);
+                        CHECK(proto::get_files_size(index) == 1);
+                    }
+                }
+            }
+        }
+    };
+    F(true, 10).run();
+}
+
+void test_pausing() {
+    struct F : fixture_t {
+        using fixture_t::fixture_t;
+        void main(diff_builder_t &) noexcept override {
+            auto builder = diff_builder_t(*cluster);
+            auto sha256 = peer_device->device_id().get_sha256();
+
+            auto &folder_infos = folder_1->get_folder_infos();
+            auto folder_1_id = folder_1->get_id();
+            auto folder_my = folder_infos.by_device(*my_device);
+            auto folder_peer = folder_infos.by_device(*peer_device);
+
+            auto max_seq = folder_peer->get_max_sequence() + 10;
+
+            builder.configure_cluster(sha256)
+                .add(sha256, folder_1_id, folder_peer->get_index(), max_seq)
+                .finish()
+                .apply(*sup);
+
+            auto file_name = std::string_view("some-file");
+            auto pr_file = proto::FileInfo();
+            proto::set_name(pr_file, file_name);
+            proto::set_type(pr_file, proto::FileInfoType::FILE);
+            proto::set_sequence(pr_file, max_seq - 1);
+            proto::set_size(pr_file, 5);
+            proto::set_block_size(pr_file, 5);
+
+            auto &v = proto::get_version(pr_file);
+            auto &counter = proto::add_counters(v);
+            proto::set_id(counter, 1);
+            proto::set_value(counter, 1);
+
+            auto data = as_owned_bytes("12345");
+            auto data_h = utils::sha256_digest(data).value();
+            auto &b1 = proto::add_blocks(pr_file);
+            proto::set_hash(b1, data_h);
+            proto::set_size(b1, data.size());
+
+            builder.make_index(sha256, folder_1_id).add(pr_file, peer_device).finish().apply(*sup);
+
+            target->do_shutdown();
+            sup->do_process();
+
+            peer_actor->block_requests = {};
+            peer_actor->block_responses = {};
+
+            start_target();
+            sup->do_process();
+
+            CHECK(peer_actor->block_requests.size() == 0);
+            builder.configure_cluster(sha256).add(sha256, folder_1_id, 0, 0).finish().apply(*sup);
+            CHECK(peer_actor->block_requests.size() == 0);
+        }
+    };
+    F(true, 10).run();
+}
+
+void test_races() {
+    struct F : fixture_t {
+        using fixture_t::fixture_t;
+        void main(diff_builder_t &) noexcept override {
+            auto builder = diff_builder_t(*cluster);
+            auto sha256 = peer_device->device_id().get_sha256();
+
+            auto &folder_infos = folder_1->get_folder_infos();
+            auto folder_1_id = folder_1->get_id();
+            auto folder_my = folder_infos.by_device(*my_device);
+            auto folder_peer = folder_infos.by_device(*peer_device);
+
+            auto max_seq = folder_peer->get_max_sequence() + 10;
+
+            builder.configure_cluster(sha256)
+                .add(sha256, folder_1_id, folder_peer->get_index(), max_seq)
+                .finish()
+                .apply(*sup, target.get());
+
+            auto file_name = std::string_view("some-file");
+            auto pr_file = proto::FileInfo();
+            proto::set_name(pr_file, file_name);
+            proto::set_type(pr_file, proto::FileInfoType::FILE);
+            proto::set_sequence(pr_file, max_seq - 1);
+            proto::set_size(pr_file, 10);
+            proto::set_block_size(pr_file, 5);
+
+            auto &v = proto::get_version(pr_file);
+            auto &counter = proto::add_counters(v);
+            proto::set_id(counter, 1);
+            proto::set_value(counter, 1);
+
+            auto data_1 = as_owned_bytes("12345");
+            auto data_1_h = utils::sha256_digest(data_1).value();
+            auto &b1 = proto::add_blocks(pr_file);
+            proto::set_hash(b1, data_1_h);
+            proto::set_size(b1, data_1.size());
+
+            auto data_2 = as_owned_bytes("67890");
+            auto data_2_h = utils::sha256_digest(data_2).value();
+            auto &b2 = proto::add_blocks(pr_file);
+            proto::set_hash(b2, data_2_h);
+            proto::set_size(b2, data_2.size());
+            proto::set_offset(b2, 5);
+
+            builder.make_index(sha256, folder_1_id).add(pr_file, peer_device).finish().apply(*sup, target.get());
+
+            SECTION("make file externally available before blocks arrive") {
+                builder.local_update(folder_1_id, pr_file).apply(*sup);
+
+                peer_actor->push_block(data_2, 1, file_name);
+                peer_actor->push_block(data_1, 0, file_name);
+                peer_actor->process_block_requests();
+                sup->do_process();
+            }
+            SECTION("make file externally available before file finishes") {
+                cluster->modify_write_requests(10);
+
+                sup->auto_ack_blocks = false;
+                peer_actor->push_block(data_2, 1, file_name);
+                peer_actor->push_block(data_1, 0, file_name);
+                peer_actor->process_block_requests();
+                sup->do_process();
+
+                builder.local_update(folder_1_id, pr_file).apply(*sup);
+
+                auto diff = sup->delayed_ack_holder;
+                REQUIRE(diff);
+                sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff));
+                sup->do_process();
+            }
+            auto file = folder_my->get_file_infos().by_name(file_name);
+            REQUIRE(file);
+            CHECK(file->is_locally_available());
+            CHECK(file->get_size() == 10);
+        }
+    };
+    F(true, 10).run();
+};
 
 int _init() {
     REGISTER_TEST_CASE(test_startup, "test_startup", "[net]");
@@ -1976,9 +2556,14 @@ int _init() {
     REGISTER_TEST_CASE(test_initiate_peer_sharing, "test_initiate_peer_sharing", "[net]");
     REGISTER_TEST_CASE(test_sending_index_updates, "test_sending_index_updates", "[net]");
     REGISTER_TEST_CASE(test_uploading, "test_uploading", "[net]");
+    REGISTER_TEST_CASE(test_overload_uploading, "test_overload_uploading", "[net]");
+    REGISTER_TEST_CASE(test_peer_down, "test_peer_down", "[net]");
     REGISTER_TEST_CASE(test_peer_removal, "test_peer_removal", "[net]");
     REGISTER_TEST_CASE(test_conflicts, "test_conflicts", "[net]");
     REGISTER_TEST_CASE(test_download_interrupting, "test_download_interrupting", "[net]");
+    REGISTER_TEST_CASE(test_change_folder_type, "test_change_folder_type", "[net]");
+    REGISTER_TEST_CASE(test_pausing, "test_pausing", "[net]");
+    REGISTER_TEST_CASE(test_races, "test_races", "[net]");
     return 1;
 }
 

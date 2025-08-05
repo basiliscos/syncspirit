@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "lock_file.h"
-#include "db/prefix.h"
 #include "model/cluster.h"
 #include "utils/format.hpp"
 #include "../cluster_visitor.h"
@@ -10,11 +9,10 @@
 using namespace syncspirit::model::diff::modify;
 
 lock_file_t::lock_file_t(const model::file_info_t &file, bool locked_) noexcept
-    : folder_id{file.get_folder_info()->get_folder()->get_id()},
-      device_id(file.get_folder_info()->get_device()->device_id().get_sha256()), file_name{file.get_name()},
-      locked{locked_} {
-    LOG_DEBUG(log, "lock_file_t, file = {}, folder = {}, device = {}, value = {}", file_name, folder_id, device_id,
-              locked);
+    : folder_id{file.get_folder_info()->get_folder()->get_id()}, file_name{file.get_name()}, locked{locked_} {
+    auto &peer = file.get_folder_info()->get_device()->device_id();
+    device_id = peer.get_sha256();
+    LOG_DEBUG(log, "lock_file_t, file = {}, folder = {}, device = {}, value = {}", file_name, folder_id, peer, locked);
 }
 
 auto lock_file_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept

@@ -4,6 +4,7 @@
 #pragma once
 
 #include "../tree_item.h"
+#include "presentation/folder_presence.h"
 
 namespace syncspirit::fltk::tree_item {
 
@@ -13,7 +14,7 @@ struct peer_folders_t : tree_item_t {
 
     void update_label() override;
 
-    augmentation_ptr_t add_folder(model::folder_info_t &folder);
+    void add_folder(presentation::folder_presence_t &presence);
     void remove_child(tree_item_t *child) override;
     model::device_t &peer;
 };

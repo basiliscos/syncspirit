@@ -10,19 +10,19 @@ auto remote_folder_info_t::create(std::uint64_t index_id, std::int64_t max_seque
     return outcome::success(ptr);
 }
 
+remote_folder_info_t::~remote_folder_info_t() {}
+
 remote_folder_info_t::remote_folder_info_t(std::uint64_t index_id_, std::int64_t max_sequence_, device_t &device_,
                                            folder_t &folder_) noexcept
     : index_id{index_id_}, max_sequence{max_sequence_}, device{&device_}, folder{&folder_} {}
 
 std::string_view remote_folder_info_t::get_key() const noexcept { return folder->get_id(); }
 
-bool remote_folder_info_t::needs_update() const noexcept {
-    auto local = get_local();
-    return (local->get_index() != index_id) || local->get_max_sequence() > max_sequence;
-}
-
 remote_folder_info_t_ptr_t remote_folder_infos_map_t::by_folder(const folder_t &folder) const noexcept {
-    return get<0>(folder.get_id());
+    auto id = folder.get_id();
+    auto ptr = (unsigned char *)id.data();
+    auto view = utils::bytes_view_t(ptr, id.size());
+    return get<0>(view);
 }
 
 auto remote_folder_info_t::get_local() const noexcept -> folder_info_ptr_t {
@@ -30,8 +30,10 @@ auto remote_folder_info_t::get_local() const noexcept -> folder_info_ptr_t {
     return folder->get_folder_infos().by_device(*device);
 }
 
-template <> SYNCSPIRIT_API std::string_view get_index<0>(const remote_folder_info_t_ptr_t &item) noexcept {
-    return item->get_key();
+template <> SYNCSPIRIT_API utils::bytes_view_t get_index<0>(const remote_folder_info_t_ptr_t &item) noexcept {
+    auto key = item->get_key();
+    auto ptr = (unsigned char *)key.data();
+    return {ptr, key.size()};
 }
 
 } // namespace syncspirit::model

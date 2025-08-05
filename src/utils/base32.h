@@ -4,6 +4,7 @@
 #pragma once
 
 #include <string_view>
+#include "bytes.h"
 #include <boost/outcome.hpp>
 #include "syncspirit-export.h"
 
@@ -19,8 +20,8 @@ struct SYNCSPIRIT_API base32 {
     static inline std::size_t encoded_size(std::size_t dec_len) noexcept { return (dec_len + 4) / 5 * 8; }
     static inline std::size_t decoded_size(std::size_t dec_len) noexcept { return dec_len * 5 / 8; }
 
-    static std::string encode(std::string_view input) noexcept;
-    static outcome::result<std::string> decode(std::string_view input) noexcept;
+    static std::string encode(bytes_view_t input) noexcept;
+    static outcome::result<bytes_t> decode(std::string_view input) noexcept;
 };
 
 } // namespace syncspirit::utils

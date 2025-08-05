@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #pragma once
 
@@ -63,8 +63,8 @@ struct SYNCSPIRIT_API ssdp_actor_t : public r::actor_base_t {
     r::address_ptr_t coordinator;
     udp::endpoint upnp_endpoint;
 
-    fmt::memory_buffer tx_buff;
-    fmt::memory_buffer rx_buff;
+    utils::bytes_t tx_buff;
+    utils::bytes_t rx_buff;
 };
 
 } // namespace net

@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "utils.h"
 #include "transaction.h"
 #include "error_code.h"
 #include "prefix.h"
+#include "model/misc/error_code.h"
+#include "proto/proto-helpers-db.h"
 #include <boost/endian/conversion.hpp>
 
 namespace syncspirit::db {
@@ -12,7 +14,7 @@ namespace syncspirit::db {
 namespace be = boost::endian;
 
 std::byte zero{0};
-std::uint32_t version{1};
+std::uint32_t version{2};
 
 namespace misc {
 static const constexpr std::string_view db_version = "db_version";
@@ -39,19 +41,28 @@ outcome::result<uint32_t> get_version(transaction_t &txn) noexcept {
     return version;
 }
 
-static outcome::result<void> migrate0(model::device_ptr_t &device, transaction_t &txn) noexcept {
+outcome::result<void> save_version(std::uint32_t v, transaction_t &txn) noexcept {
     using prefixes_t = std::vector<discr_t>;
     auto key = prefixer_t<prefix::misc>::make(misc::db_version);
     MDBX_val value;
-    auto db_ver = be::native_to_big(version);
+    auto db_ver = be::native_to_big(v);
     value.iov_base = &db_ver;
     value.iov_len = sizeof(db_ver);
     auto r = mdbx_put(txn.txn, txn.dbi, key, &value, MDBX_UPSERT);
     if (r != MDBX_SUCCESS) {
         return make_error_code(r);
     }
+    return outcome::success();
+}
+
+static outcome::result<void> migrate0(model::device_ptr_t &device, transaction_t &txn) noexcept {
+    auto version_r = save_version(1, txn);
+    if (!version_r) {
+        return version_r;
+    }
 
     // make anchors
+    using prefixes_t = std::vector<discr_t>;
     prefixes_t prefixes{prefix::device,         prefix::folder,         prefix::folder_info,
                         prefix::file_info,      prefix::ignored_device, prefix::ignored_folder,
                         prefix::pending_folder, prefix::block_info,     prefix::pending_device};
@@ -78,17 +89,47 @@ static outcome::result<void> migrate0(model::device_ptr_t &device, transaction_t
     device_db_value.iov_base = device_data.data();
     device_db_value.iov_len = device_data.size();
 
-    r = mdbx_put(txn.txn, txn.dbi, &device_db_key, &device_db_value, MDBX_UPSERT);
+    auto r = mdbx_put(txn.txn, txn.dbi, &device_db_key, &device_db_value, MDBX_UPSERT);
     if (r != MDBX_SUCCESS) {
         return make_error_code(r);
     }
     return outcome::success();
 }
 
+static outcome::result<void> migrate1(model::device_ptr_t &device, transaction_t &txn) noexcept {
+    auto fis_opt = db::load(db::prefix::folder_info, txn);
+    if (!fis_opt) {
+        return fis_opt.error();
+    }
+
+    auto &container = fis_opt.value();
+    auto self_key = device->device_id().get_key();
+
+    for (auto &pair : container) {
+        auto &key = pair.key;
+
+        auto db_fi = db::FolderInfo();
+        if (auto left = db::decode(pair.value, db_fi); left) {
+            using ec_t = model::error_code_t;
+            return make_error_code(ec_t::folder_info_deserialization_failure);
+        }
+        db::set_introducer_device_key(db_fi, self_key);
+        auto new_value = db::encode(db_fi);
+        auto r = db::save({key, new_value}, txn);
+        if (!r) {
+            return r;
+        }
+    }
+
+    return save_version(db::version, txn);
+}
+
 static outcome::result<void> do_migrate(uint32_t from, model::device_ptr_t &device, transaction_t &txn) noexcept {
     switch (from) {
     case 0:
         return migrate0(device, txn);
+    case 1:
+        return migrate1(device, txn);
     default:
         assert(0 && "impossibe migration to future version");
         std::terminate();
@@ -100,24 +141,21 @@ outcome::result<void> migrate(uint32_t from, model::device_ptr_t device, transac
         auto r = do_migrate(from, device, txn);
         if (!r)
             return r;
-        r = txn.commit();
         if (!r)
             return r;
         ++from;
     }
-    return outcome::success();
+    return txn.commit();
 }
 
 outcome::result<container_t> load(discr_t prefix, transaction_t &txn) noexcept {
-    char prefix_val = (char)prefix;
-    std::string_view prefix_mask(&prefix_val, 1);
     auto cursor_opt = txn.cursor();
     if (!cursor_opt) {
         return cursor_opt.error();
     }
     auto &cursor = cursor_opt.value();
     container_t container;
-    auto r = cursor.iterate(prefix_mask, [&](auto &key, auto &value) -> outcome::result<void> {
+    auto r = cursor.iterate(prefix, [&](auto key, auto value) -> outcome::result<void> {
         container.push_back(pair_t{key, value});
         return outcome::success();
     });
@@ -143,7 +181,7 @@ outcome::result<void> save(const pair_t &container, transaction_t &txn) noexcept
     return outcome::success();
 }
 
-outcome::result<void> remove(std::string_view key_, transaction_t &txn) noexcept {
+outcome::result<void> remove(utils::bytes_view_t key_, transaction_t &txn) noexcept {
     MDBX_val key;
     key.iov_base = (void *)key_.data();
     key.iov_len = key_.size();

@@ -29,8 +29,10 @@ namespace {
 static auto ssl_pair = utils::generate_pair("sample").value();
 
 struct dummy_http_actor_t : r::actor_base_t {
+    using request_t = r::intrusive_ptr_t<net::payload::http_request_t>;
+    using requests_t = std::list<request_t>;
     using response_t = r::intrusive_ptr_t<net::payload::http_response_t>;
-    using queue_t = std::list<response_t>;
+    using responses_t = std::list<response_t>;
 
     using r::actor_base_t::actor_base_t;
 
@@ -46,6 +48,7 @@ struct dummy_http_actor_t : r::actor_base_t {
     }
 
     void on_request(net::message::http_request_t &req) noexcept {
+        requests.emplace_back(req.payload.request_payload);
         if (!responses.empty()) {
             auto &res = *responses.front();
             reply_to(req, std::move(res.response), res.bytes, std::move(res.local_addr));
@@ -59,7 +62,8 @@ struct dummy_http_actor_t : r::actor_base_t {
 
     void on_close_connection(net::message::http_close_connection_t &) noexcept { closed = true; }
 
-    queue_t responses;
+    requests_t requests;
+    responses_t responses;
     bool connected = false;
     bool closed = false;
 };
@@ -98,14 +102,16 @@ struct fixture_t {
 
         CHECK(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::OPERATIONAL);
 
-        auto global_device_id =
-            model::device_id_t::from_string("LYXKCHX-VI3NYZR-ALCJBHF-WMZYSPK-QG6QJA3-MPFYMSO-U56GTUK-NA2MIAW");
+        auto announce_url_str =
+            "https://disc.syncthing.net/v2/id=LYXKCHX-VI3NYZR-ALCJBHF-WMZYSPK-QG6QJA3-MPFYMSO-U56GTUK-NA2MIAW";
+        auto lookup_url_str =
+            "https://lookup.syncthing.net/v2/id=LYXKCHX-VI3NYZR-ALCJBHF-WMZYSPK-QG6QJA3-MPFYMSO-U56GTUK-NA2MIAW";
 
         gda = sup->create_actor<global_discovery_actor_t>()
                   .cluster(cluster)
                   .ssl_pair(&ssl_pair)
-                  .announce_url(utils::parse("https://discovery.syncthing.net/"))
-                  .device_id(std::move(global_device_id.value()))
+                  .announce_url(utils::parse(announce_url_str))
+                  .lookup_url(utils::parse(lookup_url_str))
                   .rx_buff_size(32768ul)
                   .io_timeout(5ul)
                   .timeout(timeout)
@@ -157,6 +163,10 @@ void test_successful_announcement() {
                 sup->do_process();
                 CHECK(http_actor->connected);
                 CHECK(announce);
+
+                REQUIRE(http_actor->requests.size() == 1);
+                auto &req = http_actor->requests.front();
+                CHECK(req->url->encoded_host() == "disc.syncthing.net");
             }
 
             return true;
@@ -202,40 +212,45 @@ void test_peer_discovery() {
                 res.body() = j.dump();
 
                 http_actor->responses.push_back(new net::payload::http_response_t(std::move(res), 0));
-                builder.update_state(*peer_device, {}, model::device_state_t::discovering).apply(*sup);
+                builder.update_state(*peer_device, {}, peer_device->get_state().unknown()).apply(*sup);
 
                 REQUIRE(peer_device->get_uris().size() == 1);
                 CHECK(peer_device->get_uris()[0]->buffer() == "tcp://127.0.0.2");
-                REQUIRE(peer_device->get_state() == model::device_state_t::discovering);
+                REQUIRE(peer_device->get_state().is_offline());
 
                 // 2nd attempt
                 peer_device->assign_uris({});
                 res = {};
                 res.body() = j.dump();
                 http_actor->responses.push_back(new net::payload::http_response_t(std::move(res), 0));
-                builder.update_state(*peer_device, {}, model::device_state_t::discovering).apply(*sup);
+                builder.update_state(*peer_device, {}, peer_device->get_state().unknown()).apply(*sup);
 
                 REQUIRE(peer_device->get_uris().size() == 1);
                 CHECK(peer_device->get_uris()[0]->buffer() == "tcp://127.0.0.2");
-                REQUIRE(peer_device->get_state() == model::device_state_t::discovering);
+                REQUIRE(peer_device->get_state().is_offline());
 
                 // 3nd attempt (empty urls)
                 j["addresses"] = json::array();
                 peer_device->assign_uris({});
                 res = {};
                 res.body() = j.dump();
-                builder.update_state(*peer_device, {}, model::device_state_t::discovering).apply(*sup);
+                builder.update_state(*peer_device, {}, peer_device->get_state().unknown()).apply(*sup);
+
                 REQUIRE(peer_device->get_uris().size() == 0);
-                REQUIRE(peer_device->get_state() == model::device_state_t::offline);
+                REQUIRE(peer_device->get_state().is_offline());
+
+                REQUIRE(http_actor->requests.size() >= 1);
+                auto &req = http_actor->requests.back();
+                CHECK(req->url->encoded_host() == "lookup.syncthing.net");
             }
 
             SECTION("gargbage in response") {
                 http_actor->responses.push_back(new net::payload::http_response_t(std::move(res), 0));
-                builder.update_state(*peer_device, {}, model::device_state_t::discovering).apply(*sup);
+                builder.update_state(*peer_device, {}, peer_device->get_state().unknown()).apply(*sup);
 
                 REQUIRE(peer_device->get_uris().size() == 0);
                 CHECK(static_cast<r::actor_base_t *>(gda.get())->access<to::state>() == r::state_t::OPERATIONAL);
-                REQUIRE(peer_device->get_state() == model::device_state_t::offline);
+                REQUIRE(peer_device->get_state().is_offline());
             }
         }
     };

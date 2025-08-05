@@ -30,7 +30,7 @@ log_table_t::log_table_t(log_buffer_ptr_t &displayed_records_, int x, int y, int
     col_resize_min(col_min_size);
     col_width(0, 170);
     col_width(1, 100);
-    col_width(2, 220);
+    col_width(2, 390);
 
     auto message_col_sz = this->w() - (col_width(0) + col_width(1) + col_width(2));
     col_width(3, message_col_sz);

@@ -7,6 +7,7 @@
 #include <spdlog/sinks/dist_sink.h>
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
+#include <boost/nowide/convert.hpp>
 
 namespace st = syncspirit::test;
 namespace bfs = std::filesystem;
@@ -16,7 +17,7 @@ using namespace syncspirit;
 using L = spdlog::level::level_enum;
 
 static bool _init = []() {
-    auto dist_sink = utils::create_root_logger();
+    auto [dist_sink, _] = utils::create_root_logger();
     auto console_sink = std::make_shared<spdlog::sinks::stderr_color_sink_mt>();
     dist_sink->add_sink(console_sink);
     dist_sink->add_sink(std::make_shared<spdlog::sinks::null_sink_mt>());
@@ -58,10 +59,10 @@ TEST_CASE("hierarchy", "[log]") {
 
 TEST_CASE("file sink", "[log]") {
     auto dir = bfs::absolute(bfs::current_path() / st::unique_path());
-    auto path_guard = st::path_guard_t{dir};
-    bfs::create_directory(dir);
-    auto log_file = dir / "log.txt";
-    auto log_file_str = log_file.string();
+    auto path_guard = st::path_guard_t(dir);
+    bfs::create_directories(dir);
+    auto log_file = dir / L"папка" / L"журнал.txt";
+    auto log_file_str = boost::nowide::narrow(log_file.wstring());
 
     auto sink_config = fmt::format("file:{}", log_file_str);
     config::log_configs_t cfg{{"default", L::trace, {sink_config}}};
@@ -70,7 +71,7 @@ TEST_CASE("file sink", "[log]") {
     l->info("lorem ipsum dolor");
     l->flush();
 
-    spdlog::drop_all(); // to cleanup on win32
+    utils::finalize_loggers(); // to cleanup on win32
     auto data = st::read_file(log_file);
     CHECK(log_file_str != "");
     CHECK(!data.empty());

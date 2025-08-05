@@ -19,17 +19,6 @@ using namespace syncspirit::fltk;
 
 static constexpr int padding = 5;
 
-struct syncspirit::fltk::fltk_sink_t final : base_sink_t {
-    fltk_sink_t(log_panel_t *widget_) : widget{widget_} {}
-
-    void forward(log_record_ptr_t record) override {
-        auto lock = std::unique_lock(widget->incoming_mutex);
-        widget->incoming_records.push_back(std::move(record));
-    }
-
-    log_panel_t *widget;
-};
-
 static void _pull_in_logs(void *data) {
     reinterpret_cast<log_panel_t *>(data)->pull_in_logs();
     Fl::add_timeout(0.05, _pull_in_logs, data);
@@ -235,21 +224,8 @@ log_panel_t::log_panel_t(app_supervisor_t &supervisor_, int x, int y, int w, int
 
     resizable(log_table);
 
-    auto bridge_sink = sink_ptr_t(new fltk_sink_t(this));
+    sink = supervisor.get_log_sink();
 
-    auto &dist_sink = supervisor.get_dist_sink();
-    for (auto sink : dist_sink->sinks()) {
-        auto in_memory_sink = dynamic_cast<im_memory_sink_t *>(sink.get());
-        if (in_memory_sink) {
-            std::lock_guard lock(in_memory_sink->mutex);
-            auto &src = in_memory_sink->records;
-            std::move(src.begin(), src.end(), std::back_inserter(*records));
-            src.clear();
-            dist_sink->remove_sink(sink);
-            break;
-        }
-    }
-    supervisor.add_sink(bridge_sink);
     update();
 }
 
@@ -319,11 +295,8 @@ void log_panel_t::set_splash_text(std::string text) {
 }
 
 void log_panel_t::pull_in_logs() {
-    auto lock = std::unique_lock(incoming_mutex);
-    auto &source = incoming_records;
-    if (source.size()) {
-        auto copy = std::move(incoming_records);
-        lock.unlock();
-        update(std::move(copy));
+    auto logs = sink->consume();
+    if (logs.size()) {
+        update(std::move(logs));
     }
 }

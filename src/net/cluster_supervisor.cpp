@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "cluster_supervisor.h"
 #include "controller_actor.h"
@@ -12,8 +12,7 @@
 using namespace syncspirit::net;
 
 cluster_supervisor_t::cluster_supervisor_t(cluster_supervisor_config_t &config)
-    : ra::supervisor_asio_t{config}, bep_config{config.bep_config}, hasher_threads{config.hasher_threads},
-      cluster{config.cluster}, sequencer{config.sequencer} {}
+    : ra::supervisor_asio_t{config}, config{config.config}, cluster{config.cluster}, sequencer{config.sequencer} {}
 
 void cluster_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     ra::supervisor_asio_t::configure(plugin);
@@ -33,7 +32,7 @@ void cluster_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept 
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &) {
         create_actor<hasher::hasher_proxy_actor_t>()
             .timeout(init_timeout)
-            .hasher_threads(hasher_threads)
+            .hasher_threads(config.hasher_threads)
             .name(net::names::hasher_proxy)
             .finish();
     });
@@ -63,22 +62,24 @@ auto cluster_supervisor_t::operator()(const model::diff::contact::peer_state_t &
     -> outcome::result<void> {
     if (!cluster->is_tainted()) {
         auto peer = cluster->get_devices().by_sha256(diff.peer_id);
-        LOG_TRACE(log, "visiting peer_state_t, {}, state: {}, has been online: {}", peer->device_id(), (int)diff.state,
-                  diff.has_been_online);
-        if (diff.state == model::device_state_t::online) {
-            /* auto addr = */
+        auto conn_state = diff.state.get_connection_state();
+        bool launch_controller = (peer->get_state() == diff.state && diff.state.is_online());
+        LOG_TRACE(log, "visiting peer_state_t, {}, state: {}, has been online: {}, launch controller: {}",
+                  peer->device_id(), (int)conn_state, diff.has_been_online, launch_controller);
+        if (launch_controller) {
+            auto &bep = config.bep_config;
             create_actor<controller_actor_t>()
                 .cluster(cluster)
                 .sequencer(sequencer)
                 .timeout(init_timeout * 7 / 9)
                 .peer(peer)
                 .peer_addr(diff.peer_addr)
-                .connection_id(diff.connection_id)
-                .blocks_max_requested(bep_config.blocks_max_requested)
-                .advances_per_iteration(bep_config.advances_per_iteration)
-                .outgoing_buffer_max(bep_config.tx_buff_limit)
-                .request_pool(bep_config.rx_buff_size)
-                .request_timeout(pt::milliseconds(bep_config.request_timeout))
+                .blocks_max_requested(bep.blocks_max_requested)
+                .advances_per_iteration(bep.advances_per_iteration)
+                .outgoing_buffer_max(bep.tx_buff_limit)
+                .request_pool(bep.rx_buff_size)
+                .request_timeout(pt::milliseconds(bep.request_timeout))
+                .default_path(config.default_location)
                 .finish();
         }
     }

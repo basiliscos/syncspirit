@@ -26,14 +26,14 @@ TEST_CASE("peer state update", "[model]") {
 
     rotor::address_ptr_t addr;
     auto builder = diff_builder_t(*cluster);
-    REQUIRE(peer_device->get_state() == model::device_state_t::offline);
+    REQUIRE(peer_device->get_state().get_connection_state() == model::connection_state_t::offline);
 
-    auto connection_id = std::string("tcp://1.1.1.1:1");
-    REQUIRE(builder.update_state(*peer_device, addr, device_state_t::online, connection_id).apply());
-    CHECK(peer_device->get_state() == model::device_state_t::online);
+    auto state_1 = peer_device->get_state().connecting().connected().online("tcp://1.2.3.4:5678");
+    REQUIRE(builder.update_state(*peer_device, addr, state_1).apply());
+    REQUIRE(peer_device->get_state().is_online());
 
-    REQUIRE(builder.update_state(*peer_device, addr, device_state_t::offline, connection_id).apply());
-    CHECK(peer_device->get_state() == model::device_state_t::offline);
+    REQUIRE(builder.update_state(*peer_device, addr, state_1.offline()).apply());
+    REQUIRE(peer_device->get_state().is_offline());
 }
 
 TEST_CASE("with file", "[model]") {
@@ -49,30 +49,34 @@ TEST_CASE("with file", "[model]") {
     auto folder = cluster->get_folders().by_id("1234-5678");
     auto folder_info = folder->get_folder_infos().by_device(*my_device);
 
-    proto::FileInfo pr_file_info;
-    pr_file_info.set_name("a.txt");
-    pr_file_info.set_type(proto::FileInfoType::SYMLINK);
-    pr_file_info.set_symlink_target("/some/where");
-    pr_file_info.set_block_size(5);
-    pr_file_info.set_size(5);
-    auto b1_hash = utils::sha256_digest("12345").value();
-    auto b1 = pr_file_info.add_blocks();
-    b1->set_hash(b1_hash);
-    b1->set_offset(0);
-    b1->set_size(5);
+    auto pr_file = []() -> proto::FileInfo {
+        auto f = proto::FileInfo();
+        proto::set_name(f, "a.txt");
+        proto::set_type(f, proto::FileInfoType::SYMLINK);
+        proto::set_symlink_target(f, "/some/where");
+        proto::set_block_size(f, 5);
+        proto::set_size(f, 5);
+        return f;
+    }();
+    auto b1_hash = utils::sha256_digest(as_bytes("12345")).value();
+    auto &b1 = proto::add_blocks(pr_file);
+    proto::set_hash(b1, b1_hash);
+    proto::set_offset(b1, 0);
+    proto::set_size(b1, 5);
 
-    REQUIRE(builder.local_update(folder->get_id(), pr_file_info).apply());
+    REQUIRE(builder.local_update(folder->get_id(), pr_file).apply());
     auto file = folder_info->get_file_infos().by_name("a.txt");
     REQUIRE(file);
 
     auto v = file->get_version();
     REQUIRE(v->counters_size() == 1);
-    REQUIRE(v->get_counter(0).id() == my_device->device_id().get_uint());
+    REQUIRE(proto::get_id(v->get_counter(0)) == my_device->device_id().get_uint());
 
     SECTION("lock/unlock") {
         auto diff = diff::cluster_diff_ptr_t(new diff::modify::lock_file_t(*file, true));
         REQUIRE(diff->apply(*cluster, get_apply_controller()));
-        auto file = folder_info->get_file_infos().by_name(pr_file_info.name());
+        auto name = proto::get_name(pr_file);
+        auto file = folder_info->get_file_infos().by_name(name);
         REQUIRE(file->is_locked());
 
         diff = diff::cluster_diff_ptr_t(new diff::modify::lock_file_t(*file, false));
@@ -81,7 +85,7 @@ TEST_CASE("with file", "[model]") {
     }
 
     SECTION("file_availability") {
-        auto block = cluster->get_blocks().get(b1_hash);
+        auto block = cluster->get_blocks().by_hash(b1_hash);
         file->remove_blocks();
         file->assign_block(block, 0);
         REQUIRE(!file->is_locally_available());

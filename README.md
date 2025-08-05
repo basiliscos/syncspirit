@@ -12,13 +12,12 @@ simplistically speaking, it is a [syncthing](https://syncthing.net)-compatible s
 program at protocol level, which uses the [syncthing](https://syncthing.net) infrastructure (for global discovery
 and relaying).
 
-Despite being functional, `syncspirit` is much less feature-rich than [syncthing](https://syncthing.net)
+Despite being functional, `syncspirit` is less feature-rich than [syncthing](https://syncthing.net)
 and is still in heavy development
-
 
 # front-ends (aka UIs)
 
-![different UIs](docs/different-uis.gif)
+![overview](docs/fltk-overview.gif)
 
 - [fltk](https://www.fltk.org/)-based gui [app](docs/ui-fltk.md)
 
@@ -42,6 +41,13 @@ All front-ends share the same configuration and database when running on same ho
 
 - [x] conflict resolution
 
+- [x] incoming and outcoming messages (de)compression using lz4
+
+- [x] introducer support
+
+- [x] send only/receive only dirs
+
+
 # missing features
 
 This list is probably incomplete. Here are the most important changes:
@@ -52,15 +58,7 @@ This list is probably incomplete. Here are the most important changes:
 
 - [ ] [QUIC transport](https://en.wikipedia.org/wiki/QUIC)
 
-- [ ] introducer support
-
-- [ ] outgoing messages compression
-
 - [ ] [untrusted devices encryption](https://docs.syncthing.net/specs/untrusted.html)
-
-- [ ] send only/receive only dirs
-
-- [ ] ...
 
 # run
 
@@ -121,10 +119,27 @@ after the core completion.
 
 - linux
 - windows
-- mac os x (it is know that it can be build and run on that platform, but I don't know to make
-distributions on it)
+- mac os x
 
 # changes
+
+## 0.4.1 (05-Aug-2025)
+ - [core, fltk] support merged cluster folder model
+ - [core] possibility to import directories outside of syncthing, including
+         partial import, see [faq](faq.md)
+ - [core] performance improvents, upto 5 times on a smaller files
+ - [core] fix compatibility with global discovery [v3 protocol](https://docs.syncthing.net/specs/globaldisco-v3.html)
+ - [core] support `folder_type` folder setting (send only, receive only, send & receive)
+ - [core] support `pull_older` folder setting (alphabetic, by size, by modification date)
+ - [core, bep] support `disable_temp_indixes` (hardcoded to `1` for atm)
+ - [core, bep] support `ignore_permissions` folder flag, `permissions` and `no_permissions`
+               file flag
+ - [core, bep] support `ignore_deletes` folder flag
+ - [core, bep] support device `auto-accept` folder flag
+ - [core, bep] support device `introducer` and `skip_introduction_removals` markers
+ - [core, bep] support outgoing messages to be compressed using lz4
+ - [core] syncrhonize threads/app startup
+ - [impl] degoogle: use [protopuf](https://github.com/PragmaTwice/protopuf) instead of protobuf
 
 ## 0.4.0 (22-Feb-2025)
  - [feature] new [fltk-fronted](docs/ui-fltk.md)
@@ -163,7 +178,6 @@ the relay is randomly chosen from the public relays [pool](https://relays.syncth
 [see](docs/building.md)
 
 # license
-
 
 This software is licensed under the [GPLv3 license](https://www.gnu.org/licenses/gpl-3.0.en.html).
 

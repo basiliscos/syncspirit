@@ -37,24 +37,24 @@ TEST_CASE("remove folder", "[model]") {
 
     auto b1 = [&]() {
         auto bi = proto::BlockInfo();
-        bi.set_size(5);
-        bi.set_hash(utils::sha256_digest("1").value());
+        proto::set_hash(bi, utils::sha256_digest(as_bytes("1")).value());
+        proto::set_size(bi, 5);
         auto block = block_info_t::create(bi).assume_value();
         blocks_map.put(block);
         return block;
     }();
     auto b2 = [&]() {
         auto bi = proto::BlockInfo();
-        bi.set_size(5);
-        bi.set_hash(utils::sha256_digest("2").value());
+        proto::set_hash(bi, utils::sha256_digest(as_bytes("2")).value());
+        proto::set_size(bi, 5);
         auto block = block_info_t::create(bi).assume_value();
         blocks_map.put(block);
         return block;
     }();
     auto b3 = [&]() {
         auto bi = proto::BlockInfo();
-        bi.set_size(5);
-        bi.set_hash(utils::sha256_digest("3").value());
+        proto::set_hash(bi, utils::sha256_digest(as_bytes("3")).value());
+        proto::set_size(bi, 5);
         auto block = block_info_t::create(bi).assume_value();
         blocks_map.put(block);
         return block;
@@ -68,15 +68,16 @@ TEST_CASE("remove folder", "[model]") {
 
     auto file_1 = [&]() {
         proto::FileInfo pr_fi;
-        pr_fi.set_name("a.txt");
-        pr_fi.set_block_size(5);
-        pr_fi.set_size(5);
-        pr_fi.mutable_version()->add_counters()->set_id(peer_device->device_id().get_uint());
-        auto b_hash = utils::sha256_digest("1").value();
-        auto b = pr_fi.add_blocks();
-        b->set_hash(b_hash);
-        b->set_offset(0);
-        b->set_size(5);
+        proto::set_name(pr_fi, "a.txt");
+        proto::set_block_size(pr_fi, 5ul);
+        proto::set_size(pr_fi, 5ul);
+        auto &v = proto::get_version(pr_fi);
+        proto::add_counters(v, proto::Counter(peer_device->device_id().get_uint(), 0));
+
+        auto b_hash = utils::sha256_digest(as_bytes("1")).value();
+        auto &b = proto::add_blocks(pr_fi);
+        proto::set_hash(b, b_hash);
+        proto::set_size(b, 5);
 
         auto fi = file_info_t::create(sequencer->next_uuid(), pr_fi, fi_1_peer).value();
         fi->assign_block(b1, 0);
@@ -86,15 +87,16 @@ TEST_CASE("remove folder", "[model]") {
 
     auto file_2 = [&]() {
         proto::FileInfo pr_fi;
-        pr_fi.set_name("b.txt");
-        pr_fi.set_block_size(5);
-        pr_fi.set_size(5);
-        pr_fi.mutable_version()->add_counters()->set_id(my_device->device_id().get_uint());
-        auto b_hash = utils::sha256_digest("2").value();
-        auto b = pr_fi.add_blocks();
-        b->set_hash(b_hash);
-        b->set_offset(0);
-        b->set_size(5);
+        proto::set_name(pr_fi, "b.txt");
+        proto::set_block_size(pr_fi, 5ul);
+        proto::set_size(pr_fi, 5ul);
+        auto &v = proto::get_version(pr_fi);
+        proto::add_counters(v, proto::Counter(peer_device->device_id().get_uint(), 0));
+
+        auto b_hash = utils::sha256_digest(as_bytes("2")).value();
+        auto &b = proto::add_blocks(pr_fi);
+        proto::set_hash(b, b_hash);
+        proto::set_size(b, 5);
 
         auto fi = file_info_t::create(sequencer->next_uuid(), pr_fi, fi_1_mine).value();
         fi->assign_block(b2, 0);
@@ -104,15 +106,16 @@ TEST_CASE("remove folder", "[model]") {
 
     auto file_3 = [&]() {
         proto::FileInfo pr_fi;
-        pr_fi.set_name("c.txt");
-        pr_fi.set_block_size(5);
-        pr_fi.set_size(5);
-        pr_fi.mutable_version()->add_counters()->set_id(my_device->device_id().get_uint());
-        auto b_hash = utils::sha256_digest("3").value();
-        auto b = pr_fi.add_blocks();
-        b->set_hash(b_hash);
-        b->set_offset(0);
-        b->set_size(5);
+        proto::set_name(pr_fi, "c.txt");
+        proto::set_block_size(pr_fi, 5ul);
+        proto::set_size(pr_fi, 5ul);
+        auto &v = proto::get_version(pr_fi);
+        proto::add_counters(v, proto::Counter(peer_device->device_id().get_uint(), 0));
+
+        auto b_hash = utils::sha256_digest(as_bytes("3")).value();
+        auto &b = proto::add_blocks(pr_fi);
+        proto::set_hash(b, b_hash);
+        proto::set_size(b, 5);
 
         auto fi = file_info_t::create(sequencer->next_uuid(), pr_fi, fi_2_mine).value();
         fi->assign_block(b3, 0);

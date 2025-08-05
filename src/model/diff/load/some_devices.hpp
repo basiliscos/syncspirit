@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
 
 #pragma once
 
 #include "model/device_id.h"
 #include "model/misc/error_code.h"
-#include "structs.pb.h"
+#include "proto/proto-helpers-db.h"
 #include "common.h"
 
 #include <boost/outcome.hpp>
@@ -18,20 +18,18 @@ struct some_devices_t {
     template <typename T> static outcome::result<void> apply(const container_t items, typename T::map_t &map) noexcept {
         for (auto &pair : items) {
             auto key = pair.key;
-            auto sha256 = key.substr(1, T::digest_length);
+            auto sha256 = key.subspan(1, T::digest_length);
             auto device_id_opt = device_id_t::from_sha256(sha256);
             if (!device_id_opt) {
                 return make_error_code(error_code_t::malformed_deviceid);
             }
             auto &device_id = *device_id_opt;
 
-            auto data = pair.value;
-            db::SomeDevice db;
-            auto ok = db.ParseFromArray(data.data(), data.size());
-            if (!ok) {
+            auto db_sd = db::SomeDevice();
+            if (auto left = db::decode(pair.value, db_sd); left) {
                 return make_error_code(error_code_t::some_device_deserialization_failure);
             }
-            auto option = T::create(device_id, db);
+            auto option = T::create(device_id, db_sd);
             if (!option) {
                 return option.assume_error();
             }

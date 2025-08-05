@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #pragma once
 
@@ -72,6 +72,8 @@ struct SYNCSPIRIT_API db_actor_t : public r::actor_base_t, private model::diff::
     void on_model_load_release(model::message::model_update_t &) noexcept;
     void on_model_update(model::message::model_update_t &) noexcept;
     void on_db_info(message::db_info_request_t &) noexcept;
+    void on_controller_up(net::message::controller_up_t &message) noexcept;
+    void on_controller_down(net::message::controller_down_t &message) noexcept;
     void extracted(const model::folder_info_t &folder_info);
     outcome::result<void> save_folder_info(const model::folder_info_t &, void *) noexcept;
     outcome::result<void> remove(const model::diff::modify::generic_remove_t &, void *) noexcept;
@@ -80,6 +82,7 @@ struct SYNCSPIRIT_API db_actor_t : public r::actor_base_t, private model::diff::
     outcome::result<void> operator()(const model::diff::contact::peer_state_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::contact::ignored_connected_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::contact::unknown_connected_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::load::remove_corrupted_files_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::add_blocks_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::add_ignored_device_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::add_pending_device_t &, void *) noexcept override;

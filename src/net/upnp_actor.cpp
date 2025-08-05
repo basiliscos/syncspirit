@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "upnp_actor.h"
 #include "proto/upnp_support.h"
@@ -63,7 +63,7 @@ void upnp_actor_t::on_start() noexcept {
     r::actor_base_t::on_start();
     rx_buff = std::make_shared<payload::http_request_t::rx_buff_t>();
 
-    fmt::memory_buffer tx_buff;
+    utils::bytes_t tx_buff;
     auto res = make_description_request(tx_buff, main_url);
     if (!res) {
         auto &ec = res.error();
@@ -73,7 +73,7 @@ void upnp_actor_t::on_start() noexcept {
     make_request(addr_description, main_url, std::move(tx_buff), true);
 }
 
-void upnp_actor_t::make_request(const r::address_ptr_t &addr, utils::uri_ptr_t &uri, fmt::memory_buffer &&tx_buff,
+void upnp_actor_t::make_request(const r::address_ptr_t &addr, utils::uri_ptr_t &uri, utils::bytes_t &&tx_buff,
                                 bool get_local_address) noexcept {
     resources->acquire(resource::http_req);
     auto timeout = shutdown_timeout * 8 / 9;
@@ -131,7 +131,7 @@ void upnp_actor_t::on_igd_description(message::http_response_t &msg) noexcept {
     }
     igd_control_url = url;
 
-    fmt::memory_buffer tx_buff;
+    utils::bytes_t tx_buff;
     auto res = make_external_ip_request(tx_buff, igd_control_url);
     if (!res) {
         auto &ec = res.error();
@@ -187,7 +187,7 @@ void upnp_actor_t::on_external_ip(message::http_response_t &msg) noexcept {
     }
     LOG_DEBUG(log, "going to map {}:{} => {}:{}", ip_addr, external_port, local_address, local_port);
 
-    fmt::memory_buffer tx_buff;
+    utils::bytes_t tx_buff;
     auto res = make_mapping_request(tx_buff, igd_control_url, external_port, local_address.to_string(), local_port);
     if (!res) {
         auto &ec = res.error();
@@ -232,7 +232,7 @@ void upnp_actor_t::on_mapping_port(message::http_response_t &msg) noexcept {
     }
 
     if (ok) {
-        fmt::memory_buffer tx_buff;
+        utils::bytes_t tx_buff;
         auto res = make_mapping_validation_request(tx_buff, igd_control_url, external_port);
         if (!res) {
             auto &ec = res.error();
@@ -327,7 +327,7 @@ void upnp_actor_t::shutdown_start() noexcept {
 
     if (resources->has(resource::external_port)) {
         LOG_TRACE(log, "going to unmap external port {}", external_port);
-        fmt::memory_buffer tx_buff;
+        utils::bytes_t tx_buff;
         auto res = make_unmapping_request(tx_buff, igd_control_url, external_port);
         if (!res) {
             LOG_WARN(log, "error making port mapping request :: {}", res.error().message());

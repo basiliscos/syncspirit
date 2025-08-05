@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "clone_block.h"
 #include "model/diff/cluster_visitor.h"
@@ -19,24 +19,25 @@ clone_block_t::clone_block_t(const file_block_t &file_block) noexcept
         }
     }
     assert(source_file);
-    assert(file_block.file()->get_blocks().at(block_index)->get_hash() == source_file->get_folder_info()
-                                                                              ->get_folder()
-                                                                              ->get_cluster()
-                                                                              ->get_folders()
-                                                                              .by_id(folder_id)
-                                                                              ->get_folder_infos()
-                                                                              .by_device_id(device_id)
-                                                                              ->get_file_infos()
-                                                                              .by_name(file_name)
-                                                                              ->get_blocks()
-                                                                              .at(block_index)
-                                                                              ->get_hash());
+
     auto source_fi = source_file->get_folder_info();
     source_device_id = source_fi->get_device()->device_id().get_sha256();
     source_folder_id = source_fi->get_folder()->get_id();
     source_file_name = source_file->get_name();
 
-    LOG_DEBUG(log, "clone_block_t, file = {}, folder = {}, block = {}", file_name, folder_id, block_index);
+    assert(file_block.file()->get_blocks().at(block_index)->get_hash() == source_fi->get_folder()
+                                                                              ->get_cluster()
+                                                                              ->get_folders()
+                                                                              .by_id(source_fi->get_folder()->get_id())
+                                                                              ->get_folder_infos()
+                                                                              .by_device(*source_fi->get_device())
+                                                                              ->get_file_infos()
+                                                                              .by_name(source_file_name)
+                                                                              ->get_blocks()
+                                                                              .at(source_block_index)
+                                                                              ->get_hash());
+    LOG_DEBUG(log, "clone_block_t, file = {}, folder = {}, block = {} (source file {} from {} #{})", file_name,
+              folder_id, block_index, source_file_name, source_folder_id, source_block_index);
 }
 
 auto clone_block_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

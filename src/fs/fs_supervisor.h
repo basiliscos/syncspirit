@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #pragma once
 
@@ -8,8 +8,10 @@
 #include "utils/log.h"
 #include "model/messages.h"
 #include "model/diff/apply_controller.h"
+#include "model/diff/cluster_visitor.h"
 #include "model/misc/sequencer.h"
 #include "syncspirit-export.h"
+#include "file_cache.h"
 #include <rotor/thread.hpp>
 
 namespace syncspirit {
@@ -17,6 +19,7 @@ namespace fs {
 
 namespace r = rotor;
 namespace rth = rotor::thread;
+namespace outcome = boost::outcome_v2;
 
 struct SYNCSPIRIT_API fs_supervisor_config_t : r::supervisor_config_t {
     config::fs_config_t fs_config;
@@ -43,7 +46,9 @@ template <typename Supervisor> struct fs_supervisor_config_builder_t : r::superv
     }
 };
 
-struct SYNCSPIRIT_API fs_supervisor_t : rth::supervisor_thread_t, private model::diff::apply_controller_t {
+struct SYNCSPIRIT_API fs_supervisor_t : rth::supervisor_thread_t,
+                                        private model::diff::cluster_visitor_t,
+                                        private model::diff::apply_controller_t {
     using launcher_t = std::function<void(model::cluster_ptr_t &)>;
     using parent_t = rth::supervisor_thread_t;
     using config_t = fs_supervisor_config_t;
@@ -52,6 +57,7 @@ struct SYNCSPIRIT_API fs_supervisor_t : rth::supervisor_thread_t, private model:
     explicit fs_supervisor_t(config_t &cfg);
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
     void on_start() noexcept override;
+    void on_child_shutdown(actor_base_t *actor) noexcept override;
     template <typename F> void add_launcher(F &&launcher) noexcept { launchers.push_back(std::forward<F>(launcher)); }
 
   private:
@@ -61,7 +67,14 @@ struct SYNCSPIRIT_API fs_supervisor_t : rth::supervisor_thread_t, private model:
     void on_model_request(model::message::model_request_t &req) noexcept;
     void on_model_response(model::message::model_response_t &res) noexcept;
     void on_model_update(model::message::model_update_t &message) noexcept;
+    void on_app_ready(model::message::app_ready_t &) noexcept;
     void launch() noexcept;
+
+    outcome::result<void> operator()(const model::diff::load::load_cluster_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::modify::upsert_folder_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::modify::upsert_folder_info_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::advance::advance_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::peer::update_folder_t &, void *) noexcept override;
 
     model::sequencer_ptr_t sequencer;
     model::cluster_ptr_t cluster;
@@ -73,6 +86,7 @@ struct SYNCSPIRIT_API fs_supervisor_t : rth::supervisor_thread_t, private model:
     r::actor_ptr_t file_actor;
     model_request_ptr_t model_request;
     launchers_t launchers;
+    file_cache_ptr_t rw_cache;
 };
 
 } // namespace fs

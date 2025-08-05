@@ -4,7 +4,6 @@ include(GenerateExportHeader)
 find_package(
     Boost
     COMPONENTS
-        program_options
         system
     REQUIRED
 )
@@ -17,6 +16,7 @@ endif()
 
 add_library(syncspirit_test_lib SHARED
     $<$<PLATFORM_ID:Windows>:win32-resource.rc>
+    managed_hasher.cpp
     test_supervisor.cpp
     test-db.cpp
     test-utils.cpp
@@ -44,7 +44,7 @@ function(create_test source)
     target_link_libraries(${target} syncspirit_test_lib)
     add_test(
         NAME "${target}-test"
-        COMMAND $<TARGET_FILE_NAME:${target}>
+        COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE_NAME:${target}>
     )
 endfunction()
 
@@ -65,16 +65,19 @@ create_test(018-dns.cpp)
 create_test(020-generic-map.cpp)
 create_test(021-orphaned-blocks.cpp)
 create_test(022-version.cpp)
+create_test(023-device-state.cpp)
 create_test(025-device_id.cpp)
 create_test(026-file_info.cpp)
+create_test(027-cluster.cpp)
 create_test(029-diff-generic.cpp)
 create_test(030-diff-load-cluster.cpp)
 create_test(031-diff-cluster_update.cpp)
 create_test(032-diff-modify.cpp)
 create_test(033-diffs-trivial.cpp)
 create_test(034-diff-local_update.cpp)
+create_test(035-diff-update_folder.cpp)
 create_test(036-diff-blocks.cpp)
-create_test(037-diff-update_folder.cpp)
+create_test(037-diff-upsert_folder.cpp)
 create_test(038-diff-clone_finish-file.cpp)
 create_test(039-diff-remove-peer.cpp)
 create_test(040-diff-contacts.cpp)
@@ -86,16 +89,20 @@ create_test(052-file_info.cpp)
 create_test(053-scan_task.cpp)
 create_test(054-updates_streamer.cpp)
 create_test(055-resolver.cpp)
+create_test(056-block-request.cpp)
 create_test(060-bep.cpp)
+create_test(061-presentation.cpp)
 create_test(070-db.cpp)
 create_test(071-fs_actor.cpp)
 create_test(072-global_discovery.cpp)
 create_test(073-dialer.cpp)
 create_test(074-hasher.cpp)
 create_test(075-controller.cpp)
+create_test(076-http.cpp)
 create_test(077-initiator.cpp)
 create_test(078-relay.cpp)
 create_test(079-peer.cpp)
 create_test(080-resolver.cpp)
 create_test(085-scan-scheduler.cpp)
 create_test(086-scan_actor.cpp)
+create_test(110-file-n-controller-actors.cpp)

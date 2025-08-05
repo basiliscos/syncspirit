@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #pragma once
 
@@ -113,10 +113,10 @@ template <> struct base_impl_t<ssl_socket_t> {
 
         auto me = source.me;
         if (me) {
-            auto &cert_data = me->cert_data.bytes;
-            auto &key_data = me->key_data.bytes;
-            ctx.use_certificate(asio::const_buffer(cert_data.c_str(), cert_data.size()), ssl::context::asn1);
-            ctx.use_private_key(asio::const_buffer(key_data.c_str(), key_data.size()), ssl::context::asn1);
+            auto &cert_data = me->cert_data;
+            auto &key_data = me->key_data;
+            ctx.use_certificate(asio::const_buffer(cert_data.data(), cert_data.size()), ssl::context::asn1);
+            ctx.use_private_key(asio::const_buffer(key_data.data(), key_data.size()), ssl::context::asn1);
         }
 
         if (alpn.size()) {
@@ -172,7 +172,8 @@ template <> struct base_impl_t<ssl_socket_t> {
                     return false;
                 }
 
-                utils::cert_data_t cert_data{std::move(der_option.value())};
+                auto &der_bytes = der_option.value();
+                auto cert_data = utils::cert_data_t(std::move(der_bytes));
                 auto peer_option = model::device_id_t::from_cert(cert_data);
                 if (!peer_option) {
                     log->warn("cannot get device_id from peer");
@@ -185,7 +186,7 @@ template <> struct base_impl_t<ssl_socket_t> {
                     log->trace("peer device_id = {}", actual_peer);
                 }
 
-                if (role == ssl::stream_base::handshake_type::client) {
+                if (role == ssl::stream_base::handshake_type::client && expected_peer) {
                     if (actual_peer != expected_peer) {
                         log->warn("unexpected peer device_id. Got: {}, expected: {}", actual_peer.get_value(),
                                   expected_peer.get_value());
@@ -206,6 +207,7 @@ template <> struct base_impl_t<ssl_socket_t> {
 template <typename Sock, typename Owner> inline void generic_async_send(Owner owner, asio::const_buffer buff) noexcept {
     auto &sock = owner->backend->sock;
     asio::async_write(sock, buff, [owner = std::move(owner)](auto ec, auto bytes) mutable {
+        // sock.async_write_some(buff, [owner = std::move(owner)](auto ec, auto bytes) mutable {
         auto &strand = owner->backend->strand;
         if (ec) {
             strand.post([ec = ec, owner = std::move(owner)]() mutable {
