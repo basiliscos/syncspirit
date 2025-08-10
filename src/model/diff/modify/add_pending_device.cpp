@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
 
 #include "add_pending_device.h"
 #include "model/cluster.h"
@@ -12,7 +12,7 @@ add_pending_device_t::add_pending_device_t(const device_id_t &id_, db::SomeDevic
     LOG_DEBUG(log, "add_pending_device_t, peer = {}", device_id.get_short());
 }
 
-auto add_pending_device_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
+auto add_pending_device_t::apply_impl(cluster_t &cluster, apply_controller_t &controller, void *custom) const noexcept
     -> outcome::result<void> {
     auto opt = pending_device_t::create(device_id, db_device);
     if (!opt) {
@@ -20,7 +20,7 @@ auto add_pending_device_t::apply_impl(cluster_t &cluster, apply_controller_t &co
     }
     auto &pending_device = opt.assume_value();
     cluster.get_pending_devices().put(std::move(pending_device));
-    return applicator_t::apply_sibling(cluster, controller);
+    return applicator_t::apply_sibling(cluster, controller, custom);
 }
 
 auto add_pending_device_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

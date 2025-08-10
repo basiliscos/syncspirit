@@ -15,7 +15,7 @@ remote_copy_t::remote_copy_t(const cluster_t &cluster, sequencer_t &sequencer, p
     initialize(cluster, sequencer, std::move(proto_file_), {});
 }
 
-auto remote_copy_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
+auto remote_copy_t::apply_impl(cluster_t &cluster, apply_controller_t &controller, void *custom) const noexcept
     -> outcome::result<void> {
     auto folder = cluster.get_folders().by_id(folder_id);
     if (!folder) {
@@ -28,9 +28,9 @@ auto remote_copy_t::apply_impl(cluster_t &cluster, apply_controller_t &controlle
         LOG_DEBUG(log, "remote_copy_t, folder = {}, name = {}, peer folder is not available, ignoring", folder_id,
                   proto::get_name(proto_source));
     } else {
-        return advance_t::apply_impl(cluster, controller);
+        return advance_t::apply_impl(cluster, controller, custom);
     }
-    return applicator_t::apply_sibling(cluster, controller);
+    return applicator_t::apply_sibling(cluster, controller, custom);
 }
 
 auto remote_copy_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

@@ -8,7 +8,7 @@
 
 using namespace syncspirit::model::diff::load;
 
-auto pending_folders_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
+auto pending_folders_t::apply_impl(cluster_t &cluster, apply_controller_t &controller, void *custom) const noexcept
     -> outcome::result<void> {
     auto &items = cluster.get_pending_folders();
     for (auto &pair : folders) {
@@ -23,5 +23,5 @@ auto pending_folders_t::apply_impl(cluster_t &cluster, apply_controller_t &contr
         auto &folder = option.value();
         items.put(std::move(folder));
     }
-    return applicator_t::apply_sibling(cluster, controller);
+    return applicator_t::apply_sibling(cluster, controller, custom);
 }

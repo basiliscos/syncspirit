@@ -108,6 +108,7 @@ add_library(syncspirit_core
     src/fs/scan_scheduler.cpp
     src/fs/scan_task.cpp
     src/fs/utils.cpp
+    src/hasher/bouncer.cpp
     src/hasher/hasher_actor.cpp
     src/hasher/hasher_proxy_actor.cpp
     src/hasher/hasher_supervisor.cpp
@@ -133,6 +134,7 @@ add_library(syncspirit_core
     src/model/diff/load/folders.cpp
     src/model/diff/load/ignored_devices.cpp
     src/model/diff/load/ignored_folders.cpp
+    src/model/diff/load/interrupt.cpp
     src/model/diff/load/load_cluster.cpp
     src/model/diff/load/pending_devices.cpp
     src/model/diff/load/pending_folders.cpp

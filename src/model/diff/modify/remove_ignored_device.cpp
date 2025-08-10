@@ -13,8 +13,8 @@ remove_ignored_device_t::remove_ignored_device_t(const ignored_device_t &device)
     LOG_DEBUG(log, "remove_ignored_device_t, device = {}", device.get_device_id());
 }
 
-auto remove_ignored_device_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
-    -> outcome::result<void> {
+auto remove_ignored_device_t::apply_impl(cluster_t &cluster, apply_controller_t &controller,
+                                         void *custom) const noexcept -> outcome::result<void> {
     auto &ignored_devices = cluster.get_ignored_devices();
     auto sha256 = get_device_sha256();
     auto ignored_device = ignored_devices.by_sha256(sha256);
@@ -22,7 +22,7 @@ auto remove_ignored_device_t::apply_impl(cluster_t &cluster, apply_controller_t 
         return make_error_code(error_code_t::no_such_device);
     }
     ignored_devices.remove(ignored_device);
-    return applicator_t::apply_sibling(cluster, controller);
+    return applicator_t::apply_sibling(cluster, controller, custom);
 }
 
 auto remove_ignored_device_t::get_device_sha256() const noexcept -> utils::bytes_view_t {

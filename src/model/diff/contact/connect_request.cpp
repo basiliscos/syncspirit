@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "connect_request.h"
 #include "../cluster_visitor.h"
@@ -12,9 +12,9 @@ connect_request_t::connect_request_t(tcp::socket sock_, const tcp::endpoint &rem
     LOG_DEBUG(log, "connect_request_t, endpoint = {}", remote);
 }
 
-auto connect_request_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
+auto connect_request_t::apply_impl(cluster_t &cluster, apply_controller_t &controller, void *custom) const noexcept
     -> outcome::result<void> {
-    return applicator_t::apply_sibling(cluster, controller);
+    return applicator_t::apply_sibling(cluster, controller, custom);
 }
 
 auto connect_request_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

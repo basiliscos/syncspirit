@@ -12,7 +12,7 @@ file_availability_t::file_availability_t(file_info_ptr_t file_) noexcept : file{
     version.reset(new version_t(file->get_version()->as_proto()));
 }
 
-auto file_availability_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
+auto file_availability_t::apply_impl(cluster_t &cluster, apply_controller_t &controller, void *custom) const noexcept
     -> outcome::result<void> {
     auto folder = cluster.get_folders().by_id(folder_id);
     if (folder) {
@@ -30,7 +30,7 @@ auto file_availability_t::apply_impl(cluster_t &cluster, apply_controller_t &con
             f->notify_update();
         }
     }
-    return applicator_t::apply_sibling(cluster, controller);
+    return applicator_t::apply_sibling(cluster, controller, custom);
 }
 
 auto file_availability_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

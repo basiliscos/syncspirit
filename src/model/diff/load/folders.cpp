@@ -8,7 +8,8 @@
 
 using namespace syncspirit::model::diff::load;
 
-auto folders_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept -> outcome::result<void> {
+auto folders_t::apply_impl(cluster_t &cluster, apply_controller_t &controller, void *custom) const noexcept
+    -> outcome::result<void> {
     auto &map = cluster.get_folders();
     for (auto &pair : folders) {
 
@@ -24,5 +25,5 @@ auto folders_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) c
         map.put(folder);
         folder->assign_cluster(&cluster);
     }
-    return applicator_t::apply_sibling(cluster, controller);
+    return applicator_t::apply_sibling(cluster, controller, custom);
 }

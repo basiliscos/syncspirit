@@ -20,6 +20,7 @@
 #include "model/diff/load/blocks.h"
 #include "model/diff/load/file_infos.h"
 #include "model/diff/load/load_cluster.h"
+#include "model/diff/load/interrupt.h"
 #include "model/diff/modify/add_ignored_device.h"
 #include "model/diff/modify/add_pending_device.h"
 #include "model/diff/modify/add_pending_folders.h"
@@ -43,6 +44,7 @@
 #include <memory_resource>
 #include <unordered_set>
 
+using namespace syncspirit;
 using namespace syncspirit::fltk;
 using namespace syncspirit::presentation;
 
@@ -82,6 +84,7 @@ struct app_monitor_t final : entities_monitor_t {
 struct visitor_context_t {
     guards_t &guards;
     app_monitor_t &monitor;
+    model::diff::cluster_diff_t *next_diff = 0;
 };
 
 db_info_viewer_guard_t::db_info_viewer_guard_t(main_window_t *main_window_) : main_window{main_window_} {}
@@ -156,6 +159,7 @@ void app_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 request_load_model();
             }
         });
+        p.discover_name(net::names::bouncer, bouncer, false).link(true);
         p.discover_name(net::names::sink, sink, false).link(true);
     });
 
@@ -229,7 +233,7 @@ void app_supervisor_t::on_model_update(model::message::model_update_t &message) 
     if (!has_been_loaded) {
         main_window->set_splash_text("populating model (1/3)...");
     }
-    auto r = diff.apply(*cluster, *this);
+    auto r = diff.apply(*cluster, *this, {});
     if (!r) {
         LOG_ERROR(log, "error applying cluster diff: {}", r.assume_error().message());
         return;
@@ -276,6 +280,10 @@ void app_supervisor_t::on_model_update(model::message::model_update_t &message) 
                 item->on_update();
             }
         }
+    }
+    if (context.next_diff) {
+        std::abort();
+        // zzz
     }
 
     if (!has_been_loaded && cluster->get_devices().size()) {
@@ -610,32 +618,41 @@ auto app_supervisor_t::operator()(const model::diff::peer::update_folder_t &diff
     return diff.visit_next(*this, custom);
 }
 
-auto app_supervisor_t::apply(const model::diff::load::blocks_t &diff, model::cluster_t &cluster) noexcept
+auto app_supervisor_t::apply(const model::diff::load::blocks_t &diff, model::cluster_t &cluster, void *custom) noexcept
     -> outcome::result<void> {
     loaded_blocks += diff.blocks.size();
     auto share = (100. * loaded_blocks) / load_cluster->blocks_count;
     auto msg = fmt::format("({}%) loaded {} of {} blocks", (int)share, loaded_blocks, load_cluster->blocks_count);
     log->debug(msg);
     main_window->set_splash_text(msg);
-    auto r = apply_controller_t::apply(diff, cluster);
+    auto r = apply_controller_t::apply(diff, cluster, custom);
     return r;
 }
 
-auto app_supervisor_t::apply(const model::diff::load::file_infos_t &diff, model::cluster_t &cluster) noexcept
-    -> outcome::result<void> {
+auto app_supervisor_t::apply(const model::diff::load::file_infos_t &diff, model::cluster_t &cluster,
+                             void *custom) noexcept -> outcome::result<void> {
     loaded_files += diff.container.size();
     auto share = (100. * loaded_files) / load_cluster->files_count;
     auto msg = fmt::format("({}%) loaded {} of {} files", (int)share, loaded_files, load_cluster->files_count);
-    // log->debug(msg);
     main_window->set_splash_text(msg);
-    auto r = apply_controller_t::apply(diff, cluster);
+    auto r = apply_controller_t::apply(diff, cluster, custom);
     return r;
 }
 
-auto app_supervisor_t::apply(const model::diff::load::load_cluster_t &diff, model::cluster_t &cluster) noexcept
-    -> outcome::result<void> {
+auto app_supervisor_t::apply(const model::diff::load::interrupt_t &diff, model::cluster_t &cluster,
+                             void *custom) noexcept -> outcome::result<void> {
+    // auto ctx = static_cast<visitor_context_t *>(custom);
+    // ctx->next_diff = diff.sibling.get();
+    // return outcome::success();
+    std::abort();
+    // return r;
+}
+
+auto app_supervisor_t::apply(const model::diff::load::load_cluster_t &diff, model::cluster_t &cluster,
+                             void *custom) noexcept -> outcome::result<void> {
     load_cluster = &diff;
-    auto r = apply_controller_t::apply(diff, cluster);
+    std::abort();
+    auto r = apply_controller_t::apply(diff, cluster, custom);
     load_cluster = nullptr;
     return r;
 }

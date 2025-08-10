@@ -18,8 +18,8 @@ add_remote_folder_infos_t::add_remote_folder_infos_t(const model::device_t &peer
     }
 }
 
-auto add_remote_folder_infos_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
-    -> outcome::result<void> {
+auto add_remote_folder_infos_t::apply_impl(cluster_t &cluster, apply_controller_t &controller,
+                                           void *custom) const noexcept -> outcome::result<void> {
     auto &devices = cluster.get_devices();
     auto &folders = cluster.get_folders();
     auto peer = devices.by_sha256(device_id);
@@ -38,7 +38,7 @@ auto add_remote_folder_infos_t::apply_impl(cluster_t &cluster, apply_controller_
         }
         remote_folders.put(opt.assume_value());
     }
-    return applicator_t::apply_sibling(cluster, controller);
+    return applicator_t::apply_sibling(cluster, controller, custom);
 }
 
 auto add_remote_folder_infos_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept

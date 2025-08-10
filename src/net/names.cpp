@@ -7,6 +7,7 @@ using namespace syncspirit::net;
 
 const char *names::peer_supervisor = "net.peer_supervisor";
 const char *names::coordinator = "net.coordinator";
+const char *names::bouncer = "cpu.bouncer";
 const char *names::sink = "net.sink";
 const char *names::resolver = "net.resolver";
 const char *names::http10 = "net.http10";

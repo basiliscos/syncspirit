@@ -17,6 +17,7 @@
 #include "model/diff/load/folders.h"
 #include "model/diff/load/ignored_devices.h"
 #include "model/diff/load/ignored_folders.h"
+#include "model/diff/load/interrupt.h"
 #include "model/diff/load/load_cluster.h"
 #include "model/diff/load/pending_devices.h"
 #include "model/diff/load/pending_folders.h"
@@ -418,6 +419,9 @@ void db_actor_t::on_cluster_load(message::load_cluster_request_t &request) noexc
                 ++ptr;
             }
             current = current->assign_sibling(new load::file_infos_t(std::move(items)));
+            if (ptr != end) {
+                current = current->assign_sibling(new load::interrupt_t());
+            }
         }
     }
 

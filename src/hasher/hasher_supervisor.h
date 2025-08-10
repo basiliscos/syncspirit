@@ -3,7 +3,6 @@
 
 #pragma once
 
-#include "config/main.h"
 #include "utils/log.h"
 #include "syncspirit-export.h"
 

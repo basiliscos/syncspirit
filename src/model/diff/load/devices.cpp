@@ -9,7 +9,8 @@
 
 using namespace syncspirit::model::diff::load;
 
-auto devices_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept -> outcome::result<void> {
+auto devices_t::apply_impl(cluster_t &cluster, apply_controller_t &controller, void *custom) const noexcept
+    -> outcome::result<void> {
     auto &device_map = cluster.get_devices();
     auto &local_device = cluster.get_device();
     for (auto &pair : devices) {
@@ -30,7 +31,7 @@ auto devices_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) c
         device_map.put(device);
     }
     assert(device_map.by_sha256(local_device->device_id().get_sha256()));
-    return applicator_t::apply_sibling(cluster, controller);
+    return applicator_t::apply_sibling(cluster, controller, custom);
 }
 
 auto devices_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

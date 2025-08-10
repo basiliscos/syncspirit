@@ -6,7 +6,7 @@
 
 using namespace syncspirit::model::diff::load;
 
-auto ignored_folders_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
+auto ignored_folders_t::apply_impl(cluster_t &cluster, apply_controller_t &controller, void *custom) const noexcept
     -> outcome::result<void> {
     auto &map = cluster.get_ignored_folders();
     for (auto &pair : folders) {
@@ -17,5 +17,5 @@ auto ignored_folders_t::apply_impl(cluster_t &cluster, apply_controller_t &contr
         auto &folder = option.value();
         map.put(folder);
     }
-    return applicator_t::apply_sibling(cluster, controller);
+    return applicator_t::apply_sibling(cluster, controller, custom);
 };

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
 
 #include "add_pending_folders.h"
 #include "model/cluster.h"
@@ -11,7 +11,7 @@ add_pending_folders_t::add_pending_folders_t(container_t items) noexcept : conta
     LOG_DEBUG(log, "add_pending_folders_t, count = {}", container.size());
 }
 
-auto add_pending_folders_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
+auto add_pending_folders_t::apply_impl(cluster_t &cluster, apply_controller_t &controller, void *custom) const noexcept
     -> outcome::result<void> {
     auto &pending = cluster.get_pending_folders();
     auto &devices = cluster.get_devices();
@@ -24,7 +24,7 @@ auto add_pending_folders_t::apply_impl(cluster_t &cluster, apply_controller_t &c
         }
         pending.put(std::move(opt.value()));
     }
-    return applicator_t::apply_sibling(cluster, controller);
+    return applicator_t::apply_sibling(cluster, controller, custom);
 }
 
 auto add_pending_folders_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

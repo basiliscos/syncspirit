@@ -19,6 +19,7 @@
 #include "utils/location.h"
 #include "utils/log-setup.h"
 #include "utils/platform.h"
+#include "hasher/bouncer.h"
 #include "hasher/hasher_supervisor.h"
 #include "net/net_supervisor.h"
 #include "fs/fs_supervisor.h"
@@ -319,6 +320,13 @@ int app_main(app_context_t &app_ctx) {
         sup->do_process();
     }
 
+    auto bouncer_context = thread_sys_context_t();
+    auto bouncer = bouncer_context.create_supervisor<hasher::bouncer_t>()
+                       .timeout(timeout / 2)
+                       .registry_address(sup_net->get_registry_address())
+                       .finish();
+    bouncer->do_process();
+
     // window should outlive fltk ctx, as in ctx d-tor model augmentations
     // invoke fltk-things..
     auto main_window = std::unique_ptr<fltk::main_window_t>();
@@ -389,6 +397,16 @@ int app_main(app_context_t &app_ctx) {
         logger->trace("fs thread has been terminated");
     });
 
+    auto bouncer_thread = std::thread([&]() {
+        SET_THREAD_EN_LANGUAGE();
+#if defined(__linux__)
+        pthread_setname_np(pthread_self(), "ss/bouncer");
+#endif
+        bouncer_context.run();
+        shutdown_flag = true;
+        logger->trace("bouncer thread has been terminated");
+    });
+
     logger->debug("utf8 local support: {}", fl_utf8locale());
 
     while (!shutdown_flag) {
@@ -404,6 +422,7 @@ int app_main(app_context_t &app_ctx) {
     sup_fltk->do_process();
 
     fs_thread.join();
+    bouncer_thread.join();
     net_thread.join();
 
     logger->trace("waiting hasher threads termination");

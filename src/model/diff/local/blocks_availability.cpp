@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "blocks_availability.h"
 #include "model/diff/cluster_visitor.h"
@@ -14,7 +14,7 @@ blocks_availability_t::blocks_availability_t(const file_info_t &file, valid_bloc
     assert(file.get_blocks().size() == valid_blocks_map.size());
 }
 
-auto blocks_availability_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
+auto blocks_availability_t::apply_impl(cluster_t &cluster, apply_controller_t &controller, void *custom) const noexcept
     -> outcome::result<void> {
     auto folder = cluster.get_folders().by_id(folder_id);
     auto folder_info = folder->get_folder_infos().by_device_id(device_id);
@@ -24,7 +24,7 @@ auto blocks_availability_t::apply_impl(cluster_t &cluster, apply_controller_t &c
             file->mark_local_available(i);
         }
     }
-    return applicator_t::apply_sibling(cluster, controller);
+    return applicator_t::apply_sibling(cluster, controller, custom);
 }
 
 auto blocks_availability_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

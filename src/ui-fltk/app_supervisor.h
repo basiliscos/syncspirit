@@ -187,13 +187,16 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
     outcome::result<void> operator()(const model::diff::modify::upsert_folder_info_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::peer::update_folder_t &, void *) noexcept override;
 
-    outcome::result<void> apply(const model::diff::load::blocks_t &, model::cluster_t &cluster) noexcept override;
-    outcome::result<void> apply(const model::diff::load::file_infos_t &, model::cluster_t &cluster) noexcept override;
-    outcome::result<void> apply(const model::diff::load::load_cluster_t &, model::cluster_t &cluster) noexcept override;
+    outcome::result<void> apply(const model::diff::load::blocks_t &, model::cluster_t &, void *) noexcept override;
+    outcome::result<void> apply(const model::diff::load::file_infos_t &, model::cluster_t &, void *) noexcept override;
+    outcome::result<void> apply(const model::diff::load::interrupt_t &, model::cluster_t &, void *) noexcept override;
+    outcome::result<void> apply(const model::diff::load::load_cluster_t &, model::cluster_t &,
+                                void *) noexcept override;
 
     model::sequencer_ptr_t sequencer;
     time_point_t started_at;
     r::address_ptr_t coordinator;
+    r::address_ptr_t bouncer;
     r::address_ptr_t sink;
     in_memory_sink_t *log_sink;
     utils::logger_t log;

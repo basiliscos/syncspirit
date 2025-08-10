@@ -7,6 +7,7 @@
 #include "model/diff/advance/local_update.h"
 #include "model/diff/contact/peer_state.h"
 #include "model/diff/contact/update_contact.h"
+#include "model/diff/load/interrupt.h"
 #include "model/diff/local/scan_finish.h"
 #include "model/diff/local/scan_request.h"
 #include "model/diff/local/scan_start.h"
@@ -153,13 +154,13 @@ void diff_builder_t::send(rotor::supervisor_t &sup, const void *custom) noexcept
     sup.send<model::payload::model_update_t>(receiver, std::move(cluster_diff), custom);
 }
 
-auto diff_builder_t::apply() noexcept -> outcome::result<void> {
+auto diff_builder_t::apply(void *custom) noexcept -> outcome::result<void> {
     auto r = outcome::result<void>(outcome::success());
     bool do_try = true;
     while (do_try) {
         do_try = false;
         if (r && cluster_diff) {
-            r = cluster_diff->apply(cluster, *this);
+            r = cluster_diff->apply(cluster, *this, custom);
             cluster_diff.reset();
             do_try = true;
         }
@@ -345,6 +346,8 @@ diff_builder_t &diff_builder_t::mark_reacheable(model::file_info_ptr_t peer_file
 diff_builder_t &diff_builder_t::suspend(const model::folder_t &folder) noexcept {
     return assign(new model::diff::modify::suspend_folder_t(folder));
 }
+
+diff_builder_t &diff_builder_t::interrupt() noexcept { return assign(new model::diff::load::interrupt_t()); }
 
 template <typename Holder, typename Diff> static void generic_assign(Holder *holder, Diff *diff) noexcept {
     if (!(*holder)) {

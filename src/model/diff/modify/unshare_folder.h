@@ -15,7 +15,7 @@ struct SYNCSPIRIT_API unshare_folder_t final : cluster_diff_t {
     unshare_folder_t(const model::cluster_t &cluster, model::folder_info_t &folder,
                      orphaned_blocks_t *orphaned_blocks = nullptr) noexcept;
 
-    outcome::result<void> apply_impl(cluster_t &, apply_controller_t &) const noexcept override;
+    outcome::result<void> apply_impl(cluster_t &, apply_controller_t &, void *) const noexcept override;
     outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;
 
     utils::bytes_t peer_id;

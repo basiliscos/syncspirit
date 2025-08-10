@@ -22,9 +22,9 @@ remove_folder_infos_t::remove_folder_infos_t(const uuid_folder_infos_map_t &map,
     LOG_DEBUG(log, "remove_folder_infos_t, count = {}", map.size());
 }
 
-auto remove_folder_infos_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
+auto remove_folder_infos_t::apply_impl(cluster_t &cluster, apply_controller_t &controller, void *custom) const noexcept
     -> outcome::result<void> {
-    auto r = applicator_t::apply_child(cluster, controller);
+    auto r = applicator_t::apply_child(cluster, controller, custom);
     if (!r) {
         return r;
     }
@@ -42,7 +42,7 @@ auto remove_folder_infos_t::apply_impl(cluster_t &cluster, apply_controller_t &c
 
         folder_infos.remove(folder_info);
     }
-    return applicator_t::apply_sibling(cluster, controller);
+    return applicator_t::apply_sibling(cluster, controller, custom);
 }
 
 auto remove_folder_infos_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

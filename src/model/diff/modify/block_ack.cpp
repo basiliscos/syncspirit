@@ -15,7 +15,7 @@ block_ack_t::block_ack_t(const block_transaction_t &txn) noexcept : parent_t(txn
               block_hash);
 }
 
-auto block_ack_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
+auto block_ack_t::apply_impl(cluster_t &cluster, apply_controller_t &controller, void *custom) const noexcept
     -> outcome::result<void> {
     auto folder = cluster.get_folders().by_id(folder_id);
     bool success = false;
@@ -36,7 +36,7 @@ auto block_ack_t::apply_impl(cluster_t &cluster, apply_controller_t &controller)
         LOG_TRACE(log, "block_ack_t failed, folder = '{}', file = '{}', block: #{} (hash: {})", folder_id, file_name,
                   block_index, block_hash);
     }
-    return applicator_t::apply_sibling(cluster, controller);
+    return applicator_t::apply_sibling(cluster, controller, custom);
 }
 
 auto block_ack_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

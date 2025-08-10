@@ -30,6 +30,7 @@ struct devices_t;
 struct file_infos_t;
 struct load_cluster_t;
 struct ignored_devices_t;
+struct interrupt_t;
 struct remove_corrupted_files_t;
 struct pending_devices_t;
 } // namespace load

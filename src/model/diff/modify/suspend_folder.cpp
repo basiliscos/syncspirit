@@ -11,12 +11,12 @@ suspend_folder_t::suspend_folder_t(const model::folder_t &folder) noexcept : fol
     LOG_DEBUG(log, "suspend_folder_t, folder_id = {}", folder_id);
 }
 
-auto suspend_folder_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
+auto suspend_folder_t::apply_impl(cluster_t &cluster, apply_controller_t &controller, void *custom) const noexcept
     -> outcome::result<void> {
     LOG_TRACE(log, "applying suspend_folder_t");
     auto folder = cluster.get_folders().by_id(folder_id);
     folder->mark_suspended(true);
-    return applicator_t::apply_impl(cluster, controller);
+    return applicator_t::apply_impl(cluster, controller, custom);
 }
 
 auto suspend_folder_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

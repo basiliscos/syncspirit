@@ -63,7 +63,7 @@ struct SYNCSPIRIT_TEST_API diff_builder_t : private model::diff::apply_controlle
     cluster_configurer_t configure_cluster(utils::bytes_view_t sha256, const bfs::path &default_location = {}) noexcept;
     diff_builder_t &apply(r::supervisor_t &sup, const void *custom = {}) noexcept;
     void send(r::supervisor_t &sup, const void *custom = {}) noexcept;
-    outcome::result<void> apply() noexcept;
+    outcome::result<void> apply(void *custom = {}) noexcept;
     model::diff::cluster_diff_ptr_t extract() noexcept;
     diff_builder_t &then() noexcept;
     index_maker_t make_index(utils::bytes_view_t sha256, std::string_view folder_id) noexcept;
@@ -100,6 +100,7 @@ struct SYNCSPIRIT_TEST_API diff_builder_t : private model::diff::apply_controlle
     diff_builder_t &synchronization_finish(std::string_view id) noexcept;
     diff_builder_t &mark_reacheable(model::file_info_ptr_t peer_file, bool value) noexcept;
     diff_builder_t &suspend(const model::folder_t &folder) noexcept;
+    diff_builder_t &interrupt() noexcept;
 
     model::sequencer_t &get_sequencer() noexcept;
 

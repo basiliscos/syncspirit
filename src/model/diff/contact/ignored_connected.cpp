@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
 
 #include "ignored_connected.h"
 #include "model/cluster.h"
@@ -14,7 +14,7 @@ ignored_connected_t::ignored_connected_t(cluster_t &, const model::device_id_t &
     LOG_DEBUG(log, "ignored_connected_t, device = ", device_id.get_short());
 }
 
-auto ignored_connected_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
+auto ignored_connected_t::apply_impl(cluster_t &cluster, apply_controller_t &controller, void *custom) const noexcept
     -> outcome::result<void> {
     auto &ignored_devices = cluster.get_ignored_devices();
     auto prev = ignored_devices.by_sha256(device_id.get_sha256());
@@ -23,7 +23,7 @@ auto ignored_connected_t::apply_impl(cluster_t &cluster, apply_controller_t &con
     }
     prev->assign(db_device);
     prev->notify_update();
-    return applicator_t::apply_sibling(cluster, controller);
+    return applicator_t::apply_sibling(cluster, controller, custom);
 }
 
 auto ignored_connected_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

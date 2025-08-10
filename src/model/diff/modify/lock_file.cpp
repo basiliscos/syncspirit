@@ -15,7 +15,7 @@ lock_file_t::lock_file_t(const model::file_info_t &file, bool locked_) noexcept
     LOG_DEBUG(log, "lock_file_t, file = {}, folder = {}, device = {}, value = {}", file_name, folder_id, peer, locked);
 }
 
-auto lock_file_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
+auto lock_file_t::apply_impl(cluster_t &cluster, apply_controller_t &controller, void *custom) const noexcept
     -> outcome::result<void> {
     auto folder = cluster.get_folders().by_id(folder_id);
     auto d = cluster.get_devices().by_sha256(this->device_id);
@@ -29,7 +29,7 @@ auto lock_file_t::apply_impl(cluster_t &cluster, apply_controller_t &controller)
         assert(file->is_locked());
         file->unlock();
     }
-    return applicator_t::apply_sibling(cluster, controller);
+    return applicator_t::apply_sibling(cluster, controller, custom);
 }
 
 auto lock_file_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

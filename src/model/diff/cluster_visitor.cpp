@@ -15,6 +15,7 @@
 #include "contact/update_contact.h"
 #include "load/devices.h"
 #include "load/ignored_devices.h"
+#include "load/interrupt.h"
 #include "load/load_cluster.h"
 #include "load/pending_devices.h"
 #include "load/remove_corrupted_files.h"
@@ -120,6 +121,10 @@ auto cluster_visitor_t::operator()(const load::devices_t &diff, void *custom) no
 
 auto cluster_visitor_t::operator()(const load::ignored_devices_t &diff, void *custom) noexcept
     -> outcome::result<void> {
+    return diff.visit_next(*this, custom);
+}
+
+auto cluster_visitor_t::operator()(const load::interrupt_t &diff, void *custom) noexcept -> outcome::result<void> {
     return diff.visit_next(*this, custom);
 }
 

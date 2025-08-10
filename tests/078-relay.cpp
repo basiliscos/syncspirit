@@ -229,7 +229,7 @@ struct fixture_t : private model::diff::cluster_visitor_t {
     virtual void on_relay(proto::relay::session_invitation_t &) noexcept {};
     virtual void on(model::message::model_update_t &update) noexcept {
         auto &diff = *update.payload.diff;
-        auto r = diff.apply(*cluster, get_apply_controller());
+        auto r = diff.apply(*cluster, get_apply_controller(), {});
         if (!r) {
             LOG_ERROR(log, "error applying diff: {}", r.error().message());
         }

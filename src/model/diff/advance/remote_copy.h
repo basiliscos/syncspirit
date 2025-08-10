@@ -15,7 +15,7 @@ struct SYNCSPIRIT_API remote_copy_t final : advance_t {
                   std::string_view folder_id, utils::bytes_view_t peer_id,
                   bool disable_blocks_removal = false) noexcept;
 
-    outcome::result<void> apply_impl(cluster_t &, apply_controller_t &) const noexcept override;
+    outcome::result<void> apply_impl(cluster_t &, apply_controller_t &, void *) const noexcept override;
 
     outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;
 };

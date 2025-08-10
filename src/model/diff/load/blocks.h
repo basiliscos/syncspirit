@@ -17,8 +17,8 @@ struct SYNCSPIRIT_API blocks_t final : cluster_diff_t {
 
     template <typename T> blocks_t(T &&blocks_) noexcept : blocks{std::forward<T>(blocks_)} {}
 
-    outcome::result<void> apply_impl(cluster_t &, apply_controller_t &) const noexcept override;
-    outcome::result<void> apply_forward(cluster_t &, apply_controller_t &) const noexcept override;
+    outcome::result<void> apply_impl(cluster_t &, apply_controller_t &, void *) const noexcept override;
+    outcome::result<void> apply_forward(cluster_t &, apply_controller_t &, void *) const noexcept override;
 
     container_t blocks;
 };

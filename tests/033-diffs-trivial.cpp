@@ -74,13 +74,13 @@ TEST_CASE("with file", "[model]") {
 
     SECTION("lock/unlock") {
         auto diff = diff::cluster_diff_ptr_t(new diff::modify::lock_file_t(*file, true));
-        REQUIRE(diff->apply(*cluster, get_apply_controller()));
+        REQUIRE(diff->apply(*cluster, get_apply_controller(), {}));
         auto name = proto::get_name(pr_file);
         auto file = folder_info->get_file_infos().by_name(name);
         REQUIRE(file->is_locked());
 
         diff = diff::cluster_diff_ptr_t(new diff::modify::lock_file_t(*file, false));
-        REQUIRE(diff->apply(*cluster, get_apply_controller()));
+        REQUIRE(diff->apply(*cluster, get_apply_controller(), {}));
         REQUIRE(!file->is_locked());
     }
 
@@ -90,7 +90,7 @@ TEST_CASE("with file", "[model]") {
         file->assign_block(block, 0);
         REQUIRE(!file->is_locally_available());
         auto diff = diff::cluster_diff_ptr_t(new diff::local::file_availability_t(file));
-        REQUIRE(diff->apply(*cluster, get_apply_controller()));
+        REQUIRE(diff->apply(*cluster, get_apply_controller(), {}));
         REQUIRE(file->is_locally_available());
     }
 }
@@ -111,7 +111,7 @@ TEST_CASE("update_contact_t", "[model]") {
         auto url_3 = utils::parse("tcp://192.168.100.6:22001");
         auto update_peer = diff::cluster_diff_ptr_t(
             new diff::contact::update_contact_t(*cluster, peer_id, utils::uri_container_t{url_1, url_1, url_2, url_3}));
-        REQUIRE(update_peer->apply(*cluster, get_apply_controller()));
+        REQUIRE(update_peer->apply(*cluster, get_apply_controller(), {}));
         auto &uris = peer_device->get_uris();
         REQUIRE(uris.size() == 2u);
         CHECK(*uris[0] == *url_1);

@@ -18,7 +18,7 @@ struct SYNCSPIRIT_API folder_infos_t final : cluster_diff_t {
 
     inline folder_infos_t(container_t &&container_) noexcept : container{std::move(container_)} {}
 
-    outcome::result<void> apply_impl(cluster_t &, apply_controller_t &) const noexcept override;
+    outcome::result<void> apply_impl(cluster_t &, apply_controller_t &, void *) const noexcept override;
 
     container_t container;
 };

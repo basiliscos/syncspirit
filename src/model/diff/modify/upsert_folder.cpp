@@ -49,7 +49,7 @@ upsert_folder_t::upsert_folder_t(sequencer_t &sequencer, bu::uuid uuid_, db::Fol
     }
 }
 
-auto upsert_folder_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
+auto upsert_folder_t::apply_impl(cluster_t &cluster, apply_controller_t &controller, void *custom) const noexcept
     -> outcome::result<void> {
     auto folder_id = db::get_id(db);
     LOG_TRACE(log, "applying upsert_folder_t, folder_id: {}", folder_id);
@@ -71,7 +71,7 @@ auto upsert_folder_t::apply_impl(cluster_t &cluster, apply_controller_t &control
         }
     }
 
-    auto r = applicator_t::apply_child(cluster, controller);
+    auto r = applicator_t::apply_child(cluster, controller, custom);
     if (!r) {
         return r;
     }
@@ -89,7 +89,7 @@ auto upsert_folder_t::apply_impl(cluster_t &cluster, apply_controller_t &control
         }
     }
 
-    return applicator_t::apply_sibling(cluster, controller);
+    return applicator_t::apply_sibling(cluster, controller, custom);
 }
 
 auto upsert_folder_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

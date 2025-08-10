@@ -12,7 +12,7 @@ add_blocks_t::add_blocks_t(blocks_t blocks_) noexcept : blocks(std::move(blocks_
     LOG_DEBUG(log, "add_blocks_t, count = {}", blocks.size());
 }
 
-auto add_blocks_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
+auto add_blocks_t::apply_impl(cluster_t &cluster, apply_controller_t &controller, void *custom) const noexcept
     -> outcome::result<void> {
     auto &bm = cluster.get_blocks();
     for (const auto &b : blocks) {
@@ -25,7 +25,7 @@ auto add_blocks_t::apply_impl(cluster_t &cluster, apply_controller_t &controller
             LOG_TRACE(log, "add_blocks_t, failed to insert block '{}', already exists", block->get_hash());
         }
     }
-    return applicator_t::apply_sibling(cluster, controller);
+    return applicator_t::apply_sibling(cluster, controller, custom);
 }
 
 auto add_blocks_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {
