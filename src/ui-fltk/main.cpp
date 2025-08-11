@@ -19,7 +19,7 @@
 #include "utils/location.h"
 #include "utils/log-setup.h"
 #include "utils/platform.h"
-#include "hasher/bouncer.h"
+#include "hasher/bouncer_actor.h"
 #include "hasher/hasher_supervisor.h"
 #include "net/net_supervisor.h"
 #include "fs/fs_supervisor.h"
@@ -321,7 +321,7 @@ int app_main(app_context_t &app_ctx) {
     }
 
     auto bouncer_context = thread_sys_context_t();
-    auto bouncer = bouncer_context.create_supervisor<hasher::bouncer_t>()
+    auto bouncer = bouncer_context.create_supervisor<hasher::bouncer_actor_t>()
                        .timeout(timeout / 2)
                        .registry_address(sup_net->get_registry_address())
                        .finish();

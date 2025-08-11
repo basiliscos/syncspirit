@@ -108,7 +108,7 @@ add_library(syncspirit_core
     src/fs/scan_scheduler.cpp
     src/fs/scan_task.cpp
     src/fs/utils.cpp
-    src/hasher/bouncer.cpp
+    src/hasher/bouncer_actor.cpp
     src/hasher/hasher_actor.cpp
     src/hasher/hasher_proxy_actor.cpp
     src/hasher/hasher_supervisor.cpp

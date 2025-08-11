@@ -13,6 +13,7 @@
 #include "tree_item/pending_folders.h"
 #include "tree_item/peer_folders.h"
 #include "net/names.h"
+#include "hasher/messages.h"
 #include "config/utils.h"
 #include "model/diff/advance/advance.h"
 #include "model/diff/local/io_failure.h"
@@ -84,7 +85,11 @@ struct app_monitor_t final : entities_monitor_t {
 struct visitor_context_t {
     guards_t &guards;
     app_monitor_t &monitor;
-    model::diff::cluster_diff_t *next_diff = 0;
+};
+
+struct apply_context_t {
+    const model::diff::load::load_cluster_t *load_cluster = nullptr;
+    model::payload::model_interrupt_t payload;
 };
 
 db_info_viewer_guard_t::db_info_viewer_guard_t(main_window_t *main_window_) : main_window{main_window_} {}
@@ -127,7 +132,7 @@ app_supervisor_t::app_supervisor_t(config_t &config)
     : parent_t(config), log_sink(config.log_sink), config_path{std::move(config.config_path)},
       app_config(std::move(config.app_config)), app_config_original{app_config}, content{nullptr}, devices{nullptr},
       folders{nullptr}, pending_devices{nullptr}, ignored_devices{nullptr}, db_info_viewer{nullptr},
-      main_window{nullptr}, loaded_blocks{0}, loaded_files{0} {
+      main_window{nullptr} {
     started_at = clock_t::now();
     sequencer = model::make_sequencer(started_at.time_since_epoch().count());
 }
@@ -165,6 +170,7 @@ void app_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 
     plugin.with_casted<r::plugin::starter_plugin_t>(
         [&](auto &p) {
+            p.subscribe_actor(&app_supervisor_t::on_model_interrupt);
             p.subscribe_actor(&app_supervisor_t::on_model_response);
             p.subscribe_actor(&app_supervisor_t::on_db_info_response);
         },
@@ -233,7 +239,8 @@ void app_supervisor_t::on_model_update(model::message::model_update_t &message) 
     if (!has_been_loaded) {
         main_window->set_splash_text("populating model (1/3)...");
     }
-    auto r = diff.apply(*cluster, *this, {});
+    auto apply_ctx = apply_context_t{};
+    auto r = diff.apply(*cluster, *this, &apply_ctx);
     if (!r) {
         LOG_ERROR(log, "error applying cluster diff: {}", r.assume_error().message());
         return;
@@ -243,11 +250,11 @@ void app_supervisor_t::on_model_update(model::message::model_update_t &message) 
         main_window->set_splash_text("populating model (2/3)...");
     }
 
-    auto context = visitor_context_t{
+    auto visit_ctx = visitor_context_t{
         guards,
         monitor,
     };
-    r = diff.visit(*this, &context);
+    r = diff.visit(*this, &visit_ctx);
     if (!r) {
         LOG_ERROR(log, "error visiting cluster diff: {}", r.assume_error().message());
         return;
@@ -281,14 +288,15 @@ void app_supervisor_t::on_model_update(model::message::model_update_t &message) 
             }
         }
     }
-    if (context.next_diff) {
-        std::abort();
-        // zzz
+    if (apply_ctx.payload.diff) {
+        auto message = r::make_message<model::payload::model_interrupt_t>(address, std::move(apply_ctx.payload));
+        send<hasher::payload::package_t>(bouncer, message);
     }
+}
 
-    if (!has_been_loaded && cluster->get_devices().size()) {
-        main_window->set_splash_text("UI has been initialized");
-    }
+void app_supervisor_t::on_model_interrupt(model::message::model_interrupt_t &message) noexcept {
+    LOG_TRACE(log, "on_model_update");
+    std::abort();
 }
 
 void app_supervisor_t::on_app_ready(model::message::app_ready_t &) noexcept {
@@ -620,9 +628,12 @@ auto app_supervisor_t::operator()(const model::diff::peer::update_folder_t &diff
 
 auto app_supervisor_t::apply(const model::diff::load::blocks_t &diff, model::cluster_t &cluster, void *custom) noexcept
     -> outcome::result<void> {
-    loaded_blocks += diff.blocks.size();
-    auto share = (100. * loaded_blocks) / load_cluster->blocks_count;
-    auto msg = fmt::format("({}%) loaded {} of {} blocks", (int)share, loaded_blocks, load_cluster->blocks_count);
+    auto ctx = static_cast<apply_context_t *>(custom);
+    ctx->payload.loaded_blocks += diff.blocks.size();
+    auto blocks = ctx->payload.loaded_blocks;
+    auto total = ctx->load_cluster->blocks_count;
+    auto share = (100. * blocks) / total;
+    auto msg = fmt::format("({}%) loaded {} of {} blocks", (int)share, blocks, total);
     log->debug(msg);
     main_window->set_splash_text(msg);
     auto r = apply_controller_t::apply(diff, cluster, custom);
@@ -631,9 +642,12 @@ auto app_supervisor_t::apply(const model::diff::load::blocks_t &diff, model::clu
 
 auto app_supervisor_t::apply(const model::diff::load::file_infos_t &diff, model::cluster_t &cluster,
                              void *custom) noexcept -> outcome::result<void> {
-    loaded_files += diff.container.size();
-    auto share = (100. * loaded_files) / load_cluster->files_count;
-    auto msg = fmt::format("({}%) loaded {} of {} files", (int)share, loaded_files, load_cluster->files_count);
+    auto ctx = static_cast<apply_context_t *>(custom);
+    ctx->payload.loaded_files += diff.container.size();
+    auto files = ctx->payload.loaded_files;
+    auto total = ctx->load_cluster->files_count;
+    auto share = (100. * files) / total;
+    auto msg = fmt::format("({}%) loaded {} of {} files", (int)share, files, total);
     main_window->set_splash_text(msg);
     auto r = apply_controller_t::apply(diff, cluster, custom);
     return r;
@@ -641,20 +655,16 @@ auto app_supervisor_t::apply(const model::diff::load::file_infos_t &diff, model:
 
 auto app_supervisor_t::apply(const model::diff::load::interrupt_t &diff, model::cluster_t &cluster,
                              void *custom) noexcept -> outcome::result<void> {
-    // auto ctx = static_cast<visitor_context_t *>(custom);
-    // ctx->next_diff = diff.sibling.get();
-    // return outcome::success();
-    std::abort();
-    // return r;
+    auto ctx = static_cast<apply_context_t *>(custom);
+    ctx->payload.diff = diff.sibling;
+    return outcome::success();
 }
 
 auto app_supervisor_t::apply(const model::diff::load::load_cluster_t &diff, model::cluster_t &cluster,
                              void *custom) noexcept -> outcome::result<void> {
-    load_cluster = &diff;
-    std::abort();
-    auto r = apply_controller_t::apply(diff, cluster, custom);
-    load_cluster = nullptr;
-    return r;
+    auto ctx = static_cast<apply_context_t *>(custom);
+    ctx->load_cluster = &diff;
+    return apply_controller_t::apply(diff, cluster, custom);
 }
 
 void app_supervisor_t::write_config(const config::main_t &cfg) noexcept {

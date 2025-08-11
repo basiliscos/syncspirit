@@ -171,6 +171,7 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
 
     void on_model_response(model::message::model_response_t &res) noexcept;
     void on_model_update(model::message::model_update_t &message) noexcept;
+    void on_model_interrupt(model::message::model_interrupt_t &message) noexcept;
     void on_app_ready(model::message::app_ready_t &) noexcept;
     void on_db_info_response(net::message::db_info_response_t &res) noexcept;
     void redisplay_folder_nodes(bool refresh_labels);
@@ -212,9 +213,6 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
     db_info_viewer_t *db_info_viewer;
     callbacks_t callbacks;
     main_window_t *main_window;
-    std::size_t loaded_blocks;
-    std::size_t loaded_files;
-    const model::diff::load::load_cluster_t *load_cluster;
 
     friend struct db_info_viewer_guard_t;
 };

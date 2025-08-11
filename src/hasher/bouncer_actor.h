@@ -14,7 +14,7 @@ namespace syncspirit::hasher {
 namespace r = rotor;
 namespace rth = rotor::thread;
 
-struct SYNCSPIRIT_API bouncer_t : rth::supervisor_thread_t {
+struct SYNCSPIRIT_API bouncer_actor_t : rth::supervisor_thread_t {
     using parent_t = rth::supervisor_thread_t;
     using parent_t::parent_t;
 

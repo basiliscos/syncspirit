@@ -27,6 +27,12 @@ struct model_update_t {
     const void *custom;
 };
 
+struct model_interrupt_t {
+    model::diff::cluster_diff_ptr_t diff;
+    std::size_t loaded_blocks = 0;
+    std::size_t loaded_files = 0;
+};
+
 struct thread_ready_t {};
 struct app_ready_t {};
 
@@ -40,6 +46,7 @@ using app_ready_t = r::message_t<payload::app_ready_t>;
 
 using model_request_t = r::request_traits_t<payload::model_request_t>::request::message_t;
 using model_response_t = r::request_traits_t<payload::model_request_t>::response::message_t;
+using model_interrupt_t = r::message_t<payload::model_interrupt_t>;
 
 } // namespace message
 
