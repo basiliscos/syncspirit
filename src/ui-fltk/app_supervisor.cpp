@@ -87,10 +87,7 @@ struct visitor_context_t {
     app_monitor_t &monitor;
 };
 
-struct apply_context_t {
-    const model::diff::load::load_cluster_t *load_cluster = nullptr;
-    model::payload::model_interrupt_t payload;
-};
+using apply_context_t = model::payload::model_interrupt_t;
 
 db_info_viewer_guard_t::db_info_viewer_guard_t(main_window_t *main_window_) : main_window{main_window_} {}
 db_info_viewer_guard_t::db_info_viewer_guard_t(db_info_viewer_guard_t &&other) { *this = std::move(other); }
@@ -212,10 +209,8 @@ void app_supervisor_t::on_model_response(model::message::model_response_t &res) 
     cluster = std::move(res.payload.res.cluster);
 }
 
-void app_supervisor_t::on_model_update(model::message::model_update_t &message) noexcept {
-    LOG_TRACE(log, "on_model_update");
-    bool has_been_loaded = cluster->get_devices().size();
-
+void app_supervisor_t::process(model::diff::cluster_diff_t &diff, void *context, const void *custom) noexcept {
+    LOG_TRACE(log, "process");
     auto buffer = std::array<std::byte, 16 * 1024>();
     auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
     auto allocator = std::pmr::polymorphic_allocator<std::string>(&pool);
@@ -224,7 +219,6 @@ void app_supervisor_t::on_model_update(model::message::model_update_t &message) 
     auto deleted_entities = entities_t(allocator);
     auto monitor = app_monitor_t(deleted_entities, updated_entities);
 
-    auto &diff = *message.payload.diff;
     auto &folders = cluster->get_folders();
     auto guards = guards_t();
     guards.reserve(folders.size());
@@ -236,11 +230,11 @@ void app_supervisor_t::on_model_update(model::message::model_update_t &message) 
         }
     }
 
+    bool has_been_loaded = cluster->get_devices().size();
     if (!has_been_loaded) {
         main_window->set_splash_text("populating model (1/3)...");
     }
-    auto apply_ctx = apply_context_t{};
-    auto r = diff.apply(*cluster, *this, &apply_ctx);
+    auto r = diff.apply(*cluster, *this, context);
     if (!r) {
         LOG_ERROR(log, "error applying cluster diff: {}", r.assume_error().message());
         return;
@@ -260,7 +254,6 @@ void app_supervisor_t::on_model_update(model::message::model_update_t &message) 
         return;
     }
 
-    auto custom = message.payload.custom;
     if (custom) {
         for (auto it = begin(callbacks); it != end(callbacks); ++it) {
             if (it->get() == custom) {
@@ -288,15 +281,40 @@ void app_supervisor_t::on_model_update(model::message::model_update_t &message) 
             }
         }
     }
-    if (apply_ctx.payload.diff) {
-        auto message = r::make_message<model::payload::model_interrupt_t>(address, std::move(apply_ctx.payload));
+    auto apply_ctx = reinterpret_cast<apply_context_t *>(context);
+    interrupted = (bool)apply_ctx->diff;
+    if (interrupted) {
+        auto message = r::make_message<model::payload::model_interrupt_t>(address, std::move(*apply_ctx));
         send<hasher::payload::package_t>(bouncer, message);
     }
 }
 
-void app_supervisor_t::on_model_interrupt(model::message::model_interrupt_t &message) noexcept {
+void app_supervisor_t::on_model_update(model::message::model_update_t &message) noexcept {
     LOG_TRACE(log, "on_model_update");
-    std::abort();
+    if (interrupted) {
+        delayed_updates.emplace_back(&message);
+    } else {
+        auto &p = message.payload;
+        auto apply_ctx = apply_context_t{};
+        apply_ctx.source_message = &message;
+        process(*p.diff, &apply_ctx, p.custom);
+    }
+}
+
+void app_supervisor_t::on_model_interrupt(model::message::model_interrupt_t &message) noexcept {
+    LOG_TRACE(log, "on_model_interrupt");
+    auto copy = message.payload;
+    copy.diff = {};
+    process(*message.payload.diff, &copy, {});
+    while (!interrupted && delayed_updates.size()) {
+        LOG_TRACE(log, "applying delayed model update");
+        auto &msg = delayed_updates.front();
+        auto &p = msg->payload;
+        auto apply_ctx = apply_context_t{};
+        apply_ctx.source_message = msg;
+        process(*p.diff, &apply_ctx, p.custom);
+        delayed_updates.pop_front();
+    }
 }
 
 void app_supervisor_t::on_app_ready(model::message::app_ready_t &) noexcept {
@@ -629,9 +647,9 @@ auto app_supervisor_t::operator()(const model::diff::peer::update_folder_t &diff
 auto app_supervisor_t::apply(const model::diff::load::blocks_t &diff, model::cluster_t &cluster, void *custom) noexcept
     -> outcome::result<void> {
     auto ctx = static_cast<apply_context_t *>(custom);
-    ctx->payload.loaded_blocks += diff.blocks.size();
-    auto blocks = ctx->payload.loaded_blocks;
-    auto total = ctx->load_cluster->blocks_count;
+    ctx->loaded_blocks += diff.blocks.size();
+    auto blocks = ctx->loaded_blocks;
+    auto total = ctx->total_blocks;
     auto share = (100. * blocks) / total;
     auto msg = fmt::format("({}%) loaded {} of {} blocks", (int)share, blocks, total);
     log->debug(msg);
@@ -643,9 +661,9 @@ auto app_supervisor_t::apply(const model::diff::load::blocks_t &diff, model::clu
 auto app_supervisor_t::apply(const model::diff::load::file_infos_t &diff, model::cluster_t &cluster,
                              void *custom) noexcept -> outcome::result<void> {
     auto ctx = static_cast<apply_context_t *>(custom);
-    ctx->payload.loaded_files += diff.container.size();
-    auto files = ctx->payload.loaded_files;
-    auto total = ctx->load_cluster->files_count;
+    ctx->loaded_files += diff.container.size();
+    auto files = ctx->loaded_files;
+    auto total = ctx->total_files;
     auto share = (100. * files) / total;
     auto msg = fmt::format("({}%) loaded {} of {} files", (int)share, files, total);
     main_window->set_splash_text(msg);
@@ -656,14 +674,15 @@ auto app_supervisor_t::apply(const model::diff::load::file_infos_t &diff, model:
 auto app_supervisor_t::apply(const model::diff::load::interrupt_t &diff, model::cluster_t &cluster,
                              void *custom) noexcept -> outcome::result<void> {
     auto ctx = static_cast<apply_context_t *>(custom);
-    ctx->payload.diff = diff.sibling;
+    ctx->diff = diff.sibling;
     return outcome::success();
 }
 
 auto app_supervisor_t::apply(const model::diff::load::load_cluster_t &diff, model::cluster_t &cluster,
                              void *custom) noexcept -> outcome::result<void> {
     auto ctx = static_cast<apply_context_t *>(custom);
-    ctx->load_cluster = &diff;
+    ctx->total_blocks = diff.blocks_count;
+    ctx->total_files = diff.files_count;
     return apply_controller_t::apply(diff, cluster, custom);
 }
 

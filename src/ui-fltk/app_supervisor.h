@@ -168,6 +168,8 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
     using clock_t = std::chrono::high_resolution_clock;
     using time_point_t = typename clock_t::time_point;
     using callbacks_t = std::list<callback_ptr_t>;
+    using model_update_ptr_t = r::intrusive_ptr_t<model::message::model_update_t>;
+    using delayed_updates_t = std::list<model_update_ptr_t>;
 
     void on_model_response(model::message::model_response_t &res) noexcept;
     void on_model_update(model::message::model_update_t &message) noexcept;
@@ -176,6 +178,8 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
     void on_db_info_response(net::message::db_info_response_t &res) noexcept;
     void redisplay_folder_nodes(bool refresh_labels);
     void detach_main_window() noexcept;
+
+    void process(model::diff::cluster_diff_t &diff, void *apply_context, const void *custom) noexcept;
 
     outcome::result<void> operator()(const model::diff::advance::advance_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::load::load_cluster_t &, void *) noexcept override;
@@ -213,6 +217,8 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
     db_info_viewer_t *db_info_viewer;
     callbacks_t callbacks;
     main_window_t *main_window;
+    bool interrupted = false;
+    delayed_updates_t delayed_updates;
 
     friend struct db_info_viewer_guard_t;
 };

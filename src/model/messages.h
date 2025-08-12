@@ -28,9 +28,12 @@ struct model_update_t {
 };
 
 struct model_interrupt_t {
-    model::diff::cluster_diff_ptr_t diff;
+    std::size_t total_blocks = 0;
+    std::size_t total_files = 0;
     std::size_t loaded_blocks = 0;
     std::size_t loaded_files = 0;
+    model::diff::cluster_diff_ptr_t diff;
+    r::message_ptr_t source_message;
 };
 
 struct thread_ready_t {};

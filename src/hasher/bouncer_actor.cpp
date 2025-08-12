@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // SPDX-FileCopyrightText: 2025 Ivan Baidakou
 
-#include "bouncer.h"
+#include "bouncer_actor.h"
 #include "net/names.h"
 
 using namespace syncspirit::hasher;
