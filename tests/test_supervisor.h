@@ -52,8 +52,8 @@ template <typename Supervisor> struct supervisor_config_builder_t : r::superviso
 };
 
 struct SYNCSPIRIT_TEST_API supervisor_t : r::supervisor_t,
-                                          protected model::diff::cluster_visitor_t,
-                                          private model::diff::apply_controller_t {
+                                          model::diff::apply_controller_t,
+                                          protected model::diff::cluster_visitor_t {
     using config_t = supervisor_config_t;
     template <typename Actor> using config_builder_t = supervisor_config_builder_t<Actor>;
 
@@ -83,6 +83,8 @@ struct SYNCSPIRIT_TEST_API supervisor_t : r::supervisor_t,
     outcome::result<void> operator()(const model::diff::modify::upsert_folder_info_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::advance::advance_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::peer::update_folder_t &, void *) noexcept override;
+
+    outcome::result<void> apply(const model::diff::load::commit_t &, model::cluster_t &, void *) noexcept override;
 
     utils::logger_t log;
     model::cluster_ptr_t cluster;

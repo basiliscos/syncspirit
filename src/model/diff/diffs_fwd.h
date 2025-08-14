@@ -26,6 +26,7 @@ struct update_contact_t;
 
 namespace load {
 struct blocks_t;
+struct commit_t;
 struct devices_t;
 struct file_infos_t;
 struct load_cluster_t;

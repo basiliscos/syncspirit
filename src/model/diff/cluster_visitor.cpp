@@ -13,6 +13,7 @@
 #include "contact/relay_connect_request.h"
 #include "contact/unknown_connected.h"
 #include "contact/update_contact.h"
+#include "load/commit.h"
 #include "load/devices.h"
 #include "load/ignored_devices.h"
 #include "load/interrupt.h"
@@ -121,10 +122,6 @@ auto cluster_visitor_t::operator()(const load::devices_t &diff, void *custom) no
 
 auto cluster_visitor_t::operator()(const load::ignored_devices_t &diff, void *custom) noexcept
     -> outcome::result<void> {
-    return diff.visit_next(*this, custom);
-}
-
-auto cluster_visitor_t::operator()(const load::interrupt_t &diff, void *custom) noexcept -> outcome::result<void> {
     return diff.visit_next(*this, custom);
 }
 

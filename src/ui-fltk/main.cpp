@@ -324,6 +324,7 @@ int app_main(app_context_t &app_ctx) {
     auto bouncer = bouncer_context.create_supervisor<hasher::bouncer_actor_t>()
                        .timeout(timeout / 2)
                        .registry_address(sup_net->get_registry_address())
+                       .shutdown_flag(shutdown_flag, r::pt::millisec{50})
                        .finish();
     bouncer->do_process();
 

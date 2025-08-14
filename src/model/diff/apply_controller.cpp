@@ -5,6 +5,7 @@
 #include "load/blocks.h"
 #include "load/file_infos.h"
 #include "load/interrupt.h"
+#include "load/commit.h"
 #include "load/load_cluster.h"
 
 namespace syncspirit::model::diff {
@@ -15,6 +16,11 @@ auto apply_controller_t::apply(const cluster_diff_t &diff, cluster_t &cluster, v
 }
 
 auto apply_controller_t::apply(const load::blocks_t &diff, cluster_t &cluster, void *custom) noexcept
+    -> outcome::result<void> {
+    return diff.apply_impl(cluster, *this, custom);
+}
+
+auto apply_controller_t::apply(const load::commit_t &diff, cluster_t &cluster, void *custom) noexcept
     -> outcome::result<void> {
     return diff.apply_impl(cluster, *this, custom);
 }

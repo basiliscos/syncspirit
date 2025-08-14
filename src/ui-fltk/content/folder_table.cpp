@@ -825,7 +825,8 @@ void folder_table_t::on_remove() {
 
     auto postponed = model::diff::cluster_diff_ptr_t{};
     postponed = new model::diff::modify::remove_folder_t(cluster, sequencer, *description.get_folder());
-    sup.send_sink<model::payload::model_update_t>(std::move(diff), postponed.detach());
+    sup.send_model<model::payload::model_update_t>(std::move(diff), postponed.detach());
+    // sup.send_sink<model::payload::model_update_t>(std::move(diff), postponed.detach());
 }
 
 void folder_table_t::on_rescan() {

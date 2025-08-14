@@ -135,11 +135,6 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
         send<Payload>(coordinator, std::forward<Args>(args)...);
     }
 
-    template <typename Payload, typename... Args> void send_sink(Args &&...args) {
-        auto message = r::make_routed_message<Payload>(coordinator, sink, std::forward<Args>(args)...);
-        put(std::move(message));
-    }
-
     template <typename Fn> void with_cluster(Fn &&fn) {
         if (cluster) {
             fn();
@@ -178,11 +173,9 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
     void on_db_info_response(net::message::db_info_response_t &res) noexcept;
     void redisplay_folder_nodes(bool refresh_labels);
     void detach_main_window() noexcept;
-
     void process(model::diff::cluster_diff_t &diff, void *apply_context, const void *custom) noexcept;
 
     outcome::result<void> operator()(const model::diff::advance::advance_t &, void *) noexcept override;
-    outcome::result<void> operator()(const model::diff::load::load_cluster_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::local::io_failure_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::add_pending_folders_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::add_pending_device_t &, void *) noexcept override;
@@ -195,6 +188,7 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
     outcome::result<void> apply(const model::diff::load::blocks_t &, model::cluster_t &, void *) noexcept override;
     outcome::result<void> apply(const model::diff::load::file_infos_t &, model::cluster_t &, void *) noexcept override;
     outcome::result<void> apply(const model::diff::load::interrupt_t &, model::cluster_t &, void *) noexcept override;
+    outcome::result<void> apply(const model::diff::load::commit_t &, model::cluster_t &, void *) noexcept override;
     outcome::result<void> apply(const model::diff::load::load_cluster_t &, model::cluster_t &,
                                 void *) noexcept override;
 
@@ -202,7 +196,6 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
     time_point_t started_at;
     r::address_ptr_t coordinator;
     r::address_ptr_t bouncer;
-    r::address_ptr_t sink;
     in_memory_sink_t *log_sink;
     utils::logger_t log;
     bfs::path config_path;

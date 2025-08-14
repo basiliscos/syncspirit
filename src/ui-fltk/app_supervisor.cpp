@@ -17,8 +17,8 @@
 #include "config/utils.h"
 #include "model/diff/advance/advance.h"
 #include "model/diff/local/io_failure.h"
-#include "model/diff/local/scan_start.h"
 #include "model/diff/load/blocks.h"
+#include "model/diff/load/commit.h"
 #include "model/diff/load/file_infos.h"
 #include "model/diff/load/load_cluster.h"
 #include "model/diff/load/interrupt.h"
@@ -161,8 +161,7 @@ void app_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 request_load_model();
             }
         });
-        p.discover_name(net::names::bouncer, bouncer, false).link(true);
-        p.discover_name(net::names::sink, sink, false).link(true);
+        p.discover_name(net::names::bouncer, bouncer, true).link(true);
     });
 
     plugin.with_casted<r::plugin::starter_plugin_t>(
@@ -296,7 +295,6 @@ void app_supervisor_t::on_model_update(model::message::model_update_t &message) 
     } else {
         auto &p = message.payload;
         auto apply_ctx = apply_context_t{};
-        apply_ctx.source_message = &message;
         process(*p.diff, &apply_ctx, p.custom);
     }
 }
@@ -311,7 +309,6 @@ void app_supervisor_t::on_model_interrupt(model::message::model_interrupt_t &mes
         auto &msg = delayed_updates.front();
         auto &p = msg->payload;
         auto apply_ctx = apply_context_t{};
-        apply_ctx.source_message = msg;
         process(*p.diff, &apply_ctx, p.custom);
         delayed_updates.pop_front();
     }
@@ -415,55 +412,6 @@ callback_ptr_t app_supervisor_t::call_share_folders(std::string_view folder_id, 
     auto cb = callback_ptr_t(new callback_impl_t(std::move(fn)));
     callbacks.push_back(cb);
     return cb;
-}
-
-auto app_supervisor_t::operator()(const model::diff::load::load_cluster_t &diff, void *custom) noexcept
-    -> outcome::result<void> {
-    if (!devices) {
-        return diff.visit_next(*this, custom);
-    }
-    auto folders_node = static_cast<tree_item::folders_t *>(folders);
-    for (auto &it : cluster->get_folders()) {
-        auto &folder = it.item;
-        auto text = fmt::format("building model of cluster folder '{}'({}) ...", folder->get_label(), folder->get_id());
-        main_window->set_splash_text(text);
-        auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
-        folders_node->add_folder(*folder_entity);
-        folder->set_augmentation(folder_entity);
-    }
-
-    auto devices_node = static_cast<tree_item::devices_t *>(devices);
-
-    auto &self_device = cluster->get_device();
-    auto self_node = devices_node->set_self(*cluster->get_device());
-    auto tree = self_node->get_owner()->tree();
-    tree->select(self_node->get_owner());
-    self_device->set_augmentation(*self_node);
-
-    for (auto &it : cluster->get_devices()) {
-        auto &device = *it.item;
-        if (device.device_id() != cluster->get_device()->device_id()) {
-            auto text = fmt::format("populating device '{}'({})...", device.get_name(), device.device_id().get_short());
-            main_window->set_splash_text(text);
-            device.set_augmentation(devices_node->add_peer(device));
-        }
-    }
-
-    auto pending_devices_node = static_cast<tree_item::pending_devices_t *>(pending_devices);
-    for (auto &it : cluster->get_pending_devices()) {
-        auto &device = *it.item;
-        device.set_augmentation(pending_devices_node->add_device(device));
-    }
-
-    auto ignored_devices_node = static_cast<tree_item::ignored_devices_t *>(ignored_devices);
-    for (auto &it : cluster->get_ignored_devices()) {
-        auto &device = *it.item;
-        device.set_augmentation(ignored_devices_node->add_device(device));
-    }
-
-    send<syncspirit::model::payload::thread_ready_t>(coordinator);
-
-    return diff.visit_next(*this, custom);
 }
 
 auto app_supervisor_t::operator()(const model::diff::local::io_failure_t &diff, void *custom) noexcept
@@ -652,7 +600,6 @@ auto app_supervisor_t::apply(const model::diff::load::blocks_t &diff, model::clu
     auto total = ctx->total_blocks;
     auto share = (100. * blocks) / total;
     auto msg = fmt::format("({}%) loaded {} of {} blocks", (int)share, blocks, total);
-    log->debug(msg);
     main_window->set_splash_text(msg);
     auto r = apply_controller_t::apply(diff, cluster, custom);
     return r;
@@ -675,6 +622,55 @@ auto app_supervisor_t::apply(const model::diff::load::interrupt_t &diff, model::
                              void *custom) noexcept -> outcome::result<void> {
     auto ctx = static_cast<apply_context_t *>(custom);
     ctx->diff = diff.sibling;
+    return outcome::success();
+}
+
+auto app_supervisor_t::apply(const model::diff::load::commit_t &diff, model::cluster_t &cluster, void *custom) noexcept
+    -> outcome::result<void> {
+    log->debug("committing db load, begin");
+    put(diff.commit_message);
+    auto folders_node = static_cast<tree_item::folders_t *>(folders);
+    for (auto &it : cluster.get_folders()) {
+        auto &folder = it.item;
+        auto text = fmt::format("building model of cluster folder '{}'({}) ...", folder->get_label(), folder->get_id());
+        main_window->set_splash_text(text);
+        auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
+        folders_node->add_folder(*folder_entity);
+        folder->set_augmentation(folder_entity);
+    }
+
+    auto devices_node = static_cast<tree_item::devices_t *>(devices);
+
+    auto &self_device = cluster.get_device();
+    auto self_node = devices_node->set_self(*cluster.get_device());
+    auto tree = self_node->get_owner()->tree();
+    tree->select(self_node->get_owner());
+    self_device->set_augmentation(*self_node);
+
+    for (auto &it : cluster.get_devices()) {
+        auto &device = *it.item;
+        if (device.device_id() != cluster.get_device()->device_id()) {
+            auto text = fmt::format("populating device '{}'({})...", device.get_name(), device.device_id().get_short());
+            main_window->set_splash_text(text);
+            device.set_augmentation(devices_node->add_peer(device));
+        }
+    }
+
+    auto pending_devices_node = static_cast<tree_item::pending_devices_t *>(pending_devices);
+    for (auto &it : cluster.get_pending_devices()) {
+        auto &device = *it.item;
+        device.set_augmentation(pending_devices_node->add_device(device));
+    }
+
+    auto ignored_devices_node = static_cast<tree_item::ignored_devices_t *>(ignored_devices);
+    for (auto &it : cluster.get_ignored_devices()) {
+        auto &device = *it.item;
+        device.set_augmentation(ignored_devices_node->add_device(device));
+    }
+
+    send<syncspirit::model::payload::thread_ready_t>(coordinator);
+
+    log->debug("committing db load, end");
     return outcome::success();
 }
 

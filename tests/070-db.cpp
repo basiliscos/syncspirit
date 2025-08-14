@@ -12,7 +12,6 @@
 #include "model/cluster.h"
 #include "db/utils.h"
 #include "net/db_actor.h"
-#include "access.h"
 #include <filesystem>
 
 using namespace syncspirit;
@@ -102,12 +101,26 @@ struct fixture_t {
         launch_db();
         main();
         reply.reset();
+        CHECK(get_reading_txn() == 0);
 
         sup->shutdown();
         sup->do_process();
 
         CHECK(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::SHUT_DOWN);
         return *this;
+    }
+
+    int get_reading_txn() {
+        auto &db_env = db_actor->access<env>();
+        int counter = 0;
+        auto reader = [](void *ctx, int, int, mdbx_pid_t, mdbx_tid_t, uint64_t, uint64_t, size_t,
+                         size_t) noexcept -> int {
+            ++(*reinterpret_cast<int *>(ctx));
+            return 0;
+        };
+        auto r = mdbx_reader_list(db_env, reader, &counter);
+        CHECK(((r == MDBX_RESULT_TRUE) || (r == 0)));
+        return counter;
     }
 
     virtual void launch_db() {
@@ -159,14 +172,18 @@ void test_db_population() {
 
 void test_loading_empty_db() {
     struct F : fixture_t {
-
         void main() noexcept override {
             sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
             sup->do_process();
-            REQUIRE(reply);
+            CHECK(get_reading_txn() == 1);
 
-            auto diff = reply->payload.res.diff;
-            REQUIRE(diff->apply(*cluster, get_apply_controller(), {}));
+            auto &diff = reply->payload.res.diff;
+            REQUIRE(diff->apply(*cluster, *sup, {}));
+
+            REQUIRE(reply);
+            sup->do_process();
+            reply.reset();
+            CHECK(get_reading_txn() == 0);
 
             auto devices = cluster->get_devices();
             REQUIRE(devices.size() == 2);

@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "test_supervisor.h"
+#include "model/diff/load/commit.h"
 #include "model/diff/modify/clone_block.h"
 #include "model/diff/modify/append_block.h"
 #include "model/diff/modify/finish_file.h"
@@ -241,4 +242,10 @@ auto supervisor_t::operator()(const model::diff::peer::update_folder_t &diff, vo
         }
     }
     return diff.visit_next(*this, custom);
+}
+
+auto supervisor_t::apply(const model::diff::load::commit_t &message, model::cluster_t &, void *) noexcept
+    -> outcome::result<void> {
+    put(message.commit_message);
+    return outcome::success();
 }

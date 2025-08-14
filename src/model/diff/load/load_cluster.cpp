@@ -6,8 +6,8 @@
 
 using namespace syncspirit::model::diff::load;
 
-load_cluster_t::load_cluster_t(db::transaction_t txn_, std::size_t blocks_count_, std::size_t files_count_) noexcept
-    : txn{std::move(txn_)}, blocks_count{blocks_count_}, files_count{files_count_} {}
+load_cluster_t::load_cluster_t(std::size_t blocks_count_, std::size_t files_count_) noexcept
+    : blocks_count{blocks_count_}, files_count{files_count_} {}
 
 auto load_cluster_t::apply_impl(cluster_t &cluster, apply_controller_t &controller, void *custom) const noexcept
     -> outcome::result<void> {

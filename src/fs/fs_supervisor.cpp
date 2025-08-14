@@ -2,6 +2,8 @@
 // SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "fs_supervisor.h"
+#include "model/diff/load/commit.h"
+#include "model/diff/load/interrupt.h"
 #include "net/names.h"
 #include "scan_actor.h"
 #include "scan_scheduler.h"
@@ -19,6 +21,9 @@ using namespace syncspirit::fs;
 using namespace syncspirit::presentation;
 
 namespace {
+
+using apply_context_t = syncspirit::model::payload::model_interrupt_t;
+
 namespace resource {
 r::plugin::resource_id_t model = 0;
 }
@@ -46,10 +51,12 @@ void fs_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 resources->acquire(resource::model);
             }
         });
+        p.discover_name(net::names::bouncer, bouncer, true).link(true);
     });
 
     plugin.with_casted<r::plugin::starter_plugin_t>(
         [&](auto &p) {
+            p.subscribe_actor(&fs_supervisor_t::on_model_interrupt);
             p.subscribe_actor(&fs_supervisor_t::on_model_request);
             p.subscribe_actor(&fs_supervisor_t::on_model_response);
         },
@@ -112,6 +119,21 @@ void fs_supervisor_t::on_model_response(model::message::model_response_t &res) n
     }
 }
 
+void fs_supervisor_t::on_model_interrupt(model::message::model_interrupt_t &message) noexcept {
+    LOG_TRACE(log, "on_model_interrupt");
+    auto copy = message.payload;
+    copy.diff = {};
+    process(*message.payload.diff, &copy, {});
+    while (!interrupted && delayed_updates.size()) {
+        LOG_TRACE(log, "applying delayed model update");
+        auto &msg = delayed_updates.front();
+        auto &p = msg->payload;
+        auto apply_ctx = apply_context_t{};
+        process(*p.diff, &apply_ctx, p.custom);
+        delayed_updates.pop_front();
+    }
+}
+
 void fs_supervisor_t::on_app_ready(model::message::app_ready_t &) noexcept {
     LOG_TRACE(log, "on_app_ready");
     launch();
@@ -130,8 +152,17 @@ void fs_supervisor_t::on_child_shutdown(actor_base_t *actor) noexcept {
 
 void fs_supervisor_t::on_model_update(model::message::model_update_t &message) noexcept {
     LOG_TRACE(log, "on_model_update");
-    auto &diff = *message.payload.diff;
-    auto r = diff.apply(*cluster, *this, {});
+    if (interrupted) {
+        delayed_updates.emplace_back(&message);
+    } else {
+        auto &p = message.payload;
+        auto apply_ctx = apply_context_t{};
+        process(*p.diff, &apply_ctx, p.custom);
+    }
+}
+
+void fs_supervisor_t::process(model::diff::cluster_diff_t &diff, void *apply_context, const void *custom) noexcept {
+    auto r = diff.apply(*cluster, *this, apply_context);
     if (!r) {
         LOG_ERROR(log, "error applying model diff: {}", r.assume_error().message());
         auto ee = make_error(r.assume_error());
@@ -141,19 +172,38 @@ void fs_supervisor_t::on_model_update(model::message::model_update_t &message) n
     r = diff.visit(*this, nullptr);
     if (!r) {
         LOG_ERROR(log, "{}, error visiting model: {}", identity, r.assume_error().message());
-        do_shutdown(make_error(r.assume_error()));
+        return do_shutdown(make_error(r.assume_error()));
+    }
+
+    auto apply_ctx = reinterpret_cast<apply_context_t *>(apply_context);
+    interrupted = (bool)apply_ctx->diff;
+    if (interrupted) {
+        auto message = r::make_message<model::payload::model_interrupt_t>(address, std::move(*apply_ctx));
+        send<hasher::payload::package_t>(bouncer, message);
     }
 }
 
-auto fs_supervisor_t::operator()(const model::diff::load::load_cluster_t &diff, void *custom) noexcept
+auto fs_supervisor_t::apply(const model::diff::load::interrupt_t &diff, model::cluster_t &cluster,
+                            void *custom) noexcept -> outcome::result<void> {
+    auto ctx = static_cast<apply_context_t *>(custom);
+    ctx->diff = diff.sibling;
+    return outcome::success();
+}
+
+auto fs_supervisor_t::apply(const model::diff::load::commit_t &diff, model::cluster_t &cluster, void *custom) noexcept
     -> outcome::result<void> {
-    for (auto &it : cluster->get_folders()) {
+    log->debug("committing db load, begin");
+    put(diff.commit_message);
+
+    for (auto &it : cluster.get_folders()) {
         auto &folder = it.item;
         auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
         folder->set_augmentation(folder_entity);
     }
     send<syncspirit::model::payload::thread_ready_t>(coordinator);
-    return diff.visit_next(*this, custom);
+
+    log->debug("committing db load, end");
+    return outcome::success();
 }
 
 auto fs_supervisor_t::operator()(const model::diff::modify::upsert_folder_t &diff, void *custom) noexcept

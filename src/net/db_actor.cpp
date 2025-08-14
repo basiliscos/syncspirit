@@ -11,6 +11,7 @@
 #include "model/diff/contact/peer_state.h"
 #include "model/diff/contact/unknown_connected.h"
 #include "model/diff/load/blocks.h"
+#include "model/diff/load/commit.h"
 #include "model/diff/load/devices.h"
 #include "model/diff/load/file_infos.h"
 #include "model/diff/load/folder_infos.h"
@@ -88,6 +89,7 @@ void db_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
         p.set_identity(names::db, false);
         log = utils::get_logger(identity);
+        sink = p.create_address();
     });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
         p.register_name(names::db, get_address());
@@ -95,7 +97,6 @@ void db_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
             if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {
                 auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
                 auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
-                plugin->subscribe_actor(&db_actor_t::on_model_load_release);
                 plugin->subscribe_actor(&db_actor_t::on_model_update, coordinator);
                 plugin->subscribe_actor(&db_actor_t::on_db_info, coordinator);
                 plugin->subscribe_actor(&db_actor_t::on_controller_up, coordinator);
@@ -106,6 +107,7 @@ void db_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         open();
         p.subscribe_actor(&db_actor_t::on_cluster_load);
+        p.subscribe_actor(&db_actor_t::on_commit);
     });
 }
 
@@ -332,7 +334,7 @@ void db_actor_t::on_cluster_load(message::load_cluster_request_t &request) noexc
     LOG_TRACE(log, "on_cluster_load, all raw bytes has been loaded");
 
     auto diff = model::diff::cluster_diff_ptr_t{};
-    diff.reset(new load::load_cluster_t(std::move(txn), blocks.size(), files.size()));
+    diff.reset(new load::load_cluster_t(blocks.size(), files.size()));
 
     auto current = diff->assign_child(new load::devices_t(std::move(devices_opt.value())));
     if (blocks.size()) {
@@ -433,28 +435,20 @@ void db_actor_t::on_cluster_load(message::load_cluster_request_t &request) noexc
         current = current->assign_sibling(new load::remove_corrupted_files_t(std::move(corrupted_files)));
     }
 
+    auto commit_message = r::make_routed_message<commit_payload_t>(sink, address, std::move(txn));
+    current = current->assign_sibling(new load::commit_t(std::move(commit_message)));
+
     LOG_TRACE(log, "on_cluster_load (end)");
 
     reply_to(request, diff);
 }
 
-void db_actor_t::on_model_load_release(model::message::model_update_t &message) noexcept {
-    struct custom_visitor_t : model::diff::cluster_visitor_t {
-        outcome::result<void> operator()(const model::diff::load::load_cluster_t &diff,
-                                         void *custom) noexcept override {
-            auto self = static_cast<db_actor_t *>(custom);
-            LOG_DEBUG(self->log, "closing load transaction");
-            auto &txn = const_cast<db::transaction_t &>(diff.txn);
-            return txn.commit();
-        }
-    };
-
-    auto visitor = custom_visitor_t();
-    LOG_TRACE(log, "on_model_load_release", identity);
-    auto r = message.payload.diff->visit(visitor, this);
+void db_actor_t::on_commit(commit_message_t &message) noexcept {
+    LOG_DEBUG(log, "closing load transaction");
+    auto r = message.payload.commit();
     if (!r) {
         auto ee = make_error(r.assume_error());
-        LOG_ERROR(log, "on_model_update error: {}", r.assume_error().message());
+        LOG_ERROR(log, "committing txn error: {}", r.assume_error().message());
         do_shutdown(ee);
     }
 }

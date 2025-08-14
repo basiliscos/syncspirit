@@ -62,6 +62,8 @@ struct SYNCSPIRIT_API db_actor_t : public r::actor_base_t, private model::diff::
 
   private:
     using transaction_ptr_t = std::unique_ptr<db::transaction_t>;
+    using commit_payload_t = db::transaction_t;
+    using commit_message_t = r::message_t<commit_payload_t>;
 
     void open() noexcept;
     outcome::result<db::transaction_t *> get_txn() noexcept;
@@ -69,7 +71,7 @@ struct SYNCSPIRIT_API db_actor_t : public r::actor_base_t, private model::diff::
     outcome::result<void> force_commit() noexcept;
 
     void on_cluster_load(message::load_cluster_request_t &message) noexcept;
-    void on_model_load_release(model::message::model_update_t &) noexcept;
+    void on_commit(commit_message_t &) noexcept;
     void on_model_update(model::message::model_update_t &) noexcept;
     void on_db_info(message::db_info_request_t &) noexcept;
     void on_controller_up(net::message::controller_up_t &message) noexcept;
@@ -102,6 +104,7 @@ struct SYNCSPIRIT_API db_actor_t : public r::actor_base_t, private model::diff::
     outcome::result<void> operator()(const model::diff::peer::update_folder_t &, void *) noexcept override;
 
     r::address_ptr_t coordinator;
+    r::address_ptr_t sink;
     utils::logger_t log;
     MDBX_env *env;
     bfs::path db_dir;

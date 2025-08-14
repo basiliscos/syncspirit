@@ -33,7 +33,6 @@ struct model_interrupt_t {
     std::size_t loaded_blocks = 0;
     std::size_t loaded_files = 0;
     model::diff::cluster_diff_ptr_t diff;
-    r::message_ptr_t source_message;
 };
 
 struct thread_ready_t {};
