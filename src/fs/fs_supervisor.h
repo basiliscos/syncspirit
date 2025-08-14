@@ -7,8 +7,8 @@
 #include "config/main.h"
 #include "utils/log.h"
 #include "model/messages.h"
-#include "model/diff/apply_controller.h"
 #include "model/diff/cluster_visitor.h"
+#include "model/diff/iterative_controller.h"
 #include "model/misc/sequencer.h"
 #include "syncspirit-export.h"
 #include "file_cache.h"
@@ -46,9 +46,11 @@ template <typename Supervisor> struct fs_supervisor_config_builder_t : r::superv
     }
 };
 
-struct SYNCSPIRIT_API fs_supervisor_t : rth::supervisor_thread_t,
-                                        private model::diff::cluster_visitor_t,
-                                        private model::diff::apply_controller_t {
+template <typename T, typename Parent>
+using fs_base_t = model::diff::iterative_controller_t<T, rth::supervisor_thread_t>;
+
+struct SYNCSPIRIT_API fs_supervisor_t : fs_base_t<fs_supervisor_t, rth::supervisor_thread_t> {
+    using controller_t = fs_base_t<fs_supervisor_t, rth::supervisor_thread_t>;
     using launcher_t = std::function<void(model::cluster_ptr_t &)>;
     using parent_t = rth::supervisor_thread_t;
     using config_t = fs_supervisor_config_t;
@@ -63,15 +65,11 @@ struct SYNCSPIRIT_API fs_supervisor_t : rth::supervisor_thread_t,
   private:
     using model_request_ptr_t = r::intrusive_ptr_t<model::message::model_request_t>;
     using launchers_t = std::vector<launcher_t>;
-    using model_update_ptr_t = r::intrusive_ptr_t<model::message::model_update_t>;
-    using delayed_updates_t = std::list<model_update_ptr_t>;
 
     void on_model_request(model::message::model_request_t &req) noexcept;
-    void on_model_interrupt(model::message::model_interrupt_t &message) noexcept;
     void on_model_response(model::message::model_response_t &res) noexcept;
-    void on_model_update(model::message::model_update_t &message) noexcept;
     void on_app_ready(model::message::app_ready_t &) noexcept;
-    void process(model::diff::cluster_diff_t &diff, void *apply_context, const void *custom) noexcept;
+    void commit_loading() noexcept override;
     void launch() noexcept;
 
     outcome::result<void> operator()(const model::diff::modify::upsert_folder_t &, void *) noexcept override;
@@ -79,24 +77,14 @@ struct SYNCSPIRIT_API fs_supervisor_t : rth::supervisor_thread_t,
     outcome::result<void> operator()(const model::diff::advance::advance_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::peer::update_folder_t &, void *) noexcept override;
 
-    outcome::result<void> apply(const model::diff::load::interrupt_t &, model::cluster_t &, void *) noexcept override;
-    outcome::result<void> apply(const model::diff::load::commit_t &, model::cluster_t &, void *) noexcept override;
-
     model::sequencer_ptr_t sequencer;
-    model::cluster_ptr_t cluster;
-    utils::logger_t log;
     config::fs_config_t fs_config;
     uint32_t hasher_threads;
-    r::address_ptr_t coordinator;
-    r::address_ptr_t bouncer;
     r::actor_ptr_t scan_actor;
     r::actor_ptr_t file_actor;
     model_request_ptr_t model_request;
     launchers_t launchers;
     file_cache_ptr_t rw_cache;
-    bool interrupted = false;
-    delayed_updates_t delayed_updates;
-    void commit_message();
 };
 
 } // namespace fs

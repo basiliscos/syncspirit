@@ -22,15 +22,13 @@ using namespace syncspirit::presentation;
 
 namespace {
 
-using apply_context_t = syncspirit::model::payload::model_interrupt_t;
-
 namespace resource {
 r::plugin::resource_id_t model = 0;
 }
 } // namespace
 
 fs_supervisor_t::fs_supervisor_t(config_t &cfg)
-    : parent_t(cfg), sequencer(cfg.sequencer), fs_config{cfg.fs_config}, hasher_threads{cfg.hasher_threads} {
+    : controller_t(this, cfg), sequencer(cfg.sequencer), fs_config{cfg.fs_config}, hasher_threads{cfg.hasher_threads} {
     rw_cache.reset(new file_cache_t(fs_config.mru_size));
 }
 
@@ -119,21 +117,6 @@ void fs_supervisor_t::on_model_response(model::message::model_response_t &res) n
     }
 }
 
-void fs_supervisor_t::on_model_interrupt(model::message::model_interrupt_t &message) noexcept {
-    LOG_TRACE(log, "on_model_interrupt");
-    auto copy = message.payload;
-    copy.diff = {};
-    process(*message.payload.diff, &copy, {});
-    while (!interrupted && delayed_updates.size()) {
-        LOG_TRACE(log, "applying delayed model update");
-        auto &msg = delayed_updates.front();
-        auto &p = msg->payload;
-        auto apply_ctx = apply_context_t{};
-        process(*p.diff, &apply_ctx, p.custom);
-        delayed_updates.pop_front();
-    }
-}
-
 void fs_supervisor_t::on_app_ready(model::message::app_ready_t &) noexcept {
     LOG_TRACE(log, "on_app_ready");
     launch();
@@ -150,60 +133,12 @@ void fs_supervisor_t::on_child_shutdown(actor_base_t *actor) noexcept {
     LOG_TRACE(log, "on_child_shutdown, '{}' due to {} ", actor->get_identity(), reason->message());
 }
 
-void fs_supervisor_t::on_model_update(model::message::model_update_t &message) noexcept {
-    LOG_TRACE(log, "on_model_update");
-    if (interrupted) {
-        delayed_updates.emplace_back(&message);
-    } else {
-        auto &p = message.payload;
-        auto apply_ctx = apply_context_t{};
-        process(*p.diff, &apply_ctx, p.custom);
-    }
-}
-
-void fs_supervisor_t::process(model::diff::cluster_diff_t &diff, void *apply_context, const void *custom) noexcept {
-    auto r = diff.apply(*cluster, *this, apply_context);
-    if (!r) {
-        LOG_ERROR(log, "error applying model diff: {}", r.assume_error().message());
-        auto ee = make_error(r.assume_error());
-        return do_shutdown(ee);
-    }
-
-    r = diff.visit(*this, nullptr);
-    if (!r) {
-        LOG_ERROR(log, "{}, error visiting model: {}", identity, r.assume_error().message());
-        return do_shutdown(make_error(r.assume_error()));
-    }
-
-    auto apply_ctx = reinterpret_cast<apply_context_t *>(apply_context);
-    interrupted = (bool)apply_ctx->diff;
-    if (interrupted) {
-        auto message = r::make_message<model::payload::model_interrupt_t>(address, std::move(*apply_ctx));
-        send<hasher::payload::package_t>(bouncer, message);
-    }
-}
-
-auto fs_supervisor_t::apply(const model::diff::load::interrupt_t &diff, model::cluster_t &cluster,
-                            void *custom) noexcept -> outcome::result<void> {
-    auto ctx = static_cast<apply_context_t *>(custom);
-    ctx->diff = diff.sibling;
-    return outcome::success();
-}
-
-auto fs_supervisor_t::apply(const model::diff::load::commit_t &diff, model::cluster_t &cluster, void *custom) noexcept
-    -> outcome::result<void> {
-    log->debug("committing db load, begin");
-    put(diff.commit_message);
-
-    for (auto &it : cluster.get_folders()) {
+void fs_supervisor_t::commit_loading() noexcept {
+    for (auto &it : cluster->get_folders()) {
         auto &folder = it.item;
         auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
         folder->set_augmentation(folder_entity);
     }
-    send<syncspirit::model::payload::thread_ready_t>(coordinator);
-
-    log->debug("committing db load, end");
-    return outcome::success();
 }
 
 auto fs_supervisor_t::operator()(const model::diff::modify::upsert_folder_t &diff, void *custom) noexcept
