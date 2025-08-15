@@ -23,6 +23,9 @@ struct SYNCSPIRIT_API iterative_controller_base_t : apply_controller_t, protecte
     void on_model_update(model::message::model_update_t &message) noexcept;
     void on_model_interrupt(model::message::model_interrupt_t &message) noexcept;
     void process(model::diff::cluster_diff_t &diff, apply_context_t *apply_context, const void *custom) noexcept;
+    virtual void process(model::diff::cluster_diff_t &diff, const void *custom) noexcept;
+    virtual outcome::result<void> visit_diff(model::diff::cluster_diff_t &diff, apply_context_t *apply_context,
+                                             const void *custom) noexcept;
     virtual void commit_loading() noexcept;
 
     outcome::result<void> apply(const model::diff::load::interrupt_t &, model::cluster_t &, void *) noexcept override;

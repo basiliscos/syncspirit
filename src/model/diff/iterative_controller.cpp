@@ -35,9 +35,13 @@ void iterative_controller_base_t::on_model_update(model::message::model_update_t
         delayed_updates.emplace_back(&message);
     } else {
         auto &p = message.payload;
-        auto apply_ctx = apply_context_t{};
-        process(*p.diff, &apply_ctx, p.custom);
+        process(*p.diff, p.custom);
     }
+}
+
+void iterative_controller_base_t::process(model::diff::cluster_diff_t &diff, const void *custom) noexcept {
+    auto apply_ctx = apply_context_t{};
+    process(diff, &apply_ctx, custom);
 }
 
 void iterative_controller_base_t::on_model_interrupt(model::message::model_interrupt_t &message) noexcept {
@@ -49,8 +53,7 @@ void iterative_controller_base_t::on_model_interrupt(model::message::model_inter
         LOG_TRACE(log, "applying delayed model update");
         auto &msg = delayed_updates.front();
         auto &p = msg->payload;
-        auto apply_ctx = apply_context_t{};
-        process(*p.diff, &apply_ctx, p.custom);
+        process(*p.diff, p.custom);
         delayed_updates.pop_front();
     }
 }
@@ -69,7 +72,7 @@ void iterative_controller_base_t::process(model::diff::cluster_diff_t &diff, app
         return owner->do_shutdown(ee);
     }
 
-    r = diff.visit(*this, nullptr);
+    r = visit_diff(diff, apply_context, custom);
     if (!r) {
         LOG_ERROR(log, "error visiting model: {}", r.assume_error().message());
         auto ee = owner->access<to::make_error, T0, T1, T2>(r.assume_error(), {}, {});
@@ -83,6 +86,11 @@ void iterative_controller_base_t::process(model::diff::cluster_diff_t &diff, app
         auto message = r::make_message<model::payload::model_interrupt_t>(address, std::move(*apply_ctx));
         owner->send<hasher::payload::package_t>(bouncer, message);
     }
+}
+
+auto iterative_controller_base_t::visit_diff(model::diff::cluster_diff_t &diff, apply_context_t *,
+                                             const void *) noexcept -> outcome::result<void> {
+    return diff.visit(*this, nullptr);
 }
 
 auto iterative_controller_base_t::apply(const model::diff::load::interrupt_t &diff, model::cluster_t &cluster,

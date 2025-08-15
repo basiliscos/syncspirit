@@ -5,9 +5,7 @@
 
 #include <functional>
 #include "config/main.h"
-#include "utils/log.h"
 #include "model/messages.h"
-#include "model/diff/cluster_visitor.h"
 #include "model/diff/iterative_controller.h"
 #include "model/misc/sequencer.h"
 #include "syncspirit-export.h"
@@ -46,11 +44,10 @@ template <typename Supervisor> struct fs_supervisor_config_builder_t : r::superv
     }
 };
 
-template <typename T, typename Parent>
-using fs_base_t = model::diff::iterative_controller_t<T, rth::supervisor_thread_t>;
+template <typename T> using fs_base_t = model::diff::iterative_controller_t<T, rth::supervisor_thread_t>;
 
-struct SYNCSPIRIT_API fs_supervisor_t : fs_base_t<fs_supervisor_t, rth::supervisor_thread_t> {
-    using controller_t = fs_base_t<fs_supervisor_t, rth::supervisor_thread_t>;
+struct SYNCSPIRIT_API fs_supervisor_t : fs_base_t<fs_supervisor_t> {
+    using controller_t = fs_base_t<fs_supervisor_t>;
     using launcher_t = std::function<void(model::cluster_ptr_t &)>;
     using parent_t = rth::supervisor_thread_t;
     using config_t = fs_supervisor_config_t;

@@ -5,12 +5,11 @@
 
 #include "content.h"
 #include "config/main.h"
-#include "utils/log.h"
 #include "net/messages.h"
 #include "model/messages.h"
 #include "model/diff/apply_controller.h"
-#include "model/diff/cluster_visitor.h"
 #include "model/diff/load/load_cluster.h"
+#include "model/diff/iterative_controller.h"
 #include "model/misc/sequencer.h"
 #include "log_sink.h"
 
@@ -87,10 +86,10 @@ struct callback_t : model::arc_base_t<callback_t> {
 };
 using callback_ptr_t = model::intrusive_ptr_t<callback_t>;
 
-struct app_supervisor_t : rf::supervisor_fltk_t,
-                          private model::diff::cluster_visitor_t,
-                          private model::diff::apply_controller_t {
-    using parent_t = rf::supervisor_fltk_t;
+template <typename T> using app_supervisor_base_t = model::diff::iterative_controller_t<T, rf::supervisor_fltk_t>;
+
+struct app_supervisor_t : app_supervisor_base_t<app_supervisor_t> {
+    using parent_t = app_supervisor_base_t<app_supervisor_t>;
     using config_t = app_supervisor_config_t;
     template <typename Actor> using config_builder_t = app_supervisor_config_builder_t<Actor>;
 
@@ -167,13 +166,12 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
     using delayed_updates_t = std::list<model_update_ptr_t>;
 
     void on_model_response(model::message::model_response_t &res) noexcept;
-    void on_model_update(model::message::model_update_t &message) noexcept;
-    void on_model_interrupt(model::message::model_interrupt_t &message) noexcept;
     void on_app_ready(model::message::app_ready_t &) noexcept;
     void on_db_info_response(net::message::db_info_response_t &res) noexcept;
     void redisplay_folder_nodes(bool refresh_labels);
     void detach_main_window() noexcept;
-    void process(model::diff::cluster_diff_t &diff, void *apply_context, const void *custom) noexcept;
+
+    void process(model::diff::cluster_diff_t &diff, const void *custom) noexcept override;
 
     outcome::result<void> operator()(const model::diff::advance::advance_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::local::io_failure_t &, void *) noexcept override;
@@ -187,21 +185,19 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
 
     outcome::result<void> apply(const model::diff::load::blocks_t &, model::cluster_t &, void *) noexcept override;
     outcome::result<void> apply(const model::diff::load::file_infos_t &, model::cluster_t &, void *) noexcept override;
-    outcome::result<void> apply(const model::diff::load::interrupt_t &, model::cluster_t &, void *) noexcept override;
-    outcome::result<void> apply(const model::diff::load::commit_t &, model::cluster_t &, void *) noexcept override;
     outcome::result<void> apply(const model::diff::load::load_cluster_t &, model::cluster_t &,
                                 void *) noexcept override;
 
+    void commit_loading() noexcept override;
+    outcome::result<void> visit_diff(model::diff::cluster_diff_t &diff, apply_context_t *apply_context,
+                                     const void *custom) noexcept override;
+
     model::sequencer_ptr_t sequencer;
     time_point_t started_at;
-    r::address_ptr_t coordinator;
-    r::address_ptr_t bouncer;
     in_memory_sink_t *log_sink;
-    utils::logger_t log;
     bfs::path config_path;
     config::main_t app_config;
     config::main_t app_config_original;
-    model::cluster_ptr_t cluster;
     content_t *content;
     tree_item_t *devices;
     tree_item_t *folders;
@@ -210,8 +206,6 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
     db_info_viewer_t *db_info_viewer;
     callbacks_t callbacks;
     main_window_t *main_window;
-    bool interrupted = false;
-    delayed_updates_t delayed_updates;
 
     friend struct db_info_viewer_guard_t;
 };
