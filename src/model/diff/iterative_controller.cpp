@@ -35,61 +35,61 @@ void iterative_controller_base_t::on_model_update(model::message::model_update_t
         delayed_updates.emplace_back(&message);
     } else {
         auto &p = message.payload;
-        process(*p.diff, p.custom);
+        auto context = apply_context_t{{}, p.custom};
+        process(*p.diff, context);
     }
 }
 
-void iterative_controller_base_t::process(model::diff::cluster_diff_t &diff, const void *custom) noexcept {
-    auto apply_ctx = apply_context_t{};
-    process(diff, &apply_ctx, custom);
+void iterative_controller_base_t::process(model::diff::cluster_diff_t &diff, apply_context_t &context) noexcept {
+    process_impl(diff, context);
 }
 
 void iterative_controller_base_t::on_model_interrupt(model::message::model_interrupt_t &message) noexcept {
+    using namespace model::payload;
     LOG_TRACE(log, "on_model_interrupt");
-    auto copy = message.payload;
-    copy.diff = {};
-    process(*message.payload.diff, &copy, {});
+    auto &p = message.payload;
+    auto apply_context =
+        apply_context_t(model_interrupt_t{p.total_blocks, p.total_files, p.loaded_blocks, p.loaded_files});
+    process(*message.payload.diff, apply_context);
     while (!interrupted && delayed_updates.size()) {
         LOG_TRACE(log, "applying delayed model update");
         auto &msg = delayed_updates.front();
         auto &p = msg->payload;
-        process(*p.diff, p.custom);
+        apply_context.message_payload = p.custom;
+        process(*p.diff, apply_context);
         delayed_updates.pop_front();
     }
 }
 
-void iterative_controller_base_t::process(model::diff::cluster_diff_t &diff, apply_context_t *apply_context,
-                                          const void *custom) noexcept {
+void iterative_controller_base_t::process_impl(model::diff::cluster_diff_t &diff,
+                                               apply_context_t &apply_context) noexcept {
     using T0 = const std::error_code &;
     using T1 = const r::extended_error_ptr_t &;
     using T2 = const r::message_ptr_t &;
-
-    auto r = diff.apply(*cluster, *this, apply_context);
+    auto r = diff.apply(*cluster, *this, &apply_context);
     if (!r) {
         LOG_ERROR(log, "error applying model diff: {}", r.assume_error().message());
-        // auto ee = owner->access<to::make_error>( make_error(r.assume_error());
         auto ee = owner->access<to::make_error, T0, T1, T2>(r.assume_error(), {}, {});
         return owner->do_shutdown(ee);
     }
 
-    r = visit_diff(diff, apply_context, custom);
+    r = visit_diff(diff, apply_context);
     if (!r) {
         LOG_ERROR(log, "error visiting model: {}", r.assume_error().message());
         auto ee = owner->access<to::make_error, T0, T1, T2>(r.assume_error(), {}, {});
         return owner->do_shutdown(ee);
     }
 
-    auto apply_ctx = reinterpret_cast<apply_context_t *>(apply_context);
-    interrupted = (bool)apply_ctx->diff;
+    interrupted = (bool)apply_context.diff;
     if (interrupted) {
         auto &address = owner->get_address();
-        auto message = r::make_message<model::payload::model_interrupt_t>(address, std::move(*apply_ctx));
+        auto message = r::make_message<model::payload::model_interrupt_t>(address, std::move(apply_context));
         owner->send<hasher::payload::package_t>(bouncer, message);
     }
 }
 
-auto iterative_controller_base_t::visit_diff(model::diff::cluster_diff_t &diff, apply_context_t *,
-                                             const void *) noexcept -> outcome::result<void> {
+auto iterative_controller_base_t::visit_diff(model::diff::cluster_diff_t &diff, apply_context_t &) noexcept
+    -> outcome::result<void> {
     return diff.visit(*this, nullptr);
 }
 

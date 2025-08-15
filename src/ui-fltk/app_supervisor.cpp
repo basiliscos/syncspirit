@@ -13,15 +13,12 @@
 #include "tree_item/pending_folders.h"
 #include "tree_item/peer_folders.h"
 #include "net/names.h"
-#include "hasher/messages.h"
 #include "config/utils.h"
 #include "model/diff/advance/advance.h"
 #include "model/diff/local/io_failure.h"
 #include "model/diff/load/blocks.h"
-#include "model/diff/load/commit.h"
 #include "model/diff/load/file_infos.h"
 #include "model/diff/load/load_cluster.h"
-#include "model/diff/load/interrupt.h"
 #include "model/diff/modify/add_ignored_device.h"
 #include "model/diff/modify/add_pending_device.h"
 #include "model/diff/modify/add_pending_folders.h"
@@ -82,7 +79,7 @@ struct app_monitor_t final : entities_monitor_t {
     entities_ptrs_t &updated;
 };
 
-struct app_context_t : model::diff::iterative_controller_base_t::apply_context_t {
+struct app_context_attachment {
     guards_t &guards;
     app_monitor_t &monitor;
 };
@@ -206,7 +203,7 @@ void app_supervisor_t::on_model_response(model::message::model_response_t &res) 
     cluster = std::move(res.payload.res.cluster);
 }
 
-void app_supervisor_t::process(model::diff::cluster_diff_t &diff, const void *custom) noexcept {
+void app_supervisor_t::process(model::diff::cluster_diff_t &diff, apply_context_t &context) noexcept {
     auto buffer = std::array<std::byte, 16 * 1024>();
     auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
     auto allocator = std::pmr::polymorphic_allocator<std::string>(&pool);
@@ -226,12 +223,13 @@ void app_supervisor_t::process(model::diff::cluster_diff_t &diff, const void *cu
         }
     }
 
-    auto app_ctx = app_context_t{{}, guards, monitor};
-    parent_t::process(diff, &app_ctx, custom);
+    auto attachment = app_context_attachment{guards, monitor};
+    context.custom_payload = &attachment;
+    parent_t::process(diff, context);
 
-    if (custom) {
+    if (context.message_payload) {
         for (auto it = begin(callbacks); it != end(callbacks); ++it) {
-            if (it->get() == custom) {
+            if (it->get() == context.message_payload) {
                 auto cb = *it;
                 callbacks.erase(it);
                 cb->eval();
@@ -254,9 +252,9 @@ void app_supervisor_t::process(model::diff::cluster_diff_t &diff, const void *cu
     }
 }
 
-auto app_supervisor_t::visit_diff(model::diff::cluster_diff_t &diff, apply_context_t *apply_context,
-                                  const void *custom) noexcept -> outcome::result<void> {
-    return diff.visit(*this, apply_context);
+auto app_supervisor_t::visit_diff(model::diff::cluster_diff_t &diff, apply_context_t &apply_context) noexcept
+    -> outcome::result<void> {
+    return diff.visit(*this, &apply_context);
 }
 
 void app_supervisor_t::on_app_ready(model::message::app_ready_t &) noexcept {
@@ -457,8 +455,9 @@ auto app_supervisor_t::operator()(const model::diff::modify::upsert_folder_t &di
         auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
         folders_node->add_folder(*folder_entity);
         folder->set_augmentation(folder_entity);
-        auto ctx = static_cast<app_context_t *>(custom);
-        ctx->guards.emplace_back(folder_entity->monitor(&ctx->monitor));
+        auto ctx = static_cast<apply_context_t *>(custom);
+        auto attachment = static_cast<app_context_attachment *>(ctx->custom_payload);
+        attachment->guards.emplace_back(folder_entity->monitor(&attachment->monitor));
     }
     return diff.visit_next(*this, custom);
 }

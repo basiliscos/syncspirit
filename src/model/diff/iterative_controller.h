@@ -13,19 +13,23 @@
 namespace syncspirit::model::diff {
 
 struct SYNCSPIRIT_API iterative_controller_base_t : apply_controller_t, protected cluster_visitor_t {
-    using apply_context_t = payload::model_interrupt_t;
     using model_update_ptr_t = r::intrusive_ptr_t<model::message::model_update_t>;
     using delayed_updates_t = std::list<model_update_ptr_t>;
+
+    struct apply_context_t : payload::model_interrupt_t {
+        const void *message_payload = nullptr;
+        void *custom_payload = nullptr;
+    };
 
     iterative_controller_base_t(r::actor_base_t *owner) noexcept;
 
   protected:
     void on_model_update(model::message::model_update_t &message) noexcept;
     void on_model_interrupt(model::message::model_interrupt_t &message) noexcept;
-    void process(model::diff::cluster_diff_t &diff, apply_context_t *apply_context, const void *custom) noexcept;
-    virtual void process(model::diff::cluster_diff_t &diff, const void *custom) noexcept;
-    virtual outcome::result<void> visit_diff(model::diff::cluster_diff_t &diff, apply_context_t *apply_context,
-                                             const void *custom) noexcept;
+    void process_impl(model::diff::cluster_diff_t &diff, apply_context_t &apply_context) noexcept;
+    virtual void process(model::diff::cluster_diff_t &diff, apply_context_t &context) noexcept;
+    virtual outcome::result<void> visit_diff(model::diff::cluster_diff_t &diff,
+                                             apply_context_t &apply_context) noexcept;
     virtual void commit_loading() noexcept;
 
     outcome::result<void> apply(const model::diff::load::interrupt_t &, model::cluster_t &, void *) noexcept override;

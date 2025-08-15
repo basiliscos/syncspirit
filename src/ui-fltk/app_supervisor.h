@@ -171,7 +171,7 @@ struct app_supervisor_t : app_supervisor_base_t<app_supervisor_t> {
     void redisplay_folder_nodes(bool refresh_labels);
     void detach_main_window() noexcept;
 
-    void process(model::diff::cluster_diff_t &diff, const void *custom) noexcept override;
+    void process(model::diff::cluster_diff_t &diff, apply_context_t &context) noexcept override;
 
     outcome::result<void> operator()(const model::diff::advance::advance_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::local::io_failure_t &, void *) noexcept override;
@@ -189,8 +189,7 @@ struct app_supervisor_t : app_supervisor_base_t<app_supervisor_t> {
                                 void *) noexcept override;
 
     void commit_loading() noexcept override;
-    outcome::result<void> visit_diff(model::diff::cluster_diff_t &diff, apply_context_t *apply_context,
-                                     const void *custom) noexcept override;
+    outcome::result<void> visit_diff(model::diff::cluster_diff_t &diff, apply_context_t &context) noexcept override;
 
     model::sequencer_ptr_t sequencer;
     time_point_t started_at;
