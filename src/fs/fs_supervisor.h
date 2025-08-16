@@ -44,7 +44,7 @@ template <typename Supervisor> struct fs_supervisor_config_builder_t : r::superv
     }
 };
 
-template <typename T> using fs_base_t = model::diff::iterative_controller_t<T, rth::supervisor_thread_t>;
+template <typename T> using fs_base_t = model::diff::iterative_controller_t<T, rth::supervisor_thread_t, true>;
 
 struct SYNCSPIRIT_API fs_supervisor_t : fs_base_t<fs_supervisor_t> {
     using controller_t = fs_base_t<fs_supervisor_t>;

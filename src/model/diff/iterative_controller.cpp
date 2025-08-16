@@ -27,7 +27,8 @@ actor_base_t::access<to::make_error, const std::error_code &, const extended_err
 
 } // namespace rotor
 
-iterative_controller_base_t::iterative_controller_base_t(r::actor_base_t *owner_) noexcept : owner{owner_} {}
+iterative_controller_base_t::iterative_controller_base_t(r::actor_base_t *owner_, bool need_visitor_) noexcept
+    : owner{owner_}, need_visitor{need_visitor_} {}
 
 void iterative_controller_base_t::on_model_update(model::message::model_update_t &message) noexcept {
     LOG_TRACE(log, "on_model_update");
@@ -73,11 +74,13 @@ void iterative_controller_base_t::process_impl(model::diff::cluster_diff_t &diff
         return owner->do_shutdown(ee);
     }
 
-    r = visit_diff(diff, apply_context);
-    if (!r) {
-        LOG_ERROR(log, "error visiting model: {}", r.assume_error().message());
-        auto ee = owner->access<to::make_error, T0, T1, T2>(r.assume_error(), {}, {});
-        return owner->do_shutdown(ee);
+    if (need_visitor) {
+        r = visit_diff(diff, apply_context);
+        if (!r) {
+            LOG_ERROR(log, "error visiting model: {}", r.assume_error().message());
+            auto ee = owner->access<to::make_error, T0, T1, T2>(r.assume_error(), {}, {});
+            return owner->do_shutdown(ee);
+        }
     }
 
     interrupted = (bool)apply_context.diff;

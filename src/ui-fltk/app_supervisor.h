@@ -86,7 +86,7 @@ struct callback_t : model::arc_base_t<callback_t> {
 };
 using callback_ptr_t = model::intrusive_ptr_t<callback_t>;
 
-template <typename T> using app_supervisor_base_t = model::diff::iterative_controller_t<T, rf::supervisor_fltk_t>;
+template <typename T> using app_supervisor_base_t = model::diff::iterative_controller_t<T, rf::supervisor_fltk_t, true>;
 
 struct app_supervisor_t : app_supervisor_base_t<app_supervisor_t> {
     using parent_t = app_supervisor_base_t<app_supervisor_t>;

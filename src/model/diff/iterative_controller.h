@@ -21,7 +21,7 @@ struct SYNCSPIRIT_API iterative_controller_base_t : apply_controller_t, protecte
         void *custom_payload = nullptr;
     };
 
-    iterative_controller_base_t(r::actor_base_t *owner) noexcept;
+    iterative_controller_base_t(r::actor_base_t *owner, bool need_visitor) noexcept;
 
   protected:
     void on_model_update(model::message::model_update_t &message) noexcept;
@@ -43,13 +43,15 @@ struct SYNCSPIRIT_API iterative_controller_base_t : apply_controller_t, protecte
     r::address_ptr_t coordinator;
     r::address_ptr_t bouncer;
     bool interrupted = false;
+    bool need_visitor;
 };
 
-template <typename T, typename Parent> struct iterative_controller_t : iterative_controller_base_t, Parent {
+template <typename T, typename Parent, bool NeedVisitor>
+struct iterative_controller_t : iterative_controller_base_t, Parent {
     using base_t = iterative_controller_base_t;
 
     template <typename... Args>
-    iterative_controller_t(T *self, Args &&...args) noexcept : base_t(self), Parent(std::forward<Args>(args)...) {}
+    iterative_controller_t(T *self, Args &&...args) noexcept : base_t(self, NeedVisitor), Parent(std::forward<Args>(args)...) {}
     void on_model_update(model::message::model_update_t &message) noexcept { base_t::on_model_update(message); }
     void on_model_interrupt(model::message::model_interrupt_t &message) noexcept {
         base_t::on_model_interrupt(message);
