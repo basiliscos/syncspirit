@@ -32,6 +32,7 @@ struct SYNCSPIRIT_API iterative_controller_base_t : apply_controller_t, protecte
                                              apply_context_t &apply_context) noexcept;
     virtual void commit_loading() noexcept;
 
+    using apply_controller_t::apply;
     outcome::result<void> apply(const model::diff::load::interrupt_t &, model::cluster_t &, void *) noexcept override;
     outcome::result<void> apply(const model::diff::load::commit_t &, model::cluster_t &, void *) noexcept override;
 
@@ -51,7 +52,8 @@ struct iterative_controller_t : iterative_controller_base_t, Parent {
     using base_t = iterative_controller_base_t;
 
     template <typename... Args>
-    iterative_controller_t(T *self, Args &&...args) noexcept : base_t(self, NeedVisitor), Parent(std::forward<Args>(args)...) {}
+    iterative_controller_t(T *self, Args &&...args) noexcept
+        : base_t(self, NeedVisitor), Parent(std::forward<Args>(args)...) {}
     void on_model_update(model::message::model_update_t &message) noexcept { base_t::on_model_update(message); }
     void on_model_interrupt(model::message::model_interrupt_t &message) noexcept {
         base_t::on_model_interrupt(message);

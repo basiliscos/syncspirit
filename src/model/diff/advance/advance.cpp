@@ -6,6 +6,7 @@
 #include "remote_win.h"
 #include "proto/proto-helpers.h"
 #include "model/cluster.h"
+#include "model/diff/apply_controller.h"
 #include "model/diff/modify/add_blocks.h"
 #include "model/diff/modify/remove_blocks.h"
 #include "model/misc/orphaned_blocks.h"
@@ -116,6 +117,11 @@ void advance_t::initialize(const cluster_t &cluster, sequencer_t &sequencer, pro
             assign_child(diff);
         }
     }
+}
+
+auto advance_t::apply_forward(cluster_t &cluster, apply_controller_t &controller, void *custom) const noexcept
+    -> outcome::result<void> {
+    return controller.apply(*this, cluster, custom);
 }
 
 auto advance_t::apply_impl(cluster_t &cluster, apply_controller_t &controller, void *custom) const noexcept

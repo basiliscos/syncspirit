@@ -3,6 +3,7 @@
 
 #include "upsert_folder.h"
 #include "model/cluster.h"
+#include "model/diff/apply_controller.h"
 #include "model/diff/cluster_visitor.h"
 #include "model/misc/file_iterator.h"
 #include "upsert_folder_info.h"
@@ -47,6 +48,11 @@ upsert_folder_t::upsert_folder_t(sequencer_t &sequencer, bu::uuid uuid_, db::Fol
         diff = new upsert_folder_info_t(fi_uuid, device, device, folder_id, index_id);
         assign_child(diff);
     }
+}
+
+auto upsert_folder_t::apply_forward(cluster_t &cluster, apply_controller_t &controller, void *custom) const noexcept
+    -> outcome::result<void> {
+    return controller.apply(*this, cluster, custom);
 }
 
 auto upsert_folder_t::apply_impl(cluster_t &cluster, apply_controller_t &controller, void *custom) const noexcept

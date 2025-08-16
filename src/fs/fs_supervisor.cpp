@@ -8,7 +8,6 @@
 #include "scan_actor.h"
 #include "scan_scheduler.h"
 #include "file_actor.h"
-#include "model/diff/load/load_cluster.h"
 #include "model/diff/advance/advance.h"
 #include "model/diff/modify/upsert_folder.h"
 #include "model/diff/modify/upsert_folder_info.h"
@@ -28,7 +27,7 @@ r::plugin::resource_id_t model = 0;
 } // namespace
 
 fs_supervisor_t::fs_supervisor_t(config_t &cfg)
-    : controller_t(this, cfg), sequencer(cfg.sequencer), fs_config{cfg.fs_config}, hasher_threads{cfg.hasher_threads} {
+    : parent_t(this, cfg), sequencer(cfg.sequencer), fs_config{cfg.fs_config}, hasher_threads{cfg.hasher_threads} {
     rw_cache.reset(new file_cache_t(fs_config.mru_size));
 }
 
@@ -141,65 +140,76 @@ void fs_supervisor_t::commit_loading() noexcept {
     }
 }
 
-auto fs_supervisor_t::operator()(const model::diff::modify::upsert_folder_t &diff, void *custom) noexcept
-    -> outcome::result<void> {
-    auto folder_id = db::get_id(diff.db);
-    auto folder = cluster->get_folders().by_id(folder_id);
-    if (!folder->get_augmentation()) {
-        auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
-        folder->set_augmentation(folder_entity);
-    }
-    return diff.visit_next(*this, custom);
-}
-
-auto fs_supervisor_t::operator()(const model::diff::modify::upsert_folder_info_t &diff, void *custom) noexcept
-    -> outcome::result<void> {
-    auto r = diff.visit_next(*this, custom);
-    auto &folder = *cluster->get_folders().by_id(diff.folder_id);
-    auto &device = *cluster->get_devices().by_sha256(diff.device_id);
-    auto folder_info = folder.is_shared_with(device);
-    if (&device != cluster->get_device()) {
-        auto augmentation = folder.get_augmentation().get();
-        auto folder_entity = static_cast<presentation::folder_entity_t *>(augmentation);
-        folder_entity->on_insert(*folder_info);
+auto fs_supervisor_t::apply(const model::diff::modify::upsert_folder_t &diff, model::cluster_t &cluster,
+                            void *custom) noexcept -> outcome::result<void> {
+    auto r = parent_t::apply(diff, cluster, custom);
+    if (r) {
+        auto folder_id = db::get_id(diff.db);
+        auto folder = cluster.get_folders().by_id(folder_id);
+        if (!folder->get_augmentation()) {
+            auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
+            folder->set_augmentation(folder_entity);
+        }
     }
     return r;
 }
 
-auto fs_supervisor_t::operator()(const model::diff::advance::advance_t &diff, void *custom) noexcept
-    -> outcome::result<void> {
-    auto folder = cluster->get_folders().by_id(diff.folder_id);
-    auto augmentation = folder->get_augmentation().get();
-    auto folder_entity = static_cast<presentation::folder_entity_t *>(augmentation);
-    if (folder_entity) {
-        auto &folder_infos = folder->get_folder_infos();
-        auto local_fi = folder_infos.by_device(*cluster->get_device());
-        auto file_name = proto::get_name(diff.proto_local);
-        auto local_file = local_fi->get_file_infos().by_name(file_name);
-        if (local_file) {
-            folder_entity->on_insert(*local_file);
+auto fs_supervisor_t::apply(const model::diff::modify::upsert_folder_info_t &diff, model::cluster_t &cluster,
+                            void *custom) noexcept -> outcome::result<void> {
+    auto r = parent_t::apply(diff, cluster, custom);
+    if (r) {
+        auto &folder = *cluster.get_folders().by_id(diff.folder_id);
+        auto &device = *cluster.get_devices().by_sha256(diff.device_id);
+        auto folder_info = folder.is_shared_with(device);
+        if (&device != cluster.get_device()) {
+            auto augmentation = folder.get_augmentation().get();
+            auto folder_entity = static_cast<presentation::folder_entity_t *>(augmentation);
+            folder_entity->on_insert(*folder_info);
         }
     }
-    return diff.visit_next(*this, custom);
+    return r;
 }
 
-auto fs_supervisor_t::operator()(const model::diff::peer::update_folder_t &diff, void *custom) noexcept
-    -> outcome::result<void> {
-    auto folder = cluster->get_folders().by_id(diff.folder_id);
-    auto folder_aug = folder->get_augmentation().get();
-    auto folder_entity = static_cast<presentation::folder_entity_t *>(folder_aug);
-
-    auto &devices_map = cluster->get_devices();
-    auto peer = devices_map.by_sha256(diff.peer_id);
-    auto &files_map = folder->get_folder_infos().by_device(*peer)->get_file_infos();
-
-    for (auto &file : diff.files) {
-        auto file_name = proto::get_name(file);
-        auto file_info = files_map.by_name(file_name);
-        auto augmentation = file_info->get_augmentation().get();
-        if (!augmentation) {
-            folder_entity->on_insert(*file_info);
+auto fs_supervisor_t::apply(const model::diff::advance::advance_t &diff, model::cluster_t &cluster,
+                            void *custom) noexcept -> outcome::result<void> {
+    auto r = parent_t::apply(diff, cluster, custom);
+    if (r) {
+        auto folder = cluster.get_folders().by_id(diff.folder_id);
+        auto augmentation = folder->get_augmentation().get();
+        auto folder_entity = static_cast<presentation::folder_entity_t *>(augmentation);
+        if (folder_entity) {
+            auto &folder_infos = folder->get_folder_infos();
+            auto local_fi = folder_infos.by_device(*cluster.get_device());
+            auto file_name = proto::get_name(diff.proto_local);
+            auto local_file = local_fi->get_file_infos().by_name(file_name);
+            if (local_file) {
+                folder_entity->on_insert(*local_file);
+            }
         }
     }
-    return diff.visit_next(*this, custom);
+    return r;
+}
+
+auto fs_supervisor_t::apply(const model::diff::peer::update_folder_t &diff, model::cluster_t &cluster,
+                            void *custom) noexcept -> outcome::result<void> {
+    auto r = parent_t::apply(diff, cluster, custom);
+    if (r) {
+        auto folder = cluster.get_folders().by_id(diff.folder_id);
+        auto folder_aug = folder->get_augmentation().get();
+        auto folder_entity = static_cast<presentation::folder_entity_t *>(folder_aug);
+
+        auto &devices_map = cluster.get_devices();
+        auto peer = devices_map.by_sha256(diff.peer_id);
+        auto &files_map = folder->get_folder_infos().by_device(*peer)->get_file_infos();
+
+        for (auto &file : diff.files) {
+            auto file_name = proto::get_name(file);
+            auto file_info = files_map.by_name(file_name);
+            auto augmentation = file_info->get_augmentation().get();
+            if (!augmentation) {
+                folder_entity->on_insert(*file_info);
+            }
+        }
+    }
+    return r;
 }

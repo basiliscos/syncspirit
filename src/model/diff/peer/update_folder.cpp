@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "update_folder.h"
+#include "model/diff/apply_controller.h"
 #include "model/misc/file_iterator.h"
 #include "model/diff/modify/add_blocks.h"
 #include "model/diff/modify/remove_blocks.h"
@@ -33,6 +34,11 @@ update_folder_t::update_folder_t(std::string_view folder_id_, utils::bytes_view_
             assign_sibling(ptr);
         }
     }
+}
+
+auto update_folder_t::apply_forward(cluster_t &cluster, apply_controller_t &controller, void *custom) const noexcept
+    -> outcome::result<void> {
+    return controller.apply(*this, cluster, custom);
 }
 
 auto update_folder_t::apply_impl(cluster_t &cluster, apply_controller_t &controller, void *custom) const noexcept

@@ -4,6 +4,7 @@
 #include "upsert_folder_info.h"
 
 #include "model/cluster.h"
+#include "model/diff/apply_controller.h"
 #include "model/diff/cluster_visitor.h"
 #include "model/misc/error_code.h"
 #include "model/misc/file_iterator.h"
@@ -26,6 +27,11 @@ upsert_folder_info_t::upsert_folder_info_t(const model::folder_info_t &original,
       index_id{new_index_id} {
     assign(uuid, original.get_uuid());
     LOG_DEBUG(log, "upsert_folder_info_t, folder = {}, index = {}", folder_id, index_id);
+}
+
+auto upsert_folder_info_t::apply_forward(cluster_t &cluster, apply_controller_t &controller,
+                                         void *custom) const noexcept -> outcome::result<void> {
+    return controller.apply(*this, cluster, custom);
 }
 
 auto upsert_folder_info_t::apply_impl(cluster_t &cluster, apply_controller_t &controller, void *custom) const noexcept

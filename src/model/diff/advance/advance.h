@@ -16,6 +16,7 @@ struct SYNCSPIRIT_API advance_t : cluster_diff_t {
                                      sequencer_t &sequencer) noexcept;
 
     outcome::result<void> apply_impl(cluster_t &, apply_controller_t &, void *) const noexcept override;
+    outcome::result<void> apply_forward(cluster_t &, apply_controller_t &, void *) const noexcept override;
 
     proto::FileInfo proto_source;
     proto::FileInfo proto_local;
