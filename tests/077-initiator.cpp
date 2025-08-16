@@ -233,7 +233,6 @@ struct fixture_t : diff::cluster_visitor_t, diff::apply_controller_t {
             .finish();
     }
 
-    cluster_ptr_t cluster;
     asio::io_context io_ctx{1};
     ra::system_context_asio_t ctx;
     acceptor_t acceptor;

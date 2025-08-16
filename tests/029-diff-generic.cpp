@@ -22,8 +22,9 @@ TEST_CASE("generic cluster diff", "[model]") {
     auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
     auto my_device = device_t::create(my_id, "my-device").value();
     auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
+    auto controller = make_apply_controller(cluster);
     auto diff = diff::cluster_diff_ptr_t(new fail_diff_t());
     CHECK(!cluster->is_tainted());
-    CHECK(!diff->apply(*cluster, get_apply_controller(), {}));
+    CHECK(!diff->apply(*cluster, *controller, {}));
     CHECK(cluster->is_tainted());
 }

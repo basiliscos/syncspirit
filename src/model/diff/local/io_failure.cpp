@@ -13,7 +13,7 @@ io_failure_t::io_failure_t(io_errors_t errors_) noexcept : errors{std::move(erro
 
 auto io_failure_t::apply_forward(cluster_t &cluster, apply_controller_t &controller, void *custom) const noexcept
     -> outcome::result<void> {
-    return controller.apply(*this, cluster, custom);
+    return controller.apply(*this, custom);
 }
 
 auto io_failure_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

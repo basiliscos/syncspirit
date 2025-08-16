@@ -27,8 +27,7 @@ actor_base_t::access<to::make_error, const std::error_code &, const extended_err
 
 } // namespace rotor
 
-iterative_controller_base_t::iterative_controller_base_t(r::actor_base_t *owner_, bool need_visitor_) noexcept
-    : owner{owner_}, need_visitor{need_visitor_} {}
+iterative_controller_base_t::iterative_controller_base_t(r::actor_base_t *owner_) noexcept : owner{owner_} {}
 
 void iterative_controller_base_t::on_model_update(model::message::model_update_t &message) noexcept {
     LOG_TRACE(log, "on_model_update");
@@ -74,15 +73,6 @@ void iterative_controller_base_t::process_impl(model::diff::cluster_diff_t &diff
         return owner->do_shutdown(ee);
     }
 
-    if (need_visitor) {
-        r = visit_diff(diff, apply_context);
-        if (!r) {
-            LOG_ERROR(log, "error visiting model: {}", r.assume_error().message());
-            auto ee = owner->access<to::make_error, T0, T1, T2>(r.assume_error(), {}, {});
-            return owner->do_shutdown(ee);
-        }
-    }
-
     interrupted = (bool)apply_context.diff;
     if (interrupted) {
         auto &address = owner->get_address();
@@ -91,20 +81,15 @@ void iterative_controller_base_t::process_impl(model::diff::cluster_diff_t &diff
     }
 }
 
-auto iterative_controller_base_t::visit_diff(model::diff::cluster_diff_t &diff, apply_context_t &) noexcept
+auto iterative_controller_base_t::apply(const model::diff::load::interrupt_t &diff, void *custom) noexcept
     -> outcome::result<void> {
-    return diff.visit(*this, nullptr);
-}
-
-auto iterative_controller_base_t::apply(const model::diff::load::interrupt_t &diff, model::cluster_t &cluster,
-                                        void *custom) noexcept -> outcome::result<void> {
     auto ctx = static_cast<apply_context_t *>(custom);
     ctx->diff = diff.sibling;
     return outcome::success();
 }
 
-auto iterative_controller_base_t::apply(const model::diff::load::commit_t &diff, model::cluster_t &cluster,
-                                        void *custom) noexcept -> outcome::result<void> {
+auto iterative_controller_base_t::apply(const model::diff::load::commit_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
     log->debug("committing db load, begin");
     owner->get_supervisor().put(diff.commit_message);
 

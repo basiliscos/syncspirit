@@ -84,10 +84,11 @@ struct SYNCSPIRIT_TEST_API supervisor_t : r::supervisor_t,
     outcome::result<void> operator()(const model::diff::advance::advance_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::peer::update_folder_t &, void *) noexcept override;
 
-    outcome::result<void> apply(const model::diff::load::commit_t &, model::cluster_t &, void *) noexcept override;
+    outcome::result<void> apply(const model::diff::load::commit_t &, void *) noexcept override;
+
+    using model::diff::apply_controller_t::cluster;
 
     utils::logger_t log;
-    model::cluster_ptr_t cluster;
     model::sequencer_ptr_t sequencer;
     configure_callback_t configure_callback;
     model::diff::cluster_diff_ptr_t delayed_ack_holder;

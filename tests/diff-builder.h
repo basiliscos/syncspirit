@@ -7,6 +7,7 @@
 #include <boost/outcome.hpp>
 #include <rotor/supervisor.h>
 
+#include "test-utils.h"
 #include "syncspirit-test-export.h"
 #include "model/device.h"
 #include "model/ignored_device.h"
@@ -57,9 +58,9 @@ struct SYNCSPIRIT_TEST_API index_maker_t {
 
 struct SYNCSPIRIT_TEST_API diff_builder_t : private model::diff::apply_controller_t {
     using blocks_t = std::vector<proto::BlockInfo>;
-    using apply_controller_t::apply;
 
     diff_builder_t(model::cluster_t &, r::address_ptr_t receiver = {}, model::sequencer_ptr_t sequencer = {}) noexcept;
+    ~diff_builder_t();
     cluster_configurer_t configure_cluster(utils::bytes_view_t sha256, const bfs::path &default_location = {}) noexcept;
     diff_builder_t &apply(r::supervisor_t &sup, const void *custom = {}) noexcept;
     void send(r::supervisor_t &sup, const void *custom = {}) noexcept;
@@ -108,7 +109,7 @@ struct SYNCSPIRIT_TEST_API diff_builder_t : private model::diff::apply_controlle
 
   private:
     model::sequencer_ptr_t sequencer;
-    model::cluster_t &cluster;
+    apply_controller_ptr_t controller;
     model::diff::cluster_diff_ptr_t cluster_diff;
     r::address_ptr_t receiver;
 

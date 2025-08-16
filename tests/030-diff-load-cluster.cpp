@@ -23,6 +23,7 @@ TEST_CASE("loading cluster (base)", "[model]") {
     auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
     auto my_device = device_t::create(my_id, "my-device").value();
     auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
+    auto controller = make_apply_controller(cluster);
     auto sequencer = make_sequencer(4);
     CHECK(cluster);
 
@@ -33,7 +34,7 @@ TEST_CASE("loading cluster (base)", "[model]") {
         diff::load::container_t devices;
         devices.emplace_back(diff::load::pair_t{self_key, self_data});
         auto diff = diff::cluster_diff_ptr_t(new diff::load::devices_t(devices));
-        REQUIRE(diff->apply(*cluster, get_apply_controller(), {}));
+        REQUIRE(diff->apply(*cluster, *controller, {}));
         auto &devices_map = cluster->get_devices();
         REQUIRE(devices_map.size() == 1);
         auto self = devices_map.by_key(self_key);
@@ -64,7 +65,7 @@ TEST_CASE("loading cluster (base)", "[model]") {
             devices.emplace_back(diff::load::pair_t{key, data});
             devices.emplace_back(diff::load::pair_t{self_key, self_data});
             auto diff = diff::cluster_diff_ptr_t(new diff::load::devices_t(devices));
-            REQUIRE(diff->apply(*cluster, get_apply_controller(), {}));
+            REQUIRE(diff->apply(*cluster, *controller, {}));
             auto &devices_map = cluster->get_devices();
             REQUIRE(devices_map.size() == 2);
             peer = devices_map.by_key(key);
@@ -99,7 +100,7 @@ TEST_CASE("loading cluster (base)", "[model]") {
             auto blocks = diff::load::blocks_t::container_t();
             blocks.emplace_back(key, db_block);
             auto diff = diff::cluster_diff_ptr_t(new diff::load::blocks_t(blocks));
-            REQUIRE(diff->apply(*cluster, get_apply_controller(), {}));
+            REQUIRE(diff->apply(*cluster, *controller, {}));
             auto &blocks_map = cluster->get_blocks();
             REQUIRE(blocks_map.size() == 1);
             target_block = blocks_map.by_hash(hash);
@@ -128,7 +129,7 @@ TEST_CASE("loading cluster (base)", "[model]") {
             diff::load::container_t devices;
             devices.emplace_back(diff::load::pair_t{key, data});
             auto diff = diff::cluster_diff_ptr_t(new diff::load::ignored_devices_t(devices));
-            REQUIRE(diff->apply(*cluster, get_apply_controller(), {}));
+            REQUIRE(diff->apply(*cluster, *controller, {}));
             auto &map = cluster->get_ignored_devices();
             REQUIRE(map.size() == 1);
 
@@ -155,7 +156,7 @@ TEST_CASE("loading cluster (base)", "[model]") {
             diff::load::container_t devices;
             devices.emplace_back(diff::load::pair_t{key, data});
             auto diff = diff::cluster_diff_ptr_t(new diff::load::pending_devices_t(devices));
-            REQUIRE(diff->apply(*cluster, get_apply_controller(), {}));
+            REQUIRE(diff->apply(*cluster, *controller, {}));
             auto &map = cluster->get_pending_devices();
             REQUIRE(map.size() == 1);
 
@@ -183,7 +184,7 @@ TEST_CASE("loading cluster (base)", "[model]") {
             auto key = folder->get_key();
             folders.emplace_back(diff::load::pair_t{key, data});
             auto diff = diff::cluster_diff_ptr_t(new diff::load::folders_t(folders));
-            REQUIRE(diff->apply(*cluster, get_apply_controller(), {}));
+            REQUIRE(diff->apply(*cluster, *controller, {}));
             auto &map = cluster->get_folders();
             REQUIRE(map.size() == 1);
             auto f1 = map.begin()->item;
@@ -215,7 +216,7 @@ TEST_CASE("loading cluster (base)", "[model]") {
             diff::load::container_t folders;
             folders.emplace_back(diff::load::pair_t{key, data});
             auto diff = diff::cluster_diff_ptr_t(new diff::load::ignored_folders_t(folders));
-            REQUIRE(diff->apply(*cluster, get_apply_controller(), {}));
+            REQUIRE(diff->apply(*cluster, *controller, {}));
             auto &map = cluster->get_ignored_folders();
             REQUIRE(map.size() == 1);
             target = map.by_key(folder->get_id());
@@ -233,6 +234,7 @@ TEST_CASE("loading cluster (folder info)", "[model]") {
     auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
     auto my_device = device_t::create(my_id, "my-device").value();
     auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
+    auto controller = make_apply_controller(cluster);
     auto sequencer = make_sequencer(4);
     CHECK(cluster);
     cluster->get_devices().put(my_device);
@@ -259,7 +261,7 @@ TEST_CASE("loading cluster (folder info)", "[model]") {
         auto key = fi->get_key();
         folders.emplace_back(fi->get_key(), db_fi);
         auto diff = diff::cluster_diff_ptr_t(new diff::load::folder_infos_t(std::move(folders)));
-        REQUIRE(diff->apply(*cluster, get_apply_controller(), {}));
+        REQUIRE(diff->apply(*cluster, *controller, {}));
         auto &map = folder->get_folder_infos();
         REQUIRE(map.size() == 1);
         target = map.by_uuid(fi->get_uuid());
@@ -281,6 +283,7 @@ TEST_CASE("loading cluster (file info + block)", "[model]") {
     auto my_device = device_t::create(my_id, "my-device").value();
     auto peer_device = device_t::create(peer_id, "peer-device").value();
     auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
+    auto controller = make_apply_controller(cluster);
     auto sequencer = make_sequencer(4);
     CHECK(cluster);
     cluster->get_devices().put(my_device);
@@ -343,7 +346,7 @@ TEST_CASE("loading cluster (file info + block)", "[model]") {
         auto db = fi->as_db(true);
         container.emplace_back(item_t{fi->get_key(), std::move(db)});
         auto diff = diff::cluster_diff_ptr_t(new diff::load::file_infos_t(std::move(container)));
-        REQUIRE(diff->apply(*cluster, get_apply_controller(), {}));
+        REQUIRE(diff->apply(*cluster, *controller, {}));
         auto &map = folder_info->get_file_infos();
         REQUIRE(map.size() == 1);
         target = map.by_uuid(fi->get_uuid());

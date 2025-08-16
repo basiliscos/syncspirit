@@ -19,7 +19,8 @@ struct apply_context_t {
 };
 
 struct apply_controler_t final : model::diff::apply_controller_t {
-    outcome::result<void> apply(const diff::load::interrupt_t &diff, cluster_t &, void *custom) noexcept override {
+    apply_controler_t(model::cluster_ptr_t cluster_) { cluster = cluster_; }
+    outcome::result<void> apply(const diff::load::interrupt_t &diff, void *custom) noexcept override {
         auto ctx = reinterpret_cast<apply_context_t *>(custom);
         ctx->next = diff.sibling;
         return outcome::success();
@@ -62,9 +63,11 @@ TEST_CASE("diff interrupt", "[model]") {
     auto &files = folder_my->get_file_infos();
 
     auto ctx = apply_context_t(builder.extract());
+    auto controller = apply_controler_t(cluster);
 
     SECTION("generic applicator") {
-        REQUIRE(ctx.next->apply(*cluster, get_apply_controller(), {}));
+        auto controller = make_apply_controller(cluster);
+        REQUIRE(ctx.next->apply(*cluster, *controller, {}));
         REQUIRE(files.size() == 3);
         REQUIRE(files.by_name("a.bin"));
         REQUIRE(files.by_name("b.bin"));
@@ -72,7 +75,6 @@ TEST_CASE("diff interrupt", "[model]") {
     }
 
     SECTION("custom applicator") {
-        auto controller = apply_controler_t();
 
         REQUIRE(ctx.next);
         REQUIRE(files.size() == 0);

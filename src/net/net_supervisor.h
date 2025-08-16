@@ -48,8 +48,7 @@ struct net_supervisor_config_builder_t : ra::supervisor_config_asio_builder_t<Su
     }
 };
 
-template <typename T>
-using net_supervisor_base_t = model::diff::iterative_controller_t<T, ra::supervisor_asio_t, false>;
+template <typename T> using net_supervisor_base_t = model::diff::iterative_controller_t<T, ra::supervisor_asio_t>;
 
 struct SYNCSPIRIT_API net_supervisor_t : net_supervisor_base_t<ra::supervisor_asio_t> {
     using parent_t = net_supervisor_base_t<ra::supervisor_asio_t>;

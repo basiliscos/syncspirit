@@ -248,11 +248,6 @@ void app_supervisor_t::process(model::diff::cluster_diff_t &diff, apply_context_
     }
 }
 
-auto app_supervisor_t::visit_diff(model::diff::cluster_diff_t &diff, apply_context_t &apply_context) noexcept
-    -> outcome::result<void> {
-    return diff.visit(*this, &apply_context);
-}
-
 void app_supervisor_t::on_app_ready(model::message::app_ready_t &) noexcept {
     LOG_TRACE(log, "on_app_ready");
     main_window->on_loading_done();
@@ -353,9 +348,9 @@ callback_ptr_t app_supervisor_t::call_share_folders(std::string_view folder_id, 
     return cb;
 }
 
-auto app_supervisor_t::apply(const model::diff::local::io_failure_t &diff, model::cluster_t &cluster,
-                             void *custom) noexcept -> outcome::result<void> {
-    auto r = parent_t::apply(diff, cluster, custom);
+auto app_supervisor_t::apply(const model::diff::local::io_failure_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    auto r = parent_t::apply(diff, custom);
     if (r) {
         for (auto &details : diff.errors) {
             log->warn("I/O error on '{}': {}", details.path.string(), details.ec.message());
@@ -364,11 +359,11 @@ auto app_supervisor_t::apply(const model::diff::local::io_failure_t &diff, model
     return r;
 }
 
-auto app_supervisor_t::apply(const model::diff::modify::update_peer_t &diff, model::cluster_t &cluster,
-                             void *custom) noexcept -> outcome::result<void> {
-    auto r = parent_t::apply(diff, cluster, custom);
+auto app_supervisor_t::apply(const model::diff::modify::update_peer_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    auto r = parent_t::apply(diff, custom);
     if (r) {
-        auto device = cluster.get_devices().by_sha256(diff.peer_id);
+        auto device = cluster->get_devices().by_sha256(diff.peer_id);
         auto augmentation = device->get_augmentation();
         if (!augmentation) {
             auto devices_node = static_cast<tree_item::devices_t *>(devices);
@@ -378,12 +373,12 @@ auto app_supervisor_t::apply(const model::diff::modify::update_peer_t &diff, mod
     return r;
 }
 
-auto app_supervisor_t::apply(const model::diff::modify::add_pending_folders_t &diff, model::cluster_t &cluster,
-                             void *custom) noexcept -> outcome::result<void> {
-    auto r = parent_t::apply(diff, cluster, custom);
+auto app_supervisor_t::apply(const model::diff::modify::add_pending_folders_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    auto r = parent_t::apply(diff, custom);
     if (r) {
-        auto &devices = cluster.get_devices();
-        auto &pending_folders = cluster.get_pending_folders();
+        auto &devices = cluster->get_devices();
+        auto &pending_folders = cluster->get_pending_folders();
         for (auto &item : diff.container) {
             auto peer = devices.by_sha256(item.peer_id);
             auto augmentation = static_cast<augmentation_t *>(peer->get_augmentation().get());
@@ -400,38 +395,38 @@ auto app_supervisor_t::apply(const model::diff::modify::add_pending_folders_t &d
     return r;
 }
 
-auto app_supervisor_t::apply(const model::diff::modify::add_pending_device_t &diff, model::cluster_t &cluster,
-                             void *custom) noexcept -> outcome::result<void> {
-    auto r = parent_t::apply(diff, cluster, custom);
+auto app_supervisor_t::apply(const model::diff::modify::add_pending_device_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    auto r = parent_t::apply(diff, custom);
     if (r) {
-        auto &device = *cluster.get_pending_devices().by_sha256(diff.device_id.get_sha256());
+        auto &device = *cluster->get_pending_devices().by_sha256(diff.device_id.get_sha256());
         auto pending_devices_node = static_cast<tree_item::pending_devices_t *>(pending_devices);
         device.set_augmentation(pending_devices_node->add_device(device));
     }
     return r;
 }
 
-auto app_supervisor_t::apply(const model::diff::modify::add_ignored_device_t &diff, model::cluster_t &cluster,
-                             void *custom) noexcept -> outcome::result<void> {
-    auto r = parent_t::apply(diff, cluster, custom);
+auto app_supervisor_t::apply(const model::diff::modify::add_ignored_device_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    auto r = parent_t::apply(diff, custom);
     if (r) {
-        auto &device = *cluster.get_ignored_devices().by_sha256(diff.device_id.get_sha256());
+        auto &device = *cluster->get_ignored_devices().by_sha256(diff.device_id.get_sha256());
         auto ignored_devices_node = static_cast<tree_item::ignored_devices_t *>(ignored_devices);
         device.set_augmentation(ignored_devices_node->add_device(device));
     }
     return r;
 }
 
-auto app_supervisor_t::apply(const model::diff::advance::advance_t &diff, model::cluster_t &cluster,
-                             void *custom) noexcept -> outcome::result<void> {
-    auto r = parent_t::apply(diff, cluster, custom);
+auto app_supervisor_t::apply(const model::diff::advance::advance_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    auto r = parent_t::apply(diff, custom);
     if (r) {
-        auto folder = cluster.get_folders().by_id(diff.folder_id);
+        auto folder = cluster->get_folders().by_id(diff.folder_id);
         auto augmentation = folder->get_augmentation().get();
         auto folder_entity = static_cast<presentation::folder_entity_t *>(augmentation);
         if (folder_entity) {
             auto &folder_infos = folder->get_folder_infos();
-            auto local_fi = folder_infos.by_device(*cluster.get_device());
+            auto local_fi = folder_infos.by_device(*cluster->get_device());
             auto file_name = proto::get_name(diff.proto_local);
             auto local_file = local_fi->get_file_infos().by_name(file_name);
             if (local_file) {
@@ -460,12 +455,12 @@ auto app_supervisor_t::apply(const model::diff::advance::advance_t &diff, model:
     return r;
 }
 
-auto app_supervisor_t::apply(const model::diff::modify::upsert_folder_t &diff, model::cluster_t &cluster,
-                             void *custom) noexcept -> outcome::result<void> {
-    auto r = parent_t::apply(diff, cluster, custom);
+auto app_supervisor_t::apply(const model::diff::modify::upsert_folder_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    auto r = parent_t::apply(diff, custom);
     if (r) {
         auto folder_id = db::get_id(diff.db);
-        auto folder = cluster.get_folders().by_id(folder_id);
+        auto folder = cluster->get_folders().by_id(folder_id);
         if (!folder->get_augmentation()) {
             auto folders_node = static_cast<tree_item::folders_t *>(folders);
             auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
@@ -479,14 +474,14 @@ auto app_supervisor_t::apply(const model::diff::modify::upsert_folder_t &diff, m
     return r;
 }
 
-auto app_supervisor_t::apply(const model::diff::modify::upsert_folder_info_t &diff, model::cluster_t &cluster,
-                             void *custom) noexcept -> outcome::result<void> {
-    auto r = parent_t::apply(diff, cluster, custom);
+auto app_supervisor_t::apply(const model::diff::modify::upsert_folder_info_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    auto r = parent_t::apply(diff, custom);
     if (r) {
-        auto &folder = *cluster.get_folders().by_id(diff.folder_id);
-        auto &device = *cluster.get_devices().by_sha256(diff.device_id);
+        auto &folder = *cluster->get_folders().by_id(diff.folder_id);
+        auto &device = *cluster->get_devices().by_sha256(diff.device_id);
         auto folder_info = folder.is_shared_with(device);
-        if (&device != cluster.get_device()) {
+        if (&device != cluster->get_device()) {
             auto augmentation = folder.get_augmentation().get();
             auto folder_entity = static_cast<presentation::folder_entity_t *>(augmentation);
             auto folder_presence = folder_entity->on_insert(*folder_info);
@@ -503,17 +498,17 @@ auto app_supervisor_t::apply(const model::diff::modify::upsert_folder_info_t &di
     return r;
 }
 
-auto app_supervisor_t::apply(const model::diff::peer::update_folder_t &diff, model::cluster_t &cluster,
-                             void *custom) noexcept -> outcome::result<void> {
-    auto r = parent_t::apply(diff, cluster, custom);
+auto app_supervisor_t::apply(const model::diff::peer::update_folder_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    auto r = parent_t::apply(diff, custom);
     if (r) {
         auto buffer = std::array<std::byte, 128>();
         auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
         auto allocator = std::pmr::polymorphic_allocator<std::string>(&pool);
         auto shared_devices = shared_device_t(allocator);
 
-        auto folder = cluster.get_folders().by_id(diff.folder_id);
-        auto &devices_map = cluster.get_devices();
+        auto folder = cluster->get_folders().by_id(diff.folder_id);
+        auto &devices_map = cluster->get_devices();
 
         for (auto &it : devices_map) {
             auto &device = it.item;
@@ -558,29 +553,32 @@ auto app_supervisor_t::apply(const model::diff::peer::update_folder_t &diff, mod
     return r;
 }
 
-auto app_supervisor_t::apply(const model::diff::load::blocks_t &diff, model::cluster_t &cluster, void *custom) noexcept
-    -> outcome::result<void> {
-    auto ctx = static_cast<apply_context_t *>(custom);
-    ctx->loaded_blocks += diff.blocks.size();
-    auto blocks = ctx->loaded_blocks;
-    auto total = ctx->total_blocks;
-    auto share = (100. * blocks) / total;
-    auto msg = fmt::format("({}%) loaded {} of {} blocks", (int)share, blocks, total);
-    main_window->set_splash_text(msg);
-    auto r = apply_controller_t::apply(diff, cluster, custom);
+auto app_supervisor_t::apply(const model::diff::load::blocks_t &diff, void *custom) noexcept -> outcome::result<void> {
+    auto r = apply_controller_t::apply(diff, custom);
+    if (r) {
+        auto ctx = static_cast<apply_context_t *>(custom);
+        ctx->loaded_blocks += diff.blocks.size();
+        auto blocks = ctx->loaded_blocks;
+        auto total = ctx->total_blocks;
+        auto share = (100. * blocks) / total;
+        auto msg = fmt::format("({}%) loaded {} of {} blocks", (int)share, blocks, total);
+        main_window->set_splash_text(msg);
+    }
     return r;
 }
 
-auto app_supervisor_t::apply(const model::diff::load::file_infos_t &diff, model::cluster_t &cluster,
-                             void *custom) noexcept -> outcome::result<void> {
-    auto ctx = static_cast<apply_context_t *>(custom);
-    ctx->loaded_files += diff.container.size();
-    auto files = ctx->loaded_files;
-    auto total = ctx->total_files;
-    auto share = (100. * files) / total;
-    auto msg = fmt::format("({}%) loaded {} of {} files", (int)share, files, total);
-    main_window->set_splash_text(msg);
-    auto r = apply_controller_t::apply(diff, cluster, custom);
+auto app_supervisor_t::apply(const model::diff::load::file_infos_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    auto r = apply_controller_t::apply(diff, custom);
+    if (r) {
+        auto ctx = static_cast<apply_context_t *>(custom);
+        ctx->loaded_files += diff.container.size();
+        auto files = ctx->loaded_files;
+        auto total = ctx->total_files;
+        auto share = (100. * files) / total;
+        auto msg = fmt::format("({}%) loaded {} of {} files", (int)share, files, total);
+        main_window->set_splash_text(msg);
+    }
     return r;
 }
 
@@ -628,13 +626,13 @@ void app_supervisor_t::commit_loading() noexcept {
     }
 }
 
-auto app_supervisor_t::apply(const model::diff::load::load_cluster_t &diff, model::cluster_t &cluster,
-                             void *custom) noexcept -> outcome::result<void> {
+auto app_supervisor_t::apply(const model::diff::load::load_cluster_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
     main_window->set_splash_text("populating model (1/3)...");
     auto ctx = static_cast<apply_context_t *>(custom);
     ctx->total_blocks = diff.blocks_count;
     ctx->total_files = diff.files_count;
-    return apply_controller_t::apply(diff, cluster, custom);
+    return apply_controller_t::apply(diff, custom);
 }
 
 void app_supervisor_t::write_config(const config::main_t &cfg) noexcept {

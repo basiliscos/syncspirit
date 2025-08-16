@@ -21,7 +21,7 @@ add_ignored_device_t::add_ignored_device_t(const cluster_t &cluster, const devic
 
 auto add_ignored_device_t::apply_forward(cluster_t &cluster, apply_controller_t &controller,
                                          void *custom) const noexcept -> outcome::result<void> {
-    return controller.apply(*this, cluster, custom);
+    return controller.apply(*this, custom);
 }
 
 auto add_ignored_device_t::apply_impl(cluster_t &cluster, apply_controller_t &controller, void *custom) const noexcept

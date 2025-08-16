@@ -244,8 +244,7 @@ auto supervisor_t::operator()(const model::diff::peer::update_folder_t &diff, vo
     return diff.visit_next(*this, custom);
 }
 
-auto supervisor_t::apply(const model::diff::load::commit_t &message, model::cluster_t &, void *) noexcept
-    -> outcome::result<void> {
+auto supervisor_t::apply(const model::diff::load::commit_t &message, void *) noexcept -> outcome::result<void> {
     put(message.commit_message);
     return outcome::success();
 }

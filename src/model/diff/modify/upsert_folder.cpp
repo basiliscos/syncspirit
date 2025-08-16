@@ -52,7 +52,7 @@ upsert_folder_t::upsert_folder_t(sequencer_t &sequencer, bu::uuid uuid_, db::Fol
 
 auto upsert_folder_t::apply_forward(cluster_t &cluster, apply_controller_t &controller, void *custom) const noexcept
     -> outcome::result<void> {
-    return controller.apply(*this, cluster, custom);
+    return controller.apply(*this, custom);
 }
 
 auto upsert_folder_t::apply_impl(cluster_t &cluster, apply_controller_t &controller, void *custom) const noexcept

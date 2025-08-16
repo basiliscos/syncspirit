@@ -39,7 +39,7 @@ auto cluster_diff_t::apply(cluster_t &cluster, apply_controller_t &controller, v
 
 auto cluster_diff_t::apply_forward(cluster_t &cluster, apply_controller_t &controller, void *custom) const noexcept
     -> outcome::result<void> {
-    return controller.apply(*this, cluster, custom);
+    return controller.apply(*this, custom);
 }
 
 auto cluster_diff_t::cluster_diff_t::apply_impl(cluster_t &cluster, apply_controller_t &controller,

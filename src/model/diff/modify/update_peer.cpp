@@ -35,7 +35,7 @@ update_peer_t::update_peer_t(db::Device db, const model::device_id_t &device_id,
 
 auto update_peer_t::apply_forward(cluster_t &cluster, apply_controller_t &controller, void *custom) const noexcept
     -> outcome::result<void> {
-    return controller.apply(*this, cluster, custom);
+    return controller.apply(*this, custom);
 }
 
 auto update_peer_t::apply_impl(cluster_t &cluster, apply_controller_t &controller, void *custom) const noexcept

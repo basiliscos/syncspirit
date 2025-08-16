@@ -44,7 +44,7 @@ template <typename Supervisor> struct fs_supervisor_config_builder_t : r::superv
     }
 };
 
-template <typename T> using fs_base_t = model::diff::iterative_controller_t<T, rth::supervisor_thread_t, false>;
+template <typename T> using fs_base_t = model::diff::iterative_controller_t<T, rth::supervisor_thread_t>;
 
 struct SYNCSPIRIT_API fs_supervisor_t : fs_base_t<fs_supervisor_t> {
     using parent_t = fs_base_t<fs_supervisor_t>;
@@ -68,13 +68,10 @@ struct SYNCSPIRIT_API fs_supervisor_t : fs_base_t<fs_supervisor_t> {
     void commit_loading() noexcept override;
     void launch() noexcept;
 
-    outcome::result<void> apply(const model::diff::advance::advance_t &, model::cluster_t &, void *) noexcept override;
-    outcome::result<void> apply(const model::diff::modify::upsert_folder_t &, model::cluster_t &,
-                                void *) noexcept override;
-    outcome::result<void> apply(const model::diff::modify::upsert_folder_info_t &, model::cluster_t &,
-                                void *) noexcept override;
-    outcome::result<void> apply(const model::diff::peer::update_folder_t &, model::cluster_t &,
-                                void *) noexcept override;
+    outcome::result<void> apply(const model::diff::advance::advance_t &, void *) noexcept override;
+    outcome::result<void> apply(const model::diff::modify::upsert_folder_t &, void *) noexcept override;
+    outcome::result<void> apply(const model::diff::modify::upsert_folder_info_t &, void *) noexcept override;
+    outcome::result<void> apply(const model::diff::peer::update_folder_t &, void *) noexcept override;
 
     model::sequencer_ptr_t sequencer;
     config::fs_config_t fs_config;

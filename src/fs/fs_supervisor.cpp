@@ -140,12 +140,12 @@ void fs_supervisor_t::commit_loading() noexcept {
     }
 }
 
-auto fs_supervisor_t::apply(const model::diff::modify::upsert_folder_t &diff, model::cluster_t &cluster,
-                            void *custom) noexcept -> outcome::result<void> {
-    auto r = parent_t::apply(diff, cluster, custom);
+auto fs_supervisor_t::apply(const model::diff::modify::upsert_folder_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    auto r = parent_t::apply(diff, custom);
     if (r) {
         auto folder_id = db::get_id(diff.db);
-        auto folder = cluster.get_folders().by_id(folder_id);
+        auto folder = cluster->get_folders().by_id(folder_id);
         if (!folder->get_augmentation()) {
             auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
             folder->set_augmentation(folder_entity);
@@ -154,14 +154,14 @@ auto fs_supervisor_t::apply(const model::diff::modify::upsert_folder_t &diff, mo
     return r;
 }
 
-auto fs_supervisor_t::apply(const model::diff::modify::upsert_folder_info_t &diff, model::cluster_t &cluster,
-                            void *custom) noexcept -> outcome::result<void> {
-    auto r = parent_t::apply(diff, cluster, custom);
+auto fs_supervisor_t::apply(const model::diff::modify::upsert_folder_info_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    auto r = parent_t::apply(diff, custom);
     if (r) {
-        auto &folder = *cluster.get_folders().by_id(diff.folder_id);
-        auto &device = *cluster.get_devices().by_sha256(diff.device_id);
+        auto &folder = *cluster->get_folders().by_id(diff.folder_id);
+        auto &device = *cluster->get_devices().by_sha256(diff.device_id);
         auto folder_info = folder.is_shared_with(device);
-        if (&device != cluster.get_device()) {
+        if (&device != cluster->get_device()) {
             auto augmentation = folder.get_augmentation().get();
             auto folder_entity = static_cast<presentation::folder_entity_t *>(augmentation);
             folder_entity->on_insert(*folder_info);
@@ -170,16 +170,16 @@ auto fs_supervisor_t::apply(const model::diff::modify::upsert_folder_info_t &dif
     return r;
 }
 
-auto fs_supervisor_t::apply(const model::diff::advance::advance_t &diff, model::cluster_t &cluster,
-                            void *custom) noexcept -> outcome::result<void> {
-    auto r = parent_t::apply(diff, cluster, custom);
+auto fs_supervisor_t::apply(const model::diff::advance::advance_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    auto r = parent_t::apply(diff, custom);
     if (r) {
-        auto folder = cluster.get_folders().by_id(diff.folder_id);
+        auto folder = cluster->get_folders().by_id(diff.folder_id);
         auto augmentation = folder->get_augmentation().get();
         auto folder_entity = static_cast<presentation::folder_entity_t *>(augmentation);
         if (folder_entity) {
             auto &folder_infos = folder->get_folder_infos();
-            auto local_fi = folder_infos.by_device(*cluster.get_device());
+            auto local_fi = folder_infos.by_device(*cluster->get_device());
             auto file_name = proto::get_name(diff.proto_local);
             auto local_file = local_fi->get_file_infos().by_name(file_name);
             if (local_file) {
@@ -190,15 +190,15 @@ auto fs_supervisor_t::apply(const model::diff::advance::advance_t &diff, model::
     return r;
 }
 
-auto fs_supervisor_t::apply(const model::diff::peer::update_folder_t &diff, model::cluster_t &cluster,
-                            void *custom) noexcept -> outcome::result<void> {
-    auto r = parent_t::apply(diff, cluster, custom);
+auto fs_supervisor_t::apply(const model::diff::peer::update_folder_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    auto r = parent_t::apply(diff, custom);
     if (r) {
-        auto folder = cluster.get_folders().by_id(diff.folder_id);
+        auto folder = cluster->get_folders().by_id(diff.folder_id);
         auto folder_aug = folder->get_augmentation().get();
         auto folder_entity = static_cast<presentation::folder_entity_t *>(folder_aug);
 
-        auto &devices_map = cluster.get_devices();
+        auto &devices_map = cluster->get_devices();
         auto peer = devices_map.by_sha256(diff.peer_id);
         auto &files_map = folder->get_folder_infos().by_device(*peer)->get_file_infos();
 

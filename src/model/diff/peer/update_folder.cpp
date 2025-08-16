@@ -38,7 +38,7 @@ update_folder_t::update_folder_t(std::string_view folder_id_, utils::bytes_view_
 
 auto update_folder_t::apply_forward(cluster_t &cluster, apply_controller_t &controller, void *custom) const noexcept
     -> outcome::result<void> {
-    return controller.apply(*this, cluster, custom);
+    return controller.apply(*this, custom);
 }
 
 auto update_folder_t::apply_impl(cluster_t &cluster, apply_controller_t &controller, void *custom) const noexcept
