@@ -221,7 +221,7 @@ void app_supervisor_t::process(model::diff::cluster_diff_t &diff, apply_context_
 
     auto attachment = app_context_attachment{guards, monitor};
     context.custom_payload = &attachment;
-    parent_t::process(diff, context);
+    process_impl(diff, context);
 
     if (context.message_payload) {
         for (auto it = begin(callbacks); it != end(callbacks); ++it) {

@@ -75,8 +75,8 @@ struct SYNCSPIRIT_API net_supervisor_t : net_supervisor_base_t<ra::supervisor_as
     void load_db() noexcept;
     void seed_model() noexcept;
 
+    void commit_loading() noexcept override;
     outcome::result<void> save_config(const config::main_t &new_cfg) noexcept;
-    outcome::result<void> operator()(const model::diff::load::load_cluster_t &, void *custom) noexcept override;
 
     model::sequencer_ptr_t sequencer;
     config::main_t app_config;

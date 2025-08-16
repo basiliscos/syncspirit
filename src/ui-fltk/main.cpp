@@ -289,19 +289,11 @@ int app_main(app_context_t &app_ctx) {
     auto seed = (size_t)std::time(nullptr);
     auto sequencer = model::make_sequencer(seed);
 
-    auto bouncer_context = thread_sys_context_t();
-    auto bouncer = bouncer_context.create_supervisor<hasher::bouncer_actor_t>()
-                       .timeout(timeout / 2)
-                       .create_registry()
-                       .shutdown_flag(shutdown_flag, r::pt::millisec{50})
-                       .finish();
-    bouncer->do_process();
-
     auto sup_net = sys_context->create_supervisor<net::net_supervisor_t>()
                        .app_config(cfg)
                        .strand(strand)
                        .timeout(timeout)
-                       .registry_address(bouncer->get_registry_address())
+                       .create_registry()
                        .guard_context(true)
                        .sequencer(sequencer)
                        .independent_threads(independent_threads)
@@ -314,6 +306,15 @@ int app_main(app_context_t &app_ctx) {
         return 1;
     }
 
+    std::atomic_bool bouncer_shutdown_flag = false;
+    auto bouncer_context = thread_sys_context_t();
+    auto bouncer = bouncer_context.create_supervisor<hasher::bouncer_actor_t>()
+                       .timeout(timeout * 9 / 8)
+                       .registry_address(sup_net->get_registry_address())
+                       .shutdown_flag(bouncer_shutdown_flag, r::pt::millisec{50})
+                       .finish();
+    bouncer->do_process();
+
     auto hasher_count = cfg.hasher_threads;
     using sys_thread_context_ptr_t = r::intrusive_ptr_t<thread_sys_context_t>;
     std::vector<sys_thread_context_ptr_t> hasher_ctxs;
@@ -322,7 +323,7 @@ int app_main(app_context_t &app_ctx) {
         auto &ctx = hasher_ctxs.back();
         auto sup = ctx->create_supervisor<hasher::hasher_supervisor_t>()
                        .timeout(timeout / 2)
-                       .registry_address(bouncer->get_registry_address())
+                       .registry_address(sup_net->get_registry_address())
                        .index(i)
                        .finish();
         sup->do_process();
@@ -337,7 +338,7 @@ int app_main(app_context_t &app_ctx) {
                         .config_path(config_file_path)
                         .app_config(cfg)
                         .timeout(timeout)
-                        .registry_address(bouncer->get_registry_address())
+                        .registry_address(sup_net->get_registry_address())
                         .shutdown_flag(shutdown_flag, r::pt::millisec{50})
                         .finish();
     // warm-up
@@ -367,7 +368,7 @@ int app_main(app_context_t &app_ctx) {
         pthread_setname_np(pthread_self(), "ss/bouncer");
 #endif
         bouncer_context.run();
-        shutdown_flag = true;
+        bouncer_shutdown_flag = true;
         logger->trace("bouncer thread has been terminated");
     });
 
@@ -419,12 +420,15 @@ int app_main(app_context_t &app_ctx) {
         }
     }
 
+    bouncer_shutdown_flag = true;
+
     sup_fltk->do_shutdown();
     sup_fltk->do_process();
 
     fs_thread.join();
-    bouncer_thread.join();
     net_thread.join();
+
+    bouncer_thread.join();
 
     logger->trace("waiting hasher threads termination");
     for (auto &thread : hasher_threads) {

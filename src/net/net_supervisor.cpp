@@ -67,11 +67,13 @@ void net_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         log = utils::get_logger(identity);
     });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
+        coordinator = address;
         p.register_name(names::coordinator, get_address());
         p.discover_name(net::names::bouncer, bouncer, true).link(false);
     });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&net_supervisor_t::on_model_update);
+        p.subscribe_actor(&net_supervisor_t::on_model_interrupt);
         p.subscribe_actor(&net_supervisor_t::on_load_cluster);
         p.subscribe_actor(&net_supervisor_t::on_model_request);
         p.subscribe_actor(&net_supervisor_t::on_thread_ready);
@@ -175,7 +177,7 @@ void net_supervisor_t::on_app_ready(model::message::app_ready_t &) noexcept {
 
     if (app_config.upnp_config.enabled) {
         auto factory = [this](r::supervisor_t &, const r::address_ptr_t &spawner) -> r::actor_ptr_t {
-            auto timeout = shutdown_timeout * 9 / 10;
+            auto timeout = shutdown_timeout * 8 / 10;
             return create_actor<ssdp_actor_t>()
                 .timeout(timeout)
                 .upnp_config(app_config.upnp_config)
@@ -273,8 +275,7 @@ void net_supervisor_t::on_app_ready(model::message::app_ready_t &) noexcept {
     }
 }
 
-auto net_supervisor_t::operator()(const model::diff::load::load_cluster_t &diff, void *custom) noexcept
-    -> outcome::result<void> {
+void net_supervisor_t::commit_loading() noexcept {
     if (!cluster->is_tainted()) {
         auto &ignored_devices = cluster->get_ignored_devices();
         auto &ignored_folders = cluster->get_ignored_folders();
@@ -299,7 +300,6 @@ auto net_supervisor_t::operator()(const model::diff::load::load_cluster_t &diff,
                   ignored_folders.size(), pending_folders_sz, pending_devices.size());
         send<syncspirit::model::payload::thread_ready_t>(address);
     }
-    return diff.visit_next(*this, custom);
 }
 
 void net_supervisor_t::on_start() noexcept {
