@@ -23,6 +23,11 @@ struct SYNCSPIRIT_API apply_controller_t {
     virtual outcome::result<void> apply(const load::file_infos_t &, cluster_t &cluster, void *) noexcept;
     virtual outcome::result<void> apply(const load::interrupt_t &, cluster_t &cluste, void *r) noexcept;
     virtual outcome::result<void> apply(const load::load_cluster_t &, cluster_t &cluster, void *) noexcept;
+    virtual outcome::result<void> apply(const local::io_failure_t &, cluster_t &cluster, void *) noexcept;
+    virtual outcome::result<void> apply(const modify::add_pending_folders_t &, cluster_t &cluster, void *) noexcept;
+    virtual outcome::result<void> apply(const modify::add_pending_device_t &, cluster_t &cluster, void *) noexcept;
+    virtual outcome::result<void> apply(const modify::add_ignored_device_t &, cluster_t &cluster, void *) noexcept;
+    virtual outcome::result<void> apply(const modify::update_peer_t &, cluster_t &cluster, void *) noexcept;
     virtual outcome::result<void> apply(const modify::upsert_folder_t &, cluster_t &cluster, void *) noexcept;
     virtual outcome::result<void> apply(const modify::upsert_folder_info_t &, cluster_t &cluster, void *) noexcept;
     virtual outcome::result<void> apply(const peer::update_folder_t &, cluster_t &cluster, void *) noexcept;

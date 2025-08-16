@@ -8,6 +8,11 @@
 #include "load/interrupt.h"
 #include "load/commit.h"
 #include "load/load_cluster.h"
+#include "local/io_failure.h"
+#include "modify/add_ignored_device.h"
+#include "modify/add_pending_device.h"
+#include "modify/add_pending_folders.h"
+#include "modify/update_peer.h"
 #include "modify/upsert_folder.h"
 #include "modify/upsert_folder_info.h"
 #include "peer/update_folder.h"
@@ -29,7 +34,6 @@ auto apply_controller_t::apply(const advance::advance_t &diff, cluster_t &cluste
     -> outcome::result<void> {
     return diff.apply_impl(cluster, *this, custom);
 }
-
 auto apply_controller_t::apply(const load::commit_t &diff, cluster_t &cluster, void *custom) noexcept
     -> outcome::result<void> {
     return diff.apply_impl(cluster, *this, custom);
@@ -46,6 +50,31 @@ auto apply_controller_t::apply(const load::interrupt_t &diff, cluster_t &cluster
 }
 
 auto apply_controller_t::apply(const load::load_cluster_t &diff, cluster_t &cluster, void *custom) noexcept
+    -> outcome::result<void> {
+    return diff.apply_impl(cluster, *this, custom);
+}
+
+auto apply_controller_t::apply(const local::io_failure_t &diff, cluster_t &cluster, void *custom) noexcept
+    -> outcome::result<void> {
+    return diff.apply_impl(cluster, *this, custom);
+}
+
+auto apply_controller_t::apply(const modify::add_pending_folders_t &diff, cluster_t &cluster, void *custom) noexcept
+    -> outcome::result<void> {
+    return diff.apply_impl(cluster, *this, custom);
+}
+
+auto apply_controller_t::apply(const modify::add_pending_device_t &diff, cluster_t &cluster, void *custom) noexcept
+    -> outcome::result<void> {
+    return diff.apply_impl(cluster, *this, custom);
+}
+
+auto apply_controller_t::apply(const modify::add_ignored_device_t &diff, cluster_t &cluster, void *custom) noexcept
+    -> outcome::result<void> {
+    return diff.apply_impl(cluster, *this, custom);
+}
+
+auto apply_controller_t::apply(const modify::update_peer_t &diff, cluster_t &cluster, void *custom) noexcept
     -> outcome::result<void> {
     return diff.apply_impl(cluster, *this, custom);
 }

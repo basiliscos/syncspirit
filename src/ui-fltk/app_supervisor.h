@@ -86,7 +86,8 @@ struct callback_t : model::arc_base_t<callback_t> {
 };
 using callback_ptr_t = model::intrusive_ptr_t<callback_t>;
 
-template <typename T> using app_supervisor_base_t = model::diff::iterative_controller_t<T, rf::supervisor_fltk_t, true>;
+template <typename T>
+using app_supervisor_base_t = model::diff::iterative_controller_t<T, rf::supervisor_fltk_t, false>;
 
 struct app_supervisor_t : app_supervisor_base_t<app_supervisor_t> {
     using parent_t = app_supervisor_base_t<app_supervisor_t>;
@@ -172,19 +173,25 @@ struct app_supervisor_t : app_supervisor_base_t<app_supervisor_t> {
 
     void process(model::diff::cluster_diff_t &diff, apply_context_t &context) noexcept override;
 
-    outcome::result<void> operator()(const model::diff::advance::advance_t &, void *) noexcept override;
-    outcome::result<void> operator()(const model::diff::local::io_failure_t &, void *) noexcept override;
-    outcome::result<void> operator()(const model::diff::modify::add_pending_folders_t &, void *) noexcept override;
-    outcome::result<void> operator()(const model::diff::modify::add_pending_device_t &, void *) noexcept override;
-    outcome::result<void> operator()(const model::diff::modify::add_ignored_device_t &, void *) noexcept override;
-    outcome::result<void> operator()(const model::diff::modify::update_peer_t &, void *) noexcept override;
-    outcome::result<void> operator()(const model::diff::modify::upsert_folder_t &, void *) noexcept override;
-    outcome::result<void> operator()(const model::diff::modify::upsert_folder_info_t &, void *) noexcept override;
-    outcome::result<void> operator()(const model::diff::peer::update_folder_t &, void *) noexcept override;
-
+    outcome::result<void> apply(const model::diff::advance::advance_t &, model::cluster_t &, void *) noexcept override;
     outcome::result<void> apply(const model::diff::load::blocks_t &, model::cluster_t &, void *) noexcept override;
     outcome::result<void> apply(const model::diff::load::file_infos_t &, model::cluster_t &, void *) noexcept override;
     outcome::result<void> apply(const model::diff::load::load_cluster_t &, model::cluster_t &,
+                                void *) noexcept override;
+    outcome::result<void> apply(const model::diff::local::io_failure_t &, model::cluster_t &, void *) noexcept override;
+    outcome::result<void> apply(const model::diff::modify::add_pending_folders_t &, model::cluster_t &,
+                                void *) noexcept override;
+    outcome::result<void> apply(const model::diff::modify::add_pending_device_t &, model::cluster_t &x,
+                                void *) noexcept override;
+    outcome::result<void> apply(const model::diff::modify::add_ignored_device_t &, model::cluster_t &,
+                                void *) noexcept override;
+    outcome::result<void> apply(const model::diff::modify::update_peer_t &, model::cluster_t &,
+                                void *) noexcept override;
+    outcome::result<void> apply(const model::diff::modify::upsert_folder_t &, model::cluster_t &,
+                                void *) noexcept override;
+    outcome::result<void> apply(const model::diff::modify::upsert_folder_info_t &, model::cluster_t &,
+                                void *) noexcept override;
+    outcome::result<void> apply(const model::diff::peer::update_folder_t &, model::cluster_t &,
                                 void *) noexcept override;
 
     void commit_loading() noexcept override;

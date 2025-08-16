@@ -3,12 +3,18 @@
 
 #include "add_pending_folders.h"
 #include "model/cluster.h"
+#include "model/diff/apply_controller.h"
 #include "model/diff/cluster_visitor.h"
 
 using namespace syncspirit::model::diff::modify;
 
 add_pending_folders_t::add_pending_folders_t(container_t items) noexcept : container(std::move(items)) {
     LOG_DEBUG(log, "add_pending_folders_t, count = {}", container.size());
+}
+
+auto add_pending_folders_t::apply_forward(cluster_t &cluster, apply_controller_t &controller,
+                                          void *custom) const noexcept -> outcome::result<void> {
+    return controller.apply(*this, cluster, custom);
 }
 
 auto add_pending_folders_t::apply_impl(cluster_t &cluster, apply_controller_t &controller, void *custom) const noexcept

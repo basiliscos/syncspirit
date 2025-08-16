@@ -3,6 +3,7 @@
 
 #include "add_ignored_device.h"
 #include "model/cluster.h"
+#include "model/diff/apply_controller.h"
 #include "model/diff/cluster_visitor.h"
 #include "model/diff/modify/remove_pending_device.h"
 
@@ -16,6 +17,11 @@ add_ignored_device_t::add_ignored_device_t(const cluster_t &cluster, const devic
         assign_child(new remove_pending_device_t(*peer));
     }
     LOG_DEBUG(log, "add_ignored_device_t, peer = {}, pending = {}", device_id.get_short(), (bool)(peer));
+}
+
+auto add_ignored_device_t::apply_forward(cluster_t &cluster, apply_controller_t &controller,
+                                         void *custom) const noexcept -> outcome::result<void> {
+    return controller.apply(*this, cluster, custom);
 }
 
 auto add_ignored_device_t::apply_impl(cluster_t &cluster, apply_controller_t &controller, void *custom) const noexcept

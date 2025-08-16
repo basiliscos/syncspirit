@@ -8,6 +8,7 @@
 #include "model/cluster.h"
 #include "model/misc/error_code.h"
 #include "model/diff/cluster_visitor.h"
+#include "model/diff/apply_controller.h"
 #include "utils/format.hpp"
 
 using namespace syncspirit::model::diff::modify;
@@ -30,6 +31,11 @@ update_peer_t::update_peer_t(db::Device db, const model::device_id_t &device_id,
         diff = new remove_ignored_device_t(*ignored_device);
         current = current ? current->assign_sibling(diff.get()) : assign_child(diff);
     }
+}
+
+auto update_peer_t::apply_forward(cluster_t &cluster, apply_controller_t &controller, void *custom) const noexcept
+    -> outcome::result<void> {
+    return controller.apply(*this, cluster, custom);
 }
 
 auto update_peer_t::apply_impl(cluster_t &cluster, apply_controller_t &controller, void *custom) const noexcept

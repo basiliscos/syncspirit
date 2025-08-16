@@ -353,175 +353,201 @@ callback_ptr_t app_supervisor_t::call_share_folders(std::string_view folder_id, 
     return cb;
 }
 
-auto app_supervisor_t::operator()(const model::diff::local::io_failure_t &diff, void *custom) noexcept
-    -> outcome::result<void> {
-    for (auto &details : diff.errors) {
-        log->warn("I/O error on '{}': {}", details.path.string(), details.ec.message());
-    }
-    return diff.visit_next(*this, custom);
-}
-
-auto app_supervisor_t::operator()(const model::diff::modify::update_peer_t &diff, void *custom) noexcept
-    -> outcome::result<void> {
-    auto device = cluster->get_devices().by_sha256(diff.peer_id);
-    auto augmentation = device->get_augmentation();
-    if (!augmentation) {
-        auto devices_node = static_cast<tree_item::devices_t *>(devices);
-        device->set_augmentation(devices_node->add_peer(*device));
-    }
-    return diff.visit_next(*this, custom);
-}
-
-auto app_supervisor_t::operator()(const model::diff::modify::add_pending_folders_t &diff, void *custom) noexcept
-    -> outcome::result<void> {
-    auto &devices = cluster->get_devices();
-    auto &pending_folders = cluster->get_pending_folders();
-    for (auto &item : diff.container) {
-        auto peer = devices.by_sha256(item.peer_id);
-        auto augmentation = static_cast<augmentation_t *>(peer->get_augmentation().get());
-        auto peer_node = static_cast<tree_item::peer_device_t *>(augmentation->get_owner());
-        auto pending_node = static_cast<tree_item::pending_folders_t *>(peer_node->get_pending_folders());
-        auto folder_id = db::get_id(db::get_folder(item.db));
-        auto pending_folder = pending_folders.by_id(folder_id);
-        if (pending_folder->get_augmentation()) {
-            continue;
+auto app_supervisor_t::apply(const model::diff::local::io_failure_t &diff, model::cluster_t &cluster,
+                             void *custom) noexcept -> outcome::result<void> {
+    auto r = parent_t::apply(diff, cluster, custom);
+    if (r) {
+        for (auto &details : diff.errors) {
+            log->warn("I/O error on '{}': {}", details.path.string(), details.ec.message());
         }
-        pending_folder->set_augmentation(pending_node->add_pending_folder(*pending_folder));
     }
-    return diff.visit_next(*this, custom);
+    return r;
 }
 
-auto app_supervisor_t::operator()(const model::diff::modify::add_pending_device_t &diff, void *custom) noexcept
-    -> outcome::result<void> {
-    auto &device = *cluster->get_pending_devices().by_sha256(diff.device_id.get_sha256());
-    auto pending_devices_node = static_cast<tree_item::pending_devices_t *>(pending_devices);
-    device.set_augmentation(pending_devices_node->add_device(device));
-    return diff.visit_next(*this, custom);
+auto app_supervisor_t::apply(const model::diff::modify::update_peer_t &diff, model::cluster_t &cluster,
+                             void *custom) noexcept -> outcome::result<void> {
+    auto r = parent_t::apply(diff, cluster, custom);
+    if (r) {
+        auto device = cluster.get_devices().by_sha256(diff.peer_id);
+        auto augmentation = device->get_augmentation();
+        if (!augmentation) {
+            auto devices_node = static_cast<tree_item::devices_t *>(devices);
+            device->set_augmentation(devices_node->add_peer(*device));
+        }
+    }
+    return r;
 }
 
-auto app_supervisor_t::operator()(const model::diff::modify::add_ignored_device_t &diff, void *custom) noexcept
-    -> outcome::result<void> {
-    auto &device = *cluster->get_ignored_devices().by_sha256(diff.device_id.get_sha256());
-    auto ignored_devices_node = static_cast<tree_item::ignored_devices_t *>(ignored_devices);
-    device.set_augmentation(ignored_devices_node->add_device(device));
-    return diff.visit_next(*this, custom);
+auto app_supervisor_t::apply(const model::diff::modify::add_pending_folders_t &diff, model::cluster_t &cluster,
+                             void *custom) noexcept -> outcome::result<void> {
+    auto r = parent_t::apply(diff, cluster, custom);
+    if (r) {
+        auto &devices = cluster.get_devices();
+        auto &pending_folders = cluster.get_pending_folders();
+        for (auto &item : diff.container) {
+            auto peer = devices.by_sha256(item.peer_id);
+            auto augmentation = static_cast<augmentation_t *>(peer->get_augmentation().get());
+            auto peer_node = static_cast<tree_item::peer_device_t *>(augmentation->get_owner());
+            auto pending_node = static_cast<tree_item::pending_folders_t *>(peer_node->get_pending_folders());
+            auto folder_id = db::get_id(db::get_folder(item.db));
+            auto pending_folder = pending_folders.by_id(folder_id);
+            if (pending_folder->get_augmentation()) {
+                continue;
+            }
+            pending_folder->set_augmentation(pending_node->add_pending_folder(*pending_folder));
+        }
+    }
+    return r;
 }
 
-auto app_supervisor_t::operator()(const model::diff::advance::advance_t &diff, void *custom) noexcept
-    -> outcome::result<void> {
-    auto folder = cluster->get_folders().by_id(diff.folder_id);
-    auto augmentation = folder->get_augmentation().get();
-    auto folder_entity = static_cast<presentation::folder_entity_t *>(augmentation);
-    if (folder_entity) {
-        auto &folder_infos = folder->get_folder_infos();
-        auto local_fi = folder_infos.by_device(*cluster->get_device());
-        auto file_name = proto::get_name(diff.proto_local);
-        auto local_file = local_fi->get_file_infos().by_name(file_name);
-        if (local_file) {
-            auto entity = folder_entity->on_insert(*local_file);
-            if (entity) {
-                auto parent = entity->get_parent();
-                auto mask = mask_nodes();
-                for (auto presence : entity->get_presences()) {
-                    using F = presence_t::features_t;
-                    if (!(presence->get_features() & F::missing)) {
-                        auto parent_presence = presence->get_parent();
-                        if (parent_presence) {
-                            auto aug = parent_presence->get_augmentation().get();
-                            if (aug) {
-                                auto parent_item = static_cast<presence_item_t *>(aug);
-                                parent_item->show_child(*presence, mask);
-                                parent_item->tree()->redraw();
+auto app_supervisor_t::apply(const model::diff::modify::add_pending_device_t &diff, model::cluster_t &cluster,
+                             void *custom) noexcept -> outcome::result<void> {
+    auto r = parent_t::apply(diff, cluster, custom);
+    if (r) {
+        auto &device = *cluster.get_pending_devices().by_sha256(diff.device_id.get_sha256());
+        auto pending_devices_node = static_cast<tree_item::pending_devices_t *>(pending_devices);
+        device.set_augmentation(pending_devices_node->add_device(device));
+    }
+    return r;
+}
+
+auto app_supervisor_t::apply(const model::diff::modify::add_ignored_device_t &diff, model::cluster_t &cluster,
+                             void *custom) noexcept -> outcome::result<void> {
+    auto r = parent_t::apply(diff, cluster, custom);
+    if (r) {
+        auto &device = *cluster.get_ignored_devices().by_sha256(diff.device_id.get_sha256());
+        auto ignored_devices_node = static_cast<tree_item::ignored_devices_t *>(ignored_devices);
+        device.set_augmentation(ignored_devices_node->add_device(device));
+    }
+    return r;
+}
+
+auto app_supervisor_t::apply(const model::diff::advance::advance_t &diff, model::cluster_t &cluster,
+                             void *custom) noexcept -> outcome::result<void> {
+    auto r = parent_t::apply(diff, cluster, custom);
+    if (r) {
+        auto folder = cluster.get_folders().by_id(diff.folder_id);
+        auto augmentation = folder->get_augmentation().get();
+        auto folder_entity = static_cast<presentation::folder_entity_t *>(augmentation);
+        if (folder_entity) {
+            auto &folder_infos = folder->get_folder_infos();
+            auto local_fi = folder_infos.by_device(*cluster.get_device());
+            auto file_name = proto::get_name(diff.proto_local);
+            auto local_file = local_fi->get_file_infos().by_name(file_name);
+            if (local_file) {
+                auto entity = folder_entity->on_insert(*local_file);
+                if (entity) {
+                    auto parent = entity->get_parent();
+                    auto mask = mask_nodes();
+                    for (auto presence : entity->get_presences()) {
+                        using F = presence_t::features_t;
+                        if (!(presence->get_features() & F::missing)) {
+                            auto parent_presence = presence->get_parent();
+                            if (parent_presence) {
+                                auto aug = parent_presence->get_augmentation().get();
+                                if (aug) {
+                                    auto parent_item = static_cast<presence_item_t *>(aug);
+                                    parent_item->show_child(*presence, mask);
+                                    parent_item->tree()->redraw();
+                                }
                             }
                         }
                     }
                 }
-            }
-        }
-    }
-    return diff.visit_next(*this, custom);
-}
-
-auto app_supervisor_t::operator()(const model::diff::modify::upsert_folder_t &diff, void *custom) noexcept
-    -> outcome::result<void> {
-    auto folder_id = db::get_id(diff.db);
-    auto folder = cluster->get_folders().by_id(folder_id);
-    if (!folder->get_augmentation()) {
-        auto folders_node = static_cast<tree_item::folders_t *>(folders);
-        auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
-        folders_node->add_folder(*folder_entity);
-        folder->set_augmentation(folder_entity);
-        auto ctx = static_cast<apply_context_t *>(custom);
-        auto attachment = static_cast<app_context_attachment *>(ctx->custom_payload);
-        attachment->guards.emplace_back(folder_entity->monitor(&attachment->monitor));
-    }
-    return diff.visit_next(*this, custom);
-}
-
-auto app_supervisor_t::operator()(const model::diff::modify::upsert_folder_info_t &diff, void *custom) noexcept
-    -> outcome::result<void> {
-    auto r = diff.visit_next(*this, custom);
-    auto &folder = *cluster->get_folders().by_id(diff.folder_id);
-    auto &device = *cluster->get_devices().by_sha256(diff.device_id);
-    auto folder_info = folder.is_shared_with(device);
-    if (&device != cluster->get_device()) {
-        auto augmentation = folder.get_augmentation().get();
-        auto folder_entity = static_cast<presentation::folder_entity_t *>(augmentation);
-        auto folder_presence = folder_entity->on_insert(*folder_info);
-        if (folder_presence) {
-            auto devices_node = static_cast<tree_item::devices_t *>(devices);
-            auto peer_node = devices_node->get_peer(device);
-            auto folders_node = static_cast<tree_item::peer_folders_t *>(peer_node->get_folders());
-            if (!folder_presence->get_augmentation()) {
-                folders_node->add_folder(*folder_presence);
             }
         }
     }
     return r;
 }
 
-auto app_supervisor_t::operator()(const model::diff::peer::update_folder_t &diff, void *custom) noexcept
-    -> outcome::result<void> {
-    auto buffer = std::array<std::byte, 128>();
-    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
-    auto allocator = std::pmr::polymorphic_allocator<std::string>(&pool);
-    auto shared_devices = shared_device_t(allocator);
-
-    auto folder = cluster->get_folders().by_id(diff.folder_id);
-    auto &devices_map = cluster->get_devices();
-
-    for (auto &it : devices_map) {
-        auto &device = it.item;
-        if (folder->is_shared_with(*device)) {
-            shared_devices.emplace_back(device.get());
+auto app_supervisor_t::apply(const model::diff::modify::upsert_folder_t &diff, model::cluster_t &cluster,
+                             void *custom) noexcept -> outcome::result<void> {
+    auto r = parent_t::apply(diff, cluster, custom);
+    if (r) {
+        auto folder_id = db::get_id(diff.db);
+        auto folder = cluster.get_folders().by_id(folder_id);
+        if (!folder->get_augmentation()) {
+            auto folders_node = static_cast<tree_item::folders_t *>(folders);
+            auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
+            folders_node->add_folder(*folder_entity);
+            folder->set_augmentation(folder_entity);
+            auto ctx = static_cast<apply_context_t *>(custom);
+            auto attachment = static_cast<app_context_attachment *>(ctx->custom_payload);
+            attachment->guards.emplace_back(folder_entity->monitor(&attachment->monitor));
         }
     }
+    return r;
+}
 
-    auto peer = devices_map.by_sha256(diff.peer_id);
-    auto &files_map = folder->get_folder_infos().by_device(*peer)->get_file_infos();
-    auto folder_aug = folder->get_augmentation().get();
-    auto folder_entity = static_cast<presentation::folder_entity_t *>(folder_aug);
-    auto mask = mask_nodes();
-    for (auto &file : diff.files) {
-        auto file_name = proto::get_name(file);
-        auto file_info = files_map.by_name(file_name);
-        auto augmentation = file_info->get_augmentation().get();
-        if (!augmentation) {
-            auto entity = folder_entity->on_insert(*file_info);
-            if (entity) {
-                auto parent_entity = entity->get_parent();
-                if (parent_entity) {
-                    for (auto device : shared_devices) {
-                        auto presence = entity->get_presence(device);
-                        auto parent = presence->get_parent();
-                        if (!parent) {
-                            parent = parent_entity->get_presence(device);
-                        }
-                        if (parent) {
-                            auto parent_aug = parent->get_augmentation().get();
-                            if (parent_aug) {
-                                auto parent_item = static_cast<presence_item_t *>(parent_aug);
-                                parent_item->show_child(*presence, mask);
+auto app_supervisor_t::apply(const model::diff::modify::upsert_folder_info_t &diff, model::cluster_t &cluster,
+                             void *custom) noexcept -> outcome::result<void> {
+    auto r = parent_t::apply(diff, cluster, custom);
+    if (r) {
+        auto &folder = *cluster.get_folders().by_id(diff.folder_id);
+        auto &device = *cluster.get_devices().by_sha256(diff.device_id);
+        auto folder_info = folder.is_shared_with(device);
+        if (&device != cluster.get_device()) {
+            auto augmentation = folder.get_augmentation().get();
+            auto folder_entity = static_cast<presentation::folder_entity_t *>(augmentation);
+            auto folder_presence = folder_entity->on_insert(*folder_info);
+            if (folder_presence) {
+                auto devices_node = static_cast<tree_item::devices_t *>(devices);
+                auto peer_node = devices_node->get_peer(device);
+                auto folders_node = static_cast<tree_item::peer_folders_t *>(peer_node->get_folders());
+                if (!folder_presence->get_augmentation()) {
+                    folders_node->add_folder(*folder_presence);
+                }
+            }
+        }
+    }
+    return r;
+}
+
+auto app_supervisor_t::apply(const model::diff::peer::update_folder_t &diff, model::cluster_t &cluster,
+                             void *custom) noexcept -> outcome::result<void> {
+    auto r = parent_t::apply(diff, cluster, custom);
+    if (r) {
+        auto buffer = std::array<std::byte, 128>();
+        auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+        auto allocator = std::pmr::polymorphic_allocator<std::string>(&pool);
+        auto shared_devices = shared_device_t(allocator);
+
+        auto folder = cluster.get_folders().by_id(diff.folder_id);
+        auto &devices_map = cluster.get_devices();
+
+        for (auto &it : devices_map) {
+            auto &device = it.item;
+            if (folder->is_shared_with(*device)) {
+                shared_devices.emplace_back(device.get());
+            }
+        }
+
+        auto peer = devices_map.by_sha256(diff.peer_id);
+        auto &files_map = folder->get_folder_infos().by_device(*peer)->get_file_infos();
+        auto folder_aug = folder->get_augmentation().get();
+        auto folder_entity = static_cast<presentation::folder_entity_t *>(folder_aug);
+        auto mask = mask_nodes();
+        for (auto &file : diff.files) {
+            auto file_name = proto::get_name(file);
+            auto file_info = files_map.by_name(file_name);
+            auto augmentation = file_info->get_augmentation().get();
+            if (!augmentation) {
+                auto entity = folder_entity->on_insert(*file_info);
+                if (entity) {
+                    auto parent_entity = entity->get_parent();
+                    if (parent_entity) {
+                        for (auto device : shared_devices) {
+                            auto presence = entity->get_presence(device);
+                            auto parent = presence->get_parent();
+                            if (!parent) {
+                                parent = parent_entity->get_presence(device);
+                            }
+                            if (parent) {
+                                auto parent_aug = parent->get_augmentation().get();
+                                if (parent_aug) {
+                                    auto parent_item = static_cast<presence_item_t *>(parent_aug);
+                                    parent_item->show_child(*presence, mask);
+                                }
                             }
                         }
                     }
@@ -529,7 +555,7 @@ auto app_supervisor_t::operator()(const model::diff::peer::update_folder_t &diff
             }
         }
     }
-    return diff.visit_next(*this, custom);
+    return r;
 }
 
 auto app_supervisor_t::apply(const model::diff::load::blocks_t &diff, model::cluster_t &cluster, void *custom) noexcept
