@@ -153,10 +153,11 @@ void app_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
                 plugin->subscribe_actor(&app_supervisor_t::on_model_update, coordinator);
                 plugin->subscribe_actor(&app_supervisor_t::on_app_ready, coordinator);
-                request_load_model();
+                request<model::payload::model_request_t>(coordinator).send(init_timeout);
+                resources->acquire(resource::model);
             }
         });
-        p.discover_name(net::names::bouncer, bouncer, true).link(true);
+        p.discover_name(net::names::bouncer, bouncer, true).link(false);
     });
 
     plugin.with_casted<r::plugin::starter_plugin_t>(
@@ -183,11 +184,6 @@ void app_supervisor_t::shutdown_finish() noexcept {
             write_config(app_config);
         }
     }
-}
-
-void app_supervisor_t::request_load_model() {
-    request<model::payload::model_request_t>(coordinator).send(init_timeout);
-    resources->acquire(resource::model);
 }
 
 auto app_supervisor_t::get_coordinator_address() -> r::address_ptr_t & { return coordinator; }

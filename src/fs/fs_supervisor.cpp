@@ -49,7 +49,7 @@ void fs_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 resources->acquire(resource::model);
             }
         });
-        p.discover_name(net::names::bouncer, bouncer, true).link(true);
+        p.discover_name(net::names::bouncer, bouncer, true).link(false);
     });
 
     plugin.with_casted<r::plugin::starter_plugin_t>(

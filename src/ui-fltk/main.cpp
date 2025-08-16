@@ -289,11 +289,19 @@ int app_main(app_context_t &app_ctx) {
     auto seed = (size_t)std::time(nullptr);
     auto sequencer = model::make_sequencer(seed);
 
+    auto bouncer_context = thread_sys_context_t();
+    auto bouncer = bouncer_context.create_supervisor<hasher::bouncer_actor_t>()
+                       .timeout(timeout / 2)
+                       .create_registry()
+                       .shutdown_flag(shutdown_flag, r::pt::millisec{50})
+                       .finish();
+    bouncer->do_process();
+
     auto sup_net = sys_context->create_supervisor<net::net_supervisor_t>()
                        .app_config(cfg)
                        .strand(strand)
                        .timeout(timeout)
-                       .create_registry()
+                       .registry_address(bouncer->get_registry_address())
                        .guard_context(true)
                        .sequencer(sequencer)
                        .independent_threads(independent_threads)
@@ -314,19 +322,11 @@ int app_main(app_context_t &app_ctx) {
         auto &ctx = hasher_ctxs.back();
         auto sup = ctx->create_supervisor<hasher::hasher_supervisor_t>()
                        .timeout(timeout / 2)
-                       .registry_address(sup_net->get_registry_address())
+                       .registry_address(bouncer->get_registry_address())
                        .index(i)
                        .finish();
         sup->do_process();
     }
-
-    auto bouncer_context = thread_sys_context_t();
-    auto bouncer = bouncer_context.create_supervisor<hasher::bouncer_actor_t>()
-                       .timeout(timeout / 2)
-                       .registry_address(sup_net->get_registry_address())
-                       .shutdown_flag(shutdown_flag, r::pt::millisec{50})
-                       .finish();
-    bouncer->do_process();
 
     // window should outlive fltk ctx, as in ctx d-tor model augmentations
     // invoke fltk-things..
@@ -337,7 +337,7 @@ int app_main(app_context_t &app_ctx) {
                         .config_path(config_file_path)
                         .app_config(cfg)
                         .timeout(timeout)
-                        .registry_address(sup_net->get_registry_address())
+                        .registry_address(bouncer->get_registry_address())
                         .shutdown_flag(shutdown_flag, r::pt::millisec{50})
                         .finish();
     // warm-up
@@ -346,7 +346,7 @@ int app_main(app_context_t &app_ctx) {
     thread_sys_context_t fs_context;
     auto fs_sup = fs_context.create_supervisor<syncspirit::fs::fs_supervisor_t>()
                       .timeout(timeout)
-                      .registry_address(sup_net->get_registry_address())
+                      .registry_address(bouncer->get_registry_address())
                       .fs_config(cfg.fs_config)
                       .hasher_threads(cfg.hasher_threads)
                       .sequencer(sequencer)
@@ -361,6 +361,16 @@ int app_main(app_context_t &app_ctx) {
     main_window->wait_for_expose();
 
     // launch
+    auto bouncer_thread = std::thread([&]() {
+        SET_THREAD_EN_LANGUAGE();
+#if defined(__linux__)
+        pthread_setname_np(pthread_self(), "ss/bouncer");
+#endif
+        bouncer_context.run();
+        shutdown_flag = true;
+        logger->trace("bouncer thread has been terminated");
+    });
+
     auto net_thread = std::thread([&]() {
         SET_THREAD_EN_LANGUAGE();
 #if defined(__linux__)
@@ -396,16 +406,6 @@ int app_main(app_context_t &app_ctx) {
         fs_context.run();
         shutdown_flag = true;
         logger->trace("fs thread has been terminated");
-    });
-
-    auto bouncer_thread = std::thread([&]() {
-        SET_THREAD_EN_LANGUAGE();
-#if defined(__linux__)
-        pthread_setname_np(pthread_self(), "ss/bouncer");
-#endif
-        bouncer_context.run();
-        shutdown_flag = true;
-        logger->trace("bouncer thread has been terminated");
     });
 
     logger->debug("utf8 local support: {}", fl_utf8locale());

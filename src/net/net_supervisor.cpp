@@ -24,8 +24,8 @@ namespace bfs = std::filesystem;
 using namespace syncspirit::net;
 
 net_supervisor_t::net_supervisor_t(net_supervisor_t::config_t &cfg)
-    : parent_t{cfg}, sequencer{cfg.sequencer}, app_config{cfg.app_config}, independent_threads{cfg.independent_threads},
-      cluster_copies{independent_threads - 1} {
+    : parent_t(this, cfg), sequencer{cfg.sequencer}, app_config{cfg.app_config},
+      independent_threads{cfg.independent_threads}, cluster_copies{independent_threads - 1} {
     auto log = utils::get_logger(names::coordinator);
     auto &files_cfg = app_config.global_announce_config;
     auto result = utils::load_pair(files_cfg.cert_file.c_str(), files_cfg.key_file.c_str());
@@ -66,8 +66,10 @@ void net_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.set_identity(names::coordinator, false);
         log = utils::get_logger(identity);
     });
-    plugin.with_casted<r::plugin::registry_plugin_t>(
-        [&](auto &p) { p.register_name(names::coordinator, get_address()); });
+    plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
+        p.register_name(names::coordinator, get_address());
+        p.discover_name(net::names::bouncer, bouncer, true).link(false);
+    });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&net_supervisor_t::on_model_update);
         p.subscribe_actor(&net_supervisor_t::on_load_cluster);
@@ -268,22 +270,6 @@ void net_supervisor_t::on_app_ready(model::message::app_ready_t &) noexcept {
     auto dcfg = app_config.dialer_config;
     if (dcfg.enabled) {
         create_actor<dialer_actor_t>().timeout(timeout).dialer_config(dcfg).cluster(cluster).finish();
-    }
-}
-
-void net_supervisor_t::on_model_update(model::message::model_update_t &message) noexcept {
-    LOG_TRACE(log, "on_model_update");
-    auto &diff = *message.payload.diff;
-    auto r = diff.apply(*cluster, *this, {});
-    if (!r) {
-        LOG_ERROR(log, "error applying model diff: {}", r.assume_error().message());
-        auto ee = make_error(r.assume_error());
-        do_shutdown(ee);
-    }
-    r = diff.visit(*this, nullptr);
-    if (!r) {
-        auto ee = make_error(r.assume_error());
-        do_shutdown(ee);
     }
 }
 

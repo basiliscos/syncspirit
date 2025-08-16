@@ -153,7 +153,6 @@ struct app_supervisor_t : app_supervisor_base_t<app_supervisor_t> {
     callback_ptr_t call_select_folder(std::string_view folder_id);
     callback_ptr_t call_share_folders(std::string_view folder_id, std::vector<utils::bytes_t> devices);
     db_info_viewer_guard_t request_db_info(db_info_viewer_t *viewer);
-    void request_load_model();
     r::address_ptr_t &get_coordinator_address();
 
     std::uint32_t mask_nodes() const noexcept;
