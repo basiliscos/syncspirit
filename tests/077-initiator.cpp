@@ -101,7 +101,7 @@ struct fixture_t : diff::cluster_visitor_t, diff::apply_controller_t {
                     LOG_INFO(log, "received diff message");
                     auto &diff = msg.payload.diff;
 
-                    auto r = diff->apply(*cluster, *this, {});
+                    auto r = diff->apply(*this, {});
                     if (!r) {
                         LOG_ERROR(log, "error updating model: {}", r.assume_error().message());
                         std::abort();

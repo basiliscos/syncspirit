@@ -100,7 +100,7 @@ void supervisor_t::enqueue(r::message_ptr_t message) noexcept {
 void supervisor_t::on_model_update(model::message::model_update_t &msg) noexcept {
     LOG_TRACE(log, "{}, updating model", identity);
     auto &diff = msg.payload.diff;
-    auto r = diff->apply(*cluster, *this, {});
+    auto r = diff->apply(*this, {});
     if (!r) {
         LOG_ERROR(log, "{}, error updating model: {}", identity, r.assume_error().message());
         do_shutdown(make_error(r.assume_error()));

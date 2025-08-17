@@ -13,8 +13,8 @@ struct SYNCSPIRIT_API file_infos_t final : cluster_diff_t {
     using container_t = std::vector<item_t>;
     inline file_infos_t(container_t &&container_) noexcept : container{std::move(container_)} {}
 
-    outcome::result<void> apply_impl(cluster_t &, apply_controller_t &, void *) const noexcept override;
-    outcome::result<void> apply_forward(cluster_t &, apply_controller_t &, void *) const noexcept override;
+    outcome::result<void> apply_impl(apply_controller_t &, void *) const noexcept override;
+    outcome::result<void> apply_forward(apply_controller_t &, void *) const noexcept override;
 
     container_t container;
 };

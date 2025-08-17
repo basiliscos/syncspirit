@@ -119,17 +119,16 @@ void advance_t::initialize(const cluster_t &cluster, sequencer_t &sequencer, pro
     }
 }
 
-auto advance_t::apply_forward(cluster_t &cluster, apply_controller_t &controller, void *custom) const noexcept
-    -> outcome::result<void> {
+auto advance_t::apply_forward(apply_controller_t &controller, void *custom) const noexcept -> outcome::result<void> {
     return controller.apply(*this, custom);
 }
 
-auto advance_t::apply_impl(cluster_t &cluster, apply_controller_t &controller, void *custom) const noexcept
-    -> outcome::result<void> {
-    auto r = applicator_t::apply_child(cluster, controller, custom);
+auto advance_t::apply_impl(apply_controller_t &controller, void *custom) const noexcept -> outcome::result<void> {
+    auto r = applicator_t::apply_child(controller, custom);
     if (!r) {
         return r;
     }
+    auto &cluster = controller.get_cluster();
     auto my_device = cluster.get_device();
     auto folder = cluster.get_folders().by_id(folder_id);
     auto local_folder = folder->get_folder_infos().by_device(*my_device);
@@ -172,5 +171,5 @@ auto advance_t::apply_impl(cluster_t &cluster, apply_controller_t &controller, v
 
     local_file->notify_update();
 
-    return applicator_t::apply_sibling(cluster, controller, custom);
+    return applicator_t::apply_sibling(controller, custom);
 }

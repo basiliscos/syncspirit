@@ -112,7 +112,7 @@ struct fixture_t : private model::diff::cluster_visitor_t {
                 p.subscribe_actor(r::lambda<cluster_diff_t>([&](cluster_diff_t &msg) {
                     LOG_INFO(log, "received cluster diff message");
                     auto &diff = msg.payload.diff;
-                    auto r = diff->apply(*cluster, *controller, {});
+                    auto r = diff->apply(*controller, {});
                     if (!r) {
                         LOG_ERROR(log, "error updating model: {}", r.assume_error().message());
                         sup->do_shutdown();

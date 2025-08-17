@@ -20,8 +20,8 @@ struct SYNCSPIRIT_API update_folder_t final : cluster_diff_t {
                                                       const model::device_t &source,
                                                       const proto::IndexBase &message) noexcept;
 
-    outcome::result<void> apply_impl(cluster_t &, apply_controller_t &, void *) const noexcept override;
-    outcome::result<void> apply_forward(cluster_t &, apply_controller_t &, void *) const noexcept override;
+    outcome::result<void> apply_impl(apply_controller_t &, void *) const noexcept override;
+    outcome::result<void> apply_forward(apply_controller_t &, void *) const noexcept override;
     outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;
 
     update_folder_t(std::string_view folder_id, utils::bytes_view_t peer_id, files_t files, uuids_t uuids,

@@ -14,8 +14,8 @@ struct SYNCSPIRIT_API update_peer_t final : cluster_diff_t {
 
     update_peer_t(db::Device db, const model::device_id_t &device_id, const model::cluster_t &) noexcept;
 
-    outcome::result<void> apply_impl(cluster_t &, apply_controller_t &, void *) const noexcept override;
-    outcome::result<void> apply_forward(cluster_t &, apply_controller_t &, void *) const noexcept override;
+    outcome::result<void> apply_impl(apply_controller_t &, void *) const noexcept override;
+    outcome::result<void> apply_forward(apply_controller_t &, void *) const noexcept override;
     outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;
 
     db::Device item;

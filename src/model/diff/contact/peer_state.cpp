@@ -3,6 +3,7 @@
 
 #include "peer_state.h"
 #include "model/cluster.h"
+#include "model/diff/apply_controller.h"
 #include "model/diff/cluster_visitor.h"
 #include "utils/format.hpp"
 
@@ -39,8 +40,8 @@ peer_state_t::peer_state_t(cluster_t &cluster, utils::bytes_view_t peer_id_, con
               (state.get_url() ? state.get_url()->c_str() : "(empty)"), client_name, cert_name, client_version);
 }
 
-auto peer_state_t::apply_impl(cluster_t &cluster, apply_controller_t &controller, void *custom) const noexcept
-    -> outcome::result<void> {
+auto peer_state_t::apply_impl(apply_controller_t &controller, void *custom) const noexcept -> outcome::result<void> {
+    auto &cluster = controller.get_cluster();
     auto peer = cluster.get_devices().by_sha256(peer_id);
     auto &prev_state = peer->get_state();
     auto conn_state = state.get_connection_state();
@@ -56,7 +57,7 @@ auto peer_state_t::apply_impl(cluster_t &cluster, apply_controller_t &controller
     } else {
         LOG_DEBUG(log, "peer_state_t, ignored {}, device = {}", (int)conn_state, peer->device_id().get_short());
     }
-    return applicator_t::apply_impl(cluster, controller, custom);
+    return applicator_t::apply_impl(controller, custom);
 }
 
 auto peer_state_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

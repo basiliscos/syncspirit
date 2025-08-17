@@ -12,13 +12,14 @@ add_pending_folders_t::add_pending_folders_t(container_t items) noexcept : conta
     LOG_DEBUG(log, "add_pending_folders_t, count = {}", container.size());
 }
 
-auto add_pending_folders_t::apply_forward(cluster_t &cluster, apply_controller_t &controller,
-                                          void *custom) const noexcept -> outcome::result<void> {
+auto add_pending_folders_t::apply_forward(apply_controller_t &controller, void *custom) const noexcept
+    -> outcome::result<void> {
     return controller.apply(*this, custom);
 }
 
-auto add_pending_folders_t::apply_impl(cluster_t &cluster, apply_controller_t &controller, void *custom) const noexcept
+auto add_pending_folders_t::apply_impl(apply_controller_t &controller, void *custom) const noexcept
     -> outcome::result<void> {
+    auto &cluster = controller.get_cluster();
     auto &pending = cluster.get_pending_folders();
     auto &devices = cluster.get_devices();
     for (auto &item : container) {
@@ -30,7 +31,7 @@ auto add_pending_folders_t::apply_impl(cluster_t &cluster, apply_controller_t &c
         }
         pending.put(std::move(opt.value()));
     }
-    return applicator_t::apply_sibling(cluster, controller, custom);
+    return applicator_t::apply_sibling(controller, custom);
 }
 
 auto add_pending_folders_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

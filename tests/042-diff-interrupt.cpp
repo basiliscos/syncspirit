@@ -67,7 +67,7 @@ TEST_CASE("diff interrupt", "[model]") {
 
     SECTION("generic applicator") {
         auto controller = make_apply_controller(cluster);
-        REQUIRE(ctx.next->apply(*cluster, *controller, {}));
+        REQUIRE(ctx.next->apply(*controller, {}));
         REQUIRE(files.size() == 3);
         REQUIRE(files.by_name("a.bin"));
         REQUIRE(files.by_name("b.bin"));
@@ -79,17 +79,17 @@ TEST_CASE("diff interrupt", "[model]") {
         REQUIRE(ctx.next);
         REQUIRE(files.size() == 0);
 
-        REQUIRE(ctx.next->apply(*cluster, controller, &ctx));
+        REQUIRE(ctx.next->apply(controller, &ctx));
         REQUIRE(files.size() == 1);
         REQUIRE(files.by_name("a.bin"));
         REQUIRE(ctx.next);
 
-        REQUIRE(ctx.next->apply(*cluster, controller, &ctx));
+        REQUIRE(ctx.next->apply(controller, &ctx));
         REQUIRE(files.size() == 2);
         REQUIRE(files.by_name("b.bin"));
         REQUIRE(ctx.next);
 
-        REQUIRE(ctx.next->apply(*cluster, controller, &ctx));
+        REQUIRE(ctx.next->apply(controller, &ctx));
         REQUIRE(files.size() == 3);
         REQUIRE(files.by_name("c.bin"));
         REQUIRE(!ctx.next);

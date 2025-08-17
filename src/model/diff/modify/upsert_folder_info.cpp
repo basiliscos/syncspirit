@@ -29,13 +29,14 @@ upsert_folder_info_t::upsert_folder_info_t(const model::folder_info_t &original,
     LOG_DEBUG(log, "upsert_folder_info_t, folder = {}, index = {}", folder_id, index_id);
 }
 
-auto upsert_folder_info_t::apply_forward(cluster_t &cluster, apply_controller_t &controller,
-                                         void *custom) const noexcept -> outcome::result<void> {
+auto upsert_folder_info_t::apply_forward(apply_controller_t &controller, void *custom) const noexcept
+    -> outcome::result<void> {
     return controller.apply(*this, custom);
 }
 
-auto upsert_folder_info_t::apply_impl(cluster_t &cluster, apply_controller_t &controller, void *custom) const noexcept
+auto upsert_folder_info_t::apply_impl(apply_controller_t &controller, void *custom) const noexcept
     -> outcome::result<void> {
+    auto &cluster = controller.get_cluster();
     auto device = cluster.get_devices().by_sha256(device_id);
     if (!device) {
         return make_error_code(error_code_t::no_such_device);
@@ -72,7 +73,7 @@ auto upsert_folder_info_t::apply_impl(cluster_t &cluster, apply_controller_t &co
     }
     folder->notify_update();
 
-    return applicator_t::apply_sibling(cluster, controller, custom);
+    return applicator_t::apply_sibling(controller, custom);
 }
 
 auto upsert_folder_info_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

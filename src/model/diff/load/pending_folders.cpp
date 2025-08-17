@@ -4,12 +4,14 @@
 #include "pending_folders.h"
 #include "model/cluster.h"
 #include "model/misc/error_code.h"
+#include "model/diff/apply_controller.h"
 #include "proto/proto-helpers-db.h"
 
 using namespace syncspirit::model::diff::load;
 
-auto pending_folders_t::apply_impl(cluster_t &cluster, apply_controller_t &controller, void *custom) const noexcept
+auto pending_folders_t::apply_impl(apply_controller_t &controller, void *custom) const noexcept
     -> outcome::result<void> {
+    auto &cluster = controller.get_cluster();
     auto &items = cluster.get_pending_folders();
     for (auto &pair : folders) {
         auto db_pf = db::PendingFolder();
@@ -23,5 +25,5 @@ auto pending_folders_t::apply_impl(cluster_t &cluster, apply_controller_t &contr
         auto &folder = option.value();
         items.put(std::move(folder));
     }
-    return applicator_t::apply_sibling(cluster, controller, custom);
+    return applicator_t::apply_sibling(controller, custom);
 }

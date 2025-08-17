@@ -24,7 +24,7 @@ struct SYNCSPIRIT_API io_failure_t final : cluster_diff_t {
     io_failure_t(io_error_t) noexcept;
     io_failure_t(io_errors_t) noexcept;
 
-    outcome::result<void> apply_forward(cluster_t &, apply_controller_t &, void *) const noexcept override;
+    outcome::result<void> apply_forward(apply_controller_t &, void *) const noexcept override;
     outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;
 
     io_errors_t errors;

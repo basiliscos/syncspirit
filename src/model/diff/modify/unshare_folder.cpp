@@ -32,14 +32,14 @@ unshare_folder_t::unshare_folder_t(const model::cluster_t &, model::folder_info_
     }
 }
 
-auto unshare_folder_t::apply_impl(cluster_t &cluster, apply_controller_t &controller, void *custom) const noexcept
+auto unshare_folder_t::apply_impl(apply_controller_t &controller, void *custom) const noexcept
     -> outcome::result<void> {
-    auto r = applicator_t::apply_child(cluster, controller, custom);
+    auto r = applicator_t::apply_child(controller, custom);
     if (!r) {
         return r;
     }
     LOG_TRACE(log, "applying unshare_folder_t");
-    return applicator_t::apply_sibling(cluster, controller, custom);
+    return applicator_t::apply_sibling(controller, custom);
 }
 
 auto unshare_folder_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

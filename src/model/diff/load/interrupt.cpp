@@ -7,7 +7,6 @@
 
 using namespace syncspirit::model::diff::load;
 
-auto interrupt_t::apply_forward(cluster_t &cluster, apply_controller_t &controller, void *custom) const noexcept
-    -> outcome::result<void> {
+auto interrupt_t::apply_forward(apply_controller_t &controller, void *custom) const noexcept -> outcome::result<void> {
     return controller.apply(*this, custom);
 }

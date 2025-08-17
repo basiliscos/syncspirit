@@ -37,6 +37,8 @@ struct SYNCSPIRIT_API apply_controller_t {
     virtual outcome::result<void> apply(const modify::upsert_folder_info_t &, void *) noexcept;
     virtual outcome::result<void> apply(const peer::update_folder_t &, void *) noexcept;
 
+    inline model::cluster_t &get_cluster() noexcept { return *cluster; }
+
   protected:
     model::cluster_ptr_t cluster;
 };

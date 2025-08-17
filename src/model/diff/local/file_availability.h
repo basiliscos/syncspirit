@@ -13,7 +13,7 @@ struct SYNCSPIRIT_API file_availability_t final : cluster_diff_t {
 
     file_availability_t(file_info_ptr_t file) noexcept;
 
-    outcome::result<void> apply_impl(cluster_t &, apply_controller_t &, void *) const noexcept override;
+    outcome::result<void> apply_impl(apply_controller_t &, void *) const noexcept override;
     outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;
 
     std::string folder_id;

@@ -3,7 +3,8 @@
 
 #include "ignored_connected.h"
 #include "model/cluster.h"
-#include "../cluster_visitor.h"
+#include "model/diff/apply_controller.h"
+#include "model/diff/cluster_visitor.h"
 #include "model/misc/error_code.h"
 
 using namespace syncspirit::model::diff::contact;
@@ -14,8 +15,9 @@ ignored_connected_t::ignored_connected_t(cluster_t &, const model::device_id_t &
     LOG_DEBUG(log, "ignored_connected_t, device = ", device_id.get_short());
 }
 
-auto ignored_connected_t::apply_impl(cluster_t &cluster, apply_controller_t &controller, void *custom) const noexcept
+auto ignored_connected_t::apply_impl(apply_controller_t &controller, void *custom) const noexcept
     -> outcome::result<void> {
+    auto &cluster = controller.get_cluster();
     auto &ignored_devices = cluster.get_ignored_devices();
     auto prev = ignored_devices.by_sha256(device_id.get_sha256());
     if (!prev) {
@@ -23,7 +25,7 @@ auto ignored_connected_t::apply_impl(cluster_t &cluster, apply_controller_t &con
     }
     prev->assign(db_device);
     prev->notify_update();
-    return applicator_t::apply_sibling(cluster, controller, custom);
+    return applicator_t::apply_sibling(controller, custom);
 }
 
 auto ignored_connected_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

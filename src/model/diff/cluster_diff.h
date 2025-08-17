@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #pragma once
 
@@ -32,7 +32,7 @@ struct SYNCSPIRIT_API cluster_diff_t : arc_base_t<cluster_diff_t> {
     cluster_diff_t(cluster_diff_t &&) = delete;
     virtual ~cluster_diff_t() = default;
 
-    outcome::result<void> apply(cluster_t &, apply_controller_t &, void *) const noexcept;
+    outcome::result<void> apply(apply_controller_t &, void *) const noexcept;
     virtual outcome::result<void> visit(visitor_t &visitor, void *custom) const noexcept;
     outcome::result<void> visit_next(visitor_t &visitor, void *custom) const noexcept;
 
@@ -43,10 +43,10 @@ struct SYNCSPIRIT_API cluster_diff_t : arc_base_t<cluster_diff_t> {
     cluster_diff_ptr_t sibling;
 
   protected:
-    virtual outcome::result<void> apply_impl(cluster_t &, apply_controller_t &, void *) const noexcept;
-    virtual outcome::result<void> apply_forward(cluster_t &, apply_controller_t &, void *) const noexcept;
-    outcome::result<void> apply_child(cluster_t &cluster, apply_controller_t &, void *) const noexcept;
-    outcome::result<void> apply_sibling(cluster_t &cluster, apply_controller_t &, void *) const noexcept;
+    virtual outcome::result<void> apply_impl(apply_controller_t &, void *) const noexcept;
+    virtual outcome::result<void> apply_forward(apply_controller_t &, void *) const noexcept;
+    outcome::result<void> apply_child(apply_controller_t &, void *) const noexcept;
+    outcome::result<void> apply_sibling(apply_controller_t &, void *) const noexcept;
 
     utils::logger_t log;
 

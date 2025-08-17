@@ -9,7 +9,6 @@ using namespace syncspirit::model::diff::load;
 
 commit_t::commit_t(rotor::message_ptr_t commit_message_) noexcept : commit_message{std::move(commit_message_)} {}
 
-auto commit_t::apply_forward(cluster_t &cluster, apply_controller_t &controller, void *custom) const noexcept
-    -> outcome::result<void> {
+auto commit_t::apply_forward(apply_controller_t &controller, void *custom) const noexcept -> outcome::result<void> {
     return controller.apply(*this, custom);
 }

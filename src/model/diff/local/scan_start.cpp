@@ -3,6 +3,7 @@
 
 #include "scan_start.h"
 #include "model/cluster.h"
+#include "model/diff/apply_controller.h"
 #include "model/diff/cluster_visitor.h"
 
 using namespace syncspirit::model::diff::local;
@@ -12,11 +13,11 @@ scan_start_t::scan_start_t(std::string_view folder_id_, const pt::ptime &at_)
     LOG_DEBUG(log, "scan_start_t, folder = {}", folder_id);
 }
 
-auto scan_start_t::apply_impl(cluster_t &cluster, apply_controller_t &controller, void *custom) const noexcept
-    -> outcome::result<void> {
+auto scan_start_t::apply_impl(apply_controller_t &controller, void *custom) const noexcept -> outcome::result<void> {
+    auto &cluster = controller.get_cluster();
     auto folder = cluster.get_folders().by_id(folder_id);
     folder->set_scan_start(at);
-    auto r = applicator_t::apply_sibling(cluster, controller, custom);
+    auto r = applicator_t::apply_sibling(controller, custom);
     folder->notify_update();
     return r;
 }

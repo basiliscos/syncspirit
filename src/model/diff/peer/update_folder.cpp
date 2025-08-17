@@ -36,18 +36,18 @@ update_folder_t::update_folder_t(std::string_view folder_id_, utils::bytes_view_
     }
 }
 
-auto update_folder_t::apply_forward(cluster_t &cluster, apply_controller_t &controller, void *custom) const noexcept
+auto update_folder_t::apply_forward(apply_controller_t &controller, void *custom) const noexcept
     -> outcome::result<void> {
     return controller.apply(*this, custom);
 }
 
-auto update_folder_t::apply_impl(cluster_t &cluster, apply_controller_t &controller, void *custom) const noexcept
-    -> outcome::result<void> {
-    auto r = applicator_t::apply_child(cluster, controller, custom);
+auto update_folder_t::apply_impl(apply_controller_t &controller, void *custom) const noexcept -> outcome::result<void> {
+    auto r = applicator_t::apply_child(controller, custom);
     if (!r) {
         return r;
     }
 
+    auto &cluster = controller.get_cluster();
     auto folder = cluster.get_folders().by_id(folder_id);
     auto folder_info = folder->get_folder_infos().by_device_id(peer_id);
     auto &bm = cluster.get_blocks();
@@ -100,7 +100,7 @@ auto update_folder_t::apply_impl(cluster_t &cluster, apply_controller_t &control
 
     LOG_TRACE(log, "update_folder_t, apply(); max seq: {} -> {}", max_seq, folder_info->get_max_sequence());
 
-    r = applicator_t::apply_sibling(cluster, controller, custom);
+    r = applicator_t::apply_sibling(controller, custom);
 
     if (auto iterator = folder_info->get_device()->get_iterator(); iterator) {
         iterator->on_upsert(folder_info);

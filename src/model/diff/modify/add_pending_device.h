@@ -11,8 +11,8 @@ namespace syncspirit::model::diff::modify {
 
 struct SYNCSPIRIT_API add_pending_device_t final : cluster_diff_t {
     add_pending_device_t(const device_id_t &id, db::SomeDevice db_device) noexcept;
-    outcome::result<void> apply_impl(cluster_t &, apply_controller_t &, void *) const noexcept override;
-    outcome::result<void> apply_forward(cluster_t &, apply_controller_t &, void *) const noexcept override;
+    outcome::result<void> apply_impl(apply_controller_t &, void *) const noexcept override;
+    outcome::result<void> apply_forward(apply_controller_t &, void *) const noexcept override;
     outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;
 
     device_id_t device_id;

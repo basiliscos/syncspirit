@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "update_contact.h"
+#include "model/diff/apply_controller.h"
 #include "model/diff/cluster_visitor.h"
 #include "model/cluster.h"
 #include <fmt/core.h>
@@ -38,9 +39,10 @@ update_contact_t::update_contact_t(const model::cluster_t &cluster, const model:
     }
 }
 
-auto update_contact_t::apply_impl(cluster_t &cluster, apply_controller_t &controller, void *custom) const noexcept
+auto update_contact_t::apply_impl(apply_controller_t &controller, void *custom) const noexcept
     -> outcome::result<void> {
     if (known) {
+        auto &cluster = controller.get_cluster();
         auto &devices = cluster.get_devices();
         auto device = devices.by_sha256(this->device.get_sha256());
         auto uris_clone = utils::uri_container_t();
@@ -50,7 +52,7 @@ auto update_contact_t::apply_impl(cluster_t &cluster, apply_controller_t &contro
         }
         device->assign_uris(std::move(uris_clone));
     }
-    return applicator_t::apply_sibling(cluster, controller, custom);
+    return applicator_t::apply_sibling(controller, custom);
 }
 
 auto update_contact_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

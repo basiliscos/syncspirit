@@ -3,6 +3,7 @@
 
 #include "add_remote_folder_infos.h"
 #include "model/cluster.h"
+#include "model/diff/apply_controller.h"
 #include "model/diff/cluster_visitor.h"
 #include "model/misc/error_code.h"
 
@@ -18,8 +19,9 @@ add_remote_folder_infos_t::add_remote_folder_infos_t(const model::device_t &peer
     }
 }
 
-auto add_remote_folder_infos_t::apply_impl(cluster_t &cluster, apply_controller_t &controller,
-                                           void *custom) const noexcept -> outcome::result<void> {
+auto add_remote_folder_infos_t::apply_impl(apply_controller_t &controller, void *custom) const noexcept
+    -> outcome::result<void> {
+    auto &cluster = controller.get_cluster();
     auto &devices = cluster.get_devices();
     auto &folders = cluster.get_folders();
     auto peer = devices.by_sha256(device_id);
@@ -38,7 +40,7 @@ auto add_remote_folder_infos_t::apply_impl(cluster_t &cluster, apply_controller_
         }
         remote_folders.put(opt.assume_value());
     }
-    return applicator_t::apply_sibling(cluster, controller, custom);
+    return applicator_t::apply_sibling(controller, custom);
 }
 
 auto add_remote_folder_infos_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept

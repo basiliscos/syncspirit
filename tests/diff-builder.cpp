@@ -164,7 +164,7 @@ auto diff_builder_t::apply(void *custom) noexcept -> outcome::result<void> {
     while (do_try) {
         do_try = false;
         if (r && cluster_diff) {
-            r = cluster_diff->apply(*cluster, *this, custom);
+            r = cluster_diff->apply(*this, custom);
             cluster_diff.reset();
             do_try = true;
         }

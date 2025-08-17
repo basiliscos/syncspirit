@@ -4,6 +4,7 @@
 #include "local_update.h"
 #include "model/cluster.h"
 #include "../cluster_visitor.h"
+#include "model/diff/apply_controller.h"
 #include "proto/proto-helpers-bep.h"
 #include <memory_resource>
 
@@ -97,8 +98,8 @@ auto local_update_t::get_original(const model::folder_infos_map_t &fis, const mo
     return r;
 }
 
-auto local_update_t::apply_impl(cluster_t &cluster, apply_controller_t &controller, void *custom) const noexcept
-    -> outcome::result<void> {
+auto local_update_t::apply_impl(apply_controller_t &controller, void *custom) const noexcept -> outcome::result<void> {
+    auto &cluster = controller.get_cluster();
     auto folder = cluster.get_folders().by_id(folder_id);
     if (!folder) {
         LOG_DEBUG(log, "remote_copy_t, folder = {}, name = {}, folder is not available, ignoring", folder_id,
@@ -107,9 +108,9 @@ auto local_update_t::apply_impl(cluster_t &cluster, apply_controller_t &controll
         LOG_DEBUG(log, "remote_copy_t, folder = {}, name = {}, folder is suspended, ignoring", folder_id,
                   proto::get_name(proto_source));
     } else {
-        return advance_t::apply_impl(cluster, controller, custom);
+        return advance_t::apply_impl(controller, custom);
     }
-    return applicator_t::apply_sibling(cluster, controller, custom);
+    return applicator_t::apply_sibling(controller, custom);
 }
 
 auto local_update_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

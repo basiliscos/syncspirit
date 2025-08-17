@@ -15,7 +15,6 @@ using tcp = asio::ip::tcp;
 struct SYNCSPIRIT_API dial_request_t final : cluster_diff_t {
     dial_request_t(model::device_t &peer) noexcept;
 
-    outcome::result<void> apply_impl(cluster_t &, apply_controller_t &, void *) const noexcept override;
     outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;
 
     utils::bytes_t peer_id;

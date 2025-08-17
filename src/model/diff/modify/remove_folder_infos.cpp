@@ -4,6 +4,7 @@
 #include "remove_folder_infos.h"
 #include "reset_folder_infos.h"
 #include "model/cluster.h"
+#include "model/diff/apply_controller.h"
 #include "model/diff/cluster_visitor.h"
 #include "model/misc/file_iterator.h"
 #include <algorithm>
@@ -22,12 +23,13 @@ remove_folder_infos_t::remove_folder_infos_t(const uuid_folder_infos_map_t &map,
     LOG_DEBUG(log, "remove_folder_infos_t, count = {}", map.size());
 }
 
-auto remove_folder_infos_t::apply_impl(cluster_t &cluster, apply_controller_t &controller, void *custom) const noexcept
+auto remove_folder_infos_t::apply_impl(apply_controller_t &controller, void *custom) const noexcept
     -> outcome::result<void> {
-    auto r = applicator_t::apply_child(cluster, controller, custom);
+    auto r = applicator_t::apply_child(controller, custom);
     if (!r) {
         return r;
     }
+    auto &cluster = controller.get_cluster();
     for (auto &key : keys) {
         auto decomposed = folder_info_t::decompose_key(key);
         auto folder = cluster.get_folders().by_key(decomposed.folder_key());
@@ -42,7 +44,7 @@ auto remove_folder_infos_t::apply_impl(cluster_t &cluster, apply_controller_t &c
 
         folder_infos.remove(folder_info);
     }
-    return applicator_t::apply_sibling(cluster, controller, custom);
+    return applicator_t::apply_sibling(controller, custom);
 }
 
 auto remove_folder_infos_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

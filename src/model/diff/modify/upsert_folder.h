@@ -15,8 +15,8 @@ struct SYNCSPIRIT_API upsert_folder_t final : cluster_diff_t {
     static outcome::result<cluster_diff_ptr_t> create(const cluster_t &cluster, sequencer_t &sequencer, db::Folder db,
                                                       std::uint64_t index_id) noexcept;
 
-    outcome::result<void> apply_impl(cluster_t &, apply_controller_t &, void *) const noexcept override;
-    outcome::result<void> apply_forward(cluster_t &, apply_controller_t &, void *) const noexcept override;
+    outcome::result<void> apply_impl(apply_controller_t &, void *) const noexcept override;
+    outcome::result<void> apply_forward(apply_controller_t &, void *) const noexcept override;
     outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;
 
     bu::uuid uuid;

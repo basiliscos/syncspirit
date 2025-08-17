@@ -19,14 +19,15 @@ add_ignored_device_t::add_ignored_device_t(const cluster_t &cluster, const devic
     LOG_DEBUG(log, "add_ignored_device_t, peer = {}, pending = {}", device_id.get_short(), (bool)(peer));
 }
 
-auto add_ignored_device_t::apply_forward(cluster_t &cluster, apply_controller_t &controller,
-                                         void *custom) const noexcept -> outcome::result<void> {
+auto add_ignored_device_t::apply_forward(apply_controller_t &controller, void *custom) const noexcept
+    -> outcome::result<void> {
     return controller.apply(*this, custom);
 }
 
-auto add_ignored_device_t::apply_impl(cluster_t &cluster, apply_controller_t &controller, void *custom) const noexcept
+auto add_ignored_device_t::apply_impl(apply_controller_t &controller, void *custom) const noexcept
     -> outcome::result<void> {
-    auto r = parent_t::apply_child(cluster, controller, custom);
+    auto &cluster = controller.get_cluster();
+    auto r = parent_t::apply_child(controller, custom);
     if (!r) {
         return r;
     }
@@ -36,7 +37,7 @@ auto add_ignored_device_t::apply_impl(cluster_t &cluster, apply_controller_t &co
     }
     auto &ignored_device = opt.assume_value();
     cluster.get_ignored_devices().put(std::move(ignored_device));
-    return applicator_t::apply_sibling(cluster, controller, custom);
+    return applicator_t::apply_sibling(controller, custom);
 }
 
 auto add_ignored_device_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

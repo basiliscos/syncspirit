@@ -66,7 +66,7 @@ void iterative_controller_base_t::process_impl(model::diff::cluster_diff_t &diff
     using T0 = const std::error_code &;
     using T1 = const r::extended_error_ptr_t &;
     using T2 = const r::message_ptr_t &;
-    auto r = diff.apply(*cluster, *this, &apply_context);
+    auto r = diff.apply(*this, &apply_context);
     if (!r) {
         LOG_ERROR(log, "error applying model diff: {}", r.assume_error().message());
         auto ee = owner->access<to::make_error, T0, T1, T2>(r.assume_error(), {}, {});
