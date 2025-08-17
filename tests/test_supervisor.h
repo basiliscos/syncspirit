@@ -98,7 +98,6 @@ struct SYNCSPIRIT_TEST_API supervisor_t : r::supervisor_t,
     bool auto_ack_blocks;
     bool make_presentation;
     io_errors_t io_errors;
-    r::address_ptr_t sink;
 };
 
 }; // namespace syncspirit::test

@@ -89,6 +89,7 @@ void scan_actor_t::on_model_update(model::message::model_update_t &message) noex
 }
 
 void scan_actor_t::on_scan(message::scan_progress_t &message) noexcept {
+    using namespace model::diff;
     auto &task = message.payload.task;
     auto guard = task->guard(*this, coordinator);
     auto folder_id = task->get_folder_id();
@@ -112,9 +113,9 @@ void scan_actor_t::on_scan(message::scan_progress_t &message) noexcept {
                         completed = true;
                     }
                 } else if constexpr (std::is_same_v<T, scan_errors_t>) {
-                    task->push(new model::diff::local::io_failure_t(std::move(r)));
+                    task->push(new local::io_failure_t(std::move(r)), 0, true);
                 } else if constexpr (std::is_same_v<T, unchanged_meta_t>) {
-                    task->push(new model::diff::local::file_availability_t(r.file));
+                    task->push(new local::file_availability_t(r.file), 0, true);
                 } else if constexpr (std::is_same_v<T, removed_t>) {
                     auto &file = *r.file;
                     LOG_DEBUG(log, "locally removed {}", file.get_full_name());
@@ -122,8 +123,8 @@ void scan_actor_t::on_scan(message::scan_progress_t &message) noexcept {
                     auto folder_id = std::string(folder->get_id());
                     auto fi = file.as_proto(false);
                     proto::set_deleted(fi, true);
-                    task->push(new model::diff::advance::local_update_t(*cluster, *sequencer, std::move(fi),
-                                                                        std::move(folder_id)));
+                    task->push(new advance::local_update_t(*cluster, *sequencer, std::move(fi), std::move(folder_id)),
+                               0, true);
                 } else if constexpr (std::is_same_v<T, changed_meta_t>) {
                     auto &file = *r.file;
                     auto &metadata = r.metadata;
@@ -131,14 +132,14 @@ void scan_actor_t::on_scan(message::scan_progress_t &message) noexcept {
                     if (errs.empty()) {
                         stop_processing = true;
                     } else {
-                        task->push(new model::diff::local::io_failure_t(std::move(errs)));
+                        task->push(new local::io_failure_t(std::move(errs)), 0, true);
                     }
                 } else if constexpr (std::is_same_v<T, unknown_file_t>) {
                     auto errs = initiate_hash(task, r.path, r.metadata);
                     if (errs.empty()) {
                         stop_processing = true;
                     } else {
-                        task->push(new model::diff::local::io_failure_t(std::move(errs)));
+                        task->push(new local::io_failure_t(std::move(errs)), 0, true);
                     }
                 } else if constexpr (std::is_same_v<T, incomplete_t>) {
                     auto &f = r.file;
@@ -147,7 +148,7 @@ void scan_actor_t::on_scan(message::scan_progress_t &message) noexcept {
                 } else if constexpr (std::is_same_v<T, incomplete_removed_t>) {
                     auto &file = *r.file;
                     if (file.is_locked()) {
-                        task->push(new model::diff::modify::lock_file_t(file, false));
+                        task->push(new modify::lock_file_t(file, false), 0, true);
                     }
                 } else if constexpr (std::is_same_v<T, orphaned_removed_t>) {
                     // NO-OP
@@ -175,7 +176,7 @@ void scan_actor_t::on_scan(message::scan_progress_t &message) noexcept {
         LOG_DEBUG(log, "completed scanning of {}", folder_id);
         post_scan(*task);
         auto now = clock_t::local_time();
-        task->push(new model::diff::local::scan_finish_t(folder_id, now));
+        task->push(new local::scan_finish_t(folder_id, now));
         guard.send_by_force();
     }
 }
