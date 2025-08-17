@@ -123,6 +123,9 @@ after the core completion.
 
 # changes
 
+## 0.4.2 (xx-xxx-202x)
+- [core, fltk] more correctly display file scanning progress
+
 ## 0.4.1 (05-Aug-2025)
  - [core, fltk] support merged cluster folder model
  - [core] possibility to import directories outside of syncthing, including

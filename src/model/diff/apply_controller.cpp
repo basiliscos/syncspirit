@@ -9,6 +9,7 @@
 #include "load/commit.h"
 #include "load/load_cluster.h"
 #include "local/io_failure.h"
+#include "local/scan_start.h"
 #include "modify/add_ignored_device.h"
 #include "modify/add_pending_device.h"
 #include "modify/add_pending_folders.h"
@@ -50,6 +51,10 @@ auto apply_controller_t::apply(const load::load_cluster_t &diff, void *custom) n
 }
 
 auto apply_controller_t::apply(const local::io_failure_t &diff, void *custom) noexcept -> outcome::result<void> {
+    return diff.apply_impl(*this, custom);
+}
+
+auto apply_controller_t::apply(const local::scan_start_t &diff, void *custom) noexcept -> outcome::result<void> {
     return diff.apply_impl(*this, custom);
 }
 

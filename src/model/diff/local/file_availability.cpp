@@ -21,7 +21,7 @@ auto file_availability_t::apply_impl(apply_controller_t &controller, void *custo
         auto folder_info = folder->get_folder_infos().by_device(*cluster.get_device());
         auto f = folder_info->get_file_infos().by_name(file->get_name());
         if (f->get_version()->identical_to(*version)) {
-            f->mark_local();
+            f->mark_local(true);
             LOG_TRACE(log, "file_availability_t, mark local file = {}, folder = {}, ", file->get_name(), folder_id);
             auto &blocks = f->get_blocks();
             for (size_t i = 0; i < blocks.size(); ++i) {

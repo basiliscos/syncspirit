@@ -109,7 +109,7 @@ TEST_CASE("resolver", "[model]") {
         proto::set_value(c_local, 1);
         auto file_remote = file_info_t::create(sequencer->next_uuid(), pr_remote, folder_peer).value();
         auto file_local = file_info_t::create(sequencer->next_uuid(), pr_local, folder_my).value();
-        file_local->mark_local();
+        file_local->mark_local(true);
         folder_peer->add_strict(file_remote);
         folder_my->add_strict(file_local);
         auto action = resolve(*file_remote);
@@ -123,7 +123,7 @@ TEST_CASE("resolver", "[model]") {
         proto::set_value(c2, 3);
         auto file_remote = file_info_t::create(sequencer->next_uuid(), pr_remote, folder_peer).value();
         auto file_local = file_info_t::create(sequencer->next_uuid(), pr_local, folder_my).value();
-        file_local->mark_local();
+        file_local->mark_local(true);
         folder_peer->add_strict(file_remote);
         folder_my->add_strict(file_local);
         auto action = resolve(*file_remote);
@@ -138,7 +138,7 @@ TEST_CASE("resolver", "[model]") {
         proto::set_deleted(pr_remote, true);
         auto file_remote = file_info_t::create(sequencer->next_uuid(), pr_remote, folder_peer).value();
         auto file_local = file_info_t::create(sequencer->next_uuid(), pr_local, folder_my).value();
-        file_local->mark_local();
+        file_local->mark_local(true);
         folder_peer->add_strict(file_remote);
         folder_my->add_strict(file_local);
         auto action = resolve(*file_remote);
@@ -151,7 +151,7 @@ TEST_CASE("resolver", "[model]") {
         proto::set_value(c2, 3);
         auto file_remote = file_info_t::create(sequencer->next_uuid(), pr_remote, folder_peer).value();
         auto file_local = file_info_t::create(sequencer->next_uuid(), pr_local, folder_my).value();
-        file_local->mark_local();
+        file_local->mark_local(true);
         folder_peer->add_strict(file_remote);
         folder_my->add_strict(file_local);
         auto action = resolve(*file_remote);
@@ -165,7 +165,7 @@ TEST_CASE("resolver", "[model]") {
         proto::set_value(c2, 3);
         auto file_remote = file_info_t::create(sequencer->next_uuid(), pr_remote, folder_peer).value();
         auto file_local = file_info_t::create(sequencer->next_uuid(), pr_local, folder_my).value();
-        file_local->mark_local();
+        file_local->mark_local(true);
         folder_peer->add_strict(file_remote);
         folder_my->add_strict(file_local);
         auto action = resolve(*file_remote);
@@ -177,7 +177,7 @@ TEST_CASE("resolver", "[model]") {
         auto pr_local = pr_remote;
         auto file_remote = file_info_t::create(sequencer->next_uuid(), pr_remote, folder_peer).value();
         auto file_local = file_info_t::create(sequencer->next_uuid(), pr_local, folder_my).value();
-        file_local->mark_local();
+        file_local->mark_local(true);
         folder_peer->add_strict(file_remote);
         folder_my->add_strict(file_local);
         auto action = resolve(*file_remote);
@@ -192,7 +192,7 @@ TEST_CASE("resolver", "[model]") {
         proto::set_deleted(pr_remote, true);
         auto file_remote = file_info_t::create(sequencer->next_uuid(), pr_remote, folder_peer).value();
         auto file_local = file_info_t::create(sequencer->next_uuid(), pr_local, folder_my).value();
-        file_local->mark_local();
+        file_local->mark_local(true);
         folder_peer->add_strict(file_remote);
         folder_my->add_strict(file_local);
         auto action = resolve(*file_remote);
@@ -214,7 +214,7 @@ TEST_CASE("resolver", "[model]") {
             proto::set_deleted(pr_remote, true);
             auto file_remote = file_info_t::create(sequencer->next_uuid(), pr_remote, folder_peer).value();
             auto file_local = file_info_t::create(sequencer->next_uuid(), pr_local, folder_my).value();
-            file_local->mark_local();
+            file_local->mark_local(true);
             folder_peer->add_strict(file_remote);
             folder_my->add_strict(file_local);
             auto action = resolve(*file_remote);
@@ -233,7 +233,7 @@ TEST_CASE("resolver", "[model]") {
             proto::set_deleted(pr_remote, true);
             auto file_remote = file_info_t::create(sequencer->next_uuid(), pr_remote, folder_peer).value();
             auto file_local = file_info_t::create(sequencer->next_uuid(), pr_local, folder_my).value();
-            file_local->mark_local();
+            file_local->mark_local(true);
             folder_peer->add_strict(file_remote);
             folder_my->add_strict(file_local);
             auto action = resolve(*file_remote);
@@ -251,7 +251,7 @@ TEST_CASE("resolver", "[model]") {
             proto::set_deleted(pr_remote, true);
             auto file_remote = file_info_t::create(sequencer->next_uuid(), pr_remote, folder_peer).value();
             auto file_local = file_info_t::create(sequencer->next_uuid(), pr_local, folder_my).value();
-            file_local->mark_local();
+            file_local->mark_local(true);
             folder_peer->add_strict(file_remote);
             folder_my->add_strict(file_local);
             auto action = resolve(*file_remote);
@@ -270,7 +270,7 @@ TEST_CASE("resolver", "[model]") {
 
             auto file_remote = file_info_t::create(sequencer->next_uuid(), pr_remote, folder_peer).value();
             auto file_local = file_info_t::create(sequencer->next_uuid(), pr_local, folder_my).value();
-            file_local->mark_local();
+            file_local->mark_local(true);
             folder_peer->add_strict(file_remote);
             folder_my->add_strict(file_local);
             auto action = resolve(*file_remote);
@@ -289,7 +289,7 @@ TEST_CASE("resolver", "[model]") {
 
             auto file_remote = file_info_t::create(sequencer->next_uuid(), pr_remote, folder_peer).value();
             auto file_local = file_info_t::create(sequencer->next_uuid(), pr_local, folder_my).value();
-            file_local->mark_local();
+            file_local->mark_local(true);
             folder_peer->add_strict(file_remote);
             folder_my->add_strict(file_local);
             auto action = resolve(*file_remote);
@@ -308,7 +308,7 @@ TEST_CASE("resolver", "[model]") {
 
             auto file_remote = file_info_t::create(sequencer->next_uuid(), pr_remote, folder_peer).value();
             auto file_local = file_info_t::create(sequencer->next_uuid(), pr_local, folder_my).value();
-            file_local->mark_local();
+            file_local->mark_local(true);
             folder_peer->add_strict(file_remote);
             folder_my->add_strict(file_local);
             auto action = resolve(*file_remote);
@@ -329,7 +329,7 @@ TEST_CASE("resolver", "[model]") {
 
             auto file_remote = file_info_t::create(sequencer->next_uuid(), pr_remote, folder_peer).value();
             auto file_local = file_info_t::create(sequencer->next_uuid(), pr_local, folder_my).value();
-            file_local->mark_local();
+            file_local->mark_local(true);
             folder_peer->add_strict(file_remote);
             folder_my->add_strict(file_local);
             auto action = resolve(*file_remote);
@@ -347,7 +347,7 @@ TEST_CASE("resolver", "[model]") {
 
             auto file_remote = file_info_t::create(sequencer->next_uuid(), pr_remote, folder_peer).value();
             auto file_local = file_info_t::create(sequencer->next_uuid(), pr_local, folder_my).value();
-            file_local->mark_local();
+            file_local->mark_local(true);
             folder_my->add_strict(file_local);
             folder_peer->add_strict(file_remote);
 
@@ -359,7 +359,7 @@ TEST_CASE("resolver", "[model]") {
             proto::set_name(pr_local, file_local->make_conflicting_name());
             proto::set_sequence(pr_local, folder_my->get_max_sequence() + 1);
             auto file_resolved = file_info_t::create(sequencer->next_uuid(), pr_local, folder_my).value();
-            file_resolved->mark_local();
+            file_resolved->mark_local(true);
             REQUIRE(folder_my->add_strict(file_resolved));
 
             auto action = resolve(*file_remote);
@@ -377,7 +377,7 @@ TEST_CASE("resolver", "[model]") {
 
             auto file_remote = file_info_t::create(sequencer->next_uuid(), pr_remote, folder_peer).value();
             auto file_local = file_info_t::create(sequencer->next_uuid(), pr_local, folder_my).value();
-            file_local->mark_local();
+            file_local->mark_local(true);
             folder_my->add_strict(file_local);
             folder_peer->add_strict(file_remote);
 
@@ -389,7 +389,7 @@ TEST_CASE("resolver", "[model]") {
             proto::set_name(pr_local, file_remote->make_conflicting_name());
             proto::set_sequence(pr_local, folder_my->get_max_sequence() + 1);
             auto file_resolved = file_info_t::create(sequencer->next_uuid(), pr_local, folder_my).value();
-            file_resolved->mark_local();
+            file_resolved->mark_local(true);
             REQUIRE(folder_my->add_strict(file_resolved));
 
             auto action = resolve(*file_remote);
