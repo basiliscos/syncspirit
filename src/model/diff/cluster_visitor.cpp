@@ -116,6 +116,10 @@ auto cluster_visitor_t::operator()(const contact::update_contact_t &diff, void *
     return diff.visit_next(*this, custom);
 }
 
+auto cluster_visitor_t::operator()(const load::commit_t &diff, void *custom) noexcept -> outcome::result<void> {
+    return diff.visit_next(*this, custom);
+}
+
 auto cluster_visitor_t::operator()(const load::devices_t &diff, void *custom) noexcept -> outcome::result<void> {
     return diff.visit_next(*this, custom);
 }

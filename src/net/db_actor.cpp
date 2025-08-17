@@ -65,6 +65,32 @@ static void _my_log(MDBX_log_level_t loglevel, const char *function,int line, co
 
 using folder_infos_set_t = std::unordered_set<const model::folder_info_t *>;
 
+db_actor_t::commit_payload_t::commit_payload_t(db::transaction_t txn_) noexcept : txn{std::move(txn_)} {
+    thread_id = std::this_thread::get_id();
+}
+
+outcome::result<void> db_actor_t::commit_payload_t::commit() noexcept {
+    thread_id = {};
+    return txn.commit();
+}
+
+db_actor_t::commit_payload_t::~commit_payload_t() {
+    if (thread_id != thread_id_t{}) {
+        if (thread_id != std::this_thread::get_id()) {
+            spdlog::error("attempt to close db orphaned transaction from other thread. Leak!");
+            txn.txn = {};
+        } else {
+            auto r = txn.commit();
+            if (r) {
+                spdlog::debug("successfully closed orphaned transaction");
+            } else {
+                auto ec = r.assume_error();
+                spdlog::debug("cannot close orphaned transaction: {}", ec.message());
+            }
+        }
+    }
+}
+
 db_actor_t::db_actor_t(config_t &config)
     : r::actor_base_t{config}, env{nullptr}, db_dir{config.db_dir}, db_config{config.db_config},
       cluster{config.cluster} {

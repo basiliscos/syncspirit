@@ -60,11 +60,22 @@ struct SYNCSPIRIT_API db_actor_t : public r::actor_base_t, private model::diff::
 
     template <typename T> auto &access() noexcept;
 
-  private:
     using transaction_ptr_t = std::unique_ptr<db::transaction_t>;
-    using commit_payload_t = db::transaction_t;
+    using thread_id_t = std::thread::id;
+    struct commit_payload_t {
+        commit_payload_t(db::transaction_t txn) noexcept;
+        commit_payload_t(const commit_payload_t &) = delete;
+        commit_payload_t(commit_payload_t &&) = default;
+        ~commit_payload_t() noexcept;
+
+        outcome::result<void> commit() noexcept;
+
+        db::transaction_t txn;
+        thread_id_t thread_id;
+    };
     using commit_message_t = r::message_t<commit_payload_t>;
 
+  private:
     void open() noexcept;
     outcome::result<db::transaction_t *> get_txn() noexcept;
     outcome::result<void> commit_on_demand() noexcept;

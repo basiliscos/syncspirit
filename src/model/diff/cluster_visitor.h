@@ -25,6 +25,7 @@ struct SYNCSPIRIT_API cluster_visitor_t {
     virtual outcome::result<void> operator()(const contact::unknown_connected_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const contact::update_contact_t &, void *custom) noexcept;
 
+    virtual outcome::result<void> operator()(const load::commit_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const load::devices_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const load::ignored_devices_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const load::pending_devices_t &, void *custom) noexcept;

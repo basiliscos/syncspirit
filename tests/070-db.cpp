@@ -4,6 +4,7 @@
 #include <catch2/catch_all.hpp>
 #include "test-utils.h"
 #include "diff-builder.h"
+#include "model/diff/load/commit.h"
 #include "model/diff/peer/cluster_update.h"
 #include "model/diff/contact/ignored_connected.h"
 #include "model/diff/contact/unknown_connected.h"
@@ -13,6 +14,7 @@
 #include "db/utils.h"
 #include "net/db_actor.h"
 #include <filesystem>
+#include <thread>
 
 using namespace syncspirit;
 using namespace syncspirit::db;
@@ -199,6 +201,54 @@ void test_loading_empty_db() {
         }
     };
 
+    F().run();
+}
+
+void test_forget_to_commit_other_thread() {
+    struct F : fixture_t {
+        void main() noexcept override {
+            using namespace model::diff;
+
+            struct V : diff::cluster_visitor_t {
+                MDBX_txn *txn;
+                outcome::result<void> operator()(const load::commit_t &diff, void *custom) noexcept {
+                    auto msg = static_cast<db_actor_t::commit_message_t *>(diff.commit_message.get());
+                    txn = msg->payload.txn.txn;
+                    return outcome::success();
+                }
+            };
+
+            sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
+            sup->do_process();
+            CHECK(get_reading_txn() == 1);
+
+            auto &diff = reply->payload.res.diff;
+            auto visitor = V();
+            REQUIRE(diff->visit(visitor, {}));
+            REQUIRE(visitor.txn);
+
+            auto ptr = std::move(reply);
+            std::thread([ptr = std::move(ptr)]() mutable { ptr.reset(); }).join();
+            CHECK(get_reading_txn() == 1);
+            mdbx_txn_commit(visitor.txn);
+            sup->do_process();
+        }
+    };
+    F().run();
+}
+
+void test_forget_to_commit_own_thread() {
+    struct F : fixture_t {
+        void main() noexcept override {
+            sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
+            sup->do_process();
+            CHECK(get_reading_txn() == 1);
+
+            reply.reset();
+            CHECK(get_reading_txn() == 0);
+            sup->do_process();
+        }
+    };
     F().run();
 }
 
@@ -1280,6 +1330,8 @@ void test_flush_on_shutdown() {
 int _init() {
     REGISTER_TEST_CASE(test_db_population, "test_db_population", "[db]");
     REGISTER_TEST_CASE(test_loading_empty_db, "test_loading_empty_db", "[db]");
+    REGISTER_TEST_CASE(test_forget_to_commit_other_thread, "test_forget_to_commit_other_thread", "[db]");
+    REGISTER_TEST_CASE(test_forget_to_commit_own_thread, "test_forget_to_commit_own_thread", "[db]");
     REGISTER_TEST_CASE(test_unknown_and_ignored_devices_1, "test_unknown_and_ignored_devices_1", "[db]");
     REGISTER_TEST_CASE(test_unknown_and_ignored_devices_2, "test_unknown_and_ignored_devices_2", "[db]");
     REGISTER_TEST_CASE(test_folder_upserting, "test_folder_upserting", "[db]");
