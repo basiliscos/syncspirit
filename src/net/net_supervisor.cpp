@@ -296,7 +296,6 @@ void net_supervisor_t::commit_loading() noexcept {
                   "ignored folders = {}, pending folders = {}, pending devices = {}",
                   devices.size(), folders.size(), files, cluster->get_blocks().size(), ignored_devices.size(),
                   ignored_folders.size(), pending_folders_sz, pending_devices.size());
-        send<syncspirit::model::payload::thread_ready_t>(address);
     }
 }
 
