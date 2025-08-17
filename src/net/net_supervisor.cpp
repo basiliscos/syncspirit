@@ -14,7 +14,6 @@
 #include "dialer_actor.h"
 #include "db_actor.h"
 #include "relay_actor.h"
-#include "sink_actor.h"
 #include "names.h"
 #include "model/diff/load/load_cluster.h"
 #include <filesystem>
@@ -112,7 +111,6 @@ void net_supervisor_t::launch_early() noexcept {
                   .escalate_failure()
                   .finish()
                   ->get_address();
-    create_actor<sink_actor_t>().timeout(timeout).escalate_failure().finish();
 }
 
 void net_supervisor_t::load_db() noexcept {

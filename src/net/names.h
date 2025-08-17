@@ -11,7 +11,6 @@ struct SYNCSPIRIT_API names {
     static const char *peer_supervisor;
     static const char *coordinator;
     static const char *bouncer;
-    static const char *sink;
     static const char *resolver;
     static const char *http10;
     static const char *http11_gda;

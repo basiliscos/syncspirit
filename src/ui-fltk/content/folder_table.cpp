@@ -3,6 +3,7 @@
 
 #include "folder_table.h"
 
+#include "model/diff/load/interrupt.h"
 #include "model/diff/modify/remove_folder.h"
 #include "model/diff/modify/remove_blocks.h"
 #include "model/diff/modify/share_folder.h"
@@ -812,6 +813,8 @@ void folder_table_t::on_reset() {
 }
 
 void folder_table_t::on_remove() {
+    using namespace model::diff;
+    using namespace model::diff::modify;
     auto r = fl_choice("Are you sure? (no files on disk are touched)", "Yes", "No", nullptr);
     if (r != 0) {
         return;
@@ -821,12 +824,11 @@ void folder_table_t::on_remove() {
     auto &sequencer = sup.get_sequencer();
     auto &folder = *description.get_folder();
     auto diff = model::diff::cluster_diff_ptr_t{};
-    diff = new model::diff::modify::suspend_folder_t(folder);
+    diff = new suspend_folder_t(folder);
+    diff->assign_sibling(new load::interrupt_t())
+        ->assign_sibling(new remove_folder_t(cluster, sequencer, *description.get_folder()));
 
-    auto postponed = model::diff::cluster_diff_ptr_t{};
-    postponed = new model::diff::modify::remove_folder_t(cluster, sequencer, *description.get_folder());
-    sup.send_model<model::payload::model_update_t>(std::move(diff), postponed.detach());
-    // sup.send_sink<model::payload::model_update_t>(std::move(diff), postponed.detach());
+    sup.send_model<model::payload::model_update_t>(std::move(diff));
 }
 
 void folder_table_t::on_rescan() {

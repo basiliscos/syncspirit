@@ -224,7 +224,6 @@ add_library(syncspirit_core
     src/net/relay_actor.cpp
     src/net/resolver_actor.cpp
     src/net/names.cpp
-    src/net/sink_actor.cpp
     src/net/ssdp_actor.cpp
     src/net/upnp_actor.cpp
     src/presentation/entity.cpp
