@@ -153,7 +153,8 @@ void app_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
                 plugin->subscribe_actor(&app_supervisor_t::on_model_update, coordinator);
                 plugin->subscribe_actor(&app_supervisor_t::on_app_ready, coordinator);
-                request<model::payload::model_request_t>(coordinator).send(init_timeout);
+                plugin->subscribe_actor(&app_supervisor_t::on_db_loaded, coordinator);
+                send<syncspirit::model::payload::thread_up_t>(coordinator);
                 resources->acquire(resource::model);
             }
         });
@@ -251,6 +252,11 @@ void app_supervisor_t::process(model::diff::cluster_diff_t &diff, apply_context_
 void app_supervisor_t::on_app_ready(model::message::app_ready_t &) noexcept {
     LOG_TRACE(log, "on_app_ready");
     main_window->on_loading_done();
+}
+
+void app_supervisor_t::on_db_loaded(model::message::db_loaded_t &) noexcept {
+    LOG_TRACE(log, "on_db_loaded");
+    request<model::payload::model_request_t>(coordinator).send(init_timeout);
 }
 
 std::string app_supervisor_t::get_uptime() noexcept {

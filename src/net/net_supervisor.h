@@ -66,6 +66,7 @@ struct SYNCSPIRIT_API net_supervisor_t : net_supervisor_base_t<ra::supervisor_as
   private:
     void on_load_cluster(message::load_cluster_response_t &message) noexcept;
     void on_model_request(model::message::model_request_t &message) noexcept;
+    void on_thread_up(model::message::thread_up_t &) noexcept;
     void on_thread_ready(model::message::thread_ready_t &) noexcept;
     void on_app_ready(model::message::app_ready_t &) noexcept;
 
@@ -81,7 +82,7 @@ struct SYNCSPIRIT_API net_supervisor_t : net_supervisor_base_t<ra::supervisor_as
     model::sequencer_ptr_t sequencer;
     config::main_t app_config;
     size_t independent_threads;
-    size_t cluster_copies;
+    size_t thread_counter;
     model::diff::cluster_diff_ptr_t load_diff;
     r::address_ptr_t db_addr;
     utils::key_pair_t ssl_pair;

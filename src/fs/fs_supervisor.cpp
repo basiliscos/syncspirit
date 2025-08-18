@@ -44,7 +44,8 @@ void fs_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
                 plugin->subscribe_actor(&fs_supervisor_t::on_model_update, coordinator);
                 plugin->subscribe_actor(&fs_supervisor_t::on_app_ready, coordinator);
-                request<model::payload::model_request_t>(coordinator).send(init_timeout);
+                plugin->subscribe_actor(&fs_supervisor_t::on_db_loaded, coordinator);
+                send<syncspirit::model::payload::thread_up_t>(coordinator);
                 resources->acquire(resource::model);
             }
         });
@@ -89,6 +90,11 @@ void fs_supervisor_t::launch() noexcept {
     for (auto &l : launchers) {
         l(cluster);
     }
+}
+
+void fs_supervisor_t::on_db_loaded(model::message::db_loaded_t &) noexcept {
+    LOG_TRACE(log, "on_db_loaded");
+    request<model::payload::model_request_t>(coordinator).send(init_timeout);
 }
 
 void fs_supervisor_t::on_model_request(model::message::model_request_t &req) noexcept {

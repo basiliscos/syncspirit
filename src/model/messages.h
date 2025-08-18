@@ -35,7 +35,9 @@ struct model_interrupt_t {
     model::diff::cluster_diff_ptr_t diff;
 };
 
+struct thread_up_t {};
 struct thread_ready_t {};
+struct db_loaded_t {};
 struct app_ready_t {};
 
 } // namespace payload
@@ -43,8 +45,10 @@ struct app_ready_t {};
 namespace message {
 
 using model_update_t = r::message_t<payload::model_update_t>;
+using thread_up_t = r::message_t<payload::thread_up_t>;
 using thread_ready_t = r::message_t<payload::thread_ready_t>;
 using app_ready_t = r::message_t<payload::app_ready_t>;
+using db_loaded_t = r::message_t<payload::db_loaded_t>;
 
 using model_request_t = r::request_traits_t<payload::model_request_t>::request::message_t;
 using model_response_t = r::request_traits_t<payload::model_request_t>::response::message_t;

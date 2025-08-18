@@ -65,6 +65,7 @@ struct SYNCSPIRIT_API fs_supervisor_t : fs_base_t<fs_supervisor_t> {
     void on_model_request(model::message::model_request_t &req) noexcept;
     void on_model_response(model::message::model_response_t &res) noexcept;
     void on_app_ready(model::message::app_ready_t &) noexcept;
+    void on_db_loaded(model::message::db_loaded_t &) noexcept;
     void commit_loading() noexcept override;
     void launch() noexcept;
 
