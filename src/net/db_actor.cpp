@@ -362,7 +362,14 @@ void db_actor_t::on_cluster_load(message::load_cluster_request_t &request) noexc
     auto diff = model::diff::cluster_diff_ptr_t{};
     diff.reset(new load::load_cluster_t(blocks.size(), files.size()));
 
-    auto current = diff->assign_child(new load::devices_t(std::move(devices_opt.value())));
+    auto current = diff->assign_child(new load::devices_t(std::move(devices_opt.value())))
+                       ->assign_sibling(new load::ignored_devices_t(std::move(ignored_devices_opt.value())))
+                       ->assign_sibling(new load::ignored_folders_t(std::move(ignored_folders_opt.value())))
+                       ->assign_sibling(new load::folders_t(std::move(folders_opt.value())))
+                       ->assign_sibling(new load::folder_infos_t(std::move(folder_infos)))
+                       ->assign_sibling(new load::pending_devices_t(std::move(pending_devices_opt.value())))
+                       ->assign_sibling(new load::pending_folders_t(std::move(pending_folders_opt.value())));
+
     if (blocks.size()) {
         known_hashes.reserve(blocks.size());
         auto max_blocks = db_config.max_blocks_per_diff;
@@ -388,11 +395,6 @@ void db_actor_t::on_cluster_load(message::load_cluster_request_t &request) noexc
             current = current->assign_sibling(new load::blocks_t(std::move(slice)));
         }
     }
-
-    current = current->assign_sibling(new load::ignored_devices_t(std::move(ignored_devices_opt.value())))
-                  ->assign_sibling(new load::ignored_folders_t(std::move(ignored_folders_opt.value())))
-                  ->assign_sibling(new load::folders_t(std::move(folders_opt.value())))
-                  ->assign_sibling(new load::folder_infos_t(std::move(folder_infos)));
 
     auto corrupted_files = load::remove_corrupted_files_t::unique_keys_t();
 
@@ -452,9 +454,6 @@ void db_actor_t::on_cluster_load(message::load_cluster_request_t &request) noexc
             }
         }
     }
-
-    current = current->assign_sibling(new load::pending_devices_t(std::move(pending_devices_opt.value())))
-                  ->assign_sibling(new load::pending_folders_t(std::move(pending_folders_opt.value())));
 
     if (corrupted_files.size()) {
         LOG_WARN(log, "{} corrupted files will be removed", corrupted_files.size());
