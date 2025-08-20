@@ -20,5 +20,5 @@ void bouncer_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 
 void bouncer_actor_t::on_package(message::package_t &message) noexcept {
     LOG_TRACE(log, "on_package");
-    put(message.payload);
+    put(std::move(message.payload));
 }

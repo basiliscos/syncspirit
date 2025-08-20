@@ -49,10 +49,14 @@ void supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.set_identity(std::string(names::coordinator) + ".test", false);
         log = utils::get_logger(identity);
     });
-    plugin.with_casted<r::plugin::registry_plugin_t>(
-        [&](auto &p) { p.register_name(names::coordinator, get_address()); });
-    plugin.with_casted<r::plugin::starter_plugin_t>(
-        [&](auto &p) { p.subscribe_actor(&supervisor_t::on_model_update); });
+    plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
+        p.register_name(names::coordinator, get_address());
+        p.register_name(names::bouncer, get_address());
+    });
+    plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
+        p.subscribe_actor(&supervisor_t::on_model_update);
+        p.subscribe_actor(&supervisor_t::on_package);
+    });
     if (configure_callback) {
         configure_callback(plugin);
     }
@@ -98,19 +102,24 @@ void supervisor_t::enqueue(r::message_ptr_t message) noexcept {
 }
 
 void supervisor_t::on_model_update(model::message::model_update_t &msg) noexcept {
-    LOG_TRACE(log, "{}, updating model", identity);
+    LOG_TRACE(log, "updating model");
     auto &diff = msg.payload.diff;
     auto r = diff->apply(*this, {});
     if (!r) {
-        LOG_ERROR(log, "{}, error updating model: {}", identity, r.assume_error().message());
+        LOG_ERROR(log, "error updating model: {}", r.assume_error().message());
         do_shutdown(make_error(r.assume_error()));
     }
 
     r = diff->visit(*this, nullptr);
     if (!r) {
-        LOG_ERROR(log, "{}, error visiting model: {}", identity, r.assume_error().message());
+        LOG_ERROR(log, "error visiting model: {}", r.assume_error().message());
         do_shutdown(make_error(r.assume_error()));
     }
+}
+
+void supervisor_t::on_package(hasher::message::package_t &msg) noexcept {
+    LOG_TRACE(log, "on package");
+    put(std::move(msg.payload));
 }
 
 auto supervisor_t::consume_errors() noexcept -> io_errors_t { return std::move(io_errors); }

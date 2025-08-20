@@ -5,6 +5,7 @@
 
 #include "rotor/supervisor.h"
 #include "model/messages.h"
+#include "hasher/messages.h"
 #include "model/diff/apply_controller.h"
 #include "model/diff/cluster_visitor.h"
 #include "model/diff/local/io_failure.h"
@@ -70,6 +71,7 @@ struct SYNCSPIRIT_TEST_API supervisor_t : r::supervisor_t,
 
     virtual void on_model_update(model::message::model_update_t &) noexcept;
     void on_model_sink(model::message::model_update_t &) noexcept;
+    void on_package(hasher::message::package_t &) noexcept;
     void do_start_timer(const r::pt::time_duration &interval, r::timer_handler_base_t &handler) noexcept override;
     void do_invoke_timer(r::request_id_t timer_id) noexcept;
     void do_cancel_timer(r::request_id_t timer_id) noexcept override;

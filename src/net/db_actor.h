@@ -11,6 +11,8 @@
 #include "mdbx.h"
 #include "utils/log.h"
 #include "db/transaction.h"
+#include "db/utils.h"
+#include "utils/bytes_comparator.hpp"
 
 namespace syncspirit {
 namespace net {
@@ -62,18 +64,43 @@ struct SYNCSPIRIT_API db_actor_t : public r::actor_base_t, private model::diff::
 
     using transaction_ptr_t = std::unique_ptr<db::transaction_t>;
     using thread_id_t = std::thread::id;
-    struct commit_payload_t {
-        commit_payload_t(db::transaction_t txn) noexcept;
-        commit_payload_t(const commit_payload_t &) = delete;
-        commit_payload_t(commit_payload_t &&) = default;
-        ~commit_payload_t() noexcept;
+    using known_hashes_t = std::unordered_set<utils::bytes_view_t>;
+    using unique_keys_t = std::set<utils::bytes_t, utils::bytes_comparator_t>;
+    using folder_infos_uuids_t = std::unordered_set<std::string>;
+    using load_cluster_request_ptr_t = r::intrusive_ptr_t<message::load_cluster_request_t>;
 
-        outcome::result<void> commit() noexcept;
+    struct payload {
+        struct commit_t {
+            commit_t(db::transaction_t txn) noexcept;
+            commit_t(const commit_t &) = delete;
+            commit_t(commit_t &&) = default;
+            ~commit_t() noexcept;
 
-        db::transaction_t txn;
-        thread_id_t thread_id;
+            outcome::result<void> commit() noexcept;
+
+            db::transaction_t txn;
+            thread_id_t thread_id;
+        };
+
+        struct partial_load_t {
+            load_cluster_request_ptr_t request;
+            model::diff::cluster_diff_ptr_t diff;
+            model::diff::cluster_diff_t *next;
+            known_hashes_t known_hashes;
+            db::container_t blocks;
+            db::container_t::pointer block_next;
+            ;
+            db::container_t files;
+            db::container_t::pointer files_next;
+            ;
+            folder_infos_uuids_t folder_infos_uuids;
+            unique_keys_t corrupted_files;
+            db::transaction_t txn;
+        };
     };
-    using commit_message_t = r::message_t<commit_payload_t>;
+
+    using commit_message_t = r::message_t<payload::commit_t>;
+    using partial_load_t = r::message_t<payload::partial_load_t>;
 
   private:
     void open() noexcept;
@@ -87,6 +114,8 @@ struct SYNCSPIRIT_API db_actor_t : public r::actor_base_t, private model::diff::
     void on_db_info(message::db_info_request_t &) noexcept;
     void on_controller_up(net::message::controller_up_t &message) noexcept;
     void on_controller_down(net::message::controller_down_t &message) noexcept;
+    void on_patrial_load(partial_load_t &message) noexcept;
+
     void extracted(const model::folder_info_t &folder_info);
     outcome::result<void> save_folder_info(const model::folder_info_t &, void *) noexcept;
     outcome::result<void> remove(const model::diff::modify::generic_remove_t &, void *) noexcept;
@@ -115,6 +144,7 @@ struct SYNCSPIRIT_API db_actor_t : public r::actor_base_t, private model::diff::
     outcome::result<void> operator()(const model::diff::peer::update_folder_t &, void *) noexcept override;
 
     r::address_ptr_t coordinator;
+    r::address_ptr_t bouncer;
     r::address_ptr_t sink;
     utils::logger_t log;
     MDBX_env *env;
