@@ -123,6 +123,9 @@ after the core completion.
 
 # changes
 
+## 0.4.2 (xx-xxxx-2025)
+- [core] (#8) bugfix: crash on set peer static ip address
+
 ## 0.4.1 (05-Aug-2025)
  - [core, fltk] support merged cluster folder model
  - [core] possibility to import directories outside of syncthing, including
