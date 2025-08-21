@@ -14,7 +14,9 @@ echo $WORK_DIR
 rm -rf "$WORK_DIR"
 mkdir -p "$WORK_DIR"
 strip --strip-all $APP_PATH
+
 cp $APP_PATH "$WORK_DIR"
+cp ../misc/syncspirit-fltk.sh "$WORK_DIR"
 
 cd "AppDir"
 if [ ! -e "./linuxdeploy-x86_64.AppImage" ]; then
@@ -23,6 +25,7 @@ if [ ! -e "./linuxdeploy-x86_64.AppImage" ]; then
     chmod +x linuxdeploy-x86_64.AppImage
 fi
 
-./linuxdeploy-x86_64.AppImage -v 2 --appdir "$APP_DIR" --output appimage -e "$APP_DIR/$APP" --icon-file "../../misc/$APP.png" -d "../../misc/$APP.desktop"
-cd ..
 
+#echo ./linuxdeploy-x86_64.AppImage -v 2 --appdir "$APP_DIR" --output appimage -e "$APP_DIR/$APP" --icon-file "../../misc/$APP.png" -d "../../misc/$APP.desktop"
+./linuxdeploy-x86_64.AppImage -l`g++ -print-file-name=libstdc++.so.6` --custom-apprun "../../misc/syncspirit-fltk.sh" -v 2 --appdir "$APP_DIR" --output appimage -e "$APP_DIR/$APP" --icon-file "../../misc/$APP.png" -d "../../misc/$APP.desktop"
+cd ..
