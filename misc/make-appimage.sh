@@ -14,7 +14,9 @@ echo $WORK_DIR
 rm -rf "$WORK_DIR"
 mkdir -p "$WORK_DIR"
 strip --strip-all $APP_PATH
+
 cp $APP_PATH "$WORK_DIR"
+cp ../misc/$APP.sh "$WORK_DIR"
 
 cd "AppDir"
 if [ ! -e "./linuxdeploy-x86_64.AppImage" ]; then
@@ -23,6 +25,17 @@ if [ ! -e "./linuxdeploy-x86_64.AppImage" ]; then
     chmod +x linuxdeploy-x86_64.AppImage
 fi
 
-./linuxdeploy-x86_64.AppImage -v 2 --appdir "$APP_DIR" --output appimage -e "$APP_DIR/$APP" --icon-file "../../misc/$APP.png" -d "../../misc/$APP.desktop"
-cd ..
+DESKTOP_FILE="../../misc/$APP.desktop"
+ADD_DESKTOP_FILE=""
+if [ -e "$DESKTOP_FILE" ]; then
+    ADD_DESKTOP_FILE="-d $DESKTOP_FILE"
+fi
 
+ICON_FILE="../../misc/$APP.png"
+ADD_ICON_FILE=""
+if [ -e "$ICON_FILE" ]; then
+    ADD_ICON_FILE="--icon-file $ICON_FILE"
+fi
+
+./linuxdeploy-x86_64.AppImage -l`g++ -print-file-name=libstdc++.so.6` --custom-apprun "../../misc/$APP.sh" -v 2 --appdir "$APP_DIR" --output appimage -e "$APP_DIR/$APP" $ADD_ICON_FILE $ADD_DESKTOP_FILE
+cd ..

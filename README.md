@@ -123,8 +123,13 @@ after the core completion.
 
 # changes
 
-## 0.4.2 (xx-xxx-202x)
+## dev
 - [core, fltk] more correctly display file scanning progress
+
+## 0.4.2 (22-Aug-2025)
+ - [core, bugfix] (#8) crash on set peer static ip address
+ - [fltk, deploy] ship libstd++.so to support wider linux platforms
+ - [daemon, deploy] make AppImage (with shipped libstd++.so)
 
 ## 0.4.1 (05-Aug-2025)
  - [core, fltk] support merged cluster folder model
