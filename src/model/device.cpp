@@ -89,7 +89,7 @@ auto device_t::serialize(db::Device &r) const noexcept -> utils::bytes_t {
 
     for (size_t i = 0; i < static_uris.size(); ++i) {
         auto buff = static_uris[i]->buffer();
-        db::set_addresses(r, i, buff);
+        db::add_addresses(r, buff);
     }
     return db::encode(r);
 }

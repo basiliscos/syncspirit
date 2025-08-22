@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=syncspirit-daemon
+Exec=syncspirit-daemon
+Icon=syncspirit-daemon
+Type=Application
+Categories=Utility;
