@@ -351,25 +351,25 @@ make -j`nproc` deploy_deps
 ```
 
 
-## making appImage (debian bookworm etc.)
+## making appImage (ubuntu Focal Fossa etc.)
 
 ```
-debootstrap bookworm debian-root http://deb.debian.org/debian/
-mount --bind /proc debian-root/proc/
-mount --rbind /dev debian-root/dev/
+debootstrap --arch amd64 focal  ubuntu-root http://archive.ubuntu.com/ubuntu/
+mount --bind /proc ubuntu-root/proc/
+mount --rbind /dev ubuntu-root/dev/
 
-chroot debian-root
+chroot ubuntu-root
 apt update
 apt install -y software-properties-common
 apt update
-apt-get install -y g++11 wget libxft-dev build-essential python3-pip python3.11-venv make cmake git fuse libfuse2 libx11-dev libx11-xcb-dev libfontenc-dev libice-dev libsm-dev libxau-dev libxaw7-dev libxcomposite-dev libxcursor-dev libxdamage-dev libxfixes-dev libxi-dev libxinerama-dev libxkbfile-dev libxmuu-dev libxrandr-dev libxrender-dev libxres-dev libxss-dev libxtst-dev libxv-dev libxxf86vm-dev libxcb-glx0-dev libxcb-render0-dev libxcb-render-util0-dev libxcb-xkb-dev libxcb-icccm4-dev libxcb-image0-dev libxcb-keysyms1-dev libxcb-randr0-dev libxcb-shape0-dev libxcb-sync-dev libxcb-xfixes0-dev libxcb-xinerama0-dev libxcb-dri3-dev uuid-dev libxcb-cursor-dev libxcb-dri2-0-dev libxcb-dri3-dev libxcb-present-dev libxcb-composite0-dev libxcb-ewmh-dev libxcb-res0-dev libxcb-util0-dev libxcb-util-dev libglu1-mesa-dev pkgconf file
+apt-get install -y g++9 gcc-9 wget libxft-dev build-essential python3-pip make cmake git fuse libfuse2 libx11-dev libx11-xcb-dev libfontenc-dev libice-dev libsm-dev libxau-dev libxaw7-dev libxcomposite-dev libxcursor-dev libxdamage-dev libxfixes-dev libxi-dev libxinerama-dev libxkbfile-dev libxmuu-dev libxrandr-dev libxrender-dev libxres-dev libxss-dev libxtst-dev libxv-dev libxxf86vm-dev libxcb-glx0-dev libxcb-render0-dev libxcb-render-util0-dev libxcb-xkb-dev libxcb-icccm4-dev libxcb-image0-dev libxcb-keysyms1-dev libxcb-randr0-dev libxcb-shape0-dev libxcb-sync-dev libxcb-xfixes0-dev libxcb-xinerama0-dev libxcb-dri3-dev uuid-dev libxcb-cursor-dev libxcb-dri2-0-dev libxcb-dri3-dev libxcb-present-dev libxcb-composite0-dev libxcb-ewmh-dev libxcb-res0-dev libxcb-util0-dev libxcb-util-dev libglu1-mesa-dev pkgconf file
 
 
 adduser --quiet --disabled-password c
   
 su c
-python3 -m venv venv
-source $HOME//venv/bin/activate
+export PATH=$HOME/my-gcc/bin:$HOME/.local/bin:$PATH
+pip3 install --user conan
 pip3 install conan
 conan profile detect
 
@@ -377,14 +377,17 @@ cat << EOF > $HOME/.conan2/profiles/default
 [settings]
 arch=x86_64
 build_type=Release
+os=Linux
 compiler=gcc
 compiler.cppstd=20
 compiler.libcxx=libstdc++11
-compiler.version=12
+compiler.version=10
 os=Linux
+[buildenv]
+CC=/home/c/my-gcc/bin/x86_64-pc-linux-gnu-gcc
+CXX=/home/c/my-gcc/bin/x86_64-pc-linux-gnu-g++
 
 [options]
-shared=True
 */*:shared=True
 fltk/*:with_xft=True
 fltk/*:with_gl=False
@@ -392,6 +395,7 @@ boost/*:magic_autolink=False
 boost/*:visibility=hidden
 boost/*:header_only=False
 boost/*:without_serialization=True
+boost/*:without_cobalt=True
 boost/*:without_graph=True
 boost/*:without_fiber=True
 boost/*:without_log=True
@@ -400,7 +404,6 @@ boost/*:without_process=True
 boost/*:without_stacktrace=True
 boost/*:without_test=True
 boost/*:without_wave=True
-boost/*:without_cobalt=True
 protobuf/*:with_zlib=False
 pugixml/*:no_exceptions=True
 rotor/*:enable_asio=True
@@ -408,16 +411,25 @@ rotor/*:enable_thread=True
 rotor/*:enable_fltk=True
 EOF
 
+wget https://ftp.gnu.org/gnu/gcc/gcc-14.3.0/gcc-14.3.0.tar.xz
+tar -xf gcc-14.3.0.tar.xz
+cd gcc-14.3.0
+./contrib/download_prerequisites
+./configure --prefix=/$HOME/my-gcc --enable-languages=c,c++ --disable-multilib --enable-bootstrap
+make -j`nproc`
+make install
+
+cd
 git clone https://notabug.org/basiliscos/syncspirit.git
 cd syncspirit
-git checkout v0.4.0-dev
+git checkout v0.4.2-dev
 mkdir build.chroot
 cd build.chroot
 conan install -u --build=missing --output-folder . -s build_type=Release  -o '&:shared=True' ..
 source ./conanbuild.sh
 cmake .. -G "Unix Makefiles" -DCMAKE_TOOLCHAIN_FILE=conan_toolchain.cmake  -DCMAKE_POLICY_DEFAULT_CMP0091=NEW -DCMAKE_BUILD_TYPE=Release
 make -j`nproc`
-make deploy_syncspirit-fltk
+make deploy_syncspirit-daemon deploy_syncspirit-fltk
 ```
 
 ### Development build
