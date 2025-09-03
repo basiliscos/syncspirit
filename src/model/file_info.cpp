@@ -149,7 +149,6 @@ auto file_info_t::fields_update(const db::FileInfo &source) noexcept -> outcome:
 
     version.reset(new version_t(db::get_version(source)));
 
-    full_name = fmt::format("{}/{}", folder_info->get_folder()->get_label(), get_name());
     block_size = size ? db::get_block_size(source) : 0;
     auto block_count = db::get_blocks_size(source);
     return reserve_blocks(size ? block_count : 0);
@@ -178,7 +177,6 @@ auto file_info_t::fields_update(const proto::FileInfo &source) noexcept -> outco
 
     version.reset(new version_t(proto::get_version(source)));
 
-    full_name = fmt::format("{}/{}", folder_info->get_folder()->get_label(), get_name());
     block_size = size ? proto::get_block_size(source) : 0;
     auto block_count = proto::get_blocks_size(source);
     return reserve_blocks(size ? block_count : 0);
@@ -323,12 +321,10 @@ bool file_info_t::is_locally_available() const noexcept { return missing_blocks 
 
 bool file_info_t::is_partly_available() const noexcept { return missing_blocks < blocks.size(); }
 
-const std::filesystem::path &file_info_t::get_path() const noexcept {
-    if (!path) {
-        path = folder_info->get_folder()->get_path() / boost::nowide::widen(name);
-        path->make_preferred();
-    }
-    return path.value();
+const std::filesystem::path file_info_t::get_path() const noexcept {
+    auto path = folder_info->get_folder()->get_path() / boost::nowide::widen(name);
+    path.make_preferred();
+    return path;
 }
 
 auto file_info_t::local_file() const noexcept -> file_info_ptr_t {

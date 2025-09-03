@@ -5,7 +5,6 @@
 
 #include <cstdint>
 #include <vector>
-#include <optional>
 #include <unordered_set>
 #include <filesystem>
 #include <boost/outcome.hpp>
@@ -84,7 +83,6 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t {
 
     inline folder_info_t *get_folder_info() const noexcept { return folder_info; }
     std::string_view get_name() const noexcept;
-    inline const std::string &get_full_name() const noexcept { return full_name; }
     inline version_ptr_t get_version() noexcept { return version; }
     inline const version_ptr_t &get_version() const noexcept { return version; }
 
@@ -120,7 +118,7 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t {
 
     const std::string &get_link_target() const noexcept { return symlink_target; }
 
-    const bfs::path &get_path() const noexcept;
+    const bfs::path get_path() const noexcept;
 
     inline std::int64_t get_modified_s() const noexcept { return modified_s; }
     inline std::int32_t get_modified_ns() const noexcept { return modified_ns; }
@@ -188,10 +186,8 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t {
     std::int32_t block_size;
     std::string symlink_target;
     blocks_t blocks;
-    mutable std::optional<bfs::path> path;
-    std::string full_name;
     marks_vector_t marks;
-    size_t missing_blocks;
+    std::uint32_t missing_blocks;
 
     friend struct blocks_iterator_t;
 };

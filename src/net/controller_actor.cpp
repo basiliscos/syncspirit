@@ -261,8 +261,7 @@ void controller_actor_t::push_pending() noexcept {
             expected_sz += file_info->expected_meta_size();
             auto &update = get_update(*file_info);
             proto::add_files(update.index, file_info->as_proto(true));
-            LOG_TRACE(log, "pushing index update for: {}, seq = {}", file_info->get_full_name(),
-                      file_info->get_sequence());
+            LOG_TRACE(log, "pushing index update for: '{}', seq = {}", *file_info, file_info->get_sequence());
             if (first) {
                 update.first = true;
                 LOG_TRACE(log, "(upgraded to Index)");
@@ -400,20 +399,19 @@ void controller_actor_t::preprocess_block(model::file_block_t &file_block) noexc
     }
 
     auto file = file_block.file();
-    assert(file);
     auto block = file_block.block();
     acquire_block(file_block);
 
     auto hash = block->get_hash();
     if (file_block.is_locally_available()) {
-        LOG_TRACE(log, "cloning locally available block '{}', file = {}, block index = {} / {}", hash,
-                  file->get_full_name(), file_block.block_index(), file->get_blocks().size() - 1);
+        LOG_TRACE(log, "cloning locally available block '{}', file = {}, block index = {} / {}", hash, *file,
+                  file_block.block_index(), file->get_blocks().size() - 1);
         auto diff = cluster_diff_ptr_t(new modify::clone_block_t(file_block));
         push_block_write(std::move(diff));
     } else {
         auto sz = block->get_size();
         LOG_TRACE(log, "request_block '{}' on file '{}'; block index = {} / {}, sz = {}, request pool sz = {}", hash,
-                  file->get_full_name(), file_block.block_index(), file->get_blocks().size() - 1, sz, request_pool);
+                  *file, file_block.block_index(), file->get_blocks().size() - 1, sz, request_pool);
         request<payload::block_request_t>(peer_address, file, file_block.block_index()).send(request_timeout);
         ++rx_blocks_requested;
         request_pool -= (int64_t)sz;
@@ -843,8 +841,7 @@ void controller_actor_t::on_block(message::block_response_t &message) noexcept {
             if (ec.category() == utils::request_error_code_category()) {
                 auto file = file_block.file();
                 if (!file->is_unreachable()) {
-                    LOG_WARN(log, "can't receive block from file '{}': {}; marking unreachable", file->get_full_name(),
-                             ec.message());
+                    LOG_WARN(log, "can't receive block from file '{}': {}; marking unreachable", *file, ec.message());
                     file->mark_unreachable(true);
                     push(new model::diff::modify::mark_reachable_t(*file, false));
                     cancel_sync(file);
@@ -906,7 +903,7 @@ void controller_actor_t::on_validation(hasher::message::validation_response_t &r
             if (!res.payload.res.valid) {
                 if (!file->is_unreachable()) {
                     auto ec = utils::make_error_code(utils::protocol_error_code_t::digest_mismatch);
-                    LOG_WARN(log, "digest mismatch for '{}'; marking reachable", file->get_full_name(), ec.message());
+                    LOG_WARN(log, "digest mismatch for '{}'; marking unreachable", *file, ec.message());
                     file->mark_unreachable(true);
                     push(new model::diff::modify::mark_reachable_t(*file, false));
                 }

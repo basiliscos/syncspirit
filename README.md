@@ -123,8 +123,10 @@ after the core completion.
 
 # changes
 
-## dev
-- [core, fltk] more correctly display file scanning progress
+## 0.4.3 (xx-xxx-xxxx)
+
+ - [core, fltk] more correctly display file scanning progress
+ - [core] reduce memory consumption by model::file_info_t
 
 ## 0.4.2 (22-Aug-2025)
  - [core, bugfix] (#8) crash on set peer static ip address
