@@ -35,8 +35,8 @@ peer_state_t::peer_state_t(cluster_t &cluster, utils::bytes_view_t peer_id_, con
     auto isnt_online = !state.is_online();
     has_been_online = was_online && isnt_online;
     LOG_DEBUG(log, "peer_state_t ({}), device = {}, url = {}, client = {}, cert = {}, client {}",
-              (int)state.get_connection_state(), peer->device_id().get_short(),
-              (state.get_url() ? state.get_url()->c_str() : "(empty)"), client_name, cert_name, client_version);
+              (int)state.get_connection_state(), peer->device_id().get_short(), state.get_url(), client_name, cert_name,
+              client_version);
 }
 
 auto peer_state_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
@@ -46,8 +46,7 @@ auto peer_state_t::apply_impl(cluster_t &cluster, apply_controller_t &controller
     auto conn_state = state.get_connection_state();
     if (prev_state < state || prev_state.can_roollback_to(state)) {
         LOG_DEBUG(log, "peer_state_t, {} -> {}, device = {}, url = {}", (int)prev_state.get_connection_state(),
-                  (int)conn_state, peer->device_id().get_short(),
-                  (state.get_url() ? state.get_url()->c_str() : "(empty)"));
+                  (int)conn_state, peer->device_id().get_short(), state.get_url());
         peer->update_state(state.clone());
         if (state.is_online()) {
             peer->update_contact(client_name, client_version);

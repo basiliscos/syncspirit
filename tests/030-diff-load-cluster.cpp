@@ -356,6 +356,4 @@ TEST_CASE("loading cluster (file info + block)", "[model]") {
 
     CHECK(target->get_key() == fi->get_key());
     CHECK(target->get_name() == fi->get_name());
-    CHECK(target->get_full_name() == fi->get_full_name());
-    CHECK(target->get_full_name() == "my-label/a/b.txt");
 }

@@ -1,5 +1,5 @@
 cmake_minimum_required (VERSION 3.19)
-project (syncspirit VERSION 0.4.2)
+project (syncspirit VERSION 0.4.3)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -248,6 +248,7 @@ add_library(syncspirit_core
     src/utils/bytes.cpp
     src/utils/dns.cpp
     src/utils/error_code.cpp
+    src/utils/format.cpp
     src/utils/location.cpp
     src/utils/log.cpp
     src/utils/log-setup.cpp

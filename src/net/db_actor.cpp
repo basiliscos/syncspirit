@@ -896,7 +896,7 @@ auto db_actor_t::operator()(const model::diff::peer::update_folder_t &diff, void
     for (const auto &f : diff.files) {
         auto name = proto::get_name(f);
         auto file = files_map.by_name(name);
-        LOG_TRACE(log, "saving {}, seq = {}", file->get_full_name(), file->get_sequence());
+        LOG_TRACE(log, "saving '{}', seq. = {}", *file, file->get_sequence());
         auto key = file->get_key();
         auto data = file->serialize();
         auto r = db::save({key, data}, txn);

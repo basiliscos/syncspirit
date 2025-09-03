@@ -9,6 +9,7 @@
 #include "model/diff/local/file_availability.h"
 #include "model/diff/local/scan_finish.h"
 #include "model/diff/local/scan_start.h"
+#include "utils/format.hpp"
 #include "presentation/cluster_file_presence.h"
 #include "presentation/folder_entity.h"
 #include "presentation/presence.h"
@@ -117,8 +118,8 @@ void scan_actor_t::on_scan(message::scan_progress_t &message) noexcept {
                     task->push(new model::diff::local::file_availability_t(r.file));
                 } else if constexpr (std::is_same_v<T, removed_t>) {
                     auto &file = *r.file;
-                    LOG_DEBUG(log, "locally removed {}", file.get_full_name());
                     auto folder = file.get_folder_info()->get_folder();
+                    LOG_DEBUG(log, "locally removed '{}'", file);
                     auto folder_id = std::string(folder->get_id());
                     auto fi = file.as_proto(false);
                     proto::set_deleted(fi, true);
@@ -257,8 +258,7 @@ void scan_actor_t::on_hash(hasher::message::digest_response_t &res) noexcept {
     auto file = info.get_file();
     if (res.payload.ee) {
         auto &ee = res.payload.ee;
-        LOG_ERROR(log, "on_hash, file: {}, block = {}, error: {}", file->get_full_name(), rp.block_index,
-                  ee->message());
+        LOG_ERROR(log, "on_hash, file: {}, block: {}, error: {}", *file, rp.block_index, ee->message());
         return do_shutdown(ee);
     }
 
@@ -292,7 +292,7 @@ void scan_actor_t::on_hash(hasher::message::digest_response_t &res) noexcept {
             }
         } else {
             auto &file = *info.get_file();
-            LOG_DEBUG(log, "removing temporal of '{}' as it corrupted", file.get_full_name());
+            LOG_DEBUG(log, "removing temporal of '{}' as it corrupted", file);
             auto r = info.remove();
             if (r) {
                 auto err = scan_error_t{info.get_path(), r.assume_error()};

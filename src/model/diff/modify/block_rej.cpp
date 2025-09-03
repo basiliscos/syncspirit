@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "block_rej.h"
 #include "model/diff/cluster_visitor.h"
 #include "model/file_info.h"
 #include "model/cluster.h"
+#include "utils/format.hpp"
 
 using namespace syncspirit::model::diff::modify;
 
@@ -17,7 +18,7 @@ auto block_rej_t::apply_impl(cluster_t &cluster, apply_controller_t &controller)
     auto folder = cluster.get_folders().by_id(folder_id);
     auto folder_info = folder->get_folder_infos().by_device_id(device_id);
     auto file = folder_info->get_file_infos().by_name(file_name);
-    LOG_TRACE(log, "block_rej_t, '{}' block # {}", file->get_full_name(), block_index);
+    LOG_TRACE(log, "block_rej_t, '{}', block #{}", *file, block_index);
     file->mark_local_available(block_index);
     return applicator_t::apply_sibling(cluster, controller);
 }

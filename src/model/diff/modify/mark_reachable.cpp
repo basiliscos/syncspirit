@@ -23,7 +23,7 @@ auto mark_reachable_t::apply_impl(cluster_t &cluster, apply_controller_t &contro
     auto folder_info = folder->get_folder_infos().by_device(*device);
     auto file = folder_info->get_file_infos().by_name(file_name);
 
-    LOG_TRACE(log, "applying reachable ({}) for '{}'", reachable, file->get_full_name());
+    LOG_TRACE(log, "applying reachable ({}) for '{}'", reachable, *file);
     file->mark_unreachable(!reachable);
 
     return applicator_t::apply_sibling(cluster, controller);
