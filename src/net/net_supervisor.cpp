@@ -3,6 +3,7 @@
 
 #include "config/utils.h"
 #include "net_supervisor.h"
+#include "hasher/hasher_proxy_actor.h"
 #include "global_discovery_actor.h"
 #include "local_discovery_actor.h"
 #include "cluster_supervisor.h"
@@ -117,6 +118,12 @@ void net_supervisor_t::launch_early() noexcept {
                   .escalate_failure()
                   .finish()
                   ->get_address();
+
+    create_actor<hasher::hasher_proxy_actor_t>()
+        .timeout(init_timeout)
+        .hasher_threads(app_config.hasher_threads)
+        .name(net::names::hasher_proxy)
+        .finish();
 }
 
 void net_supervisor_t::load_db() noexcept {

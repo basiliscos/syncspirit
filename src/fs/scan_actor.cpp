@@ -27,8 +27,8 @@ using namespace syncspirit::fs;
 template <class> inline constexpr bool always_false_v = false;
 
 scan_actor_t::scan_actor_t(config_t &cfg)
-    : r::actor_base_t{cfg}, cluster{cfg.cluster}, sequencer{cfg.sequencer}, fs_config{cfg.fs_config},
-      rw_cache(cfg.rw_cache), requested_hashes_limit{cfg.requested_hashes_limit} {
+    : r::actor_base_t{cfg}, sequencer{cfg.sequencer}, fs_config{cfg.fs_config}, rw_cache(cfg.rw_cache),
+      requested_hashes_limit{cfg.requested_hashes_limit} {
     assert(sequencer);
     assert(rw_cache);
 }
@@ -48,6 +48,7 @@ void scan_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
                 auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
                 plugin->subscribe_actor(&scan_actor_t::on_model_update, coordinator);
+                plugin->subscribe_actor(&scan_actor_t::on_thread_ready, coordinator);
             }
         });
     });
@@ -60,15 +61,17 @@ void scan_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     });
 }
 
+void scan_actor_t::on_thread_ready(model::message::thread_ready_t &message) noexcept {
+    auto &p = message.payload;
+    if (p.thread_id == std::this_thread::get_id()) {
+        LOG_TRACE(log, "on_thread_ready");
+        cluster = message.payload.cluster;
+    }
+}
+
 void scan_actor_t::on_start() noexcept {
     LOG_TRACE(log, "on_start");
     r::actor_base_t::on_start();
-}
-
-void scan_actor_t::shutdown_finish() noexcept {
-    LOG_TRACE(log, "shutdown_finish");
-    get_supervisor().shutdown();
-    r::actor_base_t::shutdown_finish();
 }
 
 auto scan_actor_t::operator()(const model::diff::local::scan_start_t &diff, void *custom) noexcept

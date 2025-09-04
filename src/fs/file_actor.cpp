@@ -66,6 +66,9 @@ void file_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
                 plugin->subscribe_actor(&file_actor_t::on_controller_up, coordinator);
                 plugin->subscribe_actor(&file_actor_t::on_controller_predown, coordinator);
+                if (!cluster) {
+                    plugin->subscribe_actor(&file_actor_t::on_thread_ready, coordinator);
+                }
             }
         });
         p.discover_name(net::names::db, db, true);
@@ -74,6 +77,14 @@ void file_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.subscribe_actor(&file_actor_t::on_block_request);
         p.subscribe_actor(&file_actor_t::on_model_update);
     });
+}
+
+void file_actor_t::on_thread_ready(model::message::thread_ready_t &message) noexcept {
+    auto &p = message.payload;
+    if (p.thread_id == std::this_thread::get_id()) {
+        LOG_TRACE(log, "on_thread_ready");
+        cluster = message.payload.cluster;
+    }
 }
 
 void file_actor_t::on_start() noexcept {

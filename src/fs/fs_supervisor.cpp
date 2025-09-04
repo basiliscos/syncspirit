@@ -19,13 +19,6 @@
 using namespace syncspirit::fs;
 using namespace syncspirit::presentation;
 
-namespace {
-
-namespace resource {
-r::plugin::resource_id_t model = 0;
-}
-} // namespace
-
 fs_supervisor_t::fs_supervisor_t(config_t &cfg)
     : parent_t(this, cfg), sequencer(cfg.sequencer), fs_config{cfg.fs_config}, hasher_threads{cfg.hasher_threads} {
     rw_cache.reset(new file_cache_t(fs_config.mru_size));
@@ -43,10 +36,8 @@ void fs_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
                 auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
                 plugin->subscribe_actor(&fs_supervisor_t::on_model_update, coordinator);
-                plugin->subscribe_actor(&fs_supervisor_t::on_app_ready, coordinator);
                 plugin->subscribe_actor(&fs_supervisor_t::on_db_loaded, coordinator);
                 send<syncspirit::model::payload::thread_up_t>(coordinator);
-                resources->acquire(resource::model);
             }
         });
         p.discover_name(net::names::bouncer, bouncer, true).link(false);
@@ -79,13 +70,13 @@ void fs_supervisor_t::launch() noexcept {
     scan_actor = create_actor<scan_actor_t>()
                      .fs_config(fs_config)
                      .rw_cache(rw_cache)
-                     .cluster(cluster)
                      .sequencer(sequencer)
                      .requested_hashes_limit(hasher_threads * 2)
                      .timeout(timeout)
+                     .autoshutdown_supervisor(true)
                      .finish();
 
-    create_actor<scan_scheduler_t>().cluster(cluster).timeout(timeout).finish();
+    create_actor<scan_scheduler_t>().timeout(timeout).finish();
 
     for (auto &l : launchers) {
         l(cluster);
@@ -110,7 +101,6 @@ void fs_supervisor_t::on_model_request(model::message::model_request_t &req) noe
 
 void fs_supervisor_t::on_model_response(model::message::model_response_t &res) noexcept {
     LOG_TRACE(log, "on_model_response");
-    resources->release(resource::model);
     auto &ee = res.payload.ee;
     if (ee) {
         LOG_ERROR(log, "cannot get model: {}", ee->message());
@@ -122,14 +112,10 @@ void fs_supervisor_t::on_model_response(model::message::model_response_t &res) n
     }
 }
 
-void fs_supervisor_t::on_app_ready(model::message::app_ready_t &) noexcept {
-    LOG_TRACE(log, "on_app_ready");
-    launch();
-}
-
 void fs_supervisor_t::on_start() noexcept {
     LOG_TRACE(log, "on_start");
     r::actor_base_t::on_start();
+    launch();
 }
 
 void fs_supervisor_t::on_child_shutdown(actor_base_t *actor) noexcept {

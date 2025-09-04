@@ -7,6 +7,7 @@
 #include "model/diff/load/interrupt.h"
 #include <rotor/actor_base.h>
 #include <rotor/extended_error.h>
+#include <thread>
 
 using namespace syncspirit::model::diff;
 
@@ -94,8 +95,7 @@ auto iterative_controller_base_t::apply(const model::diff::load::commit_t &diff,
     owner->get_supervisor().put(diff.commit_message);
 
     commit_loading();
-    owner->send<syncspirit::model::payload::thread_ready_t>(coordinator);
-
+    owner->send<syncspirit::model::payload::thread_ready_t>(coordinator, cluster, std::this_thread::get_id());
     log->debug("committing db load, end");
     return outcome::success();
 }

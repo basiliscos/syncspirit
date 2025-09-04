@@ -68,6 +68,7 @@ struct SYNCSPIRIT_API file_actor_t : public r::actor_base_t, private model::diff
         bool success;
     };
 
+    void on_thread_ready(model::message::thread_ready_t &) noexcept;
     void on_model_update(model::message::model_update_t &message) noexcept;
     void on_block_request(message::block_request_t &message) noexcept;
     void on_controller_up(net::message::controller_up_t &message) noexcept;

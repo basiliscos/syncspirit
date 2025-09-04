@@ -5,6 +5,7 @@
 
 #include <rotor/request.hpp>
 #include <boost/system/errc.hpp>
+#include <thread>
 #include "cluster.h"
 #include "diff/cluster_diff.h"
 
@@ -36,7 +37,11 @@ struct model_interrupt_t {
 };
 
 struct thread_up_t {};
-struct thread_ready_t {};
+struct thread_ready_t {
+    using thread_id_t = std::thread::id;
+    model::cluster_ptr_t cluster;
+    thread_id_t thread_id;
+};
 struct db_loaded_t {};
 struct app_ready_t {};
 
