@@ -58,6 +58,7 @@ struct SYNCSPIRIT_API db_actor_t : public r::actor_base_t, private model::diff::
     ~db_actor_t();
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
     void on_start() noexcept override;
+    void shutdown_start() noexcept override;
     void shutdown_finish() noexcept override;
 
     template <typename T> auto &access() noexcept;

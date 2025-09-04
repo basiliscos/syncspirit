@@ -54,6 +54,7 @@ namespace {
 namespace resource {
 r::plugin::resource_id_t db = 0;
 r::plugin::resource_id_t controller = 1;
+r::plugin::resource_id_t partial_load = 2;
 } // namespace resource
 } // namespace
 
@@ -231,6 +232,11 @@ void db_actor_t::on_start() noexcept {
     LOG_TRACE(log, "on_start");
 }
 
+void db_actor_t::shutdown_start() noexcept {
+    r::actor_base_t::shutdown_start();
+    LOG_TRACE(log, "shutdown_start");
+}
+
 void db_actor_t::shutdown_finish() noexcept {
     if (txn_holder && uncommitted) {
         uncommitted = db_config.uncommitted_threshold;
@@ -385,12 +391,27 @@ void db_actor_t::on_cluster_load(message::load_cluster_request_t &request) noexc
 
     auto message = r::make_message<payload::partial_load_t>(address, std::move(p));
     send<hasher::payload::package_t>(bouncer, std::move(message));
+    resources->acquire(resource::partial_load);
 }
 
 void db_actor_t::on_patrial_load(partial_load_t &message) noexcept {
     using namespace model::diff;
     auto &p = message.payload;
     bool bounce_again = false;
+
+    if (state > r::state_t::OPERATIONAL) {
+        LOG_DEBUG(log, "interrupting partial loading, committing read txn");
+
+        auto r = p.txn.commit();
+        if (!r) {
+            auto ee = make_error(r.assume_error());
+            LOG_ERROR(log, "committing txn error: {}", r.assume_error().message());
+        }
+
+        reply_with_error(*p.request, shutdown_reason);
+        resources->release(resource::partial_load);
+        return;
+    }
 
     if (p.block_next) {
         bounce_again = true;
@@ -501,6 +522,7 @@ void db_actor_t::on_patrial_load(partial_load_t &message) noexcept {
         auto commit_message = r::make_routed_message<payload::commit_t>(sink, address, std::move(p.txn));
         p.next = p.next->assign_sibling(new load::commit_t(std::move(commit_message)));
         reply_to(*p.request, std::move(p.diff));
+        resources->release(resource::partial_load);
     }
 }
 

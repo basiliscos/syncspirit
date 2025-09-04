@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include <catch2/catch_all.hpp>
+#include "db/error_code.h"
 #include "test-utils.h"
 #include "diff-builder.h"
 #include "model/diff/load/commit.h"
@@ -36,11 +37,25 @@ template <> inline auto &db_actor_t::access<env>() noexcept { return env; }
 
 namespace {
 
+struct db_supervisor_t : supervisor_t {
+    using parent_t = supervisor_t;
+    using parent_t::parent_t;
+
+    void on_package(hasher::message::package_t &msg) noexcept {
+        LOG_TRACE(log, "on package");
+        ++packages;
+        put(std::move(msg.payload));
+    }
+
+    int packages = 0;
+};
+
 struct fixture_t {
     using load_msg_t = net::message::load_cluster_response_t;
     using load_msg_ptr_t = r::intrusive_ptr_t<load_msg_t>;
     using stats_msg_t = net::message::db_info_response_t;
     using stats_msg_ptr_t = r::intrusive_ptr_t<stats_msg_t>;
+    using supervisor_ptr_t = r::intrusive_ptr_t<db_supervisor_t>;
 
     fixture_t() noexcept : root_path{unique_path()}, path_quard{root_path} {
         test::init_logging();
@@ -56,12 +71,12 @@ struct fixture_t {
             plugin.template with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
                 p.subscribe_actor(r::lambda<load_msg_t>([&](load_msg_t &msg) {
                     auto &ee = msg.payload.ee;
+                    reply = &msg;
                     if (ee) {
                         spdlog::error("cannot load cluster: {}", ee->message());
-                        std::abort();
+                    } else {
+                        sup->send<model::payload::model_update_t>(db_addr, msg.payload.res.diff, nullptr);
                     }
-                    reply = &msg;
-                    sup->send<model::payload::model_update_t>(db_addr, msg.payload.res.diff, nullptr);
                 }));
                 p.subscribe_actor(r::lambda<stats_msg_t>([&](stats_msg_t &msg) { stats_reply = &msg; }));
             });
@@ -88,11 +103,15 @@ struct fixture_t {
 
     virtual config::db_config_t make_config() noexcept { return config::db_config_t{1024 * 1024, 0, 64, 32}; }
 
+    virtual supervisor_ptr_t make_supervisor(r::system_context_t &ctx) noexcept {
+        return ctx.create_supervisor<db_supervisor_t>().timeout(timeout).create_registry().finish();
+    }
+
     virtual fixture_t &run() noexcept {
         cluster = make_cluster();
 
         r::system_context_t ctx;
-        sup = ctx.create_supervisor<supervisor_t>().timeout(timeout).create_registry().finish();
+        sup = make_supervisor(ctx);
         sup->cluster = cluster;
         sup->configure_callback = configure();
 
@@ -113,15 +132,24 @@ struct fixture_t {
     }
 
     int get_reading_txn() {
-        auto &db_env = db_actor->access<env>();
         int counter = 0;
-        auto reader = [](void *ctx, int, int, mdbx_pid_t, mdbx_tid_t, uint64_t, uint64_t, size_t,
-                         size_t) noexcept -> int {
-            ++(*reinterpret_cast<int *>(ctx));
-            return 0;
-        };
-        auto r = mdbx_reader_list(db_env, reader, &counter);
-        CHECK(((r == MDBX_RESULT_TRUE) || (r == 0)));
+        auto state = static_cast<r::actor_base_t *>(db_actor.get())->access<to::state>();
+        if (state != r::state_t::SHUT_DOWN) {
+            auto &db_env = db_actor->access<env>();
+            auto reader = [](void *ctx, int, int, mdbx_pid_t, mdbx_tid_t, uint64_t, uint64_t, size_t,
+                             size_t) noexcept -> int {
+                ++(*reinterpret_cast<int *>(ctx));
+                return 0;
+            };
+            auto r = mdbx_reader_list(db_env, reader, &counter);
+            CHECK(((r == MDBX_RESULT_TRUE) || (r == 0)));
+            if (r > 0) {
+                auto ec = db::make_error_code(r);
+                auto log = utils::get_logger("");
+                LOG_INFO(log, "mdbx_reader_list, error: {}", ec.message());
+            }
+        }
+
         return counter;
     }
 
@@ -145,7 +173,7 @@ struct fixture_t {
     cluster_ptr_t cluster;
     device_ptr_t peer_device;
     device_ptr_t my_device;
-    r::intrusive_ptr_t<supervisor_t> sup;
+    supervisor_ptr_t sup;
     r::intrusive_ptr_t<net::db_actor_t> db_actor;
     bfs::path root_path;
     path_guard_t path_quard;
@@ -1327,6 +1355,91 @@ void test_flush_on_shutdown() {
     F().run();
 };
 
+void test_iterative_loading() {
+    struct F : fixture_t {
+
+        config::db_config_t make_config() noexcept override { return config::db_config_t{1024 * 1024, 0, 1, 1}; }
+
+        void main() noexcept override {
+
+            auto builder = diff_builder_t(*cluster);
+            auto folder_id = "1234-5678";
+
+            builder.upsert_folder(folder_id, "/my/path").apply(*sup);
+
+            for (int i = 0; i < 20; ++i) {
+                auto pr_file = proto::FileInfo();
+                proto::set_name(pr_file, fmt::format("file-{:03}.bin", i));
+                builder.local_update(folder_id, pr_file);
+            }
+            builder.apply(*sup);
+
+            sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
+            sup->do_process();
+            REQUIRE(reply);
+            REQUIRE(!reply->payload.ee);
+            auto cluster_clone = make_cluster();
+            auto controller = make_apply_controller(cluster_clone);
+            REQUIRE(reply->payload.res.diff->apply(*controller, {}));
+
+            auto folder = cluster_clone->get_folders().by_id(folder_id);
+            auto folder_my = folder->get_folder_infos().by_device(*my_device);
+            CHECK(folder_my->get_file_infos().size() == 20);
+            CHECK(sup->packages == 21);
+        }
+    };
+    F().run();
+};
+
+void test_iterative_loading_interrupt() {
+    struct F : fixture_t {
+
+        config::db_config_t make_config() noexcept override { return config::db_config_t{1024 * 1024, 0, 1, 1}; }
+
+        supervisor_ptr_t make_supervisor(r::system_context_t &ctx) noexcept override {
+            struct sup_t : db_supervisor_t {
+                using parent_t = db_supervisor_t;
+                using parent_t::parent_t;
+
+                void on_package(hasher::message::package_t &msg) noexcept {
+                    parent_t::on_package(msg);
+                    if (packages == 5) {
+                        fixture->db_actor->do_shutdown();
+                    }
+                }
+
+                fixture_t *fixture = {};
+            };
+
+            auto sup = ctx.create_supervisor<sup_t>().timeout(timeout).create_registry().finish();
+            sup->fixture = this;
+            return sup;
+        }
+
+        void main() noexcept override {
+
+            auto builder = diff_builder_t(*cluster);
+            auto folder_id = "1234-5678";
+
+            builder.upsert_folder(folder_id, "/my/path").apply(*sup);
+
+            for (int i = 0; i < 20; ++i) {
+                auto pr_file = proto::FileInfo();
+                proto::set_name(pr_file, fmt::format("file-{:03}.bin", i));
+                builder.local_update(folder_id, pr_file);
+            }
+            builder.apply(*sup);
+
+            sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
+            sup->do_process();
+            REQUIRE(reply);
+            REQUIRE(reply->payload.ee);
+            CHECK(sup->packages == 6);
+        }
+    };
+    F().run();
+};
+
 int _init() {
     REGISTER_TEST_CASE(test_db_population, "test_db_population", "[db]");
     REGISTER_TEST_CASE(test_loading_empty_db, "test_loading_empty_db", "[db]");
@@ -1348,6 +1461,8 @@ int _init() {
     REGISTER_TEST_CASE(test_db_migration_1_2, "test_db_migration_1_2", "[db]");
     REGISTER_TEST_CASE(test_corrupted_file, "test_corrupted_file", "[db]");
     REGISTER_TEST_CASE(test_flush_on_shutdown, "test_flush_on_shutdown", "[db]");
+    REGISTER_TEST_CASE(test_iterative_loading, "test_iterative_loading", "[db]");
+    REGISTER_TEST_CASE(test_iterative_loading_interrupt, "test_iterative_loading_interrupt", "[db]");
     return 1;
 }
 
