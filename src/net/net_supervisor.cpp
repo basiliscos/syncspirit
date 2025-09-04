@@ -132,9 +132,9 @@ void net_supervisor_t::load_db() noexcept {
 }
 
 void net_supervisor_t::seed_model() noexcept {
+    using payload_t = model::payload::model_update_t;
     thread_counter = independent_threads;
-    auto message =
-        r::make_routed_message<model::payload::model_update_t>(address, db_addr, std::move(load_diff), nullptr);
+    auto message = r::make_routed_message<payload_t>(address, db_addr, std::move(load_diff), nullptr);
     put(std::move(message));
 }
 
