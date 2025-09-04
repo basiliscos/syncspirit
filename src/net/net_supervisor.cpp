@@ -78,7 +78,7 @@ void net_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         [&](auto &p) {
             p.subscribe_actor(&net_supervisor_t::on_model_update);
             p.subscribe_actor(&net_supervisor_t::on_model_interrupt);
-            p.subscribe_actor(&net_supervisor_t::on_load_cluster);
+            // p.subscribe_actor(&net_supervisor_t::on_load_cluster);
             p.subscribe_actor(&net_supervisor_t::on_model_request);
             p.subscribe_actor(&net_supervisor_t::on_thread_up);
             p.subscribe_actor(&net_supervisor_t::on_thread_ready);
@@ -91,15 +91,6 @@ void net_supervisor_t::on_child_shutdown(actor_base_t *actor) noexcept {
     parent_t::on_child_shutdown(actor);
     auto &reason = actor->get_shutdown_reason();
     LOG_TRACE(log, "on_child_shutdown, '{}' due to {} ", actor->get_identity(), reason->message());
-}
-
-void net_supervisor_t::on_child_init(actor_base_t *actor, const r::extended_error_ptr_t &ec) noexcept {
-    parent_t::on_child_init(actor, ec);
-    auto &child_addr = actor->get_address();
-    if (!ec && db_addr && child_addr == db_addr) {
-        LOG_TRACE(log, "on_child_init, db has been launched, let's load it...");
-        load_db();
-    }
 }
 
 void net_supervisor_t::shutdown_finish() noexcept {
@@ -126,11 +117,6 @@ void net_supervisor_t::launch_early() noexcept {
         .finish();
 }
 
-void net_supervisor_t::load_db() noexcept {
-    auto timeout = init_timeout * 9 / 10;
-    request<payload::load_cluster_request_t>(db_addr).send(timeout);
-}
-
 void net_supervisor_t::seed_model() noexcept {
     using payload_t = model::payload::model_update_t;
     thread_counter = independent_threads;
@@ -138,6 +124,7 @@ void net_supervisor_t::seed_model() noexcept {
     put(std::move(message));
 }
 
+#if 0
 void net_supervisor_t::on_load_cluster(message::load_cluster_response_t &message) noexcept {
     auto &ee = message.payload.ee;
     if (ee) {
@@ -150,6 +137,7 @@ void net_supervisor_t::on_load_cluster(message::load_cluster_response_t &message
     send<model::payload::db_loaded_t>(address);
     load_diff = std::move(res.diff);
 }
+#endif
 
 void net_supervisor_t::on_model_request(model::message::model_request_t &message) noexcept {
     --thread_counter;

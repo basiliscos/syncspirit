@@ -7,6 +7,7 @@
 #include "db/utils.h"
 #include "hasher/messages.h"
 #include "db/error_code.h"
+#include "messages.h"
 #include "model/diff/advance/advance.h"
 #include "model/diff/contact/ignored_connected.h"
 #include "model/diff/contact/peer_state.h"
@@ -46,7 +47,6 @@
 #include "utils/format.hpp"
 #include <string_view>
 #include <cstring>
-#include <memory_resource>
 
 namespace syncspirit::net {
 
@@ -135,7 +135,7 @@ void db_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         open();
-        p.subscribe_actor(&db_actor_t::on_cluster_load);
+        p.subscribe_actor(&db_actor_t::on_cluster_load_trigger);
         p.subscribe_actor(&db_actor_t::on_commit);
         p.subscribe_actor(&db_actor_t::on_patrial_load);
     });
@@ -229,7 +229,8 @@ auto db_actor_t::force_commit() noexcept -> outcome::result<void> {
 
 void db_actor_t::on_start() noexcept {
     r::actor_base_t::on_start();
-    LOG_TRACE(log, "on_start");
+    LOG_TRACE(log, "on_start, triggering cluster loading");
+    send<net::payload::load_cluster_trigger_t>(address);
 }
 
 void db_actor_t::shutdown_start() noexcept {
@@ -283,45 +284,53 @@ void db_actor_t::on_controller_down(net::message::controller_down_t &message) no
     resources->release(resource::controller);
 }
 
-void db_actor_t::on_cluster_load(message::load_cluster_request_t &request) noexcept {
+void db_actor_t::on_cluster_load_trigger(message::load_cluster_trigger_t &) noexcept {
     using namespace model::diff;
-    LOG_TRACE(log, "on_cluster_load (begin)");
+    r::actor_base_t::on_start();
+    LOG_TRACE(log, "on_cluster_load_trigger");
 
     auto txn_opt = db::make_transaction(db::transaction_type_t::RO, env);
     if (!txn_opt) {
-        return reply_with_error(request, make_error(txn_opt.error()));
+        auto ee = make_error(txn_opt.error());
+        return send<net::payload::load_cluster_fail_t>(coordinator, ee);
     }
     auto &txn = txn_opt.value();
 
     auto devices_opt = db::load(db::prefix::device, txn);
     if (!devices_opt) {
-        return reply_with_error(request, make_error(devices_opt.error()));
+        auto ee = make_error(devices_opt.error());
+        return send<net::payload::load_cluster_fail_t>(coordinator, ee);
     }
 
     auto blocks_opt = db::load(db::prefix::block_info, txn);
     if (!blocks_opt) {
-        return reply_with_error(request, make_error(blocks_opt.error()));
+        auto ee = make_error(blocks_opt.error());
+        return send<net::payload::load_cluster_fail_t>(coordinator, ee);
     }
     auto blocks = std::move(blocks_opt.value());
 
     auto ignored_devices_opt = db::load(db::prefix::ignored_device, txn);
     if (!ignored_devices_opt) {
-        return reply_with_error(request, make_error(ignored_devices_opt.error()));
+        auto ee = make_error(ignored_devices_opt.error());
+        return send<net::payload::load_cluster_fail_t>(coordinator, ee);
     }
 
     auto ignored_folders_opt = db::load(db::prefix::ignored_folder, txn);
     if (!ignored_folders_opt) {
-        return reply_with_error(request, make_error(ignored_folders_opt.error()));
+        auto ee = make_error(ignored_folders_opt.error());
+        return send<net::payload::load_cluster_fail_t>(coordinator, ee);
     }
 
     auto folders_opt = db::load(db::prefix::folder, txn);
     if (!folders_opt) {
-        return reply_with_error(request, make_error(folders_opt.error()));
+        auto ee = make_error(folders_opt.error());
+        return send<net::payload::load_cluster_fail_t>(coordinator, ee);
     }
 
     auto folder_infos_opt = db::load(db::prefix::folder_info, txn);
     if (!folder_infos_opt) {
-        return reply_with_error(request, make_error(folder_infos_opt.error()));
+        auto ee = make_error(folder_infos_opt.error());
+        return send<net::payload::load_cluster_fail_t>(coordinator, ee);
     }
     auto folder_infos_raw = std::move(folder_infos_opt.value());
     auto folder_infos_uuids = folder_infos_uuids_t();
@@ -337,25 +346,28 @@ void db_actor_t::on_cluster_load(message::load_cluster_request_t &request) noexc
         auto db_fi = db::FolderInfo();
         if (auto left = db::decode(pair.value, db_fi); left) {
             auto ec = make_error_code(model::error_code_t::folder_info_deserialization_failure);
-            return reply_with_error(request, make_error(ec));
+            return send<net::payload::load_cluster_fail_t>(coordinator, make_error(ec));
         }
         folder_infos.emplace_back(item_t{pair.key, std::move(db_fi)});
     }
 
     auto file_infos_opt = db::load(db::prefix::file_info, txn);
     if (!file_infos_opt) {
-        return reply_with_error(request, make_error(file_infos_opt.error()));
+        auto ee = make_error(file_infos_opt.error());
+        return send<net::payload::load_cluster_fail_t>(coordinator, ee);
     }
     auto files = std::move(file_infos_opt.value());
 
     auto pending_devices_opt = db::load(db::prefix::pending_device, txn);
     if (!pending_devices_opt) {
-        return reply_with_error(request, make_error(pending_devices_opt.error()));
+        auto ee = make_error(pending_devices_opt.error());
+        return send<net::payload::load_cluster_fail_t>(coordinator, ee);
     }
 
     auto pending_folders_opt = db::load(db::prefix::pending_folder, txn);
     if (!pending_folders_opt) {
-        return reply_with_error(request, make_error(pending_folders_opt.error()));
+        auto ee = make_error(pending_folders_opt.error());
+        return send<net::payload::load_cluster_fail_t>(coordinator, ee);
     }
 
     LOG_DEBUG(log, "on_cluster_load, all raw bytes has been loaded, blocks = {}, files = {}", blocks.size(),
@@ -384,8 +396,15 @@ void db_actor_t::on_cluster_load(message::load_cluster_request_t &request) noexc
     }
 
     auto p = payload::partial_load_t{
-        &request,       std::move(diff),  current,    std::move(known_hashes),       std::move(blocks),
-        blocks_next,    std::move(files), files_next, std::move(folder_infos_uuids), {},
+        std::move(diff),
+        current,
+        std::move(known_hashes),
+        std::move(blocks),
+        blocks_next,
+        std::move(files),
+        files_next,
+        std::move(folder_infos_uuids),
+        {},
         std::move(txn),
     };
 
@@ -402,13 +421,13 @@ void db_actor_t::on_patrial_load(partial_load_t &message) noexcept {
     if (state > r::state_t::OPERATIONAL) {
         LOG_DEBUG(log, "interrupting partial loading, committing read txn");
 
+        auto ee = shutdown_reason;
         auto r = p.txn.commit();
         if (!r) {
-            auto ee = make_error(r.assume_error());
+            ee = make_error(r.assume_error());
             LOG_ERROR(log, "committing txn error: {}", r.assume_error().message());
         }
-
-        reply_with_error(*p.request, shutdown_reason);
+        send<net::payload::load_cluster_fail_t>(coordinator, ee);
         resources->release(resource::partial_load);
         return;
     }
@@ -521,7 +540,7 @@ void db_actor_t::on_patrial_load(partial_load_t &message) noexcept {
 
         auto commit_message = r::make_routed_message<payload::commit_t>(sink, address, std::move(p.txn));
         p.next = p.next->assign_sibling(new load::commit_t(std::move(commit_message)));
-        reply_to(*p.request, std::move(p.diff));
+        send<net::payload::load_cluster_success_t>(coordinator, std::move(p.diff));
         resources->release(resource::partial_load);
     }
 }

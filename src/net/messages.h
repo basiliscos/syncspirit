@@ -103,12 +103,14 @@ struct announce_notification_t {
     r::address_ptr_t source;
 };
 
-struct load_cluster_response_t {
+struct load_cluster_trigger_t {};
+
+struct load_cluster_success_t {
     model::diff::cluster_diff_ptr_t diff;
 };
 
-struct load_cluster_request_t {
-    using response_t = load_cluster_response_t;
+struct load_cluster_fail_t {
+    r::extended_error_ptr_t ee;
 };
 
 struct controller_up_t {
@@ -206,8 +208,9 @@ using http_response_t = r::request_traits_t<payload::http_request_t>::response::
 using http_cancel_t = r::request_traits_t<payload::http_request_t>::cancel::message_t;
 using http_close_connection_t = r::message_t<payload::http_close_connection_t>;
 
-using load_cluster_request_t = r::request_traits_t<payload::load_cluster_request_t>::request::message_t;
-using load_cluster_response_t = r::request_traits_t<payload::load_cluster_request_t>::response::message_t;
+using load_cluster_trigger_t = r::message_t<payload::load_cluster_trigger_t>;
+using load_cluster_success_t = r::message_t<payload::load_cluster_success_t>;
+using load_cluster_fail_t = r::message_t<payload::load_cluster_fail_t>;
 
 using controller_up_t = r::message_t<payload::controller_up_t>;
 using controller_predown_t = r::message_t<payload::controller_predown_t>;

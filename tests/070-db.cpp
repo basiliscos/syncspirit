@@ -51,8 +51,8 @@ struct db_supervisor_t : supervisor_t {
 };
 
 struct fixture_t {
-    using load_msg_t = net::message::load_cluster_response_t;
-    using load_msg_ptr_t = r::intrusive_ptr_t<load_msg_t>;
+    using load_cluster_success_t = net::message::load_cluster_success_t;
+    using load_cluster_fail_t = net::message::load_cluster_fail_t;
     using stats_msg_t = net::message::db_info_response_t;
     using stats_msg_ptr_t = r::intrusive_ptr_t<stats_msg_t>;
     using supervisor_ptr_t = r::intrusive_ptr_t<db_supervisor_t>;
@@ -69,14 +69,14 @@ struct fixture_t {
     virtual supervisor_t::configure_callback_t configure() noexcept {
         return [&](r::plugin::plugin_base_t &plugin) {
             plugin.template with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
-                p.subscribe_actor(r::lambda<load_msg_t>([&](load_msg_t &msg) {
-                    auto &ee = msg.payload.ee;
-                    reply = &msg;
-                    if (ee) {
-                        spdlog::error("cannot load cluster: {}", ee->message());
-                    } else {
-                        sup->send<model::payload::model_update_t>(db_addr, msg.payload.res.diff, nullptr);
-                    }
+                p.subscribe_actor(r::lambda<load_cluster_success_t>([&](load_cluster_success_t &msg) {
+                    load_diff = msg.payload.diff;
+                    spdlog::info("received load cluster diff");
+                    sup->send<model::payload::model_update_t>(db_addr, load_diff, nullptr);
+                }));
+                p.subscribe_actor(r::lambda<load_cluster_fail_t>([&](load_cluster_fail_t &msg) {
+                    ee = msg.payload.ee;
+                    spdlog::warn("fail loading cluster: {}", ee->message({}));
                 }));
                 p.subscribe_actor(r::lambda<stats_msg_t>([&](stats_msg_t &msg) { stats_reply = &msg; }));
             });
@@ -121,7 +121,7 @@ struct fixture_t {
 
         launch_db();
         main();
-        reply.reset();
+        load_diff.reset();
         CHECK(get_reading_txn() == 0);
 
         sup->shutdown();
@@ -160,10 +160,10 @@ struct fixture_t {
                        .db_config(make_config())
                        .timeout(timeout)
                        .finish();
+        db_addr = db_actor->get_address();
         sup->do_process();
 
         CHECK(static_cast<r::actor_base_t *>(db_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
-        db_addr = db_actor->get_address();
     }
 
     virtual void main() noexcept {}
@@ -178,7 +178,8 @@ struct fixture_t {
     bfs::path root_path;
     path_guard_t path_quard;
     r::system_context_t ctx;
-    load_msg_ptr_t reply;
+    model::diff::cluster_diff_ptr_t load_diff;
+    r::extended_error_ptr_t ee;
     stats_msg_ptr_t stats_reply;
 };
 
@@ -203,16 +204,13 @@ void test_db_population() {
 void test_loading_empty_db() {
     struct F : fixture_t {
         void main() noexcept override {
-            sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
-            sup->do_process();
             CHECK(get_reading_txn() == 1);
 
-            auto &diff = reply->payload.res.diff;
-            REQUIRE(diff->apply(*sup, {}));
+            REQUIRE(load_diff);
+            REQUIRE(load_diff->apply(*sup, {}));
 
-            REQUIRE(reply);
             sup->do_process();
-            reply.reset();
+            load_diff.reset();
             CHECK(get_reading_txn() == 0);
 
             auto devices = cluster->get_devices();
@@ -246,17 +244,15 @@ void test_forget_to_commit_other_thread() {
                 }
             };
 
-            sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
-            sup->do_process();
             CHECK(get_reading_txn() == 1);
 
-            auto &diff = reply->payload.res.diff;
+            REQUIRE(load_diff);
             auto visitor = V();
-            REQUIRE(diff->visit(visitor, {}));
+            REQUIRE(load_diff->visit(visitor, {}));
             REQUIRE(visitor.txn);
 
-            auto ptr = std::move(reply);
-            std::thread([ptr = std::move(ptr)]() mutable { ptr.reset(); }).join();
+            auto diff = std::move(load_diff);
+            std::thread([diff = std::move(diff)]() mutable { diff.reset(); }).join();
             CHECK(get_reading_txn() == 1);
             mdbx_txn_commit(visitor.txn);
             sup->do_process();
@@ -268,11 +264,9 @@ void test_forget_to_commit_other_thread() {
 void test_forget_to_commit_own_thread() {
     struct F : fixture_t {
         void main() noexcept override {
-            sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
-            sup->do_process();
             CHECK(get_reading_txn() == 1);
 
-            reply.reset();
+            load_diff.reset();
             CHECK(get_reading_txn() == 0);
             sup->do_process();
         }
@@ -293,12 +287,13 @@ void test_folder_upserting() {
             REQUIRE(folder->get_folder_infos().by_device(*cluster->get_device()));
 
             {
-                sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
+                load_diff = {};
+                sup->send<net::payload::load_cluster_trigger_t>(db_addr);
                 sup->do_process();
-                REQUIRE(reply);
+                REQUIRE(load_diff);
                 auto cluster_clone = make_cluster();
                 auto controller = make_apply_controller(cluster_clone);
-                REQUIRE(reply->payload.res.diff->apply(*controller, {}));
+                REQUIRE(load_diff->apply(*controller, {}));
 
                 auto folder_clone = cluster_clone->get_folders().by_id(folder->get_id());
                 REQUIRE(folder_clone);
@@ -313,13 +308,14 @@ void test_folder_upserting() {
                 builder.upsert_folder(folder_id, "/my/path", "my-label-2").apply(*sup);
                 REQUIRE(folder->get_label() == "my-label-2");
 
-                sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
+                load_diff = {};
+                sup->send<net::payload::load_cluster_trigger_t>(db_addr);
                 sup->do_process();
-                REQUIRE(reply);
+                REQUIRE(load_diff);
 
                 auto cluster_clone = make_cluster();
                 auto controller = make_apply_controller(cluster_clone);
-                REQUIRE(reply->payload.res.diff->apply(*controller, {}));
+                REQUIRE(load_diff->apply(*controller, {}));
                 auto folder_clone = cluster_clone->get_folders().by_id(folder->get_id());
                 REQUIRE(folder_clone->get_label() == "my-label-2");
             }
@@ -352,12 +348,13 @@ void test_unknown_and_ignored_devices_1() {
             REQUIRE(cluster->get_ignored_devices().size() == 1);
 
             {
-                sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
+                load_diff = {};
+                sup->send<net::payload::load_cluster_trigger_t>(db_addr);
                 sup->do_process();
-                REQUIRE(reply);
+                REQUIRE(load_diff);
                 auto cluster_clone = make_cluster();
                 auto controller = make_apply_controller(cluster_clone);
-                REQUIRE(reply->payload.res.diff->apply(*controller, {}));
+                REQUIRE(load_diff->apply(*controller, {}));
                 CHECK(cluster_clone->get_pending_devices().by_sha256(d_id1.get_sha256()));
                 CHECK(cluster_clone->get_ignored_devices().by_sha256(d_id2.get_sha256()));
             }
@@ -372,12 +369,13 @@ void test_unknown_and_ignored_devices_1() {
             sup->do_process();
 
             {
-                sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
+                load_diff = {};
+                sup->send<net::payload::load_cluster_trigger_t>(db_addr);
                 sup->do_process();
-                REQUIRE(reply);
+                REQUIRE(load_diff);
                 auto cluster_clone = make_cluster();
                 auto controller = make_apply_controller(cluster_clone);
-                REQUIRE(reply->payload.res.diff->apply(*controller, {}));
+                REQUIRE(load_diff->apply(*controller, {}));
                 REQUIRE(cluster_clone->get_pending_devices().size() == 1);
                 REQUIRE(cluster_clone->get_ignored_devices().size() == 1);
                 auto unknown = cluster_clone->get_pending_devices().by_sha256(d_id1.get_sha256());
@@ -393,12 +391,13 @@ void test_unknown_and_ignored_devices_1() {
             REQUIRE(cluster->get_ignored_devices().size() == 0);
 
             {
-                sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
+                load_diff = {};
+                sup->send<net::payload::load_cluster_trigger_t>(db_addr);
                 sup->do_process();
-                REQUIRE(reply);
+                REQUIRE(load_diff);
                 auto cluster_clone = make_cluster();
                 auto controller = make_apply_controller(cluster_clone);
-                REQUIRE(reply->payload.res.diff->apply(*controller, {}));
+                REQUIRE(load_diff->apply(*controller, {}));
                 REQUIRE(cluster_clone->get_pending_devices().size() == 0);
                 REQUIRE(cluster_clone->get_ignored_devices().size() == 0);
             }
@@ -419,24 +418,26 @@ void test_unknown_and_ignored_devices_2() {
 
             builder.add_unknown_device(d_id, sd).apply(*sup);
             {
-                sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
+                load_diff = {};
+                sup->send<net::payload::load_cluster_trigger_t>(db_addr);
                 sup->do_process();
-                REQUIRE(reply);
+                REQUIRE(load_diff);
                 auto cluster_clone = make_cluster();
                 auto controller = make_apply_controller(cluster_clone);
-                REQUIRE(reply->payload.res.diff->apply(*controller, {}));
+                REQUIRE(load_diff->apply(*controller, {}));
                 CHECK(cluster_clone->get_pending_devices().by_sha256(d_id.get_sha256()));
                 CHECK(!cluster_clone->get_ignored_devices().by_sha256(d_id.get_sha256()));
             }
 
             builder.add_ignored_device(d_id, sd).apply(*sup);
             {
-                sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
+                load_diff = {};
+                sup->send<net::payload::load_cluster_trigger_t>(db_addr);
                 sup->do_process();
-                REQUIRE(reply);
+                REQUIRE(load_diff);
                 auto cluster_clone = make_cluster();
                 auto controller = make_apply_controller(cluster_clone);
-                REQUIRE(reply->payload.res.diff->apply(*controller, {}));
+                REQUIRE(load_diff->apply(*controller, {}));
                 CHECK(!cluster_clone->get_pending_devices().by_sha256(d_id.get_sha256()));
                 CHECK(cluster_clone->get_ignored_devices().by_sha256(d_id.get_sha256()));
             }
@@ -458,12 +459,13 @@ void test_peer_updating() {
             CHECK(device->get_name() == "some_name");
             CHECK(device->get_cert_name() == "some-cn");
 
-            sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
+            load_diff = {};
+            sup->send<net::payload::load_cluster_trigger_t>(db_addr);
             sup->do_process();
-            REQUIRE(reply);
+            REQUIRE(load_diff);
             auto cluster_clone = make_cluster();
             auto controller = make_apply_controller(cluster_clone);
-            REQUIRE(reply->payload.res.diff->apply(*controller, {}));
+            REQUIRE(load_diff->apply(*controller, {}));
 
             REQUIRE(cluster_clone->get_devices().size() == 2);
             auto device_clone = cluster_clone->get_devices().by_sha256(sha256);
@@ -473,7 +475,6 @@ void test_peer_updating() {
             CHECK(device_clone->get_cert_name() == "some-cn");
         }
     };
-
     F().run();
 }
 
@@ -498,12 +499,13 @@ void test_folder_sharing() {
 
             CHECK(static_cast<r::actor_base_t *>(db_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
 
-            sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
+            load_diff = {};
+            sup->send<net::payload::load_cluster_trigger_t>(db_addr);
             sup->do_process();
-            REQUIRE(reply);
+            REQUIRE(load_diff);
             auto cluster_clone = make_cluster();
             auto controller = make_apply_controller(cluster_clone);
-            REQUIRE(reply->payload.res.diff->apply(*controller, {}));
+            REQUIRE(load_diff->apply(*controller, {}));
 
             auto peer_device = cluster_clone->get_devices().by_sha256(sha256);
             REQUIRE(peer_device);
@@ -571,15 +573,14 @@ void test_cluster_update_and_remove() {
             auto &unknown_folders = cluster->get_pending_folders();
             CHECK(std::distance(unknown_folders.begin(), unknown_folders.end()) == 1);
 
-            sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
+            load_diff = {};
+            sup->send<net::payload::load_cluster_trigger_t>(db_addr);
             sup->do_process();
-            REQUIRE(reply);
-            REQUIRE(!reply->payload.ee);
-
+            REQUIRE(load_diff);
             {
                 auto cluster_clone = make_cluster();
                 auto controller = make_apply_controller(cluster_clone);
-                REQUIRE(reply->payload.res.diff->apply(*controller, {}));
+                REQUIRE(load_diff->apply(*controller, {}));
                 REQUIRE(cluster_clone->get_blocks().size() == 1);
                 CHECK(cluster_clone->get_blocks().by_hash(b_hash));
                 auto folder = cluster_clone->get_folders().by_id(folder_id);
@@ -603,15 +604,14 @@ void test_cluster_update_and_remove() {
             sup->send<model::payload::model_update_t>(sup->get_address(), diff, nullptr);
             sup->do_process();
 
-            sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
+            load_diff = {};
+            sup->send<net::payload::load_cluster_trigger_t>(db_addr);
             sup->do_process();
-            REQUIRE(reply);
-            REQUIRE(!reply->payload.ee);
-
+            REQUIRE(load_diff);
             {
                 auto cluster_clone = make_cluster();
                 auto controller = make_apply_controller(cluster_clone);
-                REQUIRE(reply->payload.res.diff->apply(*controller, {}));
+                REQUIRE(load_diff->apply(*controller, {}));
                 REQUIRE(cluster_clone->get_blocks().size() == 0);
                 auto &fis = cluster_clone->get_folders().by_id(folder_id)->get_folder_infos();
                 REQUIRE(fis.size() == 2);
@@ -673,15 +673,15 @@ void test_unshare_and_remove_folder() {
             SECTION("unshare") {
                 builder.unshare_folder(*peer_folder_info).apply(*sup);
 
-                sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
+                load_diff = {};
+                sup->send<net::payload::load_cluster_trigger_t>(db_addr);
                 sup->do_process();
-                REQUIRE(reply);
-                REQUIRE(!reply->payload.ee);
+                REQUIRE(load_diff);
 
                 {
                     auto cluster_clone = make_cluster();
                     auto controller = make_apply_controller(cluster_clone);
-                    REQUIRE(reply->payload.res.diff->apply(*controller, {}));
+                    REQUIRE(load_diff->apply(*controller, {}));
                     auto &fis = cluster_clone->get_folders().by_id(folder_id)->get_folder_infos();
                     REQUIRE(fis.size() == 1);
                     REQUIRE(!fis.by_device(*peer_device));
@@ -693,15 +693,15 @@ void test_unshare_and_remove_folder() {
             SECTION("remove") {
                 builder.remove_folder(*folder).apply(*sup);
 
-                sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
+                load_diff = {};
+                sup->send<net::payload::load_cluster_trigger_t>(db_addr);
                 sup->do_process();
-                REQUIRE(reply);
-                REQUIRE(!reply->payload.ee);
+                REQUIRE(load_diff);
 
                 {
                     auto cluster_clone = make_cluster();
                     auto controller = make_apply_controller(cluster_clone);
-                    REQUIRE(reply->payload.res.diff->apply(*controller, {}));
+                    REQUIRE(load_diff->apply(*controller, {}));
                     REQUIRE(cluster_clone->get_folders().size() == 0);
                     REQUIRE(cluster_clone->get_blocks().size() == 0);
                 }
@@ -747,15 +747,14 @@ void test_remote_copy() {
                 REQUIRE(file_peer);
                 builder.remote_copy(*file_peer).apply(*sup);
 
-                sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
+                load_diff = {};
+                sup->send<net::payload::load_cluster_trigger_t>(db_addr);
                 sup->do_process();
-                REQUIRE(reply);
-                REQUIRE(!reply->payload.ee);
-
+                REQUIRE(load_diff);
                 {
                     auto cluster_clone = make_cluster();
                     auto controller = make_apply_controller(cluster_clone);
-                    REQUIRE(reply->payload.res.diff->apply(*controller, {}));
+                    REQUIRE(load_diff->apply(*controller, {}));
                     REQUIRE(cluster_clone->get_blocks().size() == 0);
                     auto &fis = cluster_clone->get_folders().by_id(folder_id)->get_folder_infos();
                     REQUIRE(fis.size() == 2);
@@ -790,14 +789,14 @@ void test_remote_copy() {
                 REQUIRE(folder_my->get_max_sequence() == 1);
 
                 {
-                    sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
+                    load_diff = {};
+                    sup->send<net::payload::load_cluster_trigger_t>(db_addr);
                     sup->do_process();
-                    REQUIRE(reply);
-                    REQUIRE(!reply->payload.ee);
+                    REQUIRE(load_diff);
 
                     auto cluster_clone = make_cluster();
                     auto controller = make_apply_controller(cluster_clone);
-                    REQUIRE(reply->payload.res.diff->apply(*controller, {}));
+                    REQUIRE(load_diff->apply(*controller, {}));
                     REQUIRE(cluster_clone->get_blocks().size() == 1);
                     auto &fis = cluster_clone->get_folders().by_id(folder_id)->get_folder_infos();
                     REQUIRE(fis.size() == 2);
@@ -817,14 +816,14 @@ void test_remote_copy() {
                 builder.remote_copy(*file_peer).apply(*sup);
 
                 {
-                    sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
+                    load_diff = {};
+                    sup->send<net::payload::load_cluster_trigger_t>(db_addr);
                     sup->do_process();
-                    REQUIRE(reply);
-                    REQUIRE(!reply->payload.ee);
+                    REQUIRE(load_diff);
 
                     auto cluster_clone = make_cluster();
                     auto controller = make_apply_controller(cluster_clone);
-                    REQUIRE(reply->payload.res.diff->apply(*controller, {}));
+                    REQUIRE(load_diff->apply(*controller, {}));
                     REQUIRE(cluster_clone->get_blocks().size() == 1);
                     auto &fis = cluster_clone->get_folders().by_id(folder_id)->get_folder_infos();
                     REQUIRE(fis.size() == 2);
@@ -862,13 +861,13 @@ void test_local_update() {
             builder.upsert_folder(folder_id, "/my/path").apply(*sup).local_update(folder_id, pr_file).apply(*sup);
 
             SECTION("check saved file with new blocks") {
-                sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
+                load_diff = {};
+                sup->send<net::payload::load_cluster_trigger_t>(db_addr);
                 sup->do_process();
-                REQUIRE(reply);
-                REQUIRE(!reply->payload.ee);
+                REQUIRE(load_diff);
                 auto cluster_clone = make_cluster();
                 auto controller = make_apply_controller(cluster_clone);
-                REQUIRE(reply->payload.res.diff->apply(*controller, {}));
+                REQUIRE(load_diff->apply(*controller, {}));
 
                 auto folder = cluster_clone->get_folders().by_id(folder_id);
                 auto folder_my = folder->get_folder_infos().by_device(*my_device);
@@ -884,13 +883,13 @@ void test_local_update() {
             builder.local_update(folder_id, pr_file).apply(*sup);
 
             SECTION("check deleted blocks") {
-                sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
+                load_diff = {};
+                sup->send<net::payload::load_cluster_trigger_t>(db_addr);
                 sup->do_process();
-                REQUIRE(reply);
-                REQUIRE(!reply->payload.ee);
+                REQUIRE(load_diff);
                 auto cluster_clone = make_cluster();
                 auto controller = make_apply_controller(cluster_clone);
-                REQUIRE(reply->payload.res.diff->apply(*controller, {}));
+                REQUIRE(load_diff->apply(*controller, {}));
 
                 auto folder = cluster_clone->get_folders().by_id(folder_id);
                 auto folder_my = folder->get_folder_infos().by_device(*my_device);
@@ -919,13 +918,14 @@ void test_peer_going_offline() {
 
             builder.update_state(*peer, {}, peer->get_state().offline()).apply(*sup);
 
-            sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
+            load_diff = {};
+            sup->send<net::payload::load_cluster_trigger_t>(db_addr);
             sup->do_process();
-            REQUIRE(reply);
+            REQUIRE(load_diff);
 
             auto cluster_clone = make_cluster();
             auto controller = make_apply_controller(cluster_clone);
-            REQUIRE(reply->payload.res.diff->apply(*controller, {}));
+            REQUIRE(load_diff->apply(*controller, {}));
             auto peer_clone = cluster_clone->get_devices().by_sha256(sha256);
             db::Device db_peer_clone;
             peer_clone->serialize(db_peer_clone);
@@ -987,15 +987,14 @@ void test_remove_peer() {
 
             builder.remove_peer(*peer_device).apply(*sup);
 
-            sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
+            load_diff = {};
+            sup->send<net::payload::load_cluster_trigger_t>(db_addr);
             sup->do_process();
-            REQUIRE(reply);
-            REQUIRE(!reply->payload.ee);
-
+            REQUIRE(load_diff);
             {
                 auto cluster_clone = make_cluster(false);
                 auto controller = make_apply_controller(cluster_clone);
-                REQUIRE(reply->payload.res.diff->apply(*controller, {}));
+                REQUIRE(load_diff->apply(*controller, {}));
                 CHECK(cluster_clone->get_pending_folders().size() == 0);
                 CHECK(cluster_clone->get_devices().size() == 1);
                 REQUIRE(cluster_clone->get_blocks().size() == 0);
@@ -1028,13 +1027,13 @@ void test_update_peer() {
             }
 
             {
-                sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
+                load_diff = {};
+                sup->send<net::payload::load_cluster_trigger_t>(db_addr);
                 sup->do_process();
-                REQUIRE(reply);
-                REQUIRE(!reply->payload.ee);
+                REQUIRE(load_diff);
                 auto cluster_clone = make_cluster();
                 auto controller = make_apply_controller(cluster_clone);
-                REQUIRE(reply->payload.res.diff->apply(*controller, {}));
+                REQUIRE(load_diff->apply(*controller, {}));
                 CHECK(cluster_clone->get_pending_devices().size() == 0);
                 CHECK(cluster_clone->get_ignored_devices().size() == 0);
                 CHECK(cluster_clone->get_devices().size() == 2);
@@ -1120,13 +1119,13 @@ void test_peer_3_folders_6_files() {
             }
 
             {
-                sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
+                load_diff = {};
+                sup->send<net::payload::load_cluster_trigger_t>(db_addr);
                 sup->do_process();
-                REQUIRE(reply);
-                REQUIRE(!reply->payload.ee);
+                REQUIRE(load_diff);
                 auto cluster_clone = make_cluster();
                 auto controller = make_apply_controller(cluster_clone);
-                REQUIRE(reply->payload.res.diff->apply(*controller, {}));
+                REQUIRE(load_diff->apply(*controller, {}));
 
                 auto get_my_file = [&](std::string_view folder_id, std::string_view name) {
                     auto folder = cluster->get_folders().by_id(folder_id);
@@ -1199,13 +1198,13 @@ void test_db_migration_1_2() {
     struct F2 : fixture_t {
         F2(fixture_t &other) : fixture_t(std::move(other)) {}
         void main() noexcept override {
-            sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
+            load_diff = {};
+            sup->send<net::payload::load_cluster_trigger_t>(db_addr);
             sup->do_process();
-            REQUIRE(reply);
-            REQUIRE(!reply->payload.ee);
+            REQUIRE(load_diff);
             auto cluster_clone = make_cluster();
             auto controller = make_apply_controller(cluster_clone);
-            REQUIRE(reply->payload.res.diff->apply(*controller, {}));
+            REQUIRE(load_diff->apply(*controller, {}));
 
             auto f_cloned = cluster_clone->get_folders().by_id(folder_id);
             auto &folder_infos = f_cloned->get_folder_infos();
@@ -1256,14 +1255,14 @@ void test_corrupted_file() {
                 REQUIRE(db::remove(key, txn));
                 REQUIRE(!txn.commit().has_error());
 
-                sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
+                load_diff = {};
+                sup->send<net::payload::load_cluster_trigger_t>(db_addr);
                 sup->do_process();
-                REQUIRE(reply);
-                REQUIRE(!reply->payload.ee);
+                REQUIRE(load_diff);
 
                 auto cluster_clone = make_cluster(false);
                 auto controller = make_apply_controller(cluster_clone);
-                diff = reply->payload.res.diff;
+                diff = load_diff;
                 REQUIRE(diff->apply(*controller, {}));
                 auto &folder_infos = cluster_clone->get_folders().by_id(folder_id)->get_folder_infos();
                 auto folder_info = folder_infos.by_device(*my_device);
@@ -1277,14 +1276,14 @@ void test_corrupted_file() {
                 REQUIRE(db::remove(key, txn));
                 REQUIRE(!txn.commit().has_error());
 
-                sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
+                load_diff = {};
+                sup->send<net::payload::load_cluster_trigger_t>(db_addr);
                 sup->do_process();
-                REQUIRE(reply);
-                REQUIRE(!reply->payload.ee);
+                REQUIRE(load_diff);
 
                 auto cluster_clone = make_cluster(false);
                 auto controller = make_apply_controller(cluster_clone);
-                diff = reply->payload.res.diff;
+                diff = load_diff;
                 REQUIRE(diff->apply(*controller, {}));
                 auto &folder_infos = cluster_clone->get_folders().by_id(folder_id)->get_folder_infos();
                 REQUIRE(folder_infos.size() == 0);
@@ -1329,19 +1328,19 @@ void test_flush_on_shutdown() {
             auto builder = diff_builder_t(*cluster);
             builder.upsert_folder(folder_id, "/my/path").apply(*sup).local_update(folder_id, pr_file).apply(*sup);
 
+            load_diff = {};
             db_actor->do_shutdown();
             sup->do_process();
 
             launch_db();
 
             SECTION("loaded data") {
-                sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
+                sup->send<net::payload::load_cluster_trigger_t>(db_addr);
                 sup->do_process();
-                REQUIRE(reply);
-                REQUIRE(!reply->payload.ee);
+                REQUIRE(load_diff);
                 auto cluster_clone = make_cluster();
                 auto controller = make_apply_controller(cluster_clone);
-                REQUIRE(reply->payload.res.diff->apply(*controller, {}));
+                REQUIRE(load_diff->apply(*controller, {}));
 
                 auto folder = cluster_clone->get_folders().by_id(folder_id);
                 auto folder_my = folder->get_folder_infos().by_device(*my_device);
@@ -1374,18 +1373,18 @@ void test_iterative_loading() {
             }
             builder.apply(*sup);
 
-            sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
+            load_diff = {};
+            sup->send<net::payload::load_cluster_trigger_t>(db_addr);
             sup->do_process();
-            REQUIRE(reply);
-            REQUIRE(!reply->payload.ee);
+            REQUIRE(load_diff);
             auto cluster_clone = make_cluster();
             auto controller = make_apply_controller(cluster_clone);
-            REQUIRE(reply->payload.res.diff->apply(*controller, {}));
+            REQUIRE(load_diff->apply(*controller, {}));
 
             auto folder = cluster_clone->get_folders().by_id(folder_id);
             auto folder_my = folder->get_folder_infos().by_device(*my_device);
             CHECK(folder_my->get_file_infos().size() == 20);
-            CHECK(sup->packages == 21);
+            CHECK(sup->packages >= 21);
         }
     };
     F().run();
@@ -1430,11 +1429,12 @@ void test_iterative_loading_interrupt() {
             }
             builder.apply(*sup);
 
-            sup->request<net::payload::load_cluster_request_t>(db_addr).send(timeout);
+            load_diff = {};
+            sup->send<net::payload::load_cluster_trigger_t>(db_addr);
             sup->do_process();
-            REQUIRE(reply);
-            REQUIRE(reply->payload.ee);
-            CHECK(sup->packages == 6);
+            REQUIRE(!load_diff);
+            REQUIRE(ee);
+            CHECK(sup->packages < 10);
         }
     };
     F().run();

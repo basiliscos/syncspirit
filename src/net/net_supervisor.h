@@ -58,13 +58,12 @@ struct SYNCSPIRIT_API net_supervisor_t : net_supervisor_base_t<ra::supervisor_as
 
     explicit net_supervisor_t(config_t &config);
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
-    void on_child_init(actor_base_t *actor, const r::extended_error_ptr_t &ec) noexcept override;
     void on_child_shutdown(actor_base_t *actor) noexcept override;
     void on_start() noexcept override;
     void shutdown_finish() noexcept override;
 
   private:
-    void on_load_cluster(message::load_cluster_response_t &message) noexcept;
+    // void on_load_cluster(message::load_cluster_response_t &message) noexcept;
     void on_model_request(model::message::model_request_t &message) noexcept;
     void on_thread_up(model::message::thread_up_t &) noexcept;
     void on_thread_ready(model::message::thread_ready_t &) noexcept;
@@ -72,8 +71,6 @@ struct SYNCSPIRIT_API net_supervisor_t : net_supervisor_base_t<ra::supervisor_as
 
     void dial_peer(const model::device_id_t &peer_device_id, const utils::uri_container_t &uris) noexcept;
     void launch_early() noexcept;
-    void launch_cluster() noexcept;
-    void load_db() noexcept;
     void seed_model() noexcept;
 
     void commit_loading() noexcept override;

@@ -68,7 +68,6 @@ struct SYNCSPIRIT_API db_actor_t : public r::actor_base_t, private model::diff::
     using known_hashes_t = std::unordered_set<utils::bytes_view_t>;
     using unique_keys_t = std::set<utils::bytes_t, utils::bytes_comparator_t>;
     using folder_infos_uuids_t = std::unordered_set<std::string>;
-    using load_cluster_request_ptr_t = r::intrusive_ptr_t<message::load_cluster_request_t>;
 
     struct payload {
         struct commit_t {
@@ -84,16 +83,13 @@ struct SYNCSPIRIT_API db_actor_t : public r::actor_base_t, private model::diff::
         };
 
         struct partial_load_t {
-            load_cluster_request_ptr_t request;
             model::diff::cluster_diff_ptr_t diff;
             model::diff::cluster_diff_t *next;
             known_hashes_t known_hashes;
             db::container_t blocks;
             db::container_t::pointer block_next;
-            ;
             db::container_t files;
             db::container_t::pointer files_next;
-            ;
             folder_infos_uuids_t folder_infos_uuids;
             unique_keys_t corrupted_files;
             db::transaction_t txn;
@@ -109,7 +105,7 @@ struct SYNCSPIRIT_API db_actor_t : public r::actor_base_t, private model::diff::
     outcome::result<void> commit_on_demand() noexcept;
     outcome::result<void> force_commit() noexcept;
 
-    void on_cluster_load(message::load_cluster_request_t &message) noexcept;
+    void on_cluster_load_trigger(message::load_cluster_trigger_t &) noexcept;
     void on_commit(commit_message_t &) noexcept;
     void on_model_update(model::message::model_update_t &) noexcept;
     void on_db_info(message::db_info_request_t &) noexcept;
