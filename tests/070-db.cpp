@@ -1455,7 +1455,7 @@ void test_iterative_application_interrupt() {
                 using parent_t::cluster;
                 using parent_t::resources;
 
-                my_controller_t(r::actor_config_t &cfg) noexcept : parent_t(this, cfg) {}
+                my_controller_t(r::actor_config_t &cfg) noexcept : parent_t(this, 0, cfg) {}
 
                 void configure(r::plugin::plugin_base_t &plugin) noexcept override {
                     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {

@@ -67,22 +67,26 @@ static void _my_log(MDBX_log_level_t loglevel, const char *function,int line, co
 
 using folder_infos_set_t = std::unordered_set<const model::folder_info_t *>;
 
-db_actor_t::payload::commit_t::commit_t(db::transaction_t txn_) noexcept : txn{std::move(txn_)} {
+db_actor_t::payload::commit_t::commit_t(db::transaction_t txn_, r::plugin::resources_plugin_t *resources_) noexcept
+    : txn{std::move(txn_)}, resources{resources_} {
     thread_id = std::this_thread::get_id();
 }
 
 outcome::result<void> db_actor_t::payload::commit_t::commit() noexcept {
     thread_id = {};
-    return txn.commit();
+    auto r = txn.commit();
+    resources->release(resource::partial_load);
+    return r;
 }
 
 db_actor_t::payload::commit_t::~commit_t() {
     if (thread_id != thread_id_t{}) {
         if (thread_id != std::this_thread::get_id()) {
             spdlog::error("attempt to close db orphaned transaction from other thread. Leak!");
+            resources->release(resource::partial_load);
             txn.txn = {};
         } else {
-            auto r = txn.commit();
+            auto r = commit();
             if (r) {
                 spdlog::debug("successfully closed orphaned transaction");
             } else {
@@ -538,10 +542,9 @@ void db_actor_t::on_patrial_load(partial_load_t &message) noexcept {
             p.next = p.next->assign_sibling(new load::remove_corrupted_files_t(std::move(corrupted)));
         }
 
-        auto commit_message = r::make_routed_message<payload::commit_t>(sink, address, std::move(p.txn));
+        auto commit_message = r::make_routed_message<payload::commit_t>(sink, address, std::move(p.txn), resources);
         p.next = p.next->assign_sibling(new load::commit_t(std::move(commit_message)));
         send<net::payload::load_cluster_success_t>(coordinator, std::move(p.diff));
-        resources->release(resource::partial_load);
     }
 }
 

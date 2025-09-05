@@ -15,6 +15,7 @@ namespace {
 namespace to {
 struct state {};
 struct make_error {};
+struct resources {};
 } // namespace to
 } // namespace
 
@@ -28,10 +29,13 @@ actor_base_t::access<to::make_error, const std::error_code &, const extended_err
 }
 
 template <> inline auto &actor_base_t::access<to::state>() noexcept { return state; }
+template <> inline auto &actor_base_t::access<to::resources>() noexcept { return resources; }
 
 } // namespace rotor
 
-iterative_controller_base_t::iterative_controller_base_t(r::actor_base_t *owner_) noexcept : owner{owner_} {}
+iterative_controller_base_t::iterative_controller_base_t(r::actor_base_t *owner_,
+                                                         r::plugin::resource_id_t interrupt_) noexcept
+    : owner{owner_}, interrupt{interrupt_} {}
 
 void iterative_controller_base_t::on_model_update(model::message::model_update_t &message) noexcept {
     LOG_TRACE(log, "on_model_update");
@@ -39,7 +43,10 @@ void iterative_controller_base_t::on_model_update(model::message::model_update_t
         delayed_updates.emplace_back(&message);
     } else {
         auto &p = message.payload;
-        auto context = apply_context_t{{}, p.custom};
+        auto context = apply_context_t{
+            {&message},
+            p.custom,
+        };
         process(*p.diff, context);
     }
 }
@@ -50,10 +57,11 @@ void iterative_controller_base_t::process(model::diff::cluster_diff_t &diff, app
 
 void iterative_controller_base_t::on_model_interrupt(model::message::model_interrupt_t &message) noexcept {
     using namespace model::payload;
+    owner->access<to::resources>()->release(interrupt);
     LOG_TRACE(log, "on_model_interrupt");
     auto &p = message.payload;
-    auto apply_context =
-        apply_context_t(model_interrupt_t{p.total_blocks, p.total_files, p.loaded_blocks, p.loaded_files});
+    auto apply_context = apply_context_t(
+        model_interrupt_t{std::move(p.original), p.total_blocks, p.total_files, p.loaded_blocks, p.loaded_files});
     process(*message.payload.diff, apply_context);
     while (!interrupted && delayed_updates.size()) {
         LOG_TRACE(log, "applying delayed model update");
@@ -97,16 +105,18 @@ void iterative_controller_base_t::process_impl(model::diff::cluster_diff_t &diff
 
     interrupted = (bool)apply_context.diff;
     if (interrupted) {
+        using payload_t = model::payload::model_interrupt_t;
         auto &address = owner->get_address();
-        auto message = r::make_message<model::payload::model_interrupt_t>(address, std::move(apply_context));
+        auto message = r::make_message<payload_t>(address, std::move(apply_context));
         owner->send<hasher::payload::package_t>(bouncer, message);
+        owner->access<to::resources>()->acquire(interrupt);
     }
 }
 
 auto iterative_controller_base_t::apply(const model::diff::load::interrupt_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     auto ctx = static_cast<apply_context_t *>(custom);
-    ctx->diff = diff.sibling;
+    ctx->diff = diff.sibling.get();
     return outcome::success();
 }
 

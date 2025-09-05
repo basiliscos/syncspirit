@@ -8,6 +8,7 @@
 #include "model/messages.h"
 #include <list>
 #include <rotor/plugin/plugin_base.h>
+#include <rotor/plugin/resources.h>
 
 namespace syncspirit::model::diff {
 
@@ -20,9 +21,9 @@ struct SYNCSPIRIT_API iterative_controller_base_t : apply_controller_t {
         void *custom_payload = nullptr;
     };
 
-    iterative_controller_base_t(r::actor_base_t *owner) noexcept;
-
   protected:
+    iterative_controller_base_t(r::actor_base_t *owner, r::plugin::resource_id_t interrupt) noexcept;
+
     void on_model_update(model::message::model_update_t &message) noexcept;
     void on_model_interrupt(model::message::model_interrupt_t &message) noexcept;
     void process_impl(model::diff::cluster_diff_t &diff, apply_context_t &apply_context) noexcept;
@@ -39,6 +40,7 @@ struct SYNCSPIRIT_API iterative_controller_base_t : apply_controller_t {
     delayed_updates_t delayed_updates;
     r::address_ptr_t coordinator;
     r::address_ptr_t bouncer;
+    r::plugin::resource_id_t interrupt;
     bool interrupted = false;
 };
 
@@ -46,7 +48,8 @@ template <typename T, typename Parent> struct iterative_controller_t : iterative
     using base_t = iterative_controller_base_t;
 
     template <typename... Args>
-    iterative_controller_t(T *self, Args &&...args) noexcept : base_t(self), Parent(std::forward<Args>(args)...) {}
+    iterative_controller_t(T *self, r::plugin::resource_id_t interrupt, Args &&...args) noexcept
+        : base_t(self, interrupt), Parent(std::forward<Args>(args)...) {}
     void on_model_update(model::message::model_update_t &message) noexcept { base_t::on_model_update(message); }
     void on_model_interrupt(model::message::model_interrupt_t &message) noexcept {
         base_t::on_model_interrupt(message);

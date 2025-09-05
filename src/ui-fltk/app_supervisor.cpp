@@ -53,6 +53,12 @@ using entities_t = std::pmr::unordered_set<entity_ptr_t>;
 using guards_t = std::pmr::vector<entity_t::monitor_guard_t>;
 using shared_device_t = std::pmr::vector<syncspirit::model::device_t *>;
 
+namespace {
+namespace resource {
+r::plugin::resource_id_t interrupt = 0;
+} // namespace resource
+} // namespace
+
 struct app_monitor_t final : entities_monitor_t {
     app_monitor_t(entities_t &deleted_, entities_ptrs_t &updated_) : deleted{deleted_}, updated{updated_} {}
     void on_delete(entity_t &entity) noexcept override {
@@ -115,10 +121,10 @@ struct callback_impl_t final : callback_t {
 };
 
 app_supervisor_t::app_supervisor_t(config_t &config)
-    : parent_t(this, config), log_sink(config.log_sink), config_path{std::move(config.config_path)},
-      app_config(std::move(config.app_config)), app_config_original{app_config}, content{nullptr}, devices{nullptr},
-      folders{nullptr}, pending_devices{nullptr}, ignored_devices{nullptr}, db_info_viewer{nullptr},
-      main_window{nullptr} {
+    : parent_t(this, resource::interrupt, config), log_sink(config.log_sink),
+      config_path{std::move(config.config_path)}, app_config(std::move(config.app_config)),
+      app_config_original{app_config}, content{nullptr}, devices{nullptr}, folders{nullptr}, pending_devices{nullptr},
+      ignored_devices{nullptr}, db_info_viewer{nullptr}, main_window{nullptr} {
     started_at = clock_t::now();
     sequencer = model::make_sequencer(started_at.time_since_epoch().count());
 }

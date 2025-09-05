@@ -57,6 +57,18 @@ namespace asio = boost::asio;
 
 using namespace syncspirit;
 
+namespace {
+namespace to {
+struct state {};
+} // namespace to
+} // namespace
+
+namespace rotor {
+
+template <> inline auto &actor_base_t::access<to::state>() noexcept { return state; }
+
+} // namespace rotor
+
 [[noreturn]] static void report_error_and_die(r::actor_base_t *actor, const r::extended_error_ptr_t &ec) noexcept {
     auto name = actor ? actor->get_identity() : "unknown";
     utils::get_root_logger()->critical("actor '{}' error: {}", name, ec->message());
@@ -420,10 +432,18 @@ int app_main(app_context_t &app_ctx) {
         }
     }
 
-    bouncer_shutdown_flag = true;
-
     sup_fltk->do_shutdown();
-    sup_fltk->do_process();
+    {
+        auto state = r::state_t::OPERATIONAL;
+        do {
+            Fl::wait();
+            sup_fltk->do_process();
+            state = static_cast<r::actor_base_t *>(sup_fltk.get())->access<to::state>();
+        } while (state != r::state_t::SHUT_DOWN);
+    }
+
+    logger->debug("asking bouncer to shutdown");
+    bouncer_shutdown_flag = true;
 
     fs_thread.join();
     net_thread.join();

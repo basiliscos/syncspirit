@@ -71,15 +71,16 @@ struct SYNCSPIRIT_API db_actor_t : public r::actor_base_t, private model::diff::
 
     struct payload {
         struct commit_t {
-            commit_t(db::transaction_t txn) noexcept;
+            commit_t(db::transaction_t txn, r::plugin::resources_plugin_t *resources) noexcept;
             commit_t(const commit_t &) = delete;
             commit_t(commit_t &&) = default;
-            ~commit_t() noexcept;
+            ~commit_t();
 
             outcome::result<void> commit() noexcept;
 
             db::transaction_t txn;
             thread_id_t thread_id;
+            r::plugin::resources_plugin_t *resources;
         };
 
         struct partial_load_t {

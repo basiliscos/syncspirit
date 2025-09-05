@@ -19,8 +19,15 @@
 using namespace syncspirit::fs;
 using namespace syncspirit::presentation;
 
+namespace {
+namespace resource {
+r::plugin::resource_id_t interrupt = 0;
+} // namespace resource
+} // namespace
+
 fs_supervisor_t::fs_supervisor_t(config_t &cfg)
-    : parent_t(this, cfg), sequencer(cfg.sequencer), fs_config{cfg.fs_config}, hasher_threads{cfg.hasher_threads} {
+    : parent_t(this, resource::interrupt, cfg), sequencer(cfg.sequencer), fs_config{cfg.fs_config},
+      hasher_threads{cfg.hasher_threads} {
     rw_cache.reset(new file_cache_t(fs_config.mru_size));
 }
 

@@ -22,8 +22,14 @@
 namespace bfs = std::filesystem;
 using namespace syncspirit::net;
 
+namespace {
+namespace resource {
+r::plugin::resource_id_t interrupt = 0;
+} // namespace resource
+} // namespace
+
 net_supervisor_t::net_supervisor_t(net_supervisor_t::config_t &cfg)
-    : parent_t(this, cfg), sequencer{cfg.sequencer}, app_config{cfg.app_config},
+    : parent_t(this, resource::interrupt, cfg), sequencer{cfg.sequencer}, app_config{cfg.app_config},
       independent_threads{cfg.independent_threads}, thread_counter{independent_threads} {
     auto log = utils::get_logger(names::coordinator);
     auto &files_cfg = app_config.global_announce_config;
@@ -163,7 +169,7 @@ void net_supervisor_t::on_thread_up(model::message::thread_up_t &) noexcept {
 void net_supervisor_t::on_thread_ready(model::message::thread_ready_t &) noexcept {
     --thread_counter;
     LOG_DEBUG(log, "on_thread_ready, left = {}", thread_counter);
-    if (thread_counter == 0) {
+    if (thread_counter == 0 && state == r::state_t::OPERATIONAL) {
         send<model::payload::app_ready_t>(address);
     }
 }
