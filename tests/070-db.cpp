@@ -3,6 +3,7 @@
 
 #include <catch2/catch_all.hpp>
 #include "db/error_code.h"
+#include "model/diff/iterative_controller.h"
 #include "test-utils.h"
 #include "diff-builder.h"
 #include "model/diff/load/commit.h"
@@ -14,6 +15,7 @@
 #include "model/cluster.h"
 #include "db/utils.h"
 #include "net/db_actor.h"
+#include "net/names.h"
 #include <filesystem>
 #include <thread>
 
@@ -1440,6 +1442,96 @@ void test_iterative_loading_interrupt() {
     F().run();
 };
 
+template <typename T> using my_controller_base_t = model::diff::iterative_controller_t<T, r::actor_base_t>;
+void test_iterative_application_interrupt() {
+    struct F : fixture_t {
+
+        config::db_config_t make_config() noexcept override { return config::db_config_t{1024 * 1024, 0, 1, 1}; }
+
+        void main() noexcept override {
+
+            struct my_controller_t : my_controller_base_t<my_controller_t> {
+                using parent_t = my_controller_base_t<my_controller_t>;
+                using parent_t::cluster;
+                using parent_t::resources;
+
+                my_controller_t(r::actor_config_t &cfg) noexcept : parent_t(this, cfg) {}
+
+                void configure(r::plugin::plugin_base_t &plugin) noexcept override {
+                    plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
+                        p.set_identity("my.controller", false);
+                        log = utils::get_logger(identity);
+                    });
+                    plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
+                        p.discover_name(net::names::coordinator, coordinator, true)
+                            .link(false)
+                            .callback([&](auto phase, auto &ee) {
+                                if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {
+                                    auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
+                                    auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
+                                    plugin->subscribe_actor(&my_controller_t::on_model_update, address);
+                                }
+                            });
+                        p.discover_name(net::names::bouncer, bouncer, true).link(false);
+                    });
+                    plugin.with_casted<r::plugin::starter_plugin_t>(
+                        [&](auto &p) { p.subscribe_actor(&my_controller_t::on_model_interrupt); },
+                        r::plugin::config_phase_t::PREINIT);
+                }
+
+                void process(model::diff::cluster_diff_t &diff, apply_context_t &context) noexcept override {
+                    parent_t::process(diff, context);
+                    auto &folder = cluster->get_folders().begin()->item;
+                    auto &fi = folder->get_folder_infos().begin()->item;
+                    if (fi->get_file_infos().size() == 10) {
+                        do_shutdown();
+                        resources->acquire(0);
+                    }
+                }
+            };
+
+            auto builder = diff_builder_t(*cluster);
+            auto folder_id = "1234-5678";
+
+            builder.upsert_folder(folder_id, "/my/path").apply(*sup);
+
+            for (int i = 0; i < 20; ++i) {
+                auto pr_file = proto::FileInfo();
+                proto::set_name(pr_file, fmt::format("file-{:03}.bin", i));
+                builder.local_update(folder_id, pr_file);
+            }
+            builder.apply(*sup);
+
+            load_diff = {};
+            sup->send<net::payload::load_cluster_trigger_t>(db_addr);
+            sup->do_process();
+            REQUIRE(load_diff);
+            auto cluster_clone = make_cluster();
+
+            auto controller = sup->create_actor<my_controller_t>().timeout(timeout).finish();
+            auto addr = controller->get_address();
+            sup->do_process();
+            controller->cluster = cluster_clone;
+            sup->send<model::payload::model_update_t>(addr, std::move(load_diff));
+            sup->do_process();
+
+            auto folder = cluster_clone->get_folders().by_id(folder_id);
+            auto folder_my = folder->get_folder_infos().by_device(*my_device);
+            auto files_sz = folder_my->get_file_infos().size();
+            CHECK(files_sz >= 10);
+            CHECK(files_sz <= 12);
+
+            CHECK(static_cast<r::actor_base_t *>(controller.get())->access<to::state>() == r::state_t::SHUTTING_DOWN);
+            controller->resources->release(0);
+            sup->do_process();
+            CHECK(static_cast<r::actor_base_t *>(controller.get())->access<to::state>() == r::state_t::SHUT_DOWN);
+
+            CHECK(get_reading_txn() == 0);
+        }
+    };
+    F().run();
+};
+
 int _init() {
     REGISTER_TEST_CASE(test_db_population, "test_db_population", "[db]");
     REGISTER_TEST_CASE(test_loading_empty_db, "test_loading_empty_db", "[db]");
@@ -1463,6 +1555,7 @@ int _init() {
     REGISTER_TEST_CASE(test_flush_on_shutdown, "test_flush_on_shutdown", "[db]");
     REGISTER_TEST_CASE(test_iterative_loading, "test_iterative_loading", "[db]");
     REGISTER_TEST_CASE(test_iterative_loading_interrupt, "test_iterative_loading_interrupt", "[db]");
+    REGISTER_TEST_CASE(test_iterative_application_interrupt, "test_iterative_application_interrupt", "[db]");
     return 1;
 }
 

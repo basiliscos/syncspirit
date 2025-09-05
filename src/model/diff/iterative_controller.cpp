@@ -13,6 +13,7 @@ using namespace syncspirit::model::diff;
 
 namespace {
 namespace to {
+struct state {};
 struct make_error {};
 } // namespace to
 } // namespace
@@ -25,6 +26,8 @@ actor_base_t::access<to::make_error, const std::error_code &, const extended_err
     const std::error_code &ec, const extended_error_ptr_t &next, const message_ptr_t &request) noexcept {
     return make_error(ec, next, request);
 }
+
+template <> inline auto &actor_base_t::access<to::state>() noexcept { return state; }
 
 } // namespace rotor
 
@@ -67,7 +70,25 @@ void iterative_controller_base_t::process_impl(model::diff::cluster_diff_t &diff
     using T0 = const std::error_code &;
     using T1 = const r::extended_error_ptr_t &;
     using T2 = const r::message_ptr_t &;
-    auto r = diff.apply(*this, &apply_context);
+
+    auto target_diff = &diff;
+
+    if (owner->access<to::state>() > r::state_t::OPERATIONAL) {
+        LOG_DEBUG(log, "no longer operational, going to commit immediately");
+        auto current = &diff;
+        auto commit_diff = (model::diff::load::commit_t *)(nullptr);
+        while (current && !commit_diff) {
+            commit_diff = dynamic_cast<model::diff::load::commit_t *>(current);
+            current = current->sibling.get();
+        }
+        if (!commit_diff) {
+            LOG_ERROR(log, "commit diff not found");
+        } else {
+            target_diff = commit_diff;
+        }
+    }
+
+    auto r = target_diff->apply(*this, &apply_context);
     if (!r) {
         LOG_ERROR(log, "error applying model diff: {}", r.assume_error().message());
         auto ee = owner->access<to::make_error, T0, T1, T2>(r.assume_error(), {}, {});
