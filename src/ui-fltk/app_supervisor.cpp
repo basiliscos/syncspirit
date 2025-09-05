@@ -48,12 +48,6 @@ using namespace syncspirit::presentation;
 
 static auto MAX_DEPTH = std::numeric_limits<std::int32_t>::max();
 
-namespace {
-namespace resource {
-r::plugin::resource_id_t model = 0;
-}
-} // namespace
-
 using entities_ptrs_t = std::pmr::unordered_set<const entity_t *>;
 using entities_t = std::pmr::unordered_set<entity_ptr_t>;
 using guards_t = std::pmr::vector<entity_t::monitor_guard_t>;
@@ -155,7 +149,6 @@ void app_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 plugin->subscribe_actor(&app_supervisor_t::on_app_ready, coordinator);
                 plugin->subscribe_actor(&app_supervisor_t::on_db_loaded, coordinator);
                 send<syncspirit::model::payload::thread_up_t>(coordinator);
-                resources->acquire(resource::model);
             }
         });
         p.discover_name(net::names::bouncer, bouncer, true).link(false);
@@ -191,7 +184,6 @@ auto app_supervisor_t::get_coordinator_address() -> r::address_ptr_t & { return 
 
 void app_supervisor_t::on_model_response(model::message::model_response_t &res) noexcept {
     LOG_TRACE(log, "on_model_response");
-    resources->release(resource::model);
     auto &ee = res.payload.ee;
     if (ee) {
         LOG_ERROR(log, "cannot get model: {}", ee->message());

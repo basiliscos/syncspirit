@@ -78,7 +78,8 @@ void net_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         [&](auto &p) {
             p.subscribe_actor(&net_supervisor_t::on_model_update);
             p.subscribe_actor(&net_supervisor_t::on_model_interrupt);
-            // p.subscribe_actor(&net_supervisor_t::on_load_cluster);
+            p.subscribe_actor(&net_supervisor_t::on_load_cluster_success);
+            p.subscribe_actor(&net_supervisor_t::on_load_cluster_fail);
             p.subscribe_actor(&net_supervisor_t::on_model_request);
             p.subscribe_actor(&net_supervisor_t::on_thread_up);
             p.subscribe_actor(&net_supervisor_t::on_thread_ready);
@@ -124,20 +125,18 @@ void net_supervisor_t::seed_model() noexcept {
     put(std::move(message));
 }
 
-#if 0
-void net_supervisor_t::on_load_cluster(message::load_cluster_response_t &message) noexcept {
+void net_supervisor_t::on_load_cluster_fail(message::load_cluster_fail_t &message) noexcept {
     auto &ee = message.payload.ee;
-    if (ee) {
-        LOG_ERROR(log, "cannot load cluster : {}", ee->message());
-        return do_shutdown(ee);
-    }
-    LOG_TRACE(log, "on_load_cluster");
-    auto &res = message.payload.res;
+    LOG_ERROR(log, "cannot load cluster : {}", ee->message());
+    return do_shutdown(ee);
+}
+
+void net_supervisor_t::on_load_cluster_success(message::load_cluster_success_t &message) noexcept {
+    LOG_TRACE(log, "on_load_cluster_success");
 
     send<model::payload::db_loaded_t>(address);
-    load_diff = std::move(res.diff);
+    load_diff = std::move(message.payload.diff);
 }
-#endif
 
 void net_supervisor_t::on_model_request(model::message::model_request_t &message) noexcept {
     --thread_counter;

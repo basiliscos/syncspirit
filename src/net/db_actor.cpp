@@ -239,6 +239,7 @@ void db_actor_t::shutdown_start() noexcept {
 }
 
 void db_actor_t::shutdown_finish() noexcept {
+    LOG_TRACE(log, "shutdown_finish");
     if (txn_holder && uncommitted) {
         uncommitted = db_config.uncommitted_threshold;
         auto r = commit_on_demand();
@@ -370,8 +371,8 @@ void db_actor_t::on_cluster_load_trigger(message::load_cluster_trigger_t &) noex
         return send<net::payload::load_cluster_fail_t>(coordinator, ee);
     }
 
-    LOG_DEBUG(log, "on_cluster_load, all raw bytes has been loaded, blocks = {}, files = {}", blocks.size(),
-              files.size());
+    LOG_INFO(log, "on_cluster_load, all raw bytes has been loaded, blocks = {}, files = {}", blocks.size(),
+             files.size());
 
     auto diff = model::diff::cluster_diff_ptr_t{};
     diff.reset(new load::load_cluster_t(blocks.size(), files.size()));
@@ -443,8 +444,7 @@ void db_actor_t::on_patrial_load(partial_load_t &message) noexcept {
         auto slice = load::blocks_t::container_t();
         auto number = chunk_end - ptr;
         slice.reserve(number);
-        LOG_TRACE(log, "on_patrial_load, unpacking {} blocks ({} of {} are done)", number, ptr - begin,
-                  p.blocks.size());
+        LOG_INFO(log, "on_patrial_load, unpacking {} blocks ({} of {} are done)", number, ptr - begin, p.blocks.size());
         while (ptr < chunk_end) {
             auto &pair = *ptr;
             auto db_block = db::BlockInfo();
@@ -479,7 +479,7 @@ void db_actor_t::on_patrial_load(partial_load_t &message) noexcept {
         auto chunk_end = std::min(ptr + max_files, end);
         auto count = chunk_end - ptr;
         auto items = load::file_infos_t::container_t();
-        LOG_TRACE(log, "on_patrial_load, unpacking {} files ({} of {} are done)", count, ptr - begin, p.files.size());
+        LOG_INFO(log, "on_patrial_load, unpacking {} files ({} of {} are done)", count, ptr - begin, p.files.size());
         items.reserve(count);
         while (ptr != chunk_end) {
             using item_t = decltype(items)::value_type;

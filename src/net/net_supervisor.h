@@ -63,7 +63,8 @@ struct SYNCSPIRIT_API net_supervisor_t : net_supervisor_base_t<ra::supervisor_as
     void shutdown_finish() noexcept override;
 
   private:
-    // void on_load_cluster(message::load_cluster_response_t &message) noexcept;
+    void on_load_cluster_success(message::load_cluster_success_t &message) noexcept;
+    void on_load_cluster_fail(message::load_cluster_fail_t &message) noexcept;
     void on_model_request(model::message::model_request_t &message) noexcept;
     void on_thread_up(model::message::thread_up_t &) noexcept;
     void on_thread_ready(model::message::thread_ready_t &) noexcept;
