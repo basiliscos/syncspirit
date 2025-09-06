@@ -1397,7 +1397,7 @@ TEST_CASE("statistics", "[presentation]") {
         // peer copies
         auto fi_peer = folder->get_folder_infos().by_device(*peer_device);
         f_c_my = f_c_my->get_folder_info()->get_file_infos().by_name(f_c_my->get_name());
-        proto::get_version(pr_fi) = f_c_my->get_version()->as_proto();
+        proto::get_version(pr_fi) = f_c_my->get_version().as_proto();
         auto file_c_peer = model::file_info_t::create(sequencer->next_uuid(), pr_fi, fi_peer.get()).value();
         {
             auto block = *blocks.begin();
@@ -1416,7 +1416,7 @@ TEST_CASE("statistics", "[presentation]") {
             auto pr_fi = [&]() {
                 auto pr_fi = f_c_my->as_proto(false);
                 auto &v = proto::get_version(pr_fi);
-                auto value = proto::get_value(f_c_my->get_version()->get_best());
+                auto value = proto::get_value(f_c_my->get_version().get_best());
                 proto::add_counters(v, proto::Counter(peer_device_id, value + 1));
                 auto block = model::block_info_ptr_t();
                 proto::set_size(pr_fi, 15);

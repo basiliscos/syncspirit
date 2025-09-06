@@ -11,8 +11,8 @@
 namespace syncspirit::model {
 
 static advance_action_t compare_by_version(const file_info_t &remote, const file_info_t &local) noexcept {
-    auto &r_v = *remote.get_version();
-    auto &l_v = *local.get_version();
+    auto &r_v = remote.get_version();
+    auto &l_v = local.get_version();
 
     auto &r_best = r_v.get_best();
     auto &l_best = l_v.get_best();
@@ -84,7 +84,7 @@ static advance_action_t resolve(const file_info_t &remote, const file_info_t *lo
     auto folder = remote_fi->get_folder();
     auto &self = *folder->get_cluster()->get_device();
     auto &folder_infos = folder->get_folder_infos();
-    auto &r_v = *remote.get_version();
+    auto &r_v = remote.get_version();
 
     for (auto it : folder_infos) {
         auto fi = it.item.get();
@@ -97,7 +97,7 @@ static advance_action_t resolve(const file_info_t &remote, const file_info_t *lo
         auto other_party_file = fi->get_file_infos().by_name(remote.get_name());
         if (other_party_file) {
             auto o_v = other_party_file->get_version();
-            if (!r_v.contains(*o_v)) {
+            if (!r_v.contains(o_v)) {
                 return advance_action_t::ignore;
             }
         }

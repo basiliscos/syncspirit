@@ -601,8 +601,8 @@ void test_remove_file() {
             auto file = files->by_name("file.ext");
             REQUIRE(file);
             REQUIRE(blocks.size() == 1);
-            REQUIRE(file->get_version()->counters_size() == 1);
-            auto counter = file->get_version()->get_best();
+            REQUIRE(file->get_version().counters_size() == 1);
+            auto counter = file->get_version().get_best();
 
             auto prev_finish = folder->get_scan_finish();
             bfs::remove(file_path);
@@ -615,9 +615,9 @@ void test_remove_file() {
             CHECK(blocks.size() == 0);
 
             auto v = file->get_version();
-            REQUIRE(v->counters_size() == 1);
+            REQUIRE(v.counters_size() == 1);
 
-            auto &c = v->get_best();
+            auto &c = v.get_best();
             CHECK(proto::get_id(c) == proto::get_id((counter)));
             CHECK(proto::get_value(c) > proto::get_value((counter)));
             REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
@@ -682,7 +682,7 @@ void test_importing() {
                 auto &files_my = fi_my->get_file_infos();
                 REQUIRE(files_my.size() == 1);
                 auto file = files_my.by_name(path.filename().string());
-                REQUIRE(file->get_version()->as_proto() == v);
+                REQUIRE(file->get_version().as_proto() == v);
             }
             SECTION("empty file") {
                 auto path = root_path / "b.bin";
@@ -709,7 +709,7 @@ void test_importing() {
                 auto &files_my = fi_my->get_file_infos();
                 REQUIRE(files_my.size() == 1);
                 auto file = files_my.by_name(path.filename().string());
-                REQUIRE(file->get_version()->as_proto() == v);
+                REQUIRE(file->get_version().as_proto() == v);
             }
             SECTION("deleted") {
                 SECTION("single deleted file") {
@@ -733,7 +733,7 @@ void test_importing() {
                     auto &files_my = fi_my->get_file_infos();
                     REQUIRE(files_my.size() == 1);
                     auto file = files_my.by_name(path.filename().string());
-                    REQUIRE(file->get_version()->as_proto() == v);
+                    REQUIRE(file->get_version().as_proto() == v);
                     CHECK(!bfs::exists(path));
                 }
                 SECTION("deleted file inside deleted dir") {
@@ -899,14 +899,14 @@ void test_races() {
                     CHECK(fi_my->get_file_infos().size() == 1);
 
                     auto file_my = fi_my->get_file_infos().by_name("a.bin");
-                    auto v1 = file_my->get_version()->as_proto();
+                    auto v1 = file_my->get_version().as_proto();
 
                     file_peer->mark_local_available(0);
                     hasher->auto_reply = true;
                     builder->scan_start(folder->get_id()).apply(*sup);
                     bfs::remove(path);
 
-                    auto v2 = file_my->get_version()->as_proto();
+                    auto v2 = file_my->get_version().as_proto();
                     CHECK(v1 == v2);
                 }
             }
@@ -951,14 +951,14 @@ void test_races() {
                     CHECK(fi_my->get_file_infos().size() == 1);
 
                     auto file_my = fi_my->get_file_infos().by_name("a.bin");
-                    auto v1 = file_my->get_version()->as_proto();
+                    auto v1 = file_my->get_version().as_proto();
 
                     file_peer->mark_local_available(0);
                     hasher->auto_reply = true;
                     builder->scan_start(folder->get_id()).apply(*sup);
                     bfs::remove(path);
 
-                    auto v2 = file_my->get_version()->as_proto();
+                    auto v2 = file_my->get_version().as_proto();
                     CHECK(v1 == v2);
                 }
             }

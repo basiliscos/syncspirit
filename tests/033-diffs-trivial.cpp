@@ -70,8 +70,8 @@ TEST_CASE("with file", "[model]") {
     REQUIRE(file);
 
     auto v = file->get_version();
-    REQUIRE(v->counters_size() == 1);
-    REQUIRE(proto::get_id(v->get_counter(0)) == my_device->device_id().get_uint());
+    REQUIRE(v.counters_size() == 1);
+    REQUIRE(proto::get_id(v.get_counter(0)) == my_device->device_id().get_uint());
 
     SECTION("lock/unlock") {
         auto diff = diff::cluster_diff_ptr_t(new diff::modify::lock_file_t(*file, true));

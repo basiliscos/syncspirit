@@ -127,14 +127,14 @@ void file_table_t::refresh() {
         remove_row(5);
     }
 
-    auto &model_counters = version->get_counters();
+    auto &model_counters = version.get_counters();
     auto sorted_counters = counters_t(model_counters.begin(), model_counters.end(), allocator);
     auto sorter = [](const proto::Counter &lhs, const proto::Counter &rhs) -> bool {
         return proto::get_value(lhs) > proto::get_value(rhs);
     };
     std::sort(sorted_counters.begin(), sorted_counters.end(), sorter);
 
-    displayed_versions = std::min(version->counters_size(), max_history_records);
+    displayed_versions = std::min(version.counters_size(), max_history_records);
     for (size_t i = 0; i < displayed_versions; ++i) {
         auto &counter = sorted_counters[i];
         auto value = proto::get_value(counter);

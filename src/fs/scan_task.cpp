@@ -321,9 +321,9 @@ scan_result_t scan_task_t::advance_unknown_file(unknown_file_t &file) noexcept {
             } else {
                 if (!peer_file) {
                     peer_file = std::move(f);
-                    peer_counter = peer_file->get_version()->get_best();
+                    peer_counter = peer_file->get_version().get_best();
                 } else {
-                    auto &c = f->get_version()->get_best();
+                    auto &c = f->get_version().get_best();
                     if (proto::get_value(peer_counter) < proto::get_value(c)) {
                         peer_counter = c;
                         peer_file = std::move(f);

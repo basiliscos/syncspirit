@@ -154,7 +154,7 @@ auto file_info_t::fields_update(const db::FileInfo &source) noexcept -> outcome:
 
     symlink_target = db::get_symlink_target(source);
 
-    version.reset(new version_t(db::get_version(source)));
+    version = version_t(db::get_version(source));
 
     block_size = size ? db::get_block_size(source) : 0;
     auto block_count = db::get_blocks_size(source);
@@ -181,8 +181,7 @@ auto file_info_t::fields_update(const proto::FileInfo &source) noexcept -> outco
     }
 
     symlink_target = proto::get_symlink_target(source);
-
-    version.reset(new version_t(proto::get_version(source)));
+    version = version_t(proto::get_version(source));
 
     block_size = size ? proto::get_block_size(source) : 0;
     auto block_count = proto::get_blocks_size(source);
@@ -206,7 +205,7 @@ db::FileInfo file_info_t::as_db(bool include_blocks) const noexcept {
     db::set_deleted(r, flags & f_deleted);
     db::set_invalid(r, flags & f_invalid);
     db::set_no_permissions(r, flags & f_no_permissions);
-    db::set_version(r, version->as_proto());
+    db::set_version(r, version.as_proto());
     db::set_block_size(r, block_size);
     db::set_symlink_target(r, symlink_target);
     if (include_blocks) {
@@ -233,7 +232,7 @@ proto::FileInfo file_info_t::as_proto(bool include_blocks) const noexcept {
     proto::set_deleted(r, flags & f_deleted);
     proto::set_invalid(r, flags & f_invalid);
     proto::set_no_permissions(r, flags & f_no_permissions);
-    proto::set_version(r, version->as_proto());
+    proto::set_version(r, version.as_proto());
     proto::set_block_size(r, block_size);
     proto::set_symlink_target(r, symlink_target);
     if (include_blocks) {
@@ -408,7 +407,7 @@ std::int64_t file_info_t::get_size() const noexcept {
 
 std::size_t file_info_t::expected_meta_size() const noexcept {
     auto r = name.size() + 1 + 8 + 4 + 8 + 4 + 8 + 3 + 8 + 4 + symlink_target.size();
-    r += version->counters_size() * 16;
+    r += version.counters_size() * 16;
     r += blocks.size() * (8 + 4 + 4 + 32);
     return r;
 }
@@ -420,7 +419,7 @@ bool file_info_t::has_no_permissions() const noexcept { return flags & f_no_perm
 void file_info_t::update(const file_info_t &other) noexcept {
     using hashes_t = std::set<utils::bytes_view_t, utils::bytes_comparator_t>;
     assert(this->name == other.name);
-    assert((this->get_key() == other.get_key()) || this->version->identical_to(*other.version));
+    assert((this->get_key() == other.get_key()) || version.identical_to(other.version));
     size = other.size;
     permissions = other.permissions;
     modified_s = other.modified_s;
@@ -477,7 +476,7 @@ bool file_info_t::is_global() const noexcept {
             continue;
         }
         auto other = file->get_version();
-        if (!version->contains(*other)) {
+        if (!version.contains(other)) {
             return false;
         }
     }
@@ -494,7 +493,7 @@ std::string file_info_t::make_conflicting_name() const noexcept {
     auto local = adjustor_t::utc_to_local(utc);
     auto ymd = local.date().year_month_day();
     auto time = local.time_of_day();
-    auto &counter = version->get_best();
+    auto &counter = version.get_best();
     auto device_short = device_id_t::make_short(proto::get_id(counter));
     auto conflicted_name =
         fmt::format("{}.sync-conflict-{:04}{:02}{:02}-{:02}{:02}{:02}-{}{}", stem, (int)ymd.year, ymd.month.as_number(),
@@ -507,7 +506,7 @@ auto file_info_t::guard() noexcept -> guard_ptr_t { return new guard_t(*this); }
 
 bool file_info_t::identical_to(const proto::FileInfo &file) const noexcept {
     auto &v = proto::get_version(file);
-    if (version->identical_to(v)) {
+    if (version.identical_to(v)) {
         auto blocks_sz = proto::get_blocks_size(file);
         if (blocks_sz == blocks.size()) {
             for (size_t i = 0; i < blocks_sz; ++i) {

@@ -10,7 +10,7 @@ using namespace syncspirit::model::diff::local;
 file_availability_t::file_availability_t(file_info_ptr_t file_) noexcept : file{file_} {
     LOG_DEBUG(log, "file_availability_t, file = {}", file->get_name());
     folder_id = file_->get_folder_info()->get_folder()->get_id();
-    version.reset(new version_t(file->get_version()->as_proto()));
+    version = file->get_version();
 }
 
 auto file_availability_t::apply_impl(apply_controller_t &controller, void *custom) const noexcept
@@ -20,7 +20,7 @@ auto file_availability_t::apply_impl(apply_controller_t &controller, void *custo
     if (folder) {
         auto folder_info = folder->get_folder_infos().by_device(*cluster.get_device());
         auto f = folder_info->get_file_infos().by_name(file->get_name());
-        if (f->get_version()->identical_to(*version)) {
+        if (f->get_version().identical_to(version)) {
             f->mark_local(true);
             LOG_TRACE(log, "file_availability_t, mark local file = {}, folder = {}, ", file->get_name(), folder_id);
             auto &blocks = f->get_blocks();

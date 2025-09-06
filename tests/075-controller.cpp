@@ -2030,7 +2030,7 @@ void test_conflicts() {
 
             SECTION("local win") {
                 proto::set_modified_s(file, 1734670000);
-                proto::set_value(c_1, proto::get_value(local_file->get_version()->get_best()) - 1);
+                proto::set_value(c_1, proto::get_value(local_file->get_version().get_best()) - 1);
                 auto local_seq = local_file->get_sequence();
 
                 proto::add_files(index_update, file);
@@ -2046,7 +2046,7 @@ void test_conflicts() {
             }
             SECTION("remote win") {
                 proto::set_modified_s(file, 1734690000);
-                proto::set_value(c_1, proto::get_value(local_file->get_version()->get_best()) + 1);
+                proto::set_value(c_1, proto::get_value(local_file->get_version().get_best()) + 1);
                 proto::add_files(index_update, file);
                 peer_actor->push_block(data_3, 0, file_name);
                 peer_actor->forward(index_update);

@@ -34,15 +34,15 @@ local_update_t::local_update_t(const cluster_t &cluster, sequencer_t &sequencer,
     } else {
         proto::set_modified_by(proto_file_, self.device_id().get_uint());
         initialize(cluster, sequencer, std::move(proto_file_), name);
-        auto version = version_ptr_t();
+        auto version = version_t();
         if (local_file) {
             version = local_file->get_version();
-            version->update(device);
+            version.update(device);
         } else {
-            version.reset(new version_t(device));
+            version = version_t(device);
         }
         auto &proto_version = proto::get_version(proto_local);
-        version->to_proto(proto_version);
+        version.to_proto(proto_version);
     }
 }
 

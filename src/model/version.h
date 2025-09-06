@@ -3,7 +3,6 @@
 
 #pragma once
 
-#include "misc/arc.hpp"
 #include "syncspirit-export.h"
 #include "proto/proto-fwd.hpp"
 #include <vector>
@@ -12,8 +11,9 @@ namespace syncspirit::model {
 
 struct device_t;
 
-struct SYNCSPIRIT_API version_t final : arc_base_t<version_t> {
+struct SYNCSPIRIT_API version_t final {
     using counters_t = std::vector<proto::Counter>;
+    version_t() noexcept;
     version_t(const proto::Vector &) noexcept;
     version_t(const device_t &) noexcept;
 
@@ -24,16 +24,14 @@ struct SYNCSPIRIT_API version_t final : arc_base_t<version_t> {
     const proto::Counter &get_best() const noexcept;
     void update(const device_t &) noexcept;
     const proto::Counter &get_counter(size_t) noexcept;
-    bool contains(const version_t &other) noexcept;
-    bool identical_to(const version_t &) noexcept;
+    bool contains(const version_t &other) const noexcept;
+    bool identical_to(const version_t &) const noexcept;
     size_t counters_size() const;
     const counters_t &get_counters() noexcept;
 
   private:
     counters_t counters;
-    size_t best_index;
+    uint32_t best_index;
 };
-
-using version_ptr_t = intrusive_ptr_t<version_t>;
 
 } // namespace syncspirit::model

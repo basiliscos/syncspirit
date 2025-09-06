@@ -17,12 +17,12 @@ TEST_CASE("version ", "[model]") {
     proto::add_counters(proto_v, c0);
     proto::add_counters(proto_v, c1);
 
-    auto v1 = version_ptr_t(new version_t(proto_v));
-    auto v1_copy = version_ptr_t(new version_t(proto_v));
-    v1->update(*my_device);
+    auto v1 = version_t(proto_v);
+    auto v1_copy = v1;
+    v1.update(*my_device);
 
-    CHECK(v1->contains(*v1_copy));
-    CHECK(v1->contains(*v1));
-    CHECK(!v1_copy->contains(*v1));
-    CHECK(v1_copy->contains(*v1_copy));
+    CHECK(v1.contains(v1_copy));
+    CHECK(v1.contains(v1));
+    CHECK(!v1_copy.contains(v1));
+    CHECK(v1_copy.contains(v1_copy));
 }

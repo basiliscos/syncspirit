@@ -106,14 +106,14 @@ void presence_t::sync_with_entity() const noexcept {
             for (auto p : entity->presences) {
                 if ((p == entity->best) && (p->get_features() & F::cluster)) {
                     auto best = static_cast<cluster_file_presence_t *>(p);
-                    best_version = best->get_file_info().get_version()->get_best();
+                    best_version = best->get_file_info().get_version().get_best();
                     break;
                 }
             }
             assert(features & F::cluster);
             auto const_self = static_cast<const cluster_file_presence_t *>(this);
             auto self = const_cast<cluster_file_presence_t *>(const_self);
-            if (self->get_file_info().get_version()->get_best() == best_version) {
+            if (self->get_file_info().get_version().get_best() == best_version) {
                 ++statistics.cluster_entries;
             }
         } else if (features & F::directory) {

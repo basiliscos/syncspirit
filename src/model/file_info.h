@@ -93,8 +93,8 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t {
 
     inline folder_info_t *get_folder_info() const noexcept { return folder_info; }
     std::string_view get_name() const noexcept;
-    inline version_ptr_t get_version() noexcept { return version; }
-    inline const version_ptr_t &get_version() const noexcept { return version; }
+    inline version_t &get_version() noexcept { return version; }
+    inline const version_t &get_version() const noexcept { return version; }
 
     inline std::int64_t get_sequence() const noexcept { return sequence; }
     void set_sequence(std::int64_t value) noexcept;
@@ -190,7 +190,7 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t {
     std::uint32_t permissions;
     std::uint32_t modified_ns;
 
-    version_ptr_t version;
+    version_t version;
     std::int64_t sequence;
     std::string symlink_target;
     blocks_t blocks;

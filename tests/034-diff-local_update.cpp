@@ -44,15 +44,15 @@ TEST_CASE("new file diff", "[model]") {
         REQUIRE(file->is_link());
         REQUIRE(file->get_sequence() == 1);
         REQUIRE(folder_info->get_max_sequence() == 1);
-        REQUIRE(file->get_version()->counters_size() == 1);
+        REQUIRE(file->get_version().counters_size() == 1);
         REQUIRE(file->get_modified_by() == my_device->device_id().get_uint());
-        auto &counter = file->get_version()->get_best();
+        auto &counter = file->get_version().get_best();
         auto v1 = proto::get_value(counter);
         CHECK(v1 > 0);
 
         SECTION("peer update") {
-            file->get_version()->update(*peer_device);
-            auto p = file->get_version()->as_proto();
+            file->get_version().update(*peer_device);
+            auto p = file->get_version().as_proto();
             REQUIRE(proto::get_counters_size(p) == 2);
 
             auto &c0 = proto::get_counters(p, 0);
@@ -73,8 +73,8 @@ TEST_CASE("new file diff", "[model]") {
             REQUIRE(new_file);
             CHECK(new_file.get() == file.get());
             CHECK(new_file->get_key() == file->get_key());
-            REQUIRE(new_file->get_version()->counters_size() == 1);
-            auto v2 = proto::get_value(new_file->get_version()->get_best());
+            REQUIRE(new_file->get_version().counters_size() == 1);
+            auto v2 = proto::get_value(new_file->get_version().get_best());
             REQUIRE(v1 < v2);
         }
     }

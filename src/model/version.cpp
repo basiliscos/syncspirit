@@ -7,11 +7,12 @@
 #include "utils/time.h"
 #include <limits>
 
-static constexpr auto undef = std::numeric_limits<size_t>::max();
+static constexpr auto undef = std::numeric_limits<uint32_t>::max();
 
 using namespace syncspirit::model;
 
-// auto now = r::pt::second_clock::local_time();
+version_t::version_t() noexcept: best_index{undef} {
+}
 
 version_t::version_t(const proto::Vector &v) noexcept {
     auto counters_sz = proto::get_counters_size(v);
@@ -82,7 +83,7 @@ auto version_t::get_best() const noexcept -> const proto::Counter & {
     return counters[best_index];
 }
 
-bool version_t::contains(const version_t &other) noexcept {
+bool version_t::contains(const version_t &other) const noexcept {
     auto &other_best = other.get_best();
     for (size_t i = 0; i < counters.size(); ++i) {
         auto &c = counters[i];
@@ -94,7 +95,7 @@ bool version_t::contains(const version_t &other) noexcept {
     return false;
 }
 
-bool version_t::identical_to(const version_t &other) noexcept {
+bool version_t::identical_to(const version_t &other) const noexcept {
     if (counters.size() == other.counters.size()) {
         auto p1 = counters.data();
         auto p2 = other.counters.data();
