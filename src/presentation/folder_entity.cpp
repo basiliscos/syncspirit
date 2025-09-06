@@ -25,7 +25,7 @@ static void process(model::folder_info_t *folder_info, entity_t::children_t &fil
     new_files.reserve(files_map.size());
     for (auto &it_file : files_map) {
         auto &file = *it_file.item;
-        auto name = file.get_name();
+        auto name = file.get_name()->get_full_name();
         if (new_files.count(name)) {
             continue;
         }
@@ -109,12 +109,12 @@ auto folder_entity_t::on_insert(model::folder_info_t &folder_info) noexcept -> f
 }
 
 entity_t *folder_entity_t::on_insert(model::file_info_t &file_info) noexcept {
-    auto path = model::path_t(file_info.get_name());
+    auto &path = file_info.get_name();
     auto device = file_info.get_folder_info()->get_device();
 
     auto entity = static_cast<entity_t *>(this);
     size_t i = 0;
-    for (auto piece : path) {
+    for (auto piece : *path) {
         auto &children = entity->children;
         auto it = children.find(piece);
         if (it != children.end()) {
@@ -126,16 +126,16 @@ entity_t *folder_entity_t::on_insert(model::file_info_t &file_info) noexcept {
     }
 
     auto child = file_entity_ptr_t();
-    bool has_parent = i + 1 == path.get_pieces_size();
+    bool has_parent = i + 1 == path->get_pieces_size();
     auto diff = entity_stats_t{};
     if (has_parent) {
-        child.reset(new file_entity_t(file_info, std::move(path)));
+        child.reset(new file_entity_t(file_info, *path));
         entity->add_child(*child);
         orphans.reap_children(child);
         child->commit(child->get_path(), device);
         recalc_best();
         return child.get();
-    } else if (i == path.get_pieces_size()) {
+    } else if (i == path->get_pieces_size()) {
         auto file_entity = static_cast<file_entity_t *>(entity);
         auto file_presence = file_entity->on_insert(file_info);
         entity->commit(entity->get_path(), device);
@@ -144,11 +144,11 @@ entity_t *folder_entity_t::on_insert(model::file_info_t &file_info) noexcept {
         }
         return entity;
     } else {
-        auto orphan = orphans.get_by_path(path.get_full_name());
+        auto orphan = orphans.get_by_path(path->get_full_name());
         if (orphan) {
             static_cast<file_entity_t *>(orphan.get())->on_insert(file_info);
         } else {
-            child.reset(new file_entity_t(file_info, std::move(path)));
+            child.reset(new file_entity_t(file_info, *path));
             orphans.push(child);
         }
     }

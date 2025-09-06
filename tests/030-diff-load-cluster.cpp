@@ -304,6 +304,7 @@ TEST_CASE("loading cluster (file info + block)", "[model]") {
 
     auto uuid = sequencer->next_uuid();
     auto folder = folder_t::create(uuid, db_folder).value();
+    folder->assign_cluster(cluster);
     cluster->get_folders().put(folder);
 
     db::FolderInfo db_folder_info(2, 3, {});
@@ -351,7 +352,7 @@ TEST_CASE("loading cluster (file info + block)", "[model]") {
         REQUIRE(map.size() == 1);
         target = map.by_uuid(fi->get_uuid());
         REQUIRE(target);
-        REQUIRE(map.by_name(fi->get_name()));
+        REQUIRE(map.by_name(fi->get_name()->get_full_name()));
         REQUIRE(target->get_blocks().size() == 11);
         REQUIRE(target->get_blocks().begin()->get()->get_hash() == block->get_hash());
         CHECK(!target->is_locked());

@@ -10,10 +10,11 @@
 using namespace syncspirit::model::diff::modify;
 
 lock_file_t::lock_file_t(const model::file_info_t &file, bool locked_) noexcept
-    : folder_id{file.get_folder_info()->get_folder()->get_id()}, file_name{file.get_name()}, locked{locked_} {
+    : folder_id{file.get_folder_info()->get_folder()->get_id()}, file_name{file.get_name()->get_full_name()},
+      locked{locked_} {
     auto &peer = file.get_folder_info()->get_device()->device_id();
     device_id = peer.get_sha256();
-    LOG_DEBUG(log, "lock_file_t, file = {}, folder = {}, device = {}, value = {}", file_name, folder_id, peer, locked);
+    LOG_DEBUG(log, "lock_file_t, file: '{}', device = {}, value = {}", file, peer, locked);
 }
 
 auto lock_file_t::apply_impl(apply_controller_t &controller, void *custom) const noexcept -> outcome::result<void> {

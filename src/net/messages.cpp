@@ -9,7 +9,7 @@ using namespace syncspirit::net::payload;
 block_request_t::block_request_t(const model::file_info_ptr_t &file_, size_t block_index_) noexcept {
     auto fi = file_->get_folder_info();
     folder_id = fi->get_folder()->get_id();
-    file_name = file_->get_name();
+    file_name = file_->get_name()->get_full_name();
     sequence = file_->get_sequence();
     block_index = block_index_;
     auto block = file_->get_blocks()[block_index_].get();

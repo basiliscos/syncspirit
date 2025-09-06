@@ -28,6 +28,11 @@ path_t::path_t(std::string_view full_name) noexcept : name(full_name) {
     }
 }
 
+path_t::path_t(path_t &source) noexcept {
+    name = source.name;
+    pieces = source.pieces;
+}
+
 std::size_t path_t::get_pieces_size() const noexcept { return pieces.size() + (!name.empty() ? 1 : 0); }
 
 std::string_view path_t::get_full_name() const noexcept { return name; }

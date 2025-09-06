@@ -9,6 +9,7 @@
 #include "model/diff/cluster_visitor.h"
 #include "model/misc/error_code.h"
 #include "proto/proto-helpers-bep.h"
+#include "utils/format.hpp"
 
 #include <memory_resource>
 #include <set>
@@ -78,7 +79,7 @@ auto update_folder_t::apply_impl(apply_controller_t &controller, void *custom) c
             }
         }
         bool add_file = true;
-        if (auto prev_file = fm.by_name(file->get_name()); prev_file) {
+        if (auto prev_file = fm.by_name(file->get_name()->get_full_name()); prev_file) {
             auto prev_seq = prev_file->get_sequence();
             auto new_seq = file->get_sequence();
             if (prev_seq < new_seq) {
@@ -88,8 +89,7 @@ auto update_folder_t::apply_impl(apply_controller_t &controller, void *custom) c
                 file->notify_update();
             } else if (prev_seq == new_seq) {
                 add_file = false;
-                LOG_TRACE(log, "update_folder_t, apply(); skipping update for '{}', seq. {}", new_seq,
-                          file->get_name());
+                LOG_TRACE(log, "update_folder_t, apply(); skipping update for '{}', seq. {}", new_seq, *file);
             }
         }
 

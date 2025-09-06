@@ -46,6 +46,7 @@ TEST_CASE("scan_task", "[fs]") {
     db::set_path(db_folder, root_path.string());
 
     auto folder = folder_t::create(sequencer->next_uuid(), db_folder).value();
+    folder->assign_cluster(cluster);
     cluster->get_folders().put(folder);
 
     db::FolderInfo db_folder_info;
@@ -338,7 +339,7 @@ SECTION("regular files") {
         CHECK(std::get_if<bool>(&r));
         CHECK(*std::get_if<bool>(&r) == false);
         auto &seen = task.get_seen_paths();
-        CHECK(seen.count(file->get_name()));
+        CHECK(seen.count(file->get_name()->get_full_name()));
     }
 
     SECTION("dir has been removed") {
@@ -387,7 +388,7 @@ SECTION("regular files") {
         CHECK(*std::get_if<bool>(&r) == false);
 
         auto &seen = task.get_seen_paths();
-        CHECK(seen.count(file->get_name()));
+        CHECK(seen.count(file->get_name()->get_full_name()));
     }
 
     SECTION("removed dir does not exist => unchanged meta") {
@@ -412,7 +413,7 @@ SECTION("regular files") {
         CHECK(*std::get_if<bool>(&r) == false);
 
         auto &seen = task.get_seen_paths();
-        CHECK(seen.count(file->get_name()));
+        CHECK(seen.count(file->get_name()->get_full_name()));
     }
 
     SECTION("root dir does not exist & deleted file => unchanged meta") {
@@ -437,7 +438,7 @@ SECTION("regular files") {
         CHECK(*std::get_if<bool>(&r) == false);
 
         auto &seen = task.get_seen_paths();
-        CHECK(seen.count(file->get_name()));
+        CHECK(seen.count(file->get_name()->get_full_name()));
     }
 
     SECTION("meta is changed") {
@@ -561,7 +562,7 @@ SECTION("regular files") {
         CHECK(*std::get_if<bool>(&r) == false);
 
         auto &seen = task->get_seen_paths();
-        CHECK(seen.count(file->get_name()));
+        CHECK(seen.count(file->get_name()->get_full_name()));
     }
 
     SECTION("tmp") {

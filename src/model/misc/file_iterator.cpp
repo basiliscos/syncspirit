@@ -38,8 +38,8 @@ bool file_iterator_t::file_comparator_t::operator()(const file_info_t *l, const 
         return false;
     }
 
-    auto ln = l->get_name();
-    auto rn = r->get_name();
+    auto ln = l->get_name()->get_full_name();
+    auto rn = r->get_name()->get_full_name();
 
     return std::lexicographical_compare(ln.begin(), ln.end(), rn.begin(), rn.end());
 }

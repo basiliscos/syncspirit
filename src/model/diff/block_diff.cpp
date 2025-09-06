@@ -11,7 +11,7 @@ block_diff_t::block_diff_t(const block_diff_t &source) noexcept
       block_hash{source.block_hash}, block_index{source.block_index} {}
 
 block_diff_t::block_diff_t(const file_info_t &file, size_t block_index_) noexcept
-    : file_name{file.get_name()}, block_index{block_index_} {
+    : file_name{file.get_name()->get_full_name()}, block_index{block_index_} {
     auto fi = file.get_folder_info();
     folder_id = fi->get_folder()->get_id();
     device_id = fi->get_device()->device_id().get_sha256();

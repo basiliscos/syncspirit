@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #pragma once
 
 #include "misc/arc.hpp"
+#include "misc/path_cache.h"
 #include "device.h"
 #include "ignored_device.h"
 #include "ignored_folder.h"
@@ -32,6 +33,7 @@ struct SYNCSPIRIT_API cluster_t final : arc_base_t<cluster_t> {
     pending_devices_map_t &get_pending_devices() noexcept;
     const pending_devices_map_t &get_pending_devices() const noexcept;
     pending_folder_map_t &get_pending_folders() noexcept;
+    path_cache_t &get_path_cache() noexcept;
 
     const folders_map_t &get_folders() const noexcept;
     const pending_folder_map_t &get_pending_folders() const noexcept;
@@ -49,6 +51,7 @@ struct SYNCSPIRIT_API cluster_t final : arc_base_t<cluster_t> {
     ignored_folders_map_t ignored_folders;
     pending_folder_map_t pending_folders;
     pending_devices_map_t pending_devices;
+    path_cache_ptr_t path_cache;
     bool tainted = false;
     int32_t write_requests;
 };

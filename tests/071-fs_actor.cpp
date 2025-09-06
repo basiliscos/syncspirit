@@ -154,7 +154,7 @@ void test_remote_copy() {
                 auto peer_file = make_file();
                 builder.remote_copy(*peer_file).apply(*sup);
 
-                auto my_file = folder_my->get_file_infos().by_name(peer_file->get_name());
+                auto my_file = folder_my->get_file_infos().by_name(peer_file->get_name()->get_full_name());
                 auto &path = my_file->get_path();
                 REQUIRE(bfs::exists(path));
                 REQUIRE(bfs::file_size(path) == 0);
@@ -364,7 +364,7 @@ void test_append_block() {
                     .apply(*sup);
 
                 auto file = folder_my->get_file_infos().by_name(proto::get_name(pr_source));
-                auto path = root_path / boost::nowide::widen(file->get_name());
+                auto path = root_path / boost::nowide::widen(file->get_name()->get_full_name());
                 REQUIRE(bfs::exists(path));
                 REQUIRE(bfs::file_size(path) == 5);
                 auto data = read_file(path);
@@ -378,7 +378,7 @@ void test_append_block() {
 
                 builder.append_block(*peer_file, 0, as_owned_bytes("12345")).apply(*sup);
 
-                auto wfilename = boost::nowide::widen(peer_file->get_name()) + L".syncspirit-tmp";
+                auto wfilename = boost::nowide::widen(peer_file->get_name()->get_full_name()) + L".syncspirit-tmp";
                 auto filename = boost::nowide::narrow(wfilename);
                 auto path = root_path / filename;
 #ifndef SYNCSPIRIT_WIN
@@ -484,7 +484,7 @@ void test_clone_block() {
                     auto file_block = model::file_block_t(block.get(), target_file.get(), 0);
                     builder.clone_block(file_block).apply(*sup).finish_file(*target).apply(*sup);
 
-                    auto path = root_path / std::string(target_file->get_name());
+                    auto path = root_path / std::string(target_file->get_name()->get_full_name());
                     REQUIRE(bfs::exists(path));
                     REQUIRE(bfs::file_size(path) == 5);
                     auto data = read_file(path);
@@ -511,14 +511,14 @@ void test_clone_block() {
                     source->mark_local_available(0);
 
                     auto target = make_file(pr_target, 1);
-                    write_file(root_path / boost::nowide::widen(source->get_name()), "12345");
+                    write_file(root_path / boost::nowide::widen(source->get_name()->get_full_name()), "12345");
 
                     auto target_file = folder_peer->get_file_infos().by_name(proto::get_name(pr_target));
                     auto block = source->get_blocks()[0];
                     auto file_block = model::file_block_t(block.get(), target_file.get(), 0);
                     builder.clone_block(file_block).apply(*sup).finish_file(*target).apply(*sup);
 
-                    auto path = root_path / std::string(target_file->get_name());
+                    auto path = root_path / std::string(target_file->get_name()->get_full_name());
                     REQUIRE(bfs::exists(path));
                     REQUIRE(bfs::file_size(path) == 5);
                     auto data = read_file(path);
@@ -544,7 +544,7 @@ void test_clone_block() {
                     auto fb_2 = model::file_block_t(blocks[1].get(), target_file.get(), 1);
                     builder.clone_block(fb_1).clone_block(fb_2).apply(*sup).finish_file(*target).apply(*sup);
 
-                    auto filename = std::string(target_file->get_name());
+                    auto filename = std::string(target_file->get_name()->get_full_name());
                     auto path = root_path / filename;
                     REQUIRE(bfs::exists(path));
                     REQUIRE(bfs::file_size(path) == 10);
@@ -571,7 +571,7 @@ void test_clone_block() {
                     auto fb = model::file_block_t(blocks[0].get(), target_file.get(), 1);
                     builder.clone_block(fb).apply(*sup).finish_file(*target).apply(*sup);
 
-                    auto filename = std::string(target_file->get_name());
+                    auto filename = std::string(target_file->get_name()->get_full_name());
                     auto path = root_path / filename;
                     REQUIRE(bfs::exists(path));
                     REQUIRE(bfs::file_size(path) == 10);
@@ -596,7 +596,7 @@ void test_clone_block() {
                 auto file_block = model::file_block_t(block.get(), target_file.get(), 1);
                 builder.clone_block(file_block).apply(*sup).finish_file(*source).apply(*sup);
 
-                auto path = root_path / std::string(target_file->get_name());
+                auto path = root_path / std::string(target_file->get_name()->get_full_name());
                 REQUIRE(bfs::exists(path));
                 REQUIRE(bfs::file_size(path) == 10);
                 auto data = read_file(path);

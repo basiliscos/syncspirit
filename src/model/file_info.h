@@ -10,6 +10,7 @@
 #include <boost/outcome.hpp>
 #include <boost/multi_index/ordered_index.hpp>
 #include "misc/augmentation.h"
+#include "misc/path.h"
 #include "misc/map.hpp"
 #include "misc/uuid.h"
 #include "block_info.h"
@@ -91,7 +92,7 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t {
     void update(const file_info_t &updated) noexcept;
 
     inline folder_info_t *get_folder_info() const noexcept { return folder_info; }
-    std::string_view get_name() const noexcept;
+    const path_ptr_t &get_name() const noexcept;
     inline version_t &get_version() noexcept { return version; }
     inline const version_t &get_version() const noexcept { return version; }
 
@@ -181,7 +182,7 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t {
 
     unsigned char key[data_length];
     std::int32_t block_size;
-    std::string name;
+    path_ptr_t name;
     folder_info_t *folder_info;
     std::int64_t size;
     std::int64_t modified_s;

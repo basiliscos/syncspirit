@@ -763,7 +763,7 @@ void test_remote_copy() {
                     auto folder_info_clone = fis.by_device(*cluster_clone->get_device());
                     auto file_clone = folder_info_clone->get_file_infos().by_name(proto::get_name(file));
                     REQUIRE(file_clone);
-                    REQUIRE(file_clone->get_name() == proto::get_name(file));
+                    REQUIRE(file_clone->get_name()->get_full_name() == proto::get_name(file));
                     REQUIRE(file_clone->get_blocks().size() == 0);
                     REQUIRE(file_clone->get_sequence() == 1);
                     REQUIRE(folder_info_clone->get_max_sequence() == 1);
@@ -805,7 +805,7 @@ void test_remote_copy() {
                     auto folder_info_clone = fis.by_device(*cluster_clone->get_device());
                     auto file_clone = folder_info_clone->get_file_infos().by_name(proto::get_name(file));
                     REQUIRE(file_clone);
-                    REQUIRE(file_clone->get_name() == proto::get_name(file));
+                    REQUIRE(file_clone->get_name()->get_full_name() == proto::get_name(file));
                     REQUIRE(file_clone->get_blocks().size() == 1);
                     REQUIRE(file_clone->get_sequence() == 1);
                     REQUIRE(folder_info_clone->get_max_sequence() == 1);
@@ -832,7 +832,7 @@ void test_remote_copy() {
                     auto folder_info_clone = fis.by_device(*cluster_clone->get_device());
                     auto file_clone = folder_info_clone->get_file_infos().by_name(proto::get_name(file));
                     REQUIRE(file_clone);
-                    REQUIRE(file_clone->get_name() == proto::get_name(file));
+                    REQUIRE(file_clone->get_name()->get_full_name() == proto::get_name(file));
                     REQUIRE(file_clone->get_blocks().size() == 1);
                     REQUIRE(file_clone->get_blocks().at(0));
                     REQUIRE(file_clone->get_sequence() == 2);

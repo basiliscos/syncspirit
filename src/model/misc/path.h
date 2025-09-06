@@ -30,19 +30,23 @@ struct SYNCSPIRIT_API path_t : arc_base_t<path_t> {
 
     path_t() noexcept = default;
     path_t(std::string_view full_name) noexcept;
+    path_t(path_t &) noexcept;
     path_t(path_t &&) noexcept = default;
+    virtual ~path_t() = default;
 
     iterator_t begin() const noexcept;
     iterator_t end() const noexcept;
 
     std::size_t get_pieces_size() const noexcept;
 
+    inline bool operator==(const path_t &other) const noexcept { return name == other.name; }
+
     std::string_view get_full_name() const noexcept;
     std::string_view get_own_name() const noexcept;
     std::string_view get_parent_name() const noexcept;
     bool contains(const path_t &other) const noexcept;
 
-  private:
+  protected:
     using pieces_t = std::vector<std::uint32_t>;
     std::string name;
     pieces_t pieces;

@@ -3,11 +3,12 @@
 
 #include "test-utils.h"
 #include "model/misc/path.h"
+#include "model/misc/path_cache.h"
 
 using namespace syncspirit;
 using namespace syncspirit::model;
 
-TEST_CASE("path", "[presentation]") {
+TEST_CASE("path", "[model]") {
     using pieces_t = std::vector<std::string_view>;
     SECTION("a/bb/c.txt") {
         auto p = path_t("a/bb/c.txt");
@@ -48,6 +49,35 @@ TEST_CASE("path", "[presentation]") {
         CHECK(pieces[0] == "dir");
         CHECK(pieces[1] == "file.bin");
     }
+}
+
+TEST_CASE("path_cache", "[model]") {
+    auto cache = path_cache_ptr_t(new path_cache_t());
+    auto path = cache->get_path("a/b/c");
+    REQUIRE(path);
+    CHECK(path->use_count() == 1);
+    CHECK(cache->map.size() == 1);
+
+    auto path_2 = cache->get_path("a/b/c");
+    REQUIRE(path_2);
+    CHECK(path_2 == path);
+    CHECK(path->use_count() == 2);
+    CHECK(cache->map.size() == 1);
+
+    auto path_3 = cache->get_path("x/y/z");
+    REQUIRE(path_3);
+    CHECK(path_3->use_count() == 1);
+    CHECK(cache->map.size() == 2);
+
+    path_3.reset();
+    CHECK(cache->map.size() == 1);
+
+    path_2.reset();
+    CHECK(cache->map.size() == 1);
+    CHECK(path->use_count() == 1);
+
+    path.reset();
+    CHECK(cache->map.size() == 0);
 }
 
 static bool _init = []() -> bool {

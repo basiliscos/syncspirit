@@ -10,6 +10,7 @@
 #include "model/diff/modify/add_blocks.h"
 #include "model/diff/modify/remove_blocks.h"
 #include "model/misc/orphaned_blocks.h"
+#include "utils/format.hpp"
 
 using namespace syncspirit::model;
 using namespace syncspirit::model::diff::advance;
@@ -166,8 +167,8 @@ auto advance_t::apply_impl(apply_controller_t &controller, void *custom) const n
     local_file->set_sequence(sequence);
     local_folder->add_strict(local_file);
 
-    LOG_TRACE(log, "advance_t ({}), folder = {}, name = {}, size = {}, blocks = {}, seq. = {}", stringify(action),
-              folder_id, local_file->get_name(), size, proto::get_blocks_size(proto_local), sequence);
+    LOG_TRACE(log, "advance_t ({}), file: '{}', size: {}, blocks: {}, seq.: {}", stringify(action), *local_file, size,
+              proto::get_blocks_size(proto_local), sequence);
 
     local_file->notify_update();
 

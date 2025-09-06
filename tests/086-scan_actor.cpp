@@ -143,7 +143,7 @@ void test_meta_changes() {
                         REQUIRE(folder_info->get_file_infos().size() == 1);
                         auto fi = folder_info->get_file_infos().begin()->item;
                         CHECK(fi->is_dir());
-                        CHECK(fi->get_name() == "abc");
+                        CHECK(fi->get_name()->get_full_name() == "abc");
                         bfs::permissions(subdir, bfs::perms::all);
 
                         auto &errs = sup->io_errors;

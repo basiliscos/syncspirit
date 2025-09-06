@@ -94,7 +94,7 @@ static advance_action_t resolve(const file_info_t &remote, const file_info_t *lo
         if (fi->get_device() == &self) {
             continue;
         }
-        auto other_party_file = fi->get_file_infos().by_name(remote.get_name());
+        auto other_party_file = fi->get_file_infos().by_name(remote.get_name()->get_full_name());
         if (other_party_file) {
             auto o_v = other_party_file->get_version();
             if (!r_v.contains(o_v)) {
@@ -124,14 +124,15 @@ advance_action_t resolve(const file_info_t &remote) noexcept {
     if (remote.is_link() && !remote.is_deleted() && !P::symlinks_supported()) {
         return advance_action_t::ignore;
     }
-    if (!P::path_supported(bfs::path(boost::nowide::widen(remote.get_name())))) {
+    auto remote_name = remote.get_name()->get_full_name();
+    if (!P::path_supported(bfs::path(boost::nowide::widen(remote_name)))) {
         return advance_action_t::ignore;
     }
     auto folder = remote.get_folder_info()->get_folder();
     auto self = folder->get_cluster()->get_device();
     auto local_folder = folder->get_folder_infos().by_device(*self);
     auto &local_files = local_folder->get_file_infos();
-    auto local_file = local_files.by_name(remote.get_name());
+    auto local_file = local_files.by_name(remote_name);
     auto action = resolve(remote, local_file.get());
     if (action == advance_action_t::resolve_remote_win) {
         auto name = remote.get_path().filename().string();

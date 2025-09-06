@@ -502,17 +502,17 @@ TEST_CASE("presentation", "[presentation]") {
             auto file_1 = add_file("a-file", *my_device, proto::FileInfoType::FILE);
             auto e_file_1 = folder_entity->on_insert(*file_1);
             REQUIRE(e_file_1);
-            CHECK(e_file_1->get_path().get_full_name() == file_1->get_name());
+            CHECK(e_file_1->get_path() == *file_1->get_name());
 
             auto file_3 = add_file("a-file-3", *my_device, proto::FileInfoType::FILE);
             auto e_file_3 = folder_entity->on_insert(*file_3);
             REQUIRE(e_file_3);
-            CHECK(e_file_3->get_path().get_full_name() == file_3->get_name());
+            CHECK(e_file_3->get_path() == *file_3->get_name());
 
             auto file_2 = add_file("a-file-2", *my_device, proto::FileInfoType::FILE);
             auto e_file_2 = folder_entity->on_insert(*file_2);
             REQUIRE(e_file_2);
-            CHECK(e_file_2->get_path().get_full_name() == file_2->get_name());
+            CHECK(e_file_2->get_path() == *file_2->get_name());
         }
         SECTION("presence & entity hierarchy order") {
             REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
@@ -1353,7 +1353,7 @@ TEST_CASE("statistics", "[presentation]") {
 
         // peer copies
         auto fi_peer = folder->get_folder_infos().by_device(*peer_device);
-        f_c_my = f_c_my->get_folder_info()->get_file_infos().by_name(f_c_my->get_name());
+        f_c_my = f_c_my->get_folder_info()->get_file_infos().by_name(f_c_my->get_name()->get_full_name());
         proto::get_version(pr_fi) = f_c_my->get_version().as_proto();
         auto file_c_peer = model::file_info_t::create(sequencer->next_uuid(), pr_fi, fi_peer.get()).value();
         {

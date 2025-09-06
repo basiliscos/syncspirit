@@ -39,7 +39,7 @@ TEST_CASE("new file diff", "[model]") {
         auto &files = folder_info->get_file_infos();
         auto file = files.by_name(proto::get_name(pr_file));
         REQUIRE(file);
-        REQUIRE(file->get_name() == "a.txt");
+        REQUIRE(file->get_name()->get_full_name() == "a.txt");
         REQUIRE(file->get_link_target() == "/some/where");
         REQUIRE(file->is_link());
         REQUIRE(file->get_sequence() == 1);
@@ -69,7 +69,7 @@ TEST_CASE("new file diff", "[model]") {
             REQUIRE(builder.local_update(folder->get_id(), pr_file).apply());
             REQUIRE(files.size() == 1);
 
-            auto new_file = files.by_name(file->get_name());
+            auto new_file = files.by_name(file->get_name()->get_full_name());
             REQUIRE(new_file);
             CHECK(new_file.get() == file.get());
             CHECK(new_file->get_key() == file->get_key());
@@ -96,7 +96,7 @@ TEST_CASE("new file diff", "[model]") {
         auto file = folder_info->get_file_infos().by_name(proto::get_name(pr_file));
         REQUIRE(file);
         REQUIRE(file->get_size() == 5);
-        REQUIRE(file->get_name() == "a.txt");
+        REQUIRE(file->get_name()->get_full_name() == "a.txt");
         REQUIRE(!file->is_link());
         REQUIRE(file->get_sequence() == 1);
         REQUIRE(folder_info->get_max_sequence() == 1);

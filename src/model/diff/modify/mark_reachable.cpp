@@ -10,11 +10,11 @@
 using namespace syncspirit::model::diff::modify;
 
 mark_reachable_t::mark_reachable_t(const model::file_info_t &file, bool reachable_) noexcept
-    : folder_id{file.get_folder_info()->get_folder()->get_id()}, file_name{file.get_name()}, reachable{reachable_} {
+    : folder_id{file.get_folder_info()->get_folder()->get_id()}, file_name{file.get_name()->get_full_name()},
+      reachable{reachable_} {
     auto &peer = file.get_folder_info()->get_device()->device_id();
     device_id = peer.get_sha256();
-    LOG_DEBUG(log, "mark_reachable_t, file = {}, folder = {}, device = {}, value = {}", file_name, folder_id, peer,
-              reachable);
+    LOG_DEBUG(log, "mark_reachable_t, file: '{}', device: {}, value: {}", file, peer, reachable);
 }
 
 auto mark_reachable_t::apply_impl(apply_controller_t &controller, void *custom) const noexcept

@@ -16,12 +16,14 @@ TEST_CASE("file-info", "[model]") {
     auto sequencer = make_sequencer(4);
     auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
     auto my_device = device_t::create(my_id, "my-device").value();
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
 
     db::Folder db_folder;
     db::set_id(db_folder, "1234-5678");
     db::set_label(db_folder, "my-label");
     db::set_path(db_folder, "/my/path");
     auto folder = folder_t::create(sequencer->next_uuid(), db_folder).value();
+    folder->assign_cluster(cluster);
 
     db::FolderInfo db_folder_info;
     db::set_index_id(db_folder_info, 2);

@@ -556,13 +556,13 @@ void test_index_receiving() {
                 REQUIRE(folder_peer);
                 CHECK(folder_peer->get_max_sequence() == 10ul);
                 REQUIRE(folder_peer->get_file_infos().size() == 1);
-                CHECK(folder_peer->get_file_infos().begin()->item->get_name() == file_name);
+                CHECK(folder_peer->get_file_infos().begin()->item->get_name()->get_full_name() == file_name);
 
                 auto folder_my = folder_infos.by_device(*my_device);
                 REQUIRE(folder_my);
                 CHECK(folder_my->get_max_sequence() == 1ul);
                 REQUIRE(folder_my->get_file_infos().size() == 1);
-                CHECK(folder_my->get_file_infos().begin()->item->get_name() == file_name);
+                CHECK(folder_my->get_file_infos().begin()->item->get_name()->get_full_name() == file_name);
 
                 SECTION("then index update is applied") {
                     auto index_update = proto::IndexUpdate{};
@@ -735,7 +735,7 @@ void test_downloading() {
                 REQUIRE(folder_my->get_file_infos().size() == 1);
                 auto f = folder_my->get_file_infos().begin()->item;
                 REQUIRE(f);
-                CHECK(f->get_name() == file_name);
+                CHECK(f->get_name()->get_full_name() == file_name);
                 CHECK(f->get_size() == 5);
                 CHECK(f->get_blocks().size() == 1);
                 CHECK(f->is_locally_available());
@@ -968,7 +968,7 @@ void test_downloading() {
                 REQUIRE(folder_my->get_file_infos().size() == 1);
                 auto f = folder_my->get_file_infos().begin()->item;
                 REQUIRE(f);
-                CHECK(f->get_name() == file_name);
+                CHECK(f->get_name()->get_full_name() == file_name);
                 CHECK(f->get_size() == 0);
                 CHECK(f->get_blocks().size() == 0);
                 CHECK(f->is_locally_available());
@@ -1014,7 +1014,7 @@ void test_downloading() {
                 REQUIRE(folder_my->get_file_infos().size() == 1);
                 auto f = folder_my->get_file_infos().begin()->item;
                 REQUIRE(f);
-                CHECK(f->get_name() == file_name);
+                CHECK(f->get_name()->get_full_name() == file_name);
                 CHECK(f->get_size() == 5);
                 CHECK(f->get_blocks().size() == 1);
                 CHECK(f->is_locally_available());
@@ -1075,7 +1075,7 @@ void test_downloading() {
                 REQUIRE(folder_my->get_file_infos().size() == 1);
                 auto f = folder_my->get_file_infos().begin()->item;
                 REQUIRE(f);
-                CHECK(f->get_name() == file_name);
+                CHECK(f->get_name()->get_full_name() == file_name);
                 CHECK(f->get_size() == 5);
                 CHECK(f->get_blocks().size() == 1);
                 CHECK(f->is_locally_available());
@@ -1147,7 +1147,7 @@ void test_downloading() {
                 REQUIRE(folder_my->get_file_infos().size() == 2);
                 auto f = folder_my->get_file_infos().by_name(file_name_1);
                 REQUIRE(f);
-                CHECK(f->get_name() == file_name_1);
+                CHECK(f->get_name()->get_full_name() == file_name_1);
                 CHECK(f->get_size() == 10);
                 CHECK(f->get_blocks().size() == 2);
                 CHECK(f->is_locally_available());
@@ -2059,7 +2059,7 @@ void test_conflicts() {
                 REQUIRE(local_conflict->get_blocks().size() == 1);
                 CHECK(local_conflict->get_blocks()[0]->get_hash() == data_2_h);
 
-                auto file = local_folder->get_file_infos().by_name(local_file->get_name());
+                auto file = local_folder->get_file_infos().by_name(local_file->get_name()->get_full_name());
                 REQUIRE(file);
                 CHECK(file->get_size() == 5);
                 REQUIRE(file->get_blocks().size() == 1);
@@ -2073,8 +2073,8 @@ void test_conflicts() {
                 REQUIRE(proto::get_files_size(index_update_sent) == 2);
                 auto &f1 = proto::get_files(index_update_sent, 0);
                 auto &f2 = proto::get_files(index_update_sent, 1);
-                CHECK(proto::get_name(f1) == local_conflict->get_name());
-                CHECK(proto::get_name(f2) == file->get_name());
+                CHECK(proto::get_name(f1) == local_conflict->get_name()->get_full_name());
+                CHECK(proto::get_name(f2) == file->get_name()->get_full_name());
             }
         }
     };

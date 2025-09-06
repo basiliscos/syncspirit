@@ -168,6 +168,7 @@ TEST_CASE("cluster update, new folder", "[model]") {
         db::set_label(db_folder, "some-label");
         db::set_path(db_folder, "/my/path");
         auto folder = folder_t::create(sequencer->next_uuid(), db_folder).value();
+        folder->assign_cluster(cluster);
 
         cluster->get_folders().put(folder);
 
@@ -207,6 +208,7 @@ TEST_CASE("cluster update, new folder", "[model]") {
             auto r_a = diff->apply(*controller, {});
             CHECK(r_a);
             auto pr_file = proto::FileInfo();
+            proto::set_name(pr_file, "name.bin");
             proto::set_sequence(pr_file, folder_info_peer->get_max_sequence());
             auto &pr_version = proto::get_version(pr_file);
             proto::add_counters(pr_version, proto::Counter(peer_device->device_id().get_uint(), 0));
@@ -228,6 +230,7 @@ TEST_CASE("cluster update, new folder", "[model]") {
         db::set_label(db_folder, "some-label");
         db::set_path(db_folder, "/my/path");
         auto folder = folder_t::create(sequencer->next_uuid(), db_folder).value();
+        folder->assign_cluster(cluster);
 
         cluster->get_folders().put(folder);
         auto &folder_infos = folder->get_folder_infos();
@@ -335,6 +338,7 @@ TEST_CASE("cluster update, reset folder", "[model]") {
     db::set_label(db_folder, "my-label");
     db::set_path(db_folder, "/my/path");
     auto folder = folder_t::create(sequencer->next_uuid(), db_folder).value();
+    folder->assign_cluster(cluster);
 
     cluster->get_folders().put(folder);
     auto db_p_folder = [&]() -> db::PendingFolder {
@@ -490,6 +494,7 @@ TEST_CASE("cluster update for a folder, which was not shared", "[model]") {
     db::set_label(db_folder, "my-label");
     db::set_path(db_folder, "/my/path");
     auto folder = folder_t::create(sequencer->next_uuid(), db_folder).value();
+    folder->assign_cluster(cluster);
 
     cluster->get_folders().put(folder);
 
