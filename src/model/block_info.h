@@ -40,7 +40,6 @@ struct SYNCSPIRIT_API block_info_t final : arc_base_t<block_info_t> {
 
     inline utils::bytes_view_t get_hash() const noexcept { return utils::bytes_view_t(hash + 1, digest_length); }
     inline utils::bytes_view_t get_key() const noexcept { return utils::bytes_view_t(hash); }
-    inline std::uint32_t get_weak_hash() const noexcept { return weak_hash; }
     inline std::uint32_t get_size() const noexcept { return size; }
     inline size_t usages() const noexcept { return file_blocks.size(); }
     inline file_blocks_t &get_file_blocks() { return file_blocks; }
@@ -72,9 +71,8 @@ struct SYNCSPIRIT_API block_info_t final : arc_base_t<block_info_t> {
     block_info_t(const proto::BlockInfo &block) noexcept;
 
     unsigned char hash[data_length];
-    std::uint32_t weak_hash = 0;
-    std::int32_t size = 0;
     file_blocks_t file_blocks;
+    std::int32_t size = 0;
     std::uint32_t locked = 0;
 };
 

@@ -263,8 +263,7 @@ using FileInfo = pp::message<
 >;
 
 using BlockInfo = pp::message<
-    pp::uint32_field   <"weak_hash", 1>,
-    pp::int32_field    <"size",      2>
+    pp::int32_field    <"size",      1>
 >;
 
 using SomeDevice = pp::message<

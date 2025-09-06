@@ -11,7 +11,6 @@
 #include "misc/file_iterator.h"
 #include "proto/proto-helpers.h"
 #include "utils/bytes_comparator.hpp"
-#include <zlib.h>
 #include <spdlog/spdlog.h>
 #include <boost/date_time/c_local_time_adjustor.hpp>
 #include <boost/nowide/convert.hpp>
@@ -24,12 +23,9 @@ namespace syncspirit::model {
 static const auto empty_block = []() -> proto::BlockInfo {
     unsigned char digest[SHA256_DIGEST_LENGTH];
     unsigned char empty_data[1] = {0};
-    auto weak_hash = adler32(0L, Z_NULL, 0);
-    weak_hash = adler32(weak_hash, empty_data, 0);
     utils::digest(empty_data, 0, digest);
     auto digets_bytes = utils::bytes_view_t(digest, SHA256_DIGEST_LENGTH);
     auto block = proto::BlockInfo();
-    proto::set_weak_hash(block, weak_hash);
     proto::set_hash(block, digets_bytes);
     return block;
 }();

@@ -86,7 +86,6 @@ TEST_CASE("new file diff", "[model]") {
 
         auto hash = utils::sha256_digest(as_bytes("12345")).value();
         auto &pr_block = proto::add_blocks(pr_file);
-        proto::set_weak_hash(pr_block, 12);
         proto::set_size(pr_block, 5);
         proto::set_hash(pr_block, hash);
 
@@ -114,7 +113,6 @@ TEST_CASE("new file diff", "[model]") {
 
         auto hash = utils::sha256_digest(as_bytes("12345")).value();
         auto &pr_block = proto::add_blocks(pr_file);
-        proto::set_weak_hash(pr_block, 12);
         proto::set_size(pr_block, 5);
         proto::set_hash(pr_block, hash);
         REQUIRE(builder.local_update(folder->get_id(), pr_file).apply());
@@ -139,7 +137,6 @@ TEST_CASE("new file diff", "[model]") {
 
         auto hash = utils::sha256_digest(as_bytes("12345")).value();
         auto &pr_block = proto::add_blocks(pr_file);
-        proto::set_weak_hash(pr_block, 12);
         proto::set_size(pr_block, 5);
         proto::set_hash(pr_block, hash);
 

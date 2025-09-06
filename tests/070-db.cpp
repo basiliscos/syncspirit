@@ -10,6 +10,7 @@
 #include "model/diff/peer/cluster_update.h"
 #include "model/diff/contact/ignored_connected.h"
 #include "model/diff/contact/unknown_connected.h"
+#include "proto/proto-helpers-impl.hpp"
 #include "test_supervisor.h"
 #include "access.h"
 #include "model/cluster.h"
@@ -1220,6 +1221,52 @@ void test_db_migration_1_2() {
     F2(F1().run()).run();
 }
 
+void test_db_migration_2_3() {
+    static constexpr auto folder_id = "1234-5678";
+
+    struct F1 : fixture_t {
+        void main() noexcept override {
+            // clang-format off
+            using BlockInfoEx = pp::message<
+               pp::uint32_field <"weak_hash", 1>,
+               pp::int32_field  <"size",      2>
+            >;
+            // clang-format on
+
+            auto bi = BlockInfoEx{1, 0x1234};
+            auto new_value = syncspirit::details::generic_encode(bi);
+            unsigned char key[model::block_info_t::data_length] = {0};
+            key[0] = db::prefix::block_info;
+
+            auto &db_env = db_actor->access<env>();
+            auto txn_opt = db::make_transaction(db::transaction_type_t::RW, db_env);
+            REQUIRE(txn_opt);
+            auto &txn = txn_opt.value();
+            REQUIRE(db::save_version(2, txn));
+            REQUIRE(db::save({key, new_value}, txn));
+            REQUIRE(txn.commit());
+        }
+    };
+    struct F2 : fixture_t {
+        F2(fixture_t &other) : fixture_t(std::move(other)) {}
+        void main() noexcept override {
+            load_diff = {};
+            sup->send<net::payload::load_cluster_trigger_t>(db_addr);
+            sup->do_process();
+            REQUIRE(load_diff);
+            auto cluster_clone = make_cluster();
+            auto controller = make_apply_controller(cluster_clone);
+            REQUIRE(load_diff->apply(*controller, {}));
+
+            auto &blocks = cluster_clone->get_blocks();
+            REQUIRE(blocks.size() == 1);
+            auto b = blocks.begin()->item;
+            CHECK(b->get_size() == 0x1234);
+        }
+    };
+    F2(F1().run()).run();
+}
+
 void test_corrupted_file() {
     struct F : fixture_t {
         void main() noexcept override {
@@ -1551,6 +1598,7 @@ int _init() {
     REGISTER_TEST_CASE(test_update_peer, "test_update_peer", "[db]");
     REGISTER_TEST_CASE(test_peer_3_folders_6_files, "test_peer_3_folders_6_files", "[db]");
     REGISTER_TEST_CASE(test_db_migration_1_2, "test_db_migration_1_2", "[db]");
+    REGISTER_TEST_CASE(test_db_migration_2_3, "test_db_migration_2_3", "[db]");
     REGISTER_TEST_CASE(test_corrupted_file, "test_corrupted_file", "[db]");
     REGISTER_TEST_CASE(test_flush_on_shutdown, "test_flush_on_shutdown", "[db]");
     REGISTER_TEST_CASE(test_iterative_loading, "test_iterative_loading", "[db]");

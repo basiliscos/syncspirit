@@ -133,14 +133,6 @@ inline void set_hash(BlockInfo &msg, utils::bytes_view_t value) {
     using namespace pp;
     msg["hash"_f] = utils::bytes_t{value.begin(), value.end()};
 }
-inline std::uint32_t get_weak_hash(const BlockInfo &msg) {
-    using namespace pp;
-    return msg["weak_hash"_f].value_or(0);
-}
-inline void set_weak_hash(BlockInfo &msg, std::uint32_t value) {
-    using namespace pp;
-    msg["weak_hash"_f] = value;
-}
 
 /*************/
 /*** Close ***/
@@ -740,14 +732,6 @@ inline bool get_from_temporary(const Request &msg) {
 inline void set_from_temporary(Request &msg, bool value) {
     using namespace pp;
     msg["from_temporary"_f] = value;
-}
-inline std::uint32_t get_weak_hash(const Request &msg) {
-    using namespace pp;
-    return msg["weak_hash"_f].value_or(0);
-}
-inline void set_weak_hash(Request &msg, std::uint32_t value) {
-    using namespace pp;
-    msg["weak_hash"_f] = value;
 }
 
 /****************/

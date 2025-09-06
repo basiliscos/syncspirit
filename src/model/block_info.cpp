@@ -31,13 +31,9 @@ auto block_info_t::strict_hash_t::get_key() noexcept -> utils::bytes_view_t {
 
 block_info_t::block_info_t(utils::bytes_view_t key) noexcept { std::copy(key.begin(), key.end(), hash); }
 
-block_info_t::block_info_t(const proto::BlockInfo &block) noexcept
-    : weak_hash{proto::get_weak_hash(block)}, size{proto::get_size(block)} {
-    hash[0] = prefix;
-}
+block_info_t::block_info_t(const proto::BlockInfo &block) noexcept : size{proto::get_size(block)} { hash[0] = prefix; }
 
 template <> void block_info_t::assign<db::BlockInfo>(const db::BlockInfo &block) noexcept {
-    weak_hash = db::get_weak_hash(block);
     size = db::get_size(block);
 }
 
@@ -73,13 +69,12 @@ outcome::result<block_info_ptr_t> block_info_t::create(const proto::BlockInfo &b
 proto::BlockInfo block_info_t::as_bep(size_t offset) const noexcept {
     proto::BlockInfo r;
     proto::set_size(r, size);
-    proto::set_weak_hash(r, weak_hash);
     proto::set_hash(r, get_hash());
     proto::set_offset(r, offset);
     return r;
 }
 
-utils::bytes_t block_info_t::serialize() const noexcept { return db::encode(db::BlockInfo{weak_hash, size}); }
+utils::bytes_t block_info_t::serialize() const noexcept { return db::encode(db::BlockInfo{size}); }
 
 void block_info_t::link(file_info_t *file_info, size_t block_index) noexcept {
     file_blocks.emplace_back(this, file_info, block_index);
