@@ -703,10 +703,10 @@ outcome::result<main_t> generate_config(const bfs::path &config_path) {
         60000,              /* request_timeout */
         90000,              /* tx_timeout */
         300000,             /* rx_timeout */
-        16,                 /* blocks_max_requested */
-        32,                 /* blocks_simultaneous_write */
-        10,                 /* advances_per_iteration */
-        100,                /* stats_interval */
+        64,                 /* blocks_max_requested */
+        64,                 /* blocks_simultaneous_write */
+        20,                 /* advances_per_iteration */
+        500,                /* stats_interval */
     };
     cfg.dialer_config = dialer_config_t {
         true,       /* enabled */
@@ -722,8 +722,8 @@ outcome::result<main_t> generate_config(const bfs::path &config_path) {
     cfg.db_config = db_config_t {
         0x0,           /* upper_limit, auto-adjust */
         150,           /* uncommitted_threshold */
-        8192,          /* max blocks per diff */
-        1024,          /* max files per diff */
+        50*1024,       /* max blocks per diff */
+        5*1024,        /* max files per diff */
     };
 
     cfg.relay_config = relay_config_t {
