@@ -16,11 +16,9 @@ using namespace syncspirit::presentation;
 namespace bfs = std::filesystem;
 
 using file_entity_ptr_t = model::intrusive_ptr_t<file_entity_t>;
-using new_files_t = std::unordered_map<model::path_t *, file_entity_ptr_t>;
-// using file_entities_t = std::unordered_map<std::string_view, file_entity_ptr_t>;
 using file_entities_t = std::unordered_map<model::path_t *, file_entity_ptr_t>;
 
-static void process(model::folder_info_t *folder_info, entity_t::children_t &files, new_files_t &new_files) {
+static void process(model::folder_info_t *folder_info, entity_t::children_t &files, file_entities_t &new_files) {
     auto &files_map = folder_info->get_file_infos();
     new_files.reserve(files_map.size());
     for (auto &it_file : files_map) {
@@ -34,7 +32,7 @@ static void process(model::folder_info_t *folder_info, entity_t::children_t &fil
     }
 }
 
-static void process_files(new_files_t &&new_files, orphans_t &orphans, folder_entity_t *self) {
+static void process_files(file_entities_t &&new_files, orphans_t &orphans, folder_entity_t *self) {
     using entities_vector_t = std::vector<file_entity_ptr_t>;
     auto entities = entities_vector_t();
     entities.reserve(new_files.size());
@@ -85,7 +83,7 @@ folder_entity_t::folder_entity_t(model::folder_ptr_t folder_) noexcept
     }
 
     // make all-files as chilren, make hierarchy
-    auto new_files = new_files_t();
+    auto new_files = file_entities_t();
     for (auto &it : folders_map) {
         process(it.item.get(), children, new_files);
     }
@@ -103,7 +101,7 @@ auto folder_entity_t::on_insert(model::folder_info_t &folder_info) noexcept -> f
     auto p = new folder_presence_t(*this, folder_info);
     presences.emplace_back(p);
 
-    auto new_files = new_files_t();
+    auto new_files = file_entities_t();
     process(&folder_info, children, new_files);
     process_files(std::move(new_files), orphans, this);
     commit(*path, device);
