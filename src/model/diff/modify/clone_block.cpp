@@ -4,6 +4,7 @@
 #include "clone_block.h"
 #include "model/diff/cluster_visitor.h"
 #include "model/cluster.h"
+#include "utils/format.hpp"
 
 using namespace syncspirit::model::diff::modify;
 
@@ -23,7 +24,7 @@ clone_block_t::clone_block_t(const file_block_t &file_block) noexcept
     auto source_fi = source_file->get_folder_info();
     source_device_id = source_fi->get_device()->device_id().get_sha256();
     source_folder_id = source_fi->get_folder()->get_id();
-    source_file_name = source_file->get_name();
+    source_file_name = source_file->get_name()->get_full_name();
 
     assert(file_block.file()->get_blocks().at(block_index)->get_hash() == source_fi->get_folder()
                                                                               ->get_cluster()
@@ -36,8 +37,8 @@ clone_block_t::clone_block_t(const file_block_t &file_block) noexcept
                                                                               ->get_blocks()
                                                                               .at(source_block_index)
                                                                               ->get_hash());
-    LOG_DEBUG(log, "clone_block_t, file = {}, folder = {}, block = {} (source file {} from {} #{})", file_name,
-              folder_id, block_index, source_file_name, source_folder_id, source_block_index);
+    LOG_DEBUG(log, "clone_block_t, file: '{}', block: {} (source '{}' #{})", *file_block.file(), block_index,
+              *source_file, source_block_index);
 }
 
 auto clone_block_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

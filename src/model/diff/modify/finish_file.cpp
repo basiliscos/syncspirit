@@ -15,12 +15,11 @@ finish_file_t::finish_file_t(const model::file_info_t &file) noexcept {
     auto folder = fi->get_folder();
     auto &device_id = fi->get_device()->device_id();
     folder_id = folder->get_id();
-    file_name = file.get_name();
+    file_name = file.get_name()->get_full_name();
     peer_id = device_id.get_sha256();
     assert(device_id != folder->get_cluster()->get_device()->device_id());
     action = resolve(file);
-    LOG_DEBUG(log, "finish_file_t, file = {}, folder = {}, peer = {}, action = {}", file_name, folder_id, device_id,
-              (int)action);
+    LOG_DEBUG(log, "finish_file_t, file: '{}', peer = {}, action = {}", file, device_id, (int)action);
     assert(action != advance_action_t::ignore);
 }
 

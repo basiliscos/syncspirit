@@ -92,7 +92,7 @@ TEST_CASE("loading cluster (base)", "[model]") {
 
         auto block = block_info_t::create(bi).assume_value();
         auto key = block->get_key();
-        auto db_block = db::BlockInfo{0, block->get_size()};
+        auto db_block = db::BlockInfo{block->get_size()};
 
         auto target_block = block_info_ptr_t();
 
@@ -109,7 +109,6 @@ TEST_CASE("loading cluster (base)", "[model]") {
         REQUIRE(target_block);
         CHECK(target_block->get_hash() == block->get_hash());
         CHECK(target_block->get_key() == block->get_key());
-        CHECK(target_block->get_weak_hash() == block->get_weak_hash());
         CHECK(target_block->get_size() == block->get_size());
     }
 
@@ -304,6 +303,7 @@ TEST_CASE("loading cluster (file info + block)", "[model]") {
 
     auto uuid = sequencer->next_uuid();
     auto folder = folder_t::create(uuid, db_folder).value();
+    folder->assign_cluster(cluster);
     cluster->get_folders().put(folder);
 
     db::FolderInfo db_folder_info(2, 3, {});
@@ -351,7 +351,7 @@ TEST_CASE("loading cluster (file info + block)", "[model]") {
         REQUIRE(map.size() == 1);
         target = map.by_uuid(fi->get_uuid());
         REQUIRE(target);
-        REQUIRE(map.by_name(fi->get_name()));
+        REQUIRE(map.by_name(fi->get_name()->get_full_name()));
         REQUIRE(target->get_blocks().size() == 11);
         REQUIRE(target->get_blocks().begin()->get()->get_hash() == block->get_hash());
         CHECK(!target->is_locked());

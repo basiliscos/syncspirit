@@ -188,6 +188,8 @@ add_library(syncspirit_core
     src/model/misc/file_block.cpp
     src/model/misc/file_iterator.cpp
     src/model/misc/orphaned_blocks.cpp
+    src/model/misc/path.cpp
+    src/model/misc/path_cache.cpp
     src/model/misc/resolver.cpp
     src/model/misc/sequencer.cpp
     src/model/misc/updates_streamer.cpp
@@ -234,7 +236,6 @@ add_library(syncspirit_core
     src/presentation/local_file_presence.cpp
     src/presentation/missing_file_presence.cpp
     src/presentation/orphans.cpp
-    src/presentation/path.cpp
     src/presentation/peer_file_presence.cpp
     src/presentation/presence.cpp
     src/proto/bep_support.cpp

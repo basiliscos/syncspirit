@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #pragma once
 
@@ -12,9 +12,7 @@ namespace db {
 enum class error_code {
     success = 0,
     db_version_size_mismatch,
-    deserialization_falure,
-    invalid_device_id,
-    local_device_not_found,
+    cannot_downgrade_db,
 };
 
 namespace detail {

@@ -278,7 +278,7 @@ auto file_actor_t::operator()(const model::diff::advance::remote_copy_t &diff, v
     auto r = reflect(file, file->get_path());
     if (!r) {
         auto msg = r.error().message();
-        LOG_ERROR(log, "cannot reflect (create) file '{}': {}", file->get_name(), msg);
+        LOG_ERROR(log, "cannot reflect (create) file '{}': {}", *file, msg);
         auto diff = model::diff::cluster_diff_ptr_t();
         diff = new model::diff::modify::mark_reachable_t(*file, false);
         send<model::payload::model_update_t>(coordinator, std::move(diff), this);
@@ -301,7 +301,7 @@ auto file_actor_t::operator()(const model::diff::advance::remote_win_t &diff, vo
     bfs::rename(source_path, target_path);
 
     if (ec) {
-        LOG_ERROR(log, "cannot rename file '{}': {}", file->get_name(), ec.message());
+        LOG_ERROR(log, "cannot rename file '{}': {}", file, ec.message());
         auto diff = model::diff::cluster_diff_ptr_t();
         diff = new model::diff::modify::mark_reachable_t(*file, false);
         send<model::payload::model_update_t>(coordinator, std::move(diff), this);
@@ -327,7 +327,7 @@ auto file_actor_t::operator()(const model::diff::modify::finish_file_t &diff, vo
                     auto conflicting_name = local_file->make_conflicting_name();
                     auto target_path = folder->get_path() / conflicting_name;
                     auto ec = sys::error_code{};
-                    LOG_DEBUG(log, "renaming {} -> {}", file->get_name(), conflicting_name);
+                    LOG_DEBUG(log, "renaming {} -> {}", *file, conflicting_name);
                     bfs::rename(local_path, target_path);
                     if (ec) {
                         LOG_ERROR(log, "cannot rename file: {}: {}", local_path.generic_string(), ec.message());
@@ -356,7 +356,7 @@ auto file_actor_t::operator()(const model::diff::modify::finish_file_t &diff, vo
                     return ec;
                 }
 
-                LOG_INFO(log, "file {} ({} bytes) is now locally available", file->get_name(), file->get_size());
+                LOG_INFO(log, "file {} ({} bytes) is now locally available", *file, file->get_size());
 
                 auto ack = model::diff::advance::advance_t::create(action, *file, *sequencer);
                 send<model::payload::model_update_t>(coordinator, std::move(ack), this);

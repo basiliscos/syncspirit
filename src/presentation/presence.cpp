@@ -143,8 +143,8 @@ bool presence_t::compare(const presence_t *l, const presence_t *r) noexcept {
     } else if (!ld && rd) {
         return false;
     }
-    auto l_name = l->entity->get_path().get_own_name();
-    auto r_name = r->entity->get_path().get_own_name();
+    auto l_name = l->entity->get_path()->get_own_name();
+    auto r_name = r->entity->get_path()->get_own_name();
     return l_name < r_name;
 }
 
@@ -171,10 +171,10 @@ bool presence_t::is_unique() const noexcept {
     using una::caseless::compare_utf8;
     if (!(features & F::deleted)) {
         if (parent && parent->entity) {
-            auto my_name = entity->get_path().get_own_name();
+            auto my_name = entity->get_path()->get_own_name();
             for (auto c : parent->get_children()) {
                 if (c != this && !(c->features & F::deleted)) {
-                    auto other_name = c->entity->get_path().get_own_name();
+                    auto other_name = c->entity->get_path()->get_own_name();
                     if (compare_utf8(my_name, other_name) == 0) {
                         return false;
                     }

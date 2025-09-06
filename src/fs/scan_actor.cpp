@@ -292,7 +292,7 @@ void scan_actor_t::on_hash(hasher::message::digest_response_t &res) noexcept {
             if (valid_blocks_count) {
                 task.push(new model::diff::local::blocks_availability_t(*file, info.valid_blocks()));
             } else {
-                LOG_DEBUG(log, "file '{}' has no unknown local blocks, ingnoring", file->get_name());
+                LOG_DEBUG(log, "file '{}' has no unknown local blocks, ingnoring", *file);
             }
         } else {
             auto &file = *info.get_file();
@@ -383,7 +383,7 @@ void scan_actor_t::post_scan(scan_task_t &task) noexcept {
             queue.pop_front();
             auto best = entity->get_best();
             if (best) {
-                auto file_name = entity->get_path().get_full_name();
+                auto file_name = entity->get_path()->get_full_name();
                 auto it = seen.end();
                 auto f = best->get_features();
                 if (f & F::deleted) {

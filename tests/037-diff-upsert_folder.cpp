@@ -72,7 +72,7 @@ TEST_CASE("folder upsert", "[model]") {
         auto [fi, action] = file_iterator->next();
         REQUIRE(fi);
         CHECK(action == A::remote_copy);
-        names.emplace_back(std::string(fi->get_name()));
+        names.emplace_back(std::string(fi->get_name()->get_full_name()));
     };
 
     next();

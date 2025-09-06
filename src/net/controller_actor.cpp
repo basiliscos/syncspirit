@@ -369,8 +369,7 @@ OUTER:
                 if (diff) {
                     ++advances;
                     push(std::move(diff));
-                    LOG_TRACE(log, "going to advance on file '{}' from folder '{}'", file->get_name(),
-                              file->get_folder_info()->get_folder()->get_label());
+                    LOG_TRACE(log, "going to advance on file '{}'", *file);
                 }
             } else if (file->get_size()) {
                 auto bi = model::block_iterator_ptr_t();
@@ -622,10 +621,10 @@ auto controller_actor_t::operator()(const model::diff::modify::block_ack_t &diff
                 if (file) {
                     if (file->is_locally_available()) {
                         if (resolve(*file) != model::advance_action_t::ignore) {
-                            LOG_TRACE(log, "on_block_update, finalizing '{}'", file->get_name());
+                            LOG_TRACE(log, "on_block_update, finalizing '{}'", *file);
                             push(new model::diff::modify::finish_file_t(*file));
                         } else {
-                            LOG_DEBUG(log, "on_block_update, already have actual '{}', noop", file->get_name());
+                            LOG_DEBUG(log, "on_block_update, already have actual '{}', noop", *file);
                         }
                     }
                 }
@@ -654,8 +653,7 @@ auto controller_actor_t::operator()(const model::diff::modify::block_rej_t &diff
                 auto file = folder_info->get_file_infos().by_name(diff.file_name);
                 if (file) {
                     auto &hash = diff.block_hash;
-                    LOG_DEBUG(log, "block '{}' has been rejected, marked file {} as unreachable", hash,
-                              file->get_name());
+                    LOG_DEBUG(log, "block '{}' has been rejected, marked file {} as unreachable", hash, *file);
                     file->mark_unreachable(true);
                     push(new model::diff::modify::mark_reachable_t(*file, false));
                     cancel_sync(file.get());
@@ -757,7 +755,7 @@ void controller_actor_t::on_message(proto::Request &req) noexcept {
                     code = proto::ErrorCode::NO_SUCH_FILE;
                 } else {
                     if (!file->is_file()) {
-                        LOG_WARN(log, "attempt to request non-regular file: {}", file->get_name());
+                        LOG_WARN(log, "attempt to request non-regular file: {}", *file);
                         code = proto::ErrorCode::GENERIC;
                     } else {
                         if (tx_blocks_requested > blocks_max_requested * constants::tx_blocks_max_factor) {
@@ -910,8 +908,7 @@ void controller_actor_t::on_validation(hasher::message::validation_response_t &r
                 do_release_block = true;
                 try_next = true;
             } else if (folder->is_suspended()) {
-                LOG_WARN(log, "folder '{}' is suspended, no further processing of '{}'", folder->get_id(),
-                         file->get_name());
+                LOG_WARN(log, "folder is suspended, no further processing of '{}'", *file);
             } else {
                 auto &data = block_res->payload.res.data;
                 auto index = payload.block_index;
@@ -922,7 +919,7 @@ void controller_actor_t::on_validation(hasher::message::validation_response_t &r
                         break;
                     }
                 }
-                LOG_TRACE(log, "{}, got block {}, already have: {}, write requests left = {}", file->get_name(), index,
+                LOG_TRACE(log, "{}, got block {}, already have: {}, write requests left = {}", *file, index,
                           already_have ? "y" : "n", cluster->get_write_requests());
                 if (already_have) {
                     try_next = true;

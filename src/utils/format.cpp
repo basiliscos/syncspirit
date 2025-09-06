@@ -62,7 +62,7 @@ auto fmt::formatter<device_ptr_t>::format(const device_ptr_t &device, FormatCont
 template <typename FormatContext>
 auto fmt::formatter<file_info_t>::format(const file_info_t &object, FormatContext &ctx) const -> decltype(ctx.out()) {
     auto folder = object.get_folder_info()->get_folder();
-    return fmt::format_to(ctx.out(), "{}/{}", folder->get_label(), object.get_name());
+    return fmt::format_to(ctx.out(), "{}/{}", folder->get_label(), object.get_name()->get_full_name());
 }
 
 template <typename FormatContext>

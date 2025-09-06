@@ -117,7 +117,7 @@ void file_table_t::refresh() {
     auto version = file_info.get_version();
     auto &stats = presence->get_stats();
 
-    name_cell->update(file_info.get_name());
+    name_cell->update(file_info.get_name()->get_full_name());
     device_cell->update(fmt::format("{} ({})", device->get_name(), device->device_id().get_short()));
     modified_cell->update(model::pt::to_simple_string(modified_date));
     sequence_cell->update(fmt::format("{}", file_info.get_sequence()));

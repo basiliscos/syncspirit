@@ -11,7 +11,6 @@
 #include "misc/file_iterator.h"
 #include "proto/proto-helpers.h"
 #include "utils/bytes_comparator.hpp"
-#include <zlib.h>
 #include <spdlog/spdlog.h>
 #include <boost/date_time/c_local_time_adjustor.hpp>
 #include <boost/nowide/convert.hpp>
@@ -24,12 +23,9 @@ namespace syncspirit::model {
 static const auto empty_block = []() -> proto::BlockInfo {
     unsigned char digest[SHA256_DIGEST_LENGTH];
     unsigned char empty_data[1] = {0};
-    auto weak_hash = adler32(0L, Z_NULL, 0);
-    weak_hash = adler32(weak_hash, empty_data, 0);
     utils::digest(empty_data, 0, digest);
     auto digets_bytes = utils::bytes_view_t(digest, SHA256_DIGEST_LENGTH);
     auto block = proto::BlockInfo();
-    proto::set_weak_hash(block, weak_hash);
     proto::set_hash(block, digets_bytes);
     return block;
 }();
@@ -115,6 +111,7 @@ file_info_t::~file_info_t() {
             blocks[i].reset();
         }
     }
+    name.reset();
 }
 
 utils::bytes_t file_info_t::create_key(const bu::uuid &uuid, const folder_info_ptr_t &folder_info_) noexcept {
@@ -124,7 +121,7 @@ utils::bytes_t file_info_t::create_key(const bu::uuid &uuid, const folder_info_p
     return key;
 }
 
-std::string_view file_info_t::get_name() const noexcept { return name; }
+auto file_info_t::get_name() const noexcept -> const path_ptr_t & { return name; }
 
 std::uint64_t file_info_t::get_block_offset(size_t block_index) const noexcept {
     assert(!blocks.empty());
@@ -132,8 +129,9 @@ std::uint64_t file_info_t::get_block_offset(size_t block_index) const noexcept {
 }
 
 auto file_info_t::fields_update(const db::FileInfo &source) noexcept -> outcome::result<void> {
+    auto &path_cache = folder_info->get_folder()->get_cluster()->get_path_cache();
     flags = (flags & ~0b111111) | as_flags(db::get_type(source));
-    name = db::get_name(source);
+    name = path_cache.get_path(db::get_name(source));
     sequence = db::get_sequence(source);
     set_size(db::get_size(source));
     permissions = db::get_permissions(source);
@@ -160,7 +158,8 @@ auto file_info_t::fields_update(const db::FileInfo &source) noexcept -> outcome:
 }
 
 auto file_info_t::fields_update(const proto::FileInfo &source) noexcept -> outcome::result<void> {
-    name = proto::get_name(source);
+    auto &path_cache = folder_info->get_folder()->get_cluster()->get_path_cache();
+    name = path_cache.get_path(proto::get_name(source));
     sequence = proto::get_sequence(source);
     flags = (flags & ~0b111111) | as_flags(proto::get_type(source));
     set_size(proto::get_size(source));
@@ -192,7 +191,7 @@ void file_info_t::set_sequence(std::int64_t value) noexcept { sequence = value; 
 
 db::FileInfo file_info_t::as_db(bool include_blocks) const noexcept {
     auto r = db::FileInfo();
-    db::set_name(r, name);
+    db::set_name(r, name->get_full_name());
     db::set_sequence(r, sequence);
     db::set_type(r, as_type(flags));
     db::set_size(r, size);
@@ -219,7 +218,7 @@ db::FileInfo file_info_t::as_db(bool include_blocks) const noexcept {
 
 proto::FileInfo file_info_t::as_proto(bool include_blocks) const noexcept {
     auto r = proto::FileInfo();
-    proto::set_name(r, name);
+    proto::set_name(r, name->get_full_name());
     proto::set_sequence(r, sequence);
     proto::set_type(r, as_type(flags));
     proto::set_size(r, size);
@@ -297,7 +296,7 @@ void file_info_t::mark_local(bool available) noexcept {
             if (peer != self) {
                 auto fit = peer->get_iterator();
                 if (fit) {
-                    auto peer_file = fi->get_file_infos().by_name(name);
+                    auto peer_file = fi->get_file_infos().by_name(name->get_full_name());
                     if (peer_file) {
                         fit->recheck(*peer_file);
                     }
@@ -326,7 +325,8 @@ bool file_info_t::is_locally_available() const noexcept { return missing_blocks 
 bool file_info_t::is_partly_available() const noexcept { return missing_blocks < blocks.size(); }
 
 const std::filesystem::path file_info_t::get_path() const noexcept {
-    auto path = folder_info->get_folder()->get_path() / boost::nowide::widen(name);
+    auto own_name = boost::nowide::widen(name->get_full_name());
+    auto path = folder_info->get_folder()->get_path() / own_name;
     path.make_preferred();
     return path;
 }
@@ -342,7 +342,7 @@ auto file_info_t::local_file() const noexcept -> file_info_ptr_t {
         return {};
     }
 
-    auto local_file = my_folder_info->get_file_infos().by_name(get_name());
+    auto local_file = my_folder_info->get_file_infos().by_name(name->get_full_name());
     return local_file;
 }
 
@@ -404,7 +404,7 @@ std::int64_t file_info_t::get_size() const noexcept {
 }
 
 std::size_t file_info_t::expected_meta_size() const noexcept {
-    auto r = name.size() + 1 + 8 + 4 + 8 + 4 + 8 + 3 + 8 + 4 + symlink_target.size();
+    auto r = name->get_full_name().size() + 1 + 8 + 4 + 8 + 4 + 8 + 3 + 8 + 4 + symlink_target.size();
     r += version.counters_size() * 16;
     r += blocks.size() * (8 + 4 + 4 + 32);
     return r;
@@ -416,7 +416,8 @@ bool file_info_t::has_no_permissions() const noexcept { return flags & f_no_perm
 
 void file_info_t::update(const file_info_t &other) noexcept {
     using hashes_t = std::set<utils::bytes_view_t, utils::bytes_comparator_t>;
-    assert(this->name == other.name);
+    // assert(this->name == other.name);
+    assert(this->name->get_full_name() == other.name->get_full_name());
     assert((this->get_key() == other.get_key()) || version.identical_to(other.version));
     size = other.size;
     permissions = other.permissions;
@@ -469,7 +470,7 @@ bool file_info_t::is_global() const noexcept {
             continue;
         }
         auto &files = it.item->get_file_infos();
-        auto file = files.by_name(name);
+        auto file = files.by_name(name->get_full_name());
         if (!file) {
             continue;
         }
@@ -483,7 +484,8 @@ bool file_info_t::is_global() const noexcept {
 
 std::string file_info_t::make_conflicting_name() const noexcept {
     using adjustor_t = boost::date_time::c_local_adjustor<pt::ptime>;
-    auto path = bfs::path(name);
+    auto own_name = boost::nowide::widen(name->get_full_name());
+    auto path = bfs::path(own_name);
     auto file_name = path.filename();
     auto stem = file_name.stem().string();
     auto ext = file_name.extension().string();
@@ -524,7 +526,7 @@ template <> SYNCSPIRIT_API utils::bytes_view_t get_index<0>(const file_info_ptr_
     return item->get_uuid();
 }
 template <> SYNCSPIRIT_API utils::bytes_view_t get_index<1>(const file_info_ptr_t &item) noexcept {
-    auto name = item->get_name();
+    auto name = item->get_name()->get_full_name();
     auto ptr = (unsigned char *)name.data();
     return {ptr, name.size()};
 }

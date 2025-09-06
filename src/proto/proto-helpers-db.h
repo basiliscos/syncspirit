@@ -31,14 +31,6 @@ int SYNCSPIRIT_API decode(utils::bytes_view_t, SomeDevice &);
 /*** BlockInfo ***/
 /*****************/
 
-inline std::uint32_t get_weak_hash(const BlockInfo &msg) {
-    using namespace pp;
-    return msg["weak_hash"_f].value_or(0);
-}
-inline void set_weak_hash(BlockInfo &msg, std::uint32_t value) {
-    using namespace pp;
-    msg["weak_hash"_f] = value;
-}
 inline std::int32_t get_size(const BlockInfo &msg) {
     using namespace pp;
     return msg["size"_f].value_or(0);

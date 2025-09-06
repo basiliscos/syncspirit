@@ -72,7 +72,7 @@ scan_result_t scan_task_t::advance() noexcept {
     }
     if (files.size() != 0) {
         auto file = files.begin()->item;
-        seen_paths.insert({std::string(file->get_name()), file->get_path()});
+        seen_paths.insert({std::string(file->get_name()->get_full_name()), file->get_path()});
         files.remove(file);
 
         bool unchanged = file->is_deleted() || (file->is_link() && !utils::platform_t::symlinks_supported());
@@ -112,9 +112,10 @@ scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
         }
         for (auto &it : files) {
             auto &file = *it.item;
-            bool remove = str.empty() || (file.get_name().find(str) == 0);
+            auto name = file.get_name()->get_full_name();
+            bool remove = str.empty() || (name.find(str) == 0);
             if (remove) {
-                seen_paths.insert({std::string(file.get_name()), file.get_path()});
+                seen_paths.insert({std::string(name), file.get_path()});
                 removed.put(it.item);
             }
         }
@@ -255,7 +256,7 @@ scan_result_t scan_task_t::advance_regular_file(file_info_t &file) noexcept {
 
     if (changed) {
         using FT = proto::FileInfoType;
-        proto::set_name(meta, file->get_name());
+        proto::set_name(meta, file->get_name()->get_full_name());
         proto::set_type(meta, FT::FILE);
         return changed_meta_t{file, std::move(meta)};
     }
@@ -283,7 +284,7 @@ scan_result_t scan_task_t::advance_symlink_file(file_info_t &file) noexcept {
     } else {
         using FT = proto::FileInfoType;
         auto meta = proto::FileInfo();
-        proto::set_name(meta, file->get_name());
+        proto::set_name(meta, file->get_name()->get_full_name());
         proto::set_type(meta, FT::SYMLINK);
         proto::set_symlink_target(meta, std::move(target_str));
         return changed_meta_t{file, std::move(meta)};
@@ -315,7 +316,7 @@ scan_result_t scan_task_t::advance_unknown_file(unknown_file_t &file) noexcept {
         auto &files = folder_info->get_file_infos();
         auto f = files.by_name(relative_path);
         if (f) {
-            seen_paths.insert({std::string(f->get_name()), path});
+            seen_paths.insert({std::string(f->get_name()->get_full_name()), path});
             if (folder_info->get_device() == cluster->get_device()) {
                 local_file = std::move(f);
             } else {
