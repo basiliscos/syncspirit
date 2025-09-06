@@ -11,7 +11,7 @@ namespace bfs = std::filesystem;
 
 using namespace boost::nowide;
 
-namespace syncspirit::presentation {
+namespace syncspirit::model {
 
 path_t::path_t(std::string_view full_name) noexcept : name(full_name) {
     auto file_path = bfs::path(widen(full_name));
@@ -92,4 +92,4 @@ I &I::operator++() noexcept {
 
 bool I::operator==(iterator_t other) noexcept { return (path == other.path) && position == other.position; }
 
-} // namespace syncspirit::presentation
+} // namespace syncspirit::model

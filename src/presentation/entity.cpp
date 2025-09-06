@@ -12,7 +12,7 @@ using namespace syncspirit::presentation;
 
 using F = presence_t::features_t;
 
-entity_t::entity_t(path_t path_, entity_t *parent_) noexcept
+entity_t::entity_t(model::path_t path_, entity_t *parent_) noexcept
     : parent{parent_}, path(std::move(path_)), best{nullptr}, entities_monitor{nullptr} {}
 
 entity_t::~entity_t() {
@@ -184,7 +184,7 @@ void entity_t::detach_child(entity_t &child) noexcept {
     model::intrusive_ptr_release(&child);
 }
 
-void entity_t::commit(const path_t &path, const model::device_t *device) noexcept {
+void entity_t::commit(const model::path_t &path, const model::device_t *device) noexcept {
     bool do_recurse = (device == nullptr);
     if (!do_recurse) {
         for (size_t i = 0; (i < presences.size()) && !do_recurse; ++i) {
@@ -225,7 +225,7 @@ auto entity_t::get_presences() const noexcept -> const presences_t & { return pr
 
 const entity_stats_t &entity_t::get_stats() noexcept { return statistics; }
 
-auto entity_t::get_path() const noexcept -> const path_t & { return path; }
+auto entity_t::get_path() const noexcept -> const model::path_t & { return path; }
 
 auto entity_t::get_children() noexcept -> children_t & { return children; }
 

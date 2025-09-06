@@ -4,14 +4,14 @@
 #pragma once
 
 #include "syncspirit-export.h"
+#include "arc.hpp"
 #include <string>
 #include <vector>
 #include <cstdint>
 
-namespace syncspirit::presentation {
+namespace syncspirit::model {
 
-struct SYNCSPIRIT_API path_t {
-
+struct SYNCSPIRIT_API path_t : arc_base_t<path_t> {
     struct SYNCSPIRIT_API iterator_t {
         using difference_type = std::ptrdiff_t;
         using element_type = std::string_view;
@@ -48,4 +48,6 @@ struct SYNCSPIRIT_API path_t {
     pieces_t pieces;
 };
 
-} // namespace syncspirit::presentation
+using path_ptr_t = intrusive_ptr_t<path_t>;
+
+} // namespace syncspirit::model

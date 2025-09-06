@@ -17,7 +17,8 @@ using namespace syncspirit::presentation;
 
 using F = presence_t::features_t;
 
-file_entity_t::file_entity_t(model::file_info_t &sample_file, path_t path_) noexcept : entity_t(std::move(path_)) {
+file_entity_t::file_entity_t(model::file_info_t &sample_file, model::path_t path_) noexcept
+    : entity_t(std::move(path_)) {
     using presence_files_t = std::pmr::vector<model::file_info_t *>;
 
     auto buffer = std::array<std::byte, 32 * sizeof(model::file_info_t *)>();

@@ -29,7 +29,7 @@ static void process(model::folder_info_t *folder_info, entity_t::children_t &fil
         if (new_files.count(name)) {
             continue;
         }
-        auto path = path_t(name);
+        auto path = model::path_t(name);
         auto child = file_entity_ptr_t(new file_entity_t(file, std::move(path)));
         new_files.emplace(name, std::move(child));
     }
@@ -109,7 +109,7 @@ auto folder_entity_t::on_insert(model::folder_info_t &folder_info) noexcept -> f
 }
 
 entity_t *folder_entity_t::on_insert(model::file_info_t &file_info) noexcept {
-    auto path = path_t(file_info.get_name());
+    auto path = model::path_t(file_info.get_name());
     auto device = file_info.get_folder_info()->get_device();
 
     auto entity = static_cast<entity_t *>(this);

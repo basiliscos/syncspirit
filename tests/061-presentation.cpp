@@ -44,49 +44,6 @@ struct aug_sample_t : model::augmentation_t {
     int &updated;
 };
 
-TEST_CASE("path", "[presentation]") {
-    using pieces_t = std::vector<std::string_view>;
-    SECTION("a/bb/c.txt") {
-        auto p = path_t("a/bb/c.txt");
-        CHECK(p.get_parent_name() == "a/bb");
-        CHECK(p.get_own_name() == "c.txt");
-
-        auto pieces = pieces_t();
-        for (auto p : p) {
-            pieces.emplace_back(p);
-        }
-
-        CHECK(pieces.size() == 3);
-        CHECK(pieces[0] == "a");
-        CHECK(pieces[1] == "bb");
-        CHECK(pieces[2] == "c.txt");
-        CHECK(p.contains(p));
-        CHECK(!p.contains(path_t("a/bb/c.tx")));
-        CHECK(!p.contains(path_t("a/bb/c.x")));
-        CHECK(!p.contains(path_t("a/bb/c")));
-        CHECK(!p.contains(path_t("a/bb")));
-        CHECK(!p.contains(path_t("a")));
-        CHECK(path_t("a").contains(p));
-        CHECK(path_t("a/").contains(p));
-        CHECK(path_t("a/b").contains(p));
-        CHECK(path_t("a/bb/c").contains(p));
-    }
-    SECTION("dir/file.bin") {
-        auto p = path_t("dir/file.bin");
-        CHECK(p.get_parent_name() == "dir");
-        CHECK(p.get_own_name() == "file.bin");
-
-        auto pieces = pieces_t();
-        for (auto p : p) {
-            pieces.emplace_back(p);
-        }
-
-        CHECK(pieces.size() == 2);
-        CHECK(pieces[0] == "dir");
-        CHECK(pieces[1] == "file.bin");
-    }
-}
-
 auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
 auto peer_id = device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
 auto peer_2_id =
