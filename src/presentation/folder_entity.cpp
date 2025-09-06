@@ -6,7 +6,7 @@
 #include "file_entity.h"
 #include "model/folder.h"
 #include "model/file_info.h"
-
+#include "model/cluster.h"
 #include <unordered_map>
 #include <vector>
 
@@ -16,10 +16,9 @@ using namespace syncspirit::presentation;
 namespace bfs = std::filesystem;
 
 using file_entity_ptr_t = model::intrusive_ptr_t<file_entity_t>;
-// using new_files_t = std::unordered_map<std::string_view, file_entity_ptr_t>;
 using new_files_t = std::unordered_map<model::path_t *, file_entity_ptr_t>;
 // using file_entities_t = std::unordered_map<std::string_view, file_entity_ptr_t>;
-using file_entities_t = std::unordered_map<std::string_view, file_entity_ptr_t>;
+using file_entities_t = std::unordered_map<model::path_t *, file_entity_ptr_t>;
 
 static void process(model::folder_info_t *folder_info, entity_t::children_t &files, new_files_t &new_files) {
     auto &files_map = folder_info->get_file_infos();
@@ -47,6 +46,7 @@ static void process_files(new_files_t &&new_files, orphans_t &orphans, folder_en
     };
     std::sort(entities.begin(), entities.end(), comparator);
 
+    auto &path_cache = self->get_folder().get_cluster()->get_path_cache();
     auto file_entities = file_entities_t();
     for (auto &entity : entities) {
         auto &path = entity->get_path();
@@ -55,8 +55,9 @@ static void process_files(new_files_t &&new_files, orphans_t &orphans, folder_en
             parent = self;
 
         } else {
-            auto parent_path = path->get_parent_name();
-            auto it_parent = file_entities.find(parent_path);
+            auto parent_name = path->get_parent_name();
+            auto parent_path = path_cache.get_path(parent_name);
+            auto it_parent = file_entities.find(parent_path.get());
             if (it_parent != file_entities.end()) {
                 parent = it_parent->second.get();
             } else {
@@ -66,7 +67,7 @@ static void process_files(new_files_t &&new_files, orphans_t &orphans, folder_en
         if (parent) {
             parent->add_child(*entity);
         }
-        file_entities[path->get_full_name()] = entity;
+        file_entities[path.get()] = entity;
     }
 }
 
