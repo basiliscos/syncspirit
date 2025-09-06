@@ -73,10 +73,9 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t {
     static decomposed_key_t decompose_key(utils::bytes_view_t key);
 
     static inline std::uint16_t as_flags(proto::FileInfoType type) noexcept {
-        return
-                type == proto::FileInfoType::DIRECTORY ? f_type_dir
-              : type == proto::FileInfoType::SYMLINK   ? f_type_link
-              : f_type_file;
+        return type == proto::FileInfoType::DIRECTORY ? f_type_dir
+               : type == proto::FileInfoType::SYMLINK ? f_type_link
+                                                      : f_type_file;
     }
 
     ~file_info_t();
@@ -106,7 +105,7 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t {
 
     inline std::uint16_t get_type() const noexcept { return flags & 0b111; }
     inline bool is_file() const noexcept { return flags & f_type_file; }
-    inline bool is_dir() const noexcept { return flags & f_type_dir;; }
+    inline bool is_dir() const noexcept { return flags & f_type_dir; }
     inline bool is_link() const noexcept { return flags & f_type_link; }
     inline bool is_deleted() const noexcept { return flags & f_deleted; }
     inline bool is_invalid() const noexcept { return flags & f_invalid; }

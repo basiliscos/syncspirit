@@ -11,8 +11,7 @@ static constexpr auto undef = std::numeric_limits<uint32_t>::max();
 
 using namespace syncspirit::model;
 
-version_t::version_t() noexcept: best_index{undef} {
-}
+version_t::version_t() noexcept : best_index{undef} {}
 
 version_t::version_t(const proto::Vector &v) noexcept {
     auto counters_sz = proto::get_counters_size(v);

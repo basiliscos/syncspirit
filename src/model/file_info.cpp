@@ -40,9 +40,7 @@ static const constexpr char prefix = (char)(db::prefix::file_info);
 
 static inline proto::FileInfoType as_type(std::uint16_t flags) noexcept {
     using T = proto::FileInfoType;
-    return flags & file_info_t::f_type_dir ? T::DIRECTORY
-         : flags & file_info_t::f_type_link ? T::SYMLINK
-         : T::FILE;
+    return flags & file_info_t::f_type_dir ? T::DIRECTORY : flags & file_info_t::f_type_link ? T::SYMLINK : T::FILE;
 }
 
 auto file_info_t::decompose_key(utils::bytes_view_t key) -> decomposed_key_t {
