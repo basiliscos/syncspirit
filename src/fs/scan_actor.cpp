@@ -383,7 +383,7 @@ void scan_actor_t::post_scan(scan_task_t &task) noexcept {
             queue.pop_front();
             auto best = entity->get_best();
             if (best) {
-                auto file_name = entity->get_path().get_full_name();
+                auto file_name = entity->get_path()->get_full_name();
                 auto it = seen.end();
                 auto f = best->get_features();
                 if (f & F::deleted) {

@@ -10,9 +10,9 @@ namespace syncspirit::presentation {
 
 namespace details {
 
-std::string_view get_path(const entity_ptr_t &entity) noexcept { return entity->get_path().get_full_name(); }
+model::path_t *get_path(const entity_ptr_t &entity) noexcept { return entity->get_path().get(); }
 
-std::string_view get_parent(const entity_ptr_t &entity) noexcept { return entity->get_path().get_parent_name(); }
+std::string_view get_parent(const entity_ptr_t &entity) noexcept { return entity->get_path()->get_parent_name(); }
 
 } // namespace details
 
@@ -35,13 +35,13 @@ void orphans_t::reap_children(entity_ptr_t parent) noexcept {
         auto item = queue.front();
         queue.pop_front();
 
-        auto item_name = item->get_path().get_full_name();
+        auto item_name = item->get_path()->get_full_name();
         auto [b, e] = by_parent_name.equal_range(item_name);
         for (auto it = b; it != e; ++it) {
             auto &child = **it;
             queue.emplace_back(&child);
 
-            auto it_name = by_name.find(child.get_path().get_full_name());
+            auto it_name = by_name.find(child.get_path().get());
             // by_name.erase(it_name);
 
             item->add_child(child);
@@ -50,7 +50,7 @@ void orphans_t::reap_children(entity_ptr_t parent) noexcept {
     }
 }
 
-entity_ptr_t orphans_t::get_by_path(std::string_view path) noexcept {
+entity_ptr_t orphans_t::get_by_path(model::path_t *path) noexcept {
     auto &by_name = get<0>();
     auto it = by_name.find(path);
     if (it != by_name.end()) {

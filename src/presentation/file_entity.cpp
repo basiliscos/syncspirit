@@ -17,7 +17,7 @@ using namespace syncspirit::presentation;
 
 using F = presence_t::features_t;
 
-file_entity_t::file_entity_t(model::file_info_t &sample_file, model::path_t path_) noexcept
+file_entity_t::file_entity_t(model::file_info_t &sample_file, model::path_ptr_t path_) noexcept
     : entity_t(std::move(path_)) {
     using presence_files_t = std::pmr::vector<model::file_info_t *>;
 
@@ -29,7 +29,7 @@ file_entity_t::file_entity_t(model::file_info_t &sample_file, model::path_t path
     for (auto &it_fi : fi_map) {
         auto &folder_info = it_fi.item;
         auto &files_map = folder_info->get_file_infos();
-        auto file = files_map.by_name(path.get_full_name());
+        auto file = files_map.by_name(path->get_full_name());
         if (file) {
             presence_files.emplace_back(file.get());
         }

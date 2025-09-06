@@ -12,7 +12,7 @@ using namespace syncspirit::presentation;
 
 using F = presence_t::features_t;
 
-entity_t::entity_t(model::path_t path_, entity_t *parent_) noexcept
+entity_t::entity_t(model::path_ptr_t path_, entity_t *parent_) noexcept
     : parent{parent_}, path(std::move(path_)), best{nullptr}, entities_monitor{nullptr} {}
 
 entity_t::~entity_t() {
@@ -225,22 +225,22 @@ auto entity_t::get_presences() const noexcept -> const presences_t & { return pr
 
 const entity_stats_t &entity_t::get_stats() noexcept { return statistics; }
 
-auto entity_t::get_path() const noexcept -> const model::path_t & { return path; }
+auto entity_t::get_path() const noexcept -> const model::path_ptr_t & { return path; }
 
 auto entity_t::get_children() noexcept -> children_t & { return children; }
 
 using nc_t = entity_t::name_comparator_t;
 
 bool nc_t::operator()(const entity_t *lhs, const entity_t *rhs) const noexcept {
-    return lhs->get_path().get_own_name() < rhs->get_path().get_own_name();
+    return lhs->get_path()->get_own_name() < rhs->get_path()->get_own_name();
 }
 
 bool nc_t::operator()(const entity_t *lhs, const std::string_view rhs) const noexcept {
-    return lhs->get_path().get_own_name() < rhs;
+    return lhs->get_path()->get_own_name() < rhs;
 }
 
 bool nc_t::operator()(const std::string_view lhs, const entity_t *rhs) const noexcept {
-    return lhs < rhs->get_path().get_own_name();
+    return lhs < rhs->get_path()->get_own_name();
 }
 
 using mg_t = entity_t::monitor_guard_t;

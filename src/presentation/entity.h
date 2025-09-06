@@ -51,9 +51,9 @@ struct SYNCSPIRIT_API entity_t : model::augmentable_t {
     using child_presences_t = std::vector<presence_t *>;
     using presences_t = std::vector<presence_t *>;
 
-    entity_t(model::path_t path, entity_t *parent = nullptr) noexcept;
+    entity_t(model::path_ptr_t path, entity_t *parent = nullptr) noexcept;
     virtual ~entity_t();
-    const model::path_t &get_path() const noexcept;
+    const model::path_ptr_t &get_path() const noexcept;
 
     presence_t *get_presence(const model::device_t *device) noexcept;
 
@@ -92,12 +92,12 @@ struct SYNCSPIRIT_API entity_t : model::augmentable_t {
 
     entity_t *parent;
     presences_t presences;
-    model::path_t path;
+    model::path_ptr_t path;
     children_t children;
     entity_stats_t statistics;
-    std::uint32_t generation = 0;
     const presence_t *best;
     entities_monitor_t *entities_monitor;
+    std::uint32_t generation = 0;
 };
 
 } // namespace syncspirit::presentation

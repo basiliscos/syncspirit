@@ -200,12 +200,12 @@ TEST_CASE("presentation", "[presentation]") {
         auto file_f = next_entity();
         REQUIRE(!next_entity());
 
-        CHECK(file_a->get_path().get_own_name() == "a.txt");
-        CHECK(file_b->get_path().get_own_name() == "b.txt");
-        CHECK(file_c->get_path().get_own_name() == "c.txt");
-        CHECK(file_d->get_path().get_own_name() == "d.txt");
-        CHECK(file_e->get_path().get_own_name() == "e.txt");
-        CHECK(file_f->get_path().get_own_name() == "f.txt");
+        CHECK(file_a->get_path()->get_own_name() == "a.txt");
+        CHECK(file_b->get_path()->get_own_name() == "b.txt");
+        CHECK(file_c->get_path()->get_own_name() == "c.txt");
+        CHECK(file_d->get_path()->get_own_name() == "d.txt");
+        CHECK(file_e->get_path()->get_own_name() == "e.txt");
+        CHECK(file_f->get_path()->get_own_name() == "f.txt");
         CHECK(file_a->get_parent() == folder_entity);
         CHECK(file_b->get_parent() == folder_entity);
         CHECK(file_c->get_parent() == folder_entity);
@@ -378,7 +378,7 @@ TEST_CASE("presentation", "[presentation]") {
             auto &children = folder_entity->get_children();
             REQUIRE(children.size() == 1);
             auto &dir_a_entity = *children.begin();
-            REQUIRE(dir_a_entity->get_path().get_own_name() == "a");
+            REQUIRE(dir_a_entity->get_path()->get_own_name() == "a");
             REQUIRE(dir_a_entity->get_children().size() == 1);
             CHECK(dir_a_entity->get_parent() == folder_entity);
             auto p_dir_a_my = dir_a_entity->get_presence(&*my_device);
@@ -389,7 +389,7 @@ TEST_CASE("presentation", "[presentation]") {
             CHECK(p_dir_a_peer->get_parent() == p_folder_peer);
 
             auto &dir_b_entity = *dir_a_entity->get_children().begin();
-            REQUIRE(dir_b_entity->get_path().get_own_name() == "b");
+            REQUIRE(dir_b_entity->get_path()->get_own_name() == "b");
             REQUIRE(dir_b_entity->get_children().size() == 1);
             CHECK(dir_b_entity->get_parent() == dir_a_entity);
             auto p_dir_b_my = dir_b_entity->get_presence(&*my_device);
@@ -400,7 +400,7 @@ TEST_CASE("presentation", "[presentation]") {
             CHECK(p_dir_b_peer->get_parent() == p_dir_a_peer);
 
             auto &dir_c_entity = *dir_b_entity->get_children().begin();
-            REQUIRE(dir_c_entity->get_path().get_own_name() == "c");
+            REQUIRE(dir_c_entity->get_path()->get_own_name() == "c");
             REQUIRE(dir_c_entity->get_children().size() == 1);
             CHECK(dir_c_entity->get_parent() == dir_b_entity);
             auto p_dir_c_my = dir_c_entity->get_presence(&*my_device);
@@ -411,7 +411,7 @@ TEST_CASE("presentation", "[presentation]") {
             CHECK(p_dir_c_peer->get_parent() == p_dir_b_peer);
 
             auto &dir_d_entity = *dir_c_entity->get_children().begin();
-            REQUIRE(dir_d_entity->get_path().get_own_name() == "d");
+            REQUIRE(dir_d_entity->get_path()->get_own_name() == "d");
             REQUIRE(dir_d_entity->get_children().size() == 1);
             CHECK(dir_d_entity->get_parent() == dir_c_entity);
             auto p_dir_d_my = dir_d_entity->get_presence(&*my_device);
@@ -422,7 +422,7 @@ TEST_CASE("presentation", "[presentation]") {
             CHECK(!p_dir_d_peer->get_parent());
 
             auto &file_e_entity = *dir_d_entity->get_children().begin();
-            REQUIRE(file_e_entity->get_path().get_own_name() == "e.txt");
+            REQUIRE(file_e_entity->get_path()->get_own_name() == "e.txt");
             REQUIRE(file_e_entity->get_children().size() == 0);
             CHECK(file_e_entity->get_parent() == dir_d_entity);
             auto p_file_my = file_e_entity->get_presence(&*my_device);
@@ -453,7 +453,7 @@ TEST_CASE("presentation", "[presentation]") {
             auto &children = folder_entity->get_children();
             REQUIRE(children.size() == 1);
             auto &dir_a_entity = *children.begin();
-            REQUIRE(dir_a_entity->get_path().get_own_name() == "a");
+            REQUIRE(dir_a_entity->get_path()->get_own_name() == "a");
             REQUIRE(dir_a_entity->get_children().size() == 1);
             CHECK(dir_a_entity->get_parent() == folder_entity);
             auto p_dir_a_my = dir_a_entity->get_presence(&*my_device);
@@ -464,7 +464,7 @@ TEST_CASE("presentation", "[presentation]") {
             CHECK(p_dir_a_peer->get_parent() == p_folder_peer);
 
             auto &dir_b_entity = *dir_a_entity->get_children().begin();
-            REQUIRE(dir_b_entity->get_path().get_own_name() == "b");
+            REQUIRE(dir_b_entity->get_path()->get_own_name() == "b");
             REQUIRE(dir_b_entity->get_children().size() == 0);
             CHECK(dir_b_entity->get_parent() == dir_a_entity);
             auto p_dir_b_my = dir_b_entity->get_presence(&*my_device);
@@ -479,7 +479,7 @@ TEST_CASE("presentation", "[presentation]") {
             folder_entity->on_insert(*file_c_peer); // should be ignored
             REQUIRE(dir_b_entity->get_children().size() == 1);
             auto &dir_c_entity = *dir_b_entity->get_children().begin();
-            REQUIRE(dir_c_entity->get_path().get_own_name() == "c");
+            REQUIRE(dir_c_entity->get_path()->get_own_name() == "c");
             REQUIRE(dir_c_entity->get_children().size() == 0);
             CHECK(dir_c_entity->get_parent() == dir_b_entity);
             auto p_dir_c_my = dir_c_entity->get_presence(&*my_device);
@@ -502,17 +502,17 @@ TEST_CASE("presentation", "[presentation]") {
             auto file_1 = add_file("a-file", *my_device, proto::FileInfoType::FILE);
             auto e_file_1 = folder_entity->on_insert(*file_1);
             REQUIRE(e_file_1);
-            CHECK(e_file_1->get_path() == *file_1->get_name());
+            CHECK(e_file_1->get_path() == file_1->get_name());
 
             auto file_3 = add_file("a-file-3", *my_device, proto::FileInfoType::FILE);
             auto e_file_3 = folder_entity->on_insert(*file_3);
             REQUIRE(e_file_3);
-            CHECK(e_file_3->get_path() == *file_3->get_name());
+            CHECK(e_file_3->get_path() == file_3->get_name());
 
             auto file_2 = add_file("a-file-2", *my_device, proto::FileInfoType::FILE);
             auto e_file_2 = folder_entity->on_insert(*file_2);
             REQUIRE(e_file_2);
-            CHECK(e_file_2->get_path() == *file_2->get_name());
+            CHECK(e_file_2->get_path() == file_2->get_name());
         }
         SECTION("presence & entity hierarchy order") {
             REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
@@ -524,18 +524,18 @@ TEST_CASE("presentation", "[presentation]") {
             auto it_children = children.begin();
             auto &c1 = *it_children++;
             auto &c2 = *it_children++;
-            CHECK(c1->get_path().get_full_name() == "file-a");
-            CHECK(c2->get_path().get_full_name() == "file-b");
+            CHECK(c1->get_path()->get_full_name() == "file-a");
+            CHECK(c2->get_path()->get_full_name() == "file-b");
 
             auto &p_my_children = folder_entity->get_presence(&*my_device)->get_children();
             REQUIRE(p_my_children.size() == 2);
-            CHECK(p_my_children[0]->get_entity()->get_path().get_full_name() == "file-b");
-            CHECK(p_my_children[1]->get_entity()->get_path().get_full_name() == "file-a");
+            CHECK(p_my_children[0]->get_entity()->get_path()->get_full_name() == "file-b");
+            CHECK(p_my_children[1]->get_entity()->get_path()->get_full_name() == "file-a");
 
             auto &p_peer_children = folder_entity->get_presence(&*peer_device)->get_children();
             REQUIRE(p_peer_children.size() == 2);
-            CHECK(p_peer_children[0]->get_entity()->get_path().get_full_name() == "file-b");
-            CHECK(p_peer_children[1]->get_entity()->get_path().get_full_name() == "file-a");
+            CHECK(p_peer_children[0]->get_entity()->get_path()->get_full_name() == "file-b");
+            CHECK(p_peer_children[1]->get_entity()->get_path()->get_full_name() == "file-a");
         }
         SECTION("orphans") {
             SECTION("simple") {
@@ -552,14 +552,14 @@ TEST_CASE("presentation", "[presentation]") {
 
                 REQUIRE(children.size() == 1);
                 auto &dir_a_entity = *children.begin();
-                REQUIRE(dir_a_entity->get_path().get_own_name() == "a");
+                REQUIRE(dir_a_entity->get_path()->get_own_name() == "a");
                 REQUIRE(dir_a_entity->get_children().size() == 1);
                 CHECK(dir_a_entity->get_parent() == folder_entity);
                 auto p_dir_a_my = dir_a_entity->get_presence(&*my_device);
                 CHECK(p_dir_a_my->get_features() & (F::directory | F::local));
 
                 auto &dir_b_entity = *dir_a_entity->get_children().begin();
-                REQUIRE(dir_b_entity->get_path().get_own_name() == "b");
+                REQUIRE(dir_b_entity->get_path()->get_own_name() == "b");
                 REQUIRE(dir_b_entity->get_children().size() == 0);
                 CHECK(dir_b_entity->get_parent() == dir_a_entity);
                 auto p_dir_b_my = dir_b_entity->get_presence(&*my_device);
@@ -581,17 +581,17 @@ TEST_CASE("presentation", "[presentation]") {
                 REQUIRE(children.size() == 1);
 
                 auto &dir_a_entity = *children.begin();
-                REQUIRE(dir_a_entity->get_path().get_own_name() == "a");
+                REQUIRE(dir_a_entity->get_path()->get_own_name() == "a");
                 REQUIRE(dir_a_entity->get_children().size() == 1);
                 CHECK(dir_a_entity->get_parent() == folder_entity);
 
                 auto &dir_b_entity = *dir_a_entity->get_children().begin();
-                REQUIRE(dir_b_entity->get_path().get_own_name() == "b");
+                REQUIRE(dir_b_entity->get_path()->get_own_name() == "b");
                 REQUIRE(dir_b_entity->get_children().size() == 1);
                 CHECK(dir_b_entity->get_parent() == dir_a_entity);
 
                 auto &dir_c_entity = *dir_b_entity->get_children().begin();
-                REQUIRE(dir_c_entity->get_path().get_own_name() == "c");
+                REQUIRE(dir_c_entity->get_path()->get_own_name() == "c");
                 REQUIRE(dir_c_entity->get_children().size() == 0);
                 CHECK(dir_c_entity->get_parent() == dir_b_entity);
             }
@@ -613,7 +613,7 @@ TEST_CASE("presentation", "[presentation]") {
                 REQUIRE(children.size() == 1);
 
                 auto &dir_a_entity = *children.begin();
-                REQUIRE(dir_a_entity->get_path().get_own_name() == "a");
+                REQUIRE(dir_a_entity->get_path()->get_own_name() == "a");
                 REQUIRE(dir_a_entity->get_children().size() == 1);
                 CHECK(dir_a_entity->get_parent() == folder_entity);
 
@@ -624,7 +624,7 @@ TEST_CASE("presentation", "[presentation]") {
                 CHECK(p_dir_a_my->get_parent());
 
                 auto &file_b_entity = *dir_a_entity->get_children().begin();
-                REQUIRE(file_b_entity->get_path().get_own_name() == "b.bin");
+                REQUIRE(file_b_entity->get_path()->get_own_name() == "b.bin");
                 REQUIRE(file_b_entity->get_children().size() == 0);
                 CHECK(file_b_entity->get_parent() == dir_a_entity);
 
@@ -656,7 +656,7 @@ TEST_CASE("presentation", "[presentation]") {
 
                 auto p_c_my = p_a_my->get_children()[0];
                 CHECK(p_c_my->get_children().size() == 0);
-                CHECK(p_c_my->get_entity()->get_path().get_full_name() == "a/c.bin");
+                CHECK(p_c_my->get_entity()->get_path()->get_full_name() == "a/c.bin");
 
                 auto f_a_peer = add_file("a", *peer_device);
                 auto e_a_2 = folder_entity->on_insert(*f_a_peer);
@@ -669,10 +669,10 @@ TEST_CASE("presentation", "[presentation]") {
 
                 auto p_b_peer = p_a_peer->get_children()[0];
                 CHECK(p_b_peer->get_children().size() == 0);
-                CHECK(p_b_peer->get_entity()->get_path().get_full_name() == "a/b.bin");
+                CHECK(p_b_peer->get_entity()->get_path()->get_full_name() == "a/b.bin");
 
                 CHECK(p_a_peer->get_children()[1]->get_features() & F::missing);
-                CHECK(p_a_peer->get_children()[1]->get_entity()->get_path().get_full_name() == "a/c.bin");
+                CHECK(p_a_peer->get_children()[1]->get_entity()->get_path()->get_full_name() == "a/c.bin");
 
                 CHECK(p_a_my->get_children().size() == 2);
                 CHECK(p_a_my->get_stats() == presence_stats_t{0, 2, 2, 2});
@@ -680,11 +680,11 @@ TEST_CASE("presentation", "[presentation]") {
                 auto p_b_my = p_a_my->get_children()[0];
                 CHECK(p_b_my->get_children().size() == 0);
                 CHECK(p_b_my->get_features() & F::missing);
-                CHECK(p_b_my->get_entity()->get_path().get_full_name() == "a/b.bin");
+                CHECK(p_b_my->get_entity()->get_path()->get_full_name() == "a/b.bin");
 
                 p_c_my = p_a_my->get_children()[1];
                 CHECK(p_c_my->get_children().size() == 0);
-                CHECK(p_c_my->get_entity()->get_path().get_full_name() == "a/c.bin");
+                CHECK(p_c_my->get_entity()->get_path()->get_full_name() == "a/c.bin");
             }
         }
         SECTION("removal") {
@@ -749,7 +749,7 @@ TEST_CASE("presentation", "[presentation]") {
                 REQUIRE(folder_entity->get_children().size() == 1);
 
                 auto &dir_a_entity = *folder_entity->get_children().begin();
-                REQUIRE(dir_a_entity->get_path().get_own_name() == "a");
+                REQUIRE(dir_a_entity->get_path()->get_own_name() == "a");
                 REQUIRE(dir_a_entity->get_children().size() == 1);
 
                 REQUIRE(builder.unshare_folder(*fi_peer).apply());
@@ -786,15 +786,15 @@ TEST_CASE("presentation", "[presentation]") {
                     CHECK(!folder_entity->get_parent());
 
                     auto &dir_a_entity = *folder_entity->get_children().begin();
-                    REQUIRE(dir_a_entity->get_path().get_own_name() == "a");
+                    REQUIRE(dir_a_entity->get_path()->get_own_name() == "a");
                     REQUIRE(dir_a_entity->get_children().size() == 1);
 
                     auto &dir_b_entity = *dir_a_entity->get_children().begin();
-                    REQUIRE(dir_b_entity->get_path().get_own_name() == "b");
+                    REQUIRE(dir_b_entity->get_path()->get_own_name() == "b");
                     REQUIRE(dir_a_entity->get_children().size() == 1);
 
                     auto &file_c_entity = *dir_b_entity->get_children().begin();
-                    REQUIRE(file_c_entity->get_path().get_own_name() == "c");
+                    REQUIRE(file_c_entity->get_path()->get_own_name() == "c");
                     REQUIRE(file_c_entity->get_children().size() == 0);
 
                     augment(dir_a_entity, "a");
