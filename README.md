@@ -124,7 +124,8 @@ after the core completion.
 # changes
 
 ## 0.4.3 (xx-xxx-xxxx)
-
+ - [core] allow to load huge databses and interrupt loading porgress
+ - [core, fltk] more correctly display file scanning progress
  - [core] reduce memory consumption by model::file_info_t
 
 ## 0.4.2 (22-Aug-2025)

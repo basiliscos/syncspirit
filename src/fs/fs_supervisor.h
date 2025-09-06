@@ -5,10 +5,8 @@
 
 #include <functional>
 #include "config/main.h"
-#include "utils/log.h"
 #include "model/messages.h"
-#include "model/diff/apply_controller.h"
-#include "model/diff/cluster_visitor.h"
+#include "model/diff/iterative_controller.h"
 #include "model/misc/sequencer.h"
 #include "syncspirit-export.h"
 #include "file_cache.h"
@@ -46,11 +44,11 @@ template <typename Supervisor> struct fs_supervisor_config_builder_t : r::superv
     }
 };
 
-struct SYNCSPIRIT_API fs_supervisor_t : rth::supervisor_thread_t,
-                                        private model::diff::cluster_visitor_t,
-                                        private model::diff::apply_controller_t {
+template <typename T> using fs_base_t = model::diff::iterative_controller_t<T, rth::supervisor_thread_t>;
+
+struct SYNCSPIRIT_API fs_supervisor_t : fs_base_t<fs_supervisor_t> {
+    using parent_t = fs_base_t<fs_supervisor_t>;
     using launcher_t = std::function<void(model::cluster_ptr_t &)>;
-    using parent_t = rth::supervisor_thread_t;
     using config_t = fs_supervisor_config_t;
     template <typename Supervisor> using config_builder_t = fs_supervisor_config_builder_t<Supervisor>;
 
@@ -66,22 +64,18 @@ struct SYNCSPIRIT_API fs_supervisor_t : rth::supervisor_thread_t,
 
     void on_model_request(model::message::model_request_t &req) noexcept;
     void on_model_response(model::message::model_response_t &res) noexcept;
-    void on_model_update(model::message::model_update_t &message) noexcept;
-    void on_app_ready(model::message::app_ready_t &) noexcept;
+    void on_db_loaded(model::message::db_loaded_t &) noexcept;
+    void commit_loading() noexcept override;
     void launch() noexcept;
 
-    outcome::result<void> operator()(const model::diff::load::load_cluster_t &, void *) noexcept override;
-    outcome::result<void> operator()(const model::diff::modify::upsert_folder_t &, void *) noexcept override;
-    outcome::result<void> operator()(const model::diff::modify::upsert_folder_info_t &, void *) noexcept override;
-    outcome::result<void> operator()(const model::diff::advance::advance_t &, void *) noexcept override;
-    outcome::result<void> operator()(const model::diff::peer::update_folder_t &, void *) noexcept override;
+    outcome::result<void> apply(const model::diff::advance::advance_t &, void *) noexcept override;
+    outcome::result<void> apply(const model::diff::modify::upsert_folder_t &, void *) noexcept override;
+    outcome::result<void> apply(const model::diff::modify::upsert_folder_info_t &, void *) noexcept override;
+    outcome::result<void> apply(const model::diff::peer::update_folder_t &, void *) noexcept override;
 
     model::sequencer_ptr_t sequencer;
-    model::cluster_ptr_t cluster;
-    utils::logger_t log;
     config::fs_config_t fs_config;
     uint32_t hasher_threads;
-    r::address_ptr_t coordinator;
     r::actor_ptr_t scan_actor;
     r::actor_ptr_t file_actor;
     model_request_ptr_t model_request;

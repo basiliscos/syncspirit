@@ -6,7 +6,6 @@
 #include "names.h"
 #include "utils/error_code.h"
 #include "utils/format.hpp"
-#include "hasher/hasher_proxy_actor.h"
 #include "model/diff/contact/peer_state.h"
 
 using namespace syncspirit::net;
@@ -28,13 +27,6 @@ void cluster_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept 
                 plugin->subscribe_actor(&cluster_supervisor_t::on_model_update, coordinator);
             }
         });
-    });
-    plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &) {
-        create_actor<hasher::hasher_proxy_actor_t>()
-            .timeout(init_timeout)
-            .hasher_threads(config.hasher_threads)
-            .name(net::names::hasher_proxy)
-            .finish();
     });
 }
 

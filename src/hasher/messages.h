@@ -39,6 +39,8 @@ struct validation_request_t : r::arc_base_t<validation_request_t> {
         : data{data_}, hash{std::move(hash_)}, custom{std::move(custom_)} {}
 };
 
+using package_t = r::message_ptr_t;
+
 } // namespace payload
 
 namespace message {
@@ -48,6 +50,8 @@ using digest_response_t = r::request_traits_t<payload::digest_request_t>::respon
 
 using validation_request_t = r::request_traits_t<payload::validation_request_t>::request::message_t;
 using validation_response_t = r::request_traits_t<payload::validation_request_t>::response::message_t;
+
+using package_t = r::message_t<payload::package_t>;
 
 } // namespace message
 

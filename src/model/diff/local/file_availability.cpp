@@ -2,7 +2,8 @@
 // SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "file_availability.h"
-#include "../cluster_visitor.h"
+#include "model/diff/apply_controller.h"
+#include "model/diff/cluster_visitor.h"
 
 using namespace syncspirit::model::diff::local;
 
@@ -12,14 +13,15 @@ file_availability_t::file_availability_t(file_info_ptr_t file_) noexcept : file{
     version.reset(new version_t(file->get_version()->as_proto()));
 }
 
-auto file_availability_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
+auto file_availability_t::apply_impl(apply_controller_t &controller, void *custom) const noexcept
     -> outcome::result<void> {
+    auto &cluster = controller.get_cluster();
     auto folder = cluster.get_folders().by_id(folder_id);
     if (folder) {
         auto folder_info = folder->get_folder_infos().by_device(*cluster.get_device());
         auto f = folder_info->get_file_infos().by_name(file->get_name());
         if (f->get_version()->identical_to(*version)) {
-            f->mark_local();
+            f->mark_local(true);
             LOG_TRACE(log, "file_availability_t, mark local file = {}, folder = {}, ", file->get_name(), folder_id);
             auto &blocks = f->get_blocks();
             for (size_t i = 0; i < blocks.size(); ++i) {
@@ -30,7 +32,7 @@ auto file_availability_t::apply_impl(cluster_t &cluster, apply_controller_t &con
             f->notify_update();
         }
     }
-    return applicator_t::apply_sibling(cluster, controller);
+    return applicator_t::apply_sibling(controller, custom);
 }
 
 auto file_availability_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

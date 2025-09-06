@@ -3,6 +3,7 @@
 
 #include "test-db.h"
 #include "test-utils.h"
+#include "model/cluster.h"
 
 namespace syncspirit::test {
 

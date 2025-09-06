@@ -122,7 +122,7 @@ TEST_CASE("file iterator, single folder", "[model]") {
                     REQUIRE(builder.apply());
 
                     auto my_file = file_info_t::create(sequencer->next_uuid(), pr_fi, my_folder).value();
-                    my_file->mark_local();
+                    my_file->mark_local(true);
                     my_files.put(my_file);
 
                     auto [f, action] = file_iterator->next();
@@ -147,7 +147,7 @@ TEST_CASE("file iterator, single folder", "[model]") {
                     proto::set_value(c_1, 10);
 
                     auto my_file = file_info_t::create(sequencer->next_uuid(), pr_fi, my_folder).value();
-                    my_file->mark_local();
+                    my_file->mark_local(true);
                     my_files.put(my_file);
 
                     CHECK(file_iterator->next() == R{nullptr, A::ignore});
@@ -157,7 +157,7 @@ TEST_CASE("file iterator, single folder", "[model]") {
                     REQUIRE(builder.apply());
 
                     auto my_file = file_info_t::create(sequencer->next_uuid(), pr_fi, my_folder).value();
-                    my_file->mark_local();
+                    my_file->mark_local(true);
                     my_files.put(my_file);
 
                     CHECK(file_iterator->next() == R{nullptr, A::ignore});
@@ -329,7 +329,7 @@ TEST_CASE("file iterator, single folder", "[model]") {
                 CHECK(file_iterator->next() == R{nullptr, A::ignore});
             }
             SECTION("has been scanned") {
-                my_file->mark_local();
+                my_file->mark_local(true);
 
                 auto [f, action] = file_iterator->next();
                 REQUIRE(f);

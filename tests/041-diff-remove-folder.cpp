@@ -2,7 +2,6 @@
 // SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
 
 #include "test-utils.h"
-#include "access.h"
 #include "diff-builder.h"
 
 #include "model/cluster.h"

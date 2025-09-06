@@ -82,11 +82,13 @@ struct fixture_t {
         target = sup->create_actor<fs::scan_actor_t>()
                      .timeout(timeout)
                      .rw_cache(rw_cache)
-                     .cluster(cluster)
                      .sequencer(make_sequencer(77))
                      .fs_config(fs_config)
                      .requested_hashes_limit(2ul)
                      .finish();
+        sup->do_process();
+
+        sup->send<syncspirit::model::payload::thread_ready_t>(sup->get_address(), cluster, std::this_thread::get_id());
         sup->do_process();
 
         main();

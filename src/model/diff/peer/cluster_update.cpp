@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "cluster_update.h"
+#include "model/diff/apply_controller.h"
 #include "model/diff/modify/add_remote_folder_infos.h"
 #include "model/diff/modify/add_pending_folders.h"
 #include "model/diff/modify/remove_blocks.h"
@@ -503,19 +504,20 @@ cluster_update_t::cluster_update_t(const bfs::path &default_path, const cluster_
     }
 }
 
-auto cluster_update_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
+auto cluster_update_t::apply_impl(apply_controller_t &controller, void *custom) const noexcept
     -> outcome::result<void> {
     LOG_TRACE(log, "applying cluster_update_t (self)");
+    auto &cluster = controller.get_cluster();
     auto peer = cluster.get_devices().by_sha256(peer_id);
     peer->get_remote_folder_infos().clear();
 
     LOG_TRACE(log, "applying cluster_update_t (children)");
-    auto r = applicator_t::apply_child(cluster, controller);
+    auto r = applicator_t::apply_child(controller, custom);
     if (!r) {
         return r;
     }
 
-    return applicator_t::apply_sibling(cluster, controller);
+    return applicator_t::apply_sibling(controller, custom);
 }
 
 auto cluster_update_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

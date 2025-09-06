@@ -436,16 +436,20 @@ scan_task_t::send_guard_t::~send_guard_t() {
             task.bytes_left = task.config.bytes_scan_iteration_limit;
             task.files_left = task.config.files_scan_iteration_limit;
             task.diffs.clear();
+            task.diff_siblings = 0;
 
             actor.send<model::payload::model_update_t>(coordinator, std::move(diff), nullptr);
+            task.log->debug("sending model update");
             if (manage_progress) {
                 auto &sup = actor.get_supervisor();
                 auto address = actor.get_address();
                 auto message = rotor::make_routed_message<payload::scan_progress_t>(coordinator, address, &task);
                 sup.put(message);
+                task.log->debug("routing scan progress");
             }
         }
     } else if (manage_progress) {
+        task.log->debug("sending scan progress, files left = {}", task.files_left);
         actor.send<payload::scan_progress_t>(actor.get_address(), &task);
     }
 }

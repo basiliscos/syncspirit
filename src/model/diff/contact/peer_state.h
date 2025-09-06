@@ -20,7 +20,7 @@ struct SYNCSPIRIT_API peer_state_t final : cluster_diff_t {
                                      std::string cert_name_ = {}, std::string_view client_name_ = {},
                                      std::string_view client_version_ = {}) noexcept;
 
-    outcome::result<void> apply_impl(cluster_t &, apply_controller_t &) const noexcept override;
+    outcome::result<void> apply_impl(apply_controller_t &, void *) const noexcept override;
     outcome::result<void> visit(cluster_visitor_t &, void *custom) const noexcept override;
 
     utils::bytes_t peer_id;

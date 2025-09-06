@@ -6,6 +6,7 @@
 #include "remove_blocks.h"
 #include "remove_pending_folders.h"
 #include "model/cluster.h"
+#include "model/diff/apply_controller.h"
 #include "model/diff/cluster_visitor.h"
 #include "model/misc/error_code.h"
 #include "utils/format.hpp"
@@ -56,12 +57,12 @@ remove_peer_t::remove_peer_t(const cluster_t &cluster, const device_t &peer) noe
     }
 }
 
-auto remove_peer_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
-    -> outcome::result<void> {
-    auto r = applicator_t::apply_child(cluster, controller);
+auto remove_peer_t::apply_impl(apply_controller_t &controller, void *custom) const noexcept -> outcome::result<void> {
+    auto r = applicator_t::apply_child(controller, custom);
     if (!r) {
         return r;
     }
+    auto &cluster = controller.get_cluster();
     auto sha256 = get_peer_sha256();
     assert(sha256.size() == device_id_t::digest_length);
     auto peer = cluster.get_devices().by_sha256(sha256);
@@ -75,7 +76,7 @@ auto remove_peer_t::apply_impl(cluster_t &cluster, apply_controller_t &controlle
     LOG_TRACE(log, "applying remove_peer_t (start), for device '{}' ({})", peer->device_id().get_short(),
               peer->get_name());
     cluster.get_devices().remove(peer);
-    return applicator_t::apply_sibling(cluster, controller);
+    return applicator_t::apply_sibling(controller, custom);
 }
 
 auto remove_peer_t::get_peer_sha256() const noexcept -> utils::bytes_view_t {

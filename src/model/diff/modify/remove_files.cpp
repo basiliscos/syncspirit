@@ -4,6 +4,7 @@
 #include "remove_files.h"
 #include "remove_blocks.h"
 #include "model/cluster.h"
+#include "model/diff/apply_controller.h"
 #include "model/diff/cluster_visitor.h"
 #include "utils/format.hpp"
 
@@ -33,12 +34,12 @@ remove_files_t::remove_files_t(const device_t &device, const file_infos_map_t &f
     LOG_DEBUG(log, "remove_files_t, device = {}, files count = {}", device.device_id(), files.size());
 }
 
-auto remove_files_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
-    -> outcome::result<void> {
-    auto r = applicator_t::apply_child(cluster, controller);
+auto remove_files_t::apply_impl(apply_controller_t &controller, void *custom) const noexcept -> outcome::result<void> {
+    auto r = applicator_t::apply_child(controller, custom);
     if (!r) {
         return r;
     }
+    auto &cluster = controller.get_cluster();
     auto &folders = cluster.get_folders();
     for (size_t i = 0; i < folder_ids.size(); ++i) {
         auto folder = folders.by_id(folder_ids[i]);
@@ -49,7 +50,7 @@ auto remove_files_t::apply_impl(cluster_t &cluster, apply_controller_t &controll
         auto file = file_infos.get(decomposed.file_id);
         file_infos.remove(file);
     }
-    return applicator_t::apply_sibling(cluster, controller);
+    return applicator_t::apply_sibling(controller, custom);
 }
 
 auto remove_files_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

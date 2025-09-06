@@ -3,6 +3,7 @@
 
 #include "config/utils.h"
 #include "net_supervisor.h"
+#include "hasher/hasher_proxy_actor.h"
 #include "global_discovery_actor.h"
 #include "local_discovery_actor.h"
 #include "cluster_supervisor.h"
@@ -14,18 +15,22 @@
 #include "dialer_actor.h"
 #include "db_actor.h"
 #include "relay_actor.h"
-#include "sink_actor.h"
 #include "names.h"
-#include "model/diff/load/load_cluster.h"
 #include <filesystem>
 #include <ctime>
 
 namespace bfs = std::filesystem;
 using namespace syncspirit::net;
 
+namespace {
+namespace resource {
+r::plugin::resource_id_t interrupt = 0;
+} // namespace resource
+} // namespace
+
 net_supervisor_t::net_supervisor_t(net_supervisor_t::config_t &cfg)
-    : parent_t{cfg}, sequencer{cfg.sequencer}, app_config{cfg.app_config}, independent_threads{cfg.independent_threads},
-      cluster_copies{independent_threads - 1} {
+    : parent_t(this, resource::interrupt, cfg), sequencer{cfg.sequencer}, app_config{cfg.app_config},
+      independent_threads{cfg.independent_threads}, thread_counter{independent_threads} {
     auto log = utils::get_logger(names::coordinator);
     auto &files_cfg = app_config.global_announce_config;
     auto result = utils::load_pair(files_cfg.cert_file.c_str(), files_cfg.key_file.c_str());
@@ -66,16 +71,27 @@ void net_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.set_identity(names::coordinator, false);
         log = utils::get_logger(identity);
     });
-    plugin.with_casted<r::plugin::registry_plugin_t>(
-        [&](auto &p) { p.register_name(names::coordinator, get_address()); });
-    plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
-        p.subscribe_actor(&net_supervisor_t::on_model_update);
-        p.subscribe_actor(&net_supervisor_t::on_load_cluster);
-        p.subscribe_actor(&net_supervisor_t::on_model_request);
-        p.subscribe_actor(&net_supervisor_t::on_thread_ready);
-        p.subscribe_actor(&net_supervisor_t::on_app_ready);
-        launch_early();
+    plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
+        coordinator = address;
+        p.register_name(names::coordinator, get_address());
+        p.discover_name(net::names::bouncer, bouncer, true).link(false).callback([&](auto phase, auto &ee) {
+            if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {
+                send<syncspirit::model::payload::thread_up_t>(address);
+            }
+        });
     });
+    plugin.with_casted<r::plugin::starter_plugin_t>(
+        [&](auto &p) {
+            p.subscribe_actor(&net_supervisor_t::on_model_update);
+            p.subscribe_actor(&net_supervisor_t::on_model_interrupt);
+            p.subscribe_actor(&net_supervisor_t::on_load_cluster_success);
+            p.subscribe_actor(&net_supervisor_t::on_load_cluster_fail);
+            p.subscribe_actor(&net_supervisor_t::on_model_request);
+            p.subscribe_actor(&net_supervisor_t::on_thread_up);
+            p.subscribe_actor(&net_supervisor_t::on_thread_ready);
+            p.subscribe_actor(&net_supervisor_t::on_app_ready);
+        },
+        r::plugin::config_phase_t::PREINIT);
 }
 
 void net_supervisor_t::on_child_shutdown(actor_base_t *actor) noexcept {
@@ -84,21 +100,13 @@ void net_supervisor_t::on_child_shutdown(actor_base_t *actor) noexcept {
     LOG_TRACE(log, "on_child_shutdown, '{}' due to {} ", actor->get_identity(), reason->message());
 }
 
-void net_supervisor_t::on_child_init(actor_base_t *actor, const r::extended_error_ptr_t &ec) noexcept {
-    parent_t::on_child_init(actor, ec);
-    auto &child_addr = actor->get_address();
-    if (!ec && db_addr && child_addr == db_addr) {
-        LOG_TRACE(log, "on_child_init, db has been launched, let's load it...");
-        load_db();
-    }
-}
-
 void net_supervisor_t::shutdown_finish() noexcept {
     db_addr.reset();
     ra::supervisor_asio_t::shutdown_finish();
 }
 
 void net_supervisor_t::launch_early() noexcept {
+    thread_counter = independent_threads;
     auto timeout = shutdown_timeout * 9 / 10;
     db_addr = create_actor<db_actor_t>()
                   .timeout(timeout)
@@ -108,53 +116,60 @@ void net_supervisor_t::launch_early() noexcept {
                   .escalate_failure()
                   .finish()
                   ->get_address();
-    create_actor<sink_actor_t>().timeout(timeout).escalate_failure().finish();
-}
 
-void net_supervisor_t::load_db() noexcept {
-    auto timeout = init_timeout * 9 / 10;
-    request<payload::load_cluster_request_t>(db_addr).send(timeout);
+    create_actor<hasher::hasher_proxy_actor_t>()
+        .timeout(init_timeout)
+        .hasher_threads(app_config.hasher_threads)
+        .name(net::names::hasher_proxy)
+        .finish();
 }
 
 void net_supervisor_t::seed_model() noexcept {
-    auto message =
-        r::make_routed_message<model::payload::model_update_t>(address, db_addr, std::move(load_diff), nullptr);
+    using payload_t = model::payload::model_update_t;
+    thread_counter = independent_threads;
+    auto message = r::make_routed_message<payload_t>(address, db_addr, std::move(load_diff), nullptr);
     put(std::move(message));
 }
 
-void net_supervisor_t::on_load_cluster(message::load_cluster_response_t &message) noexcept {
+void net_supervisor_t::on_load_cluster_fail(message::load_cluster_fail_t &message) noexcept {
     auto &ee = message.payload.ee;
-    if (ee) {
-        LOG_ERROR(log, "cannot load cluster : {}", ee->message());
-        return do_shutdown(ee);
-    }
-    LOG_TRACE(log, "on_load_cluster");
-    auto &res = message.payload.res;
+    LOG_ERROR(log, "cannot load cluster : {}", ee->message());
+    return do_shutdown(ee);
+}
 
-    load_diff = std::move(res.diff);
-    if (cluster_copies == 0) {
-        seed_model();
-    }
+void net_supervisor_t::on_load_cluster_success(message::load_cluster_success_t &message) noexcept {
+    LOG_TRACE(log, "on_load_cluster_success");
+
+    send<model::payload::db_loaded_t>(address);
+    load_diff = std::move(message.payload.diff);
 }
 
 void net_supervisor_t::on_model_request(model::message::model_request_t &message) noexcept {
-    --cluster_copies;
-    LOG_TRACE(log, "on_cluster_seed, left = {}", cluster_copies);
+    --thread_counter;
+    LOG_TRACE(log, "on_cluster_seed, left = {}", thread_counter);
     auto my_device = cluster->get_device();
     auto device = model::device_ptr_t();
     device = new model::local_device_t(my_device->device_id(), app_config.device_name, "");
     auto simultaneous_writes = app_config.bep_config.blocks_simultaneous_write;
     auto cluster_copy = new model::cluster_t(device, static_cast<int32_t>(simultaneous_writes));
     reply_to(message, std::move(cluster_copy));
-    if (cluster_copies == 0 && load_diff) {
+    assert(load_diff);
+    if (thread_counter == 1) { // -1 as no need to seed model to self
         seed_model();
     }
 }
 
+void net_supervisor_t::on_thread_up(model::message::thread_up_t &) noexcept {
+    LOG_DEBUG(log, "on_thread_up, left = {}", --thread_counter);
+    if (thread_counter == 0) {
+        launch_early();
+    }
+}
+
 void net_supervisor_t::on_thread_ready(model::message::thread_ready_t &) noexcept {
-    --independent_threads;
-    LOG_DEBUG(log, "on_thread_ready, left = {}", independent_threads);
-    if (independent_threads == 0) {
+    --thread_counter;
+    LOG_DEBUG(log, "on_thread_ready, left = {}", thread_counter);
+    if (thread_counter == 0 && state == r::state_t::OPERATIONAL) {
         send<model::payload::app_ready_t>(address);
     }
 }
@@ -173,7 +188,7 @@ void net_supervisor_t::on_app_ready(model::message::app_ready_t &) noexcept {
 
     if (app_config.upnp_config.enabled) {
         auto factory = [this](r::supervisor_t &, const r::address_ptr_t &spawner) -> r::actor_ptr_t {
-            auto timeout = shutdown_timeout * 9 / 10;
+            auto timeout = shutdown_timeout * 8 / 10;
             return create_actor<ssdp_actor_t>()
                 .timeout(timeout)
                 .upnp_config(app_config.upnp_config)
@@ -271,24 +286,7 @@ void net_supervisor_t::on_app_ready(model::message::app_ready_t &) noexcept {
     }
 }
 
-void net_supervisor_t::on_model_update(model::message::model_update_t &message) noexcept {
-    LOG_TRACE(log, "on_model_update");
-    auto &diff = *message.payload.diff;
-    auto r = diff.apply(*cluster, *this);
-    if (!r) {
-        LOG_ERROR(log, "error applying model diff: {}", r.assume_error().message());
-        auto ee = make_error(r.assume_error());
-        do_shutdown(ee);
-    }
-    r = diff.visit(*this, nullptr);
-    if (!r) {
-        auto ee = make_error(r.assume_error());
-        do_shutdown(ee);
-    }
-}
-
-auto net_supervisor_t::operator()(const model::diff::load::load_cluster_t &diff, void *custom) noexcept
-    -> outcome::result<void> {
+void net_supervisor_t::commit_loading() noexcept {
     if (!cluster->is_tainted()) {
         auto &ignored_devices = cluster->get_ignored_devices();
         auto &ignored_folders = cluster->get_ignored_folders();
@@ -311,9 +309,7 @@ auto net_supervisor_t::operator()(const model::diff::load::load_cluster_t &diff,
                   "ignored folders = {}, pending folders = {}, pending devices = {}",
                   devices.size(), folders.size(), files, cluster->get_blocks().size(), ignored_devices.size(),
                   ignored_folders.size(), pending_folders_sz, pending_devices.size());
-        send<syncspirit::model::payload::thread_ready_t>(address);
     }
-    return diff.visit_next(*this, custom);
 }
 
 void net_supervisor_t::on_start() noexcept {

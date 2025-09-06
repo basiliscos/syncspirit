@@ -111,7 +111,7 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t {
 
     void mark_unreachable(bool value) noexcept;
     void mark_local_available(size_t block_index) noexcept;
-    void mark_local() noexcept;
+    void mark_local(bool available) noexcept;
     bool is_locally_available(size_t block_index) const noexcept;
     bool is_locally_available() const noexcept;
     bool is_partly_available() const noexcept;

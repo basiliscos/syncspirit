@@ -19,6 +19,7 @@
 #include "utils/location.h"
 #include "utils/log-setup.h"
 #include "utils/platform.h"
+#include "hasher/bouncer_actor.h"
 #include "hasher/hasher_supervisor.h"
 #include "net/net_supervisor.h"
 #include "fs/fs_supervisor.h"
@@ -55,6 +56,18 @@ namespace rf = rotor::fltk;
 namespace asio = boost::asio;
 
 using namespace syncspirit;
+
+namespace {
+namespace to {
+struct state {};
+} // namespace to
+} // namespace
+
+namespace rotor {
+
+template <> inline auto &actor_base_t::access<to::state>() noexcept { return state; }
+
+} // namespace rotor
 
 [[noreturn]] static void report_error_and_die(r::actor_base_t *actor, const r::extended_error_ptr_t &ec) noexcept {
     auto name = actor ? actor->get_identity() : "unknown";
@@ -305,6 +318,15 @@ int app_main(app_context_t &app_ctx) {
         return 1;
     }
 
+    std::atomic_bool bouncer_shutdown_flag = false;
+    auto bouncer_context = thread_sys_context_t();
+    auto bouncer = bouncer_context.create_supervisor<hasher::bouncer_actor_t>()
+                       .timeout(timeout * 9 / 8)
+                       .registry_address(sup_net->get_registry_address())
+                       .shutdown_flag(bouncer_shutdown_flag, r::pt::millisec{50})
+                       .finish();
+    bouncer->do_process();
+
     auto hasher_count = cfg.hasher_threads;
     using sys_thread_context_ptr_t = r::intrusive_ptr_t<thread_sys_context_t>;
     std::vector<sys_thread_context_ptr_t> hasher_ctxs;
@@ -312,7 +334,7 @@ int app_main(app_context_t &app_ctx) {
         hasher_ctxs.push_back(new thread_sys_context_t{});
         auto &ctx = hasher_ctxs.back();
         auto sup = ctx->create_supervisor<hasher::hasher_supervisor_t>()
-                       .timeout(timeout / 2)
+                       .timeout(timeout * 8 / 9)
                        .registry_address(sup_net->get_registry_address())
                        .index(i)
                        .finish();
@@ -337,7 +359,7 @@ int app_main(app_context_t &app_ctx) {
     thread_sys_context_t fs_context;
     auto fs_sup = fs_context.create_supervisor<syncspirit::fs::fs_supervisor_t>()
                       .timeout(timeout)
-                      .registry_address(sup_net->get_registry_address())
+                      .registry_address(bouncer->get_registry_address())
                       .fs_config(cfg.fs_config)
                       .hasher_threads(cfg.hasher_threads)
                       .sequencer(sequencer)
@@ -352,6 +374,16 @@ int app_main(app_context_t &app_ctx) {
     main_window->wait_for_expose();
 
     // launch
+    auto bouncer_thread = std::thread([&]() {
+        SET_THREAD_EN_LANGUAGE();
+#if defined(__linux__)
+        pthread_setname_np(pthread_self(), "ss/bouncer");
+#endif
+        bouncer_context.run();
+        bouncer_shutdown_flag = true;
+        logger->trace("bouncer thread has been terminated");
+    });
+
     auto net_thread = std::thread([&]() {
         SET_THREAD_EN_LANGUAGE();
 #if defined(__linux__)
@@ -401,10 +433,22 @@ int app_main(app_context_t &app_ctx) {
     }
 
     sup_fltk->do_shutdown();
-    sup_fltk->do_process();
+    {
+        auto state = r::state_t::OPERATIONAL;
+        do {
+            Fl::wait();
+            sup_fltk->do_process();
+            state = static_cast<r::actor_base_t *>(sup_fltk.get())->access<to::state>();
+        } while (state != r::state_t::SHUT_DOWN);
+    }
+
+    logger->debug("asking bouncer to shutdown");
+    bouncer_shutdown_flag = true;
 
     fs_thread.join();
     net_thread.join();
+
+    bouncer_thread.join();
 
     logger->trace("waiting hasher threads termination");
     for (auto &thread : hasher_threads) {

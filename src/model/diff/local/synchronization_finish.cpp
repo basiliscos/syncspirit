@@ -3,6 +3,7 @@
 
 #include "synchronization_finish.h"
 #include "model/cluster.h"
+#include "model/diff/apply_controller.h"
 #include "model/diff/cluster_visitor.h"
 
 using namespace syncspirit::model::diff::local;
@@ -11,14 +12,15 @@ synchronization_finish_t::synchronization_finish_t(std::string_view folder_id_) 
     LOG_DEBUG(log, "synchronization_finish_t, folder = {}", folder_id);
 }
 
-auto synchronization_finish_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
+auto synchronization_finish_t::apply_impl(apply_controller_t &controller, void *custom) const noexcept
     -> outcome::result<void> {
+    auto &cluster = controller.get_cluster();
     auto folder = cluster.get_folders().by_id(folder_id);
     if (folder) {
         folder->adjust_synchronization(-1);
         folder->notify_update();
     }
-    auto r = applicator_t::apply_sibling(cluster, controller);
+    auto r = applicator_t::apply_sibling(controller, custom);
     return r;
 }
 

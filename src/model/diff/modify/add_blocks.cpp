@@ -3,6 +3,7 @@
 
 #include "add_blocks.h"
 #include "model/cluster.h"
+#include "model/diff/apply_controller.h"
 #include "model/diff/cluster_visitor.h"
 #include "utils/format.hpp"
 
@@ -12,8 +13,8 @@ add_blocks_t::add_blocks_t(blocks_t blocks_) noexcept : blocks(std::move(blocks_
     LOG_DEBUG(log, "add_blocks_t, count = {}", blocks.size());
 }
 
-auto add_blocks_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
-    -> outcome::result<void> {
+auto add_blocks_t::apply_impl(apply_controller_t &controller, void *custom) const noexcept -> outcome::result<void> {
+    auto &cluster = controller.get_cluster();
     auto &bm = cluster.get_blocks();
     for (const auto &b : blocks) {
         auto opt = block_info_t::create(b);
@@ -25,7 +26,7 @@ auto add_blocks_t::apply_impl(cluster_t &cluster, apply_controller_t &controller
             LOG_TRACE(log, "add_blocks_t, failed to insert block '{}', already exists", block->get_hash());
         }
     }
-    return applicator_t::apply_sibling(cluster, controller);
+    return applicator_t::apply_sibling(controller, custom);
 }
 
 auto add_blocks_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

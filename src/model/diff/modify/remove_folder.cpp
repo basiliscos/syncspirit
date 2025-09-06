@@ -7,6 +7,7 @@
 #include "model/cluster.h"
 #include "add_pending_folders.h"
 #include "model/misc/orphaned_blocks.h"
+#include "model/diff/apply_controller.h"
 #include "model/diff/cluster_visitor.h"
 #include "proto/proto-helpers-db.h"
 
@@ -68,20 +69,20 @@ remove_folder_t::remove_folder_t(const model::cluster_t &cluster, model::sequenc
     LOG_DEBUG(log, "remove_folder_t, folder_id = {}", folder_id);
 }
 
-auto remove_folder_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
-    -> outcome::result<void> {
+auto remove_folder_t::apply_impl(apply_controller_t &controller, void *custom) const noexcept -> outcome::result<void> {
     LOG_TRACE(log, "applying remove_folder_t (folder id = {})", folder_id);
-    auto r = applicator_t::apply_child(cluster, controller);
+    auto r = applicator_t::apply_child(controller, custom);
     if (!r) {
         return r;
     }
 
+    auto &cluster = controller.get_cluster();
     auto &folders = cluster.get_folders();
     auto folder = folders.by_id(folder_id);
     folder->mark_suspended(true); // aka deleted object marker
     folders.remove(folder);
 
-    return applicator_t::apply_sibling(cluster, controller);
+    return applicator_t::apply_sibling(controller, custom);
 }
 
 auto remove_folder_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

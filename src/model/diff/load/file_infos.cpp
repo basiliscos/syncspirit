@@ -9,15 +9,14 @@
 
 using namespace syncspirit::model::diff::load;
 
-auto file_infos_t::apply_forward(cluster_t &cluster, apply_controller_t &controller) const noexcept
-    -> outcome::result<void> {
-    return controller.apply(*this, cluster);
+auto file_infos_t::apply_forward(apply_controller_t &controller, void *custom) const noexcept -> outcome::result<void> {
+    return controller.apply(*this, custom);
 }
 
-auto file_infos_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
-    -> outcome::result<void> {
+auto file_infos_t::apply_impl(apply_controller_t &controller, void *custom) const noexcept -> outcome::result<void> {
     using folder_info_by_id_t = std::unordered_map<utils::bytes_view_t, folder_info_ptr_t>;
     auto all_fi = folder_info_by_id_t{};
+    auto &cluster = controller.get_cluster();
     auto &folders = cluster.get_folders();
     for (auto &f : folders) {
         for (auto &it : f.item->get_folder_infos()) {
@@ -48,5 +47,5 @@ auto file_infos_t::apply_impl(cluster_t &cluster, apply_controller_t &controller
         }
         folder_info->add_relaxed(fi);
     }
-    return applicator_t::apply_sibling(cluster, controller);
+    return applicator_t::apply_sibling(controller, custom);
 }

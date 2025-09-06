@@ -108,6 +108,7 @@ add_library(syncspirit_core
     src/fs/scan_scheduler.cpp
     src/fs/scan_task.cpp
     src/fs/utils.cpp
+    src/hasher/bouncer_actor.cpp
     src/hasher/hasher_actor.cpp
     src/hasher/hasher_proxy_actor.cpp
     src/hasher/hasher_supervisor.cpp
@@ -115,6 +116,7 @@ add_library(syncspirit_core
     src/model/diff/block_diff.cpp
     src/model/diff/cluster_diff.cpp
     src/model/diff/cluster_visitor.cpp
+    src/model/diff/iterative_controller.cpp
     src/model/diff/advance/advance.cpp
     src/model/diff/advance/local_update.cpp
     src/model/diff/advance/remote_copy.cpp
@@ -127,12 +129,14 @@ add_library(syncspirit_core
     src/model/diff/contact/unknown_connected.cpp
     src/model/diff/contact/update_contact.cpp
     src/model/diff/load/blocks.cpp
+    src/model/diff/load/commit.cpp
     src/model/diff/load/devices.cpp
     src/model/diff/load/file_infos.cpp
     src/model/diff/load/folder_infos.cpp
     src/model/diff/load/folders.cpp
     src/model/diff/load/ignored_devices.cpp
     src/model/diff/load/ignored_folders.cpp
+    src/model/diff/load/interrupt.cpp
     src/model/diff/load/load_cluster.cpp
     src/model/diff/load/pending_devices.cpp
     src/model/diff/load/pending_folders.cpp
@@ -220,7 +224,6 @@ add_library(syncspirit_core
     src/net/relay_actor.cpp
     src/net/resolver_actor.cpp
     src/net/names.cpp
-    src/net/sink_actor.cpp
     src/net/ssdp_actor.cpp
     src/net/upnp_actor.cpp
     src/presentation/entity.cpp

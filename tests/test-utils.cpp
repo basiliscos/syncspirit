@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "test-utils.h"
+#include "model/cluster.h"
 #include "model/device_id.h"
 #include "utils/base32.h"
 #include "utils/log-setup.h"
@@ -129,9 +130,9 @@ std::string hash_string(const std::string_view &hash) noexcept {
     return r;
 }
 
-static model::diff::apply_controller_t apply_controller;
-
-model::diff::apply_controller_t &get_apply_controller() { return apply_controller; }
+apply_controller_ptr_t make_apply_controller(model::cluster_ptr_t cluster) {
+    return new test_apply_controller_t(std::move(cluster));
+}
 
 void init_logging() {
     auto [dist_sink, _] = utils::create_root_logger();

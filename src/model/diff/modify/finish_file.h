@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #pragma once
 
 #include "../cluster_diff.h"
 #include "model/file_info.h"
-#include "model/device.h"
 #include "model/misc/resolver.h"
 
 namespace syncspirit::model::diff::modify {

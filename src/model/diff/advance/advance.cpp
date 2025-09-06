@@ -6,6 +6,7 @@
 #include "remote_win.h"
 #include "proto/proto-helpers.h"
 #include "model/cluster.h"
+#include "model/diff/apply_controller.h"
 #include "model/diff/modify/add_blocks.h"
 #include "model/diff/modify/remove_blocks.h"
 #include "model/misc/orphaned_blocks.h"
@@ -118,11 +119,16 @@ void advance_t::initialize(const cluster_t &cluster, sequencer_t &sequencer, pro
     }
 }
 
-auto advance_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept -> outcome::result<void> {
-    auto r = applicator_t::apply_child(cluster, controller);
+auto advance_t::apply_forward(apply_controller_t &controller, void *custom) const noexcept -> outcome::result<void> {
+    return controller.apply(*this, custom);
+}
+
+auto advance_t::apply_impl(apply_controller_t &controller, void *custom) const noexcept -> outcome::result<void> {
+    auto r = applicator_t::apply_child(controller, custom);
     if (!r) {
         return r;
     }
+    auto &cluster = controller.get_cluster();
     auto my_device = cluster.get_device();
     auto folder = cluster.get_folders().by_id(folder_id);
     auto local_folder = folder->get_folder_infos().by_device(*my_device);
@@ -156,7 +162,7 @@ auto advance_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) c
     }
 
     auto sequence = local_folder->get_max_sequence() + 1;
-    local_file->mark_local();
+    local_file->mark_local(true);
     local_file->set_sequence(sequence);
     local_folder->add_strict(local_file);
 
@@ -165,5 +171,5 @@ auto advance_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) c
 
     local_file->notify_update();
 
-    return applicator_t::apply_sibling(cluster, controller);
+    return applicator_t::apply_sibling(controller, custom);
 }

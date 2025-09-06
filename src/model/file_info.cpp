@@ -278,19 +278,25 @@ void file_info_t::mark_unreachable(bool value) noexcept {
     }
 }
 
-void file_info_t::mark_local() noexcept {
-    flags = flags | f_local;
-    auto self = folder_info->get_device();
-    auto folder = folder_info->get_folder();
-    for (auto it : folder->get_folder_infos()) {
-        auto fi = it.item.get();
-        auto peer = fi->get_device();
-        if (peer != self) {
-            auto fit = peer->get_iterator();
-            if (fit) {
-                auto peer_file = fi->get_file_infos().by_name(name);
-                if (peer_file) {
-                    fit->recheck(*peer_file);
+void file_info_t::mark_local(bool available) noexcept {
+    if (available) {
+        flags = flags | f_local;
+    } else {
+        flags = flags & ~f_local;
+    }
+    if (available) {
+        auto self = folder_info->get_device();
+        auto folder = folder_info->get_folder();
+        for (auto it : folder->get_folder_infos()) {
+            auto fi = it.item.get();
+            auto peer = fi->get_device();
+            if (peer != self) {
+                auto fit = peer->get_iterator();
+                if (fit) {
+                    auto peer_file = fi->get_file_infos().by_name(name);
+                    if (peer_file) {
+                        fit->recheck(*peer_file);
+                    }
                 }
             }
         }

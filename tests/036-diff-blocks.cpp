@@ -20,6 +20,7 @@ TEST_CASE("various block diffs", "[model]") {
     auto my_device = device_t::create(my_id, "my-device").value();
 
     auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
+    auto controller = make_apply_controller(cluster);
     cluster->get_devices().put(my_device);
 
     auto builder = diff_builder_t(*cluster);
@@ -108,7 +109,7 @@ TEST_CASE("various block diffs", "[model]") {
         auto map = blocks_map_t(2);
         map[0] = map[1] = true;
         auto diff = diff::cluster_diff_ptr_t(new diff::local::blocks_availability_t(*file, map));
-        REQUIRE(diff->apply(*cluster, get_apply_controller()));
+        REQUIRE(diff->apply(*controller, {}));
         CHECK(file->is_locally_available());
     }
 }

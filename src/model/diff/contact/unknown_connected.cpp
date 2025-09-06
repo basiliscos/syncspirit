@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
 
 #include "unknown_connected.h"
 #include "model/cluster.h"
-#include "../cluster_visitor.h"
+#include "model/diff/apply_controller.h"
+#include "model/diff/cluster_visitor.h"
 #include "model/misc/error_code.h"
 
 using namespace syncspirit::model::diff::contact;
@@ -14,8 +15,9 @@ unknown_connected_t::unknown_connected_t(cluster_t &, const model::device_id_t &
     LOG_DEBUG(log, "unknown_connected_t, device = {}", device_id.get_short());
 }
 
-auto unknown_connected_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
+auto unknown_connected_t::apply_impl(apply_controller_t &controller, void *custom) const noexcept
     -> outcome::result<void> {
+    auto &cluster = controller.get_cluster();
     auto &pending_devices = cluster.get_pending_devices();
     auto prev = pending_devices.by_sha256(device_id.get_sha256());
     if (!prev) {
@@ -23,7 +25,7 @@ auto unknown_connected_t::apply_impl(cluster_t &cluster, apply_controller_t &con
     }
     prev->assign(db_device);
     prev->notify_update();
-    return applicator_t::apply_sibling(cluster, controller);
+    return applicator_t::apply_sibling(controller, custom);
 }
 
 auto unknown_connected_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {
