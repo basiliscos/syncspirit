@@ -34,15 +34,18 @@ using file_info_ptr_t = intrusive_ptr_t<file_info_t>;
 struct SYNCSPIRIT_API file_info_t final : augmentable_t {
 
     // clang-format off
-    enum flags_t {
-        f_deleted        = 1 << 0,
-        f_invalid        = 1 << 1,
-        f_no_permissions = 1 << 2,
-        f_locked         = 1 << 3,
-        f_synchronizing  = 1 << 4,
-        f_unreachable    = 1 << 5,
-        f_unlocking      = 1 << 6,
-        f_local          = 1 << 7,
+    enum flags_t: std::uint16_t {
+        f_type_file      = 1 << 0,
+        f_type_dir       = 1 << 1,
+        f_type_link      = 1 << 2,
+        f_deleted        = 1 << 3,
+        f_invalid        = 1 << 4,
+        f_no_permissions = 1 << 5,
+        f_locked         = 1 << 6,
+        f_synchronizing  = 1 << 7,
+        f_unreachable    = 1 << 8,
+        f_unlocking      = 1 << 9,
+        f_local          = 1 << 10,
     };
     // clang-format on
 
@@ -69,6 +72,13 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t {
 
     static decomposed_key_t decompose_key(utils::bytes_view_t key);
 
+    static inline std::uint16_t as_flags(proto::FileInfoType type) noexcept {
+        return
+                type == proto::FileInfoType::DIRECTORY ? f_type_dir
+              : type == proto::FileInfoType::SYMLINK   ? f_type_link
+              : f_type_file;
+    }
+
     ~file_info_t();
 
     utils::bytes_view_t get_key() const noexcept { return utils::bytes_view_t(key, data_length); }
@@ -94,10 +104,10 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t {
     void remove_blocks() noexcept;
     void assign_block(const model::block_info_ptr_t &block, size_t index) noexcept;
 
-    inline proto::FileInfoType get_type() const noexcept { return type; }
-    inline bool is_file() const noexcept { return type == proto::FileInfoType::FILE; }
-    inline bool is_dir() const noexcept { return type == proto::FileInfoType::DIRECTORY; }
-    inline bool is_link() const noexcept { return type == proto::FileInfoType::SYMLINK; }
+    inline std::uint16_t get_type() const noexcept { return flags & 0b111; }
+    inline bool is_file() const noexcept { return flags & f_type_file; }
+    inline bool is_dir() const noexcept { return flags & f_type_dir;; }
+    inline bool is_link() const noexcept { return flags & f_type_link; }
     inline bool is_deleted() const noexcept { return flags & f_deleted; }
     inline bool is_invalid() const noexcept { return flags & f_invalid; }
     inline bool is_unreachable() const noexcept { return flags & f_unreachable; }
@@ -171,23 +181,22 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t {
     void remove_block(block_info_ptr_t &block) noexcept;
 
     unsigned char key[data_length];
+    std::int32_t block_size;
     std::string name;
     folder_info_t *folder_info;
-    proto::FileInfoType type;
     std::int64_t size;
-    std::uint32_t permissions;
     std::int64_t modified_s;
-    std::uint32_t modified_ns;
     std::uint64_t modified_by;
+    std::uint32_t permissions;
+    std::uint32_t modified_ns;
 
-    std::uint32_t flags = 0;
     version_ptr_t version;
     std::int64_t sequence;
-    std::int32_t block_size;
     std::string symlink_target;
     blocks_t blocks;
     marks_vector_t marks;
     std::uint32_t missing_blocks;
+    std::uint16_t flags = 0;
 
     friend struct blocks_iterator_t;
 };

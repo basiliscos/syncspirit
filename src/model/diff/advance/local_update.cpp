@@ -50,12 +50,12 @@ auto local_update_t::get_original(const model::folder_infos_map_t &fis, const mo
                                   const proto::FileInfo &local_file) const noexcept -> model::file_info_ptr_t {
     auto r = model::file_info_ptr_t();
     auto name = proto::get_name(local_file);
-    auto local_type = proto::get_type(local_file);
     auto local_deleted = proto::get_deleted(local_file);
     auto local_invalid = proto::get_invalid(local_file);
     auto local_perms = proto::get_permissions(local_file);
     auto local_size = proto::get_size(local_file);
     auto local_blocks_sz = proto::get_blocks_size(local_file);
+    auto local_type = model::file_info_t::as_flags(proto::get_type(local_file));
 
     for (auto &it_fi : fis) {
         auto fi = it_fi.item.get();

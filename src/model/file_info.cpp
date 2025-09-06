@@ -38,6 +38,13 @@ namespace pt = boost::posix_time;
 
 static const constexpr char prefix = (char)(db::prefix::file_info);
 
+static inline proto::FileInfoType as_type(std::uint16_t flags) noexcept {
+    using T = proto::FileInfoType;
+    return flags & file_info_t::f_type_dir ? T::DIRECTORY
+         : flags & file_info_t::f_type_link ? T::SYMLINK
+         : T::FILE;
+}
+
 auto file_info_t::decompose_key(utils::bytes_view_t key) -> decomposed_key_t {
     assert(key.size() == file_info_t::data_length);
     auto fi_key = key.subspan(1, uuid_length);
@@ -127,9 +134,9 @@ std::uint64_t file_info_t::get_block_offset(size_t block_index) const noexcept {
 }
 
 auto file_info_t::fields_update(const db::FileInfo &source) noexcept -> outcome::result<void> {
+    flags = (flags & ~0b111111) | as_flags(db::get_type(source));
     name = db::get_name(source);
     sequence = db::get_sequence(source);
-    type = db::get_type(source);
     set_size(db::get_size(source));
     permissions = db::get_permissions(source);
     modified_s = db::get_modified_s(source);
@@ -157,7 +164,7 @@ auto file_info_t::fields_update(const db::FileInfo &source) noexcept -> outcome:
 auto file_info_t::fields_update(const proto::FileInfo &source) noexcept -> outcome::result<void> {
     name = proto::get_name(source);
     sequence = proto::get_sequence(source);
-    type = proto::get_type(source);
+    flags = (flags & ~0b111111) | as_flags(proto::get_type(source));
     set_size(proto::get_size(source));
     permissions = proto::get_permissions(source);
     modified_s = proto::get_modified_s(source);
@@ -190,7 +197,7 @@ db::FileInfo file_info_t::as_db(bool include_blocks) const noexcept {
     auto r = db::FileInfo();
     db::set_name(r, name);
     db::set_sequence(r, sequence);
-    db::set_type(r, type);
+    db::set_type(r, as_type(flags));
     db::set_size(r, size);
     db::set_permissions(r, permissions);
     db::set_modified_s(r, modified_s);
@@ -217,7 +224,7 @@ proto::FileInfo file_info_t::as_proto(bool include_blocks) const noexcept {
     auto r = proto::FileInfo();
     proto::set_name(r, name);
     proto::set_sequence(r, sequence);
-    proto::set_type(r, type);
+    proto::set_type(r, as_type(flags));
     proto::set_size(r, size);
     proto::set_permissions(r, permissions);
     proto::set_modified_s(r, modified_s);
@@ -390,7 +397,7 @@ void file_info_t::remove_block(block_info_ptr_t &block) noexcept {
 }
 
 std::int64_t file_info_t::get_size() const noexcept {
-    if (type == proto::FileInfoType::FILE) {
+    if (flags & f_type_file) {
         bool ok = !is_deleted() && !is_invalid();
         if (ok) {
             return size;
@@ -414,13 +421,12 @@ void file_info_t::update(const file_info_t &other) noexcept {
     using hashes_t = std::set<utils::bytes_view_t, utils::bytes_comparator_t>;
     assert(this->name == other.name);
     assert((this->get_key() == other.get_key()) || this->version->identical_to(*other.version));
-    type = other.type;
     size = other.size;
     permissions = other.permissions;
     modified_s = other.modified_s;
     modified_ns = other.modified_ns;
     modified_by = other.modified_by;
-    flags = (other.flags & 0b111) | (flags & ~0b111); // local flags are preserved
+    flags = (other.flags & 0b111111) | (flags & ~0b111111); // local flags are preserved
     version = other.version;
     sequence = other.sequence;
     block_size = other.block_size;
