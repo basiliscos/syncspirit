@@ -8,8 +8,34 @@
 #include "utils/platform.h"
 #include "proto/proto-helpers-bep.h"
 #include <boost/nowide/convert.hpp>
+#include <array>
+#include <memory_resource>
 
 using namespace syncspirit::fs;
+
+static bool compare_paths(const bfs::path &l, const bfs::path &r) { return l.filename() > r.filename(); }
+
+bool scan_task_t::comparator_t::operator()(const queue_item_t &lhs, const queue_item_t &rhs) const noexcept {
+    auto l_index = lhs.index();
+    auto r_index = rhs.index();
+    if (l_index != r_index) {
+        return l_index > r_index;
+    }
+    return std::visit(
+        [&rhs](auto &l) {
+            using T = std::decay_t<decltype(l)>;
+            auto r = *std::get_if<T>(&rhs);
+            if constexpr (std::is_same_v<unseen_dir_t, T>) {
+                return (compare_paths(l.path, r.path));
+            } else if constexpr (std::is_same_v<file_t, T>) {
+                return (compare_paths(l.file->get_path(), r.file->get_path()));
+            } else if constexpr (std::is_same_v<unknown_file_t, T>) {
+                return (compare_paths(l.path, r.path));
+            }
+            return true;
+        },
+        lhs);
+}
 
 scan_task_t::scan_task_t(model::cluster_ptr_t cluster_, std::string_view folder_id_, file_cache_ptr_t rw_cache_,
                          const config::fs_config_t &config_) noexcept
@@ -31,7 +57,7 @@ scan_task_t::scan_task_t(model::cluster_ptr_t cluster_, std::string_view folder_
 
     ignore_permissions = folder->are_permissions_ignored() || !utils::platform_t::permissions_supported(path);
 
-    dirs_queue.push_back(path);
+    stack.push(unseen_dir_t(path));
     root = path;
 
     auto &orig_files = my_folder->get_file_infos();
@@ -50,25 +76,10 @@ scan_task_t::scan_task_t(model::cluster_ptr_t cluster_, std::string_view folder_
 const std::string &scan_task_t::get_folder_id() const noexcept { return folder_id; }
 
 scan_result_t scan_task_t::advance() noexcept {
-    if (!unknown_files_queue.empty()) {
-        auto &file = unknown_files_queue.front();
-        auto &&r = advance_unknown_file(file);
-        unknown_files_queue.pop_front();
-        return r;
-    }
-    if (!files_queue.empty()) {
-        auto &file = files_queue.front();
-        auto &&r = advance_file(file);
-        files_queue.pop_front();
-        return r;
-    } else if (!dirs_queue.empty()) {
-        auto &path = dirs_queue.front();
-        auto &&r = advance_dir(path);
-        dirs_queue.pop_front();
-        return r;
-    }
-    if (!dirs_queue.empty()) {
-        return true;
+    if (stack.size()) {
+        auto item = std::move(stack.top());
+        stack.pop();
+        return std::visit([this](auto item) { return do_advance(std::move(item)); }, std::move(item));
     }
     if (files.size() != 0) {
         auto file = files.begin()->item;
@@ -85,8 +96,17 @@ scan_result_t scan_task_t::advance() noexcept {
     return false;
 }
 
-scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
+scan_result_t scan_task_t::do_advance(unseen_dir_t queue_item) noexcept {
+    using sub_queue_t = std::pmr::vector<queue_item_t>;
+    using allocator_t = std::pmr::polymorphic_allocator<char>;
+
+    auto buffer = std::array<std::byte, 16 * 1024>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = allocator_t(&pool);
+    auto sub_queue = sub_queue_t(allocator);
+
     sys::error_code ec;
+    auto &dir = queue_item.path;
 
     bool exists = bfs::exists(dir, ec);
     if (ec) {
@@ -137,10 +157,11 @@ scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
             auto rp = relativize(child, root).generic_string();
             auto file = files.by_name(rp);
             if (file) {
-                files_queue.push_back(file);
                 removed.put(file);
                 if (status.type() == bfs::file_type::directory) {
-                    dirs_queue.push_back(child);
+                    sub_queue.emplace_back(unseen_dir_t(child, file_t{file}));
+                } else {
+                    sub_queue.emplace_back(file_t(file));
                 }
                 continue;
             }
@@ -148,6 +169,7 @@ scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
             auto file_type = status.type();
             proto::FileInfo metadata;
             proto::set_name(metadata, rp);
+            bool is_dir = false;
 
             if (file_type == bfs::file_type::regular || file_type == bfs::file_type::directory) {
                 auto modification_time = bfs::last_write_time(child, ec);
@@ -175,7 +197,8 @@ scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
                 proto::set_size(metadata, sz);
             } else if (file_type == bfs::file_type::directory) {
                 proto::set_type(metadata, proto::FileInfoType::DIRECTORY);
-                dirs_queue.push_back(child);
+                is_dir = true;
+                sub_queue.emplace_back(unseen_dir_t(child, unknown_file_t{child, std::move(metadata)}));
             } else if (file_type == bfs::file_type::symlink) {
                 auto target = bfs::read_symlink(child, ec);
                 if (ec) {
@@ -190,12 +213,29 @@ scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
                 continue;
             }
 
-            unknown_files_queue.push_back(unknown_file_t{child, std::move(metadata)});
+            if (!is_dir) {
+                sub_queue.emplace_back(unknown_file_t{child, std::move(metadata)});
+            }
         }
     }
     for (auto &it : removed) {
         files.remove(it.item);
     }
+
+    std::visit(
+        [this](auto it) {
+            using T = std::decay_t<decltype(it)>;
+            if constexpr (!std::is_same_v<T, std::monostate>) {
+                stack.push(std::move(it));
+            }
+        },
+        std::move(queue_item.next));
+
+    std::sort(sub_queue.begin(), sub_queue.end(), comparator_t{});
+    for (auto &item : sub_queue) {
+        stack.push(std::move(item));
+    }
+
     if (!errors.empty()) {
         return errors;
     }
@@ -203,7 +243,8 @@ scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
     return true;
 }
 
-scan_result_t scan_task_t::advance_file(file_info_t &file) noexcept {
+scan_result_t scan_task_t::do_advance(file_t queue_item) noexcept {
+    auto &file = queue_item.file;
     if (file->is_file()) {
         return advance_regular_file(file);
     } else if (file->is_dir()) {
@@ -291,7 +332,7 @@ scan_result_t scan_task_t::advance_symlink_file(file_info_t &file) noexcept {
     }
 }
 
-scan_result_t scan_task_t::advance_unknown_file(unknown_file_t &file) noexcept {
+scan_result_t scan_task_t::do_advance(unknown_file_t file) noexcept {
     auto &path = file.path;
     if (!is_temporal(file.path.filename())) {
         return unknown_file_t{std::move(path), std::move(file.metadata)};
@@ -377,7 +418,7 @@ scan_result_t scan_task_t::advance_unknown_file(unknown_file_t &file) noexcept {
         return incomplete_removed_t{peer_file};
     }
 
-    auto opt = file_t::open_read(path);
+    auto opt = fs::file_t::open_read(path);
     if (!opt) {
         LOG_DEBUG(log, "try to remove temporally {}, which cannot open ", path.string());
         bfs::remove(path, ec);
@@ -388,8 +429,10 @@ scan_result_t scan_task_t::advance_unknown_file(unknown_file_t &file) noexcept {
     }
 
     auto &opened_file = opt.assume_value();
-    return incomplete_t{peer_file, file_ptr_t(new file_t(std::move(opened_file)))};
+    return incomplete_t{peer_file, file_ptr_t(new fs::file_t(std::move(opened_file)))};
 }
+
+scan_result_t scan_task_t::do_advance(std::monostate item) noexcept { return true; }
 
 void scan_task_t::push(model::diff::cluster_diff_t *update, std::int64_t bytes_consumed, bool consumes_file) noexcept {
     if (diff_siblings >= files_limit) {
@@ -454,5 +497,3 @@ scan_task_t::send_guard_t::~send_guard_t() {
         actor.send<payload::scan_progress_t>(actor.get_address(), &task);
     }
 }
-
-//

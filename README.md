@@ -127,6 +127,7 @@ after the core completion.
  - [core] allow to load huge databses and interrupt loading porgress
  - [core, fltk] more correctly display file scanning progress
  - [core] reduce memory consumption by model::file_info_t
+ - [core] use in-depth scan order instead of in-breadth
 
 ## 0.4.2 (22-Aug-2025)
  - [core, bugfix] (#8) crash on set peer static ip address

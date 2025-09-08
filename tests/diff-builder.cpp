@@ -165,6 +165,10 @@ auto diff_builder_t::apply(void *custom) noexcept -> outcome::result<void> {
         do_try = false;
         if (r && cluster_diff) {
             r = cluster_diff->apply(*this, custom);
+            if (!r) {
+                auto &ec = r.assume_error();
+                spdlog::error("diff application error: {}", ec.message());
+            }
             cluster_diff.reset();
             do_try = true;
         }

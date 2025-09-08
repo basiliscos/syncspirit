@@ -15,9 +15,10 @@
 #include <boost/intrusive_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ref_counter.hpp>
 #include <filesystem>
-#include <list>
 #include <variant>
+#include <stack>
 #include <cstdint>
+
 #include <unordered_map>
 
 namespace syncspirit::fs {
@@ -70,9 +71,6 @@ using scan_result_t = std::variant<bool, scan_errors_t, changed_meta_t, unchange
 
 struct SYNCSPIRIT_API scan_task_t : boost::intrusive_ref_counter<scan_task_t, boost::thread_unsafe_counter> {
     using file_info_t = model::file_info_ptr_t;
-    using path_queue_t = std::list<bfs::path>;
-    using files_queue_t = std::list<file_info_t>;
-    using unknown_files_queue_t = std::list<unknown_file_t>;
     using seen_paths_t = std::unordered_map<std::string, bfs::path, utils::string_hash_t, utils::string_eq_t>;
 
     struct SYNCSPIRIT_API send_guard_t {
@@ -102,11 +100,30 @@ struct SYNCSPIRIT_API scan_task_t : boost::intrusive_ref_counter<scan_task_t, bo
   private:
     using diffs_t = std::vector<model::diff::cluster_diff_ptr_t>;
 
-    scan_result_t advance_dir(const bfs::path &dir) noexcept;
-    scan_result_t advance_file(file_info_t &file) noexcept;
+    struct file_t {
+        file_info_t file;
+    };
+
+    struct unseen_dir_t {
+        using next_t = std::variant<std::monostate, file_t, unknown_file_t>;
+        bfs::path path;
+        next_t next;
+    };
+
+    using queue_item_t = std::variant<file_t, unknown_file_t, unseen_dir_t>;
+    struct comparator_t {
+        bool operator()(const queue_item_t &lhs, const queue_item_t &rhs) const noexcept;
+    };
+
+    using stack_t = std::stack<queue_item_t>;
+
+    scan_result_t do_advance(std::monostate item) noexcept;
+    scan_result_t do_advance(file_t item) noexcept;
+    scan_result_t do_advance(unseen_dir_t item) noexcept;
+    scan_result_t do_advance(unknown_file_t item) noexcept;
+
     scan_result_t advance_regular_file(file_info_t &file) noexcept;
     scan_result_t advance_symlink_file(file_info_t &file) noexcept;
-    scan_result_t advance_unknown_file(unknown_file_t &file) noexcept;
 
     std::string folder_id;
     model::folder_ptr_t folder;
@@ -119,9 +136,7 @@ struct SYNCSPIRIT_API scan_task_t : boost::intrusive_ref_counter<scan_task_t, bo
     std::int64_t bytes_left;
     std::int64_t files_left;
 
-    path_queue_t dirs_queue;
-    files_queue_t files_queue;
-    unknown_files_queue_t unknown_files_queue;
+    stack_t stack;
     bfs::path root;
     seen_paths_t seen_paths;
 
