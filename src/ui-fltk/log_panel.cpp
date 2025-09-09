@@ -46,10 +46,12 @@ static void set_min_display_level(Fl_Widget *widget, void *data) {
 
     auto &level_buttons = log_panel->level_buttons;
     for (auto it = level_buttons.begin(); it != level_buttons.end(); ++it) {
+        (*it)->activate();
         if (*it != widget) {
             (**it).value(0);
         }
     }
+    widget->deactivate();
 }
 
 static void on_input_filter(Fl_Widget *widget, void *data) {
