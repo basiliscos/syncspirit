@@ -2,10 +2,10 @@
 // SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "db_actor.h"
+#include "bouncer/messages.hpp"
 #include "names.h"
 #include "db/prefix.h"
 #include "db/utils.h"
-#include "hasher/messages.h"
 #include "db/error_code.h"
 #include "messages.h"
 #include "model/diff/advance/advance.h"
@@ -42,7 +42,6 @@
 #include "model/diff/modify/upsert_folder_info.h"
 #include "model/diff/peer/update_folder.h"
 #include "model/diff/peer/cluster_update.h"
-#include "model/diff/cluster_visitor.h"
 #include "model/misc/error_code.h"
 #include "utils/format.hpp"
 #include <string_view>
@@ -414,7 +413,7 @@ void db_actor_t::on_cluster_load_trigger(message::load_cluster_trigger_t &) noex
     };
 
     auto message = r::make_message<payload::partial_load_t>(address, std::move(p));
-    send<hasher::payload::package_t>(bouncer, std::move(message));
+    send<bouncer::payload::package_t>(bouncer, std::move(message));
     resources->acquire(resource::partial_load);
 }
 
@@ -470,7 +469,7 @@ void db_actor_t::on_patrial_load(partial_load_t &message) noexcept {
         }
     }
     if (bounce_again) {
-        return send<hasher::payload::package_t>(bouncer, &message);
+        return send<bouncer::payload::package_t>(bouncer, &message);
     }
 
     if (p.files_next) {
@@ -534,7 +533,7 @@ void db_actor_t::on_patrial_load(partial_load_t &message) noexcept {
     }
 
     if (bounce_again) {
-        return send<hasher::payload::package_t>(bouncer, &message);
+        return send<bouncer::payload::package_t>(bouncer, &message);
     } else {
         auto &corrupted = p.corrupted_files;
         if (corrupted.size()) {

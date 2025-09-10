@@ -92,6 +92,8 @@ configure_file(misc/syncspirit-config.h.in include/syncspirit-config.h @ONLY)
 
 add_library(syncspirit_core
     src/constants.cpp
+    src/bouncer/bouncer_actor.cpp
+    src/bouncer/bouncer_supervisor.cpp
     src/config/utils.cpp
     src/db/cursor.cpp
     src/db/error_code.cpp
@@ -108,7 +110,6 @@ add_library(syncspirit_core
     src/fs/scan_scheduler.cpp
     src/fs/scan_task.cpp
     src/fs/utils.cpp
-    src/hasher/bouncer_actor.cpp
     src/hasher/hasher_actor.cpp
     src/hasher/hasher_proxy_actor.cpp
     src/hasher/hasher_supervisor.cpp

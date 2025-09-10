@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025 Ivan Baidakou
 
 #include "iterative_controller.h"
-#include "hasher/messages.h"
+#include "bouncer/messages.hpp"
 #include "model/diff/load/commit.h"
 #include "model/diff/load/interrupt.h"
 #include <rotor/actor_base.h>
@@ -108,7 +108,7 @@ void iterative_controller_base_t::process_impl(model::diff::cluster_diff_t &diff
         using payload_t = model::payload::model_interrupt_t;
         auto &address = owner->get_address();
         auto message = r::make_message<payload_t>(address, std::move(apply_context));
-        owner->send<hasher::payload::package_t>(bouncer, message);
+        owner->send<bouncer::payload::package_t>(bouncer, message);
         owner->access<to::resources>()->acquire(interrupt);
     }
 }

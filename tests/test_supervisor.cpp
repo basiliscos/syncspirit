@@ -117,7 +117,7 @@ void supervisor_t::on_model_update(model::message::model_update_t &msg) noexcept
     }
 }
 
-void supervisor_t::on_package(hasher::message::package_t &msg) noexcept {
+void supervisor_t::on_package(bouncer::message::package_t &msg) noexcept {
     LOG_TRACE(log, "on package");
     put(std::move(msg.payload));
 }

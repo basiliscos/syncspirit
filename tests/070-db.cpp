@@ -44,7 +44,7 @@ struct db_supervisor_t : supervisor_t {
     using parent_t = supervisor_t;
     using parent_t::parent_t;
 
-    void on_package(hasher::message::package_t &msg) noexcept {
+    void on_package(bouncer::message::package_t &msg) noexcept {
         LOG_TRACE(log, "on package");
         ++packages;
         put(std::move(msg.payload));
@@ -1449,7 +1449,7 @@ void test_iterative_loading_interrupt() {
                 using parent_t = db_supervisor_t;
                 using parent_t::parent_t;
 
-                void on_package(hasher::message::package_t &msg) noexcept {
+                void on_package(bouncer::message::package_t &msg) noexcept {
                     parent_t::on_package(msg);
                     if (packages == 5) {
                         fixture->db_actor->do_shutdown();

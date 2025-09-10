@@ -19,7 +19,7 @@
 #include "utils/location.h"
 #include "utils/log-setup.h"
 #include "utils/platform.h"
-#include "hasher/bouncer_actor.h"
+#include "bouncer/bouncer_supervisor.h"
 #include "hasher/hasher_supervisor.h"
 #include "net/net_supervisor.h"
 #include "fs/fs_supervisor.h"
@@ -318,14 +318,13 @@ int app_main(app_context_t &app_ctx) {
         return 1;
     }
 
-    std::atomic_bool bouncer_shutdown_flag = false;
     auto bouncer_context = thread_sys_context_t();
-    auto bouncer = bouncer_context.create_supervisor<hasher::bouncer_actor_t>()
-                       .timeout(timeout * 9 / 8)
-                       .registry_address(sup_net->get_registry_address())
-                       .shutdown_flag(bouncer_shutdown_flag, r::pt::millisec{50})
-                       .finish();
-    bouncer->do_process();
+    auto bouncer_sup = bouncer_context.create_supervisor<bouncer::bouncer_supervisor_t>()
+                           .timeout(timeout * 9 / 8)
+                           .registry_address(sup_net->get_registry_address())
+                           .shutdown_flag(shutdown_flag, r::pt::millisec{50})
+                           .finish();
+    bouncer_sup->do_process();
 
     auto hasher_count = cfg.hasher_threads;
     using sys_thread_context_ptr_t = r::intrusive_ptr_t<thread_sys_context_t>;
@@ -359,7 +358,7 @@ int app_main(app_context_t &app_ctx) {
     thread_sys_context_t fs_context;
     auto fs_sup = fs_context.create_supervisor<syncspirit::fs::fs_supervisor_t>()
                       .timeout(timeout)
-                      .registry_address(bouncer->get_registry_address())
+                      .registry_address(bouncer_sup->get_registry_address())
                       .fs_config(cfg.fs_config)
                       .hasher_threads(cfg.hasher_threads)
                       .sequencer(sequencer)
@@ -380,7 +379,7 @@ int app_main(app_context_t &app_ctx) {
         pthread_setname_np(pthread_self(), "ss/bouncer");
 #endif
         bouncer_context.run();
-        bouncer_shutdown_flag = true;
+        shutdown_flag = true;
         logger->trace("bouncer thread has been terminated");
     });
 
@@ -442,15 +441,16 @@ int app_main(app_context_t &app_ctx) {
         } while (state != r::state_t::SHUT_DOWN);
     }
 
-    logger->debug("asking bouncer to shutdown");
-    bouncer_shutdown_flag = true;
-
+    logger->trace("joining to fs thread");
     fs_thread.join();
+
+    logger->trace("joining to net thread");
     net_thread.join();
 
+    logger->trace("joining to bouncer thread");
     bouncer_thread.join();
 
-    logger->trace("waiting hasher threads termination");
+    logger->trace("joining to {} hasher threads", hasher_threads.size());
     for (auto &thread : hasher_threads) {
         thread.join();
     }
