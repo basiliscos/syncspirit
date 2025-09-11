@@ -20,6 +20,7 @@
 #include "utils/platform.h"
 #include "net/net_supervisor.h"
 #include "fs/fs_supervisor.h"
+#include "bouncer/bouncer_supervisor.h"
 #include "hasher/hasher_supervisor.h"
 #include "command.h"
 #include "governor_actor.h"
@@ -306,9 +307,20 @@ int app_main(app_context_t &app_ctx) {
                        .independent_threads(independent_threads)
                        .shutdown_flag(shutdown_flag, r::pt::millisec{50})
                        .finish();
-    sup_net->start();
-    // pre-startup
+    // warm-up
     sup_net->do_process();
+    if (sup_net->get_shutdown_reason()) {
+        logger->debug("net supervisor has not started");
+        return 1;
+    }
+
+    auto bouncer_context = thread_sys_context_t();
+    auto bouncer_sup = bouncer_context.create_supervisor<bouncer::bouncer_supervisor_t>()
+                           .timeout(timeout * 9 / 8)
+                           .registry_address(sup_net->get_registry_address())
+                           .shutdown_flag(shutdown_flag, r::pt::millisec{50})
+                           .finish();
+    bouncer_sup->do_process();
 
     thread_sys_context_t fs_context;
     auto fs_sup = fs_context.create_supervisor<syncspirit::fs::fs_supervisor_t>()
@@ -344,6 +356,16 @@ int app_main(app_context_t &app_ctx) {
     }
 
     /* launch actors */
+
+    auto bouncer_thread = std::thread([&]() {
+#if defined(__linux__)
+        pthread_setname_np(pthread_self(), "ss/bouncer");
+#endif
+        bouncer_context.run();
+        shutdown_flag = true;
+        logger->trace("bouncer thread has been terminated");
+    });
+
     auto fs_thread = std::thread([&]() {
 #if defined(__linux__)
         pthread_setname_np(pthread_self(), "ss/fs");
@@ -378,13 +400,22 @@ int app_main(app_context_t &app_ctx) {
     shutdown_flag = true;
     logger->trace("net thread has been terminated");
 
-    logger->trace("waiting fs thread termination");
+    logger->trace("joining to fs thread");
     fs_thread.join();
 
-    logger->trace("waiting hasher threads termination");
+    logger->trace("joining to bouncer thread");
+    bouncer_thread.join();
+
+    logger->trace("joining to {} hasher threads", hasher_threads.size());
     for (auto &thread : hasher_threads) {
         thread.join();
     }
+
+    if (auto reason = sup_net->get_shutdown_reason(); reason && reason->ec) {
+        logger->info("app shut down reason: {}", reason->message());
+    }
+
     logger->trace("everything has been terminated");
+
     return 0;
 }
