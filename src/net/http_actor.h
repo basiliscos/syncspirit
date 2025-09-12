@@ -61,6 +61,7 @@ struct SYNCSPIRIT_API http_actor_t : public r::actor_base_t {
 
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
     void on_start() noexcept override;
+    void shutdown_start() noexcept override;
     void shutdown_finish() noexcept override;
 
   private:
@@ -72,6 +73,7 @@ struct SYNCSPIRIT_API http_actor_t : public r::actor_base_t {
     void spawn_timer() noexcept;
 
     void on_request(message::http_request_t &req) noexcept;
+    void on_lock(message::lock_t &message) noexcept;
     void on_cancel(message::http_cancel_t &req) noexcept;
     void on_resolve(message::resolve_response_t &res) noexcept;
     void on_close_connection(message::http_close_connection_t &) noexcept;
@@ -80,6 +82,7 @@ struct SYNCSPIRIT_API http_actor_t : public r::actor_base_t {
     void on_request_sent(std::size_t /* bytes */) noexcept;
     void on_request_read(std::size_t bytes) noexcept;
     void on_timer(r::request_id_t, bool cancelled) noexcept;
+    void on_lock_timer(r::request_id_t, bool cancelled) noexcept;
     void on_io_error(const sys::error_code &ec) noexcept;
     void on_shutdown_timer(r::request_id_t, bool cancelled) noexcept;
     void on_handshake(bool valid_peer, utils::x509_t &, const tcp::endpoint &, const model::device_id_t *) noexcept;

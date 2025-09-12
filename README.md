@@ -129,6 +129,7 @@ after the core completion.
  - [core] reduce memory consumption by model::file_info_t
  - [core] use in-depth scan order instead of in-breadth
  - [fltk] deactivate currently selected log level button
+ - [core, bugfix] make successful upnp port unmapping upon shutdown
 
 ## 0.4.2 (22-Aug-2025)
  - [core, bugfix] (#8) crash on set peer static ip address

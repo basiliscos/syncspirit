@@ -193,6 +193,10 @@ struct db_info_request_t {
 
 struct fs_predown_t {};
 
+struct lock_t {
+    bool value;
+};
+
 } // end of namespace payload
 
 namespace message {
@@ -230,6 +234,7 @@ using db_info_request_t = r::request_traits_t<payload::db_info_request_t>::reque
 using db_info_response_t = r::request_traits_t<payload::db_info_request_t>::response::message_t;
 
 using fs_predown_t = r::message_t<payload::fs_predown_t>;
+using lock_t = r::message_t<payload::lock_t>;
 
 } // end of namespace message
 

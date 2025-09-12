@@ -13,6 +13,7 @@ namespace resource {
 r::plugin::resource_id_t io = 0;
 r::plugin::resource_id_t request_timer = 1;
 r::plugin::resource_id_t resolver = 2;
+r::plugin::resource_id_t lock = 2;
 } // namespace resource
 } // namespace
 
@@ -27,6 +28,7 @@ void http_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         log = utils::get_logger(identity);
     });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
+        p.subscribe_actor(&http_actor_t::on_lock);
         p.subscribe_actor(&http_actor_t::on_request);
         p.subscribe_actor(&http_actor_t::on_resolve);
         p.subscribe_actor(&http_actor_t::on_cancel);
@@ -36,6 +38,16 @@ void http_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.register_name(registry_name, get_address());
         p.discover_name(names::resolver, resolver, true).link(false);
     });
+}
+
+void http_actor_t::on_lock(message::lock_t &message) noexcept {
+    auto value = message.payload.value;
+    LOG_DEBUG(log, "on lock, value = {}", value);
+    if (value) {
+        resources->acquire(resource::lock);
+    } else {
+        resources->release(resource::lock);
+    }
 }
 
 void http_actor_t::on_request(message::http_request_t &req) noexcept {
@@ -147,10 +159,12 @@ void http_actor_t::on_resolve(message::resolve_response_t &res) noexcept {
         return process();
     }
 
+    LOG_TRACE(log, "on_resolve, {}", res.payload.req->payload.request_payload->host);
+
     if (stop_io || queue.empty())
         return process();
 
-    if (state != r::state_t::OPERATIONAL) {
+    if (state != r::state_t::OPERATIONAL && !resources->has(resource::lock)) {
         return;
     }
 
@@ -314,7 +328,7 @@ void http_actor_t::on_handshake(bool, utils::x509_t &, const tcp::endpoint &, co
     if (!need_response || stop_io) {
         return process();
     }
-    if (state == r::state_t::OPERATIONAL) {
+    if (state == r::state_t::OPERATIONAL || resources->has(resource::lock)) {
         write_request();
     }
 }
@@ -363,6 +377,15 @@ void http_actor_t::on_start() noexcept {
     r::actor_base_t::on_start();
 }
 
+void http_actor_t::shutdown_start() noexcept {
+    bool locked = resources->has(resource::lock);
+    LOG_TRACE(log, "shutdown_start, locked = {}", (bool)locked);
+    if (locked) {
+        start_timer(shutdown_timeout * 5 / 6, *this, &http_actor_t::on_lock_timer);
+    }
+    r::actor_base_t::shutdown_start();
+}
+
 void http_actor_t::shutdown_finish() noexcept {
     LOG_TRACE(log, "shutdown_finish");
     r::actor_base_t::shutdown_finish();
@@ -384,5 +407,13 @@ void http_actor_t::cancel_io() noexcept {
     }
     if (resources->has(resource::request_timer)) {
         cancel_timer(*timer_request);
+    }
+}
+
+void http_actor_t::on_lock_timer(r::request_id_t, bool cancelled) noexcept {
+    if (!cancelled && resources->has(resource::lock)) {
+        LOG_DEBUG(log, "on_lock_timer, unlocking by force");
+        resources->release(resource::lock);
+        cancel_io();
     }
 }

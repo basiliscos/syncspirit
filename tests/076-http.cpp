@@ -648,6 +648,58 @@ void test_cancellation_4() {
     F().run();
 }
 
+void test_request_on_shutdown() {
+    struct F : fixture_t {
+        void main() noexcept override {
+            sup->send<payload::lock_t>(http_actor->get_address(), true);
+            http_actor->do_shutdown({});
+            sup->do_process();
+
+            client_actor->make_request("/success");
+            sup->do_process();
+            io_ctx.run();
+        }
+
+        void on_response(message::http_response_t &message) noexcept override {
+            LOG_DEBUG(log, "on_response");
+            auto &ee = message.payload.ee;
+            REQUIRE(!ee);
+
+            auto &res = message.payload.res;
+            CHECK(res->response.result_int() == 200);
+            sup->send<payload::lock_t>(http_actor->get_address(), false);
+            sup->do_process();
+        }
+    };
+    F().run();
+}
+
+void test_shutdown_timeout() {
+    struct F : fixture_t {
+        void main() noexcept override {
+            sup->send<payload::lock_t>(http_actor->get_address(), true);
+            http_actor->do_shutdown({});
+            sup->do_process();
+
+            client_actor->make_request("/success");
+            sup->do_process();
+            io_ctx.run();
+        }
+
+        message_opt_t handle_request(std::string_view path) noexcept override { return {}; }
+
+        void on_response(message::http_response_t &message) noexcept override {
+            LOG_DEBUG(log, "on_response");
+            auto &ee = message.payload.ee;
+            CHECK(ee);
+            CHECK(ee->ec);
+            CHECK(ee->ec == r::make_error_code(r::error_code_t::request_timeout));
+            acceptor.cancel();
+        }
+    };
+    F().run();
+}
+
 int _init() {
     test::init_logging();
     REGISTER_TEST_CASE(test_http_start_and_shutdown, "test_http_start_and_shutdown", "[http]");
@@ -663,6 +715,8 @@ int _init() {
     REGISTER_TEST_CASE(test_cancellation_2, "test_cancellation_2", "[http]");
     REGISTER_TEST_CASE(test_cancellation_3, "test_cancellation_3", "[http]");
     REGISTER_TEST_CASE(test_cancellation_4, "test_cancellation_4", "[http]");
+    REGISTER_TEST_CASE(test_request_on_shutdown, "test_request_on_shutdown", "[http]");
+    REGISTER_TEST_CASE(test_shutdown_timeout, "test_shutdown_timeout", "[http]");
     return 1;
 }
 
