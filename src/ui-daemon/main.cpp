@@ -266,21 +266,24 @@ int app_main(app_context_t &app_ctx) {
         }
     }
 
-    if (populate) {
-        logger->info("Generating cryptographic keys...");
-        auto pair = utils::generate_pair(constants::issuer_name);
-        if (!pair) {
-            logger->error("cannot generate cryptographic keys :: {}", pair.error().message());
-            return 1;
-        }
-        auto &keys = pair.value();
+    {
         auto &cert_path = cfg.global_announce_config.cert_file;
         auto &key_path = cfg.global_announce_config.key_file;
-        auto save_result = keys.save(cert_path.c_str(), key_path.c_str());
-        if (!save_result) {
-            logger->error("cannot store cryptographic keys ({} & {}) :: {}", cert_path, key_path,
-                          save_result.error().message());
-            return 1;
+        auto ec = std::error_code{};
+        if (!bfs::exists(cert_path, ec) && !bfs::exists(key_path, ec)) {
+            logger->info("Generating cryptographic keys...");
+            auto pair = utils::generate_pair(constants::issuer_name);
+            if (!pair) {
+                logger->error("cannot generate cryptographic keys :: {}", pair.error().message());
+                return 1;
+            }
+            auto &keys = pair.value();
+            auto save_result = keys.save(cert_path.c_str(), key_path.c_str());
+            if (!save_result) {
+                logger->error("cannot store cryptographic keys ({} & {}) :: {}", cert_path, key_path,
+                              save_result.error().message());
+                return 1;
+            }
         }
     }
 
