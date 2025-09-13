@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #pragma once
 
@@ -45,6 +45,7 @@ struct transport_config_t {
     utils::uri_ptr_t uri;
     ra::supervisor_asio_t &supervisor;
     std::optional<tcp::socket> sock;
+    utils::bytes_view_t root_ca;
     bool active;
 };
 

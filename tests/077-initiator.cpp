@@ -178,7 +178,9 @@ struct fixture_t : diff::cluster_visitor_t, diff::apply_controller_t {
         auto ep = tcp::endpoint(ip, listening_ep.port());
         auto addresses = std::vector<tcp::endpoint>{ep};
         auto addresses_ptr = std::make_shared<decltype(addresses)>(addresses);
-        peer_trans = transport::initiate_tls_active(*sup, peer_keys, my_device->device_id(), peer_uri);
+        root_ca_data = std::move(utils::as_serialized_pem(my_keys.cert.get()).value());
+        peer_trans =
+            transport::initiate_tls_active(*sup, peer_keys, my_device->device_id(), peer_uri, {}, {}, root_ca_data);
 
         transport::error_fn_t on_error = [&](auto &ec) {
             LOG_WARN(log, "initiate_active/connect, err: {}", ec.message());
@@ -249,6 +251,7 @@ struct fixture_t : diff::cluster_visitor_t, diff::apply_controller_t {
     transport::stream_sp_t peer_trans;
     ready_ptr_t connected_message;
     utils::bytes_t relay_session;
+    utils::bytes_t root_ca_data;
     bool use_model = true;
 
     bool valid_handshake = false;
@@ -563,7 +566,7 @@ struct passive_relay_fixture_t : fixture_t {
     void accept(const sys::error_code &ec) noexcept override {
         LOG_INFO(log, "accept (relay/passive), ec: {}", ec.message());
         auto uri = utils::parse("tcp://127.0.0.1:0/");
-        auto cfg = transport::transport_config_t{{}, uri, *sup, std::move(peer_sock), false};
+        auto cfg = transport::transport_config_t{{}, uri, *sup, std::move(peer_sock), {}, false};
         peer_trans = transport::initiate_stream(cfg);
 
         transport::error_fn_t read_err_fn([&](auto ec) { log->error("(relay/passive), read_err: {}", ec.message()); });
@@ -754,7 +757,7 @@ struct active_relay_fixture_t : fixture_t {
             return;
         }
         auto uri = utils::parse("tcp://127.0.0.1:0/");
-        auto cfg = transport::transport_config_t{{}, uri, *sup, std::move(peer_sock), false};
+        auto cfg = transport::transport_config_t{{}, uri, *sup, std::move(peer_sock), {}, false};
         peer_trans = transport::initiate_stream(cfg);
 
         transport::error_fn_t read_err_fn([&](auto ec) { log->error("(relay/active), read_err: {}", ec.message()); });

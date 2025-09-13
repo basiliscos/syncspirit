@@ -77,6 +77,24 @@ static outcome::result<utils::bytes_t> as_der(EVP_PKEY *key) noexcept {
 
 outcome::result<utils::bytes_t> as_serialized_der(X509 *cert) noexcept { return as_der(cert); }
 
+outcome::result<utils::bytes_t> as_serialized_pem(X509 *cert) noexcept {
+    BIO *bio = BIO_new(BIO_s_mem());
+    auto bio_guard = make_guard(bio, [](auto ptr) { BIO_free(ptr); });
+    if (1 != PEM_write_bio_X509(bio, cert)) {
+        return error_code_t::tls_cert_save_failure;
+    }
+
+    char *cert_buff;
+    auto cert_sz = BIO_get_mem_data(bio, &cert_buff);
+    if (cert_sz < 0) {
+        return error_code_t::tls_cert_save_failure;
+    }
+
+    auto bytes = utils::bytes_t(static_cast<std::size_t>(cert_sz));
+    std::memcpy(bytes.data(), cert_buff, bytes.size());
+    return bytes;
+}
+
 outcome::result<key_pair_t> generate_pair(const char *issuer_name) noexcept {
     auto ev_ctx = EVP_PKEY_CTX_new_id(EVP_PKEY_EC, nullptr);
     if (ev_ctx == nullptr) {
@@ -129,7 +147,7 @@ outcome::result<key_pair_t> generate_pair(const char *issuer_name) noexcept {
     int version = 2;
     long serial = static_cast<long>(distr(generator));
     long start_epoch = 0; /* now */
-    long end_epoch = 2524568399;
+    long end_epoch = 2147483647; // 2^32 - 1
 
     if (1 != X509_set_version(cert, version)) {
         return error_code_t::tls_cert_set_failure;
@@ -316,8 +334,11 @@ outcome::result<bytes_t> sha256_digest(utils::bytes_view_t data) noexcept {
 }
 
 outcome::result<std::string> get_common_name(X509 *cert) noexcept {
-    auto name = X509_get_subject_name(cert);
+    if (!cert) {
+        return error_code_t::tls_cn_missing;
+    }
 
+    auto name = X509_get_subject_name(cert);
     char buff[256] = {};
     int r = X509_NAME_get_text_by_NID(name, NID_commonName, buff, 256);
     if (r == -1) {

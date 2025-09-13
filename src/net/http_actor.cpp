@@ -19,7 +19,7 @@ r::plugin::resource_id_t lock = 2;
 
 http_actor_t::http_actor_t(config_t &config)
     : r::actor_base_t{config}, resolve_timeout(config.resolve_timeout), request_timeout(config.request_timeout),
-      registry_name{config.registry_name}, keep_alive{config.keep_alive} {}
+      registry_name{config.registry_name}, root_ca(config.root_ca), keep_alive{config.keep_alive} {}
 
 void http_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
@@ -172,7 +172,7 @@ void http_actor_t::on_resolve(message::resolve_response_t &res) noexcept {
     auto &payload = request->payload.request_payload;
     auto &ssl_ctx = payload->ssl_context;
     auto sup = static_cast<ra::supervisor_asio_t *>(supervisor);
-    transport::transport_config_t cfg{std::move(ssl_ctx), payload->url, *sup, {}, true};
+    transport::transport_config_t cfg{std::move(ssl_ctx), payload->url, *sup, {}, root_ca, true};
     transport = transport::initiate_http(cfg);
     if (!transport) {
         auto ec = utils::make_error_code(utils::error_code_t::transport_not_available);

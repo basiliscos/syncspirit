@@ -150,7 +150,7 @@ void initiator_actor_t::initiate_relay_passive() noexcept {
 
     auto sup = static_cast<ra::supervisor_asio_t *>(&router);
     auto &uri = uris.at(0);
-    transport::transport_config_t cfg{{}, uri, *sup, {}, true};
+    transport::transport_config_t cfg{{}, uri, *sup, {}, {}, true};
     transport = transport::initiate_stream(cfg);
     assert(transport);
     resolve(uri);
@@ -470,7 +470,7 @@ void initiator_actor_t::on_read_relay_active(size_t bytes) noexcept {
     relaying = false;
 
     auto sup = static_cast<ra::supervisor_asio_t *>(&router);
-    transport::transport_config_t cfg{{}, uri, *sup, {}, true};
+    transport::transport_config_t cfg{{}, uri, *sup, {}, {}, true};
     transport = transport::initiate_stream(cfg);
     resolve(uri);
 }

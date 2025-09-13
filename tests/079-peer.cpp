@@ -157,7 +157,7 @@ struct fixture_t : private model::diff::cluster_visitor_t {
         LOG_TRACE(log, "Connecting to {}", uri_str);
 
         auto uri = utils::parse(uri_str);
-        auto cfg = transport::transport_config_t{{}, uri, *sup, {}, true};
+        auto cfg = transport::transport_config_t{{}, uri, *sup, {}, {}, true};
         client_trans = transport::initiate_stream(cfg);
 
         auto ip = asio::ip::make_address(host);
@@ -229,7 +229,7 @@ struct fixture_t : private model::diff::cluster_visitor_t {
     virtual void accept(const sys::error_code &ec) noexcept {
         LOG_INFO(log, "accept, ec: {}, remote = {}", ec.message(), peer_sock.remote_endpoint());
         auto uri = utils::parse("tcp://127.0.0.1:0/");
-        auto cfg = transport::transport_config_t{{}, uri, *sup, std::move(peer_sock), false};
+        auto cfg = transport::transport_config_t{{}, uri, *sup, std::move(peer_sock), {}, false};
         peer_trans = transport::initiate_stream(cfg);
         try_main();
     }

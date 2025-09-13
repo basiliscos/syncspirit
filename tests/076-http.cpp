@@ -9,6 +9,7 @@
 #include "net/names.h"
 #include "utils/beast_support.h"
 #include "utils/format.hpp"
+#include <boost/asio/ssl.hpp>
 #include <optional>
 
 using namespace std::chrono_literals;
@@ -148,6 +149,7 @@ struct fixture_t {
                          .request_timeout(timeout / 2)
                          .timeout(timeout)
                          .registry_name("http")
+                         .root_ca(root_ca)
                          .keep_alive(request_keep_alive())
                          .finish();
         sup->do_process();
@@ -222,6 +224,11 @@ struct fixture_t {
         http::async_read(peer_sock, rx_buff, request, std::move(handler));
     }
 
+    virtual void async_write(http::message_generator msg, bool keep_alive) noexcept {
+        auto handler = boost::beast::bind_front_handler(&fixture_t::on_write, this, keep_alive);
+        boost::beast::async_write(peer_sock, std::move(msg), std::move(handler));
+    }
+
     virtual void on_read(const sys::error_code &ec, std::size_t bytes) noexcept {
         if (ec) {
             LOG_DEBUG(log, "on_read, ec: {}", ec.message());
@@ -233,9 +240,7 @@ struct fixture_t {
                 auto &msg = *res_opt;
                 bool keep_alive = msg.keep_alive();
                 LOG_DEBUG(log, "on_read, have some responce, going to send it (keep alive = {})", keep_alive);
-
-                auto handler = boost::beast::bind_front_handler(&fixture_t::on_write, this, keep_alive);
-                boost::beast::async_write(peer_sock, std::move(msg), std::move(handler));
+                async_write(std::move(msg), keep_alive);
             }
         }
         rx_buff.clear();
@@ -268,6 +273,7 @@ struct fixture_t {
         return sup->create_actor<resolver_actor_t>().resolve_timeout(timeout / 2).timeout(timeout).finish();
     }
 
+    utils::bytes_view_t root_ca;
     asio::io_context io_ctx{1};
     ra::system_context_asio_t ctx;
     acceptor_t acceptor;
@@ -700,6 +706,79 @@ void test_shutdown_timeout() {
     F().run();
 }
 
+void test_https_200_ok() {
+    namespace ssl = asio::ssl;
+    struct F : fixture_t {
+        using tcp_socket_t = tcp::socket;
+        using ssl_socket_t = ssl::stream<tcp::socket>;
+        using ssl_socket_opt_t = std::optional<ssl_socket_t>;
+
+        F() : ctx(boost::asio::ssl::context::tls) {
+            server_keys = utils::generate_pair("test_server").value();
+            ctx.set_options(ssl::context::default_workarounds | ssl::context::no_sslv2);
+
+            auto &cert = server_keys.cert_data;
+            auto &key = server_keys.key_data;
+            ctx.use_certificate(asio::const_buffer(cert.data(), cert.size()), ssl::context::asn1);
+            ctx.use_private_key(asio::const_buffer(key.data(), key.size()), ssl::context::asn1);
+
+            root_ca_data = std::move(utils::as_serialized_pem(server_keys.cert.get()).value());
+            root_ca = root_ca_data;
+        }
+
+        utils::uri_ptr_t make_url(std::string_view path) override {
+            auto url_str = fmt::format("https://{}{}", listening_ep, path);
+            auto url = utils::parse(url_str);
+            LOG_DEBUG(log, "making request url {}", url);
+            return url;
+        }
+
+        void async_read() override {
+            LOG_TRACE(log, "async_read...");
+            auto handler = boost::beast::bind_front_handler(&fixture_t::on_read, this);
+            http::async_read(*peer_ssl_sock, rx_buff, request, std::move(handler));
+        }
+
+        void async_write(http::message_generator msg, bool keep_alive) noexcept override {
+            auto handler = boost::beast::bind_front_handler(&fixture_t::on_write, this, keep_alive);
+            boost::beast::async_write(*peer_ssl_sock, std::move(msg), std::move(handler));
+        }
+
+        void on_handshake(const sys::error_code &ec) noexcept {
+            LOG_INFO(log, "handshake, ec: {}", ec.message());
+            async_read();
+        }
+
+        void on_accept(const sys::error_code &ec) noexcept override {
+            LOG_INFO(log, "accept, ec: {}", ec.message());
+            auto ssl_sock = ssl_socket_t{std::move(peer_sock), ctx};
+            peer_ssl_sock = std::move(ssl_sock);
+            peer_ssl_sock->async_handshake(ssl::stream_base::server, [&](auto ec) { on_handshake(ec); });
+        }
+
+        void main() noexcept override {
+            client_actor->make_request("/success");
+            sup->do_process();
+            io_ctx.run();
+        }
+
+        void on_response(message::http_response_t &message) noexcept override {
+            LOG_DEBUG(log, "on_response");
+            auto &ee = message.payload.ee;
+            REQUIRE(!ee);
+
+            auto &res = message.payload.res;
+            CHECK(res->response.result_int() == 200);
+        }
+
+        utils::key_pair_t server_keys;
+        utils::bytes_t root_ca_data;
+        ssl::context ctx;
+        ssl_socket_opt_t peer_ssl_sock;
+    };
+    F().run();
+}
+
 int _init() {
     test::init_logging();
     REGISTER_TEST_CASE(test_http_start_and_shutdown, "test_http_start_and_shutdown", "[http]");
@@ -717,6 +796,7 @@ int _init() {
     REGISTER_TEST_CASE(test_cancellation_4, "test_cancellation_4", "[http]");
     REGISTER_TEST_CASE(test_request_on_shutdown, "test_request_on_shutdown", "[http]");
     REGISTER_TEST_CASE(test_shutdown_timeout, "test_shutdown_timeout", "[http]");
+    REGISTER_TEST_CASE(test_https_200_ok, "test_https_200_ok", "[http]");
     return 1;
 }
 

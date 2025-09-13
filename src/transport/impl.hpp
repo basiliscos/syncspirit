@@ -99,6 +99,7 @@ template <> struct base_impl_t<ssl_socket_t> {
     model::device_id_t expected_peer;
     model::device_id_t actual_peer;
     const utils::key_pair_t *me = nullptr;
+    utils::bytes_view_t root_ca;
     ssl::context ctx;
     ssl::stream_base::handshake_type role;
     ssl_socket_t sock;
@@ -107,19 +108,26 @@ template <> struct base_impl_t<ssl_socket_t> {
     bool cancelling = false;
     bool active;
 
-    static ssl::context get_context(self_t &source, std::string_view alpn) noexcept {
+    static ssl::context get_context(self_t &source, ssl_option_t opt) noexcept {
         ssl::context ctx(ssl::context::tls);
         ctx.set_options(ssl::context::default_workarounds | ssl::context::no_sslv2);
 
-        auto me = source.me;
-        if (me) {
+        if (opt && opt->me) {
+            auto me = opt->me;
             auto &cert_data = me->cert_data;
             auto &key_data = me->key_data;
             ctx.use_certificate(asio::const_buffer(cert_data.data(), cert_data.size()), ssl::context::asn1);
             ctx.use_private_key(asio::const_buffer(key_data.data(), key_data.size()), ssl::context::asn1);
         }
 
-        if (alpn.size()) {
+        if (source.root_ca.size()) {
+            auto &ca = source.root_ca;
+            auto buffer = asio::const_buffer(ca.data(), ca.size());
+            ctx.add_certificate_authority(buffer);
+        }
+
+        if (opt && opt->alpn.size()) {
+            auto alpn = opt->alpn;
             std::byte *wire_alpn = (std::byte *)alloca(alpn.size() + 1);
             wire_alpn[0] = (std::byte)(alpn.size());
             auto b = reinterpret_cast<const std::byte *>(alpn.data());
@@ -143,22 +151,32 @@ template <> struct base_impl_t<ssl_socket_t> {
     }
 
     base_impl_t(transport_config_t &config) noexcept
-        : supervisor{config.supervisor}, strand{supervisor.get_strand()}, expected_peer{config.ssl_junction->peer},
-          me(config.ssl_junction->me), ctx(get_context(*this, config.ssl_junction->alpn)),
+        : supervisor{config.supervisor}, strand{supervisor.get_strand()}, root_ca(config.root_ca),
+          ctx(get_context(*this, config.ssl_junction)),
           role(!config.active ? ssl::stream_base::server : ssl::stream_base::client),
           sock(mk_sock(config, ctx, strand)) {
+
+        if (config.ssl_junction) {
+            expected_peer = config.ssl_junction->peer;
+            me = config.ssl_junction->me;
+        }
+
         log = utils::get_logger("transport.tls");
-        if (config.ssl_junction->sni_extension) {
+        if (config.ssl_junction && config.ssl_junction->sni_extension) {
             auto host = config.uri->host();
             if (!SSL_set_tlsext_host_name(sock.native_handle(), host.c_str())) {
                 sys::error_code ec{static_cast<int>(::ERR_get_error()), asio::error::get_ssl_category()};
                 log->error("http_actor_t:: Set SNI Hostname : {}", ec.message());
             }
         }
-        if (me) {
+
+        if (me || config.active) {
             auto mode = ssl::verify_peer | ssl::verify_fail_if_no_peer_cert | ssl::verify_client_once;
             sock.set_verify_mode(mode);
             sock.set_verify_depth(1);
+        }
+
+        if (me) {
             sock.set_verify_callback([&](bool, ssl::verify_context &peer_ctx) -> bool {
                 auto native = peer_ctx.native_handle();
                 auto peer_cert = X509_STORE_CTX_get_current_cert(native);
