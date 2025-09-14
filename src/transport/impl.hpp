@@ -128,7 +128,7 @@ template <> struct base_impl_t<ssl_socket_t> {
             auto ec = sys::error_code();
             ctx.add_certificate_authority(buffer, ec);
             if (ec) {
-                log->warn("cannot add certificate_authority: {}", ec.message());;
+                log->warn("cannot add certificate_authority: {}", ec.message());
             } else {
                 log->trace("using custom root ca");
                 use_sytem_verify_paths = false;
