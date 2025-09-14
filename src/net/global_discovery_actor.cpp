@@ -238,7 +238,7 @@ void global_discovery_actor_t::make_request(const r::address_ptr_t &addr, utils:
                                             const model::device_id_t &device_id, utils::bytes_t &&tx_buff,
                                             const custom_msg_ptr_t &custom) noexcept {
     auto timeout = r::pt::millisec{io_timeout};
-    transport::ssl_junction_t ssl{device_id, &ssl_pair, true, "http/1.1"};
+    transport::ssl_junction_t ssl{device_id, &ssl_pair, "http/1.1"};
     auto rx_buff = std::make_shared<rx_buff_t::element_type>(rx_buff_size);
     http_request = request_via<payload::http_request_t>(http_client, addr, uri, std::move(tx_buff), std::move(rx_buff),
                                                         rx_buff_size, std::move(ssl), debug, custom)

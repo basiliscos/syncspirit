@@ -37,6 +37,14 @@
         }                                                                                                              \
     }
 
+#define SAFE_GET_PATH_OPTIONAL(property, table_name)                                                                   \
+    {                                                                                                                  \
+        auto option = t[#property].value<std::string>();                                                               \
+        if (option) {                                                                                                  \
+            c.property = boost::nowide::widen(option.value());                                                         \
+        }                                                                                                              \
+    }
+
 #define SAFE_GET_PATH_EXPANDED(property, table_name)                                                                   \
     {                                                                                                                  \
         auto option = t[#property].value<std::string>();                                                               \
@@ -122,7 +130,8 @@ static main_t make_default_config(const bfs::path &config_path, const bfs::path 
     // clang-format off
     main_t cfg;
     cfg.config_path = config_path;
-    cfg.default_location = config_dir / "shared_data";
+    cfg.default_location = config_dir;      /* "shared_data" */
+    cfg.root_ca_file = bfs::path{};         /* root ca path */
     cfg.timeout = 5000;
     cfg.device_name = device;
     cfg.hasher_threads = 3;
@@ -236,6 +245,7 @@ config_result_t get_config(std::istream &config, const bfs::path &config_path) {
         SAFE_GET_VALUE(device_name, std::string, "main");
         SAFE_GET_PATH(default_location, "main");
         SAFE_GET_VALUE(hasher_threads, std::uint32_t, "main");
+        SAFE_GET_PATH_OPTIONAL(root_ca_file, "main");
     };
 
     // local_discovery
@@ -404,6 +414,7 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
     auto tbl = toml::table{{
         {"main", toml::table{{
                      {"hasher_threads", cfg.hasher_threads},
+                     {"root_ca_file", cfg.root_ca_file.string()},
                      {"timeout", cfg.timeout},
                      {"device_name", cfg.device_name},
                      {"default_location", cfg.default_location.string()},

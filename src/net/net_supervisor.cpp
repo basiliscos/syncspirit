@@ -16,6 +16,8 @@
 #include "db_actor.h"
 #include "relay_actor.h"
 #include "names.h"
+#include "utils/io.h"
+#include <boost/nowide/convert.hpp>
 #include <filesystem>
 #include <ctime>
 
@@ -57,6 +59,22 @@ net_supervisor_t::net_supervisor_t(net_supervisor_t::config_t &cfg)
     if (!device_opt) {
         LOG_CRITICAL(log, "cannot get common name from certificate");
         throw "cannot get common name from certificate";
+    }
+
+    if (!app_config.root_ca_file.empty()) {
+        auto &file = app_config.root_ca_file;
+        LOG_TRACE(log, "going to read root ca file fron '{}'", file.string());
+        using in_t = utils::ifstream_t;
+        auto path = bfs::path(file);
+        auto ec = sys::error_code();
+        auto size = bfs::file_size(path, ec);
+        if (ec) {
+            LOG_CRITICAL(log, "cannot read root ca file size: {}", ec.message());
+            throw "cannot read root ca file size";
+        }
+        auto in = in_t(path, in_t::in | in_t::binary);
+        root_ca.resize(size);
+        in.read(reinterpret_cast<char *>(root_ca.data()), size);
     }
 
     auto device = model::device_ptr_t();
@@ -222,6 +240,7 @@ void net_supervisor_t::on_app_ready(model::message::app_ready_t &) noexcept {
             .request_timeout(io_timeout)
             .resolve_timeout(io_timeout)
             .registry_name(names::http11_gda)
+            .root_ca(root_ca)
             .keep_alive(true)
             .escalate_failure()
             .finish();
@@ -252,6 +271,7 @@ void net_supervisor_t::on_app_ready(model::message::app_ready_t &) noexcept {
             .request_timeout(io_timeout)
             .resolve_timeout(io_timeout)
             .registry_name(names::http11_relay)
+            .root_ca(root_ca)
             .keep_alive(true)
             .escalate_failure()
             .finish();
@@ -262,6 +282,7 @@ void net_supervisor_t::on_app_ready(model::message::app_ready_t &) noexcept {
                 .timeout(timeout)
                 .relay_config(app_config.relay_config)
                 .cluster(cluster)
+                .root_ca(root_ca)
                 .spawner_address(spawner)
                 .finish();
         };

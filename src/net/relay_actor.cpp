@@ -34,7 +34,7 @@ r::plugin::resource_id_t io_write = 3;
 } // namespace
 
 relay_actor_t::relay_actor_t(config_t &config) noexcept
-    : r::actor_base_t(config), cluster{std::move(config.cluster)}, config{config.config} {
+    : r::actor_base_t(config), cluster{std::move(config.cluster)}, root_ca{config.root_ca}, config{config.config} {
     http_rx_buff = std::make_shared<payload::http_request_t::rx_buff_t>();
 }
 
@@ -139,7 +139,7 @@ void relay_actor_t::request_relay_list() noexcept {
         return do_shutdown(make_error(ec));
     }
     resources->acquire(resource::http);
-    transport::ssl_junction_t ssl{model::device_id_t{}, nullptr, true, {}};
+    transport::ssl_junction_t ssl{model::device_id_t{}, nullptr, {}};
     http_request = request<payload::http_request_t>(http_client, uri, std::move(tx_buff), http_rx_buff,
                                                     config.rx_buff_size, std::move(ssl), config.debug)
                        .send(timeout);

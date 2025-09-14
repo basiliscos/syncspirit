@@ -22,6 +22,7 @@ namespace bfs = std::filesystem;
 struct main_t {
     bfs::path config_path;
     bfs::path default_location;
+    bfs::path root_ca_file;
 
     local_announce_config_t local_announce_config;
     log_configs_t log_configs;

@@ -43,8 +43,8 @@ template <typename Actor> struct http_actor_config_builder_t : r::actor_config_b
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&root_ca(utils::bytes_view_t value) && noexcept {
-        parent_t::config.root_ca = std::move(value);
+    builder_t &&root_ca(const utils::bytes_view_t &value) && noexcept {
+        parent_t::config.root_ca = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 

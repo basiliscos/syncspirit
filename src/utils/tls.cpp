@@ -146,7 +146,7 @@ outcome::result<key_pair_t> generate_pair(const char *issuer_name) noexcept {
     std::uniform_int_distribution<std::uint64_t> distr(1, max_sn);
     int version = 2;
     long serial = static_cast<long>(distr(generator));
-    long start_epoch = 0; /* now */
+    long start_epoch = 0;        /* now */
     long end_epoch = 2147483647; // 2^32 - 1
 
     if (1 != X509_set_version(cert, version)) {

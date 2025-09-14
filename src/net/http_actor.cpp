@@ -172,7 +172,7 @@ void http_actor_t::on_resolve(message::resolve_response_t &res) noexcept {
     auto &payload = request->payload.request_payload;
     auto &ssl_ctx = payload->ssl_context;
     auto sup = static_cast<ra::supervisor_asio_t *>(supervisor);
-    transport::transport_config_t cfg{std::move(ssl_ctx), payload->url, *sup, {}, root_ca, true};
+    transport::transport_config_t cfg{std::move(ssl_ctx), payload->url, *sup, {}, root_ca, true, true};
     transport = transport::initiate_http(cfg);
     if (!transport) {
         auto ec = utils::make_error_code(utils::error_code_t::transport_not_available);
@@ -373,7 +373,7 @@ void http_actor_t::on_timer(r::request_id_t, bool cancelled) noexcept {
 }
 
 void http_actor_t::on_start() noexcept {
-    LOG_TRACE(log, "on_start");
+    LOG_TRACE(log, "on_start (use custom root ca: {})", (root_ca.size() ? true : false));
     r::actor_base_t::on_start();
 }
 

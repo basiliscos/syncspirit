@@ -33,7 +33,7 @@ initiator_actor_t::initiator_actor_t(config_t &cfg)
     : r::actor_base_t{cfg}, peer_device_id{cfg.peer_device_id}, peer_state{model::device_state_t::make_offline()},
       relay_key(std::move(cfg.relay_session)), ssl_pair{*cfg.ssl_pair}, sock(std::move(cfg.sock)),
       cluster{std::move(cfg.cluster)}, sink(std::move(cfg.sink)), custom(std::move(cfg.custom)), router{*cfg.router},
-      alpn(cfg.alpn) {
+      alpn(cfg.alpn), root_ca{cfg.root_ca} {
     auto tmp_identity = "net.init/unknown";
     auto log = utils::get_logger(tmp_identity);
     for (auto &uri : cfg.uris) {
@@ -139,7 +139,7 @@ void initiator_actor_t::initiate_passive() noexcept {
     }
 
     auto sup = static_cast<ra::supervisor_asio_t *>(&router);
-    transport = transport::initiate_tls_passive(*sup, ssl_pair, std::move(sock.value()), alpn);
+    transport = transport::initiate_tls_passive(*sup, ssl_pair, std::move(sock.value()), alpn, root_ca);
     initiate_handshake();
 }
 
@@ -150,7 +150,7 @@ void initiator_actor_t::initiate_relay_passive() noexcept {
 
     auto sup = static_cast<ra::supervisor_asio_t *>(&router);
     auto &uri = uris.at(0);
-    transport::transport_config_t cfg{{}, uri, *sup, {}, {}, true};
+    transport::transport_config_t cfg{{}, uri, *sup, {}, root_ca, false, true};
     transport = transport::initiate_stream(cfg);
     assert(transport);
     resolve(uri);
@@ -220,7 +220,7 @@ void initiator_actor_t::resolve(const utils::uri_ptr_t &uri) noexcept {
 void initiator_actor_t::initiate_active_tls(const utils::uri_ptr_t &uri) noexcept {
     LOG_DEBUG(log, "trying '{}' as active tls, alpn = {}", uri, alpn);
     auto sup = static_cast<ra::supervisor_asio_t *>(&router);
-    transport = transport::initiate_tls_active(*sup, ssl_pair, peer_device_id, uri, false, alpn);
+    transport = transport::initiate_tls_active(*sup, ssl_pair, peer_device_id, uri, false, alpn, root_ca);
     active_uri = uri;
     relaying = false;
     resolve(uri);
@@ -236,7 +236,7 @@ void initiator_actor_t::initiate_active_relay(const utils::uri_ptr_t &uri) noexc
     active_uri = uri;
     relaying = true;
     auto sup = static_cast<ra::supervisor_asio_t *>(&router);
-    transport = transport::initiate_tls_active(*sup, ssl_pair, relay_device.value(), active_uri);
+    transport = transport::initiate_tls_active(*sup, ssl_pair, relay_device.value(), active_uri, false, {}, root_ca);
     resolve(uri);
 }
 
@@ -396,7 +396,7 @@ void initiator_actor_t::on_read_relay(size_t bytes) noexcept {
         return do_shutdown(make_error(ec));
     }
     auto &upgradeable = dynamic_cast<transport::upgradeable_stream_base_t &>(*transport.get());
-    auto ssl = transport::ssl_junction_t{peer_device_id, &ssl_pair, true, constants::protocol_name};
+    auto ssl = transport::ssl_junction_t{peer_device_id, &ssl_pair, constants::protocol_name};
     auto active = role == role_t::active;
     transport = upgradeable.upgrade(ssl, active);
     initiate_handshake();
@@ -470,7 +470,7 @@ void initiator_actor_t::on_read_relay_active(size_t bytes) noexcept {
     relaying = false;
 
     auto sup = static_cast<ra::supervisor_asio_t *>(&router);
-    transport::transport_config_t cfg{{}, uri, *sup, {}, {}, true};
+    transport::transport_config_t cfg{{}, uri, *sup, {}, root_ca, false, true};
     transport = transport::initiate_stream(cfg);
     resolve(uri);
 }

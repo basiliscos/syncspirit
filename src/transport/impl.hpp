@@ -120,10 +120,19 @@ template <> struct base_impl_t<ssl_socket_t> {
             ctx.use_private_key(asio::const_buffer(key_data.data(), key_data.size()), ssl::context::asn1);
         }
 
+        auto log = utils::get_logger("transport.tls");
         if (source.root_ca.size()) {
             auto &ca = source.root_ca;
             auto buffer = asio::const_buffer(ca.data(), ca.size());
             ctx.add_certificate_authority(buffer);
+            log->trace("using custom root ca");
+        } else {
+            log->trace("using default verify paths");
+            auto ec = sys::error_code();
+            ctx.set_default_verify_paths(ec);
+            if (ec) {
+                utils::get_logger("transport.tls")->warn("cannot set ssl default verify paths: {}", ec.message());
+            }
         }
 
         if (opt && opt->alpn.size()) {
@@ -162,8 +171,9 @@ template <> struct base_impl_t<ssl_socket_t> {
         }
 
         log = utils::get_logger("transport.tls");
-        if (config.ssl_junction && config.ssl_junction->sni_extension) {
+        if (config.sni_extension) {
             auto host = config.uri->host();
+            log->trace("will will use sni extension (value = '{}')", host);
             if (!SSL_set_tlsext_host_name(sock.native_handle(), host.c_str())) {
                 sys::error_code ec{static_cast<int>(::ERR_get_error()), asio::error::get_ssl_category()};
                 log->error("http_actor_t:: Set SNI Hostname : {}", ec.message());
@@ -171,6 +181,7 @@ template <> struct base_impl_t<ssl_socket_t> {
         }
 
         if (me || config.active) {
+            log->trace("will verify peer (self = {})", (const void *)this);
             auto mode = ssl::verify_peer | ssl::verify_fail_if_no_peer_cert | ssl::verify_client_once;
             sock.set_verify_mode(mode);
             sock.set_verify_depth(1);

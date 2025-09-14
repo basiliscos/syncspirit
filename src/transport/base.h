@@ -34,7 +34,6 @@ using io_fn_t = std::function<void(std::size_t)>;
 struct ssl_junction_t {
     model::device_id_t peer;
     const utils::key_pair_t *me;
-    bool sni_extension;
     std::string_view alpn; /* application layer protocol names? */
 };
 
@@ -46,6 +45,7 @@ struct transport_config_t {
     ra::supervisor_asio_t &supervisor;
     std::optional<tcp::socket> sock;
     utils::bytes_view_t root_ca;
+    bool sni_extension;
     bool active;
 };
 

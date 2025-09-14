@@ -548,7 +548,7 @@ struct passive_relay_fixture_t : fixture_t {
 
         if (initiate_handshake) {
             auto upgradeable = static_cast<transport::upgradeable_stream_base_t *>(peer_trans.get());
-            auto ssl = transport::ssl_junction_t{my_device->device_id(), &peer_keys, false, "bep"};
+            auto ssl = transport::ssl_junction_t{my_device->device_id(), &peer_keys, "bep"};
             peer_trans = upgradeable->upgrade(ssl, true);
             initiate_peer_handshake();
         }
@@ -812,7 +812,7 @@ struct active_relay_fixture_t : fixture_t {
             session_mode = true;
         } else {
             auto upgradeable = static_cast<transport::upgradeable_stream_base_t *>(peer_trans.get());
-            auto ssl = transport::ssl_junction_t{my_device->device_id(), &peer_keys, false, "bep"};
+            auto ssl = transport::ssl_junction_t{my_device->device_id(), &peer_keys, "bep"};
             peer_trans = upgradeable->upgrade(ssl, false);
             initiate_peer_handshake();
         }
