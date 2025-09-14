@@ -115,6 +115,7 @@ auto reflect(const main_cfg_t &config, const main_cfg_t &default_config) -> cate
         auto props = properties_t{
             // clang-format off
             property_ptr_t(new main::default_location_t(l.default_location.string(), l_def.default_location.string())),
+            property_ptr_t(new main::root_ca_file(l.root_ca_file.string(), l_def.root_ca_file.string())),
             property_ptr_t(new main::device_name_t(l.device_name, l_def.device_name)),
             property_ptr_t(new main::hasher_threads_t(l.hasher_threads, l_def.hasher_threads)),
             property_ptr_t(new main::timeout_t(l.timeout, l_def.timeout)),

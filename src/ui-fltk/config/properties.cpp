@@ -378,6 +378,13 @@ void default_location_t::reflect_to(syncspirit::config::main_t &main) { main.def
 
 const char *default_location_t::explanation_ = "where folders are created by default";
 
+root_ca_file::root_ca_file(std::string value, std::string default_value)
+    : parent_t("root_ca_file", explanation_, std::move(value), std::move(default_value), property_kind_t::file) {}
+
+void root_ca_file::reflect_to(syncspirit::config::main_t &main) { main.root_ca_file = convert(); }
+
+const char *root_ca_file::explanation_ = "root certificate authority (ca) file (PEM format)";
+
 device_name_t::device_name_t(std::string value, std::string default_value)
     : parent_t("device_name", explanation_, std::move(value), std::move(default_value)) {}
 
