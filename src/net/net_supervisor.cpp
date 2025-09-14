@@ -69,12 +69,17 @@ net_supervisor_t::net_supervisor_t(net_supervisor_t::config_t &cfg)
         auto ec = sys::error_code();
         auto size = bfs::file_size(path, ec);
         if (ec) {
-            LOG_CRITICAL(log, "cannot read root ca file size: {}", ec.message());
-            throw "cannot read root ca file size";
+            LOG_WARN(log, "cannot read root ca file size: {}", ec.message());
+        } else {
+            auto in = in_t(path, in_t::in | in_t::binary);
+            auto data = utils::bytes_t(size);
+            in.read(reinterpret_cast<char *>(data.data()), size);
+            if (!in.fail()) {
+                root_ca = std::move(data);
+            } else {
+                LOG_WARN(log, "cannot read root ca file '{}'", file.string());
+            }
         }
-        auto in = in_t(path, in_t::in | in_t::binary);
-        root_ca.resize(size);
-        in.read(reinterpret_cast<char *>(root_ca.data()), size);
     }
 
     auto device = model::device_ptr_t();
