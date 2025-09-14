@@ -121,12 +121,21 @@ template <> struct base_impl_t<ssl_socket_t> {
         }
 
         auto log = utils::get_logger("transport.tls");
+        bool use_sytem_verify_paths = true;
         if (source.root_ca.size()) {
             auto &ca = source.root_ca;
             auto buffer = asio::const_buffer(ca.data(), ca.size());
-            ctx.add_certificate_authority(buffer);
-            log->trace("using custom root ca");
-        } else {
+            auto ec = sys::error_code();
+            ctx.add_certificate_authority(buffer, ec);
+            if (ec) {
+                log->warn("cannot add certificate_authority: {}", ec.message());;
+            } else {
+                log->trace("using custom root ca");
+                use_sytem_verify_paths = false;
+            }
+        }
+
+        if (use_sytem_verify_paths) {
             log->trace("using default verify paths");
             auto ec = sys::error_code();
             ctx.set_default_verify_paths(ec);
