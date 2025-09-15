@@ -105,10 +105,7 @@ void main_window_t::set_splash_text(std::string text) {
     Fl::flush();
 }
 
-void main_window_t::on_loading_done() {
-    log_panel->on_loading_done();
-    activate();
-}
+void main_window_t::on_loading_done() { activate(); }
 
 void main_window_t::detach_supervisor() {
     clear();

@@ -227,12 +227,7 @@ log_panel_t::log_panel_t(app_supervisor_t &supervisor_, int x, int y, int w, int
     resizable(log_table);
 
     sink = supervisor.get_log_sink();
-
     update();
-}
-
-void log_panel_t::on_loading_done() {
-    pull_in_logs();
     Fl::add_timeout(0.05, _pull_in_logs, this);
 }
 

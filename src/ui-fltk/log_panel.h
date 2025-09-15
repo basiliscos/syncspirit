@@ -31,7 +31,6 @@ struct log_panel_t : Fl_Group {
     void pull_in_logs();
     void on_filter(std::string_view filter);
     void set_splash_text(std::string text);
-    void on_loading_done();
 
     app_supervisor_t &supervisor;
     Fl_Group *control_group;
