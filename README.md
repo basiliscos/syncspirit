@@ -125,10 +125,10 @@ after the core completion.
 
 ## 0.4.3 (xx-xxx-xxxx)
  - [core] allow to load huge databses and interrupt loading porgress
+ - [core] reduce memory consumption by model::file_info_t (~ 20%)
  - [core] allow to specify root certificate authority to use in all tls/ssl connections,
          see [faq](faq.md), mostly actual for Windows XP with expired system certificates
  - [core, fltk] more correctly display file scanning progress
- - [core] reduce memory consumption by model::file_info_t
  - [core] use in-depth scan order instead of in-breadth
  - [fltk] deactivate currently selected log level button
  - [core, bugfix] make successful upnp port unmapping upon shutdown

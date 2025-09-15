@@ -1,5 +1,28 @@
 # faq
 
+## How to handle SSL errors like "certificate verify failed (SSL routines)" (actual
+for windows xp)
+
+This is caused by outdates system certificates as using them SSL-layer of
+`syncspirit` cannot validate authentity of remote responces from
+web urls like https://discovery-announce-v4.syncthing.net.
+
+To fix it you can
+
+1. download mozilla ca certificates as single file from https://curl.se/docs/caextract.html
+
+2. point to that certificate in `syncspirit.toml`
+
+```
+...
+[main]
+...
+root_ca_file = 'c:\path\to\..\cacert.pem'
+```
+
+and restart `syncspirit`.
+
+
 ## How to import existing directories into shared folder, i.e. to avoid  full
 synchronization and transfer over network?
 
