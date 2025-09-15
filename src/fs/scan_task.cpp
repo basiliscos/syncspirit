@@ -62,7 +62,7 @@ scan_task_t::scan_task_t(model::cluster_ptr_t cluster_, std::string_view folder_
 
     auto &orig_files = my_folder->get_file_infos();
     for (auto &it : orig_files) {
-        files.put(it.item);
+        files.put(it);
     }
 
     files_limit = files_left = config.files_scan_iteration_limit;
@@ -82,7 +82,7 @@ scan_result_t scan_task_t::advance() noexcept {
         return std::visit([this](auto item) { return do_advance(std::move(item)); }, std::move(item));
     }
     if (files.size() != 0) {
-        auto file = files.begin()->item;
+        auto file = *files.begin();
         seen_paths.insert({std::string(file->get_name()->get_full_name()), file->get_path()});
         files.remove(file);
 
@@ -131,12 +131,12 @@ scan_result_t scan_task_t::do_advance(unseen_dir_t queue_item) noexcept {
             str = bfs::relative(dir, root).string() + "/";
         }
         for (auto &it : files) {
-            auto &file = *it.item;
+            auto &file = *it;
             auto name = file.get_name()->get_full_name();
             bool remove = str.empty() || (name.find(str) == 0);
             if (remove) {
                 seen_paths.insert({std::string(name), file.get_path()});
-                removed.put(it.item);
+                removed.put(it);
             }
         }
         seen_paths.insert({str, dir});
@@ -219,7 +219,7 @@ scan_result_t scan_task_t::do_advance(unseen_dir_t queue_item) noexcept {
         }
     }
     for (auto &it : removed) {
-        files.remove(it.item);
+        files.remove(it);
     }
 
     std::visit(

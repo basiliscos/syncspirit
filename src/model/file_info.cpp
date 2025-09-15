@@ -522,30 +522,133 @@ bool file_info_t::identical_to(const proto::FileInfo &file) const noexcept {
     return false;
 }
 
-template <> SYNCSPIRIT_API utils::bytes_view_t get_index<0>(const file_info_ptr_t &item) noexcept {
-    return item->get_uuid();
-}
-template <> SYNCSPIRIT_API utils::bytes_view_t get_index<1>(const file_info_ptr_t &item) noexcept {
-    auto name = item->get_name()->get_full_name();
-    auto ptr = (unsigned char *)name.data();
-    return {ptr, name.size()};
+namespace file_details {
+
+utils::bytes_view_t get_uuid(const model::file_info_ptr_t &file) noexcept { return file->get_uuid(); }
+
+std::string_view get_name(const model::file_info_ptr_t &file) noexcept { return file->get_name()->get_full_name(); }
+
+std::int64_t get_sequence(const model::file_info_ptr_t &file) noexcept { return file->get_sequence(); }
+
+std::int64_t get_size(const model::file_info_ptr_t &file) noexcept { return file->get_size(); }
+
+std::int64_t get_modification(const model::file_info_ptr_t &file) noexcept { return file->get_modified_s(); }
+
+} // namespace file_details
+
+bool file_infos_map_t::put(const model::file_info_ptr_t &item, bool replace) noexcept {
+    bool result = false;
+    auto prev = file_info_ptr_t();
+    {
+        auto &proj = parent_t::template get<0>();
+        auto [it, inserted] = proj.emplace(item);
+        if (!inserted && replace) {
+            prev = *it;
+            proj.replace(it, item);
+            inserted = true;
+        }
+        result = inserted;
+    }
+    {
+        auto &proj = parent_t::template get<1>();
+        auto [it, inserted] = proj.emplace(item);
+        if (!inserted && replace) {
+            proj.replace(it, item);
+            inserted = true;
+        }
+        result = inserted;
+    }
+    {
+        auto &proj = parent_t::template get<2>();
+        auto [it, inserted] = proj.emplace(item);
+        if (!inserted && replace) {
+            proj.replace(it, item);
+            inserted = true;
+        }
+        result = inserted;
+    }
+    {
+        auto &proj = parent_t::template get<3>();
+        if (prev) {
+            auto size = prev->get_size();
+            auto begin = proj.lower_bound(size);
+            auto end = proj.upper_bound(size);
+            for (auto it = begin; it != end; ++it) {
+                if (it->get() == prev.get()) {
+                    proj.replace(it, item);
+                    break;
+                }
+            }
+        }
+    }
+    {
+        auto &proj = parent_t::template get<4>();
+        if (prev) {
+            auto size = prev->get_modified_s();
+            auto begin = proj.lower_bound(size);
+            auto end = proj.upper_bound(size);
+            for (auto it = begin; it != end; ++it) {
+                if (it->get() == prev.get()) {
+                    proj.replace(it, item);
+                    break;
+                }
+            }
+        }
+    }
+
+    return result;
 }
 
-template <> SYNCSPIRIT_API std::int64_t get_index<2>(const file_info_ptr_t &item) noexcept {
-    return item->get_sequence();
+void file_infos_map_t::remove(const model::file_info_ptr_t &item) noexcept {
+    parent_t::template get<0>().erase(item->get_uuid());
+    parent_t::template get<1>().erase(file_details::get_name(item));
+    parent_t::template get<2>().erase(item->get_sequence());
+
+    {
+        auto &proj = parent_t::template get<3>();
+        auto value = file_details::get_size(item);
+        auto begin = proj.lower_bound(value);
+        auto end = proj.upper_bound(value);
+        for (auto it = begin; it != end; ++it) {
+            if (it->get() == item.get()) {
+                proj.erase(it);
+                break;
+            }
+        }
+    }
+    {
+        auto &proj = parent_t::template get<4>();
+        auto value = file_details::get_modification(item);
+        auto begin = proj.lower_bound(value);
+        auto end = proj.upper_bound(value);
+        for (auto it = begin; it != end; ++it) {
+            if (it->get() == item.get()) {
+                proj.erase(it);
+                break;
+            }
+        }
+    }
 }
 
-auto file_infos_map_t::sequence_projection() noexcept -> seq_projection_t { return key2item.template get<2>(); }
-
-file_info_ptr_t file_infos_map_t::by_uuid(utils::bytes_view_t uuid) noexcept { return get<0>(uuid); }
+file_info_ptr_t file_infos_map_t::by_uuid(utils::bytes_view_t uuid) noexcept {
+    auto &proj = parent_t::template get<0>();
+    auto it = proj.find(uuid);
+    return it != proj.end() ? *it : file_info_ptr_t();
+}
 
 file_info_ptr_t file_infos_map_t::by_name(std::string_view name) noexcept {
-    auto ptr = (unsigned char *)name.data();
-    auto view = utils::bytes_view_t(ptr, name.size());
-    return get<1>(view);
+    auto &proj = parent_t::template get<1>();
+    auto it = proj.find(name);
+    return it != proj.end() ? *it : file_info_ptr_t();
 }
 
-file_info_ptr_t file_infos_map_t::by_sequence(std::int64_t value) noexcept { return get<2>(value); }
+file_info_ptr_t file_infos_map_t::by_sequence(std::int64_t sequence) noexcept {
+    auto &proj = parent_t::template get<2>();
+    auto it = proj.find(sequence);
+    return it != proj.end() ? *it : file_info_ptr_t();
+}
+
+auto file_infos_map_t::sequence_projection() noexcept -> seq_projection_t & { return parent_t::template get<2>(); }
 
 auto file_infos_map_t::range(std::int64_t lower, std::int64_t upper) noexcept -> range_t {
     auto &proj = sequence_projection();

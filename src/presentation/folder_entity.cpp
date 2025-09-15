@@ -22,7 +22,7 @@ static void process(model::folder_info_t *folder_info, entity_t::children_t &fil
     auto &files_map = folder_info->get_file_infos();
     new_files.reserve(files_map.size());
     for (auto &it_file : files_map) {
-        auto &file = *it_file.item;
+        auto &file = *it_file;
         auto &name = file.get_name();
         if (new_files.count(name.get())) {
             continue;

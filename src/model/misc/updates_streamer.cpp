@@ -62,7 +62,7 @@ bool updates_streamer_t::on_update(file_info_t &file) noexcept {
                 auto unseen_files = file_infos_map_t();
                 auto [it, end] = folder_info->get_file_infos().range(seen_sequence + 1, max);
                 for (; it != end; ++it) {
-                    auto &f = it->item;
+                    auto &f = *it;
                     unseen_files.put(f.get());
                 }
                 streaming = streaming_info_t(folder_info, std::move(unseen_files));
@@ -87,8 +87,7 @@ auto updates_streamer_t::next() noexcept -> update_t {
         auto &files = streaming->unseen_files;
         auto &proj = files.sequence_projection();
         if (!proj.empty()) {
-            auto it = proj.begin();
-            auto file = it->item;
+            auto file = *proj.begin();
             files.remove(file);
             auto &seen_sequence = seen_info[streaming->folder_info];
             auto initial = seen_sequence == 0;
@@ -103,13 +102,13 @@ auto updates_streamer_t::next() noexcept -> update_t {
             auto [it, end] = folder_info->get_file_infos().range(seen_sequence + 1, max);
             if (it != end) {
                 auto initial = seen_sequence == 0;
-                auto file = it->item;
+                auto &file = *it;
                 seen_info[folder_info] = file->get_sequence();
                 ++it;
                 if (it != end) {
                     auto unseen_files = file_infos_map_t();
                     for (; it != end; ++it) {
-                        auto &f = it->item;
+                        auto &f = *it;
                         unseen_files.put(f.get());
                     }
                     streaming = streaming_info_t(folder_info, std::move(unseen_files));

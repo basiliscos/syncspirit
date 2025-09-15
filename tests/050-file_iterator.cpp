@@ -326,7 +326,7 @@ TEST_CASE("file iterator, single folder", "[model]") {
                 builder.make_index(peer_id.get_sha256(), folder->get_id()).add(pr_fi, peer_device).finish().apply());
 
             SECTION("has not bee scanned") {
-                auto peer_file = peer_files.begin()->item;
+                auto &peer_file = *peer_files.begin();
                 file_iterator->recheck(*peer_file);
                 CHECK(file_iterator->next() == R{nullptr, A::ignore});
             }

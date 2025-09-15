@@ -556,13 +556,13 @@ void test_index_receiving() {
                 REQUIRE(folder_peer);
                 CHECK(folder_peer->get_max_sequence() == 10ul);
                 REQUIRE(folder_peer->get_file_infos().size() == 1);
-                CHECK(folder_peer->get_file_infos().begin()->item->get_name()->get_full_name() == file_name);
+                CHECK(folder_peer->get_file_infos().begin()->get()->get_name()->get_full_name() == file_name);
 
                 auto folder_my = folder_infos.by_device(*my_device);
                 REQUIRE(folder_my);
                 CHECK(folder_my->get_max_sequence() == 1ul);
                 REQUIRE(folder_my->get_file_infos().size() == 1);
-                CHECK(folder_my->get_file_infos().begin()->item->get_name()->get_full_name() == file_name);
+                CHECK(folder_my->get_file_infos().begin()->get()->get_name()->get_full_name() == file_name);
 
                 SECTION("then index update is applied") {
                     auto index_update = proto::IndexUpdate{};
@@ -733,7 +733,7 @@ void test_downloading() {
                 REQUIRE(folder_my);
                 CHECK(folder_my->get_max_sequence() == 1ul);
                 REQUIRE(folder_my->get_file_infos().size() == 1);
-                auto f = folder_my->get_file_infos().begin()->item;
+                auto f = *folder_my->get_file_infos().begin();
                 REQUIRE(f);
                 CHECK(f->get_name()->get_full_name() == file_name);
                 CHECK(f->get_size() == 5);
@@ -760,7 +760,7 @@ void test_downloading() {
                     sup->do_process();
                     CHECK(peer_actor->blocks_requested == 1);
                     CHECK(folder_my->get_max_sequence() == 2ul);
-                    f = folder_my->get_file_infos().begin()->item;
+                    f = *folder_my->get_file_infos().begin();
                     CHECK(f->is_locally_available());
                     CHECK(f->get_sequence() == 2ul);
                 }
@@ -966,7 +966,7 @@ void test_downloading() {
 
                 CHECK(folder_my->get_max_sequence() == 1ul);
                 REQUIRE(folder_my->get_file_infos().size() == 1);
-                auto f = folder_my->get_file_infos().begin()->item;
+                auto f = *folder_my->get_file_infos().begin();
                 REQUIRE(f);
                 CHECK(f->get_name()->get_full_name() == file_name);
                 CHECK(f->get_size() == 0);
@@ -1012,7 +1012,7 @@ void test_downloading() {
                 auto folder_my = folder_infos.by_device(*my_device);
                 CHECK(folder_my->get_max_sequence() == 1);
                 REQUIRE(folder_my->get_file_infos().size() == 1);
-                auto f = folder_my->get_file_infos().begin()->item;
+                auto f = *folder_my->get_file_infos().begin();
                 REQUIRE(f);
                 CHECK(f->get_name()->get_full_name() == file_name);
                 CHECK(f->get_size() == 5);
@@ -1020,7 +1020,7 @@ void test_downloading() {
                 CHECK(f->is_locally_available());
                 CHECK(!f->is_locked());
 
-                auto fp = folder_1_peer->get_file_infos().begin()->item;
+                auto fp = *folder_1_peer->get_file_infos().begin();
                 REQUIRE(fp);
                 CHECK(!fp->is_locked());
             }
@@ -1073,7 +1073,7 @@ void test_downloading() {
                 sup->do_process();
 
                 REQUIRE(folder_my->get_file_infos().size() == 1);
-                auto f = folder_my->get_file_infos().begin()->item;
+                auto f = *folder_my->get_file_infos().begin();
                 REQUIRE(f);
                 CHECK(f->get_name()->get_full_name() == file_name);
                 CHECK(f->get_size() == 5);
@@ -1264,7 +1264,7 @@ void test_downloading_errors() {
 
             auto folder_peer = folder_infos.by_device(*peer_device);
             REQUIRE(folder_peer->get_file_infos().size() == 1);
-            auto f = folder_peer->get_file_infos().begin()->item;
+            auto f = *folder_peer->get_file_infos().begin();
             REQUIRE(f);
             CHECK(f->is_unreachable());
             CHECK(!f->is_synchronizing());

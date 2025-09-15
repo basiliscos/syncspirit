@@ -224,12 +224,58 @@ template <> struct indexed_by<2, indexed_file_item_t> {
 
 } // namespace details
 
-struct SYNCSPIRIT_API file_infos_map_t : generic_map_t<file_info_ptr_t, 3> {
-    using parent_t = generic_map_t<file_info_ptr_t, 3>;
-    using seq_projection_t = std::remove_cv_t<decltype(std::declval<map_t>().template get<2>())>;
+namespace file_details {
+
+namespace mi = boost::multi_index;
+
+utils::bytes_view_t get_uuid(const model::file_info_ptr_t &file) noexcept;
+std::string_view get_name(const model::file_info_ptr_t &file) noexcept;
+std::int64_t get_sequence(const model::file_info_ptr_t &file) noexcept;
+std::int64_t get_size(const model::file_info_ptr_t &file) noexcept;
+std::int64_t get_modification(const model::file_info_ptr_t &file) noexcept;
+
+// clang-format off
+using file_map_base_t = mi::multi_index_container<
+    model::file_info_ptr_t,
+    mi::indexed_by<
+        mi::hashed_unique<mi::global_fun<const model::file_info_ptr_t &, utils::bytes_view_t, &get_uuid>>,
+        mi::ordered_unique<mi::global_fun<const model::file_info_ptr_t &, std::string_view, &get_name>>,
+        mi::ordered_unique<mi::global_fun<const model::file_info_ptr_t &, std::int64_t, &get_sequence>>,
+        mi::ordered_non_unique<mi::global_fun<const model::file_info_ptr_t &, std::int64_t, &get_size>>,
+        mi::ordered_non_unique<mi::global_fun<const model::file_info_ptr_t &, std::int64_t, &get_modification>>
+    >
+>;
+// clang-format on
+
+} // namespace file_details
+
+struct files_map_t : file_details::file_map_base_t {
+    using parent_t = file_details::file_map_base_t;
+    files_map_t() = default;
+    files_map_t(const files_map_t &) = delete;
+
+    bool put(const model::file_info_ptr_t &item, bool replace = true) noexcept {
+        auto [it, inserted] = parent_t::emplace(item);
+        if (!inserted && replace) {
+            return parent_t::replace(it, item);
+        }
+        return inserted;
+    }
+};
+
+struct SYNCSPIRIT_API file_infos_map_t : private file_details::file_map_base_t {
+    using parent_t = file_details::file_map_base_t;
+    using seq_projection_t = std::remove_cv_t<decltype(std::declval<parent_t>().template get<2>())>;
     using seq_iterator_t = decltype(std::declval<seq_projection_t>().begin());
     using range_t = std::pair<seq_iterator_t, seq_iterator_t>;
 
+    using parent_t::begin;
+    using parent_t::clear;
+    using parent_t::end;
+    using parent_t::size;
+
+    bool put(const model::file_info_ptr_t &item, bool replace = true) noexcept;
+    void remove(const model::file_info_ptr_t &item) noexcept;
     file_info_ptr_t by_uuid(utils::bytes_view_t) noexcept;
     file_info_ptr_t by_name(std::string_view name) noexcept;
     file_info_ptr_t by_sequence(std::int64_t sequence) noexcept;

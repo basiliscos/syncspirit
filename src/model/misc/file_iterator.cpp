@@ -77,8 +77,8 @@ auto file_iterator_t::prepare_folder(folder_info_ptr_t peer_folder) noexcept -> 
     bool can_receive = folder->get_folder_type() != db::FolderType::send;
 
     if (can_receive) {
-        for (auto it : files) {
-            auto f = it.item.get();
+        for (auto &it : files) {
+            auto f = it.get();
             if (resolve(*f) != advance_action_t::ignore) {
                 set->emplace(f);
             }
@@ -145,7 +145,7 @@ void file_iterator_t::populate(folder_iterator_t &it) noexcept {
     auto max_sequence = peer_folder->get_max_sequence();
     auto [from, to] = files_map.range(seen_sequence + 1, max_sequence);
     for (auto fit = from; fit != to; ++fit) {
-        auto file = fit->item.get();
+        auto file = fit->get();
         if (resolve(*file) != advance_action_t::ignore) {
             it.files_queue->insert(file);
         }

@@ -68,14 +68,14 @@ TEST_CASE("remove folder", "[model]") {
                 proto::add_blocks(pr_local) = b_2;
                 REQUIRE(builder.local_update(folder->get_id(), pr_local).apply());
                 REQUIRE(files_my.size() == 1);
-                auto f_my = files_my.begin()->item;
+                auto &f_my = *files_my.begin();
                 CHECK(f_my->get_blocks()[0] == bi_2);
                 CHECK(f_my->get_version().as_proto() != file_peer->get_version().as_proto());
             }
             SECTION("identical content (aka importing)") {
                 REQUIRE(builder.local_update(folder->get_id(), pr_local).apply());
                 REQUIRE(files_my.size() == 1);
-                auto f_my = files_my.begin()->item;
+                auto &f_my = *files_my.begin();
                 CHECK(f_my->get_blocks()[0] == bi_1);
                 CHECK(f_my->get_version().as_proto() == file_peer->get_version().as_proto());
             }

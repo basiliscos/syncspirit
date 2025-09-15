@@ -141,7 +141,7 @@ void test_meta_changes() {
                     if (!ec) {
                         builder->scan_start(folder->get_id()).apply(*sup);
                         REQUIRE(folder_info->get_file_infos().size() == 1);
-                        auto fi = folder_info->get_file_infos().begin()->item;
+                        auto fi = *folder_info->get_file_infos().begin();
                         CHECK(fi->is_dir());
                         CHECK(fi->get_name()->get_full_name() == "abc");
                         bfs::permissions(subdir, bfs::perms::all);

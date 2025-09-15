@@ -48,7 +48,7 @@ TEST_CASE("file-info", "[model]") {
 
     auto [begin, end] = map.range(0, 10);
     CHECK(std::distance(begin, end) == 1);
-    CHECK(begin->item == fi);
+    CHECK(*begin == fi);
 
     map.remove(fi);
     fi->set_sequence(10);
