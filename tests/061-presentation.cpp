@@ -1231,7 +1231,7 @@ TEST_CASE("statistics", "[presentation]") {
                 auto fi_peer = folder->get_folder_infos().by_device(*peer_device);
                 auto file_x_peer = model::file_info_t::create(sequencer->next_uuid(), pr_x, fi_peer.get()).value();
                 auto block = *blocks.begin();
-                file_x_peer->assign_block(block.item, 0);
+                file_x_peer->assign_block(block, 0);
                 fi_peer->add_strict(file_x_peer);
 
                 CHECK(p_a_peer->get_children().size() == 1);
@@ -1358,7 +1358,7 @@ TEST_CASE("statistics", "[presentation]") {
         auto file_c_peer = model::file_info_t::create(sequencer->next_uuid(), pr_fi, fi_peer.get()).value();
         {
             auto block = *blocks.begin();
-            file_c_peer->assign_block(block.item, 0);
+            file_c_peer->assign_block(block, 0);
             fi_peer->add_strict(file_c_peer);
             folder_entity->on_insert(*file_c_peer);
             CHECK(folder_entity->get_stats() == entity_stats_t{10, 3});
@@ -1394,7 +1394,7 @@ TEST_CASE("statistics", "[presentation]") {
             assign(file_uuid, file_c_peer->get_uuid());
             auto file_c_peer_2 = model::file_info_t::create(file_uuid, pr_fi, fi_peer.get()).value();
             auto block = *blocks.begin();
-            file_c_peer_2->assign_block(block.item, 0);
+            file_c_peer_2->assign_block(block, 0);
             fi_peer_2->add_strict(file_c_peer);
 
             file_c_peer->update(*file_c_peer_2);

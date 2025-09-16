@@ -153,7 +153,7 @@ TEST_CASE("update folder-2 (via Index)", "[model]") {
 
             SECTION("file with new blocks is added, the preivous one is removed") {
                 REQUIRE(blocks_map.size() == 1);
-                auto prev_block = blocks_map.begin()->item;
+                auto prev_block = *blocks_map.begin();
                 proto::set_sequence(pr_file, 11ul);
                 proto::set_modified_s(pr_file, 2);
                 proto::set_hash(b, b2_hash);
@@ -161,7 +161,7 @@ TEST_CASE("update folder-2 (via Index)", "[model]") {
 
                 REQUIRE(peer_files.size() == 1);
                 REQUIRE(blocks_map.size() == 1);
-                auto new_block = blocks_map.begin()->item;
+                auto new_block = *blocks_map.begin();
                 CHECK(new_block != prev_block);
                 CHECK(new_block->get_hash() != prev_block->get_hash());
             }

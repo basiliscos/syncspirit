@@ -1453,7 +1453,7 @@ void test_download_resuming() {
 
             CHECK(!folder_1->is_synchronizing());
             for (auto &it : cluster->get_blocks()) {
-                REQUIRE(!it.item->is_locked());
+                REQUIRE(!it->is_locked());
             }
 
             start_target();

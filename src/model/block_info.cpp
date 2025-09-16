@@ -123,10 +123,19 @@ void block_info_t::unlock() noexcept {
     --locked;
 }
 
-template <> SYNCSPIRIT_API utils::bytes_view_t get_index<0>(const block_info_ptr_t &item) noexcept {
-    return item->get_hash();
+block_info_ptr_t block_infos_map_t::by_hash(utils::bytes_view_t hash) const noexcept {
+    auto &proj = get<0>();
+    auto it = proj.find(hash);
+    return it != proj.end() ? *it : block_info_ptr_t();
 }
 
-block_info_ptr_t block_infos_map_t::by_hash(utils::bytes_view_t hash) const noexcept { return get(std::move(hash)); }
+bool block_infos_map_t::put(const model::block_info_ptr_t &item, bool replace) noexcept {
+    auto &proj = get<0>();
+    return proj.emplace(item).second;
+}
+
+void block_infos_map_t::remove(const model::block_info_ptr_t &item) noexcept {
+    parent_t::template get<0>().erase(item->get_hash());
+}
 
 } // namespace syncspirit::model

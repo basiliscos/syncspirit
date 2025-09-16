@@ -1260,7 +1260,7 @@ void test_db_migration_2_3() {
 
             auto &blocks = cluster_clone->get_blocks();
             REQUIRE(blocks.size() == 1);
-            auto b = blocks.begin()->item;
+            auto b = *blocks.begin();
             CHECK(b->get_size() == 0x1234);
         }
     };
@@ -1285,7 +1285,7 @@ void test_corrupted_file() {
             proto::set_hash(pr_block, hash);
 
             builder.local_update(folder_id, pr_file).apply(*sup);
-            auto &block = *cluster->get_blocks().begin()->item;
+            auto &block = **cluster->get_blocks().begin();
 
             auto folder = cluster->get_folders().by_id(folder_id);
             auto fi = folder->get_folder_infos().by_device(*my_device);

@@ -76,8 +76,38 @@ struct SYNCSPIRIT_API block_info_t final : arc_base_t<block_info_t> {
     std::uint32_t locked = 0;
 };
 
-struct SYNCSPIRIT_API block_infos_map_t : generic_map_t<block_info_ptr_t, 1> {
+// clang-format off
+namespace block_details {
+
+namespace mi = boost::multi_index;
+
+inline utils::bytes_view_t get_hash(const model::block_info_ptr_t &block) noexcept {
+    return block->get_hash();
+}
+
+// clang-format off
+using block_map_base_t = mi::multi_index_container<
+    model::block_info_ptr_t,
+    mi::indexed_by<
+        mi::hashed_unique<mi::global_fun<const model::block_info_ptr_t &, utils::bytes_view_t, &get_hash>>
+    >
+>;
+}
+// clang-format on
+
+struct SYNCSPIRIT_API block_infos_map_t : private block_details::block_map_base_t {
+    using parent_t = block_details::block_map_base_t;
+    block_infos_map_t() = default;
+    block_infos_map_t(block_infos_map_t &) = delete;
+
+    using parent_t::begin;
+    using parent_t::clear;
+    using parent_t::end;
+    using parent_t::size;
+
     block_info_ptr_t by_hash(utils::bytes_view_t view) const noexcept;
+    bool put(const model::block_info_ptr_t &item, bool replace = false) noexcept;
+    void remove(const model::block_info_ptr_t &item) noexcept;
 };
 
 } // namespace syncspirit::model
