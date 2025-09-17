@@ -41,7 +41,6 @@ enum class error_code_t {
     malformed_deviceid,
     folder_is_not_shared,
     invalid_block_size,
-    unexpected_blocks,
     missing_version,
     mismatch_file_size,
     invalid_sequence,

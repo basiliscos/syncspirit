@@ -133,7 +133,6 @@ auto file_info_t::fields_update(const db::FileInfo &source) noexcept -> outcome:
     flags = (flags & ~0b111111) | as_flags(db::get_type(source));
     name = path_cache.get_path(db::get_name(source));
     sequence = db::get_sequence(source);
-    set_size(db::get_size(source));
     permissions = db::get_permissions(source);
     modified_s = db::get_modified_s(source);
     modified_ns = db::get_modified_ns(source);
@@ -152,9 +151,12 @@ auto file_info_t::fields_update(const db::FileInfo &source) noexcept -> outcome:
 
     version = version_t(db::get_version(source));
 
-    block_size = size ? db::get_block_size(source) : 0;
-    auto block_count = db::get_blocks_size(source);
-    return reserve_blocks(size ? block_count : 0);
+    auto declared_size = db::get_size(source);
+    bool has_content = declared_size && (flags & f_type_file);
+    size = has_content ? declared_size : 0;
+
+    block_size = has_content ? db::get_block_size(source) : 0;
+    return reserve_blocks(has_content ? db::get_blocks_size(source) : 0);
 }
 
 auto file_info_t::fields_update(const proto::FileInfo &source) noexcept -> outcome::result<void> {
@@ -162,7 +164,6 @@ auto file_info_t::fields_update(const proto::FileInfo &source) noexcept -> outco
     name = path_cache.get_path(proto::get_name(source));
     sequence = proto::get_sequence(source);
     flags = (flags & ~0b111111) | as_flags(proto::get_type(source));
-    set_size(proto::get_size(source));
     permissions = proto::get_permissions(source);
     modified_s = proto::get_modified_s(source);
     modified_ns = proto::get_modified_ns(source);
@@ -180,9 +181,12 @@ auto file_info_t::fields_update(const proto::FileInfo &source) noexcept -> outco
     symlink_target = proto::get_symlink_target(source);
     version = version_t(proto::get_version(source));
 
-    block_size = size ? proto::get_block_size(source) : 0;
-    auto block_count = proto::get_blocks_size(source);
-    return reserve_blocks(size ? block_count : 0);
+    auto declared_size = proto::get_size(source);
+    bool has_content = declared_size && (flags & f_type_file);
+    size = has_content ? declared_size : 0;
+
+    block_size = has_content ? proto::get_block_size(source) : 0;
+    return reserve_blocks(has_content ? proto::get_blocks_size(source) : 0);
 }
 
 utils::bytes_view_t file_info_t::get_uuid() const noexcept { return {key + 1 + uuid_length, uuid_length}; }
@@ -267,7 +271,7 @@ outcome::result<void> file_info_t::reserve_blocks(size_t block_count) noexcept {
     remove_blocks();
     blocks.resize(count);
     marks.resize(count);
-    missing_blocks = !(flags & f_deleted) && !(flags & f_invalid) ? count : 0;
+    missing_blocks = !(flags & f_deleted) && !(flags & f_invalid) && (flags & f_type_file) ? count : 0;
     return outcome::success();
 }
 

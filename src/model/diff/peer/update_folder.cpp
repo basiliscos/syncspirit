@@ -67,7 +67,7 @@ auto update_folder_t::apply_impl(apply_controller_t &controller, void *custom) c
         }
         file = std::move(opt.assume_value());
 
-        if (proto::get_size(f)) {
+        if (file->get_size()) {
             auto blocks_count = proto::get_blocks_size(f);
             for (int i = 0; i < blocks_count; ++i) {
                 auto &b = proto::get_blocks(f, i);
@@ -222,10 +222,10 @@ static auto instantiate(const cluster_t &cluster, sequencer_t &sequencer, const 
         auto is_deleted = proto::get_deleted(f);
         auto is_invalid = proto::get_invalid(f);
         auto blocks_count = proto::get_blocks_size(f);
-        auto is_downloadable = !is_deleted && !is_invalid;
+        auto is_file = proto::get_type(f) == proto::FileInfoType::FILE;
+        auto is_downloadable = !is_deleted && !is_invalid && is_file;
         if (!is_downloadable && blocks_count) {
-            LOG_WARN(log, "file {} should not have blocks", name);
-            return make_error_code(error_code_t::unexpected_blocks);
+            LOG_WARN(log, "file {} should not have blocks, but it has {}", name, blocks_count);
         }
         auto sequence = proto::get_sequence(f);
         if (sequence <= prev_sequence) {
@@ -266,6 +266,8 @@ static auto instantiate(const cluster_t &cluster, sequencer_t &sequencer, const 
             }
         }
         if (is_downloadable && file_size != size_by_blocks) {
+            LOG_WARN(log, "file '{}' of  type {} mismatch file size: {} vs {}", name,
+                     static_cast<int>(proto::get_type(f)), file_size, size_by_blocks);
             return make_error_code(error_code_t::mismatch_file_size);
         }
         auto &version = proto::get_version(f);

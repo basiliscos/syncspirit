@@ -52,6 +52,46 @@ TEST_CASE("folder update (Index)", "[model]") {
     REQUIRE(ec.message() == expected_ec.message());
 };
 
+TEST_CASE("folder update (Index), ignore blocks on non-files", "[model]") {
+    auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
+    auto my_device = device_t::create(my_id, "my-device").value();
+    auto peer_id = device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
+
+    auto peer_device = device_t::create(peer_id, "peer-device").value();
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
+    auto sequencer = model::make_sequencer(5);
+    cluster->get_devices().put(my_device);
+    cluster->get_devices().put(peer_device);
+
+    auto index_id = uint64_t{0x1234};
+
+    auto max_seq = int64_t(10);
+    auto builder = diff_builder_t(*cluster);
+    auto sha256 = peer_id.get_sha256();
+    REQUIRE(builder.upsert_folder("1234-5678", "some/path", "my-label").apply());
+    REQUIRE(builder.share_folder(sha256, "1234-5678").apply());
+    REQUIRE(builder.configure_cluster(sha256).add(sha256, "1234-5678", index_id, max_seq).finish().apply());
+
+    proto::FileInfo pr_fi;
+    proto::set_name(pr_fi, "some-dir");
+    proto::set_type(pr_fi, FileInfoType::DIRECTORY);
+    proto::set_block_size(pr_fi, 5ul);
+    proto::set_size(pr_fi, 0);
+    proto::set_sequence(pr_fi, 5);
+
+    auto b1_hash = utils::sha256_digest(as_bytes("12345")).value();
+    auto &b1 = proto::add_blocks(pr_fi);
+    proto::set_hash(b1, as_bytes("12345"));
+    proto::set_size(b1, 5);
+
+    REQUIRE(builder.make_index(sha256, "1234-5678").add(pr_fi, peer_device).finish().apply());
+
+    auto &folders = cluster->get_folders();
+    auto folder = folders.by_id("1234-5678");
+    auto folder_peer = folder->get_folder_infos().by_device(*peer_device);
+    CHECK(folder_peer->get_file_infos().size() == 1);
+};
+
 TEST_CASE("update folder-2 (via Index)", "[model]") {
     auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
     auto my_device = device_t::create(my_id, "my-device").value();
@@ -196,11 +236,31 @@ TEST_CASE("update folder-2 (via Index)", "[model]") {
         proto::set_hash(b, as_bytes("123"));
         proto::set_size(b, 5);
 
-        auto ec = builder.make_index(sha256, "1234-5678").add(pr_file, peer_device).fail();
-        REQUIRE(ec);
-        auto expected_ec = make_error_code(model::error_code_t::unexpected_blocks);
-        REQUIRE(ec.value() == expected_ec.value());
-        REQUIRE(ec.message() == expected_ec.message());
+        REQUIRE(builder.make_index(sha256, "1234-5678").add(pr_file, peer_device).finish().apply());
+    }
+
+    SECTION("non-files with blocks are ignored") {
+        auto pr_file = proto::FileInfo();
+        proto::set_name(pr_file, "a.txt");
+        proto::set_type(pr_file, FileInfoType::SYMLINK);
+        proto::set_block_size(pr_file, 5ul);
+        proto::set_size(pr_file, 5ul);
+        proto::set_sequence(pr_file, 10ul);
+        proto::set_modified_s(pr_file, 1);
+
+        auto &b = proto::add_blocks(pr_file);
+        proto::set_hash(b, as_bytes("123"));
+        proto::set_size(b, 5);
+
+        REQUIRE(builder.make_index(sha256, "1234-5678").add(pr_file, peer_device).finish().apply());
+
+        auto peer_folder = folder->get_folder_infos().by_device(*peer_device);
+        auto &peer_files = peer_folder->get_file_infos();
+        REQUIRE(peer_files.size() == 1);
+
+        auto file = peer_files.by_name("a.txt");
+        REQUIRE(file);
+        CHECK(file->get_size() == 0);
     }
 }
 

@@ -108,9 +108,6 @@ std::string error_code_category_t::message(int c) const {
     case error_code_t::invalid_block_size:
         r = "block size is invalid (i.e. greater than file size)";
         break;
-    case error_code_t::unexpected_blocks:
-        r = "blocks are not expected (e.g. in deleted file)";
-        break;
     case error_code_t::missing_version:
         r = "file version is missing";
         break;

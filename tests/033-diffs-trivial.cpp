@@ -53,8 +53,6 @@ TEST_CASE("with file", "[model]") {
     auto pr_file = []() -> proto::FileInfo {
         auto f = proto::FileInfo();
         proto::set_name(f, "a.txt");
-        proto::set_type(f, proto::FileInfoType::SYMLINK);
-        proto::set_symlink_target(f, "/some/where");
         proto::set_block_size(f, 5);
         proto::set_size(f, 5);
         return f;

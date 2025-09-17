@@ -126,6 +126,8 @@ after the core completion.
 ## 0.4.3 (xx-xxx-xxxx)
  - [core] allow to load huge databses and interrupt loading porgress
  - [core] reduce memory consumption by model (~ 35%)
+ - [core] fix compatibility with syncthing v2.0 (i.e. tolerate directory with 
+          non-zero size and without blocks)
  - [core] allow to specify root certificate authority to use in all tls/ssl connections,
          see [faq](faq.md), mostly actual for Windows XP with expired system certificates
  - [core, fltk] more correctly display file scanning progress
