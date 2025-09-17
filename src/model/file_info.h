@@ -228,21 +228,19 @@ namespace file_details {
 
 namespace mi = boost::multi_index;
 
-utils::bytes_view_t get_uuid(const model::file_info_ptr_t &file) noexcept;
-std::string_view get_name(const model::file_info_ptr_t &file) noexcept;
-std::int64_t get_sequence(const model::file_info_ptr_t &file) noexcept;
-std::int64_t get_size(const model::file_info_ptr_t &file) noexcept;
-std::int64_t get_modification(const model::file_info_ptr_t &file) noexcept;
+inline utils::bytes_view_t get_uuid(const model::file_info_ptr_t &file) noexcept { return file->get_uuid(); }
+inline std::string_view get_name(const model::file_info_ptr_t &file) noexcept {
+    return file->get_name()->get_full_name();
+}
+inline std::int64_t get_sequence(const model::file_info_ptr_t &file) noexcept { return file->get_sequence(); }
 
 // clang-format off
 using file_map_base_t = mi::multi_index_container<
     model::file_info_ptr_t,
     mi::indexed_by<
         mi::hashed_unique<mi::global_fun<const model::file_info_ptr_t &, utils::bytes_view_t, &get_uuid>>,
-        mi::ordered_unique<mi::global_fun<const model::file_info_ptr_t &, std::string_view, &get_name>>,
-        mi::ordered_unique<mi::global_fun<const model::file_info_ptr_t &, std::int64_t, &get_sequence>>,
-        mi::ordered_non_unique<mi::global_fun<const model::file_info_ptr_t &, std::int64_t, &get_size>>,
-        mi::ordered_non_unique<mi::global_fun<const model::file_info_ptr_t &, std::int64_t, &get_modification>>
+        mi::hashed_unique<mi::global_fun<const model::file_info_ptr_t &, std::string_view, &get_name>>,
+        mi::ordered_unique<mi::global_fun<const model::file_info_ptr_t &, std::int64_t, &get_sequence>>
     >
 >;
 // clang-format on
