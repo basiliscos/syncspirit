@@ -53,11 +53,11 @@ using C = controller_actor_t;
 
 C::folder_synchronization_t::folder_synchronization_t(controller_actor_t &controller_,
                                                       model::folder_t &folder_) noexcept
-    : controller{controller_}, folder{&folder_}, synchronizing{false} {}
+    : controller{&controller_}, folder{&folder_}, synchronizing{false} {}
 
 C::folder_synchronization_t::~folder_synchronization_t() {
     if (blocks.size() && folder && !folder->is_suspended()) {
-        controller.push(new model::diff::local::synchronization_finish_t(folder->get_id()));
+        controller->push(new model::diff::local::synchronization_finish_t(folder->get_id()));
         for (auto &it : blocks) {
             it.second->unlock();
         }
@@ -88,12 +88,12 @@ void C::folder_synchronization_t::finish_fetching(utils::bytes_view_t hash) noex
 }
 
 void C::folder_synchronization_t::start_sync() noexcept {
-    controller.push(new model::diff::local::synchronization_start_t(folder->get_id()));
+    controller->push(new model::diff::local::synchronization_start_t(folder->get_id()));
     synchronizing = true;
 }
 
 void C::folder_synchronization_t::finish_sync() noexcept {
-    controller.push(new model::diff::local::synchronization_finish_t(folder->get_id()));
+    controller->push(new model::diff::local::synchronization_finish_t(folder->get_id()));
     synchronizing = false;
 }
 
@@ -990,17 +990,16 @@ void controller_actor_t::process_block_write() noexcept {
     }
 }
 
-auto controller_actor_t::get_sync_info(model::folder_t *folder) noexcept -> folder_synchronization_ptr_t {
+auto controller_actor_t::get_sync_info(model::folder_t *folder) noexcept -> folder_synchronization_t & {
     auto it = synchronizing_folders.find(folder);
     if (it == synchronizing_folders.end()) {
-        auto info = folder_synchronization_ptr_t(new folder_synchronization_t(*this, *folder));
-        synchronizing_folders.emplace(folder, info);
-        return info;
+        auto pair = synchronizing_folders.emplace(folder, folder_synchronization_t(*this, *folder));
+        return pair.first->second;
     }
     return it->second;
 }
 
-auto controller_actor_t::get_sync_info(std::string_view folder_id) noexcept -> folder_synchronization_ptr_t {
+auto controller_actor_t::get_sync_info(std::string_view folder_id) noexcept -> folder_synchronization_t & {
     auto predicate = [folder_id](const auto &it) -> bool { return it.first->get_id() == folder_id; };
     auto it = std::find_if(synchronizing_folders.begin(), synchronizing_folders.end(), predicate);
     assert(it != synchronizing_folders.end());
@@ -1011,12 +1010,12 @@ void controller_actor_t::acquire_block(const model::file_block_t &file_block) no
     auto block = file_block.block();
     auto folder = file_block.file()->get_folder_info()->get_folder();
     LOG_TRACE(log, "acquire block '{}', {}", block->get_hash(), (const void *)block);
-    get_sync_info(folder)->start_fetching(block);
+    get_sync_info(folder).start_fetching(block);
 }
 
 void controller_actor_t::release_block(std::string_view folder_id, utils::bytes_view_t hash) noexcept {
     LOG_TRACE(log, "release block '{}'", hash);
-    get_sync_info(folder_id)->finish_fetching(hash);
+    get_sync_info(folder_id).finish_fetching(hash);
 }
 
 controller_actor_t::pull_signal_t::pull_signal_t(void *controller_) noexcept : controller{controller_} {}
