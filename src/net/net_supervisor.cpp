@@ -17,6 +17,7 @@
 #include "relay_actor.h"
 #include "names.h"
 #include "utils/io.h"
+#include "bouncer/messages.hpp"
 #include <boost/nowide/convert.hpp>
 #include <filesystem>
 #include <ctime>
@@ -192,7 +193,9 @@ void net_supervisor_t::on_thread_ready(model::message::thread_ready_t &) noexcep
     --thread_counter;
     LOG_DEBUG(log, "on_thread_ready, left = {}", thread_counter);
     if (thread_counter == 0 && state == r::state_t::OPERATIONAL) {
-        send<model::payload::app_ready_t>(address);
+        // thread_ready_t messages are routed, give let routed messages be processed 1st
+        auto message = r::make_message<model::payload::app_ready_t>(address);
+        send<bouncer::payload::package_t>(bouncer, std::move(message));
     }
 }
 

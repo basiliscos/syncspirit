@@ -107,7 +107,7 @@ void iterative_controller_base_t::process_impl(model::diff::cluster_diff_t &diff
         using payload_t = model::payload::model_interrupt_t;
         auto &address = owner->get_address();
         auto message = r::make_message<payload_t>(address, std::move(apply_context));
-        owner->send<bouncer::payload::package_t>(bouncer, message);
+        owner->send<bouncer::payload::package_t>(bouncer, std::move(message));
         owner->access<to::resources>()->acquire(interrupt);
     }
 }
@@ -128,7 +128,15 @@ auto iterative_controller_base_t::apply(const model::diff::load::commit_t &diff,
         log->debug("committing db load, begin");
 
         commit_loading();
-        owner->send<syncspirit::model::payload::thread_ready_t>(coordinator, cluster, std::this_thread::get_id());
+        auto thread_id = std::this_thread::get_id();
+        auto message = r::message_ptr_t();
+        auto self_address = owner->get_address();
+        if (coordinator != self_address) {
+            message = r::make_routed_message<payload::thread_ready_t>(coordinator, self_address, cluster, thread_id);
+        } else {
+            message = r::make_message<payload::thread_ready_t>(coordinator, cluster, thread_id);
+        }
+        owner->get_supervisor().put(std::move(message));
         log->debug("committing db load, end");
     }
     return outcome::success();

@@ -24,8 +24,8 @@ void scan_scheduler_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
                 auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
                 plugin->subscribe_actor(&scan_scheduler_t::on_model_update, coordinator);
-                plugin->subscribe_actor(&scan_scheduler_t::on_thread_ready, coordinator);
                 plugin->subscribe_actor(&scan_scheduler_t::on_app_ready, coordinator);
+                plugin->subscribe_actor(&scan_scheduler_t::on_thread_ready, supervisor->get_address());
             }
         });
         p.discover_name(net::names::fs_scanner, fs_scanner, true).link();

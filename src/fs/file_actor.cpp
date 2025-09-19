@@ -67,7 +67,7 @@ void file_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 plugin->subscribe_actor(&file_actor_t::on_controller_up, coordinator);
                 plugin->subscribe_actor(&file_actor_t::on_controller_predown, coordinator);
                 if (!cluster) {
-                    plugin->subscribe_actor(&file_actor_t::on_thread_ready, coordinator);
+                    plugin->subscribe_actor(&file_actor_t::on_thread_ready, supervisor->get_address());
                 }
             }
         });
