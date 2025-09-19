@@ -337,7 +337,6 @@ TEST_CASE("loading cluster (file info + block)", "[model]") {
         CHECK(target->get_size() == 55ul);
         CHECK(target->get_block_size() == 5ul);
         CHECK(target->get_blocks().size() == 11ul);
-        CHECK(!target->is_locked());
     }
 
     SECTION("via diff") {
@@ -354,7 +353,6 @@ TEST_CASE("loading cluster (file info + block)", "[model]") {
         REQUIRE(map.by_name(fi->get_name()->get_full_name()));
         REQUIRE(target->get_blocks().size() == 11);
         REQUIRE(target->get_blocks().begin()->get()->get_hash() == block->get_hash());
-        CHECK(!target->is_locked());
     }
 
     CHECK(target->get_key() == fi->get_key());

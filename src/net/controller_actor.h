@@ -141,7 +141,7 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     };
     using folder_synchronization_ptr_t = model::intrusive_ptr_t<folder_synchronization_t>;
     using synchronizing_folders_t = std::unordered_map<model::folder_ptr_t, folder_synchronization_ptr_t>;
-    using synchronizing_files_t = std::unordered_map<utils::bytes_view_t, model::file_info_t::guard_ptr_t>;
+    using synchronizing_files_t = std::unordered_map<utils::bytes_view_t, model::file_info_t::guard_t>;
     using updates_streamer_ptr_t = std::unique_ptr<model::updates_streamer_t>;
     using tx_size_ptr_t = payload::controller_up_t::tx_size_ptr_t;
 

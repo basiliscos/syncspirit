@@ -739,7 +739,6 @@ void test_downloading() {
                 CHECK(f->get_size() == 5);
                 CHECK(f->get_blocks().size() == 1);
                 CHECK(f->is_locally_available());
-                CHECK(!f->is_locked());
                 CHECK(peer_actor->blocks_requested == 1);
 
                 auto &queue = peer_actor->messages;
@@ -832,7 +831,6 @@ void test_downloading() {
                         CHECK(f->get_size() == 5);
                         CHECK(f->get_blocks().size() == 1);
                         CHECK(f->is_locally_available());
-                        CHECK(!f->is_locked());
                     }
                     {
                         auto f = folder_my->get_file_infos().by_name(file_name_2);
@@ -840,7 +838,6 @@ void test_downloading() {
                         CHECK(f->get_size() == 5);
                         CHECK(f->get_blocks().size() == 1);
                         CHECK(f->is_locally_available());
-                        CHECK(!f->is_locked());
                     }
                 }
 
@@ -866,7 +863,6 @@ void test_downloading() {
                         CHECK(f->get_size() == 5);
                         CHECK(f->get_blocks().size() == 1);
                         CHECK(f->is_locally_available());
-                        CHECK(!f->is_locked());
                     }
                     {
                         auto f = folder_my->get_file_infos().by_name(file_name_2);
@@ -874,7 +870,6 @@ void test_downloading() {
                         CHECK(f->get_size() == 5);
                         CHECK(f->get_blocks().size() == 1);
                         CHECK(f->is_locally_available());
-                        CHECK(!f->is_locked());
                     }
                 }
 
@@ -904,7 +899,6 @@ void test_downloading() {
                         CHECK(f->get_size() == 5);
                         CHECK(f->get_blocks().size() == 1);
                         CHECK(f->is_locally_available());
-                        CHECK(!f->is_locked());
                     }
                     {
                         auto f = folder_my->get_file_infos().by_name(file_name_2);
@@ -912,7 +906,6 @@ void test_downloading() {
                         CHECK(f->get_size() == 10);
                         CHECK(f->get_blocks().size() == 2);
                         CHECK(f->is_locally_available());
-                        CHECK(!f->is_locked());
                     }
                 }
             }
@@ -973,7 +966,6 @@ void test_downloading() {
                 CHECK(f->get_blocks().size() == 0);
                 CHECK(f->is_locally_available());
                 CHECK(f->is_deleted());
-                CHECK(!f->is_locked());
                 CHECK(f->get_sequence() == 1ul);
                 CHECK(peer_actor->blocks_requested == blocks_requested);
             }
@@ -1018,11 +1010,9 @@ void test_downloading() {
                 CHECK(f->get_size() == 5);
                 CHECK(f->get_blocks().size() == 1);
                 CHECK(f->is_locally_available());
-                CHECK(!f->is_locked());
 
                 auto fp = *folder_1_peer->get_file_infos().begin();
                 REQUIRE(fp);
-                CHECK(!fp->is_locked());
             }
 
             SECTION("deleted file, has been restored => download it") {
@@ -1079,7 +1069,6 @@ void test_downloading() {
                 CHECK(f->get_size() == 5);
                 CHECK(f->get_blocks().size() == 1);
                 CHECK(f->is_locally_available());
-                CHECK(!f->is_locked());
                 CHECK(!f->is_deleted());
             }
 
@@ -1151,7 +1140,6 @@ void test_downloading() {
                 CHECK(f->get_size() == 10);
                 CHECK(f->get_blocks().size() == 2);
                 CHECK(f->is_locally_available());
-                CHECK(!f->is_locked());
             }
         }
     };
@@ -1268,7 +1256,6 @@ void test_downloading_errors() {
             REQUIRE(f);
             CHECK(f->is_unreachable());
             CHECK(!f->is_synchronizing());
-            CHECK(!f->is_locked());
 
             CHECK(!f->local_file());
             CHECK(!folder_my->get_folder()->is_synchronizing());
@@ -1353,7 +1340,6 @@ void test_download_from_scratch() {
             CHECK(f->get_size() == 5);
             CHECK(f->get_blocks().size() == 1);
             CHECK(f->is_locally_available());
-            CHECK(!f->is_locked());
 
             cc = proto::ClusterConfig{};
             folder = proto::Folder();
@@ -1470,7 +1456,6 @@ void test_download_resuming() {
             CHECK(f->get_size() == 10);
             CHECK(f->get_blocks().size() == 2);
             CHECK(f->is_locally_available());
-            CHECK(!f->is_locked());
         }
     };
     F(false, 10, false).run();

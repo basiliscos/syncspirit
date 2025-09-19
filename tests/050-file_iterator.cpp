@@ -70,7 +70,6 @@ TEST_CASE("file iterator, single folder", "[model]") {
                     auto [f, action] = file_iterator->next();
                     REQUIRE(f);
                     CHECK(f->get_name()->get_full_name() == "a.txt");
-                    CHECK(!f->is_locked());
                     CHECK(action == A::remote_copy);
 
                     REQUIRE(builder.apply());
@@ -78,7 +77,6 @@ TEST_CASE("file iterator, single folder", "[model]") {
 
                     REQUIRE(builder.remote_copy(*f).apply());
                     CHECK(file_iterator->next() == R{nullptr, A::ignore});
-                    CHECK(!f->is_locked());
                 }
                 SECTION("symblink") {
                     proto::set_symlink_target(pr_fi, "b.txt");
@@ -92,7 +90,6 @@ TEST_CASE("file iterator, single folder", "[model]") {
 #else
                     REQUIRE(f);
                     CHECK(f->get_name()->get_full_name() == "a.txt");
-                    CHECK(!f->is_locked());
                     CHECK(action == A::remote_copy);
 #endif
                 }
@@ -184,7 +181,6 @@ TEST_CASE("file iterator, single folder", "[model]") {
                 CHECK(action == A::remote_copy);
                 auto full_name = f->get_name()->get_full_name();
                 CHECK((full_name == "a.txt" || full_name == "b.txt"));
-                CHECK(!f->is_locked());
                 files.put(f);
                 REQUIRE(builder.apply());
 
@@ -194,7 +190,6 @@ TEST_CASE("file iterator, single folder", "[model]") {
                 REQUIRE(f);
                 full_name = f->get_name()->get_full_name();
                 CHECK((full_name == "a.txt" || full_name == "b.txt"));
-                CHECK(!f->is_locked());
                 CHECK(action == A::remote_copy);
                 files.put(f);
                 REQUIRE(builder.apply());
@@ -220,7 +215,6 @@ TEST_CASE("file iterator, single folder", "[model]") {
 
                 REQUIRE(builder.remote_copy(*f).apply());
                 CHECK(file_iterator->next() == R{nullptr, A::ignore});
-                CHECK(!f->is_locked());
             }
 
             SECTION("0 files are missing on my side") {
@@ -234,14 +228,12 @@ TEST_CASE("file iterator, single folder", "[model]") {
                 REQUIRE(f_1);
                 CHECK(action_1 == A::remote_copy);
                 CHECK((f_1->get_name()->get_full_name() == "a.txt" || f_1->get_name()->get_full_name() == "b.txt"));
-                CHECK(!f_1->is_locked());
                 files.put(f_1);
 
                 auto [f_2, action_2] = file_iterator->next();
                 REQUIRE(f_2);
                 CHECK(action_2 == A::remote_copy);
                 CHECK((f_2->get_name()->get_full_name() == "a.txt" || f_2->get_name()->get_full_name() == "b.txt"));
-                CHECK(!f_2->is_locked());
                 files.put(f_2);
 
                 CHECK(files.by_name("a.txt"));
@@ -302,7 +294,6 @@ TEST_CASE("file iterator, single folder", "[model]") {
                 REQUIRE(f);
                 CHECK(action == A::remote_copy);
                 CHECK(f->get_name()->get_full_name() == "a.txt");
-                CHECK(!f->is_locked());
                 CHECK(file_iterator->next() == R{nullptr, A::ignore});
             }
         }
@@ -516,7 +507,6 @@ TEST_CASE("file iterator, create, share, iterae, unshare, share, iterate", "[mod
     auto [f, action] = file_iterator->next();
     REQUIRE(f);
     CHECK(f->get_name()->get_full_name() == "a.txt");
-    CHECK(!f->is_locked());
     CHECK(action == A::remote_copy);
 
     REQUIRE(builder.apply());

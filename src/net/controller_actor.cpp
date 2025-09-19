@@ -347,7 +347,7 @@ OUTER:
         }
         if (!block_iterator && !synchronizing_files.empty()) {
             for (auto &[key, guard] : synchronizing_files) {
-                auto file = guard->file.get();
+                auto file = guard.file.get();
                 if (seen_files.count(file)) {
                     continue;
                 }
@@ -376,7 +376,8 @@ OUTER:
                 bi = new model::blocks_iterator_t(*file);
                 if (*bi) {
                     block_iterator = bi;
-                    synchronizing_files[file->get_key()] = file->guard();
+                    auto guard = file->guard();
+                    synchronizing_files[file->get_key()] = std::move(guard);
                 }
             }
 

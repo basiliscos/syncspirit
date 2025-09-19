@@ -88,7 +88,11 @@ static void fill(unsigned char *key, const bu::uuid &uuid, const folder_info_ptr
 
 file_info_t::guard_t::guard_t(file_info_t &file_) noexcept : file{&file_} { file_.synchronizing_lock(); }
 
-file_info_t::guard_t::~guard_t() { file->synchronizing_unlock(); }
+file_info_t::guard_t::~guard_t() {
+    if (file) {
+        file->synchronizing_unlock();
+    }
+}
 
 file_info_t::file_info_t(utils::bytes_view_t key_, const folder_info_ptr_t &folder_info_) noexcept
     : folder_info{folder_info_.get()} {
@@ -350,12 +354,6 @@ auto file_info_t::local_file() const noexcept -> file_info_ptr_t {
     return local_file;
 }
 
-void file_info_t::unlock() noexcept { flags = flags & ~flags_t::f_locked; }
-
-void file_info_t::lock() noexcept { flags |= flags_t::f_locked; }
-
-bool file_info_t::is_locked() const noexcept { return flags & flags_t::f_locked; }
-
 void file_info_t::synchronizing_unlock() noexcept { flags = flags & ~flags_t::f_synchronizing; }
 
 void file_info_t::synchronizing_lock() noexcept { flags |= flags_t::f_synchronizing; }
@@ -506,7 +504,7 @@ std::string file_info_t::make_conflicting_name() const noexcept {
     return full_name.string();
 }
 
-auto file_info_t::guard() noexcept -> guard_ptr_t { return new guard_t(*this); }
+auto file_info_t::guard() noexcept -> guard_t { return guard_t(*this); }
 
 bool file_info_t::identical_to(const proto::FileInfo &file) const noexcept {
     auto &v = proto::get_version(file);

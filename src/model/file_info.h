@@ -42,11 +42,10 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t {
         f_deleted        = 1 << 3,
         f_invalid        = 1 << 4,
         f_no_permissions = 1 << 5,
-        f_locked         = 1 << 6,
-        f_synchronizing  = 1 << 7,
-        f_unreachable    = 1 << 8,
-        f_unlocking      = 1 << 9,
-        f_local          = 1 << 10,
+        f_synchronizing  = 1 << 6,
+        f_unreachable    = 1 << 7,
+        f_unlocking      = 1 << 8,
+        f_local          = 1 << 9,
     };
     // clang-format on
 
@@ -57,13 +56,17 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t {
         utils::bytes_view_t file_id;
     };
 
-    struct guard_t : arc_base_t<guard_t> {
+    struct guard_t {
+        guard_t() noexcept = default;
         guard_t(file_info_t &file) noexcept;
+        guard_t(const guard_t &) = delete;
+        guard_t(guard_t &&) = default;
         ~guard_t();
+
+        guard_t &operator=(guard_t &&) noexcept = default;
 
         file_info_ptr_t file;
     };
-    using guard_ptr_t = intrusive_ptr_t<guard_t>;
 
     static outcome::result<file_info_ptr_t> create(utils::bytes_view_t key, const db::FileInfo &data,
                                                    const folder_info_ptr_t &folder_info_) noexcept;
@@ -136,10 +139,6 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t {
 
     file_info_ptr_t local_file() const noexcept;
 
-    bool is_locked() const noexcept;
-    void lock() noexcept;
-    void unlock() noexcept;
-
     bool is_global() const noexcept;
 
     bool is_synchronizing() const noexcept;
@@ -163,7 +162,7 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t {
     std::uint32_t get_permissions() const noexcept;
     bool has_no_permissions() const noexcept;
 
-    guard_ptr_t guard() noexcept;
+    guard_t guard() noexcept;
 
     std::string make_conflicting_name() const noexcept;
 
@@ -293,9 +292,9 @@ template <> struct hash<syncspirit::model::file_info_ptr_t> {
     }
 };
 
-template <> struct hash<syncspirit::model::file_info_t::guard_ptr_t> {
-    inline size_t operator()(const syncspirit::model::file_info_t::guard_ptr_t &guard) const noexcept {
-        return reinterpret_cast<size_t>(guard->file.get());
+template <> struct hash<syncspirit::model::file_info_t::guard_t> {
+    inline size_t operator()(const syncspirit::model::file_info_t::guard_t &guard) const noexcept {
+        return reinterpret_cast<size_t>(guard.file.get());
     }
 };
 } // namespace std

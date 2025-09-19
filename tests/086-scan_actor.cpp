@@ -293,7 +293,6 @@ void test_meta_changes() {
                     bfs::last_write_time(path, from_unix(new_time));
                     builder->scan_start(folder->get_id()).apply(*sup);
                     CHECK(!file->is_locally_available());
-                    CHECK(!file->is_locked());
                     CHECK(!bfs::exists(path));
                 }
 
@@ -316,7 +315,6 @@ void test_meta_changes() {
 
                 SECTION("source is missing -> tmp is removed") {
                     folder_info_peer->get_file_infos().remove(file);
-                    file->unlock();
                     builder->scan_start(folder->get_id()).apply(*sup);
                     CHECK(!file->is_locally_available());
                     CHECK(!bfs::exists(path));
@@ -337,7 +335,6 @@ void test_meta_changes() {
                     if (!ec) {
                         builder->scan_start(folder->get_id()).apply(*sup);
                         CHECK(!file->is_locally_available());
-                        CHECK(!file->is_locked());
                         CHECK(!bfs::exists(path));
 
                         auto &errs = sup->io_errors;
@@ -355,7 +352,6 @@ void test_meta_changes() {
                 auto uuid_1 = sup->sequencer->next_uuid();
                 auto file_my = file_info_t::create(uuid_1, pr_fi, folder_info).value();
                 file_my->assign_block(b, 0);
-                file_my->lock();
                 REQUIRE(folder_info->add_strict(file_my));
 
                 proto::set_size(pr_fi, 15);
@@ -396,7 +392,6 @@ void test_meta_changes() {
                 file_my->assign_block(b, 0);
                 file_my->assign_block(b, 1);
                 file_my->assign_block(b, 2);
-                file_my->lock();
                 REQUIRE(folder_info->add_strict(file_my));
 
                 proto::set_value(counter, 2);
