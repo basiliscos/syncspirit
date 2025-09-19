@@ -67,7 +67,6 @@ struct block_transaction_t;
 struct clone_block_t;
 struct finish_file_t;
 struct generic_remove_t;
-struct lock_file_t;
 struct mark_reachable_t;
 struct remove_blocks_t;
 struct remove_files_t;

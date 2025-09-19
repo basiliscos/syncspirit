@@ -39,7 +39,6 @@
 #include "modify/block_rej.h"
 #include "modify/clone_block.h"
 #include "modify/finish_file.h"
-#include "modify/lock_file.h"
 #include "modify/mark_reachable.h"
 #include "modify/remove_blocks.h"
 #include "modify/remove_files.h"
@@ -301,10 +300,6 @@ auto cluster_visitor_t::operator()(const modify::reset_folder_infos_t &diff, voi
 }
 
 auto cluster_visitor_t::operator()(const modify::finish_file_t &diff, void *custom) noexcept -> outcome::result<void> {
-    return diff.visit_next(*this, custom);
-}
-
-auto cluster_visitor_t::operator()(const modify::lock_file_t &diff, void *custom) noexcept -> outcome::result<void> {
     return diff.visit_next(*this, custom);
 }
 

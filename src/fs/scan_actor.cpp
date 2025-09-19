@@ -3,7 +3,6 @@
 
 #include "scan_actor.h"
 #include "model/diff/advance/local_update.h"
-#include "model/diff/modify/lock_file.h"
 #include "model/diff/local/blocks_availability.h"
 #include "model/diff/local/io_failure.h"
 #include "model/diff/local/file_availability.h"
@@ -151,9 +150,6 @@ void scan_actor_t::on_scan(message::scan_progress_t &message) noexcept {
                     send<payload::rehash_needed_t>(address, task, std::move(f), std::move(r.opened_file));
                 } else if constexpr (std::is_same_v<T, incomplete_removed_t>) {
                     auto &file = *r.file;
-                    if (file.is_locked()) {
-                        task->push(new modify::lock_file_t(file, false), 0, true);
-                    }
                 } else if constexpr (std::is_same_v<T, orphaned_removed_t>) {
                     // NO-OP
                 } else if constexpr (std::is_same_v<T, file_error_t>) {

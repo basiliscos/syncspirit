@@ -5,7 +5,6 @@
 #include "access.h"
 #include "diff-builder.h"
 #include "model/cluster.h"
-#include "model/diff/modify/lock_file.h"
 #include "model/diff/local/file_availability.h"
 #include "model/diff/contact/update_contact.h"
 
@@ -70,18 +69,6 @@ TEST_CASE("with file", "[model]") {
     auto v = file->get_version();
     REQUIRE(v.counters_size() == 1);
     REQUIRE(proto::get_id(v.get_counter(0)) == my_device->device_id().get_uint());
-
-    SECTION("lock/unlock") {
-        auto diff = diff::cluster_diff_ptr_t(new diff::modify::lock_file_t(*file, true));
-        REQUIRE(diff->apply(*controller, {}));
-        auto name = proto::get_name(pr_file);
-        auto file = folder_info->get_file_infos().by_name(name);
-        REQUIRE(file->is_locked());
-
-        diff = diff::cluster_diff_ptr_t(new diff::modify::lock_file_t(*file, false));
-        REQUIRE(diff->apply(*controller, {}));
-        REQUIRE(!file->is_locked());
-    }
 
     SECTION("file_availability") {
         auto block = cluster->get_blocks().by_hash(b1_hash);

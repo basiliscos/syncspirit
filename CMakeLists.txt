@@ -162,7 +162,6 @@ add_library(syncspirit_core
     src/model/diff/modify/clone_block.cpp
     src/model/diff/modify/finish_file.cpp
     src/model/diff/modify/generic_remove.cpp
-    src/model/diff/modify/lock_file.cpp
     src/model/diff/modify/mark_reachable.cpp
     src/model/diff/modify/remove_blocks.cpp
     src/model/diff/modify/remove_files.cpp

@@ -56,7 +56,6 @@ struct SYNCSPIRIT_API cluster_visitor_t {
     virtual outcome::result<void> operator()(const modify::block_rej_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::clone_block_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::finish_file_t &, void *custom) noexcept;
-    virtual outcome::result<void> operator()(const modify::lock_file_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::mark_reachable_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::remove_blocks_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::remove_files_t &, void *custom) noexcept;
