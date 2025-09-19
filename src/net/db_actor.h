@@ -25,6 +25,7 @@ struct db_actor_config_t : r::actor_config_t {
     config::db_config_t db_config;
     model::cluster_ptr_t cluster;
     size_t uncommitted_threshold = {100};
+    r::address_ptr_t bouncer_address;
 };
 
 template <typename Actor> struct db_actor_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -36,14 +37,16 @@ template <typename Actor> struct db_actor_config_builder_t : r::actor_config_bui
         parent_t::config.db_dir = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
-
     builder_t &&cluster(const model::cluster_ptr_t &value) && noexcept {
         parent_t::config.cluster = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
-
     builder_t &&db_config(const config::db_config_t &value) && noexcept {
         parent_t::config.db_config = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+    builder_t &&bouncer_address(const r::address_ptr_t &value) && noexcept {
+        parent_t::config.bouncer_address = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };

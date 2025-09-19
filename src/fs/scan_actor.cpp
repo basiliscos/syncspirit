@@ -42,7 +42,6 @@ void scan_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
         p.register_name(net::names::fs_scanner, address);
-        p.discover_name(net::names::hasher_proxy, hasher_proxy, true).link();
         p.discover_name(net::names::coordinator, coordinator, true).link(false).callback([&](auto phase, auto &ee) {
             if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {
                 auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
@@ -51,6 +50,7 @@ void scan_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 plugin->subscribe_actor(&scan_actor_t::on_thread_ready, coordinator);
             }
         });
+        p.discover_name(net::names::hasher_proxy, hasher_proxy, true).link(false);
     });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&scan_actor_t::on_scan);

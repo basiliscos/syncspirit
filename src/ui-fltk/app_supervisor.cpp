@@ -127,6 +127,7 @@ app_supervisor_t::app_supervisor_t(config_t &config)
       ignored_devices{nullptr}, db_info_viewer{nullptr}, main_window{nullptr} {
     started_at = clock_t::now();
     sequencer = model::make_sequencer(started_at.time_since_epoch().count());
+    bouncer = config.bouncer_address;
 }
 
 app_supervisor_t::~app_supervisor_t() {
@@ -157,7 +158,6 @@ void app_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 send<syncspirit::model::payload::thread_up_t>(coordinator);
             }
         });
-        p.discover_name(net::names::bouncer, bouncer, true).link(false);
     });
 
     plugin.with_casted<r::plugin::starter_plugin_t>(

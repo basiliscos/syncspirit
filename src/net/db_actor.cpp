@@ -107,6 +107,7 @@ db_actor_t::db_actor_t(config_t &config)
         LOG_CRITICAL(log, "mdbx environment creation error ({}): {}", r, mdbx_strerror(r));
         throw std::runtime_error(std::string(mdbx_strerror(r)));
     }
+    bouncer = config.bouncer_address;
 }
 
 db_actor_t::~db_actor_t() {
@@ -124,7 +125,6 @@ void db_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
         p.register_name(names::db, get_address());
-        p.discover_name(net::names::bouncer, bouncer, true).link(false);
         p.discover_name(names::coordinator, coordinator, false).link(false).callback([&](auto phase, auto &ee) {
             if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {
                 auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);

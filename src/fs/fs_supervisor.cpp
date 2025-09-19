@@ -29,6 +29,7 @@ fs_supervisor_t::fs_supervisor_t(config_t &cfg)
     : parent_t(this, resource::interrupt, cfg), sequencer(cfg.sequencer), fs_config{cfg.fs_config},
       hasher_threads{cfg.hasher_threads} {
     rw_cache.reset(new file_cache_t(fs_config.mru_size));
+    bouncer = cfg.bouncer_address;
 }
 
 void fs_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
@@ -44,10 +45,8 @@ void fs_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
                 plugin->subscribe_actor(&fs_supervisor_t::on_model_update, coordinator);
                 plugin->subscribe_actor(&fs_supervisor_t::on_db_loaded, coordinator);
-                send<syncspirit::model::payload::thread_up_t>(coordinator);
             }
         });
-        p.discover_name(net::names::bouncer, bouncer, true).link(false);
     });
 
     plugin.with_casted<r::plugin::starter_plugin_t>(
@@ -88,6 +87,7 @@ void fs_supervisor_t::launch() noexcept {
     for (auto &l : launchers) {
         l(cluster);
     }
+    send<syncspirit::model::payload::thread_up_t>(coordinator);
 }
 
 void fs_supervisor_t::on_db_loaded(model::message::db_loaded_t &) noexcept {
@@ -102,7 +102,6 @@ void fs_supervisor_t::on_model_request(model::message::model_request_t &req) noe
         reply_to(req, cluster);
         return;
     }
-    LOG_TRACE(log, "no cluster, delaying response");
     model_request = &req;
 }
 

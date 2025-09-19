@@ -24,6 +24,7 @@ struct net_supervisor_config_t : ra::supervisor_config_asio_t {
     config::main_t app_config;
     size_t independent_threads = 0;
     model::sequencer_ptr_t sequencer;
+    r::address_ptr_t bouncer_address;
 };
 
 template <typename Supervisor>
@@ -44,6 +45,11 @@ struct net_supervisor_config_builder_t : ra::supervisor_config_asio_builder_t<Su
 
     builder_t &&sequencer(model::sequencer_ptr_t value) && noexcept {
         parent_t::config.sequencer = std::move(value);
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+
+    builder_t &&bouncer_address(const r::address_ptr_t &value) && noexcept {
+        parent_t::config.bouncer_address = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };
@@ -85,6 +91,8 @@ struct SYNCSPIRIT_API net_supervisor_t : net_supervisor_base_t<ra::supervisor_as
     r::address_ptr_t db_addr;
     utils::key_pair_t ssl_pair;
     utils::bytes_t root_ca;
+    r::supervisor_ptr_t cluster_sup;
+    r::supervisor_ptr_t peer_sup;
 };
 
 } // namespace net

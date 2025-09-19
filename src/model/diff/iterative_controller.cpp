@@ -89,10 +89,9 @@ void iterative_controller_base_t::process_impl(model::diff::cluster_diff_t &diff
             commit_diff = dynamic_cast<model::diff::load::commit_t *>(current);
             current = current->sibling.get();
         }
-        if (!commit_diff) {
-            LOG_ERROR(log, "commit diff not found");
-        } else {
+        if (commit_diff) {
             target_diff = commit_diff;
+            LOG_DEBUG(log, "commit diff found");
         }
     }
 
@@ -122,12 +121,16 @@ auto iterative_controller_base_t::apply(const model::diff::load::interrupt_t &di
 
 auto iterative_controller_base_t::apply(const model::diff::load::commit_t &diff, void *custom) noexcept
     -> outcome::result<void> {
-    log->debug("committing db load, begin");
     owner->get_supervisor().put(diff.commit_message);
+    if (owner->access<to::state>() > r::state_t::OPERATIONAL) {
+        log->debug("skipping committing db load");
+    } else {
+        log->debug("committing db load, begin");
 
-    commit_loading();
-    owner->send<syncspirit::model::payload::thread_ready_t>(coordinator, cluster, std::this_thread::get_id());
-    log->debug("committing db load, end");
+        commit_loading();
+        owner->send<syncspirit::model::payload::thread_ready_t>(coordinator, cluster, std::this_thread::get_id());
+        log->debug("committing db load, end");
+    }
     return outcome::success();
 }
 

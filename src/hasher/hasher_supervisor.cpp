@@ -15,10 +15,8 @@ void hasher_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.set_identity("hasher.supervisor", false);
         log = utils::get_logger(identity);
     });
-    plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
-        // p.register_name(net::names::bouncer, get_address());
-        p.discover_name(net::names::coordinator, coordinator, true).link(false);
-    });
+    plugin.with_casted<r::plugin::registry_plugin_t>(
+        [&](auto &p) { p.discover_name(net::names::coordinator, coordinator, true).link(false); });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &) { launch(); });
 }
 

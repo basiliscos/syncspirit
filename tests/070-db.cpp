@@ -158,6 +158,7 @@ struct fixture_t {
 
     virtual void launch_db() {
         db_actor = sup->create_actor<db_actor_t>()
+                       .bouncer_address(sup->get_address())
                        .cluster(cluster)
                        .db_dir(root_path)
                        .db_config(make_config())
@@ -1499,6 +1500,7 @@ void test_iterative_application_interrupt() {
 
             struct my_controller_t : my_controller_base_t<my_controller_t> {
                 using parent_t = my_controller_base_t<my_controller_t>;
+                using parent_t::bouncer;
                 using parent_t::cluster;
                 using parent_t::resources;
 
@@ -1519,7 +1521,6 @@ void test_iterative_application_interrupt() {
                                     plugin->subscribe_actor(&my_controller_t::on_model_update, address);
                                 }
                             });
-                        p.discover_name(net::names::bouncer, bouncer, true).link(false);
                     });
                     plugin.with_casted<r::plugin::starter_plugin_t>(
                         [&](auto &p) { p.subscribe_actor(&my_controller_t::on_model_interrupt); },
@@ -1556,6 +1557,7 @@ void test_iterative_application_interrupt() {
             auto cluster_clone = make_cluster();
 
             auto controller = sup->create_actor<my_controller_t>().timeout(timeout).finish();
+            controller->bouncer = sup->get_address();
             auto addr = controller->get_address();
             sup->do_process();
             controller->cluster = cluster_clone;

@@ -41,6 +41,7 @@ struct log_panel_t : Fl_Group {
     log_buffer_ptr_t displayed_records;
     std::string filter;
     in_memory_sink_t *sink = nullptr;
+    bool poll_scheduled;
 };
 
 } // namespace syncspirit::fltk

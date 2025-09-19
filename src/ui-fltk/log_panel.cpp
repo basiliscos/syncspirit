@@ -20,8 +20,13 @@ using namespace syncspirit::fltk;
 static constexpr int padding = 5;
 
 static void _pull_in_logs(void *data) {
-    reinterpret_cast<log_panel_t *>(data)->pull_in_logs();
-    Fl::add_timeout(0.05, _pull_in_logs, data);
+    auto panel = reinterpret_cast<log_panel_t *>(data);
+    if (panel->supervisor.state <= r::state_t::OPERATIONAL) {
+        panel->pull_in_logs();
+        Fl::add_timeout(0.05, _pull_in_logs, data);
+    } else {
+        panel->poll_scheduled = false;
+    }
 }
 
 static void auto_scroll_toggle(Fl_Widget *widget, void *data) {
@@ -237,10 +242,15 @@ log_panel_t::log_panel_t(app_supervisor_t &supervisor_, int x, int y, int w, int
 
     sink = supervisor.get_log_sink();
     update();
+    poll_scheduled = true;
     Fl::add_timeout(0.05, _pull_in_logs, this);
 }
 
-log_panel_t::~log_panel_t() { Fl::remove_timeout(_pull_in_logs, this); }
+log_panel_t::~log_panel_t() {
+    if (poll_scheduled) {
+        Fl::remove_timeout(_pull_in_logs, this);
+    }
+}
 
 void log_panel_t::update(log_queue_t new_records) {
     auto display_level = supervisor.get_app_config().fltk_config.level;

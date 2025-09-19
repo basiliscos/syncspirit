@@ -49,10 +49,8 @@ void supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.set_identity(std::string(names::coordinator) + ".test", false);
         log = utils::get_logger(identity);
     });
-    plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
-        p.register_name(names::coordinator, get_address());
-        p.register_name(names::bouncer, get_address());
-    });
+    plugin.with_casted<r::plugin::registry_plugin_t>(
+        [&](auto &p) { p.register_name(names::coordinator, get_address()); });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&supervisor_t::on_model_update);
         p.subscribe_actor(&supervisor_t::on_package);
