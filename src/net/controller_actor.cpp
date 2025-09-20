@@ -9,7 +9,6 @@
 #include "model/diff/local/synchronization_finish.h"
 #include "model/diff/local/synchronization_start.h"
 #include "model/diff/modify/append_block.h"
-#include "model/diff/modify/add_remote_folder_infos.h"
 #include "model/diff/modify/block_ack.h"
 #include "model/diff/modify/block_rej.h"
 #include "model/diff/modify/clone_block.h"
