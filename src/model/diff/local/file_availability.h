@@ -11,7 +11,7 @@ namespace syncspirit::model::diff::local {
 
 struct SYNCSPIRIT_API file_availability_t final : cluster_diff_t {
 
-    file_availability_t(file_info_ptr_t file) noexcept;
+    file_availability_t(file_info_ptr_t file, const folder_info_t &fi) noexcept;
 
     outcome::result<void> apply_impl(apply_controller_t &, void *) const noexcept override;
     outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;

@@ -75,9 +75,10 @@ struct SYNCSPIRIT_API file_actor_t : public r::actor_base_t, private model::diff
     void on_controller_predown(net::message::controller_predown_t &message) noexcept;
 
     outcome::result<file_ptr_t> get_source_for_cloning(model::file_info_ptr_t &source,
+                                                       const model::folder_info_t& source_fi,
                                                        const file_ptr_t &target_backend) noexcept;
 
-    outcome::result<file_ptr_t> open_file_rw(const bfs::path &path, model::file_info_ptr_t info) noexcept;
+    outcome::result<file_ptr_t> open_file_rw(const bfs::path &path, model::file_info_ptr_t info, const model::folder_info_t &folder_info) noexcept;
     outcome::result<file_ptr_t> open_file_ro(const bfs::path &path, bool use_cache = false) noexcept;
 
     outcome::result<void> operator()(const model::diff::advance::remote_copy_t &, void *) noexcept override;
@@ -86,7 +87,8 @@ struct SYNCSPIRIT_API file_actor_t : public r::actor_base_t, private model::diff
     outcome::result<void> operator()(const model::diff::modify::append_block_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::clone_block_t &, void *) noexcept override;
 
-    outcome::result<void> reflect(model::file_info_ptr_t &file, const bfs::path &path) noexcept;
+    outcome::result<void> reflect(model::file_info_ptr_t &file, const model::folder_info_t &fi,
+                                  const bfs::path &path) noexcept;
 
     model::cluster_ptr_t cluster;
     model::sequencer_ptr_t sequencer;

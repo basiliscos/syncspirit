@@ -9,8 +9,8 @@
 
 using namespace syncspirit::model::diff::local;
 
-blocks_availability_t::blocks_availability_t(const file_info_t &file, valid_blocks_map_t valid_blocks_map_) noexcept
-    : block_diff_t{file}, valid_blocks_map{std::move(valid_blocks_map_)} {
+blocks_availability_t::blocks_availability_t(const file_info_t &file, const folder_info_t &fi, valid_blocks_map_t valid_blocks_map_) noexcept
+    : block_diff_t{file, fi}, valid_blocks_map{std::move(valid_blocks_map_)} {
     LOG_DEBUG(log, "blocks_availability_t, file: '{}', valid blocks: {}", file, valid_blocks_map.size());
     assert(!file.is_locally_available());
     assert(file.get_blocks().size() == valid_blocks_map.size());

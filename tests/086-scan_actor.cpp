@@ -205,7 +205,7 @@ void test_meta_changes() {
                 auto file_peer = file_info_t::create(uuid, pr_fi, folder_info_peer).value();
                 file_peer->assign_block(b, 0);
                 REQUIRE(folder_info_peer->add_strict(file_peer));
-                builder->remote_copy(*file_peer).scan_start(folder->get_id()).apply(*sup);
+                builder->remote_copy(*file_peer, *folder_info_peer).scan_start(folder->get_id()).apply(*sup);
 
                 auto file = files->by_name(file_name);
                 CHECK(files->size() == 1);
@@ -218,9 +218,9 @@ void test_meta_changes() {
                 file_peer->assign_block(b, 0);
                 REQUIRE(folder_info_peer->add_strict(file_peer));
 
-                builder->remote_copy(*file_peer).apply(*sup);
+                builder->remote_copy(*file_peer, *folder_info_peer).apply(*sup);
                 auto file = files->by_name(file_name);
-                auto path = file->get_path();
+                auto path = file->get_path(*folder_info_peer);
 
                 SECTION("meta is not changed") {
                     write_file(path, "12345");
@@ -283,8 +283,9 @@ void test_meta_changes() {
                 REQUIRE(folder_info_peer->add_strict(file));
 
                 // auto file = files->by_name(pr_fi.name());
-                auto filename = file->get_path().filename().wstring() + L".syncspirit-tmp";
-                auto path = file->get_path().parent_path() / filename;
+                auto file_path = file->get_path(*folder_info_peer);
+                auto filename = file_path.filename().wstring() + L".syncspirit-tmp";
+                auto path = file_path.parent_path() / filename;
                 auto content = "12345\0\0\0\0\0";
                 write_file(path, std::string(content, 10));
 
@@ -365,7 +366,7 @@ void test_meta_changes() {
                 REQUIRE(folder_info_peer->add_strict(file_peer));
 
                 auto file = files->by_name(file_name);
-                auto &path = file->get_path();
+                auto &path = file->get_path(*folder_info_peer);
                 auto filename = path.filename().wstring() + L".syncspirit-tmp";
                 auto path_my = path;
                 auto path_peer = path_my.parent_path() / filename;
@@ -397,7 +398,7 @@ void test_meta_changes() {
                 proto::set_value(counter, 2);
 
                 auto file = files->by_name(file_name);
-                auto path_my = file->get_path();
+                auto path_my = file->get_path(*folder_info);
                 write_file(path_my, "12345");
                 bfs::last_write_time(path_my, from_unix(modified));
 
@@ -873,7 +874,7 @@ void test_races() {
 
                 auto file_peer = fi_peer->get_file_infos().by_name("a.bin");
                 SECTION("non-finished/flushed new file") {
-                    auto file_opt = fs::file_t::open_write(file_peer);
+                    auto file_opt = fs::file_t::open_write(file_peer, *fi_peer);
                     REQUIRE(file_opt);
                     // CHECK(file_opt.assume_error().message() == "zzz");
                     auto &file = file_opt.assume_value();
@@ -918,7 +919,7 @@ void test_races() {
 
                 auto file_peer = fi_peer->get_file_infos().by_name("a.bin");
                 SECTION("non-finished/flushed new file") {
-                    auto file = fs::file_t::open_write(file_peer).assume_value();
+                    auto file = fs::file_t::open_write(file_peer, *fi_peer).assume_value();
                     REQUIRE(bfs::exists(file.get_path()));
                     auto file_ptr = fs::file_ptr_t(new fs::file_t(std::move(file)));
                     rw_cache->put(file_ptr);

@@ -59,7 +59,7 @@ TEST_CASE("various block diffs", "[model]") {
     REQUIRE(!file->is_locally_available());
 
     SECTION("append") {
-        auto diff_raw = new model::diff::modify::append_block_t(*file, 0, as_owned_bytes("12345"));
+        auto diff_raw = new model::diff::modify::append_block_t(*file, *folder_info, 0, as_owned_bytes("12345"));
         auto diff = diff::cluster_diff_ptr_t(diff_raw);
         diff->assign_sibling(diff_raw->ack().get());
         REQUIRE(builder.assign(diff.get()).apply());
@@ -90,7 +90,7 @@ TEST_CASE("various block diffs", "[model]") {
         b2->mark_local_available(source.get());
 
         auto fb = model::file_block_t(bi2.get(), file.get(), 1);
-        auto diff_raw = new model::diff::modify::clone_block_t(fb);
+        auto diff_raw = new model::diff::modify::clone_block_t(fb, *folder_info, *folder_info);
         auto diff = diff::cluster_diff_ptr_t(diff_raw);
         diff->assign_sibling(diff_raw->ack().get());
         REQUIRE(builder.assign(diff.get()).apply());
@@ -108,7 +108,7 @@ TEST_CASE("various block diffs", "[model]") {
         using blocks_map_t = diff::local::blocks_availability_t::valid_blocks_map_t;
         auto map = blocks_map_t(2);
         map[0] = map[1] = true;
-        auto diff = diff::cluster_diff_ptr_t(new diff::local::blocks_availability_t(*file, map));
+        auto diff = diff::cluster_diff_ptr_t(new diff::local::blocks_availability_t(*file, *folder_info, map));
         REQUIRE(diff->apply(*controller, {}));
         CHECK(file->is_locally_available());
     }

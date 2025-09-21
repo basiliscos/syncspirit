@@ -135,7 +135,7 @@ auto supervisor_t::operator()(const model::diff::modify::finish_file_t &diff, vo
         auto folder = cluster->get_folders().by_id(diff.folder_id);
         auto file_info = folder->get_folder_infos().by_device_id(diff.peer_id);
         auto file = file_info->get_file_infos().by_name(diff.file_name);
-        auto ack = model::diff::advance::advance_t::create(diff.action, *file, *sequencer);
+        auto ack = model::diff::advance::advance_t::create(diff.action, *file, *file_info, *sequencer);
         send<model::payload::model_update_t>(get_address(), std::move(ack), this);
     }
     return diff.visit_next(*this, custom);
@@ -206,7 +206,7 @@ auto supervisor_t::operator()(const model::diff::advance::advance_t &diff, void 
             auto file_name = proto::get_name(diff.proto_local);
             auto local_file = local_fi->get_file_infos().by_name(file_name);
             if (local_file) {
-                folder_entity->on_insert(*local_file);
+                folder_entity->on_insert(*local_file, *local_fi);
             }
         }
     }
@@ -222,14 +222,15 @@ auto supervisor_t::operator()(const model::diff::peer::update_folder_t &diff, vo
 
         auto &devices_map = cluster->get_devices();
         auto peer = devices_map.by_sha256(diff.peer_id);
-        auto &files_map = folder->get_folder_infos().by_device(*peer)->get_file_infos();
+        auto folder_info = folder->get_folder_infos().by_device(*peer);
+        auto &files_map = folder_info->get_file_infos();
 
         for (auto &file : diff.files) {
             auto file_name = proto::get_name(file);
             auto file_info = files_map.by_name(file_name);
             auto augmentation = file_info->get_augmentation().get();
             if (!augmentation) {
-                folder_entity->on_insert(*file_info);
+                folder_entity->on_insert(*file_info, *folder_info);
             }
         }
     }

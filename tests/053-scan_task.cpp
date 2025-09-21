@@ -642,7 +642,8 @@ SECTION("regular files") {
             auto file_peer = file_info_t::create(sequencer->next_uuid(), pr_file, folder_peer).value();
             auto ok = folder_peer->add_strict(file_peer);
             REQUIRE(ok);
-            auto file = fs::file_ptr_t(new fs::file_t(fs::file_t::open_write(file_peer).value()));
+            auto file_raw = fs::file_t::open_write(file_peer, *folder_peer).value();
+            auto file = fs::file_ptr_t(new fs::file_t(std::move(file_raw)));
             cache->put(file);
             REQUIRE(cache->get(file_path));
 

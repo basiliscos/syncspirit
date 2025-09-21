@@ -15,7 +15,7 @@ struct SYNCSPIRIT_API folder_entity_t final : entity_t, model::augmentation_t {
     folder_entity_t(model::folder_ptr_t folder) noexcept;
     model::folder_t &get_folder() noexcept;
     folder_presence_t *on_insert(model::folder_info_t &folder_info) noexcept;
-    entity_t *on_insert(model::file_info_t &file_info) noexcept;
+    entity_t *on_insert(model::file_info_t &file_info, const model::folder_info_t& folder_info) noexcept;
     void on_update() noexcept override;
     void on_delete() noexcept override;
 

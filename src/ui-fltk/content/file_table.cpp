@@ -99,6 +99,7 @@ file_table_t::file_table_t(presence_item_t &container_, int x, int y, int w, int
 }
 
 void file_table_t::refresh() {
+#if 0
     using allocator_t = std::pmr::polymorphic_allocator<char>;
     using counters_t = std::pmr::vector<proto::Counter>;
     auto buffer = std::array<std::byte, 1024>();
@@ -171,4 +172,6 @@ void file_table_t::refresh() {
     local_entries_cell->update(entries_stats);
 
     redraw();
+#endif
+    std::abort();
 }

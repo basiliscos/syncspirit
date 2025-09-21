@@ -25,14 +25,7 @@ bool scan_task_t::comparator_t::operator()(const queue_item_t &lhs, const queue_
         [&rhs](auto &l) {
             using T = std::decay_t<decltype(l)>;
             auto r = *std::get_if<T>(&rhs);
-            if constexpr (std::is_same_v<unseen_dir_t, T>) {
-                return (compare_paths(l.path, r.path));
-            } else if constexpr (std::is_same_v<file_t, T>) {
-                return (compare_paths(l.file->get_path(), r.file->get_path()));
-            } else if constexpr (std::is_same_v<unknown_file_t, T>) {
-                return (compare_paths(l.path, r.path));
-            }
-            return true;
+            return (compare_paths(l.path, r.path));
         },
         lhs);
 }
@@ -47,8 +40,8 @@ scan_task_t::scan_task_t(model::cluster_ptr_t cluster_, std::string_view folder_
         return;
     }
 
-    auto my_folder = folder->get_folder_infos().by_device(*cluster->get_device());
-    if (!my_folder) {
+    folder_info = folder->get_folder_infos().by_device(*cluster->get_device()).get();
+    if (!folder_info ) {
         return;
     }
 
@@ -60,7 +53,7 @@ scan_task_t::scan_task_t(model::cluster_ptr_t cluster_, std::string_view folder_
     stack.push(unseen_dir_t(path));
     root = path;
 
-    auto &orig_files = my_folder->get_file_infos();
+    auto &orig_files = folder_info->get_file_infos();
     for (auto &it : orig_files) {
         files.put(it);
     }
@@ -83,7 +76,8 @@ scan_result_t scan_task_t::advance() noexcept {
     }
     if (files.size() != 0) {
         auto file = *files.begin();
-        seen_paths.insert({std::string(file->get_name()->get_full_name()), file->get_path()});
+        auto path = file->get_path(*folder_info);
+        seen_paths.insert({std::string(file->get_name()->get_full_name()), std::move(path)});
         files.remove(file);
 
         bool unchanged = file->is_deleted() || (file->is_link() && !utils::platform_t::symlinks_supported());
@@ -135,7 +129,7 @@ scan_result_t scan_task_t::do_advance(unseen_dir_t queue_item) noexcept {
             auto name = file.get_name()->get_full_name();
             bool remove = str.empty() || (name.find(str) == 0);
             if (remove) {
-                seen_paths.insert({std::string(name), file.get_path()});
+                seen_paths.insert({std::string(name), file.get_path(*folder_info)});
                 removed.put(it);
             }
         }
@@ -159,9 +153,9 @@ scan_result_t scan_task_t::do_advance(unseen_dir_t queue_item) noexcept {
             if (file) {
                 removed.put(file);
                 if (status.type() == bfs::file_type::directory) {
-                    sub_queue.emplace_back(unseen_dir_t(child, file_t{file}));
+                    sub_queue.emplace_back(unseen_dir_t(child, file_t{file, child}));
                 } else {
-                    sub_queue.emplace_back(file_t(file));
+                    sub_queue.emplace_back(file_t(file, child));
                 }
                 continue;
             }
@@ -258,7 +252,7 @@ scan_result_t scan_task_t::do_advance(file_t queue_item) noexcept {
 scan_result_t scan_task_t::advance_regular_file(file_info_t &file) noexcept {
     sys::error_code ec;
 
-    auto path = file->get_path();
+    auto path = file->get_path(*folder_info);
     auto meta = proto::FileInfo();
     bool changed = false;
 
@@ -306,7 +300,7 @@ scan_result_t scan_task_t::advance_regular_file(file_info_t &file) noexcept {
 }
 
 scan_result_t scan_task_t::advance_symlink_file(file_info_t &file) noexcept {
-    auto path = file->get_path();
+    auto path = file->get_path(*folder_info);
 
     if (!bfs::is_symlink(path)) {
         LOG_CRITICAL(log, "not implemented change tracking: symlink -> non-symblink");

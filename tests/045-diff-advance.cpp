@@ -92,19 +92,19 @@ TEST_CASE("remove folder", "[model]") {
 
     SECTION("remote copy") {
         SECTION("all ok") {
-            REQUIRE(builder.remote_copy(*file_peer).apply());
+            REQUIRE(builder.remote_copy(*file_peer, *folder_peer).apply());
             REQUIRE(files_my.size() == 1);
         }
         SECTION("after unsharing") {
-            REQUIRE(builder.unshare_folder(*folder_peer).remote_copy(*file_peer).apply());
+            REQUIRE(builder.unshare_folder(*folder_peer).remote_copy(*file_peer, *folder_peer).apply());
             REQUIRE(files_my.size() == 0);
         }
         SECTION("after suspending") {
-            REQUIRE(builder.suspend(*folder).remote_copy(*file_peer).apply());
+            REQUIRE(builder.suspend(*folder).remote_copy(*file_peer, *folder_peer).apply());
             REQUIRE(files_my.size() == 0);
         }
         SECTION("after removing") {
-            REQUIRE(builder.remove_folder(*folder).remote_copy(*file_peer).apply());
+            REQUIRE(builder.remove_folder(*folder).remote_copy(*file_peer, *folder_peer).apply());
             REQUIRE(files_my.size() == 0);
         }
     }
@@ -116,19 +116,19 @@ TEST_CASE("remove folder", "[model]") {
         proto::set_value(c_l, 3);
 
         SECTION("all ok") {
-            REQUIRE(builder.advance(*file_peer).apply());
+            REQUIRE(builder.advance(*file_peer, *folder_peer).apply());
             REQUIRE(files_my.size() == 1);
         }
         SECTION("after unsharing") {
-            REQUIRE(builder.unshare_folder(*folder_peer).advance(*file_peer).apply());
+            REQUIRE(builder.unshare_folder(*folder_peer).advance(*file_peer, *folder_peer).apply());
             REQUIRE(files_my.size() == 0);
         }
         SECTION("after suspending") {
-            REQUIRE(builder.suspend(*folder).advance(*file_peer).apply());
+            REQUIRE(builder.suspend(*folder).advance(*file_peer, *folder_peer).apply());
             REQUIRE(files_my.size() == 0);
         }
         SECTION("after removing") {
-            REQUIRE(builder.remove_folder(*folder).advance(*file_peer).apply());
+            REQUIRE(builder.remove_folder(*folder).advance(*file_peer, *folder_peer).apply());
             REQUIRE(files_my.size() == 0);
         }
     }

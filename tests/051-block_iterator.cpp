@@ -20,10 +20,10 @@ TEST_CASE("block iterator", "[model]") {
     cluster->get_devices().put(my_device);
 
     auto block_iterator = block_iterator_ptr_t();
-    auto next = [&](file_info_ptr_t source, bool reset = false) -> file_block_t {
+    auto next = [&](file_info_ptr_t source, const folder_info_t& source_fi, bool reset = false) -> file_block_t {
         if (source && source->is_file() && !source->is_deleted()) {
             if (reset) {
-                block_iterator = new blocks_iterator_t(*source);
+                block_iterator = new blocks_iterator_t(*source, source_fi);
             }
             if (block_iterator && *block_iterator) {
                 return block_iterator->next();
@@ -49,7 +49,7 @@ TEST_CASE("block iterator", "[model]") {
         REQUIRE(builder.local_update(folder->get_id(), p_file).apply());
 
         auto my_file = my_folder->get_file_infos().by_name(proto::get_name(p_file));
-        REQUIRE(!next(my_file, true));
+        REQUIRE(!next(my_file, *my_folder, true));
     }
 
     auto b1_hash = utils::sha256_digest(as_bytes("12345")).value();
@@ -74,7 +74,7 @@ TEST_CASE("block iterator", "[model]") {
             REQUIRE(builder.local_update(folder->get_id(), p_file).apply());
 
             auto my_file = my_folder->get_file_infos().by_name(proto::get_name(p_file));
-            CHECK(!next(my_file, true));
+            CHECK(!next(my_file, *my_folder, true));
         }
 
         SECTION("normal iteration") {
@@ -87,19 +87,19 @@ TEST_CASE("block iterator", "[model]") {
             my_file->assign_block(bi1, 0);
             my_file->assign_block(bi2, 1);
 
-            auto fb1 = next(my_file, true);
+            auto fb1 = next(my_file, *my_folder, true);
             REQUIRE(fb1);
             CHECK(fb1.block()->get_hash() == b1_hash);
             CHECK(fb1.block_index() == 0);
             CHECK(fb1.file() == my_file.get());
 
-            auto fb2 = next(my_file);
+            auto fb2 = next(my_file, *my_folder);
             REQUIRE(fb2);
             CHECK(fb2.block()->get_hash() == b2_hash);
             CHECK(fb2.block_index() == 1);
             CHECK(fb2.file() == my_file.get());
 
-            REQUIRE(!next(my_file));
+            REQUIRE(!next(my_file, *my_folder));
         }
 
         SECTION("no iteration upon unavailable file") {
@@ -113,7 +113,7 @@ TEST_CASE("block iterator", "[model]") {
             my_file->assign_block(bi2, 1);
 
             my_file->mark_unreachable(true);
-            CHECK(!next(my_file, true));
+            CHECK(!next(my_file, *my_folder, true));
         }
     }
 
@@ -140,7 +140,7 @@ TEST_CASE("block iterator", "[model]") {
         my_file->assign_block(bi1, 0);
         REQUIRE(!my_file->is_locally_available());
 
-        auto fb1 = next(my_file, true);
+        auto fb1 = next(my_file, *my_folder, true);
         REQUIRE(fb1);
         CHECK(fb1.block()->get_hash() == b1_hash);
         CHECK(fb1.block_index() == 0);

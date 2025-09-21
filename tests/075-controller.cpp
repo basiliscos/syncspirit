@@ -1257,7 +1257,9 @@ void test_downloading_errors() {
             CHECK(f->is_unreachable());
             CHECK(!f->is_synchronizing());
 
-            CHECK(!f->local_file());
+
+            auto f_local = folder_my->get_file_infos().by_name(f->get_name()->get_full_name());
+            CHECK(!f_local);
             CHECK(!folder_my->get_folder()->is_synchronizing());
 
             sup->do_process();

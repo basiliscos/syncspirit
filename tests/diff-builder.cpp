@@ -251,20 +251,23 @@ diff_builder_t &diff_builder_t::unshare_folder(model::folder_info_t &fi) noexcep
     return assign(new diff::modify::unshare_folder_t(*cluster, fi));
 }
 
-diff_builder_t &diff_builder_t::remote_copy(const model::file_info_t &source) noexcept {
+diff_builder_t &diff_builder_t::remote_copy(const model::file_info_t &source, const model::folder_info_t& source_fi) noexcept {
     auto action = model::advance_action_t::remote_copy;
-    auto diff = diff::advance::remote_copy_t::create(action, source, *sequencer);
+    auto diff = diff::advance::remote_copy_t::create(action, source, source_fi, *sequencer);
     return assign(diff.get());
 }
 
-diff_builder_t &diff_builder_t::advance(const model::file_info_t &source) noexcept {
-    auto action = model::resolve(source);
-    auto diff = diff::advance::remote_copy_t::create(action, source, *sequencer);
+diff_builder_t &diff_builder_t::advance(const model::file_info_t &source, const model::folder_info_t& source_fi) noexcept {
+    auto folder = source_fi.get_folder();
+    auto local_fi = folder->get_folder_infos().by_device(*folder->get_cluster()->get_device());
+    auto local_file = local_fi->get_file_infos().by_name(source.get_name()->get_full_name());
+    auto action = model::resolve(source, local_file.get(), *local_fi);
+    auto diff = diff::advance::remote_copy_t::create(action, source, source_fi, *sequencer);
     return assign(diff.get());
 }
 
-diff_builder_t &diff_builder_t::finish_file(const model::file_info_t &file) noexcept {
-    return assign(new diff::modify::finish_file_t(file));
+diff_builder_t &diff_builder_t::finish_file(const model::file_info_t &file, const model::folder_info_t& folder_info) noexcept {
+    return assign(new diff::modify::finish_file_t(file, folder_info));
 }
 
 diff_builder_t &diff_builder_t::local_update(std::string_view folder_id, const proto::FileInfo &file_) noexcept {
@@ -293,13 +296,15 @@ diff_builder_t &diff_builder_t::update_contact(const model::device_id_t &device,
     return assign(new model::diff::contact::update_contact_t(*cluster, device, uris));
 }
 
-diff_builder_t &diff_builder_t::append_block(const model::file_info_t &target, size_t block_index,
+diff_builder_t &diff_builder_t::append_block(const model::file_info_t &target,
+                                              const model::folder_info_t& target_fi,
+                                             size_t block_index,
                                              utils::bytes_t data) noexcept {
-    return assign(new diff::modify::append_block_t(target, block_index, std::move(data)));
+    return assign(new diff::modify::append_block_t(target, target_fi, block_index, std::move(data)));
 }
 
-diff_builder_t &diff_builder_t::clone_block(const model::file_block_t &file_block) noexcept {
-    return assign(new diff::modify::clone_block_t(file_block));
+diff_builder_t &diff_builder_t::clone_block(const model::file_block_t &file_block,  const model::folder_info_t& target_fi, const model::folder_info_t& source_fi) noexcept {
+    return assign(new diff::modify::clone_block_t(file_block, target_fi, source_fi));
 }
 
 diff_builder_t &diff_builder_t::ack_block(const model::diff::modify::block_transaction_t &diff) noexcept {
@@ -347,8 +352,8 @@ diff_builder_t &diff_builder_t::synchronization_finish(std::string_view id) noex
     return assign(new model::diff::local::synchronization_finish_t(std::string(id)));
 }
 
-diff_builder_t &diff_builder_t::mark_reacheable(model::file_info_ptr_t peer_file, bool value) noexcept {
-    return assign(new model::diff::modify::mark_reachable_t(*peer_file, value));
+diff_builder_t &diff_builder_t::mark_reacheable(model::file_info_ptr_t peer_file, const model::folder_info_t& peer_fi, bool value) noexcept {
+    return assign(new model::diff::modify::mark_reachable_t(*peer_file, peer_fi, value));
 }
 
 diff_builder_t &diff_builder_t::suspend(const model::folder_t &folder) noexcept {

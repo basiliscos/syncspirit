@@ -9,12 +9,13 @@
 namespace syncspirit::model {
 
 struct file_info_t;
+struct folder_info_t;
 
 namespace diff {
 
 struct SYNCSPIRIT_API block_diff_t : cluster_diff_t {
     block_diff_t(const block_diff_t &) noexcept;
-    block_diff_t(const file_info_t &file, size_t block_index = 0) noexcept;
+    block_diff_t(const file_info_t &file, const folder_info_t &fi, size_t block_index = 0) noexcept;
 
     std::string file_name;
     std::string folder_id;

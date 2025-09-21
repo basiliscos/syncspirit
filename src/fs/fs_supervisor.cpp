@@ -177,11 +177,11 @@ auto fs_supervisor_t::apply(const model::diff::advance::advance_t &diff, void *c
         auto folder_entity = static_cast<presentation::folder_entity_t *>(augmentation);
         if (folder_entity) {
             auto &folder_infos = folder->get_folder_infos();
-            auto local_fi = folder_infos.by_device(*cluster->get_device());
+            auto &local_fi = *folder_infos.by_device(*cluster->get_device());
             auto file_name = proto::get_name(diff.proto_local);
-            auto local_file = local_fi->get_file_infos().by_name(file_name);
+            auto local_file = local_fi.get_file_infos().by_name(file_name);
             if (local_file) {
-                folder_entity->on_insert(*local_file);
+                folder_entity->on_insert(*local_file, local_fi);
             }
         }
     }
@@ -198,14 +198,15 @@ auto fs_supervisor_t::apply(const model::diff::peer::update_folder_t &diff, void
 
         auto &devices_map = cluster->get_devices();
         auto peer = devices_map.by_sha256(diff.peer_id);
-        auto &files_map = folder->get_folder_infos().by_device(*peer)->get_file_infos();
+        auto &folder_info = *folder->get_folder_infos().by_device(*peer);
+        auto &files_map = folder_info.get_file_infos();
 
         for (auto &file : diff.files) {
             auto file_name = proto::get_name(file);
             auto file_info = files_map.by_name(file_name);
             auto augmentation = file_info->get_augmentation().get();
             if (!augmentation) {
-                folder_entity->on_insert(*file_info);
+                folder_entity->on_insert(*file_info, folder_info);
             }
         }
     }

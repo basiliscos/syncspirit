@@ -102,6 +102,7 @@ struct SYNCSPIRIT_API scan_task_t : boost::intrusive_ref_counter<scan_task_t, bo
 
     struct file_t {
         file_info_t file;
+        bfs::path path;
     };
 
     struct unseen_dir_t {
@@ -127,6 +128,7 @@ struct SYNCSPIRIT_API scan_task_t : boost::intrusive_ref_counter<scan_task_t, bo
 
     std::string folder_id;
     model::folder_ptr_t folder;
+    model::folder_info_t* folder_info;
     model::cluster_ptr_t cluster;
     file_cache_ptr_t rw_cache;
     model::file_infos_map_t files;

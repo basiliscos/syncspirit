@@ -32,6 +32,8 @@ struct blocks_iterator_t;
 struct file_info_t;
 using file_info_ptr_t = intrusive_ptr_t<file_info_t>;
 
+struct path_cache_t;
+
 struct SYNCSPIRIT_API file_info_t final : augmentable_t {
 
     // clang-format off
@@ -58,7 +60,7 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t {
 
     struct guard_t {
         guard_t() noexcept = default;
-        guard_t(file_info_t &file) noexcept;
+        guard_t(file_info_t &file, const folder_info_t* folder_info) noexcept;
         guard_t(const guard_t &) = delete;
         guard_t(guard_t &&) = default;
         ~guard_t();
@@ -66,6 +68,7 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t {
         guard_t &operator=(guard_t &&) noexcept = default;
 
         file_info_ptr_t file;
+        const folder_info_t* folder_info;
     };
 
     static outcome::result<file_info_ptr_t> create(utils::bytes_view_t key, const db::FileInfo &data,
@@ -94,7 +97,7 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t {
 
     void update(const file_info_t &updated) noexcept;
 
-    inline folder_info_t *get_folder_info() const noexcept { return folder_info; }
+    utils::bytes_view_t get_folder_uuid() const noexcept;
     const path_ptr_t &get_name() const noexcept;
     inline version_t &get_version() noexcept { return version; }
     inline const version_t &get_version() const noexcept { return version; }
@@ -124,22 +127,18 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t {
 
     void mark_unreachable(bool value) noexcept;
     void mark_local_available(size_t block_index) noexcept;
-    void mark_local(bool available) noexcept;
+    void mark_local(bool available, const folder_info_t&) noexcept;
     bool is_locally_available(size_t block_index) const noexcept;
     bool is_locally_available() const noexcept;
     bool is_partly_available() const noexcept;
 
     const std::string &get_link_target() const noexcept { return symlink_target; }
 
-    const bfs::path get_path() const noexcept;
+    const bfs::path get_path(const folder_info_t& folder_info) const noexcept;
 
     inline std::int64_t get_modified_s() const noexcept { return modified_s; }
     inline std::int32_t get_modified_ns() const noexcept { return modified_ns; }
     inline std::uint64_t get_modified_by() const noexcept { return modified_by; }
-
-    file_info_ptr_t local_file() const noexcept;
-
-    bool is_global() const noexcept;
 
     bool is_synchronizing() const noexcept;
     void synchronizing_lock() noexcept;
@@ -153,8 +152,8 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t {
 
     static const constexpr auto data_length = 1 + uuid_length * 2;
 
-    outcome::result<void> fields_update(const db::FileInfo &) noexcept;
-    outcome::result<void> fields_update(const proto::FileInfo &) noexcept;
+    outcome::result<void> fields_update(const db::FileInfo &, model::path_cache_t&) noexcept;
+    outcome::result<void> fields_update(const proto::FileInfo &, model::path_cache_t&) noexcept;
 
     proto::Index generate() noexcept;
     std::size_t expected_meta_size() const noexcept;
@@ -162,7 +161,7 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t {
     std::uint32_t get_permissions() const noexcept;
     bool has_no_permissions() const noexcept;
 
-    guard_t guard() noexcept;
+    guard_t guard(const model::folder_info_t& folder_info) noexcept;
 
     std::string make_conflicting_name() const noexcept;
 
@@ -182,7 +181,6 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t {
     unsigned char key[data_length];
     std::int32_t block_size;
     path_ptr_t name;
-    folder_info_t *folder_info;
     std::int64_t size;
     std::int64_t modified_s;
     std::uint64_t modified_by;
@@ -273,9 +271,9 @@ struct SYNCSPIRIT_API file_infos_map_t : private file_details::file_map_base_t {
 
     bool put(const model::file_info_ptr_t &item, bool replace = true) noexcept;
     void remove(const model::file_info_ptr_t &item) noexcept;
-    file_info_ptr_t by_uuid(utils::bytes_view_t) noexcept;
-    file_info_ptr_t by_name(std::string_view name) noexcept;
-    file_info_ptr_t by_sequence(std::int64_t sequence) noexcept;
+    file_info_ptr_t by_uuid(utils::bytes_view_t) const noexcept;
+    file_info_ptr_t by_name(std::string_view name) const noexcept;
+    file_info_ptr_t by_sequence(std::int64_t sequence) const noexcept;
     seq_projection_t &sequence_projection() noexcept;
     range_t range(std::int64_t lower, std::int64_t upper) noexcept;
 };

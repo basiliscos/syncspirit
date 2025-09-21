@@ -99,6 +99,7 @@ void scan_actor_t::on_scan(message::scan_progress_t &message) noexcept {
     LOG_TRACE(log, "on_scan, folder = {}", folder_id);
 
     auto folder = cluster->get_folders().by_id(folder_id);
+    auto folder_local = folder->get_folder_infos().by_device(*folder->get_cluster()->get_device());
     bool stop_processing = false;
     bool completed = false;
     if (folder->is_suspended()) {
@@ -118,20 +119,18 @@ void scan_actor_t::on_scan(message::scan_progress_t &message) noexcept {
                 } else if constexpr (std::is_same_v<T, scan_errors_t>) {
                     task->push(new local::io_failure_t(std::move(r)), 0, true);
                 } else if constexpr (std::is_same_v<T, unchanged_meta_t>) {
-                    task->push(new local::file_availability_t(r.file), 0, true);
+                    task->push(new local::file_availability_t(r.file, *folder_local), 0, true);
                 } else if constexpr (std::is_same_v<T, removed_t>) {
                     auto &file = *r.file;
-                    auto folder = file.get_folder_info()->get_folder();
                     LOG_DEBUG(log, "locally removed '{}'", file);
-                    auto folder_id = std::string(folder->get_id());
                     auto fi = file.as_proto(false);
                     proto::set_deleted(fi, true);
-                    task->push(new advance::local_update_t(*cluster, *sequencer, std::move(fi), std::move(folder_id)),
+                    task->push(new advance::local_update_t(*cluster, *sequencer, std::move(fi), std::string(folder_id)),
                                0, true);
                 } else if constexpr (std::is_same_v<T, changed_meta_t>) {
                     auto &file = *r.file;
                     auto &metadata = r.metadata;
-                    auto errs = initiate_hash(task, file.get_path(), metadata);
+                    auto errs = initiate_hash(task, file.get_path(*folder_local), metadata);
                     if (errs.empty()) {
                         stop_processing = true;
                     } else {
@@ -146,8 +145,9 @@ void scan_actor_t::on_scan(message::scan_progress_t &message) noexcept {
                     }
                 } else if constexpr (std::is_same_v<T, incomplete_t>) {
                     auto &f = r.file;
+                    auto fi = folder->get_folder_infos().by_uuid(f->get_folder_uuid());
                     stop_processing = true;
-                    send<payload::rehash_needed_t>(address, task, std::move(f), std::move(r.opened_file));
+                    send<payload::rehash_needed_t>(address, task, std::move(f), *fi, std::move(r.opened_file));
                 } else if constexpr (std::is_same_v<T, incomplete_removed_t>) {
                     auto &file = *r.file;
                 } else if constexpr (std::is_same_v<T, orphaned_removed_t>) {
@@ -262,6 +262,7 @@ void scan_actor_t::on_hash(hasher::message::digest_response_t &res) noexcept {
         return do_shutdown(ee);
     }
 
+    auto& fi = info.get_folder();
     bool queued_next = false;
     auto &digest = res.payload.res.digest;
     auto block_index = rp.block_index;
@@ -286,7 +287,7 @@ void scan_actor_t::on_hash(hasher::message::digest_response_t &res) noexcept {
                 }
             }
             if (valid_blocks_count) {
-                task.push(new model::diff::local::blocks_availability_t(*file, info.valid_blocks()));
+                task.push(new model::diff::local::blocks_availability_t(*file, fi, info.valid_blocks()));
             } else {
                 LOG_DEBUG(log, "file '{}' has no unknown local blocks, ingnoring", *file);
             }

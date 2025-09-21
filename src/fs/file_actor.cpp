@@ -12,6 +12,7 @@
 #include "model/diff/modify/finish_file.h"
 #include "model/diff/modify/mark_reachable.h"
 #include "presentation/presence.h"
+#include "presentation/cluster_file_presence.h"
 #include "utils.h"
 #include "utils/io.h"
 #include "utils/format.hpp"
@@ -124,9 +125,9 @@ void file_actor_t::on_block_request(message::block_request_t &message) noexcept 
     auto &dest = p.reply_to;
     auto &req = message.payload.remote_request;
     auto folder = cluster->get_folders().by_id(get_folder(req));
-    auto folder_info = folder->get_folder_infos().by_device(*cluster->get_device());
-    auto file_info = folder_info->get_file_infos().by_name(get_name(req));
-    auto &path = file_info->get_path();
+    auto &folder_info = *folder->get_folder_infos().by_device(*cluster->get_device());
+    auto file_info = folder_info.get_file_infos().by_name(get_name(req));
+    auto &path = file_info->get_path(folder_info);
     auto file_opt = open_file_ro(path, true);
     auto ec = sys::error_code{};
     auto data = utils::bytes_t{};
@@ -161,7 +162,8 @@ void file_actor_t::on_controller_predown(net::message::controller_predown_t &mes
     }
 }
 
-auto file_actor_t::reflect(model::file_info_ptr_t &file_ptr, const bfs::path &path) noexcept -> outcome::result<void> {
+auto file_actor_t::reflect(model::file_info_ptr_t &file_ptr, const model::folder_info_t &folder_info,
+                           const bfs::path &path) noexcept -> outcome::result<void> {
     auto &file = *file_ptr;
     sys::error_code ec;
 
@@ -205,7 +207,7 @@ auto file_actor_t::reflect(model::file_info_ptr_t &file_ptr, const bfs::path &pa
         bool temporal = sz > 0;
         if (temporal) {
             LOG_TRACE(log, "touching file {} ({} bytes)", path.string(), sz);
-            auto file_opt = open_file_rw(path, &file);
+            auto file_opt = open_file_rw(path, &file, folder_info);
             if (!file_opt) {
                 auto &err = file_opt.assume_error();
                 LOG_ERROR(log, "cannot open file: {}: {}", path.string(), err.message());
@@ -226,7 +228,7 @@ auto file_actor_t::reflect(model::file_info_ptr_t &file_ptr, const bfs::path &pa
             }
         }
         set_perms = utils::platform_t::permissions_supported(path) && !file.has_no_permissions() &&
-                    !file.get_folder_info()->get_folder()->are_permissions_ignored();
+                    !folder_info.get_folder()->are_permissions_ignored();
     } else if (file.is_dir()) {
         LOG_DEBUG(log, "creating directory {}", path.string());
         bfs::create_directory(path, ec);
@@ -234,7 +236,7 @@ auto file_actor_t::reflect(model::file_info_ptr_t &file_ptr, const bfs::path &pa
             return ec;
         }
         set_perms = utils::platform_t::permissions_supported(path) && !file.has_no_permissions() &&
-                    !file.get_folder_info()->get_folder()->are_permissions_ignored();
+                    !folder_info.get_folder()->are_permissions_ignored();
     } else if (file.is_link()) {
         if (utils::platform_t::symlinks_supported()) {
             auto target = bfs::path(file.get_link_target());
@@ -272,15 +274,15 @@ auto file_actor_t::reflect(model::file_info_ptr_t &file_ptr, const bfs::path &pa
 auto file_actor_t::operator()(const model::diff::advance::remote_copy_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     auto folder = cluster->get_folders().by_id(diff.folder_id);
-    auto file_info = folder->get_folder_infos().by_device_id(diff.peer_id);
+    auto &folder_info = *folder->get_folder_infos().by_device_id(diff.peer_id);
     auto name = get_name(diff.proto_source);
-    auto file = file_info->get_file_infos().by_name(name);
-    auto r = reflect(file, file->get_path());
+    auto file = folder_info.get_file_infos().by_name(name);
+    auto r = reflect(file, folder_info, file->get_path(folder_info));
     if (!r) {
         auto msg = r.error().message();
         LOG_ERROR(log, "cannot reflect (create) file '{}': {}", *file, msg);
         auto diff = model::diff::cluster_diff_ptr_t();
-        diff = new model::diff::modify::mark_reachable_t(*file, false);
+        diff = new model::diff::modify::mark_reachable_t(*file, folder_info, false);
         send<model::payload::model_update_t>(coordinator, std::move(diff), this);
     }
     return diff.visit_next(*this, custom);
@@ -289,12 +291,12 @@ auto file_actor_t::operator()(const model::diff::advance::remote_copy_t &diff, v
 auto file_actor_t::operator()(const model::diff::advance::remote_win_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     auto folder = cluster->get_folders().by_id(diff.folder_id);
-    auto folder_info = folder->get_folder_infos();
-    auto file_info = folder_info.by_device_id(diff.peer_id);
+    auto folder_infos = folder->get_folder_infos();
+    auto &folder_info = *folder_infos.by_device_id(diff.peer_id);
     auto source_name = get_name(diff.proto_source);
     auto local_name = get_name(diff.proto_local);
-    auto file = file_info->get_file_infos().by_name(source_name);
-    auto &source_path = file->get_path();
+    auto file = folder_info.get_file_infos().by_name(source_name);
+    auto &source_path = file->get_path(folder_info);
     auto target_path = folder->get_path() / local_name;
     LOG_DEBUG(log, "renaming {} -> {}", source_path, target_path);
     auto ec = sys::error_code{};
@@ -303,7 +305,7 @@ auto file_actor_t::operator()(const model::diff::advance::remote_win_t &diff, vo
     if (ec) {
         LOG_ERROR(log, "cannot rename file '{}': {}", file, ec.message());
         auto diff = model::diff::cluster_diff_ptr_t();
-        diff = new model::diff::modify::mark_reachable_t(*file, false);
+        diff = new model::diff::modify::mark_reachable_t(*file, folder_info, false);
         send<model::payload::model_update_t>(coordinator, std::move(diff), this);
     }
     return diff.visit_next(*this, custom);
@@ -313,11 +315,11 @@ auto file_actor_t::operator()(const model::diff::modify::finish_file_t &diff, vo
     -> outcome::result<void> {
     auto folder = cluster->get_folders().by_id(diff.folder_id);
     if (folder) {
-        auto file_info = folder->get_folder_infos().by_device_id(diff.peer_id);
-        if (file_info) {
-            auto file = file_info->get_file_infos().by_name(diff.file_name);
+        auto folder_info = folder->get_folder_infos().by_device_id(diff.peer_id);
+        if (folder_info) {
+            auto file = folder_info->get_file_infos().by_name(diff.file_name);
             if (file) {
-                auto &local_path = file->get_path();
+                auto &local_path = file->get_path(*folder_info);
                 auto action = diff.action;
 
                 if (action == model::advance_action_t::resolve_remote_win) {
@@ -338,8 +340,8 @@ auto file_actor_t::operator()(const model::diff::modify::finish_file_t &diff, vo
                 if (!backend) {
                     LOG_DEBUG(log, "attempt to flush non-opened file {}, re-open it as temporal",
                               local_path.generic_string());
-                    auto path_tmp = make_temporal(file->get_path());
-                    auto result = open_file_rw(path_tmp, file);
+                    auto path_tmp = make_temporal(local_path);
+                    auto result = open_file_rw(path_tmp, file, *folder_info);
                     if (!result) {
                         auto &ec = result.assume_error();
                         LOG_ERROR(log, "cannot open file: {}: {}", path_tmp.string(), ec.message());
@@ -358,7 +360,7 @@ auto file_actor_t::operator()(const model::diff::modify::finish_file_t &diff, vo
 
                 LOG_INFO(log, "file {} ({} bytes) is now locally available", *file, file->get_size());
 
-                auto ack = model::diff::advance::advance_t::create(action, *file, *sequencer);
+                auto ack = model::diff::advance::advance_t::create(action, *file, *folder_info, *sequencer);
                 send<model::payload::model_update_t>(coordinator, std::move(ack), this);
             }
         }
@@ -370,11 +372,11 @@ auto file_actor_t::operator()(const model::diff::modify::append_block_t &diff, v
     -> outcome::result<void> {
     auto guard = write_guard_t(*this, diff);
     auto folder = cluster->get_folders().by_id(diff.folder_id);
-    auto file_info = folder->get_folder_infos().by_device_id(diff.device_id);
-    auto file = file_info->get_file_infos().by_name(diff.file_name);
-    auto &path = file->get_path();
+    auto &folder_info = *folder->get_folder_infos().by_device_id(diff.device_id);
+    auto file = folder_info.get_file_infos().by_name(diff.file_name);
+    auto &path = file->get_path(folder_info);
     auto path_str = path.string();
-    auto file_opt = open_file_rw(path, file);
+    auto file_opt = open_file_rw(path, file, folder_info);
     if (!file_opt) {
         auto &err = file_opt.assume_error();
         LOG_ERROR(log, "cannot open file: {}: {}", path_str, err.message());
@@ -388,9 +390,9 @@ auto file_actor_t::operator()(const model::diff::modify::append_block_t &diff, v
     return r ? diff.visit_next(*this, custom) : r;
 }
 
-auto file_actor_t::get_source_for_cloning(model::file_info_ptr_t &source, const file_ptr_t &target_backend) noexcept
+auto file_actor_t::get_source_for_cloning(model::file_info_ptr_t &source, const model::folder_info_t& source_fi, const file_ptr_t &target_backend) noexcept
     -> outcome::result<file_ptr_t> {
-    auto source_path = source->get_path();
+    auto source_path = source->get_path(source_fi);
     if (source_path == target_backend->get_path()) {
         return target_backend;
     }
@@ -401,7 +403,7 @@ auto file_actor_t::get_source_for_cloning(model::file_info_ptr_t &source, const 
         return cached;
     } else if (auto cached = rw_cache->get(source_tmp); cached) {
         return cached;
-    } else if (auto cached = ro_cache.get(source_tmp); cached) {
+    } else if (auto cached = ro_cache.get(source_path); cached) {
         return cached;
     } else if (auto cached = ro_cache.get(source_tmp); cached) {
         return cached;
@@ -416,22 +418,22 @@ auto file_actor_t::operator()(const model::diff::modify::clone_block_t &diff, vo
     -> outcome::result<void> {
     auto guard = write_guard_t(*this, diff);
     auto folder = cluster->get_folders().by_id(diff.folder_id);
-    auto target_folder_info = folder->get_folder_infos().by_device_id(diff.device_id);
-    auto target = target_folder_info->get_file_infos().by_name(diff.file_name);
+    auto &target_folder_info = *folder->get_folder_infos().by_device_id(diff.device_id);
+    auto target = target_folder_info.get_file_infos().by_name(diff.file_name);
 
     auto source_folder = cluster->get_folders().by_id(diff.source_folder_id);
     auto source_folder_info = source_folder->get_folder_infos().by_device_id(diff.source_device_id);
     auto source = source_folder_info->get_file_infos().by_name(diff.source_file_name);
 
-    auto &target_path = target->get_path();
-    auto file_opt = open_file_rw(target_path, target);
+    auto &target_path = target->get_path(target_folder_info);
+    auto file_opt = open_file_rw(target_path, target, target_folder_info);
     if (!file_opt) {
         auto &err = file_opt.assume_error();
         LOG_ERROR(log, "cannot open file: {}: {}", target_path.string(), err.message());
         return err;
     }
     auto target_backend = std::move(file_opt.assume_value());
-    auto source_backend_opt = get_source_for_cloning(source, target_backend);
+    auto source_backend_opt = get_source_for_cloning(source, *source_folder_info, target_backend);
     if (!source_backend_opt) {
         auto ec = source_backend_opt.assume_error();
         LOG_ERROR(log, "cannot open source file for cloning: {}: {}", diff.source_file_name, ec.message());
@@ -446,13 +448,14 @@ auto file_actor_t::operator()(const model::diff::modify::clone_block_t &diff, vo
     return r ? diff.visit_next(*this, custom) : r;
 }
 
-auto file_actor_t::open_file_rw(const std::filesystem::path &path, model::file_info_ptr_t info) noexcept
+auto file_actor_t::open_file_rw(const std::filesystem::path &path, model::file_info_ptr_t info, const model::folder_info_t &folder_info) noexcept
     -> outcome::result<file_ptr_t> {
     auto augmentation = info.get()->get_augmentation();
     auto presence = static_cast<presentation::presence_t *>(augmentation.get());
     if (!presence->is_unique()) {
         return utils::make_error_code(utils::error_code_t::nonunique_filename);
     }
+
 
     LOG_TRACE(log, "open_file (r/w, by path), path = {}", path.string());
     auto item = rw_cache->get(path);
@@ -476,7 +479,7 @@ auto file_actor_t::open_file_rw(const std::filesystem::path &path, model::file_i
         }
     }
 
-    auto option = file_t::open_write(info);
+    auto option = file_t::open_write(info, folder_info);
     if (!option) {
         return option.assume_error();
     }

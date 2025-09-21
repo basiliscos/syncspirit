@@ -9,7 +9,9 @@ using namespace syncspirit::model;
 
 static constexpr auto wrong_index = std::numeric_limits<size_t>::max();
 
-blocks_iterator_t::blocks_iterator_t(file_info_t &source_) noexcept : i{0}, source{&source_} {
+blocks_iterator_t::blocks_iterator_t(file_info_t &source_, const folder_info_t &source_folder_) noexcept :
+    source_folder{source_folder_}, source{&source_},
+    i{0} {
     auto &sb = source->get_blocks();
     if (i == sb.size()) {
         i = wrong_index;

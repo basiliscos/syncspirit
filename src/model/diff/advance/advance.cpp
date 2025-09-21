@@ -26,14 +26,14 @@ static std::string_view stringify(advance_action_t action) {
     return "ignore";
 }
 
-auto advance_t::create(advance_action_t action, const model::file_info_t &source, sequencer_t &sequencer) noexcept
+auto advance_t::create(advance_action_t action, const model::file_info_t &source,
+                       const model::folder_info_t& source_fi,  sequencer_t &sequencer) noexcept
     -> cluster_diff_ptr_t {
-    auto &cluster = *source.get_folder_info()->get_folder()->get_cluster();
+    auto folder = source_fi.get_folder();
+    auto &cluster = *folder->get_cluster();
     auto proto_file = source.as_proto(true);
-    auto peer_folder_info = source.get_folder_info();
-    auto folder = peer_folder_info->get_folder();
     auto folder_id = folder->get_id();
-    auto peer_id = peer_folder_info->get_device()->device_id().get_sha256();
+    auto peer_id = source_fi.get_device()->device_id().get_sha256();
 
     if (action == advance_action_t::remote_copy) {
         return new remote_copy_t(cluster, sequencer, std::move(proto_file), folder_id, peer_id);
@@ -163,7 +163,7 @@ auto advance_t::apply_impl(apply_controller_t &controller, void *custom) const n
     }
 
     auto sequence = local_folder->get_max_sequence() + 1;
-    local_file->mark_local(true);
+    local_file->mark_local(true, *local_folder);
     local_file->set_sequence(sequence);
     local_folder->add_strict(local_file);
 

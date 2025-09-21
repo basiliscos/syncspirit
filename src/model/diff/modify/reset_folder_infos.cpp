@@ -19,7 +19,7 @@ reset_folder_infos_t::reset_folder_infos_t(const uuid_folder_infos_map_t &map, o
         auto &files_info = folder_info.get_file_infos();
         if (files_info.size()) {
             auto diff = cluster_diff_ptr_t{};
-            diff = new remove_files_t(*folder_info.get_device(), files_info, &orphaned_blocks);
+            diff = new remove_files_t(folder_info, files_info, &orphaned_blocks);
             current = current ? current->assign_sibling(diff.get()) : assign_child(diff);
         }
     }
