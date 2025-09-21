@@ -220,7 +220,8 @@ TEST_CASE("file iterator, single folder", "[model]") {
             SECTION("0 files are missing on my side") {
                 auto peer_file_1 = peer_files.by_name("a.txt");
                 auto peer_file_2 = peer_files.by_name("b.txt");
-                REQUIRE(builder.remote_copy(*peer_file_1, *peer_folder).remote_copy(*peer_file_2, *peer_folder).apply());
+                REQUIRE(
+                    builder.remote_copy(*peer_file_1, *peer_folder).remote_copy(*peer_file_2, *peer_folder).apply());
                 CHECK(file_iterator->next() == R{{}, {}, A::ignore});
             }
             SECTION("new file in new peer update") {

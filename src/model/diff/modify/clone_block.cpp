@@ -8,7 +8,8 @@
 
 using namespace syncspirit::model::diff::modify;
 
-clone_block_t::clone_block_t(const file_block_t &file_block, const folder_info_t &target_fi, const folder_info_t &source_fi) noexcept
+clone_block_t::clone_block_t(const file_block_t &file_block, const folder_info_t &target_fi,
+                             const folder_info_t &source_fi) noexcept
     : block_transaction_t{*file_block.file(), target_fi, file_block.block_index()} {
     const file_info_t *source_file = nullptr;
     auto &block_pieces = file_block.block()->get_file_blocks();
@@ -26,8 +27,7 @@ clone_block_t::clone_block_t(const file_block_t &file_block, const folder_info_t
     source_folder_id = folder->get_id();
     source_file_name = source_file->get_name()->get_full_name();
 
-    assert(file_block.file()->get_blocks().at(block_index)->get_hash() == folder
-                                                                              ->get_cluster()
+    assert(file_block.file()->get_blocks().at(block_index)->get_hash() == folder->get_cluster()
                                                                               ->get_folders()
                                                                               .by_id(source_folder_id)
                                                                               ->get_folder_infos()

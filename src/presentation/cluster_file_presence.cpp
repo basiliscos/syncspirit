@@ -14,9 +14,9 @@ using namespace syncspirit::presentation;
 using F = presence_t::features_t;
 
 cluster_file_presence_t::cluster_file_presence_t(std::uint32_t default_features_, file_entity_t &entity,
-                                                 model::file_info_t &file_info_, const model::folder_info_t &folder_info) noexcept
-    : file_presence_t(&entity, folder_info.get_device()), file_info{file_info_},
-      default_features{default_features_} {
+                                                 model::file_info_t &file_info_,
+                                                 const model::folder_info_t &folder_info) noexcept
+    : file_presence_t(&entity, folder_info.get_device()), file_info{file_info_}, default_features{default_features_} {
     link(&file_info);
     refresh_features();
     statistics = own_statistics = refresh_own_stats();

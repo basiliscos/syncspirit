@@ -390,8 +390,8 @@ auto file_actor_t::operator()(const model::diff::modify::append_block_t &diff, v
     return r ? diff.visit_next(*this, custom) : r;
 }
 
-auto file_actor_t::get_source_for_cloning(model::file_info_ptr_t &source, const model::folder_info_t& source_fi, const file_ptr_t &target_backend) noexcept
-    -> outcome::result<file_ptr_t> {
+auto file_actor_t::get_source_for_cloning(model::file_info_ptr_t &source, const model::folder_info_t &source_fi,
+                                          const file_ptr_t &target_backend) noexcept -> outcome::result<file_ptr_t> {
     auto source_path = source->get_path(source_fi);
     if (source_path == target_backend->get_path()) {
         return target_backend;
@@ -448,14 +448,13 @@ auto file_actor_t::operator()(const model::diff::modify::clone_block_t &diff, vo
     return r ? diff.visit_next(*this, custom) : r;
 }
 
-auto file_actor_t::open_file_rw(const std::filesystem::path &path, model::file_info_ptr_t info, const model::folder_info_t &folder_info) noexcept
-    -> outcome::result<file_ptr_t> {
+auto file_actor_t::open_file_rw(const std::filesystem::path &path, model::file_info_ptr_t info,
+                                const model::folder_info_t &folder_info) noexcept -> outcome::result<file_ptr_t> {
     auto augmentation = info.get()->get_augmentation();
     auto presence = static_cast<presentation::presence_t *>(augmentation.get());
     if (!presence->is_unique()) {
         return utils::make_error_code(utils::error_code_t::nonunique_filename);
     }
-
 
     LOG_TRACE(log, "open_file (r/w, by path), path = {}", path.string());
     auto item = rw_cache->get(path);

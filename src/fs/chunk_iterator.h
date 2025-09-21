@@ -21,9 +21,7 @@ namespace bfs = std::filesystem;
 struct SYNCSPIRIT_API chunk_iterator_t {
     using valid_blocks_map_t = std::vector<bool>;
 
-    chunk_iterator_t(scan_task_ptr_t task,
-                     model::file_info_ptr_t file,
-                     const model::folder_info_t& peer_folder,
+    chunk_iterator_t(scan_task_ptr_t task, model::file_info_ptr_t file, const model::folder_info_t &peer_folder,
                      file_ptr_t backend) noexcept;
 
     bool has_more_chunks() const noexcept;
@@ -36,7 +34,7 @@ struct SYNCSPIRIT_API chunk_iterator_t {
     outcome::result<details::chunk_t> read() noexcept;
 
     inline model::file_info_ptr_t get_file() { return peer_file; }
-    inline const model::folder_info_t& get_folder() { return peer_folder; }
+    inline const model::folder_info_t &get_folder() { return peer_folder; }
 
     inline bfs::path get_path() noexcept { return backend->get_path(); }
     inline outcome::result<void> remove() noexcept { return backend->remove(); }
@@ -45,7 +43,7 @@ struct SYNCSPIRIT_API chunk_iterator_t {
 
   private:
     scan_task_ptr_t task;
-    const model::folder_info_t& peer_folder;
+    const model::folder_info_t &peer_folder;
     model::file_info_ptr_t peer_file;
     file_ptr_t backend;
     int64_t last_queued_block;

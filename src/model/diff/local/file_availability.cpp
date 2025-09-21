@@ -19,7 +19,7 @@ auto file_availability_t::apply_impl(apply_controller_t &controller, void *custo
     auto &cluster = controller.get_cluster();
     auto folder = cluster.get_folders().by_id(folder_id);
     if (folder) {
-        auto& folder_info = *folder->get_folder_infos().by_device(*cluster.get_device());
+        auto &folder_info = *folder->get_folder_infos().by_device(*cluster.get_device());
         auto f = folder_info.get_file_infos().by_name(file->get_name()->get_full_name());
         if (f->get_version().identical_to(version)) {
             f->mark_local(true, folder_info);

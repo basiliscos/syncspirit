@@ -26,9 +26,8 @@ static std::string_view stringify(advance_action_t action) {
     return "ignore";
 }
 
-auto advance_t::create(advance_action_t action, const model::file_info_t &source,
-                       const model::folder_info_t& source_fi,  sequencer_t &sequencer) noexcept
-    -> cluster_diff_ptr_t {
+auto advance_t::create(advance_action_t action, const model::file_info_t &source, const model::folder_info_t &source_fi,
+                       sequencer_t &sequencer) noexcept -> cluster_diff_ptr_t {
     auto folder = source_fi.get_folder();
     auto &cluster = *folder->get_cluster();
     auto proto_file = source.as_proto(true);

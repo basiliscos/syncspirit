@@ -20,7 +20,7 @@ TEST_CASE("block iterator", "[model]") {
     cluster->get_devices().put(my_device);
 
     auto block_iterator = block_iterator_ptr_t();
-    auto next = [&](file_info_ptr_t source, const folder_info_t& source_fi, bool reset = false) -> file_block_t {
+    auto next = [&](file_info_ptr_t source, const folder_info_t &source_fi, bool reset = false) -> file_block_t {
         if (source && source->is_file() && !source->is_deleted()) {
             if (reset) {
                 block_iterator = new blocks_iterator_t(*source, source_fi);

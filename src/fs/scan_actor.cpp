@@ -262,7 +262,7 @@ void scan_actor_t::on_hash(hasher::message::digest_response_t &res) noexcept {
         return do_shutdown(ee);
     }
 
-    auto& fi = info.get_folder();
+    auto &fi = info.get_folder();
     bool queued_next = false;
     auto &digest = res.payload.res.digest;
     auto block_index = rp.block_index;

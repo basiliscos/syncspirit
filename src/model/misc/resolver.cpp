@@ -72,7 +72,8 @@ int compare(const file_info_t &file_1, const file_info_t &file_2) noexcept {
     return -1;
 }
 
-static advance_action_t _resolve(const file_info_t &remote, const file_info_t *local, const folder_info_t& local_folder) noexcept {
+static advance_action_t _resolve(const file_info_t &remote, const file_info_t *local,
+                                 const folder_info_t &local_folder) noexcept {
     if (remote.is_unreachable()) {
         return advance_action_t::ignore;
     }
@@ -115,7 +116,8 @@ static advance_action_t _resolve(const file_info_t &remote, const file_info_t *l
     return compare_by_version(remote, *local);
 }
 
-advance_action_t resolve(const file_info_t &remote, const file_info_t* local, const folder_info_t& local_folder) noexcept {
+advance_action_t resolve(const file_info_t &remote, const file_info_t *local,
+                         const folder_info_t &local_folder) noexcept {
     using P = utils::platform_t;
     if (remote.is_link() && !remote.is_deleted() && !P::symlinks_supported()) {
         return advance_action_t::ignore;

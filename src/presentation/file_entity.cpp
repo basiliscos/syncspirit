@@ -17,9 +17,9 @@ using namespace syncspirit::presentation;
 
 using F = presence_t::features_t;
 
-file_entity_t::file_entity_t(model::path_ptr_t path_, const model::folder_infos_map_t& fi_map) noexcept
+file_entity_t::file_entity_t(model::path_ptr_t path_, const model::folder_infos_map_t &fi_map) noexcept
     : entity_t(std::move(path_)) {
-    using pair_t = std::pair<model::file_info_t *, model::folder_info_t*>;
+    using pair_t = std::pair<model::file_info_t *, model::folder_info_t *>;
     using presence_files_t = std::pmr::vector<pair_t>;
 
     auto buffer = std::array<std::byte, 32 * sizeof(model::file_info_t *)>();
@@ -43,7 +43,8 @@ file_entity_t::file_entity_t(model::path_ptr_t path_, const model::folder_infos_
     }
 }
 
-auto file_entity_t::on_insert(model::file_info_t &file_info, const model::folder_info_t& fi) noexcept -> file_presence_t * {
+auto file_entity_t::on_insert(model::file_info_t &file_info, const model::folder_info_t &fi) noexcept
+    -> file_presence_t * {
     auto device = fi.get_device();
     for (auto p : presences) {
         if (p->device == device) {

@@ -41,7 +41,7 @@ scan_task_t::scan_task_t(model::cluster_ptr_t cluster_, std::string_view folder_
     }
 
     folder_info = folder->get_folder_infos().by_device(*cluster->get_device()).get();
-    if (!folder_info ) {
+    if (!folder_info) {
         return;
     }
 

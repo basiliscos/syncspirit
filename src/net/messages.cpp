@@ -6,7 +6,8 @@
 
 using namespace syncspirit::net::payload;
 
-block_request_t::block_request_t(const model::file_info_ptr_t &file_, const model::folder_info_t &fi, size_t block_index_) noexcept {
+block_request_t::block_request_t(const model::file_info_ptr_t &file_, const model::folder_info_t &fi,
+                                 size_t block_index_) noexcept {
     folder_id = fi.get_folder()->get_id();
     file_name = file_->get_name()->get_full_name();
     sequence = file_->get_sequence();

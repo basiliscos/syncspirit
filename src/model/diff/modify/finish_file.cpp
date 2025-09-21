@@ -10,7 +10,7 @@
 
 using namespace syncspirit::model::diff::modify;
 
-finish_file_t::finish_file_t(const model::file_info_t &file, const folder_info_t& fi) noexcept {
+finish_file_t::finish_file_t(const model::file_info_t &file, const folder_info_t &fi) noexcept {
     auto folder = fi.get_folder();
     auto &device_id = fi.get_device()->device_id();
     folder_id = folder->get_id();

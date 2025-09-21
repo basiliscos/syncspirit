@@ -150,7 +150,7 @@ struct block_response_t {
 
 struct SYNCSPIRIT_API block_request_t {
     using response_t = block_response_t;
-    using block_info_t = std::pair<model::file_block_t*, model::folder_info_t*>;
+    using block_info_t = std::pair<model::file_block_t *, model::folder_info_t *>;
     std::string folder_id;
     std::string file_name;
     std::int64_t sequence;
@@ -158,7 +158,8 @@ struct SYNCSPIRIT_API block_request_t {
     std::int64_t block_offset;
     std::uint32_t block_size;
     utils::bytes_t block_hash;
-    block_request_t(const model::file_info_ptr_t &file, const model::folder_info_t &folder, size_t block_index) noexcept;
+    block_request_t(const model::file_info_ptr_t &file, const model::folder_info_t &folder,
+                    size_t block_index) noexcept;
 
     block_info_t get_block(model::cluster_t &, model::device_t &peer) noexcept;
 };

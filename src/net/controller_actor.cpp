@@ -241,7 +241,7 @@ void controller_actor_t::push_pending() noexcept {
     }
 
     auto updates = updates_t{};
-    auto get_update = [&](model::file_info_t &file, model::folder_info_t& folder_info) -> update_t & {
+    auto get_update = [&](model::file_info_t &file, model::folder_info_t &folder_info) -> update_t & {
         for (auto &p : updates) {
             if (p.folder == &folder_info) {
                 return p;
@@ -389,7 +389,8 @@ OUTER:
     }
 }
 
-void controller_actor_t::preprocess_block(model::file_block_t &file_block, const model::folder_info_t &source_folder) noexcept {
+void controller_actor_t::preprocess_block(model::file_block_t &file_block,
+                                          const model::folder_info_t &source_folder) noexcept {
     using namespace model::diff;
     if (!peer_address) {
         LOG_TRACE(log, "ignoring block, as there is no peer");
@@ -414,7 +415,8 @@ void controller_actor_t::preprocess_block(model::file_block_t &file_block, const
         auto sz = block->get_size();
         LOG_TRACE(log, "request_block '{}' on file '{}'; block index = {} / {}, sz = {}, request pool sz = {}", hash,
                   *file, file_block.block_index(), file->get_blocks().size() - 1, sz, request_pool);
-        request<payload::block_request_t>(peer_address, file, source_folder, file_block.block_index()).send(request_timeout);
+        request<payload::block_request_t>(peer_address, file, source_folder, file_block.block_index())
+            .send(request_timeout);
         ++rx_blocks_requested;
         request_pool -= (int64_t)sz;
     }
@@ -618,7 +620,7 @@ auto controller_actor_t::operator()(const model::diff::modify::block_ack_t &diff
         }
         auto folder = cluster->get_folders().by_id(diff.folder_id);
         if (folder) {
-            auto& folder_infos = folder->get_folder_infos();
+            auto &folder_infos = folder->get_folder_infos();
             auto folder_info = folder_infos.by_device_id(diff.device_id);
             if (folder_info) {
                 auto file = folder_info->get_file_infos().by_name(diff.file_name);
@@ -829,7 +831,7 @@ void controller_actor_t::on_block(message::block_response_t &message) noexcept {
     auto &ee = message.payload.ee;
     auto &payload = message.payload.req->payload.request_payload;
     auto [file_block, folder_info] = payload.get_block(*cluster, *peer);
-    auto file = file_block ? file_block->file() : (model::file_info_t*)(nullptr);
+    auto file = file_block ? file_block->file() : (model::file_info_t *)(nullptr);
     bool do_release_block = false;
     bool try_next = true;
     if (state != r::state_t::OPERATIONAL) {
@@ -885,7 +887,7 @@ void controller_actor_t::on_validation(hasher::message::validation_response_t &r
     auto block_res = (message::block_response_t *)res.payload.req->payload.request_payload->custom.get();
     auto &payload = block_res->payload.req->payload.request_payload;
     auto [file_block, folder_info] = payload.get_block(*cluster, *peer);
-    auto file = file_block ? file_block->file() : (model::file_info_t*)(nullptr);
+    auto file = file_block ? file_block->file() : (model::file_info_t *)(nullptr);
     bool do_release_block = false;
     bool try_next = false;
     if (state != r::state_t::OPERATIONAL) {
@@ -933,7 +935,8 @@ void controller_actor_t::on_validation(hasher::message::validation_response_t &r
                     try_next = true;
                     do_release_block = true;
                 } else {
-                    auto diff = cluster_diff_ptr_t(new modify::append_block_t(*file, *folder_info, index, std::move(data)));
+                    auto diff =
+                        cluster_diff_ptr_t(new modify::append_block_t(*file, *folder_info, index, std::move(data)));
                     push_block_write(std::move(diff));
                 }
             }
@@ -1013,7 +1016,8 @@ auto controller_actor_t::get_sync_info(std::string_view folder_id) noexcept -> f
     return it->second;
 }
 
-void controller_actor_t::acquire_block(const model::file_block_t &file_block, const model::folder_info_t &folder_info) noexcept {
+void controller_actor_t::acquire_block(const model::file_block_t &file_block,
+                                       const model::folder_info_t &folder_info) noexcept {
     auto block = file_block.block();
     auto folder = folder_info.get_folder();
     LOG_TRACE(log, "acquire block '{}', {}", block->get_hash(), (const void *)block);

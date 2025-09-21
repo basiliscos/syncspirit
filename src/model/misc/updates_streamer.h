@@ -16,7 +16,7 @@
 namespace syncspirit::model {
 
 struct SYNCSPIRIT_API updates_streamer_t {
-    using update_t = std::tuple<file_info_ptr_t, folder_info_t*, bool>;
+    using update_t = std::tuple<file_info_ptr_t, folder_info_t *, bool>;
 
     updates_streamer_t(cluster_t &, device_t &) noexcept;
     updates_streamer_t(const updates_streamer_t &) noexcept = delete;
@@ -24,7 +24,7 @@ struct SYNCSPIRIT_API updates_streamer_t {
 
     update_t next() noexcept;
 
-    bool on_update(file_info_t &, const folder_info_t&) noexcept;
+    bool on_update(file_info_t &, const folder_info_t &) noexcept;
     void on_remote_refresh() noexcept;
     void on_upsert(const folder_info_t &) noexcept;
 

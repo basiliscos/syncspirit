@@ -58,7 +58,7 @@ outcome::result<file_info_ptr_t> file_info_t::create(utils::bytes_view_t key, co
     auto ptr = file_info_ptr_t();
     ptr = new file_info_t(key, folder_info);
 
-    auto& path_cache = folder_info->get_folder()->get_cluster()->get_path_cache();
+    auto &path_cache = folder_info->get_folder()->get_cluster()->get_path_cache();
     auto r = ptr->fields_update(data, path_cache);
     if (!r) {
         return r.assume_error();
@@ -72,7 +72,7 @@ auto file_info_t::create(const bu::uuid &uuid_, const proto::FileInfo &info_,
     auto ptr = file_info_ptr_t();
     ptr = new file_info_t(uuid_, folder_info);
 
-    auto& path_cache = folder_info->get_folder()->get_cluster()->get_path_cache();
+    auto &path_cache = folder_info->get_folder()->get_cluster()->get_path_cache();
     auto r = ptr->fields_update(info_, path_cache);
     if (!r) {
         return r.assume_error();
@@ -88,8 +88,10 @@ static void fill(unsigned char *key, const bu::uuid &uuid, const folder_info_ptr
     std::copy(uuid.begin(), uuid.end(), key + 1 + fi_uuid.size());
 }
 
-file_info_t::guard_t::guard_t(file_info_t &file_, const folder_info_t* folder_info_) noexcept :
-    file{&file_}, folder_info{folder_info_} { file_.synchronizing_lock(); }
+file_info_t::guard_t::guard_t(file_info_t &file_, const folder_info_t *folder_info_) noexcept
+    : file{&file_}, folder_info{folder_info_} {
+    file_.synchronizing_lock();
+}
 
 file_info_t::guard_t::~guard_t() {
     if (file) {
@@ -97,14 +99,12 @@ file_info_t::guard_t::~guard_t() {
     }
 }
 
-file_info_t::file_info_t(utils::bytes_view_t key_, const folder_info_ptr_t &folder_info) noexcept
-    {
+file_info_t::file_info_t(utils::bytes_view_t key_, const folder_info_ptr_t &folder_info) noexcept {
     assert(key_.subspan(1, uuid_length) == folder_info->get_uuid());
     std::copy(key_.begin(), key_.end(), key);
 }
 
-file_info_t::file_info_t(const bu::uuid &uuid, const folder_info_ptr_t &folder_info_) noexcept
-    {
+file_info_t::file_info_t(const bu::uuid &uuid, const folder_info_ptr_t &folder_info_) noexcept {
     fill(key, uuid, folder_info_);
 }
 
@@ -134,13 +134,13 @@ utils::bytes_view_t file_info_t::get_folder_uuid() const noexcept {
     return utils::bytes_view_t(key + 1, key + 1 + uuid_length);
 }
 
-
 std::uint64_t file_info_t::get_block_offset(size_t block_index) const noexcept {
     assert(!blocks.empty());
     return block_size * block_index;
 }
 
-auto file_info_t::fields_update(const db::FileInfo &source, model::path_cache_t& path_cache) noexcept -> outcome::result<void> {
+auto file_info_t::fields_update(const db::FileInfo &source, model::path_cache_t &path_cache) noexcept
+    -> outcome::result<void> {
     flags = (flags & ~0b111111) | as_flags(db::get_type(source));
     name = path_cache.get_path(db::get_name(source));
     sequence = db::get_sequence(source);
@@ -170,7 +170,8 @@ auto file_info_t::fields_update(const db::FileInfo &source, model::path_cache_t&
     return reserve_blocks(has_content ? db::get_blocks_size(source) : 0);
 }
 
-auto file_info_t::fields_update(const proto::FileInfo &source, model::path_cache_t& path_cache) noexcept -> outcome::result<void> {
+auto file_info_t::fields_update(const proto::FileInfo &source, model::path_cache_t &path_cache) noexcept
+    -> outcome::result<void> {
     name = path_cache.get_path(proto::get_name(source));
     sequence = proto::get_sequence(source);
     flags = (flags & ~0b111111) | as_flags(proto::get_type(source));
@@ -295,7 +296,7 @@ void file_info_t::mark_unreachable(bool value) noexcept {
     }
 }
 
-void file_info_t::mark_local(bool available, const folder_info_t& folder_info) noexcept {
+void file_info_t::mark_local(bool available, const folder_info_t &folder_info) noexcept {
     if (available) {
         flags = flags | f_local;
     } else {
@@ -338,7 +339,7 @@ bool file_info_t::is_locally_available() const noexcept { return missing_blocks 
 
 bool file_info_t::is_partly_available() const noexcept { return missing_blocks < blocks.size(); }
 
-const std::filesystem::path file_info_t::get_path(const folder_info_t& folder_info) const noexcept {
+const std::filesystem::path file_info_t::get_path(const folder_info_t &folder_info) const noexcept {
     auto own_name = boost::nowide::widen(name->get_full_name());
     auto path = folder_info.get_folder()->get_path() / own_name;
     path.make_preferred();
@@ -475,7 +476,9 @@ std::string file_info_t::make_conflicting_name() const noexcept {
     return full_name.string();
 }
 
-auto file_info_t::guard(const model::folder_info_t& folder_info) noexcept -> guard_t { return guard_t(*this, &folder_info); }
+auto file_info_t::guard(const model::folder_info_t &folder_info) noexcept -> guard_t {
+    return guard_t(*this, &folder_info);
+}
 
 bool file_info_t::identical_to(const proto::FileInfo &file) const noexcept {
     auto &v = proto::get_version(file);

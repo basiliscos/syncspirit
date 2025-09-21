@@ -155,7 +155,7 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     void on_forward(message::forwarded_message_t &message) noexcept;
     void on_block(message::block_response_t &message) noexcept;
     void on_validation(hasher::message::validation_response_t &res) noexcept;
-    void preprocess_block(model::file_block_t &block, const model::folder_info_t& source_folder) noexcept;
+    void preprocess_block(model::file_block_t &block, const model::folder_info_t &source_folder) noexcept;
     void on_model_update(model::message::model_update_t &message) noexcept;
     void on_tx_signal(net::message::tx_signal_t &message) noexcept;
     void on_block_response(fs::message::block_response_t &message) noexcept;

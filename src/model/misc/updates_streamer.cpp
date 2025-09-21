@@ -51,7 +51,7 @@ void updates_streamer_t::refresh_remote() noexcept {
     }
 }
 
-bool updates_streamer_t::on_update(file_info_t &file, const folder_info_t& fi) noexcept {
+bool updates_streamer_t::on_update(file_info_t &file, const folder_info_t &fi) noexcept {
     assert(fi.get_device() == self);
     bool r = false;
     if (!streaming) {
@@ -91,7 +91,7 @@ auto updates_streamer_t::next() noexcept -> update_t {
             auto &seen_sequence = seen_info[streaming->folder_info];
             auto initial = seen_sequence == 0;
             seen_sequence = file->get_sequence();
-            return {file,  streaming->folder_info.get(), initial};
+            return {file, streaming->folder_info.get(), initial};
         }
         streaming.reset();
     }

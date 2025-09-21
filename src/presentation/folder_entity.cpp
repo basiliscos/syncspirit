@@ -27,7 +27,7 @@ static void process(model::folder_info_t *folder_info, entity_t::children_t &fil
         if (new_files.count(name.get())) {
             continue;
         }
-        auto& folders_map = folder_info->get_folder()->get_folder_infos();
+        auto &folders_map = folder_info->get_folder()->get_folder_infos();
         auto child = file_entity_ptr_t(new file_entity_t(name, folders_map));
         new_files.emplace(name.get(), std::move(child));
     }
@@ -109,7 +109,7 @@ auto folder_entity_t::on_insert(model::folder_info_t &folder_info) noexcept -> f
     return p;
 }
 
-entity_t *folder_entity_t::on_insert(model::file_info_t &file_info, const model::folder_info_t& folder_info) noexcept {
+entity_t *folder_entity_t::on_insert(model::file_info_t &file_info, const model::folder_info_t &folder_info) noexcept {
     auto &path = file_info.get_name();
     auto device = folder_info.get_device();
 

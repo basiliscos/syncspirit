@@ -26,7 +26,8 @@ using namespace syncspirit::fs;
 #define SS_STAT_BUFF struct stat
 #endif
 
-auto file_t::open_write(model::file_info_ptr_t model, const model::folder_info_t& folder_info) noexcept -> outcome::result<file_t> {
+auto file_t::open_write(model::file_info_ptr_t model, const model::folder_info_t &folder_info) noexcept
+    -> outcome::result<file_t> {
     using mode_t = utils::fstream_t;
     auto tmp = model->get_size() > 0;
     auto model_path = model->get_path(folder_info);
@@ -72,8 +73,8 @@ auto file_t::open_read(const bfs::path &path) noexcept -> outcome::result<file_t
 
 file_t::file_t() noexcept {};
 
-file_t::file_t(utils::fstream_t backend_, model::file_info_ptr_t model_, bfs::path path_,
-               bfs::path model_path_, bool temporal_) noexcept
+file_t::file_t(utils::fstream_t backend_, model::file_info_ptr_t model_, bfs::path path_, bfs::path model_path_,
+               bool temporal_) noexcept
     : backend{new utils::fstream_t(std::move(backend_))}, model{std::move(model_)}, path{std::move(path_)},
       temporal{temporal_} {
     model_path = std::move(model_path_);

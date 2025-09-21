@@ -1092,7 +1092,9 @@ void test_peer_3_folders_6_files() {
             // clang-format on
 
             {
-                auto get_peer_file = [&](std::string_view folder_id, std::string_view name) -> std::pair<model::file_info_ptr_t, model::folder_info_t*> {
+                auto get_peer_file =
+                    [&](std::string_view folder_id,
+                        std::string_view name) -> std::pair<model::file_info_ptr_t, model::folder_info_t *> {
                     auto folder = cluster->get_folders().by_id(folder_id);
                     auto folder_info = folder->get_folder_infos().by_device(*peer_device);
                     auto file = folder_info->get_file_infos().by_name(name);
