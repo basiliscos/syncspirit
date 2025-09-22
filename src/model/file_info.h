@@ -34,7 +34,7 @@ using file_info_ptr_t = intrusive_ptr_t<file_info_t>;
 
 struct path_cache_t;
 
-struct SYNCSPIRIT_API file_info_t final : augmentable_t {
+struct SYNCSPIRIT_API file_info_t {
 
     // clang-format off
     enum flags_t: std::uint16_t {
@@ -172,6 +172,15 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t {
 
     std::string make_conflicting_name() const noexcept;
 
+    inline void refcouner_inc() const noexcept { ++counter; }
+    inline std::uint32_t refcouner_dec() const noexcept { return --counter; }
+    inline std::uint32_t use_count() const noexcept { return counter; }
+
+    void set_augmentation(augmentation_t &value) noexcept;
+    void set_augmentation(augmentation_ptr_t value) noexcept;
+    augmentation_ptr_t &get_augmentation() noexcept;
+    void notify_update() noexcept;
+
     template <typename T> auto &access() noexcept;
     template <typename T> auto &access() const noexcept;
 
@@ -207,6 +216,7 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t {
     void remove_block(block_info_ptr_t &block) noexcept;
 
     unsigned char key[data_length];
+    augmentation_ptr_t extension;
     path_ptr_t name;
     std::int64_t modified_s;
     std::uint64_t modified_by;
@@ -217,9 +227,18 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t {
     version_t version;
     content_t content;
     std::uint16_t flags = 0;
+    mutable std::uint16_t counter = 0;
 
     friend struct blocks_iterator_t;
 };
+
+inline void intrusive_ptr_add_ref(const file_info_t *ptr) noexcept { ptr->refcouner_inc(); }
+
+inline void intrusive_ptr_release(const file_info_t *ptr) noexcept {
+    if (ptr->refcouner_dec() == 0) {
+        delete ptr;
+    }
+}
 
 namespace details {
 

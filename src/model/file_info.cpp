@@ -543,6 +543,18 @@ bool file_info_t::identical_to(const proto::FileInfo &file) const noexcept {
     return false;
 }
 
+void file_info_t::set_augmentation(augmentation_t &value) noexcept { extension = &value; }
+
+void file_info_t::set_augmentation(augmentation_ptr_t value) noexcept { extension = std::move(value); }
+
+augmentation_ptr_t &file_info_t::get_augmentation() noexcept { return extension; }
+
+void file_info_t::notify_update() noexcept {
+    if (extension) {
+        extension->on_update();
+    }
+}
+
 bool file_infos_map_t::put(const model::file_info_ptr_t &item, bool replace) noexcept {
     bool result = false;
     auto prev = file_info_ptr_t();
