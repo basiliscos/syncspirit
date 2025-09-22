@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #pragma once
 
 #include "arc.hpp"
 #include "syncspirit-export.h"
+#include <cstdint>
 
 namespace syncspirit::model {
 
@@ -23,19 +24,23 @@ struct SYNCSPIRIT_API file_block_t {
     bool matches(const block_info_t *, const file_info_t *) noexcept;
     explicit operator bool() const noexcept;
     block_info_t *block() const noexcept { return block_info; }
-    inline void mark_locally_available(bool value = true) noexcept { local = value; }
-    inline bool is_locally_available() const noexcept { return local; }
+
     inline file_info_t *file() noexcept { return file_info; }
     inline const file_info_t *file() const noexcept { return file_info; }
 
-    inline size_t block_index() const noexcept { return block_idx; }
+    void mark_locally_available(bool value = true) noexcept;
+    bool is_locally_available() const noexcept;
+    std::uint32_t block_index() const noexcept;
+
     size_t get_offset() const noexcept;
 
   private:
+    static constexpr std::uint32_t LOCAL_MASK = 1 << 31;
+    static constexpr std::uint32_t INDEX_MASK = ~LOCAL_MASK;
+
     block_info_t *block_info;
     file_info_t *file_info;
-    std::size_t block_idx;
-    bool local = false;
+    std::uint32_t block_idx;
 };
 
 } // namespace syncspirit::model
