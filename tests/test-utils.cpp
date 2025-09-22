@@ -171,4 +171,14 @@ bool has_ipv6() noexcept {
     return !ec;
 }
 
+utils::bytes_t make_key(model::block_info_ptr_t block) {
+    static constexpr auto SZ = model::block_info_t::digest_length + 1;
+    unsigned char key_storage[SZ];
+    auto hash = block->get_hash();
+    key_storage[0] = db::prefix::block_info;
+    std::copy(hash.begin(), hash.end(), key_storage + 1);
+    auto key = utils::bytes_t(key_storage, key_storage + SZ);
+    return key;
+}
+
 } // namespace syncspirit::test

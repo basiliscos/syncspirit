@@ -91,7 +91,7 @@ TEST_CASE("loading cluster (base)", "[model]") {
         proto::set_hash(bi, hash);
 
         auto block = block_info_t::create(bi).assume_value();
-        auto key = block->get_key();
+        auto key = make_key(block);
         auto db_block = db::BlockInfo{block->get_size()};
 
         auto target_block = block_info_ptr_t();
@@ -108,7 +108,6 @@ TEST_CASE("loading cluster (base)", "[model]") {
 
         REQUIRE(target_block);
         CHECK(target_block->get_hash() == block->get_hash());
-        CHECK(target_block->get_key() == block->get_key());
         CHECK(target_block->get_size() == block->get_size());
     }
 

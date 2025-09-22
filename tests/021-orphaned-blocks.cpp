@@ -63,8 +63,9 @@ TEST_CASE("orphaned blocks, all removed for single file", "[model]") {
 
         auto blocks = orphans.deduce();
         REQUIRE(blocks.size() == 2);
-        CHECK(blocks.contains(bi1->get_key()));
-        CHECK(blocks.contains(bi2->get_key()));
+
+        CHECK(blocks.contains(bi1->get_hash()));
+        CHECK(blocks.contains(bi2->get_hash()));
     }
 
     SECTION("1 file with 2 same blocks erased") {
@@ -98,7 +99,8 @@ TEST_CASE("orphaned blocks, all removed for single file", "[model]") {
 
         auto blocks = orphans.deduce();
         REQUIRE(blocks.size() == 1);
-        CHECK(blocks.contains(bi->get_key()));
+
+        CHECK(blocks.contains(bi->get_hash()));
     }
 
     SECTION("2 file with 1 shared erased") {
@@ -167,13 +169,14 @@ TEST_CASE("orphaned blocks, all removed for single file", "[model]") {
 
         auto blocks = orphans.deduce();
         REQUIRE(blocks.size() == 1);
-        CHECK(blocks.contains(bi_2->get_key()));
+
+        CHECK(blocks.contains(bi_2->get_hash()));
 
         orphans.record(*file_2);
         blocks = orphans.deduce();
         REQUIRE(blocks.size() == 3);
-        CHECK(blocks.contains(bi_1->get_key()));
-        CHECK(blocks.contains(bi_2->get_key()));
-        CHECK(blocks.contains(bi_3->get_key()));
+        CHECK(blocks.contains(bi_1->get_hash()));
+        CHECK(blocks.contains(bi_2->get_hash()));
+        CHECK(blocks.contains(bi_3->get_hash()));
     }
 }

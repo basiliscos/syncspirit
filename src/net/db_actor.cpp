@@ -600,7 +600,7 @@ auto db_actor_t::save_folder_info(const model::folder_info_t &folder_info, void 
     return force_commit();
 }
 
-auto db_actor_t::remove(const model::diff::modify::generic_remove_t &diff, void *custom) noexcept
+auto db_actor_t::remove(const model::diff::modify::generic_remove_t &diff, void *custom, unsigned char prefix) noexcept
     -> outcome::result<void> {
     if (cluster->is_tainted()) {
         return outcome::success();
@@ -609,7 +609,13 @@ auto db_actor_t::remove(const model::diff::modify::generic_remove_t &diff, void 
 
     for (auto &key : diff.keys) {
         unsigned char buff[128] = {0};
-        auto r = db::remove(key, txn);
+        auto used_key = key;
+        if (prefix) {
+            buff[0] = prefix;
+            std::copy(key.begin(), key.end(), buff + 1);
+            used_key = utils::bytes_view_t(buff, key.size() + 1);
+        }
+        auto r = db::remove(used_key, txn);
         if (!r) {
             return r.assume_error();
         }
@@ -688,8 +694,13 @@ auto db_actor_t::operator()(const model::diff::modify::add_blocks_t &diff, void 
 
     auto &blocks_map = cluster->get_blocks();
     for (const auto &it : diff.blocks) {
+        static constexpr auto SZ = model::block_info_t::digest_length + 1;
         auto block = blocks_map.by_hash(proto::get_hash(it));
-        auto key = block->get_key();
+        unsigned char key_storage[SZ];
+        auto hash = block->get_hash();
+        key_storage[0] = db::prefix::block_info;
+        std::copy(hash.begin(), hash.end(), key_storage + 1);
+        auto key = utils::bytes_view_t(key_storage, SZ);
         auto data = block->serialize();
         auto r = db::save({key, data}, txn);
         if (!r) {
@@ -793,7 +804,7 @@ auto db_actor_t::operator()(const model::diff::load::remove_corrupted_files_t &d
 
 auto db_actor_t::operator()(const model::diff::modify::remove_blocks_t &diff, void *custom) noexcept
     -> outcome::result<void> {
-    return remove(static_cast<const model::diff::modify::generic_remove_t &>(diff), custom);
+    return remove(static_cast<const model::diff::modify::generic_remove_t &>(diff), custom, db::prefix::block_info);
 }
 
 auto db_actor_t::operator()(const model::diff::modify::remove_files_t &diff, void *custom) noexcept

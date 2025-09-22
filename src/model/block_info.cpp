@@ -15,21 +15,19 @@ static const constexpr char prefix = (char)(db::prefix::block_info);
 auto block_info_t::make_strict_hash(utils::bytes_view_t hash) noexcept -> strict_hash_t {
     assert(hash.size() <= digest_length);
     auto r = strict_hash_t{};
-    r.data[0] = prefix;
-    memset(r.data + 1, 0, digest_length);
-    memcpy(r.data + 1, hash.data(), hash.size());
+    memset(r.data, 0, digest_length);
+    memcpy(r.data, hash.data(), hash.size());
     return r;
 }
 
 auto block_info_t::strict_hash_t::get_hash() noexcept -> utils::bytes_view_t {
-    return utils::bytes_view_t(data + 1, digest_length);
+    return utils::bytes_view_t(data, digest_length);
 }
 
-auto block_info_t::strict_hash_t::get_key() noexcept -> utils::bytes_view_t {
-    return utils::bytes_view_t(data, data_length);
+block_info_t::block_info_t(utils::bytes_view_t key) noexcept {
+    auto h = key.subspan(1);
+    std::copy(h.begin(), h.end(), hash);
 }
-
-block_info_t::block_info_t(utils::bytes_view_t key) noexcept { std::copy(key.begin(), key.end(), hash); }
 
 block_info_t::block_info_t(const proto::BlockInfo &block) noexcept : size{proto::get_size(block)} { hash[0] = prefix; }
 
@@ -38,7 +36,7 @@ template <> void block_info_t::assign<db::BlockInfo>(const db::BlockInfo &block)
 }
 
 outcome::result<block_info_ptr_t> block_info_t::create(utils::bytes_view_t key, const db::BlockInfo &data) noexcept {
-    if (key.size() != data_length) {
+    if (key.size() != digest_length + 1) {
         return make_error_code(error_code_t::invalid_block_key_length);
     }
     if (key[0] != prefix) {
@@ -58,10 +56,10 @@ outcome::result<block_info_ptr_t> block_info_t::create(const proto::BlockInfo &b
 
     auto ptr = block_info_ptr_t(new block_info_t(block));
     auto &h_ptr = ptr->hash;
-    std::copy(h.begin(), h.end(), h_ptr + 1);
+    std::copy(h.begin(), h.end(), h_ptr);
     auto left = digest_length - h.size();
     if (left) {
-        std::fill_n(h_ptr + 1 + h.size(), left, 0);
+        std::fill_n(h_ptr + h.size(), left, 0);
     }
     return outcome::success(ptr);
 }
@@ -111,16 +109,16 @@ file_block_t block_info_t::local_file() noexcept {
     return {};
 }
 
-bool block_info_t::is_locked() const noexcept { return locked != 0; }
+bool block_info_t::is_locked() const noexcept { return counter & LOCK_MASK; }
 
 void block_info_t::lock() noexcept {
-    assert(!locked);
-    ++locked;
+    assert(!(counter & LOCK_MASK));
+    counter = counter | LOCK_MASK;
 }
 
 void block_info_t::unlock() noexcept {
-    assert(locked);
-    --locked;
+    assert((counter & LOCK_MASK));
+    counter = counter & COUNTER_MASK;
 }
 
 block_info_ptr_t block_infos_map_t::by_hash(utils::bytes_view_t hash) const noexcept {

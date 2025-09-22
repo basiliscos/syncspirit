@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
 
 #include "orphaned_blocks.h"
+#include "db/prefix.h"
 #include "model/file_info.h"
 
 using namespace syncspirit::model;
@@ -15,11 +16,11 @@ auto orphaned_blocks_t::deduce(const set_t &white_listed) const -> set_t {
         if (file->is_file()) {
             auto &blocks = file->get_blocks();
             for (auto &b : blocks) {
-                auto key = b->get_key();
-                if (white_listed.contains(b->get_hash())) {
+                auto hash = b->get_hash();
+                if (white_listed.contains(hash)) {
                     continue;
                 }
-                if (processed.contains(b->get_key())) {
+                if (processed.contains(hash)) {
                     continue;
                 }
                 auto &file_blocks = b->get_file_blocks();
@@ -32,10 +33,10 @@ auto orphaned_blocks_t::deduce(const set_t &white_listed) const -> set_t {
                     }
                 }
                 if (!usages) {
-                    auto copy = utils::bytes_t(key.begin(), key.end());
+                    auto copy = utils::bytes_t(hash.begin(), hash.end());
                     r.emplace(std::move(copy));
                 }
-                processed.emplace(key);
+                processed.emplace(hash);
             }
         }
     }

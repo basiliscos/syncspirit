@@ -119,7 +119,8 @@ struct SYNCSPIRIT_API db_actor_t : public r::actor_base_t, private model::diff::
 
     void extracted(const model::folder_info_t &folder_info);
     outcome::result<void> save_folder_info(const model::folder_info_t &, void *) noexcept;
-    outcome::result<void> remove(const model::diff::modify::generic_remove_t &, void *) noexcept;
+    outcome::result<void> remove(const model::diff::modify::generic_remove_t &, void *,
+                                 unsigned char prefix = 0) noexcept;
 
     outcome::result<void> operator()(const model::diff::advance::advance_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::contact::peer_state_t &, void *) noexcept override;

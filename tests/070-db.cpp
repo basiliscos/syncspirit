@@ -1238,7 +1238,7 @@ void test_db_migration_2_3() {
 
             auto bi = BlockInfoEx{1, 0x1234};
             auto new_value = syncspirit::details::generic_encode(bi);
-            unsigned char key[model::block_info_t::data_length] = {0};
+            unsigned char key[model::block_info_t::digest_length + 1] = {0};
             key[0] = db::prefix::block_info;
 
             auto &db_env = db_actor->access<env>();
@@ -1288,7 +1288,7 @@ void test_corrupted_file() {
             proto::set_hash(pr_block, hash);
 
             builder.local_update(folder_id, pr_file).apply(*sup);
-            auto &block = **cluster->get_blocks().begin();
+            auto block = *cluster->get_blocks().begin();
 
             auto folder = cluster->get_folders().by_id(folder_id);
             auto fi = folder->get_folder_infos().by_device(*my_device);
@@ -1303,7 +1303,7 @@ void test_corrupted_file() {
 
             auto diff = model::diff::cluster_diff_ptr_t();
             SECTION("missing block") {
-                auto key = block.get_key();
+                auto key = test::make_key(block);
                 REQUIRE(db::remove(key, txn));
                 REQUIRE(!txn.commit().has_error());
 

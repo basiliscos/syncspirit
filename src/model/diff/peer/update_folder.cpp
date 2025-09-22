@@ -152,7 +152,7 @@ static auto construct(sequencer_t &sequencer, folder_info_ptr_t &folder_info, sy
         for (auto &b : new_blocks) {
             auto hash = proto::get_hash(b);
             auto strict_hash = block_info_t::make_strict_hash(hash);
-            auto it = orphaned_blocks.find(strict_hash.get_key());
+            auto it = orphaned_blocks.find(strict_hash.get_hash());
             if (it != orphaned_blocks.end()) {
                 orphaned_blocks.erase(it);
             }

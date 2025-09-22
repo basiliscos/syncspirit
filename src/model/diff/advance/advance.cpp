@@ -91,7 +91,7 @@ void advance_t::initialize(const cluster_t &cluster, sequencer_t &sequencer, pro
             if (!block) {
                 new_blocks.push_back(proto_block);
             } else {
-                auto it = orphans.find(strict_hash.get_key());
+                auto it = orphans.find(strict_hash.get_hash());
                 if (it != orphans.end()) {
                     orphans.erase(it);
                 }
