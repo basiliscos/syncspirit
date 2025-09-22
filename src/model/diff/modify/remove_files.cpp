@@ -20,8 +20,11 @@ remove_files_t::remove_files_t(const folder_info_t &fi, const file_infos_map_t &
     auto &orphaned_blocks = orphaned_blocks_ ? *orphaned_blocks_ : local_orphaned_blocks;
     for (auto &file : files) {
         orphaned_blocks.record(*file);
-        auto file_key = file->get_key();
-        keys.push_back(utils::bytes_t(file_key.begin(), file_key.end()));
+        auto id = file->get_full_id();
+        auto key = utils::bytes_t(id.size() + 1);
+        key[0] = db::prefix::file_info;
+        std::copy(id.begin(), id.end(), key.data() + 1);
+        keys.push_back(std::move(key));
     }
     if (!orphaned_blocks_) {
         auto block_keys = local_orphaned_blocks.deduce();

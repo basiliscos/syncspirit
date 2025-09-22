@@ -87,9 +87,11 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t {
 
     ~file_info_t();
 
-    utils::bytes_view_t get_key() const noexcept { return utils::bytes_view_t(key, data_length); }
+    inline bool operator==(const file_info_t &other) const noexcept { return get_uuid() == other.get_uuid(); }
+
     utils::bytes_view_t get_uuid() const noexcept;
-    bool operator==(const file_info_t &other) const noexcept { return get_uuid() == other.get_uuid(); }
+    utils::bytes_view_t get_full_id() const noexcept;
+    utils::bytes_view_t get_folder_uuid() const noexcept;
 
     proto::FileInfo as_proto(bool include_blocks = true) const noexcept;
     db::FileInfo as_db(bool include_blocks = true) const noexcept;
@@ -97,7 +99,6 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t {
 
     void update(const file_info_t &updated) noexcept;
 
-    utils::bytes_view_t get_folder_uuid() const noexcept;
     const path_ptr_t &get_name() const noexcept;
     inline version_t &get_version() noexcept { return version; }
     inline const version_t &get_version() const noexcept { return version; }
@@ -150,7 +151,7 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t {
     proto::FileInfo get() const noexcept;
     bool identical_to(const proto::FileInfo &file) const noexcept;
 
-    static const constexpr auto data_length = 1 + uuid_length * 2;
+    static const constexpr auto data_length = uuid_length * 2;
 
     outcome::result<void> fields_update(const db::FileInfo &, model::path_cache_t &) noexcept;
     outcome::result<void> fields_update(const proto::FileInfo &, model::path_cache_t &) noexcept;

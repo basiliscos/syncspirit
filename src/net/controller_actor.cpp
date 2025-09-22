@@ -358,7 +358,7 @@ OUTER:
             }
         }
         if (auto [file, peer_folder, action] = file_iterator->next(); action != model::advance_action_t::ignore) {
-            auto in_sync = synchronizing_files.count(file->get_key());
+            auto in_sync = synchronizing_files.count(file->get_full_id());
             if (in_sync) {
                 continue;
             }
@@ -375,7 +375,7 @@ OUTER:
                 if (*bi) {
                     block_iterator = bi;
                     auto guard = file->guard(*peer_folder);
-                    synchronizing_files[file->get_key()] = std::move(guard);
+                    synchronizing_files[file->get_full_id()] = std::move(guard);
                 }
             }
 
@@ -559,13 +559,14 @@ auto controller_actor_t::operator()(const model::diff::modify::remove_files_t &d
     if (diff.device_id == peer->device_id().get_sha256()) {
         auto requesting_file = block_iterator ? block_iterator->get_source() : nullptr;
         for (auto &key : diff.keys) {
+            auto full_id = utils::bytes_view_t(key).subspan(1);
             if (requesting_file) {
-                if (requesting_file->get_key() == key) {
+                if (requesting_file->get_full_id() == full_id) {
                     block_iterator.reset();
                     requesting_file = nullptr;
                 }
             }
-            auto it = synchronizing_files.find(key);
+            auto it = synchronizing_files.find(full_id);
             if (it != synchronizing_files.end()) {
                 synchronizing_files.erase(it);
             }
@@ -1046,7 +1047,7 @@ void controller_actor_t::cancel_sync(model::file_info_t *file) noexcept {
     if (block_iterator && block_iterator->get_source() == file) {
         block_iterator.reset();
     }
-    auto it = synchronizing_files.find(file->get_key());
+    auto it = synchronizing_files.find(file->get_full_id());
     if (it != synchronizing_files.end()) {
         synchronizing_files.erase(it);
     }

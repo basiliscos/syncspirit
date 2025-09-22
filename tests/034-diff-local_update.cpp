@@ -72,7 +72,7 @@ TEST_CASE("new file diff", "[model]") {
             auto new_file = files.by_name(file->get_name()->get_full_name());
             REQUIRE(new_file);
             CHECK(new_file.get() == file.get());
-            CHECK(new_file->get_key() == file->get_key());
+            CHECK(new_file->get_full_id() == file->get_full_id());
             REQUIRE(new_file->get_version().counters_size() == 1);
             auto v2 = proto::get_value(new_file->get_version().get_best());
             REQUIRE(v1 < v2);

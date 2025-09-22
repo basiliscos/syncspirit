@@ -40,7 +40,7 @@ static inline proto::FileInfoType as_type(std::uint16_t flags) noexcept {
 }
 
 auto file_info_t::decompose_key(utils::bytes_view_t key) -> decomposed_key_t {
-    assert(key.size() == file_info_t::data_length);
+    assert(key.size() == file_info_t::data_length + 1);
     auto fi_key = key.subspan(1, uuid_length);
     auto file_id = key.subspan(1 + uuid_length);
     return {fi_key, file_id};
@@ -48,7 +48,7 @@ auto file_info_t::decompose_key(utils::bytes_view_t key) -> decomposed_key_t {
 
 outcome::result<file_info_ptr_t> file_info_t::create(utils::bytes_view_t key, const db::FileInfo &data,
                                                      const folder_info_ptr_t &folder_info) noexcept {
-    if (key.size() != data_length) {
+    if (key.size() != data_length + 1) {
         return make_error_code(error_code_t::invalid_file_info_key_length);
     }
     if (key[0] != prefix) {
@@ -82,10 +82,9 @@ auto file_info_t::create(const bu::uuid &uuid_, const proto::FileInfo &info_,
 }
 
 static void fill(unsigned char *key, const bu::uuid &uuid, const folder_info_ptr_t &folder_info_) noexcept {
-    key[0] = prefix;
     auto fi_uuid = folder_info_->get_uuid();
-    std::copy(fi_uuid.begin(), fi_uuid.end(), key + 1);
-    std::copy(uuid.begin(), uuid.end(), key + 1 + fi_uuid.size());
+    std::copy(fi_uuid.begin(), fi_uuid.end(), key);
+    std::copy(uuid.begin(), uuid.end(), key + fi_uuid.size());
 }
 
 file_info_t::guard_t::guard_t(file_info_t &file_, const folder_info_t *folder_info_) noexcept
@@ -100,8 +99,9 @@ file_info_t::guard_t::~guard_t() {
 }
 
 file_info_t::file_info_t(utils::bytes_view_t key_, const folder_info_ptr_t &folder_info) noexcept {
-    assert(key_.subspan(1, uuid_length) == folder_info->get_uuid());
-    std::copy(key_.begin(), key_.end(), key);
+    auto uuid_from_key = key_.subspan(1);
+    assert(uuid_from_key.subspan(0, uuid_length) == folder_info->get_uuid());
+    std::copy(uuid_from_key.begin(), uuid_from_key.end(), key);
 }
 
 file_info_t::file_info_t(const bu::uuid &uuid, const folder_info_ptr_t &folder_info_) noexcept {
@@ -129,10 +129,6 @@ utils::bytes_t file_info_t::create_key(const bu::uuid &uuid, const folder_info_p
 }
 
 auto file_info_t::get_name() const noexcept -> const path_ptr_t & { return name; }
-
-utils::bytes_view_t file_info_t::get_folder_uuid() const noexcept {
-    return utils::bytes_view_t(key + 1, key + 1 + uuid_length);
-}
 
 std::uint64_t file_info_t::get_block_offset(size_t block_index) const noexcept {
     assert(!blocks.empty());
@@ -200,7 +196,9 @@ auto file_info_t::fields_update(const proto::FileInfo &source, model::path_cache
     return reserve_blocks(has_content ? proto::get_blocks_size(source) : 0);
 }
 
-utils::bytes_view_t file_info_t::get_uuid() const noexcept { return {key + 1 + uuid_length, uuid_length}; }
+utils::bytes_view_t file_info_t::get_uuid() const noexcept { return {key + uuid_length, uuid_length}; }
+utils::bytes_view_t file_info_t::get_full_id() const noexcept { return {key, data_length}; }
+utils::bytes_view_t file_info_t::get_folder_uuid() const noexcept { return utils::bytes_view_t(key, uuid_length); }
 
 void file_info_t::set_sequence(std::int64_t value) noexcept { sequence = value; }
 
@@ -412,7 +410,7 @@ void file_info_t::update(const file_info_t &other) noexcept {
     using hashes_t = std::set<utils::bytes_view_t, utils::bytes_comparator_t>;
     // assert(this->name == other.name);
     assert(this->name->get_full_name() == other.name->get_full_name());
-    assert((this->get_key() == other.get_key()) || version.identical_to(other.version));
+    assert((this->get_uuid() == other.get_uuid()) || version.identical_to(other.version));
     size = other.size;
     permissions = other.permissions;
     modified_s = other.modified_s;

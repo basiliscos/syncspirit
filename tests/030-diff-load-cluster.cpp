@@ -332,7 +332,11 @@ TEST_CASE("loading cluster (file info + block)", "[model]") {
         auto file_info_db = db::FileInfo();
         REQUIRE(db::decode(data, file_info_db) == 0);
         auto v = db::get_version(file_info_db);
-        target = file_info_t::create(fi->get_key(), file_info_db, std::move(folder_info)).value();
+        auto id = fi->get_full_id();
+        auto key = utils::bytes_t(id.size() + 1);
+        key[0] = db::prefix::file_info;
+        std::copy(id.begin(), id.end(), key.data() + 1);
+        target = file_info_t::create(key, file_info_db, std::move(folder_info)).value();
         REQUIRE(target);
         CHECK(target->get_size() == 55ul);
         CHECK(target->get_block_size() == 5ul);
@@ -343,7 +347,11 @@ TEST_CASE("loading cluster (file info + block)", "[model]") {
         diff::load::file_infos_t::container_t container;
         using item_t = decltype(container)::value_type;
         auto db = fi->as_db(true);
-        container.emplace_back(item_t{fi->get_key(), std::move(db)});
+        auto id = fi->get_full_id();
+        auto key = utils::bytes_t(id.size() + 1);
+        key[0] = db::prefix::file_info;
+        std::copy(id.begin(), id.end(), key.data() + 1);
+        container.emplace_back(item_t{key, std::move(db)});
         auto diff = diff::cluster_diff_ptr_t(new diff::load::file_infos_t(std::move(container)));
         REQUIRE(diff->apply(*controller, {}));
         auto &map = folder_info->get_file_infos();
@@ -355,6 +363,6 @@ TEST_CASE("loading cluster (file info + block)", "[model]") {
         REQUIRE(target->get_blocks().begin()->get()->get_hash() == block->get_hash());
     }
 
-    CHECK(target->get_key() == fi->get_key());
+    CHECK(target->get_uuid() == fi->get_uuid());
     CHECK(target->get_name() == fi->get_name());
 }

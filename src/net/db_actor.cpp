@@ -608,6 +608,7 @@ auto db_actor_t::remove(const model::diff::modify::generic_remove_t &diff, void 
     auto &txn = *get_txn().assume_value();
 
     for (auto &key : diff.keys) {
+        unsigned char buff[128] = {0};
         auto r = db::remove(key, txn);
         if (!r) {
             return r.assume_error();
@@ -951,7 +952,10 @@ auto db_actor_t::operator()(const model::diff::advance::advance_t &diff, void *c
             auto &txn = *get_txn().assume_value();
 
             {
-                auto key = file->get_key();
+                unsigned char key[model::file_info_t::data_length + 1];
+                key[0] = db::prefix::file_info;
+                auto id = file->get_full_id();
+                std::copy(id.begin(), id.end(), key + 1);
                 auto data = file->serialize();
                 auto r = db::save({key, data}, txn);
                 if (!r) {
@@ -999,7 +1003,10 @@ auto db_actor_t::operator()(const model::diff::peer::update_folder_t &diff, void
         auto name = proto::get_name(f);
         auto file = files_map.by_name(name);
         LOG_TRACE(log, "saving '{}', seq. = {}", *file, file->get_sequence());
-        auto key = file->get_key();
+        unsigned char key[model::file_info_t::data_length + 1];
+        key[0] = db::prefix::file_info;
+        auto id = file->get_full_id();
+        std::copy(id.begin(), id.end(), key + 1);
         auto data = file->serialize();
         auto r = db::save({key, data}, txn);
         if (!r) {
