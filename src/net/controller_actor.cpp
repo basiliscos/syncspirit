@@ -494,7 +494,7 @@ auto controller_actor_t::operator()(const model::diff::advance::advance_t &diff,
             if (file) {
                 if (diff.peer_id == peer->device_id().get_sha256()) {
                     local_file = local_folder->get_file_infos().by_name(name);
-                    if (file->get_blocks().size()) {
+                    if (file->is_file() && file->get_blocks().size()) {
                         cancel_sync(file.get());
                     }
                 }

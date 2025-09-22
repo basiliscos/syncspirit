@@ -12,29 +12,31 @@ auto orphaned_blocks_t::deduce(const set_t &white_listed) const -> set_t {
     auto processed = view_set_t();
     auto r = set_t();
     for (auto &file : file_for_removal) {
-        auto &blocks = file->get_blocks();
-        for (auto &b : blocks) {
-            auto key = b->get_key();
-            if (white_listed.contains(b->get_hash())) {
-                continue;
-            }
-            if (processed.contains(b->get_key())) {
-                continue;
-            }
-            auto &file_blocks = b->get_file_blocks();
-            auto usages = file_blocks.size();
-            for (auto &fb : file_blocks) {
-                auto target_file = file_info_ptr_t(fb.file());
-                auto it = file_for_removal.find(target_file);
-                if (it != file_for_removal.end()) {
-                    --usages;
+        if (file->is_file()) {
+            auto &blocks = file->get_blocks();
+            for (auto &b : blocks) {
+                auto key = b->get_key();
+                if (white_listed.contains(b->get_hash())) {
+                    continue;
                 }
+                if (processed.contains(b->get_key())) {
+                    continue;
+                }
+                auto &file_blocks = b->get_file_blocks();
+                auto usages = file_blocks.size();
+                for (auto &fb : file_blocks) {
+                    auto target_file = file_info_ptr_t(fb.file());
+                    auto it = file_for_removal.find(target_file);
+                    if (it != file_for_removal.end()) {
+                        --usages;
+                    }
+                }
+                if (!usages) {
+                    auto copy = utils::bytes_t(key.begin(), key.end());
+                    r.emplace(std::move(copy));
+                }
+                processed.emplace(key);
             }
-            if (!usages) {
-                auto copy = utils::bytes_t(key.begin(), key.end());
-                r.emplace(std::move(copy));
-            }
-            processed.emplace(key);
         }
     }
     return r;

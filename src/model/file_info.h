@@ -106,7 +106,10 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t {
     inline std::int64_t get_sequence() const noexcept { return sequence; }
     void set_sequence(std::int64_t value) noexcept;
 
-    inline const blocks_t &get_blocks() const noexcept { return blocks; }
+    inline const blocks_t &get_blocks() const noexcept {
+        assert(flags & f_type_file);
+        return content.file.blocks;
+    }
 
     void remove_blocks() noexcept;
     void assign_block(const model::block_info_ptr_t &block, size_t index) noexcept;
@@ -121,9 +124,9 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t {
     inline bool is_local() const noexcept { return flags & f_local; }
 
     std::int64_t get_size() const noexcept;
-    inline void set_size(std::int64_t value) noexcept { size = value; }
+    // inline void set_size(std::int64_t value) noexcept { size = value; }
 
-    std::int32_t get_block_size() const noexcept { return block_size; }
+    std::int32_t get_block_size() const noexcept { return (flags & f_type_file) ? content.file.block_size : 0; }
     std::uint64_t get_block_offset(size_t block_index) const noexcept;
 
     void mark_unreachable(bool value) noexcept;
@@ -133,7 +136,10 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t {
     bool is_locally_available() const noexcept;
     bool is_partly_available() const noexcept;
 
-    const std::string &get_link_target() const noexcept { return symlink_target; }
+    const std::string &get_link_target() const noexcept {
+        assert(flags & f_type_link);
+        return content.non_file.symlink_target;
+    }
 
     const bfs::path get_path(const folder_info_t &folder_info) const noexcept;
 
@@ -172,6 +178,27 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t {
   private:
     using marks_vector_t = std::vector<bool>;
 
+    struct size_full_t {
+        ~size_full_t();
+        std::int64_t size;
+        blocks_t blocks;
+        marks_vector_t marks;
+        std::uint32_t missing_blocks;
+        std::int32_t block_size;
+    };
+
+    struct size_less_t {
+        ~size_less_t();
+        std::string symlink_target;
+    };
+
+    union content_t {
+        content_t();
+        ~content_t();
+        size_full_t file;
+        size_less_t non_file;
+    };
+
     file_info_t(utils::bytes_view_t key, const folder_info_ptr_t &folder_info_) noexcept;
     file_info_t(const bu::uuid &uuid, const folder_info_ptr_t &folder_info_) noexcept;
     outcome::result<void> reserve_blocks(size_t block_count) noexcept;
@@ -180,20 +207,15 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t {
     void remove_block(block_info_ptr_t &block) noexcept;
 
     unsigned char key[data_length];
-    std::int32_t block_size;
     path_ptr_t name;
-    std::int64_t size;
     std::int64_t modified_s;
     std::uint64_t modified_by;
+    std::int64_t sequence;
     std::uint32_t permissions;
     std::uint32_t modified_ns;
 
     version_t version;
-    std::int64_t sequence;
-    std::string symlink_target;
-    blocks_t blocks;
-    marks_vector_t marks;
-    std::uint32_t missing_blocks;
+    content_t content;
     std::uint16_t flags = 0;
 
     friend struct blocks_iterator_t;

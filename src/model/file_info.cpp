@@ -98,6 +98,13 @@ file_info_t::guard_t::~guard_t() {
     }
 }
 
+file_info_t::content_t::content_t() {}
+file_info_t::content_t::~content_t() {}
+
+file_info_t::size_full_t::~size_full_t() {}
+
+file_info_t::size_less_t::~size_less_t() {}
+
 file_info_t::file_info_t(utils::bytes_view_t key_, const folder_info_ptr_t &folder_info) noexcept {
     auto uuid_from_key = key_.subspan(1);
     assert(uuid_from_key.subspan(0, uuid_length) == folder_info->get_uuid());
@@ -109,14 +116,20 @@ file_info_t::file_info_t(const bu::uuid &uuid, const folder_info_ptr_t &folder_i
 }
 
 file_info_t::~file_info_t() {
-    for (auto &b : blocks) {
-        if (!b) {
-            continue;
+    if (flags & f_type_file) {
+        auto &blocks = content.file.blocks;
+        for (auto &b : blocks) {
+            if (!b) {
+                continue;
+            }
+            auto indices = b->unlink(this);
+            for (auto i : indices) {
+                blocks[i].reset();
+            }
         }
-        auto indices = b->unlink(this);
-        for (auto i : indices) {
-            blocks[i].reset();
-        }
+        content.file.~size_full_t();
+    } else {
+        content.non_file.~size_less_t();
     }
     name.reset();
 }
@@ -131,8 +144,8 @@ utils::bytes_t file_info_t::create_key(const bu::uuid &uuid, const folder_info_p
 auto file_info_t::get_name() const noexcept -> const path_ptr_t & { return name; }
 
 std::uint64_t file_info_t::get_block_offset(size_t block_index) const noexcept {
-    assert(!blocks.empty());
-    return block_size * block_index;
+    assert(flags & f_type_file && !content.file.blocks.empty());
+    return content.file.block_size * block_index;
 }
 
 auto file_info_t::fields_update(const db::FileInfo &source, model::path_cache_t &path_cache) noexcept
@@ -154,16 +167,20 @@ auto file_info_t::fields_update(const db::FileInfo &source, model::path_cache_t 
         flags |= flags_t::f_no_permissions;
     }
 
-    symlink_target = db::get_symlink_target(source);
-
     version = version_t(db::get_version(source));
 
-    auto declared_size = db::get_size(source);
-    bool has_content = declared_size && (flags & f_type_file);
-    size = has_content ? declared_size : 0;
-
-    block_size = has_content ? db::get_block_size(source) : 0;
-    return reserve_blocks(has_content ? db::get_blocks_size(source) : 0);
+    if (flags & f_type_file) {
+        new (&content.file) size_full_t();
+        auto declared_size = db::get_size(source);
+        bool has_content = declared_size && (flags & f_type_file);
+        content.file.size = has_content ? declared_size : 0;
+        content.file.block_size = has_content ? db::get_block_size(source) : 0;
+        return reserve_blocks(has_content ? db::get_blocks_size(source) : 0);
+    } else {
+        new (&content.non_file) size_less_t();
+        content.non_file.symlink_target = db::get_symlink_target(source);
+        return outcome::success();
+    }
 }
 
 auto file_info_t::fields_update(const proto::FileInfo &source, model::path_cache_t &path_cache) noexcept
@@ -185,15 +202,20 @@ auto file_info_t::fields_update(const proto::FileInfo &source, model::path_cache
         flags |= flags_t::f_no_permissions;
     }
 
-    symlink_target = proto::get_symlink_target(source);
     version = version_t(proto::get_version(source));
+    if (flags & f_type_file) {
+        new (&content.file) size_full_t();
+        auto declared_size = proto::get_size(source);
+        bool has_content = declared_size && (flags & f_type_file);
+        content.file.size = has_content ? declared_size : 0;
 
-    auto declared_size = proto::get_size(source);
-    bool has_content = declared_size && (flags & f_type_file);
-    size = has_content ? declared_size : 0;
-
-    block_size = has_content ? proto::get_block_size(source) : 0;
-    return reserve_blocks(has_content ? proto::get_blocks_size(source) : 0);
+        content.file.block_size = has_content ? proto::get_block_size(source) : 0;
+        return reserve_blocks(has_content ? proto::get_blocks_size(source) : 0);
+    } else {
+        new (&content.non_file) size_less_t();
+        content.non_file.symlink_target = proto::get_symlink_target(source);
+        return outcome::success();
+    }
 }
 
 utils::bytes_view_t file_info_t::get_uuid() const noexcept { return {key + uuid_length, uuid_length}; }
@@ -207,7 +229,6 @@ db::FileInfo file_info_t::as_db(bool include_blocks) const noexcept {
     db::set_name(r, name->get_full_name());
     db::set_sequence(r, sequence);
     db::set_type(r, as_type(flags));
-    db::set_size(r, size);
     db::set_permissions(r, permissions);
     db::set_modified_s(r, modified_s);
     db::set_modified_ns(r, modified_ns);
@@ -216,15 +237,19 @@ db::FileInfo file_info_t::as_db(bool include_blocks) const noexcept {
     db::set_invalid(r, flags & f_invalid);
     db::set_no_permissions(r, flags & f_no_permissions);
     db::set_version(r, version.as_proto());
-    db::set_block_size(r, block_size);
-    db::set_symlink_target(r, symlink_target);
-    if (include_blocks) {
-        for (auto &block : blocks) {
-            if (!block) {
-                continue;
+    if (flags & f_type_file) {
+        db::set_size(r, content.file.size);
+        db::set_block_size(r, content.file.block_size);
+        if (include_blocks) {
+            for (auto &block : content.file.blocks) {
+                if (!block) {
+                    continue;
+                }
+                db::add_blocks(r, block->get_hash());
             }
-            db::add_blocks(r, block->get_hash());
         }
+    } else {
+        db::set_symlink_target(r, content.non_file.symlink_target);
     }
     return r;
 }
@@ -234,7 +259,6 @@ proto::FileInfo file_info_t::as_proto(bool include_blocks) const noexcept {
     proto::set_name(r, name->get_full_name());
     proto::set_sequence(r, sequence);
     proto::set_type(r, as_type(flags));
-    proto::set_size(r, size);
     proto::set_permissions(r, permissions);
     proto::set_modified_s(r, modified_s);
     proto::set_modified_ns(r, modified_ns);
@@ -243,18 +267,23 @@ proto::FileInfo file_info_t::as_proto(bool include_blocks) const noexcept {
     proto::set_invalid(r, flags & f_invalid);
     proto::set_no_permissions(r, flags & f_no_permissions);
     proto::set_version(r, version.as_proto());
-    proto::set_block_size(r, block_size);
-    proto::set_symlink_target(r, symlink_target);
-    if (include_blocks) {
-        size_t offset = 0;
-        for (auto &b : blocks) {
-            auto &block = *b;
-            proto::add_blocks(r, block.as_bep(offset));
-            offset += block.get_size();
+
+    if (flags & f_type_file) {
+        proto::set_block_size(r, content.file.block_size);
+        proto::set_size(r, content.file.size);
+        if (include_blocks) {
+            size_t offset = 0;
+            for (auto &b : content.file.blocks) {
+                auto &block = *b;
+                proto::add_blocks(r, block.as_bep(offset));
+                offset += block.get_size();
+            }
+            if (content.file.blocks.empty() && !(flags & f_deleted)) {
+                proto::add_blocks(r, empty_block);
+            }
         }
-        if (blocks.empty() && is_file() && !is_deleted()) {
-            proto::add_blocks(r, empty_block);
-        }
+    } else {
+        proto::set_symlink_target(r, content.non_file.symlink_target);
     }
     return r;
 }
@@ -262,15 +291,15 @@ proto::FileInfo file_info_t::as_proto(bool include_blocks) const noexcept {
 outcome::result<void> file_info_t::reserve_blocks(size_t block_count) noexcept {
     size_t count = 0;
     if (!block_count && !(flags & f_deleted) && !(flags & f_invalid)) {
-        if ((size < block_size) && (size >= (int64_t)fs::block_sizes[0])) {
+        if ((content.file.size < content.file.block_size) && (content.file.size >= (int64_t)fs::block_sizes[0])) {
             return make_error_code(error_code_t::invalid_block_size);
         }
-        if (size) {
-            if (!block_size) {
+        if (content.file.size) {
+            if (!content.file.block_size) {
                 return make_error_code(error_code_t::invalid_block_size);
             }
-            count = size / block_size;
-            if ((int64_t)(block_size * count) != size) {
+            count = content.file.size / content.file.block_size;
+            if ((int64_t)(content.file.block_size * count) != content.file.size) {
                 ++count;
             }
         }
@@ -278,9 +307,9 @@ outcome::result<void> file_info_t::reserve_blocks(size_t block_count) noexcept {
         count = block_count;
     }
     remove_blocks();
-    blocks.resize(count);
-    marks.resize(count);
-    missing_blocks = !(flags & f_deleted) && !(flags & f_invalid) && (flags & f_type_file) ? count : 0;
+    content.file.blocks.resize(count);
+    content.file.marks.resize(count);
+    content.file.missing_blocks = !(flags & f_deleted) && !(flags & f_invalid) && (flags & f_type_file) ? count : 0;
     return outcome::success();
 }
 
@@ -320,22 +349,26 @@ void file_info_t::mark_local(bool available, const folder_info_t &folder_info) n
 }
 
 void file_info_t::mark_local_available(size_t block_index) noexcept {
-    assert(block_index < blocks.size());
-    assert(!marks[block_index]);
-    assert(missing_blocks);
-    blocks[block_index]->mark_local_available(this);
-    marks[block_index] = true;
-    --missing_blocks;
+    assert(block_index < content.file.blocks.size());
+    assert(!content.file.marks[block_index]);
+    assert(content.file.missing_blocks);
+    content.file.blocks[block_index]->mark_local_available(this);
+    content.file.marks[block_index] = true;
+    --content.file.missing_blocks;
 }
 
 bool file_info_t::is_locally_available(size_t block_index) const noexcept {
-    assert(block_index < blocks.size());
-    return marks[block_index];
+    assert(block_index < content.file.blocks.size());
+    return content.file.marks[block_index];
 }
 
-bool file_info_t::is_locally_available() const noexcept { return missing_blocks == 0; }
+bool file_info_t::is_locally_available() const noexcept {
+    return flags & f_type_file ? content.file.missing_blocks == 0 : true;
+}
 
-bool file_info_t::is_partly_available() const noexcept { return missing_blocks < blocks.size(); }
+bool file_info_t::is_partly_available() const noexcept {
+    return flags & f_type_file ? content.file.missing_blocks < content.file.blocks.size() : true;
+}
 
 const std::filesystem::path file_info_t::get_path(const folder_info_t &folder_info) const noexcept {
     auto own_name = boost::nowide::widen(name->get_full_name());
@@ -361,27 +394,31 @@ void file_info_t::set_unlocking(bool value) noexcept {
 }
 
 void file_info_t::assign_block(const model::block_info_ptr_t &block, size_t index) noexcept {
-    assert(index < blocks.size() && "blocks should be reserve enough space");
-    assert(!blocks[index]);
-    blocks[index] = block;
+    assert(flags & f_type_file);
+    assert(index < content.file.blocks.size() && "blocks should be reserve enough space");
+    assert(!content.file.blocks[index]);
+    content.file.blocks[index] = block;
     block->link(this, index);
 }
 
 void file_info_t::remove_blocks() noexcept {
-    for (auto &it : blocks) {
-        remove_block(it);
+    if (flags & f_type_file) {
+        for (auto &it : content.file.blocks) {
+            remove_block(it);
+        }
+        std::fill_n(content.file.marks.begin(), content.file.blocks.size(), false);
+        content.file.missing_blocks = content.file.blocks.size();
     }
-    std::fill_n(marks.begin(), blocks.size(), false);
-    missing_blocks = blocks.size();
 }
 
 void file_info_t::remove_block(block_info_ptr_t &block) noexcept {
+    assert(flags & f_type_file);
     if (!block) {
         return;
     }
     auto indices = block->unlink(this);
     for (auto i : indices) {
-        blocks[i] = nullptr;
+        content.file.blocks[i] = nullptr;
     }
 }
 
@@ -389,16 +426,20 @@ std::int64_t file_info_t::get_size() const noexcept {
     if (flags & f_type_file) {
         bool ok = !is_deleted() && !is_invalid();
         if (ok) {
-            return size;
+            return content.file.size;
         }
     }
     return 0;
 }
 
 std::size_t file_info_t::expected_meta_size() const noexcept {
-    auto r = name->get_full_name().size() + 1 + 8 + 4 + 8 + 4 + 8 + 3 + 8 + 4 + symlink_target.size();
+    auto r = name->get_full_name().size() + 1 + 8 + 4 + 8 + 4 + 8 + 3 + 8 + 4;
     r += version.counters_size() * 16;
-    r += blocks.size() * (8 + 4 + 4 + 32);
+    if (flags & f_type_file) {
+        r += content.file.blocks.size() * (8 + 4 + 4 + 32);
+    } else {
+        r += content.non_file.symlink_target.size();
+    }
     return r;
 }
 
@@ -408,10 +449,12 @@ bool file_info_t::has_no_permissions() const noexcept { return flags & f_no_perm
 
 void file_info_t::update(const file_info_t &other) noexcept {
     using hashes_t = std::set<utils::bytes_view_t, utils::bytes_comparator_t>;
-    // assert(this->name == other.name);
+
+    assert((flags & 0b111) == (other.flags & 0b111));
+
+    assert(this->name == other.name);
     assert(this->name->get_full_name() == other.name->get_full_name());
     assert((this->get_uuid() == other.get_uuid()) || version.identical_to(other.version));
-    size = other.size;
     permissions = other.permissions;
     modified_s = other.modified_s;
     modified_ns = other.modified_ns;
@@ -419,36 +462,40 @@ void file_info_t::update(const file_info_t &other) noexcept {
     flags = (other.flags & 0b111111) | (flags & ~0b111111); // local flags are preserved
     version = other.version;
     sequence = other.sequence;
-    block_size = other.block_size;
-    symlink_target = other.symlink_target;
+    if (!(flags & f_type_file)) {
+        content.non_file.symlink_target = other.content.non_file.symlink_target;
+    } else {
+        content.file.size = other.content.file.size;
+        content.file.block_size = other.content.file.block_size;
 
-    auto local_block_hashes = hashes_t{};
-    for (auto &b : blocks) {
-        if (b) {
-            for (auto &fb : b->get_file_blocks()) {
-                if (fb.is_locally_available() && fb.file() == this) {
-                    local_block_hashes.emplace(b->get_hash());
-                    break;
+        auto local_block_hashes = hashes_t{};
+        for (auto &b : content.file.blocks) {
+            if (b) {
+                for (auto &fb : b->get_file_blocks()) {
+                    if (fb.is_locally_available() && fb.file() == this) {
+                        local_block_hashes.emplace(b->get_hash());
+                        break;
+                    }
                 }
             }
         }
-    }
-    // avoid use after free, as local block hashes have block_views
-    auto blocks_copy = blocks;
-    remove_blocks();
+        // avoid use after free, as local block hashes have block_views
+        auto blocks_copy = content.file.blocks;
+        remove_blocks();
 
-    marks = other.marks;
-    blocks.resize(other.blocks.size());
-    missing_blocks = blocks.size();
-    for (size_t i = 0; i < other.blocks.size(); ++i) {
-        auto &b = other.blocks[i];
-        if (b) {
-            assign_block(b, i);
-            auto already_local = marks[i];
-            if (already_local) {
-                --missing_blocks;
-            } else if (local_block_hashes.contains(b->get_hash())) {
-                mark_local_available(i);
+        content.file.marks = other.content.file.marks;
+        content.file.blocks.resize(other.content.file.blocks.size());
+        content.file.missing_blocks = content.file.blocks.size();
+        for (size_t i = 0; i < other.content.file.blocks.size(); ++i) {
+            auto &b = other.content.file.blocks[i];
+            if (b) {
+                assign_block(b, i);
+                auto already_local = content.file.marks[i];
+                if (already_local) {
+                    --content.file.missing_blocks;
+                } else if (local_block_hashes.contains(b->get_hash())) {
+                    mark_local_available(i);
+                }
             }
         }
     }
@@ -482,11 +529,11 @@ bool file_info_t::identical_to(const proto::FileInfo &file) const noexcept {
     auto &v = proto::get_version(file);
     if (version.identical_to(v)) {
         auto blocks_sz = proto::get_blocks_size(file);
-        if (blocks_sz == blocks.size()) {
+        if (blocks_sz == content.file.blocks.size()) {
             for (size_t i = 0; i < blocks_sz; ++i) {
                 auto &block = proto::get_blocks(file, i);
                 auto hash = proto::get_hash(block);
-                if (blocks[i]->get_hash() != hash) {
+                if (content.file.blocks[i]->get_hash() != hash) {
                     return false;
                 }
             }

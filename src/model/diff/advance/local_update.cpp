@@ -54,7 +54,6 @@ auto local_update_t::get_original(const model::folder_infos_map_t &fis, const mo
     auto local_invalid = proto::get_invalid(local_file);
     auto local_perms = proto::get_permissions(local_file);
     auto local_size = proto::get_size(local_file);
-    auto local_blocks_sz = proto::get_blocks_size(local_file);
     auto local_type = model::file_info_t::as_flags(proto::get_type(local_file));
 
     for (auto &it_fi : fis) {
@@ -65,22 +64,29 @@ auto local_update_t::get_original(const model::folder_infos_map_t &fis, const mo
             auto candidate = peer_files.by_name(name);
             if (candidate) {
                 if (candidate->get_size() == local_size) {
-                    auto &peer_blocks = candidate->get_blocks();
                     bool matches = local_type == candidate->get_type() && local_deleted == candidate->is_deleted() &&
                                    local_invalid == candidate->is_invalid() &&
-                                   local_perms == candidate->get_permissions() && local_blocks_sz == peer_blocks.size();
+                                   local_perms == candidate->get_permissions();
                     if (matches) {
-                        for (size_t i = 0; i < peer_blocks.size(); ++i) {
-                            auto &pb = peer_blocks[i];
-                            auto &lb = proto::get_blocks(local_file, i);
-                            if (pb->get_hash() != proto::get_hash(lb)) {
-                                matches = false;
-                                break;
+                        if (candidate->is_file()) {
+                            matches = false;
+                            auto local_blocks_sz = proto::get_blocks_size(local_file);
+                            auto &peer_blocks = candidate->get_blocks();
+                            if (local_blocks_sz == peer_blocks.size()) {
+                                matches = true;
+                                for (size_t i = 0; i < peer_blocks.size(); ++i) {
+                                    auto &pb = peer_blocks[i];
+                                    auto &lb = proto::get_blocks(local_file, i);
+                                    if (pb->get_hash() != proto::get_hash(lb)) {
+                                        matches = false;
+                                        break;
+                                    }
+                                }
                             }
                         }
-                    }
-                    if (matches) {
-                        peer_file = std::move(candidate);
+                        if (matches) {
+                            peer_file = std::move(candidate);
+                        }
                     }
                 }
             }

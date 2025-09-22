@@ -38,7 +38,7 @@ void blocks_iterator_t::advance() noexcept {
 
 void blocks_iterator_t::prepare() noexcept {
     if (i != wrong_index) {
-        bool reset = source->is_unreachable() || (i >= source->blocks.size());
+        bool reset = source->is_unreachable() || (i >= source->get_blocks().size());
         if (reset) {
             i = wrong_index;
         }
