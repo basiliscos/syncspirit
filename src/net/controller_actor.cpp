@@ -402,9 +402,10 @@ void controller_actor_t::preprocess_block(model::file_block_t &file_block,
     acquire_block(file_block, source_folder);
 
     auto hash = block->get_hash();
+    auto last_index = file->iterate_blocks(0).get_total() - 1;
     if (file_block.is_locally_available()) {
         LOG_TRACE(log, "cloning locally available block '{}', file = {}, block index = {} / {}", hash, *file,
-                  file_block.block_index(), file->get_blocks().size() - 1);
+                  file_block.block_index(), last_index);
         auto &folder_infos = source_folder.get_folder()->get_folder_infos();
         auto local_block = block->local_file();
         auto target_fi = folder_infos.by_uuid(file->get_folder_uuid());
@@ -414,7 +415,7 @@ void controller_actor_t::preprocess_block(model::file_block_t &file_block,
     } else {
         auto sz = block->get_size();
         LOG_TRACE(log, "request_block '{}' on file '{}'; block index = {} / {}, sz = {}, request pool sz = {}", hash,
-                  *file, file_block.block_index(), file->get_blocks().size() - 1, sz, request_pool);
+                  *file, file_block.block_index(), last_index, sz, request_pool);
         request<payload::block_request_t>(peer_address, file, source_folder, file_block.block_index())
             .send(request_timeout);
         ++rx_blocks_requested;
@@ -494,7 +495,7 @@ auto controller_actor_t::operator()(const model::diff::advance::advance_t &diff,
             if (file) {
                 if (diff.peer_id == peer->device_id().get_sha256()) {
                     local_file = local_folder->get_file_infos().by_name(name);
-                    if (file->is_file() && file->get_blocks().size()) {
+                    if (file->is_file() && file->iterate_blocks().get_total()) {
                         cancel_sync(file.get());
                     }
                 }
@@ -1023,7 +1024,7 @@ void controller_actor_t::acquire_block(const model::file_block_t &file_block,
     auto block = file_block.block();
     auto folder = folder_info.get_folder();
     LOG_TRACE(log, "acquire block '{}', {}", block->get_hash(), (const void *)block);
-    get_sync_info(folder).start_fetching(block);
+    get_sync_info(folder).start_fetching(const_cast<model::block_info_t *>(block));
 }
 
 void controller_actor_t::release_block(std::string_view folder_id, utils::bytes_view_t hash) noexcept {

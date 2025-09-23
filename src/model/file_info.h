@@ -71,6 +71,25 @@ struct SYNCSPIRIT_API file_info_t {
         const folder_info_t *folder_info;
     };
 
+    struct blocks_iterator_t {
+        using indexed_block_t = std::pair<const block_info_t *, std::uint32_t>;
+        blocks_iterator_t() = default;
+        blocks_iterator_t(const file_info_t *file, std::uint32_t start_index) noexcept;
+
+        blocks_iterator_t(blocks_iterator_t &&) = default;
+        blocks_iterator_t(const blocks_iterator_t &) = delete;
+
+        blocks_iterator_t &operator=(blocks_iterator_t &&) = default;
+
+        const block_info_t *next() noexcept;
+        indexed_block_t current() const noexcept;
+        std::uint32_t get_total() const noexcept;
+
+      private:
+        const file_info_t *file = nullptr;
+        std::uint32_t next_index = 0;
+    };
+
     static outcome::result<file_info_ptr_t> create(utils::bytes_view_t key, const db::FileInfo &data,
                                                    const folder_info_ptr_t &folder_info_) noexcept;
     static outcome::result<file_info_ptr_t> create(const bu::uuid &uuid, const proto::FileInfo &info_,
@@ -106,9 +125,8 @@ struct SYNCSPIRIT_API file_info_t {
     inline std::int64_t get_sequence() const noexcept { return sequence; }
     void set_sequence(std::int64_t value) noexcept;
 
-    inline const blocks_t &get_blocks() const noexcept {
-        assert(flags & f_type_file);
-        return content.file.blocks;
+    inline blocks_iterator_t iterate_blocks(std::uint32_t start_index = 0) const noexcept {
+        return blocks_iterator_t(this, start_index);
     }
 
     void remove_blocks() noexcept;
@@ -228,6 +246,7 @@ struct SYNCSPIRIT_API file_info_t {
     mutable std::uint16_t counter = 0;
 
     friend struct blocks_iterator_t;
+    friend struct model::blocks_iterator_t;
 };
 
 inline void intrusive_ptr_add_ref(const file_info_t *ptr) noexcept { ptr->refcouner_inc(); }

@@ -766,7 +766,7 @@ void test_remote_copy() {
                     auto file_clone = folder_info_clone->get_file_infos().by_name(proto::get_name(file));
                     REQUIRE(file_clone);
                     REQUIRE(file_clone->get_name()->get_full_name() == proto::get_name(file));
-                    REQUIRE(file_clone->get_blocks().size() == 0);
+                    REQUIRE(file_clone->iterate_blocks().get_total() == 0);
                     REQUIRE(file_clone->get_sequence() == 1);
                     REQUIRE(folder_info_clone->get_max_sequence() == 1);
                 }
@@ -808,7 +808,7 @@ void test_remote_copy() {
                     auto file_clone = folder_info_clone->get_file_infos().by_name(proto::get_name(file));
                     REQUIRE(file_clone);
                     REQUIRE(file_clone->get_name()->get_full_name() == proto::get_name(file));
-                    REQUIRE(file_clone->get_blocks().size() == 1);
+                    REQUIRE(file_clone->iterate_blocks().get_total() == 1);
                     REQUIRE(file_clone->get_sequence() == 1);
                     REQUIRE(folder_info_clone->get_max_sequence() == 1);
                 }
@@ -835,8 +835,8 @@ void test_remote_copy() {
                     auto file_clone = folder_info_clone->get_file_infos().by_name(proto::get_name(file));
                     REQUIRE(file_clone);
                     REQUIRE(file_clone->get_name()->get_full_name() == proto::get_name(file));
-                    REQUIRE(file_clone->get_blocks().size() == 1);
-                    REQUIRE(file_clone->get_blocks().at(0));
+                    REQUIRE(file_clone->iterate_blocks().get_total() == 1);
+                    REQUIRE(file_clone->iterate_blocks().next());
                     REQUIRE(file_clone->get_sequence() == 2);
                     REQUIRE(folder_info_clone->get_max_sequence() == 2);
                 }
@@ -878,7 +878,7 @@ void test_local_update() {
                 auto file = folder_my->get_file_infos().by_name("a.txt");
                 REQUIRE(file);
                 CHECK(cluster_clone->get_blocks().size() == 1);
-                CHECK(file->get_blocks().size() == 1);
+                CHECK(file->iterate_blocks().get_total() == 1);
             }
 
             proto::set_deleted(pr_file, true);
@@ -901,7 +901,7 @@ void test_local_update() {
                 REQUIRE(file);
                 CHECK(file->is_deleted());
                 CHECK(cluster_clone->get_blocks().size() == 0);
-                CHECK(file->get_blocks().size() == 0);
+                CHECK(file->iterate_blocks().get_total() == 0);
             }
         }
     };
@@ -1398,7 +1398,7 @@ void test_flush_on_shutdown() {
                 auto folder_my = folder->get_folder_infos().by_device(*my_device);
                 auto file = folder_my->get_file_infos().by_name("a.txt");
                 REQUIRE(file);
-                CHECK(file->get_blocks().size() == 1);
+                CHECK(file->iterate_blocks().get_total() == 1);
                 CHECK(cluster_clone->get_blocks().size() == 1);
             }
         }

@@ -441,7 +441,7 @@ auto file_actor_t::operator()(const model::diff::modify::clone_block_t &diff, vo
     }
 
     auto &source_backend = source_backend_opt.assume_value();
-    auto &block = source->get_blocks().at(diff.source_block_index);
+    auto block = source->iterate_blocks(diff.source_block_index).next();
     auto target_offset = target->get_block_offset(diff.block_index);
     auto source_offset = source->get_block_offset(diff.source_block_index);
     auto r = guard(target_backend->copy(target_offset, *source_backend, source_offset, block->get_size()));

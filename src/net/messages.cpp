@@ -12,7 +12,7 @@ block_request_t::block_request_t(const model::file_info_ptr_t &file_, const mode
     file_name = file_->get_name()->get_full_name();
     sequence = file_->get_sequence();
     block_index = block_index_;
-    auto block = file_->get_blocks()[block_index_].get();
+    auto block = file_->iterate_blocks(block_index_).next();
     block_hash = block->get_hash();
     block_size = block->get_size();
 
@@ -41,11 +41,11 @@ auto block_request_t::get_block(model::cluster_t &cluster, model::device_t &peer
     if (file->get_sequence() != sequence) {
         return {};
     }
-    auto &blocks = file->get_blocks();
-    if (block_index >= blocks.size()) {
+    auto block = file->iterate_blocks(block_index).next();
+    if (!block) {
         return {};
     }
-    auto it = blocks[block_index]->iterate_blocks();
+    auto it = block->iterate_blocks();
     while (auto fb = it.next()) {
         if (fb->file() == file) {
             return {const_cast<model::file_block_t *>(fb), fi.get()};

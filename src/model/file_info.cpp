@@ -98,6 +98,41 @@ file_info_t::guard_t::~guard_t() {
     }
 }
 
+file_info_t::blocks_iterator_t::blocks_iterator_t(const file_info_t *file_, std::uint32_t start_index_) noexcept
+    : file{file_}, next_index{start_index_} {}
+
+const block_info_t *file_info_t::blocks_iterator_t::next() noexcept {
+    auto r = (const block_info_t *)(nullptr);
+    if (file && file->is_file()) {
+        auto &file_content = file->content.file;
+        auto &blocks = file_content.blocks;
+        if (next_index < static_cast<std::uint32_t>(blocks.size())) {
+            r = blocks[next_index].get();
+            ++next_index;
+        }
+    }
+    return r;
+}
+
+auto file_info_t::blocks_iterator_t::current() const noexcept -> indexed_block_t {
+    auto r = indexed_block_t{nullptr, next_index};
+    if (file && file->is_file()) {
+        auto &blocks = file->content.file.blocks;
+        if (next_index < static_cast<std::uint32_t>(blocks.size())) {
+            r.first = blocks[next_index].get();
+        }
+    }
+    return r;
+}
+
+std::uint32_t file_info_t::blocks_iterator_t::get_total() const noexcept {
+    std::uint32_t r = 0;
+    if (file && file->is_file()) {
+        r = static_cast<std::uint32_t>(file->content.file.blocks.size());
+    }
+    return r;
+}
+
 file_info_t::content_t::content_t() {}
 file_info_t::content_t::~content_t() {}
 

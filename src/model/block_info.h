@@ -43,7 +43,7 @@ struct SYNCSPIRIT_API block_info_t {
 
     struct file_blocks_iterator_t {
 
-        file_blocks_iterator_t(block_info_t *block_info, std::uint32_t next) noexcept;
+        file_blocks_iterator_t(const block_info_t *block_info, std::uint32_t next) noexcept;
 
         file_blocks_iterator_t(file_blocks_iterator_t &&) = default;
         file_blocks_iterator_t(const file_blocks_iterator_t &) = delete;
@@ -62,7 +62,7 @@ struct SYNCSPIRIT_API block_info_t {
     inline std::uint32_t get_size() const noexcept { return size; }
     std::uint32_t usages() const noexcept;
 
-    file_blocks_iterator_t iterate_blocks(std::uint32_t start_index = 0);
+    file_blocks_iterator_t iterate_blocks(std::uint32_t start_index = 0) const;
 
     proto::BlockInfo as_bep(size_t offset) const noexcept;
     utils::bytes_t serialize() const noexcept;
@@ -71,7 +71,7 @@ struct SYNCSPIRIT_API block_info_t {
     removed_incides_t unlink(file_info_t *file_info) noexcept;
 
     void mark_local_available(file_info_t *file_info) noexcept;
-    file_block_t local_file() noexcept;
+    file_block_t local_file() const noexcept;
 
     bool is_locked() const noexcept;
     void lock() noexcept;

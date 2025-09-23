@@ -15,5 +15,5 @@ block_diff_t::block_diff_t(const file_info_t &file, const folder_info_t &fi, siz
     folder_id = fi.get_folder()->get_id();
     auto device = fi.get_device();
     device_id = device->device_id().get_sha256();
-    block_hash = file.get_blocks()[block_index_]->get_hash();
+    block_hash = file.iterate_blocks(block_index_).next()->get_hash();
 }

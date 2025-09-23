@@ -94,7 +94,7 @@ TEST_CASE("new file diff", "[model]") {
                 REQUIRE(file_my);
                 CHECK(file_my->is_locally_available());
                 CHECK(file_my->get_sequence() == 2);
-                CHECK(file_my->get_blocks().size() == 0);
+                CHECK(file_my->iterate_blocks().get_total() == 0);
                 CHECK(folder_my->get_max_sequence() == 2);
                 CHECK(blocks_map.size() == 0);
             }

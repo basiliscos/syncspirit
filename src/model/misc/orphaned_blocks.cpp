@@ -13,8 +13,8 @@ auto orphaned_blocks_t::deduce(const set_t &white_listed) const -> set_t {
     auto r = set_t();
     for (auto &file : file_for_removal) {
         if (file->is_file()) {
-            auto &blocks = file->get_blocks();
-            for (auto &b : blocks) {
+            auto it_blocks = file->iterate_blocks();
+            while (auto b = it_blocks.next()) {
                 auto hash = b->get_hash();
                 if (white_listed.contains(hash)) {
                     continue;

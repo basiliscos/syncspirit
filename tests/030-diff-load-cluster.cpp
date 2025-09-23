@@ -338,7 +338,7 @@ TEST_CASE("loading cluster (file info + block)", "[model]") {
         target = file_info_t::create(key, file_info_db, std::move(folder_info)).value();
         REQUIRE(target);
         CHECK(target->get_block_size() == 5ul);
-        CHECK(target->get_blocks().size() == 11ul);
+        CHECK(target->iterate_blocks().get_total() == 11ul);
         for (size_t i = 0; i < 11; ++i) {
             target->assign_block(block, i);
         }
@@ -361,8 +361,8 @@ TEST_CASE("loading cluster (file info + block)", "[model]") {
         target = map.by_uuid(fi->get_uuid());
         REQUIRE(target);
         REQUIRE(map.by_name(fi->get_name()->get_full_name()));
-        REQUIRE(target->get_blocks().size() == 11);
-        REQUIRE(target->get_blocks().begin()->get()->get_hash() == block->get_hash());
+        REQUIRE(target->iterate_blocks().get_total() == 11);
+        REQUIRE(target->iterate_blocks().next()->get_hash() == block->get_hash());
     }
 
     CHECK(target->get_uuid() == fi->get_uuid());

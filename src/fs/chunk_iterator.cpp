@@ -9,12 +9,12 @@ chunk_iterator_t::chunk_iterator_t(scan_task_ptr_t task_, model::file_info_ptr_t
                                    const model::folder_info_t &peer_folder_, file_ptr_t backend_) noexcept
     : task{std::move(task_)}, peer_folder{peer_folder_}, peer_file{std::move(file_)}, backend{std::move(backend_)},
       last_queued_block{0}, valid_blocks_count{0}, abandoned{false} {
-    unhashed_blocks = peer_file->get_blocks().size();
+    unhashed_blocks = peer_file->iterate_blocks().get_total();
     valid_blocks_map.resize(unhashed_blocks);
 }
 
 bool chunk_iterator_t::has_more_chunks() const noexcept {
-    return !abandoned && (last_queued_block < (int64_t)peer_file->get_blocks().size());
+    return !abandoned && (last_queued_block < (int64_t)peer_file->iterate_blocks().get_total());
 }
 
 auto chunk_iterator_t::read() noexcept -> outcome::result<details::chunk_t> {
@@ -39,7 +39,7 @@ auto chunk_iterator_t::read() noexcept -> outcome::result<details::chunk_t> {
 void chunk_iterator_t::ack_hashing() noexcept { --unhashed_blocks; }
 
 void chunk_iterator_t::ack_block(utils::bytes_view_t digest, size_t block_index) noexcept {
-    auto &orig_block = peer_file->get_blocks().at(block_index);
+    auto orig_block = peer_file->iterate_blocks(block_index).next();
     if (orig_block->get_hash() != digest) {
         return;
     }

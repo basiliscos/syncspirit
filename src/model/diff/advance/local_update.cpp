@@ -71,16 +71,17 @@ auto local_update_t::get_original(const model::folder_infos_map_t &fis, const mo
                         if (candidate->is_file()) {
                             matches = false;
                             auto local_blocks_sz = proto::get_blocks_size(local_file);
-                            auto &peer_blocks = candidate->get_blocks();
-                            if (local_blocks_sz == peer_blocks.size()) {
+                            auto iterator = candidate->iterate_blocks();
+                            if (iterator.get_total() == static_cast<std::uint32_t>(local_blocks_sz)) {
                                 matches = true;
-                                for (size_t i = 0; i < peer_blocks.size(); ++i) {
-                                    auto &pb = peer_blocks[i];
+                                auto i = std::uint32_t{0};
+                                while (auto pb = iterator.next()) {
                                     auto &lb = proto::get_blocks(local_file, i);
                                     if (pb->get_hash() != proto::get_hash(lb)) {
                                         matches = false;
                                         break;
                                     }
+                                    ++i;
                                 }
                             }
                         }

@@ -239,8 +239,8 @@ void test_meta_changes() {
                     CHECK(file == new_file);
                     CHECK(new_file->is_locally_available());
                     CHECK(new_file->get_size() == 5);
-                    REQUIRE(new_file->get_blocks().size() == 1);
-                    CHECK(new_file->get_blocks()[0]->get_size() == 5);
+                    REQUIRE(new_file->iterate_blocks().get_total() == 1);
+                    CHECK(new_file->iterate_blocks().next()->get_size() == 5);
                 }
 
                 SECTION("meta is changed (size)") {
@@ -253,8 +253,8 @@ void test_meta_changes() {
                     CHECK(file == new_file);
                     CHECK(new_file->is_locally_available());
                     CHECK(new_file->get_size() == 6);
-                    REQUIRE(new_file->get_blocks().size() == 1);
-                    CHECK(new_file->get_blocks()[0]->get_size() == 6);
+                    REQUIRE(new_file->iterate_blocks().get_total() == 1);
+                    CHECK(new_file->iterate_blocks().next()->get_size() == 6);
                 }
 
                 SECTION("meta is changed (content)") {
@@ -266,8 +266,8 @@ void test_meta_changes() {
                     CHECK(file == new_file);
                     CHECK(new_file->is_locally_available());
                     CHECK(new_file->get_size() == 5);
-                    REQUIRE(new_file->get_blocks().size() == 1);
-                    CHECK(new_file->get_blocks()[0]->get_size() == 5);
+                    REQUIRE(new_file->iterate_blocks().get_total() == 1);
+                    CHECK(new_file->iterate_blocks().next()->get_size() == 5);
                 }
                 REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
             }
@@ -499,7 +499,7 @@ void test_new_files() {
                 CHECK(!file->is_link());
                 CHECK(file->is_file());
                 CHECK(file->get_size() == sz);
-                CHECK(file->get_blocks().size() == 2);
+                REQUIRE(file->iterate_blocks().get_total() == 2);
                 CHECK(blocks.size() == 1);
                 REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
             }
@@ -517,7 +517,7 @@ void test_new_files() {
                 CHECK(!file->is_link());
                 CHECK(file->is_file());
                 CHECK(file->get_size() == sz);
-                CHECK(file->get_blocks().size() == 3);
+                REQUIRE(file->iterate_blocks().get_total() == 3);
                 CHECK(blocks.size() == 1);
                 REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
             }

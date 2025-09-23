@@ -99,8 +99,8 @@ TEST_CASE("new file diff", "[model]") {
         REQUIRE(!file->is_link());
         REQUIRE(file->get_sequence() == 1);
         REQUIRE(folder_info->get_max_sequence() == 1);
-        REQUIRE(file->get_blocks().size() == 1);
-        REQUIRE(file->get_blocks()[0]->get_hash() == hash);
+        REQUIRE(file->iterate_blocks().get_total() == 1);
+        REQUIRE(file->iterate_blocks().next()->get_hash() == hash);
         REQUIRE(cluster->get_blocks().size() == 1);
         REQUIRE(cluster->get_blocks().by_hash(hash));
     }
@@ -160,7 +160,7 @@ TEST_CASE("new file diff", "[model]") {
 
         file = file = folder_info->get_file_infos().by_name(proto::get_name(pr_file));
         CHECK(file->is_deleted());
-        CHECK(file->get_blocks().size() == 0);
+        REQUIRE(file->iterate_blocks().get_total() == 0);
         CHECK(file->get_sequence() > sequence);
     }
 }

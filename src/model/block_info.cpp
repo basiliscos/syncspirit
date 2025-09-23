@@ -12,7 +12,7 @@ namespace syncspirit::model {
 
 static const constexpr char prefix = (char)(db::prefix::block_info);
 
-block_info_t::file_blocks_iterator_t::file_blocks_iterator_t(block_info_t *block_info_,
+block_info_t::file_blocks_iterator_t::file_blocks_iterator_t(const block_info_t *block_info_,
                                                              std::uint32_t next_index_) noexcept
     : block_info{block_info_}, next_index{next_index_} {}
 
@@ -106,7 +106,7 @@ outcome::result<block_info_ptr_t> block_info_t::create(const proto::BlockInfo &b
     return outcome::success(ptr);
 }
 
-auto block_info_t::iterate_blocks(std::uint32_t start_index) -> file_blocks_iterator_t {
+auto block_info_t::iterate_blocks(std::uint32_t start_index) const -> file_blocks_iterator_t {
     return file_blocks_iterator_t(this, start_index);
 }
 
@@ -195,7 +195,7 @@ void block_info_t::mark_local_available(file_info_t *file_info) noexcept {
     }
 }
 
-file_block_t block_info_t::local_file() noexcept {
+file_block_t block_info_t::local_file() const noexcept {
     auto it = iterate_blocks(0);
     while (auto fb = it.next()) {
         if (fb->is_locally_available()) {

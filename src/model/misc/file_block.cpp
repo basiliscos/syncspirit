@@ -7,7 +7,7 @@
 
 namespace syncspirit::model {
 
-file_block_t::file_block_t(block_info_t *block, file_info_t *file_info_, std::size_t block_index_) noexcept
+file_block_t::file_block_t(const block_info_t *block, file_info_t *file_info_, std::size_t block_index_) noexcept
     : block_info{block}, file_info{file_info_}, block_idx{static_cast<std::uint32_t>(block_index_)} {
     if (block->local_file()) {
         block_idx = block_idx | LOCAL_MASK;

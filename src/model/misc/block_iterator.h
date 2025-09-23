@@ -29,8 +29,8 @@ struct SYNCSPIRIT_API blocks_iterator_t : arc_base_t<blocks_iterator_t> {
 
     const folder_info_t &source_folder;
     file_info_ptr_t source;
-    size_t i = 0;
     std::int64_t sequence;
+    std::uint32_t i = 0;
 };
 
 using block_iterator_ptr_t = intrusive_ptr_t<blocks_iterator_t>;

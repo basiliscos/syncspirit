@@ -480,8 +480,8 @@ void test_clone_block() {
                         .apply(*sup);
 
                     auto target_file = folder_peer->get_file_infos().by_name(proto::get_name(pr_target));
-                    auto block = source_file->get_blocks()[0];
-                    auto file_block = model::file_block_t(block.get(), target_file.get(), 0);
+                    auto block = source_file->iterate_blocks(0).next();
+                    auto file_block = model::file_block_t(block, target_file.get(), 0);
                     builder.clone_block(file_block, *folder_peer, *folder_peer)
                         .apply(*sup)
                         .finish_file(*target, *folder_peer)
@@ -517,8 +517,8 @@ void test_clone_block() {
                     write_file(root_path / boost::nowide::widen(source->get_name()->get_full_name()), "12345");
 
                     auto target_file = folder_peer->get_file_infos().by_name(proto::get_name(pr_target));
-                    auto block = source->get_blocks()[0];
-                    auto file_block = model::file_block_t(block.get(), target_file.get(), 0);
+                    auto block = source->iterate_blocks(0).next();
+                    auto file_block = model::file_block_t(block, target_file.get(), 0);
                     builder.clone_block(file_block, *folder_peer, *fi_2_my)
                         .apply(*sup)
                         .finish_file(*target, *folder_peer)
@@ -545,9 +545,9 @@ void test_clone_block() {
                         .apply(*sup);
 
                     auto target_file = folder_peer->get_file_infos().by_name(proto::get_name(pr_target));
-                    auto blocks = source_file->get_blocks();
-                    auto fb_1 = model::file_block_t(blocks[0].get(), target_file.get(), 0);
-                    auto fb_2 = model::file_block_t(blocks[1].get(), target_file.get(), 1);
+                    auto iterator = source_file->iterate_blocks();
+                    auto fb_1 = model::file_block_t(iterator.next(), target_file.get(), 0);
+                    auto fb_2 = model::file_block_t(iterator.next(), target_file.get(), 1);
                     builder.clone_block(fb_1, *folder_peer, *folder_peer)
                         .clone_block(fb_2, *folder_peer, *folder_peer)
                         .apply(*sup)
@@ -577,8 +577,8 @@ void test_clone_block() {
                         .append_block(*target_file, *folder_peer, 0, as_owned_bytes("12345"))
                         .apply(*sup);
 
-                    auto blocks = source_file->get_blocks();
-                    auto fb = model::file_block_t(blocks[0].get(), target_file.get(), 1);
+                    auto iterator = source_file->iterate_blocks(0);
+                    auto fb = model::file_block_t(iterator.next(), target_file.get(), 1);
                     builder.clone_block(fb, *folder_peer, *folder_peer)
                         .apply(*sup)
                         .finish_file(*target, *folder_peer)
@@ -605,8 +605,8 @@ void test_clone_block() {
 
                 builder.append_block(*source_file, *folder_peer, 0, as_owned_bytes("12345")).apply(*sup);
 
-                auto block = source_file->get_blocks()[0];
-                auto file_block = model::file_block_t(block.get(), target_file.get(), 1);
+                auto iterator = source_file->iterate_blocks(0);
+                auto file_block = model::file_block_t(iterator.next(), target_file.get(), 1);
                 builder.clone_block(file_block, *folder_peer, *folder_peer)
                     .apply(*sup)
                     .finish_file(*source, *folder_peer)

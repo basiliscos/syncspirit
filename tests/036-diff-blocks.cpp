@@ -63,9 +63,8 @@ TEST_CASE("various block diffs", "[model]") {
         auto diff = diff::cluster_diff_ptr_t(diff_raw);
         diff->assign_sibling(diff_raw->ack().get());
         REQUIRE(builder.assign(diff.get()).apply());
-        auto &blocks = file->get_blocks();
 
-        auto lf1 = blocks[0]->local_file();
+        auto lf1 = file->iterate_blocks(0).next()->local_file();
         REQUIRE(lf1);
         CHECK(lf1.block_index() == 0);
         CHECK(lf1.get_offset() == 0);
@@ -86,7 +85,7 @@ TEST_CASE("various block diffs", "[model]") {
 
         REQUIRE(builder.local_update(folder->get_id(), pr_source).apply());
         auto source = folder_info->get_file_infos().by_name("b.txt");
-        auto b2 = source->get_blocks().at(0);
+        auto b2 = const_cast<model::block_info_t *>(source->iterate_blocks(0).next());
         b2->mark_local_available(source.get());
 
         auto fb = model::file_block_t(bi2.get(), file.get(), 1);
@@ -95,8 +94,7 @@ TEST_CASE("various block diffs", "[model]") {
         diff->assign_sibling(diff_raw->ack().get());
         REQUIRE(builder.assign(diff.get()).apply());
 
-        auto &blocks = file->get_blocks();
-        auto lf1 = blocks[1]->local_file();
+        auto lf1 = file->iterate_blocks(1).next()->local_file();
         REQUIRE(lf1);
         CHECK(lf1.block_index() == 1);
         CHECK(lf1.get_offset() == 5);

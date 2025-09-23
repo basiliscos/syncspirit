@@ -12,8 +12,8 @@ using namespace syncspirit::model;
 bool file_iterator_t::file_comparator_t::operator()(const file_info_t *l, const file_info_t *r) const {
     using P = db::PullOrder;
 
-    auto le = l->get_blocks().empty();
-    auto re = r->get_blocks().empty();
+    auto le = l->iterate_blocks().get_total() == 0;
+    auto re = r->iterate_blocks().get_total() == 0;
 
     if (le && !re) {
         return true;

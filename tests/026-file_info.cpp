@@ -180,5 +180,5 @@ TEST_CASE("file_info_t::create, inconsistent source") {
 
     auto my_file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
     CHECK(my_file->get_block_size() == 0);
-    CHECK(my_file->get_blocks().size() == 0);
+    CHECK(my_file->iterate_blocks().get_total() == 0);
 }
