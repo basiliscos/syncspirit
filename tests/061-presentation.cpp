@@ -887,7 +887,7 @@ TEST_CASE("statistics, update", "[presentation]") {
 
         auto file = model::file_info_t::create(sequencer->next_uuid(), pr_fi, folder_info.get()).value();
         if (block) {
-            file->assign_block(block, 0);
+            file->assign_block(block.get(), 0);
         }
         if (&device == my_device) {
             file->mark_local(true, *folder_info);
@@ -964,7 +964,7 @@ TEST_CASE("statistics", "[presentation]") {
 
         auto file = model::file_info_t::create(sequencer->next_uuid(), pr_fi, folder_info.get()).value();
         if (block) {
-            file->assign_block(block, 0);
+            file->assign_block(block.get(), 0);
         }
         if (&device == my_device) {
             file->mark_local(true, *folder_info);
@@ -1236,7 +1236,7 @@ TEST_CASE("statistics", "[presentation]") {
                 auto pr_x = f_x_my->as_proto(true);
                 auto file_x_peer = model::file_info_t::create(sequencer->next_uuid(), pr_x, fi_peer.get()).value();
                 auto block = *blocks.begin();
-                file_x_peer->assign_block(block, 0);
+                file_x_peer->assign_block(block.get(), 0);
                 fi_peer->add_strict(file_x_peer);
 
                 CHECK(p_a_peer->get_children().size() == 1);
@@ -1363,7 +1363,7 @@ TEST_CASE("statistics", "[presentation]") {
         auto file_c_peer = model::file_info_t::create(sequencer->next_uuid(), pr_fi, fi_peer.get()).value();
         {
             auto block = *blocks.begin();
-            file_c_peer->assign_block(block, 0);
+            file_c_peer->assign_block(block.get(), 0);
             fi_peer->add_strict(file_c_peer);
             folder_entity->on_insert(*file_c_peer, *fi_peer);
             CHECK(folder_entity->get_stats() == entity_stats_t{10, 3});
@@ -1399,7 +1399,7 @@ TEST_CASE("statistics", "[presentation]") {
             assign(file_uuid, file_c_peer->get_uuid());
             auto file_c_peer_2 = model::file_info_t::create(file_uuid, pr_fi, fi_peer.get()).value();
             auto block = *blocks.begin();
-            file_c_peer_2->assign_block(b_15, 0);
+            file_c_peer_2->assign_block(b_15.get(), 0);
             fi_peer_2->add_strict(file_c_peer);
 
             file_c_peer->update(*file_c_peer_2);

@@ -933,7 +933,7 @@ void test_downloading() {
 
                 auto uuid = sup->sequencer->next_uuid();
                 auto file_info = model::file_info_t::create(uuid, pr_fi, folder_peer).value();
-                file_info->assign_block(b, 0);
+                file_info->assign_block(b.get(), 0);
                 REQUIRE(folder_peer->add_strict(file_info));
                 cluster->get_blocks().put(b);
 
@@ -1124,7 +1124,7 @@ void test_downloading() {
 
                 auto uuid = sup->sequencer->next_uuid();
                 auto file_my = model::file_info_t::create(uuid, pr_file_my, folder_my).value();
-                file_my->assign_block(bi_1, 0);
+                file_my->assign_block(bi_1.get(), 0);
                 file_my->mark_local_available(0);
                 REQUIRE(folder_my->add_strict(file_my));
 
@@ -1751,7 +1751,7 @@ void test_uploading() {
 
             auto uuid = sup->sequencer->next_uuid();
             auto file_info = model::file_info_t::create(uuid, file, folder_my).value();
-            file_info->assign_block(b, 0);
+            file_info->assign_block(b.get(), 0);
             REQUIRE(folder_my->add_strict(file_info));
 
             auto req = proto::Request();

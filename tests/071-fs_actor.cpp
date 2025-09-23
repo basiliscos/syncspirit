@@ -509,7 +509,7 @@ void test_clone_block() {
 
                     proto::set_sequence(pr_source, ++next_sequence);
                     auto source = file_info_t::create(sequencer->next_uuid(), pr_source, fi_2_my).value();
-                    source->assign_block(blocks[0], 0);
+                    source->assign_block(blocks[0].get(), 0);
                     fi_2_my->add_strict(source);
                     source->mark_local_available(0);
 
@@ -660,8 +660,8 @@ void test_requesting_block() {
             proto::add_blocks(pr_source, bi2);
 
             auto file = file_info_t::create(sequencer->next_uuid(), pr_source, folder_my).value();
-            file->assign_block(b, 0);
-            file->assign_block(b2, 1);
+            file->assign_block(b.get(), 0);
+            file->assign_block(b2.get(), 1);
             folder_my->add_relaxed(file);
 
             auto req = proto::Request();

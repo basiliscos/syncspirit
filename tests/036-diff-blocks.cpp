@@ -54,8 +54,8 @@ TEST_CASE("various block diffs", "[model]") {
     auto bi1 = cluster->get_blocks().by_hash(b1_hash);
     auto bi2 = cluster->get_blocks().by_hash(b2_hash);
     file->remove_blocks();
-    file->assign_block(bi1, 0);
-    file->assign_block(bi2, 1);
+    file->assign_block(bi1.get(), 0);
+    file->assign_block(bi2.get(), 1);
     REQUIRE(!file->is_locally_available());
 
     SECTION("append") {

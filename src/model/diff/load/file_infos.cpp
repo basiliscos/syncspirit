@@ -43,7 +43,7 @@ auto file_infos_t::apply_impl(apply_controller_t &controller, void *custom) cons
             auto block_hash = db::get_blocks(db, i);
             auto block = blocks.by_hash(block_hash);
             assert(block);
-            fi->assign_block(std::move(block), i);
+            fi->assign_block(block.get(), i);
         }
         folder_info->add_relaxed(fi);
     }

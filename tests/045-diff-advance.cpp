@@ -57,7 +57,7 @@ TEST_CASE("remove folder", "[model]") {
     auto folder_my = folder->get_folder_infos().by_device(*my_device);
     auto &files_my = folder_my->get_file_infos();
     auto file_peer = file_info_t::create(sequencer->next_uuid(), pr_fi, folder_peer).value();
-    file_peer->assign_block(bi_1, 0);
+    file_peer->assign_block(bi_1.get(), 0);
     folder_peer->add_relaxed(file_peer);
 
     SECTION("local update") {

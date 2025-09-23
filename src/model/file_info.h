@@ -51,7 +51,7 @@ struct SYNCSPIRIT_API file_info_t {
     };
     // clang-format on
 
-    using blocks_t = std::vector<block_info_ptr_t>;
+    using blocks_t = std::vector<block_info_t *>;
 
     struct decomposed_key_t {
         utils::bytes_view_t folder_info_id;
@@ -71,7 +71,7 @@ struct SYNCSPIRIT_API file_info_t {
         const folder_info_t *folder_info;
     };
 
-    struct blocks_iterator_t {
+    struct SYNCSPIRIT_API blocks_iterator_t {
         using indexed_block_t = std::pair<const block_info_t *, std::uint32_t>;
         blocks_iterator_t() = default;
         blocks_iterator_t(const file_info_t *file, std::uint32_t start_index) noexcept;
@@ -130,7 +130,7 @@ struct SYNCSPIRIT_API file_info_t {
     }
 
     void remove_blocks() noexcept;
-    void assign_block(const model::block_info_ptr_t &block, size_t index) noexcept;
+    void assign_block(model::block_info_t *block, size_t index) noexcept;
 
     inline std::uint16_t get_type() const noexcept { return flags & 0b111; }
     inline bool is_file() const noexcept { return flags & f_type_file; }
@@ -151,7 +151,6 @@ struct SYNCSPIRIT_API file_info_t {
     void mark_local(bool available, const folder_info_t &) noexcept;
     bool is_locally_available(size_t block_index) const noexcept;
     bool is_locally_available() const noexcept;
-    bool is_partly_available() const noexcept;
 
     const std::string &get_link_target() const noexcept {
         assert(flags & f_type_link);
@@ -229,7 +228,7 @@ struct SYNCSPIRIT_API file_info_t {
     outcome::result<void> reserve_blocks(size_t block_count, std::int64_t declared_size) noexcept;
 
     void update_blocks(const proto::FileInfo &remote_info) noexcept;
-    void remove_block(block_info_ptr_t &block) noexcept;
+    void remove_block(block_info_t *block) noexcept;
 
     unsigned char key[data_length];
     augmentation_ptr_t extension;

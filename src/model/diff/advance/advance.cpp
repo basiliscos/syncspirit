@@ -156,7 +156,7 @@ auto advance_t::apply_impl(apply_controller_t &controller, void *custom) const n
             auto strict_hash = block_info_t::make_strict_hash(hash);
             auto block_info = blocks_map.by_hash(strict_hash.get_hash());
             assert(block_info);
-            local_file->assign_block(block_info, i);
+            local_file->assign_block(block_info.get(), i);
             local_file->mark_local_available(i);
         }
     }

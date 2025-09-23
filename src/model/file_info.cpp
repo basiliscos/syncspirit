@@ -107,7 +107,7 @@ const block_info_t *file_info_t::blocks_iterator_t::next() noexcept {
         auto &file_content = file->content.file;
         auto &blocks = file_content.blocks;
         if (next_index < static_cast<std::uint32_t>(blocks.size())) {
-            r = blocks[next_index].get();
+            r = blocks[next_index];
             ++next_index;
         }
     }
@@ -119,7 +119,7 @@ auto file_info_t::blocks_iterator_t::current() const noexcept -> indexed_block_t
     if (file && file->is_file()) {
         auto &blocks = file->content.file.blocks;
         if (next_index < static_cast<std::uint32_t>(blocks.size())) {
-            r.first = blocks[next_index].get();
+            r.first = blocks[next_index];
         }
     }
     return r;
@@ -159,7 +159,9 @@ file_info_t::~file_info_t() {
             }
             auto indices = b->unlink(this);
             for (auto i : indices) {
-                blocks[i].reset();
+                auto &b = blocks[i];
+                intrusive_ptr_release(b);
+                b = nullptr;
             }
         }
         content.file.~size_full_t();
@@ -400,10 +402,6 @@ bool file_info_t::is_locally_available() const noexcept {
     return flags & f_type_file ? content.file.missing_blocks == 0 : true;
 }
 
-bool file_info_t::is_partly_available() const noexcept {
-    return flags & f_type_file ? content.file.missing_blocks < content.file.blocks.size() : true;
-}
-
 const std::filesystem::path file_info_t::get_path(const folder_info_t &folder_info) const noexcept {
     auto own_name = boost::nowide::widen(name->get_full_name());
     auto path = folder_info.get_folder()->get_path() / own_name;
@@ -427,11 +425,12 @@ void file_info_t::set_unlocking(bool value) noexcept {
     }
 }
 
-void file_info_t::assign_block(const model::block_info_ptr_t &block, size_t index) noexcept {
+void file_info_t::assign_block(model::block_info_t *block, size_t index) noexcept {
     assert(flags & f_type_file);
     assert(index < content.file.blocks.size() && "blocks should be reserve enough space");
     assert(!content.file.blocks[index]);
     content.file.blocks[index] = block;
+    intrusive_ptr_add_ref(block);
     block->link(this, index);
 }
 
@@ -445,7 +444,7 @@ void file_info_t::remove_blocks() noexcept {
     }
 }
 
-void file_info_t::remove_block(block_info_ptr_t &block) noexcept {
+void file_info_t::remove_block(block_info_t *block) noexcept {
     assert(flags & f_type_file);
     if (!block) {
         return;
@@ -453,6 +452,7 @@ void file_info_t::remove_block(block_info_ptr_t &block) noexcept {
     auto indices = block->unlink(this);
     for (auto i : indices) {
         content.file.blocks[i] = nullptr;
+        intrusive_ptr_release(block);
     }
 }
 
@@ -517,14 +517,20 @@ void file_info_t::update(const file_info_t &other) noexcept {
                 }
             }
         }
+
         // avoid use after free, as local block hashes have block_views
-        auto blocks_copy = content.file.blocks;
+        auto sz = other.content.file.blocks.size();
+        auto blocks_copy = std::vector<model::block_info_ptr_t>();
+        blocks_copy.reserve(sz);
+        for (auto b: content.file.blocks) {
+            blocks_copy.emplace_back(b);
+        }
         remove_blocks();
 
         content.file.marks = other.content.file.marks;
-        content.file.blocks.resize(other.content.file.blocks.size());
-        content.file.missing_blocks = content.file.blocks.size();
-        for (size_t i = 0; i < other.content.file.blocks.size(); ++i) {
+        content.file.blocks.resize(sz);
+        content.file.missing_blocks = sz;
+        for (size_t i = 0; i < sz; ++i) {
             auto &b = other.content.file.blocks[i];
             if (b) {
                 assign_block(b, i);

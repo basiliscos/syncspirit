@@ -63,7 +63,7 @@ TEST_CASE("new file diff", "[model]") {
             blocks_map.put(bi);
 
             auto file_my = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
-            file_my->assign_block(bi, 0);
+            file_my->assign_block(bi.get(), 0);
             file_my->mark_local_available(0);
             REQUIRE(folder_my->add_strict(file_my));
 
@@ -71,7 +71,7 @@ TEST_CASE("new file diff", "[model]") {
                 proto::set_modified_s(pr_file, 123);
                 auto file_peer = file_info_t::create(sequencer->next_uuid(), pr_file, folder_peer).value();
                 REQUIRE(folder_peer->add_strict(file_peer));
-                file_peer->assign_block(bi, 0);
+                file_peer->assign_block(bi.get(), 0);
                 file_peer->mark_local_available(0);
                 REQUIRE(builder.remote_copy(*file_peer, *folder_peer).apply());
 

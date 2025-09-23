@@ -84,8 +84,8 @@ TEST_CASE("block iterator", "[model]") {
             auto bi1 = cluster->get_blocks().by_hash(b1_hash);
             auto bi2 = cluster->get_blocks().by_hash(b2_hash);
             my_file->remove_blocks();
-            my_file->assign_block(bi1, 0);
-            my_file->assign_block(bi2, 1);
+            my_file->assign_block(bi1.get(), 0);
+            my_file->assign_block(bi2.get(), 1);
 
             auto fb1 = next(my_file, *my_folder, true);
             REQUIRE(fb1);
@@ -109,8 +109,8 @@ TEST_CASE("block iterator", "[model]") {
             auto bi1 = cluster->get_blocks().by_hash(b1_hash);
             auto bi2 = cluster->get_blocks().by_hash(b2_hash);
             my_file->remove_blocks();
-            my_file->assign_block(bi1, 0);
-            my_file->assign_block(bi2, 1);
+            my_file->assign_block(bi1.get(), 0);
+            my_file->assign_block(bi2.get(), 1);
 
             my_file->mark_unreachable(true);
             CHECK(!next(my_file, *my_folder, true));
@@ -137,7 +137,7 @@ TEST_CASE("block iterator", "[model]") {
         auto my_file = my_folder->get_file_infos().by_name(proto::get_name(p_file));
         auto bi1 = cluster->get_blocks().by_hash(b1_hash);
         my_file->remove_blocks();
-        my_file->assign_block(bi1, 0);
+        my_file->assign_block(bi1.get(), 0);
         REQUIRE(!my_file->is_locally_available());
 
         auto fb1 = next(my_file, *my_folder, true);

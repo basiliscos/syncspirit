@@ -76,7 +76,7 @@ auto update_folder_t::apply_impl(apply_controller_t &controller, void *custom) c
                 auto strict_hash = block_info_t::make_strict_hash(hash);
                 auto block = bm.by_hash(strict_hash.get_hash());
                 assert(block);
-                file->assign_block(block, (size_t)i);
+                file->assign_block(block.get(), (size_t)i);
             }
         }
         bool add_file = true;

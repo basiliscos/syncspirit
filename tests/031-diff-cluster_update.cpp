@@ -430,10 +430,10 @@ TEST_CASE("cluster update, reset folder", "[model]") {
     REQUIRE(folder_info_peer->add_strict(fi_peer2));
     REQUIRE(folder_info_peer->get_file_infos().size() == 2);
 
-    fi_my->assign_block(b1, 0);
-    fi_peer1->assign_block(b2, 0);
-    fi_peer2->assign_block(b2, 0);
-    fi_peer2->assign_block(b3, 1);
+    fi_my->assign_block(b1.get(), 0);
+    fi_peer1->assign_block(b2.get(), 0);
+    fi_peer2->assign_block(b2.get(), 0);
+    fi_peer2->assign_block(b3.get(), 1);
 
     auto cc = std::make_unique<proto::ClusterConfig>();
     auto &pr_folder = proto::add_folders(*cc);

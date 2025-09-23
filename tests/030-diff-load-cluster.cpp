@@ -321,7 +321,7 @@ TEST_CASE("loading cluster (file info + block)", "[model]") {
     auto fi = file_info_t::create(sequencer->next_uuid(), pr_fi, folder_info).value();
     CHECK(fi);
     for (size_t i = 0; i < 11; ++i) {
-        fi->assign_block(block, i);
+        fi->assign_block(block.get(), i);
     }
 
     auto target = file_info_ptr_t();
@@ -340,7 +340,7 @@ TEST_CASE("loading cluster (file info + block)", "[model]") {
         CHECK(target->get_block_size() == 5ul);
         CHECK(target->iterate_blocks().get_total() == 11ul);
         for (size_t i = 0; i < 11; ++i) {
-            target->assign_block(block, i);
+            target->assign_block(block.get(), i);
         }
         CHECK(target->get_size() == 55ul);
     }

@@ -51,5 +51,5 @@ file_block_t blocks_iterator_t::next() noexcept {
     auto idx = i;
     ++i;
     advance();
-    return {sb[idx].get(), src, idx};
+    return {sb[idx], src, idx};
 }
