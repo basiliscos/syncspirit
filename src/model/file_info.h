@@ -51,6 +51,9 @@ struct SYNCSPIRIT_API file_info_t {
     };
     // clang-format on
 
+    static constexpr std::uintptr_t LOCAL_MASK = 1 << 0;
+    static constexpr std::uintptr_t PTR_MASK = ~LOCAL_MASK;
+
     using blocks_t = std::vector<block_info_t *>;
 
     struct decomposed_key_t {
@@ -206,7 +209,6 @@ struct SYNCSPIRIT_API file_info_t {
     struct size_full_t {
         ~size_full_t();
         blocks_t blocks;
-        marks_vector_t marks;
         std::uint32_t missing_blocks;
         std::int32_t block_size;
     };

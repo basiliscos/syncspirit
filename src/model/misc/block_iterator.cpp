@@ -28,7 +28,8 @@ void blocks_iterator_t::advance() noexcept {
     auto &sb = source->content.file.blocks;
     auto max = sb.size();
     while (i < max && sb[i]) {
-        if (!source->is_locally_available(i)) {
+        auto ptr = reinterpret_cast<std::uintptr_t>(sb[i]);
+        if (!(ptr & file_info_t::LOCAL_MASK)) {
             break;
         }
         ++i;
@@ -51,5 +52,8 @@ file_block_t blocks_iterator_t::next() noexcept {
     auto idx = i;
     ++i;
     advance();
-    return {sb[idx], src, idx};
+
+    auto ptr = reinterpret_cast<std::uintptr_t>(sb[idx]);
+    auto block = reinterpret_cast<const block_info_t *>(ptr & file_info_t::PTR_MASK);
+    return {block, src, idx};
 }

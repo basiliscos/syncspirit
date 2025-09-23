@@ -107,7 +107,8 @@ const block_info_t *file_info_t::blocks_iterator_t::next() noexcept {
         auto &file_content = file->content.file;
         auto &blocks = file_content.blocks;
         if (next_index < static_cast<std::uint32_t>(blocks.size())) {
-            r = blocks[next_index];
+            auto ptr = reinterpret_cast<std::uintptr_t>(blocks[next_index]);
+            r = reinterpret_cast<const block_info_t *>(ptr & PTR_MASK);
             ++next_index;
         }
     }
@@ -119,7 +120,8 @@ auto file_info_t::blocks_iterator_t::current() const noexcept -> indexed_block_t
     if (file && file->is_file()) {
         auto &blocks = file->content.file.blocks;
         if (next_index < static_cast<std::uint32_t>(blocks.size())) {
-            r.first = blocks[next_index];
+            auto ptr = reinterpret_cast<std::uintptr_t>(blocks[next_index]);
+            r.first = reinterpret_cast<const block_info_t *>(ptr & PTR_MASK);
         }
     }
     return r;
@@ -153,15 +155,18 @@ file_info_t::file_info_t(const bu::uuid &uuid, const folder_info_ptr_t &folder_i
 file_info_t::~file_info_t() {
     if (flags & f_type_file) {
         auto &blocks = content.file.blocks;
-        for (auto &b : blocks) {
-            if (!b) {
+        for (auto b_raw : blocks) {
+            if (!b_raw) {
                 continue;
             }
-            auto indices = b->unlink(this);
+            auto ptr = reinterpret_cast<std::uintptr_t>(b_raw);
+            auto block = reinterpret_cast<block_info_t *>(ptr & PTR_MASK);
+            auto indices = block->unlink(this);
             for (auto i : indices) {
-                auto &b = blocks[i];
+                auto p = reinterpret_cast<std::uintptr_t>(blocks[i]);
+                auto b = reinterpret_cast<block_info_t *>(p & PTR_MASK);
                 intrusive_ptr_release(b);
-                b = nullptr;
+                blocks[i] = {};
             }
         }
         content.file.~size_full_t();
@@ -277,7 +282,9 @@ db::FileInfo file_info_t::as_db(bool include_blocks) const noexcept {
         db::set_size(r, get_size());
         db::set_block_size(r, content.file.block_size);
         if (include_blocks) {
-            for (auto &block : content.file.blocks) {
+            for (auto b_raw : content.file.blocks) {
+                auto ptr = reinterpret_cast<std::uintptr_t>(b_raw);
+                auto block = reinterpret_cast<const block_info_t *>(ptr & PTR_MASK);
                 if (!block) {
                     continue;
                 }
@@ -309,10 +316,11 @@ proto::FileInfo file_info_t::as_proto(bool include_blocks) const noexcept {
         proto::set_size(r, get_size());
         if (include_blocks) {
             size_t offset = 0;
-            for (auto &b : content.file.blocks) {
-                auto &block = *b;
-                proto::add_blocks(r, block.as_bep(offset));
-                offset += block.get_size();
+            for (auto b_raw : content.file.blocks) {
+                auto ptr = reinterpret_cast<std::uintptr_t>(b_raw);
+                auto block = reinterpret_cast<const block_info_t *>(ptr & PTR_MASK);
+                proto::add_blocks(r, block->as_bep(offset));
+                offset += block->get_size();
             }
             if (content.file.blocks.empty() && !(flags & f_deleted)) {
                 proto::add_blocks(r, empty_block);
@@ -344,7 +352,6 @@ outcome::result<void> file_info_t::reserve_blocks(size_t block_count, int64_t de
     }
     remove_blocks();
     content.file.blocks.resize(count);
-    content.file.marks.resize(count);
     content.file.missing_blocks = !(flags & f_deleted) && !(flags & f_invalid) && (flags & f_type_file) ? count : 0;
     return outcome::success();
 }
@@ -385,17 +392,27 @@ void file_info_t::mark_local(bool available, const folder_info_t &folder_info) n
 }
 
 void file_info_t::mark_local_available(size_t block_index) noexcept {
-    assert(block_index < content.file.blocks.size());
-    assert(!content.file.marks[block_index]);
+    auto &blocks = content.file.blocks;
+    assert(block_index < blocks.size());
+
+    auto ptr = reinterpret_cast<std::uintptr_t>(blocks[block_index]);
+    assert(!(ptr & LOCAL_MASK));
+    auto block = reinterpret_cast<block_info_t *>(ptr & PTR_MASK);
+    block->mark_local_available(this);
+
+    ptr = ptr | LOCAL_MASK;
+    auto block_mangled = reinterpret_cast<block_info_t *>(ptr);
+    blocks[block_index] = block_mangled;
+
     assert(content.file.missing_blocks);
-    content.file.blocks[block_index]->mark_local_available(this);
-    content.file.marks[block_index] = true;
     --content.file.missing_blocks;
 }
 
 bool file_info_t::is_locally_available(size_t block_index) const noexcept {
-    assert(block_index < content.file.blocks.size());
-    return content.file.marks[block_index];
+    auto &blocks = content.file.blocks;
+    assert(block_index < blocks.size());
+    auto ptr = reinterpret_cast<std::uintptr_t>(blocks[block_index]);
+    return ptr & LOCAL_MASK;
 }
 
 bool file_info_t::is_locally_available() const noexcept {
@@ -426,20 +443,22 @@ void file_info_t::set_unlocking(bool value) noexcept {
 }
 
 void file_info_t::assign_block(model::block_info_t *block, size_t index) noexcept {
+    auto &blocks = content.file.blocks;
     assert(flags & f_type_file);
-    assert(index < content.file.blocks.size() && "blocks should be reserve enough space");
-    assert(!content.file.blocks[index]);
-    content.file.blocks[index] = block;
+    assert(index < blocks.size() && "blocks should be reserve enough space");
+    assert(!blocks[index]);
+    blocks[index] = block;
     intrusive_ptr_add_ref(block);
     block->link(this, index);
 }
 
 void file_info_t::remove_blocks() noexcept {
     if (flags & f_type_file) {
-        for (auto &it : content.file.blocks) {
-            remove_block(it);
+        for (auto b_raw : content.file.blocks) {
+            auto ptr = reinterpret_cast<std::uintptr_t>(b_raw);
+            auto block = reinterpret_cast<block_info_t *>(ptr & PTR_MASK);
+            remove_block(block);
         }
-        std::fill_n(content.file.marks.begin(), content.file.blocks.size(), false);
         content.file.missing_blocks = content.file.blocks.size();
     }
 }
@@ -463,7 +482,11 @@ std::int64_t file_info_t::get_size() const noexcept {
             auto &blocks = content.file.blocks;
             auto blocks_count = blocks.size();
             if (blocks_count) {
-                r = (blocks_count - 1) * blocks.front()->get_size() + blocks.back()->get_size();
+                auto ptr_first = reinterpret_cast<std::uintptr_t>(blocks.front());
+                auto first = reinterpret_cast<const block_info_t *>(ptr_first & PTR_MASK);
+                auto ptr_last = reinterpret_cast<std::uintptr_t>(blocks.back());
+                auto last = reinterpret_cast<const block_info_t *>(ptr_last & PTR_MASK);
+                r = (blocks_count - 1) * first->get_size() + last->get_size();
             }
         }
     }
@@ -506,12 +529,14 @@ void file_info_t::update(const file_info_t &other) noexcept {
         content.file.block_size = other.content.file.block_size;
 
         auto local_block_hashes = hashes_t{};
-        for (auto &b : content.file.blocks) {
-            if (b) {
-                auto it = b->iterate_blocks();
+        for (auto b_raw : content.file.blocks) {
+            if (b_raw) {
+                auto ptr = reinterpret_cast<std::uintptr_t>(b_raw);
+                auto block = reinterpret_cast<const block_info_t *>(ptr & PTR_MASK);
+                auto it = block->iterate_blocks();
                 while (auto fb = it.next()) {
                     if (fb->is_locally_available() && fb->file() == this) {
-                        local_block_hashes.emplace(b->get_hash());
+                        local_block_hashes.emplace(block->get_hash());
                         break;
                     }
                 }
@@ -521,23 +546,26 @@ void file_info_t::update(const file_info_t &other) noexcept {
         // avoid use after free, as local block hashes have block_views
         auto sz = other.content.file.blocks.size();
         auto blocks_copy = std::vector<model::block_info_ptr_t>();
-        blocks_copy.reserve(sz);
-        for (auto b: content.file.blocks) {
-            blocks_copy.emplace_back(b);
+        blocks_copy.reserve(content.file.blocks.size());
+        for (auto b_raw : content.file.blocks) {
+            auto ptr = reinterpret_cast<std::uintptr_t>(b_raw);
+            auto block = reinterpret_cast<block_info_t *>(ptr & PTR_MASK);
+            blocks_copy.emplace_back(block);
         }
         remove_blocks();
 
-        content.file.marks = other.content.file.marks;
         content.file.blocks.resize(sz);
         content.file.missing_blocks = sz;
         for (size_t i = 0; i < sz; ++i) {
-            auto &b = other.content.file.blocks[i];
-            if (b) {
-                assign_block(b, i);
-                auto already_local = content.file.marks[i];
+            auto b_raw = other.content.file.blocks[i];
+            if (b_raw) {
+                auto ptr = reinterpret_cast<std::uintptr_t>(b_raw);
+                auto block = reinterpret_cast<block_info_t *>(ptr & PTR_MASK);
+                assign_block(block, i);
+                auto already_local = ptr & LOCAL_MASK;
                 if (already_local) {
                     --content.file.missing_blocks;
-                } else if (local_block_hashes.contains(b->get_hash())) {
+                } else if (local_block_hashes.contains(block->get_hash())) {
                     mark_local_available(i);
                 }
             }
@@ -577,7 +605,10 @@ bool file_info_t::identical_to(const proto::FileInfo &file) const noexcept {
             for (size_t i = 0; i < blocks_sz; ++i) {
                 auto &block = proto::get_blocks(file, i);
                 auto hash = proto::get_hash(block);
-                if (content.file.blocks[i]->get_hash() != hash) {
+                auto b_raw = content.file.blocks[i];
+                auto ptr = reinterpret_cast<std::uintptr_t>(b_raw);
+                auto b = reinterpret_cast<const block_info_t *>(ptr & PTR_MASK);
+                if (b->get_hash() != hash) {
                     return false;
                 }
             }
