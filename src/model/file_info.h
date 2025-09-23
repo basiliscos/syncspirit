@@ -124,7 +124,6 @@ struct SYNCSPIRIT_API file_info_t {
     inline bool is_local() const noexcept { return flags & f_local; }
 
     std::int64_t get_size() const noexcept;
-    // inline void set_size(std::int64_t value) noexcept { size = value; }
 
     std::int32_t get_block_size() const noexcept { return (flags & f_type_file) ? content.file.block_size : 0; }
     std::uint64_t get_block_offset(size_t block_index) const noexcept;
@@ -189,7 +188,6 @@ struct SYNCSPIRIT_API file_info_t {
 
     struct size_full_t {
         ~size_full_t();
-        std::int64_t size;
         blocks_t blocks;
         marks_vector_t marks;
         std::uint32_t missing_blocks;
@@ -210,7 +208,7 @@ struct SYNCSPIRIT_API file_info_t {
 
     file_info_t(utils::bytes_view_t key, const folder_info_ptr_t &folder_info_) noexcept;
     file_info_t(const bu::uuid &uuid, const folder_info_ptr_t &folder_info_) noexcept;
-    outcome::result<void> reserve_blocks(size_t block_count) noexcept;
+    outcome::result<void> reserve_blocks(size_t block_count, std::int64_t declared_size) noexcept;
 
     void update_blocks(const proto::FileInfo &remote_info) noexcept;
     void remove_block(block_info_ptr_t &block) noexcept;

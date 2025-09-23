@@ -1375,7 +1375,7 @@ TEST_CASE("statistics", "[presentation]") {
 
         // peer updates
         {
-            auto pr_fi = [&]() {
+            auto [pr_fi, b_15] = [&]() -> std::pair<proto::FileInfo, model::block_info_ptr_t> {
                 auto pr_fi = f_c_my->as_proto(false);
                 auto &v = proto::get_version(pr_fi);
                 auto value = proto::get_value(f_c_my->get_version().get_best());
@@ -1392,14 +1392,14 @@ TEST_CASE("statistics", "[presentation]") {
                 block = blocks.by_hash(b_hash);
                 block = model::block_info_t::create(b).value();
                 blocks.put(block);
-                return pr_fi;
+                return {pr_fi, block};
             }();
             auto fi_peer_2 = folder->get_folder_infos().by_device(*peer_device);
             bu::uuid file_uuid;
             assign(file_uuid, file_c_peer->get_uuid());
             auto file_c_peer_2 = model::file_info_t::create(file_uuid, pr_fi, fi_peer.get()).value();
             auto block = *blocks.begin();
-            file_c_peer_2->assign_block(block, 0);
+            file_c_peer_2->assign_block(b_15, 0);
             fi_peer_2->add_strict(file_c_peer);
 
             file_c_peer->update(*file_c_peer_2);

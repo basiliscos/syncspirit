@@ -173,9 +173,9 @@ auto file_info_t::fields_update(const db::FileInfo &source, model::path_cache_t 
         new (&content.file) size_full_t();
         auto declared_size = db::get_size(source);
         bool has_content = declared_size && (flags & f_type_file);
-        content.file.size = has_content ? declared_size : 0;
         content.file.block_size = has_content ? db::get_block_size(source) : 0;
-        return reserve_blocks(has_content ? db::get_blocks_size(source) : 0);
+        auto blocks_count = has_content ? db::get_blocks_size(source) : 0;
+        return reserve_blocks(blocks_count, declared_size);
     } else {
         new (&content.non_file) size_less_t();
         content.non_file.symlink_target = db::get_symlink_target(source);
@@ -207,10 +207,9 @@ auto file_info_t::fields_update(const proto::FileInfo &source, model::path_cache
         new (&content.file) size_full_t();
         auto declared_size = proto::get_size(source);
         bool has_content = declared_size && (flags & f_type_file);
-        content.file.size = has_content ? declared_size : 0;
-
         content.file.block_size = has_content ? proto::get_block_size(source) : 0;
-        return reserve_blocks(has_content ? proto::get_blocks_size(source) : 0);
+        auto blocks_count = has_content ? proto::get_blocks_size(source) : 0;
+        return reserve_blocks(blocks_count, declared_size);
     } else {
         new (&content.non_file) size_less_t();
         content.non_file.symlink_target = proto::get_symlink_target(source);
@@ -238,7 +237,7 @@ db::FileInfo file_info_t::as_db(bool include_blocks) const noexcept {
     db::set_no_permissions(r, flags & f_no_permissions);
     db::set_version(r, version.as_proto());
     if (flags & f_type_file) {
-        db::set_size(r, content.file.size);
+        db::set_size(r, get_size());
         db::set_block_size(r, content.file.block_size);
         if (include_blocks) {
             for (auto &block : content.file.blocks) {
@@ -270,7 +269,7 @@ proto::FileInfo file_info_t::as_proto(bool include_blocks) const noexcept {
 
     if (flags & f_type_file) {
         proto::set_block_size(r, content.file.block_size);
-        proto::set_size(r, content.file.size);
+        proto::set_size(r, get_size());
         if (include_blocks) {
             size_t offset = 0;
             for (auto &b : content.file.blocks) {
@@ -288,18 +287,18 @@ proto::FileInfo file_info_t::as_proto(bool include_blocks) const noexcept {
     return r;
 }
 
-outcome::result<void> file_info_t::reserve_blocks(size_t block_count) noexcept {
+outcome::result<void> file_info_t::reserve_blocks(size_t block_count, int64_t declared_size) noexcept {
     size_t count = 0;
     if (!block_count && !(flags & f_deleted) && !(flags & f_invalid)) {
-        if ((content.file.size < content.file.block_size) && (content.file.size >= (int64_t)fs::block_sizes[0])) {
+        if ((declared_size < content.file.block_size) && (declared_size >= (int64_t)fs::block_sizes[0])) {
             return make_error_code(error_code_t::invalid_block_size);
         }
-        if (content.file.size) {
+        if (declared_size) {
             if (!content.file.block_size) {
                 return make_error_code(error_code_t::invalid_block_size);
             }
-            count = content.file.size / content.file.block_size;
-            if ((int64_t)(content.file.block_size * count) != content.file.size) {
+            count = declared_size / content.file.block_size;
+            if ((int64_t)(content.file.block_size * count) != declared_size) {
                 ++count;
             }
         }
@@ -423,13 +422,17 @@ void file_info_t::remove_block(block_info_ptr_t &block) noexcept {
 }
 
 std::int64_t file_info_t::get_size() const noexcept {
+    auto r = std::int64_t{0};
     if (flags & f_type_file) {
-        bool ok = !is_deleted() && !is_invalid();
-        if (ok) {
-            return content.file.size;
+        if (!is_deleted() && !is_invalid()) {
+            auto &blocks = content.file.blocks;
+            auto blocks_count = blocks.size();
+            if (blocks_count) {
+                r = (blocks_count - 1) * blocks.front()->get_size() + blocks.back()->get_size();
+            }
         }
     }
-    return 0;
+    return r;
 }
 
 std::size_t file_info_t::expected_meta_size() const noexcept {
@@ -465,7 +468,6 @@ void file_info_t::update(const file_info_t &other) noexcept {
     if (!(flags & f_type_file)) {
         content.non_file.symlink_target = other.content.non_file.symlink_target;
     } else {
-        content.file.size = other.content.file.size;
         content.file.block_size = other.content.file.block_size;
 
         auto local_block_hashes = hashes_t{};

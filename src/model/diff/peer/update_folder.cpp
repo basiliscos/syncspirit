@@ -67,7 +67,8 @@ auto update_folder_t::apply_impl(apply_controller_t &controller, void *custom) c
         }
         file = std::move(opt.assume_value());
 
-        if (file->get_size()) {
+        auto file_sz = proto::get_size(f);
+        if (file->is_file() && !file->is_deleted() && file_sz) {
             auto blocks_count = proto::get_blocks_size(f);
             for (int i = 0; i < blocks_count; ++i) {
                 auto &b = proto::get_blocks(f, i);

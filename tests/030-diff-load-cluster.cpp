@@ -337,9 +337,12 @@ TEST_CASE("loading cluster (file info + block)", "[model]") {
         std::copy(id.begin(), id.end(), key.data() + 1);
         target = file_info_t::create(key, file_info_db, std::move(folder_info)).value();
         REQUIRE(target);
-        CHECK(target->get_size() == 55ul);
         CHECK(target->get_block_size() == 5ul);
         CHECK(target->get_blocks().size() == 11ul);
+        for (size_t i = 0; i < 11; ++i) {
+            target->assign_block(block, i);
+        }
+        CHECK(target->get_size() == 55ul);
     }
 
     SECTION("via diff") {
