@@ -471,8 +471,9 @@ void file_info_t::update(const file_info_t &other) noexcept {
         auto local_block_hashes = hashes_t{};
         for (auto &b : content.file.blocks) {
             if (b) {
-                for (auto &fb : b->get_file_blocks()) {
-                    if (fb.is_locally_available() && fb.file() == this) {
+                auto it = b->iterate_blocks();
+                while (auto fb = it.next()) {
+                    if (fb->is_locally_available() && fb->file() == this) {
                         local_block_hashes.emplace(b->get_hash());
                         break;
                     }

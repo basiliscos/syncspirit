@@ -924,8 +924,9 @@ void controller_actor_t::on_validation(hasher::message::validation_response_t &r
                 auto &data = block_res->payload.res.data;
                 auto index = payload.block_index;
                 auto already_have = false;
-                for (auto &fb : file_block->block()->get_file_blocks()) {
-                    if (fb.is_locally_available()) {
+                auto it = file_block->block()->iterate_blocks();
+                while (auto fb = it.next()) {
+                    if (fb->is_locally_available()) {
                         already_have = true;
                         break;
                     }

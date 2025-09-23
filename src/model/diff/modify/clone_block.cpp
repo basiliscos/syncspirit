@@ -12,11 +12,11 @@ clone_block_t::clone_block_t(const file_block_t &file_block, const folder_info_t
                              const folder_info_t &source_fi) noexcept
     : block_transaction_t{*file_block.file(), target_fi, file_block.block_index()} {
     const file_info_t *source_file = nullptr;
-    auto &block_pieces = file_block.block()->get_file_blocks();
-    for (auto &b : block_pieces) {
-        if (b.is_locally_available()) {
-            source_file = b.file();
-            source_block_index = b.block_index();
+    auto it = file_block.block()->iterate_blocks();
+    while (auto b = it.next()) {
+        if (b->is_locally_available()) {
+            source_file = b->file();
+            source_block_index = b->block_index();
             break;
         }
     }

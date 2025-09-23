@@ -102,7 +102,6 @@ TEST_CASE("orphaned blocks, all removed for single file", "[model]") {
 
         CHECK(blocks.contains(bi->get_hash()));
     }
-
     SECTION("2 file with 1 shared erased") {
         proto::FileInfo pr_file_1;
         proto::set_name(pr_file_1, "a.txt");

@@ -16,9 +16,11 @@ block_request_t::block_request_t(const model::file_info_ptr_t &file_, const mode
     block_hash = block->get_hash();
     block_size = block->get_size();
 
-    for (auto &fb : block->get_file_blocks()) {
-        if (fb.file() == file_.get()) {
-            block_offset = fb.get_offset();
+    auto it = block->iterate_blocks();
+    while (auto fb = it.next()) {
+        if (fb->file() == file_.get()) {
+            block_offset = fb->get_offset();
+            break;
         }
     }
 }
@@ -43,10 +45,10 @@ auto block_request_t::get_block(model::cluster_t &cluster, model::device_t &peer
     if (block_index >= blocks.size()) {
         return {};
     }
-    auto &file_blocks = blocks[block_index]->get_file_blocks();
-    for (auto &fb : file_blocks) {
-        if (fb.file() == file) {
-            return {&fb, fi.get()};
+    auto it = blocks[block_index]->iterate_blocks();
+    while (auto fb = it.next()) {
+        if (fb->file() == file) {
+            return {const_cast<model::file_block_t *>(fb), fi.get()};
         }
     }
     return {};

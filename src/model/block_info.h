@@ -26,7 +26,8 @@ struct SYNCSPIRIT_API block_info_t {
     using file_blocks_t = std::vector<file_block_t>;
     static const constexpr size_t digest_length = 32;
     static constexpr std::uint32_t LOCK_MASK = 1 << 31;
-    static constexpr std::uint32_t COUNTER_MASK = ~LOCK_MASK;
+    static constexpr std::uint32_t SINGLE_MASK = 1 << 30;
+    static constexpr std::uint32_t COUNTER_MASK = ~(LOCK_MASK | SINGLE_MASK);
 
     struct strict_hash_t {
         unsigned char data[digest_length];
@@ -38,11 +39,30 @@ struct SYNCSPIRIT_API block_info_t {
     static outcome::result<block_info_ptr_t> create(utils::bytes_view_t key, const db::BlockInfo &data) noexcept;
     static outcome::result<block_info_ptr_t> create(const proto::BlockInfo &block) noexcept;
 
+    ~block_info_t();
+
+    struct file_blocks_iterator_t {
+
+        file_blocks_iterator_t(block_info_t *block_info, std::uint32_t next) noexcept;
+
+        file_blocks_iterator_t(file_blocks_iterator_t &&) = default;
+        file_blocks_iterator_t(const file_blocks_iterator_t &) = delete;
+
+        file_blocks_iterator_t &operator=(file_blocks_iterator_t &&);
+
+        const file_block_t *next() noexcept;
+        std::uint32_t get_total() const noexcept;
+
+      private:
+        const block_info_t *block_info;
+        std::uint32_t next_index;
+    };
+
     inline utils::bytes_view_t get_hash() const noexcept { return utils::bytes_view_t(hash, digest_length); }
     inline std::uint32_t get_size() const noexcept { return size; }
-    inline size_t usages() const noexcept { return file_blocks.size(); }
-    inline file_blocks_t &get_file_blocks() { return file_blocks; }
-    inline const file_blocks_t &get_file_blocks() const { return file_blocks; }
+    std::uint32_t usages() const noexcept;
+
+    file_blocks_iterator_t iterate_blocks(std::uint32_t start_index = 0);
 
     proto::BlockInfo as_bep(size_t offset) const noexcept;
     utils::bytes_t serialize() const noexcept;
@@ -57,9 +77,9 @@ struct SYNCSPIRIT_API block_info_t {
     void lock() noexcept;
     void unlock() noexcept;
 
-    inline void refcouner_inc() const noexcept { ++counter; }
-    inline std::uint32_t refcouner_dec() const noexcept { return (--counter) & COUNTER_MASK; }
-    inline std::uint32_t use_count() const noexcept { return counter & COUNTER_MASK; }
+    void refcouner_inc() const noexcept;
+    std::uint32_t refcouner_dec() const noexcept;
+    std::uint32_t use_count() const noexcept;
 
     inline bool operator==(const block_info_t &right) const noexcept {
         auto lh = get_hash();
@@ -73,8 +93,15 @@ struct SYNCSPIRIT_API block_info_t {
     block_info_t(utils::bytes_view_t key) noexcept;
     block_info_t(const proto::BlockInfo &block) noexcept;
 
+    union file_blocks_union_t {
+        file_blocks_union_t();
+        ~file_blocks_union_t();
+        file_block_t single;
+        file_blocks_t multi;
+    };
+
     unsigned char hash[digest_length];
-    file_blocks_t file_blocks;
+    file_blocks_union_t file_blocks_union;
     std::int32_t size = 0;
     mutable std::uint32_t counter = 0;
 };
