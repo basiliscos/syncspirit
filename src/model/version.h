@@ -5,14 +5,14 @@
 
 #include "syncspirit-export.h"
 #include "proto/proto-fwd.hpp"
-#include <vector>
+#include "utils/vector.hpp"
 
 namespace syncspirit::model {
 
 struct device_t;
 
 struct SYNCSPIRIT_API version_t final {
-    using counters_t = std::vector<proto::Counter>;
+    using counters_t = utils::vector_t<proto::Counter>;
     version_t() noexcept;
     version_t(const proto::Vector &) noexcept;
     version_t(const device_t &) noexcept;

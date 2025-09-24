@@ -223,7 +223,9 @@ auto file_info_t::fields_update(const db::FileInfo &source, model::path_cache_t 
         }
     } else {
         new (&content.non_file) size_less_t();
-        content.non_file.symlink_target = db::get_symlink_target(source);
+        auto link = db::get_symlink_target(source);
+        auto ptr = link.data();
+        content.non_file.symlink_target = string_t(ptr, ptr + link.size());
     }
     return outcome::success();
 }
@@ -259,7 +261,9 @@ auto file_info_t::fields_update(const proto::FileInfo &source, model::path_cache
         }
     } else {
         new (&content.non_file) size_less_t();
-        content.non_file.symlink_target = proto::get_symlink_target(source);
+        auto link = proto::get_symlink_target(source);
+        auto ptr = link.data();
+        content.non_file.symlink_target = string_t(ptr, ptr + link.size());
     }
     return outcome::success();
 }
@@ -297,7 +301,10 @@ db::FileInfo file_info_t::as_db(bool include_blocks) const noexcept {
             }
         }
     } else {
-        db::set_symlink_target(r, content.non_file.symlink_target);
+        auto& container = content.non_file.symlink_target;
+        auto ptr = container.data();
+        auto link = std::string_view(ptr, ptr + container.size());
+        db::set_symlink_target(r, link);
     }
     return r;
 }
@@ -332,7 +339,10 @@ proto::FileInfo file_info_t::as_proto(bool include_blocks) const noexcept {
             }
         }
     } else {
-        proto::set_symlink_target(r, content.non_file.symlink_target);
+        auto& container = content.non_file.symlink_target;
+        auto ptr = container.data();
+        auto link = std::string_view(ptr, ptr + container.size());
+        proto::set_symlink_target(r, link);
     }
     return r;
 }

@@ -9,6 +9,7 @@
 #include <filesystem>
 #include <boost/outcome.hpp>
 #include <boost/multi_index/ordered_index.hpp>
+#include "utils/vector.hpp"
 #include "misc/augmentation.h"
 #include "misc/path.h"
 #include "misc/map.hpp"
@@ -54,7 +55,7 @@ struct SYNCSPIRIT_API file_info_t {
     static constexpr std::uintptr_t LOCAL_MASK = 1 << 0;
     static constexpr std::uintptr_t PTR_MASK = ~LOCAL_MASK;
 
-    using blocks_t = std::vector<block_info_t *>;
+    using blocks_t = utils::vector_t<block_info_t *>;
 
     struct decomposed_key_t {
         utils::bytes_view_t folder_info_id;
@@ -164,9 +165,10 @@ struct SYNCSPIRIT_API file_info_t {
     bool is_locally_available(size_t block_index) const noexcept;
     bool is_locally_available() const noexcept;
 
-    const std::string &get_link_target() const noexcept {
+    std::string_view get_link_target() const noexcept {
         assert(flags & f_type_link);
-        return content.non_file.symlink_target;
+        auto& container = content.non_file.symlink_target;
+        return {container.data(), container.size()};
     }
 
     const bfs::path get_path(const folder_info_t &folder_info) const noexcept;
@@ -210,8 +212,7 @@ struct SYNCSPIRIT_API file_info_t {
     template <typename T> auto &access() const noexcept;
 
   private:
-    using marks_vector_t = std::vector<bool>;
-
+    using string_t = utils::vector_t<char>;
     struct size_full_t {
         ~size_full_t();
         blocks_t blocks;
@@ -219,7 +220,7 @@ struct SYNCSPIRIT_API file_info_t {
 
     struct size_less_t {
         ~size_less_t();
-        std::string symlink_target;
+        string_t symlink_target;
     };
 
     union content_t {

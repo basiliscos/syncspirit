@@ -4,12 +4,15 @@
 #pragma once
 
 #include "misc/arc.hpp"
-#include "misc/map.hpp"
 #include "misc/file_block.h"
 #include "proto/proto-fwd.hpp"
 #include "utils/bytes.h"
+#include "utils/vector.hpp"
 #include "syncspirit-export.h"
 #include <boost/outcome.hpp>
+#include <boost/multi_index/global_fun.hpp>
+#include <boost/multi_index/hashed_index.hpp>
+#include <boost/multi_index_container.hpp>
 #include <cstdint>
 
 namespace syncspirit::model {
@@ -23,7 +26,7 @@ using block_info_ptr_t = intrusive_ptr_t<block_info_t>;
 
 struct SYNCSPIRIT_API block_info_t {
     using removed_incides_t = std::vector<size_t>;
-    using file_blocks_t = std::vector<file_block_t>;
+    using file_blocks_t = utils::vector_t<file_block_t>;
     static const constexpr size_t digest_length = 32;
     static constexpr std::uint32_t LOCK_MASK = 1 << 31;
     static constexpr std::uint32_t SINGLE_MASK = 1 << 30;
