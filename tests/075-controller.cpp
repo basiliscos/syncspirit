@@ -1093,9 +1093,10 @@ void test_downloading() {
                 auto data_1 = as_owned_bytes("12345");
                 auto data_1_hash = utils::sha256_digest(data_1).value();
 
-                auto &b1 = proto::add_blocks(file_1);
+                auto b1 = proto::BlockInfo();
                 proto::set_hash(b1, data_1_hash);
                 proto::set_size(b1, 5);
+                proto::add_blocks(file_1, b1);
                 auto bi_1 = model::block_info_t::create(b1).value();
 
                 auto data_2 = as_owned_bytes("67890");
@@ -1118,6 +1119,7 @@ void test_downloading() {
                 proto::set_sequence(pr_file_my, 5);
                 proto::set_block_size(pr_file_my, 5);
                 proto::set_size(pr_file_my, 5);
+                proto::add_blocks(pr_file_my, b1);
 
                 auto &v_my = proto::get_version(pr_file_my);
                 proto::add_counters(v_my, proto::Counter(my_device->device_id().get_uint(), 1));

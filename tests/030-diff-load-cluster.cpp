@@ -318,6 +318,10 @@ TEST_CASE("loading cluster (file info + block)", "[model]") {
     proto::set_block_size(pr_fi, 5ul);
     auto &version = proto::get_version(pr_fi);
     proto::add_counters(version, proto::Counter(my_device->device_id().get_uint(), 0));
+    for (size_t i = 0; i < 11; ++i) {
+        proto::add_blocks(pr_fi, bi);
+    }
+
     auto fi = file_info_t::create(sequencer->next_uuid(), pr_fi, folder_info).value();
     CHECK(fi);
     for (size_t i = 0; i < 11; ++i) {
@@ -337,11 +341,11 @@ TEST_CASE("loading cluster (file info + block)", "[model]") {
         std::copy(id.begin(), id.end(), key.data() + 1);
         target = file_info_t::create(key, file_info_db, std::move(folder_info)).value();
         REQUIRE(target);
-        CHECK(target->get_block_size() == 5ul);
-        CHECK(target->iterate_blocks().get_total() == 11ul);
         for (size_t i = 0; i < 11; ++i) {
             target->assign_block(block.get(), i);
         }
+        CHECK(target->get_block_size() == 5ul);
+        CHECK(target->iterate_blocks().get_total() == 11ul);
         CHECK(target->get_size() == 55ul);
     }
 

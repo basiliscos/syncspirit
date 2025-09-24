@@ -94,6 +94,7 @@ TEST_CASE("file_info_t::local_file", "[model]") {
     SECTION("no local file") {
         auto file_peer = file_info_t::create(sequencer->next_uuid(), pr_file, folder_peer).value();
         CHECK(!folder_my->get_file_infos().by_name("a.txt"));
+        CHECK(file_peer->is_locally_available());
     }
 
     SECTION("there is identical local file") {

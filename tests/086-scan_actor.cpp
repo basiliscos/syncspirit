@@ -200,6 +200,8 @@ void test_meta_changes() {
 
             auto &blocks_map = cluster->get_blocks();
             blocks_map.put(b);
+            proto::add_blocks(pr_fi, bi);
+
             SECTION("a file does not physically exist") {
                 auto uuid = sup->sequencer->next_uuid();
                 auto file_peer = file_info_t::create(uuid, pr_fi, folder_info_peer).value();
@@ -214,6 +216,7 @@ void test_meta_changes() {
             }
             SECTION("complete file exists") {
                 auto uuid = sup->sequencer->next_uuid();
+                proto::set_no_permissions(pr_fi, true);
                 auto file_peer = file_info_t::create(uuid, pr_fi, folder_info_peer).value();
                 file_peer->assign_block(b.get(), 0);
                 REQUIRE(folder_info_peer->add_strict(file_peer));
@@ -229,7 +232,6 @@ void test_meta_changes() {
                     CHECK(files->size() == 1);
                     CHECK(file->is_locally_available());
                 }
-
                 SECTION("meta is changed (modification)") {
                     write_file(path, "12345");
                     builder->scan_start(folder->get_id()).apply(*sup);
@@ -271,10 +273,10 @@ void test_meta_changes() {
                 }
                 REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
             }
-
             SECTION("incomplete file exists") {
                 proto::set_size(pr_fi, 10);
                 proto::set_block_size(pr_fi, 5);
+                proto::add_blocks(pr_fi, bi_2);
 
                 auto uuid = sup->sequencer->next_uuid();
                 auto file = file_info_t::create(uuid, pr_fi, folder_info_peer).value();
@@ -357,6 +359,8 @@ void test_meta_changes() {
 
                 proto::set_size(pr_fi, 15);
                 proto::set_value(counter, 2);
+                proto::add_blocks(pr_fi, bi);
+                proto::add_blocks(pr_fi, bi);
 
                 auto uuid_2 = sup->sequencer->next_uuid();
                 auto file_peer = file_info_t::create(uuid_2, pr_fi, folder_info_peer).value();
@@ -385,6 +389,8 @@ void test_meta_changes() {
                 REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
             }
             SECTION("local (previous) file changes") {
+                proto::add_blocks(pr_fi, bi);
+                proto::add_blocks(pr_fi, bi);
                 proto::set_size(pr_fi, 15);
                 proto::set_block_size(pr_fi, 5);
                 auto uuid_1 = sup->sequencer->next_uuid();

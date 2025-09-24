@@ -47,7 +47,7 @@ struct SYNCSPIRIT_API file_info_t {
         f_synchronizing    = 1 << 6,
         f_unreachable      = 1 << 7,
         f_local            = 1 << 8,
-        f_equisized_blocks = 1 << 9,
+        f_available        = 1 << 9,
     };
     // clang-format on
 
@@ -146,7 +146,16 @@ struct SYNCSPIRIT_API file_info_t {
 
     std::int64_t get_size() const noexcept;
 
-    std::int32_t get_block_size() const noexcept { return (flags & f_type_file) ? content.file.block_size : 0; }
+    std::int32_t get_block_size() const noexcept {
+        auto has_blocks = (flags & f_type_file && !content.file.blocks.empty());
+        if (has_blocks) {
+            auto &blocks = content.file.blocks;
+            auto ptr = reinterpret_cast<std::uintptr_t>(blocks.front());
+            auto block = reinterpret_cast<const block_info_t *>(ptr & PTR_MASK);
+            return block->get_size();
+        }
+        return 0;
+    }
     std::uint64_t get_block_offset(size_t block_index) const noexcept;
 
     void mark_unreachable(bool value) noexcept;
@@ -206,8 +215,6 @@ struct SYNCSPIRIT_API file_info_t {
     struct size_full_t {
         ~size_full_t();
         blocks_t blocks;
-        std::int32_t block_size;
-        std::uint32_t missing_blocks;
     };
 
     struct size_less_t {
@@ -224,7 +231,7 @@ struct SYNCSPIRIT_API file_info_t {
 
     file_info_t(utils::bytes_view_t key, const folder_info_ptr_t &folder_info_) noexcept;
     file_info_t(const bu::uuid &uuid, const folder_info_ptr_t &folder_info_) noexcept;
-    outcome::result<void> reserve_blocks(size_t block_count, std::int64_t declared_size) noexcept;
+    void reserve_blocks(size_t block_count) noexcept;
 
     void update_blocks(const proto::FileInfo &remote_info) noexcept;
     void remove_block(block_info_t *block) noexcept;

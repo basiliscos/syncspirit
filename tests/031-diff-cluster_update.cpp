@@ -395,6 +395,7 @@ TEST_CASE("cluster update, reset folder", "[model]") {
         proto::set_size(f, 5ul);
         proto::set_block_size(f, 5ul);
         proto::set_sequence(f, 1);
+        proto::add_blocks(f, bi1);
         auto &v = proto::get_version(f);
         proto::add_counters(v, proto::Counter(my_device->device_id().get_uint(), 0));
         return f;
@@ -408,6 +409,7 @@ TEST_CASE("cluster update, reset folder", "[model]") {
         proto::set_size(f, 5ul);
         proto::set_block_size(f, 5ul);
         proto::set_sequence(f, 1);
+        proto::add_blocks(f, bi2);
         auto &v = proto::get_version(f);
         proto::add_counters(v, proto::Counter(peer_device->device_id().get_uint(), 0));
         return f;
@@ -422,6 +424,8 @@ TEST_CASE("cluster update, reset folder", "[model]") {
         proto::set_size(f, 10ul);
         proto::set_block_size(f, 5ul);
         proto::set_sequence(f, 2);
+        proto::add_blocks(f, bi2);
+        proto::add_blocks(f, bi3);
         auto &v = proto::get_version(f);
         proto::add_counters(v, proto::Counter(peer_device->device_id().get_uint(), 0));
         return f;

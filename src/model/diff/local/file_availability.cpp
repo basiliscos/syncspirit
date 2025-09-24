@@ -22,14 +22,14 @@ auto file_availability_t::apply_impl(apply_controller_t &controller, void *custo
         auto &folder_info = *folder->get_folder_infos().by_device(*cluster.get_device());
         auto f = folder_info.get_file_infos().by_name(file->get_name()->get_full_name());
         if (f->get_version().identical_to(version)) {
-            f->mark_local(true, folder_info);
-            LOG_TRACE(log, "file_availability_t, mark local file '{}", *file);
             auto count = f->iterate_blocks().get_total();
+            LOG_TRACE(log, "file_availability_t, mark local file '{}', blocks = {}", *file, count);
             for (std::uint32_t i = 0; i < count; ++i) {
                 if (!f->is_locally_available(i)) {
                     f->mark_local_available(i);
                 }
             }
+            f->mark_local(true, folder_info);
             f->notify_update();
         }
     }

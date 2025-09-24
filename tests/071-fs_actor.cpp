@@ -496,6 +496,7 @@ void test_clone_block() {
                 }
                 SECTION("single block target file, from diffrent folder") {
                     proto::set_size(pr_source, 5);
+                    proto::add_blocks(pr_source, bi);
                     proto::set_size(pr_target, 5);
                     proto::set_modified_s(pr_target, modified);
 

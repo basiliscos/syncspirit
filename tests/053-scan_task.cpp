@@ -215,6 +215,7 @@ SECTION("regular files") {
         proto::set_size(pr_file, 5);
         proto::set_modified_s(pr_file, modified);
         proto::set_permissions(pr_file, perms);
+        proto::add_blocks(pr_file, bi);
 
         auto file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
         file->assign_block(block.get(), 0);
@@ -290,6 +291,7 @@ SECTION("regular files") {
         proto::set_size(pr_file, 5);
         proto::set_modified_s(pr_file, modified);
         proto::set_permissions(pr_file, perms);
+        proto::add_blocks(pr_file, bi);
 
         auto info_file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
         info_file->assign_block(block.get(), 0);
@@ -330,6 +332,7 @@ SECTION("regular files") {
         proto::set_block_size(pr_file, 5);
         proto::set_size(pr_file, 5);
         proto::set_modified_s(pr_file, modified);
+        proto::add_blocks(pr_file, bi);
 
         auto file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
         file->assign_block(block.get(), 0);
@@ -468,6 +471,7 @@ SECTION("regular files") {
             proto::set_size(pr_file, 5);
             proto::set_modified_s(pr_file, modified);
             proto::set_permissions(pr_file, perms);
+            proto::add_blocks(pr_file, bi);
 
             file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
             file->assign_block(block.get(), 0);
@@ -498,6 +502,7 @@ SECTION("regular files") {
             proto::set_size(pr_file, 5);
             proto::set_modified_s(pr_file, modified + 1);
             proto::set_permissions(pr_file, perms);
+            proto::add_blocks(pr_file, bi);
 
             file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
             file->assign_block(block.get(), 0);
@@ -522,6 +527,7 @@ SECTION("regular files") {
             proto::set_size(pr_file, 5);
             proto::set_modified_s(pr_file, modified);
             proto::set_permissions(pr_file, static_cast<uint32_t>(-1));
+            proto::add_blocks(pr_file, bi);
 
             auto path = root_path / "a.txt";
             write_file(path, "12345");
@@ -582,6 +588,7 @@ SECTION("regular files") {
         proto::set_block_size(pr_file, 5);
         proto::set_size(pr_file, 5);
         proto::set_modified_s(pr_file, modified);
+        proto::add_blocks(pr_file, bi);
 
         auto path = root_path / "a.txt.syncspirit-tmp";
 
@@ -727,6 +734,8 @@ SECTION("regular files") {
 
             proto::set_size(pr_file, file_peer->get_size() + 10);
             proto::add_counters(v, proto::Counter(peer_device->device_id().get_uint(), 2));
+            proto::add_blocks(pr_file, bi);
+            proto::add_blocks(pr_file, bi);
 
             auto file_peer2 = file_info_t::create(sequencer->next_uuid(), pr_file, folder_peer2).value();
             file_peer2->assign_block(block.get(), 0);
@@ -787,6 +796,7 @@ SECTION("regular files") {
         proto::set_size(pr_file, 5);
         proto::set_modified_s(pr_file, modified);
         proto::set_permissions(pr_file, perms);
+        proto::add_blocks(pr_file, bi);
         auto file_my = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
         file_my->assign_block(block.get(), 0);
 

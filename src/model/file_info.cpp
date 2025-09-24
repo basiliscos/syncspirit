@@ -6,7 +6,6 @@
 #include "folder_info.h"
 #include "device.h"
 #include "db/prefix.h"
-#include "fs/utils.h"
 #include "misc/error_code.h"
 #include "misc/file_iterator.h"
 #include "proto/proto-helpers.h"
@@ -187,7 +186,9 @@ auto file_info_t::get_name() const noexcept -> const path_ptr_t & { return name;
 
 std::uint64_t file_info_t::get_block_offset(size_t block_index) const noexcept {
     assert(flags & f_type_file && !content.file.blocks.empty());
-    return content.file.block_size * block_index;
+    auto ptr = reinterpret_cast<std::uintptr_t>(content.file.blocks.front());
+    auto block = reinterpret_cast<const block_info_t *>(ptr & PTR_MASK);
+    return block->get_size() * block_index;
 }
 
 auto file_info_t::fields_update(const db::FileInfo &source, model::path_cache_t &path_cache) noexcept
@@ -215,14 +216,16 @@ auto file_info_t::fields_update(const db::FileInfo &source, model::path_cache_t 
         new (&content.file) size_full_t();
         auto declared_size = db::get_size(source);
         bool has_content = declared_size && (flags & f_type_file);
-        content.file.block_size = has_content ? db::get_block_size(source) : 0;
-        auto blocks_count = has_content ? db::get_blocks_size(source) : 0;
-        return reserve_blocks(blocks_count, declared_size);
+        auto block_size = db::get_blocks_size(source);
+        auto blocks_count = has_content ? block_size : 0;
+        if (blocks_count) {
+            reserve_blocks(blocks_count);
+        }
     } else {
         new (&content.non_file) size_less_t();
         content.non_file.symlink_target = db::get_symlink_target(source);
-        return outcome::success();
     }
+    return outcome::success();
 }
 
 auto file_info_t::fields_update(const proto::FileInfo &source, model::path_cache_t &path_cache) noexcept
@@ -249,14 +252,16 @@ auto file_info_t::fields_update(const proto::FileInfo &source, model::path_cache
         new (&content.file) size_full_t();
         auto declared_size = proto::get_size(source);
         bool has_content = declared_size && (flags & f_type_file);
-        content.file.block_size = has_content ? proto::get_block_size(source) : 0;
-        auto blocks_count = has_content ? proto::get_blocks_size(source) : 0;
-        return reserve_blocks(blocks_count, declared_size);
+        auto block_size = proto::get_blocks_size(source);
+        auto blocks_count = has_content ? block_size : 0;
+        if (blocks_count) {
+            reserve_blocks(blocks_count);
+        }
     } else {
         new (&content.non_file) size_less_t();
         content.non_file.symlink_target = proto::get_symlink_target(source);
-        return outcome::success();
     }
+    return outcome::success();
 }
 
 utils::bytes_view_t file_info_t::get_uuid() const noexcept { return {key + uuid_length, uuid_length}; }
@@ -280,7 +285,7 @@ db::FileInfo file_info_t::as_db(bool include_blocks) const noexcept {
     db::set_version(r, version.as_proto());
     if (flags & f_type_file) {
         db::set_size(r, get_size());
-        db::set_block_size(r, content.file.block_size);
+        db::set_block_size(r, get_block_size());
         if (include_blocks) {
             for (auto b_raw : content.file.blocks) {
                 auto ptr = reinterpret_cast<std::uintptr_t>(b_raw);
@@ -312,8 +317,8 @@ proto::FileInfo file_info_t::as_proto(bool include_blocks) const noexcept {
     proto::set_version(r, version.as_proto());
 
     if (flags & f_type_file) {
-        proto::set_block_size(r, content.file.block_size);
         proto::set_size(r, get_size());
+        proto::set_block_size(r, get_block_size());
         if (include_blocks) {
             size_t offset = 0;
             for (auto b_raw : content.file.blocks) {
@@ -332,28 +337,9 @@ proto::FileInfo file_info_t::as_proto(bool include_blocks) const noexcept {
     return r;
 }
 
-outcome::result<void> file_info_t::reserve_blocks(size_t block_count, int64_t declared_size) noexcept {
-    size_t count = 0;
-    if (!block_count && !(flags & f_deleted) && !(flags & f_invalid)) {
-        if ((declared_size < content.file.block_size) && (declared_size >= (int64_t)fs::block_sizes[0])) {
-            return make_error_code(error_code_t::invalid_block_size);
-        }
-        if (declared_size) {
-            if (!content.file.block_size) {
-                return make_error_code(error_code_t::invalid_block_size);
-            }
-            count = declared_size / content.file.block_size;
-            if ((int64_t)(content.file.block_size * count) != declared_size) {
-                ++count;
-            }
-        }
-    } else {
-        count = block_count;
-    }
+void file_info_t::reserve_blocks(size_t block_count) noexcept {
     remove_blocks();
-    content.file.blocks.resize(count);
-    content.file.missing_blocks = !(flags & f_deleted) && !(flags & f_invalid) && (flags & f_type_file) ? count : 0;
-    return outcome::success();
+    content.file.blocks.resize(block_count);
 }
 
 utils::bytes_t file_info_t::serialize(bool include_blocks) const noexcept { return db::encode(as_db(include_blocks)); }
@@ -371,8 +357,22 @@ void file_info_t::mark_local(bool available, const folder_info_t &folder_info) n
         flags = flags | f_local;
     } else {
         flags = flags & ~f_local;
+        flags = flags & ~f_available;
     }
     if (available) {
+        auto available = std::uint32_t{0};
+        if (flags & f_type_file) {
+            for (auto b_raw : content.file.blocks) {
+                auto ptr = reinterpret_cast<std::uintptr_t>(b_raw);
+                if (ptr & LOCAL_MASK) {
+                    ++available;
+                }
+            }
+        }
+        if (!(flags & f_type_file) || static_cast<std::uint32_t>(content.file.blocks.size()) == available) {
+            flags = flags | f_available;
+        }
+
         auto self = folder_info.get_device();
         auto folder = folder_info.get_folder();
         for (auto it : folder->get_folder_infos()) {
@@ -404,8 +404,18 @@ void file_info_t::mark_local_available(size_t block_index) noexcept {
     auto block_mangled = reinterpret_cast<block_info_t *>(ptr);
     blocks[block_index] = block_mangled;
 
-    assert(content.file.missing_blocks);
-    --content.file.missing_blocks;
+    if (!(flags & f_available)) {
+        auto available = std::uint32_t{0};
+        for (auto b_raw : blocks) {
+            auto ptr = reinterpret_cast<std::uintptr_t>(b_raw);
+            if (ptr & LOCAL_MASK) {
+                ++available;
+            }
+        }
+        if (available == static_cast<std::uint32_t>(blocks.size())) {
+            flags = flags | f_available;
+        }
+    }
 }
 
 bool file_info_t::is_locally_available(size_t block_index) const noexcept {
@@ -416,8 +426,9 @@ bool file_info_t::is_locally_available(size_t block_index) const noexcept {
 }
 
 bool file_info_t::is_locally_available() const noexcept {
-    return flags & f_type_file ? content.file.missing_blocks == 0 : true;
-}
+    auto r = !(flags & f_type_file) || ((flags & f_available) || content.file.blocks.empty());
+    return r;
+};
 
 const std::filesystem::path file_info_t::get_path(const folder_info_t &folder_info) const noexcept {
     auto own_name = boost::nowide::widen(name->get_full_name());
@@ -449,7 +460,7 @@ void file_info_t::remove_blocks() noexcept {
             auto block = reinterpret_cast<block_info_t *>(ptr & PTR_MASK);
             remove_block(block);
         }
-        content.file.missing_blocks = content.file.blocks.size();
+        flags = flags & ~f_available;
     }
 }
 
@@ -516,8 +527,6 @@ void file_info_t::update(const file_info_t &other) noexcept {
     if (!(flags & f_type_file)) {
         content.non_file.symlink_target = other.content.non_file.symlink_target;
     } else {
-        content.file.block_size = other.content.file.block_size;
-
         auto local_block_hashes = hashes_t{};
         for (auto b_raw : content.file.blocks) {
             if (b_raw) {
@@ -545,7 +554,6 @@ void file_info_t::update(const file_info_t &other) noexcept {
         remove_blocks();
 
         content.file.blocks.resize(sz);
-        content.file.missing_blocks = sz;
         for (size_t i = 0; i < sz; ++i) {
             auto b_raw = other.content.file.blocks[i];
             if (b_raw) {
@@ -553,9 +561,7 @@ void file_info_t::update(const file_info_t &other) noexcept {
                 auto block = reinterpret_cast<block_info_t *>(ptr & PTR_MASK);
                 assign_block(block, i);
                 auto already_local = ptr & LOCAL_MASK;
-                if (already_local) {
-                    --content.file.missing_blocks;
-                } else if (local_block_hashes.contains(block->get_hash())) {
+                if (local_block_hashes.contains(block->get_hash())) {
                     mark_local_available(i);
                 }
             }
