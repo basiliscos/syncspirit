@@ -38,16 +38,16 @@ struct SYNCSPIRIT_API file_info_t {
 
     // clang-format off
     enum flags_t: std::uint16_t {
-        f_type_file      = 1 << 0,
-        f_type_dir       = 1 << 1,
-        f_type_link      = 1 << 2,
-        f_deleted        = 1 << 3,
-        f_invalid        = 1 << 4,
-        f_no_permissions = 1 << 5,
-        f_synchronizing  = 1 << 6,
-        f_unreachable    = 1 << 7,
-        f_unlocking      = 1 << 8,
-        f_local          = 1 << 9,
+        f_type_file        = 1 << 0,
+        f_type_dir         = 1 << 1,
+        f_type_link        = 1 << 2,
+        f_deleted          = 1 << 3,
+        f_invalid          = 1 << 4,
+        f_no_permissions   = 1 << 5,
+        f_synchronizing    = 1 << 6,
+        f_unreachable      = 1 << 7,
+        f_local            = 1 << 8,
+        f_equisized_blocks = 1 << 9,
     };
     // clang-format on
 
@@ -170,9 +170,6 @@ struct SYNCSPIRIT_API file_info_t {
     void synchronizing_lock() noexcept;
     void synchronizing_unlock() noexcept;
 
-    bool is_unlocking() const noexcept;
-    void set_unlocking(bool value) noexcept;
-
     proto::FileInfo get() const noexcept;
     bool identical_to(const proto::FileInfo &file) const noexcept;
 
@@ -209,8 +206,8 @@ struct SYNCSPIRIT_API file_info_t {
     struct size_full_t {
         ~size_full_t();
         blocks_t blocks;
-        std::uint32_t missing_blocks;
         std::int32_t block_size;
+        std::uint32_t missing_blocks;
     };
 
     struct size_less_t {

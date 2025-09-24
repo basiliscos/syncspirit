@@ -432,16 +432,6 @@ void file_info_t::synchronizing_lock() noexcept { flags |= flags_t::f_synchroniz
 
 bool file_info_t::is_synchronizing() const noexcept { return flags & flags_t::f_synchronizing; }
 
-bool file_info_t::is_unlocking() const noexcept { return flags & flags_t::f_unlocking; }
-
-void file_info_t::set_unlocking(bool value) noexcept {
-    if (value) {
-        flags |= flags_t::f_unlocking;
-    } else {
-        flags = flags & ~flags_t::f_unlocking;
-    }
-}
-
 void file_info_t::assign_block(model::block_info_t *block, size_t index) noexcept {
     auto &blocks = content.file.blocks;
     assert(flags & f_type_file);
