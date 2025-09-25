@@ -617,7 +617,7 @@ void test_remove_file() {
             auto v = file->get_version();
             REQUIRE(v.counters_size() == 1);
 
-            auto &c = v.get_best();
+            auto c = v.get_best();
             CHECK(proto::get_id(c) == proto::get_id((counter)));
             CHECK(proto::get_value(c) > proto::get_value((counter)));
             REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());

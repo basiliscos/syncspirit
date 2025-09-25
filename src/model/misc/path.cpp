@@ -13,18 +13,24 @@ using namespace boost::nowide;
 
 namespace syncspirit::model {
 
-path_t::path_t(std::string_view full_name) noexcept : name(full_name) {
+path_t::path_t(std::string_view full_name) noexcept {
+    name = string_t(full_name.data(), full_name.data() + full_name.size());
     auto file_path = bfs::path(widen(full_name));
     auto tmp = std::vector<char>(full_name.size() * 4);
     auto it = file_path.begin();
     auto root_name = it->wstring();
     auto ptr = narrow(tmp.data(), tmp.size(), root_name.data());
     auto prev = std::strlen(tmp.data());
-    for (++it; it != file_path.end(); ++it) {
+    ++it;
+    auto sz = std::distance(it, file_path.end());
+    pieces.resize(sz);
+    auto i = std::uint32_t{0};
+    for (; it != file_path.end(); ++it) {
         auto sub_name = it->wstring();
         auto ptr = narrow(tmp.data(), tmp.size(), sub_name.data());
-        pieces.emplace_back(prev + 1);
+        pieces[i] = static_cast<uint32_t>(prev + 1);
         prev += std::strlen(tmp.data()) + 1;
+        ++i;
     }
 }
 
@@ -35,12 +41,12 @@ path_t::path_t(path_t &source) noexcept {
 
 std::size_t path_t::get_pieces_size() const noexcept { return pieces.size() + (!name.empty() ? 1 : 0); }
 
-std::string_view path_t::get_full_name() const noexcept { return name; }
+std::string_view path_t::get_full_name() const noexcept { return std::string_view(name.data(), name.size()); }
 
 std::string_view path_t::get_parent_name() const noexcept {
     if (pieces.size()) {
         auto last_offset = pieces.back();
-        auto view = std::string_view(name);
+        auto view = std::string_view(name.data(), name.size());
         return view.substr(0, last_offset - 1);
     }
     return {};
@@ -49,10 +55,10 @@ std::string_view path_t::get_parent_name() const noexcept {
 std::string_view path_t::get_own_name() const noexcept {
     if (pieces.size()) {
         auto last_offset = pieces.back();
-        auto view = std::string_view(name);
-        return view.substr(last_offset);
+        auto view = std::string_view(name.data() + last_offset, name.size() - last_offset);
+        return view;
     }
-    return name;
+    return std::string_view(name.data(), name.size());
 }
 
 auto path_t::begin() const noexcept -> iterator_t { return iterator_t(this); };
@@ -60,8 +66,11 @@ auto path_t::begin() const noexcept -> iterator_t { return iterator_t(this); };
 auto path_t::end() const noexcept -> iterator_t { return iterator_t(); }
 
 bool path_t::contains(const path_t &other) const noexcept {
-    auto view = std::string_view(other.name);
-    return view.find(name) == 0;
+    auto ptr = other.name.data();
+    auto end = ptr + other.name.sz;
+    auto view = std::string_view(ptr, end);
+    auto self = std::string_view(name.data(), name.size());
+    return view.find(self) == 0;
 }
 
 using I = path_t::iterator_t;
@@ -78,7 +87,8 @@ auto I::operator*() const noexcept -> reference {
     auto b = position ? path->pieces[position - 1] : 0;
     auto e = position < path->pieces.size() ? path->pieces[position] - 1 : std::string::npos;
     auto s = e - b;
-    auto view = std::string_view(path->name);
+    auto &n = path->name;
+    auto view = std::string_view(n.data(), n.data() + n.size());
     return view.substr(b, s);
 }
 

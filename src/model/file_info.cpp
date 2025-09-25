@@ -301,7 +301,7 @@ db::FileInfo file_info_t::as_db(bool include_blocks) const noexcept {
             }
         }
     } else {
-        auto& container = content.non_file.symlink_target;
+        auto &container = content.non_file.symlink_target;
         auto ptr = container.data();
         auto link = std::string_view(ptr, ptr + container.size());
         db::set_symlink_target(r, link);
@@ -339,7 +339,7 @@ proto::FileInfo file_info_t::as_proto(bool include_blocks) const noexcept {
             }
         }
     } else {
-        auto& container = content.non_file.symlink_target;
+        auto &container = content.non_file.symlink_target;
         auto ptr = container.data();
         auto link = std::string_view(ptr, ptr + container.size());
         proto::set_symlink_target(r, link);
@@ -590,7 +590,7 @@ std::string file_info_t::make_conflicting_name() const noexcept {
     auto local = adjustor_t::utc_to_local(utc);
     auto ymd = local.date().year_month_day();
     auto time = local.time_of_day();
-    auto &counter = version.get_best();
+    auto counter = version.get_best();
     auto device_short = device_id_t::make_short(proto::get_id(counter));
     auto conflicted_name =
         fmt::format("{}.sync-conflict-{:04}{:02}{:02}-{:02}{:02}{:02}-{}{}", stem, (int)ymd.year, ymd.month.as_number(),

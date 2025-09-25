@@ -13,7 +13,7 @@ struct cached_path_t : path_t {
     }
 
     ~cached_path_t() {
-        cache.map.erase(name);
+        cache.map.erase(get_full_name());
         intrusive_ptr_release(&cache);
     }
 

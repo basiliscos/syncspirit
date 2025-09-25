@@ -46,7 +46,7 @@ TEST_CASE("new file diff", "[model]") {
         REQUIRE(folder_info->get_max_sequence() == 1);
         REQUIRE(file->get_version().counters_size() == 1);
         REQUIRE(file->get_modified_by() == my_device->device_id().get_uint());
-        auto &counter = file->get_version().get_best();
+        auto counter = file->get_version().get_best();
         auto v1 = proto::get_value(counter);
         CHECK(v1 > 0);
 

@@ -95,8 +95,8 @@ struct SYNCSPIRIT_API block_info_t {
     template <typename T> void assign(const T &item) noexcept;
     block_info_t(utils::bytes_view_t key) noexcept;
     block_info_t(const proto::BlockInfo &block) noexcept;
-    block_info_t(block_info_t&&) noexcept = delete;
-    block_info_t(const block_info_t&) noexcept = delete;
+    block_info_t(block_info_t &&) noexcept = delete;
+    block_info_t(const block_info_t &) noexcept = delete;
 
     union file_blocks_union_t {
         file_blocks_union_t();

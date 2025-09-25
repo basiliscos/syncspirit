@@ -9,7 +9,7 @@
 #include <filesystem>
 #include <boost/outcome.hpp>
 #include <boost/multi_index/ordered_index.hpp>
-#include "utils/vector.hpp"
+#include "utils/compact_vector.hpp"
 #include "misc/augmentation.h"
 #include "misc/path.h"
 #include "misc/map.hpp"
@@ -55,7 +55,7 @@ struct SYNCSPIRIT_API file_info_t {
     static constexpr std::uintptr_t LOCAL_MASK = 1 << 0;
     static constexpr std::uintptr_t PTR_MASK = ~LOCAL_MASK;
 
-    using blocks_t = utils::vector_t<block_info_t *>;
+    using blocks_t = utils::compact_vector_t<block_info_t *>;
 
     struct decomposed_key_t {
         utils::bytes_view_t folder_info_id;
@@ -167,7 +167,7 @@ struct SYNCSPIRIT_API file_info_t {
 
     std::string_view get_link_target() const noexcept {
         assert(flags & f_type_link);
-        auto& container = content.non_file.symlink_target;
+        auto &container = content.non_file.symlink_target;
         return {container.data(), container.size()};
     }
 
@@ -212,7 +212,7 @@ struct SYNCSPIRIT_API file_info_t {
     template <typename T> auto &access() const noexcept;
 
   private:
-    using string_t = utils::vector_t<char>;
+    using string_t = utils::compact_vector_t<char>;
     struct size_full_t {
         ~size_full_t();
         blocks_t blocks;

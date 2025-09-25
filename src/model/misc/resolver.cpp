@@ -14,8 +14,8 @@ static advance_action_t compare_by_version(const file_info_t &remote, const file
     auto &r_v = remote.get_version();
     auto &l_v = local.get_version();
 
-    auto &r_best = r_v.get_best();
-    auto &l_best = l_v.get_best();
+    auto r_best = r_v.get_best();
+    auto l_best = l_v.get_best();
     auto rv = proto::get_value(r_best);
     auto lv = proto::get_value(l_best);
     auto r_id = proto::get_id(r_best);
