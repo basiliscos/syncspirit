@@ -246,8 +246,8 @@ struct SYNCSPIRIT_API file_info_t {
     std::uint32_t permissions;
     std::uint32_t modified_ns;
 
-    version_t version;
     content_t content;
+    version_t version;
     std::uint16_t flags = 0;
     mutable std::uint16_t counter = 0;
 
