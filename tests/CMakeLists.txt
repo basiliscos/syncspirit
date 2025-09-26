@@ -17,6 +17,7 @@ endif()
 add_library(syncspirit_test_lib SHARED
     $<$<PLATFORM_ID:Windows>:win32-resource.rc>
     managed_hasher.cpp
+    test_peer.cpp
     test_supervisor.cpp
     test-db.cpp
     test-utils.cpp
