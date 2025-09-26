@@ -166,9 +166,11 @@ struct SYNCSPIRIT_API file_info_t {
     bool is_locally_available() const noexcept;
 
     std::string_view get_link_target() const noexcept {
-        assert(flags & f_type_link);
-        auto &container = content.non_file.symlink_target;
-        return {container.data(), container.size()};
+        if (flags & f_type_link) {
+            auto &container = content.non_file.symlink_target;
+            return {container.data(), container.size()};
+        }
+        return {};
     }
 
     const bfs::path get_path(const folder_info_t &folder_info) const noexcept;
