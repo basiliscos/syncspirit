@@ -24,7 +24,7 @@ r::pt::time_duration timeout = r::pt::millisec{10};
 TEST_CASE("scan_task", "[fs]") {
     auto root_path = unique_path();
     bfs::create_directories(root_path);
-    path_guard_t path_quard{root_path};
+    test::path_guard_t path_quard{root_path};
     auto rw_cache = fs::file_cache_ptr_t(new fs::file_cache_t(5));
 
     config::fs_config_t config{3600, 10, 1024 * 1024, 100};
@@ -1099,7 +1099,7 @@ TEST_CASE("scan_task diffs aggregation, guard", "[fs]") {
     static constexpr int SIZE = 41;
     auto root_path = unique_path();
     bfs::create_directories(root_path);
-    path_guard_t path_quard{root_path};
+    test::path_guard_t path_quard{root_path};
     auto rw_cache = fs::file_cache_ptr_t(new fs::file_cache_t(5));
 
     config::fs_config_t config{3600, 10, 1024 * 1024, 5};
@@ -1152,7 +1152,7 @@ TEST_CASE("scan_task order", "[fs]") {
     using paths_t = std::vector<std::string>;
     auto root_path = unique_path();
     bfs::create_directories(root_path);
-    path_guard_t path_quard{root_path};
+    test::path_guard_t path_quard{root_path};
     auto rw_cache = fs::file_cache_ptr_t(new fs::file_cache_t(5));
 
     auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();

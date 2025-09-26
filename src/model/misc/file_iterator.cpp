@@ -116,11 +116,16 @@ auto file_iterator_t::next() noexcept -> result_t {
             auto it = queue->begin();
             while (it != queue->end()) {
                 auto &file = **it;
-                it = queue->erase(it);
-                auto local_file = local_files.by_name(file.get_name()->get_full_name());
-                auto action = resolve(file, local_file.get(), local_folder);
-                if (action != advance_action_t::ignore) {
-                    return std::make_tuple(&file, &peer_folder, action);
+                if (cluster.is_locked(file.get_name().get())) {
+                    ++it;
+                    continue;
+                } else {
+                    it = queue->erase(it);
+                    auto local_file = local_files.by_name(file.get_name()->get_full_name());
+                    auto action = resolve(file, local_file.get(), local_folder);
+                    if (action != advance_action_t::ignore) {
+                        return std::make_tuple(&file, &peer_folder, action);
+                    }
                 }
             }
         }

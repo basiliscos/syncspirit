@@ -12,11 +12,26 @@
 #include "pending_device.h"
 #include "pending_folder.h"
 #include "block_info.h"
+#include <unordered_set>
 
 namespace syncspirit::model {
 
-struct SYNCSPIRIT_API cluster_t final : arc_base_t<cluster_t> {
+struct SYNCSPIRIT_API path_guard_t {
+    path_guard_t() noexcept = default;
+    path_guard_t(cluster_t *cluster_, path_ptr_t path_) noexcept : path(path_), cluster{cluster_} {}
+    path_guard_t(path_guard_t &&) = default;
+    path_guard_t(const path_guard_t &) = delete;
+    ~path_guard_t();
 
+    path_guard_t &operator=(path_guard_t &&) noexcept = default;
+
+    inline operator bool() const noexcept { return path.get(); }
+
+    path_ptr_t path = {};
+    cluster_t *cluster = {};
+};
+
+struct SYNCSPIRIT_API cluster_t final : arc_base_t<cluster_t> {
     cluster_t(device_ptr_t device_, int32_t write_requests) noexcept;
     cluster_t(const cluster_t &) = delete;
 
@@ -41,8 +56,17 @@ struct SYNCSPIRIT_API cluster_t final : arc_base_t<cluster_t> {
     inline void mark_tainted() noexcept { tainted = true; }
     int32_t get_write_requests() const noexcept;
     void modify_write_requests(int32_t delta) noexcept;
+    path_guard_t lock(path_t *path) noexcept;
+    bool is_locked(path_t *path) noexcept;
 
   private:
+    struct path_hasher_t {
+        using is_transparent = void;
+        inline size_t operator()(const path_ptr_t &path) const noexcept { return reinterpret_cast<size_t>(path.get()); }
+        inline size_t operator()(const path_t *file) const noexcept { return reinterpret_cast<size_t>(file); }
+    };
+
+    using locked_paths_t = std::unordered_set<path_ptr_t, path_hasher_t>;
     device_ptr_t device;
     folders_map_t folders;
     block_infos_map_t blocks;
@@ -52,8 +76,11 @@ struct SYNCSPIRIT_API cluster_t final : arc_base_t<cluster_t> {
     pending_folder_map_t pending_folders;
     pending_devices_map_t pending_devices;
     path_cache_ptr_t path_cache;
+    locked_paths_t locked_paths;
     bool tainted = false;
     int32_t write_requests;
+
+    friend struct path_guard_t;
 };
 
 using cluster_ptr_t = intrusive_ptr_t<cluster_t>;

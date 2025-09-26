@@ -138,6 +138,7 @@ struct controller_predown_t {
 };
 
 struct peer_down_t {
+    r::address_ptr_t peer;
     r::extended_error_ptr_t ee;
 };
 

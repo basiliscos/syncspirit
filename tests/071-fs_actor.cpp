@@ -118,7 +118,7 @@ struct fixture_t {
     r::intrusive_ptr_t<supervisor_t> sup;
     r::intrusive_ptr_t<fs::file_actor_t> file_actor;
     bfs::path root_path;
-    path_guard_t path_guard;
+    test::path_guard_t path_guard;
     r::system_context_t ctx;
     blk_res_ptr_t block_reply;
     std::string_view folder_id = "1234-5678";

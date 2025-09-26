@@ -259,7 +259,7 @@ void peer_actor_t::shutdown_start() noexcept {
         r::actor_base_t::cancel_timer(*rx_timer_request);
     }
     if (controller) {
-        send<payload::peer_down_t>(controller, shutdown_reason);
+        send<payload::peer_down_t>(controller, address, shutdown_reason);
     }
 
     auto timeout = shutdown_timeout * 8 / 9;
@@ -284,7 +284,7 @@ void peer_actor_t::shutdown_finish() noexcept {
     }
     block_requests.clear();
     if (controller) {
-        send<payload::peer_down_t>(controller, shutdown_reason);
+        send<payload::peer_down_t>(controller, address, shutdown_reason);
     }
     r::actor_base_t::shutdown_finish();
     auto sha256 = peer_device_id.get_sha256();

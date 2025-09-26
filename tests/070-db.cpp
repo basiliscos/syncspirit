@@ -180,7 +180,7 @@ struct fixture_t {
     supervisor_ptr_t sup;
     r::intrusive_ptr_t<net::db_actor_t> db_actor;
     bfs::path root_path;
-    path_guard_t path_quard;
+    test::path_guard_t path_quard;
     r::system_context_t ctx;
     model::diff::cluster_diff_ptr_t load_diff;
     r::extended_error_ptr_t ee;

@@ -110,7 +110,7 @@ struct fixture_t {
     cluster_ptr_t cluster;
     device_ptr_t my_device;
     bfs::path root_path;
-    path_guard_t path_guard;
+    test::path_guard_t path_guard;
     target_ptr_t target;
     model::folder_ptr_t folder;
     model::folder_info_ptr_t folder_info;
