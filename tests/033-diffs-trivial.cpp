@@ -73,9 +73,9 @@ TEST_CASE("with file", "[model]") {
     SECTION("file_availability") {
         auto block = cluster->get_blocks().by_hash(b1_hash);
         file->remove_blocks();
-        file->assign_block(block, 0);
+        file->assign_block(block.get(), 0);
         REQUIRE(!file->is_locally_available());
-        auto diff = diff::cluster_diff_ptr_t(new diff::local::file_availability_t(file));
+        auto diff = diff::cluster_diff_ptr_t(new diff::local::file_availability_t(file, *folder_info));
         REQUIRE(diff->apply(*controller, {}));
         REQUIRE(file->is_locally_available());
     }

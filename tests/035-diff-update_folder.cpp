@@ -173,8 +173,6 @@ TEST_CASE("update folder-2 (via Index)", "[model]") {
             auto f = peer_files.by_name("a.txt");
             REQUIRE(f);
 
-            auto key = f->get_key();
-
             SECTION("exactly the same file is added, and it's duplicate is ignored") {
                 REQUIRE(builder.make_index(sha256, "1234-5678").add(pr_file, peer_device).finish().apply());
                 REQUIRE(peer_files.size() == 1);
@@ -188,7 +186,7 @@ TEST_CASE("update folder-2 (via Index)", "[model]") {
                 REQUIRE(peer_files.size() == 1);
                 auto same_f = peer_files.by_name(proto::get_name(pr_file));
                 CHECK(same_f.get() == f.get());
-                CHECK(same_f->get_key() == f->get_key());
+                CHECK(same_f->get_full_id() == f->get_full_id());
             }
 
             SECTION("file with new blocks is added, the preivous one is removed") {

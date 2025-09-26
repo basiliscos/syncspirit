@@ -152,10 +152,10 @@ void test_remote_copy() {
 
             SECTION("empty regular file") {
                 auto peer_file = make_file();
-                builder.remote_copy(*peer_file).apply(*sup);
+                builder.remote_copy(*peer_file, *folder_peer).apply(*sup);
 
                 auto my_file = folder_my->get_file_infos().by_name(peer_file->get_name()->get_full_name());
-                auto &path = my_file->get_path();
+                auto &path = my_file->get_path(*folder_my);
                 REQUIRE(bfs::exists(path));
                 REQUIRE(bfs::file_size(path) == 0);
                 REQUIRE(to_unix(bfs::last_write_time(path)) == 1641828421);
@@ -176,10 +176,10 @@ void test_remote_copy() {
                 auto name = std::string_view("a/b/c/d/e.txt");
                 proto::set_name(pr_fi, name);
                 auto peer_file = make_file();
-                builder.remote_copy(*peer_file).apply(*sup);
+                builder.remote_copy(*peer_file, *folder_peer).apply(*sup);
 
                 auto file = folder_my->get_file_infos().by_name(name);
-                auto &path = file->get_path();
+                auto &path = file->get_path(*folder_my);
                 REQUIRE(bfs::exists(path));
                 REQUIRE(bfs::file_size(path) == 0);
 
@@ -205,11 +205,11 @@ void test_remote_copy() {
                 proto::set_size(b, 5);
 
                 auto peer_file = make_file();
-                builder.remote_copy(*peer_file).apply(*sup);
+                builder.remote_copy(*peer_file, *folder_peer).apply(*sup);
 
                 auto file = folder_my->get_file_infos().by_name(proto::get_name(pr_fi));
 
-                auto &path = file->get_path();
+                auto &path = file->get_path(*folder_my);
                 auto tmp_path = path.parent_path() / (path.filename().wstring() + L".syncspirit-tmp");
                 REQUIRE(bfs::exists(tmp_path));
                 REQUIRE(bfs::file_size(tmp_path) == 5);
@@ -230,11 +230,11 @@ void test_remote_copy() {
                 proto::set_type(pr_fi, proto::FileInfoType::DIRECTORY);
 
                 auto peer_file = make_file();
-                builder.remote_copy(*peer_file).apply(*sup);
+                builder.remote_copy(*peer_file, *folder_peer).apply(*sup);
 
                 auto file = folder_my->get_file_infos().by_name(proto::get_name(pr_fi));
 
-                auto &path = file->get_path();
+                auto &path = file->get_path(*folder_my);
                 REQUIRE(bfs::exists(path));
                 REQUIRE(bfs::is_directory(path));
             }
@@ -248,10 +248,10 @@ void test_remote_copy() {
                     write_file(target, "zzz");
 
                     auto peer_file = make_file();
-                    builder.remote_copy(*peer_file).apply(*sup);
+                    builder.remote_copy(*peer_file, *folder_peer).apply(*sup);
 
                     auto file = folder_my->get_file_infos().by_name(proto::get_name(pr_fi));
-                    auto &path = file->get_path();
+                    auto &path = file->get_path(*folder_my);
 #ifndef SYNCSPIRIT_WIN
                     CHECK(bfs::exists(path));
                     CHECK(bfs::is_symlink(path));
@@ -264,10 +264,10 @@ void test_remote_copy() {
                     proto::set_symlink_target(pr_fi, boost::nowide::narrow(target.wstring()));
 
                     auto peer_file = make_file();
-                    builder.remote_copy(*peer_file).apply(*sup);
+                    builder.remote_copy(*peer_file, *folder_peer).apply(*sup);
 
                     auto file = folder_my->get_file_infos().by_name(proto::get_name(pr_fi));
-                    auto &path = file->get_path();
+                    auto &path = file->get_path(*folder_my);
                     CHECK(!bfs::exists(path));
 #ifndef SYNCSPIRIT_WIN
                     CHECK(bfs::is_symlink(path));
@@ -293,9 +293,9 @@ void test_remote_copy() {
                 REQUIRE(bfs::exists(target));
 
                 auto peer_file = make_file();
-                CHECK(peer_file->get_path() == target);
-                REQUIRE(bfs::exists(peer_file->get_path()));
-                builder.remote_copy(*peer_file).apply(*sup);
+                CHECK(peer_file->get_path(*folder_peer) == target);
+                REQUIRE(bfs::exists(peer_file->get_path(*folder_peer)));
+                builder.remote_copy(*peer_file, *folder_peer).apply(*sup);
 
                 auto file = folder_my->get_file_infos().by_name(proto::get_name(pr_fi));
                 CHECK(file->is_deleted());
@@ -358,9 +358,9 @@ void test_append_block() {
             SECTION("file with 1 block") {
                 proto::set_size(pr_source, 5);
                 auto peer_file = make_file(1);
-                builder.append_block(*peer_file, 0, as_owned_bytes("12345"))
+                builder.append_block(*peer_file, *folder_peer, 0, as_owned_bytes("12345"))
                     .apply(*sup)
-                    .finish_file(*peer_file)
+                    .finish_file(*peer_file, *folder_peer)
                     .apply(*sup);
 
                 auto file = folder_my->get_file_infos().by_name(proto::get_name(pr_source));
@@ -376,7 +376,7 @@ void test_append_block() {
 
                 auto peer_file = make_file(2);
 
-                builder.append_block(*peer_file, 0, as_owned_bytes("12345")).apply(*sup);
+                builder.append_block(*peer_file, *folder_peer, 0, as_owned_bytes("12345")).apply(*sup);
 
                 auto wfilename = boost::nowide::widen(peer_file->get_name()->get_full_name()) + L".syncspirit-tmp";
                 auto filename = boost::nowide::narrow(wfilename);
@@ -387,10 +387,10 @@ void test_append_block() {
                 auto data = read_file(path);
                 CHECK(data.substr(0, 5) == "12345");
 #endif
-                builder.append_block(*peer_file, 1, as_owned_bytes("67890")).apply(*sup);
+                builder.append_block(*peer_file, *folder_peer, 1, as_owned_bytes("67890")).apply(*sup);
 
                 SECTION("add 2nd block") {
-                    builder.finish_file(*peer_file).apply(*sup);
+                    builder.finish_file(*peer_file, *folder_peer).apply(*sup);
 
                     path = root_path / boost::nowide::widen(path_str);
                     REQUIRE(bfs::exists(path));
@@ -403,7 +403,7 @@ void test_append_block() {
 #ifndef SYNCSPIRIT_WIN
                 SECTION("remove folder (simulate err)") {
                     bfs::remove_all(root_path);
-                    builder.finish_file(*peer_file).apply(*sup);
+                    builder.finish_file(*peer_file, *folder_peer).apply(*sup);
                     CHECK(static_cast<r::actor_base_t *>(file_actor.get())->access<to::state>() ==
                           r::state_t::SHUT_DOWN);
                 }
@@ -474,15 +474,18 @@ void test_clone_block() {
                     auto target = make_file(pr_target, 1);
 
                     auto source_file = folder_peer->get_file_infos().by_name(proto::get_name(pr_source));
-                    builder.append_block(*source_file, 0, as_owned_bytes("12345"))
+                    builder.append_block(*source_file, *folder_peer, 0, as_owned_bytes("12345"))
                         .apply(*sup)
-                        .finish_file(*source_file)
+                        .finish_file(*source_file, *folder_peer)
                         .apply(*sup);
 
                     auto target_file = folder_peer->get_file_infos().by_name(proto::get_name(pr_target));
-                    auto block = source_file->get_blocks()[0];
-                    auto file_block = model::file_block_t(block.get(), target_file.get(), 0);
-                    builder.clone_block(file_block).apply(*sup).finish_file(*target).apply(*sup);
+                    auto block = source_file->iterate_blocks(0).next();
+                    auto file_block = model::file_block_t(block, target_file.get(), 0);
+                    builder.clone_block(file_block, *folder_peer, *folder_peer)
+                        .apply(*sup)
+                        .finish_file(*target, *folder_peer)
+                        .apply(*sup);
 
                     auto path = root_path / std::string(target_file->get_name()->get_full_name());
                     REQUIRE(bfs::exists(path));
@@ -493,6 +496,7 @@ void test_clone_block() {
                 }
                 SECTION("single block target file, from diffrent folder") {
                     proto::set_size(pr_source, 5);
+                    proto::add_blocks(pr_source, bi);
                     proto::set_size(pr_target, 5);
                     proto::set_modified_s(pr_target, modified);
 
@@ -506,7 +510,7 @@ void test_clone_block() {
 
                     proto::set_sequence(pr_source, ++next_sequence);
                     auto source = file_info_t::create(sequencer->next_uuid(), pr_source, fi_2_my).value();
-                    source->assign_block(blocks[0], 0);
+                    source->assign_block(blocks[0].get(), 0);
                     fi_2_my->add_strict(source);
                     source->mark_local_available(0);
 
@@ -514,9 +518,12 @@ void test_clone_block() {
                     write_file(root_path / boost::nowide::widen(source->get_name()->get_full_name()), "12345");
 
                     auto target_file = folder_peer->get_file_infos().by_name(proto::get_name(pr_target));
-                    auto block = source->get_blocks()[0];
-                    auto file_block = model::file_block_t(block.get(), target_file.get(), 0);
-                    builder.clone_block(file_block).apply(*sup).finish_file(*target).apply(*sup);
+                    auto block = source->iterate_blocks(0).next();
+                    auto file_block = model::file_block_t(block, target_file.get(), 0);
+                    builder.clone_block(file_block, *folder_peer, *fi_2_my)
+                        .apply(*sup)
+                        .finish_file(*target, *folder_peer)
+                        .apply(*sup);
 
                     auto path = root_path / std::string(target_file->get_name()->get_full_name());
                     REQUIRE(bfs::exists(path));
@@ -534,15 +541,19 @@ void test_clone_block() {
 
                     auto source_file = folder_peer->get_file_infos().by_name(proto::get_name(pr_source));
 
-                    builder.append_block(*source_file, 0, as_owned_bytes("12345"))
-                        .append_block(*source_file, 1, as_owned_bytes("67890"))
+                    builder.append_block(*source_file, *folder_peer, 0, as_owned_bytes("12345"))
+                        .append_block(*source_file, *folder_peer, 1, as_owned_bytes("67890"))
                         .apply(*sup);
 
                     auto target_file = folder_peer->get_file_infos().by_name(proto::get_name(pr_target));
-                    auto blocks = source_file->get_blocks();
-                    auto fb_1 = model::file_block_t(blocks[0].get(), target_file.get(), 0);
-                    auto fb_2 = model::file_block_t(blocks[1].get(), target_file.get(), 1);
-                    builder.clone_block(fb_1).clone_block(fb_2).apply(*sup).finish_file(*target).apply(*sup);
+                    auto iterator = source_file->iterate_blocks();
+                    auto fb_1 = model::file_block_t(iterator.next(), target_file.get(), 0);
+                    auto fb_2 = model::file_block_t(iterator.next(), target_file.get(), 1);
+                    builder.clone_block(fb_1, *folder_peer, *folder_peer)
+                        .clone_block(fb_2, *folder_peer, *folder_peer)
+                        .apply(*sup)
+                        .finish_file(*target, *folder_peer)
+                        .apply(*sup);
 
                     auto filename = std::string(target_file->get_name()->get_full_name());
                     auto path = root_path / filename;
@@ -563,13 +574,16 @@ void test_clone_block() {
                     auto source_file = folder_peer->get_file_infos().by_name(proto::get_name(pr_source));
                     auto target_file = folder_peer->get_file_infos().by_name(proto::get_name(pr_target));
 
-                    builder.append_block(*source_file, 0, as_owned_bytes("67890"))
-                        .append_block(*target_file, 0, as_owned_bytes("12345"))
+                    builder.append_block(*source_file, *folder_peer, 0, as_owned_bytes("67890"))
+                        .append_block(*target_file, *folder_peer, 0, as_owned_bytes("12345"))
                         .apply(*sup);
 
-                    auto blocks = source_file->get_blocks();
-                    auto fb = model::file_block_t(blocks[0].get(), target_file.get(), 1);
-                    builder.clone_block(fb).apply(*sup).finish_file(*target).apply(*sup);
+                    auto iterator = source_file->iterate_blocks(0);
+                    auto fb = model::file_block_t(iterator.next(), target_file.get(), 1);
+                    builder.clone_block(fb, *folder_peer, *folder_peer)
+                        .apply(*sup)
+                        .finish_file(*target, *folder_peer)
+                        .apply(*sup);
 
                     auto filename = std::string(target_file->get_name()->get_full_name());
                     auto path = root_path / filename;
@@ -590,11 +604,14 @@ void test_clone_block() {
                 auto source_file = folder_peer->get_file_infos().by_name(proto::get_name(pr_source));
                 auto target_file = source_file;
 
-                builder.append_block(*source_file, 0, as_owned_bytes("12345")).apply(*sup);
+                builder.append_block(*source_file, *folder_peer, 0, as_owned_bytes("12345")).apply(*sup);
 
-                auto block = source_file->get_blocks()[0];
-                auto file_block = model::file_block_t(block.get(), target_file.get(), 1);
-                builder.clone_block(file_block).apply(*sup).finish_file(*source).apply(*sup);
+                auto iterator = source_file->iterate_blocks(0);
+                auto file_block = model::file_block_t(iterator.next(), target_file.get(), 1);
+                builder.clone_block(file_block, *folder_peer, *folder_peer)
+                    .apply(*sup)
+                    .finish_file(*source, *folder_peer)
+                    .apply(*sup);
 
                 auto path = root_path / std::string(target_file->get_name()->get_full_name());
                 REQUIRE(bfs::exists(path));
@@ -644,8 +661,8 @@ void test_requesting_block() {
             proto::add_blocks(pr_source, bi2);
 
             auto file = file_info_t::create(sequencer->next_uuid(), pr_source, folder_my).value();
-            file->assign_block(b, 0);
-            file->assign_block(b2, 1);
+            file->assign_block(b.get(), 0);
+            file->assign_block(b2.get(), 1);
             folder_my->add_relaxed(file);
 
             auto req = proto::Request();
@@ -754,10 +771,11 @@ void test_conflicts() {
                     bfs::path kept_file = root_path / proto::get_name(pr_fi);
                     write_file(kept_file, "12345");
 
-                    REQUIRE(model::resolve(*peer_file) == advance_action_t::resolve_remote_win);
-                    builder.append_block(*peer_file, 0, as_owned_bytes("67890"))
+                    auto local_file = folder_my->get_file_infos().by_name(peer_file->get_name()->get_full_name()).get();
+                    REQUIRE(model::resolve(*peer_file, local_file, *folder_my) == advance_action_t::resolve_remote_win);
+                    builder.append_block(*peer_file, *folder_peer, 0, as_owned_bytes("67890"))
                         .apply(*sup)
-                        .finish_file(*peer_file)
+                        .finish_file(*peer_file, *folder_peer)
                         .apply(*sup);
 
                     auto conflict_file = root_path / my_file->make_conflicting_name();
@@ -787,7 +805,7 @@ void test_conflicts() {
                 bfs::path kept_file = root_path / proto::get_name(pr_fi);
                 bfs::create_directories(kept_file);
 
-                builder.advance(*peer_file).apply(*sup);
+                builder.advance(*peer_file, *folder_peer).apply(*sup);
 
                 auto conflict_file = root_path / my_file->make_conflicting_name();
                 CHECK(bfs::exists(conflict_file));
@@ -827,7 +845,7 @@ void test_uniqueness() {
             auto file_1 = folder_peer->get_file_infos().by_name(name_1);
             auto file_2 = folder_peer->get_file_infos().by_name(name_2);
 
-            builder.advance(*file_1).advance(*file_2).apply(*sup);
+            builder.advance(*file_1, *folder_peer).advance(*file_2, *folder_peer).apply(*sup);
 
             auto children = 0;
             for (auto it = bfs::directory_iterator(root_path); it != bfs::directory_iterator(); ++it) {

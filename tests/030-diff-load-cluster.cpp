@@ -91,7 +91,7 @@ TEST_CASE("loading cluster (base)", "[model]") {
         proto::set_hash(bi, hash);
 
         auto block = block_info_t::create(bi).assume_value();
-        auto key = block->get_key();
+        auto key = make_key(block);
         auto db_block = db::BlockInfo{block->get_size()};
 
         auto target_block = block_info_ptr_t();
@@ -108,7 +108,6 @@ TEST_CASE("loading cluster (base)", "[model]") {
 
         REQUIRE(target_block);
         CHECK(target_block->get_hash() == block->get_hash());
-        CHECK(target_block->get_key() == block->get_key());
         CHECK(target_block->get_size() == block->get_size());
     }
 
@@ -319,10 +318,14 @@ TEST_CASE("loading cluster (file info + block)", "[model]") {
     proto::set_block_size(pr_fi, 5ul);
     auto &version = proto::get_version(pr_fi);
     proto::add_counters(version, proto::Counter(my_device->device_id().get_uint(), 0));
+    for (size_t i = 0; i < 11; ++i) {
+        proto::add_blocks(pr_fi, bi);
+    }
+
     auto fi = file_info_t::create(sequencer->next_uuid(), pr_fi, folder_info).value();
     CHECK(fi);
     for (size_t i = 0; i < 11; ++i) {
-        fi->assign_block(block, i);
+        fi->assign_block(block.get(), i);
     }
 
     auto target = file_info_ptr_t();
@@ -332,18 +335,29 @@ TEST_CASE("loading cluster (file info + block)", "[model]") {
         auto file_info_db = db::FileInfo();
         REQUIRE(db::decode(data, file_info_db) == 0);
         auto v = db::get_version(file_info_db);
-        target = file_info_t::create(fi->get_key(), file_info_db, std::move(folder_info)).value();
+        auto id = fi->get_full_id();
+        auto key = utils::bytes_t(id.size() + 1);
+        key[0] = db::prefix::file_info;
+        std::copy(id.begin(), id.end(), key.data() + 1);
+        target = file_info_t::create(key, file_info_db, std::move(folder_info)).value();
         REQUIRE(target);
-        CHECK(target->get_size() == 55ul);
+        for (size_t i = 0; i < 11; ++i) {
+            target->assign_block(block.get(), i);
+        }
         CHECK(target->get_block_size() == 5ul);
-        CHECK(target->get_blocks().size() == 11ul);
+        CHECK(target->iterate_blocks().get_total() == 11ul);
+        CHECK(target->get_size() == 55ul);
     }
 
     SECTION("via diff") {
         diff::load::file_infos_t::container_t container;
         using item_t = decltype(container)::value_type;
         auto db = fi->as_db(true);
-        container.emplace_back(item_t{fi->get_key(), std::move(db)});
+        auto id = fi->get_full_id();
+        auto key = utils::bytes_t(id.size() + 1);
+        key[0] = db::prefix::file_info;
+        std::copy(id.begin(), id.end(), key.data() + 1);
+        container.emplace_back(item_t{key, std::move(db)});
         auto diff = diff::cluster_diff_ptr_t(new diff::load::file_infos_t(std::move(container)));
         REQUIRE(diff->apply(*controller, {}));
         auto &map = folder_info->get_file_infos();
@@ -351,10 +365,10 @@ TEST_CASE("loading cluster (file info + block)", "[model]") {
         target = map.by_uuid(fi->get_uuid());
         REQUIRE(target);
         REQUIRE(map.by_name(fi->get_name()->get_full_name()));
-        REQUIRE(target->get_blocks().size() == 11);
-        REQUIRE(target->get_blocks().begin()->get()->get_hash() == block->get_hash());
+        REQUIRE(target->iterate_blocks().get_total() == 11);
+        REQUIRE(target->iterate_blocks().next()->get_hash() == block->get_hash());
     }
 
-    CHECK(target->get_key() == fi->get_key());
+    CHECK(target->get_uuid() == fi->get_uuid());
     CHECK(target->get_name() == fi->get_name());
 }

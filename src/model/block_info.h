@@ -4,12 +4,15 @@
 #pragma once
 
 #include "misc/arc.hpp"
-#include "misc/map.hpp"
 #include "misc/file_block.h"
 #include "proto/proto-fwd.hpp"
 #include "utils/bytes.h"
+#include "utils/vector.hpp"
 #include "syncspirit-export.h"
 #include <boost/outcome.hpp>
+#include <boost/multi_index/global_fun.hpp>
+#include <boost/multi_index/hashed_index.hpp>
+#include <boost/multi_index_container.hpp>
 #include <cstdint>
 
 namespace syncspirit::model {
@@ -21,16 +24,17 @@ using file_info_ptr_t = intrusive_ptr_t<file_info_t>;
 struct block_info_t;
 using block_info_ptr_t = intrusive_ptr_t<block_info_t>;
 
-struct SYNCSPIRIT_API block_info_t final : arc_base_t<block_info_t> {
+struct SYNCSPIRIT_API block_info_t {
     using removed_incides_t = std::vector<size_t>;
-    using file_blocks_t = std::vector<file_block_t>;
+    using file_blocks_t = utils::vector_t<file_block_t>;
     static const constexpr size_t digest_length = 32;
-    static const constexpr size_t data_length = digest_length + 1;
+    static constexpr std::uint32_t LOCK_MASK = 1 << 31;
+    static constexpr std::uint32_t SINGLE_MASK = 1 << 30;
+    static constexpr std::uint32_t COUNTER_MASK = ~(LOCK_MASK | SINGLE_MASK);
 
     struct strict_hash_t {
-        unsigned char data[data_length];
+        unsigned char data[digest_length];
         utils::bytes_view_t get_hash() noexcept;
-        utils::bytes_view_t get_key() noexcept;
     };
 
     static strict_hash_t make_strict_hash(utils::bytes_view_t hash) noexcept;
@@ -38,12 +42,30 @@ struct SYNCSPIRIT_API block_info_t final : arc_base_t<block_info_t> {
     static outcome::result<block_info_ptr_t> create(utils::bytes_view_t key, const db::BlockInfo &data) noexcept;
     static outcome::result<block_info_ptr_t> create(const proto::BlockInfo &block) noexcept;
 
-    inline utils::bytes_view_t get_hash() const noexcept { return utils::bytes_view_t(hash + 1, digest_length); }
-    inline utils::bytes_view_t get_key() const noexcept { return utils::bytes_view_t(hash); }
+    ~block_info_t();
+
+    struct file_blocks_iterator_t {
+
+        file_blocks_iterator_t(const block_info_t *block_info, std::uint32_t next) noexcept;
+
+        file_blocks_iterator_t(file_blocks_iterator_t &&) = default;
+        file_blocks_iterator_t(const file_blocks_iterator_t &) = delete;
+
+        file_blocks_iterator_t &operator=(file_blocks_iterator_t &&);
+
+        const file_block_t *next() noexcept;
+        std::uint32_t get_total() const noexcept;
+
+      private:
+        const block_info_t *block_info;
+        std::uint32_t next_index;
+    };
+
+    inline utils::bytes_view_t get_hash() const noexcept { return utils::bytes_view_t(hash, digest_length); }
     inline std::uint32_t get_size() const noexcept { return size; }
-    inline size_t usages() const noexcept { return file_blocks.size(); }
-    inline file_blocks_t &get_file_blocks() { return file_blocks; }
-    inline const file_blocks_t &get_file_blocks() const { return file_blocks; }
+    std::uint32_t usages() const noexcept;
+
+    file_blocks_iterator_t iterate_blocks(std::uint32_t start_index = 0) const;
 
     proto::BlockInfo as_bep(size_t offset) const noexcept;
     utils::bytes_t serialize() const noexcept;
@@ -52,11 +74,15 @@ struct SYNCSPIRIT_API block_info_t final : arc_base_t<block_info_t> {
     removed_incides_t unlink(file_info_t *file_info) noexcept;
 
     void mark_local_available(file_info_t *file_info) noexcept;
-    file_block_t local_file() noexcept;
+    file_block_t local_file() const noexcept;
 
     bool is_locked() const noexcept;
     void lock() noexcept;
     void unlock() noexcept;
+
+    void refcouner_inc() const noexcept;
+    std::uint32_t refcouner_dec() const noexcept;
+    std::uint32_t use_count() const noexcept;
 
     inline bool operator==(const block_info_t &right) const noexcept {
         auto lh = get_hash();
@@ -69,12 +95,29 @@ struct SYNCSPIRIT_API block_info_t final : arc_base_t<block_info_t> {
     template <typename T> void assign(const T &item) noexcept;
     block_info_t(utils::bytes_view_t key) noexcept;
     block_info_t(const proto::BlockInfo &block) noexcept;
+    block_info_t(block_info_t &&) noexcept = delete;
+    block_info_t(const block_info_t &) noexcept = delete;
 
-    unsigned char hash[data_length];
-    file_blocks_t file_blocks;
+    union file_blocks_union_t {
+        file_blocks_union_t();
+        ~file_blocks_union_t();
+        file_block_t single;
+        file_blocks_t multi;
+    };
+
+    unsigned char hash[digest_length];
+    file_blocks_union_t file_blocks_union;
     std::int32_t size = 0;
-    std::uint32_t locked = 0;
+    mutable std::uint32_t counter = 0;
 };
+
+inline void intrusive_ptr_add_ref(const block_info_t *ptr) noexcept { ptr->refcouner_inc(); }
+
+inline void intrusive_ptr_release(const block_info_t *ptr) noexcept {
+    if (ptr->refcouner_dec() == 0) {
+        delete ptr;
+    }
+}
 
 // clang-format off
 namespace block_details {

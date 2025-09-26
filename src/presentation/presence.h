@@ -67,7 +67,9 @@ struct SYNCSPIRIT_API presence_t : model::proxy_t {
     void on_update() noexcept override;
     void on_delete() noexcept override;
     void clear_presense() noexcept;
-    void link(augmentable_t* augmentable) noexcept;
+
+    template<typename Augmentable>
+    void link(Augmentable *augmentable) noexcept { augmentable->set_augmentation(this); }
     void sync_with_entity() const noexcept;
 
     entity_t *entity;

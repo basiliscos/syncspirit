@@ -12,7 +12,8 @@ namespace syncspirit::model::diff::local {
 struct SYNCSPIRIT_API blocks_availability_t final : block_diff_t {
     using valid_blocks_map_t = std::vector<bool>;
 
-    blocks_availability_t(const file_info_t &file, valid_blocks_map_t valid_blocks_map) noexcept;
+    blocks_availability_t(const file_info_t &file, const folder_info_t &fi,
+                          valid_blocks_map_t valid_blocks_map) noexcept;
 
     outcome::result<void> apply_impl(apply_controller_t &, void *) const noexcept override;
     outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;

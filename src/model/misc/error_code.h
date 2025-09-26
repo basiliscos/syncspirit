@@ -40,7 +40,6 @@ enum class error_code_t {
     folder_is_already_shared,
     malformed_deviceid,
     folder_is_not_shared,
-    invalid_block_size,
     missing_version,
     mismatch_file_size,
     invalid_sequence,

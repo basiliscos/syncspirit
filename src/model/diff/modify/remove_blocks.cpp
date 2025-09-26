@@ -14,8 +14,7 @@ auto remove_blocks_t::apply_impl(apply_controller_t &controller, void *custom) c
         LOG_TRACE(log, "applying remove_blocks_t, blocks = {}", keys.size());
         auto &cluster = controller.get_cluster();
         auto &blocks = cluster.get_blocks();
-        for (auto &block_key : keys) {
-            auto block_hash = utils::bytes_view_t(block_key.data() + 1, block_key.size() - 1);
+        for (auto &block_hash : keys) {
             auto b = blocks.by_hash(block_hash);
             blocks.remove(b);
         }

@@ -5,9 +5,9 @@
 
 #include "syncspirit-export.h"
 #include "arc.hpp"
-#include <string>
-#include <vector>
 #include <cstdint>
+#include <string_view>
+#include "utils/compact_vector.hpp"
 
 namespace syncspirit::model {
 
@@ -47,8 +47,9 @@ struct SYNCSPIRIT_API path_t : arc_base_t<path_t> {
     bool contains(const path_t &other) const noexcept;
 
   protected:
-    using pieces_t = std::vector<std::uint32_t>;
-    std::string name;
+    using string_t = utils::compact_vector_t<char>;
+    using pieces_t = utils::compact_vector_t<std::uint32_t>;
+    string_t name;
     pieces_t pieces;
 };
 

@@ -46,7 +46,7 @@ TEST_CASE("new file diff", "[model]") {
         REQUIRE(folder_info->get_max_sequence() == 1);
         REQUIRE(file->get_version().counters_size() == 1);
         REQUIRE(file->get_modified_by() == my_device->device_id().get_uint());
-        auto &counter = file->get_version().get_best();
+        auto counter = file->get_version().get_best();
         auto v1 = proto::get_value(counter);
         CHECK(v1 > 0);
 
@@ -72,7 +72,7 @@ TEST_CASE("new file diff", "[model]") {
             auto new_file = files.by_name(file->get_name()->get_full_name());
             REQUIRE(new_file);
             CHECK(new_file.get() == file.get());
-            CHECK(new_file->get_key() == file->get_key());
+            CHECK(new_file->get_full_id() == file->get_full_id());
             REQUIRE(new_file->get_version().counters_size() == 1);
             auto v2 = proto::get_value(new_file->get_version().get_best());
             REQUIRE(v1 < v2);
@@ -99,8 +99,8 @@ TEST_CASE("new file diff", "[model]") {
         REQUIRE(!file->is_link());
         REQUIRE(file->get_sequence() == 1);
         REQUIRE(folder_info->get_max_sequence() == 1);
-        REQUIRE(file->get_blocks().size() == 1);
-        REQUIRE(file->get_blocks()[0]->get_hash() == hash);
+        REQUIRE(file->iterate_blocks().get_total() == 1);
+        REQUIRE(file->iterate_blocks().next()->get_hash() == hash);
         REQUIRE(cluster->get_blocks().size() == 1);
         REQUIRE(cluster->get_blocks().by_hash(hash));
     }
@@ -160,7 +160,7 @@ TEST_CASE("new file diff", "[model]") {
 
         file = file = folder_info->get_file_infos().by_name(proto::get_name(pr_file));
         CHECK(file->is_deleted());
-        CHECK(file->get_blocks().size() == 0);
+        REQUIRE(file->iterate_blocks().get_total() == 0);
         CHECK(file->get_sequence() > sequence);
     }
 }

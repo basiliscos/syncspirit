@@ -749,7 +749,7 @@ void test_remote_copy() {
 
                 auto file_peer = folder_peer->get_file_infos().by_name(proto::get_name(file));
                 REQUIRE(file_peer);
-                builder.remote_copy(*file_peer).apply(*sup);
+                builder.remote_copy(*file_peer, *folder_peer).apply(*sup);
 
                 load_diff = {};
                 sup->send<net::payload::load_cluster_trigger_t>(db_addr);
@@ -766,7 +766,7 @@ void test_remote_copy() {
                     auto file_clone = folder_info_clone->get_file_infos().by_name(proto::get_name(file));
                     REQUIRE(file_clone);
                     REQUIRE(file_clone->get_name()->get_full_name() == proto::get_name(file));
-                    REQUIRE(file_clone->get_blocks().size() == 0);
+                    REQUIRE(file_clone->iterate_blocks().get_total() == 0);
                     REQUIRE(file_clone->get_sequence() == 1);
                     REQUIRE(folder_info_clone->get_max_sequence() == 1);
                 }
@@ -789,7 +789,7 @@ void test_remote_copy() {
                 auto file_peer = folder_peer->get_file_infos().by_name(proto::get_name(file));
                 REQUIRE(file_peer);
 
-                builder.remote_copy(*file_peer).apply(*sup);
+                builder.remote_copy(*file_peer, *folder_peer).apply(*sup);
                 REQUIRE(folder_my->get_max_sequence() == 1);
 
                 {
@@ -808,7 +808,7 @@ void test_remote_copy() {
                     auto file_clone = folder_info_clone->get_file_infos().by_name(proto::get_name(file));
                     REQUIRE(file_clone);
                     REQUIRE(file_clone->get_name()->get_full_name() == proto::get_name(file));
-                    REQUIRE(file_clone->get_blocks().size() == 1);
+                    REQUIRE(file_clone->iterate_blocks().get_total() == 1);
                     REQUIRE(file_clone->get_sequence() == 1);
                     REQUIRE(folder_info_clone->get_max_sequence() == 1);
                 }
@@ -817,7 +817,7 @@ void test_remote_copy() {
                 file_peer->mark_local_available(0);
                 REQUIRE(file_peer->is_locally_available());
 
-                builder.remote_copy(*file_peer).apply(*sup);
+                builder.remote_copy(*file_peer, *folder_peer).apply(*sup);
 
                 {
                     load_diff = {};
@@ -835,8 +835,8 @@ void test_remote_copy() {
                     auto file_clone = folder_info_clone->get_file_infos().by_name(proto::get_name(file));
                     REQUIRE(file_clone);
                     REQUIRE(file_clone->get_name()->get_full_name() == proto::get_name(file));
-                    REQUIRE(file_clone->get_blocks().size() == 1);
-                    REQUIRE(file_clone->get_blocks().at(0));
+                    REQUIRE(file_clone->iterate_blocks().get_total() == 1);
+                    REQUIRE(file_clone->iterate_blocks().next());
                     REQUIRE(file_clone->get_sequence() == 2);
                     REQUIRE(folder_info_clone->get_max_sequence() == 2);
                 }
@@ -878,7 +878,7 @@ void test_local_update() {
                 auto file = folder_my->get_file_infos().by_name("a.txt");
                 REQUIRE(file);
                 CHECK(cluster_clone->get_blocks().size() == 1);
-                CHECK(file->get_blocks().size() == 1);
+                CHECK(file->iterate_blocks().get_total() == 1);
             }
 
             proto::set_deleted(pr_file, true);
@@ -901,7 +901,7 @@ void test_local_update() {
                 REQUIRE(file);
                 CHECK(file->is_deleted());
                 CHECK(cluster_clone->get_blocks().size() == 0);
-                CHECK(file->get_blocks().size() == 0);
+                CHECK(file->iterate_blocks().get_total() == 0);
             }
         }
     };
@@ -1092,19 +1092,21 @@ void test_peer_3_folders_6_files() {
             // clang-format on
 
             {
-                auto get_peer_file = [&](std::string_view folder_id, std::string_view name) {
+                auto get_peer_file =
+                    [&](std::string_view folder_id,
+                        std::string_view name) -> std::pair<model::file_info_ptr_t, model::folder_info_t *> {
                     auto folder = cluster->get_folders().by_id(folder_id);
                     auto folder_info = folder->get_folder_infos().by_device(*peer_device);
                     auto file = folder_info->get_file_infos().by_name(name);
-                    return file;
+                    return {file, folder_info.get()};
                 };
 
-                auto file_11 = get_peer_file(f1_id, "f1.1");
-                auto file_12 = get_peer_file(f1_id, "f1.2");
-                auto file_21 = get_peer_file(f2_id, "f2.1");
-                auto file_22 = get_peer_file(f2_id, "f2.2");
-                auto file_31 = get_peer_file(f3_id, "f3.1");
-                auto file_32 = get_peer_file(f3_id, "f3.2");
+                auto [file_11, fi_11] = get_peer_file(f1_id, "f1.1");
+                auto [file_12, fi_12] = get_peer_file(f1_id, "f1.2");
+                auto [file_21, fi_21] = get_peer_file(f2_id, "f2.1");
+                auto [file_22, fi_22] = get_peer_file(f2_id, "f2.2");
+                auto [file_31, fi_31] = get_peer_file(f3_id, "f3.1");
+                auto [file_32, fi_32] = get_peer_file(f3_id, "f3.2");
 
                 REQUIRE(file_11);
                 REQUIRE(file_12);
@@ -1115,9 +1117,9 @@ void test_peer_3_folders_6_files() {
 
                 // clang-format off
                 builder
-                    .remote_copy(*file_11).remote_copy(*file_12)
-                    .remote_copy(*file_21).remote_copy(*file_22)
-                    .remote_copy(*file_31).remote_copy(*file_32)
+                    .remote_copy(*file_11, *fi_11).remote_copy(*file_12, *fi_12)
+                    .remote_copy(*file_21, *fi_21).remote_copy(*file_22, *fi_22)
+                    .remote_copy(*file_31, *fi_31).remote_copy(*file_32, *fi_32)
                 .apply(*sup);
                 // clang-format on
             }
@@ -1236,7 +1238,7 @@ void test_db_migration_2_3() {
 
             auto bi = BlockInfoEx{1, 0x1234};
             auto new_value = syncspirit::details::generic_encode(bi);
-            unsigned char key[model::block_info_t::data_length] = {0};
+            unsigned char key[model::block_info_t::digest_length + 1] = {0};
             key[0] = db::prefix::block_info;
 
             auto &db_env = db_actor->access<env>();
@@ -1286,7 +1288,7 @@ void test_corrupted_file() {
             proto::set_hash(pr_block, hash);
 
             builder.local_update(folder_id, pr_file).apply(*sup);
-            auto &block = **cluster->get_blocks().begin();
+            auto block = *cluster->get_blocks().begin();
 
             auto folder = cluster->get_folders().by_id(folder_id);
             auto fi = folder->get_folder_infos().by_device(*my_device);
@@ -1301,7 +1303,7 @@ void test_corrupted_file() {
 
             auto diff = model::diff::cluster_diff_ptr_t();
             SECTION("missing block") {
-                auto key = block.get_key();
+                auto key = test::make_key(block);
                 REQUIRE(db::remove(key, txn));
                 REQUIRE(!txn.commit().has_error());
 
@@ -1396,7 +1398,7 @@ void test_flush_on_shutdown() {
                 auto folder_my = folder->get_folder_infos().by_device(*my_device);
                 auto file = folder_my->get_file_infos().by_name("a.txt");
                 REQUIRE(file);
-                CHECK(file->get_blocks().size() == 1);
+                CHECK(file->iterate_blocks().get_total() == 1);
                 CHECK(cluster_clone->get_blocks().size() == 1);
             }
         }

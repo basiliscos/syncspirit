@@ -200,12 +200,14 @@ void test_meta_changes() {
 
             auto &blocks_map = cluster->get_blocks();
             blocks_map.put(b);
+            proto::add_blocks(pr_fi, bi);
+
             SECTION("a file does not physically exist") {
                 auto uuid = sup->sequencer->next_uuid();
                 auto file_peer = file_info_t::create(uuid, pr_fi, folder_info_peer).value();
-                file_peer->assign_block(b, 0);
+                file_peer->assign_block(b.get(), 0);
                 REQUIRE(folder_info_peer->add_strict(file_peer));
-                builder->remote_copy(*file_peer).scan_start(folder->get_id()).apply(*sup);
+                builder->remote_copy(*file_peer, *folder_info_peer).scan_start(folder->get_id()).apply(*sup);
 
                 auto file = files->by_name(file_name);
                 CHECK(files->size() == 1);
@@ -214,13 +216,14 @@ void test_meta_changes() {
             }
             SECTION("complete file exists") {
                 auto uuid = sup->sequencer->next_uuid();
+                proto::set_no_permissions(pr_fi, true);
                 auto file_peer = file_info_t::create(uuid, pr_fi, folder_info_peer).value();
-                file_peer->assign_block(b, 0);
+                file_peer->assign_block(b.get(), 0);
                 REQUIRE(folder_info_peer->add_strict(file_peer));
 
-                builder->remote_copy(*file_peer).apply(*sup);
+                builder->remote_copy(*file_peer, *folder_info_peer).apply(*sup);
                 auto file = files->by_name(file_name);
-                auto path = file->get_path();
+                auto path = file->get_path(*folder_info_peer);
 
                 SECTION("meta is not changed") {
                     write_file(path, "12345");
@@ -229,7 +232,6 @@ void test_meta_changes() {
                     CHECK(files->size() == 1);
                     CHECK(file->is_locally_available());
                 }
-
                 SECTION("meta is changed (modification)") {
                     write_file(path, "12345");
                     builder->scan_start(folder->get_id()).apply(*sup);
@@ -239,8 +241,8 @@ void test_meta_changes() {
                     CHECK(file == new_file);
                     CHECK(new_file->is_locally_available());
                     CHECK(new_file->get_size() == 5);
-                    REQUIRE(new_file->get_blocks().size() == 1);
-                    CHECK(new_file->get_blocks()[0]->get_size() == 5);
+                    REQUIRE(new_file->iterate_blocks().get_total() == 1);
+                    CHECK(new_file->iterate_blocks().next()->get_size() == 5);
                 }
 
                 SECTION("meta is changed (size)") {
@@ -253,8 +255,8 @@ void test_meta_changes() {
                     CHECK(file == new_file);
                     CHECK(new_file->is_locally_available());
                     CHECK(new_file->get_size() == 6);
-                    REQUIRE(new_file->get_blocks().size() == 1);
-                    CHECK(new_file->get_blocks()[0]->get_size() == 6);
+                    REQUIRE(new_file->iterate_blocks().get_total() == 1);
+                    CHECK(new_file->iterate_blocks().next()->get_size() == 6);
                 }
 
                 SECTION("meta is changed (content)") {
@@ -266,25 +268,26 @@ void test_meta_changes() {
                     CHECK(file == new_file);
                     CHECK(new_file->is_locally_available());
                     CHECK(new_file->get_size() == 5);
-                    REQUIRE(new_file->get_blocks().size() == 1);
-                    CHECK(new_file->get_blocks()[0]->get_size() == 5);
+                    REQUIRE(new_file->iterate_blocks().get_total() == 1);
+                    CHECK(new_file->iterate_blocks().next()->get_size() == 5);
                 }
                 REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
             }
-
             SECTION("incomplete file exists") {
                 proto::set_size(pr_fi, 10);
                 proto::set_block_size(pr_fi, 5);
+                proto::add_blocks(pr_fi, bi_2);
 
                 auto uuid = sup->sequencer->next_uuid();
                 auto file = file_info_t::create(uuid, pr_fi, folder_info_peer).value();
-                file->assign_block(b, 0);
-                file->assign_block(b2, 1);
+                file->assign_block(b.get(), 0);
+                file->assign_block(b2.get(), 1);
                 REQUIRE(folder_info_peer->add_strict(file));
 
                 // auto file = files->by_name(pr_fi.name());
-                auto filename = file->get_path().filename().wstring() + L".syncspirit-tmp";
-                auto path = file->get_path().parent_path() / filename;
+                auto file_path = file->get_path(*folder_info_peer);
+                auto filename = file_path.filename().wstring() + L".syncspirit-tmp";
+                auto path = file_path.parent_path() / filename;
                 auto content = "12345\0\0\0\0\0";
                 write_file(path, std::string(content, 10));
 
@@ -351,21 +354,23 @@ void test_meta_changes() {
                 proto::set_size(pr_fi, 5);
                 auto uuid_1 = sup->sequencer->next_uuid();
                 auto file_my = file_info_t::create(uuid_1, pr_fi, folder_info).value();
-                file_my->assign_block(b, 0);
+                file_my->assign_block(b.get(), 0);
                 REQUIRE(folder_info->add_strict(file_my));
 
                 proto::set_size(pr_fi, 15);
                 proto::set_value(counter, 2);
+                proto::add_blocks(pr_fi, bi);
+                proto::add_blocks(pr_fi, bi);
 
                 auto uuid_2 = sup->sequencer->next_uuid();
                 auto file_peer = file_info_t::create(uuid_2, pr_fi, folder_info_peer).value();
-                file_peer->assign_block(b, 0);
-                file_peer->assign_block(b2, 1);
-                file_peer->assign_block(b3, 2);
+                file_peer->assign_block(b.get(), 0);
+                file_peer->assign_block(b2.get(), 1);
+                file_peer->assign_block(b3.get(), 2);
                 REQUIRE(folder_info_peer->add_strict(file_peer));
 
                 auto file = files->by_name(file_name);
-                auto &path = file->get_path();
+                auto &path = file->get_path(*folder_info_peer);
                 auto filename = path.filename().wstring() + L".syncspirit-tmp";
                 auto path_my = path;
                 auto path_peer = path_my.parent_path() / filename;
@@ -383,21 +388,21 @@ void test_meta_changes() {
                 CHECK(!file_peer->is_locally_available(2));
                 REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
             }
-
             SECTION("local (previous) file changes") {
+                proto::add_blocks(pr_fi, bi);
+                proto::add_blocks(pr_fi, bi);
                 proto::set_size(pr_fi, 15);
                 proto::set_block_size(pr_fi, 5);
                 auto uuid_1 = sup->sequencer->next_uuid();
                 auto file_my = file_info_t::create(uuid_1, pr_fi, folder_info).value();
-                file_my->assign_block(b, 0);
-                file_my->assign_block(b, 1);
-                file_my->assign_block(b, 2);
+                file_my->assign_block(b.get(), 0);
+                file_my->assign_block(b.get(), 1);
+                file_my->assign_block(b.get(), 2);
                 REQUIRE(folder_info->add_strict(file_my));
-
                 proto::set_value(counter, 2);
 
                 auto file = files->by_name(file_name);
-                auto path_my = file->get_path();
+                auto path_my = file->get_path(*folder_info);
                 write_file(path_my, "12345");
                 bfs::last_write_time(path_my, from_unix(modified));
 
@@ -498,7 +503,7 @@ void test_new_files() {
                 CHECK(!file->is_link());
                 CHECK(file->is_file());
                 CHECK(file->get_size() == sz);
-                CHECK(file->get_blocks().size() == 2);
+                REQUIRE(file->iterate_blocks().get_total() == 2);
                 CHECK(blocks.size() == 1);
                 REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
             }
@@ -516,7 +521,7 @@ void test_new_files() {
                 CHECK(!file->is_link());
                 CHECK(file->is_file());
                 CHECK(file->get_size() == sz);
-                CHECK(file->get_blocks().size() == 3);
+                REQUIRE(file->iterate_blocks().get_total() == 3);
                 CHECK(blocks.size() == 1);
                 REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
             }
@@ -612,7 +617,7 @@ void test_remove_file() {
             auto v = file->get_version();
             REQUIRE(v.counters_size() == 1);
 
-            auto &c = v.get_best();
+            auto c = v.get_best();
             CHECK(proto::get_id(c) == proto::get_id((counter)));
             CHECK(proto::get_value(c) > proto::get_value((counter)));
             REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
@@ -873,7 +878,7 @@ void test_races() {
 
                 auto file_peer = fi_peer->get_file_infos().by_name("a.bin");
                 SECTION("non-finished/flushed new file") {
-                    auto file_opt = fs::file_t::open_write(file_peer);
+                    auto file_opt = fs::file_t::open_write(file_peer, *fi_peer);
                     REQUIRE(file_opt);
                     // CHECK(file_opt.assume_error().message() == "zzz");
                     auto &file = file_opt.assume_value();
@@ -918,7 +923,7 @@ void test_races() {
 
                 auto file_peer = fi_peer->get_file_infos().by_name("a.bin");
                 SECTION("non-finished/flushed new file") {
-                    auto file = fs::file_t::open_write(file_peer).assume_value();
+                    auto file = fs::file_t::open_write(file_peer, *fi_peer).assume_value();
                     REQUIRE(bfs::exists(file.get_path()));
                     auto file_ptr = fs::file_ptr_t(new fs::file_t(std::move(file)));
                     rw_cache->put(file_ptr);

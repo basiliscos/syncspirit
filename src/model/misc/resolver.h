@@ -17,6 +17,7 @@ enum class advance_action_t {
 
 int SYNCSPIRIT_API compare(const file_info_t &file_1, const file_info_t &file_2) noexcept;
 
-advance_action_t SYNCSPIRIT_API resolve(const file_info_t &remote) noexcept;
+advance_action_t SYNCSPIRIT_API resolve(const file_info_t &remote, const file_info_t *local,
+                                        const folder_info_t &local_folder) noexcept;
 
 } // namespace syncspirit::model

@@ -26,7 +26,7 @@ auto block_ack_t::apply_impl(apply_controller_t &controller, void *custom) const
             auto file = folder_info->get_file_infos().by_name(file_name);
             if (file) {
                 if (!file->is_locally_available(block_index)) {
-                    LOG_TRACE(log, "block_ack_t, '{}' block #{} (hash: {})", file->get_path(), block_index, block_hash);
+                    LOG_TRACE(log, "block_ack_t, '{}' block #{} (hash: {})", file_name, block_index, block_hash);
                     file->mark_local_available(block_index);
                     success = true;
                 }

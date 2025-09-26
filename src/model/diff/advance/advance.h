@@ -13,7 +13,7 @@ namespace syncspirit::model::diff::advance {
 
 struct SYNCSPIRIT_API advance_t : cluster_diff_t {
     static cluster_diff_ptr_t create(advance_action_t action, const model::file_info_t &source,
-                                     sequencer_t &sequencer) noexcept;
+                                     const model::folder_info_t &source_fi, sequencer_t &sequencer) noexcept;
 
     outcome::result<void> apply_impl(apply_controller_t &, void *) const noexcept override;
     outcome::result<void> apply_forward(apply_controller_t &, void *) const noexcept override;

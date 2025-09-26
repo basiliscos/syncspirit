@@ -42,17 +42,20 @@ struct SYNCSPIRIT_API file_t : model::arc_base_t<file_t> {
     outcome::result<void> copy(size_t my_offset, const file_t &from, size_t source_offset, size_t size) noexcept;
     outcome::result<utils::bytes_t> read(size_t offset, size_t size) const noexcept;
 
-    static outcome::result<file_t> open_write(model::file_info_ptr_t model) noexcept;
+    static outcome::result<file_t> open_write(model::file_info_ptr_t model,
+                                              const model::folder_info_t &folder_info) noexcept;
     static outcome::result<file_t> open_read(const bfs::path &path) noexcept;
 
   private:
     using backend_ptr_t = std::unique_ptr<utils::fstream_t>;
-    file_t(utils::fstream_t backend, model::file_info_ptr_t model, bfs::path path, bool temporal) noexcept;
+    file_t(utils::fstream_t backend, model::file_info_ptr_t model, bfs::path path, bfs::path model_path,
+           bool temporal) noexcept;
     file_t(utils::fstream_t backend, bfs::path path) noexcept;
 
     backend_ptr_t backend;
     model::file_info_ptr_t model;
     bfs::path path;
+    bfs::path model_path;
     std::string path_str;
     bool temporal{false};
 };

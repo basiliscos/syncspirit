@@ -6,5 +6,6 @@
 using namespace syncspirit;
 using namespace syncspirit::presentation;
 
-peer_file_presence_t::peer_file_presence_t(file_entity_t &entity, model::file_info_t &file_info_) noexcept
-    : cluster_file_presence_t(features_t::peer, entity, file_info_) {}
+peer_file_presence_t::peer_file_presence_t(file_entity_t &entity, model::file_info_t &file_info_,
+                                           const model::folder_info_t &folder_info_) noexcept
+    : cluster_file_presence_t(features_t::peer, entity, file_info_, folder_info_) {}

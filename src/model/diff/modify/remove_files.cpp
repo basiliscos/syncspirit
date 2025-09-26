@@ -10,19 +10,21 @@
 
 using namespace syncspirit::model::diff::modify;
 
-remove_files_t::remove_files_t(const device_t &device, const file_infos_map_t &files,
+remove_files_t::remove_files_t(const folder_info_t &fi, const file_infos_map_t &files,
                                orphaned_blocks_t *orphaned_blocks_) noexcept {
+    auto &device = *fi.get_device();
+    folder_id = fi.get_folder()->get_id();
     device_id = device.device_id().get_sha256();
     keys.reserve(files.size());
-    folder_ids.reserve(files.size());
     auto local_orphaned_blocks = orphaned_blocks_t();
     auto &orphaned_blocks = orphaned_blocks_ ? *orphaned_blocks_ : local_orphaned_blocks;
     for (auto &file : files) {
         orphaned_blocks.record(*file);
-        auto folder_id = file->get_folder_info()->get_folder()->get_id();
-        folder_ids.push_back(std::string(folder_id));
-        auto file_key = file->get_key();
-        keys.push_back(utils::bytes_t(file_key.begin(), file_key.end()));
+        auto id = file->get_full_id();
+        auto key = utils::bytes_t(id.size() + 1);
+        key[0] = db::prefix::file_info;
+        std::copy(id.begin(), id.end(), key.data() + 1);
+        keys.push_back(std::move(key));
     }
     if (!orphaned_blocks_) {
         auto block_keys = local_orphaned_blocks.deduce();
@@ -40,11 +42,11 @@ auto remove_files_t::apply_impl(apply_controller_t &controller, void *custom) co
     }
     auto &cluster = controller.get_cluster();
     auto &folders = cluster.get_folders();
-    for (size_t i = 0; i < folder_ids.size(); ++i) {
-        auto folder = folders.by_id(folder_ids[i]);
-        auto &folder_infos = folder->get_folder_infos();
-        auto folder_info = folder_infos.by_device_id(device_id);
-        auto &file_infos = folder_info->get_file_infos();
+    auto folder = folders.by_id(folder_id);
+    auto &folder_infos = folder->get_folder_infos();
+    auto &folder_info = *folder_infos.by_device_id(device_id);
+    auto &file_infos = folder_info.get_file_infos();
+    for (size_t i = 0; i < keys.size(); ++i) {
         auto decomposed = file_info_t::decompose_key(keys[i]);
         auto file = file_infos.by_uuid(decomposed.file_id);
         file_infos.remove(file);

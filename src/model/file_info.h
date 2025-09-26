@@ -9,6 +9,7 @@
 #include <filesystem>
 #include <boost/outcome.hpp>
 #include <boost/multi_index/ordered_index.hpp>
+#include "utils/compact_vector.hpp"
 #include "misc/augmentation.h"
 #include "misc/path.h"
 #include "misc/map.hpp"
@@ -32,24 +33,29 @@ struct blocks_iterator_t;
 struct file_info_t;
 using file_info_ptr_t = intrusive_ptr_t<file_info_t>;
 
-struct SYNCSPIRIT_API file_info_t final : augmentable_t {
+struct path_cache_t;
+
+struct SYNCSPIRIT_API file_info_t {
 
     // clang-format off
     enum flags_t: std::uint16_t {
-        f_type_file      = 1 << 0,
-        f_type_dir       = 1 << 1,
-        f_type_link      = 1 << 2,
-        f_deleted        = 1 << 3,
-        f_invalid        = 1 << 4,
-        f_no_permissions = 1 << 5,
-        f_synchronizing  = 1 << 6,
-        f_unreachable    = 1 << 7,
-        f_unlocking      = 1 << 8,
-        f_local          = 1 << 9,
+        f_type_file        = 1 << 0,
+        f_type_dir         = 1 << 1,
+        f_type_link        = 1 << 2,
+        f_deleted          = 1 << 3,
+        f_invalid          = 1 << 4,
+        f_no_permissions   = 1 << 5,
+        f_synchronizing    = 1 << 6,
+        f_unreachable      = 1 << 7,
+        f_local            = 1 << 8,
+        f_available        = 1 << 9,
     };
     // clang-format on
 
-    using blocks_t = std::vector<block_info_ptr_t>;
+    static constexpr std::uintptr_t LOCAL_MASK = 1 << 0;
+    static constexpr std::uintptr_t PTR_MASK = ~LOCAL_MASK;
+
+    using blocks_t = utils::compact_vector_t<block_info_t *>;
 
     struct decomposed_key_t {
         utils::bytes_view_t folder_info_id;
@@ -58,7 +64,7 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t {
 
     struct guard_t {
         guard_t() noexcept = default;
-        guard_t(file_info_t &file) noexcept;
+        guard_t(file_info_t &file, const folder_info_t *folder_info) noexcept;
         guard_t(const guard_t &) = delete;
         guard_t(guard_t &&) = default;
         ~guard_t();
@@ -66,6 +72,26 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t {
         guard_t &operator=(guard_t &&) noexcept = default;
 
         file_info_ptr_t file;
+        const folder_info_t *folder_info;
+    };
+
+    struct SYNCSPIRIT_API blocks_iterator_t {
+        using indexed_block_t = std::pair<const block_info_t *, std::uint32_t>;
+        blocks_iterator_t() = default;
+        blocks_iterator_t(const file_info_t *file, std::uint32_t start_index) noexcept;
+
+        blocks_iterator_t(blocks_iterator_t &&) = default;
+        blocks_iterator_t(const blocks_iterator_t &) = delete;
+
+        blocks_iterator_t &operator=(blocks_iterator_t &&) = default;
+
+        const block_info_t *next() noexcept;
+        indexed_block_t current() const noexcept;
+        std::uint32_t get_total() const noexcept;
+
+      private:
+        const file_info_t *file = nullptr;
+        std::uint32_t next_index = 0;
     };
 
     static outcome::result<file_info_ptr_t> create(utils::bytes_view_t key, const db::FileInfo &data,
@@ -84,9 +110,11 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t {
 
     ~file_info_t();
 
-    utils::bytes_view_t get_key() const noexcept { return utils::bytes_view_t(key, data_length); }
+    inline bool operator==(const file_info_t &other) const noexcept { return get_uuid() == other.get_uuid(); }
+
     utils::bytes_view_t get_uuid() const noexcept;
-    bool operator==(const file_info_t &other) const noexcept { return get_uuid() == other.get_uuid(); }
+    utils::bytes_view_t get_full_id() const noexcept;
+    utils::bytes_view_t get_folder_uuid() const noexcept;
 
     proto::FileInfo as_proto(bool include_blocks = true) const noexcept;
     db::FileInfo as_db(bool include_blocks = true) const noexcept;
@@ -94,7 +122,6 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t {
 
     void update(const file_info_t &updated) noexcept;
 
-    inline folder_info_t *get_folder_info() const noexcept { return folder_info; }
     const path_ptr_t &get_name() const noexcept;
     inline version_t &get_version() noexcept { return version; }
     inline const version_t &get_version() const noexcept { return version; }
@@ -102,10 +129,12 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t {
     inline std::int64_t get_sequence() const noexcept { return sequence; }
     void set_sequence(std::int64_t value) noexcept;
 
-    inline const blocks_t &get_blocks() const noexcept { return blocks; }
+    inline blocks_iterator_t iterate_blocks(std::uint32_t start_index = 0) const noexcept {
+        return blocks_iterator_t(this, start_index);
+    }
 
     void remove_blocks() noexcept;
-    void assign_block(const model::block_info_ptr_t &block, size_t index) noexcept;
+    void assign_block(model::block_info_t *block, size_t index) noexcept;
 
     inline std::uint16_t get_type() const noexcept { return flags & 0b111; }
     inline bool is_file() const noexcept { return flags & f_type_file; }
@@ -117,44 +146,50 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t {
     inline bool is_local() const noexcept { return flags & f_local; }
 
     std::int64_t get_size() const noexcept;
-    inline void set_size(std::int64_t value) noexcept { size = value; }
 
-    std::int32_t get_block_size() const noexcept { return block_size; }
+    std::int32_t get_block_size() const noexcept {
+        auto has_blocks = (flags & f_type_file && !content.file.blocks.empty());
+        if (has_blocks) {
+            auto &blocks = content.file.blocks;
+            auto ptr = reinterpret_cast<std::uintptr_t>(blocks.front());
+            auto block = reinterpret_cast<const block_info_t *>(ptr & PTR_MASK);
+            return block->get_size();
+        }
+        return 0;
+    }
     std::uint64_t get_block_offset(size_t block_index) const noexcept;
 
     void mark_unreachable(bool value) noexcept;
     void mark_local_available(size_t block_index) noexcept;
-    void mark_local(bool available) noexcept;
+    void mark_local(bool available, const folder_info_t &) noexcept;
     bool is_locally_available(size_t block_index) const noexcept;
     bool is_locally_available() const noexcept;
-    bool is_partly_available() const noexcept;
 
-    const std::string &get_link_target() const noexcept { return symlink_target; }
+    std::string_view get_link_target() const noexcept {
+        if (flags & f_type_link) {
+            auto &container = content.non_file.symlink_target;
+            return {container.data(), container.size()};
+        }
+        return {};
+    }
 
-    const bfs::path get_path() const noexcept;
+    const bfs::path get_path(const folder_info_t &folder_info) const noexcept;
 
     inline std::int64_t get_modified_s() const noexcept { return modified_s; }
     inline std::int32_t get_modified_ns() const noexcept { return modified_ns; }
     inline std::uint64_t get_modified_by() const noexcept { return modified_by; }
 
-    file_info_ptr_t local_file() const noexcept;
-
-    bool is_global() const noexcept;
-
     bool is_synchronizing() const noexcept;
     void synchronizing_lock() noexcept;
     void synchronizing_unlock() noexcept;
 
-    bool is_unlocking() const noexcept;
-    void set_unlocking(bool value) noexcept;
-
     proto::FileInfo get() const noexcept;
     bool identical_to(const proto::FileInfo &file) const noexcept;
 
-    static const constexpr auto data_length = 1 + uuid_length * 2;
+    static const constexpr auto data_length = uuid_length * 2;
 
-    outcome::result<void> fields_update(const db::FileInfo &) noexcept;
-    outcome::result<void> fields_update(const proto::FileInfo &) noexcept;
+    outcome::result<void> fields_update(const db::FileInfo &, model::path_cache_t &) noexcept;
+    outcome::result<void> fields_update(const proto::FileInfo &, model::path_cache_t &) noexcept;
 
     proto::Index generate() noexcept;
     std::size_t expected_meta_size() const noexcept;
@@ -162,43 +197,73 @@ struct SYNCSPIRIT_API file_info_t final : augmentable_t {
     std::uint32_t get_permissions() const noexcept;
     bool has_no_permissions() const noexcept;
 
-    guard_t guard() noexcept;
+    guard_t guard(const model::folder_info_t &folder_info) noexcept;
 
     std::string make_conflicting_name() const noexcept;
+
+    inline void refcouner_inc() const noexcept { ++counter; }
+    inline std::uint32_t refcouner_dec() const noexcept { return --counter; }
+    inline std::uint32_t use_count() const noexcept { return counter; }
+
+    void set_augmentation(augmentation_t &value) noexcept;
+    void set_augmentation(augmentation_ptr_t value) noexcept;
+    augmentation_ptr_t &get_augmentation() noexcept;
+    void notify_update() noexcept;
 
     template <typename T> auto &access() noexcept;
     template <typename T> auto &access() const noexcept;
 
   private:
-    using marks_vector_t = std::vector<bool>;
+    using string_t = utils::compact_vector_t<char>;
+    struct size_full_t {
+        ~size_full_t();
+        blocks_t blocks;
+    };
+
+    struct size_less_t {
+        ~size_less_t();
+        string_t symlink_target;
+    };
+
+    union content_t {
+        content_t();
+        ~content_t();
+        size_full_t file;
+        size_less_t non_file;
+    };
 
     file_info_t(utils::bytes_view_t key, const folder_info_ptr_t &folder_info_) noexcept;
     file_info_t(const bu::uuid &uuid, const folder_info_ptr_t &folder_info_) noexcept;
-    outcome::result<void> reserve_blocks(size_t block_count) noexcept;
+    void reserve_blocks(size_t block_count) noexcept;
 
     void update_blocks(const proto::FileInfo &remote_info) noexcept;
-    void remove_block(block_info_ptr_t &block) noexcept;
+    void remove_block(block_info_t *block) noexcept;
 
     unsigned char key[data_length];
-    std::int32_t block_size;
+    augmentation_ptr_t extension;
     path_ptr_t name;
-    folder_info_t *folder_info;
-    std::int64_t size;
     std::int64_t modified_s;
     std::uint64_t modified_by;
+    std::int64_t sequence;
     std::uint32_t permissions;
     std::uint32_t modified_ns;
 
+    content_t content;
     version_t version;
-    std::int64_t sequence;
-    std::string symlink_target;
-    blocks_t blocks;
-    marks_vector_t marks;
-    std::uint32_t missing_blocks;
     std::uint16_t flags = 0;
+    mutable std::uint16_t counter = 0;
 
     friend struct blocks_iterator_t;
+    friend struct model::blocks_iterator_t;
 };
+
+inline void intrusive_ptr_add_ref(const file_info_t *ptr) noexcept { ptr->refcouner_inc(); }
+
+inline void intrusive_ptr_release(const file_info_t *ptr) noexcept {
+    if (ptr->refcouner_dec() == 0) {
+        delete ptr;
+    }
+}
 
 namespace details {
 
@@ -273,9 +338,9 @@ struct SYNCSPIRIT_API file_infos_map_t : private file_details::file_map_base_t {
 
     bool put(const model::file_info_ptr_t &item, bool replace = true) noexcept;
     void remove(const model::file_info_ptr_t &item) noexcept;
-    file_info_ptr_t by_uuid(utils::bytes_view_t) noexcept;
-    file_info_ptr_t by_name(std::string_view name) noexcept;
-    file_info_ptr_t by_sequence(std::int64_t sequence) noexcept;
+    file_info_ptr_t by_uuid(utils::bytes_view_t) const noexcept;
+    file_info_ptr_t by_name(std::string_view name) const noexcept;
+    file_info_ptr_t by_sequence(std::int64_t sequence) const noexcept;
     seq_projection_t &sequence_projection() noexcept;
     range_t range(std::int64_t lower, std::int64_t upper) noexcept;
 };

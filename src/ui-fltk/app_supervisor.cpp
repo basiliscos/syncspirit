@@ -434,7 +434,7 @@ auto app_supervisor_t::apply(const model::diff::advance::advance_t &diff, void *
             auto file_name = proto::get_name(diff.proto_local);
             auto local_file = local_fi->get_file_infos().by_name(file_name);
             if (local_file) {
-                auto entity = folder_entity->on_insert(*local_file);
+                auto entity = folder_entity->on_insert(*local_file, *local_fi);
                 if (entity) {
                     auto parent = entity->get_parent();
                     auto mask = mask_nodes();
@@ -522,7 +522,8 @@ auto app_supervisor_t::apply(const model::diff::peer::update_folder_t &diff, voi
         }
 
         auto peer = devices_map.by_sha256(diff.peer_id);
-        auto &files_map = folder->get_folder_infos().by_device(*peer)->get_file_infos();
+        auto &peer_fi = *folder->get_folder_infos().by_device(*peer);
+        auto &files_map = peer_fi.get_file_infos();
         auto folder_aug = folder->get_augmentation().get();
         auto folder_entity = static_cast<presentation::folder_entity_t *>(folder_aug);
         auto mask = mask_nodes();
@@ -531,7 +532,7 @@ auto app_supervisor_t::apply(const model::diff::peer::update_folder_t &diff, voi
             auto file_info = files_map.by_name(file_name);
             auto augmentation = file_info->get_augmentation().get();
             if (!augmentation) {
-                auto entity = folder_entity->on_insert(*file_info);
+                auto entity = folder_entity->on_insert(*file_info, peer_fi);
                 if (entity) {
                     auto parent_entity = entity->get_parent();
                     if (parent_entity) {

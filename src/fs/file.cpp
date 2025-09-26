@@ -26,10 +26,12 @@ using namespace syncspirit::fs;
 #define SS_STAT_BUFF struct stat
 #endif
 
-auto file_t::open_write(model::file_info_ptr_t model) noexcept -> outcome::result<file_t> {
+auto file_t::open_write(model::file_info_ptr_t model, const model::folder_info_t &folder_info) noexcept
+    -> outcome::result<file_t> {
     using mode_t = utils::fstream_t;
     auto tmp = model->get_size() > 0;
-    auto path = tmp ? make_temporal(model->get_path()) : model->get_path();
+    auto model_path = model->get_path(folder_info);
+    auto path = tmp ? make_temporal(std::move(model_path)) : std::move(model_path);
     path.make_preferred();
 
     bool need_resize = true;
@@ -58,7 +60,7 @@ auto file_t::open_write(model::file_info_ptr_t model) noexcept -> outcome::resul
         return sys::error_code{errno, sys::system_category()};
     }
 
-    return file_t(std::move(file), std::move(model), std::move(path), tmp);
+    return file_t(std::move(file), std::move(model), std::move(path), std::move(model_path), tmp);
 }
 
 auto file_t::open_read(const bfs::path &path) noexcept -> outcome::result<file_t> {
@@ -71,10 +73,11 @@ auto file_t::open_read(const bfs::path &path) noexcept -> outcome::result<file_t
 
 file_t::file_t() noexcept {};
 
-file_t::file_t(utils::fstream_t backend_, model::file_info_ptr_t model_, bfs::path path_, bool temporal_) noexcept
+file_t::file_t(utils::fstream_t backend_, model::file_info_ptr_t model_, bfs::path path_, bfs::path model_path_,
+               bool temporal_) noexcept
     : backend{new utils::fstream_t(std::move(backend_))}, model{std::move(model_)}, path{std::move(path_)},
       temporal{temporal_} {
-    auto model_path = model->get_path();
+    model_path = std::move(model_path_);
     model_path.make_preferred();
     path.make_preferred();
     path_str = boost::nowide::narrow(model_path.generic_wstring());
@@ -117,19 +120,19 @@ auto file_t::close(bool remove_temporal, const bfs::path &local_name) noexcept -
     backend.reset();
 
     sys::error_code ec;
-    auto orig_path = local_name.empty() ? model->get_path() : local_name;
+    auto orig_path = local_name.empty() ? &model_path : &local_name;
     if (remove_temporal) {
         assert(temporal);
-        bfs::rename(path, orig_path, ec);
+        bfs::rename(path, *orig_path, ec);
         if (ec) {
             return ec;
         }
-    } else if (orig_path != path) {
-        orig_path = path;
+    } else if (*orig_path != path) {
+        orig_path = &path;
     }
 
     auto modified = from_unix(model->get_modified_s());
-    bfs::last_write_time(orig_path, modified, ec);
+    bfs::last_write_time(*orig_path, modified, ec);
     if (ec) {
         return ec;
     }

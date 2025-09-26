@@ -79,7 +79,7 @@ TEST_CASE("remove folder", "[model]") {
         proto::set_size(b, 5);
 
         auto fi = file_info_t::create(sequencer->next_uuid(), pr_fi, fi_1_peer).value();
-        fi->assign_block(b1, 0);
+        fi->assign_block(b1.get(), 0);
         fi_1_peer->get_file_infos().put(fi);
         return fi;
     }();
@@ -98,7 +98,7 @@ TEST_CASE("remove folder", "[model]") {
         proto::set_size(b, 5);
 
         auto fi = file_info_t::create(sequencer->next_uuid(), pr_fi, fi_1_mine).value();
-        fi->assign_block(b2, 0);
+        fi->assign_block(b2.get(), 0);
         fi_1_mine->get_file_infos().put(fi);
         return fi;
     }();
@@ -117,7 +117,7 @@ TEST_CASE("remove folder", "[model]") {
         proto::set_size(b, 5);
 
         auto fi = file_info_t::create(sequencer->next_uuid(), pr_fi, fi_2_mine).value();
-        fi->assign_block(b3, 0);
+        fi->assign_block(b3.get(), 0);
         fi_2_mine->get_file_infos().put(fi);
         return fi;
     }();

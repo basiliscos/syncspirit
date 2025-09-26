@@ -67,7 +67,8 @@ auto update_folder_t::apply_impl(apply_controller_t &controller, void *custom) c
         }
         file = std::move(opt.assume_value());
 
-        if (file->get_size()) {
+        auto file_sz = proto::get_size(f);
+        if (file->is_file() && !file->is_deleted() && file_sz) {
             auto blocks_count = proto::get_blocks_size(f);
             for (int i = 0; i < blocks_count; ++i) {
                 auto &b = proto::get_blocks(f, i);
@@ -75,7 +76,7 @@ auto update_folder_t::apply_impl(apply_controller_t &controller, void *custom) c
                 auto strict_hash = block_info_t::make_strict_hash(hash);
                 auto block = bm.by_hash(strict_hash.get_hash());
                 assert(block);
-                file->assign_block(block, (size_t)i);
+                file->assign_block(block.get(), (size_t)i);
             }
         }
         bool add_file = true;
@@ -152,7 +153,7 @@ static auto construct(sequencer_t &sequencer, folder_info_ptr_t &folder_info, sy
         for (auto &b : new_blocks) {
             auto hash = proto::get_hash(b);
             auto strict_hash = block_info_t::make_strict_hash(hash);
-            auto it = orphaned_blocks.find(strict_hash.get_key());
+            auto it = orphaned_blocks.find(strict_hash.get_hash());
             if (it != orphaned_blocks.end()) {
                 orphaned_blocks.erase(it);
             }

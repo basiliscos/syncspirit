@@ -193,6 +193,12 @@ SECTION("regular files") {
     proto::set_name(pr_file, "a.txt");
     proto::set_sequence(pr_file, 4);
 
+    auto hash = utils::sha256_digest(as_bytes("12345")).value();
+    auto bi = proto::BlockInfo();
+    proto::set_size(bi, 5);
+    proto::set_hash(bi, hash);
+    auto block = block_info_t::create(bi).assume_value();
+
     auto &v = proto::get_version(pr_file);
     auto &counter = proto::add_counters(v);
     proto::set_id(counter, peer_device->device_id().get_uint());
@@ -209,8 +215,10 @@ SECTION("regular files") {
         proto::set_size(pr_file, 5);
         proto::set_modified_s(pr_file, modified);
         proto::set_permissions(pr_file, perms);
+        proto::add_blocks(pr_file, bi);
 
         auto file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
+        file->assign_block(block.get(), 0);
         REQUIRE(folder_my->add_strict(file));
 
         auto task = scan_task_t(cluster, folder->get_id(), rw_cache, config);
@@ -283,8 +291,10 @@ SECTION("regular files") {
         proto::set_size(pr_file, 5);
         proto::set_modified_s(pr_file, modified);
         proto::set_permissions(pr_file, perms);
+        proto::add_blocks(pr_file, bi);
 
         auto info_file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
+        info_file->assign_block(block.get(), 0);
         REQUIRE(folder_my->add_strict(info_file));
 
         auto info_dir = file_info_t::create(sequencer->next_uuid(), pr_dir, folder_my).value();
@@ -322,8 +332,10 @@ SECTION("regular files") {
         proto::set_block_size(pr_file, 5);
         proto::set_size(pr_file, 5);
         proto::set_modified_s(pr_file, modified);
+        proto::add_blocks(pr_file, bi);
 
         auto file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
+        file->assign_block(block.get(), 0);
         REQUIRE(folder_my->add_strict(file));
 
         auto task = scan_task_t(cluster, folder->get_id(), rw_cache, config);
@@ -450,17 +462,19 @@ SECTION("regular files") {
 
         SECTION("file size differs") {
             auto path = root_path / "a.txt";
-            write_file(path, "12345");
+            write_file(path, "1234");
             bfs::last_write_time(path, from_unix(modified));
             auto status = bfs::status(path);
             auto perms = static_cast<uint32_t>(status.permissions());
 
             proto::set_block_size(pr_file, 5);
-            proto::set_size(pr_file, 6);
+            proto::set_size(pr_file, 5);
             proto::set_modified_s(pr_file, modified);
             proto::set_permissions(pr_file, perms);
+            proto::add_blocks(pr_file, bi);
 
             file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
+            file->assign_block(block.get(), 0);
             REQUIRE(folder_my->add_strict(file));
 
             task = new scan_task_t(cluster, folder->get_id(), rw_cache, config);
@@ -473,7 +487,7 @@ SECTION("regular files") {
             REQUIRE(std::get_if<changed_meta_t>(&r));
             auto ref = std::get_if<changed_meta_t>(&r);
             CHECK(ref->file == file);
-            CHECK(proto::get_size(ref->metadata) == 5);
+            CHECK(proto::get_size(ref->metadata) == 4);
             CHECK(proto::get_modified_s(ref->metadata) == modified);
         }
 
@@ -488,8 +502,10 @@ SECTION("regular files") {
             proto::set_size(pr_file, 5);
             proto::set_modified_s(pr_file, modified + 1);
             proto::set_permissions(pr_file, perms);
+            proto::add_blocks(pr_file, bi);
 
             file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
+            file->assign_block(block.get(), 0);
             REQUIRE(folder_my->add_strict(file));
 
             task = new scan_task_t(cluster, folder->get_id(), rw_cache, config);
@@ -511,12 +527,14 @@ SECTION("regular files") {
             proto::set_size(pr_file, 5);
             proto::set_modified_s(pr_file, modified);
             proto::set_permissions(pr_file, static_cast<uint32_t>(-1));
+            proto::add_blocks(pr_file, bi);
 
             auto path = root_path / "a.txt";
             write_file(path, "12345");
             bfs::last_write_time(path, from_unix(modified));
 
             file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
+            file->assign_block(block.get(), 0);
             REQUIRE(folder_my->add_strict(file));
 
             SECTION("permissions are tracked") {
@@ -570,6 +588,7 @@ SECTION("regular files") {
         proto::set_block_size(pr_file, 5);
         proto::set_size(pr_file, 5);
         proto::set_modified_s(pr_file, modified);
+        proto::add_blocks(pr_file, bi);
 
         auto path = root_path / "a.txt.syncspirit-tmp";
 
@@ -577,6 +596,7 @@ SECTION("regular files") {
             write_file(path, "12345");
 
             auto file_peer = file_info_t::create(sequencer->next_uuid(), pr_file, folder_peer).value();
+            file_peer->assign_block(block.get(), 0);
             REQUIRE(folder_peer->add_strict(file_peer));
 
             auto task = scan_task_t(cluster, folder->get_id(), rw_cache, config);
@@ -602,6 +622,7 @@ SECTION("regular files") {
             write_file(path, "12345");
 
             auto file_peer = file_info_t::create(sequencer->next_uuid(), pr_file, folder_peer).value();
+            file_peer->assign_block(block.get(), 0);
             REQUIRE(folder_peer->add_strict(file_peer));
 
             auto task = scan_task_t(cluster, folder->get_id(), rw_cache, config);
@@ -640,9 +661,11 @@ SECTION("regular files") {
 
             auto cache = fs::file_cache_ptr_t(new fs::file_cache_t(50));
             auto file_peer = file_info_t::create(sequencer->next_uuid(), pr_file, folder_peer).value();
+            file_peer->assign_block(block.get(), 0);
             auto ok = folder_peer->add_strict(file_peer);
             REQUIRE(ok);
-            auto file = fs::file_ptr_t(new fs::file_t(fs::file_t::open_write(file_peer).value()));
+            auto file_raw = fs::file_t::open_write(file_peer, *folder_peer).value();
+            auto file = fs::file_ptr_t(new fs::file_t(std::move(file_raw)));
             cache->put(file);
             REQUIRE(cache->get(file_path));
 
@@ -677,6 +700,7 @@ SECTION("regular files") {
             write_file(path, "123456");
 
             auto file_peer = file_info_t::create(sequencer->next_uuid(), pr_file, folder_peer).value();
+            file_peer->assign_block(block.get(), 0);
             REQUIRE(folder_peer->add_strict(file_peer));
 
             // check that local files will not be considered sa removed
@@ -705,12 +729,18 @@ SECTION("regular files") {
             write_file(path, "123456");
 
             auto file_peer = file_info_t::create(sequencer->next_uuid(), pr_file, folder_peer).value();
+            file_peer->assign_block(block.get(), 0);
             REQUIRE(folder_peer->add_strict(file_peer));
 
             proto::set_size(pr_file, file_peer->get_size() + 10);
             proto::add_counters(v, proto::Counter(peer_device->device_id().get_uint(), 2));
+            proto::add_blocks(pr_file, bi);
+            proto::add_blocks(pr_file, bi);
 
             auto file_peer2 = file_info_t::create(sequencer->next_uuid(), pr_file, folder_peer2).value();
+            file_peer2->assign_block(block.get(), 0);
+            file_peer2->assign_block(block.get(), 1);
+            file_peer2->assign_block(block.get(), 2);
             REQUIRE(folder_peer2->add_strict(file_peer2));
 
             auto task = scan_task_t(cluster, folder->get_id(), rw_cache, config);
@@ -766,10 +796,13 @@ SECTION("regular files") {
         proto::set_size(pr_file, 5);
         proto::set_modified_s(pr_file, modified);
         proto::set_permissions(pr_file, perms);
+        proto::add_blocks(pr_file, bi);
         auto file_my = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
+        file_my->assign_block(block.get(), 0);
 
         proto::set_id(counter, 10);
         auto file_peer = file_info_t::create(sequencer->next_uuid(), pr_file, folder_peer).value();
+        file_peer->assign_block(block.get(), 0);
         REQUIRE(folder_my->add_strict(file_my));
         REQUIRE(folder_peer->add_strict(file_peer));
 

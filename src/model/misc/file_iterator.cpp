@@ -12,8 +12,8 @@ using namespace syncspirit::model;
 bool file_iterator_t::file_comparator_t::operator()(const file_info_t *l, const file_info_t *r) const {
     using P = db::PullOrder;
 
-    auto le = l->get_blocks().empty();
-    auto re = r->get_blocks().empty();
+    auto le = l->iterate_blocks().get_total() == 0;
+    auto re = r->iterate_blocks().get_total() == 0;
 
     if (le && !re) {
         return true;
@@ -70,6 +70,8 @@ auto file_iterator_t::find_folder(folder_t *folder) noexcept -> folder_iterator_
 auto file_iterator_t::prepare_folder(folder_info_ptr_t peer_folder) noexcept -> folder_iterator_t & {
     auto &files = peer_folder->get_file_infos();
     auto folder = peer_folder->get_folder();
+    auto &local_folder = *folder->get_folder_infos().by_device(*folder->get_cluster()->get_device());
+    auto &local_files = local_folder.get_file_infos();
     auto order = folder->get_pull_order();
     auto set = std::make_unique<queue_t>(file_comparator_t{order});
     auto seen_index = std::uint64_t{0};
@@ -79,7 +81,8 @@ auto file_iterator_t::prepare_folder(folder_info_ptr_t peer_folder) noexcept -> 
     if (can_receive) {
         for (auto &it : files) {
             auto f = it.get();
-            if (resolve(*f) != advance_action_t::ignore) {
+            auto local_file = local_files.by_name(f->get_name()->get_full_name());
+            if (resolve(*f, local_file.get(), local_folder) != advance_action_t::ignore) {
                 set->emplace(f);
             }
         }
@@ -99,11 +102,13 @@ auto file_iterator_t::next() noexcept -> result_t {
 
     while (folder_scans < folders_count) {
         auto &fi = folders_list[folder_index];
-        auto &file_infos = fi.peer_folder->get_folder()->get_folder_infos();
-        auto local_folder = file_infos.by_device(*cluster.get_device());
+        auto &peer_folder = *fi.peer_folder;
+        auto folder = peer_folder.get_folder();
+        auto &folders = folder->get_folder_infos();
+        auto &local_folder = *folders.by_device(*cluster.get_device());
+        auto &local_files = local_folder.get_file_infos();
 
         auto &queue = fi.files_queue;
-        auto folder = local_folder->get_folder();
         auto do_scan = !folder->is_paused() && !folder->is_scheduled() && !folder->is_suspended() && !queue->empty();
 
         // check other files
@@ -112,16 +117,17 @@ auto file_iterator_t::next() noexcept -> result_t {
             while (it != queue->end()) {
                 auto &file = **it;
                 it = queue->erase(it);
-                auto action = resolve(file);
+                auto local_file = local_files.by_name(file.get_name()->get_full_name());
+                auto action = resolve(file, local_file.get(), local_folder);
                 if (action != advance_action_t::ignore) {
-                    return std::make_pair(&file, action);
+                    return std::make_tuple(&file, &peer_folder, action);
                 }
             }
         }
         folder_index = (folder_index + 1) % folders_count;
         ++folder_scans;
     }
-    return {nullptr, advance_action_t::ignore};
+    return {nullptr, nullptr, advance_action_t::ignore};
 }
 
 void file_iterator_t::on_upsert(folder_info_ptr_t peer_folder) noexcept {
@@ -142,11 +148,15 @@ void file_iterator_t::populate(folder_iterator_t &it) noexcept {
         it.files_queue->clear();
     }
     auto &files_map = peer_folder->get_file_infos();
+    auto folder = peer_folder->get_folder();
+    auto &local_folder = *folder->get_folder_infos().by_device(*folder->get_cluster()->get_device());
+    auto &local_files = local_folder.get_file_infos();
     auto max_sequence = peer_folder->get_max_sequence();
     auto [from, to] = files_map.range(seen_sequence + 1, max_sequence);
     for (auto fit = from; fit != to; ++fit) {
         auto file = fit->get();
-        if (resolve(*file) != advance_action_t::ignore) {
+        auto local_file = local_files.by_name(file->get_name()->get_full_name());
+        if (resolve(*file, local_file.get(), local_folder) != advance_action_t::ignore) {
             it.files_queue->insert(file);
         }
     }
@@ -194,11 +204,15 @@ void file_iterator_t::on_remove(folder_info_ptr_t peer_folder) noexcept {
     }
 }
 
-void file_iterator_t::recheck(file_info_t &remote) noexcept {
+void file_iterator_t::recheck(const folder_info_t &remote_fi, file_info_t &remote) noexcept {
     for (auto &fi : folders_list) {
-        if (fi.peer_folder.get() == remote.get_folder_info()) {
+        if (fi.peer_folder.get() == &remote_fi) {
             if (fi.can_receive) {
-                if (resolve(remote) != advance_action_t::ignore) {
+                auto folder = fi.peer_folder->get_folder();
+                auto &local_folder = *folder->get_folder_infos().by_device(*folder->get_cluster()->get_device());
+                auto &local_files = local_folder.get_file_infos();
+                auto local_file = local_files.by_name(remote.get_name()->get_full_name());
+                if (resolve(remote, local_file.get(), local_folder) != advance_action_t::ignore) {
                     fi.files_queue->emplace(&remote);
                 }
             }

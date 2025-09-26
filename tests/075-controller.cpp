@@ -737,7 +737,7 @@ void test_downloading() {
                 REQUIRE(f);
                 CHECK(f->get_name()->get_full_name() == file_name);
                 CHECK(f->get_size() == 5);
-                CHECK(f->get_blocks().size() == 1);
+                CHECK(f->iterate_blocks().get_total() == 1);
                 CHECK(f->is_locally_available());
                 CHECK(peer_actor->blocks_requested == 1);
 
@@ -829,14 +829,14 @@ void test_downloading() {
                         auto f = folder_my->get_file_infos().by_name(file_name_1);
                         REQUIRE(f);
                         CHECK(f->get_size() == 5);
-                        CHECK(f->get_blocks().size() == 1);
+                        CHECK(f->iterate_blocks().get_total() == 1);
                         CHECK(f->is_locally_available());
                     }
                     {
                         auto f = folder_my->get_file_infos().by_name(file_name_2);
                         REQUIRE(f);
                         CHECK(f->get_size() == 5);
-                        CHECK(f->get_blocks().size() == 1);
+                        CHECK(f->iterate_blocks().get_total() == 1);
                         CHECK(f->is_locally_available());
                     }
                 }
@@ -861,14 +861,14 @@ void test_downloading() {
                         auto f = folder_my->get_file_infos().by_name(file_name_1);
                         REQUIRE(f);
                         CHECK(f->get_size() == 5);
-                        CHECK(f->get_blocks().size() == 1);
+                        CHECK(f->iterate_blocks().get_total() == 1);
                         CHECK(f->is_locally_available());
                     }
                     {
                         auto f = folder_my->get_file_infos().by_name(file_name_2);
                         REQUIRE(f);
                         CHECK(f->get_size() == 5);
-                        CHECK(f->get_blocks().size() == 1);
+                        CHECK(f->iterate_blocks().get_total() == 1);
                         CHECK(f->is_locally_available());
                     }
                 }
@@ -897,14 +897,14 @@ void test_downloading() {
                         auto f = folder_my->get_file_infos().by_name(file_name_1);
                         REQUIRE(f);
                         CHECK(f->get_size() == 5);
-                        CHECK(f->get_blocks().size() == 1);
+                        CHECK(f->iterate_blocks().get_total() == 1);
                         CHECK(f->is_locally_available());
                     }
                     {
                         auto f = folder_my->get_file_infos().by_name(file_name_2);
                         REQUIRE(f);
                         CHECK(f->get_size() == 10);
-                        CHECK(f->get_blocks().size() == 2);
+                        CHECK(f->iterate_blocks().get_total() == 2);
                         CHECK(f->is_locally_available());
                     }
                 }
@@ -933,7 +933,7 @@ void test_downloading() {
 
                 auto uuid = sup->sequencer->next_uuid();
                 auto file_info = model::file_info_t::create(uuid, pr_fi, folder_peer).value();
-                file_info->assign_block(b, 0);
+                file_info->assign_block(b.get(), 0);
                 REQUIRE(folder_peer->add_strict(file_info));
                 cluster->get_blocks().put(b);
 
@@ -963,7 +963,7 @@ void test_downloading() {
                 REQUIRE(f);
                 CHECK(f->get_name()->get_full_name() == file_name);
                 CHECK(f->get_size() == 0);
-                CHECK(f->get_blocks().size() == 0);
+                CHECK(f->iterate_blocks().get_total() == 0);
                 CHECK(f->is_locally_available());
                 CHECK(f->is_deleted());
                 CHECK(f->get_sequence() == 1ul);
@@ -1008,7 +1008,7 @@ void test_downloading() {
                 REQUIRE(f);
                 CHECK(f->get_name()->get_full_name() == file_name);
                 CHECK(f->get_size() == 5);
-                CHECK(f->get_blocks().size() == 1);
+                CHECK(f->iterate_blocks().get_total() == 1);
                 CHECK(f->is_locally_available());
 
                 auto fp = *folder_1_peer->get_file_infos().begin();
@@ -1067,7 +1067,7 @@ void test_downloading() {
                 REQUIRE(f);
                 CHECK(f->get_name()->get_full_name() == file_name);
                 CHECK(f->get_size() == 5);
-                CHECK(f->get_blocks().size() == 1);
+                CHECK(f->iterate_blocks().get_total() == 1);
                 CHECK(f->is_locally_available());
                 CHECK(!f->is_deleted());
             }
@@ -1093,9 +1093,10 @@ void test_downloading() {
                 auto data_1 = as_owned_bytes("12345");
                 auto data_1_hash = utils::sha256_digest(data_1).value();
 
-                auto &b1 = proto::add_blocks(file_1);
+                auto b1 = proto::BlockInfo();
                 proto::set_hash(b1, data_1_hash);
                 proto::set_size(b1, 5);
+                proto::add_blocks(file_1, b1);
                 auto bi_1 = model::block_info_t::create(b1).value();
 
                 auto data_2 = as_owned_bytes("67890");
@@ -1118,13 +1119,14 @@ void test_downloading() {
                 proto::set_sequence(pr_file_my, 5);
                 proto::set_block_size(pr_file_my, 5);
                 proto::set_size(pr_file_my, 5);
+                proto::add_blocks(pr_file_my, b1);
 
                 auto &v_my = proto::get_version(pr_file_my);
                 proto::add_counters(v_my, proto::Counter(my_device->device_id().get_uint(), 1));
 
                 auto uuid = sup->sequencer->next_uuid();
                 auto file_my = model::file_info_t::create(uuid, pr_file_my, folder_my).value();
-                file_my->assign_block(bi_1, 0);
+                file_my->assign_block(bi_1.get(), 0);
                 file_my->mark_local_available(0);
                 REQUIRE(folder_my->add_strict(file_my));
 
@@ -1138,7 +1140,7 @@ void test_downloading() {
                 REQUIRE(f);
                 CHECK(f->get_name()->get_full_name() == file_name_1);
                 CHECK(f->get_size() == 10);
-                CHECK(f->get_blocks().size() == 2);
+                CHECK(f->iterate_blocks().get_total() == 2);
                 CHECK(f->is_locally_available());
             }
         }
@@ -1257,7 +1259,8 @@ void test_downloading_errors() {
             CHECK(f->is_unreachable());
             CHECK(!f->is_synchronizing());
 
-            CHECK(!f->local_file());
+            auto f_local = folder_my->get_file_infos().by_name(f->get_name()->get_full_name());
+            CHECK(!f_local);
             CHECK(!folder_my->get_folder()->is_synchronizing());
 
             sup->do_process();
@@ -1338,7 +1341,7 @@ void test_download_from_scratch() {
             auto f = folder_my->get_file_infos().by_name(file_name);
             REQUIRE(f);
             CHECK(f->get_size() == 5);
-            CHECK(f->get_blocks().size() == 1);
+            CHECK(f->iterate_blocks().get_total() == 1);
             CHECK(f->is_locally_available());
 
             cc = proto::ClusterConfig{};
@@ -1454,7 +1457,7 @@ void test_download_resuming() {
             auto f = folder_my->get_file_infos().by_name(file_name);
             REQUIRE(f);
             CHECK(f->get_size() == 10);
-            CHECK(f->get_blocks().size() == 2);
+            CHECK(f->iterate_blocks().get_total() == 2);
             CHECK(f->is_locally_available());
         }
     };
@@ -1750,7 +1753,7 @@ void test_uploading() {
 
             auto uuid = sup->sequencer->next_uuid();
             auto file_info = model::file_info_t::create(uuid, file, folder_my).value();
-            file_info->assign_block(b, 0);
+            file_info->assign_block(b.get(), 0);
             REQUIRE(folder_my->add_strict(file_info));
 
             auto req = proto::Request();
@@ -2041,14 +2044,14 @@ void test_conflicts() {
                 auto local_conflict = local_folder->get_file_infos().by_name(local_file->make_conflicting_name());
                 REQUIRE(local_conflict);
                 CHECK(local_conflict->get_size() == 5);
-                REQUIRE(local_conflict->get_blocks().size() == 1);
-                CHECK(local_conflict->get_blocks()[0]->get_hash() == data_2_h);
+                REQUIRE(local_conflict->iterate_blocks().get_total() == 1);
+                CHECK(local_conflict->iterate_blocks(0).next()->get_hash() == data_2_h);
 
                 auto file = local_folder->get_file_infos().by_name(local_file->get_name()->get_full_name());
                 REQUIRE(file);
                 CHECK(file->get_size() == 5);
-                REQUIRE(file->get_blocks().size() == 1);
-                CHECK(file->get_blocks()[0]->get_hash() == data_3_h);
+                REQUIRE(file->iterate_blocks().get_total() == 1);
+                CHECK(file->iterate_blocks(0).next()->get_hash() == data_3_h);
 
                 CHECK(cluster->get_blocks().size() == 2);
 

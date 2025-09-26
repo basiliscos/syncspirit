@@ -21,6 +21,10 @@ TEST_CASE("version ", "[model]") {
     auto v1_copy = v1;
     v1.update(*my_device);
 
+    auto best = v1.get_best();
+    CHECK(proto::get_id(best) == my_device->device_id().get_uint());
+    CHECK(proto::get_value(best) != 10);
+
     CHECK(v1.contains(v1_copy));
     CHECK(v1.contains(v1));
     CHECK(!v1_copy.contains(v1));

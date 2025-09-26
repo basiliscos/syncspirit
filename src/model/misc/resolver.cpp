@@ -14,8 +14,8 @@ static advance_action_t compare_by_version(const file_info_t &remote, const file
     auto &r_v = remote.get_version();
     auto &l_v = local.get_version();
 
-    auto &r_best = r_v.get_best();
-    auto &l_best = l_v.get_best();
+    auto r_best = r_v.get_best();
+    auto l_best = l_v.get_best();
     auto rv = proto::get_value(r_best);
     auto lv = proto::get_value(l_best);
     auto r_id = proto::get_id(r_best);
@@ -72,7 +72,8 @@ int compare(const file_info_t &file_1, const file_info_t &file_2) noexcept {
     return -1;
 }
 
-static advance_action_t resolve(const file_info_t &remote, const file_info_t *local) noexcept {
+static advance_action_t _resolve(const file_info_t &remote, const file_info_t *local,
+                                 const folder_info_t &local_folder) noexcept {
     if (remote.is_unreachable()) {
         return advance_action_t::ignore;
     }
@@ -80,22 +81,18 @@ static advance_action_t resolve(const file_info_t &remote, const file_info_t *lo
         return advance_action_t::ignore;
     }
 
-    auto remote_fi = remote.get_folder_info();
-    auto folder = remote_fi->get_folder();
+    auto folder = local_folder.get_folder();
     auto &self = *folder->get_cluster()->get_device();
     auto &folder_infos = folder->get_folder_infos();
     auto &r_v = remote.get_version();
 
     for (auto it : folder_infos) {
         auto fi = it.item.get();
-        if (fi == remote_fi) {
-            continue;
-        }
-        if (fi->get_device() == &self) {
+        if (fi == &local_folder) {
             continue;
         }
         auto other_party_file = fi->get_file_infos().by_name(remote.get_name()->get_full_name());
-        if (other_party_file) {
+        if (other_party_file && other_party_file.get() != &remote) {
             auto o_v = other_party_file->get_version();
             if (!r_v.contains(o_v)) {
                 return advance_action_t::ignore;
@@ -119,7 +116,8 @@ static advance_action_t resolve(const file_info_t &remote, const file_info_t *lo
     return compare_by_version(remote, *local);
 }
 
-advance_action_t resolve(const file_info_t &remote) noexcept {
+advance_action_t resolve(const file_info_t &remote, const file_info_t *local,
+                         const folder_info_t &local_folder) noexcept {
     using P = utils::platform_t;
     if (remote.is_link() && !remote.is_deleted() && !P::symlinks_supported()) {
         return advance_action_t::ignore;
@@ -128,19 +126,14 @@ advance_action_t resolve(const file_info_t &remote) noexcept {
     if (!P::path_supported(bfs::path(boost::nowide::widen(remote_name)))) {
         return advance_action_t::ignore;
     }
-    auto folder = remote.get_folder_info()->get_folder();
-    auto self = folder->get_cluster()->get_device();
-    auto local_folder = folder->get_folder_infos().by_device(*self);
-    auto &local_files = local_folder->get_file_infos();
-    auto local_file = local_files.by_name(remote_name);
-    auto action = resolve(remote, local_file.get());
+    auto action = _resolve(remote, local, local_folder);
     if (action == advance_action_t::resolve_remote_win) {
-        auto name = remote.get_path().filename().string();
+        auto name = remote.get_name()->get_own_name();
         if (name.find(".sync-conflict-") != std::string::npos) {
             action = advance_action_t::ignore;
         } else {
-            auto resolved_name = local_file->make_conflicting_name();
-            if (auto resolved = local_files.by_name(resolved_name); resolved) {
+            auto resolved_name = local->make_conflicting_name();
+            if (auto resolved = local_folder.get_file_infos().by_name(resolved_name); resolved) {
                 action = advance_action_t::ignore;
             }
         }
