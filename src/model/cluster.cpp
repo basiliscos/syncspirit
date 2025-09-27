@@ -3,10 +3,15 @@
 
 #include "cluster.h"
 #include "proto/proto-helpers.h"
-#include <spdlog/spdlog.h>
 
 using namespace syncspirit;
 using namespace syncspirit::model;
+
+path_guard_t::~path_guard_t() {
+    if (cluster) {
+        cluster->locked_paths.erase(path);
+    }
+}
 
 cluster_t::cluster_t(device_ptr_t device_, int32_t write_requests_) noexcept
     : device(device_), tainted{false}, write_requests{write_requests_} {
@@ -55,6 +60,15 @@ const folders_map_t &cluster_t::get_folders() const noexcept { return folders; }
 auto cluster_t::get_path_cache() noexcept -> path_cache_t & { return *path_cache; }
 
 int32_t cluster_t::get_write_requests() const noexcept { return write_requests; }
+
+bool cluster_t::is_locked(path_t *path) noexcept { return locked_paths.contains(path); }
+
+path_guard_t cluster_t::lock(path_t *path) noexcept {
+    assert(locked_paths.count(path) == 0);
+    auto guard = path_guard_t(this, path);
+    locked_paths.emplace(path);
+    return guard;
+}
 
 void cluster_t::modify_write_requests(int32_t delta) noexcept {
     write_requests += delta;

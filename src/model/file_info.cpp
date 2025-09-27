@@ -89,6 +89,9 @@ static void fill(unsigned char *key, const bu::uuid &uuid, const folder_info_ptr
 file_info_t::guard_t::guard_t(file_info_t &file_, const folder_info_t *folder_info_) noexcept
     : file{&file_}, folder_info{folder_info_} {
     file_.synchronizing_lock();
+    auto cluster = folder_info->get_folder()->get_cluster();
+    path_guard = std::make_unique<path_guard_t>(cluster->lock(file->get_name().get()));
+    assert(path_guard && *path_guard);
 }
 
 file_info_t::guard_t::~guard_t() {

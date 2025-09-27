@@ -67,16 +67,32 @@ TEST_CASE("file iterator, single folder", "[model]") {
                     auto ec = index_builder.add(pr_fi, peer_device).finish().apply();
                     REQUIRE(ec);
 
-                    auto [f, fi, action] = file_iterator->next();
-                    REQUIRE(f);
-                    CHECK(f->get_name()->get_full_name() == "a.txt");
-                    CHECK(action == A::remote_copy);
+                    SECTION("no path lock") {
+                        auto [f, fi, action] = file_iterator->next();
+                        REQUIRE(f);
+                        CHECK(f->get_name()->get_full_name() == "a.txt");
+                        CHECK(action == A::remote_copy);
 
-                    REQUIRE(builder.apply());
-                    CHECK(file_iterator->next() == R{{}, {}, A::ignore});
+                        REQUIRE(builder.apply());
+                        CHECK(file_iterator->next() == R{{}, {}, A::ignore});
 
-                    REQUIRE(builder.remote_copy(*f, *fi).apply());
-                    CHECK(file_iterator->next() == R{{}, {}, A::ignore});
+                        REQUIRE(builder.remote_copy(*f, *fi).apply());
+                        CHECK(file_iterator->next() == R{{}, {}, A::ignore});
+                    }
+
+                    SECTION("path is locked") {
+                        auto &cache = cluster->get_path_cache();
+                        auto path = cache.get_path("a.txt");
+                        {
+                            auto lock = cluster->lock(path.get());
+                            auto [f, fi, action] = file_iterator->next();
+                            REQUIRE(!f);
+                        }
+                        {
+                            auto [f, fi, action] = file_iterator->next();
+                            REQUIRE(f);
+                        }
+                    }
                 }
                 SECTION("symblink") {
                     proto::set_symlink_target(pr_fi, "b.txt");

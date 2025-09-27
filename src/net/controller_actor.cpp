@@ -219,13 +219,15 @@ void controller_actor_t::on_tx_signal(message::tx_signal_t &) noexcept {
 }
 
 void controller_actor_t::on_peer_down(message::peer_down_t &message) noexcept {
-    if (resources->has(resource::peer)) {
-        resources->release(resource::peer);
-        peer_address.reset();
+    if (message.payload.peer == peer_address) {
+        if (resources->has(resource::peer)) {
+            resources->release(resource::peer);
+            peer_address.reset();
+        }
+        auto &ee = message.payload.ee;
+        LOG_TRACE(log, "on_peer_down reason: {}", ee->message());
+        do_shutdown(ee);
     }
-    auto &ee = message.payload.ee;
-    LOG_TRACE(log, "on_peer_down reason: {}", ee->message());
-    do_shutdown(ee);
 }
 
 void controller_actor_t::push_pending() noexcept {

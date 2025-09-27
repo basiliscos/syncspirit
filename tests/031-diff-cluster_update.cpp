@@ -767,7 +767,7 @@ TEST_CASE("cluster update with remote folders (1)", "[model]") {
 
 TEST_CASE("cluster update, inactual remote folders for non-shared folder", "[model]") {
     auto root_path = unique_path();
-    auto path_guard = path_guard_t(root_path);
+    auto path_guard = test::path_guard_t(root_path);
 
     auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
     auto my_device = device_t::create(my_id, "my-device").value();
@@ -932,7 +932,7 @@ TEST_CASE("device introduction", "[model]") {
 
 TEST_CASE("auto-accept folders", "[model]") {
     auto root_path = unique_path();
-    auto path_guard = path_guard_t(root_path);
+    auto path_guard = test::path_guard_t(root_path);
 
     auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
     auto my_device = device_t::create(my_id, "my-device").value();
@@ -999,7 +999,7 @@ TEST_CASE("auto-accept folders", "[model]") {
         auto new_root = root_path / "sub-root";
         bfs::create_directories(new_root);
         bfs::permissions(new_root, bfs::perms::all, bfs::perm_options::remove);
-        auto new_guard = path_guard_t(new_root);
+        auto new_guard = test::path_guard_t(new_root);
 
         auto r = builder.configure_cluster(sha256_1, new_root).add(sha256_1, folder_1_id, 5, 4).fail();
         REQUIRE(r);
@@ -1046,7 +1046,7 @@ TEST_CASE("auto-accept folders", "[model]") {
         auto new_root = root_path / "sub-root";
         bfs::create_directories(new_root);
         bfs::permissions(new_root, bfs::perms::all, bfs::perm_options::remove);
-        auto new_guard = path_guard_t(new_root);
+        auto new_guard = test::path_guard_t(new_root);
 
         auto r = builder.configure_cluster(sha256_1, new_root)
                      .add(sha256_2, folder_1_id, 55, 44)

@@ -4,7 +4,6 @@
 #pragma once
 
 #include <cstdint>
-#include <vector>
 #include <unordered_set>
 #include <filesystem>
 #include <boost/outcome.hpp>
@@ -34,6 +33,7 @@ struct file_info_t;
 using file_info_ptr_t = intrusive_ptr_t<file_info_t>;
 
 struct path_cache_t;
+struct path_guard_t;
 
 struct SYNCSPIRIT_API file_info_t {
 
@@ -63,6 +63,7 @@ struct SYNCSPIRIT_API file_info_t {
     };
 
     struct guard_t {
+        using path_guard_ptr_t = std::unique_ptr<path_guard_t>;
         guard_t() noexcept = default;
         guard_t(file_info_t &file, const folder_info_t *folder_info) noexcept;
         guard_t(const guard_t &) = delete;
@@ -72,6 +73,7 @@ struct SYNCSPIRIT_API file_info_t {
         guard_t &operator=(guard_t &&) noexcept = default;
 
         file_info_ptr_t file;
+        path_guard_ptr_t path_guard;
         const folder_info_t *folder_info;
     };
 
