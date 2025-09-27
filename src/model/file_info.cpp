@@ -496,11 +496,14 @@ std::int64_t file_info_t::get_size() const noexcept {
             auto &blocks = content.file.blocks;
             auto blocks_count = blocks.size();
             if (blocks_count) {
-                auto ptr_first = reinterpret_cast<std::uintptr_t>(blocks.front());
-                auto first = reinterpret_cast<const block_info_t *>(ptr_first & PTR_MASK);
                 auto ptr_last = reinterpret_cast<std::uintptr_t>(blocks.back());
                 auto last = reinterpret_cast<const block_info_t *>(ptr_last & PTR_MASK);
-                r = (blocks_count - 1) * first->get_size() + last->get_size();
+                r = last->get_size();
+                if (blocks_count > 1) {
+                    auto ptr_first = reinterpret_cast<std::uintptr_t>(blocks.front());
+                    auto first = reinterpret_cast<const block_info_t *>(ptr_first & PTR_MASK);
+                    r += (blocks_count - 1) * first->get_size();
+                }
             }
         }
     }
@@ -525,22 +528,29 @@ bool file_info_t::has_no_permissions() const noexcept { return flags & f_no_perm
 void file_info_t::update(const file_info_t &other) noexcept {
     using hashes_t = std::set<utils::bytes_view_t, utils::bytes_comparator_t>;
 
-    assert((flags & 0b111) == (other.flags & 0b111));
+    auto prev_symlink = flags & f_type_link;
+    auto new_symlink = other.flags & f_type_link;
+    auto prev_file = flags & f_type_file;
+    auto new_file = other.flags & f_type_file;
 
     assert(this->name == other.name);
     assert(this->name->get_full_name() == other.name->get_full_name());
     assert((this->get_uuid() == other.get_uuid()) || version.identical_to(other.version));
+
     permissions = other.permissions;
     modified_s = other.modified_s;
     modified_ns = other.modified_ns;
     modified_by = other.modified_by;
-    flags = (other.flags & 0b111111) | (flags & ~0b111111); // local flags are preserved
     version = other.version;
     sequence = other.sequence;
-    if (!(flags & f_type_file)) {
+    if (prev_symlink && new_symlink) {
         content.non_file.symlink_target = other.content.non_file.symlink_target;
-    } else {
-        auto local_block_hashes = hashes_t{};
+    }
+
+    auto local_block_hashes = hashes_t{};
+    // avoid use after free, as local block hashes have block_views
+    auto blocks_copy = std::vector<model::block_info_ptr_t>();
+    if (prev_file) {
         for (auto b_raw : content.file.blocks) {
             if (b_raw) {
                 auto ptr = reinterpret_cast<std::uintptr_t>(b_raw);
@@ -555,9 +565,7 @@ void file_info_t::update(const file_info_t &other) noexcept {
             }
         }
 
-        // avoid use after free, as local block hashes have block_views
-        auto sz = other.content.file.blocks.size();
-        auto blocks_copy = std::vector<model::block_info_ptr_t>();
+        blocks_copy = std::vector<model::block_info_ptr_t>();
         blocks_copy.reserve(content.file.blocks.size());
         for (auto b_raw : content.file.blocks) {
             auto ptr = reinterpret_cast<std::uintptr_t>(b_raw);
@@ -565,9 +573,21 @@ void file_info_t::update(const file_info_t &other) noexcept {
             blocks_copy.emplace_back(block);
         }
         remove_blocks();
+    }
 
-        content.file.blocks.resize(sz);
-        for (size_t i = 0; i < sz; ++i) {
+    if (!prev_file && new_file) {
+        content.non_file.~size_less_t();
+        new (&content.file) size_full_t();
+    }
+    if (prev_file && !new_file) {
+        content.file.~size_full_t();
+        new (&content.non_file) size_less_t();
+    }
+
+    if (new_file) {
+        auto blocks_sz = other.content.file.blocks.size();
+        content.file.blocks.resize(blocks_sz);
+        for (size_t i = 0; i < blocks_sz; ++i) {
             auto b_raw = other.content.file.blocks[i];
             if (b_raw) {
                 auto ptr = reinterpret_cast<std::uintptr_t>(b_raw);
@@ -580,6 +600,7 @@ void file_info_t::update(const file_info_t &other) noexcept {
             }
         }
     }
+    flags = (other.flags & 0b111111) | (flags & ~0b111111); // local flags are preserved
 }
 
 std::string file_info_t::make_conflicting_name() const noexcept {

@@ -150,7 +150,7 @@ TEST_CASE("file_info_t::check_consistency", "[model]") {
     CHECK(file_my->get_size() == 5);
 }
 
-TEST_CASE("file_info_t::create, inconsistent source") {
+TEST_CASE("file_info_t::create, inconsistent source", "[model]") {
     auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
     auto my_device = device_t::create(my_id, "my-device").value();
 
@@ -182,4 +182,154 @@ TEST_CASE("file_info_t::create, inconsistent source") {
     auto my_file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
     CHECK(my_file->get_block_size() == 0);
     CHECK(my_file->iterate_blocks().get_total() == 0);
+}
+
+TEST_CASE("file_info_t::get_size", "[model]") {
+    auto local_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
+    auto local_device = device_t::create(local_id, "my-device").value();
+
+    auto cluster = cluster_ptr_t(new cluster_t(local_device, 1));
+    auto sequencer = make_sequencer(4);
+    cluster->get_devices().put(local_device);
+
+    auto &folders = cluster->get_folders();
+    auto builder = diff_builder_t(*cluster);
+    builder.upsert_folder("1234-5678", "some/path", "my-label");
+    REQUIRE(builder.apply());
+
+    auto folder = folders.by_id("1234-5678");
+    auto &folder_infos = folder->get_folder_infos();
+    auto folder_local = folder_infos.by_device(*local_device);
+
+    auto b_hash = utils::sha256_digest(as_bytes("12345")).value();
+    auto pr_block = proto::BlockInfo();
+    proto::set_size(pr_block, 5);
+    proto::set_hash(pr_block, b_hash);
+
+    auto b_2_hash = utils::sha256_digest(as_bytes("11111")).value();
+    auto pr_block_2 = proto::BlockInfo();
+    proto::set_size(pr_block_2, 5);
+    proto::set_hash(pr_block_2, b_2_hash);
+    proto::set_offset(pr_block_2, 5);
+
+    auto bi1 = block_info_t::create(pr_block).value();
+    auto bi2 = block_info_t::create(pr_block_2).value();
+
+    auto pr_file = proto::FileInfo();
+    proto::set_name(pr_file, "a.txt");
+
+    auto v = proto::get_version(pr_file);
+    proto::add_counters(v, proto::Counter(local_device->device_id().get_uint(), 1));
+    proto::set_version(pr_file, v);
+
+    SECTION("1 block file") {
+        proto::set_block_size(pr_file, 5);
+        proto::set_size(pr_file, 5);
+        proto::add_blocks(pr_file, pr_block);
+
+        auto local_file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_local).value();
+        local_file->assign_block(bi1.get(), 0);
+        CHECK(local_file->get_size() == 5);
+    }
+    SECTION("0 block file") {
+        auto local_file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_local).value();
+        CHECK(local_file->get_size() == 0);
+    }
+    SECTION("2 equi-sized block file") {
+        proto::set_block_size(pr_file, 5);
+        proto::set_size(pr_file, 10);
+
+        proto::add_blocks(pr_file, pr_block);
+        proto::add_blocks(pr_file, pr_block_2);
+
+        auto local_file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_local).value();
+        local_file->assign_block(bi1.get(), 0);
+        local_file->assign_block(bi2.get(), 1);
+        CHECK(local_file->get_size() == 10);
+    }
+}
+
+TEST_CASE("file_info_t::update", "[model]") {
+    auto local_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
+    auto local_device = device_t::create(local_id, "my-device").value();
+
+    auto cluster = cluster_ptr_t(new cluster_t(local_device, 1));
+    auto sequencer = make_sequencer(4);
+    cluster->get_devices().put(local_device);
+
+    auto &folders = cluster->get_folders();
+    auto builder = diff_builder_t(*cluster);
+    builder.upsert_folder("1234-5678", "some/path", "my-label");
+    REQUIRE(builder.apply());
+
+    auto folder = folders.by_id("1234-5678");
+    auto &folder_infos = folder->get_folder_infos();
+    auto folder_local = folder_infos.by_device(*local_device);
+
+    auto pr_block = proto::BlockInfo();
+    proto::set_size(pr_block, 5);
+    auto bi1 = block_info_t::create(pr_block).value();
+
+    SECTION("update to emtpy") {
+        auto pr_file_1 = proto::FileInfo();
+        proto::set_name(pr_file_1, "a.txt");
+        proto::set_block_size(pr_file_1, 5);
+        proto::set_size(pr_file_1, 5);
+
+        auto v = proto::get_version(pr_file_1);
+        proto::add_counters(v, proto::Counter(local_device->device_id().get_uint(), 1));
+        proto::add_blocks(pr_file_1, pr_block);
+        proto::set_version(pr_file_1, v);
+
+        auto local_file_1 = file_info_t::create(sequencer->next_uuid(), pr_file_1, folder_local).value();
+        local_file_1->assign_block(bi1.get(), 0);
+        CHECK(local_file_1->get_size() == 5);
+
+        auto pr_file_2 = proto::FileInfo();
+        proto::set_name(pr_file_2, "a.txt");
+        proto::set_version(pr_file_2, v);
+
+        auto uuid = bu::uuid{};
+        assign(uuid, local_file_1->get_uuid());
+        auto local_file_2 = file_info_t::create(uuid, pr_file_2, folder_local).value();
+        CHECK(local_file_2->get_size() == 0);
+
+        local_file_1->update(*local_file_2);
+        CHECK(local_file_1->get_size() == 0);
+        CHECK(local_file_1->iterate_blocks().get_total() == 0);
+    }
+
+    SECTION("update to symlink") {
+        auto pr_file_1 = proto::FileInfo();
+        proto::set_name(pr_file_1, "a.txt");
+        proto::set_block_size(pr_file_1, 5);
+        proto::set_size(pr_file_1, 5);
+
+        auto v = proto::get_version(pr_file_1);
+        proto::add_counters(v, proto::Counter(local_device->device_id().get_uint(), 1));
+        proto::add_blocks(pr_file_1, pr_block);
+        proto::set_version(pr_file_1, v);
+
+        auto local_file_1 = file_info_t::create(sequencer->next_uuid(), pr_file_1, folder_local).value();
+        local_file_1->assign_block(bi1.get(), 0);
+        CHECK(local_file_1->get_size() == 5);
+        CHECK(local_file_1->is_file());
+
+        auto pr_file_2 = proto::FileInfo();
+        proto::set_name(pr_file_2, "a.txt");
+        proto::set_type(pr_file_2, proto::FileInfoType::SYMLINK);
+        proto::set_version(pr_file_2, v);
+        proto::set_symlink_target(pr_file_2, "b.txt");
+
+        auto uuid = bu::uuid{};
+        assign(uuid, local_file_1->get_uuid());
+        auto local_file_2 = file_info_t::create(uuid, pr_file_2, folder_local).value();
+        CHECK(local_file_2->get_size() == 0);
+        CHECK(local_file_2->is_link());
+
+        local_file_1->update(*local_file_2);
+        CHECK(local_file_1->get_size() == 0);
+        CHECK(local_file_1->iterate_blocks().get_total() == 0);
+        CHECK(local_file_1->is_link());
+    }
 }
