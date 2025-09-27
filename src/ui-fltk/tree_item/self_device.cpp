@@ -12,6 +12,7 @@
 #include "constants.h"
 
 #include <spdlog/fmt/fmt.h>
+#include <FL/Fl_Box.H>
 #include <FL/Fl.H>
 #include <FL/Fl_Tile.H>
 
