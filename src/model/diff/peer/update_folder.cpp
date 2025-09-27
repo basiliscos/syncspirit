@@ -22,7 +22,7 @@ update_folder_t::update_folder_t(std::string_view folder_id_, utils::bytes_view_
                                  uuids_t uuids, blocks_t blocks, orphaned_blocks_t::set_t removed_blocks) noexcept
     : folder_id{std::string(folder_id_)}, peer_id{peer_id_.begin(), peer_id_.end()}, files(std::move(files_)),
       uuids{std::move(uuids)} {
-    LOG_DEBUG(log, "update_folder_t, folder = {}", folder_id);
+    LOG_DEBUG(log, "update_folder_t, folder = {}, files: {}, blocks = {}", folder_id, files.size(), blocks.size());
     auto current = (cluster_diff_t *)(nullptr);
     if (!blocks.empty()) {
         current = assign_child(new modify::add_blocks_t(std::move(blocks)));

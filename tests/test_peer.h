@@ -9,6 +9,7 @@
 #include "model/cluster.h"
 #include "utils/log.h"
 #include "syncspirit-test-export.h"
+#include <optional>
 
 namespace syncspirit::test {
 
@@ -16,12 +17,24 @@ namespace r = rotor;
 namespace sys = boost::system;
 namespace outcome = boost::outcome_v2;
 
+struct block_response_t {
+    std::string name;
+    size_t block_index;
+    utils::bytes_t data;
+    sys::error_code ec;
+};
+
+using block_response_opt_t = std::optional<block_response_t>;
+
+using block_callback_t = std::function<block_response_opt_t(r::actor_base_t *, net::message::block_request_t &)>;
+
 struct test_peer_config_t : public r::actor_config_t {
     model::device_ptr_t peer_device;
     r::address_ptr_t coordinator;
     std::string url;
     bool auto_share = false;
     model::cluster_ptr_t cluster;
+    block_callback_t block_callback;
 };
 
 template <typename Actor> struct test_peer_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -49,6 +62,10 @@ template <typename Actor> struct test_peer_config_builder_t : r::actor_config_bu
         parent_t::config.url = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
+    builder_t &&block_callback(block_callback_t value) && noexcept {
+        parent_t::config.block_callback = std::move(value);
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
 };
 
 struct SYNCSPIRIT_TEST_API test_peer_t : r::actor_base_t {
@@ -60,13 +77,6 @@ struct SYNCSPIRIT_TEST_API test_peer_t : r::actor_base_t {
     using remote_message_t = r::intrusive_ptr_t<net::message::forwarded_message_t>;
     using remote_messages_t = std::list<remote_message_t>;
     using shutdown_start_callback_t = std::function<void()>;
-
-    struct block_response_t {
-        std::string name;
-        size_t block_index;
-        utils::bytes_t data;
-        sys::error_code ec;
-    };
 
     using allowed_index_updates_t = std::unordered_set<std::string>;
     using block_responses_t = std::list<block_response_t>;
@@ -94,6 +104,7 @@ struct SYNCSPIRIT_TEST_API test_peer_t : r::actor_base_t {
     void push_block(utils::bytes_view_t data, size_t index, std::string_view name = {});
     void push_block(sys::error_code ec, size_t index);
 
+    block_callback_t block_callback;
     int blocks_requested = 0;
     bool reading = false;
     bool auto_share = false;

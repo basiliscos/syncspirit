@@ -21,6 +21,7 @@ test_peer_t::test_peer_t(config_t &config)
     assert(cluster);
     assert(peer_device);
     assert(!url.empty());
+    block_callback = std::move(config.block_callback);
 }
 
 void test_peer_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
@@ -168,8 +169,13 @@ void test_peer_t::process_block_requests() noexcept {
 void test_peer_t::on_block_request(net::message::block_request_t &req) noexcept {
     block_requests.push_front(&req);
     ++blocks_requested;
-    log->debug("{}, requesting block # {}", identity, block_requests.front()->payload.request_payload.block_index);
-    if (block_responses.size()) {
+    log->debug("{}, requested block # {}", identity, block_requests.front()->payload.request_payload.block_index);
+    if (block_callback) {
+        auto opt = block_callback(this, req);
+        if (opt) {
+            block_responses.emplace_back(*opt);
+        }
+    } else if (block_responses.size()) {
         log->debug("{}, top response block # {}", identity, block_responses.front().block_index);
     }
     process_block_requests();
