@@ -285,6 +285,27 @@ void test_concurrent_downloading() {
             CHECK(requested_blocks_sz[peer_actors[0].get()] == N / 2);
             CHECK(requested_blocks_sz[peer_actors[1].get()] == N / 2);
             CHECK(local_folder->get_file_infos().size() == N);
+
+            int index_updates[2] = {0, 0};
+            for (size_t idx = 0; idx < 2; ++idx) {
+                for (auto &m : peer_actors[idx]->messages) {
+                    if (auto u = std::get_if<proto::IndexUpdate>(&m->payload); u) {
+                        ++index_updates[idx];
+                        auto peer = peer_devices[idx];
+                        auto &file = proto::get_files(*u, 0);
+                        auto file_name = proto::get_name(file);
+                        log->debug("{} got index update for '{}'", peer->device_id().get_short(), file_name);
+                    } else if (auto u = std::get_if<proto::Index>(&m->payload); u) {
+                        ++index_updates[idx];
+                        auto peer = peer_devices[idx];
+                        auto &file = proto::get_files(*u, 0);
+                        auto file_name = proto::get_name(file);
+                        log->debug("{} got index for '{}'", peer->device_id().get_short(), file_name);
+                    }
+                }
+            }
+            CHECK(index_updates[0] == N);
+            CHECK(index_updates[1] == N);
         }
 
         blocks_map_t blocks_map;
