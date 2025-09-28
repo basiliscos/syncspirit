@@ -134,11 +134,17 @@ template <> struct base_impl_t<ssl_socket_t> {
                 use_sytem_verify_paths = false;
             }
         }
-
         if (use_sytem_verify_paths) {
             log->trace("using default verify paths");
             auto ec = sys::error_code();
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+            if (!SSL_CTX_load_verify_store(ctx.native_handle(), "org.openssl.winstore://")) {
+                auto code = ::ERR_get_error();
+                ec = sys::error_code(static_cast<int>(code), asio::error::get_ssl_category());
+            }
+#else
             ctx.set_default_verify_paths(ec);
+#endif
             if (ec) {
                 utils::get_logger("transport.tls")->warn("cannot set ssl default verify paths: {}", ec.message());
             }
