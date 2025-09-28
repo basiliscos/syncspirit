@@ -2,16 +2,12 @@
 // SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
 
 #include "log_table.h"
-#include "log_sink.h"
 #include "log_colors.h"
 #include "log_utils.h"
 
 #include <FL/Fl.H>
 #include <FL/fl_draw.H>
 
-#include <spdlog/sinks/sink.h>
-#include <spdlog/pattern_formatter.h>
-#include <spdlog/fmt/fmt.h>
 #include <sstream>
 
 namespace syncspirit::fltk {

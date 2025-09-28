@@ -5,7 +5,13 @@
 
 using namespace syncspirit::fltk;
 
-in_memory_sink_t::in_memory_sink_t() : date_formatter("%H:%M:%S.%F") {}
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+#define SECOND_FRACTION "%f"
+#else
+#define SECOND_FRACTION "%F"
+#endif
+
+in_memory_sink_t::in_memory_sink_t() : date_formatter("%H:%M:%S." SECOND_FRACTION) {}
 
 void in_memory_sink_t::flush() {}
 
