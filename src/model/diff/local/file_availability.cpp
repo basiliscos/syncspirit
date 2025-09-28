@@ -29,7 +29,8 @@ auto file_availability_t::apply_impl(apply_controller_t &controller, void *custo
                     f->mark_local_available(i);
                 }
             }
-            f->mark_local(true, folder_info);
+            f->mark_local(true);
+            f->recheck(folder_info);
             f->notify_update();
         }
     }

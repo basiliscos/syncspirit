@@ -162,7 +162,7 @@ auto advance_t::apply_impl(apply_controller_t &controller, void *custom) const n
     }
 
     auto sequence = local_folder->get_max_sequence() + 1;
-    local_file->mark_local(true, *local_folder);
+    local_file->mark_local(true);
     local_file->set_sequence(sequence);
     local_folder->add_strict(local_file);
 

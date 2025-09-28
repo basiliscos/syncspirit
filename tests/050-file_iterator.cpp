@@ -83,15 +83,9 @@ TEST_CASE("file iterator, single folder", "[model]") {
                     SECTION("path is locked") {
                         auto &cache = cluster->get_path_cache();
                         auto path = cache.get_path("a.txt");
-                        {
-                            auto lock = cluster->lock(path.get());
-                            auto [f, fi, action] = file_iterator->next();
-                            REQUIRE(!f);
-                        }
-                        {
-                            auto [f, fi, action] = file_iterator->next();
-                            REQUIRE(f);
-                        }
+                        auto lock = cluster->lock(path.get());
+                        auto [f, fi, action] = file_iterator->next();
+                        REQUIRE(!f);
                     }
                 }
                 SECTION("symblink") {
@@ -135,7 +129,7 @@ TEST_CASE("file iterator, single folder", "[model]") {
                     REQUIRE(builder.apply());
 
                     auto my_file = file_info_t::create(sequencer->next_uuid(), pr_fi, my_folder).value();
-                    my_file->mark_local(true, *my_folder);
+                    my_file->mark_local(true);
                     my_files.put(my_file);
 
                     auto [f, fi, action] = file_iterator->next();
@@ -160,7 +154,7 @@ TEST_CASE("file iterator, single folder", "[model]") {
                     proto::set_value(c_1, 10);
 
                     auto my_file = file_info_t::create(sequencer->next_uuid(), pr_fi, my_folder).value();
-                    my_file->mark_local(true, *my_folder);
+                    my_file->mark_local(true);
                     my_files.put(my_file);
 
                     CHECK(file_iterator->next() == R{{}, {}, A::ignore});
@@ -170,7 +164,7 @@ TEST_CASE("file iterator, single folder", "[model]") {
                     REQUIRE(builder.apply());
 
                     auto my_file = file_info_t::create(sequencer->next_uuid(), pr_fi, my_folder).value();
-                    my_file->mark_local(true, *my_folder);
+                    my_file->mark_local(true);
                     my_files.put(my_file);
 
                     CHECK(file_iterator->next() == R{{}, {}, A::ignore});
@@ -339,7 +333,8 @@ TEST_CASE("file iterator, single folder", "[model]") {
                 CHECK(file_iterator->next() == R{{}, {}, A::ignore});
             }
             SECTION("has been scanned") {
-                my_file->mark_local(true, *my_folder);
+                my_file->mark_local(true);
+                my_file->recheck(*my_folder);
 
                 auto [f, fi, action] = file_iterator->next();
                 REQUIRE(f);

@@ -163,7 +163,7 @@ struct SYNCSPIRIT_API file_info_t {
 
     void mark_unreachable(bool value) noexcept;
     void mark_local_available(size_t block_index) noexcept;
-    void mark_local(bool available, const folder_info_t &) noexcept;
+    void mark_local(bool available) noexcept;
     bool is_locally_available(size_t block_index) const noexcept;
     bool is_locally_available() const noexcept;
 
@@ -214,6 +214,8 @@ struct SYNCSPIRIT_API file_info_t {
 
     template <typename T> auto &access() noexcept;
     template <typename T> auto &access() const noexcept;
+
+    void recheck(const folder_info_t &folder_info) noexcept;
 
   private:
     using string_t = utils::compact_vector_t<char>;

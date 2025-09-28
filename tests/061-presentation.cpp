@@ -350,7 +350,7 @@ TEST_CASE("presentation", "[presentation]") {
 
             auto file = model::file_info_t::create(sequencer->next_uuid(), pr_fi, folder_info.get()).value();
             if (&device == my_device) {
-                file->mark_local(true, *folder_info);
+                file->mark_local(true);
             }
             folder_info->add_strict(file);
             return file;
@@ -890,7 +890,7 @@ TEST_CASE("statistics, update", "[presentation]") {
             file->assign_block(block.get(), 0);
         }
         if (&device == my_device) {
-            file->mark_local(true, *folder_info);
+            file->mark_local(true);
             if (block) {
                 file->mark_local_available(0);
             }
@@ -967,7 +967,7 @@ TEST_CASE("statistics", "[presentation]") {
             file->assign_block(block.get(), 0);
         }
         if (&device == my_device) {
-            file->mark_local(true, *folder_info);
+            file->mark_local(true);
             if (block) {
                 file->mark_local_available(0);
             }

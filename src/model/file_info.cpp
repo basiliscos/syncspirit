@@ -97,6 +97,7 @@ file_info_t::guard_t::guard_t(file_info_t &file_, const folder_info_t *folder_in
 file_info_t::guard_t::~guard_t() {
     if (file) {
         file->synchronizing_unlock();
+        file->recheck(*folder_info);
     }
 }
 
@@ -365,7 +366,7 @@ void file_info_t::mark_unreachable(bool value) noexcept {
     }
 }
 
-void file_info_t::mark_local(bool available, const folder_info_t &folder_info) noexcept {
+void file_info_t::mark_local(bool available) noexcept {
     if (available) {
         flags = flags | f_local;
     } else {
@@ -385,19 +386,21 @@ void file_info_t::mark_local(bool available, const folder_info_t &folder_info) n
         if (!(flags & f_type_file) || static_cast<std::uint32_t>(content.file.blocks.size()) == available) {
             flags = flags | f_available;
         }
+    }
+}
 
-        auto self = folder_info.get_device();
-        auto folder = folder_info.get_folder();
-        for (auto it : folder->get_folder_infos()) {
-            auto fi = it.item.get();
-            auto peer = fi->get_device();
-            if (peer != self) {
-                auto fit = peer->get_iterator();
-                if (fit) {
-                    auto peer_file = fi->get_file_infos().by_name(name->get_full_name());
-                    if (peer_file) {
-                        fit->recheck(*fi, *peer_file);
-                    }
+void file_info_t::recheck(const folder_info_t &folder_info) noexcept {
+    auto self = folder_info.get_device();
+    auto folder = folder_info.get_folder();
+    for (auto it : folder->get_folder_infos()) {
+        auto fi = it.item.get();
+        auto peer = fi->get_device();
+        if (peer != self) {
+            auto fit = peer->get_iterator();
+            if (fit) {
+                auto peer_file = fi->get_file_infos().by_name(name->get_full_name());
+                if (peer_file) {
+                    fit->recheck(*fi, *peer_file);
                 }
             }
         }
