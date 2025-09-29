@@ -132,7 +132,7 @@ static main_t make_default_config(const bfs::path &config_path, const bfs::path 
     cfg.config_path = config_path;
     cfg.default_location = config_dir;      /* "shared_data" */
     cfg.root_ca_file = bfs::path{};         /* root ca path */
-    cfg.timeout = 5000;
+    cfg.timeout = 30000;
     cfg.device_name = device;
     cfg.hasher_threads = 3;
     cfg.log_configs = {
