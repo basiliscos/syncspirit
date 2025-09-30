@@ -76,9 +76,12 @@ error_ptr_t url_t::validate_value() noexcept {
     return {};
 }
 
-path_t::path_t(std::string label, std::string explanation, std::string value, std::string default_value,
+static std::string _to_str(const bfs::path &p) { return boost::nowide::narrow(p.wstring()); }
+
+path_t::path_t(std::string label, std::string explanation, const bfs::path &value, const bfs::path &default_value,
                property_kind_t kind)
-    : property_t(std::move(label), std::move(explanation), std::move(value), std::move(default_value), kind) {}
+    : property_t(std::move(label), std::move(explanation), std::move(_to_str(value)), std::move(_to_str(default_value)),
+                 kind) {}
 
 bfs::path path_t::convert() noexcept { return bfs::path(boost::nowide::widen(value)); }
 
@@ -316,20 +319,6 @@ void lookup_url_t::reflect_to(syncspirit::config::main_t &main) {
 
 const char *lookup_url_t::explanation_ = "url of syncthing/private lookup/discovery server";
 
-cert_file_t::cert_file_t(std::string value, std::string default_value)
-    : parent_t("cert_file", explanation_, std::move(value), std::move(default_value)) {}
-
-void cert_file_t::reflect_to(syncspirit::config::main_t &main) { main.global_announce_config.cert_file = value; }
-
-const char *cert_file_t::explanation_ = "this device certificate location";
-
-key_file_t::key_file_t(std::string value, std::string default_value)
-    : parent_t("key_file", explanation_, std::move(value), std::move(default_value)) {}
-
-void key_file_t::reflect_to(syncspirit::config::main_t &main) { main.global_announce_config.key_file = value; }
-
-const char *key_file_t::explanation_ = "this device key location";
-
 rx_buff_size_t::rx_buff_size_t(std::uint64_t value, std::uint64_t default_value)
     : parent_t("rx_buff_size", explanation_, value, default_value) {}
 
@@ -370,16 +359,29 @@ const char *port_t::explanation_ = "upd port used for announcement (should be th
 
 namespace main {
 
-default_location_t::default_location_t(std::string value, std::string default_value)
-    : parent_t("default_location", explanation_, std::move(value), std::move(default_value),
-               property_kind_t::directory) {}
+default_location_t::default_location_t(const bfs::path &value, const bfs::path &default_value)
+    : parent_t("default_location", explanation_, value, default_value, property_kind_t::directory) {}
 
 void default_location_t::reflect_to(syncspirit::config::main_t &main) { main.default_location = convert(); }
 
 const char *default_location_t::explanation_ = "where folders are created by default";
 
-root_ca_file::root_ca_file(std::string value, std::string default_value)
-    : parent_t("root_ca_file", explanation_, std::move(value), std::move(default_value), property_kind_t::file) {}
+cert_file_t::cert_file_t(const bfs::path &value, const bfs::path &default_value)
+    : parent_t("cert_file", explanation_, value, default_value) {}
+
+void cert_file_t::reflect_to(syncspirit::config::main_t &main) { main.cert_file = value; }
+
+const char *cert_file_t::explanation_ = "this device certificate location";
+
+key_file_t::key_file_t(const bfs::path &value, const bfs::path &default_value)
+    : parent_t("key_file", explanation_, value, default_value) {}
+
+void key_file_t::reflect_to(syncspirit::config::main_t &main) { main.key_file = value; }
+
+const char *key_file_t::explanation_ = "this device key location";
+
+root_ca_file::root_ca_file(const bfs::path &value, const bfs::path &default_value)
+    : parent_t("root_ca_file", explanation_, value, default_value, property_kind_t::file) {}
 
 void root_ca_file::reflect_to(syncspirit::config::main_t &main) { main.root_ca_file = convert(); }
 

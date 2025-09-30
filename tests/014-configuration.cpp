@@ -36,8 +36,7 @@ bool operator==(const db_config_t &lhs, const db_config_t &rhs) noexcept {
 
 bool operator==(const global_announce_config_t &lhs, const global_announce_config_t &rhs) noexcept {
     return lhs.enabled == rhs.enabled && lhs.debug == rhs.debug && *lhs.announce_url == *rhs.announce_url &&
-           *lhs.lookup_url == *rhs.lookup_url && lhs.cert_file == rhs.cert_file && lhs.key_file == rhs.key_file &&
-           lhs.rx_buff_size == rhs.rx_buff_size && lhs.timeout == rhs.timeout &&
+           *lhs.lookup_url == *rhs.lookup_url && lhs.rx_buff_size == rhs.rx_buff_size && lhs.timeout == rhs.timeout &&
            lhs.reannounce_after == rhs.reannounce_after;
 }
 
@@ -63,8 +62,8 @@ bool operator==(const main_t &lhs, const main_t &rhs) noexcept {
     return lhs.local_announce_config == rhs.local_announce_config && lhs.upnp_config == rhs.upnp_config &&
            lhs.global_announce_config == rhs.global_announce_config && lhs.bep_config == rhs.bep_config &&
            lhs.db_config == rhs.db_config && lhs.timeout == rhs.timeout && lhs.device_name == rhs.device_name &&
-           lhs.config_path == rhs.config_path && lhs.log_configs == rhs.log_configs &&
-           lhs.hasher_threads == rhs.hasher_threads;
+           lhs.config_path == rhs.config_path && lhs.log_configs == rhs.log_configs && lhs.cert_file == rhs.cert_file &&
+           lhs.key_file == rhs.key_file && lhs.hasher_threads == rhs.hasher_threads;
 }
 
 } // namespace syncspirit::config
@@ -78,15 +77,15 @@ using namespace syncspirit;
 TEST_CASE("expand_home", "[config]") {
     SECTION("valid home") {
         auto home = utils::home_option_t(fs::path("/user/home/.config/syncspirit_test"));
-        REQUIRE(utils::expand_home("some/path", home) == "some/path");
-        REQUIRE(utils::expand_home("~/some/path", home) == "/user/home/.config/syncspirit_test/some/path");
+        REQUIRE(utils::expand_home("some/path", home) == L"some/path");
+        REQUIRE(utils::expand_home("~/some/path", home) == L"/user/home/.config/syncspirit_test/some/path");
     }
 
     SECTION("invalid home") {
         auto ec = sys::error_code{1, sys::system_category()};
         auto home = utils::home_option_t(ec);
-        REQUIRE(utils::expand_home("some/path", home) == "some/path");
-        REQUIRE(utils::expand_home("~/some/path", home) == "~/some/path");
+        REQUIRE(utils::expand_home("some/path", home) == L"some/path");
+        REQUIRE(utils::expand_home("~/some/path", home) == L"~/some/path");
     }
 }
 

@@ -5,6 +5,7 @@
 #include <openssl/crypto.h>
 #include <filesystem>
 #include <boost/program_options.hpp>
+#include <boost/nowide/convert.hpp>
 #include <rotor/asio.hpp>
 #include <rotor/thread.hpp>
 #include <spdlog/spdlog.h>
@@ -262,10 +263,13 @@ int app_main(app_context_t &app_ctx) {
     }
 
     {
-        auto &cert_path = cfg.global_announce_config.cert_file;
-        auto &key_path = cfg.global_announce_config.key_file;
+        auto &cert_path = cfg.cert_file;
+        auto &key_path = cfg.key_file;
         auto ec = std::error_code{};
-        if (!bfs::exists(cert_path, ec) && !bfs::exists(key_path, ec)) {
+        if (!bfs::exists(cert_path, ec) || !bfs::exists(key_path, ec)) {
+            auto cert_path_str = boost::nowide::narrow(cert_path.wstring());
+            auto key_path_str = boost::nowide::narrow(key_path.wstring());
+            logger->trace("'{}' or '{}' do not exist", cert_path_str, key_path_str);
             logger->info("Generating cryptographic keys...");
             auto pair = utils::generate_pair(constants::issuer_name);
             if (!pair) {
@@ -273,7 +277,7 @@ int app_main(app_context_t &app_ctx) {
                 return 1;
             }
             auto &keys = pair.value();
-            auto save_result = keys.save(cert_path.c_str(), key_path.c_str());
+            auto save_result = keys.save(cert_path_str.c_str(), key_path_str.c_str());
             if (!save_result) {
                 logger->error("cannot store cryptographic keys ({} & {}) :: {}", cert_path, key_path,
                               save_result.error().message());

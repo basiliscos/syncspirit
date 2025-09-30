@@ -34,10 +34,12 @@ r::plugin::resource_id_t interrupt = 0;
 net_supervisor_t::net_supervisor_t(net_supervisor_t::config_t &cfg)
     : parent_t(this, resource::interrupt, cfg), sequencer{cfg.sequencer}, app_config{cfg.app_config},
       independent_threads{cfg.independent_threads}, thread_counter{independent_threads} {
+    using boost::nowide::narrow;
     bouncer = cfg.bouncer_address;
     auto log = utils::get_logger(names::coordinator);
-    auto &files_cfg = app_config.global_announce_config;
-    auto result = utils::load_pair(files_cfg.cert_file.c_str(), files_cfg.key_file.c_str());
+    auto cert_file = narrow(app_config.cert_file.wstring());
+    auto key_file = narrow(app_config.key_file.wstring());
+    auto result = utils::load_pair(cert_file.c_str(), key_file.c_str());
     if (!result) {
         LOG_CRITICAL(log, "cannot load certificate/key pair :: {}", result.error().message());
         throw result.error();

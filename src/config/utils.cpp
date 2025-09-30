@@ -116,7 +116,7 @@ static std::string get_device_name() noexcept {
 }
 
 static main_t make_default_config(const bfs::path &config_path, const bfs::path &config_dir, bool is_home) {
-    auto dir = config_path.parent_path();
+    auto dir = config_path;
     std::string cert_file = home_path + "/cert.pem";
     std::string key_file = home_path + "/key.pem";
     if (!is_home) {
@@ -130,8 +130,10 @@ static main_t make_default_config(const bfs::path &config_path, const bfs::path 
     // clang-format off
     main_t cfg;
     cfg.config_path = config_path;
-    cfg.default_location = config_dir;      /* "shared_data" */
-    cfg.root_ca_file = bfs::path{};         /* root ca path */
+    cfg.default_location = config_dir / L"shared-data";
+    cfg.root_ca_file = bfs::path{};
+    cfg.cert_file = cert_file;
+    cfg.key_file = key_file;
     cfg.timeout = 30000;
     cfg.device_name = device;
     cfg.hasher_threads = 3;
@@ -150,8 +152,6 @@ static main_t make_default_config(const bfs::path &config_path, const bfs::path 
         false,                                                          /* debug */
         utils::parse("https://discovery-announce-v4.syncthing.net/v2"), /* announce_url */
         utils::parse("https://discovery-lookup.syncthing.net/v2"),      /* lookup_url */
-        cert_file,                                                      /* certificate file path */
-        key_file,                                                       /* key file path */
         32 * 1024,                                                      /* rx_buff_size */
         3000,                                                           /* timeout */
         10 * 60,                                                        /* reannounce timeout */
@@ -246,6 +246,8 @@ config_result_t get_config(std::istream &config, const bfs::path &config_path) {
         SAFE_GET_PATH(default_location, "main");
         SAFE_GET_VALUE(hasher_threads, std::uint32_t, "main");
         SAFE_GET_PATH_OPTIONAL(root_ca_file, "main");
+        SAFE_GET_PATH_EXPANDED(cert_file, "main");
+        SAFE_GET_PATH_EXPANDED(key_file, "main");
     };
 
     // local_discovery
@@ -269,8 +271,6 @@ config_result_t get_config(std::istream &config, const bfs::path &config_path) {
         SAFE_GET_VALUE(debug, bool, "global_discovery");
         SAFE_GET_URL(announce_url, "global_discovery");
         SAFE_GET_URL(lookup_url, "global_discovery");
-        SAFE_GET_PATH_EXPANDED(cert_file, "global_discovery");
-        SAFE_GET_PATH_EXPANDED(key_file, "global_discovery");
         SAFE_GET_VALUE(rx_buff_size, std::uint32_t, "global_discovery");
         SAFE_GET_VALUE(timeout, std::uint32_t, "timeout");
     };
@@ -397,6 +397,8 @@ static std::string_view get_level(spdlog::level::level_enum level) noexcept {
 }
 
 outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
+    using boost::nowide::narrow;
+
     auto logs = toml::array{};
     for (auto &c : cfg.log_configs) {
         auto sinks = toml::array{};
@@ -411,13 +413,21 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
         logs.push_back(log_table);
     }
 
+    auto cert_file = cfg.cert_file;
+    cert_file.make_preferred();
+
+    auto key_file = cfg.key_file;
+    key_file.make_preferred();
+
     auto tbl = toml::table{{
         {"main", toml::table{{
                      {"hasher_threads", cfg.hasher_threads},
-                     {"root_ca_file", cfg.root_ca_file.string()},
+                     {"root_ca_file", narrow(cfg.root_ca_file.wstring())},
+                     {"cert_file", narrow(cert_file.wstring())},
+                     {"key_file", narrow(key_file.wstring())},
                      {"timeout", cfg.timeout},
                      {"device_name", cfg.device_name},
-                     {"default_location", cfg.default_location.string()},
+                     {"default_location", narrow(cfg.default_location.wstring())},
                  }}},
         {"log", logs},
         {"local_discovery", toml::table{{
@@ -430,8 +440,6 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
                                  {"debug", cfg.global_announce_config.debug},
                                  {"announce_url", cfg.global_announce_config.announce_url->buffer().data()},
                                  {"lookup_url", cfg.global_announce_config.lookup_url->buffer().data()},
-                                 {"cert_file", cfg.global_announce_config.cert_file},
-                                 {"key_file", cfg.global_announce_config.key_file},
                                  {"rx_buff_size", cfg.global_announce_config.rx_buff_size},
                                  {"timeout", cfg.global_announce_config.timeout},
                              }}},

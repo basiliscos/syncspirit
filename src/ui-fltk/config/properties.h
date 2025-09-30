@@ -39,7 +39,7 @@ struct url_t : string_t {
 };
 
 struct path_t : property_t {
-    path_t(std::string label, std::string explanation, std::string value, std::string default_value,
+    path_t(std::string label, std::string explanation, const bfs::path &value, const bfs::path &default_value,
            property_kind_t kind = property_kind_t::file);
 
     bfs::path convert() noexcept;
@@ -302,26 +302,6 @@ struct lookup_url_t final : impl::url_t {
     void reflect_to(syncspirit::config::main_t &main) override;
 };
 
-struct cert_file_t final : impl::path_t {
-    using parent_t = impl::path_t;
-
-    static const char *explanation_;
-
-    cert_file_t(std::string value, std::string default_value);
-
-    void reflect_to(syncspirit::config::main_t &main) override;
-};
-
-struct key_file_t final : impl::path_t {
-    using parent_t = impl::path_t;
-
-    static const char *explanation_;
-
-    key_file_t(std::string value, std::string default_value);
-
-    void reflect_to(syncspirit::config::main_t &main) override;
-};
-
 struct rx_buff_size_t final : impl::positive_integer_t {
     using parent_t = impl::positive_integer_t;
 
@@ -378,7 +358,27 @@ struct default_location_t final : impl::path_t {
 
     static const char *explanation_;
 
-    default_location_t(std::string value, std::string default_value);
+    default_location_t(const bfs::path &value, const bfs::path &default_value);
+
+    void reflect_to(syncspirit::config::main_t &main) override;
+};
+
+struct cert_file_t final : impl::path_t {
+    using parent_t = impl::path_t;
+
+    static const char *explanation_;
+
+    cert_file_t(const bfs::path &, const bfs::path &default_value);
+
+    void reflect_to(syncspirit::config::main_t &main) override;
+};
+
+struct key_file_t final : impl::path_t {
+    using parent_t = impl::path_t;
+
+    static const char *explanation_;
+
+    key_file_t(const bfs::path &, const bfs::path &default_value);
 
     void reflect_to(syncspirit::config::main_t &main) override;
 };
@@ -388,7 +388,7 @@ struct root_ca_file final : impl::path_t {
 
     static const char *explanation_;
 
-    root_ca_file(std::string value, std::string default_value);
+    root_ca_file(const bfs::path &value, const bfs::path &default_value);
 
     void reflect_to(syncspirit::config::main_t &main) override;
 };

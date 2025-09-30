@@ -23,12 +23,14 @@ namespace syncspirit::utils {
 
 namespace sys = boost::system;
 
-SYNCSPIRIT_API std::string expand_home(const std::string &path, const home_option_t &home) noexcept {
-    if (home.has_value() && path.size() >= 2 && path[0] == '~' && path[1] == '/') {
+SYNCSPIRIT_API std::wstring expand_home(const std::string &path, const home_option_t &home) noexcept {
+    if (home.has_value() && path.size() >= 2 && path[0] == '~' && (path[1] == '/' || path[1] == '\\')) {
         auto path_view = std::string_view(path).substr(2);
-        return (home.assume_value() / path_view).generic_string();
+        auto path_wstr = boost::nowide::widen(path_view);
+        auto path = home.assume_value() / path_wstr;
+        return path.generic_wstring();
     }
-    return path;
+    return boost::nowide::widen(path);
 }
 
 outcome::result<bfs::path> get_home_dir() noexcept {
