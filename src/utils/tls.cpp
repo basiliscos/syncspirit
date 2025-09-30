@@ -142,8 +142,8 @@ outcome::result<key_pair_t> generate_pair(const char *issuer_name) noexcept {
 
     std::random_device rd;
     std::mt19937 generator(rd());
-    constexpr const auto max_sn = std::numeric_limits<std::uint64_t>::max() >> 1;
-    std::uniform_int_distribution<std::uint64_t> distr(1, max_sn);
+    constexpr const auto max_sn = std::numeric_limits<std::int32_t>::max();
+    std::uniform_int_distribution<std::int32_t> distr(1, max_sn);
     int version = 2;
     long serial = static_cast<long>(distr(generator));
     long start_epoch = 0;        /* now */
