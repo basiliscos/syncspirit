@@ -14,7 +14,7 @@ class SyncspiritRecipe(ConanFile):
         self.requires("libqrencode/4.1.1")
         self.requires("lz4/1.10.0")
         self.requires("nlohmann_json/3.12.0")
-        self.requires("openssl/3.4.1")
+        self.requires("openssl/3.5.2")
         self.requires("protopuf/3.0.0")
         self.requires("pugixml/1.15")
         self.requires("rotor/0.34")
