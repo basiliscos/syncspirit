@@ -202,7 +202,7 @@ template <> struct base_impl_t<ssl_socket_t> {
             sock.set_verify_depth(1);
         }
 
-        log->trace("will use verify callback: {}", (me? "yes" : "no"));
+        log->trace("will use verify callback: {}", (me ? "yes" : "no"));
         if (me) {
             sock.set_verify_callback([&](bool, ssl::verify_context &peer_ctx) -> bool {
                 auto native = peer_ctx.native_handle();
