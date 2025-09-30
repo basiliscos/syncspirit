@@ -146,7 +146,7 @@ template <> struct base_impl_t<ssl_socket_t> {
             ctx.set_default_verify_paths(ec);
 #endif
             if (ec) {
-                utils::get_logger("transport.tls")->warn("cannot set ssl default verify paths: {}", ec.message());
+                log->warn("cannot set ssl default verify paths: {}", ec.message());
             }
         }
 
@@ -202,6 +202,7 @@ template <> struct base_impl_t<ssl_socket_t> {
             sock.set_verify_depth(1);
         }
 
+        log->trace("will use verify callback: {}", (me? "yes" : "no"));
         if (me) {
             sock.set_verify_callback([&](bool, ssl::verify_context &peer_ctx) -> bool {
                 auto native = peer_ctx.native_handle();
