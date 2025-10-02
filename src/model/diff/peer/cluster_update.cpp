@@ -383,7 +383,7 @@ cluster_update_t::cluster_update_t(const bfs::path &default_path, const cluster_
 
             if (!folder_info && source.is_introducer()) {
                 add_folder_info(folder_id, d, device_id);
-            } else {
+            } else if (folder_info) {
                 confirmed_folders.emplace(folder_info->get_key());
             }
         }

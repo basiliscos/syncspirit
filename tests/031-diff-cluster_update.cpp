@@ -1134,6 +1134,39 @@ TEST_CASE("folder is shared peer (seq=0), but peer does not accepts the share =>
     CHECK(folder_peer.get() == folder->get_folder_infos().by_device(*peer_device).get());
 }
 
+TEST_CASE("peer2 sharing unknown folder with us and peer1 => NOOP", "[model]") {
+    auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
+    auto my_device = device_t::create(my_id, "my-device").value();
+    auto peer_1_id =
+        device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
+    auto peer_2_id =
+        device_id_t::from_string("5XHKRRJ-FGUQ4BZ-SAY6TVF-JFYTQFV-W3FCZ4W-ROCTQ27-754D242-4POW5AC").value();
+
+    auto peer_1_device = device_t::create(peer_1_id, "peer-1-device").value();
+    auto peer_2_device = device_t::create(peer_2_id, "peer-2-device").value();
+
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
+    auto sequencer = model::make_sequencer(5);
+    auto &devices = cluster->get_devices();
+    devices.put(my_device);
+    devices.put(peer_1_device);
+    devices.put(peer_2_device);
+
+    auto builder = diff_builder_t(*cluster);
+    auto folder_id = "1234";
+
+    auto sha256_1 = peer_1_id.get_sha256();
+    auto sha256_2 = peer_2_id.get_sha256();
+
+    auto r = builder.configure_cluster(sha256_1)
+                 .add(sha256_1, folder_id, 101, 101)
+                 .add(sha256_2, folder_id, 102, 101)
+                 .finish()
+                 .apply();
+    REQUIRE(r);
+    CHECK(cluster->get_folders().size() == 0);
+}
+
 int _init() {
     test::init_logging();
     return 1;
