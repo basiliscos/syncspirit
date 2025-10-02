@@ -130,8 +130,9 @@ after the core completion.
           non-zero size and without blocks)
  - [core] allow to specify root certificate authority to use in all tls/ssl connections,
          see [faq](faq.md), mostly actual for Windows XP with expired system certificates
- - [core, fltk] more correctly display file scanning progress
+ - [core, win32] fix negative serial number in generated ssl-certificates
  - [core] use in-depth scan order instead of in-breadth
+ - [core, fltk] more correctly display file scanning progress
  - [fltk] deactivate currently selected log level button
  - [core, bugfix] make successful upnp port unmapping upon shutdown
 

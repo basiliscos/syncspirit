@@ -3,7 +3,6 @@
 
 #pragma once
 #include <cstdint>
-#include <string>
 #include "utils/uri.h"
 
 namespace syncspirit::config {
