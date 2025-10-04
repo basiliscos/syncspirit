@@ -97,17 +97,17 @@ after the core completion.
 # changes
 
 ## 0.4.3 (xx-xxx-xxxx)
- - [core] allow to load huge databses and interrupt loading porgress
- - [core] reduce memory consumption by model (~ 44%)
  - [core] fix compatibility with syncthing v2.0 (i.e. tolerate directory with 
-          non-zero size and without blocks)
+         non-zero size and without blocks)
  - [core] allow to specify root certificate authority to use in all tls/ssl connections,
          see [faq](faq.md), mostly actual for Windows XP with expired system certificates
- - [core, win32] fix negative serial number in generated ssl-certificates
+ - [core] allow to load huge databses and interrupt loading porgress
+ - [core] reduce memory consumption by model (~ 44%)
  - [core] use in-depth scan order instead of in-breadth
+ - [core, win32] fix negative serial number in generated ssl-certificates
  - [core, fltk] more correctly display file scanning progress
- - [fltk] deactivate currently selected log level button
  - [core, bugfix] make successful upnp port unmapping upon shutdown
+ - [fltk] deactivate currently selected log level button
 
 ## 0.4.2 (22-Aug-2025)
  - [core, bugfix] (#8) crash on set peer static ip address
