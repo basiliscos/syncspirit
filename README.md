@@ -96,7 +96,7 @@ after the core completion.
 
 # changes
 
-## 0.4.3 (xx-xxx-xxxx)
+## 0.4.3 (04-Oct-2025)
  - [core] fix compatibility with syncthing v2.0 (i.e. tolerate directory with 
          non-zero size and without blocks)
  - [core] allow to specify root certificate authority to use in all tls/ssl connections,
