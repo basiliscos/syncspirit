@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "error_code.h"
 
@@ -33,9 +33,6 @@ std::string error_code_category_t::message(int c) const {
     case error_code_t::invalid_block_prefix:
         r = "invalid block key prefix";
         break;
-    case error_code_t::block_deserialization_failure:
-        r = "block deserialization failure";
-        break;
     case error_code_t::invalid_device_sha256_digest:
         r = "invalid device sha256 digest";
         break;
@@ -59,9 +56,6 @@ std::string error_code_category_t::message(int c) const {
         break;
     case error_code_t::pending_folder_deserialization_failure:
         r = "pending folder deserialization failure";
-        break;
-    case error_code_t::file_info_deserialization_failure:
-        r = "file info deserialization failure";
         break;
     case error_code_t::invalid_file_info_key_length:
         r = "invalid file info key length";
@@ -110,12 +104,6 @@ std::string error_code_category_t::message(int c) const {
         break;
     case error_code_t::malformed_deviceid:
         r = "device id is malformed";
-        break;
-    case error_code_t::invalid_block_size:
-        r = "block size is invalid (i.e. greater than file size)";
-        break;
-    case error_code_t::unexpected_blocks:
-        r = "blocks are not expected (e.g. in deleted file)";
         break;
     case error_code_t::missing_version:
         r = "file version is missing";

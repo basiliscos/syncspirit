@@ -5,6 +5,7 @@
 #include <openssl/crypto.h>
 #include <filesystem>
 #include <boost/program_options.hpp>
+#include <boost/nowide/convert.hpp>
 #include <rotor/asio.hpp>
 #include <rotor/thread.hpp>
 #include <spdlog/spdlog.h>
@@ -20,6 +21,7 @@
 #include "utils/platform.h"
 #include "net/net_supervisor.h"
 #include "fs/fs_supervisor.h"
+#include "bouncer/bouncer_actor.h"
 #include "hasher/hasher_supervisor.h"
 #include "command.h"
 #include "governor_actor.h"
@@ -237,14 +239,9 @@ int app_main(app_context_t &app_ctx) {
 
     // override default
     if (log_level) {
-        if (cfg.log_configs.size()) {
-            auto &first_cfg = cfg.log_configs.front();
-            if (first_cfg.name == "default") {
-                auto level = log_level.value();
-                first_cfg.level = level;
-                logger->trace("overriding default log level to {}", int(level));
-            }
-        }
+        auto value = int(log_level.value());
+        logger->trace("overriding default log level to {}", value);
+        app_ctx.logger->set_level(log_level.value());
     }
     auto init_result = utils::init_loggers(cfg.log_configs);
     if (!init_result) {
@@ -265,36 +262,50 @@ int app_main(app_context_t &app_ctx) {
         }
     }
 
-    if (populate) {
-        logger->info("Generating cryptographic keys...");
-        auto pair = utils::generate_pair(constants::issuer_name);
-        if (!pair) {
-            logger->error("cannot generate cryptographic keys :: {}", pair.error().message());
-            return 1;
-        }
-        auto &keys = pair.value();
-        auto &cert_path = cfg.global_announce_config.cert_file;
-        auto &key_path = cfg.global_announce_config.key_file;
-        auto save_result = keys.save(cert_path.c_str(), key_path.c_str());
-        if (!save_result) {
-            logger->error("cannot store cryptographic keys ({} & {}) :: {}", cert_path, key_path,
-                          save_result.error().message());
-            return 1;
+    {
+        auto &cert_path = cfg.cert_file;
+        auto &key_path = cfg.key_file;
+        auto ec = std::error_code{};
+        if (!bfs::exists(cert_path, ec) || !bfs::exists(key_path, ec)) {
+            auto cert_path_str = boost::nowide::narrow(cert_path.wstring());
+            auto key_path_str = boost::nowide::narrow(key_path.wstring());
+            logger->trace("'{}' or '{}' do not exist", cert_path_str, key_path_str);
+            logger->info("Generating cryptographic keys...");
+            auto pair = utils::generate_pair(constants::issuer_name);
+            if (!pair) {
+                logger->error("cannot generate cryptographic keys :: {}", pair.error().message());
+                return 1;
+            }
+            auto &keys = pair.value();
+            auto save_result = keys.save(cert_path_str.c_str(), key_path_str.c_str());
+            if (!save_result) {
+                logger->error("cannot store cryptographic keys ({} & {}) :: {}", cert_path, key_path,
+                              save_result.error().message());
+                return 1;
+            }
         }
     }
 
-    logger->info("starting {} {}, libraries: lz4: v{}, OpenSSL {}", constants::client_name, SYNCSPIRIT_VERSION,
-                 LZ4_versionString(), OpenSSL_version(0));
+    logger->info("starting {} {}", constants::client_name, SYNCSPIRIT_VERSION);
 
     /* pre-init actors */
     asio::io_context io_context;
     ra::system_context_ptr_t sys_context{new asio_sys_context_t{io_context}};
     auto strand = std::make_shared<asio::io_context::strand>(io_context);
     auto timeout = pt::milliseconds{cfg.timeout};
-
     auto independent_threads = 2ul;
     auto seed = (size_t)std::time(nullptr);
     auto sequencer = model::make_sequencer(seed);
+
+    static std::atomic_bool bouncer_shutdown_flag = false;
+    auto bouncer_context = thread_sys_context_t();
+    auto bouncer_sup = bouncer_context.create_supervisor<r::thread::supervisor_thread_t>()
+                           .timeout(timeout * 9 / 8)
+                           .shutdown_flag(bouncer_shutdown_flag, r::pt::millisec{50})
+                           .finish();
+    bouncer_sup->do_process();
+    auto bouncer_actor = bouncer_sup->create_actor<bouncer::bouncer_actor_t>().timeout(timeout * 9 / 8).finish();
+    bouncer_sup->do_process();
 
     auto sup_net = sys_context->create_supervisor<net::net_supervisor_t>()
                        .app_config(cfg)
@@ -305,15 +316,44 @@ int app_main(app_context_t &app_ctx) {
                        .sequencer(sequencer)
                        .independent_threads(independent_threads)
                        .shutdown_flag(shutdown_flag, r::pt::millisec{50})
+                       .bouncer_address(bouncer_actor->get_address())
                        .finish();
-    sup_net->start();
-    // pre-startup
+    // warm-up
     sup_net->do_process();
+    if (sup_net->get_shutdown_reason()) {
+        logger->debug("net supervisor has not started");
+        return 1;
+    }
+
+    auto bouncer_thread = std::thread([&]() {
+#if defined(__linux__)
+        pthread_setname_np(pthread_self(), "ss/bouncer");
+#endif
+        logger->trace("running bouncer");
+        bouncer_context.run();
+        bouncer_shutdown_flag = true;
+        logger->trace("bouncer thread has been terminated");
+    });
+
+    auto hasher_count = cfg.hasher_threads;
+    using sys_thread_context_ptr_t = r::intrusive_ptr_t<thread_sys_context_t>;
+    std::vector<sys_thread_context_ptr_t> hasher_ctxs;
+    for (uint32_t i = 1; i <= hasher_count; ++i) {
+        hasher_ctxs.push_back(new thread_sys_context_t{});
+        auto &ctx = hasher_ctxs.back();
+        auto sup = ctx->create_supervisor<hasher::hasher_supervisor_t>()
+                       .timeout(timeout * 8 / 9)
+                       .registry_address(sup_net->get_registry_address())
+                       .index(i)
+                       .finish();
+        sup->do_process();
+    }
 
     thread_sys_context_t fs_context;
     auto fs_sup = fs_context.create_supervisor<syncspirit::fs::fs_supervisor_t>()
                       .timeout(timeout)
                       .registry_address(sup_net->get_registry_address())
+                      .bouncer_address(bouncer_actor->get_address())
                       .fs_config(cfg.fs_config)
                       .hasher_threads(cfg.hasher_threads)
                       .sequencer(sequencer)
@@ -329,29 +369,9 @@ int app_main(app_context_t &app_ctx) {
             .autoshutdown_supervisor()
             .finish();
     });
-
-    auto hasher_count = cfg.hasher_threads;
-    using sys_thread_context_ptr_t = r::intrusive_ptr_t<thread_sys_context_t>;
-    std::vector<sys_thread_context_ptr_t> hasher_ctxs;
-    for (uint32_t i = 1; i <= hasher_count; ++i) {
-        hasher_ctxs.push_back(new thread_sys_context_t{});
-        auto &ctx = hasher_ctxs.back();
-        ctx->create_supervisor<hasher::hasher_supervisor_t>()
-            .timeout(timeout / 2)
-            .registry_address(sup_net->get_registry_address())
-            .index(i)
-            .finish();
-    }
+    fs_sup->do_process();
 
     /* launch actors */
-    auto fs_thread = std::thread([&]() {
-#if defined(__linux__)
-        pthread_setname_np(pthread_self(), "ss/fs");
-#endif
-        fs_context.run();
-        shutdown_flag = true;
-        logger->trace("fs thread has been terminated");
-    });
 
     auto hasher_threads = std::vector<std::thread>();
     for (uint32_t i = 0; i < hasher_count; ++i) {
@@ -370,21 +390,41 @@ int app_main(app_context_t &app_ctx) {
         hasher_threads.emplace_back(std::move(thread));
     }
 
+    auto fs_thread = std::thread([&]() {
+#if defined(__linux__)
+        pthread_setname_np(pthread_self(), "ss/fs");
+#endif
+        fs_context.run();
+        shutdown_flag = true;
+        logger->trace("fs thread has been terminated");
+    });
+
     // main loop;
 #if defined(__linux__)
     pthread_setname_np(pthread_self(), "ss/net");
 #endif
+    sup_net->do_process();
     io_context.run();
     shutdown_flag = true;
     logger->trace("net thread has been terminated");
 
-    logger->trace("waiting fs thread termination");
+    logger->trace("joining to fs thread");
     fs_thread.join();
 
-    logger->trace("waiting hasher threads termination");
+    logger->trace("joining to {} hasher threads", hasher_threads.size());
     for (auto &thread : hasher_threads) {
         thread.join();
     }
+
+    logger->trace("joining to bouncer thread");
+    bouncer_shutdown_flag = true;
+    bouncer_thread.join();
+
+    if (auto reason = sup_net->get_shutdown_reason(); reason && reason->ec) {
+        logger->info("app shut down reason: {}", reason->message());
+    }
+
     logger->trace("everything has been terminated");
+
     return 0;
 }

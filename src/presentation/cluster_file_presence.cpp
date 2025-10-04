@@ -14,9 +14,9 @@ using namespace syncspirit::presentation;
 using F = presence_t::features_t;
 
 cluster_file_presence_t::cluster_file_presence_t(std::uint32_t default_features_, file_entity_t &entity,
-                                                 model::file_info_t &file_info_) noexcept
-    : file_presence_t(&entity, file_info_.get_folder_info()->get_device()), file_info{file_info_},
-      default_features{default_features_} {
+                                                 model::file_info_t &file_info_,
+                                                 const model::folder_info_t &folder_info) noexcept
+    : file_presence_t(&entity, folder_info.get_device()), file_info{file_info_}, default_features{default_features_} {
     link(&file_info);
     refresh_features();
     statistics = own_statistics = refresh_own_stats();
@@ -45,15 +45,28 @@ const presence_t *cluster_file_presence_t::determine_best(const presence_t *othe
 }
 
 presence_stats_t cluster_file_presence_t::refresh_own_stats() noexcept {
-    std::int32_t local = ((features & F::local) && file_info.is_locally_available()) ? 1 : 0;
-    return {file_info.get_size(), 1, 0, local};
+    std::int64_t size;
+    std::int32_t local;
+    if (features & F::local) {
+        if (file_info.is_local() && file_info.is_locally_available()) {
+            local = 1;
+            size = file_info.get_size();
+        } else {
+            local = 0;
+            size = 0;
+        }
+    } else {
+        local = 0;
+        size = file_info.get_size();
+    }
+    return {size, 1, 0, local};
 }
 
 void cluster_file_presence_t::on_update() noexcept {
     refresh_features();
-    auto presence_diff = refresh_own_stats() - own_statistics;
+    auto ex_stats = own_statistics;
+    auto presence_diff = refresh_own_stats() - ex_stats;
     auto entity_stats = entity->get_stats();
-    auto device = file_info.get_folder_info()->get_device();
     auto prev_best = entity->best;
     auto new_best = entity->recalc_best();
     auto best_changed = prev_best != new_best && new_best->device == device;

@@ -2,13 +2,14 @@
 // SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "folder_infos.h"
+#include "model/diff/apply_controller.h"
 #include "model/misc/error_code.h"
 #include "model/cluster.h"
 
 using namespace syncspirit::model::diff::load;
 
-auto folder_infos_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
-    -> outcome::result<void> {
+auto folder_infos_t::apply_impl(apply_controller_t &controller, void *custom) const noexcept -> outcome::result<void> {
+    auto &cluster = controller.get_cluster();
     auto &folders = cluster.get_folders();
     auto &devices = cluster.get_devices();
     for (auto &item : container) {
@@ -31,5 +32,5 @@ auto folder_infos_t::apply_impl(cluster_t &cluster, apply_controller_t &controll
         auto &fi = option.assume_value();
         map.put(fi);
     }
-    return applicator_t::apply_sibling(cluster, controller);
+    return applicator_t::apply_sibling(controller, custom);
 }

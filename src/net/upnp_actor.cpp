@@ -267,6 +267,7 @@ void upnp_actor_t::on_unmapping_port(message::http_response_t &msg) noexcept {
         LOG_DEBUG(log, "xml:\n{0}\n", content);
     } else {
         LOG_DEBUG(log, "successfully unmapped external port {}", external_port);
+        send<payload::lock_t>(http_client, false);
     }
     if (unlink_request) {
         auto p = get_plugin(r::plugin::link_client_plugin_t::class_identity);
@@ -305,6 +306,7 @@ void upnp_actor_t::on_validate(message::http_response_t &msg) noexcept {
 
     if (ok) {
         resources->acquire(resource::external_port);
+        send<payload::lock_t>(http_client, true);
         using namespace model::diff;
         auto diff = model::diff::cluster_diff_ptr_t{};
         auto external_uri = utils::parse(fmt::format("tcp://{}:{}", external_addr, external_port));

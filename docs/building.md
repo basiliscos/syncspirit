@@ -348,8 +348,60 @@ cmake .. -G "Unix Makefiles" -DCMAKE_TOOLCHAIN_FILE=$PWD/conan_toolchain.cmake \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_CXX_FLAGS="-DBOOST_ASIO_ENABLE_CANCELIO=1"
 make -j`nproc` deploy_deps
+python ../misc/post-install-win32.py --binaries ./dist/*.exe  --dirs $HOME/.conan2 ~/development/cpp/mxe/winxp.shared `pwd`
 ```
 
+### modern windows
+
+Install system mingw
+
+```
+[settings]
+os=Windows
+arch=x86_64
+compiler=gcc
+build_type=Release
+compiler.cppstd=gnu20
+compiler.libcxx=libstdc++11
+compiler.version=11
+[buildenv]
+CC=x86_64-w64-mingw32-gcc
+CXX=x86_64-w64-mingw32-g++
+LD=x86_64-w64-mingw32-ld
+RC=x86_64-w64-mingw32-windres
+
+[options]
+*/*:shared=True
+fltk/*:with_xft=True
+fltk/*:with_gl=False
+boost/*:magic_autolink=False
+boost/*:visibility=hidden
+boost/*:header_only=False
+boost/*:without_cobalt=True
+boost/*:without_serialization=True
+boost/*:without_graph=True
+boost/*:without_fiber=True
+boost/*:without_log=True
+boost/*:without_math=True
+boost/*:without_process=True
+boost/*:without_stacktrace=True
+boost/*:without_test=True
+boost/*:without_wave=True
+protobuf/*:with_zlib=False
+pugixml/*:no_exceptions=True
+rotor/*:enable_asio=True
+rotor/*:enable_thread=True
+rotor/*:enable_fltk=True
+spdlog/*:wchar_filenames=True
+spdlog/*:shared=False
+
+
+conan install --build=missing --output-folder . -s build_type=Release --profile:build=default --profile:host=win64  -o '&:shared=True' ..
+source ./conanbuild.sh
+cmake .. -G "Unix Makefiles" -DCMAKE_TOOLCHAIN_FILE=$PWD/conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Release
+make -j`nproc` deploy_deps
+python ../misc/post-install-win32.py --binaries ./dist/*.exe  --dirs $HOME/.conan2 /usr/x86_64-w64-mingw32/ `pwd`
+```
 
 ## making appImage (ubuntu Focal Fossa etc.)
 

@@ -18,7 +18,13 @@ namespace syncspirit::utils {
 namespace bfs = std::filesystem;
 namespace sys = boost::system;
 
-static const char *log_pattern = "[%Y-%m-%d %H:%M:%S.%e] [%^%L/%t%$] {%n} %v";
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+#define SECOND_FRACTION "%f"
+#else
+#define SECOND_FRACTION "%F"
+#endif
+
+static const char *log_pattern = "[%Y-%m-%d %H:%M:%S." SECOND_FRACTION "] [%^%L/%t%$] {%n} %v";
 
 using sink_option_t = outcome::result<spdlog::sink_ptr>;
 

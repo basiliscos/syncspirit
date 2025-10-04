@@ -39,20 +39,20 @@ TEST_CASE("new file diff", "[model]") {
         auto &files = folder_info->get_file_infos();
         auto file = files.by_name(proto::get_name(pr_file));
         REQUIRE(file);
-        REQUIRE(file->get_name() == "a.txt");
+        REQUIRE(file->get_name()->get_full_name() == "a.txt");
         REQUIRE(file->get_link_target() == "/some/where");
         REQUIRE(file->is_link());
         REQUIRE(file->get_sequence() == 1);
         REQUIRE(folder_info->get_max_sequence() == 1);
-        REQUIRE(file->get_version()->counters_size() == 1);
+        REQUIRE(file->get_version().counters_size() == 1);
         REQUIRE(file->get_modified_by() == my_device->device_id().get_uint());
-        auto &counter = file->get_version()->get_best();
+        auto counter = file->get_version().get_best();
         auto v1 = proto::get_value(counter);
         CHECK(v1 > 0);
 
         SECTION("peer update") {
-            file->get_version()->update(*peer_device);
-            auto p = file->get_version()->as_proto();
+            file->get_version().update(*peer_device);
+            auto p = file->get_version().as_proto();
             REQUIRE(proto::get_counters_size(p) == 2);
 
             auto &c0 = proto::get_counters(p, 0);
@@ -69,12 +69,12 @@ TEST_CASE("new file diff", "[model]") {
             REQUIRE(builder.local_update(folder->get_id(), pr_file).apply());
             REQUIRE(files.size() == 1);
 
-            auto new_file = files.by_name(file->get_name());
+            auto new_file = files.by_name(file->get_name()->get_full_name());
             REQUIRE(new_file);
             CHECK(new_file.get() == file.get());
-            CHECK(new_file->get_key() == file->get_key());
-            REQUIRE(new_file->get_version()->counters_size() == 1);
-            auto v2 = proto::get_value(new_file->get_version()->get_best());
+            CHECK(new_file->get_full_id() == file->get_full_id());
+            REQUIRE(new_file->get_version().counters_size() == 1);
+            auto v2 = proto::get_value(new_file->get_version().get_best());
             REQUIRE(v1 < v2);
         }
     }
@@ -86,7 +86,6 @@ TEST_CASE("new file diff", "[model]") {
 
         auto hash = utils::sha256_digest(as_bytes("12345")).value();
         auto &pr_block = proto::add_blocks(pr_file);
-        proto::set_weak_hash(pr_block, 12);
         proto::set_size(pr_block, 5);
         proto::set_hash(pr_block, hash);
 
@@ -96,12 +95,12 @@ TEST_CASE("new file diff", "[model]") {
         auto file = folder_info->get_file_infos().by_name(proto::get_name(pr_file));
         REQUIRE(file);
         REQUIRE(file->get_size() == 5);
-        REQUIRE(file->get_name() == "a.txt");
+        REQUIRE(file->get_name()->get_full_name() == "a.txt");
         REQUIRE(!file->is_link());
         REQUIRE(file->get_sequence() == 1);
         REQUIRE(folder_info->get_max_sequence() == 1);
-        REQUIRE(file->get_blocks().size() == 1);
-        REQUIRE(file->get_blocks()[0]->get_hash() == hash);
+        REQUIRE(file->iterate_blocks().get_total() == 1);
+        REQUIRE(file->iterate_blocks().next()->get_hash() == hash);
         REQUIRE(cluster->get_blocks().size() == 1);
         REQUIRE(cluster->get_blocks().by_hash(hash));
     }
@@ -114,7 +113,6 @@ TEST_CASE("new file diff", "[model]") {
 
         auto hash = utils::sha256_digest(as_bytes("12345")).value();
         auto &pr_block = proto::add_blocks(pr_file);
-        proto::set_weak_hash(pr_block, 12);
         proto::set_size(pr_block, 5);
         proto::set_hash(pr_block, hash);
         REQUIRE(builder.local_update(folder->get_id(), pr_file).apply());
@@ -139,7 +137,6 @@ TEST_CASE("new file diff", "[model]") {
 
         auto hash = utils::sha256_digest(as_bytes("12345")).value();
         auto &pr_block = proto::add_blocks(pr_file);
-        proto::set_weak_hash(pr_block, 12);
         proto::set_size(pr_block, 5);
         proto::set_hash(pr_block, hash);
 
@@ -163,7 +160,7 @@ TEST_CASE("new file diff", "[model]") {
 
         file = file = folder_info->get_file_infos().by_name(proto::get_name(pr_file));
         CHECK(file->is_deleted());
-        CHECK(file->get_blocks().size() == 0);
+        REQUIRE(file->iterate_blocks().get_total() == 0);
         CHECK(file->get_sequence() > sequence);
     }
 }

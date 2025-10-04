@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-/// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #pragma once
 
 #include <catch2/catch_all.hpp>
 #include <filesystem>
+#include <memory>
 
 #include "model/device.h"
+#include "model/cluster.h"
 #include "model/diff/apply_controller.h"
 #include "model/diff/cluster_diff.h"
 #include "proto/proto-helpers.h"
@@ -24,6 +26,12 @@ namespace syncspirit::test {
 namespace bfs = std::filesystem;
 namespace sys = boost::system;
 
+struct test_apply_controller_t final : model::arc_base_t<test_apply_controller_t>, model::diff::apply_controller_t {
+    inline test_apply_controller_t(model::cluster_ptr_t cluster_) { cluster = cluster_; }
+};
+
+using apply_controller_ptr_t = model::intrusive_ptr_t<test_apply_controller_t>;
+
 struct SYNCSPIRIT_TEST_API path_guard_t {
     bfs::path path;
     path_guard_t();
@@ -36,7 +44,7 @@ struct SYNCSPIRIT_TEST_API path_guard_t {
 SYNCSPIRIT_TEST_API utils::bytes_view_t as_bytes(std::string_view);
 SYNCSPIRIT_TEST_API utils::bytes_t as_owned_bytes(std::string_view);
 SYNCSPIRIT_TEST_API bfs::path unique_path();
-SYNCSPIRIT_TEST_API model::diff::apply_controller_t &get_apply_controller();
+SYNCSPIRIT_TEST_API apply_controller_ptr_t make_apply_controller(model::cluster_ptr_t cluster);
 SYNCSPIRIT_TEST_API void init_logging();
 SYNCSPIRIT_TEST_API bfs::path locate_path(const char *test_file);
 SYNCSPIRIT_TEST_API std::string read_file(const bfs::path &path);
@@ -45,5 +53,6 @@ SYNCSPIRIT_TEST_API utils::bytes_t device_id2sha256(std::string_view device_id);
 SYNCSPIRIT_TEST_API model::device_ptr_t make_device(std::string_view device_id, std::string_view name = "");
 SYNCSPIRIT_TEST_API std::string hash_string(const std::string_view &hash) noexcept;
 SYNCSPIRIT_TEST_API bool has_ipv6() noexcept;
+SYNCSPIRIT_TEST_API utils::bytes_t make_key(model::block_info_ptr_t block);
 
 } // namespace syncspirit::test

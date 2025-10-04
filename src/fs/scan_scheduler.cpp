@@ -11,9 +11,6 @@
 
 using namespace syncspirit::fs;
 
-scan_scheduler_t::scan_scheduler_t(config_t &cfg)
-    : r::actor_base_t(cfg), cluster{std::move(cfg.cluster)}, scan_in_progress{false} {}
-
 void scan_scheduler_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
@@ -27,15 +24,24 @@ void scan_scheduler_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
                 auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
                 plugin->subscribe_actor(&scan_scheduler_t::on_model_update, coordinator);
+                plugin->subscribe_actor(&scan_scheduler_t::on_app_ready, coordinator);
+                plugin->subscribe_actor(&scan_scheduler_t::on_thread_ready, supervisor->get_address());
             }
         });
         p.discover_name(net::names::fs_scanner, fs_scanner, true).link();
     });
 }
 
-void scan_scheduler_t::on_start() noexcept {
-    LOG_TRACE(log, "on_start");
-    r::actor_base_t::on_start();
+void scan_scheduler_t::on_thread_ready(model::message::thread_ready_t &message) noexcept {
+    auto &p = message.payload;
+    if (p.thread_id == std::this_thread::get_id()) {
+        LOG_TRACE(log, "on_thread_ready");
+        cluster = message.payload.cluster;
+    }
+}
+
+void scan_scheduler_t::on_app_ready(model::message::app_ready_t &) noexcept {
+    LOG_TRACE(log, "on_app_ready");
     scan_next();
 }
 

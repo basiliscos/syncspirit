@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #pragma once
 
@@ -34,7 +34,6 @@ using io_fn_t = std::function<void(std::size_t)>;
 struct ssl_junction_t {
     model::device_id_t peer;
     const utils::key_pair_t *me;
-    bool sni_extension;
     std::string_view alpn; /* application layer protocol names? */
 };
 
@@ -45,6 +44,8 @@ struct transport_config_t {
     utils::uri_ptr_t uri;
     ra::supervisor_asio_t &supervisor;
     std::optional<tcp::socket> sock;
+    utils::bytes_view_t root_ca;
+    bool sni_extension;
     bool active;
 };
 

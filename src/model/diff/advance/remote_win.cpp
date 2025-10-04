@@ -4,6 +4,7 @@
 #include "remote_win.h"
 #include "remote_copy.h"
 #include "model/cluster.h"
+#include "model/diff/apply_controller.h"
 #include "../cluster_visitor.h"
 #include "proto/proto-helpers.h"
 
@@ -21,8 +22,8 @@ remote_win_t::remote_win_t(const cluster_t &cluster, sequencer_t &sequencer, pro
     assign_sibling(new remote_copy_t(cluster, sequencer, std::move(proto_file_), folder_id_, peer_id_, true));
 }
 
-auto remote_win_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
-    -> outcome::result<void> {
+auto remote_win_t::apply_impl(apply_controller_t &controller, void *custom) const noexcept -> outcome::result<void> {
+    auto &cluster = controller.get_cluster();
     auto &self = *cluster.get_device();
     auto folder = cluster.get_folders().by_id(folder_id);
     if (!folder) {
@@ -39,9 +40,9 @@ auto remote_win_t::apply_impl(cluster_t &cluster, apply_controller_t &controller
         auto prev_file = local_files.by_name(proto::get_name(proto_source));
         assert(prev_file);
         local_files.remove(prev_file);
-        return parent_t::apply_impl(cluster, controller);
+        return parent_t::apply_impl(controller, custom);
     }
-    return applicator_t::apply_sibling(cluster, controller);
+    return applicator_t::apply_sibling(controller, custom);
 }
 
 auto remote_win_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

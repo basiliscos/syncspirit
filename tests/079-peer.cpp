@@ -112,7 +112,7 @@ struct fixture_t : private model::diff::cluster_visitor_t {
                 p.subscribe_actor(r::lambda<cluster_diff_t>([&](cluster_diff_t &msg) {
                     LOG_INFO(log, "received cluster diff message");
                     auto &diff = msg.payload.diff;
-                    auto r = diff->apply(*cluster, get_apply_controller());
+                    auto r = diff->apply(*controller, {});
                     if (!r) {
                         LOG_ERROR(log, "error updating model: {}", r.assume_error().message());
                         sup->do_shutdown();
@@ -138,6 +138,7 @@ struct fixture_t : private model::diff::cluster_visitor_t {
         peer_device = device_t::create(pd, "peer-device").value();
 
         cluster = new cluster_t(my_device, 1);
+        controller = make_apply_controller(cluster);
         cluster->get_devices().put(my_device);
         if (add_peer) {
             cluster->get_devices().put(peer_device);
@@ -156,7 +157,7 @@ struct fixture_t : private model::diff::cluster_visitor_t {
         LOG_TRACE(log, "Connecting to {}", uri_str);
 
         auto uri = utils::parse(uri_str);
-        auto cfg = transport::transport_config_t{{}, uri, *sup, {}, true};
+        auto cfg = transport::transport_config_t{{}, uri, *sup, {}, {}, true};
         client_trans = transport::initiate_stream(cfg);
 
         auto ip = asio::ip::make_address(host);
@@ -228,7 +229,7 @@ struct fixture_t : private model::diff::cluster_visitor_t {
     virtual void accept(const sys::error_code &ec) noexcept {
         LOG_INFO(log, "accept, ec: {}, remote = {}", ec.message(), peer_sock.remote_endpoint());
         auto uri = utils::parse("tcp://127.0.0.1:0/");
-        auto cfg = transport::transport_config_t{{}, uri, *sup, std::move(peer_sock), false};
+        auto cfg = transport::transport_config_t{{}, uri, *sup, std::move(peer_sock), {}, false};
         peer_trans = transport::initiate_stream(cfg);
         try_main();
     }
@@ -300,6 +301,7 @@ struct fixture_t : private model::diff::cluster_visitor_t {
 
     tx_size_ptr_t outgoing_buff;
     cluster_ptr_t cluster;
+    apply_controller_ptr_t controller;
     supervisor_ptr_t sup;
     asio::io_context io_ctx;
     ra::system_context_asio_t ctx;

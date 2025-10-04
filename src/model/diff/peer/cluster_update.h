@@ -22,7 +22,7 @@ struct SYNCSPIRIT_API cluster_update_t final : cluster_diff_t {
                                                       sequencer_t &sequencer, const model::device_t &source,
                                                       const message_t &message) noexcept;
 
-    outcome::result<void> apply_impl(cluster_t &, apply_controller_t &) const noexcept override;
+    outcome::result<void> apply_impl(apply_controller_t &, void *) const noexcept override;
     outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;
 
     cluster_update_t(const bfs::path &default_path, const cluster_t &cluster, sequencer_t &sequencer,

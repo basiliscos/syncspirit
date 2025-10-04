@@ -141,8 +141,11 @@ auto static_table_t::calc_col_widths() -> col_sizes_t {
 
     col_sizes_t r = {0, 0, 0, 0, true};
     for (auto &row : table_rows) {
-        int x, y, w, h;
-        fl_text_extents(row.label.data(), x, y, w, h);
+        int x = 0, y = 0, w = 0, h = 0;
+        auto label = std::string_view(row.label.data());
+        if (label.size()) {
+            fl_text_extents(label.data(), x, y, w, h);
+        }
         r.w1_min = std::max(r.w1_min, w + PADDING * 2);
         std::visit([&](auto &&arg) { calc_dimensions(arg, x, y, w, h); }, row.value);
         r.w2_min = std::max(r.w2_min, w + PADDING * 2);

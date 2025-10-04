@@ -17,6 +17,7 @@ endif()
 add_library(syncspirit_test_lib SHARED
     $<$<PLATFORM_ID:Windows>:win32-resource.rc>
     managed_hasher.cpp
+    test_peer.cpp
     test_supervisor.cpp
     test-db.cpp
     test-utils.cpp
@@ -66,6 +67,7 @@ create_test(020-generic-map.cpp)
 create_test(021-orphaned-blocks.cpp)
 create_test(022-version.cpp)
 create_test(023-device-state.cpp)
+create_test(024-path.cpp)
 create_test(025-device_id.cpp)
 create_test(026-file_info.cpp)
 create_test(027-cluster.cpp)
@@ -83,10 +85,11 @@ create_test(038-diff-clone_finish-file.cpp)
 create_test(039-diff-remove-peer.cpp)
 create_test(040-diff-contacts.cpp)
 create_test(041-diff-remove-folder.cpp)
+create_test(042-diff-interrupt.cpp)
+create_test(043-diffs-scan.cpp)
 create_test(045-diff-advance.cpp)
 create_test(050-file_iterator.cpp)
 create_test(051-block_iterator.cpp)
-create_test(052-file_info.cpp)
 create_test(053-scan_task.cpp)
 create_test(054-updates_streamer.cpp)
 create_test(055-resolver.cpp)
@@ -107,3 +110,4 @@ create_test(080-resolver.cpp)
 create_test(085-scan-scheduler.cpp)
 create_test(086-scan_actor.cpp)
 create_test(110-file-n-controller-actors.cpp)
+create_test(111-controllers-concurrency.cpp)

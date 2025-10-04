@@ -9,7 +9,7 @@
 namespace syncspirit::fltk {
 
 static std::array<std::string_view, 5> suffix = {
-    "b", "Kb", "Mb", "Gb", "Tb",
+    "B", "KB", "MB", "GB", "TB",
 };
 
 std::string get_file_size(std::int64_t value) {

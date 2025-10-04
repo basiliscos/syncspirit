@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #pragma once
 
 #include "transport/http.h"
 #include "utils/log.h"
+#include "utils/bytes.h"
 #include "messages.h"
 #include <boost/asio.hpp>
 #include <rotor.hpp>
@@ -18,6 +19,7 @@ struct http_actor_config_t : public r::actor_config_t {
     r::pt::time_duration resolve_timeout;
     r::pt::time_duration request_timeout;
     std::string registry_name;
+    utils::bytes_view_t root_ca;
     bool keep_alive;
 };
 
@@ -41,6 +43,11 @@ template <typename Actor> struct http_actor_config_builder_t : r::actor_config_b
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
+    builder_t &&root_ca(const utils::bytes_view_t &value) && noexcept {
+        parent_t::config.root_ca = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+
     builder_t &&keep_alive(bool value = true) && noexcept {
         parent_t::config.keep_alive = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
@@ -61,6 +68,7 @@ struct SYNCSPIRIT_API http_actor_t : public r::actor_base_t {
 
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
     void on_start() noexcept override;
+    void shutdown_start() noexcept override;
     void shutdown_finish() noexcept override;
 
   private:
@@ -72,6 +80,7 @@ struct SYNCSPIRIT_API http_actor_t : public r::actor_base_t {
     void spawn_timer() noexcept;
 
     void on_request(message::http_request_t &req) noexcept;
+    void on_lock(message::lock_t &message) noexcept;
     void on_cancel(message::http_cancel_t &req) noexcept;
     void on_resolve(message::resolve_response_t &res) noexcept;
     void on_close_connection(message::http_close_connection_t &) noexcept;
@@ -80,6 +89,7 @@ struct SYNCSPIRIT_API http_actor_t : public r::actor_base_t {
     void on_request_sent(std::size_t /* bytes */) noexcept;
     void on_request_read(std::size_t bytes) noexcept;
     void on_timer(r::request_id_t, bool cancelled) noexcept;
+    void on_lock_timer(r::request_id_t, bool cancelled) noexcept;
     void on_io_error(const sys::error_code &ec) noexcept;
     void on_shutdown_timer(r::request_id_t, bool cancelled) noexcept;
     void on_handshake(bool valid_peer, utils::x509_t &, const tcp::endpoint &, const model::device_id_t *) noexcept;
@@ -92,6 +102,7 @@ struct SYNCSPIRIT_API http_actor_t : public r::actor_base_t {
     pt::time_duration resolve_timeout;
     pt::time_duration request_timeout;
     std::string registry_name;
+    utils::bytes_view_t root_ca;
     bool keep_alive;
     bool kept_alive = false;
     r::address_ptr_t resolver;

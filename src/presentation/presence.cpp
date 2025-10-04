@@ -75,8 +75,6 @@ void presence_t::clear_presense() noexcept {
     }
 }
 
-void presence_t::link(augmentable_t *augmentable) noexcept { augmentable->set_augmentation(this); }
-
 void presence_t::on_delete() noexcept { clear_presense(); }
 void presence_t::on_update() noexcept {
     if (auto monitor = entity->get_monitor(); monitor) {
@@ -106,14 +104,14 @@ void presence_t::sync_with_entity() const noexcept {
             for (auto p : entity->presences) {
                 if ((p == entity->best) && (p->get_features() & F::cluster)) {
                     auto best = static_cast<cluster_file_presence_t *>(p);
-                    best_version = best->get_file_info().get_version()->get_best();
+                    best_version = best->get_file_info().get_version().get_best();
                     break;
                 }
             }
             assert(features & F::cluster);
             auto const_self = static_cast<const cluster_file_presence_t *>(this);
             auto self = const_cast<cluster_file_presence_t *>(const_self);
-            if (self->get_file_info().get_version()->get_best() == best_version) {
+            if (self->get_file_info().get_version().get_best() == best_version) {
                 ++statistics.cluster_entries;
             }
         } else if (features & F::directory) {
@@ -143,8 +141,8 @@ bool presence_t::compare(const presence_t *l, const presence_t *r) noexcept {
     } else if (!ld && rd) {
         return false;
     }
-    auto l_name = l->entity->get_path().get_own_name();
-    auto r_name = r->entity->get_path().get_own_name();
+    auto l_name = l->entity->get_path()->get_own_name();
+    auto r_name = r->entity->get_path()->get_own_name();
     return l_name < r_name;
 }
 
@@ -171,10 +169,10 @@ bool presence_t::is_unique() const noexcept {
     using una::caseless::compare_utf8;
     if (!(features & F::deleted)) {
         if (parent && parent->entity) {
-            auto my_name = entity->get_path().get_own_name();
+            auto my_name = entity->get_path()->get_own_name();
             for (auto c : parent->get_children()) {
                 if (c != this && !(c->features & F::deleted)) {
-                    auto other_name = c->entity->get_path().get_own_name();
+                    auto other_name = c->entity->get_path()->get_own_name();
                     if (compare_utf8(my_name, other_name) == 0) {
                         return false;
                     }

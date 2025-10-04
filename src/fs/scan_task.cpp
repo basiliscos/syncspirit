@@ -8,8 +8,27 @@
 #include "utils/platform.h"
 #include "proto/proto-helpers-bep.h"
 #include <boost/nowide/convert.hpp>
+#include <array>
+#include <memory_resource>
 
 using namespace syncspirit::fs;
+
+static bool compare_paths(const bfs::path &l, const bfs::path &r) { return l.filename() > r.filename(); }
+
+bool scan_task_t::comparator_t::operator()(const queue_item_t &lhs, const queue_item_t &rhs) const noexcept {
+    auto l_index = lhs.index();
+    auto r_index = rhs.index();
+    if (l_index != r_index) {
+        return l_index > r_index;
+    }
+    return std::visit(
+        [&rhs](auto &l) {
+            using T = std::decay_t<decltype(l)>;
+            auto r = *std::get_if<T>(&rhs);
+            return (compare_paths(l.path, r.path));
+        },
+        lhs);
+}
 
 scan_task_t::scan_task_t(model::cluster_ptr_t cluster_, std::string_view folder_id_, file_cache_ptr_t rw_cache_,
                          const config::fs_config_t &config_) noexcept
@@ -21,8 +40,8 @@ scan_task_t::scan_task_t(model::cluster_ptr_t cluster_, std::string_view folder_
         return;
     }
 
-    auto my_folder = folder->get_folder_infos().by_device(*cluster->get_device());
-    if (!my_folder) {
+    folder_info = folder->get_folder_infos().by_device(*cluster->get_device()).get();
+    if (!folder_info) {
         return;
     }
 
@@ -31,12 +50,12 @@ scan_task_t::scan_task_t(model::cluster_ptr_t cluster_, std::string_view folder_
 
     ignore_permissions = folder->are_permissions_ignored() || !utils::platform_t::permissions_supported(path);
 
-    dirs_queue.push_back(path);
+    stack.push(unseen_dir_t(path));
     root = path;
 
-    auto &orig_files = my_folder->get_file_infos();
+    auto &orig_files = folder_info->get_file_infos();
     for (auto &it : orig_files) {
-        files.put(it.item);
+        files.put(it);
     }
 
     files_limit = files_left = config.files_scan_iteration_limit;
@@ -50,29 +69,15 @@ scan_task_t::scan_task_t(model::cluster_ptr_t cluster_, std::string_view folder_
 const std::string &scan_task_t::get_folder_id() const noexcept { return folder_id; }
 
 scan_result_t scan_task_t::advance() noexcept {
-    if (!unknown_files_queue.empty()) {
-        auto &file = unknown_files_queue.front();
-        auto &&r = advance_unknown_file(file);
-        unknown_files_queue.pop_front();
-        return r;
-    }
-    if (!files_queue.empty()) {
-        auto &file = files_queue.front();
-        auto &&r = advance_file(file);
-        files_queue.pop_front();
-        return r;
-    } else if (!dirs_queue.empty()) {
-        auto &path = dirs_queue.front();
-        auto &&r = advance_dir(path);
-        dirs_queue.pop_front();
-        return r;
-    }
-    if (!dirs_queue.empty()) {
-        return true;
+    if (stack.size()) {
+        auto item = std::move(stack.top());
+        stack.pop();
+        return std::visit([this](auto item) { return do_advance(std::move(item)); }, std::move(item));
     }
     if (files.size() != 0) {
-        auto file = files.begin()->item;
-        seen_paths.insert({std::string(file->get_name()), file->get_path()});
+        auto file = *files.begin();
+        auto path = file->get_path(*folder_info);
+        seen_paths.insert({std::string(file->get_name()->get_full_name()), std::move(path)});
         files.remove(file);
 
         bool unchanged = file->is_deleted() || (file->is_link() && !utils::platform_t::symlinks_supported());
@@ -85,8 +90,17 @@ scan_result_t scan_task_t::advance() noexcept {
     return false;
 }
 
-scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
+scan_result_t scan_task_t::do_advance(unseen_dir_t queue_item) noexcept {
+    using sub_queue_t = std::pmr::vector<queue_item_t>;
+    using allocator_t = std::pmr::polymorphic_allocator<char>;
+
+    auto buffer = std::array<std::byte, 16 * 1024>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = allocator_t(&pool);
+    auto sub_queue = sub_queue_t(allocator);
+
     sys::error_code ec;
+    auto &dir = queue_item.path;
 
     bool exists = bfs::exists(dir, ec);
     if (ec) {
@@ -111,11 +125,12 @@ scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
             str = bfs::relative(dir, root).string() + "/";
         }
         for (auto &it : files) {
-            auto &file = *it.item;
-            bool remove = str.empty() || (file.get_name().find(str) == 0);
+            auto &file = *it;
+            auto name = file.get_name()->get_full_name();
+            bool remove = str.empty() || (name.find(str) == 0);
             if (remove) {
-                seen_paths.insert({std::string(file.get_name()), file.get_path()});
-                removed.put(it.item);
+                seen_paths.insert({std::string(name), file.get_path(*folder_info)});
+                removed.put(it);
             }
         }
         seen_paths.insert({str, dir});
@@ -136,10 +151,11 @@ scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
             auto rp = relativize(child, root).generic_string();
             auto file = files.by_name(rp);
             if (file) {
-                files_queue.push_back(file);
                 removed.put(file);
                 if (status.type() == bfs::file_type::directory) {
-                    dirs_queue.push_back(child);
+                    sub_queue.emplace_back(unseen_dir_t(child, file_t{file, child}));
+                } else {
+                    sub_queue.emplace_back(file_t(file, child));
                 }
                 continue;
             }
@@ -147,6 +163,7 @@ scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
             auto file_type = status.type();
             proto::FileInfo metadata;
             proto::set_name(metadata, rp);
+            bool is_dir = false;
 
             if (file_type == bfs::file_type::regular || file_type == bfs::file_type::directory) {
                 auto modification_time = bfs::last_write_time(child, ec);
@@ -174,7 +191,8 @@ scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
                 proto::set_size(metadata, sz);
             } else if (file_type == bfs::file_type::directory) {
                 proto::set_type(metadata, proto::FileInfoType::DIRECTORY);
-                dirs_queue.push_back(child);
+                is_dir = true;
+                sub_queue.emplace_back(unseen_dir_t(child, unknown_file_t{child, std::move(metadata)}));
             } else if (file_type == bfs::file_type::symlink) {
                 auto target = bfs::read_symlink(child, ec);
                 if (ec) {
@@ -189,12 +207,29 @@ scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
                 continue;
             }
 
-            unknown_files_queue.push_back(unknown_file_t{child, std::move(metadata)});
+            if (!is_dir) {
+                sub_queue.emplace_back(unknown_file_t{child, std::move(metadata)});
+            }
         }
     }
     for (auto &it : removed) {
-        files.remove(it.item);
+        files.remove(it);
     }
+
+    std::visit(
+        [this](auto it) {
+            using T = std::decay_t<decltype(it)>;
+            if constexpr (!std::is_same_v<T, std::monostate>) {
+                stack.push(std::move(it));
+            }
+        },
+        std::move(queue_item.next));
+
+    std::sort(sub_queue.begin(), sub_queue.end(), comparator_t{});
+    for (auto &item : sub_queue) {
+        stack.push(std::move(item));
+    }
+
     if (!errors.empty()) {
         return errors;
     }
@@ -202,7 +237,8 @@ scan_result_t scan_task_t::advance_dir(const bfs::path &dir) noexcept {
     return true;
 }
 
-scan_result_t scan_task_t::advance_file(file_info_t &file) noexcept {
+scan_result_t scan_task_t::do_advance(file_t queue_item) noexcept {
+    auto &file = queue_item.file;
     if (file->is_file()) {
         return advance_regular_file(file);
     } else if (file->is_dir()) {
@@ -216,7 +252,7 @@ scan_result_t scan_task_t::advance_file(file_info_t &file) noexcept {
 scan_result_t scan_task_t::advance_regular_file(file_info_t &file) noexcept {
     sys::error_code ec;
 
-    auto path = file->get_path();
+    auto path = file->get_path(*folder_info);
     auto meta = proto::FileInfo();
     bool changed = false;
 
@@ -255,7 +291,7 @@ scan_result_t scan_task_t::advance_regular_file(file_info_t &file) noexcept {
 
     if (changed) {
         using FT = proto::FileInfoType;
-        proto::set_name(meta, file->get_name());
+        proto::set_name(meta, file->get_name()->get_full_name());
         proto::set_type(meta, FT::FILE);
         return changed_meta_t{file, std::move(meta)};
     }
@@ -264,7 +300,7 @@ scan_result_t scan_task_t::advance_regular_file(file_info_t &file) noexcept {
 }
 
 scan_result_t scan_task_t::advance_symlink_file(file_info_t &file) noexcept {
-    auto path = file->get_path();
+    auto path = file->get_path(*folder_info);
 
     if (!bfs::is_symlink(path)) {
         LOG_CRITICAL(log, "not implemented change tracking: symlink -> non-symblink");
@@ -283,14 +319,14 @@ scan_result_t scan_task_t::advance_symlink_file(file_info_t &file) noexcept {
     } else {
         using FT = proto::FileInfoType;
         auto meta = proto::FileInfo();
-        proto::set_name(meta, file->get_name());
+        proto::set_name(meta, file->get_name()->get_full_name());
         proto::set_type(meta, FT::SYMLINK);
         proto::set_symlink_target(meta, std::move(target_str));
         return changed_meta_t{file, std::move(meta)};
     }
 }
 
-scan_result_t scan_task_t::advance_unknown_file(unknown_file_t &file) noexcept {
+scan_result_t scan_task_t::do_advance(unknown_file_t file) noexcept {
     auto &path = file.path;
     if (!is_temporal(file.path.filename())) {
         return unknown_file_t{std::move(path), std::move(file.metadata)};
@@ -315,15 +351,15 @@ scan_result_t scan_task_t::advance_unknown_file(unknown_file_t &file) noexcept {
         auto &files = folder_info->get_file_infos();
         auto f = files.by_name(relative_path);
         if (f) {
-            seen_paths.insert({std::string(f->get_name()), path});
+            seen_paths.insert({std::string(f->get_name()->get_full_name()), path});
             if (folder_info->get_device() == cluster->get_device()) {
                 local_file = std::move(f);
             } else {
                 if (!peer_file) {
                     peer_file = std::move(f);
-                    peer_counter = peer_file->get_version()->get_best();
+                    peer_counter = peer_file->get_version().get_best();
                 } else {
-                    auto &c = f->get_version()->get_best();
+                    auto c = f->get_version().get_best();
                     if (proto::get_value(peer_counter) < proto::get_value(c)) {
                         peer_counter = c;
                         peer_file = std::move(f);
@@ -376,7 +412,7 @@ scan_result_t scan_task_t::advance_unknown_file(unknown_file_t &file) noexcept {
         return incomplete_removed_t{peer_file};
     }
 
-    auto opt = file_t::open_read(path);
+    auto opt = fs::file_t::open_read(path);
     if (!opt) {
         LOG_DEBUG(log, "try to remove temporally {}, which cannot open ", path.string());
         bfs::remove(path, ec);
@@ -387,8 +423,10 @@ scan_result_t scan_task_t::advance_unknown_file(unknown_file_t &file) noexcept {
     }
 
     auto &opened_file = opt.assume_value();
-    return incomplete_t{peer_file, file_ptr_t(new file_t(std::move(opened_file)))};
+    return incomplete_t{peer_file, file_ptr_t(new fs::file_t(std::move(opened_file)))};
 }
+
+scan_result_t scan_task_t::do_advance(std::monostate item) noexcept { return true; }
 
 void scan_task_t::push(model::diff::cluster_diff_t *update, std::int64_t bytes_consumed, bool consumes_file) noexcept {
     if (diff_siblings >= files_limit) {
@@ -436,18 +474,20 @@ scan_task_t::send_guard_t::~send_guard_t() {
             task.bytes_left = task.config.bytes_scan_iteration_limit;
             task.files_left = task.config.files_scan_iteration_limit;
             task.diffs.clear();
+            task.diff_siblings = 0;
 
             actor.send<model::payload::model_update_t>(coordinator, std::move(diff), nullptr);
+            task.log->debug("sending model update");
             if (manage_progress) {
                 auto &sup = actor.get_supervisor();
                 auto address = actor.get_address();
                 auto message = rotor::make_routed_message<payload::scan_progress_t>(coordinator, address, &task);
                 sup.put(message);
+                task.log->debug("routing scan progress");
             }
         }
     } else if (manage_progress) {
+        task.log->debug("sending scan progress, files left = {}", task.files_left);
         actor.send<payload::scan_progress_t>(actor.get_address(), &task);
     }
 }
-
-//

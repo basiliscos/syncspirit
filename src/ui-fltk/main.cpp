@@ -5,6 +5,7 @@
 #include <openssl/crypto.h>
 #include <filesystem>
 #include <boost/program_options.hpp>
+#include <boost/nowide/convert.hpp>
 #include <rotor/asio.hpp>
 #include <rotor/thread.hpp>
 #include <spdlog/spdlog.h>
@@ -21,6 +22,7 @@
 #include "utils/platform.h"
 #include "hasher/hasher_supervisor.h"
 #include "net/net_supervisor.h"
+#include "bouncer/bouncer_actor.h"
 #include "fs/fs_supervisor.h"
 
 #include <FL/Fl.H>
@@ -262,21 +264,27 @@ int app_main(app_context_t &app_ctx) {
         return 1;
     }
 
-    if (populate) {
-        logger->info("generating cryptographic keys...");
-        auto pair = utils::generate_pair(constants::issuer_name);
-        if (!pair) {
-            logger->error("cannot generate cryptographic keys :: {}", pair.error().message());
-            return 1;
-        }
-        auto &keys = pair.value();
-        auto &cert_path = cfg.global_announce_config.cert_file;
-        auto &key_path = cfg.global_announce_config.key_file;
-        auto save_result = keys.save(cert_path.c_str(), key_path.c_str());
-        if (!save_result) {
-            logger->error("cannot store cryptographic keys ({} & {}) :: {}", cert_path, key_path,
-                          save_result.error().message());
-            return 1;
+    {
+        auto &cert_path = cfg.cert_file;
+        auto &key_path = cfg.key_file;
+        auto ec = std::error_code{};
+        if (!bfs::exists(cert_path, ec) || !bfs::exists(key_path, ec)) {
+            auto cert_path_str = boost::nowide::narrow(cert_path.wstring());
+            auto key_path_str = boost::nowide::narrow(key_path.wstring());
+            logger->trace("'{}' or '{}' do not exist", cert_path_str, key_path_str);
+            logger->info("Generating cryptographic keys...");
+            auto pair = utils::generate_pair(constants::issuer_name);
+            if (!pair) {
+                logger->error("cannot generate cryptographic keys :: {}", pair.error().message());
+                return 1;
+            }
+            auto &keys = pair.value();
+            auto save_result = keys.save(cert_path_str.c_str(), key_path_str.c_str());
+            if (!save_result) {
+                logger->error("cannot store cryptographic keys ({} & {}) :: {}", cert_path_str, key_path_str,
+                              save_result.error().message());
+                return 1;
+            }
         }
     }
 
@@ -288,6 +296,16 @@ int app_main(app_context_t &app_ctx) {
     auto seed = (size_t)std::time(nullptr);
     auto sequencer = model::make_sequencer(seed);
 
+    static std::atomic_bool bouncer_shutdown_flag = false;
+    auto bouncer_context = thread_sys_context_t();
+    auto bouncer_sup = bouncer_context.create_supervisor<r::thread::supervisor_thread_t>()
+                           .timeout(timeout * 9 / 8)
+                           .shutdown_flag(bouncer_shutdown_flag, r::pt::millisec{50})
+                           .finish();
+    bouncer_sup->do_process();
+    auto bouncer_actor = bouncer_sup->create_actor<bouncer::bouncer_actor_t>().timeout(timeout * 9 / 8).finish();
+    bouncer_sup->do_process();
+
     auto sup_net = sys_context->create_supervisor<net::net_supervisor_t>()
                        .app_config(cfg)
                        .strand(strand)
@@ -297,6 +315,7 @@ int app_main(app_context_t &app_ctx) {
                        .sequencer(sequencer)
                        .independent_threads(independent_threads)
                        .shutdown_flag(shutdown_flag, r::pt::millisec{50})
+                       .bouncer_address(bouncer_actor->get_address())
                        .finish();
     // warm-up
     sup_net->do_process();
@@ -305,6 +324,16 @@ int app_main(app_context_t &app_ctx) {
         return 1;
     }
 
+    auto bouncer_thread = std::thread([&]() {
+#if defined(__linux__)
+        pthread_setname_np(pthread_self(), "ss/bouncer");
+#endif
+        logger->trace("running bouncer");
+        bouncer_context.run();
+        bouncer_shutdown_flag = true;
+        logger->trace("bouncer thread has been terminated");
+    });
+
     auto hasher_count = cfg.hasher_threads;
     using sys_thread_context_ptr_t = r::intrusive_ptr_t<thread_sys_context_t>;
     std::vector<sys_thread_context_ptr_t> hasher_ctxs;
@@ -312,7 +341,7 @@ int app_main(app_context_t &app_ctx) {
         hasher_ctxs.push_back(new thread_sys_context_t{});
         auto &ctx = hasher_ctxs.back();
         auto sup = ctx->create_supervisor<hasher::hasher_supervisor_t>()
-                       .timeout(timeout / 2)
+                       .timeout(timeout * 8 / 9)
                        .registry_address(sup_net->get_registry_address())
                        .index(i)
                        .finish();
@@ -330,6 +359,7 @@ int app_main(app_context_t &app_ctx) {
                         .timeout(timeout)
                         .registry_address(sup_net->get_registry_address())
                         .shutdown_flag(shutdown_flag, r::pt::millisec{50})
+                        .bouncer_address(bouncer_actor->get_address())
                         .finish();
     // warm-up
     sup_fltk->do_process();
@@ -340,6 +370,7 @@ int app_main(app_context_t &app_ctx) {
                       .registry_address(sup_net->get_registry_address())
                       .fs_config(cfg.fs_config)
                       .hasher_threads(cfg.hasher_threads)
+                      .bouncer_address(bouncer_actor->get_address())
                       .sequencer(sequencer)
                       .finish();
     fs_sup->do_process();
@@ -396,20 +427,28 @@ int app_main(app_context_t &app_ctx) {
         if (!Fl::wait()) {
             shutdown_flag = true;
             logger->debug("main window is longer show, terminating...");
-            break;
+            sup_fltk->do_shutdown();
+            while (sup_fltk->state != r::state_t::SHUT_DOWN) {
+                Fl::wait(0.01);
+                sup_fltk->do_process();
+            }
         }
     }
 
-    sup_fltk->do_shutdown();
-    sup_fltk->do_process();
-
+    logger->trace("joining to fs thread");
     fs_thread.join();
+
+    logger->trace("joining to net thread");
     net_thread.join();
 
-    logger->trace("waiting hasher threads termination");
+    logger->trace("joining to {} hasher threads", hasher_threads.size());
     for (auto &thread : hasher_threads) {
         thread.join();
     }
+
+    logger->trace("joining to bouncer thread");
+    bouncer_shutdown_flag = true;
+    bouncer_thread.join();
 
     if (auto reason = sup_net->get_shutdown_reason(); reason && reason->ec) {
         logger->info("app shut down reason: {}", reason->message());

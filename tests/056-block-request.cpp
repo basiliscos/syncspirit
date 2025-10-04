@@ -70,18 +70,18 @@ TEST_CASE("block request", "[model]") {
     REQUIRE(builder.local_update(folder->get_id(), pr_file_2).apply());
 
     auto f1 = folder_my->get_file_infos().by_name("a.bin");
-    REQUIRE(f1->get_blocks().size() == 1);
+    REQUIRE(f1->iterate_blocks().get_total() == 1);
 
     auto f2 = folder_my->get_file_infos().by_name("b.bin");
-    REQUIRE(f2->get_blocks().size() == 2);
+    REQUIRE(f2->iterate_blocks().get_total() == 2);
 
     using request_t = syncspirit::net::payload::block_request_t;
 
-    auto r1 = request_t(f1, 0);
+    auto r1 = request_t(f1, *folder_my, 0);
     CHECK(r1.block_offset == 0);
     CHECK(r1.block_size == 5);
 
-    auto r2 = request_t(f2, 1);
+    auto r2 = request_t(f2, *folder_my, 1);
     CHECK(r2.block_offset == 5);
     CHECK(r2.block_size == 5);
 

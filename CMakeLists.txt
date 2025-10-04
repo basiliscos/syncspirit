@@ -1,5 +1,5 @@
 cmake_minimum_required (VERSION 3.19)
-project (syncspirit VERSION 0.4.2)
+project (syncspirit VERSION 0.4.3)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -92,6 +92,7 @@ configure_file(misc/syncspirit-config.h.in include/syncspirit-config.h @ONLY)
 
 add_library(syncspirit_core
     src/constants.cpp
+    src/bouncer/bouncer_actor.cpp
     src/config/utils.cpp
     src/db/cursor.cpp
     src/db/error_code.cpp
@@ -115,6 +116,7 @@ add_library(syncspirit_core
     src/model/diff/block_diff.cpp
     src/model/diff/cluster_diff.cpp
     src/model/diff/cluster_visitor.cpp
+    src/model/diff/iterative_controller.cpp
     src/model/diff/advance/advance.cpp
     src/model/diff/advance/local_update.cpp
     src/model/diff/advance/remote_copy.cpp
@@ -127,12 +129,14 @@ add_library(syncspirit_core
     src/model/diff/contact/unknown_connected.cpp
     src/model/diff/contact/update_contact.cpp
     src/model/diff/load/blocks.cpp
+    src/model/diff/load/commit.cpp
     src/model/diff/load/devices.cpp
     src/model/diff/load/file_infos.cpp
     src/model/diff/load/folder_infos.cpp
     src/model/diff/load/folders.cpp
     src/model/diff/load/ignored_devices.cpp
     src/model/diff/load/ignored_folders.cpp
+    src/model/diff/load/interrupt.cpp
     src/model/diff/load/load_cluster.cpp
     src/model/diff/load/pending_devices.cpp
     src/model/diff/load/pending_folders.cpp
@@ -158,7 +162,6 @@ add_library(syncspirit_core
     src/model/diff/modify/clone_block.cpp
     src/model/diff/modify/finish_file.cpp
     src/model/diff/modify/generic_remove.cpp
-    src/model/diff/modify/lock_file.cpp
     src/model/diff/modify/mark_reachable.cpp
     src/model/diff/modify/remove_blocks.cpp
     src/model/diff/modify/remove_files.cpp
@@ -184,6 +187,8 @@ add_library(syncspirit_core
     src/model/misc/file_block.cpp
     src/model/misc/file_iterator.cpp
     src/model/misc/orphaned_blocks.cpp
+    src/model/misc/path.cpp
+    src/model/misc/path_cache.cpp
     src/model/misc/resolver.cpp
     src/model/misc/sequencer.cpp
     src/model/misc/updates_streamer.cpp
@@ -220,7 +225,6 @@ add_library(syncspirit_core
     src/net/relay_actor.cpp
     src/net/resolver_actor.cpp
     src/net/names.cpp
-    src/net/sink_actor.cpp
     src/net/ssdp_actor.cpp
     src/net/upnp_actor.cpp
     src/presentation/entity.cpp
@@ -231,7 +235,6 @@ add_library(syncspirit_core
     src/presentation/local_file_presence.cpp
     src/presentation/missing_file_presence.cpp
     src/presentation/orphans.cpp
-    src/presentation/path.cpp
     src/presentation/peer_file_presence.cpp
     src/presentation/presence.cpp
     src/proto/bep_support.cpp
@@ -248,6 +251,7 @@ add_library(syncspirit_core
     src/utils/bytes.cpp
     src/utils/dns.cpp
     src/utils/error_code.cpp
+    src/utils/format.cpp
     src/utils/location.cpp
     src/utils/log.cpp
     src/utils/log-setup.cpp

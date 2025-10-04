@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "test-utils.h"
+#include "model/cluster.h"
 #include "model/device_id.h"
 #include "utils/base32.h"
 #include "utils/log-setup.h"
@@ -129,9 +130,9 @@ std::string hash_string(const std::string_view &hash) noexcept {
     return r;
 }
 
-static model::diff::apply_controller_t apply_controller;
-
-model::diff::apply_controller_t &get_apply_controller() { return apply_controller; }
+apply_controller_ptr_t make_apply_controller(model::cluster_ptr_t cluster) {
+    return new test_apply_controller_t(std::move(cluster));
+}
 
 void init_logging() {
     auto [dist_sink, _] = utils::create_root_logger();
@@ -168,6 +169,16 @@ bool has_ipv6() noexcept {
     auto ec = sys::error_code();
     ip::make_address_v6("1:2:3::4", ec);
     return !ec;
+}
+
+utils::bytes_t make_key(model::block_info_ptr_t block) {
+    static constexpr auto SZ = model::block_info_t::digest_length + 1;
+    unsigned char key_storage[SZ];
+    auto hash = block->get_hash();
+    key_storage[0] = db::prefix::block_info;
+    std::copy(hash.begin(), hash.end(), key_storage + 1);
+    auto key = utils::bytes_t(key_storage, key_storage + SZ);
+    return key;
 }
 
 } // namespace syncspirit::test

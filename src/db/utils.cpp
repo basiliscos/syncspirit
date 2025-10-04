@@ -7,18 +7,23 @@
 #include "prefix.h"
 #include "model/misc/error_code.h"
 #include "proto/proto-helpers-db.h"
+#include "proto/proto-helpers-impl.hpp"
 #include <boost/endian/conversion.hpp>
+#include <type_traits>
 
 namespace syncspirit::db {
 
 namespace be = boost::endian;
 
 std::byte zero{0};
-std::uint32_t version{2};
+std::uint32_t version{3};
 
 namespace misc {
 static const constexpr std::string_view db_version = "db_version";
 }
+
+using migration_fn_t = outcome::result<void>(model::device_ptr_t &device, transaction_t &txn) noexcept;
+using migration_fn_ptr_t = std::add_pointer_t<migration_fn_t>;
 
 outcome::result<uint32_t> get_version(transaction_t &txn) noexcept {
     auto key = prefixer_t<prefix::misc>::make(misc::db_version);
@@ -55,7 +60,7 @@ outcome::result<void> save_version(std::uint32_t v, transaction_t &txn) noexcept
     return outcome::success();
 }
 
-static outcome::result<void> migrate0(model::device_ptr_t &device, transaction_t &txn) noexcept {
+static outcome::result<void> migrate_0(model::device_ptr_t &device, transaction_t &txn) noexcept {
     auto version_r = save_version(1, txn);
     if (!version_r) {
         return version_r;
@@ -96,7 +101,7 @@ static outcome::result<void> migrate0(model::device_ptr_t &device, transaction_t
     return outcome::success();
 }
 
-static outcome::result<void> migrate1(model::device_ptr_t &device, transaction_t &txn) noexcept {
+static outcome::result<void> migrate_1(model::device_ptr_t &device, transaction_t &txn) noexcept {
     auto fis_opt = db::load(db::prefix::folder_info, txn);
     if (!fis_opt) {
         return fis_opt.error();
@@ -120,20 +125,56 @@ static outcome::result<void> migrate1(model::device_ptr_t &device, transaction_t
             return r;
         }
     }
+    return outcome::success();
+}
+
+static outcome::result<void> migrate_2(model::device_ptr_t &device, transaction_t &txn) noexcept {
+    // clang-format off
+    using BlockInfoEx = pp::message<
+       pp::uint32_field <"weak_hash", 1>,
+       pp::int32_field  <"size",      2>
+    >;
+    // clang-format on
+
+    auto bis_opt = db::load(db::prefix::block_info, txn);
+    if (!bis_opt) {
+        return bis_opt.error();
+    }
+
+    auto &container = bis_opt.value();
+
+    for (auto &pair : container) {
+        using namespace pp;
+        auto &key = pair.key;
+        auto db_bi_ex = BlockInfoEx();
+        if (auto left = syncspirit::details::generic_decode(pair.value, db_bi_ex); left) {
+            continue;
+        }
+        auto size = db_bi_ex["size"_f].value_or(0);
+        auto db_bi = db::BlockInfo();
+        db::set_size(db_bi, size);
+        auto new_value = db::encode(db_bi);
+        auto r = db::save({key, new_value}, txn);
+        if (!r) {
+            return r;
+        }
+    }
 
     return save_version(db::version, txn);
 }
 
 static outcome::result<void> do_migrate(uint32_t from, model::device_ptr_t &device, transaction_t &txn) noexcept {
-    switch (from) {
-    case 0:
-        return migrate0(device, txn);
-    case 1:
-        return migrate1(device, txn);
-    default:
-        assert(0 && "impossibe migration to future version");
-        std::terminate();
+    static constexpr uint32_t SZ = 3;
+    migration_fn_ptr_t migrations[SZ] = {
+        migrate_0,
+        migrate_1,
+        migrate_2,
+    };
+
+    if (from >= SZ) {
+        return db::make_error_code(error_code::cannot_downgrade_db);
     }
+    return migrations[from](device, txn);
 }
 
 outcome::result<void> migrate(uint32_t from, model::device_ptr_t device, transaction_t &txn) noexcept {

@@ -18,7 +18,7 @@ struct SYNCSPIRIT_API add_remote_folder_infos_t final : cluster_diff_t {
     using container_t = std::vector<item_t>;
 
     add_remote_folder_infos_t(const model::device_t &peer, container_t items) noexcept;
-    outcome::result<void> apply_impl(cluster_t &, apply_controller_t &) const noexcept override;
+    outcome::result<void> apply_impl(apply_controller_t &, void *) const noexcept override;
     outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;
 
     utils::bytes_t device_id;

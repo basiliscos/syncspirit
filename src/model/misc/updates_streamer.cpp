@@ -51,18 +51,17 @@ void updates_streamer_t::refresh_remote() noexcept {
     }
 }
 
-bool updates_streamer_t::on_update(file_info_t &file) noexcept {
-    assert(file.get_folder_info()->get_device() == self);
+bool updates_streamer_t::on_update(file_info_t &file, const folder_info_t &fi) noexcept {
+    assert(fi.get_device() == self);
     bool r = false;
-    auto fi = file.get_folder_info();
     if (!streaming) {
         for (auto &[folder_info, seen_sequence] : seen_info) {
-            if (folder_info.get() == fi) {
+            if (folder_info.get() == &fi) {
                 auto max = folder_info->get_max_sequence();
                 auto unseen_files = file_infos_map_t();
                 auto [it, end] = folder_info->get_file_infos().range(seen_sequence + 1, max);
                 for (; it != end; ++it) {
-                    auto &f = it->item;
+                    auto &f = *it;
                     unseen_files.put(f.get());
                 }
                 streaming = streaming_info_t(folder_info, std::move(unseen_files));
@@ -72,7 +71,7 @@ bool updates_streamer_t::on_update(file_info_t &file) noexcept {
         }
     } else if (streaming) {
         auto &info = *streaming;
-        if (info.folder_info.get() == file.get_folder_info()) {
+        if (info.folder_info.get() == &fi) {
             info.unseen_files.put(&file);
             r = true;
         }
@@ -87,13 +86,12 @@ auto updates_streamer_t::next() noexcept -> update_t {
         auto &files = streaming->unseen_files;
         auto &proj = files.sequence_projection();
         if (!proj.empty()) {
-            auto it = proj.begin();
-            auto file = it->item;
+            auto file = *proj.begin();
             files.remove(file);
             auto &seen_sequence = seen_info[streaming->folder_info];
             auto initial = seen_sequence == 0;
             seen_sequence = file->get_sequence();
-            return {file, initial};
+            return {file, streaming->folder_info.get(), initial};
         }
         streaming.reset();
     }
@@ -103,20 +101,20 @@ auto updates_streamer_t::next() noexcept -> update_t {
             auto [it, end] = folder_info->get_file_infos().range(seen_sequence + 1, max);
             if (it != end) {
                 auto initial = seen_sequence == 0;
-                auto file = it->item;
+                auto &file = *it;
                 seen_info[folder_info] = file->get_sequence();
                 ++it;
                 if (it != end) {
                     auto unseen_files = file_infos_map_t();
                     for (; it != end; ++it) {
-                        auto &f = it->item;
+                        auto &f = *it;
                         unseen_files.put(f.get());
                     }
                     streaming = streaming_info_t(folder_info, std::move(unseen_files));
                 }
-                return {file, initial};
+                return {file, folder_info.get(), initial};
             }
         }
     }
-    return {{}, false};
+    return {{}, {}, false};
 }

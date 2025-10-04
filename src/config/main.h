@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #pragma once
 #include <cstdint>
@@ -22,6 +22,9 @@ namespace bfs = std::filesystem;
 struct main_t {
     bfs::path config_path;
     bfs::path default_location;
+    bfs::path root_ca_file;
+    bfs::path cert_file;
+    bfs::path key_file;
 
     local_announce_config_t local_announce_config;
     log_configs_t log_configs;

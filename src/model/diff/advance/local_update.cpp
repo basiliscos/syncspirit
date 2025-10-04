@@ -4,6 +4,7 @@
 #include "local_update.h"
 #include "model/cluster.h"
 #include "../cluster_visitor.h"
+#include "model/diff/apply_controller.h"
 #include "proto/proto-helpers-bep.h"
 #include <memory_resource>
 
@@ -33,15 +34,15 @@ local_update_t::local_update_t(const cluster_t &cluster, sequencer_t &sequencer,
     } else {
         proto::set_modified_by(proto_file_, self.device_id().get_uint());
         initialize(cluster, sequencer, std::move(proto_file_), name);
-        auto version = version_ptr_t();
+        auto version = version_t();
         if (local_file) {
             version = local_file->get_version();
-            version->update(device);
+            version.update(device);
         } else {
-            version.reset(new version_t(device));
+            version = version_t(device);
         }
         auto &proto_version = proto::get_version(proto_local);
-        version->to_proto(proto_version);
+        version.to_proto(proto_version);
     }
 }
 
@@ -49,12 +50,11 @@ auto local_update_t::get_original(const model::folder_infos_map_t &fis, const mo
                                   const proto::FileInfo &local_file) const noexcept -> model::file_info_ptr_t {
     auto r = model::file_info_ptr_t();
     auto name = proto::get_name(local_file);
-    auto local_type = proto::get_type(local_file);
     auto local_deleted = proto::get_deleted(local_file);
     auto local_invalid = proto::get_invalid(local_file);
     auto local_perms = proto::get_permissions(local_file);
     auto local_size = proto::get_size(local_file);
-    auto local_blocks_sz = proto::get_blocks_size(local_file);
+    auto local_type = model::file_info_t::as_flags(proto::get_type(local_file));
 
     for (auto &it_fi : fis) {
         auto fi = it_fi.item.get();
@@ -64,22 +64,30 @@ auto local_update_t::get_original(const model::folder_infos_map_t &fis, const mo
             auto candidate = peer_files.by_name(name);
             if (candidate) {
                 if (candidate->get_size() == local_size) {
-                    auto &peer_blocks = candidate->get_blocks();
                     bool matches = local_type == candidate->get_type() && local_deleted == candidate->is_deleted() &&
                                    local_invalid == candidate->is_invalid() &&
-                                   local_perms == candidate->get_permissions() && local_blocks_sz == peer_blocks.size();
+                                   local_perms == candidate->get_permissions();
                     if (matches) {
-                        for (size_t i = 0; i < peer_blocks.size(); ++i) {
-                            auto &pb = peer_blocks[i];
-                            auto &lb = proto::get_blocks(local_file, i);
-                            if (pb->get_hash() != proto::get_hash(lb)) {
-                                matches = false;
-                                break;
+                        if (candidate->is_file()) {
+                            matches = false;
+                            auto local_blocks_sz = proto::get_blocks_size(local_file);
+                            auto iterator = candidate->iterate_blocks();
+                            if (iterator.get_total() == static_cast<std::uint32_t>(local_blocks_sz)) {
+                                matches = true;
+                                auto i = std::uint32_t{0};
+                                while (auto pb = iterator.next()) {
+                                    auto &lb = proto::get_blocks(local_file, i);
+                                    if (pb->get_hash() != proto::get_hash(lb)) {
+                                        matches = false;
+                                        break;
+                                    }
+                                    ++i;
+                                }
                             }
                         }
-                    }
-                    if (matches) {
-                        peer_file = std::move(candidate);
+                        if (matches) {
+                            peer_file = std::move(candidate);
+                        }
                     }
                 }
             }
@@ -97,8 +105,8 @@ auto local_update_t::get_original(const model::folder_infos_map_t &fis, const mo
     return r;
 }
 
-auto local_update_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
-    -> outcome::result<void> {
+auto local_update_t::apply_impl(apply_controller_t &controller, void *custom) const noexcept -> outcome::result<void> {
+    auto &cluster = controller.get_cluster();
     auto folder = cluster.get_folders().by_id(folder_id);
     if (!folder) {
         LOG_DEBUG(log, "remote_copy_t, folder = {}, name = {}, folder is not available, ignoring", folder_id,
@@ -107,9 +115,9 @@ auto local_update_t::apply_impl(cluster_t &cluster, apply_controller_t &controll
         LOG_DEBUG(log, "remote_copy_t, folder = {}, name = {}, folder is suspended, ignoring", folder_id,
                   proto::get_name(proto_source));
     } else {
-        return advance_t::apply_impl(cluster, controller);
+        return advance_t::apply_impl(controller, custom);
     }
-    return applicator_t::apply_sibling(cluster, controller);
+    return applicator_t::apply_sibling(controller, custom);
 }
 
 auto local_update_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

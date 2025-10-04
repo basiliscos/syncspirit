@@ -26,10 +26,12 @@ struct update_contact_t;
 
 namespace load {
 struct blocks_t;
+struct commit_t;
 struct devices_t;
 struct file_infos_t;
 struct load_cluster_t;
 struct ignored_devices_t;
+struct interrupt_t;
 struct remove_corrupted_files_t;
 struct pending_devices_t;
 } // namespace load
@@ -65,7 +67,6 @@ struct block_transaction_t;
 struct clone_block_t;
 struct finish_file_t;
 struct generic_remove_t;
-struct lock_file_t;
 struct mark_reachable_t;
 struct remove_blocks_t;
 struct remove_files_t;

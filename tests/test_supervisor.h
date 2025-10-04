@@ -5,6 +5,7 @@
 
 #include "rotor/supervisor.h"
 #include "model/messages.h"
+#include "bouncer/messages.hpp"
 #include "model/diff/apply_controller.h"
 #include "model/diff/cluster_visitor.h"
 #include "model/diff/local/io_failure.h"
@@ -52,8 +53,8 @@ template <typename Supervisor> struct supervisor_config_builder_t : r::superviso
 };
 
 struct SYNCSPIRIT_TEST_API supervisor_t : r::supervisor_t,
-                                          protected model::diff::cluster_visitor_t,
-                                          private model::diff::apply_controller_t {
+                                          model::diff::apply_controller_t,
+                                          protected model::diff::cluster_visitor_t {
     using config_t = supervisor_config_t;
     template <typename Actor> using config_builder_t = supervisor_config_builder_t<Actor>;
 
@@ -69,6 +70,7 @@ struct SYNCSPIRIT_TEST_API supervisor_t : r::supervisor_t,
     void enqueue(r::message_ptr_t message) noexcept override;
 
     virtual void on_model_update(model::message::model_update_t &) noexcept;
+    virtual void on_package(bouncer::message::package_t &) noexcept;
     void on_model_sink(model::message::model_update_t &) noexcept;
     void do_start_timer(const r::pt::time_duration &interval, r::timer_handler_base_t &handler) noexcept override;
     void do_invoke_timer(r::request_id_t timer_id) noexcept;
@@ -84,8 +86,11 @@ struct SYNCSPIRIT_TEST_API supervisor_t : r::supervisor_t,
     outcome::result<void> operator()(const model::diff::advance::advance_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::peer::update_folder_t &, void *) noexcept override;
 
+    outcome::result<void> apply(const model::diff::load::commit_t &, void *) noexcept override;
+
+    using model::diff::apply_controller_t::cluster;
+
     utils::logger_t log;
-    model::cluster_ptr_t cluster;
     model::sequencer_ptr_t sequencer;
     configure_callback_t configure_callback;
     model::diff::cluster_diff_ptr_t delayed_ack_holder;
@@ -95,7 +100,6 @@ struct SYNCSPIRIT_TEST_API supervisor_t : r::supervisor_t,
     bool auto_ack_blocks;
     bool make_presentation;
     io_errors_t io_errors;
-    r::address_ptr_t sink;
 };
 
 }; // namespace syncspirit::test

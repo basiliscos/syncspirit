@@ -5,12 +5,11 @@
 
 #include "content.h"
 #include "config/main.h"
-#include "utils/log.h"
 #include "net/messages.h"
 #include "model/messages.h"
 #include "model/diff/apply_controller.h"
-#include "model/diff/cluster_visitor.h"
 #include "model/diff/load/load_cluster.h"
+#include "model/diff/iterative_controller.h"
 #include "model/misc/sequencer.h"
 #include "log_sink.h"
 
@@ -58,6 +57,7 @@ struct app_supervisor_config_t : rf::supervisor_config_fltk_t {
     in_memory_sink_t *log_sink;
     bfs::path config_path;
     config::main_t app_config;
+    r::address_ptr_t bouncer_address;
 };
 
 template <typename Actor> struct app_supervisor_config_builder_t : rf::supervisor_config_fltk_builder_t<Actor> {
@@ -69,14 +69,16 @@ template <typename Actor> struct app_supervisor_config_builder_t : rf::superviso
         parent_t::config.log_sink = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
-
     builder_t &&config_path(const bfs::path &value) && noexcept {
         parent_t::config.config_path = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
-
     builder_t &&app_config(const config::main_t &value) && noexcept {
         parent_t::config.app_config = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+    builder_t &&bouncer_address(const r::address_ptr_t &value) && noexcept {
+        parent_t::config.bouncer_address = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };
@@ -87,10 +89,10 @@ struct callback_t : model::arc_base_t<callback_t> {
 };
 using callback_ptr_t = model::intrusive_ptr_t<callback_t>;
 
-struct app_supervisor_t : rf::supervisor_fltk_t,
-                          private model::diff::cluster_visitor_t,
-                          private model::diff::apply_controller_t {
-    using parent_t = rf::supervisor_fltk_t;
+template <typename T> using app_supervisor_base_t = model::diff::iterative_controller_t<T, rf::supervisor_fltk_t>;
+
+struct app_supervisor_t : app_supervisor_base_t<app_supervisor_t> {
+    using parent_t = app_supervisor_base_t<app_supervisor_t>;
     using config_t = app_supervisor_config_t;
     template <typename Actor> using config_builder_t = app_supervisor_config_builder_t<Actor>;
 
@@ -100,6 +102,7 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
 
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
     void shutdown_finish() noexcept override;
+    using r::actor_base_t::state;
 
     const bfs::path &get_config_path();
     config::main_t &get_app_config();
@@ -135,11 +138,6 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
         send<Payload>(coordinator, std::forward<Args>(args)...);
     }
 
-    template <typename Payload, typename... Args> void send_sink(Args &&...args) {
-        auto message = r::make_routed_message<Payload>(coordinator, sink, std::forward<Args>(args)...);
-        put(std::move(message));
-    }
-
     template <typename Fn> void with_cluster(Fn &&fn) {
         if (cluster) {
             fn();
@@ -159,7 +157,6 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
     callback_ptr_t call_select_folder(std::string_view folder_id);
     callback_ptr_t call_share_folders(std::string_view folder_id, std::vector<utils::bytes_t> devices);
     db_info_viewer_guard_t request_db_info(db_info_viewer_t *viewer);
-    void request_load_model();
     r::address_ptr_t &get_coordinator_address();
 
     std::uint32_t mask_nodes() const noexcept;
@@ -168,39 +165,39 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
     using clock_t = std::chrono::high_resolution_clock;
     using time_point_t = typename clock_t::time_point;
     using callbacks_t = std::list<callback_ptr_t>;
+    using model_update_ptr_t = r::intrusive_ptr_t<model::message::model_update_t>;
+    using delayed_updates_t = std::list<model_update_ptr_t>;
 
     void on_model_response(model::message::model_response_t &res) noexcept;
-    void on_model_update(model::message::model_update_t &message) noexcept;
     void on_app_ready(model::message::app_ready_t &) noexcept;
+    void on_db_loaded(model::message::db_loaded_t &) noexcept;
     void on_db_info_response(net::message::db_info_response_t &res) noexcept;
     void redisplay_folder_nodes(bool refresh_labels);
     void detach_main_window() noexcept;
 
-    outcome::result<void> operator()(const model::diff::advance::advance_t &, void *) noexcept override;
-    outcome::result<void> operator()(const model::diff::load::load_cluster_t &, void *) noexcept override;
-    outcome::result<void> operator()(const model::diff::local::io_failure_t &, void *) noexcept override;
-    outcome::result<void> operator()(const model::diff::modify::add_pending_folders_t &, void *) noexcept override;
-    outcome::result<void> operator()(const model::diff::modify::add_pending_device_t &, void *) noexcept override;
-    outcome::result<void> operator()(const model::diff::modify::add_ignored_device_t &, void *) noexcept override;
-    outcome::result<void> operator()(const model::diff::modify::update_peer_t &, void *) noexcept override;
-    outcome::result<void> operator()(const model::diff::modify::upsert_folder_t &, void *) noexcept override;
-    outcome::result<void> operator()(const model::diff::modify::upsert_folder_info_t &, void *) noexcept override;
-    outcome::result<void> operator()(const model::diff::peer::update_folder_t &, void *) noexcept override;
+    void process(model::diff::cluster_diff_t &diff, apply_context_t &context) noexcept override;
 
-    outcome::result<void> apply(const model::diff::load::blocks_t &, model::cluster_t &cluster) noexcept override;
-    outcome::result<void> apply(const model::diff::load::file_infos_t &, model::cluster_t &cluster) noexcept override;
-    outcome::result<void> apply(const model::diff::load::load_cluster_t &, model::cluster_t &cluster) noexcept override;
+    outcome::result<void> apply(const model::diff::advance::advance_t &, void *) noexcept override;
+    outcome::result<void> apply(const model::diff::load::blocks_t &, void *) noexcept override;
+    outcome::result<void> apply(const model::diff::load::file_infos_t &, void *) noexcept override;
+    outcome::result<void> apply(const model::diff::load::load_cluster_t &, void *) noexcept override;
+    outcome::result<void> apply(const model::diff::local::io_failure_t &, void *) noexcept override;
+    outcome::result<void> apply(const model::diff::modify::add_pending_folders_t &, void *) noexcept override;
+    outcome::result<void> apply(const model::diff::modify::add_pending_device_t &, void *) noexcept override;
+    outcome::result<void> apply(const model::diff::modify::add_ignored_device_t &, void *) noexcept override;
+    outcome::result<void> apply(const model::diff::modify::update_peer_t &, void *) noexcept override;
+    outcome::result<void> apply(const model::diff::modify::upsert_folder_t &, void *) noexcept override;
+    outcome::result<void> apply(const model::diff::modify::upsert_folder_info_t &, void *) noexcept override;
+    outcome::result<void> apply(const model::diff::peer::update_folder_t &, void *) noexcept override;
+
+    void commit_loading() noexcept override;
 
     model::sequencer_ptr_t sequencer;
     time_point_t started_at;
-    r::address_ptr_t coordinator;
-    r::address_ptr_t sink;
     in_memory_sink_t *log_sink;
-    utils::logger_t log;
     bfs::path config_path;
     config::main_t app_config;
     config::main_t app_config_original;
-    model::cluster_ptr_t cluster;
     content_t *content;
     tree_item_t *devices;
     tree_item_t *folders;
@@ -209,9 +206,6 @@ struct app_supervisor_t : rf::supervisor_fltk_t,
     db_info_viewer_t *db_info_viewer;
     callbacks_t callbacks;
     main_window_t *main_window;
-    std::size_t loaded_blocks;
-    std::size_t loaded_files;
-    const model::diff::load::load_cluster_t *load_cluster;
 
     friend struct db_info_viewer_guard_t;
 };

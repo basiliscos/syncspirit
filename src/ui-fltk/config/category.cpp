@@ -85,8 +85,6 @@ auto reflect(const main_cfg_t &config, const main_cfg_t &default_config) -> cate
             // clang-format off
             property_ptr_t(new global_discovery::enabled_t(g.enabled, g_def.enabled)),
             property_ptr_t(new global_discovery::debug_t(g.debug, g_def.debug)),
-            property_ptr_t(new global_discovery::cert_file_t(g.cert_file, g_def.cert_file)),
-            property_ptr_t(new global_discovery::key_file_t(g.key_file, g_def.key_file)),
             property_ptr_t(new global_discovery::announce_url_t(g.announce_url->buffer(), g_def.announce_url->buffer())),
             property_ptr_t(new global_discovery::lookup_url_t(g.lookup_url->buffer(), g_def.lookup_url->buffer())),
             property_ptr_t(new global_discovery::rx_buff_size_t(g.rx_buff_size, g_def.rx_buff_size)),
@@ -114,7 +112,10 @@ auto reflect(const main_cfg_t &config, const main_cfg_t &default_config) -> cate
         auto &l_def = default_config;
         auto props = properties_t{
             // clang-format off
-            property_ptr_t(new main::default_location_t(l.default_location.string(), l_def.default_location.string())),
+            property_ptr_t(new main::default_location_t(l.default_location, l_def.default_location)),
+            property_ptr_t(new main::cert_file_t(l.cert_file, l_def.cert_file)),
+            property_ptr_t(new main::key_file_t(l.key_file, l_def.key_file)),
+            property_ptr_t(new main::root_ca_file(l.root_ca_file, l_def.root_ca_file)),
             property_ptr_t(new main::device_name_t(l.device_name, l_def.device_name)),
             property_ptr_t(new main::hasher_threads_t(l.hasher_threads, l_def.hasher_threads)),
             property_ptr_t(new main::timeout_t(l.timeout, l_def.timeout)),

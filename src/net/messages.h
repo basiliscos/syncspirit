@@ -103,12 +103,14 @@ struct announce_notification_t {
     r::address_ptr_t source;
 };
 
-struct load_cluster_response_t {
+struct load_cluster_trigger_t {};
+
+struct load_cluster_success_t {
     model::diff::cluster_diff_ptr_t diff;
 };
 
-struct load_cluster_request_t {
-    using response_t = load_cluster_response_t;
+struct load_cluster_fail_t {
+    r::extended_error_ptr_t ee;
 };
 
 struct controller_up_t {
@@ -136,6 +138,7 @@ struct controller_predown_t {
 };
 
 struct peer_down_t {
+    r::address_ptr_t peer;
     r::extended_error_ptr_t ee;
 };
 
@@ -148,6 +151,7 @@ struct block_response_t {
 
 struct SYNCSPIRIT_API block_request_t {
     using response_t = block_response_t;
+    using block_info_t = std::pair<model::file_block_t *, model::folder_info_t *>;
     std::string folder_id;
     std::string file_name;
     std::int64_t sequence;
@@ -155,9 +159,10 @@ struct SYNCSPIRIT_API block_request_t {
     std::int64_t block_offset;
     std::uint32_t block_size;
     utils::bytes_t block_hash;
-    block_request_t(const model::file_info_ptr_t &file, size_t block_index) noexcept;
+    block_request_t(const model::file_info_ptr_t &file, const model::folder_info_t &folder,
+                    size_t block_index) noexcept;
 
-    model::file_block_t get_block(model::cluster_t &, model::device_t &peer) noexcept;
+    block_info_t get_block(model::cluster_t &, model::device_t &peer) noexcept;
 };
 
 struct connect_response_t {
@@ -191,6 +196,10 @@ struct db_info_request_t {
 
 struct fs_predown_t {};
 
+struct lock_t {
+    bool value;
+};
+
 } // end of namespace payload
 
 namespace message {
@@ -206,8 +215,9 @@ using http_response_t = r::request_traits_t<payload::http_request_t>::response::
 using http_cancel_t = r::request_traits_t<payload::http_request_t>::cancel::message_t;
 using http_close_connection_t = r::message_t<payload::http_close_connection_t>;
 
-using load_cluster_request_t = r::request_traits_t<payload::load_cluster_request_t>::request::message_t;
-using load_cluster_response_t = r::request_traits_t<payload::load_cluster_request_t>::response::message_t;
+using load_cluster_trigger_t = r::message_t<payload::load_cluster_trigger_t>;
+using load_cluster_success_t = r::message_t<payload::load_cluster_success_t>;
+using load_cluster_fail_t = r::message_t<payload::load_cluster_fail_t>;
 
 using controller_up_t = r::message_t<payload::controller_up_t>;
 using controller_predown_t = r::message_t<payload::controller_predown_t>;
@@ -227,6 +237,7 @@ using db_info_request_t = r::request_traits_t<payload::db_info_request_t>::reque
 using db_info_response_t = r::request_traits_t<payload::db_info_request_t>::response::message_t;
 
 using fs_predown_t = r::message_t<payload::fs_predown_t>;
+using lock_t = r::message_t<payload::lock_t>;
 
 } // end of namespace message
 

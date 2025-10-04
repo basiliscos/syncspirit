@@ -121,10 +121,15 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     using block_write_queue_t = std::list<model::diff::cluster_diff_ptr_t>;
     using block_read_queue_t = std::list<proto::Request>;
 
-    struct folder_synchronization_t : model::arc_base_t<folder_synchronization_t> {
+    struct folder_synchronization_t {
         using block_set_t = std::unordered_map<utils::bytes_view_t, model::block_info_ptr_t>;
         folder_synchronization_t(controller_actor_t &controller, model::folder_t &folder) noexcept;
+        folder_synchronization_t(const folder_synchronization_t &) = delete;
+        folder_synchronization_t(folder_synchronization_t &&) noexcept = default;
         ~folder_synchronization_t();
+
+        folder_synchronization_t &operator=(folder_synchronization_t &&) noexcept = default;
+
         void reset() noexcept;
 
         void start_fetching(model::block_info_t *) noexcept;
@@ -134,14 +139,13 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
         void finish_sync() noexcept;
 
       private:
-        controller_actor_t &controller;
+        controller_actor_t *controller = nullptr;
         model::folder_ptr_t folder;
         block_set_t blocks;
-        bool synchronizing;
+        bool synchronizing = false;
     };
-    using folder_synchronization_ptr_t = model::intrusive_ptr_t<folder_synchronization_t>;
-    using synchronizing_folders_t = std::unordered_map<model::folder_ptr_t, folder_synchronization_ptr_t>;
-    using synchronizing_files_t = std::unordered_map<utils::bytes_view_t, model::file_info_t::guard_ptr_t>;
+    using synchronizing_folders_t = std::unordered_map<model::folder_ptr_t, folder_synchronization_t>;
+    using synchronizing_files_t = std::unordered_map<utils::bytes_view_t, model::file_info_t::guard_t>;
     using updates_streamer_ptr_t = std::unique_ptr<model::updates_streamer_t>;
     using tx_size_ptr_t = payload::controller_up_t::tx_size_ptr_t;
 
@@ -151,7 +155,7 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     void on_forward(message::forwarded_message_t &message) noexcept;
     void on_block(message::block_response_t &message) noexcept;
     void on_validation(hasher::message::validation_response_t &res) noexcept;
-    void preprocess_block(model::file_block_t &block) noexcept;
+    void preprocess_block(model::file_block_t &block, const model::folder_info_t &source_folder) noexcept;
     void on_model_update(model::message::model_update_t &message) noexcept;
     void on_tx_signal(net::message::tx_signal_t &message) noexcept;
     void on_block_response(fs::message::block_response_t &message) noexcept;
@@ -177,10 +181,10 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
 
     void push(model::diff::cluster_diff_ptr_t diff) noexcept;
     void send_diff() noexcept;
-    void acquire_block(const model::file_block_t &block) noexcept;
+    void acquire_block(const model::file_block_t &block, const model::folder_info_t &folder_info) noexcept;
     void release_block(std::string_view folder_id, utils::bytes_view_t hash) noexcept;
-    folder_synchronization_ptr_t get_sync_info(model::folder_t *folder) noexcept;
-    folder_synchronization_ptr_t get_sync_info(std::string_view folder_id) noexcept;
+    folder_synchronization_t &get_sync_info(model::folder_t *folder) noexcept;
+    folder_synchronization_t &get_sync_info(std::string_view folder_id) noexcept;
     void cancel_sync(model::file_info_t *) noexcept;
 
     outcome::result<void> operator()(const model::diff::advance::advance_t &, void *) noexcept override;

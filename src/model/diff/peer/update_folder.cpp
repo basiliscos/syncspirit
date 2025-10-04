@@ -2,12 +2,14 @@
 // SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "update_folder.h"
+#include "model/diff/apply_controller.h"
 #include "model/misc/file_iterator.h"
 #include "model/diff/modify/add_blocks.h"
 #include "model/diff/modify/remove_blocks.h"
 #include "model/diff/cluster_visitor.h"
 #include "model/misc/error_code.h"
 #include "proto/proto-helpers-bep.h"
+#include "utils/format.hpp"
 
 #include <memory_resource>
 #include <set>
@@ -20,7 +22,7 @@ update_folder_t::update_folder_t(std::string_view folder_id_, utils::bytes_view_
                                  uuids_t uuids, blocks_t blocks, orphaned_blocks_t::set_t removed_blocks) noexcept
     : folder_id{std::string(folder_id_)}, peer_id{peer_id_.begin(), peer_id_.end()}, files(std::move(files_)),
       uuids{std::move(uuids)} {
-    LOG_DEBUG(log, "update_folder_t, folder = {}", folder_id);
+    LOG_DEBUG(log, "update_folder_t, folder = {}, files: {}, blocks = {}", folder_id, files.size(), blocks.size());
     auto current = (cluster_diff_t *)(nullptr);
     if (!blocks.empty()) {
         current = assign_child(new modify::add_blocks_t(std::move(blocks)));
@@ -35,13 +37,18 @@ update_folder_t::update_folder_t(std::string_view folder_id_, utils::bytes_view_
     }
 }
 
-auto update_folder_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
+auto update_folder_t::apply_forward(apply_controller_t &controller, void *custom) const noexcept
     -> outcome::result<void> {
-    auto r = applicator_t::apply_child(cluster, controller);
+    return controller.apply(*this, custom);
+}
+
+auto update_folder_t::apply_impl(apply_controller_t &controller, void *custom) const noexcept -> outcome::result<void> {
+    auto r = applicator_t::apply_child(controller, custom);
     if (!r) {
         return r;
     }
 
+    auto &cluster = controller.get_cluster();
     auto folder = cluster.get_folders().by_id(folder_id);
     auto folder_info = folder->get_folder_infos().by_device_id(peer_id);
     auto &bm = cluster.get_blocks();
@@ -60,7 +67,8 @@ auto update_folder_t::apply_impl(cluster_t &cluster, apply_controller_t &control
         }
         file = std::move(opt.assume_value());
 
-        if (proto::get_size(f)) {
+        auto file_sz = proto::get_size(f);
+        if (file->is_file() && !file->is_deleted() && file_sz) {
             auto blocks_count = proto::get_blocks_size(f);
             for (int i = 0; i < blocks_count; ++i) {
                 auto &b = proto::get_blocks(f, i);
@@ -68,11 +76,11 @@ auto update_folder_t::apply_impl(cluster_t &cluster, apply_controller_t &control
                 auto strict_hash = block_info_t::make_strict_hash(hash);
                 auto block = bm.by_hash(strict_hash.get_hash());
                 assert(block);
-                file->assign_block(block, (size_t)i);
+                file->assign_block(block.get(), (size_t)i);
             }
         }
         bool add_file = true;
-        if (auto prev_file = fm.by_name(file->get_name()); prev_file) {
+        if (auto prev_file = fm.by_name(file->get_name()->get_full_name()); prev_file) {
             auto prev_seq = prev_file->get_sequence();
             auto new_seq = file->get_sequence();
             if (prev_seq < new_seq) {
@@ -82,8 +90,7 @@ auto update_folder_t::apply_impl(cluster_t &cluster, apply_controller_t &control
                 file->notify_update();
             } else if (prev_seq == new_seq) {
                 add_file = false;
-                LOG_TRACE(log, "update_folder_t, apply(); skipping update for '{}', seq. {}", new_seq,
-                          file->get_name());
+                LOG_TRACE(log, "update_folder_t, apply(); skipping update for '{}', seq. {}", new_seq, *file);
             }
         }
 
@@ -94,7 +101,7 @@ auto update_folder_t::apply_impl(cluster_t &cluster, apply_controller_t &control
 
     LOG_TRACE(log, "update_folder_t, apply(); max seq: {} -> {}", max_seq, folder_info->get_max_sequence());
 
-    r = applicator_t::apply_sibling(cluster, controller);
+    r = applicator_t::apply_sibling(controller, custom);
 
     if (auto iterator = folder_info->get_device()->get_iterator(); iterator) {
         iterator->on_upsert(folder_info);
@@ -146,7 +153,7 @@ static auto construct(sequencer_t &sequencer, folder_info_ptr_t &folder_info, sy
         for (auto &b : new_blocks) {
             auto hash = proto::get_hash(b);
             auto strict_hash = block_info_t::make_strict_hash(hash);
-            auto it = orphaned_blocks.find(strict_hash.get_key());
+            auto it = orphaned_blocks.find(strict_hash.get_hash());
             if (it != orphaned_blocks.end()) {
                 orphaned_blocks.erase(it);
             }
@@ -216,10 +223,10 @@ static auto instantiate(const cluster_t &cluster, sequencer_t &sequencer, const 
         auto is_deleted = proto::get_deleted(f);
         auto is_invalid = proto::get_invalid(f);
         auto blocks_count = proto::get_blocks_size(f);
-        auto is_downloadable = !is_deleted && !is_invalid;
+        auto is_file = proto::get_type(f) == proto::FileInfoType::FILE;
+        auto is_downloadable = !is_deleted && !is_invalid && is_file;
         if (!is_downloadable && blocks_count) {
-            LOG_WARN(log, "file {} should not have blocks", name);
-            return make_error_code(error_code_t::unexpected_blocks);
+            LOG_WARN(log, "file {} should not have blocks, but it has {}", name, blocks_count);
         }
         auto sequence = proto::get_sequence(f);
         if (sequence <= prev_sequence) {
@@ -260,6 +267,8 @@ static auto instantiate(const cluster_t &cluster, sequencer_t &sequencer, const 
             }
         }
         if (is_downloadable && file_size != size_by_blocks) {
+            LOG_WARN(log, "file '{}' of  type {} mismatch file size: {} vs {}", name,
+                     static_cast<int>(proto::get_type(f)), file_size, size_by_blocks);
             return make_error_code(error_code_t::mismatch_file_size);
         }
         auto &version = proto::get_version(f);

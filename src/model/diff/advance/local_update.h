@@ -15,7 +15,7 @@ struct SYNCSPIRIT_API local_update_t final : advance_t {
     local_update_t(const cluster_t &cluster, sequencer_t &sequencer, proto::FileInfo proto_file,
                    std::string_view folder_id) noexcept;
 
-    outcome::result<void> apply_impl(cluster_t &, apply_controller_t &) const noexcept override;
+    outcome::result<void> apply_impl(apply_controller_t &, void *) const noexcept override;
     outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;
 
   private:

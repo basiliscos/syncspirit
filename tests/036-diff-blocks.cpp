@@ -20,6 +20,7 @@ TEST_CASE("various block diffs", "[model]") {
     auto my_device = device_t::create(my_id, "my-device").value();
 
     auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
+    auto controller = make_apply_controller(cluster);
     cluster->get_devices().put(my_device);
 
     auto builder = diff_builder_t(*cluster);
@@ -53,18 +54,17 @@ TEST_CASE("various block diffs", "[model]") {
     auto bi1 = cluster->get_blocks().by_hash(b1_hash);
     auto bi2 = cluster->get_blocks().by_hash(b2_hash);
     file->remove_blocks();
-    file->assign_block(bi1, 0);
-    file->assign_block(bi2, 1);
+    file->assign_block(bi1.get(), 0);
+    file->assign_block(bi2.get(), 1);
     REQUIRE(!file->is_locally_available());
 
     SECTION("append") {
-        auto diff_raw = new model::diff::modify::append_block_t(*file, 0, as_owned_bytes("12345"));
+        auto diff_raw = new model::diff::modify::append_block_t(*file, *folder_info, 0, as_owned_bytes("12345"));
         auto diff = diff::cluster_diff_ptr_t(diff_raw);
         diff->assign_sibling(diff_raw->ack().get());
         REQUIRE(builder.assign(diff.get()).apply());
-        auto &blocks = file->get_blocks();
 
-        auto lf1 = blocks[0]->local_file();
+        auto lf1 = file->iterate_blocks(0).next()->local_file();
         REQUIRE(lf1);
         CHECK(lf1.block_index() == 0);
         CHECK(lf1.get_offset() == 0);
@@ -85,17 +85,16 @@ TEST_CASE("various block diffs", "[model]") {
 
         REQUIRE(builder.local_update(folder->get_id(), pr_source).apply());
         auto source = folder_info->get_file_infos().by_name("b.txt");
-        auto b2 = source->get_blocks().at(0);
+        auto b2 = const_cast<model::block_info_t *>(source->iterate_blocks(0).next());
         b2->mark_local_available(source.get());
 
         auto fb = model::file_block_t(bi2.get(), file.get(), 1);
-        auto diff_raw = new model::diff::modify::clone_block_t(fb);
+        auto diff_raw = new model::diff::modify::clone_block_t(fb, *folder_info, *folder_info);
         auto diff = diff::cluster_diff_ptr_t(diff_raw);
         diff->assign_sibling(diff_raw->ack().get());
         REQUIRE(builder.assign(diff.get()).apply());
 
-        auto &blocks = file->get_blocks();
-        auto lf1 = blocks[1]->local_file();
+        auto lf1 = file->iterate_blocks(1).next()->local_file();
         REQUIRE(lf1);
         CHECK(lf1.block_index() == 1);
         CHECK(lf1.get_offset() == 5);
@@ -107,8 +106,8 @@ TEST_CASE("various block diffs", "[model]") {
         using blocks_map_t = diff::local::blocks_availability_t::valid_blocks_map_t;
         auto map = blocks_map_t(2);
         map[0] = map[1] = true;
-        auto diff = diff::cluster_diff_ptr_t(new diff::local::blocks_availability_t(*file, map));
-        REQUIRE(diff->apply(*cluster, get_apply_controller()));
+        auto diff = diff::cluster_diff_ptr_t(new diff::local::blocks_availability_t(*file, *folder_info, map));
+        REQUIRE(diff->apply(*controller, {}));
         CHECK(file->is_locally_available());
     }
 }

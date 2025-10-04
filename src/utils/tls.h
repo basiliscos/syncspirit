@@ -58,6 +58,8 @@ SYNCSPIRIT_API outcome::result<bytes_t> sha256_digest(utils::bytes_view_t data) 
 
 SYNCSPIRIT_API outcome::result<bytes_t> as_serialized_der(X509 *cert) noexcept;
 
+SYNCSPIRIT_API outcome::result<bytes_t> as_serialized_pem(X509 *cert) noexcept;
+
 SYNCSPIRIT_API outcome::result<std::string> get_common_name(X509 *cert) noexcept;
 
 SYNCSPIRIT_API void digest(const unsigned char *src, size_t length, unsigned char *storage) noexcept;

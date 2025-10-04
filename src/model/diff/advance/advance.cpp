@@ -6,9 +6,11 @@
 #include "remote_win.h"
 #include "proto/proto-helpers.h"
 #include "model/cluster.h"
+#include "model/diff/apply_controller.h"
 #include "model/diff/modify/add_blocks.h"
 #include "model/diff/modify/remove_blocks.h"
 #include "model/misc/orphaned_blocks.h"
+#include "utils/format.hpp"
 
 using namespace syncspirit::model;
 using namespace syncspirit::model::diff::advance;
@@ -24,14 +26,13 @@ static std::string_view stringify(advance_action_t action) {
     return "ignore";
 }
 
-auto advance_t::create(advance_action_t action, const model::file_info_t &source, sequencer_t &sequencer) noexcept
-    -> cluster_diff_ptr_t {
-    auto &cluster = *source.get_folder_info()->get_folder()->get_cluster();
+auto advance_t::create(advance_action_t action, const model::file_info_t &source, const model::folder_info_t &source_fi,
+                       sequencer_t &sequencer) noexcept -> cluster_diff_ptr_t {
+    auto folder = source_fi.get_folder();
+    auto &cluster = *folder->get_cluster();
     auto proto_file = source.as_proto(true);
-    auto peer_folder_info = source.get_folder_info();
-    auto folder = peer_folder_info->get_folder();
     auto folder_id = folder->get_id();
-    auto peer_id = peer_folder_info->get_device()->device_id().get_sha256();
+    auto peer_id = source_fi.get_device()->device_id().get_sha256();
 
     if (action == advance_action_t::remote_copy) {
         return new remote_copy_t(cluster, sequencer, std::move(proto_file), folder_id, peer_id);
@@ -90,7 +91,7 @@ void advance_t::initialize(const cluster_t &cluster, sequencer_t &sequencer, pro
             if (!block) {
                 new_blocks.push_back(proto_block);
             } else {
-                auto it = orphans.find(strict_hash.get_key());
+                auto it = orphans.find(strict_hash.get_hash());
                 if (it != orphans.end()) {
                     orphans.erase(it);
                 }
@@ -118,11 +119,16 @@ void advance_t::initialize(const cluster_t &cluster, sequencer_t &sequencer, pro
     }
 }
 
-auto advance_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept -> outcome::result<void> {
-    auto r = applicator_t::apply_child(cluster, controller);
+auto advance_t::apply_forward(apply_controller_t &controller, void *custom) const noexcept -> outcome::result<void> {
+    return controller.apply(*this, custom);
+}
+
+auto advance_t::apply_impl(apply_controller_t &controller, void *custom) const noexcept -> outcome::result<void> {
+    auto r = applicator_t::apply_child(controller, custom);
     if (!r) {
         return r;
     }
+    auto &cluster = controller.get_cluster();
     auto my_device = cluster.get_device();
     auto folder = cluster.get_folders().by_id(folder_id);
     auto local_folder = folder->get_folder_infos().by_device(*my_device);
@@ -150,20 +156,20 @@ auto advance_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) c
             auto strict_hash = block_info_t::make_strict_hash(hash);
             auto block_info = blocks_map.by_hash(strict_hash.get_hash());
             assert(block_info);
-            local_file->assign_block(block_info, i);
+            local_file->assign_block(block_info.get(), i);
             local_file->mark_local_available(i);
         }
     }
 
     auto sequence = local_folder->get_max_sequence() + 1;
-    local_file->mark_local();
+    local_file->mark_local(true);
     local_file->set_sequence(sequence);
     local_folder->add_strict(local_file);
 
-    LOG_TRACE(log, "advance_t ({}), folder = {}, name = {}, size = {}, blocks = {}, seq. = {}", stringify(action),
-              folder_id, local_file->get_name(), size, proto::get_blocks_size(proto_local), sequence);
+    LOG_TRACE(log, "advance_t ({}), file: '{}', size: {}, blocks: {}, seq.: {}", stringify(action), *local_file, size,
+              proto::get_blocks_size(proto_local), sequence);
 
     local_file->notify_update();
 
-    return applicator_t::apply_sibling(cluster, controller);
+    return applicator_t::apply_sibling(controller, custom);
 }

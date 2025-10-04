@@ -20,7 +20,8 @@ struct SYNCSPIRIT_API add_pending_folders_t final : cluster_diff_t {
     using container_t = std::vector<item_t>;
 
     add_pending_folders_t(container_t items) noexcept;
-    outcome::result<void> apply_impl(cluster_t &, apply_controller_t &) const noexcept override;
+    outcome::result<void> apply_impl(apply_controller_t &, void *) const noexcept override;
+    outcome::result<void> apply_forward(apply_controller_t &, void *) const noexcept override;
     outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;
 
     container_t container;

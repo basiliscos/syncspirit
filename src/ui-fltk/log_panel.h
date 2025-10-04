@@ -31,7 +31,6 @@ struct log_panel_t : Fl_Group {
     void pull_in_logs();
     void on_filter(std::string_view filter);
     void set_splash_text(std::string text);
-    void on_loading_done();
 
     app_supervisor_t &supervisor;
     Fl_Group *control_group;
@@ -42,6 +41,7 @@ struct log_panel_t : Fl_Group {
     log_buffer_ptr_t displayed_records;
     std::string filter;
     in_memory_sink_t *sink = nullptr;
+    bool poll_scheduled;
 };
 
 } // namespace syncspirit::fltk

@@ -3,6 +3,7 @@
 
 #include "upsert_folder.h"
 #include "model/cluster.h"
+#include "model/diff/apply_controller.h"
 #include "model/diff/cluster_visitor.h"
 #include "model/misc/file_iterator.h"
 #include "upsert_folder_info.h"
@@ -49,8 +50,12 @@ upsert_folder_t::upsert_folder_t(sequencer_t &sequencer, bu::uuid uuid_, db::Fol
     }
 }
 
-auto upsert_folder_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
+auto upsert_folder_t::apply_forward(apply_controller_t &controller, void *custom) const noexcept
     -> outcome::result<void> {
+    return controller.apply(*this, custom);
+}
+
+auto upsert_folder_t::apply_impl(apply_controller_t &controller, void *custom) const noexcept -> outcome::result<void> {
     auto folder_id = db::get_id(db);
     LOG_TRACE(log, "applying upsert_folder_t, folder_id: {}", folder_id);
     auto folder_opt = folder_t::create(uuid, db);
@@ -59,6 +64,7 @@ auto upsert_folder_t::apply_impl(cluster_t &cluster, apply_controller_t &control
     }
     auto &folder = folder_opt.value();
 
+    auto &cluster = controller.get_cluster();
     auto &folders = cluster.get_folders();
     auto prev_folder = folders.by_id(folder_id);
     if (!prev_folder) {
@@ -71,7 +77,7 @@ auto upsert_folder_t::apply_impl(cluster_t &cluster, apply_controller_t &control
         }
     }
 
-    auto r = applicator_t::apply_child(cluster, controller);
+    auto r = applicator_t::apply_child(controller, custom);
     if (!r) {
         return r;
     }
@@ -89,7 +95,7 @@ auto upsert_folder_t::apply_impl(cluster_t &cluster, apply_controller_t &control
         }
     }
 
-    return applicator_t::apply_sibling(cluster, controller);
+    return applicator_t::apply_sibling(controller, custom);
 }
 
 auto upsert_folder_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

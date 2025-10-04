@@ -8,6 +8,7 @@
 #include "model/cluster.h"
 #include "model/misc/error_code.h"
 #include "model/diff/cluster_visitor.h"
+#include "model/diff/apply_controller.h"
 #include "utils/format.hpp"
 
 using namespace syncspirit::model::diff::modify;
@@ -32,12 +33,17 @@ update_peer_t::update_peer_t(db::Device db, const model::device_id_t &device_id,
     }
 }
 
-auto update_peer_t::apply_impl(cluster_t &cluster, apply_controller_t &controller) const noexcept
+auto update_peer_t::apply_forward(apply_controller_t &controller, void *custom) const noexcept
     -> outcome::result<void> {
-    auto r = applicator_t::apply_child(cluster, controller);
+    return controller.apply(*this, custom);
+}
+
+auto update_peer_t::apply_impl(apply_controller_t &controller, void *custom) const noexcept -> outcome::result<void> {
+    auto r = applicator_t::apply_child(controller, custom);
     if (!r) {
         return r;
     }
+    auto &cluster = controller.get_cluster();
     auto &devices = cluster.get_devices();
     auto peer = devices.by_sha256(peer_id);
     if (!peer) {
@@ -65,7 +71,7 @@ auto update_peer_t::apply_impl(cluster_t &cluster, apply_controller_t &controlle
         peer->notify_update();
     }
     LOG_TRACE(log, "applying update_peer_t, device {}", peer->device_id());
-    return applicator_t::apply_sibling(cluster, controller);
+    return applicator_t::apply_sibling(controller, custom);
 }
 
 auto update_peer_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

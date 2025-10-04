@@ -241,7 +241,7 @@ void presence_item_t::update_label() {
     auto allocator = allocator_t(&pool);
 
     auto color = get_color();
-    auto name = presence->get_entity()->get_path().get_own_name();
+    auto name = presence->get_entity()->get_path()->get_own_name();
     auto features = presence->get_features();
     auto node_label = string_t(allocator);
     if (features & F::folder) {

@@ -20,6 +20,7 @@ TEST_CASE("unknown device connected", "[model]") {
     auto my_device = device_t::create(my_id, "my-device").value();
 
     auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
+    auto controller = make_apply_controller(cluster);
     auto &devices = cluster->get_devices();
     devices.put(my_device);
 
@@ -31,7 +32,7 @@ TEST_CASE("unknown device connected", "[model]") {
     db::set_name(db_device, "a name-2");
     auto diff = model::diff::cluster_diff_ptr_t{};
     diff = new model::diff::contact::unknown_connected_t(*cluster, peer_id, db_device);
-    REQUIRE(diff->apply(*cluster, get_apply_controller()));
+    REQUIRE(diff->apply(*controller, {}));
 
     REQUIRE(cluster->get_pending_devices().size() == 1);
     auto unknown = cluster->get_pending_devices().by_sha256(peer_id.get_sha256());
@@ -67,6 +68,7 @@ TEST_CASE("ignored device connected", "[model]") {
     auto my_device = device_t::create(my_id, "my-device").value();
 
     auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
+    auto controller = make_apply_controller(cluster);
     auto &devices = cluster->get_devices();
     devices.put(my_device);
 
@@ -79,7 +81,7 @@ TEST_CASE("ignored device connected", "[model]") {
 
     auto diff = model::diff::cluster_diff_ptr_t{};
     diff = new model::diff::contact::ignored_connected_t(*cluster, peer_id, db_device);
-    REQUIRE(diff->apply(*cluster, get_apply_controller()));
+    REQUIRE(diff->apply(*controller, {}));
 }
 
 TEST_CASE("ignored device is removed when connecting to it ", "[model]") {

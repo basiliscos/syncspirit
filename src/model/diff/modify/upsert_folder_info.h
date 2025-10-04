@@ -19,7 +19,8 @@ struct SYNCSPIRIT_API upsert_folder_info_t final : cluster_diff_t {
                          std::uint64_t index_id) noexcept;
     upsert_folder_info_t(const model::folder_info_t &original, std::uint64_t new_index_id) noexcept;
 
-    outcome::result<void> apply_impl(cluster_t &, apply_controller_t &) const noexcept override;
+    outcome::result<void> apply_impl(apply_controller_t &, void *) const noexcept override;
+    outcome::result<void> apply_forward(apply_controller_t &, void *) const noexcept override;
     outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;
 
     bu::uuid uuid;

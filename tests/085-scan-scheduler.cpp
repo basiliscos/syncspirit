@@ -47,7 +47,10 @@ struct fixture_t {
         CHECK(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::OPERATIONAL);
         sup->do_process();
 
-        target = sup->create_actor<fs::scan_scheduler_t>().timeout(timeout).cluster(cluster).finish();
+        target = sup->create_actor<fs::scan_scheduler_t>().timeout(timeout).finish();
+        sup->do_process();
+
+        sup->send<syncspirit::model::payload::thread_ready_t>(sup->get_address(), cluster, std::this_thread::get_id());
         sup->do_process();
 
         REQUIRE(static_cast<r::actor_base_t *>(target.get())->access<to::state>() == r::state_t::OPERATIONAL);

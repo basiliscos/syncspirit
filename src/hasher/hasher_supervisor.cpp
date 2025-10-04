@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "hasher_supervisor.h"
 #include "hasher_actor.h"
-#include "../net/names.h"
+#include "net/names.h"
 
 using namespace syncspirit::hasher;
 

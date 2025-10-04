@@ -11,6 +11,7 @@
 #include "test_supervisor.h"
 
 #include <boost/nowide/convert.hpp>
+#include <vector>
 
 using namespace syncspirit;
 using namespace syncspirit::test;
@@ -23,7 +24,7 @@ r::pt::time_duration timeout = r::pt::millisec{10};
 TEST_CASE("scan_task", "[fs]") {
     auto root_path = unique_path();
     bfs::create_directories(root_path);
-    path_guard_t path_quard{root_path};
+    test::path_guard_t path_quard{root_path};
     auto rw_cache = fs::file_cache_ptr_t(new fs::file_cache_t(5));
 
     config::fs_config_t config{3600, 10, 1024 * 1024, 100};
@@ -46,6 +47,7 @@ TEST_CASE("scan_task", "[fs]") {
     db::set_path(db_folder, root_path.string());
 
     auto folder = folder_t::create(sequencer->next_uuid(), db_folder).value();
+    folder->assign_cluster(cluster);
     cluster->get_folders().put(folder);
 
     db::FolderInfo db_folder_info;
@@ -106,6 +108,10 @@ SECTION("some dirs, no files") {
     CHECK(*std::get_if<bool>(&r) == true);
 
     r = task.advance();
+    CHECK(std::get_if<bool>(&r));
+    CHECK(*std::get_if<bool>(&r) == true);
+
+    r = task.advance();
     auto *uf = std::get_if<unknown_file_t>(&r);
     REQUIRE(uf);
     CHECK(uf->path.filename() == "some-dir");
@@ -121,10 +127,6 @@ SECTION("some dirs, no files") {
     CHECK(proto::get_permissions(uf->metadata) == 0666);
     CHECK(proto::get_no_permissions(uf->metadata) == 1);
 #endif
-
-    r = task.advance();
-    CHECK(std::get_if<bool>(&r));
-    CHECK(*std::get_if<bool>(&r) == true);
 
     r = task.advance();
     CHECK(std::get_if<bool>(&r));
@@ -191,6 +193,12 @@ SECTION("regular files") {
     proto::set_name(pr_file, "a.txt");
     proto::set_sequence(pr_file, 4);
 
+    auto hash = utils::sha256_digest(as_bytes("12345")).value();
+    auto bi = proto::BlockInfo();
+    proto::set_size(bi, 5);
+    proto::set_hash(bi, hash);
+    auto block = block_info_t::create(bi).assume_value();
+
     auto &v = proto::get_version(pr_file);
     auto &counter = proto::add_counters(v);
     proto::set_id(counter, peer_device->device_id().get_uint());
@@ -207,8 +215,10 @@ SECTION("regular files") {
         proto::set_size(pr_file, 5);
         proto::set_modified_s(pr_file, modified);
         proto::set_permissions(pr_file, perms);
+        proto::add_blocks(pr_file, bi);
 
         auto file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
+        file->assign_block(block.get(), 0);
         REQUIRE(folder_my->add_strict(file));
 
         auto task = scan_task_t(cluster, folder->get_id(), rw_cache, config);
@@ -222,7 +232,7 @@ SECTION("regular files") {
         CHECK(ref->file == file);
 
         r = task.advance();
-        CHECK(std::get_if<bool>(&r));
+        REQUIRE(std::get_if<bool>(&r));
         CHECK(*std::get_if<bool>(&r) == false);
 
         auto &seen = task.get_seen_paths();
@@ -245,13 +255,13 @@ SECTION("regular files") {
         CHECK(*std::get_if<bool>(&r) == true);
 
         r = task.advance();
+        CHECK(std::get_if<bool>(&r));
+        CHECK(*std::get_if<bool>(&r) == true);
+
+        r = task.advance();
         REQUIRE(std::get_if<unchanged_meta_t>(&r));
         auto ref = std::get_if<unchanged_meta_t>(&r);
         CHECK(ref->file == file);
-
-        r = task.advance();
-        CHECK(std::get_if<bool>(&r));
-        CHECK(*std::get_if<bool>(&r) == true);
 
         r = task.advance();
         CHECK(std::get_if<bool>(&r));
@@ -281,8 +291,10 @@ SECTION("regular files") {
         proto::set_size(pr_file, 5);
         proto::set_modified_s(pr_file, modified);
         proto::set_permissions(pr_file, perms);
+        proto::add_blocks(pr_file, bi);
 
         auto info_file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
+        info_file->assign_block(block.get(), 0);
         REQUIRE(folder_my->add_strict(info_file));
 
         auto info_dir = file_info_t::create(sequencer->next_uuid(), pr_dir, folder_my).value();
@@ -294,18 +306,18 @@ SECTION("regular files") {
         CHECK(*std::get_if<bool>(&r) == true);
 
         r = task.advance();
-        REQUIRE(std::get_if<unchanged_meta_t>(&r));
-        auto ref = std::get_if<unchanged_meta_t>(&r);
-        CHECK(ref->file == info_dir);
-
-        r = task.advance();
         CHECK(std::get_if<bool>(&r));
         CHECK(*std::get_if<bool>(&r) == true);
 
         r = task.advance();
         REQUIRE(std::get_if<unchanged_meta_t>(&r));
-        ref = std::get_if<unchanged_meta_t>(&r);
+        auto ref = std::get_if<unchanged_meta_t>(&r);
         CHECK(ref->file == info_file);
+
+        r = task.advance();
+        REQUIRE(std::get_if<unchanged_meta_t>(&r));
+        ref = std::get_if<unchanged_meta_t>(&r);
+        CHECK(ref->file == info_dir);
 
         r = task.advance();
         CHECK(std::get_if<bool>(&r));
@@ -320,8 +332,10 @@ SECTION("regular files") {
         proto::set_block_size(pr_file, 5);
         proto::set_size(pr_file, 5);
         proto::set_modified_s(pr_file, modified);
+        proto::add_blocks(pr_file, bi);
 
         auto file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
+        file->assign_block(block.get(), 0);
         REQUIRE(folder_my->add_strict(file));
 
         auto task = scan_task_t(cluster, folder->get_id(), rw_cache, config);
@@ -338,7 +352,7 @@ SECTION("regular files") {
         CHECK(std::get_if<bool>(&r));
         CHECK(*std::get_if<bool>(&r) == false);
         auto &seen = task.get_seen_paths();
-        CHECK(seen.count(file->get_name()));
+        CHECK(seen.count(file->get_name()->get_full_name()));
     }
 
     SECTION("dir has been removed") {
@@ -387,7 +401,7 @@ SECTION("regular files") {
         CHECK(*std::get_if<bool>(&r) == false);
 
         auto &seen = task.get_seen_paths();
-        CHECK(seen.count(file->get_name()));
+        CHECK(seen.count(file->get_name()->get_full_name()));
     }
 
     SECTION("removed dir does not exist => unchanged meta") {
@@ -412,7 +426,7 @@ SECTION("regular files") {
         CHECK(*std::get_if<bool>(&r) == false);
 
         auto &seen = task.get_seen_paths();
-        CHECK(seen.count(file->get_name()));
+        CHECK(seen.count(file->get_name()->get_full_name()));
     }
 
     SECTION("root dir does not exist & deleted file => unchanged meta") {
@@ -437,7 +451,7 @@ SECTION("regular files") {
         CHECK(*std::get_if<bool>(&r) == false);
 
         auto &seen = task.get_seen_paths();
-        CHECK(seen.count(file->get_name()));
+        CHECK(seen.count(file->get_name()->get_full_name()));
     }
 
     SECTION("meta is changed") {
@@ -448,17 +462,19 @@ SECTION("regular files") {
 
         SECTION("file size differs") {
             auto path = root_path / "a.txt";
-            write_file(path, "12345");
+            write_file(path, "1234");
             bfs::last_write_time(path, from_unix(modified));
             auto status = bfs::status(path);
             auto perms = static_cast<uint32_t>(status.permissions());
 
             proto::set_block_size(pr_file, 5);
-            proto::set_size(pr_file, 6);
+            proto::set_size(pr_file, 5);
             proto::set_modified_s(pr_file, modified);
             proto::set_permissions(pr_file, perms);
+            proto::add_blocks(pr_file, bi);
 
             file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
+            file->assign_block(block.get(), 0);
             REQUIRE(folder_my->add_strict(file));
 
             task = new scan_task_t(cluster, folder->get_id(), rw_cache, config);
@@ -471,7 +487,7 @@ SECTION("regular files") {
             REQUIRE(std::get_if<changed_meta_t>(&r));
             auto ref = std::get_if<changed_meta_t>(&r);
             CHECK(ref->file == file);
-            CHECK(proto::get_size(ref->metadata) == 5);
+            CHECK(proto::get_size(ref->metadata) == 4);
             CHECK(proto::get_modified_s(ref->metadata) == modified);
         }
 
@@ -486,8 +502,10 @@ SECTION("regular files") {
             proto::set_size(pr_file, 5);
             proto::set_modified_s(pr_file, modified + 1);
             proto::set_permissions(pr_file, perms);
+            proto::add_blocks(pr_file, bi);
 
             file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
+            file->assign_block(block.get(), 0);
             REQUIRE(folder_my->add_strict(file));
 
             task = new scan_task_t(cluster, folder->get_id(), rw_cache, config);
@@ -509,12 +527,14 @@ SECTION("regular files") {
             proto::set_size(pr_file, 5);
             proto::set_modified_s(pr_file, modified);
             proto::set_permissions(pr_file, static_cast<uint32_t>(-1));
+            proto::add_blocks(pr_file, bi);
 
             auto path = root_path / "a.txt";
             write_file(path, "12345");
             bfs::last_write_time(path, from_unix(modified));
 
             file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
+            file->assign_block(block.get(), 0);
             REQUIRE(folder_my->add_strict(file));
 
             SECTION("permissions are tracked") {
@@ -561,13 +581,14 @@ SECTION("regular files") {
         CHECK(*std::get_if<bool>(&r) == false);
 
         auto &seen = task->get_seen_paths();
-        CHECK(seen.count(file->get_name()));
+        CHECK(seen.count(file->get_name()->get_full_name()));
     }
 
     SECTION("tmp") {
         proto::set_block_size(pr_file, 5);
         proto::set_size(pr_file, 5);
         proto::set_modified_s(pr_file, modified);
+        proto::add_blocks(pr_file, bi);
 
         auto path = root_path / "a.txt.syncspirit-tmp";
 
@@ -575,6 +596,7 @@ SECTION("regular files") {
             write_file(path, "12345");
 
             auto file_peer = file_info_t::create(sequencer->next_uuid(), pr_file, folder_peer).value();
+            file_peer->assign_block(block.get(), 0);
             REQUIRE(folder_peer->add_strict(file_peer));
 
             auto task = scan_task_t(cluster, folder->get_id(), rw_cache, config);
@@ -600,6 +622,7 @@ SECTION("regular files") {
             write_file(path, "12345");
 
             auto file_peer = file_info_t::create(sequencer->next_uuid(), pr_file, folder_peer).value();
+            file_peer->assign_block(block.get(), 0);
             REQUIRE(folder_peer->add_strict(file_peer));
 
             auto task = scan_task_t(cluster, folder->get_id(), rw_cache, config);
@@ -638,9 +661,11 @@ SECTION("regular files") {
 
             auto cache = fs::file_cache_ptr_t(new fs::file_cache_t(50));
             auto file_peer = file_info_t::create(sequencer->next_uuid(), pr_file, folder_peer).value();
+            file_peer->assign_block(block.get(), 0);
             auto ok = folder_peer->add_strict(file_peer);
             REQUIRE(ok);
-            auto file = fs::file_ptr_t(new fs::file_t(fs::file_t::open_write(file_peer).value()));
+            auto file_raw = fs::file_t::open_write(file_peer, *folder_peer).value();
+            auto file = fs::file_ptr_t(new fs::file_t(std::move(file_raw)));
             cache->put(file);
             REQUIRE(cache->get(file_path));
 
@@ -650,17 +675,17 @@ SECTION("regular files") {
             CHECK(*std::get_if<bool>(&r) == true);
 
             r = task.advance();
+            CHECK(std::get_if<bool>(&r));
+            CHECK(*std::get_if<bool>(&r) == true);
+
+            r = task.advance();
+            CHECK(std::get_if<bool>(&r));
+            CHECK(*std::get_if<bool>(&r) == true);
+
+            r = task.advance();
             REQUIRE(std::get_if<unknown_file_t>(&r));
             auto &uf = std::get<unknown_file_t>(r);
             CHECK(uf.path.filename() == file_path.parent_path().filename());
-
-            r = task.advance();
-            CHECK(std::get_if<bool>(&r));
-            CHECK(*std::get_if<bool>(&r) == true);
-
-            r = task.advance();
-            CHECK(std::get_if<bool>(&r));
-            CHECK(*std::get_if<bool>(&r) == true);
 
             r = task.advance();
             CHECK(std::get_if<bool>(&r));
@@ -675,6 +700,7 @@ SECTION("regular files") {
             write_file(path, "123456");
 
             auto file_peer = file_info_t::create(sequencer->next_uuid(), pr_file, folder_peer).value();
+            file_peer->assign_block(block.get(), 0);
             REQUIRE(folder_peer->add_strict(file_peer));
 
             // check that local files will not be considered sa removed
@@ -703,12 +729,18 @@ SECTION("regular files") {
             write_file(path, "123456");
 
             auto file_peer = file_info_t::create(sequencer->next_uuid(), pr_file, folder_peer).value();
+            file_peer->assign_block(block.get(), 0);
             REQUIRE(folder_peer->add_strict(file_peer));
 
             proto::set_size(pr_file, file_peer->get_size() + 10);
             proto::add_counters(v, proto::Counter(peer_device->device_id().get_uint(), 2));
+            proto::add_blocks(pr_file, bi);
+            proto::add_blocks(pr_file, bi);
 
             auto file_peer2 = file_info_t::create(sequencer->next_uuid(), pr_file, folder_peer2).value();
+            file_peer2->assign_block(block.get(), 0);
+            file_peer2->assign_block(block.get(), 1);
+            file_peer2->assign_block(block.get(), 2);
             REQUIRE(folder_peer2->add_strict(file_peer2));
 
             auto task = scan_task_t(cluster, folder->get_id(), rw_cache, config);
@@ -764,10 +796,13 @@ SECTION("regular files") {
         proto::set_size(pr_file, 5);
         proto::set_modified_s(pr_file, modified);
         proto::set_permissions(pr_file, perms);
+        proto::add_blocks(pr_file, bi);
         auto file_my = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
+        file_my->assign_block(block.get(), 0);
 
         proto::set_id(counter, 10);
         auto file_peer = file_info_t::create(sequencer->next_uuid(), pr_file, folder_peer).value();
+        file_peer->assign_block(block.get(), 0);
         REQUIRE(folder_my->add_strict(file_my));
         REQUIRE(folder_peer->add_strict(file_peer));
 
@@ -851,19 +886,19 @@ SECTION("regular files") {
             CHECK(*std::get_if<bool>(&r) == true);
 
             r = task.advance();
-            auto *uf = std::get_if<unknown_file_t>(&r);
-            REQUIRE(uf);
-            CHECK(uf->path.filename() == "some");
-            CHECK(proto::get_size(uf->metadata) == 0);
-            CHECK(proto::get_type(uf->metadata) == proto::FileInfoType::DIRECTORY);
-
-            r = task.advance();
             REQUIRE(std::get_if<scan_errors_t>(&r));
             auto errs = std::get_if<scan_errors_t>(&r);
             REQUIRE(errs);
             REQUIRE(errs->size() == 1);
             REQUIRE(errs->at(0).path == parent);
             REQUIRE(errs->at(0).ec);
+
+            r = task.advance();
+            auto *uf = std::get_if<unknown_file_t>(&r);
+            REQUIRE(uf);
+            CHECK(uf->path.filename() == "some");
+            CHECK(proto::get_size(uf->metadata) == 0);
+            CHECK(proto::get_type(uf->metadata) == proto::FileInfoType::DIRECTORY);
 
             r = task.advance();
             REQUIRE(std::get_if<bool>(&r));
@@ -947,30 +982,30 @@ SECTION("symlink file") {
         CHECK(std::get_if<bool>(&r));
         CHECK(*std::get_if<bool>(&r) == true);
 
+#ifdef SYNCSPIRIT_WIN
+        r = task.advance();
+        CHECK(std::get_if<bool>(&r));
+        CHECK(*std::get_if<bool>(&r) == true);
+
+        r = task.advance();
+        REQUIRE(std::get_if<unchanged_meta_t>(&r));
+        auto ref = std::get_if<unchanged_meta_t>(&r);
+        CHECK(((ref->file == dir) || (ref->file == file)));
+#else
         r = task.advance();
         REQUIRE(std::get_if<unchanged_meta_t>(&r));
         auto ref = std::get_if<unchanged_meta_t>(&r);
         CHECK(((ref->file == dir) || (ref->file == file)));
 
-#ifndef SYNCSPIRIT_WIN
-        r = task.advance();
-        REQUIRE(std::get_if<unchanged_meta_t>(&r));
-        ref = std::get_if<unchanged_meta_t>(&r);
-        CHECK(((ref->file == dir) || (ref->file == file)));
-
         r = task.advance();
         CHECK(std::get_if<bool>(&r));
         CHECK(*std::get_if<bool>(&r) == true);
-#else
-        r = task.advance();
-        CHECK(std::get_if<bool>(&r));
-        CHECK(*std::get_if<bool>(&r) == true);
-
-        r = task.advance();
-        REQUIRE(std::get_if<unchanged_meta_t>(&r));
-        ref = std::get_if<unchanged_meta_t>(&r);
-        CHECK(((ref->file == dir) || (ref->file == file)));
 #endif
+
+        r = task.advance();
+        REQUIRE(std::get_if<unchanged_meta_t>(&r));
+        ref = std::get_if<unchanged_meta_t>(&r);
+        CHECK(((ref->file == dir) || (ref->file == file)));
 
         r = task.advance();
         CHECK(std::get_if<bool>(&r));
@@ -1064,7 +1099,7 @@ TEST_CASE("scan_task diffs aggregation, guard", "[fs]") {
     static constexpr int SIZE = 41;
     auto root_path = unique_path();
     bfs::create_directories(root_path);
-    path_guard_t path_quard{root_path};
+    test::path_guard_t path_quard{root_path};
     auto rw_cache = fs::file_cache_ptr_t(new fs::file_cache_t(5));
 
     config::fs_config_t config{3600, 10, 1024 * 1024, 5};
@@ -1111,6 +1146,72 @@ TEST_CASE("scan_task diffs aggregation, guard", "[fs]") {
 
     sup->do_shutdown();
     sup->do_process();
+}
+
+TEST_CASE("scan_task order", "[fs]") {
+    using paths_t = std::vector<std::string>;
+    auto root_path = unique_path();
+    bfs::create_directories(root_path);
+    test::path_guard_t path_quard{root_path};
+    auto rw_cache = fs::file_cache_ptr_t(new fs::file_cache_t(5));
+
+    auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
+    auto my_device = device_t::create(my_id, "my-device").value();
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
+    auto sequencer = make_sequencer(4);
+    cluster->get_devices().put(my_device);
+    auto builder = diff_builder_t(*cluster);
+
+    auto db_folder = db::Folder();
+    db::set_id(db_folder, "some-id");
+    db::set_label(db_folder, "my-label");
+    db::set_path(db_folder, root_path.string());
+
+    REQUIRE(builder.upsert_folder(db_folder).apply());
+
+    bfs::create_directory(root_path / "a");
+    bfs::create_directory(root_path / "a" / "c");
+    bfs::create_directory(root_path / "b");
+    bfs::create_directory(root_path / "d");
+    bfs::create_directory(root_path / "d" / "d1");
+    bfs::create_directory(root_path / "d" / "d2");
+    write_file(root_path / "x.bin", "");
+    write_file(root_path / "y.bin", "");
+    write_file(root_path / "a/file.bin", "");
+    write_file(root_path / "a/c/file_2.bin", "");
+    write_file(root_path / "d/d1/file_3.bin", "");
+
+    auto folders = cluster->get_folders();
+    auto folder = folders.by_id("some-id");
+    auto folder_my = folder->get_folder_infos().by_device(*my_device);
+
+    config::fs_config_t config{3600, 10, 1024 * 1024, 100};
+    auto task = scan_task_t(cluster, folder->get_id(), rw_cache, config);
+
+    bool try_next = true;
+    auto visited_paths = paths_t();
+    while (try_next) {
+        auto r = task.advance();
+        std::visit(
+            [&](auto &&arg) {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, bool>) {
+                    try_next = arg;
+                } else if constexpr (std::is_same_v<T, unknown_file_t>) {
+                    auto p = relativize(arg.path, root_path);
+                    auto str = p.string();
+                    std::replace(str.begin(), str.end(), '\\', '/');
+                    visited_paths.emplace_back(str);
+                } else {
+                    try_next = false;
+                }
+            },
+            r);
+    }
+
+    auto expected = paths_t{"x.bin", "y.bin",           "a/file.bin", "a/c/file_2.bin", "a/c", "a",
+                            "b",     "d/d1/file_3.bin", "d/d1",       "d/d2",           "d"};
+    CHECK(visited_paths == expected);
 }
 
 int _init() {

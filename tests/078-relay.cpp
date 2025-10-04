@@ -135,6 +135,7 @@ struct fixture_t : private model::diff::cluster_visitor_t {
         initiate_accept();
 
         cluster = new cluster_t(my_device, 1);
+        controller = make_apply_controller(cluster);
 
         cluster->get_devices().put(my_device);
         cluster->get_devices().put(peer_device);
@@ -176,7 +177,7 @@ struct fixture_t : private model::diff::cluster_visitor_t {
     virtual void accept(const sys::error_code &ec) noexcept {
         LOG_INFO(log, "accept (relay), ec: {}, remote = {}", ec.message(), peer_sock.remote_endpoint());
         auto uri = utils::parse("tcp://127.0.0.1:0/");
-        auto cfg = transport::transport_config_t{{}, uri, *sup, std::move(peer_sock), false};
+        auto cfg = transport::transport_config_t{{}, uri, *sup, std::move(peer_sock), {}, false};
         relay_trans = transport::initiate_stream(cfg);
         relay_read();
     }
@@ -193,7 +194,7 @@ struct fixture_t : private model::diff::cluster_visitor_t {
     virtual void on(net::message::connect_request_t &req) noexcept {
         auto &uri = req.payload.request_payload.uri;
         log->info("requested connect to {}", uri);
-        auto cfg = transport::transport_config_t{{}, uri, *sup, {}, true};
+        auto cfg = transport::transport_config_t{{}, uri, *sup, {}, {}, true};
 
         auto ip = asio::ip::make_address(host);
         auto peer_ep = tcp::endpoint(ip, uri->port_number());
@@ -229,7 +230,7 @@ struct fixture_t : private model::diff::cluster_visitor_t {
     virtual void on_relay(proto::relay::session_invitation_t &) noexcept {};
     virtual void on(model::message::model_update_t &update) noexcept {
         auto &diff = *update.payload.diff;
-        auto r = diff.apply(*cluster, get_apply_controller());
+        auto r = diff.apply(*controller, {});
         if (!r) {
             LOG_ERROR(log, "error applying diff: {}", r.error().message());
         }
@@ -259,6 +260,7 @@ struct fixture_t : private model::diff::cluster_visitor_t {
 
     config::relay_config_t relay_config;
     cluster_ptr_t cluster;
+    apply_controller_ptr_t controller;
     asio::io_context io_ctx;
     ra::system_context_asio_t ctx;
     acceptor_t acceptor;

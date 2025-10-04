@@ -12,7 +12,7 @@
 #include <vector>
 #include <set>
 #include <memory>
-#include <utility>
+#include <tuple>
 
 namespace syncspirit::model {
 
@@ -20,7 +20,7 @@ using compare_fn_t = bool(const file_info_t *l, const file_info_t *r);
 
 struct SYNCSPIRIT_API file_iterator_t : arc_base_t<file_iterator_t> {
     using files_list_t = std::vector<file_info_ptr_t>;
-    using result_t = std::pair<file_info_t *, advance_action_t>;
+    using result_t = std::tuple<file_info_t *, const folder_info_t *, advance_action_t>;
 
     file_iterator_t(cluster_t &cluster, const device_ptr_t &peer) noexcept;
     file_iterator_t(const file_iterator_t &) = delete;
@@ -30,7 +30,7 @@ struct SYNCSPIRIT_API file_iterator_t : arc_base_t<file_iterator_t> {
     void on_upsert(folder_t &folder) noexcept;
     void on_upsert(folder_info_ptr_t peer_folder) noexcept;
     void on_remove(folder_info_ptr_t peer_folder) noexcept;
-    void recheck(file_info_t &file) noexcept;
+    void recheck(const folder_info_t &fi, file_info_t &file) noexcept;
 
   private:
     struct file_comparator_t {

@@ -109,7 +109,8 @@ void file_table_t::refresh() {
     assert(presence->get_features() & F::cluster);
     auto cluster_presence = static_cast<cluster_file_presence_t *>(presence);
     auto &file_info = cluster_presence->get_file_info();
-    auto device = file_info.get_folder_info()->get_device();
+
+    auto device = presence->get_device();
     auto &devices = container.supervisor.get_cluster()->get_devices();
     auto data = table_rows_t();
     auto modified_s = file_info.get_modified_s();
@@ -117,7 +118,7 @@ void file_table_t::refresh() {
     auto version = file_info.get_version();
     auto &stats = presence->get_stats();
 
-    name_cell->update(file_info.get_name());
+    name_cell->update(file_info.get_name()->get_full_name());
     device_cell->update(fmt::format("{} ({})", device->get_name(), device->device_id().get_short()));
     modified_cell->update(model::pt::to_simple_string(modified_date));
     sequence_cell->update(fmt::format("{}", file_info.get_sequence()));
@@ -127,14 +128,14 @@ void file_table_t::refresh() {
         remove_row(5);
     }
 
-    auto &model_counters = version->get_counters();
+    auto model_counters = version.get_counters();
     auto sorted_counters = counters_t(model_counters.begin(), model_counters.end(), allocator);
     auto sorter = [](const proto::Counter &lhs, const proto::Counter &rhs) -> bool {
         return proto::get_value(lhs) > proto::get_value(rhs);
     };
     std::sort(sorted_counters.begin(), sorted_counters.end(), sorter);
 
-    displayed_versions = std::min(version->counters_size(), max_history_records);
+    displayed_versions = std::min(version.counters_size(), max_history_records);
     for (size_t i = 0; i < displayed_versions; ++i) {
         auto &counter = sorted_counters[i];
         auto value = proto::get_value(counter);
@@ -157,9 +158,10 @@ void file_table_t::refresh() {
         fmt::format_to(std::back_inserter(label), "({}) {}", value, device_str);
         insert_row("modification", new static_string_provider_t(std::move(label)), 5 + i);
     }
+    auto blocks_count = file_info.iterate_blocks().get_total();
 
     block_size_cell->update(std::to_string(file_info.get_block_size()));
-    blocks_cell->update(std::to_string(file_info.get_blocks().size()));
+    blocks_cell->update(std::to_string(blocks_count));
     permissions_cell->update(fmt::format("0{:o}", file_info.get_permissions()));
     modified_s_cell->update(fmt::format("{}", modified_s));
     modified_ns_cell->update(fmt::format("{}", file_info.get_modified_ns()));

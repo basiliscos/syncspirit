@@ -25,6 +25,7 @@ struct initiator_actor_config_t : public r::actor_config_t {
     r::message_ptr_t custom;
     r::supervisor_t *router;
     std::string_view alpn;
+    utils::bytes_view_t root_ca;
     bool relay_enabled;
 };
 
@@ -83,6 +84,11 @@ template <typename Actor> struct initiator_actor_config_builder_t : r::actor_con
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
+    builder_t &&root_ca(const utils::bytes_view_t &value) && noexcept {
+        parent_t::config.root_ca = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+
     builder_t &&relay_enabled(bool value) && noexcept {
         parent_t::config.relay_enabled = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
@@ -138,6 +144,7 @@ struct SYNCSPIRIT_API initiator_actor_t : r::actor_base_t {
     r::message_ptr_t custom;
     r::supervisor_t &router;
     std::string_view alpn;
+    utils::bytes_view_t root_ca;
 
     utils::uri_ptr_t active_uri;
     transport::stream_sp_t transport;

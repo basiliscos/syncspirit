@@ -10,9 +10,9 @@ namespace syncspirit::model::diff::modify {
 
 struct SYNCSPIRIT_API mark_reachable_t final : cluster_diff_t {
 
-    mark_reachable_t(const model::file_info_t &file, bool reachable) noexcept;
+    mark_reachable_t(const model::file_info_t &file, const folder_info_t &fi, bool reachable) noexcept;
 
-    outcome::result<void> apply_impl(cluster_t &, apply_controller_t &) const noexcept override;
+    outcome::result<void> apply_impl(apply_controller_t &, void *) const noexcept override;
     outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;
 
     std::string folder_id;

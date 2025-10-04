@@ -16,7 +16,6 @@ using tcp = asio::ip::tcp;
 struct SYNCSPIRIT_API relay_connect_request_t final : cluster_diff_t {
     relay_connect_request_t(model::device_id_t peer, utils::bytes_t session_key, tcp::endpoint relay) noexcept;
 
-    outcome::result<void> apply_impl(cluster_t &, apply_controller_t &) const noexcept override;
     outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;
 
     model::device_id_t peer;

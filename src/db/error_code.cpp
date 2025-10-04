@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "error_code.h"
 #include "mdbx.h"
@@ -28,6 +28,9 @@ std::string mdbx_code_category::message(int c) const {
         break;
     case error_code::db_version_size_mismatch:
         r = "db version size mismatch";
+        break;
+    case error_code::cannot_downgrade_db:
+        r = "cannot downgrade database";
         break;
     default:
         r = "unknown";

@@ -20,8 +20,13 @@ using namespace syncspirit::fltk;
 static constexpr int padding = 5;
 
 static void _pull_in_logs(void *data) {
-    reinterpret_cast<log_panel_t *>(data)->pull_in_logs();
-    Fl::add_timeout(0.05, _pull_in_logs, data);
+    auto panel = reinterpret_cast<log_panel_t *>(data);
+    if (panel->supervisor.state <= r::state_t::OPERATIONAL) {
+        panel->pull_in_logs();
+        Fl::add_timeout(0.05, _pull_in_logs, data);
+    } else {
+        panel->poll_scheduled = false;
+    }
 }
 
 static void auto_scroll_toggle(Fl_Widget *widget, void *data) {
@@ -39,15 +44,20 @@ static void clear_logs(Fl_Widget *, void *data) {
 }
 
 static void set_min_display_level(Fl_Widget *widget, void *data) {
-    auto log_panel = static_cast<log_panel_t *>(widget->parent()->parent());
-    auto level_ptr = reinterpret_cast<intptr_t>(data);
-    auto level = static_cast<spdlog::level::level_enum>(level_ptr);
-    log_panel->min_display_level(level);
+    if (widget->active_r()) {
+        auto button = static_cast<Fl_Toggle_Button *>(widget);
+        auto log_panel = static_cast<log_panel_t *>(button->parent()->parent());
+        auto level_ptr = reinterpret_cast<intptr_t>(data);
+        auto level = static_cast<spdlog::level::level_enum>(level_ptr);
+        log_panel->min_display_level(level);
+        button->value(1);
 
-    auto &level_buttons = log_panel->level_buttons;
-    for (auto it = level_buttons.begin(); it != level_buttons.end(); ++it) {
-        if (*it != widget) {
-            (**it).value(0);
+        auto &level_buttons = log_panel->level_buttons;
+        for (auto it = level_buttons.begin(); it != level_buttons.end(); ++it) {
+            (*it)->activate();
+            if (*it != widget) {
+                (**it).value(0);
+            }
         }
     }
 }
@@ -156,6 +166,7 @@ log_panel_t::log_panel_t(app_supervisor_t &supervisor_, int x, int y, int w, int
     auto trace_button = new Fl_Toggle_Button(button_x, common_y, common_h, common_h, " ");
     trace_button->color(log_colors[static_cast<int>(spdlog::level::trace) * 2]);
     trace_button->selection_color(log_colors[static_cast<int>(spdlog::level::trace) * 2 + 1]);
+    trace_button->when(FL_WHEN_CHANGED);
     trace_button->callback(set_min_display_level, (void *)std::intptr_t(spdlog::level::trace));
     trace_button->tooltip("display log records with trace level and above");
     level_buttons[0] = trace_button;
@@ -164,6 +175,7 @@ log_panel_t::log_panel_t(app_supervisor_t &supervisor_, int x, int y, int w, int
     auto debug_button = new Fl_Toggle_Button(button_x, common_y, common_h, common_h, " ");
     debug_button->color(log_colors[static_cast<int>(spdlog::level::debug) * 2]);
     debug_button->selection_color(log_colors[static_cast<int>(spdlog::level::debug) * 2 + 1]);
+    debug_button->when(FL_WHEN_CHANGED);
     debug_button->callback(set_min_display_level, (void *)std::intptr_t(spdlog::level::debug));
     debug_button->tooltip("display log records with debug level and above");
     level_buttons[1] = debug_button;
@@ -172,6 +184,7 @@ log_panel_t::log_panel_t(app_supervisor_t &supervisor_, int x, int y, int w, int
     auto info_button = new Fl_Toggle_Button(button_x, common_y, common_h, common_h, " ");
     info_button->color(log_colors[static_cast<int>(spdlog::level::info) * 2]);
     info_button->selection_color(log_colors[static_cast<int>(spdlog::level::info) * 2 + 1]);
+    info_button->when(FL_WHEN_CHANGED);
     info_button->callback(set_min_display_level, (void *)std::intptr_t(spdlog::level::info));
     info_button->tooltip("display log records with info level and above");
     level_buttons[2] = info_button;
@@ -180,6 +193,7 @@ log_panel_t::log_panel_t(app_supervisor_t &supervisor_, int x, int y, int w, int
     auto warn_button = new Fl_Toggle_Button(button_x, common_y, common_h, common_h, " ");
     warn_button->color(log_colors[static_cast<int>(spdlog::level::warn) * 2]);
     warn_button->selection_color(log_colors[static_cast<int>(spdlog::level::warn) * 2 + 1]);
+    warn_button->when(FL_WHEN_CHANGED);
     warn_button->callback(set_min_display_level, (void *)std::intptr_t(spdlog::level::warn));
     warn_button->tooltip("display log records with warning level and above");
     level_buttons[3] = warn_button;
@@ -188,6 +202,7 @@ log_panel_t::log_panel_t(app_supervisor_t &supervisor_, int x, int y, int w, int
     auto error_button = new Fl_Toggle_Button(button_x, common_y, common_h, common_h, " ");
     error_button->color(log_colors[static_cast<int>(spdlog::level::err) * 2]);
     error_button->selection_color(log_colors[static_cast<int>(spdlog::level::err) * 2 + 1]);
+    error_button->when(FL_WHEN_CHANGED);
     error_button->callback(set_min_display_level, (void *)std::intptr_t(spdlog::level::err));
     error_button->tooltip("display log records with error level and above");
     level_buttons[4] = error_button;
@@ -196,6 +211,7 @@ log_panel_t::log_panel_t(app_supervisor_t &supervisor_, int x, int y, int w, int
     auto critical_button = new Fl_Toggle_Button(button_x, common_y, common_h, common_h, " ");
     critical_button->color(log_colors[static_cast<int>(spdlog::level::critical) * 2]);
     critical_button->selection_color(log_colors[static_cast<int>(spdlog::level::critical) * 2 + 1]);
+    critical_button->when(FL_WHEN_CHANGED);
     critical_button->callback(set_min_display_level, (void *)std::intptr_t(spdlog::level::critical));
     critical_button->tooltip("display log records with critical level");
     level_buttons[5] = critical_button;
@@ -225,16 +241,16 @@ log_panel_t::log_panel_t(app_supervisor_t &supervisor_, int x, int y, int w, int
     resizable(log_table);
 
     sink = supervisor.get_log_sink();
-
     update();
-}
-
-void log_panel_t::on_loading_done() {
-    pull_in_logs();
+    poll_scheduled = true;
     Fl::add_timeout(0.05, _pull_in_logs, this);
 }
 
-log_panel_t::~log_panel_t() { Fl::remove_timeout(_pull_in_logs, this); }
+log_panel_t::~log_panel_t() {
+    if (poll_scheduled) {
+        Fl::remove_timeout(_pull_in_logs, this);
+    }
+}
 
 void log_panel_t::update(log_queue_t new_records) {
     auto display_level = supervisor.get_app_config().fltk_config.level;

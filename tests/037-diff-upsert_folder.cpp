@@ -69,10 +69,10 @@ TEST_CASE("folder upsert", "[model]") {
     auto file_iterator = peer_device->create_iterator(*cluster);
     auto names = names_t();
     auto next = [&]() {
-        auto [fi, action] = file_iterator->next();
-        REQUIRE(fi);
+        auto [file, folder_info, action] = file_iterator->next();
+        REQUIRE(file);
         CHECK(action == A::remote_copy);
-        names.emplace_back(std::string(fi->get_name()));
+        names.emplace_back(std::string(file->get_name()->get_full_name()));
     };
 
     next();

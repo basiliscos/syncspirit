@@ -44,12 +44,11 @@ TEST_CASE("new file diff", "[model]") {
         SECTION("no file on my side, clone blockless file") {
             auto file_peer = file_info_t::create(sequencer->next_uuid(), pr_file, folder_peer).value();
             REQUIRE(folder_peer->add_strict(file_peer));
-            REQUIRE(builder.remote_copy(*file_peer).apply());
+            REQUIRE(builder.remote_copy(*file_peer, *folder_peer).apply());
             auto file_my = folder_my->get_file_infos().by_name(proto::get_name(pr_file));
             REQUIRE(file_my);
             CHECK(file_my->is_locally_available());
             CHECK(file_my->get_sequence() == 1);
-            CHECK(file_my->get_folder_info() == folder_my.get());
             CHECK(folder_my->get_max_sequence() == 1);
         }
 
@@ -64,7 +63,7 @@ TEST_CASE("new file diff", "[model]") {
             blocks_map.put(bi);
 
             auto file_my = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
-            file_my->assign_block(bi, 0);
+            file_my->assign_block(bi.get(), 0);
             file_my->mark_local_available(0);
             REQUIRE(folder_my->add_strict(file_my));
 
@@ -72,16 +71,15 @@ TEST_CASE("new file diff", "[model]") {
                 proto::set_modified_s(pr_file, 123);
                 auto file_peer = file_info_t::create(sequencer->next_uuid(), pr_file, folder_peer).value();
                 REQUIRE(folder_peer->add_strict(file_peer));
-                file_peer->assign_block(bi, 0);
+                file_peer->assign_block(bi.get(), 0);
                 file_peer->mark_local_available(0);
-                REQUIRE(builder.remote_copy(*file_peer).apply());
+                REQUIRE(builder.remote_copy(*file_peer, *folder_peer).apply());
 
                 file_my = folder_my->get_file_infos().by_name(proto::get_name(pr_file));
                 REQUIRE(file_my);
                 CHECK(file_my->is_locally_available());
                 CHECK(file_my->get_sequence() == 2);
                 CHECK(file_my->get_modified_s() == 123);
-                CHECK(file_my->get_folder_info() == folder_my.get());
                 CHECK(folder_my->get_max_sequence() == 2);
             }
 
@@ -90,14 +88,13 @@ TEST_CASE("new file diff", "[model]") {
                 proto::set_block_size(pr_file, 0);
                 auto file_peer = file_info_t::create(sequencer->next_uuid(), pr_file, folder_peer).value();
                 REQUIRE(folder_peer->add_strict(file_peer));
-                REQUIRE(builder.remote_copy(*file_peer).apply());
+                REQUIRE(builder.remote_copy(*file_peer, *folder_peer).apply());
 
                 file_my = folder_my->get_file_infos().by_name(proto::get_name(pr_file));
                 REQUIRE(file_my);
                 CHECK(file_my->is_locally_available());
                 CHECK(file_my->get_sequence() == 2);
-                CHECK(file_my->get_folder_info() == folder_my.get());
-                CHECK(file_my->get_blocks().size() == 0);
+                CHECK(file_my->iterate_blocks().get_total() == 0);
                 CHECK(folder_my->get_max_sequence() == 2);
                 CHECK(blocks_map.size() == 0);
             }

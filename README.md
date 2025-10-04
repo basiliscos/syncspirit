@@ -60,33 +60,6 @@ This list is probably incomplete. Here are the most important changes:
 
 - [ ] [untrusted devices encryption](https://docs.syncthing.net/specs/untrusted.html)
 
-# run
-
-(headless ui-daemon only, atm)
-
-    syncspirit-daemon --log_level debug \
-        --config_dir=/tmp/my_dir \
-        --command add_peer:peer_label:KUEQE66-JJ7P6AD-BEHD4ZW-GPBNW6Q-Y4C3K4Y-X44WJWZ-DVPIDXS-UDRJMA7 \
-        --command add_folder:label=my_label:id=nagkw-srrjz:path=/tmp/my_dir/data \
-        --command share:folder=my_label:device=KUEQE66 \
-        --command inactivate:120
-
-the output should be like
-
-[![asciicast](https://asciinema.org/a/474217.svg)](https://asciinema.org/a/474217)
-
-i.e. it records some peer, adds a folder, then shares the folder with the peer device, connects to
-the peer and downloads all files into `/tmp/my_dir/data` . The peer device currently can only be
-[syncthing](https://syncthing.net). Then `syncspirit` either exits after 2 minutes of inactivity
-or when you press `ctrl+c`. The output is successful, because I previously authorized this device
-with the [syncthing](https://syncthing.net) web interface, and shared the folder with this device
-(`syncspirit`).
-
-I also assume some familiarity with [syncthing](https://syncthing.net), so you should understand
-what's going on here.
-
-For more details see [ui-daemon](docs/ui-daemon.md) docs and [configuration](docs/config.md) docs.
-
 # design and ideas
 
 [syncthing](https://syncthing.net) is implemented using [go](https://go.dev/) programming
@@ -122,6 +95,19 @@ after the core completion.
 - mac os x
 
 # changes
+
+## 0.4.3 (04-Oct-2025)
+ - [core] fix compatibility with syncthing v2.0 (i.e. tolerate directory with 
+         non-zero size and without blocks)
+ - [core] allow to specify root certificate authority to use in all tls/ssl connections,
+         see [faq](faq.md), mostly actual for Windows XP with expired system certificates
+ - [core] allow to load huge databses and interrupt loading porgress
+ - [core] reduce memory consumption by model (~ 44%)
+ - [core] use in-depth scan order instead of in-breadth
+ - [core, win32] fix negative serial number in generated ssl-certificates
+ - [core, fltk] more correctly display file scanning progress
+ - [core, bugfix] make successful upnp port unmapping upon shutdown
+ - [fltk] deactivate currently selected log level button
 
 ## 0.4.2 (22-Aug-2025)
  - [core, bugfix] (#8) crash on set peer static ip address
@@ -177,6 +163,31 @@ the relay is randomly chosen from the public relays [pool](https://relays.syncth
 
 ## 0.1.0 (18-Arp-2022)
  - initial release
+
+# run (headless daemon)
+
+    syncspirit-daemon --log_level debug \
+        --config_dir=/tmp/my_dir \
+        --command add_peer:peer_label:KUEQE66-JJ7P6AD-BEHD4ZW-GPBNW6Q-Y4C3K4Y-X44WJWZ-DVPIDXS-UDRJMA7 \
+        --command add_folder:label=my_label:id=nagkw-srrjz:path=/tmp/my_dir/data \
+        --command share:folder=my_label:device=KUEQE66 \
+        --command inactivate:120
+
+the output should be like
+
+[![asciicast](https://asciinema.org/a/746301.svg)](https://asciinema.org/a/746301)
+
+i.e. it records some peer, adds a folder, then shares the folder with the peer device, connects to
+the peer and downloads all files into `/tmp/my_dir/data` . The peer device currently can only be
+[syncthing](https://syncthing.net). Then `syncspirit` either exits after 2 minutes of inactivity
+or when you press `ctrl+c`. The output is successful, because I previously authorized this device
+with the [syncthing](https://syncthing.net) web interface, and shared the folder with this device
+(`syncspirit`).
+
+I also assume some familiarity with [syncthing](https://syncthing.net), so you should understand
+what's going on here.
+
+For more details see [ui-daemon](docs/ui-daemon.md) docs and [configuration](docs/config.md) docs.
 
 # building from source
 

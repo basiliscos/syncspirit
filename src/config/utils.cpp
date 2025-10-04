@@ -15,6 +15,75 @@
 #define TOML_EXCEPTIONS 0
 #include <toml++/toml.h>
 
+#define SAFE_GET_VALUE(property, type, table_name)                                                                     \
+    {                                                                                                                  \
+        auto option = t[#property].value<type>();                                                                      \
+        if (!option) {                                                                                                 \
+            spdlog::warn("using default value for {}/{}", table_name, #property);                                      \
+            c.property = c_default.property;                                                                           \
+        } else {                                                                                                       \
+            c.property = option.value();                                                                               \
+        }                                                                                                              \
+    }
+
+#define SAFE_GET_PATH(property, table_name)                                                                            \
+    {                                                                                                                  \
+        auto option = t[#property].value<std::string>();                                                               \
+        if (!option) {                                                                                                 \
+            spdlog::warn("using default value for {}/{}", table_name, #property);                                      \
+            c.property = c_default.property;                                                                           \
+        } else {                                                                                                       \
+            c.property = boost::nowide::widen(option.value());                                                         \
+        }                                                                                                              \
+    }
+
+#define SAFE_GET_PATH_OPTIONAL(property, table_name)                                                                   \
+    {                                                                                                                  \
+        auto option = t[#property].value<std::string>();                                                               \
+        if (option) {                                                                                                  \
+            c.property = boost::nowide::widen(option.value());                                                         \
+        }                                                                                                              \
+    }
+
+#define SAFE_GET_PATH_EXPANDED(property, table_name)                                                                   \
+    {                                                                                                                  \
+        auto option = t[#property].value<std::string>();                                                               \
+        if (!option) {                                                                                                 \
+            spdlog::warn("using default value for {}/{}", table_name, #property);                                      \
+            c.property = c_default.property;                                                                           \
+        } else {                                                                                                       \
+            c.property = utils::expand_home(option.value(), home_opt);                                                 \
+        }                                                                                                              \
+    }
+
+#define SAFE_GET_URL(property, table_name)                                                                             \
+    {                                                                                                                  \
+        auto option = t[#property].value<std::string>();                                                               \
+        if (option) {                                                                                                  \
+            auto url = utils::parse(option.value().c_str());                                                           \
+            if (url) {                                                                                                 \
+                c.property = url;                                                                                      \
+            }                                                                                                          \
+        }                                                                                                              \
+        if (!c.property) {                                                                                             \
+            spdlog::warn("using default value for {}/{}", table_name, #property);                                      \
+            c.property = c_default.property;                                                                           \
+        }                                                                                                              \
+    }
+
+#define SAFE_GET_LEVEL(property, table_name)                                                                           \
+    {                                                                                                                  \
+        auto option = t[#property].value<std::string>();                                                               \
+        if (!option) {                                                                                                 \
+            spdlog::warn("using default value for {}/{}", table_name, #property);                                      \
+            c.property = c_default.property;                                                                           \
+        } else {                                                                                                       \
+            c.property = utils::get_log_level(option.value()).value_or(level_t::debug);                                \
+        }                                                                                                              \
+    }
+
+//        c.level = utils::get_log_level(level.value()).value_or(level_t::debug);
+
 namespace sys = boost::system;
 
 #if defined(__unix__)
@@ -46,7 +115,107 @@ static std::string get_device_name() noexcept {
     }
 }
 
+static main_t make_default_config(const bfs::path &config_path, const bfs::path &config_dir, bool is_home) {
+    auto dir = config_path;
+    std::string cert_file = home_path + "/cert.pem";
+    std::string key_file = home_path + "/key.pem";
+    if (!is_home) {
+        using boost::algorithm::replace_all_copy;
+        cert_file = replace_all_copy(cert_file, home_path, dir.string());
+        key_file = replace_all_copy(key_file, home_path, dir.string());
+    }
+
+    auto device = get_device_name();
+
+    // clang-format off
+    main_t cfg;
+    cfg.config_path = config_path;
+    cfg.default_location = config_dir / L"shared-data";
+    cfg.root_ca_file = bfs::path{};
+    cfg.cert_file = cert_file;
+    cfg.key_file = key_file;
+    cfg.timeout = 30000;
+    cfg.device_name = device;
+    cfg.hasher_threads = 3;
+    cfg.log_configs = {
+        // log_config_t {
+        //     "default", spdlog::level::level_enum::trace, {"stdout"}
+        // }
+    };
+    cfg.local_announce_config = local_announce_config_t {
+        true,   /* enabled */
+        21027,  /* port */
+        30000   /* frequency */
+    };
+    cfg.global_announce_config = global_announce_config_t{
+        true,                                                           /* enabled */
+        false,                                                          /* debug */
+        utils::parse("https://discovery-announce-v4.syncthing.net/v2"), /* announce_url */
+        utils::parse("https://discovery-lookup.syncthing.net/v2"),      /* lookup_url */
+        32 * 1024,                                                      /* rx_buff_size */
+        3000,                                                           /* timeout */
+        10 * 60,                                                        /* reannounce timeout */
+    };
+    cfg.upnp_config = upnp_config_t {
+        true,       /* enabled */
+        false,      /* debug */
+        1,          /* max_wait */
+        22001,      /* external port */
+        64 * 1024   /* rx_buff */
+    };
+    cfg.bep_config = bep_config_t {
+        16 * 1024 * 1024,   /* rx_buff_size */
+        8 * 1024 * 1024,    /* tx_buff_limit */
+        5000,               /* connect_timeout */
+        60000,              /* request_timeout */
+        90000,              /* tx_timeout */
+        300000,             /* rx_timeout */
+        64,                 /* blocks_max_requested */
+        64,                 /* blocks_simultaneous_write */
+        20,                 /* advances_per_iteration */
+        500,                /* stats_interval */
+    };
+    cfg.dialer_config = dialer_config_t {
+        true,       /* enabled */
+        5 * 60000,  /* redial timeout */
+        10          /* skip_discovers */
+    };
+    cfg.fs_config = fs_config_t {
+        86400000,   /* temporally_timeout, 24h default */
+        128,        /* mru_size max number of open files for reading and writing */
+        1024*1024,  /* bytes_scan_iteration_limit max number of bytes before emitting scan events */
+        128,        /* files_scan_iteration_limit max number processed files before emitting scan events */
+    };
+    cfg.db_config = db_config_t {
+        0x0,           /* upper_limit, auto-adjust */
+        150,           /* uncommitted_threshold */
+        50*1024,       /* max blocks per diff */
+        5*1024,        /* max files per diff */
+    };
+
+    cfg.relay_config = relay_config_t {
+        true,                                                   /* enabled */
+        false,                                                  /* debug */
+        utils::parse("https://relays.syncthing.net/endpoint"),  /* discovery url */
+        1024 * 1024,                                            /* rx buff size */
+    };
+
+    cfg.fltk_config = fltk_config_t {
+        spdlog::level::level_enum::info,    /* level */
+        false,                              /* display_deleted */
+        true,                               /* display_missing */
+        true,                               /* display_colorized */
+        700,                                /* main_window_width */
+        480,                                /* main_window_height */
+        0.5,                                /* left_panel_share */
+        0.3,                                /* bottom_panel_share */
+        99'999,                             /* log_records_buffer */
+    };
+    return cfg;
+}
+
 config_result_t get_config(std::istream &config, const bfs::path &config_path) {
+    auto dir = config_path.parent_path();
     main_t cfg;
     cfg.config_path = config_path;
 
@@ -56,454 +225,149 @@ config_result_t get_config(std::istream &config, const bfs::path &config_path) {
         return std::string(r.error().description());
     }
 
+    auto config_dir_opt = utils::get_default_config_dir();
+    if (!config_dir_opt) {
+        auto ec = config_dir_opt.assume_error();
+        return fmt::format("cannot get config dir: {}", ec.message());
+    }
+    auto &config_dir = config_dir_opt.assume_value();
+    bool is_home = dir == config_dir;
+    auto default_config = make_default_config(config_path, dir, is_home);
+
     auto &root_tbl = r.table();
     // main
     {
         auto t = root_tbl["main"];
         auto &c = cfg;
-        auto timeout = t["timeout"].value<std::uint32_t>();
-        if (!timeout) {
-            return "main/timeout is incorrect or missing";
-        }
-        c.timeout = timeout.value();
+        auto &c_default = default_config;
 
-        auto device_name = t["device_name"].value<std::string>();
-        if (!device_name) {
-            device_name = get_device_name();
-        }
-        c.device_name = device_name.value();
-
-        auto default_location = t["default_location"].value<std::string>();
-        if (!default_location) {
-            return "main/default_location is incorrect or missing";
-        }
-        // otherwise it will be corrupted somehow
-        c.default_location = boost::nowide::widen(default_location.value());
-
-        auto hasher_threads = t["hasher_threads"].value<std::uint32_t>();
-        if (!hasher_threads) {
-            return "main/hasher_threads is incorrect or missing";
-        }
-        c.hasher_threads = hasher_threads.value();
+        SAFE_GET_VALUE(timeout, std::uint32_t, "main");
+        SAFE_GET_VALUE(device_name, std::string, "main");
+        SAFE_GET_PATH(default_location, "main");
+        SAFE_GET_VALUE(hasher_threads, std::uint32_t, "main");
+        SAFE_GET_PATH_OPTIONAL(root_ca_file, "main");
+        SAFE_GET_PATH_EXPANDED(cert_file, "main");
+        SAFE_GET_PATH_EXPANDED(key_file, "main");
     };
-
-    // log
-    {
-        auto t = root_tbl["log"];
-        auto &c = cfg.log_configs;
-        if (t.is_array_of_tables()) {
-            auto arr = t.as_array();
-            for (size_t i = 0; i < arr->size(); ++i) {
-                auto node = arr->get(i);
-                if (node->is_table()) {
-                    auto t = *node->as_table();
-                    auto level = t["level"].value<std::string>();
-                    if (!level) {
-                        return "log/level is incorrect or missing (" + std::to_string(i + 1) + ")";
-                    }
-                    auto name = t["name"].value<std::string>();
-                    if (!name) {
-                        return "log/name is incorrect or missing (" + std::to_string(i + 1) + ")";
-                    }
-                    log_config_t log_config;
-                    log_config.level = utils::get_log_level(level.value()).value_or(level_t::debug);
-                    log_config.name = name.value();
-
-                    auto sinks = t["sinks"];
-                    if (sinks) {
-                        auto s_arr = sinks.as_array();
-                        for (size_t j = 0; j < s_arr->size(); ++j) {
-                            auto sink = s_arr->get(j)->value<std::string>();
-                            if (!sink) {
-                                return "log/sinks " + std::to_string(j + 1) + " is incorrect or missing (" +
-                                       std::to_string(i + 1) + ")";
-                            }
-                            log_config.sinks.emplace_back(sink.value());
-                        }
-                    }
-                    c.emplace_back(std::move(log_config));
-                }
-            }
-        }
-    }
 
     // local_discovery
     {
         auto t = root_tbl["local_discovery"];
         auto &c = cfg.local_announce_config;
+        auto &c_default = default_config.local_announce_config;
 
-        auto enabled = t["enabled"].value<bool>();
-        if (!enabled) {
-            return "local_discovery/enabled is incorrect or missing";
-        }
-        c.enabled = enabled.value();
-
-        auto port = t["port"].value<std::uint16_t>();
-        if (!port) {
-            return "local_discovery/port is incorrect or missing";
-        }
-        c.port = port.value();
-
-        auto frequency = t["frequency"].value<std::uint32_t>();
-        if (!frequency) {
-            return "local_discovery/frequency is incorrect or missing";
-        }
-        c.frequency = frequency.value();
+        SAFE_GET_VALUE(enabled, bool, "local_discovery");
+        SAFE_GET_VALUE(port, std::uint16_t, "local_discovery");
+        SAFE_GET_VALUE(frequency, std::uint32_t, "local_discovery");
     }
 
     // global_discovery
     {
         auto t = root_tbl["global_discovery"];
         auto &c = cfg.global_announce_config;
+        auto &c_default = default_config.global_announce_config;
 
-        auto enabled = t["enabled"].value<bool>();
-        if (!enabled) {
-            return "global_discovery/enabled is incorrect or missing";
-        }
-        c.enabled = enabled.value();
-
-        auto debug = t["debug"].value<bool>();
-        if (!debug) {
-            return "global_discovery/debug is incorrect or missing";
-        }
-        c.debug = debug.value();
-
-        auto url_announce_str = t["announce_url"].value<std::string>();
-        if (!url_announce_str) {
-            return "global_discovery/announce_url is incorrect or missing";
-        }
-        auto announce_url = utils::parse(url_announce_str.value().c_str());
-        if (!announce_url) {
-            return "global_discovery/announce_url is not url";
-        }
-        c.announce_url = announce_url;
-
-        auto url_lookup_str = t["lookup_url"].value<std::string>();
-        if (!url_lookup_str) {
-            return "global_discovery/lookup_url is incorrect or missing";
-        }
-        auto lookup_url = utils::parse(url_lookup_str.value().c_str());
-        if (!lookup_url) {
-            return "global_discovery/lookup_url is not url";
-        }
-        c.lookup_url = lookup_url;
-
-        auto cert_file = t["cert_file"].value<std::string>();
-        if (!cert_file) {
-            return "global_discovery/cert_file is incorrect or missing";
-        }
-        c.cert_file = utils::expand_home(cert_file.value(), home_opt);
-
-        auto key_file = t["key_file"].value<std::string>();
-        if (!key_file) {
-            return "global_discovery/key_file is incorrect or missing";
-        }
-        c.key_file = utils::expand_home(key_file.value(), home_opt);
-
-        auto rx_buff_size = t["rx_buff_size"].value<std::uint32_t>();
-        if (!rx_buff_size) {
-            return "global_discovery/rx_buff_size is incorrect or missing";
-        }
-        c.rx_buff_size = rx_buff_size.value();
-
-        auto timeout = t["timeout"].value<std::uint32_t>();
-        if (!timeout) {
-            return "global_discovery/timeout is incorrect or missing";
-        }
-        c.timeout = timeout.value();
+        SAFE_GET_VALUE(enabled, bool, "global_discovery");
+        SAFE_GET_VALUE(debug, bool, "global_discovery");
+        SAFE_GET_URL(announce_url, "global_discovery");
+        SAFE_GET_URL(lookup_url, "global_discovery");
+        SAFE_GET_VALUE(rx_buff_size, std::uint32_t, "global_discovery");
+        SAFE_GET_VALUE(timeout, std::uint32_t, "timeout");
     };
 
     // upnp
     {
         auto t = root_tbl["upnp"];
         auto &c = cfg.upnp_config;
+        auto &c_default = default_config.upnp_config;
 
-        auto enabled = t["enabled"].value<bool>();
-        if (!enabled) {
-            return "upnp/enabled is incorrect or missing";
-        }
-        c.enabled = enabled.value();
-
-        auto debug = t["debug"].value<bool>();
-        if (!debug) {
-            return "upnp/debug is incorrect or missing";
-        }
-        c.debug = debug.value();
-
-        auto max_wait = t["max_wait"].value<std::uint32_t>();
-        if (!max_wait) {
-            return "upnp/max_wait is incorrect or missing";
-        }
-        c.max_wait = max_wait.value();
-
-        auto external_port = t["external_port"].value<std::uint32_t>();
-        if (!external_port) {
-            return "upnp/external_port is incorrect or missing";
-        }
-        c.external_port = external_port.value();
-
-        auto rx_buff_size = t["rx_buff_size"].value<std::uint32_t>();
-        if (!rx_buff_size) {
-            return "upnp/rx_buff_size is incorrect or missing";
-        }
-        c.rx_buff_size = rx_buff_size.value();
+        SAFE_GET_VALUE(enabled, bool, "upnp");
+        SAFE_GET_VALUE(debug, bool, "upnp");
+        SAFE_GET_VALUE(max_wait, std::uint32_t, "upnp");
+        SAFE_GET_VALUE(external_port, std::uint32_t, "upnp");
+        SAFE_GET_VALUE(rx_buff_size, std::uint32_t, "upnp");
     };
 
     // relay
     {
         auto t = root_tbl["relay"];
         auto &c = cfg.relay_config;
+        auto &c_default = default_config.relay_config;
 
-        auto enabled = t["enabled"].value<bool>();
-        if (!enabled) {
-            return "relay/enabled is incorrect or missing";
-        }
-        c.enabled = enabled.value();
-
-        auto debug = t["debug"].value<bool>();
-        if (!debug) {
-            return "relay/debug is incorrect or missing";
-        }
-        c.debug = debug.value();
-
-        auto discovery_url_str = t["discovery_url"].value<std::string>();
-        if (!discovery_url_str) {
-            return "upnp/discovery_url is incorrect or missing";
-        }
-        auto discovery_url = utils::parse(discovery_url_str.value());
-        if (!discovery_url_str) {
-            return "upnp/discovery_url is non a valid url";
-        }
-        c.discovery_url = discovery_url;
-
-        auto rx_buff_size = t["rx_buff_size"].value<std::uint32_t>();
-        if (!rx_buff_size) {
-            return "relay/rx_buff_size is incorrect or missing";
-        }
-        c.rx_buff_size = rx_buff_size.value();
+        SAFE_GET_VALUE(enabled, bool, "relay");
+        SAFE_GET_VALUE(debug, bool, "relay");
+        SAFE_GET_URL(discovery_url, "relay");
+        SAFE_GET_VALUE(rx_buff_size, std::uint32_t, "relay");
     };
 
     // bep
     {
         auto t = root_tbl["bep"];
         auto &c = cfg.bep_config;
-        auto rx_buff_size = t["rx_buff_size"].value<std::uint32_t>();
-        if (!rx_buff_size) {
-            return "bep/rx_buff_size is incorrect or missing";
-        }
-        c.rx_buff_size = rx_buff_size.value();
-        auto tx_buff_limit = t["tx_buff_limit"].value<std::uint32_t>();
-        if (!tx_buff_limit) {
-            return "bep/tx_buff_limit is incorrect or missing";
-        }
-        c.tx_buff_limit = tx_buff_limit.value();
+        auto &c_default = default_config.bep_config;
 
-        auto connect_timeout = t["connect_timeout"].value<std::uint32_t>();
-        if (!connect_timeout) {
-            return "bep/connect_timeout is incorrect or missing";
-        }
-        c.connect_timeout = connect_timeout.value();
-
-        auto request_timeout = t["request_timeout"].value<std::uint32_t>();
-        if (!request_timeout) {
-            return "bep/request_timeout is incorrect or missing";
-        }
-        c.request_timeout = request_timeout.value();
-
-        auto tx_timeout = t["tx_timeout"].value<std::uint32_t>();
-        if (!tx_timeout) {
-            return "bep/tx_timeout is incorrect or missing";
-        }
-        c.tx_timeout = tx_timeout.value();
-
-        auto rx_timeout = t["rx_timeout"].value<std::uint32_t>();
-        if (!rx_timeout) {
-            return "bep/rx_timeout is incorrect or missing";
-        }
-        c.rx_timeout = rx_timeout.value();
-
-        auto blocks_max_requested = t["blocks_max_requested"].value<std::uint32_t>();
-        if (!blocks_max_requested) {
-            return "bep/blocks_max_requested is incorrect or missing";
-        }
-        c.blocks_max_requested = blocks_max_requested.value();
-
-        auto blocks_simultaneous_write = t["blocks_simultaneous_write"].value<std::uint32_t>();
-        if (!blocks_simultaneous_write) {
-            return "bep/blocks_simultaneous_write is incorrect or missing";
-        }
-        c.blocks_simultaneous_write = blocks_simultaneous_write.value();
-
-        auto advances_per_iteration = t["advances_per_iteration"].value<std::uint32_t>();
-        if (!advances_per_iteration) {
-            return "bep/advances_per_iteration is incorrect or missing";
-        }
-        c.advances_per_iteration = advances_per_iteration.value();
-
-        auto stats_interval = t["stats_interval"].value<std::int32_t>();
-        if (!stats_interval) {
-            return "bep/stats_interval is incorrect or missing";
-        }
-        c.stats_interval = stats_interval.value();
+        SAFE_GET_VALUE(rx_buff_size, std::uint32_t, "bep");
+        SAFE_GET_VALUE(tx_buff_limit, std::uint32_t, "bep");
+        SAFE_GET_VALUE(connect_timeout, std::uint32_t, "bep");
+        SAFE_GET_VALUE(request_timeout, std::uint32_t, "bep");
+        SAFE_GET_VALUE(tx_timeout, std::uint32_t, "bep");
+        SAFE_GET_VALUE(rx_timeout, std::uint32_t, "bep");
+        SAFE_GET_VALUE(blocks_max_requested, std::uint32_t, "bep");
+        SAFE_GET_VALUE(blocks_simultaneous_write, std::uint32_t, "bep");
+        SAFE_GET_VALUE(advances_per_iteration, std::uint32_t, "bep");
+        SAFE_GET_VALUE(stats_interval, std::int32_t, "bep");
     }
 
     // dialer
     {
         auto t = root_tbl["dialer"];
         auto &c = cfg.dialer_config;
+        auto &c_default = default_config.dialer_config;
 
-        auto enabled = t["enabled"].value<bool>();
-        if (!enabled) {
-            return "dialer/enabled is incorrect or missing";
-        }
-        c.enabled = enabled.value();
-
-        auto redial_timeout = t["redial_timeout"].value<std::uint32_t>();
-        if (!redial_timeout) {
-            return "dialer/redial_timeout is incorrect or missing";
-        }
-        c.redial_timeout = redial_timeout.value();
-
-        auto skip_discovers = t["skip_discovers"].value<std::uint32_t>();
-        if (!skip_discovers) {
-            return "dialer/skip_discovers is incorrect or missing";
-        }
-        c.skip_discovers = skip_discovers.value();
+        SAFE_GET_VALUE(enabled, bool, "dialer");
+        SAFE_GET_VALUE(redial_timeout, std::uint32_t, "dialer");
+        SAFE_GET_VALUE(skip_discovers, std::uint32_t, "skip_discovers");
     }
 
     // fs
     {
         auto t = root_tbl["fs"];
         auto &c = cfg.fs_config;
+        auto &c_default = default_config.fs_config;
 
-        auto temporally_timeout = t["temporally_timeout"].value<std::uint32_t>();
-        if (!temporally_timeout) {
-            return "fs/temporally_timeout is incorrect or missing";
-        }
-        c.temporally_timeout = temporally_timeout.value();
-
-        auto mru_size = t["mru_size"].value<std::uint32_t>();
-        if (!mru_size) {
-            return "fs/mru_size is incorrect or missing";
-        }
-        c.mru_size = mru_size.value();
-
-        auto bytes_scan_iteration_limit = t["bytes_scan_iteration_limit"].value<std::int64_t>();
-        if (!bytes_scan_iteration_limit) {
-            return "fs/bytes_scan_iteration_limit is incorrect or missing";
-        }
-        if (bytes_scan_iteration_limit.value() <= 0) {
-            return "fs/bytes_scan_iteration_limit should be >= 0";
-        }
-        c.bytes_scan_iteration_limit = bytes_scan_iteration_limit.value();
-
-        auto files_scan_iteration_limit = t["files_scan_iteration_limit"].value<std::int64_t>();
-        if (!files_scan_iteration_limit) {
-            return "fs/files_scan_iteration_limit is incorrect or missing";
-        }
-        if (files_scan_iteration_limit.value() <= 0) {
-            return "fs/files_scan_iteration_limit should be >= 0";
-        }
-        c.files_scan_iteration_limit = files_scan_iteration_limit.value();
+        SAFE_GET_VALUE(temporally_timeout, std::uint32_t, "fs");
+        SAFE_GET_VALUE(mru_size, std::uint32_t, "fs");
+        SAFE_GET_VALUE(bytes_scan_iteration_limit, std::int64_t, "fs");
+        SAFE_GET_VALUE(files_scan_iteration_limit, std::int64_t, "fs");
     }
 
     // db
     {
         auto t = root_tbl["db"];
         auto &c = cfg.db_config;
+        auto &c_default = default_config.db_config;
 
-        auto upper_limit = t["upper_limit"].value<std::int64_t>();
-        if (!upper_limit) {
-            return "db/upper_limit is incorrect or missing";
-        }
-        c.upper_limit = upper_limit.value();
-
-        auto uncommitted_threshold = t["uncommitted_threshold"].value<std::uint32_t>();
-        if (!uncommitted_threshold) {
-            return "db/uncommitted_threshold is incorrect or missing";
-        }
-        c.uncommitted_threshold = uncommitted_threshold.value();
-
-        auto max_blocks_per_diff = t["max_blocks_per_diff"].value<std::uint32_t>();
-        if (!max_blocks_per_diff) {
-            return "db/max_blocks_per_diff is incorrect or missing";
-        }
-        if (max_blocks_per_diff.value() <= 10) {
-            return "db/max_blocks_per_diff should be > 10";
-        }
-        c.max_blocks_per_diff = max_blocks_per_diff.value();
-
-        auto max_files_per_diff = t["max_files_per_diff"].value<std::uint32_t>();
-        if (!max_files_per_diff) {
-            return "db/max_files_per_diff is incorrect or missing";
-        }
-        if (max_files_per_diff.value() <= 10) {
-            return "db/max_files_per_diff should be > 10";
-        }
-        c.max_files_per_diff = max_files_per_diff.value();
+        SAFE_GET_VALUE(upper_limit, std::int64_t, "db");
+        SAFE_GET_VALUE(uncommitted_threshold, std::uint32_t, "db");
+        SAFE_GET_VALUE(max_blocks_per_diff, std::uint32_t, "db");
+        SAFE_GET_VALUE(max_files_per_diff, std::uint32_t, "db");
     }
 
     // fltk
     {
         auto t = root_tbl["fltk"];
         auto &c = cfg.fltk_config;
+        auto &c_default = default_config.fltk_config;
 
-        auto level = t["level"].value<std::string>();
-        if (!level) {
-            return "fltk/level is incorrect or missing";
-        }
-        c.level = utils::get_log_level(level.value()).value_or(level_t::debug);
-
-        auto display_deleted = t["display_deleted"].value<bool>();
-        if (!display_deleted) {
-            return "fltk/display_deleted is incorrect or missing";
-        }
-        c.display_deleted = display_deleted.value();
-
-        auto display_missing = t["display_missing"].value<bool>();
-        if (!display_missing) {
-            return "fltk/display_missing is incorrect or missing";
-        }
-        c.display_missing = display_missing.value();
-
-        auto display_colorized = t["display_colorized"].value<bool>();
-        if (!display_colorized) {
-            return "fltk/display_colorized is incorrect or missing";
-        }
-        c.display_colorized = display_colorized.value();
-
-        auto main_window_width = t["main_window_width"].value<std::int64_t>();
-        if (!main_window_width) {
-            return "fltk/main_window_width is incorrect or missing";
-        }
-        c.main_window_width = main_window_width.value();
-
-        auto main_window_height = t["main_window_height"].value<std::int64_t>();
-        if (!main_window_height) {
-            return "fltk/main_window_height is incorrect or missing";
-        }
-        c.main_window_height = main_window_height.value();
-
-        auto left_panel_share = t["left_panel_share"].value<double>();
-        if (!left_panel_share) {
-            return "fltk/left_panel_share is incorrect or missing";
-        }
-        c.left_panel_share = left_panel_share.value();
-
-        auto bottom_panel_share = t["bottom_panel_share"].value<double>();
-        if (!bottom_panel_share) {
-            return "fltk/bottom_panel_share is incorrect or missing";
-        }
-        c.bottom_panel_share = bottom_panel_share.value();
-
-        auto log_records_buffer = t["log_records_buffer"].value<std::uint32_t>();
-        if (!log_records_buffer) {
-            return "fltk/log_records_buffer is incorrect or missing";
-        }
-        if (log_records_buffer.value() < 100) {
-            return "fltk/log_records_buffer should be >= 0";
-        }
-        c.log_records_buffer = log_records_buffer.value();
+        SAFE_GET_LEVEL(level, "fltk");
+        SAFE_GET_VALUE(display_deleted, bool, "fltk");
+        SAFE_GET_VALUE(display_missing, bool, "fltk");
+        SAFE_GET_VALUE(display_colorized, bool, "fltk");
+        SAFE_GET_VALUE(main_window_width, std::int64_t, "fltk");
+        SAFE_GET_VALUE(main_window_height, std::int64_t, "fltk");
+        SAFE_GET_VALUE(left_panel_share, double, "fltk");
+        SAFE_GET_VALUE(bottom_panel_share, double, "fltk");
+        SAFE_GET_VALUE(log_records_buffer, std::uint32_t, "fltk");
     }
 
     return cfg;
@@ -533,6 +397,8 @@ static std::string_view get_level(spdlog::level::level_enum level) noexcept {
 }
 
 outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
+    using boost::nowide::narrow;
+
     auto logs = toml::array{};
     for (auto &c : cfg.log_configs) {
         auto sinks = toml::array{};
@@ -547,12 +413,21 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
         logs.push_back(log_table);
     }
 
+    auto cert_file = cfg.cert_file;
+    cert_file.make_preferred();
+
+    auto key_file = cfg.key_file;
+    key_file.make_preferred();
+
     auto tbl = toml::table{{
         {"main", toml::table{{
                      {"hasher_threads", cfg.hasher_threads},
+                     {"root_ca_file", narrow(cfg.root_ca_file.wstring())},
+                     {"cert_file", narrow(cert_file.wstring())},
+                     {"key_file", narrow(key_file.wstring())},
                      {"timeout", cfg.timeout},
                      {"device_name", cfg.device_name},
-                     {"default_location", cfg.default_location.string()},
+                     {"default_location", narrow(cfg.default_location.wstring())},
                  }}},
         {"log", logs},
         {"local_discovery", toml::table{{
@@ -565,8 +440,6 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
                                  {"debug", cfg.global_announce_config.debug},
                                  {"announce_url", cfg.global_announce_config.announce_url->buffer().data()},
                                  {"lookup_url", cfg.global_announce_config.lookup_url->buffer().data()},
-                                 {"cert_file", cfg.global_announce_config.cert_file},
-                                 {"key_file", cfg.global_announce_config.key_file},
                                  {"rx_buff_size", cfg.global_announce_config.rx_buff_size},
                                  {"timeout", cfg.global_announce_config.timeout},
                              }}},
@@ -658,93 +531,7 @@ outcome::result<main_t> generate_config(const bfs::path &config_path) {
         cert_file = replace_all_copy(cert_file, home_path, dir.string());
         key_file = replace_all_copy(key_file, home_path, dir.string());
     }
-
-    auto device = get_device_name();
-
-    // clang-format off
-    main_t cfg;
-    cfg.config_path = config_path;
-    cfg.default_location = config_dir / "shared_data";
-    cfg.timeout = 5000;
-    cfg.device_name = device;
-    cfg.hasher_threads = 3;
-    cfg.log_configs = {
-        // log_config_t {
-        //     "default", spdlog::level::level_enum::trace, {"stdout"}
-        // }
-    };
-    cfg.local_announce_config = local_announce_config_t {
-        true,   /* enabled */
-        21027,  /* port */
-        30000   /* frequency */
-    };
-    cfg.global_announce_config = global_announce_config_t{
-        true,                                                           /* enabled */
-        false,                                                          /* debug */
-        utils::parse("https://discovery-announce-v4.syncthing.net/v2"), /* announce_url */
-        utils::parse("https://discovery-lookup.syncthing.net/v2"),      /* lookup_url */
-        cert_file,
-        key_file,
-        32 * 1024,
-        3000,
-        10 * 60,
-    };
-    cfg.upnp_config = upnp_config_t {
-        true,       /* enabled */
-        false,      /* debug */
-        1,          /* max_wait */
-        22001,      /* external port */
-        64 * 1024   /* rx_buff */
-    };
-    cfg.bep_config = bep_config_t {
-        16 * 1024 * 1024,   /* rx_buff_size */
-        8 * 1024 * 1024,    /* tx_buff_limit */
-        5000,               /* connect_timeout */
-        60000,              /* request_timeout */
-        90000,              /* tx_timeout */
-        300000,             /* rx_timeout */
-        16,                 /* blocks_max_requested */
-        32,                 /* blocks_simultaneous_write */
-        10,                 /* advances_per_iteration */
-        100,                /* stats_interval */
-    };
-    cfg.dialer_config = dialer_config_t {
-        true,       /* enabled */
-        5 * 60000,  /* redial timeout */
-        10          /* skip_discovers */
-    };
-    cfg.fs_config = fs_config_t {
-        86400000,   /* temporally_timeout, 24h default */
-        128,        /* mru_size max number of open files for reading and writing */
-        1024*1024,  /* bytes_scan_iteration_limit max number of bytes before emitting scan events */
-        128,        /* files_scan_iteration_limit max number processed files before emitting scan events */
-    };
-    cfg.db_config = db_config_t {
-        0x0,           /* upper_limit, auto-adjust */
-        150,           /* uncommitted_threshold */
-        8192,          /* max blocks per diff */
-        1024,          /* max files per diff */
-    };
-
-    cfg.relay_config = relay_config_t {
-        true,                                                   /* enabled */
-        false,                                                  /* debug */
-        utils::parse("https://relays.syncthing.net/endpoint"),  /* discovery url */
-        1024 * 1024,                                            /* rx buff size */
-    };
-
-    cfg.fltk_config = fltk_config_t {
-        spdlog::level::level_enum::info,    /* level */
-        false,                              /* display_deleted */
-        true,                               /* display_missing */
-        true,                               /* display_colorized */
-        700,                                /* main_window_width */
-        480,                                /* main_window_height */
-        0.5,                                /* left_panel_share */
-        0.3,                                /* bottom_panel_share */
-        99'999,                             /* log_records_buffer */
-    };
-    return cfg;
+    return make_default_config(config_path, config_dir, is_home);
 }
 
-}
+} // namespace syncspirit::config

@@ -12,6 +12,7 @@ template <typename T> struct arc_base_t : boost::intrusive_ref_counter<T, boost:
     using parent_t = boost::intrusive_ref_counter<T, boost::thread_unsafe_counter>;
     using parent_t::parent_t;
     arc_base_t(const arc_base_t &) = delete;
+    arc_base_t(arc_base_t &&) = default;
 };
 
 template <typename T> using intrusive_ptr_t = boost::intrusive_ptr<T>;

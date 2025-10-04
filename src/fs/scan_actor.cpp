@@ -3,12 +3,12 @@
 
 #include "scan_actor.h"
 #include "model/diff/advance/local_update.h"
-#include "model/diff/modify/lock_file.h"
 #include "model/diff/local/blocks_availability.h"
 #include "model/diff/local/io_failure.h"
 #include "model/diff/local/file_availability.h"
 #include "model/diff/local/scan_finish.h"
 #include "model/diff/local/scan_start.h"
+#include "utils/format.hpp"
 #include "presentation/cluster_file_presence.h"
 #include "presentation/folder_entity.h"
 #include "presentation/presence.h"
@@ -26,8 +26,8 @@ using namespace syncspirit::fs;
 template <class> inline constexpr bool always_false_v = false;
 
 scan_actor_t::scan_actor_t(config_t &cfg)
-    : r::actor_base_t{cfg}, cluster{cfg.cluster}, sequencer{cfg.sequencer}, fs_config{cfg.fs_config},
-      rw_cache(cfg.rw_cache), requested_hashes_limit{cfg.requested_hashes_limit} {
+    : r::actor_base_t{cfg}, sequencer{cfg.sequencer}, fs_config{cfg.fs_config}, rw_cache(cfg.rw_cache),
+      requested_hashes_limit{cfg.requested_hashes_limit} {
     assert(sequencer);
     assert(rw_cache);
 }
@@ -41,14 +41,15 @@ void scan_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
         p.register_name(net::names::fs_scanner, address);
-        p.discover_name(net::names::hasher_proxy, hasher_proxy, true).link();
         p.discover_name(net::names::coordinator, coordinator, true).link(false).callback([&](auto phase, auto &ee) {
             if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {
                 auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
                 auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
                 plugin->subscribe_actor(&scan_actor_t::on_model_update, coordinator);
+                plugin->subscribe_actor(&scan_actor_t::on_thread_ready, supervisor->get_address());
             }
         });
+        p.discover_name(net::names::hasher_proxy, hasher_proxy, true).link(false);
     });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&scan_actor_t::on_scan);
@@ -59,15 +60,17 @@ void scan_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     });
 }
 
+void scan_actor_t::on_thread_ready(model::message::thread_ready_t &message) noexcept {
+    auto &p = message.payload;
+    if (p.thread_id == std::this_thread::get_id()) {
+        LOG_TRACE(log, "on_thread_ready");
+        cluster = message.payload.cluster;
+    }
+}
+
 void scan_actor_t::on_start() noexcept {
     LOG_TRACE(log, "on_start");
     r::actor_base_t::on_start();
-}
-
-void scan_actor_t::shutdown_finish() noexcept {
-    LOG_TRACE(log, "shutdown_finish");
-    get_supervisor().shutdown();
-    r::actor_base_t::shutdown_finish();
 }
 
 auto scan_actor_t::operator()(const model::diff::local::scan_start_t &diff, void *custom) noexcept
@@ -89,12 +92,14 @@ void scan_actor_t::on_model_update(model::message::model_update_t &message) noex
 }
 
 void scan_actor_t::on_scan(message::scan_progress_t &message) noexcept {
+    using namespace model::diff;
     auto &task = message.payload.task;
     auto guard = task->guard(*this, coordinator);
     auto folder_id = task->get_folder_id();
     LOG_TRACE(log, "on_scan, folder = {}", folder_id);
 
     auto folder = cluster->get_folders().by_id(folder_id);
+    auto folder_local = folder->get_folder_infos().by_device(*folder->get_cluster()->get_device());
     bool stop_processing = false;
     bool completed = false;
     if (folder->is_suspended()) {
@@ -112,43 +117,39 @@ void scan_actor_t::on_scan(message::scan_progress_t &message) noexcept {
                         completed = true;
                     }
                 } else if constexpr (std::is_same_v<T, scan_errors_t>) {
-                    task->push(new model::diff::local::io_failure_t(std::move(r)));
+                    task->push(new local::io_failure_t(std::move(r)), 0, true);
                 } else if constexpr (std::is_same_v<T, unchanged_meta_t>) {
-                    task->push(new model::diff::local::file_availability_t(r.file));
+                    task->push(new local::file_availability_t(r.file, *folder_local), 0, true);
                 } else if constexpr (std::is_same_v<T, removed_t>) {
                     auto &file = *r.file;
-                    LOG_DEBUG(log, "locally removed {}", file.get_full_name());
-                    auto folder = file.get_folder_info()->get_folder();
-                    auto folder_id = std::string(folder->get_id());
+                    LOG_DEBUG(log, "locally removed '{}'", file);
                     auto fi = file.as_proto(false);
                     proto::set_deleted(fi, true);
-                    task->push(new model::diff::advance::local_update_t(*cluster, *sequencer, std::move(fi),
-                                                                        std::move(folder_id)));
+                    task->push(new advance::local_update_t(*cluster, *sequencer, std::move(fi), std::string(folder_id)),
+                               0, true);
                 } else if constexpr (std::is_same_v<T, changed_meta_t>) {
                     auto &file = *r.file;
                     auto &metadata = r.metadata;
-                    auto errs = initiate_hash(task, file.get_path(), metadata);
+                    auto errs = initiate_hash(task, file.get_path(*folder_local), metadata);
                     if (errs.empty()) {
                         stop_processing = true;
                     } else {
-                        task->push(new model::diff::local::io_failure_t(std::move(errs)));
+                        task->push(new local::io_failure_t(std::move(errs)), 0, true);
                     }
                 } else if constexpr (std::is_same_v<T, unknown_file_t>) {
                     auto errs = initiate_hash(task, r.path, r.metadata);
                     if (errs.empty()) {
                         stop_processing = true;
                     } else {
-                        task->push(new model::diff::local::io_failure_t(std::move(errs)));
+                        task->push(new local::io_failure_t(std::move(errs)), 0, true);
                     }
                 } else if constexpr (std::is_same_v<T, incomplete_t>) {
                     auto &f = r.file;
+                    auto fi = folder->get_folder_infos().by_uuid(f->get_folder_uuid());
                     stop_processing = true;
-                    send<payload::rehash_needed_t>(address, task, std::move(f), std::move(r.opened_file));
+                    send<payload::rehash_needed_t>(address, task, std::move(f), *fi, std::move(r.opened_file));
                 } else if constexpr (std::is_same_v<T, incomplete_removed_t>) {
                     auto &file = *r.file;
-                    if (file.is_locked()) {
-                        task->push(new model::diff::modify::lock_file_t(file, false));
-                    }
                 } else if constexpr (std::is_same_v<T, orphaned_removed_t>) {
                     // NO-OP
                 } else if constexpr (std::is_same_v<T, file_error_t>) {
@@ -175,7 +176,7 @@ void scan_actor_t::on_scan(message::scan_progress_t &message) noexcept {
         LOG_DEBUG(log, "completed scanning of {}", folder_id);
         post_scan(*task);
         auto now = clock_t::local_time();
-        task->push(new model::diff::local::scan_finish_t(folder_id, now));
+        task->push(new local::scan_finish_t(folder_id, now));
         guard.send_by_force();
     }
 }
@@ -257,11 +258,11 @@ void scan_actor_t::on_hash(hasher::message::digest_response_t &res) noexcept {
     auto file = info.get_file();
     if (res.payload.ee) {
         auto &ee = res.payload.ee;
-        LOG_ERROR(log, "on_hash, file: {}, block = {}, error: {}", file->get_full_name(), rp.block_index,
-                  ee->message());
+        LOG_ERROR(log, "on_hash, file: {}, block: {}, error: {}", *file, rp.block_index, ee->message());
         return do_shutdown(ee);
     }
 
+    auto &fi = info.get_folder();
     bool queued_next = false;
     auto &digest = res.payload.res.digest;
     auto block_index = rp.block_index;
@@ -286,13 +287,13 @@ void scan_actor_t::on_hash(hasher::message::digest_response_t &res) noexcept {
                 }
             }
             if (valid_blocks_count) {
-                task.push(new model::diff::local::blocks_availability_t(*file, info.valid_blocks()));
+                task.push(new model::diff::local::blocks_availability_t(*file, fi, info.valid_blocks()));
             } else {
-                LOG_DEBUG(log, "file '{}' has no unknown local blocks, ingnoring", file->get_name());
+                LOG_DEBUG(log, "file '{}' has no unknown local blocks, ingnoring", *file);
             }
         } else {
             auto &file = *info.get_file();
-            LOG_DEBUG(log, "removing temporal of '{}' as it corrupted", file.get_full_name());
+            LOG_DEBUG(log, "removing temporal of '{}' as it corrupted", file);
             auto r = info.remove();
             if (r) {
                 auto err = scan_error_t{info.get_path(), r.assume_error()};
@@ -379,7 +380,7 @@ void scan_actor_t::post_scan(scan_task_t &task) noexcept {
             queue.pop_front();
             auto best = entity->get_best();
             if (best) {
-                auto file_name = entity->get_path().get_full_name();
+                auto file_name = entity->get_path()->get_full_name();
                 auto it = seen.end();
                 auto f = best->get_features();
                 if (f & F::deleted) {
