@@ -96,6 +96,9 @@ after the core completion.
 
 # changes
 
+## 0.4.4 (xx-xxx-202x)
+- [fltk] allow to regenereate certificate/key pair and soft restart
+
 ## 0.4.3 (04-Oct-2025)
  - [core] fix compatibility with syncthing v2.0 (i.e. tolerate directory with 
          non-zero size and without blocks)

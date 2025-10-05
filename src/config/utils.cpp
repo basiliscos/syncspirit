@@ -170,7 +170,7 @@ static main_t make_default_config(const bfs::path &config_path, const bfs::path 
         60000,              /* request_timeout */
         90000,              /* tx_timeout */
         300000,             /* rx_timeout */
-        64,                 /* blocks_max_requested */
+        32,                 /* blocks_max_requested */
         64,                 /* blocks_simultaneous_write */
         20,                 /* advances_per_iteration */
         500,                /* stats_interval */

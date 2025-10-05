@@ -706,3 +706,9 @@ void app_supervisor_t::detach_main_window() noexcept {
         main_window = nullptr;
     }
 }
+
+void app_supervisor_t::soft_restart() {
+    log->debug("soft restart has been requested");
+    soft_restart_request = true;
+    main_window->hide();
+}

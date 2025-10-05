@@ -11,16 +11,19 @@
 #include "utils/dns.h"
 #include "constants.h"
 
-#include <spdlog/fmt/fmt.h>
+#include <FL/fl_ask.H>
 #include <FL/Fl_Box.H>
 #include <FL/Fl.H>
 #include <FL/Fl_Tile.H>
+#include <FL/Fl_Button.H>
 
 #include <lz4.h>
+#include <spdlog/fmt/fmt.h>
 #include <openssl/crypto.h>
 #include <openssl/opensslv.h>
 #include <mdbx.h>
 #include <boost/version.hpp>
+#include <boost/nowide/convert.hpp>
 
 using namespace syncspirit;
 using namespace syncspirit::fltk;
@@ -28,6 +31,11 @@ using namespace syncspirit::fltk::tree_item;
 
 namespace {
 
+static constexpr int padding = 2;
+
+struct self_table_t;
+
+static auto make_actions(self_table_t &container) -> widgetable_ptr_t;
 static void on_uptime_timeout(void *data);
 static void on_db_refresh_timeout(void *data);
 
@@ -35,8 +43,8 @@ struct self_table_t final : static_table_t, db_info_viewer_t {
     using parent_t = static_table_t;
     using db_info_t = syncspirit::net::payload::db_info_response_t;
 
-    self_table_t(main_window_t *owner_, int x, int y, int w, int h)
-        : parent_t(x, y, w, h), owner{owner_}, db_info_guard(nullptr) {
+    self_table_t(main_window_t *owner_, self_device_t *tree_node_, int x, int y, int w, int h)
+        : parent_t(x, y, w, h), owner{owner_}, tree_node{tree_node_}, db_info_guard(nullptr) {
 
         auto v = OPENSSL_VERSION_NUMBER;
         // clang-format off
@@ -89,6 +97,8 @@ struct self_table_t final : static_table_t, db_info_viewer_t {
         data.push_back({"openssl version", new static_string_provider_t(openssl_version)});
         data.push_back({"fltk version", new static_string_provider_t(fltk_version)});
         data.push_back({"ares version", new static_string_provider_t(ares_version)});
+        data.push_back({"", new static_string_provider_t("")});
+        data.push_back({"actions", make_actions(*this)});
 
         assign_rows(std::move(data));
 
@@ -148,8 +158,46 @@ struct self_table_t final : static_table_t, db_info_viewer_t {
         }
     }
 
+    void on_restart() { owner->get_supervisor()->soft_restart(); }
+
+    void on_regenerate_keys() {
+        auto r = fl_choice("Are you sure? (no files on disk are touched)", "Yes", "No", nullptr);
+        if (r != 0) {
+            return;
+        }
+
+        auto sup = owner->get_supervisor();
+        auto &cfg = sup->get_app_config();
+        auto &cert_path = cfg.cert_file;
+        auto &key_path = cfg.key_file;
+
+        auto logger = sup->get_logger();
+        auto cert_path_str = boost::nowide::narrow(cert_path.wstring());
+        auto key_path_str = boost::nowide::narrow(key_path.wstring());
+        auto pair = utils::generate_pair(constants::issuer_name);
+        if (!pair) {
+            logger->error("cannot generate cryptographic keys :: {}", pair.error().message());
+            return;
+        }
+        auto &keys = pair.value();
+        auto save_result = keys.save(cert_path_str.c_str(), key_path_str.c_str());
+        if (!save_result) {
+            logger->error("cannot store cryptographic keys ({} & {}) :: {}", cert_path_str, key_path_str,
+                          save_result.error().message());
+        }
+        logger->info("keys has been regenerated, please restart");
+
+        for (int i = 0; i < tree_node->children(); ++i) {
+            auto child = tree_node->child(i);
+            if (auto settings = dynamic_cast<settings_t *>(child); settings) {
+                settings->update_label(true);
+            }
+        }
+    }
+
     main_window_t *owner;
     db_info_viewer_guard_t db_info_guard;
+    self_device_t *tree_node;
     db_info_t db_info;
     static_string_provider_ptr_t device_id_short_cell;
     static_string_provider_ptr_t device_id_cell;
@@ -166,10 +214,47 @@ static void on_uptime_timeout(void *data) {
     self->refresh();
     Fl::repeat_timeout(1.0, on_uptime_timeout, data);
 }
+
 static void on_db_refresh_timeout(void *data) {
     auto self = reinterpret_cast<self_table_t *>(data);
     self->update_db_info();
     Fl::repeat_timeout(10.0, on_db_refresh_timeout, data);
+}
+
+static auto make_actions(self_table_t &container) -> widgetable_ptr_t {
+    struct widget_t final : widgetable_t {
+        using parent_t = widgetable_t;
+        using parent_t::parent_t;
+
+        Fl_Widget *create_widget(int x, int y, int w, int h) override {
+            auto group = new Fl_Group(x, y, w, h);
+            group->begin();
+            group->box(FL_FLAT_BOX);
+            auto &container = static_cast<self_table_t &>(this->container);
+
+            auto yy = y + padding, ww = 200, hh = h - padding * 2;
+
+            auto restart = new Fl_Button(x + padding, yy, ww, hh, "restart");
+            restart->callback([](auto, void *data) { static_cast<self_table_t *>(data)->on_restart(); }, &container);
+
+            int xx = restart->x() + ww + padding * 2;
+
+            auto regenerate = new Fl_Button(xx, yy, ww, hh, "regenerate keys");
+            regenerate->callback([](auto, void *data) { static_cast<self_table_t *>(data)->on_regenerate_keys(); },
+                                 &container);
+            regenerate->color(FL_RED);
+            xx = regenerate->x() + ww + padding * 2;
+
+            group->resizable(nullptr);
+            group->end();
+            widget = group;
+
+            this->reset();
+            return widget;
+        }
+    };
+
+    return new widget_t(container);
 }
 
 } // namespace
@@ -204,7 +289,7 @@ bool self_device_t::on_select() {
         group->resizable(resizable_area);
 
         group->begin();
-        auto top = new self_table_t(supervisor.get_main_window(), x, y, w, h - bot_h);
+        auto top = new self_table_t(supervisor.get_main_window(), this, x, y, w, h - bot_h);
         auto bot = [&]() -> Fl_Widget * {
             auto &device = supervisor.get_cluster()->get_device()->device_id();
             return new qr_button_t(device, supervisor, x, y + top->h(), w, bot_h);
