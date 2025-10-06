@@ -10,6 +10,7 @@
 #include "chunk_iterator.h"
 #include "new_chunk_iterator.h"
 #include "utils/bytes.h"
+#include "model/misc/resolver.h"
 
 namespace syncspirit::fs {
 
@@ -26,6 +27,7 @@ using hash_anew_t = new_chunk_iterator_t;
 
 struct block_request_t {
     proto::Request remote_request;
+    bfs::path path;
     r::address_ptr_t reply_to;
 };
 
@@ -34,6 +36,61 @@ struct block_response_t {
     sys::error_code ec;
     utils::bytes_t data;
 };
+
+struct extendended_context_t: model::arc_base_t<extendended_context_t> {
+    virtual ~extendended_context_t() = default;
+};
+
+using extendended_context_prt_t = model::intrusive_ptr_t<extendended_context_t>;
+
+template<typename T>
+struct generic_reply_t {
+    T* request;
+    r::message_ptr_t request_keeper;
+    outcome::result<void> response;
+};
+
+struct remote_copy_t {
+
+};
+
+struct remote_win_t {
+};
+
+struct finish_file_t {
+    const bfs::path* path;
+    const bfs::path* local_path;
+    std::uint64_t file_size;
+    std::int64_t modification_s;
+    r::address_ptr_t reply_to;
+    extendended_context_prt_t context;
+};
+
+using finish_file_reply_t = generic_reply_t<finish_file_t>;
+
+struct append_block_t {
+    const bfs::path* path;
+    utils::bytes_view_t data;
+    std::uint64_t offset;
+    std::uint64_t file_size;
+    r::address_ptr_t reply_to;
+    extendended_context_prt_t context;
+};
+
+using append_block_reply_t = generic_reply_t<append_block_t>;
+
+struct clone_block_t {
+    const bfs::path* target;
+    std::uint64_t target_offset;
+    std::uint64_t target_size;
+    const bfs::path* source;
+    std::uint64_t source_offset;
+    std::uint64_t block_size;
+    r::address_ptr_t reply_to;
+    extendended_context_prt_t context;
+};
+
+using clone_block_reply_t = generic_reply_t<clone_block_t>;
 
 } // namespace payload
 
@@ -44,6 +101,16 @@ using rehash_needed_t = r::message_t<payload::rehash_needed_t>;
 using hash_anew_t = r::message_t<payload::hash_anew_t>;
 using block_request_t = r::message_t<payload::block_request_t>;
 using block_response_t = r::message_t<payload::block_response_t>;
+
+using remote_copy_t = r::message_t<payload::remote_copy_t>;
+using remote_win_t = r::message_t<payload::remote_win_t>;
+using finish_file_t = r::message_t<payload::finish_file_t>;
+using append_block_t = r::message_t<payload::append_block_t>;
+using clone_block_t = r::message_t<payload::clone_block_t>;
+
+using append_block_reply_t = r::message_t<payload::append_block_reply_t>;
+using clone_block_reply_t = r::message_t<payload::clone_block_reply_t>;
+using finish_file_reply_t = r::message_t<payload::finish_file_reply_t>;
 
 } // namespace message
 

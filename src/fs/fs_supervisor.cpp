@@ -2,8 +2,6 @@
 // SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "fs_supervisor.h"
-#include "model/diff/load/commit.h"
-#include "model/diff/load/interrupt.h"
 #include "net/names.h"
 #include "scan_actor.h"
 #include "scan_scheduler.h"
@@ -63,8 +61,6 @@ void fs_supervisor_t::launch() noexcept {
     auto factory = [this](r::supervisor_t &, const r::address_ptr_t &spawner) -> r::actor_ptr_t {
         auto timeout = shutdown_timeout * 9 / 10;
         return create_actor<file_actor_t>()
-            .cluster(cluster)
-            .sequencer(sequencer)
             .rw_cache(rw_cache)
             .timeout(timeout)
             .spawner_address(spawner)

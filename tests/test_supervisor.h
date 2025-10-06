@@ -18,12 +18,15 @@ namespace syncspirit::test {
 namespace r = rotor;
 namespace outcome = boost::outcome_v2;
 
+using configure_callback_t = std::function<void(r::plugin::plugin_base_t &)>;
+
 struct supervisor_config_t : r::supervisor_config_t {
     using parent_t = r::supervisor_config_t;
     using parent_t::parent_t;
     bool auto_finish = true;
     bool auto_ack_blocks = true;
     bool make_presentation = false;
+    configure_callback_t configure_callback;
 };
 
 template <typename Supervisor> struct supervisor_config_builder_t : r::supervisor_config_builder_t<Supervisor> {
@@ -50,6 +53,10 @@ template <typename Supervisor> struct supervisor_config_builder_t : r::superviso
         parent_t::config.make_presentation = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
+    builder_t &&configure_callback(configure_callback_t value) && noexcept {
+        parent_t::config.configure_callback = std::move(value);
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
 };
 
 struct SYNCSPIRIT_TEST_API supervisor_t : r::supervisor_t,
@@ -61,7 +68,6 @@ struct SYNCSPIRIT_TEST_API supervisor_t : r::supervisor_t,
     using timers_t = std::list<r::timer_handler_base_t *>;
     using parent_t = r::supervisor_t;
     using io_errors_t = model::diff::local::io_errors_t;
-    using configure_callback_t = std::function<void(r::plugin::plugin_base_t &)>;
 
     supervisor_t(config_t &cfg);
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;

@@ -40,6 +40,7 @@ supervisor_t::supervisor_t(config_t &cfg) : parent_t(cfg) {
     auto_finish = cfg.auto_finish;
     auto_ack_blocks = cfg.auto_ack_blocks;
     make_presentation = cfg.make_presentation;
+    configure_callback = cfg.configure_callback;
     sequencer = model::make_sequencer(1234);
 }
 

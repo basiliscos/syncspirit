@@ -792,7 +792,10 @@ void controller_actor_t::on_message(proto::Request &req) noexcept {
     } else {
         if (forward) {
             ++tx_blocks_requested;
+#if 0
             send<fs::payload::block_request_t>(fs_addr, std::move(req), address);
+#endif
+            std::abort();
         } else {
             block_read_queue.emplace_back(std::move(req));
         }
@@ -825,7 +828,10 @@ void controller_actor_t::on_block_response(fs::message::block_response_t &messag
     while (!block_read_queue.empty() && (tx_blocks_requested <= max_block_read)) {
         auto &req = block_read_queue.front();
         ++tx_blocks_requested;
+#if 0
         send<fs::payload::block_request_t>(fs_addr, std::move(req), address);
+#endif
+        std::abort();
         block_read_queue.pop_front();
     }
 }

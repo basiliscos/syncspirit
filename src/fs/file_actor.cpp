@@ -12,7 +12,6 @@
 #include "model/diff/modify/finish_file.h"
 #include "model/diff/modify/mark_reachable.h"
 #include "presentation/presence.h"
-#include "presentation/cluster_file_presence.h"
 #include "utils.h"
 #include "utils/io.h"
 #include "utils/format.hpp"
@@ -30,27 +29,10 @@ r::plugin::resource_id_t controller = 0;
 } // namespace resource
 } // namespace
 
-file_actor_t::write_guard_t::write_guard_t(file_actor_t &actor_,
-                                           const model::diff::modify::block_transaction_t &txn_) noexcept
-    : actor{actor_}, txn{txn_}, success{false} {}
-
-auto file_actor_t::write_guard_t::operator()(outcome::result<void> result) noexcept -> outcome::result<void> {
-    success = (bool)result;
-    if (!success) {
-        actor.log->debug("I/O failure on {}: {}", txn.file_name, result.assume_error().message());
-    }
-    return result;
-}
-
-file_actor_t::write_guard_t::~write_guard_t() {
-    auto reply = success ? txn.ack() : txn.rej();
-    actor.send<model::payload::model_update_t>(actor.coordinator, std::move(reply));
-}
 
 file_actor_t::file_actor_t(config_t &cfg)
-    : r::actor_base_t{cfg}, cluster{cfg.cluster}, sequencer(cfg.sequencer), rw_cache(std::move(cfg.rw_cache)),
+    : r::actor_base_t{cfg}, rw_cache(std::move(cfg.rw_cache)),
       ro_cache(rw_cache->get_max_items()) {
-    assert(sequencer);
 }
 
 void file_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
@@ -67,25 +49,18 @@ void file_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
                 plugin->subscribe_actor(&file_actor_t::on_controller_up, coordinator);
                 plugin->subscribe_actor(&file_actor_t::on_controller_predown, coordinator);
-                if (!cluster) {
-                    plugin->subscribe_actor(&file_actor_t::on_thread_ready, supervisor->get_address());
-                }
             }
         });
         p.discover_name(net::names::db, db, true);
     });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&file_actor_t::on_block_request);
-        p.subscribe_actor(&file_actor_t::on_model_update);
+        p.subscribe_actor(&file_actor_t::on_remote_copy);
+        p.subscribe_actor(&file_actor_t::on_remote_win);
+        p.subscribe_actor(&file_actor_t::on_finish_file);
+        p.subscribe_actor(&file_actor_t::on_append_block);
+        p.subscribe_actor(&file_actor_t::on_clone_block);
     });
-}
-
-void file_actor_t::on_thread_ready(model::message::thread_ready_t &message) noexcept {
-    auto &p = message.payload;
-    if (p.thread_id == std::this_thread::get_id()) {
-        LOG_TRACE(log, "on_thread_ready");
-        cluster = message.payload.cluster;
-    }
 }
 
 void file_actor_t::on_start() noexcept {
@@ -107,27 +82,12 @@ void file_actor_t::shutdown_finish() noexcept {
     r::actor_base_t::shutdown_finish();
 }
 
-void file_actor_t::on_model_update(model::message::model_update_t &message) noexcept {
-    LOG_TRACE(log, "on_model_update");
-    auto &payload = message.payload;
-    auto &diff = payload.diff;
-    auto r = diff->visit(*this, nullptr);
-    if (!r) {
-        auto ee = make_error(r.assume_error());
-        return do_shutdown(ee);
-    }
-    send<model::payload::model_update_t>(coordinator, std::move(diff), payload.custom);
-}
-
 void file_actor_t::on_block_request(message::block_request_t &message) noexcept {
     LOG_TRACE(log, "on_block_request");
     auto &p = message.payload;
     auto &dest = p.reply_to;
     auto &req = message.payload.remote_request;
-    auto folder = cluster->get_folders().by_id(get_folder(req));
-    auto &folder_info = *folder->get_folder_infos().by_device(*cluster->get_device());
-    auto file_info = folder_info.get_file_infos().by_name(get_name(req));
-    auto &path = file_info->get_path(folder_info);
+    auto &path = p.path;
     auto file_opt = open_file_ro(path, true);
     auto ec = sys::error_code{};
     auto data = utils::bytes_t{};
@@ -164,6 +124,7 @@ void file_actor_t::on_controller_predown(net::message::controller_predown_t &mes
 
 auto file_actor_t::reflect(model::file_info_ptr_t &file_ptr, const model::folder_info_t &folder_info,
                            const bfs::path &path) noexcept -> outcome::result<void> {
+#if 0
     auto &file = *file_ptr;
     sys::error_code ec;
 
@@ -267,12 +228,13 @@ auto file_actor_t::reflect(model::file_info_ptr_t &file_ptr, const model::folder
             return ec;
         }
     }
-
+#endif
     return outcome::success();
 }
 
-auto file_actor_t::operator()(const model::diff::advance::remote_copy_t &diff, void *custom) noexcept
-    -> outcome::result<void> {
+
+void file_actor_t::on_remote_copy(message::remote_copy_t& message) noexcept {
+#if 0
     auto folder = cluster->get_folders().by_id(diff.folder_id);
     auto &folder_info = *folder->get_folder_infos().by_device_id(diff.peer_id);
     auto name = get_name(diff.proto_source);
@@ -286,7 +248,15 @@ auto file_actor_t::operator()(const model::diff::advance::remote_copy_t &diff, v
         send<model::payload::model_update_t>(coordinator, std::move(diff), this);
     }
     return diff.visit_next(*this, custom);
+#endif
+    std::abort();
 }
+
+void file_actor_t::on_remote_win(message::remote_win_t& message) noexcept {
+    std::abort();
+}
+
+#if 0
 
 auto file_actor_t::operator()(const model::diff::advance::remote_win_t &diff, void *custom) noexcept
     -> outcome::result<void> {
@@ -310,9 +280,42 @@ auto file_actor_t::operator()(const model::diff::advance::remote_win_t &diff, vo
     }
     return diff.visit_next(*this, custom);
 }
+#endif
 
-auto file_actor_t::operator()(const model::diff::modify::finish_file_t &diff, void *custom) noexcept
-    -> outcome::result<void> {
+void file_actor_t::on_finish_file(message::finish_file_t& message) noexcept {
+    auto& p = message.payload;
+    auto guard = io_guard_t(*this, message);
+
+    auto path_str = p.path->generic_string();
+    auto backend = rw_cache->get(*p.path);
+    if (!backend) {
+        std::abort();
+        LOG_DEBUG(log, "attempt to flush non-opened file {}, re-open it as temporal", path_str);
+#if 0
+        auto path_tmp = make_temporal(local_path);
+        auto result = open_file_rw(path_tmp, file, *folder_info);
+        if (!result) {
+            auto &ec = result.assume_error();
+            LOG_ERROR(log, "cannot open file: {}: {}", path_tmp.string(), ec.message());
+            return ec;
+        }
+        backend = std::move(result.assume_value());
+#endif
+    }
+
+    rw_cache->remove(backend);
+    auto ok = backend->close(p.modification_s, *p.local_path);
+    if (!ok) {
+        auto local_path_str = p.local_path->generic_string();
+        auto &ec = ok.assume_error();
+        LOG_ERROR(log, "cannot close file: {}: {}", local_path_str, ec.message());
+        return guard.reply(ec);
+    }
+
+    LOG_INFO(log, "file {} ({} bytes) is now locally available", path_str, p.file_size);
+    return guard.reply(outcome::success());
+
+#if 0
     auto folder = cluster->get_folders().by_id(diff.folder_id);
     if (folder) {
         auto folder_info = folder->get_folder_infos().by_device_id(diff.peer_id);
@@ -366,30 +369,37 @@ auto file_actor_t::operator()(const model::diff::modify::finish_file_t &diff, vo
         }
     }
     return diff.visit_next(*this, custom);
+#endif
 }
 
-auto file_actor_t::operator()(const model::diff::modify::append_block_t &diff, void *custom) noexcept
-    -> outcome::result<void> {
+void file_actor_t::on_append_block(message::append_block_t& message) noexcept {
+    auto& p = message.payload;
+#if 0
     auto guard = write_guard_t(*this, diff);
     auto folder = cluster->get_folders().by_id(diff.folder_id);
     auto &folder_info = *folder->get_folder_infos().by_device_id(diff.device_id);
     auto file = folder_info.get_file_infos().by_name(diff.file_name);
     auto &path = file->get_path(folder_info);
-    auto path_str = path.string();
-    auto file_opt = open_file_rw(path, file, folder_info);
-    if (!file_opt) {
-        auto &err = file_opt.assume_error();
-        LOG_ERROR(log, "cannot open file: {}: {}", path_str, err.message());
-        return err;
-    }
-
     auto block_index = diff.block_index;
     auto offset = file->get_block_offset(block_index);
     auto &backend = file_opt.value();
     auto r = guard(backend->write(offset, diff.data));
     return r ? diff.visit_next(*this, custom) : r;
+#endif
+    auto guard = io_guard_t(*this, message);
+    auto& path = p.path;
+    auto file_opt = open_file_rw(*path, p.file_size);
+    if (!file_opt) {
+        auto path_str = path->string();
+        auto &err = file_opt.assume_error();
+        LOG_ERROR(log, "cannot open file: {}: {}", path_str, err.message());
+        return guard.reply(err);
+    }
+    auto &backend = file_opt.assume_value();
+    return guard.reply(backend->write(p.offset, p.data));
 }
 
+#if 0
 auto file_actor_t::get_source_for_cloning(model::file_info_ptr_t &source, const model::folder_info_t &source_fi,
                                           const file_ptr_t &target_backend) noexcept -> outcome::result<file_ptr_t> {
     auto source_path = source->get_path(source_fi);
@@ -413,9 +423,10 @@ auto file_actor_t::get_source_for_cloning(model::file_info_ptr_t &source, const 
 
     return open_file_ro(source_path, false);
 }
+#endif
 
-auto file_actor_t::operator()(const model::diff::modify::clone_block_t &diff, void *custom) noexcept
-    -> outcome::result<void> {
+void file_actor_t::on_clone_block(message::clone_block_t& message) noexcept {
+#if 0
     auto guard = write_guard_t(*this, diff);
     auto folder = cluster->get_folders().by_id(diff.folder_id);
     auto &target_folder_info = *folder->get_folder_infos().by_device_id(diff.device_id);
@@ -446,26 +457,54 @@ auto file_actor_t::operator()(const model::diff::modify::clone_block_t &diff, vo
     auto source_offset = source->get_block_offset(diff.source_block_index);
     auto r = guard(target_backend->copy(target_offset, *source_backend, source_offset, block->get_size()));
     return r ? diff.visit_next(*this, custom) : r;
+#endif
+    auto& p = message.payload;
+    auto guard = io_guard_t(*this, message);
+    auto target_path = p.target;
+    auto target_opt = open_file_rw(*target_path, p.target_size);
+    if (!target_opt) {
+        auto path_str = target_path->string();
+        auto &err = target_opt.assume_error();
+        LOG_ERROR(log, "cannot open file: {}: {}", path_str, err.message());
+        return guard.reply(err);
+    }
+    auto target_backend = std::move(target_opt.assume_value());
+    auto source_backend_opt = [&]() -> outcome::result<file_ptr_t>
+    {
+            if (auto cached = rw_cache->get(*p.source); cached) {
+                return cached;
+            } else if (auto cached = ro_cache.get(*p.source); cached) {
+                return cached;
+            } else {
+                return open_file_ro(*p.source, false);
+            }
+    }();
+    if (!source_backend_opt) {
+        auto path_str = p.source->string();
+        auto ec = source_backend_opt.assume_error();
+        LOG_ERROR(log, "cannot open source file for cloning: {}: {}", path_str, ec.message());
+        return guard.reply(ec);
+    }
+    auto& source_backend = *source_backend_opt.assume_value();
+    return guard.reply(target_backend->copy(p.target_offset, source_backend, p.source_offset, p.block_size));
 }
 
-auto file_actor_t::open_file_rw(const std::filesystem::path &path, model::file_info_ptr_t info,
-                                const model::folder_info_t &folder_info) noexcept -> outcome::result<file_ptr_t> {
+auto file_actor_t::open_file_rw(const std::filesystem::path &path, std::uint64_t file_size) noexcept -> outcome::result<file_ptr_t> {
+#if 0
     auto augmentation = info.get()->get_augmentation();
     auto presence = static_cast<presentation::presence_t *>(augmentation.get());
     if (!presence->is_unique()) {
         return utils::make_error_code(utils::error_code_t::nonunique_filename);
     }
 
+#endif
     LOG_TRACE(log, "open_file (r/w, by path), path = {}", path.string());
     auto item = rw_cache->get(path);
     if (item) {
         return item;
     }
-
-    auto size = info->get_size();
-    LOG_TRACE(log, "open_file (model), path = {} ({} bytes)", path.string(), size);
-    // auto opt = file_t::open_write(path, )
-    // bfs::path operational_path = temporal ? make_temporal(path) : path;
+    // auto size = info->get_size();
+    LOG_TRACE(log, "open_file (rw), path = {}, size = {}", path.string(), file_size);
 
     auto parent = path.parent_path();
     sys::error_code ec;
@@ -478,7 +517,7 @@ auto file_actor_t::open_file_rw(const std::filesystem::path &path, model::file_i
         }
     }
 
-    auto option = file_t::open_write(info, folder_info);
+    auto option = file_t::open_write(path, file_size);
     if (!option) {
         return option.assume_error();
     }
