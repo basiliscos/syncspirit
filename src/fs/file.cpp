@@ -26,8 +26,7 @@ using namespace syncspirit::fs;
 #define SS_STAT_BUFF struct stat
 #endif
 
-auto file_t::open_write(const bfs::path &model_path, std::uint64_t file_size) noexcept
-    -> outcome::result<file_t> {
+auto file_t::open_write(const bfs::path &model_path, std::uint64_t file_size) noexcept -> outcome::result<file_t> {
     using mode_t = utils::fstream_t;
     auto tmp = file_size > 0;
     auto path = tmp ? make_temporal(std::move(model_path)) : std::move(model_path);
@@ -72,8 +71,7 @@ auto file_t::open_read(const bfs::path &path) noexcept -> outcome::result<file_t
 file_t::file_t() noexcept {};
 
 file_t::file_t(utils::fstream_t backend_, bfs::path path_, bfs::path model_path_, std::uint64_t file_size_) noexcept
-    : backend{new utils::fstream_t(std::move(backend_))}, path{std::move(path_)},
-      file_size{file_size_} {
+    : backend{new utils::fstream_t(std::move(backend_))}, path{std::move(path_)}, file_size{file_size_} {
     model_path = std::move(model_path_);
     model_path.make_preferred();
     path.make_preferred();
@@ -146,7 +144,7 @@ auto file_t::remove() noexcept -> outcome::result<void> {
     return ec;
 }
 
-auto file_t::read(size_t offset, size_t size) const noexcept -> outcome::result<utils::bytes_t> {
+auto file_t::read(std::uint64_t offset, std::uint64_t size) const noexcept -> outcome::result<utils::bytes_t> {
     if (backend->tellg() != offset) {
         if (!backend->seekp((long)offset, std::ios_base::beg)) {
             return sys::errc::make_error_code(sys::errc::io_error);
@@ -183,7 +181,7 @@ auto file_t::write(uint64_t offset, utils::bytes_view_t data) noexcept -> outcom
     return outcome::success();
 }
 
-auto file_t::copy(size_t my_offset, const file_t &from, size_t source_offset, size_t size) noexcept
+auto file_t::copy(std::uint64_t my_offset, const file_t &from, std::uint64_t source_offset, std::uint64_t size) noexcept
     -> outcome::result<void> {
     auto in_opt = from.read(source_offset, size);
     if (!in_opt) {

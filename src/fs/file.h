@@ -39,7 +39,8 @@ struct SYNCSPIRIT_API file_t : model::arc_base_t<file_t> {
     outcome::result<void> close(std::int64_t modification_s, const bfs::path &local_name = {}) noexcept;
     outcome::result<void> remove() noexcept;
     outcome::result<void> write(std::uint64_t offset, utils::bytes_view_t data) noexcept;
-    outcome::result<void> copy(std::uint64_t my_offset, const file_t &from, std::uint64_t source_offset, std::uint64_t size) noexcept;
+    outcome::result<void> copy(std::uint64_t my_offset, const file_t &from, std::uint64_t source_offset,
+                               std::uint64_t size) noexcept;
     outcome::result<utils::bytes_t> read(std::uint64_t offset, std::uint64_t size) const noexcept;
 
     static outcome::result<file_t> open_write(const bfs::path &path, std::uint64_t file_size) noexcept;

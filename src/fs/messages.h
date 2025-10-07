@@ -4,13 +4,11 @@
 #pragma once
 
 #include <rotor.hpp>
-#include "proto/bep_support.h"
+#include "proto/proto-fwd.hpp"
 #include "scan_task.h"
-#include "file.h"
 #include "chunk_iterator.h"
 #include "new_chunk_iterator.h"
 #include "utils/bytes.h"
-#include "model/misc/resolver.h"
 
 namespace syncspirit::fs {
 
@@ -37,29 +35,33 @@ struct block_response_t {
     utils::bytes_t data;
 };
 
-struct extendended_context_t: model::arc_base_t<extendended_context_t> {
+struct extendended_context_t : model::arc_base_t<extendended_context_t> {
     virtual ~extendended_context_t() = default;
 };
 
 using extendended_context_prt_t = model::intrusive_ptr_t<extendended_context_t>;
 
-template<typename T>
-struct generic_reply_t {
-    T* request;
+template <typename T> struct generic_reply_t {
+    T *request;
     r::message_ptr_t request_keeper;
     outcome::result<void> response;
 };
 
 struct remote_copy_t {
-
+    const bfs::path *path;
+    proto::FileInfo meta;
+    bool ignore_permissions;
+    r::address_ptr_t reply_to;
+    extendended_context_prt_t context;
 };
 
-struct remote_win_t {
-};
+using remote_copy_reply_t = generic_reply_t<remote_copy_t>;
+
+struct remote_win_t {};
 
 struct finish_file_t {
-    const bfs::path* path;
-    const bfs::path* local_path;
+    const bfs::path *path;
+    const bfs::path *local_path;
     std::uint64_t file_size;
     std::int64_t modification_s;
     r::address_ptr_t reply_to;
@@ -69,7 +71,7 @@ struct finish_file_t {
 using finish_file_reply_t = generic_reply_t<finish_file_t>;
 
 struct append_block_t {
-    const bfs::path* path;
+    const bfs::path *path;
     utils::bytes_view_t data;
     std::uint64_t offset;
     std::uint64_t file_size;
@@ -80,10 +82,10 @@ struct append_block_t {
 using append_block_reply_t = generic_reply_t<append_block_t>;
 
 struct clone_block_t {
-    const bfs::path* target;
+    const bfs::path *target;
     std::uint64_t target_offset;
     std::uint64_t target_size;
-    const bfs::path* source;
+    const bfs::path *source;
     std::uint64_t source_offset;
     std::uint64_t block_size;
     r::address_ptr_t reply_to;
@@ -111,6 +113,7 @@ using clone_block_t = r::message_t<payload::clone_block_t>;
 using append_block_reply_t = r::message_t<payload::append_block_reply_t>;
 using clone_block_reply_t = r::message_t<payload::clone_block_reply_t>;
 using finish_file_reply_t = r::message_t<payload::finish_file_reply_t>;
+using remote_copy_reply_t = r::message_t<payload::remote_copy_reply_t>;
 
 } // namespace message
 

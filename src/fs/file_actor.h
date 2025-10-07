@@ -41,38 +41,32 @@ struct SYNCSPIRIT_API file_actor_t : public r::actor_base_t {
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
 
   private:
-    template<typename T>
-    struct io_guard_t {
+    template <typename T> struct io_guard_t {
         using reply_payload_t = payload::generic_reply_t<T>;
-        io_guard_t(file_actor_t &actor_, r::message_t<T>& request) noexcept:
-            actor{actor_}, payload(&request.payload, &request, outcome::success())
-        {}
+        io_guard_t(file_actor_t &actor_, r::message_t<T> &request) noexcept
+            : actor{actor_}, payload(&request.payload, &request, outcome::success()) {}
 
         io_guard_t() = delete;
-        io_guard_t(const io_guard_t&) = delete;
+        io_guard_t(const io_guard_t &) = delete;
         ~io_guard_t() {
             auto &to = payload.request->reply_to;
             actor.send<reply_payload_t>(to, std::move(payload));
         }
 
-        void reply(const sys::error_code& ec) noexcept {
-            payload.response = ec;
-        }
+        void reply(const sys::error_code &ec) noexcept { payload.response = ec; }
 
-        void reply(const outcome::result<void>& result) noexcept {
-            payload.response = result;
-        }
+        void reply(const outcome::result<void> &result) noexcept { payload.response = result; }
 
         file_actor_t &actor;
         reply_payload_t payload;
     };
 
     void on_block_request(message::block_request_t &message) noexcept;
-    void on_remote_copy(message::remote_copy_t& message) noexcept;
-    void on_remote_win(message::remote_win_t& message) noexcept;
-    void on_finish_file(message::finish_file_t& message) noexcept;
-    void on_append_block(message::append_block_t& message) noexcept;
-    void on_clone_block(message::clone_block_t& message) noexcept;
+    void on_remote_copy(message::remote_copy_t &message) noexcept;
+    void on_remote_win(message::remote_win_t &message) noexcept;
+    void on_finish_file(message::finish_file_t &message) noexcept;
+    void on_append_block(message::append_block_t &message) noexcept;
+    void on_clone_block(message::clone_block_t &message) noexcept;
 
     void on_controller_up(net::message::controller_up_t &message) noexcept;
     void on_controller_predown(net::message::controller_predown_t &message) noexcept;

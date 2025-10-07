@@ -2280,6 +2280,206 @@ void test_races() {
     F(true, 10).run();
 };
 
+#if 0
+
+    auto augmentation = info.get()->get_augmentation();
+    auto presence = static_cast<presentation::presence_t *>(augmentation.get());
+    if (!presence->is_unique()) {
+        return utils::make_error_code(utils::error_code_t::nonunique_filename);
+    }
+
+void test_uniqueness() {
+    struct F : fixture_t {
+        void main() noexcept override {
+            auto path_1 = root_path / L"ФАЙЛ";
+            auto path_2 = root_path / L"файл";
+
+            proto::FileInfo pr_fi;
+            std::int64_t modified = 1641828421;
+            proto::set_modified_s(pr_fi, modified);
+            proto::set_permissions(pr_fi, 0666);
+
+            remote_copy(&path_1, pr_fi).check_success();
+            CHECK(bfs::exists(path_1));
+
+#if defined(SYNCSPIRIT_WIN) || defined(SYNCSPIRIT_MAC)
+            remote_copy(&path_2, pr_fi).check_fail();
+            CHECK(!bfs::exists(path_1));
+#else
+            remote_copy(&path_2, pr_fi).check_success();
+            CHECK(bfs::exists(path_2));
+#endif
+        }
+    };
+    F().run();
+}
+#endif
+
+#if 0
+    auto folder = cluster->get_folders().by_id(diff.folder_id);
+    if (folder) {
+        auto folder_info = folder->get_folder_infos().by_device_id(diff.peer_id);
+        if (folder_info) {
+            auto file = folder_info->get_file_infos().by_name(diff.file_name);
+            if (file) {
+                auto &local_path = file->get_path(*folder_info);
+                auto action = diff.action;
+
+                if (action == model::advance_action_t::resolve_remote_win) {
+                    auto &self = *cluster->get_device();
+                    auto local_fi = folder->get_folder_infos().by_device(self);
+                    auto local_file = local_fi->get_file_infos().by_name(diff.file_name);
+                    auto conflicting_name = local_file->make_conflicting_name();
+                    auto target_path = folder->get_path() / conflicting_name;
+                    auto ec = sys::error_code{};
+                    LOG_DEBUG(log, "renaming {} -> {}", *file, conflicting_name);
+                    bfs::rename(local_path, target_path);
+                    if (ec) {
+                        LOG_ERROR(log, "cannot rename file: {}: {}", local_path.generic_string(), ec.message());
+                        return ec;
+                    }
+                }
+                auto backend = rw_cache->get(local_path);
+                if (!backend) {
+                    LOG_DEBUG(log, "attempt to flush non-opened file {}, re-open it as temporal",
+                              local_path.generic_string());
+                    auto path_tmp = make_temporal(local_path);
+                    auto result = open_file_rw(path_tmp, file, *folder_info);
+                    if (!result) {
+                        auto &ec = result.assume_error();
+                        LOG_ERROR(log, "cannot open file: {}: {}", path_tmp.string(), ec.message());
+                        return ec;
+                    }
+                    backend = std::move(result.assume_value());
+                }
+
+                rw_cache->remove(backend);
+                auto ok = backend->close(true, local_path);
+                if (!ok) {
+                    auto &ec = ok.assume_error();
+                    LOG_ERROR(log, "cannot close file: {}: {}", local_path.generic_string(), ec.message());
+                    return ec;
+                }
+
+                LOG_INFO(log, "file {} ({} bytes) is now locally available", *file, file->get_size());
+
+                auto ack = model::diff::advance::advance_t::create(action, *file, *folder_info, *sequencer);
+                send<model::payload::model_update_t>(coordinator, std::move(ack), this);
+            }
+        }
+    }
+    return diff.visit_next(*this, custom);
+#endif
+
+#if 0
+
+void test_conflicts() {
+    struct F : fixture_t {
+        void main() noexcept override {
+            auto builder = diff_builder_t(*cluster, file_addr);
+
+            proto::FileInfo pr_fi;
+            std::int64_t modified = 1641828421;
+            proto::set_name(pr_fi, "q.txt");
+            proto::set_modified_s(pr_fi, modified);
+            proto::set_sequence(pr_fi, folder_peer->get_max_sequence() + 1);
+
+            auto sha256 = peer_device->device_id().get_sha256();
+            auto folder_peer = folder->get_folder_infos().by_device(*peer_device);
+            auto folder_my = folder->get_folder_infos().by_device(*my_device);
+
+            SECTION("non-empty (via file_finish)") {
+                proto::set_block_size(pr_fi, 5);
+                proto::set_size(pr_fi, 5);
+
+                auto peer_block = []() {
+                    auto block = proto::BlockInfo();
+                    auto hash = utils::sha256_digest(as_bytes("12345")).value();
+                    proto::set_hash(block, hash);
+                    proto::set_size(block, 5);
+                    return block;
+                }();
+
+                auto my_block = []() {
+                    auto block = proto::BlockInfo();
+                    auto hash = utils::sha256_digest(as_bytes("67890")).value();
+                    proto::set_hash(block, hash);
+                    proto::set_size(block, 5);
+                    return block;
+                }();
+
+                SECTION("remote win") {
+                    auto peer_file = [&]() {
+                        auto &v = proto::get_version(pr_fi);
+                        auto &c = proto::add_counters(v);
+                        proto::set_id(c, peer_device->device_id().get_uint());
+                        proto::set_value(c, 10);
+                        proto::add_blocks(pr_fi, peer_block);
+                        proto::set_modified_s(pr_fi, 1734690000);
+                        builder.make_index(sha256, folder_id).add(pr_fi, peer_device, false).finish().apply(*sup);
+                        return folder_peer->get_file_infos().by_name("q.txt");
+                    }();
+
+                    auto my_file = [&]() {
+                        auto &v = proto::get_version(pr_fi);
+                        proto::add_counters(v, proto::Counter(my_device->device_id().get_uint(), 5));
+                        proto::set_modified_s(pr_fi, 1734600000);
+                        proto::add_blocks(pr_fi, my_block);
+                        builder.local_update(folder_id, pr_fi).apply(*sup);
+                        return folder_my->get_file_infos().by_name("q.txt");
+                    }();
+
+                    bfs::path kept_file = root_path / proto::get_name(pr_fi);
+                    write_file(kept_file, "12345");
+
+                    auto local_file = folder_my->get_file_infos().by_name(peer_file->get_name()->get_full_name()).get();
+                    REQUIRE(model::resolve(*peer_file, local_file, *folder_my) == advance_action_t::resolve_remote_win);
+                    builder.append_block(*peer_file, *folder_peer, 0, as_owned_bytes("67890"))
+                        .apply(*sup)
+                        .finish_file(*peer_file, *folder_peer)
+                        .apply(*sup);
+
+                    auto conflict_file = root_path / my_file->make_conflicting_name();
+                    CHECK(read_file(kept_file) == "67890");
+                    CHECK(bfs::exists(conflict_file));
+                    CHECK(read_file(conflict_file) == "12345");
+                }
+            }
+
+            SECTION("remote win emtpy (file vs directory)") {
+                auto my_file = [&]() {
+                    auto &v = proto::get_version(pr_fi);
+                    proto::add_counters(v, proto::Counter(my_device->device_id().get_uint(), 5));
+                    proto::set_modified_s(pr_fi, 1734600000);
+                    builder.local_update(folder_id, pr_fi).apply(*sup);
+                    return folder_my->get_file_infos().by_name("q.txt");
+                }();
+
+                auto peer_file = [&]() {
+                    auto &v = proto::get_version(pr_fi);
+                    proto::add_counters(v, proto::Counter(peer_device->device_id().get_uint(), 10));
+                    proto::set_modified_s(pr_fi, 1734690000);
+                    builder.make_index(sha256, folder_id).add(pr_fi, peer_device, false).finish().apply(*sup);
+                    return folder_peer->get_file_infos().by_name("q.txt");
+                }();
+
+                bfs::path kept_file = root_path / proto::get_name(pr_fi);
+                bfs::create_directories(kept_file);
+
+                builder.advance(*peer_file, *folder_peer).apply(*sup);
+
+                auto conflict_file = root_path / my_file->make_conflicting_name();
+                CHECK(bfs::exists(conflict_file));
+                CHECK(bfs::exists(kept_file));
+                CHECK(bfs::is_directory(conflict_file));
+                CHECK(bfs::is_regular_file(kept_file));
+            }
+        }
+    };
+    F().run();
+}
+#endif
+
 int _init() {
     REGISTER_TEST_CASE(test_startup, "test_startup", "[net]");
     REGISTER_TEST_CASE(test_overwhelm, "test_overwhelm", "[net]");
@@ -2301,6 +2501,7 @@ int _init() {
     REGISTER_TEST_CASE(test_change_folder_type, "test_change_folder_type", "[net]");
     REGISTER_TEST_CASE(test_pausing, "test_pausing", "[net]");
     REGISTER_TEST_CASE(test_races, "test_races", "[net]");
+    REGISTER_TEST_CASE(test_uniqueness, "test_uniqueness", "[net]");
     return 1;
 }
 

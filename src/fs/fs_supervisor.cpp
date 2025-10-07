@@ -60,11 +60,7 @@ void fs_supervisor_t::launch() noexcept {
     LOG_DEBUG(log, "launching children actors");
     auto factory = [this](r::supervisor_t &, const r::address_ptr_t &spawner) -> r::actor_ptr_t {
         auto timeout = shutdown_timeout * 9 / 10;
-        return create_actor<file_actor_t>()
-            .rw_cache(rw_cache)
-            .timeout(timeout)
-            .spawner_address(spawner)
-            .finish();
+        return create_actor<file_actor_t>().rw_cache(rw_cache).timeout(timeout).spawner_address(spawner).finish();
     };
     spawn(factory).restart_period(r::pt::seconds{1}).restart_policy(r::restart_policy_t::fail_only).spawn();
 
