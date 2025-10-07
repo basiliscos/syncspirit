@@ -86,6 +86,14 @@ net_supervisor_t::net_supervisor_t(net_supervisor_t::config_t &cfg)
         }
     }
 
+    auto &mru_size = app_config.fs_config.mru_size;
+    auto &sim_writes = app_config.bep_config.blocks_simultaneous_write;
+    if (app_config.fs_config.mru_size <= app_config.bep_config.blocks_simultaneous_write) {
+        LOG_WARN(log, "config fs_config.mru_size ({}) <= bep_config.blocks_simultaneous_write ({})",
+                 app_config.fs_config.mru_size, app_config.bep_config.blocks_simultaneous_write);
+        sim_writes = mru_size - 2;
+    }
+
     auto device = model::device_ptr_t();
     device = new model::local_device_t(device_id, app_config.device_name, cn.value());
     auto simultaneous_writes = app_config.bep_config.blocks_simultaneous_write;

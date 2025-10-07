@@ -119,6 +119,9 @@ std::string error_code_category::message(int c) const {
     case error_code_t::cares_failure:
         r = "cares failure";
         break;
+    case error_code_t::flush_non_opened:
+        r = "attempt to flush a non-opened file";
+        break;
     case error_code_t::nonunique_filename:
         r = "filename uniqueness violation (OS/filesystem dependent)";
         break;

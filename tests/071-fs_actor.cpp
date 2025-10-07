@@ -7,7 +7,7 @@
 #include "net/names.h"
 #include "test_supervisor.h"
 #include "access.h"
-#include "access.h"
+#include "utils/error_code.h"
 #include <filesystem>
 #include <boost/nowide/convert.hpp>
 #include <optional>
@@ -328,8 +328,14 @@ void test_append_block() {
             auto path_str = boost::nowide::narrow(path_wstr);
 
             auto data_1 = as_owned_bytes("12345");
-            SECTION("file with 1 block") {
 
+            SECTION("finish non-opened") {
+                auto path = bfs::absolute(root_path / path_rel);
+                auto ec = utils::make_error_code(utils::error_code_t::nonunique_filename);
+                finish_file(&path, 5, 1641828421).check_fail(ec);
+            }
+
+            SECTION("file with 1 block") {
                 auto path = bfs::absolute(root_path / path_rel);
                 append_block(&path, data_1, 0, 5).check_success().finish_file(&path, 5, 1641828421).check_success();
 

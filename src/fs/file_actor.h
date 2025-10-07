@@ -63,7 +63,6 @@ struct SYNCSPIRIT_API file_actor_t : public r::actor_base_t {
 
     void on_block_request(message::block_request_t &message) noexcept;
     void on_remote_copy(message::remote_copy_t &message) noexcept;
-    void on_remote_win(message::remote_win_t &message) noexcept;
     void on_finish_file(message::finish_file_t &message) noexcept;
     void on_append_block(message::append_block_t &message) noexcept;
     void on_clone_block(message::clone_block_t &message) noexcept;
@@ -77,9 +76,6 @@ struct SYNCSPIRIT_API file_actor_t : public r::actor_base_t {
 
     outcome::result<file_ptr_t> open_file_rw(const bfs::path &path, std::uint64_t file_size) noexcept;
     outcome::result<file_ptr_t> open_file_ro(const bfs::path &path, bool use_cache = false) noexcept;
-
-    outcome::result<void> reflect(model::file_info_ptr_t &file, const model::folder_info_t &fi,
-                                  const bfs::path &path) noexcept;
 
     utils::logger_t log;
     r::address_ptr_t coordinator;

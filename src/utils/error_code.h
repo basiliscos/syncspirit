@@ -76,6 +76,7 @@ enum class error_code_t {
     cares_failure,
     peer_has_been_removed,
     nonunique_filename,
+    flush_non_opened,
 };
 
 enum class bep_error_code_t {

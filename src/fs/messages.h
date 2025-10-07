@@ -57,8 +57,6 @@ struct remote_copy_t {
 
 using remote_copy_reply_t = generic_reply_t<remote_copy_t>;
 
-struct remote_win_t {};
-
 struct finish_file_t {
     const bfs::path *path;
     const bfs::path *local_path;
@@ -105,7 +103,6 @@ using block_request_t = r::message_t<payload::block_request_t>;
 using block_response_t = r::message_t<payload::block_response_t>;
 
 using remote_copy_t = r::message_t<payload::remote_copy_t>;
-using remote_win_t = r::message_t<payload::remote_win_t>;
 using finish_file_t = r::message_t<payload::finish_file_t>;
 using append_block_t = r::message_t<payload::append_block_t>;
 using clone_block_t = r::message_t<payload::clone_block_t>;

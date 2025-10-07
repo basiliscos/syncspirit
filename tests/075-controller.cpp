@@ -2480,6 +2480,32 @@ void test_conflicts() {
 }
 #endif
 
+#if 0
+
+auto file_actor_t::operator()(const model::diff::advance::remote_win_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    auto folder = cluster->get_folders().by_id(diff.folder_id);
+    auto folder_infos = folder->get_folder_infos();
+    auto &folder_info = *folder_infos.by_device_id(diff.peer_id);
+    auto source_name = get_name(diff.proto_source);
+    auto local_name = get_name(diff.proto_local);
+    auto file = folder_info.get_file_infos().by_name(source_name);
+    auto &source_path = file->get_path(folder_info);
+    auto target_path = folder->get_path() / local_name;
+    LOG_DEBUG(log, "renaming {} -> {}", source_path, target_path);
+    auto ec = sys::error_code{};
+    bfs::rename(source_path, target_path);
+
+    if (ec) {
+        LOG_ERROR(log, "cannot rename file '{}': {}", file, ec.message());
+        auto diff = model::diff::cluster_diff_ptr_t();
+        diff = new model::diff::modify::mark_reachable_t(*file, folder_info, false);
+        send<model::payload::model_update_t>(coordinator, std::move(diff), this);
+    }
+    return diff.visit_next(*this, custom);
+}
+#endif
+
 int _init() {
     REGISTER_TEST_CASE(test_startup, "test_startup", "[net]");
     REGISTER_TEST_CASE(test_overwhelm, "test_overwhelm", "[net]");
