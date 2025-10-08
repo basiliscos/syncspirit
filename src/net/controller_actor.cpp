@@ -140,7 +140,9 @@ void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.subscribe_actor(&controller_actor_t::on_peer_down);
         p.subscribe_actor(&controller_actor_t::on_block);
         p.subscribe_actor(&controller_actor_t::on_validation);
+#if 0
         p.subscribe_actor(&controller_actor_t::on_block_response);
+#endif
         p.subscribe_actor(&controller_actor_t::on_tx_signal);
     });
 }
@@ -806,6 +808,7 @@ void controller_actor_t::on_message(proto::DownloadProgress &) noexcept {
     LOG_ERROR(log, "on_message, not implemented");
 }
 
+#if 0
 void controller_actor_t::on_block_response(fs::message::block_response_t &message) noexcept {
     --tx_blocks_requested;
     if (!peer_address) {
@@ -814,15 +817,12 @@ void controller_actor_t::on_block_response(fs::message::block_response_t &messag
 
     auto &p = message.payload;
     proto::Response res;
-#if 0
     proto::set_id(res, proto::get_id(p.remote_request));
     if (p.ec) {
         proto::set_code(res, proto::ErrorCode::GENERIC);
     } else {
         proto::set_data(res, std::move(p.data));
     }
-#endif
-    std::abort();
 
     auto data = proto::serialize(res, peer->get_compression());
     send_to_peer(std::move(data));
@@ -831,13 +831,11 @@ void controller_actor_t::on_block_response(fs::message::block_response_t &messag
     while (!block_read_queue.empty() && (tx_blocks_requested <= max_block_read)) {
         auto &req = block_read_queue.front();
         ++tx_blocks_requested;
-#if 0
         send<fs::payload::block_request_t>(fs_addr, std::move(req), address);
-#endif
-        std::abort();
         block_read_queue.pop_front();
     }
 }
+#endif
 
 void controller_actor_t::on_block(message::block_response_t &message) noexcept {
     --rx_blocks_requested;

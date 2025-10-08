@@ -71,10 +71,7 @@ void file_actor_t::shutdown_finish() noexcept {
 
 void file_actor_t::on_block_request(message::block_request_t &message) noexcept {
     LOG_TRACE(log, "on_block_request");
-    using guard_t = io_guard_t<payload::block_request_t, payload::block_response_t>;
-    auto guard = guard_t(*this, message);
     auto &p = message.payload;
-    auto &dest = p.reply_to;
     auto &path = p.path;
     auto file_opt = open_file_ro(path, true);
     auto ec = sys::error_code{};
@@ -82,7 +79,8 @@ void file_actor_t::on_block_request(message::block_request_t &message) noexcept 
     if (!file_opt) {
         ec = file_opt.assume_error();
         LOG_ERROR(log, "error opening file {}: {}", path.string(), ec.message());
-        return guard.reply(ec);
+        p.result = ec;
+        return;
     } else {
         auto &file = file_opt.assume_value();
         auto block_opt = file->read(p.offset, p.block_size);
@@ -90,13 +88,13 @@ void file_actor_t::on_block_request(message::block_request_t &message) noexcept 
             ec = block_opt.assume_error();
             LOG_WARN(log, "error requesting block; offset = {}, size = {} :: {} ", p.offset, p.block_size,
                      ec.message());
-            return guard.reply(ec);
+            p.result = ec;
+            return;
         } else {
             data = std::move(block_opt.assume_value());
         }
     }
-    guard.payload.data = std::move(data);
-    return guard.reply(ec);
+    p.result = std::move(data);
 }
 
 void file_actor_t::on_controller_up(net::message::controller_up_t &message) noexcept {
@@ -116,7 +114,6 @@ void file_actor_t::on_remote_copy(message::remote_copy_t &message) noexcept {
     auto &p = message.payload;
     auto &path = p.path;
     sys::error_code ec;
-    auto guard = io_guard_t(*this, message);
 
     if (p.deleted) {
         if (bfs::exists(path, ec)) {
@@ -124,12 +121,13 @@ void file_actor_t::on_remote_copy(message::remote_copy_t &message) noexcept {
             auto ok = bfs::remove_all(path, ec);
             if (!ok) {
                 LOG_ERROR(log, "error removing {} : {}", path.string(), ec.message());
-                return guard.reply(ec);
+                p.result = ec;
+                return;
             }
         } else {
             LOG_TRACE(log, "{} already abscent, noop", path.string());
         }
-        return guard.reply(outcome::success());
+        return;
     }
 
     auto parent = path.parent_path();
@@ -139,7 +137,8 @@ void file_actor_t::on_remote_copy(message::remote_copy_t &message) noexcept {
     if (!exists) {
         bfs::create_directories(parent, ec);
         if (ec) {
-            return guard.reply(ec);
+            p.result = ec;
+            return;
         }
     }
 
@@ -152,7 +151,8 @@ void file_actor_t::on_remote_copy(message::remote_copy_t &message) noexcept {
             if (!file_opt) {
                 auto &err = file_opt.assume_error();
                 LOG_ERROR(log, "cannot open file: {}: {}", path.string(), err.message());
-                return guard.reply(err);
+                p.result = err;
+                return;
             }
             path = file_opt.assume_value()->get_path();
         } else {
@@ -161,12 +161,14 @@ void file_actor_t::on_remote_copy(message::remote_copy_t &message) noexcept {
             if (!out) {
                 auto ec = sys::error_code{errno, sys::system_category()};
                 LOG_ERROR(log, "error creating {}: {}", path.string(), ec.message());
-                return guard.reply(ec);
+                p.result = ec;
+                return;
             }
             out.close();
             bfs::last_write_time(path, from_unix(p.modification_s), ec);
             if (ec) {
-                return guard.reply(ec);
+                p.result = ec;
+                return;
             }
         }
         set_perms = !p.no_permissions && utils::platform_t::permissions_supported(path);
@@ -174,7 +176,8 @@ void file_actor_t::on_remote_copy(message::remote_copy_t &message) noexcept {
         LOG_DEBUG(log, "creating directory {}", path.string());
         bfs::create_directory(path, ec);
         if (ec) {
-            return guard.reply(ec);
+            p.result = ec;
+            return;
         }
         set_perms = !p.no_permissions && utils::platform_t::permissions_supported(path);
     } else if (p.type == proto::FileInfoType::SYMLINK) {
@@ -188,7 +191,8 @@ void file_actor_t::on_remote_copy(message::remote_copy_t &message) noexcept {
                 bfs::create_symlink(target, path, ec);
                 if (ec) {
                     LOG_WARN(log, "error symlinking {} -> {} : {}", path.string(), target.string(), ec.message());
-                    return guard.reply(ec);
+                    p.result = ec;
+                    return;
                 }
             } else {
                 LOG_TRACE(log, "no need to create symlink {} -> {}", path.string(), target.string());
@@ -204,21 +208,21 @@ void file_actor_t::on_remote_copy(message::remote_copy_t &message) noexcept {
         if (ec) {
             LOG_ERROR(log, "cannot set permissions {:#o} on file: '{}': {}", p.permissions, path.string(),
                       ec.message());
-            return guard.reply(ec);
+            p.result = ec;
+            return;
         }
     }
 }
 
 void file_actor_t::on_finish_file(message::finish_file_t &message) noexcept {
     auto &p = message.payload;
-    auto guard = io_guard_t(*this, message);
 
     auto path_str = p.path.generic_string();
     auto backend = rw_cache->get(p.path);
     if (!backend) {
         LOG_WARN(log, "attempt to flush non-opened file {}", path_str);
-        auto ec = utils::make_error_code(utils::error_code_t::nonunique_filename);
-        return guard.reply(ec);
+        p.result = utils::make_error_code(utils::error_code_t::nonunique_filename);
+        return;
     }
 
     rw_cache->remove(backend);
@@ -227,38 +231,39 @@ void file_actor_t::on_finish_file(message::finish_file_t &message) noexcept {
         auto local_path_str = p.local_path.generic_string();
         auto &ec = ok.assume_error();
         LOG_ERROR(log, "cannot close file: {}: {}", local_path_str, ec.message());
-        return guard.reply(ec);
+        p.result = ec;
+        return;
     }
 
     LOG_INFO(log, "file {} ({} bytes) is now locally available", path_str, p.file_size);
-    return guard.reply(outcome::success());
 }
 
 void file_actor_t::on_append_block(message::append_block_t &message) noexcept {
     auto &p = message.payload;
-    auto guard = io_guard_t(*this, message);
     auto &path = p.path;
     auto file_opt = open_file_rw(path, p.file_size);
     if (!file_opt) {
         auto path_str = path.string();
         auto &err = file_opt.assume_error();
         LOG_ERROR(log, "cannot open file: {}: {}", path_str, err.message());
-        return guard.reply(err);
+        p.result = err;
+        return;
+        return;
     }
     auto &backend = file_opt.assume_value();
-    return guard.reply(backend->write(p.offset, p.data));
+    p.result = backend->write(p.offset, p.data);
 }
 
 void file_actor_t::on_clone_block(message::clone_block_t &message) noexcept {
     auto &p = message.payload;
-    auto guard = io_guard_t(*this, message);
     auto target_path = p.target;
     auto target_opt = open_file_rw(target_path, p.target_size);
     if (!target_opt) {
         auto path_str = target_path.string();
         auto &err = target_opt.assume_error();
         LOG_ERROR(log, "cannot open file: {}: {}", path_str, err.message());
-        return guard.reply(err);
+        p.result = err;
+        return;
     }
     auto target_backend = std::move(target_opt.assume_value());
     auto source_backend_opt = [&]() -> outcome::result<file_ptr_t> {
@@ -274,10 +279,11 @@ void file_actor_t::on_clone_block(message::clone_block_t &message) noexcept {
         auto path_str = p.source.string();
         auto ec = source_backend_opt.assume_error();
         LOG_ERROR(log, "cannot open source file for cloning: {}: {}", path_str, ec.message());
-        return guard.reply(ec);
+        p.result = ec;
+        return;
     }
     auto &source_backend = *source_backend_opt.assume_value();
-    return guard.reply(target_backend->copy(p.target_offset, source_backend, p.source_offset, p.block_size));
+    p.result = target_backend->copy(p.target_offset, source_backend, p.source_offset, p.block_size);
 }
 
 auto file_actor_t::open_file_rw(const std::filesystem::path &path, std::uint64_t file_size) noexcept

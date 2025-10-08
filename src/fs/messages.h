@@ -30,21 +30,11 @@ struct extendended_context_t {
 
 using extendended_context_prt_t = std::unique_ptr<extendended_context_t>;
 
-template <typename T> struct generic_reply_t {
-    T *request;
-    r::message_ptr_t request_keeper;
-    sys::error_code ec;
-};
-
 struct block_request_t {
     bfs::path path;
     std::uint64_t offset;
     std::uint64_t block_size;
-    r::address_ptr_t reply_to;
-};
-
-struct block_response_t : generic_reply_t<block_request_t> {
-    utils::bytes_t data;
+    outcome::result<utils::bytes_t> result;
 };
 
 struct remote_copy_t {
@@ -56,33 +46,27 @@ struct remote_copy_t {
     std::string symlink_target;
     bool deleted;
     bool no_permissions;
-    r::address_ptr_t reply_to;
+    outcome::result<void> result;
     extendended_context_prt_t context;
 };
-
-using remote_copy_reply_t = generic_reply_t<remote_copy_t>;
 
 struct finish_file_t {
     bfs::path path;
     bfs::path local_path;
     std::uint64_t file_size;
     std::int64_t modification_s;
-    r::address_ptr_t reply_to;
+    outcome::result<void> result;
     extendended_context_prt_t context;
 };
-
-using finish_file_reply_t = generic_reply_t<finish_file_t>;
 
 struct append_block_t {
     bfs::path path;
     utils::bytes_view_t data;
     std::uint64_t offset;
     std::uint64_t file_size;
-    r::address_ptr_t reply_to;
+    outcome::result<void> result;
     extendended_context_prt_t context;
 };
-
-using append_block_reply_t = generic_reply_t<append_block_t>;
 
 struct clone_block_t {
     bfs::path target;
@@ -91,11 +75,9 @@ struct clone_block_t {
     bfs::path source;
     std::uint64_t source_offset;
     std::uint64_t block_size;
-    r::address_ptr_t reply_to;
+    outcome::result<void> result;
     extendended_context_prt_t context;
 };
-
-using clone_block_reply_t = generic_reply_t<clone_block_t>;
 
 } // namespace payload
 
@@ -110,12 +92,6 @@ using remote_copy_t = r::message_t<payload::remote_copy_t>;
 using finish_file_t = r::message_t<payload::finish_file_t>;
 using append_block_t = r::message_t<payload::append_block_t>;
 using clone_block_t = r::message_t<payload::clone_block_t>;
-
-using append_block_reply_t = r::message_t<payload::append_block_reply_t>;
-using clone_block_reply_t = r::message_t<payload::clone_block_reply_t>;
-using finish_file_reply_t = r::message_t<payload::finish_file_reply_t>;
-using remote_copy_reply_t = r::message_t<payload::remote_copy_reply_t>;
-using block_response_t = r::message_t<payload::block_response_t>;
 
 } // namespace message
 

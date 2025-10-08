@@ -27,9 +27,15 @@ namespace {
 struct fixture_t;
 
 struct chain_builder_t {
-    template <typename T> chain_builder_t(fixture_t *fixture_, r::intrusive_ptr_t<T> &message) : fixture{fixture_} {
-        if (message) {
-            response = message->payload.ec;
+    template <typename T> chain_builder_t(fixture_t *fixture_, r::intrusive_ptr_t<T> msg) : fixture{fixture_} {
+        message = msg;
+        if (msg) {
+            auto &result = msg->payload.result;
+            if (result) {
+                response = sys::error_code{};
+            } else {
+                response = result.assume_error();
+            }
             message.reset();
         }
     }
@@ -51,19 +57,20 @@ struct chain_builder_t {
     }
 
     std::optional<sys::error_code> response;
+    r::message_ptr_t message;
     fixture_t *fixture;
 };
 
 struct fixture_t {
-    using blk_res_t = fs::message::block_response_t;
+    using blk_res_t = fs::message::block_request_t;
     using blk_res_ptr_t = r::intrusive_ptr_t<blk_res_t>;
-    using append_res_t = fs::message::append_block_reply_t;
+    using append_res_t = fs::message::append_block_t;
     using append_res_ptr_t = r::intrusive_ptr_t<append_res_t>;
-    using clone_res_t = fs::message::clone_block_reply_t;
+    using clone_res_t = fs::message::clone_block_t;
     using clone_res_ptr_t = r::intrusive_ptr_t<clone_res_t>;
-    using finish_res_t = fs::message::finish_file_reply_t;
+    using finish_res_t = fs::message::finish_file_t;
     using finish_res_ptr_t = r::intrusive_ptr_t<finish_res_t>;
-    using copy_res_t = fs::message::remote_copy_reply_t;
+    using copy_res_t = fs::message::remote_copy_t;
     using copy_res_ptr_t = r::intrusive_ptr_t<copy_res_t>;
 
     fixture_t() noexcept : root_path{unique_path()}, path_guard{root_path} { bfs::create_directory(root_path); }
@@ -128,8 +135,10 @@ struct fixture_t {
                                  std::uint64_t file_size) noexcept {
         auto bytes = utils::bytes_t(data.begin(), data.end());
         auto context = fs::payload::extendended_context_prt_t{};
-        sup->send<fs::payload::append_block_t>(file_addr, path, std::move(bytes), offset, file_size, append_reply_addr,
-                                               std::move(context));
+        auto msg = r::make_routed_message<fs::payload::append_block_t>(file_addr, append_reply_addr, path,
+                                                                       std::move(bytes), offset, file_size,
+                                                                       outcome::success(), std::move(context));
+        sup->put(std::move(msg));
         sup->do_process();
         return chain_builder_t(this, append_reply);
     }
@@ -138,8 +147,10 @@ struct fixture_t {
                                 const bfs::path &source, std::uint64_t source_offset,
                                 std::uint64_t block_size) noexcept {
         auto context = fs::payload::extendended_context_prt_t{};
-        sup->send<fs::payload::clone_block_t>(file_addr, target, target_offset, target_size, source, source_offset,
-                                              block_size, clone_reply_addr, std::move(context));
+        auto msg = r::make_routed_message<fs::payload::clone_block_t>(
+            file_addr, clone_reply_addr, target, target_offset, target_size, source, source_offset, block_size,
+            outcome::success(), std::move(context));
+        sup->put(std::move(msg));
         sup->do_process();
         return chain_builder_t(this, clone_reply);
     }
@@ -150,8 +161,10 @@ struct fixture_t {
             local_path = path;
         }
         auto context = fs::payload::extendended_context_prt_t{};
-        sup->send<fs::payload::finish_file_t>(file_addr, path, local_path, file_size, modification_s, finish_reply_addr,
-                                              std::move(context));
+        auto msg = r::make_routed_message<fs::payload::finish_file_t>(file_addr, finish_reply_addr, path, local_path,
+                                                                      file_size, modification_s, outcome::success(),
+                                                                      std::move(context));
+        sup->put(std::move(msg));
         sup->do_process();
         return chain_builder_t(this, finish_reply);
     }
@@ -164,8 +177,11 @@ struct fixture_t {
         auto perms = proto::get_permissions(meta);
         auto modificaiton = proto::get_modified_s(meta);
         auto target = std::string(proto::get_symlink_target(meta));
-        sup->send<fs::payload::remote_copy_t>(file_addr, path, type, size, perms, modificaiton, target, deleted, false,
-                                              remote_copy_addr, std::move(context));
+
+        auto msg = r::make_routed_message<fs::payload::remote_copy_t>(file_addr, remote_copy_addr, path, type, size,
+                                                                      perms, modificaiton, target, deleted, false,
+                                                                      outcome::success(), std::move(context));
+        sup->put(std::move(msg));
         sup->do_process();
         return chain_builder_t(this, copy_reply);
     }
@@ -486,40 +502,38 @@ void test_requesting_block() {
             auto fs_addr = file_actor->get_address();
             auto back_addr = sup->get_address();
 
-            auto msg = r::make_message<request_t>(fs_addr, target, 0, 5, back_addr);
+            auto msg = r::make_routed_message<request_t>(fs_addr, back_addr, target, 0, 5, utils::bytes_t{});
 
             SECTION("error, no file") {
-                sup->put(msg);
+                sup->put(std::move(msg));
                 sup->do_process();
                 REQUIRE(block_reply);
-                REQUIRE(block_reply->payload.ec);
-                REQUIRE(block_reply->payload.data.empty());
+                REQUIRE(block_reply->payload.result.has_error());
             }
 
             SECTION("error, oversized request") {
                 write_file(target, "1234");
-                sup->put(msg);
+                sup->put(std::move(msg));
                 sup->do_process();
                 REQUIRE(block_reply);
-                REQUIRE(block_reply->payload.ec);
-                REQUIRE(block_reply->payload.data.empty());
+                REQUIRE(block_reply->payload.result.has_error());
             }
 
             SECTION("successful file reading") {
                 write_file(target, "1234567890");
-                sup->put(msg);
+                sup->put(std::move(msg));
                 sup->do_process();
                 REQUIRE(block_reply);
-                REQUIRE(!block_reply->payload.ec);
-                REQUIRE(block_reply->payload.data == as_bytes("12345"));
+                REQUIRE(block_reply->payload.result.has_value());
+                REQUIRE(block_reply->payload.result.value() == as_bytes("12345"));
 
                 // proto::set_offset(req, 5);
-                auto msg = r::make_message<request_t>(fs_addr, target, 5, 5, back_addr);
-                sup->put(msg);
+                auto msg = r::make_routed_message<request_t>(fs_addr, back_addr, target, 5, 5, utils::bytes_t{});
+                sup->put(std::move(msg));
                 sup->do_process();
                 REQUIRE(block_reply);
-                REQUIRE(!block_reply->payload.ec);
-                REQUIRE(block_reply->payload.data == as_bytes("67890"));
+                REQUIRE(block_reply->payload.result.has_value());
+                REQUIRE(block_reply->payload.result.value() == as_bytes("67890"));
             }
         }
     };
