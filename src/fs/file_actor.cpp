@@ -115,7 +115,7 @@ void file_actor_t::on_remote_copy(message::remote_copy_t &message) noexcept {
     sys::error_code ec;
     auto guard = io_guard_t(*this, message);
 
-    if (proto::get_deleted(p.meta)) {
+    if (p.deleted) {
         if (bfs::exists(path, ec)) {
             LOG_DEBUG(log, "removing {}", path.string());
             auto ok = bfs::remove_all(path, ec);
@@ -140,9 +140,8 @@ void file_actor_t::on_remote_copy(message::remote_copy_t &message) noexcept {
         }
     }
 
-    auto type = proto::get_type(p.meta);
-    if (type == proto::FileInfoType::FILE) {
-        auto sz = proto::get_size(p.meta);
+    if (p.type == proto::FileInfoType::FILE) {
+        auto sz = p.size;
         bool temporal = sz > 0;
         if (temporal) {
             LOG_TRACE(log, "touching file {} ({} bytes)", path.string(), sz);
@@ -162,25 +161,22 @@ void file_actor_t::on_remote_copy(message::remote_copy_t &message) noexcept {
                 return guard.reply(ec);
             }
             out.close();
-            auto modification_time = proto::get_modified_s(p.meta);
-            bfs::last_write_time(path, from_unix(modification_time), ec);
+            bfs::last_write_time(path, from_unix(p.modification_s), ec);
             if (ec) {
                 return guard.reply(ec);
             }
         }
-        auto need_perms = !proto::get_no_permissions(p.meta) && !p.ignore_permissions;
-        set_perms = need_perms && utils::platform_t::permissions_supported(path);
-    } else if (type == proto::FileInfoType::DIRECTORY) {
+        set_perms = !p.no_permissions && utils::platform_t::permissions_supported(path);
+    } else if (p.type == proto::FileInfoType::DIRECTORY) {
         LOG_DEBUG(log, "creating directory {}", path.string());
         bfs::create_directory(path, ec);
         if (ec) {
             return guard.reply(ec);
         }
-        auto need_perms = !proto::get_no_permissions(p.meta) && !p.ignore_permissions;
-        set_perms = need_perms && utils::platform_t::permissions_supported(path);
-    } else if (type == proto::FileInfoType::SYMLINK) {
+        set_perms = !p.no_permissions && utils::platform_t::permissions_supported(path);
+    } else if (p.type == proto::FileInfoType::SYMLINK) {
         if (utils::platform_t::symlinks_supported()) {
-            auto target = bfs::path(proto::get_symlink_target(p.meta));
+            auto target = bfs::path(p.symlink_target);
             LOG_DEBUG(log, "creating symlink {} -> {}", path.string(), target.string());
 
             bool attempt_create =
@@ -200,11 +196,11 @@ void file_actor_t::on_remote_copy(message::remote_copy_t &message) noexcept {
     }
 
     if (set_perms) {
-        auto file_perms = proto::get_permissions(p.meta);
-        auto perms = static_cast<bfs::perms>(file_perms);
+        auto perms = static_cast<bfs::perms>(p.permissions);
         bfs::permissions(path, perms, ec);
         if (ec) {
-            LOG_ERROR(log, "cannot set permissions {:#o} on file: '{}': {}", file_perms, path.string(), ec.message());
+            LOG_ERROR(log, "cannot set permissions {:#o} on file: '{}': {}", p.permissions, path.string(),
+                      ec.message());
             return guard.reply(ec);
         }
     }

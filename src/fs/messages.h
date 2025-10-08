@@ -50,8 +50,13 @@ template <typename T> struct generic_reply_t {
 
 struct remote_copy_t {
     bfs::path path;
-    proto::FileInfo meta;
-    bool ignore_permissions;
+    proto::FileInfoType type;
+    std::uint64_t size;
+    std::uint32_t permissions;
+    std::int64_t modification_s;
+    std::string symlink_target;
+    bool deleted;
+    bool no_permissions;
     r::address_ptr_t reply_to;
     extendended_context_prt_t context;
 };

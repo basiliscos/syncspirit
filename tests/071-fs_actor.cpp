@@ -159,7 +159,14 @@ struct fixture_t {
 
     chain_builder_t remote_copy(const bfs::path &path, const proto::FileInfo &meta) noexcept {
         auto context = fs::payload::extendended_context_prt_t{};
-        sup->send<fs::payload::remote_copy_t>(file_addr, path, meta, false, remote_copy_addr, std::move(context));
+        auto type = proto::get_type(meta);
+        auto size = proto::get_size(meta);
+        auto deleted = proto::get_deleted(meta);
+        auto perms = proto::get_permissions(meta);
+        auto modificaiton = proto::get_modified_s(meta);
+        auto target = std::string(proto::get_symlink_target(meta));
+        sup->send<fs::payload::remote_copy_t>(file_addr, path, type, size, perms, modificaiton, target, deleted, false,
+                                              remote_copy_addr, std::move(context));
         sup->do_process();
         return chain_builder_t(this, copy_reply);
     }
