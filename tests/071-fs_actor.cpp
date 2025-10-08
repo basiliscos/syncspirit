@@ -125,7 +125,7 @@ struct fixture_t {
 
     virtual void main() noexcept {}
 
-    chain_builder_t append_block(const bfs::path *path, utils::bytes_view_t data, std::uint64_t offset,
+    chain_builder_t append_block(const bfs::path &path, utils::bytes_view_t data, std::uint64_t offset,
                                  std::uint64_t file_size) noexcept {
         auto bytes = utils::bytes_t(data.begin(), data.end());
         auto context = fs::payload::extendended_context_prt_t{};
@@ -135,8 +135,8 @@ struct fixture_t {
         return chain_builder_t(this, append_reply);
     }
 
-    chain_builder_t clone_block(const bfs::path *target, std::uint64_t target_offset, std::uint64_t target_size,
-                                const bfs::path *source, std::uint64_t source_offset,
+    chain_builder_t clone_block(const bfs::path &target, std::uint64_t target_offset, std::uint64_t target_size,
+                                const bfs::path &source, std::uint64_t source_offset,
                                 std::uint64_t block_size) noexcept {
         auto context = fs::payload::extendended_context_prt_t{};
         sup->send<fs::payload::clone_block_t>(file_addr, target, target_offset, target_size, source, source_offset,
@@ -145,9 +145,9 @@ struct fixture_t {
         return chain_builder_t(this, clone_reply);
     }
 
-    chain_builder_t finish_file(const bfs::path *path, std::uint64_t file_size, std::int64_t modification_s,
-                                const bfs::path *local_path = {}) noexcept {
-        if (!local_path) {
+    chain_builder_t finish_file(const bfs::path &path, std::uint64_t file_size, std::int64_t modification_s,
+                                bfs::path local_path = {}) noexcept {
+        if (local_path.empty()) {
             local_path = path;
         }
         auto context = fs::payload::extendended_context_prt_t{};
@@ -157,7 +157,7 @@ struct fixture_t {
         return chain_builder_t(this, finish_reply);
     }
 
-    chain_builder_t remote_copy(const bfs::path *path, const proto::FileInfo &meta) noexcept {
+    chain_builder_t remote_copy(const bfs::path &path, const proto::FileInfo &meta) noexcept {
         auto context = fs::payload::extendended_context_prt_t{};
         sup->send<fs::payload::remote_copy_t>(file_addr, path, meta, false, remote_copy_addr, std::move(context));
         sup->do_process();
@@ -200,7 +200,7 @@ void test_remote_copy() {
 
             SECTION("empty regular file") {
                 auto path = root_path / L"папка" / L"файл.txt";
-                remote_copy(&path, pr_fi).check_success();
+                remote_copy(path, pr_fi).check_success();
 
                 REQUIRE(bfs::exists(path));
                 REQUIRE(bfs::file_size(path) == 0);
@@ -220,7 +220,7 @@ void test_remote_copy() {
             SECTION("empty regular file in a subdir") {
                 auto path = root_path / L"а" / L"б" / L"в" / L"г" / L"д" / L"файл.txt";
 
-                remote_copy(&path, pr_fi).check_success();
+                remote_copy(path, pr_fi).check_success();
 
                 REQUIRE(bfs::exists(path));
                 REQUIRE(bfs::file_size(path) == 0);
@@ -240,7 +240,7 @@ void test_remote_copy() {
             SECTION("non-empty regular file") {
                 proto::set_size(pr_fi, 5);
                 auto path = root_path / L"папка" / L"файл.txt";
-                remote_copy(&path, pr_fi).check_success();
+                remote_copy(path, pr_fi).check_success();
 
                 auto tmp_path = path.parent_path() / (path.filename().wstring() + L".syncspirit-tmp");
                 REQUIRE(bfs::exists(tmp_path));
@@ -260,7 +260,7 @@ void test_remote_copy() {
             SECTION("directory") {
                 auto path = root_path / L"папка";
                 proto::set_type(pr_fi, proto::FileInfoType::DIRECTORY);
-                remote_copy(&path, pr_fi).check_success();
+                remote_copy(path, pr_fi).check_success();
                 REQUIRE(bfs::exists(path));
                 REQUIRE(bfs::is_directory(path));
             }
@@ -272,7 +272,7 @@ void test_remote_copy() {
                     proto::set_symlink_target(pr_fi, boost::nowide::narrow(target.wstring()));
 
                     write_file(target, "zzz");
-                    remote_copy(&path, pr_fi).check_success();
+                    remote_copy(path, pr_fi).check_success();
 #ifndef SYNCSPIRIT_WIN
                     CHECK(bfs::exists(path));
                     CHECK(bfs::is_symlink(path));
@@ -285,7 +285,7 @@ void test_remote_copy() {
                     proto::set_type(pr_fi, proto::FileInfoType::SYMLINK);
                     proto::set_symlink_target(pr_fi, boost::nowide::narrow(target.wstring()));
 
-                    remote_copy(&path, pr_fi).check_success();
+                    remote_copy(path, pr_fi).check_success();
 
                     CHECK(!bfs::exists(path));
 #ifndef SYNCSPIRIT_WIN
@@ -306,11 +306,11 @@ void test_remote_copy() {
                 write_file(target, "zzz");
                 REQUIRE(bfs::exists(target));
 
-                remote_copy(&target, pr_fi).check_success();
+                remote_copy(target, pr_fi).check_success();
 
                 REQUIRE(!bfs::exists(target));
 
-                remote_copy(&target, pr_fi).check_success();
+                remote_copy(target, pr_fi).check_success();
                 REQUIRE(!bfs::exists(target));
             }
         }
@@ -332,12 +332,12 @@ void test_append_block() {
             SECTION("finish non-opened") {
                 auto path = bfs::absolute(root_path / path_rel);
                 auto ec = utils::make_error_code(utils::error_code_t::nonunique_filename);
-                finish_file(&path, 5, 1641828421).check_fail(ec);
+                finish_file(path, 5, 1641828421).check_fail(ec);
             }
 
             SECTION("file with 1 block") {
                 auto path = bfs::absolute(root_path / path_rel);
-                append_block(&path, data_1, 0, 5).check_success().finish_file(&path, 5, 1641828421).check_success();
+                append_block(path, data_1, 0, 5).check_success().finish_file(path, 5, 1641828421).check_success();
 
                 REQUIRE(bfs::exists(path));
                 REQUIRE(bfs::file_size(path) == 5);
@@ -352,17 +352,17 @@ void test_append_block() {
 
                 auto data = as_owned_bytes("12345");
 
-                append_block(&path, data, 0, 10).check_success();
+                append_block(path, data, 0, 10).check_success();
 
 #ifndef SYNCSPIRIT_WIN
                 REQUIRE(bfs::exists(tmp_path));
                 REQUIRE(bfs::file_size(tmp_path) == 10);
                 CHECK(read_file(tmp_path).substr(0, 5) == "12345");
 #endif
-                append_block(&path, as_owned_bytes("67890"), 5, 10).check_success();
+                append_block(path, as_owned_bytes("67890"), 5, 10).check_success();
 
                 SECTION("add 2nd block") {
-                    finish_file(&path, 5, 1641828421).check_success();
+                    finish_file(path, 5, 1641828421).check_success();
                     REQUIRE(!bfs::exists(tmp_path));
                     REQUIRE(bfs::exists(path));
                     REQUIRE(bfs::file_size(path) == 10);
@@ -374,7 +374,7 @@ void test_append_block() {
 #ifndef SYNCSPIRIT_WIN
                 SECTION("remove folder (simulate err)") {
                     bfs::remove_all(root_path);
-                    finish_file(&path, 5, 1641828421).check_fail();
+                    finish_file(path, 5, 1641828421).check_fail();
                 }
 #endif
             }
@@ -394,13 +394,13 @@ void test_clone_block() {
 
                 SECTION("single block target file") {
                     auto data = as_owned_bytes("12345");
-                    append_block(&source_path, data, 0, 5)
+                    append_block(source_path, data, 0, 5)
                         .check_success()
-                        .finish_file(&source_path, 5, modified)
+                        .finish_file(source_path, 5, modified)
                         .check_success()
-                        .clone_block(&target_path, 0, 5, &source_path, 0, 5)
+                        .clone_block(target_path, 0, 5, source_path, 0, 5)
                         .check_success()
-                        .finish_file(&target_path, 5, modified)
+                        .finish_file(target_path, 5, modified)
                         .check_success();
 
                     REQUIRE(bfs::exists(target_path));
@@ -411,17 +411,17 @@ void test_clone_block() {
                 SECTION("multi block target file") {
                     auto data_1 = as_owned_bytes("12345");
                     auto data_2 = as_owned_bytes("67890");
-                    append_block(&source_path, data_1, 0, 10)
+                    append_block(source_path, data_1, 0, 10)
                         .check_success()
-                        .append_block(&source_path, data_2, 5, 10)
+                        .append_block(source_path, data_2, 5, 10)
                         .check_success()
-                        .finish_file(&source_path, 10, modified)
+                        .finish_file(source_path, 10, modified)
                         .check_success()
-                        .clone_block(&target_path, 0, 10, &source_path, 0, 5)
+                        .clone_block(target_path, 0, 10, source_path, 0, 5)
                         .check_success()
-                        .clone_block(&target_path, 5, 10, &source_path, 5, 5)
+                        .clone_block(target_path, 5, 10, source_path, 5, 5)
                         .check_success()
-                        .finish_file(&target_path, 10, modified)
+                        .finish_file(target_path, 10, modified)
                         .check_success();
 
                     REQUIRE(bfs::exists(target_path));
@@ -432,15 +432,15 @@ void test_clone_block() {
                 SECTION("source/target different sizes") {
                     auto data_1 = as_owned_bytes("12345");
                     auto data_2 = as_owned_bytes("67890");
-                    append_block(&source_path, data_2, 0, 5)
+                    append_block(source_path, data_2, 0, 5)
                         .check_success()
-                        .finish_file(&source_path, 5, modified)
+                        .finish_file(source_path, 5, modified)
                         .check_success()
-                        .append_block(&target_path, data_1, 0, 10)
+                        .append_block(target_path, data_1, 0, 10)
                         .check_success()
-                        .clone_block(&target_path, 5, 10, &source_path, 0, 5)
+                        .clone_block(target_path, 5, 10, source_path, 0, 5)
                         .check_success()
-                        .finish_file(&target_path, 10, modified)
+                        .finish_file(target_path, 10, modified)
                         .check_success();
 
                     REQUIRE(bfs::exists(target_path));
@@ -452,11 +452,11 @@ void test_clone_block() {
             SECTION("source & target are is the same file") {
                 auto target_path = root_path / L"ы" / L"ять.txt";
                 auto data = as_owned_bytes("12345");
-                append_block(&target_path, data, 0, 10)
+                append_block(target_path, data, 0, 10)
                     .check_success()
-                    .clone_block(&target_path, 5, 10, &target_path, 0, 5)
+                    .clone_block(target_path, 5, 10, target_path, 0, 5)
                     .check_success()
-                    .finish_file(&target_path, 10, modified)
+                    .finish_file(target_path, 10, modified)
                     .check_success();
 
                 REQUIRE(bfs::exists(target_path));

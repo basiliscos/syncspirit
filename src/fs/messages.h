@@ -4,6 +4,7 @@
 #pragma once
 
 #include <rotor.hpp>
+#include <memory>
 #include "proto/proto-fwd.hpp"
 #include "scan_task.h"
 #include "chunk_iterator.h"
@@ -35,11 +36,11 @@ struct block_response_t {
     utils::bytes_t data;
 };
 
-struct extendended_context_t : model::arc_base_t<extendended_context_t> {
+struct extendended_context_t {
     virtual ~extendended_context_t() = default;
 };
 
-using extendended_context_prt_t = model::intrusive_ptr_t<extendended_context_t>;
+using extendended_context_prt_t = std::unique_ptr<extendended_context_t>;
 
 template <typename T> struct generic_reply_t {
     T *request;
@@ -48,7 +49,7 @@ template <typename T> struct generic_reply_t {
 };
 
 struct remote_copy_t {
-    const bfs::path *path;
+    bfs::path path;
     proto::FileInfo meta;
     bool ignore_permissions;
     r::address_ptr_t reply_to;
@@ -58,8 +59,8 @@ struct remote_copy_t {
 using remote_copy_reply_t = generic_reply_t<remote_copy_t>;
 
 struct finish_file_t {
-    const bfs::path *path;
-    const bfs::path *local_path;
+    bfs::path path;
+    bfs::path local_path;
     std::uint64_t file_size;
     std::int64_t modification_s;
     r::address_ptr_t reply_to;
@@ -69,7 +70,7 @@ struct finish_file_t {
 using finish_file_reply_t = generic_reply_t<finish_file_t>;
 
 struct append_block_t {
-    const bfs::path *path;
+    bfs::path path;
     utils::bytes_view_t data;
     std::uint64_t offset;
     std::uint64_t file_size;
@@ -80,10 +81,10 @@ struct append_block_t {
 using append_block_reply_t = generic_reply_t<append_block_t>;
 
 struct clone_block_t {
-    const bfs::path *target;
+    bfs::path target;
     std::uint64_t target_offset;
     std::uint64_t target_size;
-    const bfs::path *source;
+    bfs::path source;
     std::uint64_t source_offset;
     std::uint64_t block_size;
     r::address_ptr_t reply_to;

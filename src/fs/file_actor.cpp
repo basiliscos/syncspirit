@@ -111,7 +111,7 @@ void file_actor_t::on_controller_predown(net::message::controller_predown_t &mes
 
 void file_actor_t::on_remote_copy(message::remote_copy_t &message) noexcept {
     auto &p = message.payload;
-    auto path = *p.path;
+    auto &path = p.path;
     sys::error_code ec;
     auto guard = io_guard_t(*this, message);
 
@@ -214,8 +214,8 @@ void file_actor_t::on_finish_file(message::finish_file_t &message) noexcept {
     auto &p = message.payload;
     auto guard = io_guard_t(*this, message);
 
-    auto path_str = p.path->generic_string();
-    auto backend = rw_cache->get(*p.path);
+    auto path_str = p.path.generic_string();
+    auto backend = rw_cache->get(p.path);
     if (!backend) {
         LOG_WARN(log, "attempt to flush non-opened file {}", path_str);
         auto ec = utils::make_error_code(utils::error_code_t::nonunique_filename);
@@ -223,9 +223,9 @@ void file_actor_t::on_finish_file(message::finish_file_t &message) noexcept {
     }
 
     rw_cache->remove(backend);
-    auto ok = backend->close(p.modification_s, *p.local_path);
+    auto ok = backend->close(p.modification_s, p.local_path);
     if (!ok) {
-        auto local_path_str = p.local_path->generic_string();
+        auto local_path_str = p.local_path.generic_string();
         auto &ec = ok.assume_error();
         LOG_ERROR(log, "cannot close file: {}: {}", local_path_str, ec.message());
         return guard.reply(ec);
@@ -239,9 +239,9 @@ void file_actor_t::on_append_block(message::append_block_t &message) noexcept {
     auto &p = message.payload;
     auto guard = io_guard_t(*this, message);
     auto &path = p.path;
-    auto file_opt = open_file_rw(*path, p.file_size);
+    auto file_opt = open_file_rw(path, p.file_size);
     if (!file_opt) {
-        auto path_str = path->string();
+        auto path_str = path.string();
         auto &err = file_opt.assume_error();
         LOG_ERROR(log, "cannot open file: {}: {}", path_str, err.message());
         return guard.reply(err);
@@ -254,25 +254,25 @@ void file_actor_t::on_clone_block(message::clone_block_t &message) noexcept {
     auto &p = message.payload;
     auto guard = io_guard_t(*this, message);
     auto target_path = p.target;
-    auto target_opt = open_file_rw(*target_path, p.target_size);
+    auto target_opt = open_file_rw(target_path, p.target_size);
     if (!target_opt) {
-        auto path_str = target_path->string();
+        auto path_str = target_path.string();
         auto &err = target_opt.assume_error();
         LOG_ERROR(log, "cannot open file: {}: {}", path_str, err.message());
         return guard.reply(err);
     }
     auto target_backend = std::move(target_opt.assume_value());
     auto source_backend_opt = [&]() -> outcome::result<file_ptr_t> {
-        if (auto cached = rw_cache->get(*p.source); cached) {
+        if (auto cached = rw_cache->get(p.source); cached) {
             return cached;
-        } else if (auto cached = ro_cache.get(*p.source); cached) {
+        } else if (auto cached = ro_cache.get(p.source); cached) {
             return cached;
         } else {
-            return open_file_ro(*p.source, false);
+            return open_file_ro(p.source, false);
         }
     }();
     if (!source_backend_opt) {
-        auto path_str = p.source->string();
+        auto path_str = p.source.string();
         auto ec = source_backend_opt.assume_error();
         LOG_ERROR(log, "cannot open source file for cloning: {}: {}", path_str, ec.message());
         return guard.reply(ec);
