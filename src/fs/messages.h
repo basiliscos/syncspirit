@@ -24,18 +24,6 @@ struct scan_progress_t {
 using rehash_needed_t = chunk_iterator_t;
 using hash_anew_t = new_chunk_iterator_t;
 
-struct block_request_t {
-    proto::Request remote_request;
-    bfs::path path;
-    r::address_ptr_t reply_to;
-};
-
-struct block_response_t {
-    proto::Request remote_request;
-    sys::error_code ec;
-    utils::bytes_t data;
-};
-
 struct extendended_context_t {
     virtual ~extendended_context_t() = default;
 };
@@ -45,7 +33,18 @@ using extendended_context_prt_t = std::unique_ptr<extendended_context_t>;
 template <typename T> struct generic_reply_t {
     T *request;
     r::message_ptr_t request_keeper;
-    outcome::result<void> response;
+    sys::error_code ec;
+};
+
+struct block_request_t {
+    bfs::path path;
+    std::uint64_t offset;
+    std::uint64_t block_size;
+    r::address_ptr_t reply_to;
+};
+
+struct block_response_t : generic_reply_t<block_request_t> {
+    utils::bytes_t data;
 };
 
 struct remote_copy_t {
@@ -105,9 +104,8 @@ namespace message {
 using scan_progress_t = r::message_t<payload::scan_progress_t>;
 using rehash_needed_t = r::message_t<payload::rehash_needed_t>;
 using hash_anew_t = r::message_t<payload::hash_anew_t>;
-using block_request_t = r::message_t<payload::block_request_t>;
-using block_response_t = r::message_t<payload::block_response_t>;
 
+using block_request_t = r::message_t<payload::block_request_t>;
 using remote_copy_t = r::message_t<payload::remote_copy_t>;
 using finish_file_t = r::message_t<payload::finish_file_t>;
 using append_block_t = r::message_t<payload::append_block_t>;
@@ -117,6 +115,7 @@ using append_block_reply_t = r::message_t<payload::append_block_reply_t>;
 using clone_block_reply_t = r::message_t<payload::clone_block_reply_t>;
 using finish_file_reply_t = r::message_t<payload::finish_file_reply_t>;
 using remote_copy_reply_t = r::message_t<payload::remote_copy_reply_t>;
+using block_response_t = r::message_t<payload::block_response_t>;
 
 } // namespace message
 

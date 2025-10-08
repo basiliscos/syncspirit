@@ -29,29 +29,28 @@ struct fixture_t;
 struct chain_builder_t {
     template <typename T> chain_builder_t(fixture_t *fixture_, r::intrusive_ptr_t<T> &message) : fixture{fixture_} {
         if (message) {
-            response = message->payload.response;
+            response = message->payload.ec;
             message.reset();
         }
     }
 
     fixture_t &check_success() noexcept {
         REQUIRE(response);
-        CHECK(response->has_value());
+        CHECK(!*response);
         return *fixture;
     }
     fixture_t &check_fail(const sys::error_code &ec = {}) noexcept {
         REQUIRE(response);
-        REQUIRE(response->has_error());
-        auto &err = response->assume_error();
+        CHECK(*response);
         if (ec) {
-            CHECK(err == ec);
+            CHECK(*response == ec);
         } else {
-            CHECK(err.message() != "");
+            CHECK(response->message() != "");
         }
         return *fixture;
     }
 
-    std::optional<outcome::result<void>> response;
+    std::optional<sys::error_code> response;
     fixture_t *fixture;
 };
 
@@ -483,21 +482,11 @@ void test_requesting_block() {
             bfs::path target = root_path / "a.txt";
 
             std::int64_t modified = 1641828421;
-            proto::FileInfo pr_source;
-
-            proto::set_name(pr_source, "a.txt");
-            proto::set_modified_s(pr_source, modified);
-            proto::set_block_size(pr_source, 5);
-            proto::set_size(pr_source, 10);
-
-            auto req = proto::Request();
-            proto::set_name(req, "a.txt");
-            proto::set_size(req, 5);
 
             auto fs_addr = file_actor->get_address();
             auto back_addr = sup->get_address();
 
-            auto msg = r::make_message<request_t>(fs_addr, req, target, back_addr);
+            auto msg = r::make_message<request_t>(fs_addr, target, 0, 5, back_addr);
 
             SECTION("error, no file") {
                 sup->put(msg);
@@ -524,8 +513,8 @@ void test_requesting_block() {
                 REQUIRE(!block_reply->payload.ec);
                 REQUIRE(block_reply->payload.data == as_bytes("12345"));
 
-                proto::set_offset(req, 5);
-                auto msg = r::make_message<request_t>(fs_addr, req, target, back_addr);
+                // proto::set_offset(req, 5);
+                auto msg = r::make_message<request_t>(fs_addr, target, 5, 5, back_addr);
                 sup->put(msg);
                 sup->do_process();
                 REQUIRE(block_reply);

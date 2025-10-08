@@ -71,9 +71,10 @@ void file_actor_t::shutdown_finish() noexcept {
 
 void file_actor_t::on_block_request(message::block_request_t &message) noexcept {
     LOG_TRACE(log, "on_block_request");
+    using guard_t = io_guard_t<payload::block_request_t, payload::block_response_t>;
+    auto guard = guard_t(*this, message);
     auto &p = message.payload;
     auto &dest = p.reply_to;
-    auto &req = message.payload.remote_request;
     auto &path = p.path;
     auto file_opt = open_file_ro(path, true);
     auto ec = sys::error_code{};
@@ -81,19 +82,21 @@ void file_actor_t::on_block_request(message::block_request_t &message) noexcept 
     if (!file_opt) {
         ec = file_opt.assume_error();
         LOG_ERROR(log, "error opening file {}: {}", path.string(), ec.message());
+        return guard.reply(ec);
     } else {
         auto &file = file_opt.assume_value();
-        auto offset = get_offset(req);
-        auto size = get_size(req);
-        auto block_opt = file->read(offset, size);
+        auto block_opt = file->read(p.offset, p.block_size);
         if (!block_opt) {
             ec = block_opt.assume_error();
-            LOG_WARN(log, "error requesting block; offset = {}, size = {} :: {} ", offset, size, ec.message());
+            LOG_WARN(log, "error requesting block; offset = {}, size = {} :: {} ", p.offset, p.block_size,
+                     ec.message());
+            return guard.reply(ec);
         } else {
             data = std::move(block_opt.assume_value());
         }
     }
-    send<payload::block_response_t>(dest, std::move(req), ec, std::move(data));
+    guard.payload.data = std::move(data);
+    return guard.reply(ec);
 }
 
 void file_actor_t::on_controller_up(net::message::controller_up_t &message) noexcept {

@@ -814,12 +814,15 @@ void controller_actor_t::on_block_response(fs::message::block_response_t &messag
 
     auto &p = message.payload;
     proto::Response res;
+#if 0
     proto::set_id(res, proto::get_id(p.remote_request));
     if (p.ec) {
         proto::set_code(res, proto::ErrorCode::GENERIC);
     } else {
         proto::set_data(res, std::move(p.data));
     }
+#endif
+    std::abort();
 
     auto data = proto::serialize(res, peer->get_compression());
     send_to_peer(std::move(data));

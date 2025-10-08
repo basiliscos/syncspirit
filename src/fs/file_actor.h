@@ -41,24 +41,27 @@ struct SYNCSPIRIT_API file_actor_t : public r::actor_base_t {
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
 
   private:
-    template <typename T> struct io_guard_t {
-        using reply_payload_t = payload::generic_reply_t<T>;
+    template <typename T, typename Reply = payload::generic_reply_t<T>> struct io_guard_t {
         io_guard_t(file_actor_t &actor_, r::message_t<T> &request) noexcept
-            : actor{actor_}, payload(&request.payload, &request, outcome::success()) {}
+            : actor{actor_}, payload({&request.payload, &request, {}}) {}
 
         io_guard_t() = delete;
         io_guard_t(const io_guard_t &) = delete;
         ~io_guard_t() {
             auto &to = payload.request->reply_to;
-            actor.send<reply_payload_t>(to, std::move(payload));
+            actor.send<Reply>(to, std::move(payload));
         }
 
-        void reply(const sys::error_code &ec) noexcept { payload.response = ec; }
+        void reply(const sys::error_code &ec) noexcept { payload.ec = ec; }
 
-        void reply(const outcome::result<void> &result) noexcept { payload.response = result; }
+        void reply(const outcome::result<void> &result) noexcept {
+            if (result.has_error()) {
+                payload.ec = result.assume_error();
+            }
+        }
 
         file_actor_t &actor;
-        reply_payload_t payload;
+        Reply payload;
     };
 
     void on_block_request(message::block_request_t &message) noexcept;
