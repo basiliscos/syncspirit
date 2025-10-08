@@ -135,9 +135,8 @@ struct fixture_t {
                                  std::uint64_t file_size) noexcept {
         auto bytes = utils::bytes_t(data.begin(), data.end());
         auto context = fs::payload::extendended_context_prt_t{};
-        auto msg = r::make_routed_message<fs::payload::append_block_t>(file_addr, append_reply_addr, path,
-                                                                       std::move(bytes), offset, file_size,
-                                                                       outcome::success(), std::move(context));
+        auto msg = r::make_routed_message<fs::payload::append_block_t>(file_addr, append_reply_addr, std::move(context),
+                                                                       path, std::move(bytes), offset, file_size);
         sup->put(std::move(msg));
         sup->do_process();
         return chain_builder_t(this, append_reply);
@@ -147,9 +146,9 @@ struct fixture_t {
                                 const bfs::path &source, std::uint64_t source_offset,
                                 std::uint64_t block_size) noexcept {
         auto context = fs::payload::extendended_context_prt_t{};
-        auto msg = r::make_routed_message<fs::payload::clone_block_t>(
-            file_addr, clone_reply_addr, target, target_offset, target_size, source, source_offset, block_size,
-            outcome::success(), std::move(context));
+        auto msg = r::make_routed_message<fs::payload::clone_block_t>(file_addr, clone_reply_addr, std::move(context),
+                                                                      target, target_offset, target_size, source,
+                                                                      source_offset, block_size);
         sup->put(std::move(msg));
         sup->do_process();
         return chain_builder_t(this, clone_reply);
@@ -161,9 +160,8 @@ struct fixture_t {
             local_path = path;
         }
         auto context = fs::payload::extendended_context_prt_t{};
-        auto msg = r::make_routed_message<fs::payload::finish_file_t>(file_addr, finish_reply_addr, path, local_path,
-                                                                      file_size, modification_s, outcome::success(),
-                                                                      std::move(context));
+        auto msg = r::make_routed_message<fs::payload::finish_file_t>(file_addr, finish_reply_addr, std::move(context),
+                                                                      path, local_path, file_size, modification_s);
         sup->put(std::move(msg));
         sup->do_process();
         return chain_builder_t(this, finish_reply);
@@ -178,9 +176,9 @@ struct fixture_t {
         auto modificaiton = proto::get_modified_s(meta);
         auto target = std::string(proto::get_symlink_target(meta));
 
-        auto msg = r::make_routed_message<fs::payload::remote_copy_t>(file_addr, remote_copy_addr, path, type, size,
-                                                                      perms, modificaiton, target, deleted, false,
-                                                                      outcome::success(), std::move(context));
+        auto msg =
+            r::make_routed_message<fs::payload::remote_copy_t>(file_addr, remote_copy_addr, std::move(context), path,
+                                                               type, size, perms, modificaiton, target, deleted, false);
         sup->put(std::move(msg));
         sup->do_process();
         return chain_builder_t(this, copy_reply);
@@ -502,7 +500,8 @@ void test_requesting_block() {
             auto fs_addr = file_actor->get_address();
             auto back_addr = sup->get_address();
 
-            auto msg = r::make_routed_message<request_t>(fs_addr, back_addr, target, 0, 5, utils::bytes_t{});
+            auto context = fs::payload::extendended_context_prt_t{};
+            auto msg = r::make_routed_message<request_t>(fs_addr, back_addr, std::move(context), target, 0, 5);
 
             SECTION("error, no file") {
                 sup->put(std::move(msg));
@@ -528,7 +527,8 @@ void test_requesting_block() {
                 REQUIRE(block_reply->payload.result.value() == as_bytes("12345"));
 
                 // proto::set_offset(req, 5);
-                auto msg = r::make_routed_message<request_t>(fs_addr, back_addr, target, 5, 5, utils::bytes_t{});
+                auto context = fs::payload::extendended_context_prt_t{};
+                auto msg = r::make_routed_message<request_t>(fs_addr, back_addr, std::move(context), target, 5, 5);
                 sup->put(std::move(msg));
                 sup->do_process();
                 REQUIRE(block_reply);
