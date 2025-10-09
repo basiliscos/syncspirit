@@ -33,7 +33,7 @@ struct fixture_t {
 
     fixture_t() noexcept : root_path{unique_path()}, path_guard{root_path} { bfs::create_directory(root_path); }
 
-    virtual supervisor_t::configure_callback_t configure() noexcept {
+    virtual configure_callback_t configure() noexcept {
         return [&](r::plugin::plugin_base_t &plugin) {
             plugin.template with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
                 p.register_name(net::names::db, sup->get_address());
@@ -73,8 +73,6 @@ struct fixture_t {
         rw_cache.reset(new fs::file_cache_t(2));
         file_actor = sup->create_actor<fs::file_actor_t>()
                          .rw_cache(rw_cache)
-                         .cluster(cluster)
-                         .sequencer(sup->sequencer)
                          .timeout(timeout)
                          .finish();
         sup->do_process();

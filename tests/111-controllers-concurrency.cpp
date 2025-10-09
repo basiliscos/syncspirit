@@ -32,7 +32,7 @@ struct fixture_t {
 
     fixture_t() noexcept { log = utils::get_logger("fixture"); }
 
-    virtual supervisor_t::configure_callback_t configure() noexcept {
+    virtual configure_callback_t configure() noexcept {
         return [&](r::plugin::plugin_base_t &plugin) {
             plugin.template with_casted<r::plugin::registry_plugin_t>(
                 [&](auto &p) { p.register_name(net::names::fs_actor, sup->get_address()); });

@@ -69,7 +69,7 @@ struct fixture_t {
     fixture_t(fixture_t &&source) noexcept
         : root_path(std::move(source.root_path)), path_quard(std::move(source.path_quard)) {}
 
-    virtual supervisor_t::configure_callback_t configure() noexcept {
+    virtual configure_callback_t configure() noexcept {
         return [&](r::plugin::plugin_base_t &plugin) {
             plugin.template with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
                 p.subscribe_actor(r::lambda<load_cluster_success_t>([&](load_cluster_success_t &msg) {
