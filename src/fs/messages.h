@@ -49,7 +49,7 @@ struct block_request_t : payload_base_t<utils::bytes_t> {
           block_size{block_size_} {}
 
     block_request_t(const block_request_t &) = delete;
-    block_request_t(block_request_t &&) = default;
+    block_request_t(block_request_t &&) noexcept = default;
 };
 
 struct remote_copy_t : payload_base_t<void> {
@@ -71,7 +71,7 @@ struct remote_copy_t : payload_base_t<void> {
           deleted{deleted_}, no_permissions{no_permissions_} {}
 
     remote_copy_t(const remote_copy_t &) = delete;
-    remote_copy_t(remote_copy_t &&) = default;
+    remote_copy_t(remote_copy_t &&) noexcept = default;
 };
 
 struct finish_file_t : payload_base_t<void> {
@@ -87,7 +87,7 @@ struct finish_file_t : payload_base_t<void> {
           file_size{file_size_}, modification_s{modification_s_} {}
 
     finish_file_t(const finish_file_t &) = delete;
-    finish_file_t(finish_file_t &&) = default;
+    finish_file_t(finish_file_t &&) noexcept = default;
 };
 
 struct append_block_t : payload_base_t<void> {
@@ -103,7 +103,7 @@ struct append_block_t : payload_base_t<void> {
           offset{offset_}, file_size{file_size_} {}
 
     append_block_t(const append_block_t &) = delete;
-    append_block_t(append_block_t &&) = default;
+    append_block_t(append_block_t &&) noexcept = default;
 };
 
 struct clone_block_t : payload_base_t<void> {
@@ -124,10 +124,11 @@ struct clone_block_t : payload_base_t<void> {
           block_size{block_size_} {}
 
     clone_block_t(const clone_block_t &) = delete;
-    clone_block_t(clone_block_t &&) = default;
+    clone_block_t(clone_block_t &&) noexcept = default;
 };
 
 using io_command_t = std::variant<block_request_t, remote_copy_t, finish_file_t, append_block_t, clone_block_t>;
+using io_commands_t = std::vector<io_command_t>;
 
 } // namespace payload
 
@@ -137,7 +138,7 @@ using scan_progress_t = r::message_t<payload::scan_progress_t>;
 using rehash_needed_t = r::message_t<payload::rehash_needed_t>;
 using hash_anew_t = r::message_t<payload::hash_anew_t>;
 
-using io_command_t = r::message_t<payload::io_command_t>;
+using io_commands_t = r::message_t<payload::io_commands_t>;
 
 } // namespace message
 

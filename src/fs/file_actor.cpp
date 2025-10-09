@@ -41,7 +41,7 @@ void file_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         });
         p.discover_name(net::names::db, db, true);
     });
-    plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) { p.subscribe_actor(&file_actor_t::on_io_command); });
+    plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) { p.subscribe_actor(&file_actor_t::on_io_commands); });
 }
 
 void file_actor_t::on_start() noexcept {
@@ -63,8 +63,10 @@ void file_actor_t::shutdown_finish() noexcept {
     r::actor_base_t::shutdown_finish();
 }
 
-void file_actor_t::on_io_command(message::io_command_t &message) noexcept {
-    std::visit([&](auto &p) { process(p); }, message.payload);
+void file_actor_t::on_io_commands(message::io_commands_t &message) noexcept {
+    for (auto &cmd : message.payload) {
+        std::visit([&](auto &cmd) { process(cmd); }, cmd);
+    }
 }
 
 void file_actor_t::on_controller_up(net::message::controller_up_t &message) noexcept {
@@ -80,44 +82,44 @@ void file_actor_t::on_controller_predown(net::message::controller_predown_t &mes
     }
 }
 
-void file_actor_t::process(payload::block_request_t &p) noexcept {
+void file_actor_t::process(payload::block_request_t &cmd) noexcept {
     LOG_TRACE(log, "processing block request");
-    auto &path = p.path;
+    auto &path = cmd.path;
     auto file_opt = open_file_ro(path, true);
     auto ec = sys::error_code{};
     auto data = utils::bytes_t{};
     if (!file_opt) {
         ec = file_opt.assume_error();
         LOG_ERROR(log, "error opening file {}: {}", path.string(), ec.message());
-        p.result = ec;
+        cmd.result = ec;
         return;
     } else {
         auto &file = file_opt.assume_value();
-        auto block_opt = file->read(p.offset, p.block_size);
+        auto block_opt = file->read(cmd.offset, cmd.block_size);
         if (!block_opt) {
             ec = block_opt.assume_error();
-            LOG_WARN(log, "error requesting block; offset = {}, size = {} :: {} ", p.offset, p.block_size,
+            LOG_WARN(log, "error requesting block; offset = {}, size = {} :: {} ", cmd.offset, cmd.block_size,
                      ec.message());
-            p.result = ec;
+            cmd.result = ec;
             return;
         } else {
             data = std::move(block_opt.assume_value());
         }
     }
-    p.result = std::move(data);
+    cmd.result = std::move(data);
 }
 
-void file_actor_t::process(payload::remote_copy_t &p) noexcept {
-    auto &path = p.path;
+void file_actor_t::process(payload::remote_copy_t &cmd) noexcept {
+    auto &path = cmd.path;
     sys::error_code ec;
 
-    if (p.deleted) {
+    if (cmd.deleted) {
         if (bfs::exists(path, ec)) {
             LOG_DEBUG(log, "removing {}", path.string());
             auto ok = bfs::remove_all(path, ec);
             if (!ok) {
                 LOG_ERROR(log, "error removing {} : {}", path.string(), ec.message());
-                p.result = ec;
+                cmd.result = ec;
                 return;
             }
         } else {
@@ -133,13 +135,13 @@ void file_actor_t::process(payload::remote_copy_t &p) noexcept {
     if (!exists) {
         bfs::create_directories(parent, ec);
         if (ec) {
-            p.result = ec;
+            cmd.result = ec;
             return;
         }
     }
 
-    if (p.type == proto::FileInfoType::FILE) {
-        auto sz = p.size;
+    if (cmd.type == proto::FileInfoType::FILE) {
+        auto sz = cmd.size;
         bool temporal = sz > 0;
         if (temporal) {
             LOG_TRACE(log, "touching file {} ({} bytes)", path.string(), sz);
@@ -147,7 +149,7 @@ void file_actor_t::process(payload::remote_copy_t &p) noexcept {
             if (!file_opt) {
                 auto &err = file_opt.assume_error();
                 LOG_ERROR(log, "cannot open file: {}: {}", path.string(), err.message());
-                p.result = err;
+                cmd.result = err;
                 return;
             }
             path = file_opt.assume_value()->get_path();
@@ -157,28 +159,28 @@ void file_actor_t::process(payload::remote_copy_t &p) noexcept {
             if (!out) {
                 auto ec = sys::error_code{errno, sys::system_category()};
                 LOG_ERROR(log, "error creating {}: {}", path.string(), ec.message());
-                p.result = ec;
+                cmd.result = ec;
                 return;
             }
             out.close();
-            bfs::last_write_time(path, from_unix(p.modification_s), ec);
+            bfs::last_write_time(path, from_unix(cmd.modification_s), ec);
             if (ec) {
-                p.result = ec;
+                cmd.result = ec;
                 return;
             }
         }
-        set_perms = !p.no_permissions && utils::platform_t::permissions_supported(path);
-    } else if (p.type == proto::FileInfoType::DIRECTORY) {
+        set_perms = !cmd.no_permissions && utils::platform_t::permissions_supported(path);
+    } else if (cmd.type == proto::FileInfoType::DIRECTORY) {
         LOG_DEBUG(log, "creating directory {}", path.string());
         bfs::create_directory(path, ec);
         if (ec) {
-            p.result = ec;
+            cmd.result = ec;
             return;
         }
-        set_perms = !p.no_permissions && utils::platform_t::permissions_supported(path);
-    } else if (p.type == proto::FileInfoType::SYMLINK) {
+        set_perms = !cmd.no_permissions && utils::platform_t::permissions_supported(path);
+    } else if (cmd.type == proto::FileInfoType::SYMLINK) {
         if (utils::platform_t::symlinks_supported()) {
-            auto target = bfs::path(p.symlink_target);
+            auto target = bfs::path(cmd.symlink_target);
             LOG_DEBUG(log, "creating symlink {} -> {}", path.string(), target.string());
 
             bool attempt_create =
@@ -187,7 +189,7 @@ void file_actor_t::process(payload::remote_copy_t &p) noexcept {
                 bfs::create_symlink(target, path, ec);
                 if (ec) {
                     LOG_WARN(log, "error symlinking {} -> {} : {}", path.string(), target.string(), ec.message());
-                    p.result = ec;
+                    cmd.result = ec;
                     return;
                 }
             } else {
@@ -199,83 +201,83 @@ void file_actor_t::process(payload::remote_copy_t &p) noexcept {
     }
 
     if (set_perms) {
-        auto perms = static_cast<bfs::perms>(p.permissions);
+        auto perms = static_cast<bfs::perms>(cmd.permissions);
         bfs::permissions(path, perms, ec);
         if (ec) {
-            LOG_ERROR(log, "cannot set permissions {:#o} on file: '{}': {}", p.permissions, path.string(),
+            LOG_ERROR(log, "cannot set permissions {:#o} on file: '{}': {}", cmd.permissions, path.string(),
                       ec.message());
-            p.result = ec;
+            cmd.result = ec;
             return;
         }
     }
 }
 
-void file_actor_t::process(payload::finish_file_t &p) noexcept {
-    auto path_str = p.path.generic_string();
-    auto backend = rw_cache->get(p.path);
+void file_actor_t::process(payload::finish_file_t &cmd) noexcept {
+    auto path_str = cmd.path.generic_string();
+    auto backend = rw_cache->get(cmd.path);
     if (!backend) {
         LOG_WARN(log, "attempt to flush non-opened file {}", path_str);
-        p.result = utils::make_error_code(utils::error_code_t::nonunique_filename);
+        cmd.result = utils::make_error_code(utils::error_code_t::nonunique_filename);
         return;
     }
 
     rw_cache->remove(backend);
-    auto ok = backend->close(p.modification_s, p.local_path);
+    auto ok = backend->close(cmd.modification_s, cmd.local_path);
     if (!ok) {
-        auto local_path_str = p.local_path.generic_string();
+        auto local_path_str = cmd.local_path.generic_string();
         auto &ec = ok.assume_error();
         LOG_ERROR(log, "cannot close file: {}: {}", local_path_str, ec.message());
-        p.result = ec;
+        cmd.result = ec;
         return;
     }
 
-    LOG_INFO(log, "file {} ({} bytes) is now locally available", path_str, p.file_size);
+    LOG_INFO(log, "file {} ({} bytes) is now locally available", path_str, cmd.file_size);
 }
 
-void file_actor_t::process(payload::append_block_t &p) noexcept {
-    auto &path = p.path;
-    auto file_opt = open_file_rw(path, p.file_size);
+void file_actor_t::process(payload::append_block_t &cmd) noexcept {
+    auto &path = cmd.path;
+    auto file_opt = open_file_rw(path, cmd.file_size);
     if (!file_opt) {
         auto path_str = path.string();
         auto &err = file_opt.assume_error();
         LOG_ERROR(log, "cannot open file: {}: {}", path_str, err.message());
-        p.result = err;
+        cmd.result = err;
         return;
         return;
     }
     auto &backend = file_opt.assume_value();
-    p.result = backend->write(p.offset, p.data);
+    cmd.result = backend->write(cmd.offset, cmd.data);
 }
 
-void file_actor_t::process(payload::clone_block_t &p) noexcept {
-    auto target_path = p.target;
-    auto target_opt = open_file_rw(target_path, p.target_size);
+void file_actor_t::process(payload::clone_block_t &cmd) noexcept {
+    auto target_path = cmd.target;
+    auto target_opt = open_file_rw(target_path, cmd.target_size);
     if (!target_opt) {
         auto path_str = target_path.string();
         auto &err = target_opt.assume_error();
         LOG_ERROR(log, "cannot open file: {}: {}", path_str, err.message());
-        p.result = err;
+        cmd.result = err;
         return;
     }
     auto target_backend = std::move(target_opt.assume_value());
     auto source_backend_opt = [&]() -> outcome::result<file_ptr_t> {
-        if (auto cached = rw_cache->get(p.source); cached) {
+        if (auto cached = rw_cache->get(cmd.source); cached) {
             return cached;
-        } else if (auto cached = ro_cache.get(p.source); cached) {
+        } else if (auto cached = ro_cache.get(cmd.source); cached) {
             return cached;
         } else {
-            return open_file_ro(p.source, false);
+            return open_file_ro(cmd.source, false);
         }
     }();
     if (!source_backend_opt) {
-        auto path_str = p.source.string();
+        auto path_str = cmd.source.string();
         auto ec = source_backend_opt.assume_error();
         LOG_ERROR(log, "cannot open source file for cloning: {}: {}", path_str, ec.message());
-        p.result = ec;
+        cmd.result = ec;
         return;
     }
     auto &source_backend = *source_backend_opt.assume_value();
-    p.result = target_backend->copy(p.target_offset, source_backend, p.source_offset, p.block_size);
+    cmd.result = target_backend->copy(cmd.target_offset, source_backend, cmd.source_offset, cmd.block_size);
 }
 
 auto file_actor_t::open_file_rw(const std::filesystem::path &path, std::uint64_t file_size) noexcept

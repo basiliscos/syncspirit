@@ -41,7 +41,7 @@ struct SYNCSPIRIT_API file_actor_t : public r::actor_base_t {
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
 
   private:
-    void on_io_command(message::io_command_t &) noexcept;
+    void on_io_commands(message::io_commands_t &) noexcept;
     void process(payload::block_request_t &) noexcept;
     void process(payload::remote_copy_t &) noexcept;
     void process(payload::append_block_t &) noexcept;
