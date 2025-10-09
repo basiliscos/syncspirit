@@ -41,13 +41,7 @@ void file_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         });
         p.discover_name(net::names::db, db, true);
     });
-    plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
-        p.subscribe_actor(&file_actor_t::on_block_request);
-        p.subscribe_actor(&file_actor_t::on_remote_copy);
-        p.subscribe_actor(&file_actor_t::on_finish_file);
-        p.subscribe_actor(&file_actor_t::on_append_block);
-        p.subscribe_actor(&file_actor_t::on_clone_block);
-    });
+    plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) { p.subscribe_actor(&file_actor_t::on_io_command); });
 }
 
 void file_actor_t::on_start() noexcept {
@@ -69,9 +63,25 @@ void file_actor_t::shutdown_finish() noexcept {
     r::actor_base_t::shutdown_finish();
 }
 
-void file_actor_t::on_block_request(message::block_request_t &message) noexcept {
-    LOG_TRACE(log, "on_block_request");
+void file_actor_t::on_io_command(message::io_command_t &message) noexcept {
+    std::visit([&](auto &p) { process(p); }, message.payload);
+}
+
+void file_actor_t::on_controller_up(net::message::controller_up_t &message) noexcept {
+    LOG_DEBUG(log, "on_controller_up, {}", (const void *)message.payload.controller.get());
+    resources->acquire(resource::controller);
+}
+
+void file_actor_t::on_controller_predown(net::message::controller_predown_t &message) noexcept {
     auto &p = message.payload;
+    LOG_DEBUG(log, "on_controller_predown, {}, started: {}", (const void *)p.controller.get(), p.started);
+    if (p.started) {
+        resources->release(resource::controller);
+    }
+}
+
+void file_actor_t::process(payload::block_request_t &p) noexcept {
+    LOG_TRACE(log, "processing block request");
     auto &path = p.path;
     auto file_opt = open_file_ro(path, true);
     auto ec = sys::error_code{};
@@ -97,21 +107,7 @@ void file_actor_t::on_block_request(message::block_request_t &message) noexcept 
     p.result = std::move(data);
 }
 
-void file_actor_t::on_controller_up(net::message::controller_up_t &message) noexcept {
-    LOG_DEBUG(log, "on_controller_up, {}", (const void *)message.payload.controller.get());
-    resources->acquire(resource::controller);
-}
-
-void file_actor_t::on_controller_predown(net::message::controller_predown_t &message) noexcept {
-    auto &p = message.payload;
-    LOG_DEBUG(log, "on_controller_predown, {}, started: {}", (const void *)p.controller.get(), p.started);
-    if (p.started) {
-        resources->release(resource::controller);
-    }
-}
-
-void file_actor_t::on_remote_copy(message::remote_copy_t &message) noexcept {
-    auto &p = message.payload;
+void file_actor_t::process(payload::remote_copy_t &p) noexcept {
     auto &path = p.path;
     sys::error_code ec;
 
@@ -214,9 +210,7 @@ void file_actor_t::on_remote_copy(message::remote_copy_t &message) noexcept {
     }
 }
 
-void file_actor_t::on_finish_file(message::finish_file_t &message) noexcept {
-    auto &p = message.payload;
-
+void file_actor_t::process(payload::finish_file_t &p) noexcept {
     auto path_str = p.path.generic_string();
     auto backend = rw_cache->get(p.path);
     if (!backend) {
@@ -238,8 +232,7 @@ void file_actor_t::on_finish_file(message::finish_file_t &message) noexcept {
     LOG_INFO(log, "file {} ({} bytes) is now locally available", path_str, p.file_size);
 }
 
-void file_actor_t::on_append_block(message::append_block_t &message) noexcept {
-    auto &p = message.payload;
+void file_actor_t::process(payload::append_block_t &p) noexcept {
     auto &path = p.path;
     auto file_opt = open_file_rw(path, p.file_size);
     if (!file_opt) {
@@ -254,8 +247,7 @@ void file_actor_t::on_append_block(message::append_block_t &message) noexcept {
     p.result = backend->write(p.offset, p.data);
 }
 
-void file_actor_t::on_clone_block(message::clone_block_t &message) noexcept {
-    auto &p = message.payload;
+void file_actor_t::process(payload::clone_block_t &p) noexcept {
     auto target_path = p.target;
     auto target_opt = open_file_rw(target_path, p.target_size);
     if (!target_opt) {

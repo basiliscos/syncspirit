@@ -3,13 +3,15 @@
 
 #pragma once
 
-#include <rotor.hpp>
-#include <memory>
 #include "proto/proto-fwd.hpp"
 #include "scan_task.h"
 #include "chunk_iterator.h"
 #include "new_chunk_iterator.h"
 #include "utils/bytes.h"
+
+#include <rotor.hpp>
+#include <memory>
+#include <variant>
 
 namespace syncspirit::fs {
 
@@ -47,6 +49,7 @@ struct block_request_t : payload_base_t<utils::bytes_t> {
           block_size{block_size_} {}
 
     block_request_t(const block_request_t &) = delete;
+    block_request_t(block_request_t &&) = default;
 };
 
 struct remote_copy_t : payload_base_t<void> {
@@ -68,6 +71,7 @@ struct remote_copy_t : payload_base_t<void> {
           deleted{deleted_}, no_permissions{no_permissions_} {}
 
     remote_copy_t(const remote_copy_t &) = delete;
+    remote_copy_t(remote_copy_t &&) = default;
 };
 
 struct finish_file_t : payload_base_t<void> {
@@ -83,6 +87,7 @@ struct finish_file_t : payload_base_t<void> {
           file_size{file_size_}, modification_s{modification_s_} {}
 
     finish_file_t(const finish_file_t &) = delete;
+    finish_file_t(finish_file_t &&) = default;
 };
 
 struct append_block_t : payload_base_t<void> {
@@ -93,11 +98,12 @@ struct append_block_t : payload_base_t<void> {
     std::uint64_t file_size;
 
     inline append_block_t(extendended_context_prt_t context_, bfs::path path_, utils::bytes_t data_,
-                          std::uint64_t offset_, std::uint64_t file_size_) noexcept
+                          std::uint64_t offset_, std::uint64_t file_size_)
         : parent_t{outcome::success(), std::move(context_)}, path{std::move(path_)}, data{std::move(data_)},
           offset{offset_}, file_size{file_size_} {}
 
     append_block_t(const append_block_t &) = delete;
+    append_block_t(append_block_t &&) = default;
 };
 
 struct clone_block_t : payload_base_t<void> {
@@ -118,7 +124,10 @@ struct clone_block_t : payload_base_t<void> {
           block_size{block_size_} {}
 
     clone_block_t(const clone_block_t &) = delete;
+    clone_block_t(clone_block_t &&) = default;
 };
+
+using io_command_t = std::variant<block_request_t, remote_copy_t, finish_file_t, append_block_t, clone_block_t>;
 
 } // namespace payload
 
@@ -128,11 +137,7 @@ using scan_progress_t = r::message_t<payload::scan_progress_t>;
 using rehash_needed_t = r::message_t<payload::rehash_needed_t>;
 using hash_anew_t = r::message_t<payload::hash_anew_t>;
 
-using block_request_t = r::message_t<payload::block_request_t>;
-using remote_copy_t = r::message_t<payload::remote_copy_t>;
-using finish_file_t = r::message_t<payload::finish_file_t>;
-using append_block_t = r::message_t<payload::append_block_t>;
-using clone_block_t = r::message_t<payload::clone_block_t>;
+using io_command_t = r::message_t<payload::io_command_t>;
 
 } // namespace message
 

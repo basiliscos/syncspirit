@@ -41,11 +41,12 @@ struct SYNCSPIRIT_API file_actor_t : public r::actor_base_t {
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
 
   private:
-    void on_block_request(message::block_request_t &message) noexcept;
-    void on_remote_copy(message::remote_copy_t &message) noexcept;
-    void on_finish_file(message::finish_file_t &message) noexcept;
-    void on_append_block(message::append_block_t &message) noexcept;
-    void on_clone_block(message::clone_block_t &message) noexcept;
+    void on_io_command(message::io_command_t &) noexcept;
+    void process(payload::block_request_t &) noexcept;
+    void process(payload::remote_copy_t &) noexcept;
+    void process(payload::append_block_t &) noexcept;
+    void process(payload::finish_file_t &) noexcept;
+    void process(payload::clone_block_t &) noexcept;
 
     void on_controller_up(net::message::controller_up_t &message) noexcept;
     void on_controller_predown(net::message::controller_predown_t &message) noexcept;

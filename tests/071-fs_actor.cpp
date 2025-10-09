@@ -11,6 +11,7 @@
 #include <filesystem>
 #include <boost/nowide/convert.hpp>
 #include <optional>
+#include <utility>
 
 using namespace syncspirit;
 using namespace syncspirit::db;
@@ -26,11 +27,17 @@ namespace {
 
 struct fixture_t;
 
+using io_command_t = fs::message::io_command_t;
+using io_command_t_ptr_t = r::intrusive_ptr_t<io_command_t>;
+
 struct chain_builder_t {
-    template <typename T> chain_builder_t(fixture_t *fixture_, r::intrusive_ptr_t<T> msg) : fixture{fixture_} {
+    template <typename Reply>
+    chain_builder_t(fixture_t *fixture_, io_command_t_ptr_t msg, std::in_place_type_t<Reply>) : fixture{fixture_} {
         message = msg;
         if (msg) {
-            auto &result = msg->payload.result;
+            auto reply = std::get_if<Reply>(&msg->payload);
+            REQUIRE(reply);
+            auto &result = reply->result;
             if (result) {
                 response = sys::error_code{};
             } else {
@@ -45,6 +52,7 @@ struct chain_builder_t {
         CHECK(!*response);
         return *fixture;
     }
+
     fixture_t &check_fail(const sys::error_code &ec = {}) noexcept {
         REQUIRE(response);
         CHECK(*response);
@@ -57,44 +65,20 @@ struct chain_builder_t {
     }
 
     std::optional<sys::error_code> response;
-    r::message_ptr_t message;
+    io_command_t_ptr_t message;
     fixture_t *fixture;
 };
 
 struct fixture_t {
-    using blk_res_t = fs::message::block_request_t;
-    using blk_res_ptr_t = r::intrusive_ptr_t<blk_res_t>;
-    using append_res_t = fs::message::append_block_t;
-    using append_res_ptr_t = r::intrusive_ptr_t<append_res_t>;
-    using clone_res_t = fs::message::clone_block_t;
-    using clone_res_ptr_t = r::intrusive_ptr_t<clone_res_t>;
-    using finish_res_t = fs::message::finish_file_t;
-    using finish_res_ptr_t = r::intrusive_ptr_t<finish_res_t>;
-    using copy_res_t = fs::message::remote_copy_t;
-    using copy_res_ptr_t = r::intrusive_ptr_t<copy_res_t>;
 
     fixture_t() noexcept : root_path{unique_path()}, path_guard{root_path} { bfs::create_directory(root_path); }
 
     virtual configure_callback_t configure() noexcept {
         return [&](r::plugin::plugin_base_t &plugin) {
-            plugin.template with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
-                append_reply_addr = p.create_address();
-                clone_reply_addr = p.create_address();
-                finish_reply_addr = p.create_address();
-                remote_copy_addr = p.create_address();
-            });
             plugin.template with_casted<r::plugin::registry_plugin_t>(
                 [&](auto &p) { p.register_name(net::names::db, sup->get_address()); });
-            plugin.template with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
-                p.subscribe_actor(r::lambda<blk_res_t>([&](blk_res_t &msg) { block_reply = &msg; }));
-                p.subscribe_actor(r::lambda<append_res_t>([&](append_res_t &msg) { append_reply = &msg; }),
-                                  append_reply_addr);
-                p.subscribe_actor(r::lambda<clone_res_t>([&](clone_res_t &msg) { clone_reply = &msg; }),
-                                  clone_reply_addr);
-                p.subscribe_actor(r::lambda<finish_res_t>([&](finish_res_t &msg) { finish_reply = &msg; }),
-                                  finish_reply_addr);
-                p.subscribe_actor(r::lambda<copy_res_t>([&](copy_res_t &msg) { copy_reply = &msg; }), remote_copy_addr);
-            });
+            plugin.template with_casted<r::plugin::starter_plugin_t>(
+                [&](auto &p) { p.subscribe_actor(r::lambda<io_command_t>([&](io_command_t &msg) { reply = &msg; })); });
         };
     }
 
@@ -134,24 +118,28 @@ struct fixture_t {
     chain_builder_t append_block(const bfs::path &path, utils::bytes_view_t data, std::uint64_t offset,
                                  std::uint64_t file_size) noexcept {
         auto bytes = utils::bytes_t(data.begin(), data.end());
+
         auto context = fs::payload::extendended_context_prt_t{};
-        auto msg = r::make_routed_message<fs::payload::append_block_t>(file_addr, append_reply_addr, std::move(context),
-                                                                       path, std::move(bytes), offset, file_size);
+        auto payload = fs::payload::append_block_t(std::move(context), path, std::move(bytes), offset, file_size);
+        auto cmd = fs::payload::io_command_t(std::move(payload));
+        auto msg = r::make_routed_message<fs::payload::io_command_t>(file_addr, sup->get_address(), std::move(cmd));
         sup->put(std::move(msg));
         sup->do_process();
-        return chain_builder_t(this, append_reply);
+        return chain_builder_t(this, reply, std::in_place_type_t<decltype(payload)>());
     }
 
     chain_builder_t clone_block(const bfs::path &target, std::uint64_t target_offset, std::uint64_t target_size,
                                 const bfs::path &source, std::uint64_t source_offset,
                                 std::uint64_t block_size) noexcept {
         auto context = fs::payload::extendended_context_prt_t{};
-        auto msg = r::make_routed_message<fs::payload::clone_block_t>(file_addr, clone_reply_addr, std::move(context),
-                                                                      target, target_offset, target_size, source,
-                                                                      source_offset, block_size);
+
+        auto payload = fs::payload::clone_block_t(std::move(context), target, target_offset, target_size, source,
+                                                  source_offset, block_size);
+        auto cmd = fs::payload::io_command_t(std::move(payload));
+        auto msg = r::make_routed_message<fs::payload::io_command_t>(file_addr, sup->get_address(), std::move(cmd));
         sup->put(std::move(msg));
         sup->do_process();
-        return chain_builder_t(this, clone_reply);
+        return chain_builder_t(this, reply, std::in_place_type_t<decltype(payload)>());
     }
 
     chain_builder_t finish_file(const bfs::path &path, std::uint64_t file_size, std::int64_t modification_s,
@@ -160,11 +148,12 @@ struct fixture_t {
             local_path = path;
         }
         auto context = fs::payload::extendended_context_prt_t{};
-        auto msg = r::make_routed_message<fs::payload::finish_file_t>(file_addr, finish_reply_addr, std::move(context),
-                                                                      path, local_path, file_size, modification_s);
+        auto payload = fs::payload::finish_file_t(std::move(context), path, local_path, file_size, modification_s);
+        auto cmd = fs::payload::io_command_t(std::move(payload));
+        auto msg = r::make_routed_message<fs::payload::io_command_t>(file_addr, sup->get_address(), std::move(cmd));
         sup->put(std::move(msg));
         sup->do_process();
-        return chain_builder_t(this, finish_reply);
+        return chain_builder_t(this, reply, std::in_place_type_t<decltype(payload)>());
     }
 
     chain_builder_t remote_copy(const bfs::path &path, const proto::FileInfo &meta) noexcept {
@@ -176,19 +165,16 @@ struct fixture_t {
         auto modificaiton = proto::get_modified_s(meta);
         auto target = std::string(proto::get_symlink_target(meta));
 
-        auto msg =
-            r::make_routed_message<fs::payload::remote_copy_t>(file_addr, remote_copy_addr, std::move(context), path,
-                                                               type, size, perms, modificaiton, target, deleted, false);
+        auto payload = fs::payload::remote_copy_t(std::move(context), path, type, size, perms, modificaiton, target,
+                                                  deleted, false);
+        auto cmd = fs::payload::io_command_t(std::move(payload));
+        auto msg = r::make_routed_message<fs::payload::io_command_t>(file_addr, sup->get_address(), std::move(cmd));
         sup->put(std::move(msg));
         sup->do_process();
-        return chain_builder_t(this, copy_reply);
+        return chain_builder_t(this, reply, std::in_place_type_t<decltype(payload)>());
     }
 
     r::address_ptr_t file_addr;
-    r::address_ptr_t append_reply_addr;
-    r::address_ptr_t clone_reply_addr;
-    r::address_ptr_t finish_reply_addr;
-    r::address_ptr_t remote_copy_addr;
     r::pt::time_duration timeout = r::pt::millisec{10};
     model::sequencer_ptr_t sequencer;
     r::intrusive_ptr_t<supervisor_t> sup;
@@ -196,13 +182,7 @@ struct fixture_t {
     bfs::path root_path;
     test::path_guard_t path_guard;
     r::system_context_t ctx;
-    blk_res_ptr_t block_reply;
-
-    clone_res_ptr_t clone_reply;
-    append_res_ptr_t append_reply;
-    finish_res_ptr_t finish_reply;
-    copy_res_ptr_t copy_reply;
-
+    io_command_t_ptr_t reply;
     std::string_view folder_id = "1234-5678";
     fs::file_cache_ptr_t rw_cache;
 };
@@ -492,7 +472,6 @@ void test_clone_block() {
 void test_requesting_block() {
     struct F : fixture_t {
         void main() noexcept override {
-            using request_t = fs::payload::block_request_t;
             bfs::path target = root_path / "a.txt";
 
             std::int64_t modified = 1641828421;
@@ -501,39 +480,56 @@ void test_requesting_block() {
             auto back_addr = sup->get_address();
 
             auto context = fs::payload::extendended_context_prt_t{};
-            auto msg = r::make_routed_message<request_t>(fs_addr, back_addr, std::move(context), target, 0, 5);
+
+            auto payload = fs::payload::block_request_t(std::move(context), target, 0, 5);
+            auto cmd = fs::payload::io_command_t(std::move(payload));
+            auto msg = r::make_routed_message<fs::payload::io_command_t>(file_addr, sup->get_address(), std::move(cmd));
 
             SECTION("error, no file") {
                 sup->put(std::move(msg));
                 sup->do_process();
-                REQUIRE(block_reply);
-                REQUIRE(block_reply->payload.result.has_error());
+                REQUIRE(reply);
+                auto reply_payload = std::get_if<decltype(payload)>(&reply->payload);
+                REQUIRE(reply_payload);
+                REQUIRE(reply_payload->result.has_error());
             }
 
             SECTION("error, oversized request") {
                 write_file(target, "1234");
                 sup->put(std::move(msg));
                 sup->do_process();
-                REQUIRE(block_reply);
-                REQUIRE(block_reply->payload.result.has_error());
+                REQUIRE(reply);
+                auto reply_payload = std::get_if<decltype(payload)>(&reply->payload);
+                REQUIRE(reply_payload);
+                REQUIRE(reply_payload->result.has_error());
             }
 
             SECTION("successful file reading") {
                 write_file(target, "1234567890");
                 sup->put(std::move(msg));
                 sup->do_process();
-                REQUIRE(block_reply);
-                REQUIRE(block_reply->payload.result.has_value());
-                REQUIRE(block_reply->payload.result.value() == as_bytes("12345"));
 
-                // proto::set_offset(req, 5);
+                REQUIRE(reply);
+                auto reply_payload = std::get_if<decltype(payload)>(&reply->payload);
+                REQUIRE(reply_payload);
+                REQUIRE(reply_payload->result.has_value());
+                REQUIRE(reply_payload->result.value() == as_bytes("12345"));
+
+                reply.reset();
+
                 auto context = fs::payload::extendended_context_prt_t{};
-                auto msg = r::make_routed_message<request_t>(fs_addr, back_addr, std::move(context), target, 5, 5);
+                auto payload = fs::payload::block_request_t(std::move(context), target, 5, 5);
+                auto cmd = fs::payload::io_command_t(std::move(payload));
+                auto msg =
+                    r::make_routed_message<fs::payload::io_command_t>(file_addr, sup->get_address(), std::move(cmd));
                 sup->put(std::move(msg));
                 sup->do_process();
-                REQUIRE(block_reply);
-                REQUIRE(block_reply->payload.result.has_value());
-                REQUIRE(block_reply->payload.result.value() == as_bytes("67890"));
+
+                REQUIRE(reply);
+                reply_payload = std::get_if<decltype(payload)>(&reply->payload);
+                REQUIRE(reply_payload);
+                REQUIRE(reply_payload->result.has_value());
+                REQUIRE(reply_payload->result.value() == as_bytes("67890"));
             }
         }
     };
