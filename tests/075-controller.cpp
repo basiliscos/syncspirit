@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
-#include "model/diff/modify/append_block.h"
 #include "test-utils.h"
 #include "access.h"
 #include "test_supervisor.h"
@@ -25,6 +24,27 @@ using namespace syncspirit::net;
 using namespace syncspirit::hasher;
 
 namespace {
+
+struct mock_supervisor_t: supervisor_t {
+    using block_responces_t = std::list<outcome::result<utils::bytes_t>>;
+    using block_requests_t = std::list<fs::payload::block_request_t>;
+    using supervisor_t::supervisor_t;
+    using supervisor_t::process_io;
+
+    void process_io(fs::payload::block_request_t &req) noexcept override {
+        supervisor_t::process_io(req);
+        if (!block_responces.empty()) {
+            auto& res = block_responces.front();
+            req.result = std::move(res);
+            block_responces.pop_front();
+        }
+        auto copy = fs::payload::block_request_t({}, req.path, req.offset, req.block_size);
+        block_requests.emplace_back(std::move(copy));
+    }
+
+    block_responces_t block_responces;
+    block_requests_t block_requests;
+};
 
 struct fixture_t {
     using peer_ptr_t = r::intrusive_ptr_t<test_peer_t>;
@@ -109,17 +129,6 @@ struct fixture_t {
         sup->configure_callback = [&](r::plugin::plugin_base_t &plugin) {
             plugin.template with_casted<r::plugin::registry_plugin_t>(
                 [&](auto &p) { p.register_name(net::names::fs_actor, sup->get_address()); });
-#if 0
-            plugin.template with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
-                p.subscribe_actor(r::lambda<io_commands_t>([&](io_commands_t &msg) {
-                    io_in.push_back(&msg);
-                    if (io_out.size()) {
-                        sup->put(io_out.front());
-                        io_out.pop_front();
-                    }
-                }));
-            });
-#endif
         };
         sup->start();
         sup->do_process();
@@ -161,8 +170,8 @@ struct fixture_t {
 
     virtual std::uint32_t get_blocks_max_requested() { return 8; }
 
-    virtual r::intrusive_ptr_t<supervisor_t> create_supervisor() {
-        return ctx.create_supervisor<supervisor_t>().timeout(timeout).create_registry().finish();
+    virtual r::intrusive_ptr_t<mock_supervisor_t> create_supervisor() {
+        return ctx.create_supervisor<mock_supervisor_t>().timeout(timeout).create_registry().finish();
     }
 
     bool auto_start;
@@ -175,7 +184,7 @@ struct fixture_t {
     cluster_ptr_t cluster;
     device_ptr_t peer_device;
     device_ptr_t my_device;
-    r::intrusive_ptr_t<supervisor_t> sup;
+    r::intrusive_ptr_t<mock_supervisor_t> sup;
     r::system_context_t ctx;
     model::folder_ptr_t folder_1;
     model::folder_info_ptr_t folder_1_peer;
@@ -900,26 +909,23 @@ void test_downloading_errors() {
     struct F : fixture_t {
         using fixture_t::fixture_t;
 
-        struct custom_supervisor_t : supervisor_t {
-            using parent_t = supervisor_t;
+        struct custom_supervisor_t : mock_supervisor_t {
+            using parent_t = mock_supervisor_t;
             using parent_t::parent_t;
+            using parent_t::process_io;
 
             bool reject_blocks = false;
 
-            outcome::result<void> operator()(const model::diff::modify::append_block_t &diff,
-                                             void *custom) noexcept override {
-#if 0
-                if (!reject_blocks) {
-                    return parent_t::operator()(diff, custom);
+            void process_io(fs::payload::append_block_t & req) noexcept {
+                if (reject_blocks) {
+                    // error by default;
+                } else {
+                    parent_t::process_io(req);
                 }
-#endif
-                std::abort();
-                send<model::payload::model_update_t>(address, diff.rej(), this);
-                return outcome::success();
             }
         };
 
-        r::intrusive_ptr_t<supervisor_t> create_supervisor() override {
+        r::intrusive_ptr_t<mock_supervisor_t> create_supervisor() override {
             return ctx.create_supervisor<custom_supervisor_t>().timeout(timeout).create_registry().finish();
         }
 
@@ -983,6 +989,8 @@ void test_downloading_errors() {
             CHECK(folder_my->get_max_sequence() == 0ul);
             peer_actor->forward(index);
 
+            auto expected_state = r::state_t::OPERATIONAL;
+            bool expected_unreachability = true;
             SECTION("general error, ok, do not shutdown") {
                 auto ec = utils::make_error_code(utils::request_error_code_t::generic);
                 peer_actor->push_block(ec, 0);
@@ -996,18 +1004,20 @@ void test_downloading_errors() {
                 custom_sup->reject_blocks = true;
                 peer_actor->push_block(data_1, 0);
                 peer_actor->push_block(data_2, 1);
+                expected_state = r::state_t::SHUT_DOWN;
+                expected_unreachability = false;
             }
 
             sup->do_process();
 
             CHECK(peer_actor->blocks_requested <= 2);
-            CHECK(static_cast<r::actor_base_t *>(target.get())->access<to::state>() == r::state_t::OPERATIONAL);
+            CHECK(static_cast<r::actor_base_t *>(target.get())->access<to::state>() == expected_state);
 
             auto folder_peer = folder_infos.by_device(*peer_device);
             REQUIRE(folder_peer->get_file_infos().size() == 1);
             auto f = *folder_peer->get_file_infos().begin();
             REQUIRE(f);
-            CHECK(f->is_unreachable());
+            CHECK(f->is_unreachable() == expected_unreachability);
             CHECK(!f->is_synchronizing());
 
             auto f_local = folder_my->get_file_infos().by_name(f->get_name()->get_full_name());
@@ -1516,24 +1526,23 @@ void test_uploading() {
             peer_actor->forward(cc);
 
             SECTION("upload regular file, no hash") {
-#if 0
                 peer_actor->forward(req);
-
-                auto res = r::make_message<fs::payload::block_response_t>(target->get_address(), req, sys::error_code{},
-                                                                          data_1);
-                block_responses.push_back(res);
+                auto res = outcome::result<utils::bytes_t>(data_1);
+                sup->block_responces.emplace_back(res);
 
                 sup->do_process();
-                REQUIRE(block_requests.size() == 1);
-                CHECK(proto::get_id(block_requests[0]->payload.remote_request) == 1);
-                CHECK(proto::get_name(block_requests[0]->payload.remote_request) == file_name);
+                REQUIRE(sup->block_responces.size() == 0);
+                REQUIRE(sup->block_requests.size() == 1);
+                auto& req = sup->block_requests.front();
+                CHECK(req.path.filename() == file_name);
+                CHECK(req.offset == 0);
+                CHECK(req.block_size == data_1.size());
 
                 REQUIRE(peer_actor->uploaded_blocks.size() == 1);
                 auto &peer_res = peer_actor->uploaded_blocks.front();
                 CHECK(proto::get_id(peer_res) == 1);
                 CHECK(proto::get_code(peer_res) == proto::ErrorCode::NO_BEP_ERROR);
                 CHECK(proto::get_data(peer_res) == data_1);
-#endif
             }
         }
     };

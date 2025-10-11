@@ -81,6 +81,14 @@ struct finish_file_context_t final: fs::payload::extendended_context_t {
     model::advance_action_t action;
 };
 
+struct block_request_context_t final: fs::payload::extendended_context_t {
+    block_request_context_t(proto::Request request_) noexcept:
+        request{std::move(request_)}{
+    }
+
+    proto::Request request;
+};
+
 } // namespace
 
 using C = controller_actor_t;
@@ -102,6 +110,13 @@ C::stack_context_t::~stack_context_t() {
             // LOG_TRACE(log, "{} block writes sent, requests left = {}", sent, requests_left);
             actor.cluster->modify_write_requests(-sent);
         }
+    }
+    auto max_block_read = actor.blocks_max_requested * constants::tx_blocks_max_factor;
+    while (!actor.block_read_queue.empty() && (actor.tx_blocks_requested <= max_block_read)) {
+        ++actor.tx_blocks_requested;
+        auto &cmd = actor.block_read_queue.front();
+        io_commands.emplace_back(std::move(cmd));
+        actor.block_read_queue.pop_front();
     }
     if (!io_commands.empty()) {
         auto& self = actor.get_address();
@@ -220,7 +235,6 @@ void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         id += peer->device_id().get_short();
         p.set_identity(id, false);
         log = utils::get_logger(identity);
-        open_reading = p.create_address();
     });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
         p.discover_name(names::hasher_proxy, hasher_proxy, false).link();
@@ -240,9 +254,6 @@ void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.subscribe_actor(&controller_actor_t::on_peer_down);
         p.subscribe_actor(&controller_actor_t::on_block);
         p.subscribe_actor(&controller_actor_t::on_validation);
-#if 0
-        p.subscribe_actor(&controller_actor_t::on_block_response);
-#endif
         p.subscribe_actor(&controller_actor_t::on_tx_signal);
         p.subscribe_actor(&controller_actor_t::on_postprocess_io);
     });
@@ -280,7 +291,7 @@ void controller_actor_t::shutdown_finish() noexcept {
     peer->release_iterator(file_iterator);
     file_iterator.reset();
     synchronizing_folders.clear();
-    // send_io();
+    synchronizing_files.clear();
     if (announced) {
         send<payload::controller_down_t>(coordinator, address, peer_address);
     }
@@ -561,6 +572,17 @@ void controller_actor_t::io_finish_file(model::file_info_t* local_file, model::f
     auto payload = fs::payload::finish_file_t(std::move(context), std::move(path), std::move(local_path),
                                               peer_file.get_size(), peer_file.get_modified_s());
     ctx.push(std::move(payload));
+}
+
+auto controller_actor_t::io_make_request_block(model::file_info_t& source, model::folder_info_t& source_fi, proto::Request req)
+-> fs::payload::io_command_t {
+    auto path = source.get_path(source_fi);
+    auto offset = proto::get_offset(req);
+    auto block_size = proto::get_size(req);
+    auto context = fs::payload::extendended_context_prt_t{};
+    context.reset(new block_request_context_t(std::move(req)));
+    auto payload = fs::payload::block_request_t(std::move(context), std::move(path), offset, block_size);
+    return payload;
 }
 
 void controller_actor_t::preprocess_block(model::file_block_t &file_block,
@@ -917,6 +939,8 @@ void controller_actor_t::on_message(proto::Request &req, stack_context_t& ctx) n
 
     auto folder_id = proto::get_folder(req);
     auto folder = cluster->get_folders().by_id(folder_id);
+    auto local_folder = model::folder_info_ptr_t();
+    auto local_file = model::file_info_ptr_t();
     if (!folder) {
         code = proto::ErrorCode::NO_SUCH_FILE;
     } else {
@@ -929,14 +953,14 @@ void controller_actor_t::on_message(proto::Request &req, stack_context_t& ctx) n
             if (!peer_folder) {
                 code = proto::ErrorCode::NO_SUCH_FILE;
             } else {
-                auto my_folder = folder_infos.by_device(*cluster->get_device());
+                local_folder = folder_infos.by_device(*cluster->get_device());
                 auto name = proto::get_name(req);
-                auto file = my_folder->get_file_infos().by_name(name);
-                if (!file) {
+                local_file = local_folder->get_file_infos().by_name(name);
+                if (!local_file) {
                     code = proto::ErrorCode::NO_SUCH_FILE;
                 } else {
-                    if (!file->is_file()) {
-                        LOG_WARN(log, "attempt to request non-regular file: {}", *file);
+                    if (!local_file->is_file()) {
+                        LOG_WARN(log, "attempt to request non-regular file: {}", *local_file);
                         code = proto::ErrorCode::GENERIC;
                     } else {
                         if (tx_blocks_requested > blocks_max_requested * constants::tx_blocks_max_factor) {
@@ -957,14 +981,12 @@ void controller_actor_t::on_message(proto::Request &req, stack_context_t& ctx) n
             send_to_peer(std::move(data));
         }
     } else {
+        auto io_command = io_make_request_block(*local_file, *local_folder, std::move(req));
         if (forward) {
             ++tx_blocks_requested;
-#if 0
-            send<fs::payload::block_request_t>(fs_addr, std::move(req), address);
-#endif
-            std::abort();
+            ctx.push(std::move(io_command));
         } else {
-            block_read_queue.emplace_back(std::move(req));
+            block_read_queue.emplace_back(std::move(io_command));
         }
     }
 }
@@ -989,8 +1011,24 @@ static inline void ack_block(block_ack_context_t* io_ctx, model::cluster_t* clus
     ctx.push(std::move(diff));
 }
 
-void controller_actor_t::postprocess_io(fs::payload::block_request_t &, stack_context_t& ctx) noexcept {
-    std::abort();
+void controller_actor_t::postprocess_io(fs::payload::block_request_t &res, stack_context_t& ctx) noexcept {
+    --tx_blocks_requested;
+    if (!peer_address) {
+        return;
+    }
+
+    auto io_ctx = static_cast<block_request_context_t*>(res.context.get());
+    proto::Response reply;
+    proto::set_id(reply, proto::get_id(io_ctx->request));
+    if (res.result.has_error()) {
+        proto::set_code(reply, proto::ErrorCode::GENERIC);
+    } else {
+        auto& data = res.result.assume_value();
+        proto::set_data(reply, std::move(data));
+    }
+
+    auto data = proto::serialize(reply, peer->get_compression());
+    send_to_peer(std::move(data));
 }
 
 void controller_actor_t::postprocess_io(fs::payload::remote_copy_t &res, stack_context_t& ctx) noexcept {
@@ -1018,35 +1056,6 @@ void controller_actor_t::postprocess_io(fs::payload::finish_file_t &res, stack_c
     auto diff = advance::advance_t::create(io_ctx->action, *io_ctx->peer_file, *io_ctx->peer_folder, *sequencer);
     ctx.push(std::move(diff));
 }
-
-#if 0
-void controller_actor_t::on_block_response(fs::message::block_response_t &message) noexcept {
-    --tx_blocks_requested;
-    if (!peer_address) {
-        return;
-    }
-
-    auto &p = message.payload;
-    proto::Response res;
-    proto::set_id(res, proto::get_id(p.remote_request));
-    if (p.ec) {
-        proto::set_code(res, proto::ErrorCode::GENERIC);
-    } else {
-        proto::set_data(res, std::move(p.data));
-    }
-
-    auto data = proto::serialize(res, peer->get_compression());
-    send_to_peer(std::move(data));
-
-    auto max_block_read = blocks_max_requested * constants::tx_blocks_max_factor;
-    while (!block_read_queue.empty() && (tx_blocks_requested <= max_block_read)) {
-        auto &req = block_read_queue.front();
-        ++tx_blocks_requested;
-        send<fs::payload::block_request_t>(fs_addr, std::move(req), address);
-        block_read_queue.pop_front();
-    }
-}
-#endif
 
 void controller_actor_t::on_block(message::block_response_t &message) noexcept {
     --rx_blocks_requested;
@@ -1193,31 +1202,6 @@ void controller_actor_t::on_fs_ack_timer(r::request_id_t, bool cancelled) noexce
         }
     }
 }
-
-#if 0
-void controller_actor_t::process_block_write() noexcept {
-    if (state == r::state_t::OPERATIONAL) {
-        auto requests_left = cluster->get_write_requests();
-        auto sent = 0;
-        while (requests_left > 0 && !block_write_queue.empty()) {
-            auto &diff = block_write_queue.front();
-            push(diff.get());
-            --requests_left;
-            ++sent;
-            block_write_queue.pop_front();
-        }
-        if (sent) {
-            send_diff();
-            LOG_TRACE(log, "{} block writes sent, requests left = {}", sent, requests_left);
-            cluster->modify_write_requests(-sent);
-            for (int i = 0; i < sent; ++i) {
-                resources->acquire(resource::fs);
-            }
-        }
-    }
-    std::abort();
-}
-#endif
 
 auto controller_actor_t::get_sync_info(model::folder_t *folder) noexcept -> folder_synchronization_t & {
     auto it = synchronizing_folders.find(folder);

@@ -140,8 +140,7 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     };
 
     using peers_map_t = std::unordered_map<r::address_ptr_t, model::device_ptr_t>;
-    using block_write_queue_t = std::list<fs::payload::io_command_t>;
-    using block_read_queue_t = std::list<proto::Request>;
+    using io_queue_t = std::list<fs::payload::io_command_t>;
 
     struct folder_synchronization_t {
         using block_set_t = std::unordered_map<utils::bytes_view_t, model::block_info_ptr_t>;
@@ -182,9 +181,6 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     void on_model_update(model::message::model_update_t &message) noexcept;
     void on_tx_signal(net::message::tx_signal_t &message) noexcept;
     void on_postprocess_io(fs::message::io_commands_t &) noexcept;
-#if 0
-    void on_block_response(fs::message::block_response_t &message) noexcept;
-#endif
     void on_fs_predown(message::fs_predown_t &message) noexcept;
     void on_fs_ack_timer(r::request_id_t, bool cancelled) noexcept;
 
@@ -215,6 +211,7 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     void io_append_block(model::file_info_t&, model::folder_info_t&, uint32_t block_index, utils::bytes_t data, stack_context_t&);
     void io_clone_block(const model::file_block_t &file_block, const model::folder_info_t& source_fi, model::folder_info_t& target_fi, stack_context_t&);
     void io_finish_file(model::file_info_t*, model::file_info_t&, model::folder_info_t&, model::advance_action_t, stack_context_t&);
+    auto io_make_request_block(model::file_info_t&, model::folder_info_t&, proto::Request) -> fs::payload::io_command_t;
 
     void acquire_block(const model::file_block_t &block, const model::folder_info_t &folder_info, stack_context_t&) noexcept;
     void release_block(std::string_view folder_id, utils::bytes_view_t hash, stack_context_t&) noexcept;
@@ -243,7 +240,6 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     r::address_ptr_t peer_address;
     r::address_ptr_t hasher_proxy;
     r::address_ptr_t fs_addr;
-    r::address_ptr_t open_reading; /* for routing */
     pt::time_duration request_timeout;
     model::ignored_folders_map_t *ignored_folders;
     // generic
@@ -263,8 +259,8 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     model::block_iterator_ptr_t block_iterator;
     synchronizing_folders_t synchronizing_folders;
     synchronizing_files_t synchronizing_files;
-    block_write_queue_t block_write_queue;
-    block_read_queue_t block_read_queue;
+    io_queue_t block_write_queue;
+    io_queue_t block_read_queue;
     std::optional<r::request_id_t> fs_ack_timer;
     bool announced;
 
