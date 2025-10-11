@@ -110,6 +110,11 @@ struct SYNCSPIRIT_API file_info_t {
                                                       : f_type_file;
     }
 
+    static inline proto::FileInfoType as_type(std::uint16_t flags) noexcept {
+        using T = proto::FileInfoType;
+        return flags & file_info_t::f_type_dir ? T::DIRECTORY : flags & file_info_t::f_type_link ? T::SYMLINK : T::FILE;
+    }
+
     ~file_info_t();
 
     inline bool operator==(const file_info_t &other) const noexcept { return get_uuid() == other.get_uuid(); }
@@ -175,7 +180,7 @@ struct SYNCSPIRIT_API file_info_t {
         return {};
     }
 
-    const bfs::path get_path(const folder_info_t &folder_info) const noexcept;
+    bfs::path get_path(const folder_info_t &folder_info) const noexcept;
 
     inline std::int64_t get_modified_s() const noexcept { return modified_s; }
     inline std::int32_t get_modified_ns() const noexcept { return modified_ns; }

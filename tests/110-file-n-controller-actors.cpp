@@ -71,10 +71,7 @@ struct fixture_t {
         CHECK(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::OPERATIONAL);
 
         rw_cache.reset(new fs::file_cache_t(2));
-        file_actor = sup->create_actor<fs::file_actor_t>()
-                         .rw_cache(rw_cache)
-                         .timeout(timeout)
-                         .finish();
+        file_actor = sup->create_actor<fs::file_actor_t>().rw_cache(rw_cache).timeout(timeout).finish();
         sup->do_process();
 
         sup->create_actor<hasher::hasher_actor_t>().index(1).timeout(timeout).finish();

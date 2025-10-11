@@ -125,6 +125,7 @@ void file_actor_t::process(payload::remote_copy_t &cmd) noexcept {
         } else {
             LOG_TRACE(log, "{} already abscent, noop", path.string());
         }
+        cmd.result = outcome::success();
         return;
     }
 
@@ -210,6 +211,7 @@ void file_actor_t::process(payload::remote_copy_t &cmd) noexcept {
             return;
         }
     }
+    cmd.result = outcome::success();
 }
 
 void file_actor_t::process(payload::finish_file_t &cmd) noexcept {
@@ -231,6 +233,7 @@ void file_actor_t::process(payload::finish_file_t &cmd) noexcept {
         return;
     }
 
+    cmd.result = outcome::success();
     LOG_INFO(log, "file {} ({} bytes) is now locally available", path_str, cmd.file_size);
 }
 

@@ -12,6 +12,7 @@ struct SYNCSPIRIT_API block_ack_t final : block_diff_t {
     using parent_t = block_diff_t;
 
     block_ack_t(const block_transaction_t &) noexcept;
+    using parent_t::parent_t;
 
     outcome::result<void> apply_impl(apply_controller_t &, void *) const noexcept override;
     outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;

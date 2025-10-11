@@ -7,7 +7,7 @@
 
 using namespace syncspirit::model::diff::modify;
 
-append_block_t::append_block_t(const file_info_t &file, const folder_info_t &fi, size_t block_index_,
+append_block_t::append_block_t(const file_info_t &file, const folder_info_t &fi, std::uint32_t block_index_,
                                utils::bytes_t data_) noexcept
     : block_transaction_t{file, fi, block_index_}, data{std::move(data_)} {
     LOG_DEBUG(log, "append_block_t, file: '{}', block: {}", file, block_index);

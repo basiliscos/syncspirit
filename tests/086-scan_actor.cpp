@@ -924,7 +924,8 @@ void test_races() {
                 auto file_peer = fi_peer->get_file_infos().by_name("a.bin");
                 SECTION("non-finished/flushed new file") {
                     auto path = file_peer->get_path(*fi_peer);
-                    auto file = fs::file_t::open_write(path, static_cast<std::uint64_t>(file_peer->get_size())).assume_value();
+                    auto file =
+                        fs::file_t::open_write(path, static_cast<std::uint64_t>(file_peer->get_size())).assume_value();
                     REQUIRE(bfs::exists(file.get_path()));
                     auto file_ptr = fs::file_ptr_t(new fs::file_t(std::move(file)));
                     rw_cache->put(file_ptr);

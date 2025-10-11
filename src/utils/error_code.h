@@ -12,6 +12,7 @@ namespace syncspirit::utils {
 
 enum class error_code_t {
     success = 0,
+    no_action,
     incomplete_discovery_reply,
     no_location,
     no_st,

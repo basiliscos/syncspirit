@@ -7,7 +7,7 @@
 
 using namespace syncspirit::model::diff::modify;
 
-block_transaction_t::block_transaction_t(const file_info_t &file, const folder_info_t &fi, size_t block_index)
+block_transaction_t::block_transaction_t(const file_info_t &file, const folder_info_t &fi, uint32_t block_index)
     : parent_t(file, fi, block_index) {}
 
 auto block_transaction_t::ack() const -> cluster_diff_ptr_t { return new block_ack_t(*this); }

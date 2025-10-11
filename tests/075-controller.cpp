@@ -109,6 +109,7 @@ struct fixture_t {
         sup->configure_callback = [&](r::plugin::plugin_base_t &plugin) {
             plugin.template with_casted<r::plugin::registry_plugin_t>(
                 [&](auto &p) { p.register_name(net::names::fs_actor, sup->get_address()); });
+#if 0
             plugin.template with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
                 p.subscribe_actor(r::lambda<io_commands_t>([&](io_commands_t &msg) {
                     io_in.push_back(&msg);
@@ -118,6 +119,7 @@ struct fixture_t {
                     }
                 }));
             });
+#endif
         };
         sup->start();
         sup->do_process();
@@ -178,8 +180,8 @@ struct fixture_t {
     model::folder_ptr_t folder_1;
     model::folder_info_ptr_t folder_1_peer;
     model::folder_ptr_t folder_2;
-    io_queue_t io_out;
-    io_queue_t io_in;
+    // io_queue_t io_out;
+    // io_queue_t io_in;
 };
 
 } // namespace
@@ -906,9 +908,12 @@ void test_downloading_errors() {
 
             outcome::result<void> operator()(const model::diff::modify::append_block_t &diff,
                                              void *custom) noexcept override {
+#if 0
                 if (!reject_blocks) {
                     return parent_t::operator()(diff, custom);
                 }
+#endif
+                std::abort();
                 send<model::payload::model_update_t>(address, diff.rej(), this);
                 return outcome::success();
             }
@@ -1610,7 +1615,6 @@ void test_overload_uploading() {
                 blocks.pop_front();
             }
 #endif
-
         }
     };
     F(true, 10).run();
@@ -1895,6 +1899,7 @@ void test_download_interrupting() {
                     CHECK(folder_my->get_file_infos().size() == 0);
                 }
                 SECTION("remove folder") {
+#if 0
                     sup->auto_ack_blocks = false;
 
                     peer_actor->push_block(data_2, 1, file_name);
@@ -1912,6 +1917,8 @@ void test_download_interrupting() {
                     sup->do_process();
                     CHECK(peer_actor->blocks_requested == proto::get_blocks_size(file));
                     CHECK(!cluster->get_folders().by_id(proto::get_id(folder)));
+#endif
+                    std::abort();
                 }
             }
             SECTION("hash validation replies") {
@@ -1937,6 +1944,8 @@ void test_download_interrupting() {
                 }
             }
             SECTION("block acks from fs") {
+                std::abort();
+#if 0
                 auto write_requests = cluster->get_write_requests();
                 sup->auto_ack_blocks = false;
                 hasher->auto_reply = true;
@@ -1988,6 +1997,7 @@ void test_download_interrupting() {
 
                     CHECK(cluster->get_write_requests() == write_requests);
                 }
+#endif
             }
         }
 
@@ -2258,6 +2268,8 @@ void test_races() {
                 sup->do_process();
             }
             SECTION("make file externally available before file finishes") {
+                std::abort();
+#if 0
                 cluster->modify_write_requests(10);
 
                 sup->auto_ack_blocks = false;
@@ -2272,6 +2284,7 @@ void test_races() {
                 REQUIRE(diff);
                 sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff));
                 sup->do_process();
+#endif
             }
             auto file = folder_my->get_file_infos().by_name(file_name);
             REQUIRE(file);

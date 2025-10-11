@@ -20,6 +20,9 @@ std::string error_code_category::message(int c) const {
     case error_code_t::success:
         r = "success";
         break;
+    case error_code_t::no_action:
+        r = "no action (messages has not been processed)";
+        break;
     case error_code_t::no_location:
         r = "no location";
         break;

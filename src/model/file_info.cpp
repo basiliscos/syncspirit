@@ -33,11 +33,6 @@ namespace pt = boost::posix_time;
 
 static const constexpr char prefix = (char)(db::prefix::file_info);
 
-static inline proto::FileInfoType as_type(std::uint16_t flags) noexcept {
-    using T = proto::FileInfoType;
-    return flags & file_info_t::f_type_dir ? T::DIRECTORY : flags & file_info_t::f_type_link ? T::SYMLINK : T::FILE;
-}
-
 auto file_info_t::decompose_key(utils::bytes_view_t key) -> decomposed_key_t {
     assert(key.size() == file_info_t::data_length + 1);
     auto fi_key = key.subspan(1, uuid_length);
@@ -446,7 +441,7 @@ bool file_info_t::is_locally_available() const noexcept {
     return r;
 };
 
-const std::filesystem::path file_info_t::get_path(const folder_info_t &folder_info) const noexcept {
+std::filesystem::path file_info_t::get_path(const folder_info_t &folder_info) const noexcept {
     auto own_name = boost::nowide::widen(name->get_full_name());
     auto path = folder_info.get_folder()->get_path() / own_name;
     path.make_preferred();
