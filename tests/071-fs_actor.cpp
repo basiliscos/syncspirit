@@ -149,12 +149,9 @@ struct fixture_t {
     }
 
     chain_builder_t finish_file(const bfs::path &path, std::uint64_t file_size, std::int64_t modification_s,
-                                bfs::path local_path = {}) noexcept {
-        if (local_path.empty()) {
-            local_path = path;
-        }
+                                bfs::path conflict_path = {}) noexcept {
         auto context = fs::payload::extendended_context_prt_t{};
-        auto payload = fs::payload::finish_file_t(std::move(context), path, local_path, file_size, modification_s);
+        auto payload = fs::payload::finish_file_t(std::move(context), path, conflict_path, file_size, modification_s);
         auto cmd = fs::payload::io_command_t(std::move(payload));
         auto cmds = fs::payload::io_commands_t{};
         cmds.emplace_back(std::move(cmd));
@@ -353,6 +350,21 @@ void test_append_block() {
                 REQUIRE(bfs::file_size(path) == 5);
                 CHECK(data_1 == as_bytes(read_file(path)));
                 CHECK(to_unix(bfs::last_write_time(path)) == 1641828421);
+            }
+            SECTION("file with 1 block & conflict rename") {
+                auto path = bfs::absolute(root_path / path_rel);
+                write_file(path, "abcdef");
+                auto conflict_path = path.parent_path() / L"экс-инфо.txt";
+                append_block(path, data_1, 0, 5).check_success().finish_file(path, 5, 1641828421, conflict_path).check_success();
+
+                REQUIRE(bfs::exists(path));
+                CHECK(bfs::file_size(path) == 5);
+                CHECK(data_1 == as_bytes(read_file(path)));
+                CHECK(to_unix(bfs::last_write_time(path)) == 1641828421);
+
+                REQUIRE(bfs::exists(conflict_path));
+                CHECK(bfs::file_size(conflict_path) == 6);
+                CHECK(as_bytes(read_file(conflict_path)) == as_owned_bytes("abcdef"));
             }
             SECTION("file with 2 different blocks") {
                 auto wfilename = boost::nowide::widen(path_str) + L".syncspirit-tmp";

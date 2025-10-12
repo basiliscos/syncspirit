@@ -78,14 +78,14 @@ struct remote_copy_t : payload_base_t<void> {
 struct finish_file_t : payload_base_t<void> {
     using parent_t = payload_base_t<void>;
     bfs::path path;
-    bfs::path local_path;
+    bfs::path conflict_path;
     std::uint64_t file_size;
     std::int64_t modification_s;
 
-    inline finish_file_t(extendended_context_prt_t context_, bfs::path path_, bfs::path local_path_,
+    inline finish_file_t(extendended_context_prt_t context_, bfs::path path_, bfs::path conflict_path_,
                          std::uint64_t file_size_, std::int64_t modification_s_) noexcept
         : parent_t{utils::make_error_code(utils::error_code_t::no_action), std::move(context_)}, path{std::move(path_)},
-          local_path{std::move(local_path_)}, file_size{file_size_}, modification_s{modification_s_} {}
+          conflict_path{std::move(conflict_path_)}, file_size{file_size_}, modification_s{modification_s_} {}
 
     finish_file_t(const finish_file_t &) = delete;
     finish_file_t(finish_file_t &&) noexcept = default;

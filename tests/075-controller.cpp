@@ -52,7 +52,7 @@ struct mock_supervisor_t: supervisor_t {
     }
 
     void process_io(fs::payload::finish_file_t &req) noexcept override {
-        auto copy = fs::payload::finish_file_t({}, req.path, req.local_path, req.file_size, req.modification_s);
+        auto copy = fs::payload::finish_file_t({}, req.path, req.conflict_path, req.file_size, req.modification_s);
         file_finishes.emplace_back(std::move(copy));
         supervisor_t::process_io(req);
     }
@@ -1888,9 +1888,9 @@ void test_conflicts() {
                 REQUIRE(sup->file_finishes.size() == 1);
                 auto& file_finish = sup->file_finishes.front();
                 CHECK(file_finish.path == file->get_path(*local_folder));
-                CHECK(file_finish.local_path == local_conflict->get_path(*local_folder));
+                CHECK(file_finish.conflict_path == local_conflict->get_path(*local_folder));
                 CHECK(file_finish.file_size == 5);
-                CHECK(file_finish.modification_s == local_conflict->get_modified_s());
+                CHECK(file_finish.modification_s == file->get_modified_s());
             }
         }
     };

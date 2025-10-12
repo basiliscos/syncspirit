@@ -565,24 +565,17 @@ void controller_actor_t::io_clone_block(const model::file_block_t &file_block, c
 void controller_actor_t::io_finish_file(model::file_info_t* local_file, model::file_info_t& peer_file,
                                         model::folder_info_t& peer_folder, model::advance_action_t action, stack_context_t& ctx){
     assert((action == model::advance_action_t::remote_copy) || (action == model::advance_action_t::resolve_remote_win));
-    static constexpr auto remote_copy = model::advance_action_t::remote_copy;
     auto path = peer_file.get_path(peer_folder);
-    auto local_path = bfs::path();
-    auto file_size = std::int64_t{};
-    auto modified_s = std::int64_t{};
-    if (action == model::advance_action_t::remote_copy) {
-        local_path = path;
-        file_size = peer_file.get_size();
-        modified_s = peer_file.get_modified_s();
-    } else {
+    auto conflict_path = bfs::path();
+    auto file_size = peer_file.get_size();
+    auto modified_s = peer_file.get_modified_s();
+    if (action == model::advance_action_t::resolve_remote_win) {
         assert(local_file);
-        local_path = peer_folder.get_folder()->get_path() / bfs::path(local_file->make_conflicting_name());
-        file_size = local_file->get_size();
-        modified_s = local_file->get_modified_s();
+        conflict_path = peer_folder.get_folder()->get_path() / bfs::path(local_file->make_conflicting_name());
     }
     auto context = fs::payload::extendended_context_prt_t{};
     context.reset(new finish_file_context_t(peer_file, peer_folder, action));
-    auto payload = fs::payload::finish_file_t(std::move(context), std::move(path), std::move(local_path), file_size, modified_s);
+    auto payload = fs::payload::finish_file_t(std::move(context), std::move(path), std::move(conflict_path), file_size, modified_s);
     ctx.push(std::move(payload));
 }
 

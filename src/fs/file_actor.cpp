@@ -223,12 +223,23 @@ void file_actor_t::process(payload::finish_file_t &cmd) noexcept {
         return;
     }
 
+    if (!cmd.conflict_path.empty()) {
+        auto conflict_path_str = cmd.conflict_path.generic_string();
+        LOG_DEBUG(log, "renaming {} -> {}", path_str, conflict_path_str);
+        auto ec = sys::error_code();
+        bfs::rename(cmd.path, cmd.conflict_path);
+        if (ec) {
+            LOG_ERROR(log, "cannot rename file: {}: {}", path_str, ec.message());
+            cmd.result = ec;
+            return;
+        }
+    }
+
     rw_cache->remove(backend);
-    auto ok = backend->close(cmd.modification_s, cmd.local_path);
+    auto ok = backend->close(cmd.modification_s, cmd.path);
     if (!ok) {
-        auto local_path_str = cmd.local_path.generic_string();
         auto &ec = ok.assume_error();
-        LOG_ERROR(log, "cannot close file: {}: {}", local_path_str, ec.message());
+        LOG_ERROR(log, "cannot close file: {}: {}", path_str, ec.message());
         cmd.result = ec;
         return;
     }
