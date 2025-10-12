@@ -149,7 +149,7 @@ struct fixture_t {
     }
 
     chain_builder_t finish_file(const bfs::path &path, std::uint64_t file_size, std::int64_t modification_s,
-                                bfs::path conflict_path = {}) noexcept {
+                                const bfs::path &conflict_path = {}) noexcept {
         auto context = fs::payload::extendended_context_prt_t{};
         auto payload = fs::payload::finish_file_t(std::move(context), path, conflict_path, file_size, modification_s);
         auto cmd = fs::payload::io_command_t(std::move(payload));
@@ -161,7 +161,7 @@ struct fixture_t {
         return chain_builder_t(this, reply, std::in_place_type_t<decltype(payload)>());
     }
 
-    chain_builder_t remote_copy(const bfs::path &path, const proto::FileInfo &meta) noexcept {
+    chain_builder_t remote_copy(const bfs::path &path, const proto::FileInfo &meta, const bfs::path &conflict_path = {}) noexcept {
         auto context = fs::payload::extendended_context_prt_t{};
         auto type = proto::get_type(meta);
         auto size = proto::get_size(meta);
@@ -170,7 +170,7 @@ struct fixture_t {
         auto modificaiton = proto::get_modified_s(meta);
         auto target = std::string(proto::get_symlink_target(meta));
 
-        auto payload = fs::payload::remote_copy_t(std::move(context), path, type, size, perms, modificaiton, target,
+        auto payload = fs::payload::remote_copy_t(std::move(context), path, conflict_path, type, size, perms, modificaiton, target,
                                                   deleted, false);
         auto cmd = fs::payload::io_command_t(std::move(payload));
         auto cmds = fs::payload::io_commands_t{};
@@ -319,6 +319,22 @@ void test_remote_copy() {
 
                 remote_copy(target, pr_fi).check_success();
                 REQUIRE(!bfs::exists(target));
+            }
+            SECTION("conflict") {
+                auto name = bfs::path(L"папка") / L"файл.bin";
+                proto::set_name(pr_fi, boost::nowide::narrow(name.generic_wstring()));
+                proto::set_modified_s(pr_fi, modified);
+
+                bfs::path target = root_path / name;
+                bfs::path conflict = target.parent_path() / L"конфликт.bin";
+                bfs::create_directories(target.parent_path());
+                write_file(target, "zzz");
+                REQUIRE(bfs::exists(target));
+
+                remote_copy(target, pr_fi, conflict).check_success();
+                CHECK(bfs::exists(target));
+                CHECK(bfs::exists(conflict));
+                CHECK(as_owned_bytes("zzz") == as_bytes(read_file(conflict)));
             }
         }
     };

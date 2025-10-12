@@ -113,6 +113,19 @@ void file_actor_t::process(payload::remote_copy_t &cmd) noexcept {
     auto &path = cmd.path;
     sys::error_code ec;
 
+    if (!cmd.conflict_path.empty()) {
+        auto path_str = path.string();
+        auto conflict_path_str = cmd.conflict_path.generic_string();
+        LOG_DEBUG(log, "renaming {} -> {}", path_str, conflict_path_str);
+        auto ec = sys::error_code();
+        bfs::rename(cmd.path, cmd.conflict_path);
+        if (ec) {
+            LOG_ERROR(log, "cannot rename file: {}: {}", path_str, ec.message());
+            cmd.result = ec;
+            return;
+        }
+    }
+
     if (cmd.deleted) {
         if (bfs::exists(path, ec)) {
             LOG_DEBUG(log, "removing {}", path.string());

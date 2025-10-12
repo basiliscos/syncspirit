@@ -499,27 +499,32 @@ OUTER:
 void controller_actor_t::io_advance(model::advance_action_t action, model::file_info_t &peer_file,
                                     model::folder_info_t &peer_folder, stack_context_t& ctx) {
     using namespace model::diff::advance;
-    LOG_TRACE(log, "going to advance ({}) on file '{}'", peer_file, static_cast<int>(action));
+    LOG_TRACE(log, "going to advance (action: {}) on file '{}'", static_cast<int>(action), peer_file);
+    assert((action == model::advance_action_t::remote_copy) || (action == model::advance_action_t::resolve_remote_win));
 
-    if (action == model::advance_action_t::remote_copy) {
-        auto path = peer_file.get_path(peer_folder);
-        auto type = model::file_info_t::as_type(peer_file.get_type());
-        auto size = peer_file.get_size();
-        auto modified = peer_file.get_modified_s();
-        auto target = std::string(peer_file.get_link_target());
-        auto deleted = peer_file.is_deleted();
-        auto perms = peer_file.get_permissions();
-        bool no_permissions =
-                  !utils::platform_t::permissions_supported(path)
-                || peer_folder.get_folder()->are_permissions_ignored()
-                || peer_file.has_no_permissions() ;
-
-        auto context = fs::payload::extendended_context_prt_t{};
-        context.reset(new remote_copy_context_t(action, peer_file, peer_folder));
-        auto payload = fs::payload::remote_copy_t(std::move(context), path, type, size, perms, modified, target,
-                                                  deleted, no_permissions);
-        ctx.push(std::move(payload));
+    auto conflict_path = bfs::path();
+    if (action == model::advance_action_t::resolve_remote_win) {
+        auto local_folder = peer_folder.get_folder()->get_folder_infos().by_device(*cluster->get_device());
+        auto local_file = local_folder->get_file_infos().by_name(peer_file.get_name()->get_full_name());
+        conflict_path = peer_folder.get_folder()->get_path() / bfs::path(local_file->make_conflicting_name());
     }
+    auto path = peer_file.get_path(peer_folder);
+    auto type = model::file_info_t::as_type(peer_file.get_type());
+    auto size = peer_file.get_size();
+    auto modified = peer_file.get_modified_s();
+    auto target = std::string(peer_file.get_link_target());
+    auto deleted = peer_file.is_deleted();
+    auto perms = peer_file.get_permissions();
+    bool no_permissions =
+              !utils::platform_t::permissions_supported(path)
+            || peer_folder.get_folder()->are_permissions_ignored()
+            || peer_file.has_no_permissions() ;
+
+    auto context = fs::payload::extendended_context_prt_t{};
+    context.reset(new remote_copy_context_t(action, peer_file, peer_folder));
+    auto payload = fs::payload::remote_copy_t(std::move(context), path, conflict_path, type, size, perms, modified, target,
+                                              deleted, no_permissions);
+    ctx.push(std::move(payload));
 }
 
 void controller_actor_t::io_append_block(model::file_info_t& peer_file, model::folder_info_t& peer_folder,
