@@ -76,7 +76,6 @@ enum class error_code_t {
     invalid_deviceid,
     cares_failure,
     peer_has_been_removed,
-    nonunique_filename,
     flush_non_opened,
 };
 

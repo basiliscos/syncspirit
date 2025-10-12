@@ -16,6 +16,7 @@
 #include "utils/error_code.h"
 #include "utils/tls.h"
 #include <type_traits>
+#include <boost/nowide/convert.hpp>
 
 using namespace syncspirit;
 using namespace syncspirit::test;
@@ -154,6 +155,14 @@ struct fixture_t {
         cluster->get_devices().put(my_device);
         cluster->get_devices().put(peer_device);
 
+        sup = create_supervisor();
+        sup->cluster = cluster;
+        sup->configure_callback = [&](r::plugin::plugin_base_t &plugin) {
+            plugin.template with_casted<r::plugin::registry_plugin_t>(
+                [&](auto &p) { p.register_name(net::names::fs_actor, sup->get_address()); });
+        };
+        sup->do_process();
+
         auto folder_id_1 = "1234-5678";
         auto folder_id_2 = "5555";
         auto builder = diff_builder_t(*cluster);
@@ -162,21 +171,12 @@ struct fixture_t {
             .upsert_folder(folder_id_2, "")
             .configure_cluster(sha256)
             .add(sha256, folder_id_1, 123, max_sequence)
-            .finish();
-        REQUIRE(builder.apply());
+            .finish().apply(*sup);
 
         if (auto_share) {
-            REQUIRE(builder.share_folder(peer_id.get_sha256(), folder_id_1).apply());
+            builder.share_folder(peer_id.get_sha256(), folder_id_1).apply(*sup);
         }
 
-        sup = create_supervisor();
-        sup->cluster = cluster;
-
-        sup->configure_callback = [&](r::plugin::plugin_base_t &plugin) {
-            plugin.template with_casted<r::plugin::registry_plugin_t>(
-                [&](auto &p) { p.register_name(net::names::fs_actor, sup->get_address()); });
-        };
-        sup->start();
         sup->do_process();
 
         CHECK(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::OPERATIONAL);
@@ -712,11 +712,17 @@ void test_downloading() {
                     }
                 }
             }
-
             SECTION("don't attempt to download a file, which is deleted") {
                 auto folder_peer = folder_infos.by_device(*peer_device);
-                auto pr_fi = proto::FileInfo{};
                 auto file_name = std::string_view("some-file");
+
+                proto::set_max_sequence(*d_peer, folder_1_peer->get_max_sequence() + 1);
+                peer_actor->forward(cc);
+                sup->do_process();
+
+                auto index_update_0 = proto::IndexUpdate{};
+                proto::set_folder(index_update_0, folder_1->get_id());
+                auto &pr_fi = proto::add_files(index_update_0);
                 proto::set_name(pr_fi, file_name);
                 proto::set_type(pr_fi, proto::FileInfoType::FILE);
                 proto::set_sequence(pr_fi, folder_1_peer->get_max_sequence() + 1);
@@ -734,15 +740,9 @@ void test_downloading() {
                 proto::set_size(b1, 5);
                 auto b = model::block_info_t::create(b1).value();
 
-                auto uuid = sup->sequencer->next_uuid();
-                auto file_info = model::file_info_t::create(uuid, pr_fi, folder_peer).value();
-                file_info->assign_block(b.get(), 0);
-                REQUIRE(folder_peer->add_strict(file_info));
-                cluster->get_blocks().put(b);
-
-                proto::set_max_sequence(*d_peer, folder_1_peer->get_max_sequence() + 1);
-                peer_actor->forward(cc);
+                peer_actor->forward(index_update_0);
                 sup->do_process();
+
                 auto blocks_requested = peer_actor->blocks_requested;
 
                 auto index_update = proto::IndexUpdate{};
@@ -1269,6 +1269,45 @@ void test_download_resuming() {
         }
     };
     F(false, 10, false).run();
+}
+
+void test_uniqueness() {
+    struct F : fixture_t {
+        using fixture_t::fixture_t;
+        void main(diff_builder_t &) noexcept override {
+            auto &folder_infos = folder_1->get_folder_infos();
+            auto folder_my = folder_infos.by_device(*my_device);
+            auto folder_peer = folder_infos.by_device(*peer_device);
+
+            auto builder = diff_builder_t(*cluster);
+            auto folder_1_id = folder_1->get_id();
+            auto sha256 = peer_device->device_id().get_sha256();
+            builder.configure_cluster(sha256)
+                .add(sha256, folder_1_id, folder_peer->get_index(), 10)
+                .finish()
+                .apply(*sup, target.get());
+
+            auto pr_file_1 = proto::FileInfo();
+            proto::set_name(pr_file_1, boost::nowide::narrow(L"ФАЙЛ"));
+            proto::set_type(pr_file_1, proto::FileInfoType::FILE);
+            proto::set_sequence(pr_file_1, 9);
+
+            auto pr_file_2 = proto::FileInfo();
+            proto::set_name(pr_file_2, boost::nowide::narrow(L"файл"));
+            proto::set_type(pr_file_2, proto::FileInfoType::FILE);
+            proto::set_sequence(pr_file_2, 10);
+
+            builder.make_index(sha256, folder_1_id).add(pr_file_1, peer_device).add(pr_file_2, peer_device)
+                    .finish().apply(*sup, target.get());
+
+#if defined(SYNCSPIRIT_WIN) || defined(SYNCSPIRIT_MAC)
+            REQUIRE(folder_my->get_file_infos().size() == 0);
+#else
+            REQUIRE(folder_my->get_file_infos().size() == 2);
+#endif
+        }
+    };
+    F(true, 10, true).run();
 }
 
 void test_initiate_my_sharing() {
@@ -2396,41 +2435,6 @@ void test_races() {
     F(true, 10).run();
 };
 
-#if 0
-    auto augmentation = info.get()->get_augmentation();
-    auto presence = static_cast<presentation::presence_t *>(augmentation.get());
-    if (!presence->is_unique()) {
-        return utils::make_error_code(utils::error_code_t::nonunique_filename);
-    }
-
-void test_uniqueness() {
-    struct F : fixture_t {
-        void main() noexcept override {
-            auto path_1 = root_path / L"ФАЙЛ";
-            auto path_2 = root_path / L"файл";
-
-            proto::FileInfo pr_fi;
-            std::int64_t modified = 1641828421;
-            proto::set_modified_s(pr_fi, modified);
-            proto::set_permissions(pr_fi, 0666);
-
-            remote_copy(&path_1, pr_fi).check_success();
-            CHECK(bfs::exists(path_1));
-
-#if defined(SYNCSPIRIT_WIN) || defined(SYNCSPIRIT_MAC)
-            remote_copy(&path_2, pr_fi).check_fail();
-            CHECK(!bfs::exists(path_1));
-#else
-            remote_copy(&path_2, pr_fi).check_success();
-            CHECK(bfs::exists(path_2));
-#endif
-        }
-    };
-    F().run();
-}
-#endif
-
-
 int _init() {
     REGISTER_TEST_CASE(test_startup, "test_startup", "[net]");
     REGISTER_TEST_CASE(test_overwhelm, "test_overwhelm", "[net]");
@@ -2440,6 +2444,7 @@ int _init() {
     REGISTER_TEST_CASE(test_downloading_errors, "test_downloading_errors", "[net]");
     REGISTER_TEST_CASE(test_download_from_scratch, "test_download_from_scratch", "[net]");
     REGISTER_TEST_CASE(test_download_resuming, "test_download_resuming", "[net]");
+    REGISTER_TEST_CASE(test_uniqueness, "test_uniqueness", "[net]");
     REGISTER_TEST_CASE(test_initiate_my_sharing, "test_initiate_my_sharing", "[net]");
     REGISTER_TEST_CASE(test_initiate_peer_sharing, "test_initiate_peer_sharing", "[net]");
     REGISTER_TEST_CASE(test_sending_index_updates, "test_sending_index_updates", "[net]");
@@ -2452,7 +2457,6 @@ int _init() {
     REGISTER_TEST_CASE(test_change_folder_type, "test_change_folder_type", "[net]");
     REGISTER_TEST_CASE(test_pausing, "test_pausing", "[net]");
     REGISTER_TEST_CASE(test_races, "test_races", "[net]");
-    // REGISTER_TEST_CASE(test_uniqueness, "test_uniqueness", "[net]");
     return 1;
 }
 

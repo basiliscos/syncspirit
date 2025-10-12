@@ -18,6 +18,7 @@
 #include "model/diff/peer/cluster_update.h"
 #include "model/diff/peer/update_folder.h"
 #include "model/misc/resolver.h"
+#include "presentation/presence.h"
 #include "proto/bep_support.h"
 #include "proto/proto-helpers-bep.h"
 #include "proto/proto-helpers-db.h"
@@ -477,6 +478,13 @@ OUTER:
         if (auto [file, peer_folder, action] = file_iterator->next(); action != model::advance_action_t::ignore) {
             auto in_sync = synchronizing_files.count(file->get_full_id());
             if (in_sync) {
+                continue;
+            }
+            auto augmentation = file->get_augmentation();
+            auto presence = static_cast<presentation::presence_t *>(augmentation.get());
+            if (!presence->is_unique()) {
+                LOG_WARN(log, "file '{}' is not unique in folder '{}', skipping",
+                         file->get_name()->get_full_name(), peer_folder->get_folder()->get_label());
                 continue;
             }
             if (file->is_locally_available()) {

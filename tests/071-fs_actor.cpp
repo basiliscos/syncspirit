@@ -91,7 +91,6 @@ struct fixture_t {
                   .auto_ack_io(false)
                   .timeout(timeout)
                   .create_registry()
-                  .make_presentation(true)
                   .configure_callback(configure())
                   .finish();
 
@@ -354,7 +353,7 @@ void test_append_block() {
 
             SECTION("finish non-opened") {
                 auto path = bfs::absolute(root_path / path_rel);
-                auto ec = utils::make_error_code(utils::error_code_t::nonunique_filename);
+                auto ec = utils::make_error_code(utils::error_code_t::flush_non_opened);
                 finish_file(path, 5, 1641828421).check_fail(ec);
             }
 

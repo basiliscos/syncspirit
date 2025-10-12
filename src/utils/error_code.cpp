@@ -125,9 +125,6 @@ std::string error_code_category::message(int c) const {
     case error_code_t::flush_non_opened:
         r = "attempt to flush a non-opened file";
         break;
-    case error_code_t::nonunique_filename:
-        r = "filename uniqueness violation (OS/filesystem dependent)";
-        break;
     case error_code_t::peer_has_been_removed:
         r = "peer has been removed";
         break;

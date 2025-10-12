@@ -232,7 +232,7 @@ void file_actor_t::process(payload::finish_file_t &cmd) noexcept {
     auto backend = rw_cache->get(cmd.path);
     if (!backend) {
         LOG_WARN(log, "attempt to flush non-opened file {}", path_str);
-        cmd.result = utils::make_error_code(utils::error_code_t::nonunique_filename);
+        cmd.result = utils::make_error_code(utils::error_code_t::flush_non_opened);
         return;
     }
 

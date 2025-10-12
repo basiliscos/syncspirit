@@ -26,7 +26,7 @@ struct supervisor_config_t : r::supervisor_config_t {
     using parent_t::parent_t;
     bool auto_finish = true;
     bool auto_ack_io = true;
-    bool make_presentation = false;
+    bool make_presentation = true;
     configure_callback_t configure_callback;
 };
 
