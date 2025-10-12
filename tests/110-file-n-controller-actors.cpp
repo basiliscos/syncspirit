@@ -219,7 +219,6 @@ void test_fs_actor_error() {
                     .add(pr_file, peer_device)
                     .finish()
                     .apply(*sup, controller_actor.get());
-
             }
             SECTION("fs error -> controller down") {
                 builder.make_index(sha256, folder_id)

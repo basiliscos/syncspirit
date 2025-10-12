@@ -229,8 +229,9 @@ auto supervisor_t::operator()(const model::diff::peer::update_folder_t &diff, vo
     return diff.visit_next(*this, custom);
 }
 
-void supervisor_t::process_io(fs::payload::block_request_t & req) noexcept {
-    LOG_TRACE(log, "process_io, requesting on '{}' (offset: {}, size: {})", req.path.string(), req.offset, req.block_size);
+void supervisor_t::process_io(fs::payload::block_request_t &req) noexcept {
+    LOG_TRACE(log, "process_io, requesting on '{}' (offset: {}, size: {})", req.path.string(), req.offset,
+              req.block_size);
 }
 
 void supervisor_t::process_io(fs::payload::remote_copy_t &req) noexcept {
@@ -255,12 +256,8 @@ void supervisor_t::process_io(fs::payload::finish_file_t &req) noexcept {
 }
 
 void supervisor_t::process_io(fs::payload::clone_block_t &req) noexcept {
-    LOG_TRACE(log, "process_io (ack: {}), clone_block_t, {} bytes,  {}(#{}) -> {}(#{})",
-              auto_ack_io,
-              req.block_size,
-              req.source.string(), req.source_offset,
-              req.target.string(), req.target_offset
-        );
+    LOG_TRACE(log, "process_io (ack: {}), clone_block_t, {} bytes,  {}(#{}) -> {}(#{})", auto_ack_io, req.block_size,
+              req.source.string(), req.source_offset, req.target.string(), req.target_offset);
     if (auto_ack_io) {
         req.result = outcome::success();
     }

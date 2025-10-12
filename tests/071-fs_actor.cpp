@@ -160,7 +160,8 @@ struct fixture_t {
         return chain_builder_t(this, reply, std::in_place_type_t<decltype(payload)>());
     }
 
-    chain_builder_t remote_copy(const bfs::path &path, const proto::FileInfo &meta, const bfs::path &conflict_path = {}) noexcept {
+    chain_builder_t remote_copy(const bfs::path &path, const proto::FileInfo &meta,
+                                const bfs::path &conflict_path = {}) noexcept {
         auto context = fs::payload::extendended_context_prt_t{};
         auto type = proto::get_type(meta);
         auto size = proto::get_size(meta);
@@ -169,8 +170,8 @@ struct fixture_t {
         auto modificaiton = proto::get_modified_s(meta);
         auto target = std::string(proto::get_symlink_target(meta));
 
-        auto payload = fs::payload::remote_copy_t(std::move(context), path, conflict_path, type, size, perms, modificaiton, target,
-                                                  deleted, false);
+        auto payload = fs::payload::remote_copy_t(std::move(context), path, conflict_path, type, size, perms,
+                                                  modificaiton, target, deleted, false);
         auto cmd = fs::payload::io_command_t(std::move(payload));
         auto cmds = fs::payload::io_commands_t{};
         cmds.emplace_back(std::move(cmd));
@@ -370,7 +371,10 @@ void test_append_block() {
                 auto path = bfs::absolute(root_path / path_rel);
                 write_file(path, "abcdef");
                 auto conflict_path = path.parent_path() / L"экс-инфо.txt";
-                append_block(path, data_1, 0, 5).check_success().finish_file(path, 5, 1641828421, conflict_path).check_success();
+                append_block(path, data_1, 0, 5)
+                    .check_success()
+                    .finish_file(path, 5, 1641828421, conflict_path)
+                    .check_success();
 
                 REQUIRE(bfs::exists(path));
                 CHECK(bfs::file_size(path) == 5);

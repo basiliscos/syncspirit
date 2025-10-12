@@ -111,16 +111,16 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     void shutdown_finish() noexcept override;
 
     struct stack_context_t {
-        stack_context_t(controller_actor_t& actor_) noexcept;
+        stack_context_t(controller_actor_t &actor_) noexcept;
         inline ~stack_context_t();
         void push(fs::payload::io_command_t command) noexcept;
         void push(fs::payload::append_block_t command) noexcept;
         void push(model::diff::cluster_diff_ptr_t diff_) noexcept;
 
-    private:
-        controller_actor_t& actor;
+      private:
+        controller_actor_t &actor;
         model::diff::cluster_diff_ptr_t diff;
-        model::diff::cluster_diff_t* next = nullptr;
+        model::diff::cluster_diff_t *next = nullptr;
         fs::payload::io_commands_t io_commands;
     };
 
@@ -131,8 +131,9 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
         void *controller;
     };
 
-    struct update_context_t: stack_context_t {
-        update_context_t(controller_actor_t& actor, bool from_self_, bool cluster_config_sent_, std::uint32_t pull_ready_) noexcept;
+    struct update_context_t : stack_context_t {
+        update_context_t(controller_actor_t &actor, bool from_self_, bool cluster_config_sent_,
+                         std::uint32_t pull_ready_) noexcept;
 
         bool from_self;
         bool cluster_config_sent;
@@ -153,11 +154,11 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
 
         void reset() noexcept;
 
-        void start_fetching(model::block_info_t *, stack_context_t&) noexcept;
-        void finish_fetching(utils::bytes_view_t hash, stack_context_t&) noexcept;
+        void start_fetching(model::block_info_t *, stack_context_t &) noexcept;
+        void finish_fetching(utils::bytes_view_t hash, stack_context_t &) noexcept;
 
-        void start_sync(stack_context_t&) noexcept;
-        void finish_sync(stack_context_t&) noexcept;
+        void start_sync(stack_context_t &) noexcept;
+        void finish_sync(stack_context_t &) noexcept;
 
       private:
         controller_actor_t *controller = nullptr;
@@ -177,44 +178,50 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     void on_forward(message::forwarded_message_t &message) noexcept;
     void on_block(message::block_response_t &message) noexcept;
     void on_validation(hasher::message::validation_response_t &res) noexcept;
-    void preprocess_block(model::file_block_t &block, const model::folder_info_t &source_folder, stack_context_t&) noexcept;
+    void preprocess_block(model::file_block_t &block, const model::folder_info_t &source_folder,
+                          stack_context_t &) noexcept;
     void on_model_update(model::message::model_update_t &message) noexcept;
     void on_tx_signal(net::message::tx_signal_t &message) noexcept;
     void on_postprocess_io(fs::message::io_commands_t &) noexcept;
     void on_fs_predown(message::fs_predown_t &message) noexcept;
     void on_fs_ack_timer(r::request_id_t, bool cancelled) noexcept;
 
-    void on_message(proto::ClusterConfig &message, stack_context_t&) noexcept;
-    void on_message(proto::Index &message, stack_context_t&) noexcept;
-    void on_message(proto::IndexUpdate &message, stack_context_t&) noexcept;
-    void on_message(proto::Request &message, stack_context_t&) noexcept;
-    void on_message(proto::DownloadProgress &message, stack_context_t&) noexcept;
+    void on_message(proto::ClusterConfig &message, stack_context_t &) noexcept;
+    void on_message(proto::Index &message, stack_context_t &) noexcept;
+    void on_message(proto::IndexUpdate &message, stack_context_t &) noexcept;
+    void on_message(proto::Request &message, stack_context_t &) noexcept;
+    void on_message(proto::DownloadProgress &message, stack_context_t &) noexcept;
 
-    void postprocess_io(fs::payload::block_request_t &, stack_context_t&) noexcept;
-    void postprocess_io(fs::payload::remote_copy_t &, stack_context_t&) noexcept;
-    void postprocess_io(fs::payload::append_block_t &, stack_context_t&) noexcept;
-    void postprocess_io(fs::payload::finish_file_t &, stack_context_t&) noexcept;
-    void postprocess_io(fs::payload::clone_block_t &, stack_context_t&) noexcept;
+    void postprocess_io(fs::payload::block_request_t &, stack_context_t &) noexcept;
+    void postprocess_io(fs::payload::remote_copy_t &, stack_context_t &) noexcept;
+    void postprocess_io(fs::payload::append_block_t &, stack_context_t &) noexcept;
+    void postprocess_io(fs::payload::finish_file_t &, stack_context_t &) noexcept;
+    void postprocess_io(fs::payload::clone_block_t &, stack_context_t &) noexcept;
 
     void on_custom(const pull_signal_t &diff) noexcept;
 
     void request_block(const model::file_block_t &block) noexcept;
-    void pull_next(stack_context_t&) noexcept;
+    void pull_next(stack_context_t &) noexcept;
     // void pull_ready() noexcept;
     void push_pending() noexcept;
     void send_cluster_config() noexcept;
     void send_new_indices() noexcept;
     // void process_block_write() noexcept;
 
-    void io_advance(model::advance_action_t action, model::file_info_t &peer_file,
-                    model::folder_info_t &peer_folder, stack_context_t&);
-    void io_append_block(model::file_info_t&, model::folder_info_t&, uint32_t block_index, utils::bytes_t data, stack_context_t&);
-    void io_clone_block(const model::file_block_t &file_block, const model::folder_info_t& source_fi, model::folder_info_t& target_fi, stack_context_t&);
-    void io_finish_file(model::file_info_t*, model::file_info_t&, model::folder_info_t&, model::advance_action_t, stack_context_t&);
-    auto io_make_request_block(model::file_info_t&, model::folder_info_t&, proto::Request) -> fs::payload::io_command_t;
+    void io_advance(model::advance_action_t action, model::file_info_t &peer_file, model::folder_info_t &peer_folder,
+                    stack_context_t &);
+    void io_append_block(model::file_info_t &, model::folder_info_t &, uint32_t block_index, utils::bytes_t data,
+                         stack_context_t &);
+    void io_clone_block(const model::file_block_t &file_block, const model::folder_info_t &source_fi,
+                        model::folder_info_t &target_fi, stack_context_t &);
+    void io_finish_file(model::file_info_t *, model::file_info_t &, model::folder_info_t &, model::advance_action_t,
+                        stack_context_t &);
+    auto io_make_request_block(model::file_info_t &, model::folder_info_t &, proto::Request)
+        -> fs::payload::io_command_t;
 
-    void acquire_block(const model::file_block_t &block, const model::folder_info_t &folder_info, stack_context_t&) noexcept;
-    void release_block(std::string_view folder_id, utils::bytes_view_t hash, stack_context_t&) noexcept;
+    void acquire_block(const model::file_block_t &block, const model::folder_info_t &folder_info,
+                       stack_context_t &) noexcept;
+    void release_block(std::string_view folder_id, utils::bytes_view_t hash, stack_context_t &) noexcept;
     folder_synchronization_t &get_sync_info(model::folder_t *folder) noexcept;
     folder_synchronization_t &get_sync_info(std::string_view folder_id) noexcept;
     void cancel_sync(model::file_info_t *) noexcept;

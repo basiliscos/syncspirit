@@ -65,12 +65,14 @@ struct remote_copy_t : payload_base_t<void> {
     bool deleted;
     bool no_permissions;
 
-    inline remote_copy_t(extendended_context_prt_t context_, bfs::path path_, bfs::path conflict_path_, proto::FileInfoType type_,
-                         std::uint64_t size_, std::uint32_t permissions_, std::int64_t modification_s_,
-                         std::string symlink_target_, bool deleted_, bool no_permissions_) noexcept
+    inline remote_copy_t(extendended_context_prt_t context_, bfs::path path_, bfs::path conflict_path_,
+                         proto::FileInfoType type_, std::uint64_t size_, std::uint32_t permissions_,
+                         std::int64_t modification_s_, std::string symlink_target_, bool deleted_,
+                         bool no_permissions_) noexcept
         : parent_t{utils::make_error_code(utils::error_code_t::no_action), std::move(context_)}, path{std::move(path_)},
-          conflict_path{std::move(conflict_path_)}, type{type_}, size{size_}, permissions{permissions_}, modification_s{modification_s_},
-          symlink_target(std::move(symlink_target_)), deleted{deleted_}, no_permissions{no_permissions_} {}
+          conflict_path{std::move(conflict_path_)}, type{type_}, size{size_}, permissions{permissions_},
+          modification_s{modification_s_}, symlink_target(std::move(symlink_target_)), deleted{deleted_},
+          no_permissions{no_permissions_} {}
 
     remote_copy_t(const remote_copy_t &) = delete;
     remote_copy_t(remote_copy_t &&) noexcept = default;

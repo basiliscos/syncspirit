@@ -26,7 +26,7 @@ using namespace syncspirit::hasher;
 
 namespace {
 
-struct mock_supervisor_t: supervisor_t {
+struct mock_supervisor_t : supervisor_t {
     using block_responces_t = std::list<outcome::result<utils::bytes_t>>;
     using block_requests_t = std::list<fs::payload::block_request_t>;
     using io_message_ptr = r::intrusive_ptr_t<fs::message::io_commands_t>;
@@ -34,15 +34,17 @@ struct mock_supervisor_t: supervisor_t {
     using appended_blocks_t = std::list<fs::payload::append_block_t>;
     using file_finishes_t = std::list<fs::payload::finish_file_t>;
 
-    using supervisor_t::supervisor_t;
     using supervisor_t::process_io;
+    using supervisor_t::supervisor_t;
 
-    void on_io(fs::message::io_commands_t & message) noexcept override {
+    void on_io(fs::message::io_commands_t &message) noexcept override {
         if (bypass_io_messages == 0) {
             io_messages.emplace_back(&message);
         } else {
             supervisor_t::on_io(message);
-            if (bypass_io_messages > 0) { --bypass_io_messages; }
+            if (bypass_io_messages > 0) {
+                --bypass_io_messages;
+            }
         }
     }
 
@@ -61,7 +63,7 @@ struct mock_supervisor_t: supervisor_t {
     void process_io(fs::payload::block_request_t &req) noexcept override {
         supervisor_t::process_io(req);
         if (!block_responces.empty()) {
-            auto& res = block_responces.front();
+            auto &res = block_responces.front();
             req.result = std::move(res);
             block_responces.pop_front();
         }
@@ -69,7 +71,7 @@ struct mock_supervisor_t: supervisor_t {
         block_requests.emplace_back(std::move(copy));
     }
 
-    mock_supervisor_t* resume_io(int count = 1) noexcept {
+    mock_supervisor_t *resume_io(int count = 1) noexcept {
         int i = count;
         while (io_messages.size() && i > 0) {
             auto msg = io_messages.front();
@@ -81,9 +83,7 @@ struct mock_supervisor_t: supervisor_t {
         return this;
     }
 
-    void intercept_io(int count) noexcept {
-        bypass_io_messages = count;
-    }
+    void intercept_io(int count) noexcept { bypass_io_messages = count; }
 
     block_responces_t block_responces;
     block_requests_t block_requests;
@@ -171,7 +171,8 @@ struct fixture_t {
             .upsert_folder(folder_id_2, "")
             .configure_cluster(sha256)
             .add(sha256, folder_id_1, 123, max_sequence)
-            .finish().apply(*sup);
+            .finish()
+            .apply(*sup);
 
         if (auto_share) {
             builder.share_folder(peer_id.get_sha256(), folder_id_1).apply(*sup);
@@ -962,7 +963,7 @@ void test_downloading_errors() {
 
             bool reject_blocks = false;
 
-            void process_io(fs::payload::append_block_t & req) noexcept {
+            void process_io(fs::payload::append_block_t &req) noexcept {
                 if (reject_blocks) {
                     // error by default;
                 } else {
@@ -1300,8 +1301,11 @@ void test_uniqueness() {
             proto::set_type(pr_file_2, proto::FileInfoType::FILE);
             proto::set_sequence(pr_file_2, 10);
 
-            builder.make_index(sha256, folder_1_id).add(pr_file_1, peer_device).add(pr_file_2, peer_device)
-                    .finish().apply(*sup, target.get());
+            builder.make_index(sha256, folder_1_id)
+                .add(pr_file_1, peer_device)
+                .add(pr_file_2, peer_device)
+                .finish()
+                .apply(*sup, target.get());
 
 #if defined(SYNCSPIRIT_WIN) || defined(SYNCSPIRIT_MAC)
             REQUIRE(folder_my->get_file_infos().size() == 0);
@@ -1620,7 +1624,7 @@ void test_uploading() {
                 sup->do_process();
                 REQUIRE(sup->block_responces.size() == 0);
                 REQUIRE(sup->block_requests.size() == 1);
-                auto& req = sup->block_requests.front();
+                auto &req = sup->block_requests.front();
                 CHECK(req.path.filename() == file_name);
                 CHECK(req.offset == 0);
                 CHECK(req.block_size == data_1.size());
@@ -1640,7 +1644,7 @@ void test_uploading() {
                 sup->do_process();
                 REQUIRE(sup->block_responces.size() == 0);
                 REQUIRE(sup->block_requests.size() == 1);
-                auto& req = sup->block_requests.front();
+                auto &req = sup->block_requests.front();
                 CHECK(req.path.filename() == file_name);
                 CHECK(req.offset == 0);
                 CHECK(req.block_size == data_1.size());
@@ -1935,14 +1939,14 @@ void test_conflicts() {
                 CHECK(proto::get_name(f2) == file->get_name()->get_full_name());
 
                 REQUIRE(sup->appended_blocks.size() == 1);
-                auto& appended_block = sup->appended_blocks.front();
+                auto &appended_block = sup->appended_blocks.front();
                 CHECK(appended_block.path == file->get_path(*local_folder));
                 CHECK(appended_block.file_size == 5);
                 CHECK(appended_block.offset == 0);
                 CHECK(appended_block.data == data_3);
 
                 REQUIRE(sup->file_finishes.size() == 1);
-                auto& file_finish = sup->file_finishes.front();
+                auto &file_finish = sup->file_finishes.front();
                 CHECK(file_finish.path == file->get_path(*local_folder));
                 CHECK(file_finish.conflict_path == local_conflict->get_path(*local_folder));
                 CHECK(file_finish.file_size == 5);
@@ -2120,7 +2124,6 @@ void test_download_interrupting() {
                     builder.apply(*sup);
                     auto folder_my = folder_1->get_folder_infos().by_device(*my_device);
                     CHECK(folder_my->get_file_infos().size() == 0);
-
                 }
                 SECTION("remove") {
                     builder.remove_folder(*folder_1).apply(*sup);
@@ -2134,17 +2137,14 @@ void test_download_interrupting() {
                     CHECK(static_cast<r::actor_base_t *>(target.get())->access<to::state>() ==
                           r::state_t::SHUTTING_DOWN);
 
-                    SECTION("ack upon shutdown") {
-                        sup->resume_io(2)->do_process();
-                    }
+                    SECTION("ack upon shutdown") { sup->resume_io(2)->do_process(); }
                     SECTION("no ack, timeout trigger") {
                         auto fs_timer_id = sup->timers.back()->request_id;
                         sup->do_invoke_timer(fs_timer_id);
                         sup->do_process();
                     }
 
-                    CHECK(static_cast<r::actor_base_t *>(target.get())->access<to::state>() ==
-                          r::state_t::SHUT_DOWN);
+                    CHECK(static_cast<r::actor_base_t *>(target.get())->access<to::state>() == r::state_t::SHUT_DOWN);
                     CHECK(cluster->get_write_requests() == write_requests);
                 }
                 sup->resume_io(2)->do_process();
