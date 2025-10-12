@@ -88,7 +88,7 @@ struct fixture_t {
         r::system_context_t ctx;
         sup = ctx.create_supervisor<supervisor_t>()
                   .auto_finish(false)
-                  .auto_ack_blocks(false)
+                  .auto_ack_io(false)
                   .timeout(timeout)
                   .create_registry()
                   .make_presentation(true)
