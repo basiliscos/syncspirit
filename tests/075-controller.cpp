@@ -1570,7 +1570,6 @@ void test_uploading() {
             proto::set_size(req, data.size());
 
             peer_actor->forward(cc);
-
             SECTION("upload regular file, no hash") {
                 peer_actor->forward(req);
                 auto res = outcome::result<utils::bytes_t>(data_1);
@@ -1589,6 +1588,26 @@ void test_uploading() {
                 CHECK(proto::get_id(peer_res) == 1);
                 CHECK(proto::get_code(peer_res) == proto::ErrorCode::NO_BEP_ERROR);
                 CHECK(proto::get_data(peer_res) == data_1);
+            }
+            SECTION("fs error") {
+                peer_actor->forward(req);
+                auto ec = utils::make_error_code(utils::error_code_t::fs_error);
+                auto res = outcome::result<utils::bytes_t>(ec);
+                sup->block_responces.emplace_back(res);
+
+                sup->do_process();
+                REQUIRE(sup->block_responces.size() == 0);
+                REQUIRE(sup->block_requests.size() == 1);
+                auto& req = sup->block_requests.front();
+                CHECK(req.path.filename() == file_name);
+                CHECK(req.offset == 0);
+                CHECK(req.block_size == data_1.size());
+
+                REQUIRE(peer_actor->uploaded_blocks.size() == 1);
+                auto &peer_res = peer_actor->uploaded_blocks.front();
+                CHECK(proto::get_id(peer_res) == 1);
+                CHECK(proto::get_code(peer_res) == proto::ErrorCode::GENERIC);
+                CHECK(proto::get_data(peer_res).size() == 0);
             }
         }
     };

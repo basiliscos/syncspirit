@@ -8,12 +8,8 @@
 #include "model/diff/contact/peer_state.h"
 #include "model/diff/local/synchronization_finish.h"
 #include "model/diff/local/synchronization_start.h"
-#include "model/diff/modify/append_block.h"
 #include "model/diff/modify/block_ack.h"
-#include "model/diff/modify/block_rej.h"
-#include "model/diff/modify/clone_block.h"
 #include "model/diff/modify/mark_reachable.h"
-#include "model/diff/modify/finish_file.h"
 #include "model/diff/modify/remove_peer.h"
 #include "model/diff/modify/remove_files.h"
 #include "model/diff/modify/remove_folder_infos.h"
@@ -30,6 +26,7 @@
 #include "utils/platform.h"
 
 #include <utility>
+#include <type_traits>
 
 using namespace syncspirit;
 using namespace syncspirit::net;
@@ -349,12 +346,17 @@ void controller_actor_t::on_postprocess_io(fs::message::io_commands_t &message) 
     resources->release(resource::fs);
     for (auto &cmd : message.payload) {
         std::visit([&](auto &cmd) {
-            if (cmd.result.has_error()) {
-                auto& ec = cmd.result.assume_error();
-                LOG_ERROR(log, "i/o error (postprocessing): {}", ec.message());
-                do_shutdown(make_error(ec));
-            } else {
+            using T = std::decay_t<decltype(cmd)>;
+            if constexpr(std::is_same_v<T, fs::payload::block_request_t>) {
                 postprocess_io(cmd, stack_ctx);
+            } else {
+                if (cmd.result.has_error()) {
+                    auto& ec = cmd.result.assume_error();
+                    LOG_ERROR(log, "i/o error (postprocessing): {}", ec.message());
+                    do_shutdown(make_error(ec));
+                } else {
+                    postprocess_io(cmd, stack_ctx);
+                }
             }
         }, cmd);
     }
