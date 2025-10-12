@@ -28,8 +28,20 @@ namespace {
 struct mock_supervisor_t: supervisor_t {
     using block_responces_t = std::list<outcome::result<utils::bytes_t>>;
     using block_requests_t = std::list<fs::payload::block_request_t>;
+    using io_message_ptr = r::intrusive_ptr_t<fs::message::io_commands_t>;
+    using io_messages_t = std::list<io_message_ptr>;
+
     using supervisor_t::supervisor_t;
     using supervisor_t::process_io;
+
+    void on_io(fs::message::io_commands_t & message) noexcept override {
+        if (bypass_io_messages == 0) {
+            io_messages.emplace_back(&message);
+        } else {
+            supervisor_t::on_io(message);
+            if (bypass_io_messages > 0) { --bypass_io_messages; }
+        }
+    }
 
     void process_io(fs::payload::block_request_t &req) noexcept override {
         supervisor_t::process_io(req);
@@ -42,8 +54,26 @@ struct mock_supervisor_t: supervisor_t {
         block_requests.emplace_back(std::move(copy));
     }
 
+    mock_supervisor_t* resume_io(int count = 1) noexcept {
+        int i = count;
+        while (io_messages.size() && i > 0) {
+            auto msg = io_messages.front();
+            put(std::move(msg));
+            io_messages.pop_front();
+            --i;
+        }
+        bypass_io_messages = count;
+        return this;
+    }
+
+    void intercept_io(int count) noexcept {
+        bypass_io_messages = count;
+    }
+
     block_responces_t block_responces;
     block_requests_t block_requests;
+    int bypass_io_messages = -1;
+    io_messages_t io_messages;
 };
 
 struct fixture_t {
@@ -1908,8 +1938,7 @@ void test_download_interrupting() {
                     CHECK(folder_my->get_file_infos().size() == 0);
                 }
                 SECTION("remove folder") {
-#if 0
-                    sup->auto_ack_blocks = false;
+                    sup->auto_ack_io = false;
 
                     peer_actor->push_block(data_2, 1, file_name);
                     peer_actor->process_block_requests();
@@ -1926,8 +1955,6 @@ void test_download_interrupting() {
                     sup->do_process();
                     CHECK(peer_actor->blocks_requested == proto::get_blocks_size(file));
                     CHECK(!cluster->get_folders().by_id(proto::get_id(folder)));
-#endif
-                    std::abort();
                 }
             }
             SECTION("hash validation replies") {
@@ -1953,38 +1980,28 @@ void test_download_interrupting() {
                 }
             }
             SECTION("block acks from fs") {
-                std::abort();
-#if 0
                 auto write_requests = cluster->get_write_requests();
-                sup->auto_ack_blocks = false;
+                sup->intercept_io(0);
                 hasher->auto_reply = true;
                 peer_actor->push_block(data_2, 1, file_name);
                 peer_actor->push_block(data_1, 0, file_name);
                 peer_actor->process_block_requests();
                 sup->do_process();
-                REQUIRE(sup->delayed_ack_holder);
+                REQUIRE(!sup->io_messages.empty());
 
                 SECTION("suspend") {
                     builder.suspend(*folder_1);
-                    sup->send<model::payload::model_update_t>(sup->get_address(), std::move(sup->delayed_ack_holder));
+                    sup->resume_io(1);
                     builder.apply(*sup);
                     auto folder_my = folder_1->get_folder_infos().by_device(*my_device);
                     CHECK(folder_my->get_file_infos().size() == 0);
 
-                    REQUIRE(sup->delayed_ack_holder);
-                    sup->send<model::payload::model_update_t>(sup->get_address(), std::move(sup->delayed_ack_holder));
-                    sup->do_process();
                 }
-
                 SECTION("remove") {
                     builder.remove_folder(*folder_1).apply(*sup);
-                    sup->send<model::payload::model_update_t>(sup->get_address(), std::move(sup->delayed_ack_holder));
-                    sup->do_process();
+                    sup->resume_io(1)->do_process();
                     CHECK(!cluster->get_folders().by_id(proto::get_id(folder)));
-
-                    REQUIRE(sup->delayed_ack_holder);
-                    sup->send<model::payload::model_update_t>(sup->get_address(), std::move(sup->delayed_ack_holder));
-                    sup->do_process();
+                    CHECK(!sup->io_messages.empty());
                 }
                 SECTION("down controller") {
                     target->do_shutdown();
@@ -1993,10 +2010,7 @@ void test_download_interrupting() {
                           r::state_t::SHUTTING_DOWN);
 
                     SECTION("ack upon shutdown") {
-                        REQUIRE(sup->delayed_ack_holder);
-                        sup->send<model::payload::model_update_t>(sup->get_address(),
-                                                                  std::move(sup->delayed_ack_holder));
-                        sup->do_process();
+                        sup->resume_io(2)->do_process();
                     }
                     SECTION("no ack, timeout trigger") {
                         auto fs_timer_id = sup->timers.back()->request_id;
@@ -2004,9 +2018,11 @@ void test_download_interrupting() {
                         sup->do_process();
                     }
 
+                    CHECK(static_cast<r::actor_base_t *>(target.get())->access<to::state>() ==
+                          r::state_t::SHUT_DOWN);
                     CHECK(cluster->get_write_requests() == write_requests);
                 }
-#endif
+                sup->resume_io(2)->do_process();
             }
         }
 

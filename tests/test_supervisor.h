@@ -82,7 +82,7 @@ struct SYNCSPIRIT_TEST_API supervisor_t : r::supervisor_t,
     void do_start_timer(const r::pt::time_duration &interval, r::timer_handler_base_t &handler) noexcept override;
     void do_invoke_timer(r::request_id_t timer_id) noexcept;
     void do_cancel_timer(r::request_id_t timer_id) noexcept override;
-    void on_io(fs::message::io_commands_t &) noexcept;
+    virtual void on_io(fs::message::io_commands_t &) noexcept;
     io_errors_t consume_errors() noexcept;
 
     virtual void process_io(fs::payload::block_request_t &) noexcept;
@@ -105,8 +105,6 @@ struct SYNCSPIRIT_TEST_API supervisor_t : r::supervisor_t,
     utils::logger_t log;
     model::sequencer_ptr_t sequencer;
     configure_callback_t configure_callback;
-    model::diff::cluster_diff_ptr_t delayed_ack_holder;
-    model::diff::cluster_diff_t *delayed_ack_current;
     timers_t timers;
     bool auto_finish;
     bool auto_ack_io;
