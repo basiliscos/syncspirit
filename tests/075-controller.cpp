@@ -30,6 +30,8 @@ struct mock_supervisor_t: supervisor_t {
     using block_requests_t = std::list<fs::payload::block_request_t>;
     using io_message_ptr = r::intrusive_ptr_t<fs::message::io_commands_t>;
     using io_messages_t = std::list<io_message_ptr>;
+    using appended_blocks_t = std::list<fs::payload::append_block_t>;
+    using file_finishes_t = std::list<fs::payload::finish_file_t>;
 
     using supervisor_t::supervisor_t;
     using supervisor_t::process_io;
@@ -41,6 +43,18 @@ struct mock_supervisor_t: supervisor_t {
             supervisor_t::on_io(message);
             if (bypass_io_messages > 0) { --bypass_io_messages; }
         }
+    }
+
+    void process_io(fs::payload::append_block_t &req) noexcept override {
+        auto copy = fs::payload::append_block_t({}, req.path, req.data, req.offset, req.file_size);
+        appended_blocks.emplace_back(std::move(copy));
+        supervisor_t::process_io(req);
+    }
+
+    void process_io(fs::payload::finish_file_t &req) noexcept override {
+        auto copy = fs::payload::finish_file_t({}, req.path, req.local_path, req.file_size, req.modification_s);
+        file_finishes.emplace_back(std::move(copy));
+        supervisor_t::process_io(req);
     }
 
     void process_io(fs::payload::block_request_t &req) noexcept override {
@@ -72,6 +86,8 @@ struct mock_supervisor_t: supervisor_t {
 
     block_responces_t block_responces;
     block_requests_t block_requests;
+    appended_blocks_t appended_blocks;
+    file_finishes_t file_finishes;
     int bypass_io_messages = -1;
     io_messages_t io_messages;
 };
@@ -1809,6 +1825,8 @@ void test_conflicts() {
             proto::set_folder(index_update, folder_1->get_id());
 
             peer_actor->messages.clear();
+            sup->appended_blocks.clear();
+            sup->file_finishes.clear();
 
             SECTION("local win") {
                 proto::set_modified_s(file, 1734670000);
@@ -1825,6 +1843,8 @@ void test_conflicts() {
                 CHECK(cluster->get_blocks().size() == 2);
 
                 CHECK(peer_actor->messages.size() == 0);
+                CHECK(sup->appended_blocks.size() == 0);
+                CHECK(sup->file_finishes.size() == 0);
             }
             SECTION("remote win") {
                 proto::set_modified_s(file, 1734690000);
@@ -1857,6 +1877,20 @@ void test_conflicts() {
                 auto &f2 = proto::get_files(index_update_sent, 1);
                 CHECK(proto::get_name(f1) == local_conflict->get_name()->get_full_name());
                 CHECK(proto::get_name(f2) == file->get_name()->get_full_name());
+
+                REQUIRE(sup->appended_blocks.size() == 1);
+                auto& appended_block = sup->appended_blocks.front();
+                CHECK(appended_block.path == file->get_path(*local_folder));
+                CHECK(appended_block.file_size == 5);
+                CHECK(appended_block.offset == 0);
+                CHECK(appended_block.data == data_3);
+
+                REQUIRE(sup->file_finishes.size() == 1);
+                auto& file_finish = sup->file_finishes.front();
+                CHECK(file_finish.path == file->get_path(*local_folder));
+                CHECK(file_finish.local_path == local_conflict->get_path(*local_folder));
+                CHECK(file_finish.file_size == 5);
+                CHECK(file_finish.modification_s == local_conflict->get_modified_s());
             }
         }
     };
