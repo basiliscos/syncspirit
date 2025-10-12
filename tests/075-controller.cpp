@@ -2293,11 +2293,8 @@ void test_races() {
                 sup->do_process();
             }
             SECTION("make file externally available before file finishes") {
-                std::abort();
-#if 0
                 cluster->modify_write_requests(10);
-
-                sup->auto_ack_blocks = false;
+                sup->intercept_io(0);
                 peer_actor->push_block(data_2, 1, file_name);
                 peer_actor->push_block(data_1, 0, file_name);
                 peer_actor->process_block_requests();
@@ -2305,11 +2302,7 @@ void test_races() {
 
                 builder.local_update(folder_1_id, pr_file).apply(*sup);
 
-                auto diff = sup->delayed_ack_holder;
-                REQUIRE(diff);
-                sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff));
-                sup->do_process();
-#endif
+                sup->resume_io(2)->do_process();
             }
             auto file = folder_my->get_file_infos().by_name(file_name);
             REQUIRE(file);
@@ -2567,7 +2560,7 @@ int _init() {
     REGISTER_TEST_CASE(test_change_folder_type, "test_change_folder_type", "[net]");
     REGISTER_TEST_CASE(test_pausing, "test_pausing", "[net]");
     REGISTER_TEST_CASE(test_races, "test_races", "[net]");
-    // REGISTER_TEST_CASE(test_uniqueness, "test_uniqueness", "[net]");
+    // // REGISTER_TEST_CASE(test_uniqueness, "test_uniqueness", "[net]");
     return 1;
 }
 
