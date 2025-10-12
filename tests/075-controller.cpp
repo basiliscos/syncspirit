@@ -1663,7 +1663,6 @@ void test_overload_uploading() {
                 .finish()
                 .apply(*sup);
 
-#if 0
             for (size_t i = 0; i < BLOCKS_COUNT; ++i) {
                 auto req = proto::Request();
                 proto::set_id(req, 1);
@@ -1673,10 +1672,8 @@ void test_overload_uploading() {
                 proto::set_offset(req, i * 5);
                 peer_actor->forward(req);
 
-                auto &piece = pieces[i];
-                auto res = r::make_message<fs::payload::block_response_t>(target->get_address(), req, sys::error_code{},
-                                                                          piece);
-                block_responses.push_back(res);
+                auto res = outcome::result<utils::bytes_t>(pieces[i]);
+                sup->block_responces.emplace_back(res);
             }
             sup->do_process();
 
@@ -1688,7 +1685,6 @@ void test_overload_uploading() {
                 CHECK(data == pieces[i]);
                 blocks.pop_front();
             }
-#endif
         }
     };
     F(true, 10).run();
@@ -1846,7 +1842,6 @@ void test_conflicts() {
             peer_actor->messages.clear();
             sup->appended_blocks.clear();
             sup->file_finishes.clear();
-#if 0
             SECTION("local win") {
                 proto::set_modified_s(file, 1734670000);
                 proto::set_value(c_1, proto::get_value(local_file->get_version().get_best()) - 1);
@@ -1911,7 +1906,6 @@ void test_conflicts() {
                 CHECK(file_finish.file_size == 5);
                 CHECK(file_finish.modification_s == file->get_modified_s());
             }
-#endif
             SECTION("remote win (empty, new file type: directory)") {
                 proto::set_modified_s(file, 1734690000);
                 proto::set_value(c_1, proto::get_value(local_file->get_version().get_best()) + 1);
