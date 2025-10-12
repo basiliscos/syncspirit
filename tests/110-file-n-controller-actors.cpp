@@ -58,7 +58,7 @@ struct fixture_t {
         r::system_context_t ctx;
         sup = ctx.create_supervisor<supervisor_t>()
                   .auto_finish(false)
-                  .auto_ack_blocks(false)
+                  .auto_ack_io(false)
                   .timeout(timeout)
                   .create_registry()
                   .make_presentation(true)
@@ -219,6 +219,7 @@ void test_fs_actor_error() {
                     .add(pr_file, peer_device)
                     .finish()
                     .apply(*sup, controller_actor.get());
+
             }
             SECTION("fs error -> controller down") {
                 builder.make_index(sha256, folder_id)
@@ -236,12 +237,12 @@ void test_fs_actor_error() {
                 CHECK(static_cast<r::actor_base_t *>(peer_actor.get())->access<to::state>() == r::state_t::SHUT_DOWN);
                 CHECK(static_cast<r::actor_base_t *>(controller_actor.get())->access<to::state>() ==
                       r::state_t::SHUT_DOWN);
-                CHECK(static_cast<r::actor_base_t *>(file_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
-
-                file_actor->do_shutdown();
                 sup->do_process();
             }
 
+            CHECK(static_cast<r::actor_base_t *>(file_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
+            file_actor->do_shutdown();
+            sup->do_process();
             CHECK(cluster->get_write_requests() == 10);
         }
     };

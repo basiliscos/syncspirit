@@ -351,6 +351,9 @@ void controller_actor_t::on_postprocess_io(fs::message::io_commands_t &message) 
             if constexpr(std::is_same_v<T, fs::payload::block_request_t>) {
                 postprocess_io(cmd, stack_ctx);
             } else {
+                if constexpr(std::is_same_v<T, fs::payload::append_block_t>) {
+                    cluster->modify_write_requests(+1);
+                }
                 if (cmd.result.has_error()) {
                     auto& ec = cmd.result.assume_error();
                     LOG_ERROR(log, "i/o error (postprocessing): {}", ec.message());
@@ -867,37 +870,6 @@ auto controller_actor_t::operator()(const model::diff::modify::block_ack_t &diff
 
     return diff.visit_next(*this, custom);
 }
-#if 0
-
-auto controller_actor_t::operator()(const model::diff::modify::block_rej_t &diff, void *custom) noexcept
-    -> outcome::result<void> {
-    if (diff.device_id == peer->device_id().get_sha256()) {
-        if (resources->has(resource::fs)) {
-            resources->release(resource::fs);
-        }
-        auto folder = cluster->get_folders().by_id(diff.folder_id);
-        if (folder) {
-            auto folder_info = folder->get_folder_infos().by_device_id(diff.device_id);
-            if (folder_info) {
-                auto file = folder_info->get_file_infos().by_name(diff.file_name);
-                if (file) {
-                    auto &hash = diff.block_hash;
-                    LOG_DEBUG(log, "block '{}' has been rejected, marked file {} as unreachable", hash, *file);
-                    file->mark_unreachable(true);
-                    push(new model::diff::modify::mark_reachable_t(*file, *folder_info, false));
-                    cancel_sync(file.get());
-                }
-            }
-        }
-        release_block(diff.folder_id, diff.block_hash);
-        cluster->modify_write_requests(1);
-        pull_ready();
-        process_block_write();
-        send_diff();
-    }
-    return diff.visit_next(*this, custom);
-}
-#endif
 
 auto controller_actor_t::operator()(const model::diff::modify::remove_peer_t &diff, void *custom) noexcept
     -> outcome::result<void> {
@@ -1019,10 +991,7 @@ void controller_actor_t::on_message(proto::DownloadProgress &, stack_context_t&)
 
 static inline void ack_block(block_ack_context_t* io_ctx, model::cluster_t* cluster, controller_actor_t::stack_context_t& ctx) noexcept {
     using namespace model::diff;
-
     auto folder_id = io_ctx->folder->get_id();
-    cluster->modify_write_requests(+1);
-
     auto diff = cluster_diff_ptr_t();
     auto name = std::string(io_ctx->target_file->get_name()->get_full_name());
     auto device_id = utils::bytes_t(io_ctx->target_folder->get_device()->device_id().get_sha256());

@@ -1037,6 +1037,8 @@ void test_downloading_errors() {
 
             auto expected_state = r::state_t::OPERATIONAL;
             bool expected_unreachability = true;
+            auto initial_write_pool = cluster->get_write_requests();
+
             SECTION("general error, ok, do not shutdown") {
                 auto ec = utils::make_error_code(utils::request_error_code_t::generic);
                 peer_actor->push_block(ec, 0);
@@ -1071,6 +1073,7 @@ void test_downloading_errors() {
             CHECK(!folder_my->get_folder()->is_synchronizing());
 
             sup->do_process();
+            CHECK(cluster->get_write_requests() == initial_write_pool);
         }
     };
     F(true, 10).run();

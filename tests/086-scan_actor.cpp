@@ -370,7 +370,7 @@ void test_meta_changes() {
                 REQUIRE(folder_info_peer->add_strict(file_peer));
 
                 auto file = files->by_name(file_name);
-                auto &path = file->get_path(*folder_info_peer);
+                auto path = file->get_path(*folder_info_peer);
                 auto filename = path.filename().wstring() + L".syncspirit-tmp";
                 auto path_my = path;
                 auto path_peer = path_my.parent_path() / filename;
