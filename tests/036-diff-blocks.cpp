@@ -2,12 +2,9 @@
 // SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "test-utils.h"
-#include "access.h"
 #include "model/cluster.h"
 #include "diff-builder.h"
 
-#include "model/diff/modify/append_block.h"
-#include "model/diff/modify/clone_block.h"
 #include "model/diff/local/blocks_availability.h"
 
 using namespace syncspirit;
@@ -57,50 +54,6 @@ TEST_CASE("various block diffs", "[model]") {
     file->assign_block(bi1.get(), 0);
     file->assign_block(bi2.get(), 1);
     REQUIRE(!file->is_locally_available());
-
-    SECTION("append") {
-        auto diff_raw = new model::diff::modify::append_block_t(*file, *folder_info, 0, as_owned_bytes("12345"));
-        auto diff = diff::cluster_diff_ptr_t(diff_raw);
-        diff->assign_sibling(diff_raw->ack().get());
-        REQUIRE(builder.assign(diff.get()).apply());
-
-        auto lf1 = file->iterate_blocks(0).next()->local_file();
-        REQUIRE(lf1);
-        CHECK(lf1.block_index() == 0);
-        CHECK(lf1.get_offset() == 0);
-        CHECK(lf1.is_locally_available());
-        CHECK(!file->is_locally_available());
-    }
-
-    SECTION("clone, from different file") {
-        proto::FileInfo pr_source;
-        proto::set_name(pr_source, "b.txt");
-        proto::set_block_size(pr_source, 5ul);
-        proto::set_size(pr_source, 5ul);
-
-        auto &b1 = proto::add_blocks(pr_source);
-        proto::set_offset(b1, 0);
-        proto::set_size(b1, 5);
-        proto::set_hash(b1, b2_hash);
-
-        REQUIRE(builder.local_update(folder->get_id(), pr_source).apply());
-        auto source = folder_info->get_file_infos().by_name("b.txt");
-        auto b2 = const_cast<model::block_info_t *>(source->iterate_blocks(0).next());
-        b2->mark_local_available(source.get());
-
-        auto fb = model::file_block_t(bi2.get(), file.get(), 1);
-        auto diff_raw = new model::diff::modify::clone_block_t(fb, *folder_info, *folder_info);
-        auto diff = diff::cluster_diff_ptr_t(diff_raw);
-        diff->assign_sibling(diff_raw->ack().get());
-        REQUIRE(builder.assign(diff.get()).apply());
-
-        auto lf1 = file->iterate_blocks(1).next()->local_file();
-        REQUIRE(lf1);
-        CHECK(lf1.block_index() == 1);
-        CHECK(lf1.get_offset() == 5);
-        CHECK(lf1.is_locally_available());
-        CHECK(!file->is_locally_available());
-    }
 
     SECTION("availability") {
         using blocks_map_t = diff::local::blocks_availability_t::valid_blocks_map_t;

@@ -3,7 +3,6 @@
 
 #include "test_supervisor.h"
 #include "model/diff/load/commit.h"
-#include "model/diff/modify/finish_file.h"
 #include "model/diff/modify/upsert_folder.h"
 #include "model/diff/modify/upsert_folder_info.h"
 #include "model/diff/advance/advance.h"
@@ -134,28 +133,6 @@ auto supervisor_t::operator()(const model::diff::local::io_failure_t &diff, void
     std::copy(errs.begin(), errs.end(), std::back_inserter(io_errors));
     return diff.visit_next(*this, custom);
 }
-
-auto supervisor_t::operator()(const model::diff::modify::finish_file_t &diff, void *custom) noexcept
-    -> outcome::result<void> {
-    if (auto_finish) {
-        auto folder = cluster->get_folders().by_id(diff.folder_id);
-        auto file_info = folder->get_folder_infos().by_device_id(diff.peer_id);
-        auto file = file_info->get_file_infos().by_name(diff.file_name);
-        auto ack = model::diff::advance::advance_t::create(diff.action, *file, *file_info, *sequencer);
-        send<model::payload::model_update_t>(get_address(), std::move(ack), this);
-    }
-    return diff.visit_next(*this, custom);
-}
-
-#if 0
-auto supervisor_t::operator()(const model::diff::modify::clone_block_t &diff, void *custom) noexcept
-    -> outcome::result<void> {
-    if (auto_ack_blocks) {
-        send<model::payload::model_update_t>(address, diff.ack(), this);
-    }
-    return diff.visit_next(*this, custom);
-}
-#endif
 
 auto supervisor_t::operator()(const model::diff::modify::upsert_folder_t &diff, void *custom) noexcept
     -> outcome::result<void> {

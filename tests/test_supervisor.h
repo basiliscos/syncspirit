@@ -92,7 +92,6 @@ struct SYNCSPIRIT_TEST_API supervisor_t : r::supervisor_t,
     virtual void process_io(fs::payload::clone_block_t &) noexcept;
 
     outcome::result<void> operator()(const model::diff::local::io_failure_t &, void *) noexcept override;
-    outcome::result<void> operator()(const model::diff::modify::finish_file_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::upsert_folder_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::upsert_folder_info_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::advance::advance_t &, void *) noexcept override;

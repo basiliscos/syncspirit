@@ -34,11 +34,7 @@
 #include "modify/add_pending_device.h"
 #include "modify/add_pending_folders.h"
 #include "modify/add_remote_folder_infos.h"
-#include "modify/append_block.h"
 #include "modify/block_ack.h"
-#include "modify/block_rej.h"
-#include "modify/clone_block.h"
-#include "modify/finish_file.h"
 #include "modify/mark_reachable.h"
 #include "modify/remove_blocks.h"
 #include "modify/remove_files.h"
@@ -189,24 +185,12 @@ auto cluster_visitor_t::operator()(const peer::update_folder_t &diff, void *cust
     return diff.visit_next(*this, custom);
 }
 
-auto cluster_visitor_t::operator()(const modify::append_block_t &diff, void *custom) noexcept -> outcome::result<void> {
-    return diff.visit_next(*this, custom);
-}
-
 auto cluster_visitor_t::operator()(const local::blocks_availability_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     return diff.visit_next(*this, custom);
 }
 
 auto cluster_visitor_t::operator()(const modify::block_ack_t &diff, void *custom) noexcept -> outcome::result<void> {
-    return diff.visit_next(*this, custom);
-}
-
-auto cluster_visitor_t::operator()(const modify::block_rej_t &diff, void *custom) noexcept -> outcome::result<void> {
-    return diff.visit_next(*this, custom);
-}
-
-auto cluster_visitor_t::operator()(const modify::clone_block_t &diff, void *custom) noexcept -> outcome::result<void> {
     return diff.visit_next(*this, custom);
 }
 
@@ -296,10 +280,6 @@ auto cluster_visitor_t::operator()(const modify::remove_pending_folders_t &diff,
 
 auto cluster_visitor_t::operator()(const modify::reset_folder_infos_t &diff, void *custom) noexcept
     -> outcome::result<void> {
-    return diff.visit_next(*this, custom);
-}
-
-auto cluster_visitor_t::operator()(const modify::finish_file_t &diff, void *custom) noexcept -> outcome::result<void> {
     return diff.visit_next(*this, custom);
 }
 

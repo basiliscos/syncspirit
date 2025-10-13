@@ -720,8 +720,8 @@ void test_downloading() {
                 }
                 SECTION("with multiple clones") {
                     cluster->modify_write_requests(99);
-                    auto f1  = *file_1;
-                    auto f2  = *file_2;
+                    auto f1 = *file_1;
+                    auto f2 = *file_2;
                     auto b1_copy = b1;
                     auto b2_copy = b2;
 

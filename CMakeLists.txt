@@ -155,12 +155,8 @@ add_library(syncspirit_core
     src/model/diff/modify/add_ignored_device.cpp
     src/model/diff/modify/add_pending_device.cpp
     src/model/diff/modify/add_pending_folders.cpp
-    src/model/diff/modify/append_block.cpp
     src/model/diff/modify/block_ack.cpp
-    src/model/diff/modify/block_rej.cpp
     src/model/diff/modify/block_transaction.cpp
-    src/model/diff/modify/clone_block.cpp
-    src/model/diff/modify/finish_file.cpp
     src/model/diff/modify/generic_remove.cpp
     src/model/diff/modify/mark_reachable.cpp
     src/model/diff/modify/remove_blocks.cpp

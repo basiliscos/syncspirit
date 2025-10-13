@@ -125,12 +125,6 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     };
 
   private:
-    struct pull_signal_t final : model::diff::local::custom_t {
-        pull_signal_t(void *controller) noexcept;
-        outcome::result<void> visit(model::diff::cluster_visitor_t &, void *) const noexcept override;
-        void *controller;
-    };
-
     struct update_context_t : stack_context_t {
         update_context_t(controller_actor_t &actor, bool from_self_, bool cluster_config_sent_,
                          std::uint32_t pull_ready_) noexcept;
@@ -198,8 +192,6 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     void postprocess_io(fs::payload::finish_file_t &, stack_context_t &) noexcept;
     void postprocess_io(fs::payload::clone_block_t &, stack_context_t &) noexcept;
 
-    void on_custom(const pull_signal_t &diff) noexcept;
-
     void request_block(const model::file_block_t &block) noexcept;
     void pull_next(stack_context_t &) noexcept;
     // void pull_ready() noexcept;
@@ -229,7 +221,6 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     outcome::result<void> operator()(const model::diff::advance::advance_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::contact::peer_state_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::block_ack_t &, void *) noexcept override;
-    // outcome::result<void> operator()(const model::diff::modify::block_rej_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::mark_reachable_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::remove_peer_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::remove_files_t &, void *) noexcept override;

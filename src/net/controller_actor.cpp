@@ -417,15 +417,6 @@ void controller_actor_t::push_pending() noexcept {
     }
 }
 
-#if 0
-void controller_actor_t::pull_ready() noexcept { ++planned_pulls; }
-#endif
-
-void controller_actor_t::on_custom(const pull_signal_t &) noexcept {
-    std::abort();
-    // pull_next();
-}
-
 void controller_actor_t::pull_next(stack_context_t &context) noexcept {
     if (!file_iterator) {
         return;
@@ -845,9 +836,9 @@ auto controller_actor_t::operator()(const model::diff::modify::block_ack_t &diff
                         if (local_fi) {
                             auto it = synchronizing_files.find(file->get_full_id());
                             if (it != synchronizing_files.end()) {
-                                auto& guard = it->second;
+                                auto &guard = it->second;
                                 if (!guard.finished) {
-                                   guard.finished = true;
+                                    guard.finished = true;
                                     auto local_file = local_fi->get_file_infos().by_name(diff.file_name);
                                     auto action = resolve(*file, local_file.get(), *local_fi);
                                     if (action != model::advance_action_t::ignore) {
@@ -1218,19 +1209,6 @@ void controller_actor_t::release_block(std::string_view folder_id, utils::bytes_
                                        stack_context_t &context) noexcept {
     LOG_TRACE(log, "release block '{}'", hash);
     get_sync_info(folder_id).finish_fetching(hash, context);
-}
-
-controller_actor_t::pull_signal_t::pull_signal_t(void *controller_) noexcept : controller{controller_} {}
-
-auto controller_actor_t::pull_signal_t::visit(model::diff::cluster_visitor_t &visitor, void *custom) const noexcept
-    -> outcome::result<void> {
-    auto r = visitor(*this, custom);
-    auto ctx = reinterpret_cast<update_context_t *>(custom);
-    if (r && &visitor == controller && ctx->from_self) {
-        auto self = static_cast<controller_actor_t *>(&visitor);
-        self->on_custom(*this);
-    }
-    return r;
 }
 
 void controller_actor_t::cancel_sync(model::file_info_t *file) noexcept {
