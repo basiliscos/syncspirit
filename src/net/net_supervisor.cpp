@@ -334,6 +334,12 @@ void net_supervisor_t::on_app_ready(model::message::app_ready_t &) noexcept {
 
 void net_supervisor_t::commit_loading() noexcept {
     if (!cluster->is_tainted()) {
+        for (auto &it : cluster->get_folders()) {
+            auto &folder = it.item;
+            auto folder_entity = presentation::folder_entity_ptr_t(new presentation::folder_entity_t(folder));
+            folder->set_augmentation(folder_entity);
+        }
+
         auto &ignored_devices = cluster->get_ignored_devices();
         auto &ignored_folders = cluster->get_ignored_folders();
         auto &pending_folders = cluster->get_pending_folders();

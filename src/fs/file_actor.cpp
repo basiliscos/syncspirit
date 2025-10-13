@@ -309,7 +309,6 @@ void file_actor_t::process(payload::clone_block_t &cmd) noexcept {
 
 auto file_actor_t::open_file_rw(const std::filesystem::path &path, std::uint64_t file_size) noexcept
     -> outcome::result<file_ptr_t> {
-    LOG_TRACE(log, "open_file (r/w, by path), path = {}", path.string());
     auto item = rw_cache->get(path);
     if (item) {
         return item;

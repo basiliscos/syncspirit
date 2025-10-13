@@ -86,20 +86,21 @@ using C = controller_actor_t;
 C::stack_context_t::stack_context_t(controller_actor_t &actor_) noexcept : actor{actor_} {}
 
 C::stack_context_t::~stack_context_t() {
-    if (actor.state == r::state_t::OPERATIONAL) {
-        auto requests_left = actor.cluster->get_write_requests();
-        auto sent = 0;
-        while (requests_left > 0 && !actor.block_write_queue.empty()) {
-            auto &io_command = actor.block_write_queue.front();
-            io_commands.emplace_back(std::move(io_command));
-            --requests_left;
-            ++sent;
-            actor.block_write_queue.pop_front();
-        }
-        if (sent) {
-            // LOG_TRACE(log, "{} block writes sent, requests left = {}", sent, requests_left);
-            actor.cluster->modify_write_requests(-sent);
-        }
+    if (actor.state != r::state_t::OPERATIONAL) {
+        return;
+    }
+    auto requests_left = actor.cluster->get_write_requests();
+    auto sent = 0;
+    while (requests_left > 0 && !actor.block_write_queue.empty()) {
+        auto &io_command = actor.block_write_queue.front();
+        io_commands.emplace_back(std::move(io_command));
+        --requests_left;
+        ++sent;
+        actor.block_write_queue.pop_front();
+    }
+    if (sent) {
+        // LOG_TRACE(log, "{} block writes sent, requests left = {}", sent, requests_left);
+        actor.cluster->modify_write_requests(-sent);
     }
     auto max_block_read = actor.blocks_max_requested * constants::tx_blocks_max_factor;
     while (!actor.block_read_queue.empty() && (actor.tx_blocks_requested <= max_block_read)) {
@@ -831,9 +832,6 @@ auto controller_actor_t::operator()(const model::diff::modify::mark_reachable_t 
 auto controller_actor_t::operator()(const model::diff::modify::block_ack_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     if (diff.device_id == peer->device_id().get_sha256()) {
-        // if (resources->has(resource::fs)) {
-        //     resources->release(resource::fs);
-        // }
         auto ctx = reinterpret_cast<update_context_t *>(custom);
         auto folder = cluster->get_folders().by_id(diff.folder_id);
         if (folder) {
@@ -845,13 +843,20 @@ auto controller_actor_t::operator()(const model::diff::modify::block_ack_t &diff
                     if (file->is_locally_available()) {
                         auto local_fi = folder_infos.by_device(*cluster->get_device());
                         if (local_fi) {
-                            auto local_file = local_fi->get_file_infos().by_name(diff.file_name);
-                            auto action = resolve(*file, local_file.get(), *local_fi);
-                            if (action != model::advance_action_t::ignore) {
-                                LOG_TRACE(log, "on_block_update, finalizing '{}'", *file);
-                                io_finish_file(local_file.get(), *file, *folder_info, action, *ctx);
-                            } else {
-                                LOG_DEBUG(log, "on_block_update, already have actual '{}', noop", *file);
+                            auto it = synchronizing_files.find(file->get_full_id());
+                            if (it != synchronizing_files.end()) {
+                                auto& guard = it->second;
+                                if (!guard.finished) {
+                                   guard.finished = true;
+                                    auto local_file = local_fi->get_file_infos().by_name(diff.file_name);
+                                    auto action = resolve(*file, local_file.get(), *local_fi);
+                                    if (action != model::advance_action_t::ignore) {
+                                        LOG_TRACE(log, "on_block_update, finalizing '{}'", *file);
+                                        io_finish_file(local_file.get(), *file, *folder_info, action, *ctx);
+                                    } else {
+                                        LOG_DEBUG(log, "on_block_update, already have actual '{}', noop", *file);
+                                    }
+                                }
                             }
                         }
                     }

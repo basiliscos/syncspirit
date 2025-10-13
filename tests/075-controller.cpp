@@ -596,6 +596,11 @@ void test_downloading() {
                 proto::set_hash(b1, data_1_hash);
                 proto::set_size(b1, 5);
 
+                auto b2 = proto::BlockInfo();
+                proto::set_hash(b2, data_2_hash);
+                proto::set_size(b2, 5);
+                proto::set_offset(b2, 5);
+
                 auto file_name_2 = std::string_view("file-2");
                 auto file_2 = &proto::add_files(index);
                 proto::set_name(*file_2, file_name_2);
@@ -709,6 +714,66 @@ void test_downloading() {
                         REQUIRE(f);
                         CHECK(f->get_size() == 10);
                         CHECK(f->iterate_blocks().get_total() == 2);
+                        CHECK(f->is_locally_available());
+                    }
+                    CHECK(sup->file_finishes.size() == 2);
+                }
+                SECTION("with multiple clones") {
+                    cluster->modify_write_requests(99);
+                    auto f1  = *file_1;
+                    auto f2  = *file_2;
+                    auto b1_copy = b1;
+                    auto b2_copy = b2;
+
+                    proto::clear_files(index);
+                    proto::add_files(index, f1);
+
+                    proto::add_blocks(f2, b1_copy);
+                    proto::add_blocks(f2, b1_copy);
+                    proto::add_blocks(f2, b2_copy);
+                    proto::add_blocks(f2, b2_copy);
+                    proto::set_size(f2, 20);
+
+                    proto::add_blocks(*file_1, b2_copy);
+                    proto::set_size(*file_1, 10);
+
+                    auto folder_my = folder_infos.by_device(*my_device);
+                    CHECK(folder_my->get_max_sequence() == 0ul);
+                    CHECK(!folder_my->get_folder()->is_synchronizing());
+
+                    peer_actor->forward(index);
+                    peer_actor->push_block(data_1, 0, file_name_1);
+                    peer_actor->push_block(data_2, 1, file_name_1);
+                    sup->do_process();
+
+                    CHECK(sup->file_finishes.size() == 1);
+                    CHECK(!folder_my->get_folder()->is_synchronizing());
+                    CHECK(peer_actor->blocks_requested == 2);
+                    REQUIRE(folder_my);
+                    CHECK(folder_my->get_max_sequence() == 1ul);
+                    REQUIRE(folder_my->get_file_infos().size() == 1);
+                    {
+                        auto f = folder_my->get_file_infos().by_name(file_name_1);
+                        REQUIRE(f);
+                        CHECK(f->get_size() == 10);
+                        CHECK(f->iterate_blocks().get_total() == 2);
+                        CHECK(f->is_locally_available());
+                    }
+
+                    auto index_update = proto::IndexUpdate();
+                    proto::set_folder(index_update, folder_1->get_id());
+                    proto::add_files(index_update, f2);
+                    peer_actor->forward(index_update);
+                    sup->do_process();
+
+                    CHECK(sup->file_finishes.size() == 2);
+                    CHECK(!folder_my->get_folder()->is_synchronizing());
+                    CHECK(peer_actor->blocks_requested == 2);
+                    {
+                        auto f = folder_my->get_file_infos().by_name(file_name_2);
+                        REQUIRE(f);
+                        CHECK(f->get_size() == 20);
+                        CHECK(f->iterate_blocks().get_total() == 4);
                         CHECK(f->is_locally_available());
                     }
                 }
@@ -1084,6 +1149,7 @@ void test_download_from_scratch() {
     struct F : fixture_t {
         using fixture_t::fixture_t;
         void main(diff_builder_t &) noexcept override {
+            cluster->modify_write_requests(10);
             sup->do_process();
             peer_actor->messages.clear();
 
@@ -1127,7 +1193,7 @@ void test_download_from_scratch() {
             proto::set_name(file, file_name);
             proto::set_type(file, proto::FileInfoType::FILE);
             proto::set_sequence(file, 154);
-            proto::set_size(file, 5);
+            proto::set_size(file, 10);
             proto::set_block_size(file, 5);
 
             auto &v = proto::get_version(file);
@@ -1141,8 +1207,15 @@ void test_download_from_scratch() {
             proto::set_hash(b1, data_1_h);
             proto::set_size(b1, data_1.size());
 
+            auto data_2 = as_owned_bytes("67890");
+            auto data_2_h = utils::sha256_digest(data_2).value();
+            auto &b2 = proto::add_blocks(file);
+            proto::set_hash(b2, data_2_h);
+            proto::set_size(b2, data_2.size());
+
             peer_actor->forward(index);
             peer_actor->push_block(data_1, 0, file_name);
+            peer_actor->push_block(data_2, 1, file_name);
             sup->do_process();
 
             auto folder_my = folder_1->get_folder_infos().by_device(*my_device);
@@ -1151,8 +1224,8 @@ void test_download_from_scratch() {
 
             auto f = folder_my->get_file_infos().by_name(file_name);
             REQUIRE(f);
-            CHECK(f->get_size() == 5);
-            CHECK(f->iterate_blocks().get_total() == 1);
+            CHECK(f->get_size() == 10);
+            CHECK(f->iterate_blocks().get_total() == 2);
             CHECK(f->is_locally_available());
 
             cc = proto::ClusterConfig{};
@@ -1182,6 +1255,7 @@ void test_download_from_scratch() {
                 auto peer_msg = &peer_actor->messages.front()->payload;
                 REQUIRE(std::get_if<proto::Index>(peer_msg));
             }
+            CHECK(sup->file_finishes.size() == 1);
         }
     };
     F(false, 10, false).run();

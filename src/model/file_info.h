@@ -72,6 +72,7 @@ struct SYNCSPIRIT_API file_info_t {
 
         guard_t &operator=(guard_t &&) noexcept = default;
 
+        bool finished = false;
         file_info_ptr_t file;
         path_guard_ptr_t path_guard;
         const folder_info_t *folder_info;
