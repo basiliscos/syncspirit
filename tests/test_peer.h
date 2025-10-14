@@ -90,10 +90,6 @@ struct SYNCSPIRIT_TEST_API test_peer_t : r::actor_base_t {
 
     void push_response(proto::ErrorCode, std::int32_t request_id) noexcept;
     void push_response(utils::bytes_view_t data, std::int32_t request_id) noexcept;
-#if 0
-    void push_block(utils::bytes_view_t data, size_t index, std::string_view name = {});
-    void push_block(sys::error_code ec, size_t index);
-#endif
 
     int blocks_requested = 0;
     bool reading = false;
@@ -108,6 +104,7 @@ struct SYNCSPIRIT_TEST_API test_peer_t : r::actor_base_t {
     utils::logger_t log;
 
     requests_t in_requests;
+    requests_t in_requests_copy;
     responses_t out_responses;
 
     requests_t out_requests;

@@ -115,18 +115,9 @@ void test_peer_t::on_transfer(net::message::transfer_data_t &message) noexcept {
                 using V = net::payload::forwarded_message_t;
                 type = proto::message::get_bep_type<T>();
                 if constexpr (std::is_same_v<T, proto::Request>) {
+                    in_requests_copy.push_back(msg);
                     in_requests.push_back(std::move(msg));
                     ++blocks_requested;
-#if 0
-                    if (block_callback) {
-                        auto opt = block_callback(this, req);
-                        if (opt) {
-                            block_responses.emplace_back(*opt);
-                        }
-                    } else if (block_responses.size()) {
-                        log->debug("{}, top response block # {}", identity, block_responses.front().block_index);
-                    }
-#endif
                     process_block_requests();
                 } else if constexpr (std::is_same_v<T, proto::Response>) {
                     in_responses.push_back(std::move(msg));

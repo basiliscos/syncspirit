@@ -83,18 +83,12 @@ struct fixture_t {
                 [&](auto &p) { p.register_name(net::names::fs_actor, sup->get_address()); });
         };
 
-        auto block_callback = [&](r::actor_base_t *actor,
-                                  net::message::block_request_t &request) -> block_response_opt_t {
-            return on_block_request(actor, request);
-        };
-
         peer_actors[0] = sup->create_actor<test_peer_t>()
                              .cluster(cluster)
                              .peer_device(peer_devices[0])
                              .url("relay://1.2.3.4:5")
                              .coordinator(sup->get_address())
                              .timeout(timeout)
-                             .block_callback(block_callback)
                              .finish();
         peer_actors[1] = sup->create_actor<test_peer_t>()
                              .cluster(cluster)
@@ -102,7 +96,6 @@ struct fixture_t {
                              .url("relay://1.2.3.4:6")
                              .coordinator(sup->get_address())
                              .timeout(timeout)
-                             .block_callback(block_callback)
                              .finish();
 
         sup->do_process();
@@ -160,10 +153,6 @@ struct fixture_t {
         CHECK(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::SHUT_DOWN);
     }
 
-    virtual block_response_opt_t on_block_request(r::actor_base_t *, net::message::block_request_t &request) noexcept {
-        return {};
-    }
-
     virtual void main() noexcept {}
 
     r::pt::time_duration timeout = r::pt::millisec{10};
@@ -189,19 +178,11 @@ void test_concurrent_up_n_down() {
     };
     F().run();
 }
+
 void test_concurrent_downloading() {
     struct F : fixture_t {
-        using request_ptr_t = model::intrusive_ptr_t<net::message::block_request_t>;
-        using requests_t = std::list<request_ptr_t>;
         using blocks_map_t = std::unordered_map<utils::bytes_t, utils::bytes_t>;
-        using requested_blocks_t = std::unordered_map<r::actor_base_t *, requests_t>;
         using requested_blocks_sz_t = std::unordered_map<r::actor_base_t *, size_t>;
-
-        block_response_opt_t on_block_request(r::actor_base_t *actor,
-                                              net::message::block_request_t &request) noexcept override {
-            requested[actor].emplace_back(&request);
-            return {};
-        }
 
         void main() noexcept override {
             static constexpr size_t N = 10;
@@ -264,24 +245,25 @@ void test_concurrent_downloading() {
             }
 
             auto pushed_blocks = size_t{0};
-            REQUIRE(requested.size() == 2);
+            // REQUIRE(requested.size() == 2);
             while (pushed_blocks < N) {
-                for (auto &[peer_actor, queue] : requested) {
-                    if (queue.size()) {
-                        auto actor = static_cast<test_peer_t *>(peer_actor);
-                        auto p = queue.front()->payload.request_payload;
-                        auto &bytes = blocks_map.at(p.block_hash);
-                        actor->push_block(bytes, p.block_index, p.file_name);
+                // for (auto &[peer_actor, queue] : requested) {
+                for (auto &actor : peer_actors) {
+                    if (actor->in_requests.size()) {
+                        auto &p = actor->in_requests.front();
+                        auto hash = utils::bytes_t(proto::get_hash(p));
+                        auto request_id = proto::get_id(p);
+                        auto &bytes = blocks_map.at(hash);
+                        actor->push_response(bytes, request_id);
                         actor->process_block_requests();
-                        queue.pop_front();
                         ++pushed_blocks;
-                        ++requested_blocks_sz[actor];
+                        ++requested_blocks_sz[actor.get()];
                     }
                 }
                 sup->do_process();
             }
-            CHECK(requested[peer_actors[0].get()].empty());
-            CHECK(requested[peer_actors[1].get()].empty());
+            CHECK(peer_actors[0]->in_requests.empty());
+            CHECK(peer_actors[1]->in_requests.empty());
             CHECK(requested_blocks_sz[peer_actors[0].get()] == N / 2);
             CHECK(requested_blocks_sz[peer_actors[1].get()] == N / 2);
             CHECK(local_folder->get_file_infos().size() == N);
@@ -309,7 +291,6 @@ void test_concurrent_downloading() {
         }
 
         blocks_map_t blocks_map;
-        requested_blocks_t requested;
         requested_blocks_sz_t requested_blocks_sz;
     };
     F().run();

@@ -212,7 +212,7 @@ void test_fs_actor_error() {
                 .apply(*sup, controller_actor.get());
 
             SECTION("fs error -> controller down") {
-                peer_actor->push_block(data_1, 0);
+                peer_actor->push_response(data_1, 0);
                 write_file(folder_path, ""); // prevent dir creation
 
                 builder.make_index(sha256, folder_id)
@@ -228,7 +228,7 @@ void test_fs_actor_error() {
 
                 CHECK("just 4 logging");
 
-                peer_actor->push_block(data_1, 0);
+                peer_actor->push_response(data_1, 0);
                 controller_actor->do_shutdown();
                 peer_actor->process_block_requests();
                 sup->do_process();
