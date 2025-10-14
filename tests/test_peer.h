@@ -26,15 +26,12 @@ struct block_response_t {
 
 using block_response_opt_t = std::optional<block_response_t>;
 
-using block_callback_t = std::function<block_response_opt_t(r::actor_base_t *, net::message::block_request_t &)>;
-
 struct test_peer_config_t : public r::actor_config_t {
     model::device_ptr_t peer_device;
     r::address_ptr_t coordinator;
     std::string url;
     bool auto_share = false;
     model::cluster_ptr_t cluster;
-    block_callback_t block_callback;
 };
 
 template <typename Actor> struct test_peer_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -62,10 +59,6 @@ template <typename Actor> struct test_peer_config_builder_t : r::actor_config_bu
         parent_t::config.url = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
-    builder_t &&block_callback(block_callback_t value) && noexcept {
-        parent_t::config.block_callback = std::move(value);
-        return std::move(*static_cast<typename parent_t::builder_t *>(this));
-    }
 };
 
 struct SYNCSPIRIT_TEST_API test_peer_t : r::actor_base_t {
@@ -79,10 +72,8 @@ struct SYNCSPIRIT_TEST_API test_peer_t : r::actor_base_t {
     using shutdown_start_callback_t = std::function<void()>;
 
     using allowed_index_updates_t = std::unordered_set<std::string>;
-    using block_responses_t = std::list<block_response_t>;
-    using block_request_t = r::intrusive_ptr_t<net::message::block_request_t>;
-    using block_requests_t = std::list<block_request_t>;
-    using uploaded_blocks_t = std::list<proto::Response>;
+    using requests_t = std::list<proto::Request>;
+    using responses_t = std::list<proto::Response>;
 
     test_peer_t(config_t &config);
 
@@ -95,16 +86,15 @@ struct SYNCSPIRIT_TEST_API test_peer_t : r::actor_base_t {
     void on_controller_predown(net::message::controller_predown_t &msg) noexcept;
     void on_transfer(net::message::transfer_data_t &message) noexcept;
     void process_block_requests() noexcept;
-    void on_block_request(net::message::block_request_t &req) noexcept;
+    void forward(net::payload::forwarded_message_t payload) noexcept;
 
-    void forward(net::payload::forwarded_message_t payload) noexcept {
-        send<net::payload::forwarded_message_t>(controller, std::move(payload));
-    }
-
+     void push_response(proto::Response) noexcept;
+     void push_response(utils::bytes_view_t data, std::int32_t request_id) noexcept;
+#if 0
     void push_block(utils::bytes_view_t data, size_t index, std::string_view name = {});
     void push_block(sys::error_code ec, size_t index);
+#endif
 
-    block_callback_t block_callback;
     int blocks_requested = 0;
     bool reading = false;
     bool auto_share = false;
@@ -116,9 +106,13 @@ struct SYNCSPIRIT_TEST_API test_peer_t : r::actor_base_t {
     model::device_ptr_t peer_device;
     model::device_state_t peer_state;
     utils::logger_t log;
-    block_requests_t block_requests;
-    block_responses_t block_responses;
-    uploaded_blocks_t uploaded_blocks;
+
+    requests_t in_requests;
+    responses_t out_responses;
+
+    requests_t out_requests;
+    responses_t in_responses;
+
     allowed_index_updates_t allowed_index_updates;
     shutdown_start_callback_t shutdown_start_callback;
 };

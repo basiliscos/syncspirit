@@ -107,14 +107,15 @@ struct SYNCSPIRIT_API peer_actor_t : public r::actor_base_t {
     using tx_queue_t = std::list<tx_item_t>;
     using tx_size_ptr_t = payload::controller_up_t::tx_size_ptr_t;
     using read_action_t = bool (peer_actor_t::*)(proto::message::message_t &&msg);
+#if 0
     using block_request_ptr_t = r::intrusive_ptr_t<message::block_request_t>;
     using block_requests_t = std::list<block_request_ptr_t>;
+#endif
     using clock_t = std::chrono::steady_clock;
     using received_queue_t = std::list<payload::forwarded_message_t>;
 
     void on_controller_up(message::controller_up_t &) noexcept;
     void on_controller_predown(message::controller_predown_t &) noexcept;
-    void on_block_request(message::block_request_t &) noexcept;
     void on_transfer(message::transfer_data_t &message) noexcept;
 
     void on_io_error(const sys::error_code &ec, r::plugin::resource_id_t resource) noexcept;
@@ -136,7 +137,6 @@ struct SYNCSPIRIT_API peer_actor_t : public r::actor_base_t {
     bool handle_hello(proto::Hello &&) noexcept;
     void handle_ping(proto::Ping &&) noexcept;
     void handle_close(proto::Close &&) noexcept;
-    void handle_response(proto::Response &&) noexcept;
 
     void emit_io_stats(bool force = false) noexcept;
 
@@ -158,7 +158,9 @@ struct SYNCSPIRIT_API peer_actor_t : public r::actor_base_t {
     std::string cert_name;
     read_action_t read_action;
     r::address_ptr_t controller;
+#if 0
     block_requests_t block_requests;
+#endif
     std::size_t rx_bytes;
     std::size_t tx_bytes;
     tx_size_ptr_t tx_bytes_in_progress;

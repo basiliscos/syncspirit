@@ -142,9 +142,10 @@ struct peer_down_t {
     r::extended_error_ptr_t ee;
 };
 
-using forwarded_message_t =
-    std::variant<proto::ClusterConfig, proto::Index, proto::IndexUpdate, proto::Request, proto::DownloadProgress>;
+using forwarded_message_t = std::variant<proto::ClusterConfig, proto::Index, proto::IndexUpdate, proto::Request, proto::Response>;
+using forwarded_messages_t = std::vector<forwarded_message_t>;
 
+#if 0
 struct block_response_t {
     utils::bytes_t data;
 };
@@ -164,6 +165,7 @@ struct SYNCSPIRIT_API block_request_t {
 
     block_info_t get_block(model::cluster_t &, model::device_t &peer) noexcept;
 };
+#endif
 
 struct connect_response_t {
     transport::stream_sp_t transport;
@@ -227,8 +229,10 @@ using peer_down_t = r::message_t<payload::peer_down_t>;
 using forwarded_message_t = r::message_t<payload::forwarded_message_t>;
 using transfer_data_t = r::message_t<payload::transfer_data_t>;
 
+#if 0
 using block_request_t = r::request_traits_t<payload::block_request_t>::request::message_t;
 using block_response_t = r::request_traits_t<payload::block_request_t>::response::message_t;
+#endif
 
 using connect_request_t = r::request_traits_t<payload::connect_request_t>::request::message_t;
 using connect_response_t = r::request_traits_t<payload::connect_request_t>::response::message_t;

@@ -6,6 +6,7 @@
 
 using namespace syncspirit::net::payload;
 
+#if 0
 block_request_t::block_request_t(const model::file_info_ptr_t &file_, const model::folder_info_t &fi,
                                  size_t block_index_) noexcept {
     folder_id = fi.get_folder()->get_id();
@@ -53,3 +54,4 @@ auto block_request_t::get_block(model::cluster_t &cluster, model::device_t &peer
     }
     return {};
 }
+#endif

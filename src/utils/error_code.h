@@ -95,13 +95,6 @@ enum class protocol_error_code_t {
     digest_mismatch,
 };
 
-enum class request_error_code_t {
-    success = 0,
-    generic = 1,
-    no_such_file = 2,
-    invalid_file = 3,
-};
-
 namespace detail {
 
 class SYNCSPIRIT_API error_code_category : public boost::system::error_category {
@@ -119,11 +112,6 @@ class SYNCSPIRIT_API protocol_error_code_category : public boost::system::error_
     virtual std::string message(int c) const override;
 };
 
-class SYNCSPIRIT_API request_error_code_category : public boost::system::error_category {
-    virtual const char *name() const noexcept override;
-    virtual std::string message(int c) const override;
-};
-
 } // namespace detail
 
 SYNCSPIRIT_API const detail::error_code_category &error_code_category();
@@ -131,8 +119,6 @@ SYNCSPIRIT_API const detail::error_code_category &error_code_category();
 SYNCSPIRIT_API const detail::bep_error_code_category &bep_error_code_category();
 
 SYNCSPIRIT_API const detail::protocol_error_code_category &protocol_error_code_category();
-
-SYNCSPIRIT_API const detail::request_error_code_category &request_error_code_category();
 
 inline boost::system::error_code make_error_code(error_code_t e) {
     return {static_cast<int>(e), error_code_category()};
@@ -143,10 +129,6 @@ inline boost::system::error_code make_error_code(bep_error_code_t e) {
 
 inline boost::system::error_code make_error_code(protocol_error_code_t e) {
     return {static_cast<int>(e), protocol_error_code_category()};
-}
-
-inline boost::system::error_code make_error_code(request_error_code_t e) {
-    return {static_cast<int>(e), request_error_code_category()};
 }
 
 SYNCSPIRIT_API boost::system::error_code adapt(const std::error_code &ec) noexcept;
@@ -169,10 +151,6 @@ template <> struct is_error_code_enum<syncspirit::utils::bep_error_code_t> : std
 };
 
 template <> struct is_error_code_enum<syncspirit::utils::protocol_error_code_t> : std::true_type {
-    static const bool value = true;
-};
-
-template <> struct is_error_code_enum<syncspirit::utils::request_error_code_t> : std::true_type {
     static const bool value = true;
 };
 

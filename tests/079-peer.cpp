@@ -297,7 +297,7 @@ struct fixture_t : private model::diff::cluster_visitor_t {
     virtual void on_message(proto::Index &message) noexcept {};
     virtual void on_message(proto::IndexUpdate &message) noexcept {};
     virtual void on_message(proto::Request &message) noexcept {};
-    virtual void on_message(proto::DownloadProgress &message) noexcept {};
+    virtual void on_message(proto::Response &message) noexcept {};
 
     tx_size_ptr_t outgoing_buff;
     cluster_ptr_t cluster;

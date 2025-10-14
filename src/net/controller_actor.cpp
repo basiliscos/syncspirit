@@ -79,6 +79,15 @@ struct block_request_context_t final : fs::payload::extendended_context_t {
     proto::Request request;
 };
 
+struct peer_request_context_t final : fs::payload::extendended_context_t {
+    peer_request_context_t(proto::Request request_, std::int64_t sequence_, std::int32_t block_index_) noexcept :
+        request{std::move(request_)}, sequence{sequence_}, block_index{block_index_} {}
+
+    proto::Request request;
+    std::int64_t sequence;
+    std::int32_t block_index;
+};
+
 } // namespace
 
 using C = controller_actor_t;
@@ -120,6 +129,14 @@ C::stack_context_t::~stack_context_t() {
         auto &addr = actor.coordinator;
         actor.send<model::payload::model_update_t>(addr, std::move(diff), &actor);
     }
+    if (!peer_data.empty()) {
+        if (actor.peer_address) {
+            *actor.outgoing_buffer += static_cast<uint32_t>(peer_data.size());
+            actor.send<payload::transfer_data_t>(actor.peer_address, std::move(peer_data));
+        } else {
+            LOG_DEBUG(actor.log, "peer is no longer available, send has been ignored");
+        }
+    }
 }
 
 void C::stack_context_t::push(fs::payload::io_command_t command) noexcept {
@@ -145,6 +162,12 @@ void C::stack_context_t::push(model::diff::cluster_diff_ptr_t diff_) noexcept {
         diff = std::move(diff_);
         next = diff.get();
     }
+}
+
+void C::stack_context_t::push(utils::bytes_t data) noexcept {
+    peer_data.reserve(peer_data.size() + data.size());
+    auto out = std::back_insert_iterator(peer_data);
+    std::copy(data.begin(), data.end(), out);
 }
 
 C::update_context_t::update_context_t(controller_actor_t &actor, bool from_self_, bool cluster_config_sent_,
@@ -215,6 +238,7 @@ controller_actor_t::controller_actor_t(config_t &config)
         assert(peer_state.is_online());
         // planned_pulls = 0;
         outgoing_buffer.reset(new std::uint32_t(0));
+        block_requests.resize(config.blocks_max_requested);
     }
 }
 
@@ -242,7 +266,6 @@ void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&controller_actor_t::on_forward);
         p.subscribe_actor(&controller_actor_t::on_peer_down);
-        p.subscribe_actor(&controller_actor_t::on_block);
         p.subscribe_actor(&controller_actor_t::on_validation);
         p.subscribe_actor(&controller_actor_t::on_tx_signal);
         p.subscribe_actor(&controller_actor_t::on_postprocess_io);
@@ -259,8 +282,9 @@ void controller_actor_t::on_start() noexcept {
         return do_shutdown();
     }
 
+    auto stack_ctx = stack_context_t(*this);
     send<payload::controller_up_t>(coordinator, address, my_url->clone(), peer->device_id(), outgoing_buffer);
-    send_cluster_config();
+    send_cluster_config(stack_ctx);
     resources->acquire(resource::peer);
     LOG_INFO(log, "is online (connection: {})", my_url);
     announced = true;
@@ -288,11 +312,11 @@ void controller_actor_t::shutdown_finish() noexcept {
     r::actor_base_t::shutdown_finish();
 }
 
-void controller_actor_t::send_cluster_config() noexcept {
+void controller_actor_t::send_cluster_config(stack_context_t &ctx) noexcept {
     LOG_TRACE(log, "sending cluster config");
     auto cluster_config = cluster->generate(*peer);
     auto bytes = proto::serialize(cluster_config, peer->get_compression());
-    send_to_peer(std::move(bytes));
+    ctx.push(std::move(bytes));
     send_new_indices();
 }
 
@@ -319,7 +343,8 @@ void controller_actor_t::send_new_indices() noexcept {
 
 void controller_actor_t::on_tx_signal(message::tx_signal_t &) noexcept {
     LOG_TRACE(log, "on_tx_signal, outgoing buff size is {} bytes", *outgoing_buffer);
-    push_pending();
+    auto stack_ctx = stack_context_t(*this);
+    push_pending(stack_ctx);
 }
 
 void controller_actor_t::on_peer_down(message::peer_down_t &message) noexcept {
@@ -361,7 +386,7 @@ void controller_actor_t::on_postprocess_io(fs::message::io_commands_t &message) 
     pull_next(stack_ctx);
 }
 
-void controller_actor_t::push_pending() noexcept {
+void controller_actor_t::push_pending(stack_context_t &ctx) noexcept {
     struct update_t {
         model::folder_info_t *folder;
         proto::IndexUpdate index;
@@ -412,7 +437,7 @@ void controller_actor_t::push_pending() noexcept {
             } else {
                 data = proto::serialize(index, compression);
             }
-            send_to_peer(std::move(data));
+            ctx.push(std::move(data));
         }
     }
 }
@@ -595,7 +620,7 @@ auto controller_actor_t::io_make_request_block(model::file_info_t &source, model
 }
 
 void controller_actor_t::preprocess_block(model::file_block_t &file_block, const model::folder_info_t &source_folder,
-                                          stack_context_t &context) noexcept {
+                                          stack_context_t &ctx) noexcept {
     using namespace model::diff;
     if (!peer_address) {
         LOG_TRACE(log, "ignoring block, as there is no peer");
@@ -604,7 +629,7 @@ void controller_actor_t::preprocess_block(model::file_block_t &file_block, const
 
     auto file = file_block.file();
     auto block = file_block.block();
-    acquire_block(file_block, source_folder, context);
+    acquire_block(file_block, source_folder, ctx);
 
     auto hash = block->get_hash();
     auto last_index = file->iterate_blocks(0).get_total() - 1;
@@ -614,13 +639,32 @@ void controller_actor_t::preprocess_block(model::file_block_t &file_block, const
         auto &folder_infos = source_folder.get_folder()->get_folder_infos();
         auto local_block = block->local_file();
         auto target_fi = folder_infos.by_uuid(file->get_folder_uuid());
-        io_clone_block(file_block, source_folder, *target_fi, context);
+        io_clone_block(file_block, source_folder, *target_fi, ctx);
     } else {
         auto sz = block->get_size();
         LOG_TRACE(log, "request_block '{}' on file '{}'; block index = {} / {}, sz = {}, request pool sz = {}", hash,
                   *file, file_block.block_index(), last_index, sz, request_pool);
-        request<payload::block_request_t>(peer_address, file, source_folder, file_block.block_index())
-            .send(request_timeout);
+
+        auto request_id = block_requests_next;
+        if (block_requests_next + 1 >= blocks_max_requested) {
+            block_requests_next = 0;
+        } else {
+            ++block_requests_next;
+        }
+
+        proto::Request req;
+        proto::set_id(req, static_cast<std::int32_t>(request_id));
+        proto::set_folder(req, source_folder.get_folder()->get_id());
+        proto::set_name(req, file->get_name()->get_full_name());
+        proto::set_offset(req, static_cast<std::int32_t>(file_block.get_offset()));
+        proto::set_size(req, static_cast<std::int32_t>(block->get_size()));
+        proto::set_hash(req, block->get_hash());
+
+        ctx.push(proto::serialize(req, peer->get_compression()));
+
+        auto context = fs::payload::extendended_context_prt_t{};
+        context.reset(new peer_request_context_t(std::move(req), file->get_sequence(), file_block.block_index()));
+        block_requests[request_id] = std::move(context);
         ++rx_blocks_requested;
         request_pool -= (int64_t)sz;
     }
@@ -651,7 +695,7 @@ void controller_actor_t::on_model_update(model::message::model_update_t &message
         return do_shutdown(ee);
     }
     pull_next(ctx);
-    push_pending();
+    push_pending(ctx);
 }
 
 auto controller_actor_t::operator()(const model::diff::peer::cluster_update_t &diff, void *custom) noexcept
@@ -754,7 +798,7 @@ auto controller_actor_t::operator()(const model::diff::modify::upsert_folder_inf
         auto ctx = reinterpret_cast<update_context_t *>(custom);
         if (!ctx->cluster_config_sent) {
             ctx->cluster_config_sent = true;
-            send_cluster_config();
+            send_cluster_config(*ctx);
         }
         ++ctx->pull_ready;
     }
@@ -791,7 +835,7 @@ auto controller_actor_t::operator()(const model::diff::modify::remove_folder_inf
             auto ctx = reinterpret_cast<update_context_t *>(custom);
             if (!ctx->cluster_config_sent) {
                 ctx->cluster_config_sent = true;
-                send_cluster_config();
+                send_cluster_config(*ctx);
             }
             break;
         }
@@ -959,7 +1003,7 @@ void controller_actor_t::on_message(proto::Request &req, stack_context_t &ctx) n
             proto::set_id(res, proto::get_id(req));
             proto::set_code(res, code);
             auto data = proto::serialize(res, peer->get_compression());
-            send_to_peer(std::move(data));
+            ctx.push(std::move(data));
         }
     } else {
         auto io_command = io_make_request_block(*local_file, *local_folder, std::move(req));
@@ -972,8 +1016,94 @@ void controller_actor_t::on_message(proto::Request &req, stack_context_t &ctx) n
     }
 }
 
-void controller_actor_t::on_message(proto::DownloadProgress &, stack_context_t &) noexcept {
-    LOG_WARN(log, "on_message, not implemented");
+void controller_actor_t::on_message(proto::Response &message, stack_context_t &ctx) noexcept {
+    --rx_blocks_requested;
+
+    auto request_id = proto::get_id(message);
+    if (request_id > static_cast<std::int32_t>(block_requests.size())) {
+        std::abort();
+    }
+    auto& request_context = block_requests[request_id];
+    if (!request_context) {
+        std::abort();
+    }
+    auto peer_context = static_cast<peer_request_context_t*>(request_context.get());
+
+    auto block_hash = proto::get_hash(peer_context->request);
+    auto folder_id = proto::get_folder(peer_context->request);
+    auto file_name = proto::get_name(peer_context->request);
+    auto folder = cluster->get_folders().by_id(folder_id);
+    auto peer_folder = model::folder_info_ptr_t();
+    auto file = model::file_info_ptr_t();
+    auto block = (const model::block_info_t*)(nullptr);
+    auto file_block = (const model::file_block_t *)(nullptr);
+
+    if (folder && !folder->is_suspended()) {
+        peer_folder = folder->get_folder_infos().by_device(*peer);
+    }
+    if (peer_folder) {
+        auto f = peer_folder->get_file_infos().by_name(file_name);
+        if (f->get_sequence() == peer_context->sequence) {
+            file = std::move(f);
+        }
+    }
+    if (file) {
+        auto b = file->iterate_blocks(peer_context->block_index).next();
+        auto it = b->iterate_blocks();
+        while (auto fb = it.next()) {
+            if (fb->file() == file) {
+                file_block = fb;
+                block = b;
+                break;
+
+            }
+        }
+    }
+    if (!file_block) {
+        file = {};
+    }
+
+    bool try_next = true;
+    bool do_release_block = false;
+    auto stack_ctx = stack_context_t(*this);
+    if (state != r::state_t::OPERATIONAL) {
+        do_release_block = true;
+        try_next = false;
+        LOG_DEBUG(log, "on_block, file = '{}',  non-operational ignoring", file_name);
+    } else if (!file) {
+        LOG_DEBUG(log, "on_block, file '{}' is not longer available in '{}'", file_name, folder_id);
+        do_release_block = true;
+    } else {
+        auto code = proto::get_code(message);
+        auto code_int = (int)code;
+        if (code_int) {
+            do_release_block = true;
+            if (!file->is_unreachable()) {
+                LOG_WARN(log, "can't receive block from file '{}': {}; marking unreachable", *file, code_int);
+                file->mark_unreachable(true);
+                stack_ctx.push(new model::diff::modify::mark_reachable_t(*file, *peer_folder, false));
+                cancel_sync(file.get());
+            }
+        } else {
+            auto data = utils::bytes_t(proto::extract_data(message));
+            auto hash = file_block->block()->get_hash();
+            auto hash_bytes = utils::bytes_t(hash.begin(), hash.end());
+            request_pool += block->get_size();
+
+            std::abort();
+#if 0
+            request<hasher::payload::validation_request_t>(hasher_proxy, data, std::move(hash_bytes), &message)
+                .send(init_timeout);
+            resources->acquire(resource::hash);
+#endif
+        }
+    }
+    if (try_next) {
+        pull_next(ctx);
+    }
+    if (do_release_block) {
+        release_block(folder_id, block_hash, ctx);
+    }
 }
 
 static inline void ack_block(block_ack_context_t *io_ctx, model::cluster_t *cluster,
@@ -1006,7 +1136,7 @@ void controller_actor_t::postprocess_io(fs::payload::block_request_t &res, stack
     }
 
     auto data = proto::serialize(reply, peer->get_compression());
-    send_to_peer(std::move(data));
+    ctx.push(std::move(data));
 }
 
 void controller_actor_t::postprocess_io(fs::payload::remote_copy_t &res, stack_context_t &ctx) noexcept {
@@ -1035,61 +1165,9 @@ void controller_actor_t::postprocess_io(fs::payload::finish_file_t &res, stack_c
     ctx.push(std::move(diff));
 }
 
-void controller_actor_t::on_block(message::block_response_t &message) noexcept {
-    --rx_blocks_requested;
-    auto &ee = message.payload.ee;
-    auto &payload = message.payload.req->payload.request_payload;
-    auto [file_block, folder_info] = payload.get_block(*cluster, *peer);
-    auto file = file_block ? file_block->file() : (model::file_info_t *)(nullptr);
-    bool do_release_block = false;
-    bool try_next = true;
-    auto stack_ctx = stack_context_t(*this);
-    if (state != r::state_t::OPERATIONAL) {
-        do_release_block = true;
-        try_next = false;
-        LOG_DEBUG(log, "on_block, file = '{}',  non-operational ignoring", payload.file_name);
-    } else if (!file) {
-        LOG_DEBUG(log, "on_block, file '{}' is not longer available in '{}'", payload.file_name, payload.folder_id);
-        do_release_block = true;
-    } else {
-        auto &block = *file_block->block();
-        if (ee) {
-            do_release_block = true;
-            auto &ec = ee->root()->ec;
-            if (ec.category() == utils::request_error_code_category()) {
-                auto file = file_block->file();
-                if (!file->is_unreachable()) {
-                    LOG_WARN(log, "can't receive block from file '{}': {}; marking unreachable", *file, ec.message());
-                    file->mark_unreachable(true);
-                    stack_ctx.push(new model::diff::modify::mark_reachable_t(*file, *folder_info, false));
-                    cancel_sync(file);
-                }
-            } else {
-                LOG_WARN(log, "can't receive block : {}", ee->message());
-                do_shutdown(ee);
-                try_next = false;
-            }
-        } else {
-            auto &data = message.payload.res.data;
-            auto hash = file_block->block()->get_hash();
-            auto hash_bytes = utils::bytes_t(hash.begin(), hash.end());
-            request_pool += block.get_size();
-
-            request<hasher::payload::validation_request_t>(hasher_proxy, data, std::move(hash_bytes), &message)
-                .send(init_timeout);
-            resources->acquire(resource::hash);
-        }
-    }
-
-    if (try_next) {
-        pull_next(stack_ctx);
-    }
-    if (do_release_block) {
-        release_block(payload.folder_id, payload.block_hash, stack_ctx);
-    }
-}
-
 void controller_actor_t::on_validation(hasher::message::validation_response_t &res) noexcept {
+    std::abort();
+#if 0
     using namespace model::diff;
     resources->release(resource::hash);
     auto &ee = res.payload.ee;
@@ -1160,6 +1238,7 @@ void controller_actor_t::on_validation(hasher::message::validation_response_t &r
     if (try_next) {
         pull_next(stack_ctx);
     }
+#endif
 }
 
 void controller_actor_t::on_fs_predown(message::fs_predown_t &message) noexcept {
@@ -1218,14 +1297,5 @@ void controller_actor_t::cancel_sync(model::file_info_t *file) noexcept {
     auto it = synchronizing_files.find(file->get_full_id());
     if (it != synchronizing_files.end()) {
         synchronizing_files.erase(it);
-    }
-}
-
-void controller_actor_t::send_to_peer(utils::bytes_t data) noexcept {
-    if (peer_address) {
-        *outgoing_buffer += static_cast<uint32_t>(data.size());
-        send<payload::transfer_data_t>(peer_address, std::move(data));
-    } else {
-        LOG_DEBUG(log, "peer is no longer available, send has been ingored");
     }
 }

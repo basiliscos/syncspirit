@@ -62,7 +62,6 @@ void peer_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         });
     });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
-        p.subscribe_actor(&peer_actor_t::on_block_request);
         p.subscribe_actor(&peer_actor_t::on_transfer);
     });
 }
@@ -278,11 +277,13 @@ void peer_actor_t::shutdown_start() noexcept {
 
 void peer_actor_t::shutdown_finish() noexcept {
     LOG_TRACE(log, "shutdown_finish");
+#if 0
     for (auto &it : block_requests) {
         auto ec = r::make_error_code(r::error_code_t::cancelled);
         reply_with_error(*it, make_error(ec));
     }
     block_requests.clear();
+#endif
     if (controller) {
         send<payload::peer_down_t>(controller, address, shutdown_reason);
     }
@@ -341,6 +342,7 @@ void peer_actor_t::on_controller_predown(message::controller_predown_t &message)
     }
 }
 
+#if 0
 void peer_actor_t::on_block_request(message::block_request_t &message) noexcept {
     auto req_id = (std::int32_t)message.payload.id;
     auto &p = message.payload.request_payload;
@@ -356,6 +358,7 @@ void peer_actor_t::on_block_request(message::block_request_t &message) noexcept 
     push_write(std::move(buff), false);
     block_requests.emplace_back(&message);
 }
+#endif
 
 void peer_actor_t::on_transfer(message::transfer_data_t &message) noexcept {
     LOG_TRACE(log, "on_transfer");
@@ -396,8 +399,8 @@ bool peer_actor_t::read_controlled(proto::message::message_t &&msg) noexcept {
                 handle_ping(std::move(msg));
             } else if constexpr (std::is_same_v<T, proto::Close>) {
                 handle_close(std::move(msg));
-            } else if constexpr (std::is_same_v<T, proto::Response>) {
-                handle_response(std::move(msg));
+            } else if constexpr (std::is_same_v<T, proto::DownloadProgress>) {
+                LOG_WARN(log, "on_message(DownloadProgress), not implemented");
             } else {
                 if (controller) {
                     auto fwd = payload::forwarded_message_t{std::move(msg)};
@@ -480,6 +483,7 @@ void peer_actor_t::handle_close(proto::Close &&message) noexcept {
     do_shutdown(ee);
 }
 
+#if 0
 void peer_actor_t::handle_response(proto::Response &&message) noexcept {
     auto id = proto::get_id(message);
     LOG_TRACE(log, "handle_response, message id = {}", id);
@@ -514,6 +518,7 @@ void peer_actor_t::handle_response(proto::Response &&message) noexcept {
     }
     block_requests.erase(it);
 }
+#endif
 
 void peer_actor_t::reset_tx_timer() noexcept {
     if (state == r::state_t::OPERATIONAL) {

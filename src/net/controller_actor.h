@@ -112,16 +112,18 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
 
     struct stack_context_t {
         stack_context_t(controller_actor_t &actor_) noexcept;
-        inline ~stack_context_t();
+        ~stack_context_t();
         void push(fs::payload::io_command_t command) noexcept;
         void push(fs::payload::append_block_t command) noexcept;
         void push(model::diff::cluster_diff_ptr_t diff_) noexcept;
+        void push(utils::bytes_t data) noexcept;
 
       private:
         controller_actor_t &actor;
         model::diff::cluster_diff_ptr_t diff;
         model::diff::cluster_diff_t *next = nullptr;
         fs::payload::io_commands_t io_commands;
+        utils::bytes_t peer_data;
     };
 
   private:
@@ -165,12 +167,11 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     using synchronizing_files_t = std::unordered_map<utils::bytes_view_t, model::file_info_t::guard_t>;
     using updates_streamer_ptr_t = std::unique_ptr<model::updates_streamer_t>;
     using tx_size_ptr_t = payload::controller_up_t::tx_size_ptr_t;
-
-    void send_to_peer(utils::bytes_t data) noexcept;
+    using block_requests_t = std::vector<fs::payload::extendended_context_prt_t>;
 
     void on_peer_down(message::peer_down_t &message) noexcept;
     void on_forward(message::forwarded_message_t &message) noexcept;
-    void on_block(message::block_response_t &message) noexcept;
+
     void on_validation(hasher::message::validation_response_t &res) noexcept;
     void preprocess_block(model::file_block_t &block, const model::folder_info_t &source_folder,
                           stack_context_t &) noexcept;
@@ -184,7 +185,7 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     void on_message(proto::Index &message, stack_context_t &) noexcept;
     void on_message(proto::IndexUpdate &message, stack_context_t &) noexcept;
     void on_message(proto::Request &message, stack_context_t &) noexcept;
-    void on_message(proto::DownloadProgress &message, stack_context_t &) noexcept;
+    void on_message(proto::Response &message, stack_context_t &) noexcept;
 
     void postprocess_io(fs::payload::block_request_t &, stack_context_t &) noexcept;
     void postprocess_io(fs::payload::remote_copy_t &, stack_context_t &) noexcept;
@@ -195,8 +196,8 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     void request_block(const model::file_block_t &block) noexcept;
     void pull_next(stack_context_t &) noexcept;
     // void pull_ready() noexcept;
-    void push_pending() noexcept;
-    void send_cluster_config() noexcept;
+    void push_pending(stack_context_t &) noexcept;
+    void send_cluster_config(stack_context_t &) noexcept;
     void send_new_indices() noexcept;
     // void process_block_write() noexcept;
 
@@ -259,6 +260,8 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     synchronizing_files_t synchronizing_files;
     io_queue_t block_write_queue;
     io_queue_t block_read_queue;
+    block_requests_t block_requests;
+    std::uint_fast32_t block_requests_next = 0;
     std::optional<r::request_id_t> fs_ack_timer;
     bool announced;
 
