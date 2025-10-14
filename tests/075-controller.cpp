@@ -1015,8 +1015,6 @@ void test_downloading() {
     F(true, 10).run();
 }
 
-#if 0
-
 void test_downloading_errors() {
     struct F : fixture_t {
         using fixture_t::fixture_t;
@@ -1101,23 +1099,21 @@ void test_downloading_errors() {
             CHECK(folder_my->get_max_sequence() == 0ul);
             peer_actor->forward(index);
 
+            cluster->modify_write_requests(10);
             auto expected_state = r::state_t::OPERATIONAL;
             bool expected_unreachability = true;
             auto initial_write_pool = cluster->get_write_requests();
 
-            SECTION("general error, ok, do not shutdown") {
-                auto ec = utils::make_error_code(utils::request_error_code_t::generic);
-                peer_actor->push_block(ec, 0);
-            }
+            SECTION("general error, ok, do not shutdown") { peer_actor->push_response(proto::ErrorCode::GENERIC, 0); }
             SECTION("hash mismatch, do not shutdown") {
-                peer_actor->push_block(as_owned_bytes("123"), 0);
-                peer_actor->push_block(data_2, 1); // needed to terminate/shutdown controller
+                peer_actor->push_response(as_owned_bytes("123"), 0);
+                peer_actor->push_response(data_2, 0); // needed to terminate/shutdown controller
             }
             SECTION("rejecting blocks") {
                 auto custom_sup = static_cast<custom_supervisor_t *>(sup.get());
                 custom_sup->reject_blocks = true;
-                peer_actor->push_block(data_1, 0);
-                peer_actor->push_block(data_2, 1);
+                peer_actor->push_response(data_1, 0);
+                peer_actor->push_response(data_2, 1);
                 expected_state = r::state_t::SHUT_DOWN;
                 expected_unreachability = false;
             }
@@ -1144,7 +1140,6 @@ void test_downloading_errors() {
     };
     F(true, 10).run();
 }
-#endif
 
 void test_download_from_scratch() {
     struct F : fixture_t {
@@ -2521,7 +2516,7 @@ int _init() {
     REGISTER_TEST_CASE(test_index_receiving, "test_index_receiving", "[net]");
     REGISTER_TEST_CASE(test_index_sending, "test_index_sending", "[net]");
     REGISTER_TEST_CASE(test_downloading, "test_downloading", "[net]");
-    // REGISTER_TEST_CASE(test_downloading_errors, "test_downloading_errors", "[net]");
+    REGISTER_TEST_CASE(test_downloading_errors, "test_downloading_errors", "[net]");
     REGISTER_TEST_CASE(test_download_from_scratch, "test_download_from_scratch", "[net]");
     REGISTER_TEST_CASE(test_download_resuming, "test_download_resuming", "[net]");
     REGISTER_TEST_CASE(test_uniqueness, "test_uniqueness", "[net]");

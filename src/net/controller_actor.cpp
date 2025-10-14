@@ -642,7 +642,7 @@ void controller_actor_t::preprocess_block(model::file_block_t &file_block, const
         io_clone_block(file_block, source_folder, *target_fi, ctx);
     } else {
         auto sz = block->get_size();
-        LOG_TRACE(log, "request_block '{}' on file '{}'; block index = {} / {}, sz = {}, request pool sz = {}", hash,
+        LOG_TRACE(log, "request_block '{}' on file '{}'; block index = {} of {}, sz = {}, request pool sz = {}", hash,
                   *file, file_block.block_index(), last_index, sz, request_pool);
 
         auto request_id = block_requests_next;
@@ -683,8 +683,6 @@ void controller_actor_t::on_model_update(model::message::model_update_t &message
     auto pulls = std::uint32_t{0};
     if (custom == this) {
         ++pulls;
-        // pulls = planned_pulls;
-        // planned_pulls = 0;
     }
     auto ctx = update_context_t(*this, custom == this, false, pulls);
     LOG_TRACE(log, "on_model_update, planned pulls = {}", pulls);
@@ -1218,7 +1216,8 @@ void controller_actor_t::on_validation(hasher::message::validation_t &res) noexc
         if (res.payload.result.has_error()) {
             if (!file->is_unreachable()) {
                 auto ec = utils::make_error_code(utils::protocol_error_code_t::digest_mismatch);
-                LOG_WARN(log, "digest mismatch for '{}'; marking unreachable", *file, ec.message());
+                LOG_WARN(log, "digest mismatch for file '{}', expected = {}; marking unreachable", *file,
+                         block->get_hash());
                 file->mark_unreachable(true);
                 stack_ctx.push(new model::diff::modify::mark_reachable_t(*file, *peer_folder, false));
             }

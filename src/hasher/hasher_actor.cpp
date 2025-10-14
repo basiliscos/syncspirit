@@ -48,7 +48,7 @@ void hasher_actor_t::on_digest(message::digest_t &req) noexcept {
 }
 
 void hasher_actor_t::on_validation(message::validation_t &req) noexcept {
-    LOG_TRACE(log, "{}, on_validation");
+    LOG_TRACE(log, "on_validation");
     auto &h = req.payload.hash;
 
     unsigned char digest[SZ];

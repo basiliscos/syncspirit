@@ -180,7 +180,13 @@ void test_peer_t::process_block_requests() noexcept {
     }
 }
 
-void test_peer_t::push_response(proto::Response res) noexcept { out_responses.emplace_back(std::move(res)); }
+void test_peer_t::push_response(proto::ErrorCode code, std::int32_t request_id) noexcept {
+    assert((int)code);
+    proto::Response res;
+    proto::set_id(res, request_id);
+    proto::set_code(res, code);
+    out_responses.emplace_back(std::move(res));
+}
 
 void test_peer_t::push_response(utils::bytes_view_t data, std::int32_t request_id) noexcept {
     proto::Response res;
