@@ -108,6 +108,7 @@ void test_peer_t::on_transfer(net::message::transfer_data_t &message) noexcept {
         auto orig = std::move(value).message;
         auto type = proto::MessageType::UNKNOWN;
         auto variant = net::payload::forwarded_message_t();
+        bool has_variant = false;
         std::visit(
             [&](auto &msg) {
                 using T = std::decay_t<decltype(msg)>;
@@ -131,12 +132,15 @@ void test_peer_t::on_transfer(net::message::transfer_data_t &message) noexcept {
                     in_responses.push_back(std::move(msg));
                 } else if constexpr (std::is_constructible_v<V, T>) {
                     variant = std::move(msg);
+                    has_variant = true;
                 }
             },
             orig);
         LOG_TRACE(log, "on_transfer, bytes = {}, type = {}", sz, (int)type);
-        auto fwd_msg = new net::message::forwarded_message_t(address, std::move(variant));
-        messages.emplace_back(fwd_msg);
+        if (has_variant) {
+            auto fwd_msg = new net::message::forwarded_message_t(address, std::move(variant));
+            messages.emplace_back(fwd_msg);
+        }
 
         for (auto &msg : messages) {
             auto &p = msg->payload;

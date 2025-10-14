@@ -1624,7 +1624,6 @@ void test_sending_index_updates() {
     F(true, 10).run();
 }
 
-#if 0
 void test_uploading() {
     struct F : fixture_t {
         using fixture_t::fixture_t;
@@ -1700,8 +1699,8 @@ void test_uploading() {
                 CHECK(req.offset == 0);
                 CHECK(req.block_size == data_1.size());
 
-                REQUIRE(peer_actor->uploaded_blocks.size() == 1);
-                auto &peer_res = peer_actor->uploaded_blocks.front();
+                REQUIRE(peer_actor->in_responses.size() == 1);
+                auto &peer_res = peer_actor->in_responses.front();
                 CHECK(proto::get_id(peer_res) == 1);
                 CHECK(proto::get_code(peer_res) == proto::ErrorCode::NO_BEP_ERROR);
                 CHECK(proto::get_data(peer_res) == data_1);
@@ -1720,8 +1719,8 @@ void test_uploading() {
                 CHECK(req.offset == 0);
                 CHECK(req.block_size == data_1.size());
 
-                REQUIRE(peer_actor->uploaded_blocks.size() == 1);
-                auto &peer_res = peer_actor->uploaded_blocks.front();
+                REQUIRE(peer_actor->in_responses.size() == 1);
+                auto &peer_res = peer_actor->in_responses.front();
                 CHECK(proto::get_id(peer_res) == 1);
                 CHECK(proto::get_code(peer_res) == proto::ErrorCode::GENERIC);
                 CHECK(proto::get_data(peer_res).size() == 0);
@@ -1794,7 +1793,7 @@ void test_overload_uploading() {
             }
             sup->do_process();
 
-            auto &blocks = peer_actor->uploaded_blocks;
+            auto &blocks = peer_actor->in_responses;
             REQUIRE(blocks.size() == BLOCKS_COUNT);
             for (size_t i = 0; i < BLOCKS_COUNT; ++i) {
                 auto &res = blocks.front();
@@ -1924,7 +1923,7 @@ void test_conflicts() {
             proto::set_size(b1, data_1.size());
 
             peer_actor->forward(index);
-            peer_actor->push_block(data_1, 0, file_name);
+            peer_actor->push_response(data_1, 0);
             sup->do_process();
 
             auto &folder_infos = folder_1->get_folder_infos();
@@ -1981,7 +1980,7 @@ void test_conflicts() {
                 proto::set_modified_s(file, 1734690000);
                 proto::set_value(c_1, proto::get_value(local_file->get_version().get_best()) + 1);
                 proto::add_files(index_update, file);
-                peer_actor->push_block(data_3, 0, file_name);
+                peer_actor->push_response(data_3, 1);
                 peer_actor->forward(index_update);
                 sup->do_process();
 
@@ -2130,8 +2129,8 @@ void test_download_interrupting() {
                 SECTION("folder is kept") {
                     SECTION("suspend folder") { builder.suspend(*folder_1).apply(*sup); }
                     SECTION("unshare folder") { builder.unshare_folder(*folder_peer).apply(*sup); }
-                    peer_actor->push_block(data_1, 0, file_name);
-                    peer_actor->push_block(data_2, 1, file_name);
+                    peer_actor->push_response(data_1, 0);
+                    peer_actor->push_response(data_2, 1);
                     peer_actor->process_block_requests();
                     sup->do_process();
                     auto folder_my = folder_1->get_folder_infos().by_device(*my_device);
@@ -2140,7 +2139,8 @@ void test_download_interrupting() {
                 SECTION("remove folder") {
                     sup->auto_ack_io = false;
 
-                    peer_actor->push_block(data_2, 1, file_name);
+                    peer_actor->push_response(data_2, 0);
+                    // peer_actor->push_block(data_2, 1, file_name);
                     peer_actor->process_block_requests();
                     sup->do_process();
 
@@ -2150,7 +2150,7 @@ void test_download_interrupting() {
                     hasher->process_requests();
                     sup->do_process();
 
-                    peer_actor->push_block(data_1, 0, file_name);
+                    peer_actor->push_response(data_1, 0);
                     peer_actor->process_block_requests();
                     sup->do_process();
                     CHECK(peer_actor->blocks_requested == proto::get_blocks_size(file));
@@ -2159,7 +2159,7 @@ void test_download_interrupting() {
             }
             SECTION("hash validation replies") {
                 SECTION("folder is kept") {
-                    peer_actor->push_block(data_1, 0, file_name);
+                    peer_actor->push_response(data_1, 0);
                     peer_actor->process_block_requests();
                     sup->do_process();
 
@@ -2172,7 +2172,7 @@ void test_download_interrupting() {
                 }
                 SECTION("remove folder") {
                     builder.remove_folder(*folder_1).apply(*sup);
-                    peer_actor->push_block(data_1, 0, file_name);
+                    peer_actor->push_response(data_1, 0);
                     peer_actor->process_block_requests();
                     hasher->process_requests();
                     sup->do_process();
@@ -2183,8 +2183,10 @@ void test_download_interrupting() {
                 auto write_requests = cluster->get_write_requests();
                 sup->intercept_io(0);
                 hasher->auto_reply = true;
-                peer_actor->push_block(data_2, 1, file_name);
-                peer_actor->push_block(data_1, 0, file_name);
+                // peer_actor->push_block(data_2, 1, file_name);
+                // peer_actor->push_block(data_1, 0, file_name);
+                peer_actor->push_response(data_1, 0);
+                peer_actor->push_response(data_2, 1);
                 peer_actor->process_block_requests();
                 sup->do_process();
                 REQUIRE(!sup->io_messages.empty());
@@ -2227,6 +2229,7 @@ void test_download_interrupting() {
     };
     F(false, 10, false).run();
 }
+#if 0
 
 void test_change_folder_type() {
     struct F : fixture_t {
@@ -2523,12 +2526,12 @@ int _init() {
     REGISTER_TEST_CASE(test_initiate_my_sharing, "test_initiate_my_sharing", "[net]");
     REGISTER_TEST_CASE(test_initiate_peer_sharing, "test_initiate_peer_sharing", "[net]");
     REGISTER_TEST_CASE(test_sending_index_updates, "test_sending_index_updates", "[net]");
-    // REGISTER_TEST_CASE(test_uploading, "test_uploading", "[net]");
-    // REGISTER_TEST_CASE(test_overload_uploading, "test_overload_uploading", "[net]");
-    // REGISTER_TEST_CASE(test_peer_down, "test_peer_down", "[net]");
-    // REGISTER_TEST_CASE(test_peer_removal, "test_peer_removal", "[net]");
-    // REGISTER_TEST_CASE(test_conflicts, "test_conflicts", "[net]");
-    // REGISTER_TEST_CASE(test_download_interrupting, "test_download_interrupting", "[net]");
+    REGISTER_TEST_CASE(test_uploading, "test_uploading", "[net]");
+    REGISTER_TEST_CASE(test_overload_uploading, "test_overload_uploading", "[net]");
+    REGISTER_TEST_CASE(test_peer_down, "test_peer_down", "[net]");
+    REGISTER_TEST_CASE(test_peer_removal, "test_peer_removal", "[net]");
+    REGISTER_TEST_CASE(test_conflicts, "test_conflicts", "[net]");
+    REGISTER_TEST_CASE(test_download_interrupting, "test_download_interrupting", "[net]");
     // REGISTER_TEST_CASE(test_change_folder_type, "test_change_folder_type", "[net]");
     // REGISTER_TEST_CASE(test_pausing, "test_pausing", "[net]");
     // REGISTER_TEST_CASE(test_races, "test_races", "[net]");

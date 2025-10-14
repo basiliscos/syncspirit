@@ -641,16 +641,18 @@ void controller_actor_t::preprocess_block(model::file_block_t &file_block, const
         auto target_fi = folder_infos.by_uuid(file->get_folder_uuid());
         io_clone_block(file_block, source_folder, *target_fi, ctx);
     } else {
-        auto sz = block->get_size();
-        LOG_TRACE(log, "request_block '{}' on file '{}'; block index = {} of {}, sz = {}, request pool sz = {}", hash,
-                  *file, file_block.block_index(), last_index, sz, request_pool);
-
         auto request_id = block_requests_next;
         if (block_requests_next + 1 >= blocks_max_requested) {
             block_requests_next = 0;
         } else {
             ++block_requests_next;
         }
+
+        auto sz = block->get_size();
+        LOG_TRACE(
+            log,
+            "request_block '{}' on file '{}'; block index = {} of {}, sz = {}, request pool sz = {}, request id = {}",
+            hash, *file, file_block.block_index(), last_index, sz, request_pool, request_id);
 
         proto::Request req;
         proto::set_id(req, static_cast<std::int32_t>(request_id));
