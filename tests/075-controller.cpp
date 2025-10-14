@@ -2140,7 +2140,6 @@ void test_download_interrupting() {
                     sup->auto_ack_io = false;
 
                     peer_actor->push_response(data_2, 0);
-                    // peer_actor->push_block(data_2, 1, file_name);
                     peer_actor->process_block_requests();
                     sup->do_process();
 
@@ -2183,8 +2182,6 @@ void test_download_interrupting() {
                 auto write_requests = cluster->get_write_requests();
                 sup->intercept_io(0);
                 hasher->auto_reply = true;
-                // peer_actor->push_block(data_2, 1, file_name);
-                // peer_actor->push_block(data_1, 0, file_name);
                 peer_actor->push_response(data_1, 0);
                 peer_actor->push_response(data_2, 1);
                 peer_actor->process_block_requests();
@@ -2229,7 +2226,6 @@ void test_download_interrupting() {
     };
     F(false, 10, false).run();
 }
-#if 0
 
 void test_change_folder_type() {
     struct F : fixture_t {
@@ -2305,7 +2301,7 @@ void test_change_folder_type() {
                 REQUIRE(peer_actor->blocks_requested == 1);
 
                 SECTION("folder type is kept as send/receive") {
-                    peer_actor->push_block(data_1, 0);
+                    peer_actor->push_response(data_1, 0);
                     peer_actor->process_block_requests();
                     sup->do_process();
                     REQUIRE(peer_actor->blocks_requested == 2);
@@ -2316,7 +2312,7 @@ void test_change_folder_type() {
                     db::set_folder_type(db_folder, db::FolderType::send);
                     builder.upsert_folder(db_folder, folder_my->get_index()).apply(*sup);
 
-                    peer_actor->push_block(data_1, 0);
+                    peer_actor->push_response(data_1, 0);
                     peer_actor->process_block_requests();
                     sup->do_process();
 
@@ -2422,15 +2418,15 @@ void test_pausing() {
             target->do_shutdown();
             sup->do_process();
 
-            peer_actor->block_requests = {};
-            peer_actor->block_responses = {};
+            peer_actor->in_requests = {};
+            peer_actor->out_requests = {};
 
             start_target();
             sup->do_process();
 
-            CHECK(peer_actor->block_requests.size() == 0);
+            CHECK(peer_actor->in_requests.size() == 0);
             builder.configure_cluster(sha256).add(sha256, folder_1_id, 0, 0).finish().apply(*sup);
-            CHECK(peer_actor->block_requests.size() == 0);
+            CHECK(peer_actor->in_requests.size() == 0);
         }
     };
     F(true, 10).run();
@@ -2485,17 +2481,16 @@ void test_races() {
 
             SECTION("make file externally available before blocks arrive") {
                 builder.local_update(folder_1_id, pr_file).apply(*sup);
-
-                peer_actor->push_block(data_2, 1, file_name);
-                peer_actor->push_block(data_1, 0, file_name);
+                peer_actor->push_response(data_1, 0);
+                peer_actor->push_response(data_2, 0);
                 peer_actor->process_block_requests();
                 sup->do_process();
             }
             SECTION("make file externally available before file finishes") {
                 cluster->modify_write_requests(10);
                 sup->intercept_io(0);
-                peer_actor->push_block(data_2, 1, file_name);
-                peer_actor->push_block(data_1, 0, file_name);
+                peer_actor->push_response(data_1, 0);
+                peer_actor->push_response(data_2, 0);
                 peer_actor->process_block_requests();
                 sup->do_process();
 
@@ -2511,7 +2506,6 @@ void test_races() {
     };
     F(true, 10).run();
 };
-#endif
 
 int _init() {
     REGISTER_TEST_CASE(test_startup, "test_startup", "[net]");
@@ -2532,9 +2526,9 @@ int _init() {
     REGISTER_TEST_CASE(test_peer_removal, "test_peer_removal", "[net]");
     REGISTER_TEST_CASE(test_conflicts, "test_conflicts", "[net]");
     REGISTER_TEST_CASE(test_download_interrupting, "test_download_interrupting", "[net]");
-    // REGISTER_TEST_CASE(test_change_folder_type, "test_change_folder_type", "[net]");
-    // REGISTER_TEST_CASE(test_pausing, "test_pausing", "[net]");
-    // REGISTER_TEST_CASE(test_races, "test_races", "[net]");
+    REGISTER_TEST_CASE(test_change_folder_type, "test_change_folder_type", "[net]");
+    REGISTER_TEST_CASE(test_pausing, "test_pausing", "[net]");
+    REGISTER_TEST_CASE(test_races, "test_races", "[net]");
     return 1;
 }
 
