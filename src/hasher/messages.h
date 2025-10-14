@@ -4,50 +4,61 @@
 #pragma once
 
 #include "utils/bytes.h"
+#include "utils/error_code.h"
+
 #include <rotor.hpp>
+#include <boost/outcome.hpp>
+#include <memory>
 
 namespace syncspirit {
 namespace hasher {
 
 namespace r = rotor;
+namespace outcome = boost::outcome_v2;
 
 namespace payload {
 
-struct digest_response_t {
-    utils::bytes_t digest;
-    uint32_t weak;
+struct extendended_context_t {
+    virtual ~extendended_context_t() = default;
 };
 
-struct digest_request_t {
-    using response_t = digest_response_t;
+using extendended_context_prt_t = std::unique_ptr<extendended_context_t>;
+
+struct digest_t {
     utils::bytes_t data;
-    size_t block_index;
-    r::message_ptr_t custom;
+    extendended_context_prt_t context;
+    r::address_ptr_t back_addr;
+    r::address_ptr_t hasher_addr;
+    outcome::result<utils::bytes_t> result;
+
+    digest_t(utils::bytes_view_t data_) noexcept
+        : data{std::move(data_)}, result{utils::make_error_code(utils::error_code_t::no_action)} {}
+    digest_t(const digest_t &) = delete;
+    digest_t(digest_t &&) noexcept = default;
 };
 
-struct validation_response_t {
-    bool valid;
-};
-
-struct validation_request_t : r::arc_base_t<validation_request_t> {
-    using response_t = validation_response_t;
-    utils::bytes_view_t data;
+struct validation_t {
+    utils::bytes_t data;
     utils::bytes_t hash;
-    r::message_ptr_t custom;
+    extendended_context_prt_t context;
+    r::address_ptr_t back_addr;
+    r::address_ptr_t hasher_addr;
+    outcome::result<void> result;
 
-    validation_request_t(utils::bytes_view_t data_, utils::bytes_t hash_, r::message_ptr_t custom_ = nullptr) noexcept
-        : data{data_}, hash{std::move(hash_)}, custom{std::move(custom_)} {}
+    validation_t(utils::bytes_t data_, utils::bytes_t hash_, extendended_context_prt_t context_ = {}) noexcept
+        : data{std::move(data_)}, hash{std::move(hash_)}, context{std::move(context_)},
+          result{utils::make_error_code(utils::error_code_t::no_action)} {}
+
+    validation_t(const validation_t &) = delete;
+    validation_t(validation_t &&) noexcept = default;
 };
 
 } // namespace payload
 
 namespace message {
 
-using digest_request_t = r::request_traits_t<payload::digest_request_t>::request::message_t;
-using digest_response_t = r::request_traits_t<payload::digest_request_t>::response::message_t;
-
-using validation_request_t = r::request_traits_t<payload::validation_request_t>::request::message_t;
-using validation_response_t = r::request_traits_t<payload::validation_request_t>::response::message_t;
+using digest_t = r::message_t<payload::digest_t>;
+using validation_t = r::message_t<payload::validation_t>;
 
 } // namespace message
 

@@ -41,7 +41,8 @@ void managed_hasher_t::on_digest(digest_request_t &req) noexcept {
 void managed_hasher_t::process_requests() noexcept {
     static const constexpr size_t SZ = SHA256_DIGEST_LENGTH;
     LOG_TRACE(log, "{}, process_requests", identity);
-
+    std::abort();
+#if 0
     while (!validation_queue.empty()) {
         auto req = validation_queue.front();
         validation_queue.pop_front();
@@ -68,7 +69,7 @@ void managed_hasher_t::process_requests() noexcept {
         weak_hash = adler32(weak_hash, (const unsigned char *)data.data(), data.size());
 
         reply_to(*req, utils::bytes_t(digest, digest + SZ), static_cast<uint32_t>(weak_hash));
-    }
+#endif
 }
 
 } // namespace syncspirit::test

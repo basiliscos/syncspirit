@@ -1,10 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "hasher_proxy_actor.h"
-#include "../utils/error_code.h"
-#include <fmt/core.h>
-#include <numeric>
+#include <utility>
 
 using namespace syncspirit::hasher;
 
@@ -26,6 +24,7 @@ void hasher_proxy_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept 
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
         p.set_identity(name, false);
         log = utils::get_logger(identity);
+        reply_addr = p.create_address();
     });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
         p.register_name(name, get_address());
@@ -36,19 +35,19 @@ void hasher_proxy_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept 
     });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&hasher_proxy_actor_t::on_validation_request);
-        p.subscribe_actor(&hasher_proxy_actor_t::on_validation_response);
+        p.subscribe_actor(&hasher_proxy_actor_t::on_validation_response, reply_addr);
         p.subscribe_actor(&hasher_proxy_actor_t::on_digest_request);
-        p.subscribe_actor(&hasher_proxy_actor_t::on_digest_response);
+        p.subscribe_actor(&hasher_proxy_actor_t::on_digest_response, reply_addr);
     });
 }
 
 void hasher_proxy_actor_t::on_start() noexcept {
     r::actor_base_t::on_start();
-    LOG_TRACE(log, "{}, on_start", identity);
+    LOG_TRACE(log, "on_start");
 }
 
 void hasher_proxy_actor_t::shutdown_finish() noexcept {
-    LOG_TRACE(log, "{}, shutdown_finish", identity);
+    LOG_TRACE(log, "shutdown_finish");
     r::actor_base_t::shutdown_finish();
 }
 
@@ -83,44 +82,34 @@ void hasher_proxy_actor_t::free_hasher(r::address_ptr_t &addr) noexcept {
     assert(0 && "should not happen");
 }
 
-void hasher_proxy_actor_t::on_validation_request(hasher::message::validation_request_t &req) noexcept {
-    LOG_TRACE(log, "{}, on_validation_request", identity);
+void hasher_proxy_actor_t::on_validation_request(hasher::message::validation_t &req) noexcept {
+    LOG_TRACE(log, "on_validation_request");
     auto hasher = find_next_hasher();
-    auto &p = *req.payload.request_payload;
-    request<hasher::payload::validation_request_t>(hasher, p.data, p.hash, &req).send(init_timeout);
+    auto &p = req.payload;
+    p.back_addr = std::exchange(req.next_route, reply_addr);
+    p.hasher_addr = req.address = hasher;
+    supervisor->put(&req);
 }
 
-void hasher_proxy_actor_t::on_validation_response(hasher::message::validation_response_t &res) noexcept {
-    using request_t = hasher::message::validation_request_t;
-    LOG_TRACE(log, "{}, on_validation_response", identity);
-    auto req = (request_t *)res.payload.req->payload.request_payload->custom.get();
-    auto &payload = res.payload;
-    auto &ee = payload.ee;
-    if (ee) {
-        reply_with_error(*req, std::move(ee));
-    } else {
-        reply_to(*req, payload.res.valid);
-    }
-    free_hasher(payload.req->address);
+void hasher_proxy_actor_t::on_validation_response(hasher::message::validation_t &res) noexcept {
+    LOG_TRACE(log, "on_validation_response");
+    auto &p = res.payload;
+    res.next_route = p.back_addr;
+    free_hasher(p.hasher_addr);
 }
 
-void hasher_proxy_actor_t::on_digest_request(hasher::message::digest_request_t &req) noexcept {
-    LOG_TRACE(log, "{}, on_digest_request", identity);
+void hasher_proxy_actor_t::on_digest_request(hasher::message::digest_t &req) noexcept {
+    LOG_TRACE(log, "on_digest_request");
     auto hasher = find_next_hasher();
-    auto &p = req.payload.request_payload;
-    request<hasher::payload::digest_request_t>(hasher, p.data, p.block_index, &req).send(init_timeout);
+    auto &p = req.payload;
+    p.back_addr = std::exchange(req.next_route, reply_addr);
+    p.hasher_addr = req.address = hasher;
+    supervisor->put(&req);
 }
 
-void hasher_proxy_actor_t::on_digest_response(hasher::message::digest_response_t &res) noexcept {
-    LOG_TRACE(log, "{}, on_digest_response", identity);
-    using request_t = hasher::message::digest_request_t;
-    auto req = (request_t *)res.payload.req->payload.request_payload.custom.get();
-    auto &payload = res.payload;
-    auto &ee = payload.ee;
-    if (ee) {
-        reply_with_error(*req, std::move(ee));
-    } else {
-        reply_to(*req, payload.res.digest, payload.res.weak);
-    }
-    free_hasher(payload.req->address);
+void hasher_proxy_actor_t::on_digest_response(hasher::message::digest_t &res) noexcept {
+    LOG_TRACE(log, "on_digest_response");
+    auto &p = res.payload;
+    res.next_route = p.back_addr;
+    free_hasher(p.hasher_addr);
 }

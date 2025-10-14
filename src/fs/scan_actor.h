@@ -71,10 +71,10 @@ struct SYNCSPIRIT_API scan_actor_t : public r::actor_base_t, private model::diff
     void on_thread_ready(model::message::thread_ready_t &) noexcept;
     void on_model_update(model::message::model_update_t &message) noexcept;
     void on_scan(message::scan_progress_t &message) noexcept;
-    void on_hash(hasher::message::digest_response_t &res) noexcept;
+    void on_hash(hasher::message::digest_t &res) noexcept;
     void on_rehash(message::rehash_needed_t &message) noexcept;
     void on_hash_anew(message::hash_anew_t &message) noexcept;
-    void on_hash_new(hasher::message::digest_response_t &res) noexcept;
+    void on_hash_new(hasher::message::digest_t &res) noexcept;
     void post_scan(scan_task_t &task) noexcept;
 
     outcome::result<void> operator()(const model::diff::local::scan_start_t &, void *custom) noexcept override;

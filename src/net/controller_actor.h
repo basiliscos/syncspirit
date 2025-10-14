@@ -172,7 +172,7 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     void on_peer_down(message::peer_down_t &message) noexcept;
     void on_forward(message::forwarded_message_t &message) noexcept;
 
-    void on_validation(hasher::message::validation_response_t &res) noexcept;
+    void on_validation(hasher::message::validation_t &res) noexcept;
     void preprocess_block(model::file_block_t &block, const model::folder_info_t &source_folder,
                           stack_context_t &) noexcept;
     void on_model_update(model::message::model_update_t &message) noexcept;

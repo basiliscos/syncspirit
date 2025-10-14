@@ -39,9 +39,7 @@ void test_peer_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
             }
         });
     });
-    plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
-        p.subscribe_actor(&test_peer_t::on_transfer);
-    });
+    plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) { p.subscribe_actor(&test_peer_t::on_transfer); });
 }
 
 void test_peer_t::on_start() noexcept {
@@ -104,7 +102,7 @@ void test_peer_t::on_transfer(net::message::transfer_data_t &message) noexcept {
     auto buff = utils::bytes_view_t(data);
     while (buff.size()) {
         auto result = proto::parse_bep(buff);
-        auto& value = result.value();
+        auto &value = result.value();
         auto sz = value.consumed;
         buff = buff.subspan(sz);
         auto orig = std::move(value).message;
@@ -131,13 +129,12 @@ void test_peer_t::on_transfer(net::message::transfer_data_t &message) noexcept {
                     process_block_requests();
                 } else if constexpr (std::is_same_v<T, proto::Response>) {
                     in_responses.push_back(std::move(msg));
-                } else  if constexpr (std::is_constructible_v<V, T>) {
+                } else if constexpr (std::is_constructible_v<V, T>) {
                     variant = std::move(msg);
                 }
-
             },
             orig);
-        LOG_TRACE(log, "on_transfer, bytes = {}, type = {}",  data.size(), (int)type);
+        LOG_TRACE(log, "on_transfer, bytes = {}, type = {}", sz, (int)type);
         auto fwd_msg = new net::message::forwarded_message_t(address, std::move(variant));
         messages.emplace_back(fwd_msg);
 
@@ -183,9 +180,7 @@ void test_peer_t::process_block_requests() noexcept {
     }
 }
 
-void test_peer_t::push_response(proto::Response res) noexcept {
-    out_responses.emplace_back(std::move(res));
-}
+void test_peer_t::push_response(proto::Response res) noexcept { out_responses.emplace_back(std::move(res)); }
 
 void test_peer_t::push_response(utils::bytes_view_t data, std::int32_t request_id) noexcept {
     proto::Response res;

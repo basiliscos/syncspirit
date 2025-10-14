@@ -17,8 +17,8 @@ using namespace syncspirit::hasher;
 
 struct hash_consumer_t : r::actor_base_t {
     r::address_ptr_t hasher;
-    r::intrusive_ptr_t<message::digest_response_t> digest_res;
-    r::intrusive_ptr_t<message::validation_response_t> validation_res;
+    r::intrusive_ptr_t<message::digest_t> digest_res;
+    r::intrusive_ptr_t<message::validation_t> validation_res;
 
     using r::actor_base_t::actor_base_t;
 
@@ -33,17 +33,19 @@ struct hash_consumer_t : r::actor_base_t {
     }
 
     void request_digest(const utils::bytes_t &data) {
-        request<payload::digest_request_t>(hasher, data).send(init_timeout);
+        auto msg = r::make_routed_message<payload::digest_t>(hasher, address, std::move(data));
+        supervisor->put(std::move(msg));
     }
 
     void request_validation(const utils::bytes_t &data, utils::bytes_view_t hash) {
         auto hash_bytes = utils::bytes_t(hash.begin(), hash.end());
-        request<payload::validation_request_t>(hasher, data, std::move(hash_bytes), nullptr).send(init_timeout);
+        auto msg = r::make_routed_message<payload::validation_t>(hasher, address, data, std::move(hash_bytes));
+        supervisor->put(std::move(msg));
     }
 
-    void on_digest(message::digest_response_t &res) noexcept { digest_res = &res; }
+    void on_digest(message::digest_t &res) noexcept { digest_res = &res; }
 
-    void on_validation(message::validation_response_t &res) noexcept { validation_res = &res; }
+    void on_validation(message::validation_t &res) noexcept { validation_res = &res; }
 };
 
 TEST_CASE("hasher-actor", "[hasher]") {
@@ -59,14 +61,13 @@ TEST_CASE("hasher-actor", "[hasher]") {
     consumer->request_digest(data);
     sup->do_process();
     REQUIRE(consumer->digest_res);
-    CHECK(consumer->digest_res->payload.res.weak == 136184406u);
-    auto digest = consumer->digest_res->payload.res.digest;
+    auto &digest = consumer->digest_res->payload.result.value();
     CHECK(digest[2] == 126);
 
     consumer->request_validation(data, digest);
     sup->do_process();
-    REQUIRE(consumer->digest_res);
-    CHECK(consumer->digest_res->payload.res.weak == 136184406u);
+    REQUIRE(consumer->validation_res);
+    CHECK(!consumer->validation_res->payload.result.has_error());
 
     sup->shutdown();
     sup->do_process();

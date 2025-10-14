@@ -4,6 +4,7 @@
 #pragma once
 
 #include "proto/proto-fwd.hpp"
+#include "hasher/messages.h"
 #include "scan_task.h"
 #include "chunk_iterator.h"
 #include "new_chunk_iterator.h"
@@ -11,7 +12,6 @@
 #include "utils/error_code.h"
 
 #include <rotor.hpp>
-#include <memory>
 #include <variant>
 
 namespace syncspirit::fs {
@@ -24,14 +24,11 @@ struct scan_progress_t {
     scan_task_ptr_t task;
 };
 
+using extendended_context_t = hasher::payload::extendended_context_t;
+using extendended_context_prt_t = hasher::payload::extendended_context_prt_t;
+
 using rehash_needed_t = chunk_iterator_t;
 using hash_anew_t = new_chunk_iterator_t;
-
-struct extendended_context_t {
-    virtual ~extendended_context_t() = default;
-};
-
-using extendended_context_prt_t = std::unique_ptr<extendended_context_t>;
 
 template <typename ReplyType = void> struct payload_base_t {
     outcome::result<ReplyType> result;

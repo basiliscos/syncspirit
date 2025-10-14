@@ -61,9 +61,7 @@ void peer_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
             }
         });
     });
-    plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
-        p.subscribe_actor(&peer_actor_t::on_transfer);
-    });
+    plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) { p.subscribe_actor(&peer_actor_t::on_transfer); });
 }
 
 void peer_actor_t::on_start() noexcept {

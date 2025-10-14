@@ -27,41 +27,37 @@ void hasher_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 }
 
 void hasher_actor_t::on_start() noexcept {
-    LOG_TRACE(log, "{}, on_start", identity);
+    LOG_TRACE(log, "{}, on_start");
     r::actor_base_t::on_start();
 }
 
 void hasher_actor_t::shutdown_finish() noexcept {
-    LOG_TRACE(log, "{}, shutdown_finish", identity);
+    LOG_TRACE(log, "{}, shutdown_finish");
     get_supervisor().shutdown();
     r::actor_base_t::shutdown_finish();
 }
 
-void hasher_actor_t::on_digest(message::digest_request_t &req) noexcept {
-    LOG_TRACE(log, "{}, on_digest", identity);
+void hasher_actor_t::on_digest(message::digest_t &req) noexcept {
+    LOG_TRACE(log, "{}, on_digest");
 
     unsigned char digest[SZ];
-    auto &data = req.payload.request_payload.data;
+    auto &data = req.payload.data;
 
     utils::digest(data.data(), data.size(), digest);
-
-    // alder32
-    auto weak_hash = adler32(0L, Z_NULL, 0);
-    weak_hash = adler32(weak_hash, (const unsigned char *)data.data(), data.size());
-
-    reply_to(req, utils::bytes_t(digest, digest + SZ), static_cast<uint32_t>(weak_hash));
+    req.payload.result = utils::bytes_t(digest, digest + SZ);
 }
 
-void hasher_actor_t::on_validation(message::validation_request_t &req) noexcept {
-    LOG_TRACE(log, "{}, on_validation", identity);
-    auto &payload = *req.payload.request_payload;
-    auto &h = payload.hash;
+void hasher_actor_t::on_validation(message::validation_t &req) noexcept {
+    LOG_TRACE(log, "{}, on_validation");
+    auto &h = req.payload.hash;
 
     unsigned char digest[SZ];
-    auto &data = payload.data;
+    auto &data = req.payload.data;
 
     utils::digest(data.data(), data.size(), digest);
     bool eq = std::equal(h.begin(), h.end(), digest, digest + SZ);
 
-    reply_to(req, eq);
+    if (eq) {
+        req.payload.result = outcome::success();
+    }
 }

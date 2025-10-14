@@ -235,11 +235,14 @@ void scan_actor_t::hash_next(Message &message, const r::address_ptr_t &reply_add
             } else {
                 auto &chunk = opt.assume_value();
                 if (chunk.data.size()) {
+                    std::abort();
+#if 0
                     using request_t = hasher::payload::digest_request_t;
                     request_via<request_t>(hasher_proxy, reply_addr, std::move(chunk.data), (size_t)chunk.block_index,
                                            r::message_ptr_t(&message))
                         .send(init_timeout);
                     ++requested_hashes;
+#endif
                 }
             }
         }
@@ -247,7 +250,9 @@ void scan_actor_t::hash_next(Message &message, const r::address_ptr_t &reply_add
     return;
 }
 
-void scan_actor_t::on_hash(hasher::message::digest_response_t &res) noexcept {
+void scan_actor_t::on_hash(hasher::message::digest_t &res) noexcept {
+    std::abort();
+#if 0
     --requested_hashes;
 
     auto &rp = res.payload.req->payload.request_payload;
@@ -305,6 +310,7 @@ void scan_actor_t::on_hash(hasher::message::digest_response_t &res) noexcept {
     if (!queued_next && !requested_hashes) {
         send<payload::scan_progress_t>(address, info.get_task());
     }
+#endif
 }
 
 void scan_actor_t::commit_new_file(new_chunk_iterator_t &info) noexcept {
@@ -327,7 +333,9 @@ void scan_actor_t::commit_new_file(new_chunk_iterator_t &info) noexcept {
     task.push(new model::diff::advance::local_update_t(*cluster, *sequencer, std::move(file), std::move(folder_id)));
 }
 
-void scan_actor_t::on_hash_new(hasher::message::digest_response_t &res) noexcept {
+void scan_actor_t::on_hash_new(hasher::message::digest_t &res) noexcept {
+    std::abort();
+#if 0
     --requested_hashes;
 
     auto &rp = res.payload.req->payload.request_payload;
@@ -353,6 +361,7 @@ void scan_actor_t::on_hash_new(hasher::message::digest_response_t &res) noexcept
         commit_new_file(info);
         send<payload::scan_progress_t>(address, info.get_task());
     }
+#endif
 }
 
 void scan_actor_t::post_scan(scan_task_t &task) noexcept {

@@ -80,8 +80,8 @@ struct block_request_context_t final : fs::payload::extendended_context_t {
 };
 
 struct peer_request_context_t final : fs::payload::extendended_context_t {
-    peer_request_context_t(proto::Request request_, std::int64_t sequence_, std::int32_t block_index_) noexcept :
-        request{std::move(request_)}, sequence{sequence_}, block_index{block_index_} {}
+    peer_request_context_t(proto::Request request_, std::int64_t sequence_, std::int32_t block_index_) noexcept
+        : request{std::move(request_)}, sequence{sequence_}, block_index{block_index_} {}
 
     proto::Request request;
     std::int64_t sequence;
@@ -1023,11 +1023,11 @@ void controller_actor_t::on_message(proto::Response &message, stack_context_t &c
     if (request_id > static_cast<std::int32_t>(block_requests.size())) {
         std::abort();
     }
-    auto& request_context = block_requests[request_id];
+    auto request_context = std::move(block_requests[request_id]);
     if (!request_context) {
         std::abort();
     }
-    auto peer_context = static_cast<peer_request_context_t*>(request_context.get());
+    auto peer_context = static_cast<peer_request_context_t *>(request_context.get());
 
     auto block_hash = proto::get_hash(peer_context->request);
     auto folder_id = proto::get_folder(peer_context->request);
@@ -1035,7 +1035,7 @@ void controller_actor_t::on_message(proto::Response &message, stack_context_t &c
     auto folder = cluster->get_folders().by_id(folder_id);
     auto peer_folder = model::folder_info_ptr_t();
     auto file = model::file_info_ptr_t();
-    auto block = (const model::block_info_t*)(nullptr);
+    auto block = (const model::block_info_t *)(nullptr);
     auto file_block = (const model::file_block_t *)(nullptr);
 
     if (folder && !folder->is_suspended()) {
@@ -1055,7 +1055,6 @@ void controller_actor_t::on_message(proto::Response &message, stack_context_t &c
                 file_block = fb;
                 block = b;
                 break;
-
             }
         }
     }
@@ -1090,12 +1089,12 @@ void controller_actor_t::on_message(proto::Response &message, stack_context_t &c
             auto hash_bytes = utils::bytes_t(hash.begin(), hash.end());
             request_pool += block->get_size();
 
-            std::abort();
-#if 0
-            request<hasher::payload::validation_request_t>(hasher_proxy, data, std::move(hash_bytes), &message)
-                .send(init_timeout);
+            auto payload =
+                hasher::payload::validation_t(std::move(data), std::move(hash_bytes), std::move(request_context));
+            auto request =
+                r::make_routed_message<hasher::payload::validation_t>(hasher_proxy, address, std::move(payload));
+            supervisor->put(std::move(request));
             resources->acquire(resource::hash);
-#endif
         }
     }
     if (try_next) {
@@ -1165,80 +1164,89 @@ void controller_actor_t::postprocess_io(fs::payload::finish_file_t &res, stack_c
     ctx.push(std::move(diff));
 }
 
-void controller_actor_t::on_validation(hasher::message::validation_response_t &res) noexcept {
-    std::abort();
-#if 0
+void controller_actor_t::on_validation(hasher::message::validation_t &res) noexcept {
     using namespace model::diff;
     resources->release(resource::hash);
-    auto &ee = res.payload.ee;
-    auto block_res = (message::block_response_t *)res.payload.req->payload.request_payload->custom.get();
-    auto &payload = block_res->payload.req->payload.request_payload;
-    auto [file_block, folder_info] = payload.get_block(*cluster, *peer);
-    auto file = file_block ? file_block->file() : (model::file_info_t *)(nullptr);
+
+    auto peer_context = static_cast<peer_request_context_t *>(res.payload.context.get());
+
+    auto block_hash = proto::get_hash(peer_context->request);
+    auto folder_id = proto::get_folder(peer_context->request);
+    auto file_name = proto::get_name(peer_context->request);
+    auto folder = cluster->get_folders().by_id(folder_id);
+    auto peer_folder = model::folder_info_ptr_t();
+    auto file = model::file_info_ptr_t();
+    auto block = (const model::block_info_t *)(nullptr);
+    auto file_block = (const model::file_block_t *)(nullptr);
+
+    if (folder && !folder->is_suspended()) {
+        peer_folder = folder->get_folder_infos().by_device(*peer);
+    }
+    if (peer_folder) {
+        auto f = peer_folder->get_file_infos().by_name(file_name);
+        if (f->get_sequence() == peer_context->sequence) {
+            file = std::move(f);
+        }
+    }
+    if (file) {
+        auto b = file->iterate_blocks(peer_context->block_index).next();
+        auto it = b->iterate_blocks();
+        while (auto fb = it.next()) {
+            if (fb->file() == file) {
+                file_block = fb;
+                block = b;
+                break;
+            }
+        }
+    }
+    if (!file_block) {
+        file = {};
+    }
     bool do_release_block = false;
     bool try_next = false;
     auto stack_ctx = stack_context_t(*this);
     if (state != r::state_t::OPERATIONAL) {
-        LOG_DEBUG(log, "on_validation, non-operational, ingoring block from '{}'", payload.file_name);
+        LOG_DEBUG(log, "on_validation, non-operational, ingoring block from '{}'", file_name);
         do_release_block = true;
     } else if (!file) {
-        LOG_DEBUG(log, "on_validation, file '{}' is not longer available in '{}'", payload.file_name,
-                  payload.folder_id);
+        LOG_DEBUG(log, "on_validation, file '{}' is not longer available in '{}'", file_name, folder_id);
         do_release_block = true;
     } else if (!peer_address) {
-        LOG_DEBUG(log, "on_validation, file: '{}', hash: {}, peer is no longer available", payload.file_name,
-                  file_block->block()->get_hash());
+        LOG_DEBUG(log, "on_validation, file: '{}', peer is no longer available", file_name);
         do_release_block = true;
     } else {
-        auto folder = folder_info->get_folder();
-        if (ee) {
+        if (res.payload.result.has_error()) {
+            if (!file->is_unreachable()) {
+                auto ec = utils::make_error_code(utils::protocol_error_code_t::digest_mismatch);
+                LOG_WARN(log, "digest mismatch for '{}'; marking unreachable", *file, ec.message());
+                file->mark_unreachable(true);
+                stack_ctx.push(new model::diff::modify::mark_reachable_t(*file, *peer_folder, false));
+            }
             do_release_block = true;
-            LOG_WARN(log, "on_validation failed : {}", ee->message());
-            do_shutdown(ee);
+            try_next = true;
         } else {
-            if (!res.payload.res.valid) {
-                if (!file->is_unreachable()) {
-                    auto ec = utils::make_error_code(utils::protocol_error_code_t::digest_mismatch);
-                    LOG_WARN(log, "digest mismatch for '{}'; marking unreachable", *file, ec.message());
-                    file->mark_unreachable(true);
-                    stack_ctx.push(new model::diff::modify::mark_reachable_t(*file, *folder_info, false));
-                }
-                do_release_block = true;
+            auto &data = res.payload.data;
+            auto index = file_block->block_index();
+            auto already_have = file_block->is_locally_available();
+            LOG_TRACE(log, "{}, got block {}, already have: {}, write requests left = {}", *file, index,
+                      already_have ? "y" : "n", cluster->get_write_requests());
+            if (already_have) {
                 try_next = true;
-            } else if (folder->is_suspended()) {
-                LOG_WARN(log, "folder is suspended, no further processing of '{}'", *file);
+                do_release_block = true;
             } else {
-                auto &data = block_res->payload.res.data;
-                auto index = payload.block_index;
-                auto already_have = false;
-                auto it = file_block->block()->iterate_blocks();
-                while (auto fb = it.next()) {
-                    if (fb->is_locally_available()) {
-                        already_have = true;
-                        break;
-                    }
-                }
-                LOG_TRACE(log, "{}, got block {}, already have: {}, write requests left = {}", *file, index,
-                          already_have ? "y" : "n", cluster->get_write_requests());
-                if (already_have) {
-                    try_next = true;
-                    do_release_block = true;
-                } else {
-                    io_append_block(*file, *folder_info, index, std::move(data), stack_ctx);
-                }
+                io_append_block(*file, *peer_folder, index, std::move(data), stack_ctx);
             }
         }
     }
     if (do_release_block) {
-        release_block(payload.folder_id, payload.block_hash, stack_ctx);
+        release_block(folder_id, block_hash, stack_ctx);
         if (file) {
-            cancel_sync(file);
+            cancel_sync(file.get());
         }
     }
     if (try_next) {
         pull_next(stack_ctx);
     }
-#endif
 }
 
 void controller_actor_t::on_fs_predown(message::fs_predown_t &message) noexcept {

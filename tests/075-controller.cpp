@@ -568,7 +568,6 @@ void test_downloading() {
                     CHECK(f->get_sequence() == 2ul);
                 }
             }
-#if 0
             SECTION("download 2 files") {
                 peer_actor->forward(cc);
                 auto index = proto::Index{};
@@ -625,8 +624,8 @@ void test_downloading() {
                     CHECK(!folder_my->get_folder()->is_synchronizing());
 
                     peer_actor->forward(index);
-                    peer_actor->push_block(data_1, 0, file_name_1);
-                    peer_actor->push_block(data_2, 0, file_name_2);
+                    peer_actor->push_response(data_1, 0);
+                    peer_actor->push_response(data_2, 1);
                     sup->do_process();
 
                     CHECK(!folder_my->get_folder()->is_synchronizing());
@@ -658,7 +657,7 @@ void test_downloading() {
                     CHECK(!folder_my->get_folder()->is_synchronizing());
 
                     peer_actor->forward(index);
-                    peer_actor->push_block(data_1, 0, file_name_1);
+                    peer_actor->push_response(data_1, 0);
                     sup->do_process();
 
                     CHECK(!folder_my->get_folder()->is_synchronizing());
@@ -681,7 +680,6 @@ void test_downloading() {
                         CHECK(f->is_locally_available());
                     }
                 }
-
                 SECTION("with the same blocks") {
                     auto concurrent_writes = GENERATE(1, 5);
                     cluster->modify_write_requests(concurrent_writes);
@@ -694,7 +692,7 @@ void test_downloading() {
                     CHECK(!folder_my->get_folder()->is_synchronizing());
 
                     peer_actor->forward(index);
-                    peer_actor->push_block(data_1, 0, file_name_1);
+                    peer_actor->push_response(data_1, 0);
                     sup->do_process();
 
                     CHECK(!folder_my->get_folder()->is_synchronizing());
@@ -742,8 +740,8 @@ void test_downloading() {
                     CHECK(!folder_my->get_folder()->is_synchronizing());
 
                     peer_actor->forward(index);
-                    peer_actor->push_block(data_1, 0, file_name_1);
-                    peer_actor->push_block(data_2, 1, file_name_1);
+                    peer_actor->push_response(data_1, 0);
+                    peer_actor->push_response(data_2, 1);
                     sup->do_process();
 
                     CHECK(sup->file_finishes.size() == 1);
@@ -778,6 +776,7 @@ void test_downloading() {
                     }
                 }
             }
+
             SECTION("don't attempt to download a file, which is deleted") {
                 auto folder_peer = folder_infos.by_device(*peer_device);
                 auto file_name = std::string_view("some-file");
@@ -867,7 +866,7 @@ void test_downloading() {
                 proto::set_size(b1, data_1.size());
 
                 peer_actor->forward(index_update);
-                peer_actor->push_block(data_1, 0);
+                peer_actor->push_response(data_1, 0);
                 sup->do_process();
 
                 auto folder_my = folder_infos.by_device(*my_device);
@@ -928,7 +927,7 @@ void test_downloading() {
                 proto::set_size(b1, 5);
 
                 peer_actor->forward(index_update);
-                peer_actor->push_block(data_1, 0);
+                peer_actor->push_response(data_1, 0);
                 sup->do_process();
 
                 REQUIRE(folder_my->get_file_infos().size() == 1);
@@ -940,7 +939,6 @@ void test_downloading() {
                 CHECK(f->is_locally_available());
                 CHECK(!f->is_deleted());
             }
-
             SECTION("download a file, which has the same blocks locally") {
                 peer_actor->forward(cc);
                 sup->do_process();
@@ -1000,7 +998,7 @@ void test_downloading() {
                 REQUIRE(folder_my->add_strict(file_my));
 
                 peer_actor->forward(index);
-                peer_actor->push_block(data_2, 1);
+                peer_actor->push_response(data_2, 0);
                 cluster->modify_write_requests(10);
                 sup->do_process();
 
@@ -1012,7 +1010,6 @@ void test_downloading() {
                 CHECK(f->iterate_blocks().get_total() == 2);
                 CHECK(f->is_locally_available());
             }
-#endif
         }
     };
     F(true, 10).run();
@@ -1147,6 +1144,7 @@ void test_downloading_errors() {
     };
     F(true, 10).run();
 }
+#endif
 
 void test_download_from_scratch() {
     struct F : fixture_t {
@@ -1217,8 +1215,8 @@ void test_download_from_scratch() {
             proto::set_size(b2, data_2.size());
 
             peer_actor->forward(index);
-            peer_actor->push_block(data_1, 0, file_name);
-            peer_actor->push_block(data_2, 1, file_name);
+            peer_actor->push_response(data_1, 0);
+            peer_actor->push_response(data_2, 1);
             sup->do_process();
 
             auto folder_my = folder_1->get_folder_infos().by_device(*my_device);
@@ -1319,7 +1317,7 @@ void test_download_resuming() {
             proto::set_offset(b2, 5);
 
             peer_actor->forward(index);
-            peer_actor->push_block(data_1, 0, file_name);
+            peer_actor->push_response(data_1, 0);
             sup->do_process();
 
             target->do_shutdown();
@@ -1335,7 +1333,7 @@ void test_download_resuming() {
 
             start_target();
             peer_actor->forward(cc);
-            peer_actor->push_block(data_2, 1, file_name);
+            peer_actor->push_response(data_2, 0);
             sup->do_process();
 
             auto folder_my = folder_1->get_folder_infos().by_device(*my_device);
@@ -1631,6 +1629,7 @@ void test_sending_index_updates() {
     F(true, 10).run();
 }
 
+#if 0
 void test_uploading() {
     struct F : fixture_t {
         using fixture_t::fixture_t;
@@ -2523,12 +2522,12 @@ int _init() {
     REGISTER_TEST_CASE(test_index_sending, "test_index_sending", "[net]");
     REGISTER_TEST_CASE(test_downloading, "test_downloading", "[net]");
     // REGISTER_TEST_CASE(test_downloading_errors, "test_downloading_errors", "[net]");
-    // REGISTER_TEST_CASE(test_download_from_scratch, "test_download_from_scratch", "[net]");
-    // REGISTER_TEST_CASE(test_download_resuming, "test_download_resuming", "[net]");
-    // REGISTER_TEST_CASE(test_uniqueness, "test_uniqueness", "[net]");
-    // REGISTER_TEST_CASE(test_initiate_my_sharing, "test_initiate_my_sharing", "[net]");
-    // REGISTER_TEST_CASE(test_initiate_peer_sharing, "test_initiate_peer_sharing", "[net]");
-    // REGISTER_TEST_CASE(test_sending_index_updates, "test_sending_index_updates", "[net]");
+    REGISTER_TEST_CASE(test_download_from_scratch, "test_download_from_scratch", "[net]");
+    REGISTER_TEST_CASE(test_download_resuming, "test_download_resuming", "[net]");
+    REGISTER_TEST_CASE(test_uniqueness, "test_uniqueness", "[net]");
+    REGISTER_TEST_CASE(test_initiate_my_sharing, "test_initiate_my_sharing", "[net]");
+    REGISTER_TEST_CASE(test_initiate_peer_sharing, "test_initiate_peer_sharing", "[net]");
+    REGISTER_TEST_CASE(test_sending_index_updates, "test_sending_index_updates", "[net]");
     // REGISTER_TEST_CASE(test_uploading, "test_uploading", "[net]");
     // REGISTER_TEST_CASE(test_overload_uploading, "test_overload_uploading", "[net]");
     // REGISTER_TEST_CASE(test_peer_down, "test_peer_down", "[net]");

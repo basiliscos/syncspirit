@@ -142,7 +142,8 @@ struct peer_down_t {
     r::extended_error_ptr_t ee;
 };
 
-using forwarded_message_t = std::variant<proto::ClusterConfig, proto::Index, proto::IndexUpdate, proto::Request, proto::Response>;
+using forwarded_message_t =
+    std::variant<proto::ClusterConfig, proto::Index, proto::IndexUpdate, proto::Request, proto::Response>;
 using forwarded_messages_t = std::vector<forwarded_message_t>;
 
 #if 0
