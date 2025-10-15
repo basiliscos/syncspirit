@@ -31,8 +31,9 @@ struct digest_t {
     r::address_ptr_t hasher_addr;
     outcome::result<utils::bytes_t> result;
 
-    digest_t(utils::bytes_view_t data_) noexcept
-        : data{std::move(data_)}, result{utils::make_error_code(utils::error_code_t::no_action)} {}
+    digest_t(utils::bytes_view_t data_, extendended_context_prt_t context_ = {}) noexcept
+        : data{std::move(data_)}, result{utils::make_error_code(utils::error_code_t::no_action)},
+          context{std::move(context_)} {}
     digest_t(const digest_t &) = delete;
     digest_t(digest_t &&) noexcept = default;
 };

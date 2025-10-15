@@ -79,7 +79,8 @@ struct SYNCSPIRIT_API scan_actor_t : public r::actor_base_t, private model::diff
 
     outcome::result<void> operator()(const model::diff::local::scan_start_t &, void *custom) noexcept override;
 
-    template <typename Message> void hash_next(Message &m, const r::address_ptr_t &reply_addr) noexcept;
+    template <typename Context, typename Iterator>
+    void hash_next(Iterator &it, const r::address_ptr_t &reply_addr) noexcept;
 
     model::cluster_ptr_t cluster;
     model::sequencer_ptr_t sequencer;

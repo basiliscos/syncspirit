@@ -65,6 +65,7 @@ void managed_hasher_t::process_requests() noexcept {
         utils::digest(data.data(), data.size(), digest);
 
         req->address = std::exchange(req->next_route, {});
+        req->payload.result = utils::bytes_t(digest, digest + SZ);
         supervisor->put(std::move(req));
     }
 }
