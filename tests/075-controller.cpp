@@ -1102,7 +1102,6 @@ void test_downloading_errors() {
             auto expected_state = r::state_t::OPERATIONAL;
             bool expected_unreachability = true;
             auto initial_write_pool = cluster->get_write_requests();
-
             SECTION("general error, ok, do not shutdown") { peer_actor->push_response(proto::ErrorCode::GENERIC, 0); }
             SECTION("hash mismatch, do not shutdown") {
                 peer_actor->push_response(as_owned_bytes("123"), 0);
@@ -1113,6 +1112,26 @@ void test_downloading_errors() {
                 custom_sup->reject_blocks = true;
                 peer_actor->push_response(data_1, 0);
                 peer_actor->push_response(data_2, 1);
+                expected_state = r::state_t::SHUT_DOWN;
+                expected_unreachability = false;
+            }
+            SECTION("wrong request id") {
+                proto::Response res;
+                proto::set_id(res, 99);
+                proto::set_data(res, data_1);
+                peer_actor->forward(std::move(res));
+                expected_state = r::state_t::SHUT_DOWN;
+                expected_unreachability = false;
+            }
+            SECTION("wrong request id (2)") {
+                proto::Response res;
+                proto::set_id(res, 0);
+                proto::set_data(res, data_1);
+                proto::Response res_2;
+                proto::set_id(res_2, 0);
+                proto::set_data(res_2, data_2);
+                peer_actor->forward(res);
+                peer_actor->forward(res_2);
                 expected_state = r::state_t::SHUT_DOWN;
                 expected_unreachability = false;
             }
