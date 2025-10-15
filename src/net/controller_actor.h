@@ -122,12 +122,10 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
 
   private:
     struct update_context_t : stack_context_t {
-        update_context_t(controller_actor_t &actor, bool from_self_, bool cluster_config_sent_,
-                         std::uint32_t pull_ready_) noexcept;
+        update_context_t(controller_actor_t &actor, bool from_self_, bool cluster_config_sent_) noexcept;
 
         bool from_self;
         bool cluster_config_sent;
-        std::uint32_t pull_ready;
     };
 
     using peers_map_t = std::unordered_map<r::address_ptr_t, model::device_ptr_t>;
@@ -189,11 +187,9 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
 
     void request_block(const model::file_block_t &block) noexcept;
     void pull_next(stack_context_t &) noexcept;
-    // void pull_ready() noexcept;
     void push_pending(stack_context_t &) noexcept;
     void send_cluster_config(stack_context_t &) noexcept;
     void send_new_indices() noexcept;
-    // void process_block_write() noexcept;
 
     void io_advance(model::advance_action_t action, model::file_info_t &peer_file, model::folder_info_t &peer_folder,
                     stack_context_t &);

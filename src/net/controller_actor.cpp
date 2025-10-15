@@ -170,10 +170,8 @@ void C::stack_context_t::push(utils::bytes_t data) noexcept {
     std::copy(data.begin(), data.end(), out);
 }
 
-C::update_context_t::update_context_t(controller_actor_t &actor, bool from_self_, bool cluster_config_sent_,
-                                      std::uint32_t pull_ready_) noexcept
-    : stack_context_t(actor), from_self{from_self_}, cluster_config_sent{cluster_config_sent_},
-      pull_ready{pull_ready_} {}
+C::update_context_t::update_context_t(controller_actor_t &actor, bool from_self_, bool cluster_config_sent_) noexcept
+    : stack_context_t(actor), from_self{from_self_}, cluster_config_sent{cluster_config_sent_} {}
 
 C::folder_synchronization_t::folder_synchronization_t(controller_actor_t &controller_,
                                                       model::folder_t &folder_) noexcept
@@ -235,7 +233,6 @@ controller_actor_t::controller_actor_t(config_t &config)
         assert(cluster);
         assert(sequencer);
         assert(peer_state.is_online());
-        // planned_pulls = 0;
         outgoing_buffer.reset(new std::uint32_t(0));
         block_requests.resize(config.blocks_max_requested);
     }
@@ -687,12 +684,8 @@ void controller_actor_t::on_forward(message::forwarded_message_t &message) noexc
 
 void controller_actor_t::on_model_update(model::message::model_update_t &message) noexcept {
     auto custom = const_cast<void *>(message.payload.custom);
-    auto pulls = std::uint32_t{0};
-    if (custom == this) {
-        ++pulls;
-    }
-    auto ctx = update_context_t(*this, custom == this, false, pulls);
-    LOG_TRACE(log, "on_model_update, planned pulls = {}", pulls);
+    auto ctx = update_context_t(*this, custom == this, false);
+    LOG_TRACE(log, "on_model_update");
     auto &diff = *message.payload.diff;
     auto r = diff.visit(*this, &ctx);
     if (!r) {
@@ -712,7 +705,6 @@ auto controller_actor_t::operator()(const model::diff::peer::cluster_update_t &d
         send_new_indices();
         if (!file_iterator) {
             file_iterator = peer->create_iterator(*cluster);
-            ++ctx->pull_ready;
         }
     }
     return result;
@@ -728,7 +720,6 @@ auto controller_actor_t::operator()(const model::diff::peer::update_folder_t &di
             auto file = files_map.by_name(proto::get_name(f));
             cancel_sync(file.get());
         }
-        ++ctx->pull_ready;
     }
     return diff.visit_next(*this, custom);
 }
@@ -764,7 +755,6 @@ auto controller_actor_t::operator()(const model::diff::advance::advance_t &diff,
             if (updates_streamer) {
                 updates_streamer->on_update(*local_file, *local_folder);
             }
-            ++ctx->pull_ready;
         }
     }
     return diff.visit_next(*this, custom);
@@ -790,7 +780,6 @@ auto controller_actor_t::operator()(const model::diff::modify::upsert_folder_t &
     if (folder->is_shared_with(*peer)) {
         if (updates_streamer) {
             updates_streamer->on_remote_refresh();
-            ++ctx->pull_ready;
         }
     }
     return diff.visit_next(*this, custom);
@@ -805,7 +794,6 @@ auto controller_actor_t::operator()(const model::diff::modify::upsert_folder_inf
             ctx->cluster_config_sent = true;
             send_cluster_config(*ctx);
         }
-        ++ctx->pull_ready;
     }
     return diff.visit_next(*this, custom);
 }
@@ -861,7 +849,6 @@ auto controller_actor_t::operator()(const model::diff::modify::mark_reachable_t 
     auto file = folder_info->get_file_infos().by_name(file_name);
     if (ctx->from_self) {
         cancel_sync(file.get());
-        ++ctx->pull_ready;
     }
     if (device == cluster->get_device() && updates_streamer) {
         updates_streamer->on_update(*file, *folder_info);
