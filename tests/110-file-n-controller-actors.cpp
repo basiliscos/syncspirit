@@ -100,7 +100,6 @@ struct fixture_t {
                                .cluster(cluster)
                                .sequencer(sup->sequencer)
                                .timeout(timeout)
-                               .request_timeout(timeout)
                                .blocks_max_requested(100)
                                .finish();
 

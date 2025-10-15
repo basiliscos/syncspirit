@@ -227,11 +227,10 @@ void C::folder_synchronization_t::finish_sync(stack_context_t &context) noexcept
 
 controller_actor_t::controller_actor_t(config_t &config)
     : r::actor_base_t{config}, sequencer{std::move(config.sequencer)}, cluster{config.cluster}, peer{config.peer},
-      peer_state{peer->get_state().clone()}, peer_address{config.peer_addr}, request_timeout{config.request_timeout},
-      rx_blocks_requested{0}, tx_blocks_requested{0}, outgoing_buffer_max{config.outgoing_buffer_max},
-      request_pool{config.request_pool}, blocks_max_requested{config.blocks_max_requested},
-      advances_per_iteration{config.advances_per_iteration}, default_path(std::move(config.default_path)),
-      announced{false} {
+      peer_state{peer->get_state().clone()}, peer_address{config.peer_addr}, rx_blocks_requested{0},
+      tx_blocks_requested{0}, outgoing_buffer_max{config.outgoing_buffer_max}, request_pool{config.request_pool},
+      blocks_max_requested{config.blocks_max_requested}, advances_per_iteration{config.advances_per_iteration},
+      default_path(std::move(config.default_path)), announced{false} {
     {
         assert(cluster);
         assert(sequencer);

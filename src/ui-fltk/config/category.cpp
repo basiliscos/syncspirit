@@ -26,11 +26,9 @@ auto reflect(const main_cfg_t &config, const main_cfg_t &default_config) -> cate
             property_ptr_t(new bep::blocks_simultaneous_write_t(bep.blocks_simultaneous_write, bep_def.blocks_simultaneous_write)),
             property_ptr_t(new bep::connect_timeout_t(bep.connect_timeout, bep_def.connect_timeout)),
             property_ptr_t(new bep::advances_per_iteration_t(bep.advances_per_iteration, bep_def.advances_per_iteration)),
-            property_ptr_t(new bep::request_timeout_t(bep.request_timeout, bep_def.request_timeout)),
+            property_ptr_t(new bep::ping_timeout_t(bep.ping_timeout, bep_def.ping_timeout)),
             property_ptr_t(new bep::rx_buff_size_t(bep.rx_buff_size, bep_def.rx_buff_size)),
-            property_ptr_t(new bep::rx_timeout_t(bep.rx_timeout, bep_def.rx_timeout)),
             property_ptr_t(new bep::tx_buff_limit_t(bep.tx_buff_limit, bep_def.tx_buff_limit)),
-            property_ptr_t(new bep::tx_timeout_t(bep.tx_timeout, bep_def.tx_timeout)),
             property_ptr_t(new bep::stats_interval_t(bep.stats_interval, bep_def.stats_interval)),
             // clang-format on
         };

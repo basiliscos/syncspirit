@@ -167,9 +167,7 @@ static main_t make_default_config(const bfs::path &config_path, const bfs::path 
         16 * 1024 * 1024,   /* rx_buff_size */
         8 * 1024 * 1024,    /* tx_buff_limit */
         5000,               /* connect_timeout */
-        60000,              /* request_timeout */
-        90000,              /* tx_timeout */
-        300000,             /* rx_timeout */
+        90000,              /* ping_timeout */
         32,                 /* blocks_max_requested */
         64,                 /* blocks_simultaneous_write */
         20,                 /* advances_per_iteration */
@@ -309,9 +307,7 @@ config_result_t get_config(std::istream &config, const bfs::path &config_path) {
         SAFE_GET_VALUE(rx_buff_size, std::uint32_t, "bep");
         SAFE_GET_VALUE(tx_buff_limit, std::uint32_t, "bep");
         SAFE_GET_VALUE(connect_timeout, std::uint32_t, "bep");
-        SAFE_GET_VALUE(request_timeout, std::uint32_t, "bep");
-        SAFE_GET_VALUE(tx_timeout, std::uint32_t, "bep");
-        SAFE_GET_VALUE(rx_timeout, std::uint32_t, "bep");
+        SAFE_GET_VALUE(ping_timeout, std::uint32_t, "bep");
         SAFE_GET_VALUE(blocks_max_requested, std::uint32_t, "bep");
         SAFE_GET_VALUE(blocks_simultaneous_write, std::uint32_t, "bep");
         SAFE_GET_VALUE(advances_per_iteration, std::uint32_t, "bep");
@@ -455,12 +451,10 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
                     {"blocks_max_requested", cfg.bep_config.blocks_max_requested},
                     {"blocks_simultaneous_write", cfg.bep_config.blocks_simultaneous_write},
                     {"connect_timeout", cfg.bep_config.connect_timeout},
-                    {"request_timeout", cfg.bep_config.request_timeout},
+                    {"ping_timeout", cfg.bep_config.ping_timeout},
                     {"rx_buff_size", cfg.bep_config.rx_buff_size},
-                    {"rx_timeout", cfg.bep_config.rx_timeout},
                     {"stats_interval", cfg.bep_config.stats_interval},
                     {"tx_buff_limit", cfg.bep_config.tx_buff_limit},
-                    {"tx_timeout", cfg.bep_config.tx_timeout},
                 }}},
         {"dialer", toml::table{{
                        {"enabled", cfg.dialer_config.enabled},

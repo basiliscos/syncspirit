@@ -148,12 +148,12 @@ void advances_per_iteration_t::reflect_to(syncspirit::config::main_t &main) {
 
 const char *advances_per_iteration_t::explanation_ = "maximum amount of file metadata advances per iteration";
 
-request_timeout_t::request_timeout_t(std::uint64_t value, std::uint64_t default_value)
-    : parent_t("request_timeout", explanation_, value, default_value) {}
+ping_timeout_t::ping_timeout_t(std::uint64_t value, std::uint64_t default_value)
+    : parent_t("ping_timeout", explanation_, value, default_value) {}
 
-void request_timeout_t::reflect_to(syncspirit::config::main_t &main) { main.bep_config.request_timeout = native_value; }
+void ping_timeout_t::reflect_to(syncspirit::config::main_t &main) { main.bep_config.ping_timeout = native_value; }
 
-const char *request_timeout_t::explanation_ = "maximum time for request, milliseconds";
+const char *ping_timeout_t::explanation_ = "maximum interval between pings, milliseconds";
 
 rx_buff_size_t::rx_buff_size_t(std::uint64_t value, std::uint64_t default_value)
     : parent_t("rx_buff_size", explanation_, value, default_value) {}
@@ -162,26 +162,12 @@ void rx_buff_size_t::reflect_to(syncspirit::config::main_t &main) { main.bep_con
 
 const char *rx_buff_size_t::explanation_ = "preallocated receive buffer size, bytes";
 
-rx_timeout_t::rx_timeout_t(std::uint64_t value, std::uint64_t default_value)
-    : parent_t("rx_timeout", explanation_, value, default_value) {}
-
-void rx_timeout_t::reflect_to(syncspirit::config::main_t &main) { main.bep_config.rx_timeout = native_value; }
-
-const char *rx_timeout_t::explanation_ = "rx max time, milliseconds";
-
 tx_buff_limit_t::tx_buff_limit_t(std::uint64_t value, std::uint64_t default_value)
     : parent_t("tx_buff_limit", explanation_, value, default_value) {}
 
 void tx_buff_limit_t::reflect_to(syncspirit::config::main_t &main) { main.bep_config.tx_buff_limit = native_value; }
 
 const char *tx_buff_limit_t::explanation_ = "preallocated transmit buffer size";
-
-tx_timeout_t::tx_timeout_t(std::uint64_t value, std::uint64_t default_value)
-    : parent_t("tx_timeout", explanation_, value, default_value) {}
-
-void tx_timeout_t::reflect_to(syncspirit::config::main_t &main) { main.bep_config.tx_timeout = native_value; }
-
-const char *tx_timeout_t::explanation_ = "tx max time, milliseconds";
 
 stats_interval_t::stats_interval_t(std::int64_t value, std::int64_t default_value)
     : parent_t("tx_timeout", explanation_, value, default_value) {}

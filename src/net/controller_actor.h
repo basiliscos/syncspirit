@@ -32,7 +32,6 @@ struct controller_actor_config_t : r::actor_config_t {
     model::sequencer_ptr_t sequencer;
     model::device_ptr_t peer;
     r::address_ptr_t peer_addr;
-    pt::time_duration request_timeout;
     uint32_t blocks_max_requested = 8;
     uint32_t outgoing_buffer_max = 0;
     std::uint32_t advances_per_iteration = 10;
@@ -61,11 +60,6 @@ template <typename Actor> struct controller_actor_config_builder_t : r::actor_co
 
     builder_t &&peer_addr(const r::address_ptr_t &value) && noexcept {
         parent_t::config.peer_addr = value;
-        return std::move(*static_cast<typename parent_t::builder_t *>(this));
-    }
-
-    builder_t &&request_timeout(const pt::time_duration &value) && noexcept {
-        parent_t::config.request_timeout = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
@@ -239,7 +233,6 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     r::address_ptr_t peer_address;
     r::address_ptr_t hasher_proxy;
     r::address_ptr_t fs_addr;
-    pt::time_duration request_timeout;
     model::ignored_folders_map_t *ignored_folders;
     // generic
     tx_size_ptr_t outgoing_buffer;
