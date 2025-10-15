@@ -1979,7 +1979,7 @@ void test_conflicts() {
                 proto::set_modified_s(file, 1734690000);
                 proto::set_value(c_1, proto::get_value(local_file->get_version().get_best()) + 1);
                 proto::add_files(index_update, file);
-                peer_actor->push_response(data_3, 1);
+                peer_actor->push_response(data_3, 0);
                 peer_actor->forward(index_update);
                 sup->do_process();
 

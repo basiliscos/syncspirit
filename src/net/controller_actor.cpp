@@ -641,17 +641,23 @@ void controller_actor_t::preprocess_block(model::file_block_t &file_block, const
         io_clone_block(file_block, source_folder, *target_fi, ctx);
     } else {
         auto request_id = block_requests_next;
-        if (block_requests_next + 1 >= blocks_max_requested) {
-            block_requests_next = 0;
-        } else {
-            ++block_requests_next;
+        for (std::uint_fast32_t i = 0; i < blocks_max_requested; ++i) {
+            if (!block_requests[request_id]) {
+                if (request_id + 1 >= blocks_max_requested) {
+                    block_requests_next = 0;
+                } else {
+                    ++block_requests_next;
+                }
+                break;
+            } else {
+                ++request_id;
+            }
         }
+        assert(!block_requests[request_id]);
 
         auto sz = block->get_size();
-        LOG_TRACE(
-            log,
-            "request_block '{}' on file '{}'; block index = {} of {}, sz = {}, request pool sz = {}, request id = {}",
-            hash, *file, file_block.block_index(), last_index, sz, request_pool, request_id);
+        LOG_TRACE(log, "requesting block '{}', file '{}', index = {} of {} ({} bytes), pool sz = {}, req.id = {}", hash,
+                  *file, file_block.block_index(), last_index, sz, request_pool, request_id);
 
         proto::Request req;
         proto::set_id(req, static_cast<std::int32_t>(request_id));
@@ -1019,14 +1025,17 @@ void controller_actor_t::on_message(proto::Response &message, stack_context_t &c
     --rx_blocks_requested;
 
     auto request_id = proto::get_id(message);
-    if (request_id > static_cast<std::int32_t>(block_requests.size())) {
-        std::abort();
+    if (request_id > static_cast<std::int32_t>(block_requests.size()) || request_id < 0) {
+        LOG_WARN(log, "responce id = {} is incorrect, shut self down", request_id);
+        return do_shutdown();
     }
     auto request_context = std::move(block_requests[request_id]);
     if (!request_context) {
-        std::abort();
+        LOG_WARN(log, "there was no request for responce id = {}, shut self down", request_id);
+        return do_shutdown();
     }
     auto peer_context = static_cast<peer_request_context_t *>(request_context.get());
+    block_requests_next = request_id;
 
     auto block_hash = proto::get_hash(peer_context->request);
     auto folder_id = proto::get_folder(peer_context->request);
