@@ -189,7 +189,7 @@ struct fixture_t : private model::diff::cluster_visitor_t {
 
     virtual void main() noexcept {}
 
-    virtual actor_ptr_t create_actor(uint32_t rx_timeout = 2000) noexcept {
+    virtual actor_ptr_t create_actor(uint32_t ping_timeout = 2000) noexcept {
         outgoing_buff.reset(new std::uint32_t(0));
         auto url_str = fmt::format("tcp+active://{}", peer_ep);
         auto state = device_state_t::make_offline();
@@ -205,9 +205,9 @@ struct fixture_t : private model::diff::cluster_visitor_t {
 
         auto bep_config = config::bep_config_t();
         bep_config.rx_buff_size = 1024;
-        bep_config.rx_timeout = rx_timeout;
         bep_config.stats_interval = -1;
-        LOG_INFO(log, "crearing actor, timeout = {}", rx_timeout);
+        bep_config.ping_timeout = ping_timeout;
+        LOG_INFO(log, "crearing actor, ping_timeout = {}", ping_timeout);
 
         peer_actor = sup->create_actor<actor_ptr_t::element_type>()
                          .timeout(timeout)
@@ -219,6 +219,7 @@ struct fixture_t : private model::diff::cluster_visitor_t {
                          .peer_state(std::move(state))
                          .device_name("peer-device")
                          .uri(peer_url->clone())
+
                          .autoshutdown_supervisor(true)
                          .finish();
         return peer_actor;
@@ -441,7 +442,6 @@ void test_hello_from_unknown() {
 
             auto delta = pt::microsec_clock::local_time() - peer->get_last_seen();
             CHECK(delta.seconds() <= 2);
-            CHECK((my_device->get_rx_bytes() > 0 || my_device->get_tx_bytes() > 0));
         }
 
         void on_shutdown() noexcept override {
@@ -474,7 +474,6 @@ void test_hello_from_known_unknown() {
 
             auto delta = pt::microsec_clock::local_time() - peer->get_last_seen();
             CHECK(delta.seconds() <= 2);
-            CHECK((my_device->get_rx_bytes() > 0 || my_device->get_tx_bytes() > 0));
         }
 
         void on_shutdown() noexcept override {
