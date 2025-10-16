@@ -13,7 +13,6 @@
 #include "model/cluster.h"
 #include "access.h"
 #include <filesystem>
-#include <list>
 
 using namespace syncspirit;
 using namespace syncspirit::db;

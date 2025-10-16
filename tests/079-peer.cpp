@@ -2,7 +2,6 @@
 // SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "test-utils.h"
-#include "access.h"
 
 #include "utils/tls.h"
 #include "utils/format.hpp"

@@ -6,7 +6,6 @@
 #include <filesystem>
 #include <memory>
 #include <boost/outcome.hpp>
-#include <boost/smart_ptr/local_shared_ptr.hpp>
 #include "model/misc/arc.hpp"
 #include "utils/io.h"
 #include "utils/bytes.h"

@@ -3,7 +3,6 @@
 
 #include "test-utils.h"
 #include "test_supervisor.h"
-#include "access.h"
 #include "hasher/hasher_actor.h"
 #include "utils/bytes.h"
 #include <net/names.h>
@@ -71,4 +70,9 @@ TEST_CASE("hasher-actor", "[hasher]") {
 
     sup->shutdown();
     sup->do_process();
+}
+
+int _init() {
+    test::init_logging();
+    return 1;
 }
