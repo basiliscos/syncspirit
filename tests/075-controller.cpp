@@ -98,7 +98,6 @@ struct fixture_t {
     using target_ptr_t = r::intrusive_ptr_t<net::controller_actor_t>;
     using io_commands_t = fs::message::io_commands_t;
     using io_commands_t_ptr_t = r::intrusive_ptr_t<io_commands_t>;
-    using io_queue_t = std::deque<io_commands_t_ptr_t>;
 
     fixture_t(bool auto_start_, int64_t max_sequence_, bool auto_share_ = true) noexcept
         : auto_start{auto_start_}, auto_share{auto_share_}, max_sequence{max_sequence_} {
@@ -235,8 +234,6 @@ struct fixture_t {
     model::folder_ptr_t folder_1;
     model::folder_info_ptr_t folder_1_peer;
     model::folder_ptr_t folder_2;
-    // io_queue_t io_out;
-    // io_queue_t io_in;
 };
 
 } // namespace
