@@ -14,6 +14,7 @@
 #include "presentation/presence.h"
 #include "net/names.h"
 #include "proto/proto-helpers-bep.h"
+#include "hasher/messages.h"
 
 #include <algorithm>
 #include <memory_resource>
@@ -22,6 +23,21 @@
 
 namespace sys = boost::system;
 using namespace syncspirit::fs;
+
+namespace {
+
+template <typename ChunkIterator> struct generic_context final : payload::extendended_context_t {
+    using ptr_t = std::shared_ptr<ChunkIterator>;
+    generic_context(ptr_t it_, std::uint32_t block_index_) noexcept : it{std::move(it_)}, block_index{block_index_} {}
+
+    ptr_t it;
+    std::uint32_t block_index;
+};
+
+using hash_new_context_t = generic_context<new_chunk_iterator_t>;
+using rehash_context_t = generic_context<chunk_iterator_t>;
+
+} // namespace
 
 template <class> inline constexpr bool always_false_v = false;
 
@@ -147,7 +163,9 @@ void scan_actor_t::on_scan(message::scan_progress_t &message) noexcept {
                     auto &f = r.file;
                     auto fi = folder->get_folder_infos().by_uuid(f->get_folder_uuid());
                     stop_processing = true;
-                    send<payload::rehash_needed_t>(address, task, std::move(f), *fi, std::move(r.opened_file));
+                    auto it = chunk_iterator_t(task, std::move(f), *fi, std::move(r.opened_file));
+                    auto ptr = std::make_shared<chunk_iterator_t>(std::move(it));
+                    send<payload::rehash_ptr_t>(address, std::move(ptr));
                 } else if constexpr (std::is_same_v<T, incomplete_removed_t>) {
                     auto &file = *r.file;
                 } else if constexpr (std::is_same_v<T, orphaned_removed_t>) {
@@ -194,51 +212,55 @@ auto scan_actor_t::initiate_hash(scan_task_ptr_t task, const bfs::path &path, pr
         }
         file = new file_t(std::move(opt.value()));
     }
-    send<payload::hash_anew_t>(address, std::move(task), std::move(metadata), std::move(file));
+    auto it = new_chunk_iterator_t(std::move(task), std::move(metadata), std::move(file));
+    auto ptr = std::make_shared<new_chunk_iterator_t>(std::move(it));
+    send<payload::hash_anew_ptr_t>(address, std::move(ptr));
     return {};
 }
 
 void scan_actor_t::on_rehash(message::rehash_needed_t &message) noexcept {
     LOG_TRACE(log, "on_rehash");
     auto initial = requested_hashes;
-    hash_next(message, address);
+    auto &it = message.payload;
+    hash_next<rehash_context_t>(it, address);
     if (initial == requested_hashes) {
-        send<payload::scan_progress_t>(address, message.payload.get_task());
+        send<payload::scan_progress_t>(address, message.payload->get_task());
     }
 }
 
 void scan_actor_t::on_hash_anew(message::hash_anew_t &message) noexcept {
     LOG_TRACE(log, "on_hash_anew");
     auto initial = requested_hashes;
-    hash_next(message, new_files);
+    auto &it = message.payload;
+    hash_next<hash_new_context_t>(it, new_files);
     // file w/o context
     if (initial == requested_hashes) {
-        auto &p = message.payload;
-        commit_new_file(p);
-        send<payload::scan_progress_t>(address, p.get_task());
+        commit_new_file(*it);
+        send<payload::scan_progress_t>(address, it->get_task());
     }
 }
 
-template <typename Message>
-void scan_actor_t::hash_next(Message &message, const r::address_ptr_t &reply_addr) noexcept {
-    auto &info = message.payload;
-    if (info.has_more_chunks()) {
-        auto condition = [&]() { return requested_hashes < requested_hashes_limit && info.has_more_chunks(); };
+template <typename Context, typename Iterator>
+void scan_actor_t::hash_next(Iterator &info, const r::address_ptr_t &reply_addr) noexcept {
+    if (info->has_more_chunks()) {
+        auto condition = [&]() { return requested_hashes < requested_hashes_limit && info->has_more_chunks(); };
         while (condition()) {
-            auto opt = info.read();
+            auto opt = info->read();
             if (!opt) {
-                auto &task = *info.get_task().get();
+                auto &task = *info->get_task().get();
                 auto guard = task.guard(*this, coordinator);
-                auto err = scan_error_t{info.get_path(), opt.assume_error()};
+                auto err = scan_error_t{info->get_path(), opt.assume_error()};
                 task.push(new model::diff::local::io_failure_t(std::move(err)));
                 return;
             } else {
                 auto &chunk = opt.assume_value();
                 if (chunk.data.size()) {
-                    using request_t = hasher::payload::digest_request_t;
-                    request_via<request_t>(hasher_proxy, reply_addr, std::move(chunk.data), (size_t)chunk.block_index,
-                                           r::message_ptr_t(&message))
-                        .send(init_timeout);
+                    using request_t = hasher::payload::digest_t;
+                    auto req_ctx = hasher::payload::extendended_context_prt_t{};
+                    req_ctx.reset(new Context(info, chunk.block_index));
+                    auto payload = request_t(std::move(chunk.data), std::move(req_ctx));
+                    auto request = r::make_routed_message<request_t>(hasher_proxy, reply_addr, std::move(payload));
+                    supervisor->put(std::move(request));
                     ++requested_hashes;
                 }
             }
@@ -247,27 +269,28 @@ void scan_actor_t::hash_next(Message &message, const r::address_ptr_t &reply_add
     return;
 }
 
-void scan_actor_t::on_hash(hasher::message::digest_response_t &res) noexcept {
+void scan_actor_t::on_hash(hasher::message::digest_t &res) noexcept {
     --requested_hashes;
 
-    auto &rp = res.payload.req->payload.request_payload;
-    auto msg = static_cast<message::rehash_needed_t *>(rp.custom.get());
-    auto &info = msg->payload;
+    auto ctx = static_cast<rehash_context_t *>(res.payload.context.get());
+    auto &info = *ctx->it;
     info.ack_hashing();
 
     auto file = info.get_file();
-    if (res.payload.ee) {
-        auto &ee = res.payload.ee;
-        LOG_ERROR(log, "on_hash, file: {}, block: {}, error: {}", *file, rp.block_index, ee->message());
-        return do_shutdown(ee);
+    auto &result = res.payload.result;
+    auto block_index = ctx->block_index;
+    if (result.has_error()) {
+        auto &ec = result.assume_error();
+        LOG_ERROR(log, "on_hash, file: {}, block: {}, error: {}", *file, block_index, ec.message());
+        return do_shutdown(make_error(ec));
     }
 
     auto &fi = info.get_folder();
     bool queued_next = false;
-    auto &digest = res.payload.res.digest;
-    auto block_index = rp.block_index;
+    auto &digest = result.assume_value();
     info.ack_block(digest, block_index);
-    hash_next(*msg, address);
+    hash_next<rehash_context_t>(ctx->it, address);
+
     bool can_process_more = requested_hashes < requested_hashes_limit;
     auto &task = *info.get_task().get();
     auto guard = task.guard(*this, coordinator);
@@ -317,7 +340,7 @@ void scan_actor_t::commit_new_file(new_chunk_iterator_t &info) noexcept {
 
     // file.clear_blocks();
     for (auto &b : hashes) {
-        auto block_info = proto::BlockInfo{offset, b.size, b.digest, b.weak};
+        auto block_info = proto::BlockInfo{offset, b.size, b.digest, {}};
         proto::add_blocks(file, std::move(block_info));
         offset += b.size;
     }
@@ -327,27 +350,27 @@ void scan_actor_t::commit_new_file(new_chunk_iterator_t &info) noexcept {
     task.push(new model::diff::advance::local_update_t(*cluster, *sequencer, std::move(file), std::move(folder_id)));
 }
 
-void scan_actor_t::on_hash_new(hasher::message::digest_response_t &res) noexcept {
+void scan_actor_t::on_hash_new(hasher::message::digest_t &res) noexcept {
     --requested_hashes;
 
-    auto &rp = res.payload.req->payload.request_payload;
-    auto msg = static_cast<message::hash_anew_t *>(rp.custom.get());
-    auto &info = msg->payload;
-
+    auto ctx = static_cast<hash_new_context_t *>(res.payload.context.get());
+    auto &info = *ctx->it;
     auto &path = info.get_path();
-    if (res.payload.ee) {
-        auto &ee = res.payload.ee;
-        LOG_ERROR(log, "on_hash_new, file: {}, block = {}, error: {}", path.string(), rp.block_index, ee->message());
-        return do_shutdown(ee);
+
+    auto &result = res.payload.result;
+    if (result.has_error()) {
+        auto &ec = result.assume_error();
+        LOG_ERROR(log, "on_hash_new, file: {}, block = {}, error: {}", path.string(), ctx->block_index, ec.message());
+        return do_shutdown(make_error(ec));
     }
 
-    auto &hash_info = res.payload.res;
-    auto block_size = rp.data.size();
+    auto &hash = res.payload.result.assume_value();
+    auto block_size = res.payload.data.size();
 
-    info.ack(rp.block_index, hash_info.weak, hash_info.digest, block_size);
+    info.ack(ctx->block_index, hash, block_size);
 
     while (info.has_more_chunks() && (requested_hashes < requested_hashes_limit)) {
-        hash_next(*msg, new_files);
+        hash_next<hash_new_context_t>(ctx->it, new_files);
     }
     if (info.is_complete()) {
         commit_new_file(info);

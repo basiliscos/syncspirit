@@ -4,7 +4,7 @@
 #pragma once
 
 #include <functional>
-#include "config/main.h"
+#include "config/fs.h"
 #include "model/messages.h"
 #include "model/diff/iterative_controller.h"
 #include "model/misc/sequencer.h"

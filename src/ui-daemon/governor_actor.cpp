@@ -8,8 +8,7 @@
 #include "utils/error_code.h"
 #include "model/diff/advance/remote_copy.h"
 #include "model/diff/local/io_failure.h"
-#include "model/diff/modify/append_block.h"
-#include "model/diff/modify/clone_block.h"
+#include "model/diff/modify/block_ack.h"
 #include "model/diff/peer/cluster_update.h"
 #include "model/diff/peer/update_folder.h"
 
@@ -152,13 +151,7 @@ auto governor_actor_t::operator()(const model::diff::peer::update_folder_t &diff
     return diff.visit_next(*this, custom);
 }
 
-auto governor_actor_t::operator()(const model::diff::modify::append_block_t &diff, void *custom) noexcept
-    -> outcome::result<void> {
-    refresh_deadline();
-    return diff.visit_next(*this, custom);
-}
-
-auto governor_actor_t::operator()(const model::diff::modify::clone_block_t &diff, void *custom) noexcept
+auto governor_actor_t::operator()(const model::diff::modify::block_ack_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     refresh_deadline();
     return diff.visit_next(*this, custom);

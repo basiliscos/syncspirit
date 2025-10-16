@@ -33,7 +33,7 @@ struct fixture_t {
 
     fixture_t() noexcept : root_path{unique_path()}, path_guard{root_path} { bfs::create_directory(root_path); }
 
-    virtual supervisor_t::configure_callback_t configure() noexcept {
+    virtual configure_callback_t configure() noexcept {
         return [&](r::plugin::plugin_base_t &plugin) {
             plugin.template with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
                 p.register_name(net::names::db, sup->get_address());
@@ -58,7 +58,7 @@ struct fixture_t {
         r::system_context_t ctx;
         sup = ctx.create_supervisor<supervisor_t>()
                   .auto_finish(false)
-                  .auto_ack_blocks(false)
+                  .auto_ack_io(false)
                   .timeout(timeout)
                   .create_registry()
                   .make_presentation(true)
@@ -71,12 +71,7 @@ struct fixture_t {
         CHECK(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::OPERATIONAL);
 
         rw_cache.reset(new fs::file_cache_t(2));
-        file_actor = sup->create_actor<fs::file_actor_t>()
-                         .rw_cache(rw_cache)
-                         .cluster(cluster)
-                         .sequencer(sup->sequencer)
-                         .timeout(timeout)
-                         .finish();
+        file_actor = sup->create_actor<fs::file_actor_t>().rw_cache(rw_cache).timeout(timeout).finish();
         sup->do_process();
 
         sup->create_actor<hasher::hasher_actor_t>().index(1).timeout(timeout).finish();
@@ -105,7 +100,6 @@ struct fixture_t {
                                .cluster(cluster)
                                .sequencer(sup->sequencer)
                                .timeout(timeout)
-                               .request_timeout(timeout)
                                .blocks_max_requested(100)
                                .finish();
 
@@ -217,7 +211,7 @@ void test_fs_actor_error() {
                 .apply(*sup, controller_actor.get());
 
             SECTION("fs error -> controller down") {
-                peer_actor->push_block(data_1, 0);
+                peer_actor->push_response(data_1, 0);
                 write_file(folder_path, ""); // prevent dir creation
 
                 builder.make_index(sha256, folder_id)
@@ -233,7 +227,7 @@ void test_fs_actor_error() {
 
                 CHECK("just 4 logging");
 
-                peer_actor->push_block(data_1, 0);
+                peer_actor->push_response(data_1, 0);
                 controller_actor->do_shutdown();
                 peer_actor->process_block_requests();
                 sup->do_process();
@@ -241,12 +235,12 @@ void test_fs_actor_error() {
                 CHECK(static_cast<r::actor_base_t *>(peer_actor.get())->access<to::state>() == r::state_t::SHUT_DOWN);
                 CHECK(static_cast<r::actor_base_t *>(controller_actor.get())->access<to::state>() ==
                       r::state_t::SHUT_DOWN);
-                CHECK(static_cast<r::actor_base_t *>(file_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
-
-                file_actor->do_shutdown();
                 sup->do_process();
             }
 
+            CHECK(static_cast<r::actor_base_t *>(file_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
+            file_actor->do_shutdown();
+            sup->do_process();
             CHECK(cluster->get_write_requests() == 10);
         }
     };

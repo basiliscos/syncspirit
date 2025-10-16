@@ -107,38 +107,31 @@ struct SYNCSPIRIT_API peer_actor_t : public r::actor_base_t {
     using tx_queue_t = std::list<tx_item_t>;
     using tx_size_ptr_t = payload::controller_up_t::tx_size_ptr_t;
     using read_action_t = bool (peer_actor_t::*)(proto::message::message_t &&msg);
-    using block_request_ptr_t = r::intrusive_ptr_t<message::block_request_t>;
-    using block_requests_t = std::list<block_request_ptr_t>;
     using clock_t = std::chrono::steady_clock;
     using received_queue_t = std::list<payload::forwarded_message_t>;
 
     void on_controller_up(message::controller_up_t &) noexcept;
     void on_controller_predown(message::controller_predown_t &) noexcept;
-    void on_block_request(message::block_request_t &) noexcept;
     void on_transfer(message::transfer_data_t &message) noexcept;
 
     void on_io_error(const sys::error_code &ec, r::plugin::resource_id_t resource) noexcept;
     void on_write(std::size_t bytes) noexcept;
     void on_read(std::size_t bytes) noexcept;
-    void on_timer(r::request_id_t, bool cancelled) noexcept;
+    void on_ping_timeout(r::request_id_t, bool cancelled) noexcept;
+    void on_stats_timeout(r::request_id_t, bool cancelled) noexcept;
     void read_more() noexcept;
     void push_write(utils::bytes_t buff, bool final) noexcept;
     void process_tx_queue() noexcept;
     void cancel_io() noexcept;
-    void on_tx_timeout(r::request_id_t, bool cancelled) noexcept;
-    void on_rx_timeout(r::request_id_t, bool cancelled) noexcept;
-
-    void reset_tx_timer() noexcept;
-    void reset_rx_timer() noexcept;
     bool read_hello(proto::message::message_t &&msg) noexcept;
     bool read_controlled(proto::message::message_t &&msg) noexcept;
+
+    void reset_ping_timer() noexcept;
+    void reset_stats_timer() noexcept;
 
     bool handle_hello(proto::Hello &&) noexcept;
     void handle_ping(proto::Ping &&) noexcept;
     void handle_close(proto::Close &&) noexcept;
-    void handle_response(proto::Response &&) noexcept;
-
-    void emit_io_stats(bool force = false) noexcept;
 
     model::cluster_ptr_t cluster;
     utils::logger_t log;
@@ -149,8 +142,9 @@ struct SYNCSPIRIT_API peer_actor_t : public r::actor_base_t {
     model::device_state_t peer_state;
     transport::stream_sp_t transport;
     utils::uri_ptr_t url;
-    std::optional<r::request_id_t> tx_timer_request;
-    std::optional<r::request_id_t> rx_timer_request;
+    std::optional<r::request_id_t> ping_timer_request;
+    std::optional<r::request_id_t> stats_timer_request;
+
     tx_queue_t tx_queue;
     tx_item_t tx_item;
     fmt::memory_buffer rx_buff;
@@ -158,14 +152,16 @@ struct SYNCSPIRIT_API peer_actor_t : public r::actor_base_t {
     std::string cert_name;
     read_action_t read_action;
     r::address_ptr_t controller;
-    block_requests_t block_requests;
     std::size_t rx_bytes;
     std::size_t tx_bytes;
     tx_size_ptr_t tx_bytes_in_progress;
-    clock_t::time_point last_stats;
     received_queue_t received_queue;
     bool finished = false;
     bool io_error = false;
+
+    bool had_writes = false;
+    bool had_reads = false;
+    bool had_ping = false;
 };
 
 } // namespace net

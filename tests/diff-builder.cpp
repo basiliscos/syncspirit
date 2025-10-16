@@ -15,10 +15,7 @@
 #include "model/diff/local/synchronization_start.h"
 #include "model/diff/modify/add_ignored_device.h"
 #include "model/diff/modify/add_pending_device.h"
-#include "model/diff/modify/append_block.h"
 #include "model/diff/modify/block_ack.h"
-#include "model/diff/modify/clone_block.h"
-#include "model/diff/modify/finish_file.h"
 #include "model/diff/modify/mark_reachable.h"
 #include "model/diff/modify/share_folder.h"
 #include "model/diff/modify/suspend_folder.h"
@@ -268,11 +265,6 @@ diff_builder_t &diff_builder_t::advance(const model::file_info_t &source,
     return assign(diff.get());
 }
 
-diff_builder_t &diff_builder_t::finish_file(const model::file_info_t &file,
-                                            const model::folder_info_t &folder_info) noexcept {
-    return assign(new diff::modify::finish_file_t(file, folder_info));
-}
-
 diff_builder_t &diff_builder_t::local_update(std::string_view folder_id, const proto::FileInfo &file_) noexcept {
     return assign(new diff::advance::local_update_t(*cluster, *sequencer, file_, folder_id));
 }
@@ -297,17 +289,6 @@ diff_builder_t &diff_builder_t::update_state(const model::device_t &peer, const 
 diff_builder_t &diff_builder_t::update_contact(const model::device_id_t &device,
                                                const utils::uri_container_t &uris) noexcept {
     return assign(new model::diff::contact::update_contact_t(*cluster, device, uris));
-}
-
-diff_builder_t &diff_builder_t::append_block(const model::file_info_t &target, const model::folder_info_t &target_fi,
-                                             size_t block_index, utils::bytes_t data) noexcept {
-    return assign(new diff::modify::append_block_t(target, target_fi, block_index, std::move(data)));
-}
-
-diff_builder_t &diff_builder_t::clone_block(const model::file_block_t &file_block,
-                                            const model::folder_info_t &target_fi,
-                                            const model::folder_info_t &source_fi) noexcept {
-    return assign(new diff::modify::clone_block_t(file_block, target_fi, source_fi));
 }
 
 diff_builder_t &diff_builder_t::ack_block(const model::diff::modify::block_transaction_t &diff) noexcept {

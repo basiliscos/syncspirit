@@ -114,7 +114,7 @@ using BlockInfo = pp::message<
     pp::int64_field  <"offset",    1                                      >,
     pp::int32_field  <"size",      2                                      >,
     pp::bytes_field  <"hash",      3, pp::singular, proto::bytes_backend_t>,
-    pp::uint32_field <"weak_hash", 4                                      >
+    pp::uint32_field <"_",         4                                      >
 >;
 
 using FileInfo = pp::message<

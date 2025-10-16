@@ -3,9 +3,6 @@
 
 #include "test_supervisor.h"
 #include "model/diff/load/commit.h"
-#include "model/diff/modify/clone_block.h"
-#include "model/diff/modify/append_block.h"
-#include "model/diff/modify/finish_file.h"
 #include "model/diff/modify/upsert_folder.h"
 #include "model/diff/modify/upsert_folder_info.h"
 #include "model/diff/advance/advance.h"
@@ -38,8 +35,9 @@ using namespace syncspirit::presentation;
 
 supervisor_t::supervisor_t(config_t &cfg) : parent_t(cfg) {
     auto_finish = cfg.auto_finish;
-    auto_ack_blocks = cfg.auto_ack_blocks;
+    auto_ack_io = cfg.auto_ack_io;
     make_presentation = cfg.make_presentation;
+    configure_callback = cfg.configure_callback;
     sequencer = model::make_sequencer(1234);
 }
 
@@ -54,6 +52,7 @@ void supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&supervisor_t::on_model_update);
         p.subscribe_actor(&supervisor_t::on_package);
+        p.subscribe_actor(&supervisor_t::on_io);
     });
     if (configure_callback) {
         configure_callback(plugin);
@@ -120,48 +119,18 @@ void supervisor_t::on_package(bouncer::message::package_t &msg) noexcept {
     put(std::move(msg.payload));
 }
 
+void supervisor_t::on_io(fs::message::io_commands_t &message) noexcept {
+    for (auto &cmd : message.payload) {
+        std::visit([&](auto &cmd) { process_io(cmd); }, cmd);
+    }
+}
+
 auto supervisor_t::consume_errors() noexcept -> io_errors_t { return std::move(io_errors); }
 
 auto supervisor_t::operator()(const model::diff::local::io_failure_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     auto &errs = diff.errors;
     std::copy(errs.begin(), errs.end(), std::back_inserter(io_errors));
-    return diff.visit_next(*this, custom);
-}
-
-auto supervisor_t::operator()(const model::diff::modify::finish_file_t &diff, void *custom) noexcept
-    -> outcome::result<void> {
-    if (auto_finish) {
-        auto folder = cluster->get_folders().by_id(diff.folder_id);
-        auto file_info = folder->get_folder_infos().by_device_id(diff.peer_id);
-        auto file = file_info->get_file_infos().by_name(diff.file_name);
-        auto ack = model::diff::advance::advance_t::create(diff.action, *file, *file_info, *sequencer);
-        send<model::payload::model_update_t>(get_address(), std::move(ack), this);
-    }
-    return diff.visit_next(*this, custom);
-}
-
-auto supervisor_t::operator()(const model::diff::modify::append_block_t &diff, void *custom) noexcept
-    -> outcome::result<void> {
-    auto ack_diff = diff.ack();
-    if (auto_ack_blocks) {
-        send<model::payload::model_update_t>(address, diff.ack(), this);
-    } else {
-        if (delayed_ack_holder) {
-            delayed_ack_current = delayed_ack_current->assign_sibling(ack_diff.get());
-        } else {
-            delayed_ack_holder = ack_diff;
-            delayed_ack_current = ack_diff.get();
-        }
-    }
-    return diff.visit_next(*this, custom);
-}
-
-auto supervisor_t::operator()(const model::diff::modify::clone_block_t &diff, void *custom) noexcept
-    -> outcome::result<void> {
-    if (auto_ack_blocks) {
-        send<model::payload::model_update_t>(address, diff.ack(), this);
-    }
     return diff.visit_next(*this, custom);
 }
 
@@ -235,6 +204,40 @@ auto supervisor_t::operator()(const model::diff::peer::update_folder_t &diff, vo
         }
     }
     return diff.visit_next(*this, custom);
+}
+
+void supervisor_t::process_io(fs::payload::block_request_t &req) noexcept {
+    LOG_TRACE(log, "process_io, requesting on '{}' (offset: {}, size: {})", req.path.string(), req.offset,
+              req.block_size);
+}
+
+void supervisor_t::process_io(fs::payload::remote_copy_t &req) noexcept {
+    LOG_TRACE(log, "process_io (ack: {}), remote_copy_t of '{} ({} bytes)'", auto_ack_io, req.path.string(), req.size);
+    if (auto_ack_io) {
+        req.result = outcome::success();
+    }
+}
+
+void supervisor_t::process_io(fs::payload::append_block_t &req) noexcept {
+    LOG_TRACE(log, "process_io (ack: {}), append_block_t of {}", auto_ack_io, req.path.string());
+    if (auto_ack_io) {
+        req.result = outcome::success();
+    }
+}
+
+void supervisor_t::process_io(fs::payload::finish_file_t &req) noexcept {
+    LOG_TRACE(log, "process_io (ack: {}), finish_file_t of {}", auto_ack_io, req.path.string());
+    if (auto_ack_io) {
+        req.result = outcome::success();
+    }
+}
+
+void supervisor_t::process_io(fs::payload::clone_block_t &req) noexcept {
+    LOG_TRACE(log, "process_io (ack: {}), clone_block_t, {} bytes,  {}(#{}) -> {}(#{})", auto_ack_io, req.block_size,
+              req.source.string(), req.source_offset, req.target.string(), req.target_offset);
+    if (auto_ack_io) {
+        req.result = outcome::success();
+    }
 }
 
 auto supervisor_t::apply(const model::diff::load::commit_t &message, void *) noexcept -> outcome::result<void> {

@@ -72,6 +72,7 @@ struct SYNCSPIRIT_API file_info_t {
 
         guard_t &operator=(guard_t &&) noexcept = default;
 
+        bool finished = false;
         file_info_ptr_t file;
         path_guard_ptr_t path_guard;
         const folder_info_t *folder_info;
@@ -108,6 +109,11 @@ struct SYNCSPIRIT_API file_info_t {
         return type == proto::FileInfoType::DIRECTORY ? f_type_dir
                : type == proto::FileInfoType::SYMLINK ? f_type_link
                                                       : f_type_file;
+    }
+
+    static inline proto::FileInfoType as_type(std::uint16_t flags) noexcept {
+        using T = proto::FileInfoType;
+        return flags & file_info_t::f_type_dir ? T::DIRECTORY : flags & file_info_t::f_type_link ? T::SYMLINK : T::FILE;
     }
 
     ~file_info_t();
@@ -175,7 +181,7 @@ struct SYNCSPIRIT_API file_info_t {
         return {};
     }
 
-    const bfs::path get_path(const folder_info_t &folder_info) const noexcept;
+    bfs::path get_path(const folder_info_t &folder_info) const noexcept;
 
     inline std::int64_t get_modified_s() const noexcept { return modified_s; }
     inline std::int32_t get_modified_ns() const noexcept { return modified_ns; }

@@ -4,8 +4,6 @@
 #include "managed_hasher.h"
 #include "utils/tls.h"
 
-#include <zlib.h>
-
 namespace syncspirit::test {
 
 managed_hasher_t::managed_hasher_t(config_t &cfg)
@@ -40,34 +38,35 @@ void managed_hasher_t::on_digest(digest_request_t &req) noexcept {
 
 void managed_hasher_t::process_requests() noexcept {
     static const constexpr size_t SZ = SHA256_DIGEST_LENGTH;
-    LOG_TRACE(log, "{}, process_requests", identity);
-
+    LOG_TRACE(log, "process_requests");
     while (!validation_queue.empty()) {
         auto req = validation_queue.front();
         validation_queue.pop_front();
-        auto &payload = *req->payload.request_payload;
+        auto &payload = req->payload;
 
         unsigned char digest[SZ];
         auto &data = payload.data;
 
         utils::digest(data.data(), data.size(), digest);
         bool eq = payload.hash == utils::bytes_view_t(digest, SZ);
-        reply_to(*req, eq);
+        if (eq) {
+            payload.result = hasher::outcome::success();
+        }
+        req->address = std::exchange(req->next_route, {});
+        supervisor->put(std::move(req));
     }
     while (!digest_queue.empty()) {
         auto req = digest_queue.front();
         digest_queue.pop_front();
 
+        auto &payload = req->payload;
+        auto &data = payload.data;
         unsigned char digest[SZ];
-        auto &data = req->payload.request_payload.data;
-
         utils::digest(data.data(), data.size(), digest);
 
-        // alder32
-        auto weak_hash = adler32(0L, Z_NULL, 0);
-        weak_hash = adler32(weak_hash, (const unsigned char *)data.data(), data.size());
-
-        reply_to(*req, utils::bytes_t(digest, digest + SZ), static_cast<uint32_t>(weak_hash));
+        req->address = std::exchange(req->next_route, {});
+        req->payload.result = utils::bytes_t(digest, digest + SZ);
+        supervisor->put(std::move(req));
     }
 }
 

@@ -33,9 +33,9 @@ struct SYNCSPIRIT_TEST_API managed_hasher_t : r::actor_base_t {
     using config_t = managed_hasher_config_t;
     template <typename Actor> using config_builder_t = hasher_config_builder_t<Actor>;
 
-    using validation_request_t = hasher::message::validation_request_t;
+    using validation_request_t = hasher::message::validation_t;
     using validation_request_ptr_t = model::intrusive_ptr_t<validation_request_t>;
-    using digest_request_t = hasher::message::digest_request_t;
+    using digest_request_t = hasher::message::digest_t;
     using digest_request_ptr_t = model::intrusive_ptr_t<digest_request_t>;
     using validation_queue_t = std::deque<validation_request_ptr_t>;
     using digest_queue_t = std::deque<digest_request_ptr_t>;

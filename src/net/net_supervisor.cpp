@@ -1,23 +1,31 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
-#include "config/utils.h"
-#include "net_supervisor.h"
-#include "hasher/hasher_proxy_actor.h"
-#include "global_discovery_actor.h"
-#include "local_discovery_actor.h"
-#include "cluster_supervisor.h"
-#include "acceptor_actor.h"
-#include "ssdp_actor.h"
-#include "http_actor.h"
-#include "resolver_actor.h"
-#include "peer_supervisor.h"
-#include "dialer_actor.h"
-#include "db_actor.h"
-#include "relay_actor.h"
-#include "names.h"
-#include "utils/io.h"
 #include "bouncer/messages.hpp"
+#include "cluster_supervisor.h"
+#include "db_actor.h"
+#include "hasher/hasher_proxy_actor.h"
+#include "local_discovery_actor.h"
+#include "model/diff/advance/advance.h"
+#include "model/diff/modify/upsert_folder.h"
+#include "model/diff/modify/upsert_folder_info.h"
+#include "model/diff/peer/update_folder.h"
+#include "net/acceptor_actor.h"
+#include "net/dialer_actor.h"
+#include "net/global_discovery_actor.h"
+#include "net/http_actor.h"
+#include "net/names.h"
+#include "net/net_supervisor.h"
+#include "net/peer_supervisor.h"
+#include "net/relay_actor.h"
+#include "net/resolver_actor.h"
+#include "net/ssdp_actor.h"
+#include "presentation/folder_entity.h"
+#include "presentation/folder_entity.h"
+#include "proto/proto-helpers-bep.h"
+#include "proto/proto-helpers-db.h"
+#include "utils/io.h"
+
 #include <boost/nowide/convert.hpp>
 #include <filesystem>
 #include <ctime>
@@ -84,6 +92,14 @@ net_supervisor_t::net_supervisor_t(net_supervisor_t::config_t &cfg)
                 LOG_WARN(log, "cannot read root ca file '{}'", file.string());
             }
         }
+    }
+
+    auto &mru_size = app_config.fs_config.mru_size;
+    auto &sim_writes = app_config.bep_config.blocks_simultaneous_write;
+    if (app_config.fs_config.mru_size <= app_config.bep_config.blocks_simultaneous_write) {
+        LOG_WARN(log, "config fs_config.mru_size ({}) <= bep_config.blocks_simultaneous_write ({})",
+                 app_config.fs_config.mru_size, app_config.bep_config.blocks_simultaneous_write);
+        sim_writes = mru_size - 2;
     }
 
     auto device = model::device_ptr_t();
@@ -318,6 +334,12 @@ void net_supervisor_t::on_app_ready(model::message::app_ready_t &) noexcept {
 
 void net_supervisor_t::commit_loading() noexcept {
     if (!cluster->is_tainted()) {
+        for (auto &it : cluster->get_folders()) {
+            auto &folder = it.item;
+            auto folder_entity = presentation::folder_entity_ptr_t(new presentation::folder_entity_t(folder));
+            folder->set_augmentation(folder_entity);
+        }
+
         auto &ignored_devices = cluster->get_ignored_devices();
         auto &ignored_folders = cluster->get_ignored_folders();
         auto &pending_folders = cluster->get_pending_folders();
@@ -357,4 +379,79 @@ void net_supervisor_t::on_start() noexcept {
         .keep_alive(false)
         .escalate_failure()
         .finish();
+}
+
+auto net_supervisor_t::apply(const model::diff::modify::upsert_folder_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    auto r = parent_t::apply(diff, custom);
+    if (r) {
+        auto folder_id = db::get_id(diff.db);
+        auto folder = cluster->get_folders().by_id(folder_id);
+        if (!folder->get_augmentation()) {
+            auto folder_entity = presentation::folder_entity_ptr_t(new presentation::folder_entity_t(folder));
+            folder->set_augmentation(folder_entity);
+        }
+    }
+    return r;
+}
+
+auto net_supervisor_t::apply(const model::diff::modify::upsert_folder_info_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    auto r = parent_t::apply(diff, custom);
+    if (r) {
+        auto &folder = *cluster->get_folders().by_id(diff.folder_id);
+        auto &device = *cluster->get_devices().by_sha256(diff.device_id);
+        auto folder_info = folder.is_shared_with(device);
+        if (&device != cluster->get_device()) {
+            auto augmentation = folder.get_augmentation().get();
+            auto folder_entity = static_cast<presentation::folder_entity_t *>(augmentation);
+            folder_entity->on_insert(*folder_info);
+        }
+    }
+    return r;
+}
+
+auto net_supervisor_t::apply(const model::diff::advance::advance_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    auto r = parent_t::apply(diff, custom);
+    if (r) {
+        auto folder = cluster->get_folders().by_id(diff.folder_id);
+        auto augmentation = folder->get_augmentation().get();
+        auto folder_entity = static_cast<presentation::folder_entity_t *>(augmentation);
+        if (folder_entity) {
+            auto &folder_infos = folder->get_folder_infos();
+            auto &local_fi = *folder_infos.by_device(*cluster->get_device());
+            auto file_name = proto::get_name(diff.proto_local);
+            auto local_file = local_fi.get_file_infos().by_name(file_name);
+            if (local_file) {
+                folder_entity->on_insert(*local_file, local_fi);
+            }
+        }
+    }
+    return r;
+}
+
+auto net_supervisor_t::apply(const model::diff::peer::update_folder_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    auto r = parent_t::apply(diff, custom);
+    if (r) {
+        auto folder = cluster->get_folders().by_id(diff.folder_id);
+        auto folder_aug = folder->get_augmentation().get();
+        auto folder_entity = static_cast<presentation::folder_entity_t *>(folder_aug);
+
+        auto &devices_map = cluster->get_devices();
+        auto peer = devices_map.by_sha256(diff.peer_id);
+        auto &folder_info = *folder->get_folder_infos().by_device(*peer);
+        auto &files_map = folder_info.get_file_infos();
+
+        for (auto &file : diff.files) {
+            auto file_name = proto::get_name(file);
+            auto file_info = files_map.by_name(file_name);
+            auto augmentation = file_info->get_augmentation().get();
+            if (!augmentation) {
+                folder_entity->on_insert(*file_info, folder_info);
+            }
+        }
+    }
+    return r;
 }

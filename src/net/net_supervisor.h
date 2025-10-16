@@ -80,6 +80,11 @@ struct SYNCSPIRIT_API net_supervisor_t : net_supervisor_base_t<ra::supervisor_as
     void launch_early() noexcept;
     void seed_model() noexcept;
 
+    outcome::result<void> apply(const model::diff::advance::advance_t &, void *) noexcept override;
+    outcome::result<void> apply(const model::diff::modify::upsert_folder_t &, void *) noexcept override;
+    outcome::result<void> apply(const model::diff::modify::upsert_folder_info_t &, void *) noexcept override;
+    outcome::result<void> apply(const model::diff::peer::update_folder_t &, void *) noexcept override;
+
     void commit_loading() noexcept override;
     outcome::result<void> save_config(const config::main_t &new_cfg) noexcept;
 

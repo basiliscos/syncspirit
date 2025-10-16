@@ -370,7 +370,7 @@ void test_meta_changes() {
                 REQUIRE(folder_info_peer->add_strict(file_peer));
 
                 auto file = files->by_name(file_name);
-                auto &path = file->get_path(*folder_info_peer);
+                auto path = file->get_path(*folder_info_peer);
                 auto filename = path.filename().wstring() + L".syncspirit-tmp";
                 auto path_my = path;
                 auto path_peer = path_my.parent_path() / filename;
@@ -878,9 +878,9 @@ void test_races() {
 
                 auto file_peer = fi_peer->get_file_infos().by_name("a.bin");
                 SECTION("non-finished/flushed new file") {
-                    auto file_opt = fs::file_t::open_write(file_peer, *fi_peer);
+                    auto path = file_peer->get_path(*fi_peer);
+                    auto file_opt = fs::file_t::open_write(path, static_cast<std::uint64_t>(file_peer->get_size()));
                     REQUIRE(file_opt);
-                    // CHECK(file_opt.assume_error().message() == "zzz");
                     auto &file = file_opt.assume_value();
                     REQUIRE(bfs::exists(file.get_path()));
                     auto file_ptr = fs::file_ptr_t(new fs::file_t(std::move(file)));
@@ -923,7 +923,9 @@ void test_races() {
 
                 auto file_peer = fi_peer->get_file_infos().by_name("a.bin");
                 SECTION("non-finished/flushed new file") {
-                    auto file = fs::file_t::open_write(file_peer, *fi_peer).assume_value();
+                    auto path = file_peer->get_path(*fi_peer);
+                    auto file =
+                        fs::file_t::open_write(path, static_cast<std::uint64_t>(file_peer->get_size())).assume_value();
                     REQUIRE(bfs::exists(file.get_path()));
                     auto file_ptr = fs::file_ptr_t(new fs::file_t(std::move(file)));
                     rw_cache->put(file_ptr);

@@ -660,6 +660,10 @@ inline FileInfo &add_files(IndexBase &msg) {
     opt.emplace_back(FileInfo());
     return opt.back();
 }
+inline void clear_files(IndexBase &msg) {
+    using namespace pp;
+    msg["files"_f].clear();
+}
 
 /***************/
 /*** Request ***/

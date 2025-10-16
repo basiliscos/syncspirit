@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #pragma once
 
@@ -45,10 +45,10 @@ struct SYNCSPIRIT_API hasher_proxy_actor_t : public r::actor_base_t {
   private:
     using addresses_t = std::vector<r::address_ptr_t>;
 
-    void on_digest_request(hasher::message::digest_request_t &req) noexcept;
-    void on_digest_response(hasher::message::digest_response_t &res) noexcept;
-    void on_validation_request(hasher::message::validation_request_t &req) noexcept;
-    void on_validation_response(hasher::message::validation_response_t &res) noexcept;
+    void on_digest_request(hasher::message::digest_t &req) noexcept;
+    void on_digest_response(hasher::message::digest_t &res) noexcept;
+    void on_validation_request(hasher::message::validation_t &req) noexcept;
+    void on_validation_response(hasher::message::validation_t &res) noexcept;
 
     r::address_ptr_t find_next_hasher() noexcept;
     void free_hasher(r::address_ptr_t &addr) noexcept;
@@ -59,6 +59,7 @@ struct SYNCSPIRIT_API hasher_proxy_actor_t : public r::actor_base_t {
     uint32_t hasher_threads;
     std::string name;
     uint32_t index = 0;
+    r::address_ptr_t reply_addr;
 };
 
 } // namespace hasher
