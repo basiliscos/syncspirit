@@ -104,6 +104,7 @@ add_library(syncspirit_core
     src/fs/file_actor.cpp
     src/fs/file_cache.cpp
     src/fs/fs_supervisor.cpp
+    src/fs/fs_slave.cpp
     src/fs/new_chunk_iterator.cpp
     src/fs/scan_actor.cpp
     src/fs/scan_scheduler.cpp
