@@ -41,8 +41,6 @@ void dialer_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
             }
         });
     });
-    plugin.with_casted<r::plugin::starter_plugin_t>(
-        [&](auto &p) { p.subscribe_actor(&dialer_actor_t::on_model_update); });
 }
 
 void dialer_actor_t::on_start() noexcept {

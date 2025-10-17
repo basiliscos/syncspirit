@@ -215,6 +215,7 @@ add_library(syncspirit_core
     src/net/http_actor.cpp
     src/net/initiator_actor.cpp
     src/net/local_discovery_actor.cpp
+    src/net/local_keeper.cpp
     src/net/net_supervisor.cpp
     src/net/peer_actor.cpp
     src/net/peer_supervisor.cpp
