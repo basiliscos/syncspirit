@@ -52,8 +52,7 @@ void managed_hasher_t::process_requests() noexcept {
         if (eq) {
             payload.result = hasher::outcome::success();
         }
-        req->address = std::exchange(req->next_route, {});
-        supervisor->put(std::move(req));
+        redirect(req, std::exchange(req->next_route, {}));
     }
     while (!digest_queue.empty()) {
         auto req = digest_queue.front();
@@ -64,9 +63,8 @@ void managed_hasher_t::process_requests() noexcept {
         unsigned char digest[SZ];
         utils::digest(data.data(), data.size(), digest);
 
-        req->address = std::exchange(req->next_route, {});
         req->payload.result = utils::bytes_t(digest, digest + SZ);
-        supervisor->put(std::move(req));
+        redirect(req, std::exchange(req->next_route, {}));
     }
 }
 
