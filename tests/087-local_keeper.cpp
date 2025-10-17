@@ -31,7 +31,7 @@ struct fixture_t {
 
     void run() noexcept {
         auto my_hash = "KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD";
-        auto my_id =device_id_t::from_string(my_hash).value();
+        auto my_id = device_id_t::from_string(my_hash).value();
         my_device = device_t::create(my_id, "my-device").value();
 
         auto peer_hash = "VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ";
@@ -78,10 +78,7 @@ struct fixture_t {
         auto fs_config = config::fs_config_t{3600, 10, 1024 * 1024, files_scan_iteration_limit};
         rw_cache.reset(new fs::file_cache_t(5));
 
-        target = sup->create_actor<net::local_keeper_t>()
-                     .timeout(timeout)
-                     .cluster(cluster)
-                     .finish();
+        target = sup->create_actor<net::local_keeper_t>().timeout(timeout).cluster(cluster).finish();
         sup->do_process();
 
         sup->send<syncspirit::model::payload::thread_ready_t>(sup->get_address(), cluster, std::this_thread::get_id());
@@ -117,13 +114,9 @@ struct fixture_t {
     fs::file_cache_ptr_t rw_cache;
 };
 
-
-
 void test_local_keeper() {
     struct F : fixture_t {
-        void main() noexcept override {
-            sys::error_code ec;
-        }
+        void main() noexcept override { sys::error_code ec; }
     };
     F().run();
 }

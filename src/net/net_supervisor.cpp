@@ -165,10 +165,8 @@ void net_supervisor_t::launch_early() noexcept {
 }
 
 void net_supervisor_t::seed_model() noexcept {
-    using payload_t = model::payload::model_update_t;
     thread_counter = independent_threads;
-    auto message = r::make_routed_message<payload_t>(address, db_addr, std::move(load_diff), nullptr);
-    put(std::move(message));
+    route<model::payload::model_update_t>(address, db_addr, std::move(load_diff), nullptr);
 }
 
 void net_supervisor_t::on_load_cluster_fail(message::load_cluster_fail_t &message) noexcept {

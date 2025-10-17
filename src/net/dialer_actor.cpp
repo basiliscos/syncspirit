@@ -123,8 +123,7 @@ void dialer_actor_t::discover_or_dial(const model::device_ptr_t &peer_device) no
         if (state.is_offline()) {
             auto diff = peer_state_t::create(*cluster, device_id.get_sha256(), {}, state.unknown());
             assert(diff);
-            auto msg = r::make_routed_message<payload_t>(coordinator, address, std::move(diff), this);
-            supervisor->put(std::move(msg));
+            route<payload_t>(coordinator, address, std::move(diff), this);
         }
     }
     if (do_dial) {

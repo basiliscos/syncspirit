@@ -37,8 +37,7 @@ struct SYNCSPIRIT_API local_keeper_t final : public r::actor_base_t, private mod
     void shutdown_start() noexcept override;
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
 
-    private:
-
+  private:
     void on_model_update(model::message::model_update_t &) noexcept;
     // outcome::result<void> operator()(const model::diff::local::scan_start_t &, void *custom) noexcept override;
 
@@ -47,4 +46,4 @@ struct SYNCSPIRIT_API local_keeper_t final : public r::actor_base_t, private mod
     r::address_ptr_t coordinator;
 };
 
-}
+} // namespace syncspirit::net

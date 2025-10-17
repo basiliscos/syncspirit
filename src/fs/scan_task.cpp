@@ -481,8 +481,7 @@ scan_task_t::send_guard_t::~send_guard_t() {
             if (manage_progress) {
                 auto &sup = actor.get_supervisor();
                 auto address = actor.get_address();
-                auto message = rotor::make_routed_message<payload::scan_progress_t>(coordinator, address, &task);
-                sup.put(message);
+                sup.route<payload::scan_progress_t>(coordinator, address, &task);
                 task.log->debug("routing scan progress");
             }
         }

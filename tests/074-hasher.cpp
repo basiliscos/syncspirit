@@ -32,14 +32,12 @@ struct hash_consumer_t : r::actor_base_t {
     }
 
     void request_digest(const utils::bytes_t &data) {
-        auto msg = r::make_routed_message<payload::digest_t>(hasher, address, std::move(data));
-        supervisor->put(std::move(msg));
+        supervisor->route<payload::digest_t>(hasher, address, std::move(data));
     }
 
     void request_validation(const utils::bytes_t &data, utils::bytes_view_t hash) {
         auto hash_bytes = utils::bytes_t(hash.begin(), hash.end());
-        auto msg = r::make_routed_message<payload::validation_t>(hasher, address, data, std::move(hash_bytes));
-        supervisor->put(std::move(msg));
+        supervisor->route<payload::validation_t>(hasher, address, data, std::move(hash_bytes));
     }
 
     void on_digest(message::digest_t &res) noexcept { digest_res = &res; }

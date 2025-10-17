@@ -121,8 +121,7 @@ C::stack_context_t::~stack_context_t() {
     if (!io_commands.empty()) {
         auto &self = actor.get_address();
         auto &fs = actor.fs_addr;
-        auto msg = r::make_routed_message<fs::payload::io_commands_t>(fs, self, std::move(io_commands));
-        actor.get_supervisor().put(std::move(msg));
+        actor.route<fs::payload::io_commands_t>(fs, self, std::move(io_commands));
         actor.resources->acquire(resource::fs);
     }
     if (next) {
@@ -1086,9 +1085,7 @@ void controller_actor_t::on_message(proto::Response &message, stack_context_t &c
 
             auto payload =
                 hasher::payload::validation_t(std::move(data), std::move(hash_bytes), std::move(request_context));
-            auto request =
-                r::make_routed_message<hasher::payload::validation_t>(hasher_proxy, address, std::move(payload));
-            supervisor->put(std::move(request));
+            route<hasher::payload::validation_t>(hasher_proxy, address, std::move(payload));
             resources->acquire(resource::hash);
         }
     }

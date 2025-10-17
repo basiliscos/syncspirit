@@ -259,8 +259,7 @@ void scan_actor_t::hash_next(Iterator &info, const r::address_ptr_t &reply_addr)
                     auto req_ctx = hasher::payload::extendended_context_prt_t{};
                     req_ctx.reset(new Context(info, chunk.block_index));
                     auto payload = request_t(std::move(chunk.data), std::move(req_ctx));
-                    auto request = r::make_routed_message<request_t>(hasher_proxy, reply_addr, std::move(payload));
-                    supervisor->put(std::move(request));
+                    route<request_t>(hasher_proxy, reply_addr, std::move(payload));
                     ++requested_hashes;
                 }
             }

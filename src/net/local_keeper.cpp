@@ -6,10 +6,9 @@
 
 using namespace syncspirit::net;
 
-local_keeper_t::local_keeper_t(config_t &cfg): r::actor_base_t(cfg) {
-}
+local_keeper_t::local_keeper_t(config_t &cfg) : r::actor_base_t(cfg) {}
 
-void local_keeper_t::configure(r::plugin::plugin_base_t &plugin) noexcept  {
+void local_keeper_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
         p.set_identity("net.local_keeper", false);

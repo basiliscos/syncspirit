@@ -125,8 +125,7 @@ struct fixture_t {
         auto cmd = fs::payload::io_command_t(std::move(payload));
         auto cmds = fs::payload::io_commands_t{};
         cmds.emplace_back(std::move(cmd));
-        auto msg = r::make_routed_message<fs::payload::io_commands_t>(file_addr, sup->get_address(), std::move(cmds));
-        sup->put(std::move(msg));
+        sup->route<fs::payload::io_commands_t>(file_addr, sup->get_address(), std::move(cmds));
         sup->do_process();
         return chain_builder_t(this, reply, std::in_place_type_t<decltype(payload)>());
     }
@@ -141,8 +140,7 @@ struct fixture_t {
         auto cmd = fs::payload::io_command_t(std::move(payload));
         auto cmds = fs::payload::io_commands_t{};
         cmds.emplace_back(std::move(cmd));
-        auto msg = r::make_routed_message<fs::payload::io_commands_t>(file_addr, sup->get_address(), std::move(cmds));
-        sup->put(std::move(msg));
+        sup->route<fs::payload::io_commands_t>(file_addr, sup->get_address(), std::move(cmds));
         sup->do_process();
         return chain_builder_t(this, reply, std::in_place_type_t<decltype(payload)>());
     }
@@ -154,8 +152,7 @@ struct fixture_t {
         auto cmd = fs::payload::io_command_t(std::move(payload));
         auto cmds = fs::payload::io_commands_t{};
         cmds.emplace_back(std::move(cmd));
-        auto msg = r::make_routed_message<fs::payload::io_commands_t>(file_addr, sup->get_address(), std::move(cmds));
-        sup->put(std::move(msg));
+        sup->route<fs::payload::io_commands_t>(file_addr, sup->get_address(), std::move(cmds));
         sup->do_process();
         return chain_builder_t(this, reply, std::in_place_type_t<decltype(payload)>());
     }
@@ -175,8 +172,7 @@ struct fixture_t {
         auto cmd = fs::payload::io_command_t(std::move(payload));
         auto cmds = fs::payload::io_commands_t{};
         cmds.emplace_back(std::move(cmd));
-        auto msg = r::make_routed_message<fs::payload::io_commands_t>(file_addr, sup->get_address(), std::move(cmds));
-        sup->put(std::move(msg));
+        sup->route<fs::payload::io_commands_t>(file_addr, sup->get_address(), std::move(cmds));
         sup->do_process();
         return chain_builder_t(this, reply, std::in_place_type_t<decltype(payload)>());
     }
@@ -526,11 +522,9 @@ void test_requesting_block() {
             auto cmd = fs::payload::io_command_t(std::move(payload));
             auto cmds = fs::payload::io_commands_t{};
             cmds.emplace_back(std::move(cmd));
-            auto msg =
-                r::make_routed_message<fs::payload::io_commands_t>(file_addr, sup->get_address(), std::move(cmds));
+            sup->route<fs::payload::io_commands_t>(file_addr, sup->get_address(), std::move(cmds));
 
             SECTION("error, no file") {
-                sup->put(std::move(msg));
                 sup->do_process();
                 REQUIRE(reply);
                 REQUIRE(reply->payload.size() == 1);
@@ -541,7 +535,6 @@ void test_requesting_block() {
 
             SECTION("error, oversized request") {
                 write_file(target, "1234");
-                sup->put(std::move(msg));
                 sup->do_process();
                 REQUIRE(reply);
                 REQUIRE(reply->payload.size() == 1);
@@ -552,7 +545,6 @@ void test_requesting_block() {
 
             SECTION("successful file reading") {
                 write_file(target, "1234567890");
-                sup->put(std::move(msg));
                 sup->do_process();
 
                 REQUIRE(reply);
