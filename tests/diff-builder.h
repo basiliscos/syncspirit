@@ -98,7 +98,7 @@ struct SYNCSPIRIT_TEST_API diff_builder_t : private model::diff::apply_controlle
     diff_builder_t &synchronization_finish(std::string_view id) noexcept;
     diff_builder_t &mark_reacheable(model::file_info_ptr_t peer_file, const model::folder_info_t &peer_fi,
                                     bool value) noexcept;
-    diff_builder_t &suspend(const model::folder_t &folder) noexcept;
+    diff_builder_t &suspend(const model::folder_t &folder, bool value = true) noexcept;
     diff_builder_t &interrupt() noexcept;
 
     model::sequencer_t &get_sequencer() noexcept;

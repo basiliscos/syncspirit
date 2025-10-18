@@ -9,7 +9,7 @@
 
 #include "model/cluster.h"
 #include "hasher/hasher_proxy_actor.h"
-#include "fs/fs_slave.h"
+#include "fs/messages.h"
 #include "net/local_keeper.h"
 #include "net/names.h"
 
@@ -46,6 +46,17 @@ struct fixture_t {
         r::system_context_t ctx;
         sup = ctx.create_supervisor<supervisor_t>().make_presentation(true).timeout(timeout).create_registry().finish();
         sup->cluster = cluster;
+        sup->configure_callback = [&](r::plugin::plugin_base_t &plugin) {
+            plugin.template with_casted<r::plugin::registry_plugin_t>(
+                [&](auto &p) { p.register_name(net::names::fs_actor, sup->get_address()); });
+            plugin.template with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
+                using msg_t = fs::message::foreign_executor_t;
+                p.subscribe_actor(r::lambda<msg_t>([&](msg_t &req) {
+                    sup->log->info("executing foreign task");
+                    req.payload->exec();
+                }));
+            });
+        };
 
         auto folder_id = "1234-5678";
 
@@ -78,7 +89,11 @@ struct fixture_t {
         auto fs_config = config::fs_config_t{3600, 10, 1024 * 1024, files_scan_iteration_limit};
         rw_cache.reset(new fs::file_cache_t(5));
 
-        target = sup->create_actor<net::local_keeper_t>().timeout(timeout).cluster(cluster).finish();
+        target = sup->create_actor<net::local_keeper_t>()
+                     .timeout(timeout)
+                     .cluster(cluster)
+                     .sequencer(make_sequencer(77))
+                     .finish();
         sup->do_process();
 
         sup->send<syncspirit::model::payload::thread_ready_t>(sup->get_address(), cluster, std::this_thread::get_id());
@@ -116,7 +131,51 @@ struct fixture_t {
 
 void test_local_keeper() {
     struct F : fixture_t {
-        void main() noexcept override { sys::error_code ec; }
+        void main() noexcept override {
+            sys::error_code ec;
+            SECTION("root folder errors") {
+                auto dir_path = root_path / "some-dir";
+                folder->set_path(dir_path);
+                builder->scan_start(folder->get_id()).apply(*sup);
+                REQUIRE(folder->is_suspended());
+                REQUIRE(folder->get_suspend_reason().message() != "");
+                SECTION("scan on created again") {
+                    bfs::create_directories(dir_path);
+                    builder->scan_start(folder->get_id()).apply(*sup);
+                    REQUIRE(!folder->is_suspended());
+                    REQUIRE(!folder->get_suspend_reason());
+                }
+                CHECK(!folder->is_scanning());
+                CHECK(folder->get_scan_finish() >= folder->get_scan_start());
+            }
+            SECTION("emtpy root dir") {
+                auto dir_path = root_path / "some-dir";
+                bfs::create_directories(dir_path);
+                folder->set_path(dir_path);
+                builder->scan_start(folder->get_id()).apply(*sup);
+                CHECK(!folder->is_scanning());
+                CHECK(folder->get_scan_finish() >= folder->get_scan_start());
+            }
+#if 0
+            SECTION("new items") {
+                SECTION("new dir") {
+                    auto dir_path = root_path / "some-dir";
+                    bfs::create_directories(dir_path);
+                    builder->scan_start(folder->get_id()).apply(*sup);
+
+                    auto file = files->by_name("some-dir");
+                    REQUIRE(file);
+                    CHECK(file->is_locally_available());
+                    CHECK(file->is_dir());
+                    CHECK(!file->is_link());
+                    CHECK(file->get_block_size() == 0);
+                    CHECK(file->get_size() == 0);
+                    CHECK(cluster->get_blocks().size() == 0);
+                    REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
+                }
+            }
+#endif
+        }
     };
     F().run();
 }

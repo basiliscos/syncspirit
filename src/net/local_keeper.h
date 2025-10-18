@@ -3,17 +3,20 @@
 
 #pragma once
 
-#include "messages.h"
+#include "fs/messages.h"
 #include "model/messages.h"
 #include "model/cluster.h"
 #include "model/diff/cluster_visitor.h"
+#include "model/misc/sequencer.h"
 
 namespace syncspirit::net {
 
 namespace outcome = boost::outcome_v2;
+namespace r = rotor;
 
 struct local_keeper_config_t : r::actor_config_t {
     model::cluster_ptr_t cluster;
+    model::sequencer_ptr_t sequencer;
 };
 
 template <typename Actor> struct local_keeper_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -23,6 +26,10 @@ template <typename Actor> struct local_keeper_config_builder_t : r::actor_config
 
     builder_t &&cluster(const model::cluster_ptr_t &value) && noexcept {
         parent_t::config.cluster = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+    builder_t &&sequencer(model::sequencer_ptr_t value) && noexcept {
+        parent_t::config.sequencer = std::move(value);
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };
@@ -37,13 +44,15 @@ struct SYNCSPIRIT_API local_keeper_t final : public r::actor_base_t, private mod
     void shutdown_start() noexcept override;
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
 
-  private:
     void on_model_update(model::message::model_update_t &) noexcept;
-    // outcome::result<void> operator()(const model::diff::local::scan_start_t &, void *custom) noexcept override;
+    void on_post_process(fs::message::foreign_executor_t &) noexcept;
+    outcome::result<void> operator()(const model::diff::local::scan_start_t &, void *custom) noexcept override;
 
     utils::logger_t log;
+    model::sequencer_ptr_t sequencer;
     model::cluster_ptr_t cluster;
     r::address_ptr_t coordinator;
+    r::address_ptr_t fs_addr;
 };
 
 } // namespace syncspirit::net

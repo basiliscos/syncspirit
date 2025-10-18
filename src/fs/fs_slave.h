@@ -34,7 +34,7 @@ struct SYNCSPIRIT_API scan_dir_t {
 
 using task_t = std::variant<task::scan_dir_t>;
 
-struct SYNCSPIRIT_API fs_slave_t final : payload::foreign_executor_t {
+struct SYNCSPIRIT_API fs_slave_t : payload::foreign_executor_t {
     using tasks_t = std::list<task_t>;
 
     void exec() noexcept override;

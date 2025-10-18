@@ -824,7 +824,7 @@ void folder_table_t::on_remove() {
     auto &sequencer = sup.get_sequencer();
     auto &folder = *description.get_folder();
     auto diff = model::diff::cluster_diff_ptr_t{};
-    diff = new suspend_folder_t(folder);
+    diff = new suspend_folder_t(folder, true);
     diff->assign_sibling(new load::interrupt_t())
         ->assign_sibling(new remove_folder_t(cluster, sequencer, *description.get_folder()));
 

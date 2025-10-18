@@ -341,8 +341,8 @@ diff_builder_t &diff_builder_t::mark_reacheable(model::file_info_ptr_t peer_file
     return assign(new model::diff::modify::mark_reachable_t(*peer_file, peer_fi, value));
 }
 
-diff_builder_t &diff_builder_t::suspend(const model::folder_t &folder) noexcept {
-    return assign(new model::diff::modify::suspend_folder_t(folder));
+diff_builder_t &diff_builder_t::suspend(const model::folder_t &folder, bool value) noexcept {
+    return assign(new model::diff::modify::suspend_folder_t(folder, value));
 }
 
 diff_builder_t &diff_builder_t::interrupt() noexcept { return assign(new model::diff::load::interrupt_t()); }
