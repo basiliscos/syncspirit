@@ -5,11 +5,15 @@
 #include "model/diff/local/scan_start.h"
 #include "model/diff/local/scan_finish.h"
 #include "model/diff/modify/suspend_folder.h"
+#include "presentation/folder_entity.h"
 #include "fs/fs_slave.h"
 #include "names.h"
+#include "presentation/presence.h"
 
 using namespace syncspirit;
 using namespace syncspirit::net;
+
+namespace bfs = std::filesystem;
 
 namespace {
 
@@ -22,7 +26,7 @@ using folder_context_ptr_t = r::intrusive_ptr_t<folder_context_t>;
 
 struct folder_slave_t final : fs::fs_slave_t {
     using local_keeper_ptr_t = r::intrusive_ptr_t<net::local_keeper_t>;
-    enum class state_t { folder_scan, done };
+    enum class state_t { folder_scan, dir_scan, done };
 
     folder_slave_t(folder_context_ptr_t context_, local_keeper_ptr_t actor_) noexcept
         : context{context_}, state{state_t::folder_scan}, actor{std::move(actor_)} {
@@ -38,6 +42,13 @@ struct folder_slave_t final : fs::fs_slave_t {
         if (!done) {
             if (state == state_t::folder_scan) {
                 post_process_folder();
+            } else if (state == state_t::dir_scan) {
+                auto &task = tasks_out.front();
+                auto &t = std::get<fs::task::scan_dir_t>(task);
+                auto &ec = t.ec;
+                assert(!ec);
+                process_dir(t);
+                tasks_out.pop_front();
             }
         }
         if (done) {
@@ -48,6 +59,12 @@ struct folder_slave_t final : fs::fs_slave_t {
             diff = new model::diff::local::scan_finish_t(folder_id, now);
             actor->send<model::payload::model_update_t>(actor->coordinator, std::move(diff));
             done = true;
+        } else {
+            if (!pending_disk_scans.empty()) {
+                auto first = pending_disk_scans.front();
+                push(std::move(first));
+                pending_disk_scans.pop_front();
+            }
         }
         return done;
     }
@@ -70,11 +87,39 @@ struct folder_slave_t final : fs::fs_slave_t {
                 auto diff = model::diff::cluster_diff_ptr_t{};
                 diff = new model::diff::modify::suspend_folder_t(*folder, false);
                 actor->send<model::payload::model_update_t>(actor->coordinator, std::move(diff));
+            } else {
+                process_dir(t);
+                if (!pending_disk_scans.empty()) {
+                    state = state_t::dir_scan;
+                }
             }
         }
         tasks_out.pop_front();
     }
 
+    void process_dir(fs::task::scan_dir_t &dir) noexcept {
+        auto folder = context->local_folder->get_folder();
+        auto augmentation = folder->get_augmentation().get();
+        auto folder_entity = static_cast<presentation::folder_entity_t *>(augmentation);
+        auto local_device = folder->get_cluster()->get_device();
+        auto folder_presence = folder_entity->get_presence(local_device.get());
+        auto &model_children = folder_presence->get_children();
+        auto it_model = model_children.begin();
+        auto it_disk = dir.child_infos.begin();
+
+        while (it_disk != dir.child_infos.end()) {
+            auto &info = *it_disk;
+            if (info.ec) {
+                std::abort();
+            } else if (info.status.type() == bfs::file_type::directory) {
+                auto task = fs::task::scan_dir_t(std::move(dir.path / info.path));
+                pending_disk_scans.emplace_back(std::move(task));
+            }
+            ++it_disk;
+        }
+    }
+
+    tasks_t pending_disk_scans;
     folder_context_ptr_t context;
     local_keeper_ptr_t actor;
     utils::logger_t log;
