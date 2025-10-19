@@ -2,13 +2,21 @@
 // SPDX-FileCopyrightText: 2025 Ivan Baidakou
 
 #include "local_keeper.h"
+#include "model/diff/advance/local_update.h"
 #include "model/diff/local/scan_start.h"
 #include "model/diff/local/scan_finish.h"
 #include "model/diff/modify/suspend_folder.h"
 #include "presentation/folder_entity.h"
 #include "fs/fs_slave.h"
+#include "fs/utils.h"
 #include "names.h"
 #include "presentation/presence.h"
+#include "presentation/cluster_file_presence.h"
+#include "proto/proto-helpers-bep.h"
+
+#include <algorithm>
+#include <memory_resource>
+#include <boost/nowide/convert.hpp>
 
 using namespace syncspirit;
 using namespace syncspirit::net;
@@ -16,6 +24,20 @@ using namespace syncspirit::net;
 namespace bfs = std::filesystem;
 
 namespace {
+
+struct stack_context_t {
+    model::diff::cluster_diff_ptr_t diff;
+    model::diff::cluster_diff_t *next = nullptr;
+
+    void push(model::diff::cluster_diff_t *d) noexcept {
+        if (next) {
+            next = next->assign_sibling(d);
+        } else {
+            next = d;
+            diff = d;
+        }
+    }
+};
 
 struct folder_context_t : boost::intrusive_ref_counter<folder_context_t, boost::thread_safe_counter> {
     folder_context_t(model::folder_info_ptr_t local_folder_) noexcept : local_folder{local_folder_} {}
@@ -26,6 +48,7 @@ using folder_context_ptr_t = r::intrusive_ptr_t<folder_context_t>;
 
 struct folder_slave_t final : fs::fs_slave_t {
     using local_keeper_ptr_t = r::intrusive_ptr_t<net::local_keeper_t>;
+    using presences_t = std::pair<presentation::presence_t *, presentation::presence_t *>;
     enum class state_t { folder_scan, dir_scan, done };
 
     folder_slave_t(folder_context_ptr_t context_, local_keeper_ptr_t actor_) noexcept
@@ -38,9 +61,19 @@ struct folder_slave_t final : fs::fs_slave_t {
     bool post_process() noexcept {
         auto folder_id = context->local_folder->get_folder()->get_id();
         LOG_TRACE(log, "postpocess of '{}'", folder_id);
+        auto ctx = stack_context_t();
+
         for (auto &t : tasks_out) {
-            std::visit([&](auto &t) { post_process(t); }, t);
+            std::visit([&](auto &t) { post_process(t, ctx); }, t);
         }
+        tasks_out.clear();
+
+        if (!pending_disk_scans.empty()) {
+            auto &t = pending_disk_scans.front();
+            tasks_in.emplace_back(std::move(t));
+            pending_disk_scans.pop_front();
+        }
+
         if (tasks_in.empty()) {
             using clock_t = r::pt::microsec_clock;
             auto now = clock_t::local_time();
@@ -48,39 +81,113 @@ struct folder_slave_t final : fs::fs_slave_t {
             diff = new model::diff::local::scan_finish_t(folder_id, now);
             actor->send<model::payload::model_update_t>(actor->coordinator, std::move(diff));
         }
+
+        if (ctx.diff) {
+            actor->send<model::payload::model_update_t>(actor->coordinator, std::move(ctx.diff));
+        }
+
         return tasks_in.empty();
     }
 
-    void post_process(fs::task::scan_dir_t &task) noexcept {
+    presences_t get_presence(const bfs::path &path) {
+        struct comparator_t {
+            bool operator()(const presentation::presence_t *p, const bfs::path &name) const {
+                using allocator_t = std::pmr::polymorphic_allocator<char>;
+
+                auto buffer = std::array<std::byte, 1024>();
+                auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+                auto allocator = allocator_t(&pool);
+                auto own_wname = std::pmr::wstring(allocator);
+                auto cp = static_cast<const presentation::cluster_file_presence_t *>(p);
+                auto own_name = cp->get_file_info().get_name()->get_own_name();
+                own_wname.resize(own_name.size());
+                auto str = boost::nowide::widen(own_wname.data(), own_wname.size(), own_name.data());
+                assert(str);
+                auto wname = std::wstring_view(str, str + wcslen(str));
+                return wname < name.wstring();
+            }
+        };
+
+        auto folder = context->local_folder->get_folder();
+        auto folder_id = folder->get_id();
+        auto &root_path = folder->get_path();
+        auto augmentation = folder->get_augmentation().get();
+        auto folder_entity = static_cast<presentation::folder_entity_t *>(augmentation);
+        auto local_device = folder->get_cluster()->get_device();
+        auto folder_presence = folder_entity->get_presence(local_device.get());
+        auto skip = std::distance(root_path.begin(), root_path.end());
+        auto it = path.begin();
+        std::advance(it, skip);
+        auto parent = folder_presence;
+        auto result = parent;
+        while (it != path.end()) {
+            // auto child_eq = [&]();
+            auto &children = parent->get_children();
+            auto it_child = std::lower_bound(children.begin(), children.end(), *it, comparator_t{});
+            if (it_child != children.end()) {
+                parent = result;
+                result = *it_child;
+            } else {
+                result = {};
+                break;
+            }
+            ++it;
+        }
+        return std::make_pair(parent, result);
+    }
+
+    void post_process(fs::task::scan_dir_t &task, stack_context_t &ctx) noexcept {
         auto &ec = task.ec;
         auto folder = context->local_folder->get_folder();
         auto folder_id = folder->get_id();
-        if (task.path == folder->get_path()) {
+        auto &root_path = folder->get_path();
+        bool is_root = task.path == folder->get_path();
+        if (is_root) {
             if (ec) {
                 LOG_TRACE(log, "suspending {}, due to: {}", folder_id, ec.message());
-                auto diff = model::diff::cluster_diff_ptr_t{};
-                diff = new model::diff::modify::suspend_folder_t(*folder, true, ec);
-                actor->send<model::payload::model_update_t>(actor->coordinator, std::move(diff));
+                ctx.push(new model::diff::modify::suspend_folder_t(*folder, true, ec));
                 return;
             } else {
                 if (folder->is_suspended()) {
                     LOG_TRACE(log, "un-suspending {}", folder_id);
-                    auto diff = model::diff::cluster_diff_ptr_t{};
-                    diff = new model::diff::modify::suspend_folder_t(*folder, false);
-                    actor->send<model::payload::model_update_t>(actor->coordinator, std::move(diff));
+                    ctx.push(new model::diff::modify::suspend_folder_t(*folder, false));
                     return;
                 }
             }
         }
-        auto it_disk = task.child_infos.begin();
 
+        auto sub_scans = std::uint_fast32_t{0};
+        auto it_disk = task.child_infos.begin();
         while (it_disk != task.child_infos.end()) {
             auto &info = *it_disk;
             if (info.ec) {
                 std::abort();
             } else if (info.status.type() == bfs::file_type::directory) {
+                auto [parent, child] = get_presence(info.path);
+                if (!child) {
+                    auto file = proto::FileInfo();
+                    auto name = fs::relativize(info.path, root_path);
+                    auto permissions = static_cast<uint32_t>(info.status.permissions());
+                    proto::set_name(file, boost::nowide::narrow(name.wstring()));
+                    proto::set_type(file, proto::FileInfoType::DIRECTORY);
+                    proto::set_modified_s(file, fs::to_unix(info.last_write_time));
+                    proto::set_permissions(file, permissions);
+#if 0
+                    if (ignore_permissions == false) {
+                        auto permissions = static_cast<uint32_t>(status.permissions());
+                        proto::set_permissions(metadata, permissions);
+                    } else {
+                        proto::set_permissions(metadata, 0666);
+                        proto::set_no_permissions(metadata, true);
+                    }
+#endif
+                    ctx.push(new model::diff::advance::local_update_t(*actor->cluster, *actor->sequencer,
+                                                                      std::move(file), folder_id));
+                }
+
                 auto sub_task = fs::task::scan_dir_t(std::move(task.path / info.path));
                 pending_disk_scans.emplace_back(std::move(sub_task));
+                ++sub_scans;
             }
             ++it_disk;
         }

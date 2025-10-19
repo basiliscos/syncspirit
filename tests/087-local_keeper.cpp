@@ -156,7 +156,6 @@ void test_local_keeper() {
                 CHECK(!folder->is_scanning());
                 CHECK(folder->get_scan_finish() >= folder->get_scan_start());
             }
-#if 0
             SECTION("new items") {
                 SECTION("new dir") {
                     auto dir_path = root_path / "some-dir";
@@ -174,7 +173,6 @@ void test_local_keeper() {
                     REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
                 }
             }
-#endif
         }
     };
     F().run();
