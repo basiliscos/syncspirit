@@ -173,7 +173,6 @@ void test_local_keeper() {
                     CHECK(cluster->get_blocks().size() == 0);
                     REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
                 }
-#if 0
                 SECTION("empty file") {
                     CHECK(bfs::create_directories(root_path / "abc"));
                     auto file_path = root_path / "abc" / "empty.file";
@@ -190,7 +189,6 @@ void test_local_keeper() {
                     CHECK(blocks.size() == 0);
                     REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
                 }
-#endif
 #ifndef SYNCSPIRIT_WIN
                 SECTION("new symlink") {
                     auto file_path = root_path / "symlink";

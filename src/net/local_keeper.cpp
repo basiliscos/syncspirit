@@ -113,7 +113,7 @@ struct folder_slave_t final : fs::fs_slave_t {
         } else if (type == bfs::file_type::symlink) {
             stack.push_front(child_ready_t(child_info));
             return true;
-        } else if (type == bfs::file_type::symlink) {
+        } else if (type == bfs::file_type::regular) {
             if (!child_info.size) {
                 stack.push_front(child_ready_t(child_info));
                 return true;
