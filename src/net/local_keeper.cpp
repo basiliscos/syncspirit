@@ -105,10 +105,20 @@ struct folder_slave_t final : fs::fs_slave_t {
     }
 
     bool process(unexamined_t &child_info, stack_context_t &ctx) noexcept {
-        if (child_info.status.type() == bfs::file_type::directory) {
+        auto type = child_info.status.type();
+        if (type == bfs::file_type::directory) {
             stack.push_front(child_ready_t(child_info));
             stack.push_front(unscanned_dir_t(child_info.path));
             return true;
+        } else if (type == bfs::file_type::symlink) {
+            stack.push_front(child_ready_t(child_info));
+            return true;
+        } else if (type == bfs::file_type::symlink) {
+            if (!child_info.size) {
+                stack.push_front(child_ready_t(child_info));
+                return true;
+            }
+            std::abort();
         } else {
             std::abort();
         }
@@ -142,8 +152,18 @@ struct folder_slave_t final : fs::fs_slave_t {
             auto file = proto::FileInfo();
             auto name = fs::relativize(info.path, folder->get_path());
             auto permissions = static_cast<uint32_t>(info.status.permissions());
+            auto type = [&]() -> proto::FileInfoType {
+                using FT = proto::FileInfoType;
+                auto t = info.status.type();
+                if (t == bfs::file_type::directory)
+                    return FT::DIRECTORY;
+                else if (t == bfs::file_type::symlink)
+                    return FT::SYMLINK;
+                else
+                    return FT::FILE;
+            }();
             proto::set_name(file, boost::nowide::narrow(name.wstring()));
-            proto::set_type(file, proto::FileInfoType::DIRECTORY);
+            proto::set_type(file, type);
             proto::set_modified_s(file, fs::to_unix(info.last_write_time));
             proto::set_permissions(file, permissions);
 #if 0

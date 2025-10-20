@@ -157,6 +157,7 @@ void test_local_keeper() {
                 CHECK(folder->get_scan_finish() >= folder->get_scan_start());
             }
             SECTION("new items") {
+                auto &blocks = cluster->get_blocks();
                 SECTION("new dir") {
                     auto dir_path = root_path / "some-dir";
                     bfs::create_directories(dir_path);
@@ -172,6 +173,42 @@ void test_local_keeper() {
                     CHECK(cluster->get_blocks().size() == 0);
                     REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
                 }
+#if 0
+                SECTION("empty file") {
+                    CHECK(bfs::create_directories(root_path / "abc"));
+                    auto file_path = root_path / "abc" / "empty.file";
+                    write_file(file_path, "");
+                    builder->scan_start(folder->get_id()).apply(*sup);
+
+                    auto file = files->by_name("abc/empty.file");
+                    REQUIRE(file);
+                    CHECK(file->is_locally_available());
+                    CHECK(!file->is_link());
+                    CHECK(file->is_file());
+                    CHECK(file->get_block_size() == 0);
+                    CHECK(file->get_size() == 0);
+                    CHECK(blocks.size() == 0);
+                    REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
+                }
+#endif
+#ifndef SYNCSPIRIT_WIN
+                SECTION("new symlink") {
+                    auto file_path = root_path / "symlink";
+                    bfs::create_symlink(bfs::path("/some/where"), file_path, ec);
+                    REQUIRE(!ec);
+                    builder->scan_start(folder->get_id()).apply(*sup);
+
+                    auto file = files->by_name("symlink");
+                    REQUIRE(file);
+                    CHECK(file->is_locally_available());
+                    CHECK(!file->is_file());
+                    CHECK(file->is_link());
+                    CHECK(file->get_block_size() == 0);
+                    CHECK(file->get_size() == 0);
+                    CHECK(blocks.size() == 0);
+                    REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
+                }
+#endif
             }
         }
     };
