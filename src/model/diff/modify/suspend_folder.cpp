@@ -15,7 +15,7 @@ suspend_folder_t::suspend_folder_t(const model::folder_t &folder, bool value_, c
 
 auto suspend_folder_t::apply_impl(apply_controller_t &controller, void *custom) const noexcept
     -> outcome::result<void> {
-    LOG_TRACE(log, "applying suspend_folder_t");
+    LOG_TRACE(log, "applying suspend_folder_t, value: {}", value);
     auto &cluster = controller.get_cluster();
     auto folder = cluster.get_folders().by_id(folder_id);
     folder->mark_suspended(value, ec);
