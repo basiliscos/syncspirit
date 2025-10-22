@@ -4,33 +4,12 @@
 #pragma once
 
 #include "messages.h"
+#include "task/scan_dir.h"
 #include "syncspirit-export.h"
 #include <variant>
 #include <list>
 
 namespace syncspirit::fs {
-
-namespace task {
-
-struct SYNCSPIRIT_API scan_dir_t {
-    struct child_info_t {
-        bfs::path path;
-        bfs::path target;
-        bfs::file_status status;
-        bfs::file_time_type last_write_time;
-        std::uintmax_t size;
-        sys::error_code ec;
-    };
-    using child_infos_t = std::vector<child_info_t>;
-
-    scan_dir_t(bfs::path path) noexcept;
-
-    bfs::path path;
-    sys::error_code ec;
-    child_infos_t child_infos;
-};
-
-} // namespace task
 
 using task_t = std::variant<task::scan_dir_t>;
 
