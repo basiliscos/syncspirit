@@ -31,9 +31,9 @@ using rehash_ptr_t = std::shared_ptr<chunk_iterator_t>;
 using hash_anew_ptr_t = std::shared_ptr<new_chunk_iterator_t>;
 
 struct foreign_executor_t : hasher::payload::extendended_context_t {
-    virtual void exec() noexcept = 0;
+    virtual void exec(r::actor_base_t &host) noexcept = 0;
 };
-using foreign_executor_prt_t = std::unique_ptr<foreign_executor_t>;
+using foreign_executor_prt_t = r::intrusive_ptr_t<foreign_executor_t>;
 
 template <typename ReplyType = void> struct payload_base_t {
     outcome::result<ReplyType> result;

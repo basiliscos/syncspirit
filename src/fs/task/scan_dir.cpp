@@ -3,6 +3,7 @@
 
 #include "scan_dir.h"
 #include "fs/fs_slave.h"
+#include <algorithm>
 
 using namespace syncspirit::fs;
 using namespace syncspirit::fs::task;
@@ -21,7 +22,7 @@ struct comparator_t {
 
 scan_dir_t::scan_dir_t(bfs::path path_) noexcept : path{std::move(path_)} {}
 
-void scan_dir_t::process(fs_slave_t &slave) noexcept {
+void scan_dir_t::process(fs_slave_t &slave, rotor::actor_base_t &host) noexcept {
     auto it = bfs::directory_iterator(path, ec);
     if (ec) {
         return;

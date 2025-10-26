@@ -5,18 +5,19 @@
 
 #include "messages.h"
 #include "task/scan_dir.h"
+#include "task/segment_iterator.h"
 #include "syncspirit-export.h"
 #include <variant>
 #include <list>
 
 namespace syncspirit::fs {
 
-using task_t = std::variant<task::scan_dir_t>;
+using task_t = std::variant<task::scan_dir_t, task::segment_iterator_t>;
 
 struct SYNCSPIRIT_API fs_slave_t : payload::foreign_executor_t {
     using tasks_t = std::list<task_t>;
 
-    void exec() noexcept override;
+    void exec(r::actor_base_t &host) noexcept override;
     void push(task_t task) noexcept;
 
     void process(task::scan_dir_t &) noexcept;

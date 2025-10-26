@@ -4,6 +4,7 @@
 #include "test-utils.h"
 #include "fs/fs_slave.h"
 #include "fs/utils.h"
+#include "test_supervisor.h"
 #include "test-utils.h"
 #include <boost/nowide/convert.hpp>
 
@@ -13,16 +14,28 @@ using namespace syncspirit::utils;
 using namespace syncspirit::model;
 using namespace syncspirit::fs;
 
+namespace {
+struct sup_t final : r::supervisor_t {
+    using r::supervisor_t::supervisor_t;
+};
+
+} // namespace
+
 TEST_CASE("fs_slave", "[fs]") {
     auto root_path = unique_path();
     bfs::create_directories(root_path);
     test::path_guard_t path_quard{root_path};
 
+    auto timeout = r::pt::time_duration(r::pt::millisec{10});
     auto slave = fs_slave_t();
+    r::system_context_t ctx;
+    auto sup = ctx.create_supervisor<supervisor_t>().timeout(timeout).create_registry().finish();
+    sup->do_process();
+
     SECTION("dir scan") {
         SECTION("empty dir") {
             slave.push(task::scan_dir_t(root_path));
-            slave.exec();
+            slave.exec(*sup);
             REQUIRE(slave.tasks_out.size() == 1);
             auto &t = std::get<task::scan_dir_t>(slave.tasks_out.front());
             CHECK(!t.ec);
@@ -30,7 +43,7 @@ TEST_CASE("fs_slave", "[fs]") {
         }
         SECTION("non-existing dir") {
             slave.push(task::scan_dir_t(root_path / "non-existing"));
-            slave.exec();
+            slave.exec(*sup);
             REQUIRE(slave.tasks_out.size() == 1);
             auto &t = std::get<task::scan_dir_t>(slave.tasks_out.front());
             CHECK(t.ec);
@@ -39,7 +52,7 @@ TEST_CASE("fs_slave", "[fs]") {
         SECTION("not a dir") {
             slave.push(task::scan_dir_t(root_path / "file"));
             write_file(root_path / "file", "");
-            slave.exec();
+            slave.exec(*sup);
             REQUIRE(slave.tasks_out.size() == 1);
             auto &t = std::get<task::scan_dir_t>(slave.tasks_out.front());
             CHECK(t.ec);
@@ -48,7 +61,7 @@ TEST_CASE("fs_slave", "[fs]") {
         SECTION("not a dir") {
             slave.push(task::scan_dir_t(root_path / "file"));
             write_file(root_path / "file", "");
-            slave.exec();
+            slave.exec(*sup);
             REQUIRE(slave.tasks_out.size() == 1);
             auto &t = std::get<task::scan_dir_t>(slave.tasks_out.front());
             CHECK(t.ec);
@@ -69,7 +82,7 @@ TEST_CASE("fs_slave", "[fs]") {
             bfs::create_directories(child_3);
             bfs::last_write_time(child_3, from_unix(modified));
 
-            slave.exec();
+            slave.exec(*sup);
 
             REQUIRE(slave.tasks_out.size() == 1);
             auto &t = std::get<task::scan_dir_t>(slave.tasks_out.front());
@@ -99,6 +112,9 @@ TEST_CASE("fs_slave", "[fs]") {
             }
         }
     }
+
+    sup->do_shutdown();
+    sup->do_process();
 }
 
 int _init() {

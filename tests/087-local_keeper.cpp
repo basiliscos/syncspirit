@@ -12,6 +12,7 @@
 #include "fs/messages.h"
 #include "net/local_keeper.h"
 #include "net/names.h"
+#include <boost/nowide/convert.hpp>
 
 using namespace syncspirit;
 using namespace syncspirit::test;
@@ -53,7 +54,7 @@ struct fixture_t {
                 using msg_t = fs::message::foreign_executor_t;
                 p.subscribe_actor(r::lambda<msg_t>([&](msg_t &req) {
                     sup->log->info("executing foreign task");
-                    req.payload->exec();
+                    req.payload->exec(*sup);
                 }));
             });
         };
@@ -93,6 +94,7 @@ struct fixture_t {
                      .timeout(timeout)
                      .cluster(cluster)
                      .sequencer(make_sequencer(77))
+                     .requested_hashes_limit(1)
                      .finish();
         sup->do_process();
 
@@ -207,6 +209,23 @@ void test_local_keeper() {
                     REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
                 }
 #endif
+                SECTION("small non-emtpy file") {
+                    CHECK(bfs::create_directories(root_path / L"папка"));
+                    auto part_path = bfs::path(L"папка") / L"файл.bin";
+                    auto file_path = root_path / part_path;
+                    write_file(file_path, "12345");
+                    builder->scan_start(folder->get_id()).apply(*sup);
+
+                    auto file = files->by_name(boost::nowide::narrow(part_path.wstring()));
+                    REQUIRE(file);
+                    CHECK(file->is_locally_available());
+                    CHECK(!file->is_link());
+                    CHECK(file->is_file());
+                    CHECK(file->get_block_size() == 5);
+                    CHECK(file->get_size() == 5);
+                    CHECK(blocks.size() == 1);
+                    REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
+                }
             }
         }
     };

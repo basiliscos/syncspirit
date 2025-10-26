@@ -32,7 +32,7 @@ struct hash_consumer_t : r::actor_base_t {
     }
 
     void request_digest(const utils::bytes_t &data) {
-        supervisor->route<payload::digest_t>(hasher, address, std::move(data));
+        supervisor->route<payload::digest_t>(hasher, address, std::move(data), 0);
     }
 
     void request_validation(const utils::bytes_t &data, utils::bytes_view_t hash) {

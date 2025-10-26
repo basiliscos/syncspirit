@@ -4,6 +4,7 @@
 #pragma once
 
 #include "fs/messages.h"
+#include "hasher/messages.h"
 #include "model/messages.h"
 #include "model/cluster.h"
 #include "model/diff/cluster_visitor.h"
@@ -17,6 +18,7 @@ namespace r = rotor;
 struct local_keeper_config_t : r::actor_config_t {
     model::cluster_ptr_t cluster;
     model::sequencer_ptr_t sequencer;
+    uint32_t requested_hashes_limit;
 };
 
 template <typename Actor> struct local_keeper_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -30,6 +32,10 @@ template <typename Actor> struct local_keeper_config_builder_t : r::actor_config
     }
     builder_t &&sequencer(model::sequencer_ptr_t value) && noexcept {
         parent_t::config.sequencer = std::move(value);
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+    builder_t &&requested_hashes_limit(uint32_t value) && noexcept {
+        parent_t::config.requested_hashes_limit = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };
@@ -46,6 +52,8 @@ struct SYNCSPIRIT_API local_keeper_t final : public r::actor_base_t, private mod
 
     void on_model_update(model::message::model_update_t &) noexcept;
     void on_post_process(fs::message::foreign_executor_t &) noexcept;
+    void on_digest(hasher::message::digest_t &res) noexcept;
+
     outcome::result<void> operator()(const model::diff::local::scan_start_t &, void *custom) noexcept override;
 
     utils::logger_t log;
@@ -53,6 +61,8 @@ struct SYNCSPIRIT_API local_keeper_t final : public r::actor_base_t, private mod
     model::cluster_ptr_t cluster;
     r::address_ptr_t coordinator;
     r::address_ptr_t fs_addr;
+    r::address_ptr_t hasher_proxy;
+    std::int32_t requested_hashes_limit;
 };
 
 } // namespace syncspirit::net

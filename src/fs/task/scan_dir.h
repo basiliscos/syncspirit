@@ -6,11 +6,13 @@
 #include "syncspirit-export.h"
 #include <filesystem>
 #include <boost/system.hpp>
+#include <rotor.hpp>
 
 namespace syncspirit::fs {
 
 namespace bfs = std::filesystem;
 namespace sys = boost::system;
+namespace r = rotor;
 
 struct fs_slave_t;
 
@@ -28,7 +30,7 @@ struct SYNCSPIRIT_API scan_dir_t {
     using child_infos_t = std::vector<child_info_t>;
 
     scan_dir_t(bfs::path path) noexcept;
-    void process(fs_slave_t &fs_slave) noexcept;
+    void process(fs_slave_t &fs_slave, r::actor_base_t &host) noexcept;
 
     bfs::path path;
     sys::error_code ec;

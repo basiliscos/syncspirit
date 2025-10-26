@@ -6,10 +6,10 @@
 using namespace syncspirit::fs;
 using namespace syncspirit::fs::task;
 
-void fs_slave_t::exec() noexcept {
+void fs_slave_t::exec(r::actor_base_t &host) noexcept {
     while (!tasks_in.empty()) {
         auto &t = tasks_in.front();
-        std::visit([this](auto &task) { task.process(*this); }, t);
+        std::visit([&](auto &task) { task.process(*this, host); }, t);
         tasks_out.emplace_back(std::move(t));
         tasks_in.pop_front();
     }

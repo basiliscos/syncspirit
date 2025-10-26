@@ -258,7 +258,8 @@ void scan_actor_t::hash_next(Iterator &info, const r::address_ptr_t &reply_addr)
                     using request_t = hasher::payload::digest_t;
                     auto req_ctx = hasher::payload::extendended_context_prt_t{};
                     req_ctx.reset(new Context(info, chunk.block_index));
-                    auto payload = request_t(std::move(chunk.data), std::move(req_ctx));
+                    auto block_index = std::int32_t{0};
+                    auto payload = request_t(std::move(chunk.data), block_index, std::move(req_ctx));
                     route<request_t>(hasher_proxy, reply_addr, std::move(payload));
                     ++requested_hashes;
                 }

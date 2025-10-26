@@ -49,15 +49,38 @@ using folder_context_ptr_t = r::intrusive_ptr_t<folder_context_t>;
 using child_info_t = fs::task::scan_dir_t::child_info_t;
 using unscanned_dir_t = bfs::path;
 struct unexamined_t : child_info_t {};
-struct child_ready_t : child_info_t {};
+struct child_ready_t : child_info_t {
+    using blocks_t = std::vector<proto::BlockInfo>;
+    child_ready_t(child_info_t info, blocks_t blocks_ = {})
+        : child_info_t{std::move(info)}, blocks{std::move(blocks_)} {}
+    blocks_t blocks;
+};
+struct hash_file_t : fs::payload::extendended_context_t, child_info_t {
+    using blocks_t = std::vector<proto::BlockInfo>;
+    hash_file_t(child_info_t &&info_, fs::payload::extendended_context_prt_t context_)
+        : child_info_t{std::move(info_)}, context{std::move(context_)} {
+        auto div = fs::get_block_size(size, 0);
+        block_size = div.size;
+        blocks_left = total_blocks = div.count;
+        blocks.resize(total_blocks);
+    }
+
+    std::int32_t block_size;
+    std::int32_t total_blocks;
+    std::int32_t processing_blocks = 0;
+    std::int32_t blocks_left = 0;
+    blocks_t blocks;
+    fs::payload::extendended_context_prt_t context;
+};
+using hash_file_ptr_t = boost::intrusive_ptr<hash_file_t>;
 struct complete_scan_t {};
 struct suspend_scan_t {
     sys::error_code ec;
 };
 struct unsuspend_scan_t {};
 
-using stack_item_t =
-    std::variant<unscanned_dir_t, unexamined_t, complete_scan_t, child_ready_t, suspend_scan_t, unsuspend_scan_t>;
+using stack_item_t = std::variant<unscanned_dir_t, unexamined_t, complete_scan_t, child_ready_t, hash_file_ptr_t,
+                                  suspend_scan_t, unsuspend_scan_t>;
 
 struct folder_slave_t final : fs::fs_slave_t {
     using local_keeper_ptr_t = r::intrusive_ptr_t<net::local_keeper_t>;
@@ -100,7 +123,7 @@ struct folder_slave_t final : fs::fs_slave_t {
 
     bool process(unscanned_dir_t &path, stack_context_t &ctx) noexcept {
         auto sub_task = fs::task::scan_dir_t(std::move(path));
-        pending_disk_scans.emplace_back(std::move(sub_task));
+        pending_io.emplace_back(std::move(sub_task));
         return false;
     }
 
@@ -117,8 +140,11 @@ struct folder_slave_t final : fs::fs_slave_t {
             if (!child_info.size) {
                 stack.push_front(child_ready_t(child_info));
                 return true;
+            } else {
+                auto ptr = hash_file_ptr_t(new hash_file_t(std::move(child_info), this));
+                stack.emplace_back(std::move(ptr));
+                return true;
             }
-            std::abort();
         } else {
             std::abort();
         }
@@ -162,10 +188,17 @@ struct folder_slave_t final : fs::fs_slave_t {
                 else
                     return FT::FILE;
             }();
+            auto size = info.size;
             proto::set_name(file, boost::nowide::narrow(name.wstring()));
             proto::set_type(file, type);
             proto::set_modified_s(file, fs::to_unix(info.last_write_time));
             proto::set_permissions(file, permissions);
+            if (size) {
+                auto block_size = proto::get_size(info.blocks.front());
+                proto::set_block_size(file, block_size);
+                proto::set_size(file, size);
+                proto::set_blocks(file, std::move(info.blocks));
+            }
 #if 0
             if (ignore_permissions == false) {
                 auto permissions = static_cast<uint32_t>(status.permissions());
@@ -181,6 +214,36 @@ struct folder_slave_t final : fs::fs_slave_t {
         return true;
     }
 
+    bool process(hash_file_ptr_t &item, stack_context_t &ctx) noexcept {
+        auto folder = context->local_folder->get_folder();
+        auto folder_id = folder->get_id();
+        auto &ec = item->ec;
+        LOG_TRACE(log, "going to rehash '{}' ", boost::nowide::narrow(item->path.wstring()));
+
+        auto total_blocks = item->total_blocks;
+        auto processing_blocks = item->processing_blocks;
+        auto block_size = item->block_size;
+        auto max_blocks = std::min(actor->requested_hashes_limit, total_blocks - processing_blocks);
+        auto last_block_sz = [&]() -> std::int32_t {
+            if ((max_blocks + processing_blocks) == total_blocks) {
+                if (total_blocks > 1) {
+                    auto sz = std::int64_t(block_size) * block_size;
+                    if (sz != item->size) {
+                        return sz - item->size;
+                    }
+                }
+            }
+            return block_size;
+        }();
+        assert(last_block_sz > 0);
+        auto offset = std::int64_t{processing_blocks} * block_size;
+        auto task_ctx = hasher::payload::extendended_context_prt_t(item.get());
+        auto sub_task = fs::task::segment_iterator_t(actor->hasher_proxy, actor->get_address(), item, item->path,
+                                                     offset, 0, max_blocks, block_size, last_block_sz);
+        pending_io.emplace_back(std::move(sub_task));
+        return false;
+    }
+
     bool post_process() noexcept {
         auto folder_id = context->local_folder->get_folder()->get_id();
         LOG_TRACE(log, "postpocess of '{}'", folder_id);
@@ -193,34 +256,58 @@ struct folder_slave_t final : fs::fs_slave_t {
 
         process_stack(ctx);
 
-        if (!pending_disk_scans.empty()) {
-            auto &t = pending_disk_scans.front();
+        if (!pending_io.empty()) {
+            auto &t = pending_io.front();
             tasks_in.emplace_back(std::move(t));
-            pending_disk_scans.pop_front();
+            pending_io.pop_front();
         }
 
         return tasks_in.empty();
+    }
+
+    void post_process(hash_file_t &hash_file, hasher::message::digest_t &msg) noexcept {
+        auto &p = msg.payload;
+        auto &result = msg.payload.result;
+        if (result.has_error()) {
+            std::abort();
+        }
+        auto index = p.block_index;
+        auto offset = index * hash_file.block_size;
+        auto bi = proto::BlockInfo();
+        proto::set_offset(bi, offset);
+        proto::set_size(bi, static_cast<std::int32_t>(p.data.size()));
+        proto::set_hash(bi, std::move(result).assume_value());
+        hash_file.blocks[index] = std::move(bi);
+        --hash_file.blocks_left;
+        if (!hash_file.blocks_left) {
+            auto blocks = std::move(hash_file.blocks);
+            auto copy = static_cast<child_info_t &>(hash_file);
+            stack.push_front(child_ready_t(std::move(copy), std::move(blocks)));
+        }
+        post_process();
     }
 
     presences_t get_presence(const bfs::path &path) {
         struct comparator_t {
             bool operator()(const presentation::presence_t *p, const bfs::path &name) const {
                 using allocator_t = std::pmr::polymorphic_allocator<char>;
-
                 auto buffer = std::array<std::byte, 1024>();
                 auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
                 auto allocator = allocator_t(&pool);
                 auto own_wname = std::pmr::wstring(allocator);
                 auto cp = static_cast<const presentation::cluster_file_presence_t *>(p);
                 auto own_name = cp->get_file_info().get_name()->get_own_name();
-                own_wname.resize(own_name.size());
-                auto str = boost::nowide::widen(own_wname.data(), own_wname.size(), own_name.data());
+                own_wname.resize(own_name.size() + 1);
+                auto b = own_name.data();
+                auto e = b + own_name.size();
+                auto str = boost::nowide::widen(own_wname.data(), own_wname.size(), b, e);
                 assert(str);
-                auto wname = std::wstring_view(str, str + wcslen(str));
+                auto wname = std::wstring_view(str, str + own_name.size());
                 return wname < name.wstring();
             }
         };
 
+        LOG_TRACE(log, "zzz, get_presence for {}", path.string());
         auto folder = context->local_folder->get_folder();
         auto folder_id = folder->get_id();
         auto &root_path = folder->get_path();
@@ -279,7 +366,13 @@ struct folder_slave_t final : fs::fs_slave_t {
         }
     }
 
-    tasks_t pending_disk_scans;
+    void post_process(fs::task::segment_iterator_t &task, stack_context_t &ctx) noexcept {
+        if (task.ec) {
+            std::abort();
+        }
+    }
+
+    tasks_t pending_io;
     stack_t stack;
     folder_context_ptr_t context;
     local_keeper_ptr_t actor;
@@ -289,9 +382,11 @@ struct folder_slave_t final : fs::fs_slave_t {
 } // namespace
 
 local_keeper_t::local_keeper_t(config_t &config)
-    : r::actor_base_t(config), sequencer{std::move(config.sequencer)}, cluster{config.cluster} {
+    : r::actor_base_t(config), sequencer{std::move(config.sequencer)}, cluster{config.cluster},
+      requested_hashes_limit{static_cast<std::int32_t>(config.requested_hashes_limit)} {
     assert(cluster);
     assert(sequencer);
+    assert(requested_hashes_limit);
 }
 
 void local_keeper_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
@@ -302,6 +397,7 @@ void local_keeper_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
         p.discover_name(names::fs_actor, fs_addr, false).link(false);
+        p.discover_name(names::hasher_proxy, hasher_proxy, false).link(false);
         p.discover_name(net::names::coordinator, coordinator, false).link(false).callback([&](auto phase, auto &ee) {
             if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {
                 auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
@@ -310,8 +406,10 @@ void local_keeper_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
             }
         });
     });
-    plugin.with_casted<r::plugin::starter_plugin_t>(
-        [&](auto &p) { p.subscribe_actor(&local_keeper_t::on_post_process); });
+    plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
+        p.subscribe_actor(&local_keeper_t::on_post_process);
+        p.subscribe_actor(&local_keeper_t::on_digest);
+    });
 }
 
 void local_keeper_t::on_start() noexcept {
@@ -332,6 +430,13 @@ void local_keeper_t::on_model_update(model::message::model_update_t &msg) noexce
         auto ee = make_error(r.assume_error());
         do_shutdown(ee);
     }
+}
+
+void local_keeper_t::on_digest(hasher::message::digest_t &msg) noexcept {
+    LOG_TRACE(log, "on_digest");
+    auto &hash_file = *static_cast<hash_file_t *>(msg.payload.context.get());
+    auto &slave = static_cast<folder_slave_t &>(*hash_file.context.get());
+    slave.post_process(hash_file, msg);
 }
 
 auto local_keeper_t::operator()(const model::diff::local::scan_start_t &diff, void *custom) noexcept

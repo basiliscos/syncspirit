@@ -32,6 +32,7 @@ struct SYNCSPIRIT_API file_t : model::arc_base_t<file_t> {
 
     file_t &operator=(file_t &&) noexcept;
 
+    bool has_backend() const noexcept;
     std::string_view get_path_view() const noexcept;
     const bfs::path &get_path() const noexcept;
 

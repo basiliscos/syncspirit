@@ -8,7 +8,7 @@ namespace syncspirit::fs {
 
 const std::string_view tmp_suffix = ".syncspirit-tmp";
 
-static const std::int64_t _block_sizes[] = {
+static const std::int32_t _block_sizes[] = {
     // clang-format off
     (1 << 7) * 1024ull,
     (1 << 8) * 1024ull,
@@ -22,7 +22,7 @@ static const std::int64_t _block_sizes[] = {
 };
 
 const std::size_t block_sizes_sz = 8;
-const std::int64_t *block_sizes = _block_sizes;
+const std::int32_t *block_sizes = _block_sizes;
 
 static const constexpr size_t max_blocks_count = 2000;
 
@@ -52,7 +52,7 @@ block_division_t get_block_size(int64_t sz, int32_t prev_size) noexcept {
         bs = block_sizes[block_sizes_sz - 1];
     }
 
-    auto count = std::int64_t{0};
+    auto count = std::int32_t{0};
     if (bs != 0) {
         count = sz / bs;
         if (count * bs < sz) {
@@ -60,7 +60,7 @@ block_division_t get_block_size(int64_t sz, int32_t prev_size) noexcept {
         }
     }
 
-    return {static_cast<size_t>(count), (int32_t)bs};
+    return {count, (int32_t)bs};
 }
 
 bfs::path make_temporal(const bfs::path &path) noexcept {
