@@ -4,7 +4,6 @@
 #include "hasher_actor.h"
 #include "../utils/tls.h"
 #include <fmt/core.h>
-#include <zlib.h>
 #include <algorithm>
 
 using namespace syncspirit::hasher;
