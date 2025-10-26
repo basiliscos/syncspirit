@@ -67,6 +67,8 @@ TEST_CASE("fs_slave", "[fs]") {
             CHECK(t.ec);
             CHECK(t.ec.message() != "");
         }
+
+#ifndef SYNCSPIRIT_WIN
         SECTION("dir with a file, dir & symlink") {
             slave.push(task::scan_dir_t(root_path));
 
@@ -111,6 +113,7 @@ TEST_CASE("fs_slave", "[fs]") {
                 CHECK(c.target == link_target);
             }
         }
+#endif
     }
 
     sup->do_shutdown();

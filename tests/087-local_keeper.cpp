@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // SPDX-FileCopyrightText: 2025 Ivan Baidakou
 
+#include "fs/utils.h"
 #include "test-utils.h"
 #include "access.h"
 #include "test_supervisor.h"
@@ -28,6 +29,10 @@ struct fixture_t {
     fixture_t() noexcept : root_path{unique_path()}, path_guard{root_path} {
         test::init_logging();
         bfs::create_directory(root_path);
+    }
+
+    virtual std::uint32_t get_hash_limit() {
+        return 1;
     }
 
     void run() noexcept {
@@ -94,7 +99,7 @@ struct fixture_t {
                      .timeout(timeout)
                      .cluster(cluster)
                      .sequencer(make_sequencer(77))
-                     .requested_hashes_limit(1)
+                     .requested_hashes_limit(get_hash_limit())
                      .finish();
         sup->do_process();
 
@@ -133,6 +138,10 @@ struct fixture_t {
 
 void test_local_keeper() {
     struct F : fixture_t {
+        std::uint32_t get_hash_limit() override {
+            return 2;
+        }
+
         void main() noexcept override {
             sys::error_code ec;
             SECTION("root folder errors") {
@@ -224,6 +233,26 @@ void test_local_keeper() {
                     CHECK(file->get_block_size() == 5);
                     CHECK(file->get_size() == 5);
                     CHECK(blocks.size() == 1);
+                    REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
+                }
+                SECTION("2 blocks file") {
+                    CHECK(bfs::create_directories(root_path / L"папка"));
+                    auto part_path = bfs::path(L"папка") / L"файл.bin";
+                    auto file_path = root_path / part_path;
+                    auto block_sz = fs::block_sizes[0];
+                    auto b1 = std::string(block_sz, '0');
+                    auto b2 = std::string(block_sz, '1');
+                    write_file(file_path, b1 + b2);
+                    builder->scan_start(folder->get_id()).apply(*sup);
+
+                    auto file = files->by_name(boost::nowide::narrow(part_path.wstring()));
+                    REQUIRE(file);
+                    CHECK(file->is_locally_available());
+                    CHECK(!file->is_link());
+                    CHECK(file->is_file());
+                    CHECK(file->get_block_size() == block_sz);
+                    CHECK(file->get_size() == block_sz * 2);
+                    CHECK(blocks.size() == 2);
                     REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
                 }
             }

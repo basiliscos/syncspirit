@@ -28,7 +28,8 @@ void segment_iterator_t::process(fs_slave_t &fs_slave, r::actor_base_t &host) no
 
     for (std::int32_t i = block_index; i < block_count; ++i) {
         auto bs = (i + 1 == block_count) ? last_block_size : block_size;
-        auto block_opt = file.read(offset, bs);
+        auto off = offset + std::int64_t{block_size} * i;
+        auto block_opt = file.read(off, bs);
         if (!block_opt) {
             std::abort();
         }

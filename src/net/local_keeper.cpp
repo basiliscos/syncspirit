@@ -227,7 +227,7 @@ struct folder_slave_t final : fs::fs_slave_t {
         auto last_block_sz = [&]() -> std::int32_t {
             if ((max_blocks + processing_blocks) == total_blocks) {
                 if (total_blocks > 1) {
-                    auto sz = std::int64_t(block_size) * block_size;
+                    auto sz = std::int64_t(block_size) * total_blocks;
                     if (sz != item->size) {
                         return sz - item->size;
                     }
