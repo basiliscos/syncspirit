@@ -31,9 +31,7 @@ struct fixture_t {
         bfs::create_directory(root_path);
     }
 
-    virtual std::uint32_t get_hash_limit() {
-        return 1;
-    }
+    virtual std::uint32_t get_hash_limit() { return 1; }
 
     void run() noexcept {
         auto my_hash = "KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD";
@@ -138,9 +136,7 @@ struct fixture_t {
 
 void test_local_keeper() {
     struct F : fixture_t {
-        std::uint32_t get_hash_limit() override {
-            return 2;
-        }
+        std::uint32_t get_hash_limit() override { return 2; }
 
         void main() noexcept override {
             sys::error_code ec;
