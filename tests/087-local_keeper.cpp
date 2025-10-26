@@ -225,7 +225,7 @@ void test_local_keeper() {
                     write_file(file_path, "12345");
                     builder->scan_start(folder->get_id()).apply(*sup);
 
-                    auto file = files->by_name(boost::nowide::narrow(part_path.wstring()));
+                    auto file = files->by_name(boost::nowide::narrow(part_path.generic_wstring()));
                     REQUIRE(file);
                     CHECK(file->is_locally_available());
                     CHECK(!file->is_link());
@@ -245,7 +245,7 @@ void test_local_keeper() {
                     write_file(file_path, b1 + b2);
                     builder->scan_start(folder->get_id()).apply(*sup);
 
-                    auto file = files->by_name(boost::nowide::narrow(part_path.wstring()));
+                    auto file = files->by_name(boost::nowide::narrow(part_path.generic_wstring()));
                     REQUIRE(file);
                     CHECK(file->is_locally_available());
                     CHECK(!file->is_link());

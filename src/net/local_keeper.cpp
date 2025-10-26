@@ -189,7 +189,7 @@ struct folder_slave_t final : fs::fs_slave_t {
                     return FT::FILE;
             }();
             auto size = info.size;
-            proto::set_name(file, boost::nowide::narrow(name.wstring()));
+            proto::set_name(file, boost::nowide::narrow(name.generic_wstring()));
             proto::set_type(file, type);
             proto::set_modified_s(file, fs::to_unix(info.last_write_time));
             proto::set_permissions(file, permissions);
@@ -307,7 +307,7 @@ struct folder_slave_t final : fs::fs_slave_t {
             }
         };
 
-        LOG_TRACE(log, "zzz, get_presence for {}", path.string());
+        LOG_TRACE(log, "get_presence for {}", path.string());
         auto folder = context->local_folder->get_folder();
         auto folder_id = folder->get_id();
         auto &root_path = folder->get_path();
