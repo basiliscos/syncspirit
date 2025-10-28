@@ -6,13 +6,13 @@
 #include "messages.h"
 #include "model/messages.h"
 #include "model/cluster.h"
-#include "model/diff/local/custom.h"
 #include "model/diff/cluster_visitor.h"
 #include "model/misc/file_iterator.h"
 #include "model/misc/block_iterator.h"
 #include "model/misc/updates_streamer.h"
 #include "model/misc/sequencer.h"
 #include "hasher/messages.h"
+#include "hasher/hasher_plugin.h"
 #include "utils/log.h"
 #include "fs/messages.h"
 
@@ -32,7 +32,8 @@ struct controller_actor_config_t : r::actor_config_t {
     model::sequencer_ptr_t sequencer;
     model::device_ptr_t peer;
     r::address_ptr_t peer_addr;
-    uint32_t blocks_max_requested = 8;
+    uint32_t hasher_threads;
+    uint32_t blocks_max_requested = 0;
     uint32_t outgoing_buffer_max = 0;
     std::uint32_t advances_per_iteration = 10;
     bfs::path default_path;
@@ -68,6 +69,11 @@ template <typename Actor> struct controller_actor_config_builder_t : r::actor_co
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
+    builder_t &&hasher_threads(uint32_t value) && noexcept {
+        parent_t::config.hasher_threads = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+
     builder_t &&blocks_max_requested(uint32_t value) && noexcept {
         parent_t::config.blocks_max_requested = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
@@ -97,6 +103,19 @@ template <typename Actor> struct controller_actor_config_builder_t : r::actor_co
 struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model::diff::cluster_visitor_t {
     using config_t = controller_actor_config_t;
     template <typename Actor> using config_builder_t = controller_actor_config_builder_t<Actor>;
+
+    // clang-format off
+    using plugins_list_t = std::tuple<
+        r::plugin::address_maker_plugin_t,
+        r::plugin::lifetime_plugin_t,
+        r::plugin::init_shutdown_plugin_t,
+        r::plugin::link_server_plugin_t,
+        r::plugin::link_client_plugin_t,
+        hasher::hasher_plugin_t,
+        r::plugin::resources_plugin_t,
+        r::plugin::starter_plugin_t
+    >;
+    // clang-format on
 
     controller_actor_t(config_t &config);
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
@@ -164,7 +183,7 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     void on_peer_down(message::peer_down_t &message) noexcept;
     void on_forward(message::forwarded_message_t &message) noexcept;
 
-    void on_validation(hasher::message::validation_t &res) noexcept;
+    void on_digest(hasher::message::digest_t &res) noexcept;
     void preprocess_block(model::file_block_t &block, const model::folder_info_t &source_folder,
                           stack_context_t &) noexcept;
     void on_model_update(model::message::model_update_t &message) noexcept;
@@ -227,7 +246,6 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     model::device_state_t peer_state;
     r::address_ptr_t coordinator;
     r::address_ptr_t peer_address;
-    r::address_ptr_t hasher_proxy;
     r::address_ptr_t fs_addr;
     model::ignored_folders_map_t *ignored_folders;
     // generic
@@ -238,6 +256,7 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
 
     int64_t request_pool;
     uint32_t blocks_max_kept;
+    uint32_t hasher_threads;
     uint32_t blocks_max_requested;
     uint32_t advances_per_iteration;
     bfs::path default_path;

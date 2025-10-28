@@ -10,6 +10,7 @@
 #include "model/diff/cluster_visitor.h"
 #include "utils/log.h"
 #include "hasher/messages.h"
+#include "hasher/hasher_plugin.h"
 #include "messages.h"
 #include "scan_task.h"
 #include <rotor.hpp>
@@ -24,7 +25,7 @@ struct SYNCSPIRIT_API scan_actor_config_t : r::actor_config_t {
     config::fs_config_t fs_config;
     model::sequencer_ptr_t sequencer;
     file_cache_ptr_t rw_cache;
-    uint32_t requested_hashes_limit;
+    uint32_t hasher_threads;
 };
 
 template <typename Actor> struct scan_actor_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -37,11 +38,6 @@ template <typename Actor> struct scan_actor_config_builder_t : r::actor_config_b
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&requested_hashes_limit(uint32_t value) && noexcept {
-        parent_t::config.requested_hashes_limit = value;
-        return std::move(*static_cast<typename parent_t::builder_t *>(this));
-    }
-
     builder_t &&sequencer(model::sequencer_ptr_t value) && noexcept {
         parent_t::config.sequencer = std::move(value);
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
@@ -51,11 +47,29 @@ template <typename Actor> struct scan_actor_config_builder_t : r::actor_config_b
         parent_t::config.rw_cache = std::move(value);
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
+
+    builder_t &&hasher_threads(uint32_t value) && noexcept {
+        parent_t::config.hasher_threads = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
 };
 
 struct SYNCSPIRIT_API scan_actor_t : public r::actor_base_t, private model::diff::cluster_visitor_t {
     using config_t = scan_actor_config_t;
     template <typename Actor> using config_builder_t = scan_actor_config_builder_t<Actor>;
+
+    // clang-format off
+    using plugins_list_t = std::tuple<
+        r::plugin::address_maker_plugin_t,
+        r::plugin::lifetime_plugin_t,
+        r::plugin::init_shutdown_plugin_t,
+        r::plugin::link_server_plugin_t,
+        r::plugin::link_client_plugin_t,
+        hasher::hasher_plugin_t,
+        r::plugin::resources_plugin_t,
+        r::plugin::starter_plugin_t
+    >;
+    // clang-format on
 
     explicit scan_actor_t(config_t &cfg);
 
@@ -86,11 +100,10 @@ struct SYNCSPIRIT_API scan_actor_t : public r::actor_base_t, private model::diff
     model::sequencer_ptr_t sequencer;
     config::fs_config_t fs_config;
     file_cache_ptr_t rw_cache;
-    r::address_ptr_t hasher_proxy;
+    uint32_t hasher_threads;
     r::address_ptr_t new_files; /* for routing */
     utils::logger_t log;
     r::address_ptr_t coordinator;
-    uint32_t requested_hashes_limit;
     uint32_t requested_hashes = 0;
     uint32_t progress = 0;
 };

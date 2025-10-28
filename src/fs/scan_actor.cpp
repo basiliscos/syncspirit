@@ -43,9 +43,10 @@ template <class> inline constexpr bool always_false_v = false;
 
 scan_actor_t::scan_actor_t(config_t &cfg)
     : r::actor_base_t{cfg}, sequencer{cfg.sequencer}, fs_config{cfg.fs_config}, rw_cache(cfg.rw_cache),
-      requested_hashes_limit{cfg.requested_hashes_limit} {
+      hasher_threads{cfg.hasher_threads} {
     assert(sequencer);
     assert(rw_cache);
+    assert(hasher_threads);
 }
 
 void scan_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
@@ -55,7 +56,8 @@ void scan_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         log = utils::get_logger(identity);
         new_files = p.create_address();
     });
-    plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
+    plugin.with_casted<hasher::hasher_plugin_t>([&](auto &p) {
+        p.configure_hashers(hasher_threads);
         p.register_name(net::names::fs_scanner, address);
         p.discover_name(net::names::coordinator, coordinator, true).link(false).callback([&](auto phase, auto &ee) {
             if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {
@@ -65,7 +67,6 @@ void scan_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 plugin->subscribe_actor(&scan_actor_t::on_thread_ready, supervisor->get_address());
             }
         });
-        p.discover_name(net::names::hasher_proxy, hasher_proxy, true).link(false);
     });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&scan_actor_t::on_scan);
@@ -243,7 +244,7 @@ void scan_actor_t::on_hash_anew(message::hash_anew_t &message) noexcept {
 template <typename Context, typename Iterator>
 void scan_actor_t::hash_next(Iterator &info, const r::address_ptr_t &reply_addr) noexcept {
     if (info->has_more_chunks()) {
-        auto condition = [&]() { return requested_hashes < requested_hashes_limit && info->has_more_chunks(); };
+        auto condition = [&]() { return requested_hashes < hasher_threads && info->has_more_chunks(); };
         while (condition()) {
             auto opt = info->read();
             if (!opt) {
@@ -257,10 +258,11 @@ void scan_actor_t::hash_next(Iterator &info, const r::address_ptr_t &reply_addr)
                 if (chunk.data.size()) {
                     using request_t = hasher::payload::digest_t;
                     auto req_ctx = hasher::payload::extendended_context_prt_t{};
-                    req_ctx.reset(new Context(info, chunk.block_index));
-                    auto block_index = std::int32_t{0};
-                    auto payload = request_t(std::move(chunk.data), block_index, std::move(req_ctx));
-                    route<request_t>(hasher_proxy, reply_addr, std::move(payload));
+                    auto block_index = chunk.block_index;
+                    req_ctx.reset(new Context(info, block_index));
+                    auto plugin = get_plugin(hasher::hasher_plugin_t::class_identity);
+                    auto hasher = static_cast<hasher::hasher_plugin_t *>(plugin);
+                    hasher->calc_digest(std::move(chunk.data), block_index, reply_addr, std::move(req_ctx));
                     ++requested_hashes;
                 }
             }
@@ -291,7 +293,7 @@ void scan_actor_t::on_hash(hasher::message::digest_t &res) noexcept {
     info.ack_block(digest, block_index);
     hash_next<rehash_context_t>(ctx->it, address);
 
-    bool can_process_more = requested_hashes < requested_hashes_limit;
+    bool can_process_more = requested_hashes < hasher_threads;
     auto &task = *info.get_task().get();
     auto guard = task.guard(*this, coordinator);
     queued_next = !can_process_more;
@@ -369,7 +371,7 @@ void scan_actor_t::on_hash_new(hasher::message::digest_t &res) noexcept {
 
     info.ack(ctx->block_index, hash, block_size);
 
-    while (info.has_more_chunks() && (requested_hashes < requested_hashes_limit)) {
+    while (info.has_more_chunks() && (requested_hashes < hasher_threads)) {
         hash_next<hash_new_context_t>(ctx->it, new_files);
     }
     if (info.is_complete()) {

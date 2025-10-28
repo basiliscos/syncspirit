@@ -4,7 +4,6 @@
 #include "bouncer/messages.hpp"
 #include "cluster_supervisor.h"
 #include "db_actor.h"
-#include "hasher/hasher_proxy_actor.h"
 #include "local_discovery_actor.h"
 #include "model/diff/advance/advance.h"
 #include "model/diff/modify/upsert_folder.h"
@@ -156,12 +155,6 @@ void net_supervisor_t::launch_early() noexcept {
                   .escalate_failure()
                   .finish()
                   ->get_address();
-
-    create_actor<hasher::hasher_proxy_actor_t>()
-        .timeout(init_timeout)
-        .hasher_threads(app_config.hasher_threads)
-        .name(net::names::hasher_proxy)
-        .finish();
 }
 
 void net_supervisor_t::seed_model() noexcept {

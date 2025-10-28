@@ -61,7 +61,6 @@ struct SYNCSPIRIT_API local_keeper_t final : public r::actor_base_t, private mod
     model::cluster_ptr_t cluster;
     r::address_ptr_t coordinator;
     r::address_ptr_t fs_addr;
-    r::address_ptr_t hasher_proxy;
     std::int32_t requested_hashes_limit;
 };
 

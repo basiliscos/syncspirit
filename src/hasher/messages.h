@@ -17,7 +17,7 @@ namespace outcome = boost::outcome_v2;
 
 namespace payload {
 
-struct extendended_context_t : boost::intrusive_ref_counter<extendended_context_t, boost::thread_unsafe_counter> {
+struct extendended_context_t : boost::intrusive_ref_counter<extendended_context_t, boost::thread_safe_counter> {
     virtual ~extendended_context_t() = default;
 };
 
@@ -38,28 +38,11 @@ struct digest_t {
     digest_t(digest_t &&) noexcept = default;
 };
 
-struct validation_t {
-    utils::bytes_t data;
-    utils::bytes_t hash;
-    extendended_context_prt_t context;
-    r::address_ptr_t back_addr;
-    r::address_ptr_t hasher_addr;
-    outcome::result<void> result;
-
-    validation_t(utils::bytes_t data_, utils::bytes_t hash_, extendended_context_prt_t context_ = {}) noexcept
-        : data{std::move(data_)}, hash{std::move(hash_)}, context{std::move(context_)},
-          result{utils::make_error_code(utils::error_code_t::no_action)} {}
-
-    validation_t(const validation_t &) = delete;
-    validation_t(validation_t &&) noexcept = default;
-};
-
 } // namespace payload
 
 namespace message {
 
 using digest_t = r::message_t<payload::digest_t>;
-using validation_t = r::message_t<payload::validation_t>;
 
 } // namespace message
 

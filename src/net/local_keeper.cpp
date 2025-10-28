@@ -238,8 +238,8 @@ struct folder_slave_t final : fs::fs_slave_t {
         assert(last_block_sz > 0);
         auto offset = std::int64_t{processing_blocks} * block_size;
         auto task_ctx = hasher::payload::extendended_context_prt_t(item.get());
-        auto sub_task = fs::task::segment_iterator_t(actor->hasher_proxy, actor->get_address(), item, item->path,
-                                                     offset, 0, max_blocks, block_size, last_block_sz);
+        auto sub_task = fs::task::segment_iterator_t(actor->get_address(), item, item->path, offset, 0, max_blocks,
+                                                     block_size, last_block_sz);
         pending_io.emplace_back(std::move(sub_task));
         return false;
     }
@@ -397,7 +397,6 @@ void local_keeper_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
         p.discover_name(names::fs_actor, fs_addr, false).link(false);
-        p.discover_name(names::hasher_proxy, hasher_proxy, false).link(false);
         p.discover_name(net::names::coordinator, coordinator, false).link(false).callback([&](auto phase, auto &ee) {
             if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {
                 auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);

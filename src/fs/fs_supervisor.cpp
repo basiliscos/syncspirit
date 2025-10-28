@@ -64,7 +64,7 @@ void fs_supervisor_t::launch() noexcept {
                      .fs_config(fs_config)
                      .rw_cache(rw_cache)
                      .sequencer(sequencer)
-                     .requested_hashes_limit(hasher_threads * 2)
+                     .hasher_threads(hasher_threads) // * 2 ??
                      .timeout(timeout)
                      .autoshutdown_supervisor(true)
                      .finish();

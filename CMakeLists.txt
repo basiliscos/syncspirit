@@ -114,7 +114,6 @@ add_library(syncspirit_core
     src/fs/task/scan_dir.cpp
     src/hasher/hasher_actor.cpp
     src/hasher/hasher_plugin.cpp
-    src/hasher/hasher_proxy_actor.cpp
     src/hasher/hasher_supervisor.cpp
     src/model/diff/apply_controller.cpp
     src/model/diff/block_diff.cpp
@@ -146,7 +145,6 @@ add_library(syncspirit_core
     src/model/diff/load/pending_folders.cpp
     src/model/diff/load/remove_corrupted_files.cpp
     src/model/diff/local/blocks_availability.cpp
-    src/model/diff/local/custom.cpp
     src/model/diff/local/file_availability.cpp
     src/model/diff/local/io_failure.cpp
     src/model/diff/local/scan_finish.cpp

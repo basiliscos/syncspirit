@@ -226,14 +226,16 @@ controller_actor_t::controller_actor_t(config_t &config)
     : r::actor_base_t{config}, sequencer{std::move(config.sequencer)}, cluster{config.cluster}, peer{config.peer},
       peer_state{peer->get_state().clone()}, peer_address{config.peer_addr}, rx_blocks_requested{0},
       tx_blocks_requested{0}, outgoing_buffer_max{config.outgoing_buffer_max}, request_pool{config.request_pool},
-      blocks_max_requested{config.blocks_max_requested}, advances_per_iteration{config.advances_per_iteration},
+      hasher_threads{config.hasher_threads}, advances_per_iteration{config.advances_per_iteration},
       default_path(std::move(config.default_path)), announced{false} {
     {
         assert(cluster);
         assert(sequencer);
         assert(peer_state.is_online());
+        assert(hasher_threads);
+        blocks_max_requested = config.blocks_max_requested ? config.blocks_max_requested : hasher_threads * 2;
         outgoing_buffer.reset(new std::uint32_t(0));
-        block_requests.resize(config.blocks_max_requested);
+        block_requests.resize(blocks_max_requested);
     }
 }
 
@@ -245,8 +247,8 @@ void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.set_identity(id, false);
         log = utils::get_logger(identity);
     });
-    plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
-        p.discover_name(names::hasher_proxy, hasher_proxy, false).link();
+    plugin.with_casted<hasher::hasher_plugin_t>([&](auto &p) {
+        p.configure_hashers(hasher_threads);
         p.discover_name(names::fs_actor, fs_addr, false).link(false);
         p.discover_name(names::coordinator, coordinator, false).link(false).callback([&](auto phase, auto &ee) {
             if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {
@@ -261,7 +263,7 @@ void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&controller_actor_t::on_forward);
         p.subscribe_actor(&controller_actor_t::on_peer_down);
-        p.subscribe_actor(&controller_actor_t::on_validation);
+        p.subscribe_actor(&controller_actor_t::on_digest);
         p.subscribe_actor(&controller_actor_t::on_tx_signal);
         p.subscribe_actor(&controller_actor_t::on_postprocess_io);
     });
@@ -1079,13 +1081,13 @@ void controller_actor_t::on_message(proto::Response &message, stack_context_t &c
             }
         } else {
             auto data = utils::bytes_t(proto::extract_data(message));
-            auto hash = file_block->block()->get_hash();
-            auto hash_bytes = utils::bytes_t(hash.begin(), hash.end());
+            // auto hash = file_block->block()->get_hash();
+            // auto hash_bytes = utils::bytes_t(hash.begin(), hash.end());
             request_pool += block->get_size();
 
-            auto payload =
-                hasher::payload::validation_t(std::move(data), std::move(hash_bytes), std::move(request_context));
-            route<hasher::payload::validation_t>(hasher_proxy, address, std::move(payload));
+            auto plugin = get_plugin(hasher::hasher_plugin_t::class_identity);
+            auto hasher = static_cast<hasher::hasher_plugin_t *>(plugin);
+            hasher->calc_digest(std::move(data), file_block->block_index(), address, std::move(request_context));
             resources->acquire(resource::hash);
         }
     }
@@ -1156,7 +1158,7 @@ void controller_actor_t::postprocess_io(fs::payload::finish_file_t &res, stack_c
     ctx.push(std::move(diff));
 }
 
-void controller_actor_t::on_validation(hasher::message::validation_t &res) noexcept {
+void controller_actor_t::on_digest(hasher::message::digest_t &res) noexcept {
     using namespace model::diff;
     resources->release(resource::hash);
 
@@ -1197,6 +1199,7 @@ void controller_actor_t::on_validation(hasher::message::validation_t &res) noexc
     bool do_release_block = false;
     bool try_next = false;
     auto stack_ctx = stack_context_t(*this);
+    auto &result = res.payload.result;
     if (state != r::state_t::OPERATIONAL) {
         LOG_DEBUG(log, "on_validation, non-operational, ingoring block from '{}'", file_name);
         do_release_block = true;
@@ -1207,7 +1210,7 @@ void controller_actor_t::on_validation(hasher::message::validation_t &res) noexc
         LOG_DEBUG(log, "on_validation, file: '{}', peer is no longer available", file_name);
         do_release_block = true;
     } else {
-        if (res.payload.result.has_error()) {
+        if (result.has_error() || result.assume_value() != block->get_hash()) {
             if (!file->is_unreachable()) {
                 auto ec = utils::make_error_code(utils::protocol_error_code_t::digest_mismatch);
                 LOG_WARN(log, "digest mismatch for file '{}', expected = {}; marking unreachable", *file,

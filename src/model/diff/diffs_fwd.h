@@ -38,7 +38,6 @@ struct pending_devices_t;
 
 namespace local {
 struct blocks_availability_t;
-struct custom_t;
 struct file_availability_t;
 struct io_failure_t;
 struct scan_finish_t;
