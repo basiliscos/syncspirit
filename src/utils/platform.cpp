@@ -13,7 +13,7 @@ bool platform_t::startup() {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
     // make explicit dependency on zlib, as openssl loads it via LoadLibrary,
     // and it cannot be found by scanning dlls
-    (void) zlibVersion(); // make explict
+    (void)zlibVersion(); // make explict
 
     auto wVersionRequested = MAKEWORD(2, 2);
     WSADATA wsaData;

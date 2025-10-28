@@ -23,7 +23,7 @@ template <typename Actor> struct hasher_config_builder_t : hasher::hasher_actor_
     using parent_t = hasher::hasher_actor_config_builder_t<Actor>;
     using parent_t::parent_t;
 
-    builder_t &&auto_reply(uint32_t value) && noexcept {
+    builder_t &&auto_reply(bool value = true) && noexcept {
         parent_t::config.auto_reply = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
@@ -48,6 +48,7 @@ struct SYNCSPIRIT_TEST_API managed_hasher_t : r::actor_base_t {
     void process_requests() noexcept;
 
     uint32_t index;
+    std::uint64_t digested_bytes = 0;
     bool auto_reply;
     utils::logger_t log;
     validation_queue_t validation_queue;

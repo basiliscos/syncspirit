@@ -12,8 +12,8 @@ managed_hasher_t::managed_hasher_t(config_t &cfg)
 void managed_hasher_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
-        p.set_identity(fmt::format("hasher-{}", 1), false);
-        log = utils::get_logger(fmt::format("managed-hasher-{}", 1));
+        p.set_identity(fmt::format("hasher-{}", index), false);
+        log = utils::get_logger(fmt::format("managed-hasher-{}", index));
     });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) { p.register_name(identity, get_address()); });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
@@ -65,6 +65,7 @@ void managed_hasher_t::process_requests() noexcept {
 
         req->payload.result = utils::bytes_t(digest, digest + SZ);
         redirect(req, std::exchange(req->next_route, {}));
+        digested_bytes += data.size();
     }
 }
 

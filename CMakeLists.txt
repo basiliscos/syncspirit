@@ -113,6 +113,7 @@ add_library(syncspirit_core
     src/fs/task/segment_iterator.cpp
     src/fs/task/scan_dir.cpp
     src/hasher/hasher_actor.cpp
+    src/hasher/hasher_plugin.cpp
     src/hasher/hasher_proxy_actor.cpp
     src/hasher/hasher_supervisor.cpp
     src/model/diff/apply_controller.cpp
