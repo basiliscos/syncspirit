@@ -248,6 +248,7 @@ void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         log = utils::get_logger(identity);
     });
     plugin.with_casted<hasher::hasher_plugin_t>([&](auto &p) {
+        hasher = &p;
         p.configure_hashers(hasher_threads);
         p.discover_name(names::fs_actor, fs_addr, false).link(false);
         p.discover_name(names::coordinator, coordinator, false).link(false).callback([&](auto phase, auto &ee) {
@@ -1085,8 +1086,6 @@ void controller_actor_t::on_message(proto::Response &message, stack_context_t &c
             // auto hash_bytes = utils::bytes_t(hash.begin(), hash.end());
             request_pool += block->get_size();
 
-            auto plugin = get_plugin(hasher::hasher_plugin_t::class_identity);
-            auto hasher = static_cast<hasher::hasher_plugin_t *>(plugin);
             hasher->calc_digest(std::move(data), file_block->block_index(), address, std::move(request_context));
             resources->acquire(resource::hash);
         }

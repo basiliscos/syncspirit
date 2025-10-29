@@ -271,6 +271,7 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     block_requests_t block_requests;
     std::uint_fast32_t block_requests_next = 0;
     std::optional<r::request_id_t> fs_ack_timer;
+    hasher::hasher_plugin_t *hasher;
     bool announced;
 
     friend stack_context_t;
