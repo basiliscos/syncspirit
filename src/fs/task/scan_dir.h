@@ -3,20 +3,9 @@
 
 #pragma once
 
-#include "syncspirit-export.h"
-#include <filesystem>
-#include <boost/system.hpp>
-#include <rotor.hpp>
+#include "task.h"
 
-namespace syncspirit::fs {
-
-namespace bfs = std::filesystem;
-namespace sys = boost::system;
-namespace r = rotor;
-
-struct fs_slave_t;
-
-namespace task {
+namespace syncspirit::fs::task {
 
 struct SYNCSPIRIT_API scan_dir_t {
     struct child_info_t {
@@ -37,5 +26,4 @@ struct SYNCSPIRIT_API scan_dir_t {
     child_infos_t child_infos;
 };
 
-} // namespace task
-} // namespace syncspirit::fs
+} // namespace syncspirit::fs::task

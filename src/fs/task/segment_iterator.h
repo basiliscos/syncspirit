@@ -1,25 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2025 Ivan Baidakou
 
 #pragma once
 
-#include "syncspirit-export.h"
 #include "fs/file.h"
-#include "hasher/messages.h"
-#include <cstdint>
-#include <filesystem>
-#include <boost/system.hpp>
-#include <rotor.hpp>
+#include "task.h"
 
-namespace syncspirit::fs {
-
-namespace bfs = std::filesystem;
-namespace sys = boost::system;
-namespace r = rotor;
-
-struct fs_slave_t;
-
-namespace task {
+namespace syncspirit::fs::task {
 
 struct SYNCSPIRIT_API segment_iterator_t {
     segment_iterator_t(const r::address_ptr_t &back_addr, hasher::payload::extendended_context_prt_t context,
@@ -41,6 +28,4 @@ struct SYNCSPIRIT_API segment_iterator_t {
     hasher::payload::extendended_context_prt_t context;
 };
 
-} // namespace task
-
-} // namespace syncspirit::fs
+} // namespace syncspirit::fs::task
