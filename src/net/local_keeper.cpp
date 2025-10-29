@@ -61,14 +61,15 @@ struct hash_file_t : fs::payload::extendended_context_t, child_info_t {
         : child_info_t{std::move(info_)}, context{std::move(context_)} {
         auto div = fs::get_block_size(size, 0);
         block_size = div.size;
-        blocks_left = total_blocks = div.count;
+        unprocessed_blocks = unhashed_blocks = total_blocks = div.count;
         blocks.resize(total_blocks);
     }
 
     std::int32_t block_size;
     std::int32_t total_blocks;
     std::int32_t processing_blocks = 0;
-    std::int32_t blocks_left = 0;
+    std::int32_t unprocessed_blocks = 0;
+    std::int32_t unhashed_blocks = 0;
     blocks_t blocks;
     fs::payload::extendended_context_prt_t context;
 };
@@ -98,9 +99,13 @@ struct folder_slave_t final : fs::fs_slave_t {
     void process_stack(stack_context_t &ctx) noexcept {
         auto try_next = true;
         while (!stack.empty() && try_next) {
-            auto item = stack.front();
-            stack.pop_front();
-            std::visit([&](auto &item) { try_next = process(item, ctx); }, item);
+            auto it = stack.begin();
+            auto &item = *it;
+            auto r = std::visit([&](auto &item) { return process(item, ctx); }, item);
+            if (r >= 0) {
+                stack.erase(it);
+            }
+            try_next = r > 0;
         }
         if (ctx.diff) {
             actor->send<model::payload::model_update_t>(actor->coordinator, std::move(ctx.diff));
@@ -112,45 +117,45 @@ struct folder_slave_t final : fs::fs_slave_t {
         process_stack(ctx);
     }
 
-    bool process(complete_scan_t &, stack_context_t &ctx) noexcept {
+    int process(complete_scan_t &, stack_context_t &ctx) noexcept {
         using clock_t = r::pt::microsec_clock;
         auto folder = context->local_folder->get_folder();
         auto folder_id = folder->get_id();
         auto now = clock_t::local_time();
         ctx.push(new model::diff::local::scan_finish_t(folder_id, now));
-        return false;
+        return 0;
     }
 
-    bool process(unscanned_dir_t &path, stack_context_t &ctx) noexcept {
+    int process(unscanned_dir_t &path, stack_context_t &ctx) noexcept {
         auto sub_task = fs::task::scan_dir_t(std::move(path));
         pending_io.emplace_back(std::move(sub_task));
-        return false;
+        return 0;
     }
 
-    bool process(unexamined_t &child_info, stack_context_t &ctx) noexcept {
+    int process(unexamined_t &child_info, stack_context_t &ctx) noexcept {
         auto type = child_info.status.type();
         if (type == bfs::file_type::directory) {
             stack.push_front(child_ready_t(child_info));
             stack.push_front(unscanned_dir_t(child_info.path));
-            return true;
+            return 1;
         } else if (type == bfs::file_type::symlink) {
             stack.push_front(child_ready_t(child_info));
-            return true;
+            return 1;
         } else if (type == bfs::file_type::regular) {
             if (!child_info.size) {
                 stack.push_front(child_ready_t(child_info));
-                return true;
+                return 1;
             } else {
                 auto ptr = hash_file_ptr_t(new hash_file_t(std::move(child_info), this));
                 stack.emplace_back(std::move(ptr));
-                return true;
+                return 1;
             }
         } else {
             std::abort();
         }
     }
 
-    bool process(suspend_scan_t &item, stack_context_t &ctx) noexcept {
+    int process(suspend_scan_t &item, stack_context_t &ctx) noexcept {
         auto folder = context->local_folder->get_folder();
         auto folder_id = folder->get_id();
         auto &ec = item.ec;
@@ -159,18 +164,18 @@ struct folder_slave_t final : fs::fs_slave_t {
         while (stack.size() > 1) {
             stack.pop_front();
         }
-        return true;
+        return 1;
     }
 
-    bool process(unsuspend_scan_t &, stack_context_t &ctx) noexcept {
+    int process(unsuspend_scan_t &, stack_context_t &ctx) noexcept {
         auto folder = context->local_folder->get_folder();
         auto folder_id = folder->get_id();
         LOG_TRACE(log, "un-suspending {}", folder_id);
         ctx.push(new model::diff::modify::suspend_folder_t(*folder, false));
-        return true;
+        return 1;
     }
 
-    bool process(child_ready_t &info, stack_context_t &ctx) noexcept {
+    int process(child_ready_t &info, stack_context_t &ctx) noexcept {
         auto folder = context->local_folder->get_folder();
         auto folder_id = folder->get_id();
         auto [parent, child] = get_presence(info.path);
@@ -211,37 +216,42 @@ struct folder_slave_t final : fs::fs_slave_t {
             ctx.push(new model::diff::advance::local_update_t(*actor->cluster, *actor->sequencer, std::move(file),
                                                               folder_id));
         }
-        return true;
+        return 1;
     }
 
-    bool process(hash_file_ptr_t &item, stack_context_t &ctx) noexcept {
+    int process(hash_file_ptr_t &item, stack_context_t &ctx) noexcept {
+        if (!actor->requested_hashes_limit) {
+            return -1;
+        }
         auto folder = context->local_folder->get_folder();
         auto folder_id = folder->get_id();
         auto &ec = item->ec;
-        LOG_TRACE(log, "going to rehash '{}' ", boost::nowide::narrow(item->path.wstring()));
 
         auto total_blocks = item->total_blocks;
-        auto processing_blocks = item->processing_blocks;
         auto block_size = item->block_size;
-        auto max_blocks = std::min(actor->requested_hashes_limit, total_blocks - processing_blocks);
+        auto &blocks_limit = actor->requested_hashes_limit;
+        auto processed_blocks = item->total_blocks - item->unprocessed_blocks;
+        auto max_blocks = std::min(blocks_limit, item->unprocessed_blocks);
         auto last_block_sz = [&]() -> std::int32_t {
-            if ((max_blocks + processing_blocks) == total_blocks) {
+            if (item->unprocessed_blocks == max_blocks) {
                 if (total_blocks > 1) {
-                    auto sz = std::int64_t(block_size) * total_blocks;
-                    if (sz != item->size) {
-                        return sz - item->size;
-                    }
+                    auto sz = std::int64_t(block_size) * (total_blocks - 1);
+                    return item->size - sz;
                 }
             }
             return block_size;
         }();
         assert(last_block_sz > 0);
-        auto offset = std::int64_t{processing_blocks} * block_size;
+        auto offset = std::int64_t{processed_blocks} * block_size;
         auto task_ctx = hasher::payload::extendended_context_prt_t(item.get());
-        auto sub_task = fs::task::segment_iterator_t(actor->get_address(), item, item->path, offset, 0, max_blocks,
-                                                     block_size, last_block_sz);
+        auto sub_task = fs::task::segment_iterator_t(actor->get_address(), item, item->path, offset, processed_blocks,
+                                                     max_blocks, block_size, last_block_sz);
         pending_io.emplace_back(std::move(sub_task));
-        return false;
+        blocks_limit -= max_blocks;
+        item->unprocessed_blocks -= max_blocks;
+
+        LOG_TRACE(log, "going to rehash {} blocks of '{}'", max_blocks, boost::nowide::narrow(item->path.wstring()));
+        return item->unprocessed_blocks ? -1 : 1;
     }
 
     bool post_process() noexcept {
@@ -265,7 +275,7 @@ struct folder_slave_t final : fs::fs_slave_t {
         return tasks_in.empty();
     }
 
-    void post_process(hash_file_t &hash_file, hasher::message::digest_t &msg) noexcept {
+    bool post_process(hash_file_t &hash_file, hasher::message::digest_t &msg) noexcept {
         auto &p = msg.payload;
         auto &result = msg.payload.result;
         if (result.has_error()) {
@@ -278,13 +288,14 @@ struct folder_slave_t final : fs::fs_slave_t {
         proto::set_size(bi, static_cast<std::int32_t>(p.data.size()));
         proto::set_hash(bi, std::move(result).assume_value());
         hash_file.blocks[index] = std::move(bi);
-        --hash_file.blocks_left;
-        if (!hash_file.blocks_left) {
+        --hash_file.unhashed_blocks;
+        if (!hash_file.unhashed_blocks) {
             auto blocks = std::move(hash_file.blocks);
             auto copy = static_cast<child_info_t &>(hash_file);
             stack.push_front(child_ready_t(std::move(copy), std::move(blocks)));
         }
-        post_process();
+        ++actor->requested_hashes_limit;
+        return post_process();
     }
 
     presences_t get_presence(const bfs::path &path) {
@@ -431,13 +442,6 @@ void local_keeper_t::on_model_update(model::message::model_update_t &msg) noexce
     }
 }
 
-void local_keeper_t::on_digest(hasher::message::digest_t &msg) noexcept {
-    LOG_TRACE(log, "on_digest");
-    auto &hash_file = *static_cast<hash_file_t *>(msg.payload.context.get());
-    auto &slave = static_cast<folder_slave_t &>(*hash_file.context.get());
-    slave.post_process(hash_file, msg);
-}
-
 auto local_keeper_t::operator()(const model::diff::local::scan_start_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     bool do_scan = true;
@@ -462,8 +466,19 @@ auto local_keeper_t::operator()(const model::diff::local::scan_start_t &diff, vo
 void local_keeper_t::on_post_process(fs::message::foreign_executor_t &msg) noexcept {
     auto &slave = static_cast<folder_slave_t &>(*msg.payload.get());
     auto folder_id = slave.context->local_folder->get_folder()->get_id();
-    auto done = slave.post_process();
-    if (!done) {
+    auto pending_io = !slave.post_process();
+    if (pending_io) {
         redirect(&msg, fs_addr, address);
+    }
+}
+
+void local_keeper_t::on_digest(hasher::message::digest_t &msg) noexcept {
+    auto &p = msg.payload;
+    LOG_TRACE(log, "on_digest, block size: {}, index: {}", p.data.size(), p.block_index);
+    auto &hash_file = *static_cast<hash_file_t *>(p.context.get());
+    auto &slave = static_cast<folder_slave_t &>(*hash_file.context.get());
+    auto pending_io = !slave.post_process(hash_file, msg);
+    if (pending_io) {
+        route<fs::payload::foreign_executor_prt_t>(fs_addr, address, &slave);
     }
 }

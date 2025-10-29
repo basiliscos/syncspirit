@@ -275,6 +275,27 @@ void test_local_keeper() {
                     CHECK(blocks.size() == 2);
                     REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
                 }
+                SECTION("2 blocks + 1 byte file") {
+                    CHECK(bfs::create_directories(root_path / L"папка"));
+                    auto part_path = bfs::path(L"папка") / L"файл.bin";
+                    auto file_path = root_path / part_path;
+                    auto block_sz = fs::block_sizes[0];
+                    auto b1 = std::string(block_sz, '0');
+                    auto b2 = std::string(block_sz, '1');
+                    auto b3 = std::string(1, '2');
+                    write_file(file_path, b1 + b2 + b3);
+                    builder->scan_start(folder->get_id()).apply(*sup);
+
+                    auto file = files->by_name(boost::nowide::narrow(part_path.generic_wstring()));
+                    REQUIRE(file);
+                    CHECK(file->is_locally_available());
+                    CHECK(!file->is_link());
+                    CHECK(file->is_file());
+                    CHECK(file->get_block_size() == block_sz);
+                    CHECK(file->get_size() == block_sz * 2 + 1);
+                    CHECK(blocks.size() == 3);
+                    REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
+                }
             }
         }
     };

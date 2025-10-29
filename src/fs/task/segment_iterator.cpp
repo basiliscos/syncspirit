@@ -27,9 +27,9 @@ void segment_iterator_t::process(fs_slave_t &fs_slave, hasher::hasher_plugin_t *
         file = std::move(opt.assume_value());
     }
 
-    for (std::int32_t i = block_index; i < block_count; ++i) {
-        auto bs = (i + 1 == block_count) ? last_block_size : block_size;
-        auto off = offset + std::int64_t{block_size} * i;
+    for (std::int32_t i = block_index, j = 0; j < block_count; ++i, ++j) {
+        auto bs = (j + 1 == block_count) ? last_block_size : block_size;
+        auto off = offset + std::int64_t{block_size} * j;
         auto block_opt = file.read(off, bs);
         if (!block_opt) {
             std::abort();
