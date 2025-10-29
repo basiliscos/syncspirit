@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2025 Ivan Baidakou
 
 #pragma once
 
@@ -17,7 +17,7 @@ using task_t = std::variant<task::scan_dir_t, task::segment_iterator_t>;
 struct SYNCSPIRIT_API fs_slave_t : payload::foreign_executor_t {
     using tasks_t = std::list<task_t>;
 
-    void exec(r::actor_base_t &host) noexcept override;
+    void exec(hasher::hasher_plugin_t *hasher) noexcept override;
     void push(task_t task) noexcept;
 
     void process(task::scan_dir_t &) noexcept;

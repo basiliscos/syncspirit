@@ -8,7 +8,15 @@
 #include "hasher/messages.h"
 #include <cstdint>
 
-namespace syncspirit::fs {
+namespace syncspirit {
+
+namespace hasher {
+
+struct hasher_plugin_t;
+
+}
+
+namespace fs {
 
 namespace bfs = std::filesystem;
 namespace sys = boost::system;
@@ -16,4 +24,6 @@ namespace r = rotor;
 
 struct fs_slave_t;
 
-} // namespace syncspirit::fs
+} // namespace fs
+
+} // namespace syncspirit

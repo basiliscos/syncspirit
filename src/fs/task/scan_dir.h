@@ -19,7 +19,7 @@ struct SYNCSPIRIT_API scan_dir_t {
     using child_infos_t = std::vector<child_info_t>;
 
     scan_dir_t(bfs::path path) noexcept;
-    void process(fs_slave_t &fs_slave, r::actor_base_t &host) noexcept;
+    void process(fs_slave_t &fs_slave, hasher::hasher_plugin_t *) noexcept;
 
     bfs::path path;
     sys::error_code ec;

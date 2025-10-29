@@ -22,7 +22,7 @@ struct comparator_t {
 
 scan_dir_t::scan_dir_t(bfs::path path_) noexcept : path{std::move(path_)} {}
 
-void scan_dir_t::process(fs_slave_t &slave, rotor::actor_base_t &host) noexcept {
+void scan_dir_t::process(fs_slave_t &slave, hasher::hasher_plugin_t *) noexcept {
     auto it = bfs::directory_iterator(path, ec);
     if (ec) {
         return;

@@ -5,6 +5,7 @@
 
 #include "proto/proto-fwd.hpp"
 #include "hasher/messages.h"
+#include "hasher/hasher_plugin.h"
 #include "scan_task.h"
 #include "chunk_iterator.h"
 #include "new_chunk_iterator.h"
@@ -31,7 +32,7 @@ using rehash_ptr_t = std::shared_ptr<chunk_iterator_t>;
 using hash_anew_ptr_t = std::shared_ptr<new_chunk_iterator_t>;
 
 struct foreign_executor_t : hasher::payload::extendended_context_t {
-    virtual void exec(r::actor_base_t &host) noexcept = 0;
+    virtual void exec(hasher::hasher_plugin_t *hasher) noexcept = 0;
 };
 using foreign_executor_prt_t = r::intrusive_ptr_t<foreign_executor_t>;
 

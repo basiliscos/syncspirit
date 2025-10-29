@@ -21,6 +21,36 @@ using namespace syncspirit::net;
 using namespace syncspirit::fs;
 using namespace syncspirit::hasher;
 
+struct executor_t : r::actor_base_t {
+    using parent_t = r::actor_base_t;
+    using parent_t::parent_t;
+
+    // clang-format off
+    using plugins_list_t = std::tuple<
+        r::plugin::address_maker_plugin_t,
+        r::plugin::lifetime_plugin_t,
+        r::plugin::init_shutdown_plugin_t,
+        r::plugin::link_server_plugin_t,
+        r::plugin::link_client_plugin_t,
+        hasher::hasher_plugin_t,
+        r::plugin::resources_plugin_t,
+        r::plugin::starter_plugin_t
+    >;
+    // clang-format on
+
+    void configure(r::plugin::plugin_base_t &plugin) noexcept {
+        r::actor_base_t::configure(plugin);
+        plugin.with_casted<hasher::hasher_plugin_t>([&](auto &p) {
+            hasher = &p;
+            p.configure_hashers(1);
+        });
+    }
+
+    hasher_plugin_t *hasher;
+};
+
+using executor_ptr_t = r::intrusive_ptr_t<executor_t>;
+
 struct fixture_t {
     using target_ptr_t = r::intrusive_ptr_t<net::local_keeper_t>;
     using builder_ptr_t = std::unique_ptr<diff_builder_t>;
@@ -56,7 +86,7 @@ struct fixture_t {
                 using msg_t = fs::message::foreign_executor_t;
                 p.subscribe_actor(r::lambda<msg_t>([&](msg_t &req) {
                     sup->log->info("executing foreign task");
-                    req.payload->exec(*sup);
+                    req.payload->exec(executor->hasher);
                 }));
             });
         };
@@ -79,6 +109,7 @@ struct fixture_t {
 
         CHECK(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::OPERATIONAL);
 
+        executor = sup->create_actor<executor_t>().timeout(timeout).finish();
         hasher = sup->create_actor<managed_hasher_t>().index(1).auto_reply(true).timeout(timeout).finish().get();
         sup->do_process();
 
@@ -111,6 +142,7 @@ struct fixture_t {
     builder_ptr_t builder;
     r::pt::time_duration timeout = r::pt::millisec{10};
     r::intrusive_ptr_t<supervisor_t> sup;
+    executor_ptr_t executor;
     managed_hasher_t *hasher;
     cluster_ptr_t cluster;
     device_ptr_t my_device;
@@ -206,7 +238,6 @@ void test_local_keeper() {
                     REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
                 }
 #endif
-#if 0
                 SECTION("small non-emtpy file") {
                     CHECK(bfs::create_directories(root_path / L"папка"));
                     auto part_path = bfs::path(L"папка") / L"файл.bin";
@@ -244,7 +275,6 @@ void test_local_keeper() {
                     CHECK(blocks.size() == 2);
                     REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
                 }
-#endif
             }
         }
     };

@@ -3,6 +3,7 @@
 
 #include "segment_iterator.h"
 #include "hasher/messages.h"
+#include "hasher/hasher_plugin.h"
 
 using namespace syncspirit::fs;
 using namespace syncspirit::fs::task;
@@ -15,7 +16,7 @@ segment_iterator_t::segment_iterator_t(const r::address_ptr_t &back_addr_,
       block_index{block_index_}, block_count{block_count_}, block_size{block_size_}, last_block_size{last_block_size_} {
 }
 
-void segment_iterator_t::process(fs_slave_t &fs_slave, r::actor_base_t &host) noexcept {
+void segment_iterator_t::process(fs_slave_t &fs_slave, hasher::hasher_plugin_t *hasher) noexcept {
     assert(!ec);
     if (!file.has_backend()) {
         auto opt = file_t::open_read(path);
@@ -34,10 +35,7 @@ void segment_iterator_t::process(fs_slave_t &fs_slave, r::actor_base_t &host) no
             std::abort();
         }
         auto bytes = std::move(block_opt).value();
-        std::abort();
-#if 0
-        host.route<hasher::payload::digest_t>(hasher_addr, back_addr, std::move(bytes), i, context);
-#endif
+        hasher->calc_digest(std::move(bytes), i, back_addr, context);
         ++current_block;
     }
 }
