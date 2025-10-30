@@ -5,6 +5,7 @@
 #include "model/diff/advance/local_update.h"
 #include "model/diff/local/scan_start.h"
 #include "model/diff/local/scan_finish.h"
+#include "model/diff/local/file_availability.h"
 #include "model/diff/modify/suspend_folder.h"
 #include "presentation/folder_entity.h"
 #include "fs/fs_slave.h"
@@ -73,6 +74,12 @@ struct hash_file_t : fs::payload::extendended_context_t, child_info_t {
     blocks_t blocks;
     fs::payload::extendended_context_prt_t context;
 };
+struct check_child_t : child_info_t {
+    check_child_t(child_info_t &&info, presentation::presence_t *presence_)
+        : child_info_t{std::move(info)}, presence{presence_} {}
+    presentation::presence_ptr_t presence;
+};
+
 using hash_file_ptr_t = boost::intrusive_ptr<hash_file_t>;
 struct complete_scan_t {};
 struct suspend_scan_t {
@@ -81,7 +88,7 @@ struct suspend_scan_t {
 struct unsuspend_scan_t {};
 
 using stack_item_t = std::variant<unscanned_dir_t, unexamined_t, complete_scan_t, child_ready_t, hash_file_ptr_t,
-                                  suspend_scan_t, unsuspend_scan_t>;
+                                  check_child_t, suspend_scan_t, unsuspend_scan_t>;
 
 struct folder_slave_t final : fs::fs_slave_t {
     using local_keeper_ptr_t = r::intrusive_ptr_t<net::local_keeper_t>;
@@ -178,21 +185,21 @@ struct folder_slave_t final : fs::fs_slave_t {
     int process(child_ready_t &info, stack_context_t &ctx) noexcept {
         auto folder = context->local_folder->get_folder();
         auto folder_id = folder->get_id();
+        auto type = [&]() -> proto::FileInfoType {
+            using FT = proto::FileInfoType;
+            auto t = info.status.type();
+            if (t == bfs::file_type::directory)
+                return FT::DIRECTORY;
+            else if (t == bfs::file_type::symlink)
+                return FT::SYMLINK;
+            else
+                return FT::FILE;
+        }();
         auto [parent, child] = get_presence(info.path);
         if (!child) {
             auto file = proto::FileInfo();
             auto name = fs::relativize(info.path, folder->get_path());
             auto permissions = static_cast<uint32_t>(info.status.permissions());
-            auto type = [&]() -> proto::FileInfoType {
-                using FT = proto::FileInfoType;
-                auto t = info.status.type();
-                if (t == bfs::file_type::directory)
-                    return FT::DIRECTORY;
-                else if (t == bfs::file_type::symlink)
-                    return FT::SYMLINK;
-                else
-                    return FT::FILE;
-            }();
             auto size = info.size;
             proto::set_name(file, boost::nowide::narrow(name.generic_wstring()));
             proto::set_type(file, type);
@@ -215,6 +222,35 @@ struct folder_slave_t final : fs::fs_slave_t {
 #endif
             ctx.push(new model::diff::advance::local_update_t(*actor->cluster, *actor->sequencer, std::move(file),
                                                               folder_id));
+        } else {
+            auto presence = static_cast<presentation::cluster_file_presence_t *>(child);
+            auto &file = const_cast<model::file_info_t &>(presence->get_file_info());
+            auto modification_time = fs::to_unix(info.last_write_time);
+            bool match = false;
+            if (modification_time == file.get_modified_s()) {
+                auto perms = static_cast<uint32_t>(info.status.permissions());
+                if (perms == file.get_permissions()) {
+                    if (type == model::file_info_t::as_type(file.get_type())) {
+                        if (type == proto::FileInfoType::SYMLINK) {
+                            std::abort();
+                        } else {
+                        }
+                        match = true;
+                    }
+                }
+            }
+            if (match) {
+                if (type == proto::FileInfoType::SYMLINK) {
+                    std::abort();
+                } else {
+                }
+            } else {
+                std::abort();
+            }
+            if (match) {
+                using namespace model::diff;
+                ctx.push(new local::file_availability_t(&file, *context->local_folder));
+            }
         }
         return 1;
     }
@@ -253,6 +289,8 @@ struct folder_slave_t final : fs::fs_slave_t {
         LOG_TRACE(log, "going to rehash {} blocks of '{}'", max_blocks, boost::nowide::narrow(item->path.wstring()));
         return item->unprocessed_blocks ? -1 : 1;
     }
+
+    int process(check_child_t &item, stack_context_t &ctx) noexcept { std::abort(); }
 
     bool post_process() noexcept {
         auto folder_id = context->local_folder->get_folder()->get_id();

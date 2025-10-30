@@ -164,6 +164,8 @@ void test_local_keeper() {
 
         void main() noexcept override {
             sys::error_code ec;
+            auto &blocks = cluster->get_blocks();
+            auto my_short_id = my_device->device_id().get_uint();
             SECTION("root folder errors") {
                 auto dir_path = root_path / "some-dir";
                 folder->set_path(dir_path);
@@ -188,7 +190,6 @@ void test_local_keeper() {
                 CHECK(folder->get_scan_finish() >= folder->get_scan_start());
             }
             SECTION("new items") {
-                auto &blocks = cluster->get_blocks();
                 SECTION("new dir") {
                     auto dir_path = root_path / "some-dir";
                     bfs::create_directories(dir_path);
@@ -295,6 +296,44 @@ void test_local_keeper() {
                     CHECK(file->get_size() == block_sz * 2 + 1);
                     CHECK(blocks.size() == 3);
                     REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
+                }
+            }
+            SECTION("unchanged items") {
+                auto pr_file = proto::FileInfo{};
+                auto file_name = bfs::path(L"неизменное.bin");
+                proto::set_name(pr_file, file_name.string());
+                proto::set_sequence(pr_file, 4);
+                auto &v = proto::get_version(pr_file);
+                auto &counter = proto::add_counters(v);
+                proto::set_id(counter, my_short_id);
+                proto::set_value(counter, 1);
+
+                SECTION("dir") {
+                    auto dir = root_path / file_name;
+                    bfs::create_directories(dir);
+                    CHECK(2 == 2);
+                    auto modified = to_unix(bfs::last_write_time(dir));
+                    CHECK(1 == 1);
+                    auto status = bfs::status(dir);
+                    auto perms = static_cast<uint32_t>(status.permissions());
+
+                    proto::set_type(pr_file, proto::FileInfoType::DIRECTORY);
+                    proto::set_permissions(pr_file, perms);
+                    proto::set_modified_s(pr_file, modified);
+
+                    builder->local_update(folder->get_id(), pr_file).apply(*sup);
+                    REQUIRE(files->size() == 1);
+                    auto file_1 = files->by_name(boost::nowide::narrow(file_name.wstring()));
+                    file_1->mark_local(false);
+                    CHECK(!file_1->is_local());
+
+                    builder->scan_start(folder->get_id()).apply(*sup);
+                    REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
+                    REQUIRE(files->size() == 1);
+
+                    auto file_2 = files->by_name(boost::nowide::narrow(file_name.wstring()));
+                    CHECK(file_1.get() == file_2.get());
+                    CHECK(file_1->is_local());
                 }
             }
         }
