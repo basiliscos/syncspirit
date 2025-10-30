@@ -335,12 +335,11 @@ void test_local_keeper() {
                 }
 
 #ifndef SYNCSPIRIT_WIN
-#if 0
                 SECTION("symlink") {
                     auto file_path = root_path / file_name;
                     auto target = bfs::path(L"/куда-то/where");
                     bfs::create_symlink(target, file_path);
-                    auto status = bfs::status(file_path);
+                    auto status = bfs::symlink_status(file_path);
                     auto perms = static_cast<uint32_t>(status.permissions());
 
                     proto::set_symlink_target(pr_file, boost::nowide::narrow(target.wstring()));
@@ -363,7 +362,6 @@ void test_local_keeper() {
                     CHECK(file_1.get() == file_2.get());
                     CHECK(file_1->is_local());
                 }
-#endif
 #endif
             }
         }

@@ -50,6 +50,7 @@ using folder_context_ptr_t = r::intrusive_ptr_t<folder_context_t>;
 struct child_info_t {
     child_info_t(fs::task::scan_dir_t::child_info_t backend) {
         path = std::move(backend.path);
+        link_target = std::move(backend.target);
         last_write_time = fs::to_unix(backend.last_write_time);
         size = backend.size;
         type = [&]() -> proto::FileInfoType {
@@ -68,6 +69,7 @@ struct child_info_t {
     }
 
     bfs::path path;
+    bfs::path link_target;
     std::int64_t last_write_time;
     std::uintmax_t size;
     proto::FileInfoType type;
@@ -243,24 +245,17 @@ struct folder_slave_t final : fs::fs_slave_t {
             auto presence = static_cast<presentation::cluster_file_presence_t *>(child);
             auto &file = const_cast<model::file_info_t &>(presence->get_file_info());
             bool match = false;
-            if (info.last_write_time == file.get_modified_s()) {
-                if (info.perms == file.get_permissions()) {
-                    if (type == model::file_info_t::as_type(file.get_type())) {
-                        if (type == proto::FileInfoType::SYMLINK) {
-                            std::abort();
-                        } else {
-                        }
-                        match = true;
+            auto modification_match =
+                (type == proto::FileInfoType::SYMLINK) || (info.last_write_time == file.get_modified_s());
+            if (modification_match && info.perms == file.get_permissions()) {
+                if (type == model::file_info_t::as_type(file.get_type())) {
+                    if (type == proto::FileInfoType::SYMLINK) {
+                        auto target = boost::nowide::narrow(info.link_target.generic_wstring());
+                        match = file.get_link_target() == target;
+                    } else {
+                        match = file.get_size() == info.size;
                     }
                 }
-            }
-            if (match) {
-                if (type == proto::FileInfoType::SYMLINK) {
-                    std::abort();
-                } else {
-                }
-            } else {
-                std::abort();
             }
             if (match) {
                 using namespace model::diff;
