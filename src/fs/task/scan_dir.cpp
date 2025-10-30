@@ -23,6 +23,7 @@ struct comparator_t {
 scan_dir_t::scan_dir_t(bfs::path path_) noexcept : path{std::move(path_)} {}
 
 void scan_dir_t::process(fs_slave_t &slave, hasher::hasher_plugin_t *) noexcept {
+    using FT = bfs::file_type;
     auto it = bfs::directory_iterator(path, ec);
     if (ec) {
         return;
@@ -38,21 +39,27 @@ void scan_dir_t::process(fs_slave_t &slave, hasher::hasher_plugin_t *) noexcept 
             continue;
         } else {
             auto file_type = last.status.type();
-            bool get_mtime = (file_type == bfs::file_type::regular || file_type == bfs::file_type::directory);
-            if (get_mtime) {
+            auto is_regular = file_type == FT::regular;
+            auto is_dir = file_type == FT::directory;
+            auto is_link = file_type == FT::symlink;
+            if (!is_regular && !is_dir && !is_link) {
+                continue;
+            }
+
+            if (is_regular || is_dir) {
                 last.last_write_time = bfs::last_write_time(child, ec);
                 if (ec) {
                     last.ec = ec;
                     continue;
                 }
             }
-            if (file_type == bfs::file_type::regular) {
+            if (is_regular) {
                 last.size = bfs::file_size(child, ec);
                 if (ec) {
                     last.ec = ec;
                     continue;
                 }
-            } else if (file_type == bfs::file_type::symlink) {
+            } else if (is_link) {
                 last.target = bfs::read_symlink(child, ec);
                 if (ec) {
                     last.ec = ec;

@@ -47,7 +47,34 @@ struct folder_context_t : boost::intrusive_ref_counter<folder_context_t, boost::
 };
 
 using folder_context_ptr_t = r::intrusive_ptr_t<folder_context_t>;
-using child_info_t = fs::task::scan_dir_t::child_info_t;
+struct child_info_t {
+    child_info_t(fs::task::scan_dir_t::child_info_t backend) {
+        path = std::move(backend.path);
+        last_write_time = fs::to_unix(backend.last_write_time);
+        size = backend.size;
+        type = [&]() -> proto::FileInfoType {
+            using FT = proto::FileInfoType;
+            auto t = backend.status.type();
+            if (t == bfs::file_type::directory)
+                return FT::DIRECTORY;
+            else if (t == bfs::file_type::symlink)
+                return FT::SYMLINK;
+            else
+                return FT::FILE;
+        }();
+        auto &status = backend.status;
+        perms = static_cast<std::uint32_t>(status.permissions());
+        ec = backend.ec;
+    }
+
+    bfs::path path;
+    std::int64_t last_write_time;
+    std::uintmax_t size;
+    proto::FileInfoType type;
+    std::uint32_t perms;
+    sys::error_code ec;
+};
+
 using unscanned_dir_t = bfs::path;
 struct unexamined_t : child_info_t {};
 struct child_ready_t : child_info_t {
@@ -140,15 +167,16 @@ struct folder_slave_t final : fs::fs_slave_t {
     }
 
     int process(unexamined_t &child_info, stack_context_t &ctx) noexcept {
-        auto type = child_info.status.type();
-        if (type == bfs::file_type::directory) {
+        auto &type = child_info.type;
+        if (type == proto::FileInfoType::DIRECTORY) {
             stack.push_front(child_ready_t(child_info));
             stack.push_front(unscanned_dir_t(child_info.path));
             return 1;
-        } else if (type == bfs::file_type::symlink) {
+        } else if (type == proto::FileInfoType::SYMLINK) {
             stack.push_front(child_ready_t(child_info));
             return 1;
-        } else if (type == bfs::file_type::regular) {
+        } else {
+            assert(type == proto::FileInfoType::FILE);
             if (!child_info.size) {
                 stack.push_front(child_ready_t(child_info));
                 return 1;
@@ -157,8 +185,6 @@ struct folder_slave_t final : fs::fs_slave_t {
                 stack.emplace_back(std::move(ptr));
                 return 1;
             }
-        } else {
-            std::abort();
         }
     }
 
@@ -185,25 +211,16 @@ struct folder_slave_t final : fs::fs_slave_t {
     int process(child_ready_t &info, stack_context_t &ctx) noexcept {
         auto folder = context->local_folder->get_folder();
         auto folder_id = folder->get_id();
-        auto type = [&]() -> proto::FileInfoType {
-            using FT = proto::FileInfoType;
-            auto t = info.status.type();
-            if (t == bfs::file_type::directory)
-                return FT::DIRECTORY;
-            else if (t == bfs::file_type::symlink)
-                return FT::SYMLINK;
-            else
-                return FT::FILE;
-        }();
+        auto &type = info.type;
         auto [parent, child] = get_presence(info.path);
         if (!child) {
             auto file = proto::FileInfo();
             auto name = fs::relativize(info.path, folder->get_path());
-            auto permissions = static_cast<uint32_t>(info.status.permissions());
+            auto permissions = info.perms;
             auto size = info.size;
             proto::set_name(file, boost::nowide::narrow(name.generic_wstring()));
             proto::set_type(file, type);
-            proto::set_modified_s(file, fs::to_unix(info.last_write_time));
+            proto::set_modified_s(file, info.last_write_time);
             proto::set_permissions(file, permissions);
             if (size) {
                 auto block_size = proto::get_size(info.blocks.front());
@@ -225,11 +242,9 @@ struct folder_slave_t final : fs::fs_slave_t {
         } else {
             auto presence = static_cast<presentation::cluster_file_presence_t *>(child);
             auto &file = const_cast<model::file_info_t &>(presence->get_file_info());
-            auto modification_time = fs::to_unix(info.last_write_time);
             bool match = false;
-            if (modification_time == file.get_modified_s()) {
-                auto perms = static_cast<uint32_t>(info.status.permissions());
-                if (perms == file.get_permissions()) {
+            if (info.last_write_time == file.get_modified_s()) {
+                if (info.perms == file.get_permissions()) {
                     if (type == model::file_info_t::as_type(file.get_type())) {
                         if (type == proto::FileInfoType::SYMLINK) {
                             std::abort();
