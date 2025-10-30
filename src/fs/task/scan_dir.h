@@ -12,7 +12,7 @@ struct SYNCSPIRIT_API scan_dir_t {
         bfs::path path;
         bfs::path target;
         bfs::file_status status;
-        bfs::file_time_type last_write_time;
+        bfs::file_time_type last_write_time = {};
         std::uintmax_t size;
         sys::error_code ec;
     };

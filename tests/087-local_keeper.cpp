@@ -311,9 +311,7 @@ void test_local_keeper() {
                 SECTION("dir") {
                     auto dir = root_path / file_name;
                     bfs::create_directories(dir);
-                    CHECK(2 == 2);
                     auto modified = to_unix(bfs::last_write_time(dir));
-                    CHECK(1 == 1);
                     auto status = bfs::status(dir);
                     auto perms = static_cast<uint32_t>(status.permissions());
 
@@ -335,6 +333,38 @@ void test_local_keeper() {
                     CHECK(file_1.get() == file_2.get());
                     CHECK(file_1->is_local());
                 }
+
+#ifndef SYNCSPIRIT_WIN
+#if 0
+                SECTION("symlink") {
+                    auto file_path = root_path / file_name;
+                    auto target = bfs::path(L"/куда-то/where");
+                    bfs::create_symlink(target, file_path);
+                    auto status = bfs::status(file_path);
+                    auto perms = static_cast<uint32_t>(status.permissions());
+
+                    proto::set_symlink_target(pr_file, boost::nowide::narrow(target.wstring()));
+                    proto::set_type(pr_file, proto::FileInfoType::SYMLINK);
+                    proto::set_permissions(pr_file, perms);
+
+                    builder->local_update(folder->get_id(), pr_file).apply(*sup);
+                    REQUIRE(files->size() == 1);
+                    auto file_1 = files->by_name(boost::nowide::narrow(file_name.wstring()));
+                    file_1->mark_local(false);
+                    REQUIRE(file_1->is_link());
+                    REQUIRE(file_1->get_link_target() == boost::nowide::narrow(target.wstring()));
+                    CHECK(!file_1->is_local());
+
+                    builder->scan_start(folder->get_id()).apply(*sup);
+                    REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
+                    REQUIRE(files->size() == 1);
+
+                    auto file_2 = files->by_name(boost::nowide::narrow(file_name.wstring()));
+                    CHECK(file_1.get() == file_2.get());
+                    CHECK(file_1->is_local());
+                }
+#endif
+#endif
             }
         }
     };
