@@ -451,6 +451,34 @@ void test_complex() {
                 CHECK(file_1->is_local());
                 REQUIRE(file_1->is_deleted());
             }
+            SECTION("deleted hierarchy of dirs") {
+                auto pr_file = proto::FileInfo{};
+                proto::set_type(pr_file, proto::FileInfoType::DIRECTORY);
+                proto::set_deleted(pr_file, true);
+                proto::set_sequence(pr_file, 4);
+                auto &v = proto::get_version(pr_file);
+                auto &counter = proto::add_counters(v);
+                proto::set_id(counter, my_short_id);
+                proto::set_value(counter, 1);
+                auto file_name = bfs::path(L"имя");
+                for (auto &name : {"a", "a/bb", "a/cc", "a/bb/ddd"}) {
+                    proto::set_name(pr_file, name);
+                    builder->local_update(folder->get_id(), pr_file);
+                }
+                builder->apply(*sup);
+                REQUIRE(files->size() == 4);
+                for (auto f : *files) {
+                    f->mark_local(false);
+                }
+
+                builder->scan_start(folder->get_id()).apply(*sup);
+                REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
+                CHECK(files->size() == 4);
+                for (auto f : *files) {
+                    CHECK(f->is_local());
+                    CHECK(f->is_deleted());
+                }
+            }
         }
     };
     F().run();
