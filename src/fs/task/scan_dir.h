@@ -4,6 +4,7 @@
 #pragma once
 
 #include "task.h"
+#include "presentation/presence.h"
 
 namespace syncspirit::fs::task {
 
@@ -18,10 +19,11 @@ struct SYNCSPIRIT_API scan_dir_t {
     };
     using child_infos_t = std::vector<child_info_t>;
 
-    scan_dir_t(bfs::path path) noexcept;
+    scan_dir_t(bfs::path path, presentation::presence_ptr_t presence) noexcept;
     void process(fs_slave_t &fs_slave, hasher::hasher_plugin_t *) noexcept;
 
     bfs::path path;
+    presentation::presence_ptr_t presence;
     sys::error_code ec;
     child_infos_t child_infos;
 };

@@ -158,7 +158,7 @@ struct fixture_t {
     fs::file_cache_ptr_t rw_cache;
 };
 
-void test_local_keeper() {
+void test_simple() {
     struct F : fixture_t {
         std::uint32_t get_hash_limit() override { return 2; }
 
@@ -402,9 +402,52 @@ void test_local_keeper() {
     F().run();
 }
 
+void test_complex() {
+    struct F : fixture_t {
+        std::uint32_t get_hash_limit() override { return 2; }
+
+        void main() noexcept override {
+            sys::error_code ec;
+            auto &blocks = cluster->get_blocks();
+            auto my_short_id = my_device->device_id().get_uint();
+
+            SECTION("deleted items") {
+                auto pr_file = proto::FileInfo{};
+                auto file_name = bfs::path(L"неизменное.bin");
+                proto::set_deleted(pr_file, true);
+                proto::set_name(pr_file, file_name.string());
+                proto::set_sequence(pr_file, 4);
+                auto &v = proto::get_version(pr_file);
+                auto &counter = proto::add_counters(v);
+                proto::set_id(counter, my_short_id);
+                proto::set_value(counter, 1);
+
+                builder->local_update(folder->get_id(), pr_file).apply(*sup);
+                REQUIRE(files->size() == 1);
+
+                auto file_1 = files->by_name(boost::nowide::narrow(file_name.wstring()));
+                file_1->mark_local(false);
+                CHECK(!file_1->is_local());
+                REQUIRE(file_1->is_deleted());
+
+                builder->scan_start(folder->get_id()).apply(*sup);
+                REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
+                REQUIRE(files->size() == 1);
+
+                auto file_2 = files->by_name(boost::nowide::narrow(file_name.wstring()));
+                CHECK(file_1.get() == file_2.get());
+                CHECK(file_1->is_local());
+                REQUIRE(file_1->is_deleted());
+            }
+        }
+    };
+    F().run();
+}
+
 int _init() {
     test::init_logging();
-    REGISTER_TEST_CASE(test_local_keeper, "test_local_keeper", "[net]");
+    REGISTER_TEST_CASE(test_simple, "test_simple", "[net]");
+    REGISTER_TEST_CASE(test_complex, "test_complex", "[net]");
     return 1;
 }
 

@@ -27,7 +27,7 @@ TEST_CASE("fs_slave", "[fs]") {
     sup->do_process();
 #endif
 
-    SECTION("dir scan"){SECTION("empty dir"){slave.push(task::scan_dir_t(root_path));
+    SECTION("dir scan"){SECTION("empty dir"){slave.push(task::scan_dir_t(root_path, {}));
     slave.exec({});
     REQUIRE(slave.tasks_out.size() == 1);
     auto &t = std::get<task::scan_dir_t>(slave.tasks_out.front());
@@ -35,7 +35,7 @@ TEST_CASE("fs_slave", "[fs]") {
     CHECK(t.child_infos.size() == 0);
 }
 SECTION("non-existing dir") {
-    slave.push(task::scan_dir_t(root_path / "non-existing"));
+    slave.push(task::scan_dir_t(root_path / "non-existing", {}));
     slave.exec({});
     REQUIRE(slave.tasks_out.size() == 1);
     auto &t = std::get<task::scan_dir_t>(slave.tasks_out.front());
@@ -43,7 +43,7 @@ SECTION("non-existing dir") {
     CHECK(t.ec.message() != "");
 }
 SECTION("not a dir") {
-    slave.push(task::scan_dir_t(root_path / "file"));
+    slave.push(task::scan_dir_t(root_path / "file", {}));
     write_file(root_path / "file", "");
     slave.exec({});
     REQUIRE(slave.tasks_out.size() == 1);
@@ -52,7 +52,7 @@ SECTION("not a dir") {
     CHECK(t.ec.message() != "");
 }
 SECTION("not a dir") {
-    slave.push(task::scan_dir_t(root_path / "file"));
+    slave.push(task::scan_dir_t(root_path / "file", {}));
     write_file(root_path / "file", "");
     slave.exec({});
     REQUIRE(slave.tasks_out.size() == 1);
@@ -63,7 +63,7 @@ SECTION("not a dir") {
 
 #ifndef SYNCSPIRIT_WIN
 SECTION("dir with a file, dir & symlink") {
-    slave.push(task::scan_dir_t(root_path));
+    slave.push(task::scan_dir_t(root_path, {}));
 
     auto modified = std::int64_t{1642007468};
     auto child_1 = root_path / L"a_файл";

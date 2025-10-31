@@ -20,7 +20,8 @@ struct comparator_t {
     }
 };
 
-scan_dir_t::scan_dir_t(bfs::path path_) noexcept : path{std::move(path_)} {}
+scan_dir_t::scan_dir_t(bfs::path path_, presentation::presence_ptr_t presence_) noexcept
+    : path{std::move(path_)}, presence{std::move(presence_)} {}
 
 void scan_dir_t::process(fs_slave_t &slave, hasher::hasher_plugin_t *) noexcept {
     using FT = bfs::file_type;

@@ -11,6 +11,7 @@
 #include "fs/fs_slave.h"
 #include "fs/utils.h"
 #include "names.h"
+#include "presentation/local_file_presence.h"
 #include "presentation/presence.h"
 #include "presentation/cluster_file_presence.h"
 #include "proto/proto-helpers-bep.h"
@@ -26,6 +27,9 @@ namespace bfs = std::filesystem;
 namespace sys = boost::system;
 
 namespace {
+
+using allocator_t = std::pmr::polymorphic_allocator<char>;
+using F = presentation::presence_t::features_t;
 
 struct stack_context_t {
     model::diff::cluster_diff_ptr_t diff;
@@ -77,18 +81,31 @@ struct child_info_t {
     sys::error_code ec;
 };
 
-using unscanned_dir_t = bfs::path;
-struct unexamined_t : child_info_t {};
+struct unscanned_dir_t {
+    unscanned_dir_t(bfs::path path_, presentation::presence_ptr_t presence_)
+        : path(std::move(path_)), presence(std::move(presence_)) {}
+    bfs::path path;
+    presentation::presence_ptr_t presence;
+};
+
+struct unexamined_t : child_info_t {
+    unexamined_t(child_info_t info, presentation::presence_ptr_t parent_, presentation::presence_ptr_t self_)
+        : child_info_t(std::move(info)), self{std::move(self_)}, parent{std::move(parent_)} {}
+    presentation::presence_ptr_t self;
+    presentation::presence_ptr_t parent;
+};
 struct child_ready_t : child_info_t {
     using blocks_t = std::vector<proto::BlockInfo>;
-    child_ready_t(child_info_t info, blocks_t blocks_ = {})
-        : child_info_t{std::move(info)}, blocks{std::move(blocks_)} {}
+    child_ready_t(child_info_t info, presentation::presence_ptr_t presence_, blocks_t blocks_ = {})
+        : child_info_t{std::move(info)}, presence(std::move(presence_)), blocks{std::move(blocks_)} {}
+    presentation::presence_ptr_t presence;
     blocks_t blocks;
 };
 struct hash_file_t : fs::payload::extendended_context_t, child_info_t {
     using blocks_t = std::vector<proto::BlockInfo>;
-    hash_file_t(child_info_t &&info_, fs::payload::extendended_context_prt_t context_)
-        : child_info_t{std::move(info_)}, context{std::move(context_)} {
+    hash_file_t(child_info_t &&info_, presentation::presence_ptr_t presence_,
+                fs::payload::extendended_context_prt_t context_)
+        : child_info_t{std::move(info_)}, presence{std::move(presence_)}, context{std::move(context_)} {
         auto div = fs::get_block_size(size, 0);
         block_size = div.size;
         unprocessed_blocks = unhashed_blocks = total_blocks = div.count;
@@ -101,6 +118,7 @@ struct hash_file_t : fs::payload::extendended_context_t, child_info_t {
     std::int32_t unprocessed_blocks = 0;
     std::int32_t unhashed_blocks = 0;
     blocks_t blocks;
+    presentation::presence_ptr_t presence;
     fs::payload::extendended_context_prt_t context;
 };
 struct check_child_t : child_info_t {
@@ -115,21 +133,28 @@ struct suspend_scan_t {
     sys::error_code ec;
 };
 struct unsuspend_scan_t {};
+struct removed_dir_t {
+    presentation::presence_ptr_t presence;
+};
 
 using stack_item_t = std::variant<unscanned_dir_t, unexamined_t, complete_scan_t, child_ready_t, hash_file_ptr_t,
-                                  check_child_t, suspend_scan_t, unsuspend_scan_t>;
+                                  check_child_t, removed_dir_t, suspend_scan_t, unsuspend_scan_t>;
 
 struct folder_slave_t final : fs::fs_slave_t {
     using local_keeper_ptr_t = r::intrusive_ptr_t<net::local_keeper_t>;
-    using presences_t = std::pair<presentation::presence_t *, presentation::presence_t *>;
     using stack_t = std::list<stack_item_t>;
 
     folder_slave_t(folder_context_ptr_t context_, local_keeper_ptr_t actor_) noexcept
         : context{context_}, actor{std::move(actor_)} {
         log = actor->log;
-        auto path = context->local_folder->get_folder()->get_path();
+        auto folder = context->local_folder->get_folder();
+        auto augmentation = folder->get_augmentation().get();
+        auto folder_entity = static_cast<presentation::folder_entity_t *>(augmentation);
+        auto local_device = folder->get_cluster()->get_device();
+        auto folder_presence = folder_entity->get_presence(local_device.get());
+        auto path = folder->get_path();
         stack.push_front(complete_scan_t{});
-        stack.push_front(unscanned_dir_t(std::move(path)));
+        stack.push_front(unscanned_dir_t(std::move(path), folder_presence));
     }
 
     void process_stack(stack_context_t &ctx) noexcept {
@@ -162,28 +187,29 @@ struct folder_slave_t final : fs::fs_slave_t {
         return 0;
     }
 
-    int process(unscanned_dir_t &path, stack_context_t &ctx) noexcept {
-        auto sub_task = fs::task::scan_dir_t(std::move(path));
+    int process(unscanned_dir_t &dir, stack_context_t &ctx) noexcept {
+        auto sub_task = fs::task::scan_dir_t(std::move(dir.path), std::move(dir.presence));
         pending_io.emplace_back(std::move(sub_task));
         return 0;
     }
 
     int process(unexamined_t &child_info, stack_context_t &ctx) noexcept {
         auto &type = child_info.type;
+        auto presence = get_presence(child_info.parent.get(), child_info.path);
         if (type == proto::FileInfoType::DIRECTORY) {
-            stack.push_front(child_ready_t(child_info));
-            stack.push_front(unscanned_dir_t(child_info.path));
+            stack.push_front(child_ready_t(child_info, presence));
+            stack.push_front(unscanned_dir_t(child_info.path, presence));
             return 1;
         } else if (type == proto::FileInfoType::SYMLINK) {
-            stack.push_front(child_ready_t(child_info));
+            stack.push_front(child_ready_t(child_info, presence));
             return 1;
         } else {
             assert(type == proto::FileInfoType::FILE);
             if (!child_info.size) {
-                stack.push_front(child_ready_t(child_info));
+                stack.push_front(child_ready_t(child_info, presence));
                 return 1;
             } else {
-                auto ptr = hash_file_ptr_t(new hash_file_t(std::move(child_info), this));
+                auto ptr = hash_file_ptr_t(new hash_file_t(std::move(child_info), presence, this));
                 stack.emplace_back(std::move(ptr));
                 return 1;
             }
@@ -214,7 +240,7 @@ struct folder_slave_t final : fs::fs_slave_t {
         auto folder = context->local_folder->get_folder();
         auto folder_id = folder->get_id();
         auto &type = info.type;
-        auto [parent, child] = get_presence(info.path);
+        auto child = info.presence.get();
         if (!child) {
             auto file = proto::FileInfo();
             auto name = fs::relativize(info.path, folder->get_path());
@@ -300,6 +326,8 @@ struct folder_slave_t final : fs::fs_slave_t {
         return item->unprocessed_blocks ? -1 : 1;
     }
 
+    int process(removed_dir_t &item, stack_context_t &ctx) noexcept { std::abort(); }
+
     int process(check_child_t &item, stack_context_t &ctx) noexcept { std::abort(); }
 
     bool post_process() noexcept {
@@ -340,16 +368,15 @@ struct folder_slave_t final : fs::fs_slave_t {
         if (!hash_file.unhashed_blocks) {
             auto blocks = std::move(hash_file.blocks);
             auto copy = static_cast<child_info_t &>(hash_file);
-            stack.push_front(child_ready_t(std::move(copy), std::move(blocks)));
+            stack.push_front(child_ready_t(std::move(copy), std::move(hash_file.presence), std::move(blocks)));
         }
         ++actor->requested_hashes_limit;
         return post_process();
     }
 
-    presences_t get_presence(const bfs::path &path) {
+    presentation::presence_t *get_presence(presentation::presence_t *parent, const bfs::path &path) {
         struct comparator_t {
             bool operator()(const presentation::presence_t *p, const bfs::path &name) const {
-                using allocator_t = std::pmr::polymorphic_allocator<char>;
                 auto buffer = std::array<std::byte, 1024>();
                 auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
                 auto allocator = allocator_t(&pool);
@@ -365,19 +392,16 @@ struct folder_slave_t final : fs::fs_slave_t {
                 return wname < name.wstring();
             }
         };
-
+        if (!parent) {
+            return nullptr;
+        }
         LOG_TRACE(log, "get_presence for {}", path.string());
         auto folder = context->local_folder->get_folder();
         auto folder_id = folder->get_id();
         auto &root_path = folder->get_path();
-        auto augmentation = folder->get_augmentation().get();
-        auto folder_entity = static_cast<presentation::folder_entity_t *>(augmentation);
-        auto local_device = folder->get_cluster()->get_device();
-        auto folder_presence = folder_entity->get_presence(local_device.get());
         auto skip = std::distance(root_path.begin(), root_path.end());
         auto it = path.begin();
         std::advance(it, skip);
-        auto parent = folder_presence;
         auto result = parent;
         while (it != path.end()) {
             // auto child_eq = [&]();
@@ -392,10 +416,11 @@ struct folder_slave_t final : fs::fs_slave_t {
             }
             ++it;
         }
-        return std::make_pair(parent, result);
+        return result;
     }
 
     void post_process(fs::task::scan_dir_t &task, stack_context_t &ctx) noexcept {
+        using checked_chidren_t = std::pmr::set<presentation::presence_t *>;
         auto &ec = task.ec;
         auto folder = context->local_folder->get_folder();
         auto folder_id = folder->get_id();
@@ -413,15 +438,41 @@ struct folder_slave_t final : fs::fs_slave_t {
             }
         }
 
+        auto parent_presence = task.presence.get();
+        auto buffer = std::array<std::byte, 1024 * 128>();
+        auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+        auto allocator = allocator_t(&pool);
+        auto checked_children = checked_chidren_t(allocator);
+
         auto it_disk = task.child_infos.begin();
         while (it_disk != task.child_infos.end()) {
             auto &info = *it_disk;
             if (info.ec) {
                 std::abort();
             } else {
-                stack.push_front(unexamined_t(info));
+                auto presence = get_presence(task.presence.get(), info.path);
+                stack.push_front(unexamined_t(info, presence, task.presence));
+                if (presence) {
+                    checked_children.emplace(presence);
+                }
             }
             ++it_disk;
+        }
+
+        if (parent_presence) {
+            for (auto child : parent_presence->get_children()) {
+                if (!checked_children.count(child)) {
+                    if (child->get_features() & F::directory) {
+                        stack.push_front(removed_dir_t(child));
+                    } else {
+                        auto file = static_cast<presentation::local_file_presence_t *>(child);
+                        auto file_data = file->get_file_info().as_proto(false);
+                        proto::set_deleted(file_data, true);
+                        ctx.push(new model::diff::advance::local_update_t(*actor->cluster, *actor->sequencer,
+                                                                          std::move(file_data), folder_id));
+                    }
+                }
+            }
         }
     }
 
