@@ -402,7 +402,7 @@ void test_simple() {
     F().run();
 }
 
-void test_complex() {
+void test_deleted() {
     struct F : fixture_t {
         std::uint32_t get_hash_limit() override { return 2; }
 
@@ -411,7 +411,7 @@ void test_complex() {
             auto &blocks = cluster->get_blocks();
             auto my_short_id = my_device->device_id().get_uint();
 
-            SECTION("deleted items") {
+            SECTION("sigle items") {
                 auto pr_file = proto::FileInfo{};
                 auto file_name = bfs::path(L"неизменное.bin");
                 proto::set_deleted(pr_file, true);
@@ -487,7 +487,7 @@ void test_complex() {
 int _init() {
     test::init_logging();
     REGISTER_TEST_CASE(test_simple, "test_simple", "[net]");
-    REGISTER_TEST_CASE(test_complex, "test_complex", "[net]");
+    REGISTER_TEST_CASE(test_deleted, "test_deleted", "[net]");
     return 1;
 }
 
