@@ -333,6 +333,39 @@ void test_local_keeper() {
                     CHECK(file_1.get() == file_2.get());
                     CHECK(file_1->is_local());
                 }
+                SECTION("regular file") {
+                    auto path = root_path / file_name;
+                    auto data = std::string("12345");
+                    write_file(path, data);
+                    auto modified = to_unix(bfs::last_write_time(path));
+                    auto status = bfs::status(path);
+                    auto perms = static_cast<uint32_t>(status.permissions());
+
+                    proto::set_permissions(pr_file, perms);
+                    proto::set_modified_s(pr_file, modified);
+                    proto::set_size(pr_file, 5);
+                    proto::set_block_size(pr_file, 5);
+                    auto b = proto::BlockInfo();
+                    proto::set_size(b, 5);
+                    proto::set_hash(b, utils::sha256_digest(as_bytes(data)).value());
+                    proto::add_blocks(pr_file, b);
+
+                    builder->local_update(folder->get_id(), pr_file).apply(*sup);
+                    REQUIRE(files->size() == 1);
+                    REQUIRE(blocks.size() == 1);
+                    auto file_1 = files->by_name(boost::nowide::narrow(file_name.wstring()));
+                    file_1->mark_local(false);
+                    CHECK(!file_1->is_local());
+
+                    builder->scan_start(folder->get_id()).apply(*sup);
+                    REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
+                    REQUIRE(files->size() == 1);
+
+                    auto file_2 = files->by_name(boost::nowide::narrow(file_name.wstring()));
+                    CHECK(file_1.get() == file_2.get());
+                    CHECK(file_1->is_local());
+                    REQUIRE(blocks.size() == 1);
+                }
 
 #ifndef SYNCSPIRIT_WIN
                 SECTION("symlink") {
