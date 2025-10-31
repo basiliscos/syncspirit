@@ -422,7 +422,19 @@ void test_complex() {
                 proto::set_id(counter, my_short_id);
                 proto::set_value(counter, 1);
 
-                builder->local_update(folder->get_id(), pr_file).apply(*sup);
+                SECTION("regular file") { builder->local_update(folder->get_id(), pr_file).apply(*sup); }
+#ifndef SYNCSPIRIT_WIN
+                SECTION("symlink") {
+                    proto::set_symlink_target(pr_file, "does/not/matter");
+                    proto::set_type(pr_file, proto::FileInfoType::SYMLINK);
+                    builder->local_update(folder->get_id(), pr_file).apply(*sup);
+                }
+#endif
+                SECTION("regular dir") {
+                    proto::set_type(pr_file, proto::FileInfoType::DIRECTORY);
+                    builder->local_update(folder->get_id(), pr_file).apply(*sup);
+                }
+
                 REQUIRE(files->size() == 1);
 
                 auto file_1 = files->by_name(boost::nowide::narrow(file_name.wstring()));

@@ -326,7 +326,25 @@ struct folder_slave_t final : fs::fs_slave_t {
         return item->unprocessed_blocks ? -1 : 1;
     }
 
-    int process(removed_dir_t &item, stack_context_t &ctx) noexcept { std::abort(); }
+    int process(removed_dir_t &item, stack_context_t &ctx) noexcept {
+        auto folder_id = context->local_folder->get_folder()->get_id();
+        auto dir = static_cast<presentation::local_file_presence_t *>(item.presence.get());
+        auto dir_data = dir->get_file_info().as_proto(false);
+        ctx.push(new model::diff::advance::local_update_t(*actor->cluster, *actor->sequencer, std::move(dir_data),
+                                                          folder_id));
+        for (auto child : item.presence->get_children()) {
+            if (child->get_features() & F::directory) {
+                stack.push_front(removed_dir_t(child));
+            } else {
+                auto file = static_cast<presentation::local_file_presence_t *>(child);
+                auto file_data = file->get_file_info().as_proto(false);
+                proto::set_deleted(file_data, true);
+                ctx.push(new model::diff::advance::local_update_t(*actor->cluster, *actor->sequencer,
+                                                                  std::move(file_data), folder_id));
+            }
+        }
+        return 1;
+    }
 
     int process(check_child_t &item, stack_context_t &ctx) noexcept { std::abort(); }
 
