@@ -55,7 +55,8 @@ struct child_info_t {
     using blocks_t = std::vector<proto::BlockInfo>;
 
     child_info_t(fs::task::scan_dir_t::child_info_t backend, presentation::presence_ptr_t self_,
-                 presentation::presence_ptr_t parent_): self(std::move(self_)), parent(std::move(parent_)) {
+                 presentation::presence_ptr_t parent_)
+        : self(std::move(self_)), parent(std::move(parent_)) {
         path = std::move(backend.path);
         link_target = std::move(backend.target);
         last_write_time = fs::to_unix(backend.last_write_time);
@@ -75,7 +76,7 @@ struct child_info_t {
         ec = backend.ec;
     }
 
-    proto::FileInfo serialize(const model::folder_info_t& local_folder, blocks_t blocks) {
+    proto::FileInfo serialize(const model::folder_info_t &local_folder, blocks_t blocks) {
         auto data = proto::FileInfo();
         auto name = fs::relativize(path, local_folder.get_folder()->get_path());
         proto::set_name(data, boost::nowide::narrow(name.generic_wstring()));
@@ -119,8 +120,7 @@ struct unscanned_dir_t {
 };
 
 struct unexamined_t : child_info_t {
-    unexamined_t(child_info_t info) : child_info_t(std::move(info)) {
-    }
+    unexamined_t(child_info_t info) : child_info_t(std::move(info)) {}
 };
 struct child_ready_t : child_info_t {
     child_ready_t(child_info_t info, blocks_t blocks_ = {})
@@ -129,7 +129,7 @@ struct child_ready_t : child_info_t {
 };
 struct hash_base_t : fs::payload::extendended_context_t, child_info_t {
     using blocks_t = std::vector<proto::BlockInfo>;
-    hash_base_t(child_info_t &&info_,  fs::payload::extendended_context_prt_t context_)
+    hash_base_t(child_info_t &&info_, fs::payload::extendended_context_prt_t context_)
         : child_info_t{std::move(info_)}, context{std::move(context_)} {
         auto div = fs::get_block_size(size, 0);
         block_size = div.size;
@@ -146,11 +146,11 @@ struct hash_base_t : fs::payload::extendended_context_t, child_info_t {
     fs::payload::extendended_context_prt_t context;
 };
 
-struct hash_new_file_t: hash_base_t {
+struct hash_new_file_t : hash_base_t {
     using hash_base_t::hash_base_t;
 };
 
-struct hash_existing_file_t: hash_base_t {
+struct hash_existing_file_t : hash_base_t {
     using hash_base_t::hash_base_t;
 };
 
@@ -172,8 +172,9 @@ struct removed_dir_t {
     presentation::presence_ptr_t presence;
 };
 
-using stack_item_t = std::variant<unscanned_dir_t, unexamined_t, complete_scan_t, child_ready_t, hash_new_file_ptr_t,
-                                  hash_existing_file_ptr_t, check_child_t, removed_dir_t, suspend_scan_t, unsuspend_scan_t>;
+using stack_item_t =
+    std::variant<unscanned_dir_t, unexamined_t, complete_scan_t, child_ready_t, hash_new_file_ptr_t,
+                 hash_existing_file_ptr_t, check_child_t, removed_dir_t, suspend_scan_t, unsuspend_scan_t>;
 
 struct folder_slave_t final : fs::fs_slave_t {
     using local_keeper_ptr_t = r::intrusive_ptr_t<net::local_keeper_t>;
@@ -279,8 +280,7 @@ struct folder_slave_t final : fs::fs_slave_t {
             auto &file = const_cast<model::file_info_t &>(presence->get_file_info());
             bool match = false;
             auto &type = info.type;
-            auto modification_match =
-                (type == FT::SYMLINK) || (info.last_write_time == file.get_modified_s());
+            auto modification_match = (type == FT::SYMLINK) || (info.last_write_time == file.get_modified_s());
             if (modification_match && info.perms == file.get_permissions()) {
                 if (type == model::file_info_t::as_type(file.get_type())) {
                     if (type == FT::SYMLINK) {
@@ -313,7 +313,7 @@ struct folder_slave_t final : fs::fs_slave_t {
         return 1;
     }
 
-    int schedule_hash(hash_base_t* item,  stack_context_t &ctx) noexcept {
+    int schedule_hash(hash_base_t *item, stack_context_t &ctx) noexcept {
         if (!actor->requested_hashes_limit) {
             return -1;
         }
@@ -352,9 +352,7 @@ struct folder_slave_t final : fs::fs_slave_t {
         return schedule_hash(item.get(), ctx);
     }
 
-    int process(hash_new_file_ptr_t &item, stack_context_t &ctx) noexcept {
-        return schedule_hash(item.get(), ctx);
-    }
+    int process(hash_new_file_ptr_t &item, stack_context_t &ctx) noexcept { return schedule_hash(item.get(), ctx); }
 
     int process(removed_dir_t &item, stack_context_t &ctx) noexcept {
         auto folder_id = context->local_folder->get_folder()->get_id();

@@ -207,7 +207,7 @@ void test_simple() {
                 }
                 SECTION("new dir inside a new ir") {
                     auto name_1 = bfs::path(L"п1");
-                    auto name_2 = name_1  / bfs::path(L"п2");
+                    auto name_2 = name_1 / bfs::path(L"п2");
                     auto dir_path = root_path / name_2;
                     bfs::create_directories(dir_path);
                     builder->scan_start(folder->get_id()).apply(*sup);
@@ -509,43 +509,43 @@ void test_changed() {
             auto &blocks = cluster->get_blocks();
             auto my_short_id = my_device->device_id().get_uint();
             SECTION("single items") {
-                auto data_1 = as_owned_bytes("12345");
-                auto data_2 = as_owned_bytes("67890");
-                auto data_3 = as_owned_bytes("aaaaa");
+                SECTION("change all content of a small file") {
+                    auto data_1 = as_owned_bytes("12345");
+                    auto data_2 = as_owned_bytes("67890");
+                    auto data_x = as_owned_bytes("5432109876");
 
-                auto hash_1 = utils::sha256_digest(data_1).value();
-                auto hash_2 = utils::sha256_digest(data_2).value();
-                auto hash_3 = utils::sha256_digest(data_3).value();
+                    auto hash_1 = utils::sha256_digest(data_1).value();
+                    auto hash_2 = utils::sha256_digest(data_2).value();
+                    auto hash_4 = utils::sha256_digest(data_x).value();
 
-                auto pr_file = proto::FileInfo{};
-                auto file_name = bfs::path(L"файлик.bin");
-                auto file_path = root_path / file_name;
+                    auto pr_file = proto::FileInfo{};
+                    auto file_name = bfs::path(L"файлик.bin");
+                    auto file_path = root_path / file_name;
 
-                proto::set_name(pr_file, file_name.string());
-                proto::set_sequence(pr_file, 4);
-                auto &v = proto::get_version(pr_file);
-                auto &counter = proto::add_counters(v);
-                proto::set_id(counter, my_short_id);
-                proto::set_value(counter, 1);
+                    proto::set_name(pr_file, file_name.string());
+                    proto::set_sequence(pr_file, 4);
+                    auto &v = proto::get_version(pr_file);
+                    auto &counter = proto::add_counters(v);
+                    proto::set_id(counter, my_short_id);
+                    proto::set_value(counter, 1);
 
-                auto b_1 = proto::BlockInfo();
-                proto::set_hash(b_1, hash_1);
-                proto::set_size(b_1, data_1.size());
+                    auto b_1 = proto::BlockInfo();
+                    proto::set_hash(b_1, hash_1);
+                    proto::set_size(b_1, data_1.size());
 
-                auto b_2 = proto::BlockInfo();
-                proto::set_hash(b_2, hash_2);
-                proto::set_offset(b_2, data_1.size());
-                proto::set_size(b_2, data_2.size());
+                    auto b_2 = proto::BlockInfo();
+                    proto::set_hash(b_2, hash_2);
+                    proto::set_offset(b_2, data_1.size());
+                    proto::set_size(b_2, data_2.size());
 
-                proto::add_blocks(pr_file, b_1);
-                proto::add_blocks(pr_file, b_2);
-                proto::set_size(pr_file, data_1.size() + data_2.size());
+                    proto::add_blocks(pr_file, b_1);
+                    proto::add_blocks(pr_file, b_2);
+                    proto::set_size(pr_file, data_1.size() + data_2.size());
 
-                builder->local_update(folder->get_id(), pr_file).apply(*sup);
-                REQUIRE(files->size() == 1);
-                REQUIRE(blocks.size() == 2);
+                    builder->local_update(folder->get_id(), pr_file).apply(*sup);
+                    REQUIRE(files->size() == 1);
+                    REQUIRE(blocks.size() == 2);
 
-                SECTION("change all blocks") {
                     write_file(file_path, "5432109876");
 
                     auto file_1 = files->by_name(boost::nowide::narrow(file_name.wstring()));
@@ -556,10 +556,72 @@ void test_changed() {
                     REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
 
                     CHECK(files->size() == 1);
-                    CHECK(blocks.size() == 2);
+                    CHECK(blocks.size() == 1);
                     auto file_2 = files->by_name(boost::nowide::narrow(file_name.wstring()));
                     CHECK(file_2->is_local());
-                    CHECK(file_2->iterate_blocks().get_total() == 2);
+                    REQUIRE(file_2->iterate_blocks().get_total() == 1);
+                    CHECK(file_2->iterate_blocks().next()->get_hash() == hash_4);
+                    auto seq_2 = file_2->get_sequence();
+                    CHECK(seq_2 > seq_1);
+                }
+                SECTION("append new lbock") {
+                    auto block_sz = fs::block_sizes[0];
+                    auto b1 = std::string(block_sz, '0');
+                    auto b2 = std::string(block_sz, '1');
+                    auto b3 = std::string(block_sz, '2');
+
+                    auto data_1 = as_owned_bytes(b1);
+                    auto data_2 = as_owned_bytes(b2);
+                    auto data_3 = as_owned_bytes(b3);
+
+                    auto hash_1 = utils::sha256_digest(data_1).value();
+                    auto hash_2 = utils::sha256_digest(data_2).value();
+                    auto hash_3 = utils::sha256_digest(data_3).value();
+
+                    auto pr_file = proto::FileInfo{};
+                    auto file_name = bfs::path(L"файлик.bin");
+                    auto file_path = root_path / file_name;
+
+                    proto::set_name(pr_file, file_name.string());
+                    proto::set_sequence(pr_file, 4);
+                    auto &v = proto::get_version(pr_file);
+                    auto &counter = proto::add_counters(v);
+                    proto::set_id(counter, my_short_id);
+                    proto::set_value(counter, 1);
+
+                    auto b_1 = proto::BlockInfo();
+                    proto::set_hash(b_1, hash_1);
+                    proto::set_size(b_1, data_1.size());
+
+                    auto b_2 = proto::BlockInfo();
+                    proto::set_hash(b_2, hash_2);
+                    proto::set_offset(b_2, data_1.size());
+                    proto::set_size(b_2, data_2.size());
+
+                    proto::add_blocks(pr_file, b_1);
+                    proto::add_blocks(pr_file, b_2);
+                    proto::set_size(pr_file, data_1.size() + data_2.size());
+
+                    builder->local_update(folder->get_id(), pr_file).apply(*sup);
+                    REQUIRE(files->size() == 1);
+                    REQUIRE(blocks.size() == 2);
+
+                    write_file(file_path, b1 + b2 + b3);
+
+                    auto file_1 = files->by_name(boost::nowide::narrow(file_name.wstring()));
+                    file_1->mark_local(false);
+                    auto seq_1 = file_1->get_sequence();
+
+                    builder->scan_start(folder->get_id()).apply(*sup);
+                    REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
+
+                    CHECK(files->size() == 1);
+                    CHECK(blocks.size() == 3);
+                    auto file_2 = files->by_name(boost::nowide::narrow(file_name.wstring()));
+                    CHECK(file_2->is_local());
+                    REQUIRE(file_2->iterate_blocks().get_total() == 3);
+                    REQUIRE(file_2->iterate_blocks(2).next()->get_hash() == hash_3);
+                    REQUIRE(file_2->get_size() == block_sz * 3);
                     auto seq_2 = file_2->get_sequence();
                     CHECK(seq_2 > seq_1);
                 }
