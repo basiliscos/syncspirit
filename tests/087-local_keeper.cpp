@@ -689,11 +689,113 @@ void test_changed() {
     F().run();
 }
 
+void test_type_change() {
+    struct F : fixture_t {
+        void main() noexcept override {
+            auto my_short_id = my_device->device_id().get_uint();
+            auto pr_file = proto::FileInfo{};
+            auto file_name = bfs::path(L"файлик.bin");
+            proto::set_name(pr_file, file_name.string());
+            proto::set_sequence(pr_file, 4);
+            auto &v = proto::get_version(pr_file);
+            auto &counter = proto::add_counters(v);
+            proto::set_id(counter, my_short_id);
+            proto::set_value(counter, 1);
+            auto file_path = root_path / file_name;
+
+            SECTION("has been dir") {
+                proto::set_type(pr_file, proto::FileInfoType::DIRECTORY);
+                builder->local_update(folder->get_id(), pr_file).apply(*sup);
+                auto file_1 = files->by_name(boost::nowide::narrow(file_name.wstring()));
+                REQUIRE(file_1->is_dir());
+                auto seq_1 = file_1->get_sequence();
+
+                SECTION(" -> regular file") {
+                    write_file(file_path, "");
+                    builder->scan_start(folder->get_id()).apply(*sup);
+                    REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
+                    auto file_2 = files->by_name(boost::nowide::narrow(file_name.wstring()));
+                    REQUIRE(file_2->is_file());
+                    auto seq_2 = file_2->get_sequence();
+                    CHECK(seq_2 > seq_1);
+                }
+#ifndef SYNCSPIRIT_WIN
+                SECTION(" -> symlink") {
+                    bfs::create_symlink(bfs::path("/some/where"), file_path);
+                    builder->scan_start(folder->get_id()).apply(*sup);
+                    REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
+                    auto file_2 = files->by_name(boost::nowide::narrow(file_name.wstring()));
+                    REQUIRE(file_2->is_link());
+                    auto seq_2 = file_2->get_sequence();
+                    CHECK(seq_2 > seq_1);
+                }
+#endif
+            }
+            SECTION("has been regular file") {
+                proto::set_type(pr_file, proto::FileInfoType::FILE);
+                builder->local_update(folder->get_id(), pr_file).apply(*sup);
+                auto file_1 = files->by_name(boost::nowide::narrow(file_name.wstring()));
+                REQUIRE(file_1->is_file());
+                auto seq_1 = file_1->get_sequence();
+                SECTION(" -> dir") {
+                    bfs::create_directories(file_path);
+                    builder->scan_start(folder->get_id()).apply(*sup);
+                    REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
+                    auto file_2 = files->by_name(boost::nowide::narrow(file_name.wstring()));
+                    REQUIRE(file_2->is_dir());
+                    auto seq_2 = file_2->get_sequence();
+                    CHECK(seq_2 > seq_1);
+                }
+#ifndef SYNCSPIRIT_WIN
+                SECTION(" -> symlink") {
+                    bfs::create_symlink(bfs::path("/some/where"), file_path);
+                    builder->scan_start(folder->get_id()).apply(*sup);
+                    REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
+                    auto file_2 = files->by_name(boost::nowide::narrow(file_name.wstring()));
+                    REQUIRE(file_2->is_link());
+                    auto seq_2 = file_2->get_sequence();
+                    CHECK(seq_2 > seq_1);
+                }
+#endif
+            }
+#ifndef SYNCSPIRIT_WIN
+            SECTION("has been symlink") {
+                proto::set_type(pr_file, proto::FileInfoType::SYMLINK);
+                builder->local_update(folder->get_id(), pr_file).apply(*sup);
+                auto file_1 = files->by_name(boost::nowide::narrow(file_name.wstring()));
+                REQUIRE(file_1->is_link());
+                auto seq_1 = file_1->get_sequence();
+                SECTION(" -> dir") {
+                    bfs::create_directories(file_path);
+                    builder->scan_start(folder->get_id()).apply(*sup);
+                    REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
+                    auto file_2 = files->by_name(boost::nowide::narrow(file_name.wstring()));
+                    REQUIRE(file_2->is_dir());
+                    auto seq_2 = file_2->get_sequence();
+                    CHECK(seq_2 > seq_1);
+                }
+                SECTION(" -> regular file") {
+                    write_file(file_path, "");
+                    builder->scan_start(folder->get_id()).apply(*sup);
+                    REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
+                    auto file_2 = files->by_name(boost::nowide::narrow(file_name.wstring()));
+                    REQUIRE(file_2->is_file());
+                    auto seq_2 = file_2->get_sequence();
+                    CHECK(seq_2 > seq_1);
+                }
+            }
+#endif
+        }
+    };
+    F().run();
+}
+
 int _init() {
     test::init_logging();
     REGISTER_TEST_CASE(test_simple, "test_simple", "[net]");
     REGISTER_TEST_CASE(test_deleted, "test_deleted", "[net]");
     REGISTER_TEST_CASE(test_changed, "test_changed", "[net]");
+    REGISTER_TEST_CASE(test_type_change, "test_type_change", "[net]");
     return 1;
 }
 
