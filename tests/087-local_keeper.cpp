@@ -564,7 +564,7 @@ void test_changed() {
                     auto seq_2 = file_2->get_sequence();
                     CHECK(seq_2 > seq_1);
                 }
-                SECTION("modification time changed") {
+                SECTION("meta changed") {
                     auto data_1_str = std::string("12345");
                     auto data_1 = as_owned_bytes(data_1_str);
                     auto hash_1 = utils::sha256_digest(data_1).value();
@@ -587,11 +587,24 @@ void test_changed() {
                     proto::add_blocks(pr_file, b_1);
                     proto::set_size(pr_file, data_1.size());
 
+                    write_file(file_path, data_1_str);
+
+                    auto status = bfs::status(file_path);
+                    auto modified = to_unix(bfs::last_write_time(file_path));
+                    auto perms = static_cast<uint32_t>(status.permissions());
+
+                    SECTION("modificaiton time changed") {
+                        proto::set_permissions(pr_file, perms);
+                        proto::set_modified_s(pr_file, modified - 1);
+                    }
+                    SECTION("permissions changed") {
+                        proto::set_permissions(pr_file, perms - 1);
+                        proto::set_modified_s(pr_file, modified);
+                    }
+
                     builder->local_update(folder->get_id(), pr_file).apply(*sup);
                     REQUIRE(files->size() == 1);
                     REQUIRE(blocks.size() == 1);
-
-                    write_file(file_path, data_1_str);
 
                     auto file_1 = files->by_name(boost::nowide::narrow(file_name.wstring()));
                     file_1->mark_local(false);
