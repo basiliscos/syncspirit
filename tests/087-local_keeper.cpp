@@ -790,12 +790,55 @@ void test_type_change() {
     F().run();
 }
 
+void test_errors() {
+    struct F : fixture_t {
+        void main() noexcept override {
+            SECTION("root dir errors") {
+                SECTION("missing root dir") {
+                    auto dir_path = root_path / "some-dir";
+                    folder->set_path(dir_path);
+                }
+                SECTION("no permissings to read outer dir") {
+                    auto dir_path = root_path / "some-dir";
+                    folder->set_path(dir_path);
+                    bfs::permissions(root_path, bfs::perms::none);
+                }
+                builder->scan_start(folder->get_id()).apply(*sup);
+                REQUIRE(folder->is_suspended());
+                REQUIRE(folder->get_suspend_reason().message() != "");
+                CHECK(!folder->is_scanning());
+                CHECK(folder->get_scan_finish() >= folder->get_scan_start());
+                bfs::permissions(root_path, bfs::perms::all);
+            }
+            SECTION("non-root errors") {
+                auto dir_path = root_path / "d1" / "d2";
+                auto d1_path = dir_path.parent_path();
+                bfs::create_directories(dir_path);
+
+                auto status = bfs::status(d1_path);
+                auto perms = status.permissions();
+                bfs::permissions(d1_path, perms, bfs::perm_options::remove);
+
+                builder->scan_start(folder->get_id()).apply(*sup);
+                REQUIRE(!folder->is_suspended());
+                CHECK(!folder->is_scanning());
+                CHECK(folder->get_scan_finish() >= folder->get_scan_start());
+                CHECK(files->size() == 1);
+                CHECK((*files->begin())->get_name()->get_own_name() == "d1");
+                bfs::permissions(d1_path, perms, bfs::perm_options::add);
+            }
+        }
+    };
+    F().run();
+}
+
 int _init() {
     test::init_logging();
     REGISTER_TEST_CASE(test_simple, "test_simple", "[net]");
     REGISTER_TEST_CASE(test_deleted, "test_deleted", "[net]");
     REGISTER_TEST_CASE(test_changed, "test_changed", "[net]");
     REGISTER_TEST_CASE(test_type_change, "test_type_change", "[net]");
+    REGISTER_TEST_CASE(test_errors, "test_errors", "[net]");
     return 1;
 }
 

@@ -26,6 +26,8 @@ using namespace syncspirit::net;
 namespace bfs = std::filesystem;
 namespace sys = boost::system;
 
+using boost::nowide::narrow;
+
 namespace {
 
 using allocator_t = std::pmr::polymorphic_allocator<char>;
@@ -79,7 +81,7 @@ struct child_info_t {
     proto::FileInfo serialize(const model::folder_info_t &local_folder, blocks_t blocks) {
         auto data = proto::FileInfo();
         auto name = fs::relativize(path, local_folder.get_folder()->get_path());
-        proto::set_name(data, boost::nowide::narrow(name.generic_wstring()));
+        proto::set_name(data, narrow(name.generic_wstring()));
         proto::set_type(data, type);
         proto::set_modified_s(data, last_write_time);
         proto::set_permissions(data, perms);
@@ -284,7 +286,7 @@ struct folder_slave_t final : fs::fs_slave_t {
             if (modification_match && info.perms == file.get_permissions()) {
                 if (type == model::file_info_t::as_type(file.get_type())) {
                     if (type == FT::SYMLINK) {
-                        auto target = boost::nowide::narrow(info.link_target.generic_wstring());
+                        auto target = narrow(info.link_target.generic_wstring());
                         match = file.get_link_target() == target;
                     } else {
                         match = file.get_size() == info.size;
@@ -344,7 +346,7 @@ struct folder_slave_t final : fs::fs_slave_t {
         blocks_limit -= max_blocks;
         item->unprocessed_blocks -= max_blocks;
 
-        LOG_TRACE(log, "going to rehash {} blocks of '{}'", max_blocks, boost::nowide::narrow(item->path.wstring()));
+        LOG_TRACE(log, "going to rehash {} blocks of '{}'", max_blocks, narrow(item->path.wstring()));
         return item->unprocessed_blocks ? -1 : 1;
     }
 
@@ -482,6 +484,10 @@ struct folder_slave_t final : fs::fs_slave_t {
                     return;
                 }
             }
+        }
+
+        if (task.ec) {
+            actor->log->warn("cannot scan {}: {}", narrow(task.path.wstring()), ec.message());
         }
 
         auto parent_presence = task.presence.get();
