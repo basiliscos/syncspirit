@@ -487,7 +487,7 @@ struct folder_slave_t final : fs::fs_slave_t {
         }
 
         if (task.ec) {
-            actor->log->warn("cannot scan {}: {}", narrow(task.path.wstring()), ec.message());
+            actor->log->warn("cannot scan '{}': {}", narrow(task.path.wstring()), ec.message());
         }
 
         auto parent_presence = task.presence.get();
@@ -499,15 +499,15 @@ struct folder_slave_t final : fs::fs_slave_t {
         auto it_disk = task.child_infos.begin();
         while (it_disk != task.child_infos.end()) {
             auto &info = *it_disk;
+            auto presence = get_presence(task.presence.get(), info.path);
+            if (presence) {
+                checked_children.emplace(presence);
+            }
             if (info.ec) {
-                std::abort();
+                actor->log->warn("scannig of  {} failed: {}", narrow(info.path.wstring()), info.ec.message());
             } else {
-                auto presence = get_presence(task.presence.get(), info.path);
                 auto child = child_info_t(std::move(info), presence, task.presence);
                 stack.push_front(unexamined_t(std::move(child)));
-                if (presence) {
-                    checked_children.emplace(presence);
-                }
             }
             ++it_disk;
         }

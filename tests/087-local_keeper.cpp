@@ -802,12 +802,21 @@ void test_type_change() {
 
 void test_errors() {
     struct F : fixture_t {
+        using task_processor_t = std::function<void(fs::fs_slave_t *)>;
+
+        F() {
+            processor = [&](fs::fs_slave_t *slave) {
+                slave->ec = {};
+                sup->log->info("executing foreign task");
+                slave->exec(executor->hasher);
+            };
+        }
+
         void execute(fs::message::foreign_executor_t &req) noexcept override {
             if (exec_pool) {
-                sup->log->info("executing foreign task (left = {})", exec_pool);
+                sup->log->info("processing foreign task (left = {})", exec_pool);
                 auto slave = static_cast<fs::fs_slave_t *>(req.payload.get());
-                slave->ec = {};
-                slave->exec(executor->hasher);
+                processor(slave);
                 --exec_pool;
             } else {
                 sup->log->info("ignoring foreign task execution");
@@ -860,7 +869,7 @@ void test_errors() {
                 CHECK(files->size() == 0);
             }
 #endif
-            SECTION("scan dir generic error") {
+            SECTION("generic task error") {
                 exec_pool = 2;
                 auto dir_path = root_path / "d1" / "d2";
                 auto d1_path = dir_path.parent_path();
@@ -871,9 +880,49 @@ void test_errors() {
                 CHECK(folder->get_scan_finish() >= folder->get_scan_start());
                 CHECK(files->size() == 1);
             }
+            SECTION("scan dir error (1)") {
+                auto dir_path = root_path / "d1";
+                auto d1_path = dir_path.parent_path();
+                bfs::create_directories(dir_path);
+
+                int mocked = 0;
+                processor = [&](fs::fs_slave_t *slave) {
+                    slave->ec = {};
+                    bool do_exec = true;
+                    if (!slave->tasks_in.empty()) {
+                        auto task = &slave->tasks_in.front();
+                        auto scan_task = std::get_if<fs::task::scan_dir_t>(task);
+                        if (scan_task) {
+                            if (scan_task->path == dir_path) {
+                                ++mocked;
+                                do_exec = false;
+                                scan_task->ec = {};
+                                sup->log->info("mocking result");
+                                auto info = fs::task::scan_dir_t::child_info_t();
+                                info.path = dir_path / "xx";
+                                info.ec = r::make_error_code(r::error_code_t::cancelled);
+                                scan_task->child_infos.emplace_back(std::move(info));
+                                slave->tasks_out.emplace_back(std::move(*task));
+                                slave->tasks_in.pop_front();
+                            }
+                        }
+                    }
+                    if (do_exec) {
+                        sup->log->info("executing foreign task");
+                        slave->exec(executor->hasher);
+                    }
+                };
+
+                builder->scan_start(folder->get_id()).apply(*sup);
+                CHECK(!folder->is_scanning());
+                CHECK(folder->get_scan_finish() >= folder->get_scan_start());
+                CHECK(files->size() == 1);
+                CHECK(mocked == 1);
+            }
         }
 
-        std::uint32_t exec_pool = 999;
+        std::uint32_t exec_pool = 5;
+        task_processor_t processor;
     };
     F().run();
 }
@@ -887,5 +936,8 @@ int _init() {
     REGISTER_TEST_CASE(test_errors, "test_errors", "[net]");
     return 1;
 }
+
+// test for?
+//             actor->log->warn("cannot scan {}: {}", narrow(task.path.wstring()), ec.message());
 
 static int v = _init();
