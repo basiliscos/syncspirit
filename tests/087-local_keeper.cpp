@@ -880,13 +880,10 @@ void test_errors() {
                 CHECK(folder->get_scan_finish() >= folder->get_scan_start());
                 CHECK(files->size() == 1);
             }
-            SECTION("scan dir error (1)") {
-                auto dir_path = root_path / "d1";
-                auto d1_path = dir_path.parent_path();
-                bfs::create_directories(dir_path);
 
-                int mocked = 0;
-                processor = [&](fs::fs_slave_t *slave) {
+            int mocked = 0;
+            auto do_mock = [&](bfs::path dir_path) {
+                processor = [&, dir_path = dir_path](fs::fs_slave_t *slave) {
                     slave->ec = {};
                     bool do_exec = true;
                     if (!slave->tasks_in.empty()) {
@@ -912,12 +909,52 @@ void test_errors() {
                         slave->exec(executor->hasher);
                     }
                 };
+            };
 
-                builder->scan_start(folder->get_id()).apply(*sup);
+            SECTION("scan dir errors") {
+                auto my_short_id = my_device->device_id().get_uint();
+                auto dir_path = root_path / "d1";
+                auto d1_path = dir_path.parent_path();
+                bfs::create_directories(dir_path);
+
+                auto pr_dir = proto::FileInfo{};
+                proto::set_name(pr_dir, "d1");
+                proto::set_sequence(pr_dir, 4);
+                auto &v = proto::get_version(pr_dir);
+                auto &counter = proto::add_counters(v);
+                proto::set_id(counter, my_short_id);
+                proto::set_value(counter, 1);
+                builder->local_update(folder->get_id(), pr_dir).apply(*sup);
+                CHECK(files->size() == 1);
+                auto dir_file = *files->begin();
+
+                SECTION("new file") {
+                    do_mock(dir_path);
+                    builder->scan_start(folder->get_id()).apply(*sup);
+                    CHECK(files->size() == 1);
+                }
+                SECTION("existing file") {
+                    auto pr_file = proto::FileInfo{};
+                    proto::set_name(pr_file, "d1/xx");
+                    proto::set_sequence(pr_file, 5);
+                    auto &v = proto::get_version(pr_file);
+                    auto &counter = proto::add_counters(v);
+                    proto::set_id(counter, my_short_id);
+                    proto::set_value(counter, 1);
+                    builder->local_update(folder->get_id(), pr_file).apply(*sup);
+
+                    do_mock(dir_path);
+                    builder->scan_start(folder->get_id()).apply(*sup);
+                    CHECK(files->size() == 2);
+
+                    auto file = files->by_name("d1/xx");
+                    CHECK(file->is_locally_available());
+                }
+
+                CHECK(dir_file->is_locally_available());
+                CHECK(mocked == 1);
                 CHECK(!folder->is_scanning());
                 CHECK(folder->get_scan_finish() >= folder->get_scan_start());
-                CHECK(files->size() == 1);
-                CHECK(mocked == 1);
             }
         }
 
