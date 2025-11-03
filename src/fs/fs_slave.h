@@ -12,6 +12,7 @@
 
 namespace syncspirit::fs {
 
+namespace sys = boost::system;
 using task_t = std::variant<task::scan_dir_t, task::segment_iterator_t>;
 
 struct SYNCSPIRIT_API fs_slave_t : payload::foreign_executor_t {
@@ -24,6 +25,7 @@ struct SYNCSPIRIT_API fs_slave_t : payload::foreign_executor_t {
 
     tasks_t tasks_in;
     tasks_t tasks_out;
+    sys::error_code ec;
 };
 
 } // namespace syncspirit::fs

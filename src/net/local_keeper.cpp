@@ -620,7 +620,12 @@ void local_keeper_t::on_post_process(fs::message::foreign_executor_t &msg) noexc
     auto folder_id = slave.context->local_folder->get_folder()->get_id();
     auto pending_io = !slave.post_process();
     if (pending_io) {
-        redirect(&msg, fs_addr, address);
+        if (slave.ec) {
+            LOG_ERROR(log, "cannot process folder any longer: {}", slave.ec.message());
+        } else {
+            slave.ec = utils::make_error_code(utils::error_code_t::no_action);
+            redirect(&msg, fs_addr, address);
+        }
     }
 }
 

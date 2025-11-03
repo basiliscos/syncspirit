@@ -3,6 +3,7 @@
 
 #include "access.h"
 #include "diff-builder.h"
+#include "fs/fs_slave.h"
 #include "fs/messages.h"
 #include "fs/utils.h"
 #include "managed_hasher.h"
@@ -67,6 +68,13 @@ struct fixture_t {
 
     virtual std::uint32_t get_hash_limit() { return 1; }
 
+    virtual void execute(fs::message::foreign_executor_t &req) noexcept {
+        sup->log->info("executing foreign task");
+        auto slave = static_cast<fs::fs_slave_t *>(req.payload.get());
+        slave->ec = {};
+        req.payload->exec(executor->hasher);
+    }
+
     void run() noexcept {
         auto my_hash = "KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD";
         auto my_id = device_id_t::from_string(my_hash).value();
@@ -89,10 +97,7 @@ struct fixture_t {
                 [&](auto &p) { p.register_name(net::names::fs_actor, sup->get_address()); });
             plugin.template with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
                 using msg_t = fs::message::foreign_executor_t;
-                p.subscribe_actor(r::lambda<msg_t>([&](msg_t &req) {
-                    sup->log->info("executing foreign task");
-                    req.payload->exec(executor->hasher);
-                }));
+                p.subscribe_actor(r::lambda<msg_t>([&](msg_t &req) { execute(req); }));
             });
         };
 
@@ -797,6 +802,18 @@ void test_type_change() {
 
 void test_errors() {
     struct F : fixture_t {
+        void execute(fs::message::foreign_executor_t &req) noexcept override {
+            if (exec_pool) {
+                sup->log->info("executing foreign task (left = {})", exec_pool);
+                auto slave = static_cast<fs::fs_slave_t *>(req.payload.get());
+                slave->ec = {};
+                slave->exec(executor->hasher);
+                --exec_pool;
+            } else {
+                sup->log->info("ignoring foreign task execution");
+            }
+        }
+
         void main() noexcept override {
             SECTION("root dir errors") {
                 SECTION("missing root dir") {
@@ -843,7 +860,20 @@ void test_errors() {
                 CHECK(files->size() == 0);
             }
 #endif
+            SECTION("scan dir generic error") {
+                exec_pool = 2;
+                auto dir_path = root_path / "d1" / "d2";
+                auto d1_path = dir_path.parent_path();
+                bfs::create_directories(dir_path);
+
+                builder->scan_start(folder->get_id()).apply(*sup);
+                CHECK(!folder->is_scanning());
+                CHECK(folder->get_scan_finish() >= folder->get_scan_start());
+                CHECK(files->size() == 1);
+            }
         }
+
+        std::uint32_t exec_pool = 999;
     };
     F().run();
 }
