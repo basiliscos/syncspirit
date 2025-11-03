@@ -881,37 +881,43 @@ void test_errors() {
                 CHECK(files->size() == 1);
             }
 
-            int mocked = 0;
-            auto do_mock = [&](bfs::path dir_path) {
-                processor = [&, dir_path = dir_path](fs::fs_slave_t *slave) {
-                    slave->ec = {};
-                    bool do_exec = true;
-                    if (!slave->tasks_in.empty()) {
-                        auto task = &slave->tasks_in.front();
-                        auto scan_task = std::get_if<fs::task::scan_dir_t>(task);
-                        if (scan_task) {
-                            if (scan_task->path == dir_path) {
-                                ++mocked;
-                                do_exec = false;
-                                scan_task->ec = {};
-                                sup->log->info("mocking result");
-                                auto info = fs::task::scan_dir_t::child_info_t();
-                                info.path = dir_path / "xx";
-                                info.ec = r::make_error_code(r::error_code_t::cancelled);
-                                scan_task->child_infos.emplace_back(std::move(info));
-                                slave->tasks_out.emplace_back(std::move(*task));
-                                slave->tasks_in.pop_front();
+            SECTION("scan dir errors") {
+                int mocked = 0;
+                auto generator_type = GENERATE(0, 1);
+                auto do_mock = [&](bfs::path dir_path) {
+                    processor = [&, dir_path = dir_path](fs::fs_slave_t *slave) {
+                        slave->ec = {};
+                        bool do_exec = true;
+                        if (!slave->tasks_in.empty()) {
+                            auto task = &slave->tasks_in.front();
+                            auto scan_task = std::get_if<fs::task::scan_dir_t>(task);
+                            if (scan_task) {
+                                if (scan_task->path == dir_path) {
+                                    ++mocked;
+                                    do_exec = false;
+                                    auto ec = r::make_error_code(r::error_code_t::cancelled);
+                                    sup->log->info("mocking result {}", generator_type);
+                                    if (generator_type == 0) {
+                                        scan_task->ec = {};
+                                        auto info = fs::task::scan_dir_t::child_info_t();
+                                        info.path = dir_path / "xx";
+                                        info.ec = ec;
+                                        scan_task->child_infos.emplace_back(std::move(info));
+                                    } else {
+                                        scan_task->ec = ec;
+                                    }
+                                    slave->tasks_out.emplace_back(std::move(*task));
+                                    slave->tasks_in.pop_front();
+                                }
                             }
                         }
-                    }
-                    if (do_exec) {
-                        sup->log->info("executing foreign task");
-                        slave->exec(executor->hasher);
-                    }
+                        if (do_exec) {
+                            sup->log->info("executing foreign task");
+                            slave->exec(executor->hasher);
+                        }
+                    };
                 };
-            };
 
-            SECTION("scan dir errors") {
                 auto my_short_id = my_device->device_id().get_uint();
                 auto dir_path = root_path / "d1";
                 auto d1_path = dir_path.parent_path();
