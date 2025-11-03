@@ -33,35 +33,37 @@ void scan_dir_t::process(fs_slave_t &slave, hasher::hasher_plugin_t *) noexcept 
         auto &child = *it;
         auto child_info = task::scan_dir_t::child_info_t{};
         child_info.path = child;
-        child_info.status = bfs::symlink_status(child, ec);
-        auto &last = child_infos.emplace_back(std::move(child_info));
+        auto status = bfs::symlink_status(child_info.path, ec);
         if (ec) {
-            last.ec = ec;
+            child_info.ec = ec;
+            child_infos.emplace_back(std::move(child_info));
             continue;
         } else {
-            auto file_type = last.status.type();
+            auto file_type = status.type();
             auto is_regular = file_type == FT::regular;
             auto is_dir = file_type == FT::directory;
             auto is_link = file_type == FT::symlink;
             if (!is_regular && !is_dir && !is_link) {
                 continue;
             }
+            auto &last = child_infos.emplace_back(std::move(child_info));
+            last.status = std::move(status);
 
             if (is_regular || is_dir) {
-                last.last_write_time = bfs::last_write_time(child, ec);
+                last.last_write_time = bfs::last_write_time(last.path, ec);
                 if (ec) {
                     last.ec = ec;
                     continue;
                 }
             }
             if (is_regular) {
-                last.size = bfs::file_size(child, ec);
+                last.size = bfs::file_size(last.path, ec);
                 if (ec) {
                     last.ec = ec;
                     continue;
                 }
             } else if (is_link) {
-                last.target = bfs::read_symlink(child, ec);
+                last.target = bfs::read_symlink(last.path, ec);
                 if (ec) {
                     last.ec = ec;
                     continue;

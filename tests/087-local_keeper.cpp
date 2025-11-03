@@ -1,18 +1,23 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // SPDX-FileCopyrightText: 2025 Ivan Baidakou
 
-#include "fs/utils.h"
-#include "test-utils.h"
 #include "access.h"
-#include "test_supervisor.h"
-#include "managed_hasher.h"
 #include "diff-builder.h"
-
-#include "model/cluster.h"
 #include "fs/messages.h"
+#include "fs/utils.h"
+#include "managed_hasher.h"
+#include "model/cluster.h"
 #include "net/local_keeper.h"
 #include "net/names.h"
+#include "test-utils.h"
+#include "test_supervisor.h"
+
 #include <boost/nowide/convert.hpp>
+
+#ifndef SYNCSPIRIT_WIN
+#include <sys/types.h>
+#include <sys/stat.h>
+#endif
 
 using namespace syncspirit;
 using namespace syncspirit::test;
@@ -810,7 +815,8 @@ void test_errors() {
                 CHECK(folder->get_scan_finish() >= folder->get_scan_start());
                 bfs::permissions(root_path, bfs::perms::all);
             }
-            SECTION("non-root errors") {
+#ifndef SYNCSPIRIT_WIN
+            SECTION("non-root errors (non-win32)") {
                 auto dir_path = root_path / "d1" / "d2";
                 auto d1_path = dir_path.parent_path();
                 bfs::create_directories(dir_path);
@@ -827,6 +833,16 @@ void test_errors() {
                 CHECK((*files->begin())->get_name()->get_own_name() == "d1");
                 bfs::permissions(d1_path, perms, bfs::perm_options::add);
             }
+            SECTION("non-sync'able entity (named fifo file)") {
+                auto fifo_path = root_path / "fifo";
+                auto fifo_str = boost::nowide::narrow(fifo_path.wstring());
+                REQUIRE(mknod(fifo_str.c_str(), S_IFIFO | 0666, 0) == 0);
+                builder->scan_start(folder->get_id()).apply(*sup);
+                CHECK(!folder->is_scanning());
+                CHECK(folder->get_scan_finish() >= folder->get_scan_start());
+                CHECK(files->size() == 0);
+            }
+#endif
         }
     };
     F().run();
