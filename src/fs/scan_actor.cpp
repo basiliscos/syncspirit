@@ -314,7 +314,7 @@ void scan_actor_t::on_hash(hasher::message::digest_t &res) noexcept {
             if (valid_blocks_count) {
                 task.push(new model::diff::local::blocks_availability_t(*file, fi, info.valid_blocks()));
             } else {
-                LOG_DEBUG(log, "file '{}' has no unknown local blocks, ingnoring", *file);
+                LOG_DEBUG(log, "file '{}' has no unknown local blocks, ignoring", *file);
             }
         } else {
             auto &file = *info.get_file();

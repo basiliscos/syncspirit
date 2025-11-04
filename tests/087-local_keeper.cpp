@@ -78,6 +78,10 @@ struct fixture_t {
         req.payload->exec(executor->hasher);
     }
 
+    virtual void launch_hasher() noexcept {
+        hasher = sup->create_actor<managed_hasher_t>().index(1).auto_reply(true).timeout(timeout).finish().get();
+    }
+
     void run() noexcept {
         auto my_hash = "KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD";
         auto my_id = device_id_t::from_string(my_hash).value();
@@ -123,7 +127,7 @@ struct fixture_t {
         CHECK(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::OPERATIONAL);
 
         executor = sup->create_actor<executor_t>().timeout(timeout).finish();
-        hasher = sup->create_actor<managed_hasher_t>().index(1).auto_reply(true).timeout(timeout).finish().get();
+        launch_hasher();
         sup->do_process();
 
         auto fs_config = config::fs_config_t{3600, 10, 1024 * 1024, files_scan_iteration_limit};
@@ -147,7 +151,7 @@ struct fixture_t {
                      .timeout(timeout)
                      .cluster(cluster)
                      .sequencer(make_sequencer(77))
-                     .requested_hashes_limit(get_hash_limit())
+                     .concurrent_hashes(get_hash_limit())
                      .finish();
         sup->do_process();
 
@@ -1079,6 +1083,31 @@ void test_read_errors() {
     F().run();
 };
 
+void test_leaks() {
+    struct F : fixture_t {
+        void launch_hasher() noexcept override {
+            hasher = sup->create_actor<managed_hasher_t>().index(1).auto_reply(false).timeout(timeout).finish().get();
+        }
+        void main() noexcept override {
+            SECTION("small unknown file") {
+                write_file(root_path / "file-1.bin", "12345");
+                write_file(root_path / "file-2.bin", "12345");
+                builder->scan_start(folder->get_id()).apply(*sup);
+                CHECK(folder->is_scanning());
+
+                target->do_shutdown();
+                sup->do_process();
+                CHECK(folder->get_scan_finish() >= folder->get_scan_start());
+                CHECK(files->size() == 0);
+
+                hasher->process_requests();
+                sup->do_process();
+            }
+        }
+    };
+    F().run();
+}
+
 int _init() {
     test::init_logging();
     REGISTER_TEST_CASE(test_simple, "test_simple", "[net]");
@@ -1087,7 +1116,11 @@ int _init() {
     REGISTER_TEST_CASE(test_type_change, "test_type_change", "[net]");
     REGISTER_TEST_CASE(test_scan_errors, "test_scan_errors", "[net]");
     REGISTER_TEST_CASE(test_read_errors, "test_read_errors", "[net]");
+    // REGISTER_TEST_CASE(test_leaks, "test_leaks", "[net]");
     return 1;
 }
+
+// task.push(new model::diff::local::blocks_availability_t(*file, fi, info.valid_blocks()));
+// hashing errors -> shutdown?
 
 static int v = _init();

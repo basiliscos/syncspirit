@@ -226,12 +226,16 @@ struct folder_slave_t final : fs::fs_slave_t {
     }
 
     int process(complete_scan_t &, stack_context_t &ctx) noexcept {
-        using clock_t = r::pt::microsec_clock;
-        auto folder = context->local_folder->get_folder();
-        auto folder_id = folder->get_id();
-        auto now = clock_t::local_time();
-        ctx.push(new model::diff::local::scan_finish_t(folder_id, now));
-        return 0;
+        auto nothing_left = pending_io.empty() && (actor->concurrent_hashes_left == actor->concurrent_hashes_limit) &&
+                            (actor->fs_tasks == 0);
+        if (nothing_left) {
+            using clock_t = r::pt::microsec_clock;
+            auto folder = context->local_folder->get_folder();
+            auto folder_id = folder->get_id();
+            auto now = clock_t::local_time();
+            ctx.push(new model::diff::local::scan_finish_t(folder_id, now));
+        }
+        return -1;
     }
 
     int process(unscanned_dir_t &dir, stack_context_t &ctx) noexcept {
@@ -252,10 +256,10 @@ struct folder_slave_t final : fs::fs_slave_t {
         } else {
             assert(type == proto::FileInfoType::FILE);
             if (!child_info.size || child_info.self) {
-                stack.push_front(child_ready_t(std::move(child_info)));
+                stack.emplace_front(child_ready_t(std::move(child_info)));
             } else {
                 auto ptr = hash_new_file_ptr_t(new hash_new_file_t(std::move(child_info), this));
-                stack.emplace_back(std::move(ptr));
+                stack.emplace_front(std::move(ptr));
             }
         }
         return 1;
@@ -267,8 +271,10 @@ struct folder_slave_t final : fs::fs_slave_t {
         auto &ec = item.ec;
         LOG_TRACE(log, "suspending '{}', due to: {}", folder_id, ec.message());
         ctx.push(new model::diff::modify::suspend_folder_t(*folder, true, ec));
-        while (stack.size() > 1) {
-            stack.pop_front();
+        auto it = stack.begin();
+        std::advance(it, 1);
+        while (it != stack.end() && (&*it != &stack.back())) {
+            it = stack.erase(it);
         }
         return 1;
     }
@@ -308,7 +314,7 @@ struct folder_slave_t final : fs::fs_slave_t {
             } else {
                 if (info.size && info.blocks.empty()) {
                     auto ptr = hash_existing_file_ptr_t(new hash_existing_file_t(std::move(info), this));
-                    stack.emplace_back(std::move(ptr));
+                    stack.emplace_front(std::move(ptr));
                 } else {
                     emit_update = true;
                 }
@@ -333,7 +339,7 @@ struct folder_slave_t final : fs::fs_slave_t {
 
             return 1;
         }
-        if (!actor->requested_hashes_limit) {
+        if (!actor->concurrent_hashes_left) {
             return -1;
         }
         auto folder = context->local_folder->get_folder();
@@ -342,7 +348,7 @@ struct folder_slave_t final : fs::fs_slave_t {
 
         auto total_blocks = item->total_blocks;
         auto block_size = item->block_size;
-        auto &blocks_limit = actor->requested_hashes_limit;
+        auto &blocks_limit = actor->concurrent_hashes_left;
         auto first_block = item->total_blocks - item->unprocessed_blocks;
         auto max_blocks = std::min(blocks_limit, item->unprocessed_blocks);
         auto last_block_sz = [&]() -> std::int32_t {
@@ -436,7 +442,7 @@ struct folder_slave_t final : fs::fs_slave_t {
             auto copy = static_cast<child_info_t &>(hash_file);
             stack.push_front(child_ready_t(std::move(copy), std::move(blocks)));
         }
-        ++actor->requested_hashes_limit;
+        ++actor->concurrent_hashes_left;
         return post_process();
     }
 
@@ -507,6 +513,7 @@ struct folder_slave_t final : fs::fs_slave_t {
         if (ec) {
             auto ctx = static_cast<hash_base_t *>(task.context.get());
             auto delta = task.block_count - task.current_block;
+            this->actor->concurrent_hashes_left += delta;
             if (ctx->commit_error(ec, delta)) {
                 LOG_WARN(actor->log, "I/O error during processing '{}': {}", narrow(task.path.generic_wstring()),
                          ec.message());
@@ -570,10 +577,11 @@ struct folder_slave_t final : fs::fs_slave_t {
 
 local_keeper_t::local_keeper_t(config_t &config)
     : r::actor_base_t(config), sequencer{std::move(config.sequencer)}, cluster{config.cluster},
-      requested_hashes_limit{static_cast<std::int32_t>(config.requested_hashes_limit)} {
+      concurrent_hashes_left{static_cast<std::int32_t>(config.concurrent_hashes)},
+      concurrent_hashes_limit{concurrent_hashes_left} {
     assert(cluster);
     assert(sequencer);
-    assert(requested_hashes_limit);
+    assert(concurrent_hashes_left);
 }
 
 void local_keeper_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
@@ -633,6 +641,7 @@ auto local_keeper_t::operator()(const model::diff::local::scan_start_t &diff, vo
         backend->process_stack();
         auto slave = fs::payload::foreign_executor_prt_t(backend);
         route<fs::payload::foreign_executor_prt_t>(fs_addr, address, std::move(slave));
+        ++fs_tasks;
     } else {
         LOG_DEBUG(log, "skipping scan of {}", diff.folder_id);
     }
@@ -640,6 +649,8 @@ auto local_keeper_t::operator()(const model::diff::local::scan_start_t &diff, vo
 }
 
 void local_keeper_t::on_post_process(fs::message::foreign_executor_t &msg) noexcept {
+    --fs_tasks;
+    assert(fs_tasks >= 0);
     auto &slave = static_cast<folder_slave_t &>(*msg.payload.get());
     auto folder_id = slave.context->local_folder->get_folder()->get_id();
     auto pending_io = !slave.post_process();
@@ -649,6 +660,7 @@ void local_keeper_t::on_post_process(fs::message::foreign_executor_t &msg) noexc
         } else {
             slave.ec = utils::make_error_code(utils::error_code_t::no_action);
             redirect(&msg, fs_addr, address);
+            ++fs_tasks;
         }
     }
 }
@@ -661,5 +673,6 @@ void local_keeper_t::on_digest(hasher::message::digest_t &msg) noexcept {
     auto pending_io = !slave.post_process(hash_file, msg);
     if (pending_io) {
         route<fs::payload::foreign_executor_prt_t>(fs_addr, address, &slave);
+        ++fs_tasks;
     }
 }
