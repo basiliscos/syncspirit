@@ -1003,40 +1003,46 @@ void test_read_errors() {
                 CHECK(files->size() == 0);
             }
 #endif
-            SECTION("large unknown file, last piece error") {
+            SECTION("large unknown file") {
                 auto file_path = root_path / "file.bin";
                 auto block_sz = fs::block_sizes[0];
                 auto count = std::uint32_t{5};
                 auto b = std::string(block_sz * count, 'x');
                 write_file(file_path, b);
 
-                processor = [&, count](fs::fs_slave_t *slave) {
-                    slave->ec = {};
-                    bool do_exec = true;
-                    if (!slave->tasks_in.empty()) {
-                        auto task = &slave->tasks_in.front();
-                        auto iterator = std::get_if<fs::task::segment_iterator_t>(task);
-                        if (iterator) {
-                            if (iterator->block_index + 1 == count) {
-                                do_exec = false;
-                                auto ec = r::make_error_code(r::error_code_t::cancelled);
-                                iterator->ec = ec;
-                                sup->log->info("mocking result");
-                                slave->tasks_out.emplace_back(std::move(*task));
-                                slave->tasks_in.pop_front();
+                auto do_mock = [&](std::int32_t block_index) {
+                    processor = [&, count, block_index](fs::fs_slave_t *slave) {
+                        slave->ec = {};
+                        bool do_exec = true;
+                        if (!slave->tasks_in.empty()) {
+                            auto task = &slave->tasks_in.front();
+                            auto iterator = std::get_if<fs::task::segment_iterator_t>(task);
+                            if (iterator) {
+                                if (iterator->block_index == block_index) {
+                                    do_exec = false;
+                                    auto ec = r::make_error_code(r::error_code_t::cancelled);
+                                    iterator->ec = ec;
+                                    sup->log->info("mocking result {} block", block_index);
+                                    slave->tasks_out.emplace_back(std::move(*task));
+                                    slave->tasks_in.pop_front();
+                                }
                             }
                         }
-                    }
-                    if (do_exec) {
-                        sup->log->info("executing foreign task");
-                        slave->exec(executor->hasher);
-                    }
+                        if (do_exec) {
+                            sup->log->info("executing foreign task");
+                            slave->exec(executor->hasher);
+                        }
+                    };
                 };
+
+                auto block_index = GENERATE(0, 1, 2, 3, 4);
+                do_mock(block_index);
 
                 builder->scan_start(folder->get_id()).apply(*sup);
                 CHECK(!folder->is_scanning());
                 CHECK(folder->get_scan_finish() >= folder->get_scan_start());
                 CHECK(files->size() == 0);
+                CHECK(hasher->digested_blocks <= block_index);
             }
         }
         std::uint32_t exec_pool = 10;

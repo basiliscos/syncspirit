@@ -41,6 +41,7 @@ void managed_hasher_t::process_requests() noexcept {
         req->payload.result = utils::bytes_t(digest, digest + SZ);
         redirect(req, std::exchange(req->next_route, {}));
         digested_bytes += data.size();
+        ++digested_blocks;
     }
 }
 

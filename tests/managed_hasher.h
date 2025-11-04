@@ -45,6 +45,7 @@ struct SYNCSPIRIT_TEST_API managed_hasher_t : r::actor_base_t {
 
     uint32_t index;
     std::uint64_t digested_bytes = 0;
+    std::uint32_t digested_blocks = 0;
     bool auto_reply;
     utils::logger_t log;
     digest_queue_t digest_queue;

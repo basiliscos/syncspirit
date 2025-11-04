@@ -141,8 +141,7 @@ struct hash_base_t : fs::payload::extendended_context_t, child_info_t {
 
     bool commit_error(std::int32_t delta) {
         errored_blocks += delta;
-        // return errored_blocks + unprocessed_blocks + unhashed_blocks + == total_blocks;
-        return errored_blocks == unhashed_blocks;
+        return errored_blocks + unprocessed_blocks == unhashed_blocks;
     }
 
     std::int32_t block_size;
