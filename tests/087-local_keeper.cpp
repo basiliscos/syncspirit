@@ -63,7 +63,8 @@ struct fixture_t {
     using target_ptr_t = r::intrusive_ptr_t<net::local_keeper_t>;
     using builder_ptr_t = std::unique_ptr<diff_builder_t>;
 
-    fixture_t() noexcept : root_path{unique_path()}, path_guard{root_path} {
+    fixture_t(bool auto_launch_ = true) noexcept
+        : root_path{unique_path()}, path_guard{root_path}, auto_launch{auto_launch_} {
         test::init_logging();
         bfs::create_directory(root_path);
     }
@@ -128,6 +129,20 @@ struct fixture_t {
         auto fs_config = config::fs_config_t{3600, 10, 1024 * 1024, files_scan_iteration_limit};
         rw_cache.reset(new fs::file_cache_t(5));
 
+        if (auto_launch) {
+            launch_target();
+        }
+
+        main();
+
+        sup->do_process();
+        sup->shutdown();
+        sup->do_process();
+
+        CHECK(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::SHUT_DOWN);
+    }
+
+    void launch_target() {
         target = sup->create_actor<net::local_keeper_t>()
                      .timeout(timeout)
                      .cluster(cluster)
@@ -138,14 +153,6 @@ struct fixture_t {
 
         sup->send<syncspirit::model::payload::thread_ready_t>(sup->get_address(), cluster, std::this_thread::get_id());
         sup->do_process();
-
-        main();
-
-        sup->do_process();
-        sup->shutdown();
-        sup->do_process();
-
-        CHECK(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::SHUT_DOWN);
     }
 
     virtual void main() noexcept {}
@@ -168,6 +175,7 @@ struct fixture_t {
     model::file_infos_map_t *files_peer;
     model::device_ptr_t peer_device;
     fs::file_cache_ptr_t rw_cache;
+    bool auto_launch;
 };
 
 void test_simple() {
@@ -972,13 +980,15 @@ void test_scan_errors() {
 
 void test_read_errors() {
     struct F : fixture_t {
-        F() {
+        F() : fixture_t{false} {
             processor = [&](fs::fs_slave_t *slave) {
                 slave->ec = {};
                 sup->log->info("executing foreign task");
                 slave->exec(executor->hasher);
             };
         }
+
+        std::uint32_t get_hash_limit() override { return hash_limit; }
 
         void execute(fs::message::foreign_executor_t &req) noexcept override {
             if (exec_pool) {
@@ -994,6 +1004,7 @@ void test_read_errors() {
         void main() noexcept override {
 #ifndef SYNCSPIRIT_WIN
             SECTION("small unknown file") {
+                launch_target();
                 auto file_path = root_path / "file.bin";
                 write_file(file_path, "12345");
                 bfs::permissions(file_path, bfs::perms::all, bfs::perm_options::remove);
@@ -1035,18 +1046,35 @@ void test_read_errors() {
                     };
                 };
 
-                auto block_index = GENERATE(0, 1, 2, 3, 4);
-                do_mock(block_index);
+                using pair_t = std::tuple<std::int32_t, std::int32_t>;
+                // clang-format off
+                auto pair = GENERATE(table<std::int32_t, std::int32_t>({
+                    pair_t{0, 1},
+                    pair_t{1, 1},
+                    pair_t{2, 1},
+                    pair_t{3, 1},
+                    pair_t{4, 1},
+                    pair_t{2, 2},
+                }));
+                // clang-format on
 
+                std::int32_t block_index;
+                std::tie(block_index, hash_limit) = pair;
+
+                do_mock(block_index);
+                launch_target();
+
+                INFO("block index = " << block_index << ", hash limit = " << hash_limit);
                 builder->scan_start(folder->get_id()).apply(*sup);
                 CHECK(!folder->is_scanning());
                 CHECK(folder->get_scan_finish() >= folder->get_scan_start());
                 CHECK(files->size() == 0);
-                CHECK(hasher->digested_blocks <= block_index);
+                CHECK(hasher->digested_blocks <= block_index + hash_limit);
             }
         }
         std::uint32_t exec_pool = 10;
         task_processor_t processor;
+        std::uint32_t hash_limit = 1;
     };
     F().run();
 };

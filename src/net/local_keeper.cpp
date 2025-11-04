@@ -139,16 +139,20 @@ struct hash_base_t : fs::payload::extendended_context_t, child_info_t {
         blocks.resize(total_blocks);
     }
 
-    bool commit_error(std::int32_t delta) {
+    bool commit_error(sys::error_code ec_, std::int32_t delta) {
+        ec = ec_;
         errored_blocks += delta;
         return errored_blocks + unprocessed_blocks == unhashed_blocks;
     }
+
+    bool commit_hash() const { return errored_blocks + unprocessed_blocks + unhashed_blocks == total_blocks; }
 
     std::int32_t block_size;
     std::int32_t total_blocks;
     std::int32_t unprocessed_blocks;
     std::int32_t unhashed_blocks;
     std::int32_t errored_blocks = 0;
+    sys::error_code ec;
     blocks_t blocks;
     fs::payload::extendended_context_prt_t context;
 };
@@ -322,6 +326,11 @@ struct folder_slave_t final : fs::fs_slave_t {
 
     int schedule_hash(hash_base_t *item, stack_context_t &ctx) noexcept {
         if (item->errored_blocks) {
+            if (item->commit_hash()) {
+                LOG_WARN(actor->log, "I/O error during processing '{}': {}", narrow(item->path.generic_wstring()),
+                         item->ec.message());
+            }
+
             return 1;
         }
         if (!actor->requested_hashes_limit) {
@@ -334,7 +343,7 @@ struct folder_slave_t final : fs::fs_slave_t {
         auto total_blocks = item->total_blocks;
         auto block_size = item->block_size;
         auto &blocks_limit = actor->requested_hashes_limit;
-        auto processed_blocks = item->total_blocks - item->unprocessed_blocks;
+        auto first_block = item->total_blocks - item->unprocessed_blocks;
         auto max_blocks = std::min(blocks_limit, item->unprocessed_blocks);
         auto last_block_sz = [&]() -> std::int32_t {
             if (item->unprocessed_blocks == max_blocks) {
@@ -346,15 +355,16 @@ struct folder_slave_t final : fs::fs_slave_t {
             return block_size;
         }();
         assert(last_block_sz > 0);
-        auto offset = std::int64_t{processed_blocks} * block_size;
+        auto offset = std::int64_t{first_block} * block_size;
         auto task_ctx = hasher::payload::extendended_context_prt_t(item);
-        auto sub_task = fs::task::segment_iterator_t(actor->get_address(), item, item->path, offset, processed_blocks,
+        auto sub_task = fs::task::segment_iterator_t(actor->get_address(), item, item->path, offset, first_block,
                                                      max_blocks, block_size, last_block_sz);
         pending_io.emplace_back(std::move(sub_task));
         blocks_limit -= max_blocks;
         item->unprocessed_blocks -= max_blocks;
 
-        LOG_TRACE(log, "going to rehash {} blocks of '{}'", max_blocks, narrow(item->path.wstring()));
+        LOG_TRACE(log, "going to rehash {} block(s) ({}..{}) of '{}'", max_blocks, first_block,
+                  first_block + max_blocks, narrow(item->path.wstring()));
         return item->unprocessed_blocks ? -1 : 1;
     }
 
@@ -493,12 +503,13 @@ struct folder_slave_t final : fs::fs_slave_t {
     }
 
     void post_process(fs::task::segment_iterator_t &task, stack_context_t &ctx) noexcept {
-        if (task.ec) {
+        auto &ec = task.ec;
+        if (ec) {
             auto ctx = static_cast<hash_base_t *>(task.context.get());
             auto delta = task.block_count - task.current_block;
-            if (ctx->commit_error(delta)) {
+            if (ctx->commit_error(ec, delta)) {
                 LOG_WARN(actor->log, "I/O error during processing '{}': {}", narrow(task.path.generic_wstring()),
-                         task.ec.message());
+                         ec.message());
             }
         }
     }
