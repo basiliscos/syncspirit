@@ -321,6 +321,9 @@ struct folder_slave_t final : fs::fs_slave_t {
     }
 
     int schedule_hash(hash_base_t *item, stack_context_t &ctx) noexcept {
+        if (item->errored_blocks) {
+            return 1;
+        }
         if (!actor->requested_hashes_limit) {
             return -1;
         }
