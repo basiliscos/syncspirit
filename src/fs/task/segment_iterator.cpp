@@ -14,6 +14,7 @@ segment_iterator_t::segment_iterator_t(const r::address_ptr_t &back_addr_,
                                        std::int32_t block_size_, std::int32_t last_block_size_) noexcept
     : back_addr{back_addr_}, context{std::move(context_)}, path{std::move(path_)}, offset{offset_},
       block_index{block_index_}, block_count{block_count_}, block_size{block_size_}, last_block_size{last_block_size_} {
+    assert(block_count > 0);
 }
 
 void segment_iterator_t::process(fs_slave_t &fs_slave, hasher::hasher_plugin_t *hasher) noexcept {

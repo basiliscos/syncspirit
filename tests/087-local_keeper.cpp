@@ -27,6 +27,8 @@ using namespace syncspirit::net;
 using namespace syncspirit::fs;
 using namespace syncspirit::hasher;
 
+using task_processor_t = std::function<void(fs::fs_slave_t *)>;
+
 struct executor_t : r::actor_base_t {
     using parent_t = r::actor_base_t;
     using parent_t::parent_t;
@@ -800,10 +802,8 @@ void test_type_change() {
     F().run();
 }
 
-void test_errors() {
+void test_scan_errors() {
     struct F : fixture_t {
-        using task_processor_t = std::function<void(fs::fs_slave_t *)>;
-
         F() {
             processor = [&](fs::fs_slave_t *slave) {
                 slave->ec = {};
@@ -970,17 +970,90 @@ void test_errors() {
     F().run();
 }
 
+void test_read_errors() {
+    struct F : fixture_t {
+        F() {
+            processor = [&](fs::fs_slave_t *slave) {
+                slave->ec = {};
+                sup->log->info("executing foreign task");
+                slave->exec(executor->hasher);
+            };
+        }
+
+        void execute(fs::message::foreign_executor_t &req) noexcept override {
+            if (exec_pool) {
+                sup->log->info("processing foreign task (left = {})", exec_pool);
+                auto slave = static_cast<fs::fs_slave_t *>(req.payload.get());
+                processor(slave);
+                --exec_pool;
+            } else {
+                sup->log->info("ignoring foreign task execution");
+            }
+        }
+
+        void main() noexcept override {
+#ifndef SYNCSPIRIT_WIN
+            SECTION("small unknown file") {
+                auto file_path = root_path / "file.bin";
+                write_file(file_path, "12345");
+                bfs::permissions(file_path, bfs::perms::all, bfs::perm_options::remove);
+                builder->scan_start(folder->get_id()).apply(*sup);
+                CHECK(!folder->is_scanning());
+                CHECK(folder->get_scan_finish() >= folder->get_scan_start());
+                CHECK(files->size() == 0);
+            }
+#endif
+            SECTION("large unknown file, last piece error") {
+                auto file_path = root_path / "file.bin";
+                auto block_sz = fs::block_sizes[0];
+                auto count = std::uint32_t{5};
+                auto b = std::string(block_sz * count, 'x');
+                write_file(file_path, b);
+
+                processor = [&, count](fs::fs_slave_t *slave) {
+                    slave->ec = {};
+                    bool do_exec = true;
+                    if (!slave->tasks_in.empty()) {
+                        auto task = &slave->tasks_in.front();
+                        auto iterator = std::get_if<fs::task::segment_iterator_t>(task);
+                        if (iterator) {
+                            if (iterator->block_index + 1 == count) {
+                                do_exec = false;
+                                auto ec = r::make_error_code(r::error_code_t::cancelled);
+                                iterator->ec = ec;
+                                sup->log->info("mocking result");
+                                slave->tasks_out.emplace_back(std::move(*task));
+                                slave->tasks_in.pop_front();
+                            }
+                        }
+                    }
+                    if (do_exec) {
+                        sup->log->info("executing foreign task");
+                        slave->exec(executor->hasher);
+                    }
+                };
+
+                builder->scan_start(folder->get_id()).apply(*sup);
+                CHECK(!folder->is_scanning());
+                CHECK(folder->get_scan_finish() >= folder->get_scan_start());
+                CHECK(files->size() == 0);
+            }
+        }
+        std::uint32_t exec_pool = 10;
+        task_processor_t processor;
+    };
+    F().run();
+};
+
 int _init() {
     test::init_logging();
     REGISTER_TEST_CASE(test_simple, "test_simple", "[net]");
     REGISTER_TEST_CASE(test_deleted, "test_deleted", "[net]");
     REGISTER_TEST_CASE(test_changed, "test_changed", "[net]");
     REGISTER_TEST_CASE(test_type_change, "test_type_change", "[net]");
-    REGISTER_TEST_CASE(test_errors, "test_errors", "[net]");
+    REGISTER_TEST_CASE(test_scan_errors, "test_scan_errors", "[net]");
+    REGISTER_TEST_CASE(test_read_errors, "test_read_errors", "[net]");
     return 1;
 }
-
-// test for?
-//             actor->log->warn("cannot scan {}: {}", narrow(task.path.wstring()), ec.message());
 
 static int v = _init();

@@ -139,11 +139,17 @@ struct hash_base_t : fs::payload::extendended_context_t, child_info_t {
         blocks.resize(total_blocks);
     }
 
+    bool commit_error(std::int32_t delta) {
+        errored_blocks += delta;
+        // return errored_blocks + unprocessed_blocks + unhashed_blocks + == total_blocks;
+        return errored_blocks == unhashed_blocks;
+    }
+
     std::int32_t block_size;
     std::int32_t total_blocks;
-    std::int32_t processing_blocks = 0;
-    std::int32_t unprocessed_blocks = 0;
-    std::int32_t unhashed_blocks = 0;
+    std::int32_t unprocessed_blocks;
+    std::int32_t unhashed_blocks;
+    std::int32_t errored_blocks = 0;
     blocks_t blocks;
     fs::payload::extendended_context_prt_t context;
 };
@@ -422,51 +428,6 @@ struct folder_slave_t final : fs::fs_slave_t {
         return post_process();
     }
 
-    presentation::presence_t *get_presence(presentation::presence_t *parent, const bfs::path &path) {
-        struct comparator_t {
-            bool operator()(const presentation::presence_t *p, const bfs::path &name) const {
-                auto buffer = std::array<std::byte, 1024>();
-                auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
-                auto allocator = allocator_t(&pool);
-                auto own_wname = std::pmr::wstring(allocator);
-                auto cp = static_cast<const presentation::cluster_file_presence_t *>(p);
-                auto own_name = cp->get_file_info().get_name()->get_own_name();
-                own_wname.resize(own_name.size() + 1);
-                auto b = own_name.data();
-                auto e = b + own_name.size();
-                auto str = boost::nowide::widen(own_wname.data(), own_wname.size(), b, e);
-                assert(str);
-                auto wname = std::wstring_view(str, str + own_name.size());
-                return wname < name.wstring();
-            }
-        };
-        if (!parent) {
-            return nullptr;
-        }
-        LOG_TRACE(log, "get_presence for {}", path.string());
-        auto folder = context->local_folder->get_folder();
-        auto folder_id = folder->get_id();
-        auto &root_path = folder->get_path();
-        auto skip = std::distance(root_path.begin(), root_path.end());
-        auto it = path.begin();
-        std::advance(it, skip);
-        auto result = parent;
-        while (it != path.end()) {
-            // auto child_eq = [&]();
-            auto &children = parent->get_children();
-            auto it_child = std::lower_bound(children.begin(), children.end(), *it, comparator_t{});
-            if (it_child != children.end()) {
-                parent = result;
-                result = *it_child;
-            } else {
-                result = {};
-                break;
-            }
-            ++it;
-        }
-        return result;
-    }
-
     void post_process(fs::task::scan_dir_t &task, stack_context_t &ctx) noexcept {
         using checked_chidren_t = std::pmr::set<presentation::presence_t *>;
         auto &ec = task.ec;
@@ -531,8 +492,58 @@ struct folder_slave_t final : fs::fs_slave_t {
 
     void post_process(fs::task::segment_iterator_t &task, stack_context_t &ctx) noexcept {
         if (task.ec) {
-            std::abort();
+            auto ctx = static_cast<hash_base_t *>(task.context.get());
+            auto delta = task.block_count - task.current_block;
+            if (ctx->commit_error(delta)) {
+                LOG_WARN(actor->log, "I/O error during processing '{}': {}", narrow(task.path.generic_wstring()),
+                         task.ec.message());
+            }
         }
+    }
+
+    presentation::presence_t *get_presence(presentation::presence_t *parent, const bfs::path &path) {
+        struct comparator_t {
+            bool operator()(const presentation::presence_t *p, const bfs::path &name) const {
+                auto buffer = std::array<std::byte, 1024>();
+                auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+                auto allocator = allocator_t(&pool);
+                auto own_wname = std::pmr::wstring(allocator);
+                auto cp = static_cast<const presentation::cluster_file_presence_t *>(p);
+                auto own_name = cp->get_file_info().get_name()->get_own_name();
+                own_wname.resize(own_name.size() + 1);
+                auto b = own_name.data();
+                auto e = b + own_name.size();
+                auto str = boost::nowide::widen(own_wname.data(), own_wname.size(), b, e);
+                assert(str);
+                auto wname = std::wstring_view(str, str + own_name.size());
+                return wname < name.wstring();
+            }
+        };
+        if (!parent) {
+            return nullptr;
+        }
+        LOG_TRACE(log, "get_presence for {}", path.string());
+        auto folder = context->local_folder->get_folder();
+        auto folder_id = folder->get_id();
+        auto &root_path = folder->get_path();
+        auto skip = std::distance(root_path.begin(), root_path.end());
+        auto it = path.begin();
+        std::advance(it, skip);
+        auto result = parent;
+        while (it != path.end()) {
+            // auto child_eq = [&]();
+            auto &children = parent->get_children();
+            auto it_child = std::lower_bound(children.begin(), children.end(), *it, comparator_t{});
+            if (it_child != children.end()) {
+                parent = result;
+                result = *it_child;
+            } else {
+                result = {};
+                break;
+            }
+            ++it;
+        }
+        return result;
     }
 
     tasks_t pending_io;
