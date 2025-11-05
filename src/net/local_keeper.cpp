@@ -131,8 +131,7 @@ struct child_ready_t : child_info_t {
 };
 struct hash_base_t : fs::payload::extendended_context_t, child_info_t {
     using blocks_t = std::vector<proto::BlockInfo>;
-    hash_base_t(child_info_t &&info_, fs::payload::extendended_context_prt_t context_)
-        : child_info_t{std::move(info_)}, context{std::move(context_)} {
+    hash_base_t(child_info_t &&info_) : child_info_t{std::move(info_)} {
         auto div = fs::get_block_size(size, 0);
         block_size = div.size;
         unprocessed_blocks = unhashed_blocks = total_blocks = div.count;
@@ -258,7 +257,7 @@ struct folder_slave_t final : fs::fs_slave_t {
             if (!child_info.size || child_info.self) {
                 stack.emplace_front(child_ready_t(std::move(child_info)));
             } else {
-                auto ptr = hash_new_file_ptr_t(new hash_new_file_t(std::move(child_info), this));
+                auto ptr = hash_new_file_ptr_t(new hash_new_file_t(std::move(child_info)));
                 stack.emplace_front(std::move(ptr));
             }
         }
@@ -313,7 +312,7 @@ struct folder_slave_t final : fs::fs_slave_t {
                 ctx.push(new local::file_availability_t(&file, *context->local_folder));
             } else {
                 if (info.size && info.blocks.empty()) {
-                    auto ptr = hash_existing_file_ptr_t(new hash_existing_file_t(std::move(info), this));
+                    auto ptr = hash_existing_file_ptr_t(new hash_existing_file_t(std::move(info)));
                     stack.emplace_front(std::move(ptr));
                 } else {
                     emit_update = true;
@@ -361,6 +360,7 @@ struct folder_slave_t final : fs::fs_slave_t {
             return block_size;
         }();
         assert(last_block_sz > 0);
+        item->context = this;
         auto offset = std::int64_t{first_block} * block_size;
         auto task_ctx = hasher::payload::extendended_context_prt_t(item);
         auto sub_task = fs::task::segment_iterator_t(actor->get_address(), item, item->path, offset, first_block,

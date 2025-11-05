@@ -1116,7 +1116,7 @@ int _init() {
     REGISTER_TEST_CASE(test_type_change, "test_type_change", "[net]");
     REGISTER_TEST_CASE(test_scan_errors, "test_scan_errors", "[net]");
     REGISTER_TEST_CASE(test_read_errors, "test_read_errors", "[net]");
-    // REGISTER_TEST_CASE(test_leaks, "test_leaks", "[net]");
+    REGISTER_TEST_CASE(test_leaks, "test_leaks", "[net]");
     return 1;
 }
 
