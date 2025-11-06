@@ -427,7 +427,12 @@ struct folder_slave_t final : fs::fs_slave_t {
         auto &p = msg.payload;
         auto &result = msg.payload.result;
         if (result.has_error()) {
-            std::abort();
+            auto &ec = result.assume_error();
+            auto ee = actor->make_error(ec);
+            LOG_ERROR(actor->log, "cannot hash '{}': {}, going to shut down", narrow(hash_file.path.generic_wstring()),
+                      ec.message());
+            actor->do_shutdown(ee);
+            return true;
         }
         auto index = p.block_index;
         auto offset = index * hash_file.block_size;
@@ -630,7 +635,7 @@ auto local_keeper_t::operator()(const model::diff::local::scan_start_t &diff, vo
     -> outcome::result<void> {
     bool do_scan = true;
     auto folder = cluster->get_folders().by_id(diff.folder_id);
-    if (folder->is_suspended() && !folder->get_suspend_reason()) {
+    if ((folder->is_suspended() && !folder->get_suspend_reason()) || state != r::state_t::OPERATIONAL) {
         do_scan = false;
     }
     if (do_scan) {
@@ -651,28 +656,36 @@ auto local_keeper_t::operator()(const model::diff::local::scan_start_t &diff, vo
 void local_keeper_t::on_post_process(fs::message::foreign_executor_t &msg) noexcept {
     --fs_tasks;
     assert(fs_tasks >= 0);
-    auto &slave = static_cast<folder_slave_t &>(*msg.payload.get());
-    auto folder_id = slave.context->local_folder->get_folder()->get_id();
-    auto pending_io = !slave.post_process();
-    if (pending_io) {
-        if (slave.ec) {
-            LOG_ERROR(log, "cannot process folder any longer: {}", slave.ec.message());
-        } else {
-            slave.ec = utils::make_error_code(utils::error_code_t::no_action);
-            redirect(&msg, fs_addr, address);
-            ++fs_tasks;
+    if (state == r::state_t::OPERATIONAL) {
+        auto &slave = static_cast<folder_slave_t &>(*msg.payload.get());
+        auto folder_id = slave.context->local_folder->get_folder()->get_id();
+        auto pending_io = !slave.post_process();
+        if (pending_io) {
+            if (slave.ec) {
+                LOG_ERROR(log, "cannot process folder any longer: {}", slave.ec.message());
+            } else {
+                slave.ec = utils::make_error_code(utils::error_code_t::no_action);
+                redirect(&msg, fs_addr, address);
+                ++fs_tasks;
+            }
         }
+    } else {
+        LOG_DEBUG(log, "skipping post-processing of foreign executor (non-operational)");
     }
 }
 
 void local_keeper_t::on_digest(hasher::message::digest_t &msg) noexcept {
     auto &p = msg.payload;
     LOG_TRACE(log, "on_digest, block size: {}, index: {}", p.data.size(), p.block_index);
-    auto &hash_file = *static_cast<hash_base_t *>(p.context.get());
-    auto &slave = static_cast<folder_slave_t &>(*hash_file.context.get());
-    auto pending_io = !slave.post_process(hash_file, msg);
-    if (pending_io) {
-        route<fs::payload::foreign_executor_prt_t>(fs_addr, address, &slave);
-        ++fs_tasks;
+    if (state == r::state_t::OPERATIONAL) {
+        auto &hash_file = *static_cast<hash_base_t *>(p.context.get());
+        auto &slave = static_cast<folder_slave_t &>(*hash_file.context.get());
+        auto pending_io = !slave.post_process(hash_file, msg);
+        if (pending_io) {
+            route<fs::payload::foreign_executor_prt_t>(fs_addr, address, &slave);
+            ++fs_tasks;
+        }
+    } else {
+        LOG_DEBUG(log, "skipping post-processing of hashed digest (non-operational)");
     }
 }

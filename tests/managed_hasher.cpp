@@ -7,7 +7,7 @@
 namespace syncspirit::test {
 
 managed_hasher_t::managed_hasher_t(config_t &cfg)
-    : r::actor_base_t{cfg}, index{cfg.index}, auto_reply{cfg.auto_reply} {}
+    : r::actor_base_t{cfg}, index{cfg.index}, auto_reply{cfg.auto_reply}, subscribe{cfg.subscribe} {}
 
 void managed_hasher_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
@@ -16,7 +16,11 @@ void managed_hasher_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         log = utils::get_logger(fmt::format("managed-hasher-{}", index));
     });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) { p.register_name(identity, get_address()); });
-    plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) { p.subscribe_actor(&managed_hasher_t::on_digest); });
+    plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
+        if (subscribe) {
+            p.subscribe_actor(&managed_hasher_t::on_digest);
+        }
+    });
 }
 
 void managed_hasher_t::on_digest(digest_request_t &req) noexcept {

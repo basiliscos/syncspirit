@@ -55,6 +55,7 @@ struct SYNCSPIRIT_API local_keeper_t final : public r::actor_base_t, private mod
     void on_digest(hasher::message::digest_t &res) noexcept;
 
     outcome::result<void> operator()(const model::diff::local::scan_start_t &, void *custom) noexcept override;
+    using r::actor_base_t::make_error;
 
     utils::logger_t log;
     model::sequencer_ptr_t sequencer;

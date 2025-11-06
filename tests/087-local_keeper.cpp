@@ -1089,20 +1089,39 @@ void test_leaks() {
             hasher = sup->create_actor<managed_hasher_t>().index(1).auto_reply(false).timeout(timeout).finish().get();
         }
         void main() noexcept override {
-            SECTION("small unknown file") {
-                write_file(root_path / "file-1.bin", "12345");
-                write_file(root_path / "file-2.bin", "12345");
-                builder->scan_start(folder->get_id()).apply(*sup);
-                CHECK(folder->is_scanning());
+            write_file(root_path / "file-1.bin", "12345");
+            write_file(root_path / "file-2.bin", "12345");
+            builder->scan_start(folder->get_id()).apply(*sup);
+            CHECK(folder->is_scanning());
 
-                target->do_shutdown();
-                sup->do_process();
-                CHECK(folder->get_scan_finish() >= folder->get_scan_start());
-                CHECK(files->size() == 0);
+            target->do_shutdown();
+            sup->do_process();
+            CHECK(folder->get_scan_finish() >= folder->get_scan_start());
+            CHECK(files->size() == 0);
 
-                hasher->process_requests();
-                sup->do_process();
-            }
+            hasher->process_requests();
+            sup->do_process();
+        }
+    };
+    F().run();
+}
+
+void test_hashing_fail() {
+    struct F : fixture_t {
+        std::uint32_t get_hash_limit() override { return 2; }
+        void launch_hasher() noexcept override {
+            hasher = sup->create_actor<managed_hasher_t>().index(1).subscribe(false).timeout(timeout).finish().get();
+        }
+        void main() noexcept override {
+            auto block_sz = fs::block_sizes[0];
+            auto b = std::string(block_sz * 5, 'x');
+            write_file(root_path / "file.bin", b);
+            builder->scan_start(folder->get_id()).apply(*sup);
+
+            sup->do_process();
+            CHECK(folder->get_scan_finish() >= folder->get_scan_start());
+            CHECK(files->size() == 0);
+            CHECK(target->get_shutdown_reason());
         }
     };
     F().run();
@@ -1117,10 +1136,10 @@ int _init() {
     REGISTER_TEST_CASE(test_scan_errors, "test_scan_errors", "[net]");
     REGISTER_TEST_CASE(test_read_errors, "test_read_errors", "[net]");
     REGISTER_TEST_CASE(test_leaks, "test_leaks", "[net]");
+    REGISTER_TEST_CASE(test_hashing_fail, "test_hashing_fail", "[net]");
     return 1;
 }
 
 // task.push(new model::diff::local::blocks_availability_t(*file, fi, info.valid_blocks()));
-// hashing errors -> shutdown?
 
 static int v = _init();

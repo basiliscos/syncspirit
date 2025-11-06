@@ -16,6 +16,7 @@ namespace r = rotor;
 struct managed_hasher_config_t : hasher::hasher_actor_config_t {
     uint32_t index;
     bool auto_reply = true;
+    bool subscribe = true;
 };
 
 template <typename Actor> struct hasher_config_builder_t : hasher::hasher_actor_config_builder_t<Actor> {
@@ -25,6 +26,10 @@ template <typename Actor> struct hasher_config_builder_t : hasher::hasher_actor_
 
     builder_t &&auto_reply(bool value = true) && noexcept {
         parent_t::config.auto_reply = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+    builder_t &&subscribe(bool value = true) && noexcept {
+        parent_t::config.subscribe = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };
@@ -47,6 +52,7 @@ struct SYNCSPIRIT_TEST_API managed_hasher_t : r::actor_base_t {
     std::uint64_t digested_bytes = 0;
     std::uint32_t digested_blocks = 0;
     bool auto_reply;
+    bool subscribe;
     utils::logger_t log;
     digest_queue_t digest_queue;
 };
