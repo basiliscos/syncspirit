@@ -129,7 +129,7 @@ struct child_ready_t : child_info_t {
         : child_info_t{std::move(info)}, blocks{std::move(blocks_)} {}
     blocks_t blocks;
 };
-struct hash_base_t : fs::payload::extendended_context_t, child_info_t {
+struct hash_base_t : model::arc_base_t<hash_base_t>, child_info_t {
     using blocks_t = std::vector<proto::BlockInfo>;
     hash_base_t(child_info_t &&info_) : child_info_t{std::move(info_)} {
         auto div = fs::get_block_size(size, 0);
@@ -153,7 +153,6 @@ struct hash_base_t : fs::payload::extendended_context_t, child_info_t {
     std::int32_t errored_blocks = 0;
     sys::error_code ec;
     blocks_t blocks;
-    fs::payload::extendended_context_prt_t context;
 };
 
 struct hash_new_file_t : hash_base_t {
@@ -185,6 +184,19 @@ struct removed_dir_t {
 using stack_item_t =
     std::variant<unscanned_dir_t, unexamined_t, complete_scan_t, child_ready_t, hash_new_file_ptr_t,
                  hash_existing_file_ptr_t, check_child_t, removed_dir_t, suspend_scan_t, unsuspend_scan_t>;
+
+struct folder_slave_t;
+using folder_slave_ptr_t = r::intrusive_ptr_t<folder_slave_t>;
+using hash_base_ptr_t = model::intrusive_ptr_t<hash_base_t>;
+
+struct hash_context_t final : hasher::payload::extendended_context_t {
+    hash_context_t(folder_slave_ptr_t slave_, hash_base_ptr_t hash_file_)
+        : slave{std::move(slave_)}, hash_file{std::move(hash_file_)} {}
+
+    folder_slave_ptr_t slave;
+    hash_base_ptr_t hash_file;
+};
+using hash_context_ptr_t = r::intrusive_ptr_t<hash_context_t>;
 
 struct folder_slave_t final : fs::fs_slave_t {
     using local_keeper_ptr_t = r::intrusive_ptr_t<net::local_keeper_t>;
@@ -360,18 +372,17 @@ struct folder_slave_t final : fs::fs_slave_t {
             return block_size;
         }();
         assert(last_block_sz > 0);
-        item->context = this;
         auto offset = std::int64_t{first_block} * block_size;
-        auto task_ctx = hasher::payload::extendended_context_prt_t(item);
-        auto sub_task = fs::task::segment_iterator_t(actor->get_address(), item, item->path, offset, first_block,
-                                                     max_blocks, block_size, last_block_sz);
+        auto hash_context = hash_context_ptr_t(new hash_context_t(this, item));
+        auto sub_task = fs::task::segment_iterator_t(actor->get_address(), hash_context, item->path, offset,
+                                                     first_block, max_blocks, block_size, last_block_sz);
         pending_io.emplace_back(std::move(sub_task));
         blocks_limit -= max_blocks;
-        item->unprocessed_blocks -= max_blocks;
+        auto blocks_left = item->unprocessed_blocks -= max_blocks;
 
         LOG_TRACE(log, "going to rehash {} block(s) ({}..{}) of '{}'", max_blocks, first_block,
                   first_block + max_blocks, narrow(item->path.wstring()));
-        return item->unprocessed_blocks ? -1 : 1;
+        return blocks_left ? -1 : 1;
     }
 
     int process(hash_existing_file_ptr_t &item, stack_context_t &ctx) noexcept {
@@ -516,10 +527,10 @@ struct folder_slave_t final : fs::fs_slave_t {
     void post_process(fs::task::segment_iterator_t &task, stack_context_t &ctx) noexcept {
         auto &ec = task.ec;
         if (ec) {
-            auto ctx = static_cast<hash_base_t *>(task.context.get());
+            auto hash_ctx = static_cast<hash_context_t *>(task.context.get());
             auto delta = task.block_count - task.current_block;
             this->actor->concurrent_hashes_left += delta;
-            if (ctx->commit_error(ec, delta)) {
+            if (hash_ctx->hash_file->commit_error(ec, delta)) {
                 LOG_WARN(actor->log, "I/O error during processing '{}': {}", narrow(task.path.generic_wstring()),
                          ec.message());
             }
@@ -678,11 +689,11 @@ void local_keeper_t::on_digest(hasher::message::digest_t &msg) noexcept {
     auto &p = msg.payload;
     LOG_TRACE(log, "on_digest, block size: {}, index: {}", p.data.size(), p.block_index);
     if (state == r::state_t::OPERATIONAL) {
-        auto &hash_file = *static_cast<hash_base_t *>(p.context.get());
-        auto &slave = static_cast<folder_slave_t &>(*hash_file.context.get());
-        auto pending_io = !slave.post_process(hash_file, msg);
+        auto hash_ctx = *static_cast<hash_context_t *>(p.context.get());
+        auto &slave = *hash_ctx.slave.get();
+        auto pending_io = !slave.post_process(*hash_ctx.hash_file.get(), msg);
         if (pending_io) {
-            route<fs::payload::foreign_executor_prt_t>(fs_addr, address, &slave);
+            route<fs::payload::foreign_executor_prt_t>(fs_addr, address, std::move(hash_ctx.slave));
             ++fs_tasks;
         }
     } else {
