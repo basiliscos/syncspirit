@@ -180,10 +180,13 @@ struct unsuspend_scan_t {};
 struct removed_dir_t {
     presentation::presence_ptr_t presence;
 };
+struct fatal_error_t {
+    sys::error_code ec;
+};
 
-using stack_item_t =
-    std::variant<unscanned_dir_t, unexamined_t, complete_scan_t, child_ready_t, hash_new_file_ptr_t,
-                 hash_existing_file_ptr_t, check_child_t, removed_dir_t, suspend_scan_t, unsuspend_scan_t>;
+using stack_item_t = std::variant<unscanned_dir_t, unexamined_t, complete_scan_t, child_ready_t, hash_new_file_ptr_t,
+                                  hash_existing_file_ptr_t, check_child_t, removed_dir_t, suspend_scan_t,
+                                  unsuspend_scan_t, fatal_error_t>;
 
 struct folder_slave_t;
 using folder_slave_ptr_t = r::intrusive_ptr_t<folder_slave_t>;
@@ -239,7 +242,7 @@ struct folder_slave_t final : fs::fs_slave_t {
     int process(complete_scan_t &, stack_context_t &ctx) noexcept {
         auto nothing_left = pending_io.empty() && (actor->concurrent_hashes_left == actor->concurrent_hashes_limit) &&
                             (actor->fs_tasks == 0);
-        if (nothing_left) {
+        if (nothing_left || force_completion) {
             using clock_t = r::pt::microsec_clock;
             auto folder = context->local_folder->get_folder();
             auto folder_id = folder->get_id();
@@ -287,6 +290,22 @@ struct folder_slave_t final : fs::fs_slave_t {
         while (it != stack.end() && (&*it != &stack.back())) {
             it = stack.erase(it);
         }
+        return 1;
+    }
+
+    int process(fatal_error_t &item, stack_context_t &ctx) noexcept {
+        auto folder = context->local_folder->get_folder();
+        auto folder_id = folder->get_id();
+        auto &ec = item.ec;
+        auto ee = actor->make_error(ec);
+        actor->do_shutdown(ee);
+        LOG_WARN(actor->log, "severe error during processing {}: {}", folder_id, ec.message());
+        auto it = stack.begin();
+        std::advance(it, 1);
+        while (it != stack.end() && (&*it != &stack.back())) {
+            it = stack.erase(it);
+        }
+        force_completion = true;
         return 1;
     }
 
@@ -439,26 +458,23 @@ struct folder_slave_t final : fs::fs_slave_t {
         auto &result = msg.payload.result;
         if (result.has_error()) {
             auto &ec = result.assume_error();
-            auto ee = actor->make_error(ec);
-            LOG_ERROR(actor->log, "cannot hash '{}': {}, going to shut down", narrow(hash_file.path.generic_wstring()),
-                      ec.message());
-            actor->do_shutdown(ee);
-            return true;
+            stack.push_front(fatal_error_t(ec));
+        } else {
+            auto index = p.block_index;
+            auto offset = index * hash_file.block_size;
+            auto bi = proto::BlockInfo();
+            proto::set_offset(bi, offset);
+            proto::set_size(bi, static_cast<std::int32_t>(p.data.size()));
+            proto::set_hash(bi, std::move(result).assume_value());
+            hash_file.blocks[index] = std::move(bi);
+            --hash_file.unhashed_blocks;
+            if (!hash_file.unhashed_blocks) {
+                auto blocks = std::move(hash_file.blocks);
+                auto copy = static_cast<child_info_t &>(hash_file);
+                stack.push_front(child_ready_t(std::move(copy), std::move(blocks)));
+            }
+            ++actor->concurrent_hashes_left;
         }
-        auto index = p.block_index;
-        auto offset = index * hash_file.block_size;
-        auto bi = proto::BlockInfo();
-        proto::set_offset(bi, offset);
-        proto::set_size(bi, static_cast<std::int32_t>(p.data.size()));
-        proto::set_hash(bi, std::move(result).assume_value());
-        hash_file.blocks[index] = std::move(bi);
-        --hash_file.unhashed_blocks;
-        if (!hash_file.unhashed_blocks) {
-            auto blocks = std::move(hash_file.blocks);
-            auto copy = static_cast<child_info_t &>(hash_file);
-            stack.push_front(child_ready_t(std::move(copy), std::move(blocks)));
-        }
-        ++actor->concurrent_hashes_left;
         return post_process();
     }
 
@@ -587,6 +603,7 @@ struct folder_slave_t final : fs::fs_slave_t {
     folder_context_ptr_t context;
     local_keeper_ptr_t actor;
     utils::logger_t log;
+    bool force_completion = false;
 };
 
 } // namespace

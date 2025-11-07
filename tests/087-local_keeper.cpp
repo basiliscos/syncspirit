@@ -1119,6 +1119,8 @@ void test_hashing_fail() {
             builder->scan_start(folder->get_id()).apply(*sup);
 
             sup->do_process();
+            CHECK(!folder->get_scan_start().is_special());
+            CHECK(!folder->get_scan_finish().is_special());
             CHECK(folder->get_scan_finish() >= folder->get_scan_start());
             CHECK(files->size() == 0);
             CHECK(target->get_shutdown_reason());
