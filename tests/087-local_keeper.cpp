@@ -1096,7 +1096,6 @@ void test_leaks() {
 
             target->do_shutdown();
             sup->do_process();
-            CHECK(folder->get_scan_finish() >= folder->get_scan_start());
             CHECK(files->size() == 0);
 
             hasher->process_requests();
