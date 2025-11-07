@@ -14,7 +14,7 @@ using namespace syncspirit::utils;
 using namespace syncspirit::model;
 using namespace syncspirit::fs;
 
-TEST_CASE("fs_slave", "[fs]") {
+TEST_CASE("fs_slave, scan_dir", "[fs]") {
     auto root_path = unique_path();
     bfs::create_directories(root_path);
     test::path_guard_t path_quard{root_path};
@@ -113,6 +113,36 @@ SECTION("dir with a file, dir & symlink") {
     sup->do_shutdown();
     sup->do_process();
 #endif
+}
+
+TEST_CASE("fs_slave, rm_file", "[fs]") {
+    auto root_path = unique_path();
+    bfs::create_directories(root_path);
+    test::path_guard_t path_quard{root_path};
+    auto slave = fs_slave_t();
+
+    SECTION("successfuly remove") {
+        auto file = root_path / "file";
+        write_file(file, "");
+        slave.push(task::remove_file_t(file));
+        slave.exec({});
+        REQUIRE(slave.tasks_out.size() == 1);
+        auto &t = std::get<task::remove_file_t>(slave.tasks_out.front());
+        CHECK(!t.ec);
+        CHECK(!bfs::exists(file));
+    }
+
+    SECTION("failed to remove") {
+        auto file = root_path / "dir";
+        bfs::create_directories(file / "subdir");
+        slave.push(task::remove_file_t(file));
+        slave.exec({});
+        REQUIRE(slave.tasks_out.size() == 1);
+        auto &t = std::get<task::remove_file_t>(slave.tasks_out.front());
+        CHECK(t.ec);
+        CHECK(t.ec.message() != "");
+        CHECK(bfs::exists(file));
+    }
 }
 
 int _init() {

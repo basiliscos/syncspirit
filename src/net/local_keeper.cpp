@@ -553,6 +553,8 @@ struct folder_slave_t final : fs::fs_slave_t {
         }
     }
 
+    void post_process(fs::task::remove_file_t &task, stack_context_t &ctx) noexcept { std::abort(); }
+
     presentation::presence_t *get_presence(presentation::presence_t *parent, const bfs::path &path) {
         struct comparator_t {
             bool operator()(const presentation::presence_t *p, const bfs::path &name) const {
