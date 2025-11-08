@@ -124,6 +124,9 @@ struct unscanned_dir_t {
 struct unexamined_t : child_info_t {
     unexamined_t(child_info_t info) : child_info_t(std::move(info)) {}
 };
+struct incomplete_t : child_info_t {
+    using child_info_t::child_info_t;
+};
 struct child_ready_t : child_info_t {
     child_ready_t(child_info_t info, blocks_t blocks_ = {})
         : child_info_t{std::move(info)}, blocks{std::move(blocks_)} {}
@@ -184,9 +187,9 @@ struct fatal_error_t {
     sys::error_code ec;
 };
 
-using stack_item_t = std::variant<unscanned_dir_t, unexamined_t, complete_scan_t, child_ready_t, hash_new_file_ptr_t,
-                                  hash_existing_file_ptr_t, check_child_t, removed_dir_t, suspend_scan_t,
-                                  unsuspend_scan_t, fatal_error_t>;
+using stack_item_t = std::variant<unscanned_dir_t, unexamined_t, incomplete_t, complete_scan_t, child_ready_t,
+                                  hash_new_file_ptr_t, hash_existing_file_ptr_t, check_child_t, removed_dir_t,
+                                  suspend_scan_t, unsuspend_scan_t, fatal_error_t>;
 
 struct folder_slave_t;
 using folder_slave_ptr_t = r::intrusive_ptr_t<folder_slave_t>;
@@ -430,6 +433,37 @@ struct folder_slave_t final : fs::fs_slave_t {
         return 1;
     }
 
+    int process(incomplete_t &item, stack_context_t &ctx) noexcept {
+        auto name = narrow(item.path.stem().generic_wstring());
+        auto name_view = std::string_view(name);
+        auto self_device = actor->cluster->get_device().get();
+        auto &entities = item.parent->get_entity()->get_children();
+        auto comparator = presentation::entity_t::name_comparator_t{};
+        auto it = std::lower_bound(entities.begin(), entities.end(), name_view, comparator);
+        auto presence = (const presentation::presence_t *)(nullptr);
+        if (it != entities.end()) {
+            presence = (*it)->get_best();
+            if (presence && presence->get_device() == self_device) {
+                presence = nullptr;
+            }
+        }
+        if (presence) {
+            auto cp = static_cast<const presentation::cluster_file_presence_t *>(presence);
+            auto &file = cp->get_file_info();
+            if (file.get_size() != item.size) {
+                presence = nullptr;
+            }
+        }
+
+        if (!presence) {
+            LOG_DEBUG(log, "scheduling removal of '{}", narrow(item.path.generic_wstring()));
+            auto sub_task = fs::task::remove_file_t(std::move(item.path));
+            pending_io.emplace_back(std::move(sub_task));
+            return 1;
+        }
+        std::abort();
+    }
+
     int process(check_child_t &item, stack_context_t &ctx) noexcept { std::abort(); }
 
     bool post_process() noexcept {
@@ -517,16 +551,22 @@ struct folder_slave_t final : fs::fs_slave_t {
             if (info.ec) {
                 actor->log->warn("scannig of  {} failed: {}", narrow(info.path.wstring()), info.ec.message());
             } else {
-                auto child = child_info_t(std::move(info), presence, task.presence);
-                stack.push_front(unexamined_t(std::move(child)));
+                if (fs::is_temporal(info.path)) {
+                    auto child = incomplete_t(std::move(info), presence, task.presence);
+                    stack.push_front(std::move(child));
+                } else {
+                    auto child = child_info_t(std::move(info), presence, task.presence);
+                    stack.push_front(unexamined_t(std::move(child)));
+                }
             }
             ++it_disk;
         }
 
         if (parent_presence) {
             for (auto child : parent_presence->get_children()) {
-                if (!checked_children.count(child)) {
-                    if (child->get_features() & F::directory) {
+                auto features = child->get_features();
+                if ((features & F::local) && !checked_children.count(child)) {
+                    if (features & F::directory) {
                         stack.push_front(removed_dir_t(child));
                     } else {
                         auto file = static_cast<presentation::local_file_presence_t *>(child);
@@ -553,7 +593,12 @@ struct folder_slave_t final : fs::fs_slave_t {
         }
     }
 
-    void post_process(fs::task::remove_file_t &task, stack_context_t &ctx) noexcept { std::abort(); }
+    void post_process(fs::task::remove_file_t &task, stack_context_t &ctx) noexcept {
+        auto &ec = task.ec;
+        if (ec) {
+            LOG_WARN(log, "(ignored) cannot remove '{}': {}", narrow(task.path.generic_wstring()), ec.message());
+        }
+    }
 
     presentation::presence_t *get_presence(presentation::presence_t *parent, const bfs::path &path) {
         struct comparator_t {

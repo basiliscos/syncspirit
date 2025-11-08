@@ -70,12 +70,11 @@ bfs::path make_temporal(const bfs::path &path) noexcept {
 }
 
 bool is_temporal(const bfs::path &path) noexcept {
-    auto name = path.string();
-    if (name.length() < tmp_suffix.length()) {
+    if (!path.has_extension()) {
         return false;
     }
-    auto pos = name.find(tmp_suffix, name.length() - tmp_suffix.length());
-    return (pos != name.npos);
+    auto ext = path.extension().generic_string();
+    return ext == tmp_suffix;
 }
 
 bfs::path relativize(const bfs::path &path, const bfs::path &root) noexcept {

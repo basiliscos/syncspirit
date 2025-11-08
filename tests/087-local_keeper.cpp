@@ -83,6 +83,7 @@ struct fixture_t {
     }
 
     void run() noexcept {
+        sequencer = make_sequencer(1234);
         auto my_hash = "KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD";
         auto my_id = device_id_t::from_string(my_hash).value();
         my_device = device_t::create(my_id, "my-device").value();
@@ -150,7 +151,7 @@ struct fixture_t {
         target = sup->create_actor<net::local_keeper_t>()
                      .timeout(timeout)
                      .cluster(cluster)
-                     .sequencer(make_sequencer(77))
+                     .sequencer(sequencer)
                      .concurrent_hashes(get_hash_limit())
                      .finish();
         sup->do_process();
@@ -178,6 +179,7 @@ struct fixture_t {
     model::file_infos_map_t *files;
     model::file_infos_map_t *files_peer;
     model::device_ptr_t peer_device;
+    model::sequencer_ptr_t sequencer;
     fs::file_cache_ptr_t rw_cache;
     bool auto_launch;
 };
@@ -1128,6 +1130,73 @@ void test_hashing_fail() {
     F().run();
 }
 
+void test_incomplete() {
+    struct F : fixture_t {
+        void main() noexcept override {
+            auto block_sz = fs::block_sizes[0];
+            auto path = root_path / "файл.syncspirit-tmp";
+
+            auto pr_file = proto::FileInfo{};
+            proto::set_name(pr_file, boost::nowide::narrow(L"файл"));
+            proto::set_sequence(pr_file, 4);
+            auto &v = proto::get_version(pr_file);
+            auto &counter = proto::add_counters(v);
+            proto::set_id(counter, 55);
+            proto::set_value(counter, 1);
+            proto::set_modified_s(pr_file, 12345);
+
+            auto data_1 = as_owned_bytes("12345");
+            auto hash_1 = utils::sha256_digest(data_1).value();
+            auto b_1 = proto::BlockInfo();
+            proto::set_hash(b_1, hash_1);
+            proto::set_size(b_1, data_1.size());
+
+            SECTION("no in model => remove") {
+                write_file(path, "");
+                builder->scan_start(folder->get_id()).apply(*sup);
+
+                CHECK(files->size() == 0);
+                CHECK(!bfs::exists(path));
+            }
+
+            SECTION("exists only in my model => remove") {
+                write_file(path, "");
+                builder->local_update(folder->get_id(), pr_file)
+                    .apply(*sup)
+                    .then()
+                    .scan_start(folder->get_id())
+                    .apply(*sup);
+
+                CHECK(files->size() == 1);
+                CHECK(!bfs::exists(path));
+            }
+
+#if 0
+            auto sha256 = peer_device->device_id().get_sha256();
+            SECTION("found in peer model, size mismatch => remove") {
+                proto::add_blocks(pr_file, b_1);
+                proto::set_size(pr_file, data_1.size());
+                builder->make_index(sha256, folder->get_id()).add(pr_file, peer_device).finish()
+                        .apply(*sup);
+
+                builder->scan_start(folder->get_id()).apply(*sup);
+
+                write_file(path, "");
+                builder->scan_start(folder->get_id()).apply(*sup);
+
+                CHECK(files->size() == 0);
+                CHECK(!bfs::exists(path));
+            }
+#endif
+
+            CHECK(!folder->get_scan_start().is_special());
+            CHECK(!folder->get_scan_finish().is_special());
+            CHECK(folder->get_scan_finish() >= folder->get_scan_start());
+        }
+    };
+    F().run();
+}
+
 int _init() {
     test::init_logging();
     REGISTER_TEST_CASE(test_simple, "test_simple", "[net]");
@@ -1138,6 +1207,7 @@ int _init() {
     REGISTER_TEST_CASE(test_read_errors, "test_read_errors", "[net]");
     REGISTER_TEST_CASE(test_leaks, "test_leaks", "[net]");
     REGISTER_TEST_CASE(test_hashing_fail, "test_hashing_fail", "[net]");
+    REGISTER_TEST_CASE(test_incomplete, "test_incomplete", "[net]");
     return 1;
 }
 
