@@ -1159,7 +1159,6 @@ void test_incomplete() {
             proto::set_offset(b_2, data_1.size());
             proto::set_size(b_2, data_2.size());
 
-#if 0
             SECTION("no in model => remove") {
                 write_file(path, "");
                 builder->scan_start(folder->get_id()).apply(*sup);
@@ -1167,7 +1166,6 @@ void test_incomplete() {
                 CHECK(files->size() == 0);
                 CHECK(!bfs::exists(path));
             }
-
             SECTION("exists only in my model => remove") {
                 write_file(path, "");
                 builder->local_update(folder->get_id(), pr_file)
@@ -1179,7 +1177,6 @@ void test_incomplete() {
                 CHECK(files->size() == 1);
                 CHECK(!bfs::exists(path));
             }
-
             SECTION("found in peer model, size mismatch => remove") {
                 proto::add_blocks(pr_file, b_1);
                 proto::set_size(pr_file, data_1.size());
@@ -1193,7 +1190,6 @@ void test_incomplete() {
                 CHECK(files->size() == 0);
                 CHECK(!bfs::exists(path));
             }
-#endif
             SECTION("all blocks match => rename & add into model") {
                 write_file(path, "1234567890");
                 auto status = bfs::status(path);

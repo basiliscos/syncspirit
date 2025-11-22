@@ -496,21 +496,22 @@ struct folder_slave_t final : fs::fs_slave_t {
             auto &peer_file = cp->get_file_info();
             if (peer_file.get_size() != item.size) {
                 presence = nullptr;
-            }
-            auto local_file = (const model::file_info_t *)(nullptr);
-            auto local_fi = context->local_folder.get();
-            auto local_presence = presence->get_entity()->get_presence(self_device);
-            if (local_presence->get_features() & F::cluster) {
-                auto cp = static_cast<const presentation::cluster_file_presence_t *>(local_presence);
-                local_file = &cp->get_file_info();
-            }
-            action = model::resolve(peer_file, local_file, *local_fi);
-            if (action == model::advance_action_t::ignore) {
-                presence = nullptr;
+            } else {
+                auto local_file = (const model::file_info_t *)(nullptr);
+                auto local_fi = context->local_folder.get();
+                auto local_presence = presence->get_entity()->get_presence(self_device);
+                if (local_presence->get_features() & F::cluster) {
+                    auto cp = static_cast<const presentation::cluster_file_presence_t *>(local_presence);
+                    local_file = &cp->get_file_info();
+                }
+                action = model::resolve(peer_file, local_file, *local_fi);
+                if (action == model::advance_action_t::ignore) {
+                    presence = nullptr;
+                }
             }
         }
 
-        if (!presence) {
+        if (!presence || action == model::advance_action_t::ignore) {
             LOG_DEBUG(log, "scheduling removal of '{}", narrow(item.path.generic_wstring()));
             auto sub_task = fs::task::remove_file_t(std::move(item.path));
             pending_io.emplace_back(std::move(sub_task));
