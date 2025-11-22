@@ -16,3 +16,4 @@ folder_presence_t::folder_presence_t(folder_entity_t &entity_, model::folder_inf
 }
 
 auto folder_presence_t::get_folder_info() noexcept -> model::folder_info_t & { return folder_info; }
+auto folder_presence_t::get_folder_info() const noexcept -> const model::folder_info_t & { return folder_info; }

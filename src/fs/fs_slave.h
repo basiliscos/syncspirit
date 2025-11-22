@@ -5,6 +5,7 @@
 
 #include "messages.h"
 #include "task/remove_file.h"
+#include "task/rename_file.h"
 #include "task/scan_dir.h"
 #include "task/segment_iterator.h"
 #include "syncspirit-export.h"
@@ -14,7 +15,7 @@
 namespace syncspirit::fs {
 
 namespace sys = boost::system;
-using task_t = std::variant<task::scan_dir_t, task::segment_iterator_t, task::remove_file_t>;
+using task_t = std::variant<task::scan_dir_t, task::segment_iterator_t, task::remove_file_t, task::rename_file_t>;
 
 struct SYNCSPIRIT_API fs_slave_t : payload::foreign_executor_t {
     using tasks_t = std::list<task_t>;

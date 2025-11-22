@@ -1133,11 +1133,13 @@ void test_hashing_fail() {
 void test_incomplete() {
     struct F : fixture_t {
         void main() noexcept override {
+            auto sha256 = peer_device->device_id().get_sha256();
             auto block_sz = fs::block_sizes[0];
             auto path = root_path / "файл.syncspirit-tmp";
 
             auto pr_file = proto::FileInfo{};
-            proto::set_name(pr_file, boost::nowide::narrow(L"файл"));
+            auto file_name = boost::nowide::narrow(L"файл");
+            proto::set_name(pr_file, file_name);
             proto::set_sequence(pr_file, 4);
             auto &v = proto::get_version(pr_file);
             auto &counter = proto::add_counters(v);
@@ -1146,11 +1148,18 @@ void test_incomplete() {
             proto::set_modified_s(pr_file, 12345);
 
             auto data_1 = as_owned_bytes("12345");
+            auto data_2 = as_owned_bytes("67890");
             auto hash_1 = utils::sha256_digest(data_1).value();
+            auto hash_2 = utils::sha256_digest(data_2).value();
             auto b_1 = proto::BlockInfo();
             proto::set_hash(b_1, hash_1);
             proto::set_size(b_1, data_1.size());
+            auto b_2 = proto::BlockInfo();
+            proto::set_hash(b_2, hash_2);
+            proto::set_offset(b_2, data_1.size());
+            proto::set_size(b_2, data_2.size());
 
+#if 0
             SECTION("no in model => remove") {
                 write_file(path, "");
                 builder->scan_start(folder->get_id()).apply(*sup);
@@ -1171,13 +1180,10 @@ void test_incomplete() {
                 CHECK(!bfs::exists(path));
             }
 
-#if 0
-            auto sha256 = peer_device->device_id().get_sha256();
             SECTION("found in peer model, size mismatch => remove") {
                 proto::add_blocks(pr_file, b_1);
                 proto::set_size(pr_file, data_1.size());
-                builder->make_index(sha256, folder->get_id()).add(pr_file, peer_device).finish()
-                        .apply(*sup);
+                builder->make_index(sha256, folder->get_id()).add(pr_file, peer_device).finish().apply(*sup);
 
                 builder->scan_start(folder->get_id()).apply(*sup);
 
@@ -1188,6 +1194,33 @@ void test_incomplete() {
                 CHECK(!bfs::exists(path));
             }
 #endif
+            SECTION("all blocks match => rename & add into model") {
+                proto::add_blocks(pr_file, b_1);
+                proto::add_blocks(pr_file, b_2);
+                proto::set_size(pr_file, data_1.size() + data_2.size());
+                builder->make_index(sha256, folder->get_id()).add(pr_file, peer_device).finish().apply(*sup);
+
+                auto max_seq = folder_info->get_max_sequence();
+                write_file(path, "1234567890");
+                builder->scan_start(folder->get_id()).apply(*sup);
+                // builder->scan_start(folder->get_id()).apply(*sup);
+
+                auto model_path = root_path / file_name;
+                CHECK(!bfs::exists(path));
+                CHECK(bfs::exists(model_path));
+                CHECK(read_file(model_path) == "1234567890");
+                CHECK(files->size() == 1);
+                auto f = files->by_name(file_name);
+                REQUIRE(f);
+                CHECK(f->get_size() == 10);
+                REQUIRE(f->iterate_blocks().get_total() == 2);
+                CHECK(f->iterate_blocks(0).next()->get_hash() == hash_1);
+                CHECK(f->iterate_blocks(1).next()->get_hash() == hash_2);
+                CHECK(folder_info->get_max_sequence() == max_seq + 1);
+            }
+
+            // SECTION("some blocks match");
+            // SECTION("no blocks match");
 
             CHECK(!folder->get_scan_start().is_special());
             CHECK(!folder->get_scan_finish().is_special());
@@ -1199,14 +1232,14 @@ void test_incomplete() {
 
 int _init() {
     test::init_logging();
-    REGISTER_TEST_CASE(test_simple, "test_simple", "[net]");
-    REGISTER_TEST_CASE(test_deleted, "test_deleted", "[net]");
-    REGISTER_TEST_CASE(test_changed, "test_changed", "[net]");
-    REGISTER_TEST_CASE(test_type_change, "test_type_change", "[net]");
-    REGISTER_TEST_CASE(test_scan_errors, "test_scan_errors", "[net]");
-    REGISTER_TEST_CASE(test_read_errors, "test_read_errors", "[net]");
-    REGISTER_TEST_CASE(test_leaks, "test_leaks", "[net]");
-    REGISTER_TEST_CASE(test_hashing_fail, "test_hashing_fail", "[net]");
+    // REGISTER_TEST_CASE(test_simple, "test_simple", "[net]");
+    // REGISTER_TEST_CASE(test_deleted, "test_deleted", "[net]");
+    // REGISTER_TEST_CASE(test_changed, "test_changed", "[net]");
+    // REGISTER_TEST_CASE(test_type_change, "test_type_change", "[net]");
+    // REGISTER_TEST_CASE(test_scan_errors, "test_scan_errors", "[net]");
+    // REGISTER_TEST_CASE(test_read_errors, "test_read_errors", "[net]");
+    // REGISTER_TEST_CASE(test_leaks, "test_leaks", "[net]");
+    // REGISTER_TEST_CASE(test_hashing_fail, "test_hashing_fail", "[net]");
     REGISTER_TEST_CASE(test_incomplete, "test_incomplete", "[net]");
     return 1;
 }

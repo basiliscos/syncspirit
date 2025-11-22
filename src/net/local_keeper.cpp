@@ -2,15 +2,19 @@
 // SPDX-FileCopyrightText: 2025 Ivan Baidakou
 
 #include "local_keeper.h"
+#include "model/diff/advance/advance.h"
 #include "model/diff/advance/local_update.h"
+#include "model/diff/local/blocks_availability.h"
 #include "model/diff/local/scan_start.h"
 #include "model/diff/local/scan_finish.h"
 #include "model/diff/local/file_availability.h"
 #include "model/diff/modify/suspend_folder.h"
+#include "model/misc/resolver.h"
 #include "presentation/folder_entity.h"
 #include "fs/fs_slave.h"
 #include "fs/utils.h"
 #include "names.h"
+#include "presentation/folder_presence.h"
 #include "presentation/local_file_presence.h"
 #include "presentation/presence.h"
 #include "presentation/cluster_file_presence.h"
@@ -30,6 +34,7 @@ using boost::nowide::narrow;
 
 namespace {
 
+struct folder_slave_t;
 using allocator_t = std::pmr::polymorphic_allocator<char>;
 using F = presentation::presence_t::features_t;
 
@@ -53,6 +58,7 @@ struct folder_context_t : boost::intrusive_ref_counter<folder_context_t, boost::
 };
 
 using folder_context_ptr_t = r::intrusive_ptr_t<folder_context_t>;
+
 struct child_info_t {
     using blocks_t = std::vector<proto::BlockInfo>;
 
@@ -134,11 +140,14 @@ struct child_ready_t : child_info_t {
 };
 struct hash_base_t : model::arc_base_t<hash_base_t>, child_info_t {
     using blocks_t = std::vector<proto::BlockInfo>;
-    hash_base_t(child_info_t &&info_) : child_info_t{std::move(info_)} {
-        auto div = fs::get_block_size(size, 0);
-        block_size = div.size;
-        unprocessed_blocks = unhashed_blocks = total_blocks = div.count;
-        blocks.resize(total_blocks);
+
+    hash_base_t(child_info_t &&info_, bool auto_block = true) : child_info_t{std::move(info_)} {
+        if (auto_block) {
+            auto div = fs::get_block_size(size, 0);
+            block_size = div.size;
+            unprocessed_blocks = unhashed_blocks = total_blocks = div.count;
+            blocks.resize(total_blocks);
+        }
     }
 
     bool commit_error(sys::error_code ec_, std::int32_t delta) {
@@ -156,6 +165,8 @@ struct hash_base_t : model::arc_base_t<hash_base_t>, child_info_t {
     std::int32_t errored_blocks = 0;
     sys::error_code ec;
     blocks_t blocks;
+    model::advance_action_t action = model::advance_action_t::ignore;
+    bool incomplete = false;
 };
 
 struct hash_new_file_t : hash_base_t {
@@ -166,6 +177,28 @@ struct hash_existing_file_t : hash_base_t {
     using hash_base_t::hash_base_t;
 };
 
+struct hash_incomplete_file_t : hash_base_t {
+    hash_incomplete_file_t(child_info_t info_, const presentation::presence_t *presence_,
+                           model::advance_action_t action_)
+        : hash_base_t(std::move(info_), false) {
+        incomplete = true;
+        auto cp = static_cast<const presentation::cluster_file_presence_t *>(presence_);
+        auto &file = cp->get_file_info();
+        block_size = file.get_block_size();
+        unprocessed_blocks = unhashed_blocks = total_blocks = file.iterate_blocks().get_total();
+        blocks.resize(total_blocks);
+        self = const_cast<presentation::presence_t *>(presence_);
+        action = action_;
+    }
+};
+
+struct rehashed_incomplete_t : child_ready_t {
+    rehashed_incomplete_t(child_info_t info, blocks_t blocks_, model::advance_action_t action_)
+        : child_ready_t(std::move(info), std::move(blocks_)), action{action_} {}
+    model::advance_action_t action;
+    ;
+};
+
 struct check_child_t : child_info_t {
     check_child_t(child_info_t &&info, presentation::presence_t *presence_)
         : child_info_t{std::move(info)}, presence{presence_} {}
@@ -174,6 +207,7 @@ struct check_child_t : child_info_t {
 
 using hash_new_file_ptr_t = boost::intrusive_ptr<hash_new_file_t>;
 using hash_existing_file_ptr_t = boost::intrusive_ptr<hash_existing_file_t>;
+using hash_incomplete_file_ptr_t = boost::intrusive_ptr<hash_incomplete_file_t>;
 
 struct complete_scan_t {};
 struct suspend_scan_t {
@@ -187,11 +221,12 @@ struct fatal_error_t {
     sys::error_code ec;
 };
 
-using stack_item_t = std::variant<unscanned_dir_t, unexamined_t, incomplete_t, complete_scan_t, child_ready_t,
-                                  hash_new_file_ptr_t, hash_existing_file_ptr_t, check_child_t, removed_dir_t,
-                                  suspend_scan_t, unsuspend_scan_t, fatal_error_t>;
+using stack_item_t =
+    std::variant<unscanned_dir_t, unexamined_t, incomplete_t, complete_scan_t, child_ready_t, hash_new_file_ptr_t,
+                 hash_existing_file_ptr_t, hash_incomplete_file_ptr_t, rehashed_incomplete_t, check_child_t,
+                 removed_dir_t, suspend_scan_t, unsuspend_scan_t, fatal_error_t>;
+using stack_t = std::list<stack_item_t>;
 
-struct folder_slave_t;
 using folder_slave_ptr_t = r::intrusive_ptr_t<folder_slave_t>;
 using hash_base_ptr_t = model::intrusive_ptr_t<hash_base_t>;
 
@@ -204,9 +239,13 @@ struct hash_context_t final : hasher::payload::extendended_context_t {
 };
 using hash_context_ptr_t = r::intrusive_ptr_t<hash_context_t>;
 
+struct rename_context_t final : hasher::payload::extendended_context_t {
+    rename_context_t(rehashed_incomplete_t item_) : item(std::move(item_)) {}
+    rehashed_incomplete_t item;
+};
+
 struct folder_slave_t final : fs::fs_slave_t {
     using local_keeper_ptr_t = r::intrusive_ptr_t<net::local_keeper_t>;
-    using stack_t = std::list<stack_item_t>;
 
     folder_slave_t(folder_context_ptr_t context_, local_keeper_ptr_t actor_) noexcept
         : context{context_}, actor{std::move(actor_)} {
@@ -413,6 +452,10 @@ struct folder_slave_t final : fs::fs_slave_t {
 
     int process(hash_new_file_ptr_t &item, stack_context_t &ctx) noexcept { return schedule_hash(item.get(), ctx); }
 
+    int process(hash_incomplete_file_ptr_t &item, stack_context_t &ctx) noexcept {
+        return schedule_hash(item.get(), ctx);
+    }
+
     int process(removed_dir_t &item, stack_context_t &ctx) noexcept {
         auto folder_id = context->local_folder->get_folder()->get_id();
         auto dir = static_cast<presentation::local_file_presence_t *>(item.presence.get());
@@ -440,17 +483,29 @@ struct folder_slave_t final : fs::fs_slave_t {
         auto &entities = item.parent->get_entity()->get_children();
         auto comparator = presentation::entity_t::name_comparator_t{};
         auto it = std::lower_bound(entities.begin(), entities.end(), name_view, comparator);
-        auto presence = (const presentation::presence_t *)(nullptr);
+        auto presence = (presentation::presence_t *)(nullptr);
         if (it != entities.end()) {
-            presence = (*it)->get_best();
+            presence = const_cast<presentation::presence_t *>((*it)->get_best());
             if (presence && presence->get_device() == self_device) {
                 presence = nullptr;
             }
         }
+        auto action = model::advance_action_t::ignore;
         if (presence) {
             auto cp = static_cast<const presentation::cluster_file_presence_t *>(presence);
-            auto &file = cp->get_file_info();
-            if (file.get_size() != item.size) {
+            auto &peer_file = cp->get_file_info();
+            if (peer_file.get_size() != item.size) {
+                presence = nullptr;
+            }
+            auto local_file = (const model::file_info_t *)(nullptr);
+            auto local_fi = context->local_folder.get();
+            auto local_presence = presence->get_entity()->get_presence(self_device);
+            if (local_presence->get_features() & F::cluster) {
+                auto cp = static_cast<const presentation::cluster_file_presence_t *>(local_presence);
+                local_file = &cp->get_file_info();
+            }
+            action = model::resolve(peer_file, local_file, *local_fi);
+            if (action == model::advance_action_t::ignore) {
                 presence = nullptr;
             }
         }
@@ -459,9 +514,64 @@ struct folder_slave_t final : fs::fs_slave_t {
             LOG_DEBUG(log, "scheduling removal of '{}", narrow(item.path.generic_wstring()));
             auto sub_task = fs::task::remove_file_t(std::move(item.path));
             pending_io.emplace_back(std::move(sub_task));
-            return 1;
+        } else {
+            LOG_TRACE(log, "scheduling rehashing of '{}", narrow(item.path.generic_wstring()));
+            auto &child_info = static_cast<child_info_t &>(item);
+            auto ptr = hash_incomplete_file_ptr_t(new hash_incomplete_file_t(std::move(child_info), presence, action));
+            stack.emplace_front(std::move(ptr));
         }
-        std::abort();
+        return 1;
+    }
+
+    int process(rehashed_incomplete_t &item, stack_context_t &ctx) noexcept {
+        auto cp = static_cast<const presentation::cluster_file_presence_t *>(item.self.get());
+        auto &peer_file = cp->get_file_info();
+        auto &blocks = item.blocks;
+        auto it = peer_file.iterate_blocks();
+        if (it.get_total() != static_cast<std::uint32_t>(blocks.size())) {
+            LOG_DEBUG(log, "scheduling removal of '{}", narrow(item.path.generic_wstring()));
+            auto sub_task = fs::task::remove_file_t(std::move(item.path));
+            pending_io.emplace_back(std::move(sub_task));
+        } else {
+            auto valid_blocks = model::diff::local::blocks_availability_t::valid_blocks_map_t();
+            valid_blocks.resize(blocks.size());
+            auto all_match = true;
+            for (size_t i = 0; i < blocks.size(); ++i, it.next()) {
+                auto peer_block = it.current().first;
+                auto &local_block = blocks[i];
+                if (peer_block->get_hash() != proto::get_hash(local_block)) {
+                    all_match = false;
+                } else {
+                    valid_blocks[i] = true;
+                }
+            }
+            if (all_match) {
+                LOG_DEBUG(log, "scheduling finalization of '{}", narrow(item.path.generic_wstring()));
+                auto modified_s = peer_file.get_modified_s();
+                auto name = [&]() -> bfs::path {
+                    if (item.action == model::advance_action_t::remote_copy) {
+                        return bfs::path(peer_file.get_name()->get_own_name());
+                    } else {
+                        assert(item.action == model::advance_action_t::resolve_remote_win);
+                        auto self_device = actor->cluster->get_device().get();
+                        auto local_presence = item.self->get_entity()->get_presence(self_device);
+                        assert(local_presence->get_features() & F::cluster);
+                        auto lp = static_cast<const presentation::cluster_file_presence_t *>(local_presence);
+                        auto &local_file = cp->get_file_info();
+                        return bfs::path(local_file.make_conflicting_name()).filename();
+                    }
+                }();
+                auto rename_ctx = hasher::payload::extendended_context_prt_t();
+                auto path_copy = item.path;
+                rename_ctx = new rename_context_t(std::move(item));
+                auto sub_task =
+                    fs::task::rename_file_t(std::move(path_copy), std::move(name), modified_s, std::move(rename_ctx));
+                pending_io.emplace_back(std::move(sub_task));
+            } else {
+                std::abort();
+            }
+        }
+        return 1;
     }
 
     int process(check_child_t &item, stack_context_t &ctx) noexcept { std::abort(); }
@@ -505,7 +615,11 @@ struct folder_slave_t final : fs::fs_slave_t {
             if (!hash_file.unhashed_blocks) {
                 auto blocks = std::move(hash_file.blocks);
                 auto copy = static_cast<child_info_t &>(hash_file);
-                stack.push_front(child_ready_t(std::move(copy), std::move(blocks)));
+                if (hash_file.incomplete) {
+                    stack.push_front(rehashed_incomplete_t(std::move(copy), std::move(blocks), hash_file.action));
+                } else {
+                    stack.push_front(child_ready_t(std::move(copy), std::move(blocks)));
+                }
             }
             ++actor->concurrent_hashes_left;
         }
@@ -600,15 +714,35 @@ struct folder_slave_t final : fs::fs_slave_t {
         }
     }
 
+    void post_process(fs::task::rename_file_t &task, stack_context_t &ctx) noexcept {
+        auto raname_ctx = static_cast<rename_context_t *>(task.context.get());
+        auto &ec = task.ec;
+        if (ec) {
+            auto &path = task.path;
+            LOG_WARN(log, "cannot rename '{}' -> {}: {}, going to remove", narrow(path.generic_wstring()),
+                     narrow(task.new_name.generic_wstring()), ec.message());
+            auto sub_task = fs::task::remove_file_t(std::move(path));
+            pending_io.emplace_back(std::move(sub_task));
+        } else {
+            auto &item = raname_ctx->item;
+            auto cp = static_cast<const presentation::cluster_file_presence_t *>(item.self.get());
+            auto &peer_file = cp->get_file_info();
+            auto peer = cp->get_device();
+            auto &peer_folder = cp->get_folder()->get_folder_info();
+            auto diff = model::diff::advance::advance_t::create(item.action, peer_file, peer_folder, *actor->sequencer);
+            ctx.push(diff.get());
+        }
+    }
+
     presentation::presence_t *get_presence(presentation::presence_t *parent, const bfs::path &path) {
         struct comparator_t {
             bool operator()(const presentation::presence_t *p, const bfs::path &name) const {
+                auto entity = const_cast<presentation::presence_t *>(p)->get_entity();
                 auto buffer = std::array<std::byte, 1024>();
                 auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
                 auto allocator = allocator_t(&pool);
                 auto own_wname = std::pmr::wstring(allocator);
-                auto cp = static_cast<const presentation::cluster_file_presence_t *>(p);
-                auto own_name = cp->get_file_info().get_name()->get_own_name();
+                auto own_name = entity->get_path()->get_own_name();
                 own_wname.resize(own_name.size() + 1);
                 auto b = own_name.data();
                 auto e = b + own_name.size();
@@ -618,31 +752,15 @@ struct folder_slave_t final : fs::fs_slave_t {
                 return wname < name.wstring();
             }
         };
+
         if (!parent) {
             return nullptr;
         }
         LOG_TRACE(log, "get_presence for {}", path.string());
-        auto folder = context->local_folder->get_folder();
-        auto folder_id = folder->get_id();
-        auto &root_path = folder->get_path();
-        auto skip = std::distance(root_path.begin(), root_path.end());
-        auto it = path.begin();
-        std::advance(it, skip);
-        auto result = parent;
-        while (it != path.end()) {
-            // auto child_eq = [&]();
-            auto &children = parent->get_children();
-            auto it_child = std::lower_bound(children.begin(), children.end(), *it, comparator_t{});
-            if (it_child != children.end()) {
-                parent = result;
-                result = *it_child;
-            } else {
-                result = {};
-                break;
-            }
-            ++it;
-        }
-        return result;
+        auto &children = parent->get_children();
+        auto comparator = comparator_t{};
+        auto it = std::lower_bound(children.begin(), children.end(), path.filename(), comparator);
+        return it != children.end() ? *it : nullptr;
     }
 
     tasks_t pending_io;
