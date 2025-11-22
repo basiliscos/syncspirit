@@ -1195,15 +1195,18 @@ void test_incomplete() {
             }
 #endif
             SECTION("all blocks match => rename & add into model") {
+                write_file(path, "1234567890");
+                auto status = bfs::status(path);
+                auto perms = static_cast<uint32_t>(status.permissions());
+
                 proto::add_blocks(pr_file, b_1);
                 proto::add_blocks(pr_file, b_2);
                 proto::set_size(pr_file, data_1.size() + data_2.size());
+                proto::set_permissions(pr_file, perms);
                 builder->make_index(sha256, folder->get_id()).add(pr_file, peer_device).finish().apply(*sup);
 
                 auto max_seq = folder_info->get_max_sequence();
-                write_file(path, "1234567890");
                 builder->scan_start(folder->get_id()).apply(*sup);
-                // builder->scan_start(folder->get_id()).apply(*sup);
 
                 auto model_path = root_path / file_name;
                 CHECK(!bfs::exists(path));
@@ -1216,6 +1219,12 @@ void test_incomplete() {
                 REQUIRE(f->iterate_blocks().get_total() == 2);
                 CHECK(f->iterate_blocks(0).next()->get_hash() == hash_1);
                 CHECK(f->iterate_blocks(1).next()->get_hash() == hash_2);
+                CHECK(folder_info->get_max_sequence() == max_seq + 1);
+
+                builder->scan_start(folder->get_id()).apply(*sup);
+                auto f2 = files->by_name(file_name);
+                CHECK(f2.get() == f.get());
+                REQUIRE(f2->iterate_blocks().get_total() == 2);
                 CHECK(folder_info->get_max_sequence() == max_seq + 1);
             }
 
@@ -1232,14 +1241,14 @@ void test_incomplete() {
 
 int _init() {
     test::init_logging();
-    // REGISTER_TEST_CASE(test_simple, "test_simple", "[net]");
-    // REGISTER_TEST_CASE(test_deleted, "test_deleted", "[net]");
-    // REGISTER_TEST_CASE(test_changed, "test_changed", "[net]");
-    // REGISTER_TEST_CASE(test_type_change, "test_type_change", "[net]");
-    // REGISTER_TEST_CASE(test_scan_errors, "test_scan_errors", "[net]");
-    // REGISTER_TEST_CASE(test_read_errors, "test_read_errors", "[net]");
-    // REGISTER_TEST_CASE(test_leaks, "test_leaks", "[net]");
-    // REGISTER_TEST_CASE(test_hashing_fail, "test_hashing_fail", "[net]");
+    REGISTER_TEST_CASE(test_simple, "test_simple", "[net]");
+    REGISTER_TEST_CASE(test_deleted, "test_deleted", "[net]");
+    REGISTER_TEST_CASE(test_changed, "test_changed", "[net]");
+    REGISTER_TEST_CASE(test_type_change, "test_type_change", "[net]");
+    REGISTER_TEST_CASE(test_scan_errors, "test_scan_errors", "[net]");
+    REGISTER_TEST_CASE(test_read_errors, "test_read_errors", "[net]");
+    REGISTER_TEST_CASE(test_leaks, "test_leaks", "[net]");
+    REGISTER_TEST_CASE(test_hashing_fail, "test_hashing_fail", "[net]");
     REGISTER_TEST_CASE(test_incomplete, "test_incomplete", "[net]");
     return 1;
 }
