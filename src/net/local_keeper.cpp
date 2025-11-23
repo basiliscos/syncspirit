@@ -759,7 +759,13 @@ struct folder_slave_t final : fs::fs_slave_t {
         auto &children = parent->get_children();
         auto comparator = comparator_t{};
         auto it = std::lower_bound(children.begin(), children.end(), path.filename(), comparator);
-        return it != children.end() ? *it : nullptr;
+        if (it != children.end()) {
+            auto &p = *it;
+            if (!(p->get_features() & F::missing)) {
+                return p;
+            }
+        }
+        return nullptr;
     }
 
     tasks_t pending_io;

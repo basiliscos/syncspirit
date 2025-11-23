@@ -1362,13 +1362,87 @@ void test_traversal() {
             // clang-format on
             CHECK(paths == expected);
         }
-
         paths_t paths;
     };
     F().run();
 }
 
-// importing
+void test_importing() {
+    struct F : fixture_t {
+        void main() noexcept override {
+            auto peer_short_id = my_device->device_id().get_uint();
+            auto modified_s = std::int64_t{12345};
+
+            SECTION("regular file") {
+                auto sha256 = peer_device->device_id().get_sha256();
+                auto block_sz = fs::block_sizes[0];
+                auto path = root_path / L"файл";
+
+                auto pr_file = proto::FileInfo{};
+                auto file_name = boost::nowide::narrow(L"файл");
+                proto::set_name(pr_file, file_name);
+                proto::set_sequence(pr_file, 4);
+                auto &v = proto::get_version(pr_file);
+                auto &counter = proto::add_counters(v);
+                proto::set_id(counter, 55);
+                proto::set_value(counter, peer_short_id);
+                proto::set_modified_s(pr_file, modified_s);
+
+                auto data_1 = as_owned_bytes("12345");
+                auto data_2 = as_owned_bytes("67890");
+                auto hash_1 = utils::sha256_digest(data_1).value();
+                auto hash_2 = utils::sha256_digest(data_2).value();
+                auto b_1 = proto::BlockInfo();
+                proto::set_hash(b_1, hash_1);
+                proto::set_size(b_1, data_1.size());
+                auto b_2 = proto::BlockInfo();
+                proto::set_hash(b_2, hash_2);
+                proto::set_offset(b_2, data_1.size());
+                proto::set_size(b_2, data_2.size());
+
+                SECTION("one block file") {
+                    proto::add_blocks(pr_file, b_1);
+                    proto::set_size(pr_file, 5);
+                    proto::set_block_size(pr_file, 5);
+
+                    write_file(path, "12345");
+                    bfs::last_write_time(path, from_unix(modified_s));
+
+                    proto::set_permissions(pr_file, static_cast<uint32_t>(bfs::status(path).permissions()));
+                    builder->make_index(sha256, folder->get_id()).add(pr_file, peer_device).finish().apply(*sup);
+
+                    builder->scan_start(folder->get_id()).apply(*sup);
+                    REQUIRE(files->size() == 1);
+
+                    auto f = *files->begin();
+                    REQUIRE(f);
+                    CHECK(f->get_size() == proto::get_size(pr_file));
+                    REQUIRE(f->get_version().as_proto() == v);
+                }
+#if 0
+                SECTION("two blocks file") {
+                    proto::add_blocks(pr_file, b_1);
+                    proto::add_blocks(pr_file, b_2);
+                    proto::set_size(pr_file, 10);
+                    proto::set_block_size(pr_file, 5);
+
+                    builder->make_index(sha256, folder->get_id()).add(pr_file, peer_device).finish().apply(*sup);
+                    write_file(path, "1234567890");
+
+                    builder->scan_start(folder->get_id()).apply(*sup);
+                    REQUIRE(files->size() == 1);
+
+                    auto f = files->by_name(file_name);
+                    REQUIRE(f);
+                    CHECK(f->get_size() == proto::get_size(pr_file));
+                    REQUIRE(f->get_version().as_proto() == v);
+                }
+#endif
+            }
+        }
+    };
+    F().run();
+}
 
 int _init() {
     test::init_logging();
@@ -1382,6 +1456,7 @@ int _init() {
     REGISTER_TEST_CASE(test_hashing_fail, "test_hashing_fail", "[net]");
     REGISTER_TEST_CASE(test_incomplete, "test_incomplete", "[net]");
     REGISTER_TEST_CASE(test_traversal, "test_traversal", "[net]");
+    REGISTER_TEST_CASE(test_importing, "test_importing", "[net]");
     return 1;
 }
 
