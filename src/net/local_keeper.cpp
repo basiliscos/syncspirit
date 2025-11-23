@@ -314,6 +314,7 @@ struct folder_slave_t final : fs::fs_slave_t {
                 stack.emplace_front(child_ready_t(std::move(child_info)));
             } else {
                 auto block_size = [&]() -> std::int32_t {
+                    // for possible correct importing later at local-update.
                     if (!child_info.self) {
                         using namespace presentation;
                         auto folder = context->local_folder->get_folder();
