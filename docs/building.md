@@ -22,7 +22,7 @@
 The [conan](https://conan.io/) package manager (v2.0+) is used with
 [cmake](https://cmake.org/) build system.
 
-`syncspririt` can be build with [conan](https://conan.io/) or just with bare
+`syncspirit` can be build with [conan](https://conan.io/) or just with bare
 [cmake](https://cmake.org/) build system. [conan](https://conan.io/) is
 responsible for installing and building dependencies, with bare [cmake](https://cmake.org/)
 it should be done manually (e.g. use system-provided libraries).
@@ -70,7 +70,7 @@ rotor/*:enable_fltk=True
 
 If static build is planned, than `*/*:shared=True` should be `False`.
 
-If the defult conan profile is missing, than create it via:
+If the default conan profile is missing, than create it via:
 ```
 conan profile detect
 ```
@@ -190,7 +190,7 @@ make zip
 ```
 
 
-Add $mxe_dir/uer/bin to your `PATH`, and make sure something like that works:
+Add $mxe_dir/usr/bin to your `PATH`, and make sure something like that works:
 
 ```
 export PATH=`pwd`/usr/bin:$PATH
@@ -276,7 +276,7 @@ Copy the resulting `zip.exe` to windows xp host and launch, i.e. make sure
 everything is ok with the toolchain.
 
 
-Add $mxe_dir/uer/bin to your `PATH`, and make sure something like that works:
+Add $mxe\_dir/usr/bin to your `PATH`, and make sure something like that works:
 
 ```
 export PATH=`pwd`/usr/bin:$PATH
