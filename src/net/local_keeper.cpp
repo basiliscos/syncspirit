@@ -529,24 +529,21 @@ struct folder_slave_t final : fs::fs_slave_t {
         auto &peer_file = cp->get_file_info();
         auto &blocks = item.blocks;
         auto it = peer_file.iterate_blocks();
-        if (it.get_total() != static_cast<std::uint32_t>(blocks.size())) {
-            LOG_DEBUG(log, "scheduling removal of '{}", narrow(item.path.generic_wstring()));
-            auto sub_task = fs::task::remove_file_t(std::move(item.path));
-            pending_io.emplace_back(std::move(sub_task));
-        } else {
+        auto schedule_removal = it.get_total() != static_cast<std::uint32_t>(blocks.size());
+        if (!schedule_removal) {
             auto valid_blocks = model::diff::local::blocks_availability_t::valid_blocks_map_t();
             valid_blocks.resize(blocks.size());
-            auto all_match = true;
+            auto matched = blocks.size();
             for (size_t i = 0; i < blocks.size(); ++i, it.next()) {
                 auto peer_block = it.current().first;
                 auto &local_block = blocks[i];
                 if (peer_block->get_hash() != proto::get_hash(local_block)) {
-                    all_match = false;
+                    --matched;
                 } else {
                     valid_blocks[i] = true;
                 }
             }
-            if (all_match) {
+            if (matched == blocks.size()) {
                 LOG_DEBUG(log, "scheduling finalization of '{}", narrow(item.path.generic_wstring()));
                 auto modified_s = peer_file.get_modified_s();
                 auto name = [&]() -> bfs::path {
@@ -569,10 +566,19 @@ struct folder_slave_t final : fs::fs_slave_t {
                     fs::task::rename_file_t(std::move(path_copy), std::move(name), modified_s, std::move(rename_ctx));
                 pending_io.emplace_back(std::move(sub_task));
             } else {
-                using namespace model::diff::local;
-                auto &peer_folder = cp->get_folder()->get_folder_info();
-                ctx.push(new blocks_availability_t(peer_file, peer_folder, std::move(valid_blocks)));
+                if (matched) {
+                    using namespace model::diff::local;
+                    auto &peer_folder = cp->get_folder()->get_folder_info();
+                    ctx.push(new blocks_availability_t(peer_file, peer_folder, std::move(valid_blocks)));
+                } else {
+                    schedule_removal = true;
+                }
             }
+        }
+        if (schedule_removal) {
+            LOG_DEBUG(log, "scheduling removal of '{}", narrow(item.path.generic_wstring()));
+            auto sub_task = fs::task::remove_file_t(std::move(item.path));
+            pending_io.emplace_back(std::move(sub_task));
         }
         return 1;
     }

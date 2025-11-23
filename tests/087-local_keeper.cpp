@@ -1261,9 +1261,21 @@ void test_incomplete() {
                     CHECK(!peer_file->iterate_blocks(0).current().first->local_file());
                     CHECK(peer_file->iterate_blocks(1).current().first->local_file());
                 }
-            }
+                SECTION("no block match") {
+                    write_file(path, "0000000000");
+                    auto status = bfs::status(path);
+                    auto perms = static_cast<uint32_t>(status.permissions());
 
-            // SECTION("no blocks match");
+                    proto::set_permissions(pr_file, perms);
+                    builder->make_index(sha256, folder->get_id()).add(pr_file, peer_device).finish().apply(*sup);
+
+                    auto max_seq = folder_info->get_max_sequence();
+                    builder->scan_start(folder->get_id()).apply(*sup);
+                    CHECK(!bfs::exists(path));
+                    CHECK(!bfs::exists(model_path));
+                    CHECK(files->size() == 0);
+                }
+            }
 
             CHECK(!folder->get_scan_start().is_special());
             CHECK(!folder->get_scan_finish().is_special());
