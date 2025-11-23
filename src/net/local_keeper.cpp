@@ -138,13 +138,20 @@ struct child_ready_t : child_info_t {
 struct hash_base_t : model::arc_base_t<hash_base_t>, child_info_t {
     using blocks_t = std::vector<proto::BlockInfo>;
 
-    hash_base_t(child_info_t &&info_, bool auto_block = true) : child_info_t{std::move(info_)} {
-        if (auto_block) {
+    hash_base_t(child_info_t &&info_, std::int32_t block_size_ = 0) : child_info_t{std::move(info_)} {
+        if (block_size_ == 0) {
             auto div = fs::get_block_size(size, 0);
             block_size = div.size;
             unprocessed_blocks = unhashed_blocks = total_blocks = div.count;
-            blocks.resize(total_blocks);
+        } else {
+            block_size = block_size_;
+            auto count = size / static_cast<decltype(size)>(block_size_);
+            if (size % count) {
+                ++count;
+            }
+            unprocessed_blocks = unhashed_blocks = total_blocks = count;
         }
+        blocks.resize(total_blocks);
     }
 
     bool commit_error(sys::error_code ec_, std::int32_t delta) {
@@ -306,7 +313,34 @@ struct folder_slave_t final : fs::fs_slave_t {
             if (!child_info.size || child_info.self) {
                 stack.emplace_front(child_ready_t(std::move(child_info)));
             } else {
-                auto ptr = hash_new_file_ptr_t(new hash_new_file_t(std::move(child_info)));
+                auto block_size = [&]() -> std::int32_t {
+                    if (!child_info.self) {
+                        using namespace presentation;
+                        auto folder = context->local_folder->get_folder();
+                        auto &folder_path = folder->get_path();
+                        auto rel_path = fs::relativize(child_info.path, folder_path);
+                        auto name = narrow(rel_path.generic_wstring());
+                        auto folder_infos = folder->get_folder_infos();
+                        for (auto &it : folder_infos) {
+                            if (auto file = it.item->get_file_infos().by_name(name)) {
+                                auto augmentation = file->get_augmentation().get();
+                                auto file_presence = static_cast<cluster_file_presence_t *>(augmentation);
+                                auto best = file_presence->get_entity()->get_best();
+                                if (best && best->get_features() & F::cluster) {
+                                    auto mutable_best = const_cast<presentation::presence_t *>(best);
+                                    auto cp = static_cast<cluster_file_presence_t *>(mutable_best);
+                                    auto &best_file = cp->get_file_info();
+                                    auto match = best_file.is_file() && best_file.get_size() == child_info.size;
+                                    if (match) {
+                                        return best_file.get_block_size();
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    return 0;
+                }();
+                auto ptr = hash_new_file_ptr_t(new hash_new_file_t(std::move(child_info), block_size));
                 stack.emplace_front(std::move(ptr));
             }
         }

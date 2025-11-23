@@ -1399,7 +1399,6 @@ void test_importing() {
                 proto::set_hash(b_2, hash_2);
                 proto::set_offset(b_2, data_1.size());
                 proto::set_size(b_2, data_2.size());
-
                 SECTION("one block file") {
                     proto::add_blocks(pr_file, b_1);
                     proto::set_size(pr_file, 5);
@@ -1419,15 +1418,17 @@ void test_importing() {
                     CHECK(f->get_size() == proto::get_size(pr_file));
                     REQUIRE(f->get_version().as_proto() == v);
                 }
-#if 0
-                SECTION("two blocks file") {
+                SECTION("two blocks file (non-standard size)") {
                     proto::add_blocks(pr_file, b_1);
                     proto::add_blocks(pr_file, b_2);
                     proto::set_size(pr_file, 10);
                     proto::set_block_size(pr_file, 5);
 
-                    builder->make_index(sha256, folder->get_id()).add(pr_file, peer_device).finish().apply(*sup);
                     write_file(path, "1234567890");
+                    bfs::last_write_time(path, from_unix(modified_s));
+
+                    proto::set_permissions(pr_file, static_cast<uint32_t>(bfs::status(path).permissions()));
+                    builder->make_index(sha256, folder->get_id()).add(pr_file, peer_device).finish().apply(*sup);
 
                     builder->scan_start(folder->get_id()).apply(*sup);
                     REQUIRE(files->size() == 1);
@@ -1437,7 +1438,6 @@ void test_importing() {
                     CHECK(f->get_size() == proto::get_size(pr_file));
                     REQUIRE(f->get_version().as_proto() == v);
                 }
-#endif
             }
         }
     };
