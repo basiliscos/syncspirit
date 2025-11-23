@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2025 Ivan Baidakou
 
 #include "scan_dir.h"
 #include "fs/fs_slave.h"
@@ -8,14 +8,16 @@
 using namespace syncspirit::fs;
 using namespace syncspirit::fs::task;
 
+// inverse files sorting as files will be inversed again (inderectly) by
+// stack structure
 struct comparator_t {
     bool operator()(const scan_dir_t::child_info_t &lhs, const scan_dir_t::child_info_t &rhs) const noexcept {
         auto l_dir = lhs.status.type() == bfs::file_type::directory;
         auto r_dir = rhs.status.type() == bfs::file_type::directory;
         if (l_dir xor r_dir) {
-            return l_dir ? true : false;
+            return l_dir ? false : true;
         } else {
-            return lhs.path.filename() < rhs.path.filename();
+            return lhs.path.filename() > rhs.path.filename();
         }
     }
 };

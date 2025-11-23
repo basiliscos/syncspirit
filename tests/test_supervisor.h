@@ -100,6 +100,7 @@ struct SYNCSPIRIT_TEST_API supervisor_t : r::supervisor_t,
     outcome::result<void> apply(const model::diff::load::commit_t &, void *) noexcept override;
 
     using model::diff::apply_controller_t::cluster;
+    using model::diff::cluster_visitor_t::operator();
 
     utils::logger_t log;
     model::sequencer_ptr_t sequencer;

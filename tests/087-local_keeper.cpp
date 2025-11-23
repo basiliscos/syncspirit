@@ -8,6 +8,8 @@
 #include "fs/utils.h"
 #include "managed_hasher.h"
 #include "model/cluster.h"
+#include "model/diff/advance/advance.h"
+#include "model/diff/advance/local_update.h"
 #include "net/local_keeper.h"
 #include "net/names.h"
 #include "test-utils.h"
@@ -59,6 +61,17 @@ struct executor_t : r::actor_base_t {
 
 using executor_ptr_t = r::intrusive_ptr_t<executor_t>;
 
+struct fixture_t;
+
+struct my_supervisort_t : supervisor_t {
+    using parent_t = supervisor_t;
+    using parent_t::parent_t;
+
+    fixture_t *fixture = nullptr;
+
+    outcome::result<void> operator()(const model::diff::advance::local_update_t &, void *) noexcept override;
+};
+
 struct fixture_t {
     using target_ptr_t = r::intrusive_ptr_t<net::local_keeper_t>;
     using builder_ptr_t = std::unique_ptr<diff_builder_t>;
@@ -82,6 +95,8 @@ struct fixture_t {
         hasher = sup->create_actor<managed_hasher_t>().index(1).auto_reply(true).timeout(timeout).finish().get();
     }
 
+    virtual void on_diff(const model::diff::advance::local_update_t &) noexcept {}
+
     void run() noexcept {
         sequencer = make_sequencer(1234);
         auto my_hash = "KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD";
@@ -98,8 +113,13 @@ struct fixture_t {
         cluster->get_devices().put(peer_device);
 
         r::system_context_t ctx;
-        sup = ctx.create_supervisor<supervisor_t>().make_presentation(true).timeout(timeout).create_registry().finish();
+        sup = ctx.create_supervisor<my_supervisort_t>()
+                  .make_presentation(true)
+                  .timeout(timeout)
+                  .create_registry()
+                  .finish();
         sup->cluster = cluster;
+        static_cast<my_supervisort_t *>(sup.get())->fixture = this;
         sup->configure_callback = [&](r::plugin::plugin_base_t &plugin) {
             plugin.template with_casted<r::plugin::registry_plugin_t>(
                 [&](auto &p) { p.register_name(net::names::fs_actor, sup->get_address()); });
@@ -183,6 +203,12 @@ struct fixture_t {
     fs::file_cache_ptr_t rw_cache;
     bool auto_launch;
 };
+
+auto my_supervisort_t::operator()(const model::diff::advance::local_update_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    fixture->on_diff(diff);
+    return parent_t::operator()(diff, custom);
+}
 
 void test_simple() {
     struct F : fixture_t {
@@ -1292,7 +1318,56 @@ void test_incomplete() {
     F().run();
 }
 
-// traversal order
+void test_traversal() {
+    struct F : fixture_t {
+        using paths_t = std::vector<std::string>;
+
+        void on_diff(const model::diff::advance::local_update_t &diff) noexcept override {
+            auto file = folder_info->get_file_infos().by_uuid(diff.uuid);
+            auto name = file->get_name()->get_full_name();
+            paths.emplace_back(std::string(name));
+        }
+
+        void main() noexcept override {
+            bfs::create_directory(root_path / "a");
+            bfs::create_directory(root_path / "a" / "c");
+            bfs::create_directory(root_path / "b");
+            bfs::create_directory(root_path / "d");
+            bfs::create_directory(root_path / "d" / "d1");
+            bfs::create_directory(root_path / "d" / "d2");
+            write_file(root_path / "x.bin", "");
+            write_file(root_path / "y.bin", "");
+            write_file(root_path / "a/file.bin", "");
+            write_file(root_path / "a/c/file_2.bin", "");
+            write_file(root_path / "d/d1/file_3.bin", "");
+
+            builder->scan_start(folder->get_id()).apply(*sup);
+            REQUIRE(files->size() == 11);
+            REQUIRE(paths.size() == 11);
+
+            // clang-format off
+            auto expected = paths_t{
+                "a/c/file_2.bin",
+                "a/c",
+                "a/file.bin",
+                "a",
+                "b",
+                "d/d1/file_3.bin",
+                "d/d1",
+                "d/d2",
+                "d",
+                "x.bin",
+                "y.bin",
+            };
+            // clang-format on
+            CHECK(paths == expected);
+        }
+
+        paths_t paths;
+    };
+    F().run();
+}
+
 // importing
 
 int _init() {
@@ -1306,6 +1381,7 @@ int _init() {
     REGISTER_TEST_CASE(test_leaks, "test_leaks", "[net]");
     REGISTER_TEST_CASE(test_hashing_fail, "test_hashing_fail", "[net]");
     REGISTER_TEST_CASE(test_incomplete, "test_incomplete", "[net]");
+    REGISTER_TEST_CASE(test_traversal, "test_traversal", "[net]");
     return 1;
 }
 

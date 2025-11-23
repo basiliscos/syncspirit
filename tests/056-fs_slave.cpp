@@ -85,10 +85,10 @@ SECTION("dir with a file, dir & symlink") {
     CHECK(t.child_infos.size() == 3);
     {
         auto &c = t.child_infos[0];
-        CHECK(c.path.filename() == child_3.filename());
+        CHECK(c.path.filename() == child_2.filename());
         CHECK(!c.ec);
-        CHECK(c.status.type() == bfs::file_type::directory);
-        CHECK(c.last_write_time == from_unix(modified));
+        CHECK(c.status.type() == bfs::file_type::symlink);
+        CHECK(c.target == link_target);
     }
     {
         auto &c = t.child_infos[1];
@@ -100,10 +100,10 @@ SECTION("dir with a file, dir & symlink") {
     }
     {
         auto &c = t.child_infos[2];
-        CHECK(c.path.filename() == child_2.filename());
+        CHECK(c.path.filename() == child_3.filename());
         CHECK(!c.ec);
-        CHECK(c.status.type() == bfs::file_type::symlink);
-        CHECK(c.target == link_target);
+        CHECK(c.status.type() == bfs::file_type::directory);
+        CHECK(c.last_write_time == from_unix(modified));
     }
 }
 #endif
