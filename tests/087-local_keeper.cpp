@@ -1190,41 +1190,79 @@ void test_incomplete() {
                 CHECK(files->size() == 0);
                 CHECK(!bfs::exists(path));
             }
-            SECTION("all blocks match => rename & add into model") {
-                write_file(path, "1234567890");
-                auto status = bfs::status(path);
-                auto perms = static_cast<uint32_t>(status.permissions());
-
+            SECTION("2 blocks peer file") {
                 proto::add_blocks(pr_file, b_1);
                 proto::add_blocks(pr_file, b_2);
                 proto::set_size(pr_file, data_1.size() + data_2.size());
-                proto::set_permissions(pr_file, perms);
-                builder->make_index(sha256, folder->get_id()).add(pr_file, peer_device).finish().apply(*sup);
-
-                auto max_seq = folder_info->get_max_sequence();
-                builder->scan_start(folder->get_id()).apply(*sup);
 
                 auto model_path = root_path / file_name;
-                CHECK(!bfs::exists(path));
-                CHECK(bfs::exists(model_path));
-                CHECK(read_file(model_path) == "1234567890");
-                CHECK(files->size() == 1);
-                auto f = files->by_name(file_name);
-                REQUIRE(f);
-                CHECK(f->get_size() == 10);
-                REQUIRE(f->iterate_blocks().get_total() == 2);
-                CHECK(f->iterate_blocks(0).next()->get_hash() == hash_1);
-                CHECK(f->iterate_blocks(1).next()->get_hash() == hash_2);
-                CHECK(folder_info->get_max_sequence() == max_seq + 1);
+                SECTION("all blocks match => rename & add into model") {
+                    write_file(path, "1234567890");
+                    auto status = bfs::status(path);
+                    auto perms = static_cast<uint32_t>(status.permissions());
 
-                builder->scan_start(folder->get_id()).apply(*sup);
-                auto f2 = files->by_name(file_name);
-                CHECK(f2.get() == f.get());
-                REQUIRE(f2->iterate_blocks().get_total() == 2);
-                CHECK(folder_info->get_max_sequence() == max_seq + 1);
+                    proto::set_permissions(pr_file, perms);
+                    builder->make_index(sha256, folder->get_id()).add(pr_file, peer_device).finish().apply(*sup);
+
+                    auto max_seq = folder_info->get_max_sequence();
+                    builder->scan_start(folder->get_id()).apply(*sup);
+
+                    CHECK(!bfs::exists(path));
+                    CHECK(bfs::exists(model_path));
+                    CHECK(read_file(model_path) == "1234567890");
+                    CHECK(files->size() == 1);
+                    auto f = files->by_name(file_name);
+                    REQUIRE(f);
+                    CHECK(f->get_size() == 10);
+                    REQUIRE(f->iterate_blocks().get_total() == 2);
+                    CHECK(f->iterate_blocks(0).next()->get_hash() == hash_1);
+                    CHECK(f->iterate_blocks(1).next()->get_hash() == hash_2);
+                    CHECK(folder_info->get_max_sequence() == max_seq + 1);
+
+                    builder->scan_start(folder->get_id()).apply(*sup);
+                    auto f2 = files->by_name(file_name);
+                    CHECK(f2.get() == f.get());
+                    REQUIRE(f2->iterate_blocks().get_total() == 2);
+                    CHECK(folder_info->get_max_sequence() == max_seq + 1);
+                }
+                SECTION("1st block match") {
+                    write_file(path, "1234500000");
+                    auto status = bfs::status(path);
+                    auto perms = static_cast<uint32_t>(status.permissions());
+
+                    proto::set_permissions(pr_file, perms);
+                    builder->make_index(sha256, folder->get_id()).add(pr_file, peer_device).finish().apply(*sup);
+
+                    auto max_seq = folder_info->get_max_sequence();
+                    builder->scan_start(folder->get_id()).apply(*sup);
+                    CHECK(bfs::exists(path));
+                    CHECK(!bfs::exists(model_path));
+                    CHECK(files->size() == 0);
+
+                    auto peer_file = folder_info_peer->get_file_infos().by_name(file_name);
+                    CHECK(peer_file->iterate_blocks(0).current().first->local_file());
+                    CHECK(!peer_file->iterate_blocks(1).current().first->local_file());
+                }
+                SECTION("2nd block match") {
+                    write_file(path, "0000067890");
+                    auto status = bfs::status(path);
+                    auto perms = static_cast<uint32_t>(status.permissions());
+
+                    proto::set_permissions(pr_file, perms);
+                    builder->make_index(sha256, folder->get_id()).add(pr_file, peer_device).finish().apply(*sup);
+
+                    auto max_seq = folder_info->get_max_sequence();
+                    builder->scan_start(folder->get_id()).apply(*sup);
+                    CHECK(bfs::exists(path));
+                    CHECK(!bfs::exists(model_path));
+                    CHECK(files->size() == 0);
+
+                    auto peer_file = folder_info_peer->get_file_infos().by_name(file_name);
+                    CHECK(!peer_file->iterate_blocks(0).current().first->local_file());
+                    CHECK(peer_file->iterate_blocks(1).current().first->local_file());
+                }
             }
 
-            // SECTION("some blocks match");
             // SECTION("no blocks match");
 
             CHECK(!folder->get_scan_start().is_special());

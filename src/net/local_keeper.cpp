@@ -569,7 +569,9 @@ struct folder_slave_t final : fs::fs_slave_t {
                     fs::task::rename_file_t(std::move(path_copy), std::move(name), modified_s, std::move(rename_ctx));
                 pending_io.emplace_back(std::move(sub_task));
             } else {
-                std::abort();
+                using namespace model::diff::local;
+                auto &peer_folder = cp->get_folder()->get_folder_info();
+                ctx.push(new blocks_availability_t(peer_file, peer_folder, std::move(valid_blocks)));
             }
         }
         return 1;
