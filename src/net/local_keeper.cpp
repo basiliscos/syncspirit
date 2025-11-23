@@ -19,6 +19,7 @@
 #include "presentation/presence.h"
 #include "presentation/cluster_file_presence.h"
 #include "proto/proto-helpers-bep.h"
+#include "utils/platform.h"
 
 #include <algorithm>
 #include <memory_resource>
@@ -84,28 +85,24 @@ struct child_info_t {
         ec = backend.ec;
     }
 
-    proto::FileInfo serialize(const model::folder_info_t &local_folder, blocks_t blocks) {
+    proto::FileInfo serialize(const model::folder_info_t &local_folder, blocks_t blocks, bool ignore_permissions) {
         auto data = proto::FileInfo();
         auto name = fs::relativize(path, local_folder.get_folder()->get_path());
         proto::set_name(data, narrow(name.generic_wstring()));
         proto::set_type(data, type);
         proto::set_modified_s(data, last_write_time);
-        proto::set_permissions(data, perms);
         if (size) {
             auto block_size = proto::get_size(blocks.front());
             proto::set_block_size(data, block_size);
             proto::set_size(data, size);
             proto::set_blocks(data, std::move(blocks));
         }
-#if 0
         if (ignore_permissions == false) {
-            auto permissions = static_cast<uint32_t>(status.permissions());
-            proto::set_permissions(metadata, permissions);
+            proto::set_permissions(data, perms);
         } else {
-            proto::set_permissions(metadata, 0666);
-            proto::set_no_permissions(metadata, true);
+            proto::set_permissions(data, 0666);
+            proto::set_no_permissions(data, true);
         }
-#endif
         return data;
     }
 
@@ -250,6 +247,7 @@ struct folder_slave_t final : fs::fs_slave_t {
         auto local_device = folder->get_cluster()->get_device();
         auto folder_presence = folder_entity->get_presence(local_device.get());
         auto path = folder->get_path();
+        ignore_permissions = folder->are_permissions_ignored() || !utils::platform_t::permissions_supported(path);
         stack.push_front(complete_scan_t{});
         stack.push_front(unscanned_dir_t(std::move(path), folder_presence));
     }
@@ -389,7 +387,7 @@ struct folder_slave_t final : fs::fs_slave_t {
         if (emit_update) {
             auto folder = context->local_folder->get_folder();
             auto folder_id = folder->get_id();
-            auto data = info.serialize(*context->local_folder, std::move(info.blocks));
+            auto data = info.serialize(*context->local_folder, std::move(info.blocks), ignore_permissions);
             ctx.push(new model::diff::advance::local_update_t(*actor->cluster, *actor->sequencer, std::move(data),
                                                               folder_id));
         }
@@ -770,6 +768,7 @@ struct folder_slave_t final : fs::fs_slave_t {
     local_keeper_ptr_t actor;
     utils::logger_t log;
     bool force_completion = false;
+    bool ignore_permissions;
 };
 
 } // namespace

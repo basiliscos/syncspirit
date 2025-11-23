@@ -266,6 +266,13 @@ void test_simple() {
                     CHECK(file->get_size() == 0);
                     CHECK(blocks.size() == 0);
                     REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
+#ifndef SYNCSPIRIT_WIN
+                    CHECK(!file->has_no_permissions());
+                    CHECK(file->get_permissions() == static_cast<uint32_t>(bfs::status(file_path).permissions()));
+#else
+                    CHECK(file->has_no_permissions());
+                    CHECK(file->get_permissions() == 0666);
+#endif
                 }
 #ifndef SYNCSPIRIT_WIN
                 SECTION("new symlink") {
@@ -1286,7 +1293,6 @@ void test_incomplete() {
 }
 
 // traversal order
-// permissions
 
 int _init() {
     test::init_logging();
