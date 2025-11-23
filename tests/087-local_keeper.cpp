@@ -1285,6 +1285,9 @@ void test_incomplete() {
     F().run();
 }
 
+// traversal order
+// permissions
+
 int _init() {
     test::init_logging();
     REGISTER_TEST_CASE(test_simple, "test_simple", "[net]");
@@ -1298,7 +1301,5 @@ int _init() {
     REGISTER_TEST_CASE(test_incomplete, "test_incomplete", "[net]");
     return 1;
 }
-
-// task.push(new model::diff::local::blocks_availability_t(*file, fi, info.valid_blocks()));
 
 static int v = _init();

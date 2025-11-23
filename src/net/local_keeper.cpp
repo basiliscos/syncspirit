@@ -199,12 +199,6 @@ struct rehashed_incomplete_t : child_ready_t {
     ;
 };
 
-struct check_child_t : child_info_t {
-    check_child_t(child_info_t &&info, presentation::presence_t *presence_)
-        : child_info_t{std::move(info)}, presence{presence_} {}
-    presentation::presence_ptr_t presence;
-};
-
 using hash_new_file_ptr_t = boost::intrusive_ptr<hash_new_file_t>;
 using hash_existing_file_ptr_t = boost::intrusive_ptr<hash_existing_file_t>;
 using hash_incomplete_file_ptr_t = boost::intrusive_ptr<hash_incomplete_file_t>;
@@ -223,8 +217,8 @@ struct fatal_error_t {
 
 using stack_item_t =
     std::variant<unscanned_dir_t, unexamined_t, incomplete_t, complete_scan_t, child_ready_t, hash_new_file_ptr_t,
-                 hash_existing_file_ptr_t, hash_incomplete_file_ptr_t, rehashed_incomplete_t, check_child_t,
-                 removed_dir_t, suspend_scan_t, unsuspend_scan_t, fatal_error_t>;
+                 hash_existing_file_ptr_t, hash_incomplete_file_ptr_t, rehashed_incomplete_t, removed_dir_t,
+                 suspend_scan_t, unsuspend_scan_t, fatal_error_t>;
 using stack_t = std::list<stack_item_t>;
 
 using folder_slave_ptr_t = r::intrusive_ptr_t<folder_slave_t>;
@@ -582,8 +576,6 @@ struct folder_slave_t final : fs::fs_slave_t {
         }
         return 1;
     }
-
-    int process(check_child_t &item, stack_context_t &ctx) noexcept { std::abort(); }
 
     bool post_process() noexcept {
         auto folder_id = context->local_folder->get_folder()->get_id();
