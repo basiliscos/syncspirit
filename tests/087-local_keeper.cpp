@@ -1372,9 +1372,9 @@ void test_importing() {
         void main() noexcept override {
             auto peer_short_id = my_device->device_id().get_uint();
             auto modified_s = std::int64_t{12345};
+            auto sha256 = peer_device->device_id().get_sha256();
 
             SECTION("regular file") {
-                auto sha256 = peer_device->device_id().get_sha256();
                 auto block_sz = fs::block_sizes[0];
                 auto path = root_path / L"файл";
 
@@ -1438,6 +1438,36 @@ void test_importing() {
                     CHECK(f->get_size() == proto::get_size(pr_file));
                     REQUIRE(f->get_version().as_proto() == v);
                 }
+            }
+            SECTION("folder") {
+                auto path = root_path / L"папка";
+
+                auto pr_file = proto::FileInfo{};
+                auto file_name = boost::nowide::narrow(L"папка");
+                proto::set_name(pr_file, file_name);
+                proto::set_sequence(pr_file, 4);
+                proto::set_type(pr_file, proto::FileInfoType::DIRECTORY);
+                auto &v = proto::get_version(pr_file);
+                auto &counter = proto::add_counters(v);
+                proto::set_id(counter, 55);
+                proto::set_value(counter, peer_short_id);
+                proto::set_modified_s(pr_file, modified_s);
+#ifdef SYNCSPIRIT_WIN
+                proto::set_no_permissions(pr_file, true);
+#endif
+
+                bfs::create_directories(path);
+                proto::set_permissions(pr_file, static_cast<uint32_t>(bfs::status(path).permissions()));
+
+                builder->make_index(sha256, folder->get_id()).add(pr_file, peer_device).finish().apply(*sup);
+
+                builder->scan_start(folder->get_id()).apply(*sup);
+                REQUIRE(files->size() == 1);
+
+                auto f = files->by_name(file_name);
+                REQUIRE(f);
+                CHECK(f->get_size() == proto::get_size(pr_file));
+                REQUIRE(f->get_version().as_proto() == v);
             }
         }
     };
