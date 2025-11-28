@@ -1471,11 +1471,11 @@ void test_importing() {
             }
             SECTION("deleted") {
                 SECTION("single deleted file") {
-                    auto path = root_path / "файл.bin";
+                    auto path = root_path / L"файл.bin";
                     auto pr_file = proto::FileInfo();
                     proto::set_name(pr_file, path.filename().string());
                     proto::set_sequence(pr_file, 4);
-                    proto::set_type(pr_file, proto::FileInfoType::DIRECTORY);
+                    proto::set_type(pr_file, proto::FileInfoType::FILE);
                     proto::set_deleted(pr_file, true);
 
                     auto &v = proto::get_version(pr_file);
@@ -1495,7 +1495,49 @@ void test_importing() {
                     CHECK(!bfs::exists(path));
                 }
                 SECTION("deleted file inside deleted dir") {
-                    // zzz
+                    auto v = proto::Vector();
+                    auto &counter = proto::add_counters(v);
+                    proto::set_id(counter, 1);
+                    proto::set_value(counter, 1);
+
+                    auto dir_path = bfs::path(L"папка");
+                    auto file_path = dir_path / L"файл.bin";
+                    auto narrow_dir = boost::nowide::narrow(dir_path.generic_wstring());
+                    auto narrow_file = boost::nowide::narrow(file_path.generic_wstring());
+
+                    auto pr_dir = proto::FileInfo();
+                    proto::set_name(pr_dir, narrow_dir);
+                    proto::set_sequence(pr_dir, 4);
+                    proto::set_type(pr_dir, proto::FileInfoType::DIRECTORY);
+                    proto::set_deleted(pr_dir, true);
+                    proto::set_version(pr_dir, v);
+
+                    auto pr_file = proto::FileInfo();
+                    proto::set_name(pr_file, narrow_file);
+                    proto::set_sequence(pr_file, 5);
+                    proto::set_type(pr_file, proto::FileInfoType::FILE);
+                    proto::set_deleted(pr_file, true);
+                    proto::set_version(pr_file, v);
+
+                    builder->make_index(sha256, folder->get_id())
+                        .add(pr_dir, peer_device)
+                        .add(pr_file, peer_device)
+                        .finish()
+                        .apply(*sup);
+
+                    builder->scan_start(folder->get_id()).apply(*sup);
+
+                    auto &files_my = folder_info->get_file_infos();
+                    REQUIRE(files_my.size() == 2);
+
+                    auto file_1 = files_my.by_name(narrow_dir);
+                    REQUIRE(file_1->get_version().as_proto() == v);
+                    auto file_2 = files_my.by_name(narrow_file);
+                    REQUIRE(file_2->get_version().as_proto() == v);
+
+                    auto it = bfs::directory_iterator(root_path);
+                    auto children_count = std::distance(it, bfs::directory_iterator());
+                    CHECK(children_count == 0);
                 }
             }
         }
