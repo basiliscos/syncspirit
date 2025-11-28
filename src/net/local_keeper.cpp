@@ -661,7 +661,7 @@ struct folder_slave_t final : fs::fs_slave_t {
     }
 
     void post_process(fs::task::scan_dir_t &task, stack_context_t &ctx) noexcept {
-        using checked_chidren_t = std::pmr::set<presentation::presence_t *>;
+        using checked_chidren_t = std::pmr::set<std::string_view>;
         auto &ec = task.ec;
         auto folder = context->local_folder->get_folder();
         auto folder_id = folder->get_id();
@@ -694,7 +694,8 @@ struct folder_slave_t final : fs::fs_slave_t {
             auto &info = *it_disk;
             auto presence = get_presence(task.presence.get(), info.path);
             if (presence) {
-                checked_children.emplace(presence);
+                auto filename = presence->get_entity()->get_path()->get_own_name();
+                checked_children.emplace(filename);
             }
             if (info.ec) {
                 actor->log->warn("scannig of  {} failed: {}", narrow(info.path.wstring()), info.ec.message());
@@ -713,15 +714,48 @@ struct folder_slave_t final : fs::fs_slave_t {
         if (parent_presence) {
             for (auto child : parent_presence->get_children()) {
                 auto features = child->get_features();
-                if ((features & F::local) && !checked_children.count(child)) {
-                    if (features & F::directory) {
-                        stack.push_front(removed_dir_t(child));
-                    } else {
-                        auto file = static_cast<presentation::local_file_presence_t *>(child);
-                        auto file_data = file->get_file_info().as_proto(false);
-                        proto::set_deleted(file_data, true);
-                        ctx.push(new model::diff::advance::local_update_t(*actor->cluster, *actor->sequencer,
-                                                                          std::move(file_data), folder_id));
+                if (features & F::local) {
+                    auto filename = child->get_entity()->get_path()->get_own_name();
+                    if (!checked_children.count(filename)) {
+                        checked_children.emplace(filename);
+                        if (features & F::directory) {
+                            stack.push_front(removed_dir_t(child));
+                        } else {
+                            auto file = static_cast<presentation::local_file_presence_t *>(child);
+                            auto file_data = file->get_file_info().as_proto(false);
+                            proto::set_deleted(file_data, true);
+                            ctx.push(new model::diff::advance::local_update_t(*actor->cluster, *actor->sequencer,
+                                                                              std::move(file_data), folder_id));
+                        }
+                    }
+                }
+            }
+            using queue_t = std::pmr::list<presentation::entity_t *>;
+            auto queue = queue_t(allocator);
+            for (auto child_entity : parent_presence->get_entity()->get_children()) {
+                auto filename = child_entity->get_path()->get_own_name();
+                if (!checked_children.count(filename)) {
+                    auto best = child_entity->get_best();
+                    if (best->get_features() & F::deleted) {
+                        queue.emplace_back(child_entity);
+                    }
+                }
+            }
+            while (!queue.empty()) {
+                auto child_entity = queue.front();
+                queue.pop_back();
+                auto best = child_entity->get_best();
+                auto presence = static_cast<const presentation::cluster_file_presence_t *>(best);
+                auto &peer_file = presence->get_file_info();
+                auto pr_file = peer_file.as_proto(true);
+                ctx.push(new model::diff::advance::local_update_t(*actor->cluster, *actor->sequencer,
+                                                                  std::move(pr_file), folder_id));
+                if (best->get_features() & F::directory) {
+                    for (auto c : child_entity->get_children()) {
+                        auto best = child_entity->get_best();
+                        if (best->get_features() & F::deleted) {
+                            queue.emplace_back(c);
+                        }
                     }
                 }
             }

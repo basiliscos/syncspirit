@@ -1439,7 +1439,7 @@ void test_importing() {
                     REQUIRE(f->get_version().as_proto() == v);
                 }
             }
-            SECTION("folder") {
+            SECTION("directory") {
                 auto path = root_path / L"папка";
 
                 auto pr_file = proto::FileInfo{};
@@ -1468,6 +1468,35 @@ void test_importing() {
                 REQUIRE(f);
                 CHECK(f->get_size() == proto::get_size(pr_file));
                 REQUIRE(f->get_version().as_proto() == v);
+            }
+            SECTION("deleted") {
+                SECTION("single deleted file") {
+                    auto path = root_path / "файл.bin";
+                    auto pr_file = proto::FileInfo();
+                    proto::set_name(pr_file, path.filename().string());
+                    proto::set_sequence(pr_file, 4);
+                    proto::set_type(pr_file, proto::FileInfoType::DIRECTORY);
+                    proto::set_deleted(pr_file, true);
+
+                    auto &v = proto::get_version(pr_file);
+                    auto &counter = proto::add_counters(v);
+                    proto::set_id(counter, 1);
+                    proto::set_value(counter, 1);
+
+                    builder->make_index(sha256, folder->get_id()).add(pr_file, peer_device).finish().apply(*sup);
+
+                    builder->scan_start(folder->get_id()).apply(*sup);
+
+                    auto fi_my = folder->get_folder_infos().by_device(*my_device);
+                    auto &files_my = fi_my->get_file_infos();
+                    REQUIRE(files_my.size() == 1);
+                    auto file = files_my.by_name(path.filename().string());
+                    REQUIRE(file->get_version().as_proto() == v);
+                    CHECK(!bfs::exists(path));
+                }
+                SECTION("deleted file inside deleted dir") {
+                    // zzz
+                }
             }
         }
     };
