@@ -284,10 +284,10 @@ struct folder_slave_t final : fs::fs_slave_t {
         auto nothing_left = pending_io.empty() && (actor->concurrent_hashes_left == actor->concurrent_hashes_limit) &&
                             (actor->fs_tasks == 0);
         if (nothing_left || force_completion) {
-            using clock_t = r::pt::microsec_clock;
             auto folder = context->local_folder->get_folder();
             auto folder_id = folder->get_id();
-            auto now = clock_t::local_time();
+            auto now = r::pt::microsec_clock::local_time();
+            LOG_DEBUG(log, "pushing scan_finish");
             ctx.push(new model::diff::local::scan_finish_t(folder_id, now));
         }
         return -1;

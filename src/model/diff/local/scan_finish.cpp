@@ -18,6 +18,9 @@ auto scan_finish_t::apply_impl(apply_controller_t &controller, void *custom) con
     auto folder = cluster.get_folders().by_id(folder_id);
     folder->set_scan_finish(at);
     auto r = applicator_t::apply_sibling(controller, custom);
+    auto local_device = cluster.get_device();
+    auto &local_folder = *folder->get_folder_infos().by_device(*local_device);
+    local_folder.notify_update();
     folder->notify_update();
     return r;
 }

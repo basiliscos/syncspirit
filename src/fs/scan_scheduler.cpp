@@ -110,10 +110,10 @@ void scan_scheduler_t::scan_next_or_schedule() noexcept {
 
 auto scan_scheduler_t::scan_next() noexcept -> schedule_option_t {
     while (!scan_queue.empty()) {
-        auto folder_id = scan_queue.front();
+        auto folder_id = std::move(scan_queue.front());
         scan_queue.pop_front();
         auto folder = cluster->get_folders().by_id(folder_id);
-        if (!folder || folder->is_synchronizing() || folder->is_suspended()) {
+        if (!folder || folder->is_synchronizing() || ((folder->is_suspended() && !folder->get_suspend_reason()))) {
             continue;
         }
         for (auto it = scan_queue.begin(); it != scan_queue.end();) {
