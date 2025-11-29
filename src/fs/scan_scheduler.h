@@ -50,7 +50,6 @@ struct SYNCSPIRIT_API scan_scheduler_t : public r::actor_base_t, private model::
     model::cluster_ptr_t cluster;
     scan_queue_t scan_queue;
     utils::logger_t log;
-    r::address_ptr_t fs_scanner;
     r::address_ptr_t coordinator;
     std::optional<r::request_id_t> timer_id;
     schedule_option_t schedule_option;

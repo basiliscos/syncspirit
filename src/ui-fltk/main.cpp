@@ -299,7 +299,7 @@ int app_main(app_context_t &app_ctx) {
     ra::system_context_ptr_t sys_context{new asio_sys_context_t{io_context}};
     auto strand = std::make_shared<asio::io_context::strand>(io_context);
     auto timeout = pt::milliseconds{cfg.timeout};
-    auto independent_threads = 3ul;
+    auto independent_threads = 2ul;
     auto seed = (size_t)std::time(nullptr);
     auto sequencer = model::make_sequencer(seed);
 
@@ -376,9 +376,8 @@ int app_main(app_context_t &app_ctx) {
                       .timeout(timeout)
                       .registry_address(sup_net->get_registry_address())
                       .fs_config(cfg.fs_config)
+                      .shutdown_flag(shutdown_flag, r::pt::millisec{50})
                       .hasher_threads(cfg.hasher_threads)
-                      .bouncer_address(bouncer_actor->get_address())
-                      .sequencer(sequencer)
                       .finish();
     fs_sup->do_process();
 

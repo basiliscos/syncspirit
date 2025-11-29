@@ -352,7 +352,7 @@ struct folder_slave_t final : fs::fs_slave_t {
         auto folder = context->local_folder->get_folder();
         auto folder_id = folder->get_id();
         auto &ec = item.ec;
-        LOG_TRACE(log, "suspending '{}', due to: {}", folder_id, ec.message());
+        LOG_WARN(log, "suspending '{}', due to: {}", folder_id, ec.message());
         ctx.push(new model::diff::modify::suspend_folder_t(*folder, true, ec));
         auto it = stack.begin();
         std::advance(it, 1);
@@ -849,10 +849,9 @@ struct folder_slave_t final : fs::fs_slave_t {
 } // namespace
 
 local_keeper_t::local_keeper_t(config_t &config)
-    : r::actor_base_t(config), sequencer{std::move(config.sequencer)}, cluster{config.cluster},
+    : r::actor_base_t(config), sequencer{std::move(config.sequencer)},
       concurrent_hashes_left{static_cast<std::int32_t>(config.concurrent_hashes)},
       concurrent_hashes_limit{concurrent_hashes_left} {
-    assert(cluster);
     assert(sequencer);
     assert(concurrent_hashes_left);
 }
@@ -870,6 +869,7 @@ void local_keeper_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
                 auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
                 plugin->subscribe_actor(&local_keeper_t::on_model_update, coordinator);
+                plugin->subscribe_actor(&local_keeper_t::on_thread_ready, coordinator);
             }
         });
     });
@@ -896,6 +896,14 @@ void local_keeper_t::on_model_update(model::message::model_update_t &msg) noexce
     if (!r) {
         auto ee = make_error(r.assume_error());
         do_shutdown(ee);
+    }
+}
+
+void local_keeper_t::on_thread_ready(model::message::thread_ready_t &message) noexcept {
+    auto &p = message.payload;
+    if (p.thread_id == std::this_thread::get_id()) {
+        LOG_TRACE(log, "on_thread_ready");
+        cluster = message.payload.cluster;
     }
 }
 

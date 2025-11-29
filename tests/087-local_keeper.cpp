@@ -170,7 +170,6 @@ struct fixture_t {
     void launch_target() {
         target = sup->create_actor<net::local_keeper_t>()
                      .timeout(timeout)
-                     .cluster(cluster)
                      .sequencer(sequencer)
                      .concurrent_hashes(get_hash_limit())
                      .finish();

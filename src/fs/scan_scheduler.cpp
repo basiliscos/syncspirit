@@ -28,7 +28,6 @@ void scan_scheduler_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 plugin->subscribe_actor(&scan_scheduler_t::on_thread_ready, supervisor->get_address());
             }
         });
-        p.discover_name(net::names::fs_scanner, fs_scanner, true).link();
     });
 }
 
