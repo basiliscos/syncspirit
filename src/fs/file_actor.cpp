@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "file_actor.h"
+#include "fs/fs_slave.h"
 #include "net/names.h"
 #include "utils.h"
 #include "utils/io.h"
@@ -77,7 +78,8 @@ void file_actor_t::on_io_commands(message::io_commands_t &message) noexcept {
 
 void file_actor_t::on_exec(message::foreign_executor_t &request) noexcept {
     LOG_DEBUG(log, "on_exec");
-    auto slave = request.payload.get();
+    auto slave = static_cast<fs::fs_slave_t *>(request.payload.get());
+    slave->ec = {};
     slave->exec(hasher);
 }
 

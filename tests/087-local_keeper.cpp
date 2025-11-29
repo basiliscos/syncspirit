@@ -376,15 +376,32 @@ void test_simple() {
                     REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
                 }
             }
-            SECTION("unchanged items") {
+        }
+    };
+    F().run();
+}
+
+void test_no_changes() {
+    struct F : fixture_t {
+        std::uint32_t get_hash_limit() override { return 2; }
+
+        void main() noexcept override {
+            sys::error_code ec;
+            auto &blocks = cluster->get_blocks();
+            auto my_short_id = my_device->device_id().get_uint();
+            auto folder_id = folder->get_id();
+
+            auto v = proto::Vector();
+            auto &counter = proto::add_counters(v);
+            proto::set_id(counter, 1);
+            proto::set_value(counter, 1);
+
+            SECTION("single item") {
                 auto pr_file = proto::FileInfo{};
                 auto file_name = bfs::path(L"неизменное.bin");
                 proto::set_name(pr_file, file_name.string());
                 proto::set_sequence(pr_file, 4);
-                auto &v = proto::get_version(pr_file);
-                auto &counter = proto::add_counters(v);
-                proto::set_id(counter, my_short_id);
-                proto::set_value(counter, 1);
+                proto::set_version(pr_file, v);
 
                 SECTION("dir") {
                     auto dir = root_path / file_name;
@@ -397,13 +414,13 @@ void test_simple() {
                     proto::set_permissions(pr_file, perms);
                     proto::set_modified_s(pr_file, modified);
 
-                    builder->local_update(folder->get_id(), pr_file).apply(*sup);
+                    builder->local_update(folder_id, pr_file).apply(*sup);
                     REQUIRE(files->size() == 1);
                     auto file_1 = files->by_name(boost::nowide::narrow(file_name.wstring()));
                     file_1->mark_local(false);
                     CHECK(!file_1->is_local());
 
-                    builder->scan_start(folder->get_id()).apply(*sup);
+                    builder->scan_start(folder_id).apply(*sup);
                     REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
                     REQUIRE(files->size() == 1);
 
@@ -428,14 +445,14 @@ void test_simple() {
                     proto::set_hash(b, utils::sha256_digest(as_bytes(data)).value());
                     proto::add_blocks(pr_file, b);
 
-                    builder->local_update(folder->get_id(), pr_file).apply(*sup);
+                    builder->local_update(folder_id, pr_file).apply(*sup);
                     REQUIRE(files->size() == 1);
                     REQUIRE(blocks.size() == 1);
                     auto file_1 = files->by_name(boost::nowide::narrow(file_name.wstring()));
                     file_1->mark_local(false);
                     CHECK(!file_1->is_local());
 
-                    builder->scan_start(folder->get_id()).apply(*sup);
+                    builder->scan_start(folder_id).apply(*sup);
                     REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
                     REQUIRE(files->size() == 1);
 
@@ -457,7 +474,7 @@ void test_simple() {
                     proto::set_type(pr_file, proto::FileInfoType::SYMLINK);
                     proto::set_permissions(pr_file, perms);
 
-                    builder->local_update(folder->get_id(), pr_file).apply(*sup);
+                    builder->local_update(folder_id, pr_file).apply(*sup);
                     REQUIRE(files->size() == 1);
                     auto file_1 = files->by_name(boost::nowide::narrow(file_name.wstring()));
                     file_1->mark_local(false);
@@ -465,7 +482,7 @@ void test_simple() {
                     REQUIRE(file_1->get_link_target() == boost::nowide::narrow(target.wstring()));
                     CHECK(!file_1->is_local());
 
-                    builder->scan_start(folder->get_id()).apply(*sup);
+                    builder->scan_start(folder_id).apply(*sup);
                     REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
                     REQUIRE(files->size() == 1);
 
@@ -474,6 +491,42 @@ void test_simple() {
                     CHECK(file_1->is_local());
                 }
 #endif
+            }
+            SECTION("dir & file") {
+                auto file_name_1 = bfs::path(L"b-dir");
+                auto dir = root_path / file_name_1;
+                bfs::create_directories(dir);
+
+                auto modified_1 = to_unix(bfs::last_write_time(dir));
+                auto perms_1 = static_cast<uint32_t>(bfs::status(dir).permissions());
+
+                auto pr_file_1 = proto::FileInfo{};
+                proto::set_name(pr_file_1, file_name_1.string());
+                proto::set_version(pr_file_1, v);
+                proto::set_type(pr_file_1, proto::FileInfoType::DIRECTORY);
+                proto::set_permissions(pr_file_1, perms_1);
+                proto::set_modified_s(pr_file_1, modified_1);
+
+                auto file_name_2 = bfs::path(L"a-file");
+                auto file = root_path / file_name_2;
+                write_file(file, "");
+
+                auto modified_2 = to_unix(bfs::last_write_time(file));
+                auto perms_2 = static_cast<uint32_t>(bfs::status(file).permissions());
+
+                auto pr_file_2 = proto::FileInfo{};
+                proto::set_name(pr_file_2, file_name_2.string());
+                proto::set_version(pr_file_2, v);
+                proto::set_type(pr_file_2, proto::FileInfoType::FILE);
+                proto::set_permissions(pr_file_2, perms_2);
+                proto::set_modified_s(pr_file_2, modified_2);
+
+                builder->local_update(folder_id, pr_file_1).local_update(folder_id, pr_file_2).apply(*sup);
+                REQUIRE(files->size() == 2);
+
+                auto sequence = folder_info->get_max_sequence();
+                builder->scan_start(folder_id).apply(*sup);
+                CHECK(folder_info->get_max_sequence() == sequence);
             }
         }
     };
@@ -1547,6 +1600,7 @@ void test_importing() {
 int _init() {
     test::init_logging();
     REGISTER_TEST_CASE(test_simple, "test_simple", "[net]");
+    REGISTER_TEST_CASE(test_no_changes, "test_no_changes", "[net]");
     REGISTER_TEST_CASE(test_deleted, "test_deleted", "[net]");
     REGISTER_TEST_CASE(test_changed, "test_changed", "[net]");
     REGISTER_TEST_CASE(test_type_change, "test_type_change", "[net]");

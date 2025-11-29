@@ -692,7 +692,8 @@ struct folder_slave_t final : fs::fs_slave_t {
         auto it_disk = task.child_infos.begin();
         while (it_disk != task.child_infos.end()) {
             auto &info = *it_disk;
-            auto presence = get_presence(task.presence.get(), info.path);
+            auto is_dir = info.status.type() == bfs::file_type::directory;
+            auto presence = get_presence(task.presence.get(), info.path, is_dir);
             if (presence) {
                 auto filename = presence->get_entity()->get_path()->get_own_name();
                 checked_children.emplace(filename);
@@ -802,32 +803,16 @@ struct folder_slave_t final : fs::fs_slave_t {
         }
     }
 
-    presentation::presence_t *get_presence(presentation::presence_t *parent, const bfs::path &path) {
-        struct comparator_t {
-            bool operator()(const presentation::presence_t *p, const bfs::path &name) const {
-                auto entity = const_cast<presentation::presence_t *>(p)->get_entity();
-                auto buffer = std::array<std::byte, 1024>();
-                auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
-                auto allocator = allocator_t(&pool);
-                auto own_wname = std::pmr::wstring(allocator);
-                auto own_name = entity->get_path()->get_own_name();
-                own_wname.resize(own_name.size() + 1);
-                auto b = own_name.data();
-                auto e = b + own_name.size();
-                auto str = boost::nowide::widen(own_wname.data(), own_wname.size(), b, e);
-                assert(str);
-                auto wname = std::wstring_view(str, str + own_name.size());
-                return wname < name.wstring();
-            }
-        };
-
+    presentation::presence_t *get_presence(presentation::presence_t *parent, const bfs::path &path, bool is_dir) {
         if (!parent) {
             return nullptr;
         }
         LOG_TRACE(log, "get_presence for {}", path.string());
         auto &children = parent->get_children();
-        auto comparator = comparator_t{};
-        auto it = std::lower_bound(children.begin(), children.end(), path.filename(), comparator);
+        auto comparator = presentation::presence_t::child_comparator_t{};
+        auto own_name = narrow(path.filename().generic_wstring());
+        auto presence_like = presentation::presence_t::presence_like_t{own_name, is_dir};
+        auto it = std::lower_bound(children.begin(), children.end(), presence_like, comparator);
         if (it != children.end()) {
             auto &p = *it;
             if (!(p->get_features() & F::missing)) {
