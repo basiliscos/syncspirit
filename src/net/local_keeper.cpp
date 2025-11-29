@@ -103,6 +103,9 @@ struct child_info_t {
             proto::set_permissions(data, 0666);
             proto::set_no_permissions(data, true);
         }
+        if (type == proto::FileInfoType::SYMLINK) {
+            proto::set_symlink_target(data, narrow(link_target.generic_wstring()));
+        }
         return data;
     }
 

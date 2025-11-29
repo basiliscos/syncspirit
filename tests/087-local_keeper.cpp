@@ -302,7 +302,8 @@ void test_simple() {
 #ifndef SYNCSPIRIT_WIN
                 SECTION("new symlink") {
                     auto file_path = root_path / "symlink";
-                    bfs::create_symlink(bfs::path("/some/where"), file_path, ec);
+                    auto target = std::string_view("/some/where");
+                    bfs::create_symlink(bfs::path(target), file_path, ec);
                     REQUIRE(!ec);
                     builder->scan_start(folder->get_id()).apply(*sup);
 
@@ -313,6 +314,7 @@ void test_simple() {
                     CHECK(file->is_link());
                     CHECK(file->get_block_size() == 0);
                     CHECK(file->get_size() == 0);
+                    CHECK(file->get_link_target() == target);
                     CHECK(blocks.size() == 0);
                     REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
                 }
