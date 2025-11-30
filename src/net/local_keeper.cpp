@@ -490,6 +490,7 @@ struct folder_slave_t final : fs::fs_slave_t {
         auto folder_id = context->local_folder->get_folder()->get_id();
         auto dir = static_cast<presentation::local_file_presence_t *>(item.presence.get());
         auto dir_data = dir->get_file_info().as_proto(false);
+        proto::set_deleted(dir_data, true);
         ctx.push(new model::diff::advance::local_update_t(*actor->cluster, *actor->sequencer, std::move(dir_data),
                                                           folder_id));
         for (auto child : item.presence->get_children()) {

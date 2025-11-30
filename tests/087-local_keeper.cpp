@@ -585,7 +585,7 @@ void test_deleted() {
             SECTION("deleted hierarchy of dirs") {
                 auto pr_file = proto::FileInfo{};
                 proto::set_type(pr_file, proto::FileInfoType::DIRECTORY);
-                proto::set_deleted(pr_file, true);
+                proto::set_deleted(pr_file, false);
                 proto::set_sequence(pr_file, 4);
                 auto &v = proto::get_version(pr_file);
                 auto &counter = proto::add_counters(v);
