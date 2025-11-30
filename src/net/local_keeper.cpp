@@ -40,10 +40,14 @@ using allocator_t = std::pmr::polymorphic_allocator<char>;
 using F = presentation::presence_t::features_t;
 
 struct stack_context_t {
+    stack_context_t(std::int64_t diffs_left_) : diffs_left{diffs_left_}, next{nullptr} {}
+
+    std::int64_t diffs_left;
     model::diff::cluster_diff_ptr_t diff;
-    model::diff::cluster_diff_t *next = nullptr;
+    model::diff::cluster_diff_t *next;
 
     void push(model::diff::cluster_diff_t *d) noexcept {
+        --diffs_left;
         if (next) {
             next = next->assign_sibling(d);
         } else {
@@ -272,15 +276,16 @@ struct folder_slave_t final : fs::fs_slave_t {
                 stack.erase(it);
             }
             try_next = r > 0;
+            if (try_next) {
+                if (ctx.diffs_left <= 0 && !stack.empty() && pending_io.empty()) {
+                    pending_io.emplace_back(fs::task::noop_t());
+                    break;
+                }
+            }
         }
         if (ctx.diff) {
             actor->send<model::payload::model_update_t>(actor->coordinator, std::move(ctx.diff));
         }
-    }
-
-    void process_stack() noexcept {
-        auto ctx = stack_context_t();
-        process_stack(ctx);
     }
 
     int process(complete_scan_t &, stack_context_t &ctx) noexcept {
@@ -617,7 +622,8 @@ struct folder_slave_t final : fs::fs_slave_t {
     bool post_process() noexcept {
         auto folder_id = context->local_folder->get_folder()->get_id();
         LOG_TRACE(log, "postpocess of '{}'", folder_id);
-        auto ctx = stack_context_t();
+
+        auto ctx = stack_context_t(actor->files_scan_iteration_limit);
 
         for (auto &t : tasks_out) {
             std::visit([&](auto &t) { post_process(t, ctx); }, t);
@@ -808,6 +814,8 @@ struct folder_slave_t final : fs::fs_slave_t {
         }
     }
 
+    void post_process(fs::task::noop_t &, stack_context_t &) noexcept {}
+
     presentation::presence_t *get_presence(presentation::presence_t *parent, const bfs::path &path, bool is_dir) {
         if (!parent) {
             return nullptr;
@@ -841,9 +849,10 @@ struct folder_slave_t final : fs::fs_slave_t {
 local_keeper_t::local_keeper_t(config_t &config)
     : r::actor_base_t(config), sequencer{std::move(config.sequencer)},
       concurrent_hashes_left{static_cast<std::int32_t>(config.concurrent_hashes)},
-      concurrent_hashes_limit{concurrent_hashes_left} {
+      concurrent_hashes_limit{concurrent_hashes_left}, files_scan_iteration_limit{config.files_scan_iteration_limit} {
     assert(sequencer);
     assert(concurrent_hashes_left);
+    assert(files_scan_iteration_limit);
 }
 
 void local_keeper_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
@@ -909,7 +918,8 @@ auto local_keeper_t::operator()(const model::diff::local::scan_start_t &diff, vo
         auto local_folder = folder->get_folder_infos().by_device(*cluster->get_device());
         auto ctx = folder_context_ptr_t(new folder_context_t(local_folder));
         auto backend = new folder_slave_t(std::move(ctx), this);
-        backend->process_stack();
+        auto stack_ctx = stack_context_t(concurrent_hashes_left);
+        backend->process_stack(stack_ctx);
         backend->prepare_task();
         auto slave = fs::payload::foreign_executor_prt_t(backend);
         route<fs::payload::foreign_executor_prt_t>(fs_addr, address, std::move(slave));

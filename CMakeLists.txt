@@ -110,6 +110,7 @@ add_library(syncspirit_core
     src/fs/scan_scheduler.cpp
     src/fs/scan_task.cpp
     src/fs/utils.cpp
+    src/fs/task/noop.cpp
     src/fs/task/remove_file.cpp
     src/fs/task/rename_file.cpp
     src/fs/task/segment_iterator.cpp

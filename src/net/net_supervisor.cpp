@@ -160,6 +160,7 @@ void net_supervisor_t::launch_early() noexcept {
 
     create_actor<local_keeper_t>()
         .concurrent_hashes(app_config.hasher_threads)
+        .files_scan_iteration_limit(app_config.fs_config.files_scan_iteration_limit)
         .sequencer(sequencer)
         .escalate_failure()
         .timeout(timeout)

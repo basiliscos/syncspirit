@@ -8,7 +8,6 @@
 #include "fs/utils.h"
 #include "managed_hasher.h"
 #include "model/cluster.h"
-#include "model/diff/advance/advance.h"
 #include "model/diff/advance/local_update.h"
 #include "net/local_keeper.h"
 #include "net/names.h"
@@ -69,6 +68,7 @@ struct my_supervisort_t : supervisor_t {
 
     fixture_t *fixture = nullptr;
 
+    void on_model_update(model::message::model_update_t &) noexcept override;
     outcome::result<void> operator()(const model::diff::advance::local_update_t &, void *) noexcept override;
 };
 
@@ -84,6 +84,8 @@ struct fixture_t {
 
     virtual std::uint32_t get_hash_limit() { return 1; }
 
+    virtual std::int64_t get_iterations_limit() { return 100; }
+
     virtual void execute(fs::message::foreign_executor_t &req) noexcept {
         sup->log->info("executing foreign task");
         auto slave = static_cast<fs::fs_slave_t *>(req.payload.get());
@@ -96,6 +98,7 @@ struct fixture_t {
     }
 
     virtual void on_diff(const model::diff::advance::local_update_t &) noexcept {}
+    virtual void on_model_update(model::message::model_update_t &) noexcept {}
 
     void run() noexcept {
         sequencer = make_sequencer(1234);
@@ -172,6 +175,7 @@ struct fixture_t {
                      .timeout(timeout)
                      .sequencer(sequencer)
                      .concurrent_hashes(get_hash_limit())
+                     .files_scan_iteration_limit(get_iterations_limit())
                      .finish();
         sup->do_process();
 
@@ -207,6 +211,11 @@ auto my_supervisort_t::operator()(const model::diff::advance::local_update_t &di
     -> outcome::result<void> {
     fixture->on_diff(diff);
     return parent_t::operator()(diff, custom);
+}
+
+void my_supervisort_t::on_model_update(model::message::model_update_t &diff) noexcept {
+    fixture->on_model_update(diff);
+    return parent_t::on_model_update(diff);
 }
 
 void test_simple() {
@@ -1599,6 +1608,45 @@ void test_importing() {
     F().run();
 }
 
+void test_concurrency() {
+    static constexpr int N = 5;
+    static constexpr int M = 3;
+
+    struct F : fixture_t {
+
+        void on_model_update(model::message::model_update_t &) noexcept override { ++local_updates; }
+
+        std::int64_t get_iterations_limit() override { return M; }
+
+        void main() noexcept override {
+            for (int i = 0; i < N; ++i) {
+                auto letter = static_cast<char>('a' + i);
+                auto dir_name = std::string_view(&letter, 1);
+                auto dir_path = root_path / "sub-dir" / dir_name;
+                bfs::create_directories(dir_path);
+                for (int j = 0; j < M; ++j) {
+                    auto letter = static_cast<char>('1' + j);
+                    auto file_name = std::string_view(&letter, 1);
+                    auto file_path = dir_path / file_name;
+                    write_file(file_path, "");
+                }
+            }
+            builder->scan_start(folder->get_id()).apply(*sup);
+            REQUIRE(files->size() == 1 + N * (M + 1));
+
+            local_updates = 0;
+            bfs::remove_all(root_path / "sub-dir");
+            builder->scan_start(folder->get_id()).apply(*sup);
+
+            CHECK(local_updates >= N);
+            CHECK(local_updates <= N * 2);
+        }
+
+        int local_updates = 0;
+    };
+    F().run();
+}
+
 int _init() {
     test::init_logging();
     REGISTER_TEST_CASE(test_simple, "test_simple", "[net]");
@@ -1613,6 +1661,7 @@ int _init() {
     REGISTER_TEST_CASE(test_incomplete, "test_incomplete", "[net]");
     REGISTER_TEST_CASE(test_traversal, "test_traversal", "[net]");
     REGISTER_TEST_CASE(test_importing, "test_importing", "[net]");
+    REGISTER_TEST_CASE(test_concurrency, "test_concurrency", "[net]");
     return 1;
 }
 
