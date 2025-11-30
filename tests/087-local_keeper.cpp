@@ -546,10 +546,23 @@ void test_no_changes() {
 
 void test_deleted() {
     struct F : fixture_t {
+        using paths_t = std::vector<std::string>;
+
+        void on_diff(const model::diff::advance::local_update_t &diff) noexcept override {
+            auto file = folder_info->get_file_infos().by_uuid(diff.uuid);
+            auto name = file->get_name()->get_full_name();
+            paths.emplace_back(std::string(name));
+        }
+
         void main() noexcept override {
             sys::error_code ec;
             auto &blocks = cluster->get_blocks();
             auto my_short_id = my_device->device_id().get_uint();
+
+            auto v = proto::Vector();
+            auto &counter = proto::add_counters(v);
+            proto::set_id(counter, my_short_id);
+            proto::set_value(counter, 1);
 
             SECTION("sigle items") {
                 auto pr_file = proto::FileInfo{};
@@ -557,10 +570,7 @@ void test_deleted() {
                 proto::set_deleted(pr_file, true);
                 proto::set_name(pr_file, file_name.string());
                 proto::set_sequence(pr_file, 4);
-                auto &v = proto::get_version(pr_file);
-                auto &counter = proto::add_counters(v);
-                proto::set_id(counter, my_short_id);
-                proto::set_value(counter, 1);
+                proto::set_version(pr_file, v);
 
                 SECTION("regular file") { builder->local_update(folder->get_id(), pr_file).apply(*sup); }
 #ifndef SYNCSPIRIT_WIN
@@ -596,10 +606,8 @@ void test_deleted() {
                 proto::set_type(pr_file, proto::FileInfoType::DIRECTORY);
                 proto::set_deleted(pr_file, false);
                 proto::set_sequence(pr_file, 4);
-                auto &v = proto::get_version(pr_file);
-                auto &counter = proto::add_counters(v);
-                proto::set_id(counter, my_short_id);
-                proto::set_value(counter, 1);
+                proto::set_version(pr_file, v);
+
                 auto file_name = bfs::path(L"имя");
                 for (auto &name : {"a", "a/bb", "a/cc", "a/bb/ddd"}) {
                     proto::set_name(pr_file, name);
@@ -619,7 +627,75 @@ void test_deleted() {
                     CHECK(f->is_deleted());
                 }
             }
+            SECTION("order of deletion (1)") {
+                auto file_type = GENERATE(0, 1);
+
+                auto pr_file = proto::FileInfo{};
+                proto::set_type(pr_file, static_cast<proto::FileInfoType>(file_type));
+                proto::set_deleted(pr_file, false);
+                proto::set_sequence(pr_file, 4);
+                proto::set_version(pr_file, v);
+
+                for (auto &name : {"a", "b", "c", "d"}) {
+                    proto::set_name(pr_file, name);
+                    builder->local_update(folder->get_id(), pr_file);
+                }
+                builder->apply(*sup);
+                REQUIRE(files->size() == 4);
+                for (auto f : *files) {
+                    f->mark_local(false);
+                }
+                paths = {};
+                builder->scan_start(folder->get_id()).apply(*sup);
+
+                auto expected = paths_t{
+                    "a",
+                    "b",
+                    "c",
+                    "d",
+                };
+                CHECK(paths == expected);
+            }
+            SECTION("order of deletion (2)") {
+                auto file_type = GENERATE(0, 1);
+
+                auto pr_file = proto::FileInfo{};
+                proto::set_type(pr_file, proto::FileInfoType::DIRECTORY);
+                proto::set_deleted(pr_file, false);
+                proto::set_sequence(pr_file, 4);
+                proto::set_version(pr_file, v);
+
+                for (auto &name : {"a", "a/1", "a/2", "a/3", "b", "b/1", "b/2", "b/3", "a/2/xx", "a/2/yy"}) {
+                    proto::set_name(pr_file, name);
+                    builder->local_update(folder->get_id(), pr_file);
+                }
+                builder->apply(*sup);
+                REQUIRE(files->size() == 10);
+                for (auto f : *files) {
+                    f->mark_local(false);
+                }
+                paths = {};
+                builder->scan_start(folder->get_id()).apply(*sup);
+
+                // clang-format off
+                auto expected = paths_t{
+                    "a",
+                    "a/1",
+                    "a/2",
+                    "a/2/xx",
+                    "a/2/yy",
+                    "a/3",
+                    "b", "b/1", "b/2",  "b/3",
+                };
+                // clang-format on
+                CHECK(paths == expected);
+
+                // builder->scan_start(folder->get_id()).apply(*sup);
+                // CHECK(paths == expected);
+            }
         }
+
+        paths_t paths;
     };
     F().run();
 }

@@ -498,9 +498,11 @@ struct folder_slave_t final : fs::fs_slave_t {
         proto::set_deleted(dir_data, true);
         ctx.push(new model::diff::advance::local_update_t(*actor->cluster, *actor->sequencer, std::move(dir_data),
                                                           folder_id));
+        auto dirs_stack = stack_t();
+        auto children = item.presence->get_children();
         for (auto child : item.presence->get_children()) {
             if (child->get_features() & F::directory) {
-                stack.push_front(removed_dir_t(child));
+                dirs_stack.push_front(removed_dir_t(child));
             } else {
                 auto file = static_cast<presentation::local_file_presence_t *>(child);
                 auto file_data = file->get_file_info().as_proto(false);
@@ -508,6 +510,11 @@ struct folder_slave_t final : fs::fs_slave_t {
                 ctx.push(new model::diff::advance::local_update_t(*actor->cluster, *actor->sequencer,
                                                                   std::move(file_data), folder_id));
             }
+        }
+        while (!dirs_stack.empty()) {
+            auto item = std::move(dirs_stack.front());
+            stack.push_front(std::move(item));
+            dirs_stack.pop_front();
         }
         return 1;
     }
@@ -724,6 +731,7 @@ struct folder_slave_t final : fs::fs_slave_t {
         }
 
         if (parent_presence) {
+            auto dirs_stack = stack_t();
             for (auto child : parent_presence->get_children()) {
                 auto features = child->get_features();
                 if (features & F::local) {
@@ -731,7 +739,7 @@ struct folder_slave_t final : fs::fs_slave_t {
                     if (!checked_children.count(filename)) {
                         checked_children.emplace(filename);
                         if (features & F::directory) {
-                            stack.push_front(removed_dir_t(child));
+                            dirs_stack.push_front(removed_dir_t(child));
                         } else {
                             auto file = static_cast<presentation::local_file_presence_t *>(child);
                             auto file_data = file->get_file_info().as_proto(false);
@@ -742,6 +750,12 @@ struct folder_slave_t final : fs::fs_slave_t {
                     }
                 }
             }
+            while (!dirs_stack.empty()) {
+                auto item = std::move(dirs_stack.front());
+                stack.push_front(std::move(item));
+                dirs_stack.pop_front();
+            }
+
             using queue_t = std::pmr::list<presentation::entity_t *>;
             auto queue = queue_t(allocator);
             for (auto child_entity : parent_presence->get_entity()->get_children()) {
