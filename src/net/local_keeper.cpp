@@ -738,14 +738,16 @@ struct folder_slave_t final : fs::fs_slave_t {
                     auto filename = child->get_entity()->get_path()->get_own_name();
                     if (!checked_children.count(filename)) {
                         checked_children.emplace(filename);
-                        if (features & F::directory) {
-                            dirs_stack.push_front(removed_dir_t(child));
-                        } else {
-                            auto file = static_cast<presentation::local_file_presence_t *>(child);
-                            auto file_data = file->get_file_info().as_proto(false);
-                            proto::set_deleted(file_data, true);
-                            ctx.push(new model::diff::advance::local_update_t(*actor->cluster, *actor->sequencer,
-                                                                              std::move(file_data), folder_id));
+                        if (!(features & F::deleted)) {
+                            if (features & F::directory) {
+                                dirs_stack.push_front(removed_dir_t(child));
+                            } else {
+                                auto file = static_cast<presentation::local_file_presence_t *>(child);
+                                auto file_data = file->get_file_info().as_proto(false);
+                                proto::set_deleted(file_data, true);
+                                ctx.push(new model::diff::advance::local_update_t(*actor->cluster, *actor->sequencer,
+                                                                                  std::move(file_data), folder_id));
+                            }
                         }
                     }
                 }

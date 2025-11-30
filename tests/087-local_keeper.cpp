@@ -567,7 +567,6 @@ void test_deleted() {
             SECTION("sigle items") {
                 auto pr_file = proto::FileInfo{};
                 auto file_name = bfs::path(L"неизменное.bin");
-                proto::set_deleted(pr_file, true);
                 proto::set_name(pr_file, file_name.string());
                 proto::set_sequence(pr_file, 4);
                 proto::set_version(pr_file, v);
@@ -590,7 +589,6 @@ void test_deleted() {
                 auto file_1 = files->by_name(boost::nowide::narrow(file_name.wstring()));
                 file_1->mark_local(false);
                 CHECK(!file_1->is_local());
-                REQUIRE(file_1->is_deleted());
 
                 builder->scan_start(folder->get_id()).apply(*sup);
                 REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
@@ -655,6 +653,9 @@ void test_deleted() {
                     "d",
                 };
                 CHECK(paths == expected);
+
+                builder->scan_start(folder->get_id()).apply(*sup);
+                CHECK(paths == expected);
             }
             SECTION("order of deletion (2)") {
                 auto file_type = GENERATE(0, 1);
@@ -690,8 +691,8 @@ void test_deleted() {
                 // clang-format on
                 CHECK(paths == expected);
 
-                // builder->scan_start(folder->get_id()).apply(*sup);
-                // CHECK(paths == expected);
+                builder->scan_start(folder->get_id()).apply(*sup);
+                CHECK(paths == expected);
             }
         }
 
