@@ -7,6 +7,7 @@ using namespace syncspirit::fs;
 using namespace syncspirit::fs::task;
 
 void fs_slave_t::exec(hasher::hasher_plugin_t *hasher) noexcept {
+    assert(!tasks_in.empty());
     while (!tasks_in.empty()) {
         auto &t = tasks_in.front();
         std::visit([&](auto &task) { task.process(*this, hasher); }, t);

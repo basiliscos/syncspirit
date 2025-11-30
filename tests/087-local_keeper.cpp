@@ -971,7 +971,7 @@ void test_scan_errors() {
             }
 #endif
             SECTION("generic task error") {
-                exec_pool = 2;
+                exec_pool = 1;
                 auto dir_path = root_path / "d1" / "d2";
                 auto d1_path = dir_path.parent_path();
                 bfs::create_directories(dir_path);

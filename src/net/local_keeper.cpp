@@ -625,13 +625,14 @@ struct folder_slave_t final : fs::fs_slave_t {
 
         process_stack(ctx);
 
-        if (!pending_io.empty()) {
-            auto &t = pending_io.front();
-            tasks_in.emplace_back(std::move(t));
-            pending_io.pop_front();
-        }
+        return pending_io.size();
+    }
 
-        return tasks_in.empty();
+    void prepare_task() {
+        assert(!pending_io.empty());
+        auto &t = pending_io.front();
+        tasks_in.emplace_back(std::move(t));
+        pending_io.pop_front();
     }
 
     bool post_process(hash_base_t &hash_file, hasher::message::digest_t &msg) noexcept {
@@ -908,6 +909,7 @@ auto local_keeper_t::operator()(const model::diff::local::scan_start_t &diff, vo
         auto ctx = folder_context_ptr_t(new folder_context_t(local_folder));
         auto backend = new folder_slave_t(std::move(ctx), this);
         backend->process_stack();
+        backend->prepare_task();
         auto slave = fs::payload::foreign_executor_prt_t(backend);
         route<fs::payload::foreign_executor_prt_t>(fs_addr, address, std::move(slave));
         ++fs_tasks;
@@ -919,17 +921,20 @@ auto local_keeper_t::operator()(const model::diff::local::scan_start_t &diff, vo
 
 void local_keeper_t::on_post_process(fs::message::foreign_executor_t &msg) noexcept {
     --fs_tasks;
+    LOG_TRACE(log, "on_post_process, active tasks: {}", fs_tasks);
     assert(fs_tasks >= 0);
     if (state == r::state_t::OPERATIONAL) {
         auto &slave = static_cast<folder_slave_t &>(*msg.payload.get());
         auto folder_id = slave.context->local_folder->get_folder()->get_id();
-        auto pending_io = !slave.post_process();
-        if (pending_io) {
+        auto has_pending = slave.post_process();
+        if (has_pending && fs_tasks == 0) {
             if (slave.ec) {
                 LOG_ERROR(log, "cannot process folder any longer: {}", slave.ec.message());
             } else {
+                slave.prepare_task();
                 slave.ec = utils::make_error_code(utils::error_code_t::no_action);
                 redirect(&msg, fs_addr, address);
+                LOG_TRACE(log, "redirected {}", (void *)&slave);
                 ++fs_tasks;
             }
         }
@@ -944,8 +949,10 @@ void local_keeper_t::on_digest(hasher::message::digest_t &msg) noexcept {
     if (state == r::state_t::OPERATIONAL) {
         auto hash_ctx = *static_cast<hash_context_t *>(p.context.get());
         auto &slave = *hash_ctx.slave.get();
-        auto pending_io = !slave.post_process(*hash_ctx.hash_file.get(), msg);
-        if (pending_io) {
+        auto has_pending = slave.post_process(*hash_ctx.hash_file.get(), msg);
+        if (has_pending && fs_tasks == 0) {
+            slave.prepare_task();
+            LOG_TRACE(log, "routed {}", (void *)&slave);
             route<fs::payload::foreign_executor_prt_t>(fs_addr, address, std::move(hash_ctx.slave));
             ++fs_tasks;
         }
