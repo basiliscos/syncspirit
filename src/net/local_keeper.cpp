@@ -222,6 +222,10 @@ struct unsuspend_scan_t {};
 struct removed_dir_t {
     presentation::presence_ptr_t presence;
 };
+struct confirmed_deleted_t {
+    presentation::presence_ptr_t presence;
+};
+
 struct fatal_error_t {
     sys::error_code ec;
 };
@@ -229,7 +233,7 @@ struct fatal_error_t {
 using stack_item_t =
     std::variant<unscanned_dir_t, unexamined_t, incomplete_t, complete_scan_t, child_ready_t, hash_new_file_ptr_t,
                  hash_existing_file_ptr_t, hash_incomplete_file_ptr_t, rehashed_incomplete_t, removed_dir_t,
-                 suspend_scan_t, unsuspend_scan_t, fatal_error_t>;
+                 confirmed_deleted_t, suspend_scan_t, unsuspend_scan_t, fatal_error_t>;
 using stack_t = std::list<stack_item_t>;
 
 struct dirs_stack_t : stack_t {
@@ -526,6 +530,27 @@ struct folder_slave_t final : fs::fs_slave_t {
         return 1;
     }
 
+    int process(confirmed_deleted_t &item, stack_context_t &ctx) noexcept {
+        auto dir_presence = static_cast<presentation::local_file_presence_t *>(item.presence.get());
+        auto &dir = const_cast<model::file_info_t &>(dir_presence->get_file_info());
+        ctx.push(new model::diff::local::file_availability_t(&dir, *context->local_folder));
+
+        auto dirs_stack = dirs_stack_t(stack);
+        for (auto child : item.presence->get_children()) {
+            auto f = child->get_features();
+            if (f & F::local) {
+                if (f & F::directory) {
+                    dirs_stack.push_front(confirmed_deleted_t(child));
+                } else {
+                    auto file_presence = static_cast<presentation::local_file_presence_t *>(child);
+                    auto &file = const_cast<model::file_info_t &>(file_presence->get_file_info());
+                    ctx.push(new model::diff::local::file_availability_t(&file, *context->local_folder));
+                }
+            }
+        }
+        return 1;
+    }
+
     int process(incomplete_t &item, stack_context_t &ctx) noexcept {
         auto name = narrow(item.path.stem().generic_wstring());
         auto name_view = std::string_view(name);
@@ -699,7 +724,6 @@ struct folder_slave_t final : fs::fs_slave_t {
             } else {
                 if (folder->is_suspended()) {
                     stack.push_front(unsuspend_scan_t());
-                    return;
                 }
             }
         }
@@ -745,8 +769,9 @@ struct folder_slave_t final : fs::fs_slave_t {
                     auto filename = child->get_entity()->get_path()->get_own_name();
                     if (!checked_children.count(filename)) {
                         checked_children.emplace(filename);
+                        auto is_dir = features & F::directory;
                         if (!(features & F::deleted)) {
-                            if (features & F::directory) {
+                            if (is_dir) {
                                 dirs_stack.push_front(removed_dir_t(child));
                             } else {
                                 auto file = static_cast<presentation::local_file_presence_t *>(child);
@@ -755,6 +780,9 @@ struct folder_slave_t final : fs::fs_slave_t {
                                 ctx.push(new model::diff::advance::local_update_t(*actor->cluster, *actor->sequencer,
                                                                                   std::move(file_data), folder_id));
                             }
+                        } else {
+                            auto &target_stack = is_dir ? dirs_stack : stack;
+                            dirs_stack.push_front(confirmed_deleted_t(child));
                         }
                     }
                 }

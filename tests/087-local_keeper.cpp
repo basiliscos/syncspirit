@@ -11,6 +11,7 @@
 #include "managed_hasher.h"
 #include "model/cluster.h"
 #include "model/diff/advance/local_update.h"
+#include "model/diff/local/file_availability.h"
 #include "net/local_keeper.h"
 #include "net/names.h"
 #include "test-utils.h"
@@ -72,6 +73,7 @@ struct my_supervisort_t : supervisor_t {
 
     void on_model_update(model::message::model_update_t &) noexcept override;
     outcome::result<void> operator()(const model::diff::advance::local_update_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::local::file_availability_t &, void *custom) noexcept;
 };
 
 struct fixture_t {
@@ -100,6 +102,7 @@ struct fixture_t {
     }
 
     virtual void on_diff(const model::diff::advance::local_update_t &) noexcept {}
+    virtual void on_diff(const model::diff::local::file_availability_t &) noexcept {}
     virtual void on_model_update(model::message::model_update_t &) noexcept {}
 
     void run() noexcept {
@@ -210,6 +213,12 @@ struct fixture_t {
 };
 
 auto my_supervisort_t::operator()(const model::diff::advance::local_update_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    fixture->on_diff(diff);
+    return parent_t::operator()(diff, custom);
+}
+
+auto my_supervisort_t::operator()(const model::diff::local::file_availability_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     fixture->on_diff(diff);
     return parent_t::operator()(diff, custom);
@@ -555,6 +564,11 @@ void test_deleted() {
             auto name = file->get_name()->get_full_name();
             paths.emplace_back(std::string(name));
         }
+        void on_diff(const model::diff::local::file_availability_t &diff) noexcept override {
+            auto file = diff.file;
+            auto name = file->get_name()->get_full_name();
+            available.emplace_back(std::string(name));
+        }
 
         void main() noexcept override {
             sys::error_code ec;
@@ -693,12 +707,15 @@ void test_deleted() {
                 // clang-format on
                 CHECK(paths == expected);
 
+                available = {};
                 builder->scan_start(folder->get_id()).apply(*sup);
                 CHECK(paths == expected);
+                CHECK(available == expected);
             }
         }
 
         paths_t paths;
+        paths_t available;
     };
     F().run();
 }
