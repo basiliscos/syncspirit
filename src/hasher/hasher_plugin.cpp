@@ -52,26 +52,17 @@ void hasher_plugin_t::calc_digest(utils::bytes_t data, std::int32_t block_index,
     int min_index;
     if (hashers.size() > 1) {
         min_index = -1;
-        int next_dec = LIMIT;
+        int min_value = LIMIT;
         for (size_t i = 0; i < hashers.size(); ++i) {
             auto &val = usages[i];
-            if (val) {
-                val -= min_usage;
-            }
-            if (val == 0) {
-                if (min_index < 0) {
-                    min_index = i;
-                }
-            } else {
-                if (val < next_dec) {
-                    next_dec = val;
-                }
+            val -= min_usage;
+            if (val < min_value) {
+                min_index = i;
+                min_value = val;
             }
         }
         assert(min_index >= 0);
-        if (next_dec != LIMIT) {
-            min_usage = next_dec;
-        }
+        min_usage = min_value;
         usages[min_index] += static_cast<std::int32_t>(data.size());
     } else {
         min_index = 0;

@@ -105,6 +105,7 @@ TEST_CASE("hasher-plugin", "[hasher]") {
     sup->start();
     auto h1 = sup->create_actor<test::managed_hasher_t>().auto_reply().index(1).timeout(timeout).finish();
     auto h2 = sup->create_actor<test::managed_hasher_t>().auto_reply().index(2).timeout(timeout).finish();
+    auto h3 = sup->create_actor<test::managed_hasher_t>().auto_reply().index(3).timeout(timeout).finish();
     sup->do_process();
 
     auto consumer = sup->create_actor<consumer_t>().timeout(timeout).finish();
@@ -123,6 +124,15 @@ TEST_CASE("hasher-plugin", "[hasher]") {
         CHECK(consumer->counter == 0);
         CHECK(h1->digested_bytes == 55);
         CHECK(h2->digested_bytes == 0);
+    }
+
+    SECTION("3 threads") {
+        consumer->hasher_threads = 3;
+        sup->do_process();
+        CHECK(consumer->counter == 0);
+        CHECK(h1->digested_bytes > 0);
+        CHECK(h2->digested_bytes > 0);
+        CHECK(h3->digested_bytes > 0);
     }
 
     sup->shutdown();
