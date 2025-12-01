@@ -374,6 +374,7 @@ int app_main(app_context_t &app_ctx) {
     thread_sys_context_t fs_context;
     auto fs_sup = fs_context.create_supervisor<syncspirit::fs::fs_supervisor_t>()
                       .timeout(timeout)
+                      .poll_duration(r::pt::microsec{1})
                       .registry_address(sup_net->get_registry_address())
                       .fs_config(cfg.fs_config)
                       .shutdown_flag(shutdown_flag, r::pt::millisec{50})
