@@ -3,9 +3,11 @@
 
 #include "access.h"
 #include "diff-builder.h"
+#include "config/fs.h"
 #include "fs/fs_slave.h"
 #include "fs/messages.h"
 #include "fs/utils.h"
+#include "fs/file_cache.h"
 #include "managed_hasher.h"
 #include "model/cluster.h"
 #include "model/diff/advance/local_update.h"

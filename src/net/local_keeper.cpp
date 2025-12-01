@@ -232,6 +232,18 @@ using stack_item_t =
                  suspend_scan_t, unsuspend_scan_t, fatal_error_t>;
 using stack_t = std::list<stack_item_t>;
 
+struct dirs_stack_t : stack_t {
+    dirs_stack_t(stack_t &outer_) : outer{outer_} {}
+    ~dirs_stack_t() {
+        while (!empty()) {
+            auto item = std::move(front());
+            outer.push_front(std::move(item));
+            pop_front();
+        }
+    }
+    stack_t &outer;
+};
+
 using folder_slave_ptr_t = r::intrusive_ptr_t<folder_slave_t>;
 using hash_base_ptr_t = model::intrusive_ptr_t<hash_base_t>;
 
@@ -498,7 +510,7 @@ struct folder_slave_t final : fs::fs_slave_t {
         proto::set_deleted(dir_data, true);
         ctx.push(new model::diff::advance::local_update_t(*actor->cluster, *actor->sequencer, std::move(dir_data),
                                                           folder_id));
-        auto dirs_stack = stack_t();
+        auto dirs_stack = dirs_stack_t(stack);
         auto children = item.presence->get_children();
         for (auto child : item.presence->get_children()) {
             if (child->get_features() & F::directory) {
@@ -510,11 +522,6 @@ struct folder_slave_t final : fs::fs_slave_t {
                 ctx.push(new model::diff::advance::local_update_t(*actor->cluster, *actor->sequencer,
                                                                   std::move(file_data), folder_id));
             }
-        }
-        while (!dirs_stack.empty()) {
-            auto item = std::move(dirs_stack.front());
-            stack.push_front(std::move(item));
-            dirs_stack.pop_front();
         }
         return 1;
     }
@@ -731,7 +738,7 @@ struct folder_slave_t final : fs::fs_slave_t {
         }
 
         if (parent_presence) {
-            auto dirs_stack = stack_t();
+            auto dirs_stack = dirs_stack_t(stack);
             for (auto child : parent_presence->get_children()) {
                 auto features = child->get_features();
                 if (features & F::local) {
@@ -751,11 +758,6 @@ struct folder_slave_t final : fs::fs_slave_t {
                         }
                     }
                 }
-            }
-            while (!dirs_stack.empty()) {
-                auto item = std::move(dirs_stack.front());
-                stack.push_front(std::move(item));
-                dirs_stack.pop_front();
             }
 
             using queue_t = std::pmr::list<presentation::entity_t *>;

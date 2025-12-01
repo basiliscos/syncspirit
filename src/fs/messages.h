@@ -6,30 +6,24 @@
 #include "proto/proto-fwd.hpp"
 #include "hasher/messages.h"
 #include "hasher/hasher_plugin.h"
-#include "scan_task.h"
-#include "chunk_iterator.h"
-#include "new_chunk_iterator.h"
 #include "utils/bytes.h"
 #include "utils/error_code.h"
 
 #include <rotor.hpp>
+#include <boost/outcome.hpp>
 #include <variant>
+#include <filesystem>
 
 namespace syncspirit::fs {
 
 namespace r = rotor;
+namespace bfs = std::filesystem;
+namespace outcome = boost::outcome_v2;
 
 namespace payload {
 
-struct scan_progress_t {
-    scan_task_ptr_t task;
-};
-
 using extendended_context_t = hasher::payload::extendended_context_t;
 using extendended_context_prt_t = hasher::payload::extendended_context_prt_t;
-
-using rehash_ptr_t = std::shared_ptr<chunk_iterator_t>;
-using hash_anew_ptr_t = std::shared_ptr<new_chunk_iterator_t>;
 
 struct foreign_executor_t : hasher::payload::extendended_context_t {
     virtual void exec(hasher::hasher_plugin_t *hasher) noexcept = 0;
@@ -141,9 +135,6 @@ using io_commands_t = std::vector<io_command_t>;
 
 namespace message {
 
-using scan_progress_t = r::message_t<payload::scan_progress_t>;
-using rehash_needed_t = r::message_t<payload::rehash_ptr_t>;
-using hash_anew_t = r::message_t<payload::hash_anew_ptr_t>;
 using foreign_executor_t = r::message_t<payload::foreign_executor_prt_t>;
 
 using io_commands_t = r::message_t<payload::io_commands_t>;

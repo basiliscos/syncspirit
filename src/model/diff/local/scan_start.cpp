@@ -24,7 +24,7 @@ auto scan_start_t::apply_impl(apply_controller_t &controller, void *custom) cons
     auto &local_files = local_folder.get_file_infos();
     for (auto &f : local_files) {
         auto &local_file = *f;
-        if (local_file.is_local()) {
+        if (local_file.is_local() && !local_file.is_deleted()) {
             local_file.mark_local(false);
             local_file.notify_update();
         }

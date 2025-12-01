@@ -8,6 +8,7 @@
 #include "net/messages.h"
 #include "hasher/hasher_plugin.h"
 #include "utils/log.h"
+#include "model/file_info.h"
 #include <rotor.hpp>
 
 namespace syncspirit::fs {

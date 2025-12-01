@@ -4,6 +4,7 @@
 #include "test-utils.h"
 #include "hasher/hasher_actor.h"
 #include "net/controller_actor.h"
+#include "fs/file_cache.h"
 #include "diff-builder.h"
 #include "net/names.h"
 #include "test_peer.h"

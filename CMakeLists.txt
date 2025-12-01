@@ -99,16 +99,12 @@ add_library(syncspirit_core
     src/db/prefix.cpp
     src/db/transaction.cpp
     src/db/utils.cpp
-    src/fs/chunk_iterator.cpp
     src/fs/file.cpp
     src/fs/file_actor.cpp
     src/fs/file_cache.cpp
     src/fs/fs_supervisor.cpp
     src/fs/fs_slave.cpp
-    src/fs/new_chunk_iterator.cpp
-    src/fs/scan_actor.cpp
     src/fs/scan_scheduler.cpp
-    src/fs/scan_task.cpp
     src/fs/utils.cpp
     src/fs/task/noop.cpp
     src/fs/task/remove_file.cpp
