@@ -54,8 +54,11 @@ struct SYNCSPIRIT_API local_keeper_t final : public r::actor_base_t, private mod
     void on_post_process(fs::message::foreign_executor_t &) noexcept;
     void on_digest(hasher::message::digest_t &res) noexcept;
     void on_thread_ready(model::message::thread_ready_t &) noexcept;
+    void on_create_dir(fs::message::create_dir_t &) noexcept;
 
     outcome::result<void> operator()(const model::diff::local::scan_start_t &, void *custom) noexcept override;
+    outcome::result<void> operator()(const model::diff::modify::upsert_folder_t &, void *custom) noexcept override;
+
     using r::actor_base_t::make_error;
 
     utils::logger_t log;

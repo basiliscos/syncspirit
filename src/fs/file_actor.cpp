@@ -48,6 +48,7 @@ void file_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&file_actor_t::on_exec);
         p.subscribe_actor(&file_actor_t::on_io_commands);
+        p.subscribe_actor(&file_actor_t::on_create_dir);
     });
 }
 
@@ -364,4 +365,10 @@ auto file_actor_t::open_file_ro(const bfs::path &path, bool use_cache) noexcept 
     }
     LOG_TRACE(log, "open_file (r/o, by path), path = {}", path.string());
     return file_ptr_t(new file_t(std::move(opt.assume_value())));
+}
+
+void file_actor_t::on_create_dir(message::create_dir_t &message) noexcept {
+    auto &path = message.payload;
+    LOG_TRACE(log, "on_create_dir, '{}'", boost::nowide::narrow(path.wstring()));
+    bfs::create_directory(path, path.ec);
 }

@@ -54,6 +54,7 @@ struct SYNCSPIRIT_API file_actor_t : public r::actor_base_t {
   private:
     void on_exec(message::foreign_executor_t &) noexcept;
     void on_io_commands(message::io_commands_t &) noexcept;
+    void on_create_dir(message::create_dir_t &) noexcept;
     void process(payload::block_request_t &) noexcept;
     void process(payload::remote_copy_t &) noexcept;
     void process(payload::append_block_t &) noexcept;

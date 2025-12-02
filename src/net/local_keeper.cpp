@@ -9,6 +9,7 @@
 #include "model/diff/local/scan_finish.h"
 #include "model/diff/local/file_availability.h"
 #include "model/diff/modify/suspend_folder.h"
+#include "model/diff/modify/upsert_folder.h"
 #include "model/misc/resolver.h"
 #include "presentation/folder_entity.h"
 #include "fs/fs_slave.h"
@@ -18,7 +19,7 @@
 #include "presentation/local_file_presence.h"
 #include "presentation/presence.h"
 #include "presentation/cluster_file_presence.h"
-#include "proto/proto-helpers-bep.h"
+#include "proto/proto-helpers.h"
 #include "utils/platform.h"
 
 #include <algorithm>
@@ -921,6 +922,7 @@ void local_keeper_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&local_keeper_t::on_post_process);
         p.subscribe_actor(&local_keeper_t::on_digest);
+        p.subscribe_actor(&local_keeper_t::on_create_dir);
     });
 }
 
@@ -974,6 +976,31 @@ auto local_keeper_t::operator()(const model::diff::local::scan_start_t &diff, vo
         LOG_DEBUG(log, "skipping scan of {}", diff.folder_id);
     }
     return diff.visit_next(*this, custom);
+}
+
+auto local_keeper_t::operator()(const model::diff::modify::upsert_folder_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    auto folder_id = db::get_id(diff.db);
+    auto folder = cluster->get_folders().by_id(folder_id);
+    auto path = fs::payload::create_dir_t(folder->get_path(), folder_id);
+    route<fs::payload::create_dir_t>(fs_addr, address, std::move((path)));
+    return diff.visit_next(*this, custom);
+}
+
+void local_keeper_t::on_create_dir(fs::message::create_dir_t &message) noexcept {
+    auto &p = message.payload;
+    auto &ec = message.payload.ec;
+    auto folder = cluster->get_folders().by_id(p.folder_id);
+    if (folder) {
+        LOG_TRACE(log, "on_create_dir, folder path: {}", narrow(p.generic_wstring()));
+        if (ec) {
+            LOG_WARN(log, "on_create_dir, cannot create path '{}': {}, suspending", narrow(p.generic_wstring()),
+                     ec.message());
+            auto diff = model::diff::cluster_diff_ptr_t();
+            diff = new model::diff::modify::suspend_folder_t(*folder, true, ec);
+            send<model::payload::model_update_t>(coordinator, std::move(diff));
+        }
+    }
 }
 
 void local_keeper_t::on_post_process(fs::message::foreign_executor_t &msg) noexcept {

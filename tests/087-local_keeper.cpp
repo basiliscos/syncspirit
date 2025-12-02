@@ -73,7 +73,7 @@ struct my_supervisort_t : supervisor_t {
 
     void on_model_update(model::message::model_update_t &) noexcept override;
     outcome::result<void> operator()(const model::diff::advance::local_update_t &, void *) noexcept override;
-    outcome::result<void> operator()(const model::diff::local::file_availability_t &, void *custom) noexcept;
+    outcome::result<void> operator()(const model::diff::local::file_availability_t &, void *) noexcept override;
 };
 
 struct fixture_t {
@@ -95,6 +95,12 @@ struct fixture_t {
         auto slave = static_cast<fs::fs_slave_t *>(req.payload.get());
         slave->ec = {};
         req.payload->exec(executor->hasher);
+    }
+
+    virtual void create_dir(fs::message::create_dir_t &req) noexcept {
+        auto &path = req.payload;
+        sup->log->info("on_create_dir, '{}'", boost::nowide::narrow(path.wstring()));
+        bfs::create_directory(path, path.ec);
     }
 
     virtual void launch_hasher() noexcept {
@@ -132,8 +138,11 @@ struct fixture_t {
             plugin.template with_casted<r::plugin::registry_plugin_t>(
                 [&](auto &p) { p.register_name(net::names::fs_actor, sup->get_address()); });
             plugin.template with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
-                using msg_t = fs::message::foreign_executor_t;
-                p.subscribe_actor(r::lambda<msg_t>([&](msg_t &req) { execute(req); }));
+                using exec_msg_t = fs::message::foreign_executor_t;
+                using create_dir_msg_t = fs::message::create_dir_t;
+
+                p.subscribe_actor(r::lambda<exec_msg_t>([&](exec_msg_t &req) { execute(req); }));
+                p.subscribe_actor(r::lambda<create_dir_msg_t>([&](create_dir_msg_t &req) { create_dir(req); }));
             });
         };
 
@@ -397,6 +406,37 @@ void test_simple() {
                     CHECK(blocks.size() == 3);
                     REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
                 }
+            }
+        }
+    };
+    F().run();
+}
+
+void test_create_dir() {
+    struct F : fixture_t {
+        void main() noexcept override {
+            auto folder_id = std::string(folder->get_id());
+
+            builder->remove_folder(*folder).apply(*sup);
+            bfs::remove_all(root_path);
+            REQUIRE(!bfs::exists(root_path));
+
+            SECTION("success") {
+                builder->upsert_folder(folder_id, root_path).apply(*sup);
+                CHECK(bfs::exists(root_path));
+                auto f = cluster->get_folders().by_id(folder_id);
+                REQUIRE(f);
+                REQUIRE(!f->is_suspended());
+            }
+            SECTION("fail & suspend") {
+                auto sub_path = root_path / "a" / "dir";
+                builder->upsert_folder(folder_id, sub_path).apply(*sup);
+                CHECK(!bfs::exists(sub_path));
+
+                auto f = cluster->get_folders().by_id(folder_id);
+                REQUIRE(f);
+                REQUIRE(f->is_suspended());
+                CHECK(f->get_suspend_reason());
             }
         }
     };
@@ -1746,6 +1786,7 @@ void test_concurrency() {
 int _init() {
     test::init_logging();
     REGISTER_TEST_CASE(test_simple, "test_simple", "[net]");
+    REGISTER_TEST_CASE(test_create_dir, "test_create_dir", "[net]");
     REGISTER_TEST_CASE(test_no_changes, "test_no_changes", "[net]");
     REGISTER_TEST_CASE(test_deleted, "test_deleted", "[net]");
     REGISTER_TEST_CASE(test_changed, "test_changed", "[net]");

@@ -19,6 +19,7 @@ namespace syncspirit::fs {
 namespace r = rotor;
 namespace bfs = std::filesystem;
 namespace outcome = boost::outcome_v2;
+namespace sys = boost::system;
 
 namespace payload {
 
@@ -131,6 +132,17 @@ struct clone_block_t : payload_base_t<void> {
 using io_command_t = std::variant<block_request_t, remote_copy_t, finish_file_t, append_block_t, clone_block_t>;
 using io_commands_t = std::vector<io_command_t>;
 
+struct create_dir_t : bfs::path {
+    using parent_t = bfs::path;
+    using parent_t::parent_t;
+
+    inline create_dir_t(bfs::path path, std::string_view folder_id_) noexcept
+        : parent_t(std::move(path)), folder_id(folder_id_) {}
+
+    std::string folder_id;
+    sys::error_code ec;
+};
+
 } // namespace payload
 
 namespace message {
@@ -138,6 +150,7 @@ namespace message {
 using foreign_executor_t = r::message_t<payload::foreign_executor_prt_t>;
 
 using io_commands_t = r::message_t<payload::io_commands_t>;
+using create_dir_t = r::message_t<payload::create_dir_t>;
 
 } // namespace message
 
