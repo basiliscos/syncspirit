@@ -370,5 +370,5 @@ auto file_actor_t::open_file_ro(const bfs::path &path, bool use_cache) noexcept 
 void file_actor_t::on_create_dir(message::create_dir_t &message) noexcept {
     auto &path = message.payload;
     LOG_TRACE(log, "on_create_dir, '{}'", boost::nowide::narrow(path.wstring()));
-    bfs::create_directory(path, path.ec);
+    bfs::create_directories(path, path.ec);
 }
