@@ -272,6 +272,18 @@ void file_actor_t::process(payload::finish_file_t &cmd) noexcept {
         return;
     }
 
+    if (!cmd.no_permissions) {
+        auto perms = static_cast<bfs::perms>(cmd.permissions);
+        auto ec = sys::error_code();
+        bfs::permissions(cmd.path, perms, ec);
+        if (ec) {
+            LOG_ERROR(log, "cannot set permissions {:#o} on file: '{}': {}", cmd.permissions, cmd.path.string(),
+                      ec.message());
+            cmd.result = ec;
+            return;
+        }
+    }
+
     cmd.result = outcome::success();
     LOG_INFO(log, "file {} ({} bytes) is now locally available", path_str, cmd.file_size);
 }

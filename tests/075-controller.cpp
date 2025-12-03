@@ -59,7 +59,8 @@ struct mock_supervisor_t : supervisor_t {
     }
 
     void process_io(fs::payload::finish_file_t &req) noexcept override {
-        auto copy = fs::payload::finish_file_t({}, req.path, req.conflict_path, req.file_size, req.modification_s);
+        auto copy = fs::payload::finish_file_t({}, req.path, req.conflict_path, req.file_size, req.modification_s,
+                                               req.permissions, req.no_permissions);
         file_finishes.emplace_back(std::move(copy));
         supervisor_t::process_io(req);
     }

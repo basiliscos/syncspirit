@@ -12,6 +12,7 @@
 #include <boost/nowide/convert.hpp>
 #include <optional>
 #include <utility>
+#include <utils/platform.h>
 
 using namespace syncspirit;
 using namespace syncspirit::db;
@@ -146,9 +147,11 @@ struct fixture_t {
     }
 
     chain_builder_t finish_file(const bfs::path &path, std::uint64_t file_size, std::int64_t modification_s,
+                                std::uint32_t permissions, bool no_permissions,
                                 const bfs::path &conflict_path = {}) noexcept {
         auto context = fs::payload::extendended_context_prt_t{};
-        auto payload = fs::payload::finish_file_t(std::move(context), path, conflict_path, file_size, modification_s);
+        auto payload = fs::payload::finish_file_t(std::move(context), path, conflict_path, file_size, modification_s,
+                                                  permissions, no_permissions);
         auto cmd = fs::payload::io_command_t(std::move(payload));
         auto cmds = fs::payload::io_commands_t{};
         cmds.emplace_back(std::move(cmd));
@@ -347,21 +350,29 @@ void test_append_block() {
             auto path_str = boost::nowide::narrow(path_wstr);
 
             auto data_1 = as_owned_bytes("12345");
+            auto perms = std::uint32_t(0444);
+            auto no_perms = !utils::platform_t::permissions_supported(path_rel);
 
             SECTION("finish non-opened") {
                 auto path = bfs::absolute(root_path / path_rel);
                 auto ec = utils::make_error_code(utils::error_code_t::flush_non_opened);
-                finish_file(path, 5, 1641828421).check_fail(ec);
+                finish_file(path, 5, 1641828421, perms, no_perms).check_fail(ec);
             }
 
             SECTION("file with 1 block") {
                 auto path = bfs::absolute(root_path / path_rel);
-                append_block(path, data_1, 0, 5).check_success().finish_file(path, 5, 1641828421).check_success();
+                append_block(path, data_1, 0, 5)
+                    .check_success()
+                    .finish_file(path, 5, 1641828421, perms, no_perms)
+                    .check_success();
 
                 REQUIRE(bfs::exists(path));
                 REQUIRE(bfs::file_size(path) == 5);
                 CHECK(data_1 == as_bytes(read_file(path)));
                 CHECK(to_unix(bfs::last_write_time(path)) == 1641828421);
+                if (!no_perms) {
+                    CHECK(static_cast<std::uint32_t>(bfs::status(path).permissions()) == perms);
+                }
             }
             SECTION("file with 1 block & conflict rename") {
                 auto path = bfs::absolute(root_path / path_rel);
@@ -369,13 +380,16 @@ void test_append_block() {
                 auto conflict_path = path.parent_path() / L"экс-инфо.txt";
                 append_block(path, data_1, 0, 5)
                     .check_success()
-                    .finish_file(path, 5, 1641828421, conflict_path)
+                    .finish_file(path, 5, 1641828421, perms, no_perms, conflict_path)
                     .check_success();
 
                 REQUIRE(bfs::exists(path));
                 CHECK(bfs::file_size(path) == 5);
                 CHECK(data_1 == as_bytes(read_file(path)));
                 CHECK(to_unix(bfs::last_write_time(path)) == 1641828421);
+                if (!no_perms) {
+                    CHECK(static_cast<std::uint32_t>(bfs::status(path).permissions()) == perms);
+                }
 
                 REQUIRE(bfs::exists(conflict_path));
                 CHECK(bfs::file_size(conflict_path) == 6);
@@ -399,19 +413,22 @@ void test_append_block() {
                 append_block(path, as_owned_bytes("67890"), 5, 10).check_success();
 
                 SECTION("add 2nd block") {
-                    finish_file(path, 5, 1641828421).check_success();
+                    finish_file(path, 5, 1641828421, perms, no_perms).check_success();
                     REQUIRE(!bfs::exists(tmp_path));
                     REQUIRE(bfs::exists(path));
                     REQUIRE(bfs::file_size(path) == 10);
                     auto data = read_file(path);
                     CHECK(data == "1234567890");
                     CHECK(to_unix(bfs::last_write_time(path)) == 1641828421);
+                    if (!no_perms) {
+                        CHECK(static_cast<std::uint32_t>(bfs::status(path).permissions()) == perms);
+                    }
                 }
 
 #ifndef SYNCSPIRIT_WIN
                 SECTION("remove folder (simulate err)") {
                     bfs::remove_all(root_path);
-                    finish_file(path, 5, 1641828421).check_fail();
+                    finish_file(path, 5, 1641828421, perms, no_perms).check_fail();
                 }
 #endif
             }
@@ -424,7 +441,12 @@ void test_clone_block() {
     struct F : fixture_t {
         void main() noexcept override {
             std::int64_t modified = 1641828421;
-
+            auto perms = std::uint32_t(0444);
+#ifndef SYNCSPIRIT_WIN
+            auto no_perms = false;
+#else
+            auto no_perms = true;
+#endif
             SECTION("source & target are different files") {
                 auto source_path = root_path / L"ать.txt";
                 auto target_path = root_path / L"ять.txt";
@@ -433,11 +455,11 @@ void test_clone_block() {
                     auto data = as_owned_bytes("12345");
                     append_block(source_path, data, 0, 5)
                         .check_success()
-                        .finish_file(source_path, 5, modified)
+                        .finish_file(source_path, 5, modified, perms, no_perms)
                         .check_success()
                         .clone_block(target_path, 0, 5, source_path, 0, 5)
                         .check_success()
-                        .finish_file(target_path, 5, modified)
+                        .finish_file(target_path, 5, modified, perms, no_perms)
                         .check_success();
 
                     REQUIRE(bfs::exists(target_path));
@@ -452,13 +474,13 @@ void test_clone_block() {
                         .check_success()
                         .append_block(source_path, data_2, 5, 10)
                         .check_success()
-                        .finish_file(source_path, 10, modified)
+                        .finish_file(source_path, 10, modified, perms, no_perms)
                         .check_success()
                         .clone_block(target_path, 0, 10, source_path, 0, 5)
                         .check_success()
                         .clone_block(target_path, 5, 10, source_path, 5, 5)
                         .check_success()
-                        .finish_file(target_path, 10, modified)
+                        .finish_file(target_path, 10, modified, perms, no_perms)
                         .check_success();
 
                     REQUIRE(bfs::exists(target_path));
@@ -471,13 +493,13 @@ void test_clone_block() {
                     auto data_2 = as_owned_bytes("67890");
                     append_block(source_path, data_2, 0, 5)
                         .check_success()
-                        .finish_file(source_path, 5, modified)
+                        .finish_file(source_path, 5, modified, perms, no_perms)
                         .check_success()
                         .append_block(target_path, data_1, 0, 10)
                         .check_success()
                         .clone_block(target_path, 5, 10, source_path, 0, 5)
                         .check_success()
-                        .finish_file(target_path, 10, modified)
+                        .finish_file(target_path, 10, modified, perms, no_perms)
                         .check_success();
 
                     REQUIRE(bfs::exists(target_path));
@@ -493,7 +515,7 @@ void test_clone_block() {
                     .check_success()
                     .clone_block(target_path, 5, 10, target_path, 0, 5)
                     .check_success()
-                    .finish_file(target_path, 10, modified)
+                    .finish_file(target_path, 10, modified, perms, no_perms)
                     .check_success();
 
                 REQUIRE(bfs::exists(target_path));

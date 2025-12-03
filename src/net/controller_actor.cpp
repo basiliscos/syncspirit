@@ -599,10 +599,14 @@ void controller_actor_t::io_finish_file(model::file_info_t *local_file, model::f
         assert(local_file);
         conflict_path = peer_folder.get_folder()->get_path() / bfs::path(local_file->make_conflicting_name());
     }
+    auto perms = peer_file.get_permissions();
+    bool no_permissions = !utils::platform_t::permissions_supported(path) ||
+                          peer_folder.get_folder()->are_permissions_ignored() || peer_file.has_no_permissions();
+
     auto context = fs::payload::extendended_context_prt_t{};
     context.reset(new finish_file_context_t(peer_file, peer_folder, action));
     auto payload = fs::payload::finish_file_t(std::move(context), std::move(path), std::move(conflict_path), file_size,
-                                              modified_s);
+                                              modified_s, perms, no_permissions);
     ctx.push(std::move(payload));
 }
 

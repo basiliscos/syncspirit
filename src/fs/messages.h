@@ -82,11 +82,15 @@ struct finish_file_t : payload_base_t<void> {
     bfs::path conflict_path;
     std::uint64_t file_size;
     std::int64_t modification_s;
+    std::uint32_t permissions;
+    bool no_permissions;
 
     inline finish_file_t(extendended_context_prt_t context_, bfs::path path_, bfs::path conflict_path_,
-                         std::uint64_t file_size_, std::int64_t modification_s_) noexcept
+                         std::uint64_t file_size_, std::int64_t modification_s_, std::uint32_t permissions_,
+                         bool no_permissions_) noexcept
         : parent_t{utils::make_error_code(utils::error_code_t::no_action), std::move(context_)}, path{std::move(path_)},
-          conflict_path{std::move(conflict_path_)}, file_size{file_size_}, modification_s{modification_s_} {}
+          conflict_path{std::move(conflict_path_)}, file_size{file_size_}, modification_s{modification_s_},
+          permissions{permissions_}, no_permissions{no_permissions_} {}
 
     finish_file_t(const finish_file_t &) = delete;
     finish_file_t(finish_file_t &&) noexcept = default;
