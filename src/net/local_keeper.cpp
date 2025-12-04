@@ -422,13 +422,16 @@ struct folder_slave_t final : fs::fs_slave_t {
             bool match = false;
             auto &type = info.type;
             auto modification_match = (type == FT::SYMLINK) || (info.last_write_time == file.get_modified_s());
-            if (modification_match && info.perms == file.get_permissions()) {
+            if (modification_match) {
                 if (type == model::file_info_t::as_type(file.get_type())) {
-                    if (type == FT::SYMLINK) {
-                        auto target = narrow(info.link_target.generic_wstring());
-                        match = file.get_link_target() == target;
-                    } else {
-                        match = file.get_size() == info.size;
+                    auto perms_match = ignore_permissions || info.perms == file.get_permissions();
+                    if (perms_match) {
+                        if (type == FT::SYMLINK) {
+                            auto target = narrow(info.link_target.generic_wstring());
+                            match = file.get_link_target() == target;
+                        } else {
+                            match = file.get_size() == info.size;
+                        }
                     }
                 }
             }

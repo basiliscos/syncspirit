@@ -16,6 +16,7 @@
 #include "net/names.h"
 #include "test-utils.h"
 #include "test_supervisor.h"
+#include "utils/platform.h"
 
 #include <boost/nowide/convert.hpp>
 
@@ -850,14 +851,16 @@ void test_changed() {
                     auto status = bfs::status(file_path);
                     auto modified = to_unix(bfs::last_write_time(file_path));
                     auto perms = static_cast<uint32_t>(status.permissions());
+                    bool perms_changed = false;
 
-                    SECTION("modificaiton time changed") {
+                    SECTION("modification time changed") {
                         proto::set_permissions(pr_file, perms);
                         proto::set_modified_s(pr_file, modified - 1);
                     }
                     SECTION("permissions changed") {
                         proto::set_permissions(pr_file, perms - 1);
                         proto::set_modified_s(pr_file, modified);
+                        perms_changed = true;
                     }
 
                     builder->local_update(folder->get_id(), pr_file).apply(*sup);
@@ -878,7 +881,12 @@ void test_changed() {
                     REQUIRE(file_2->iterate_blocks().get_total() == 1);
                     CHECK(file_2->iterate_blocks().next()->get_hash() == hash_1);
                     auto seq_2 = file_2->get_sequence();
-                    CHECK(seq_2 > seq_1);
+
+                    if (!perms_changed || utils::platform_t::permissions_supported(file_path)) {
+                        CHECK(seq_2 > seq_1);
+                    } else {
+                        CHECK(seq_2 == seq_1);
+                    }
                 }
                 SECTION("append new lbock") {
                     auto block_sz = fs::block_sizes[0];
