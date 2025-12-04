@@ -421,7 +421,8 @@ struct folder_slave_t final : fs::fs_slave_t {
             auto &file = const_cast<model::file_info_t &>(presence->get_file_info());
             bool match = false;
             auto &type = info.type;
-            auto modification_match = (type == FT::SYMLINK) || (info.last_write_time == file.get_modified_s());
+            auto modification_match =
+                (type == FT::SYMLINK) || (type == FT::DIRECTORY) || (info.last_write_time == file.get_modified_s());
             if (modification_match) {
                 if (type == model::file_info_t::as_type(file.get_type())) {
                     auto perms_match = ignore_permissions || info.perms == file.get_permissions();

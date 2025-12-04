@@ -903,12 +903,10 @@ void test_changed() {
                 proto::set_version(pr_file, v);
                 proto::set_type(pr_file, proto::FileInfoType::DIRECTORY);
 
-#ifndef SYNCSPIRIT_WIN
                 SECTION("modification time changed") {
                     proto::set_permissions(pr_file, perms);
                     proto::set_modified_s(pr_file, modified - 1);
                 }
-#endif
                 SECTION("permissions changed") {
                     proto::set_permissions(pr_file, perms - 1);
                     proto::set_modified_s(pr_file, modified);
@@ -930,7 +928,7 @@ void test_changed() {
                 CHECK(file_2->is_local());
                 auto seq_2 = file_2->get_sequence();
 
-                if (!perms_changed || utils::platform_t::permissions_supported(file_path)) {
+                if (perms_changed && utils::platform_t::permissions_supported(file_path)) {
                     CHECK(seq_2 > seq_1);
                 } else {
                     CHECK(seq_2 == seq_1);
