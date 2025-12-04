@@ -825,8 +825,7 @@ void folder_table_t::on_remove() {
     auto &folder = *description.get_folder();
     auto diff = model::diff::cluster_diff_ptr_t{};
     diff = new suspend_folder_t(folder);
-    diff->assign_sibling(new load::interrupt_t())
-        ->assign_sibling(new remove_folder_t(cluster, sequencer, *description.get_folder()));
+    diff->assign_sibling(new remove_folder_t(cluster, sequencer, *description.get_folder()));
 
     sup.send_model<model::payload::model_update_t>(std::move(diff));
 }
