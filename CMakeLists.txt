@@ -99,18 +99,20 @@ add_library(syncspirit_core
     src/db/prefix.cpp
     src/db/transaction.cpp
     src/db/utils.cpp
-    src/fs/chunk_iterator.cpp
     src/fs/file.cpp
     src/fs/file_actor.cpp
     src/fs/file_cache.cpp
     src/fs/fs_supervisor.cpp
-    src/fs/new_chunk_iterator.cpp
-    src/fs/scan_actor.cpp
+    src/fs/fs_slave.cpp
     src/fs/scan_scheduler.cpp
-    src/fs/scan_task.cpp
     src/fs/utils.cpp
+    src/fs/task/noop.cpp
+    src/fs/task/remove_file.cpp
+    src/fs/task/rename_file.cpp
+    src/fs/task/segment_iterator.cpp
+    src/fs/task/scan_dir.cpp
     src/hasher/hasher_actor.cpp
-    src/hasher/hasher_proxy_actor.cpp
+    src/hasher/hasher_plugin.cpp
     src/hasher/hasher_supervisor.cpp
     src/model/diff/apply_controller.cpp
     src/model/diff/block_diff.cpp
@@ -142,7 +144,6 @@ add_library(syncspirit_core
     src/model/diff/load/pending_folders.cpp
     src/model/diff/load/remove_corrupted_files.cpp
     src/model/diff/local/blocks_availability.cpp
-    src/model/diff/local/custom.cpp
     src/model/diff/local/file_availability.cpp
     src/model/diff/local/io_failure.cpp
     src/model/diff/local/scan_finish.cpp
@@ -214,6 +215,7 @@ add_library(syncspirit_core
     src/net/http_actor.cpp
     src/net/initiator_actor.cpp
     src/net/local_discovery_actor.cpp
+    src/net/local_keeper.cpp
     src/net/net_supervisor.cpp
     src/net/peer_actor.cpp
     src/net/peer_supervisor.cpp

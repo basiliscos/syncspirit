@@ -53,6 +53,7 @@ auto local_update_t::get_original(const model::folder_infos_map_t &fis, const mo
     auto local_deleted = proto::get_deleted(local_file);
     auto local_invalid = proto::get_invalid(local_file);
     auto local_perms = proto::get_permissions(local_file);
+    auto local_no_perms = proto::get_no_permissions(local_file);
     auto local_size = proto::get_size(local_file);
     auto local_type = model::file_info_t::as_flags(proto::get_type(local_file));
 
@@ -66,7 +67,9 @@ auto local_update_t::get_original(const model::folder_infos_map_t &fis, const mo
                 if (candidate->get_size() == local_size) {
                     bool matches = local_type == candidate->get_type() && local_deleted == candidate->is_deleted() &&
                                    local_invalid == candidate->is_invalid() &&
-                                   local_perms == candidate->get_permissions();
+                                   (local_no_perms == candidate->has_no_permissions() ||
+                                    local_perms == candidate->get_permissions());
+
                     if (matches) {
                         if (candidate->is_file()) {
                             matches = false;

@@ -59,9 +59,7 @@ void governor_actor_t::on_model_update(model::message::model_update_t &message) 
 }
 
 void governor_actor_t::send_command(model::diff::cluster_diff_ptr_t diff, command_t &source) noexcept {
-    auto message =
-        r::make_routed_message<model::payload::model_update_t>(coordinator, address, std::move(diff), &source);
-    get_supervisor().put(std::move(message));
+    route<model::payload::model_update_t>(coordinator, address, std::move(diff), &source);
 }
 
 void governor_actor_t::on_command(model::message::model_update_t &message) noexcept {

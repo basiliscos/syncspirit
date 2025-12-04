@@ -5,7 +5,6 @@
 
 #include <cstdint>
 #include <optional>
-#include <boost/outcome.hpp>
 #include "misc/augmentation.h"
 #include "device.h"
 #include "folder_info.h"
@@ -13,11 +12,14 @@
 #include "folder_data.h"
 #include "syncspirit-export.h"
 #include "proto/proto-fwd.hpp"
+#include <boost/system/error_code.hpp>
+#include <boost/outcome.hpp>
 
 namespace syncspirit::model {
 
 namespace bfs = std::filesystem;
 namespace outcome = boost::outcome_v2;
+namespace sys = boost::system;
 
 struct cluster_t;
 using cluster_ptr_t = intrusive_ptr_t<cluster_t>;
@@ -54,8 +56,9 @@ struct SYNCSPIRIT_API folder_t final : augmentable_t, folder_data_t {
     bool is_scanning() const noexcept;
     bool is_synchronizing() const noexcept;
     void adjust_synchronization(std::int_fast32_t delta) noexcept;
-    void mark_suspended(bool value) noexcept;
+    void mark_suspended(bool value, const sys::error_code &ec = {}) noexcept;
     bool is_suspended() const noexcept;
+    const sys::error_code &get_suspend_reason() const noexcept;
 
     using folder_data_t::get_path;
     using folder_data_t::set_path;
@@ -77,6 +80,7 @@ struct SYNCSPIRIT_API folder_t final : augmentable_t, folder_data_t {
     cluster_t *cluster = nullptr;
     unsigned char key[data_length];
     std::int_fast32_t synchronizing = 0;
+    sys::error_code suspend_reason;
     bool suspended;
 };
 

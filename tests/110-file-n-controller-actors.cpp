@@ -3,7 +3,6 @@
 
 #include "test-utils.h"
 #include "fs/file_actor.h"
-#include "hasher/hasher_proxy_actor.h"
 #include "hasher/hasher_actor.h"
 #include "net/controller_actor.h"
 #include "diff-builder.h"
@@ -75,11 +74,6 @@ struct fixture_t {
         sup->do_process();
 
         sup->create_actor<hasher::hasher_actor_t>().index(1).timeout(timeout).finish();
-        sup->create_actor<hasher::hasher_proxy_actor_t>()
-            .timeout(timeout)
-            .hasher_threads(1)
-            .name(net::names::hasher_proxy)
-            .finish();
 
         auto url = "relay://1.2.3.4:5";
 
@@ -100,6 +94,7 @@ struct fixture_t {
                                .cluster(cluster)
                                .sequencer(sup->sequencer)
                                .timeout(timeout)
+                               .hasher_threads(1)
                                .blocks_max_requested(100)
                                .finish();
 

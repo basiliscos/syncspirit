@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "file_actor.h"
+#include "fs/fs_slave.h"
 #include "net/names.h"
 #include "utils.h"
 #include "utils/io.h"
@@ -21,7 +22,8 @@ r::plugin::resource_id_t controller = 0;
 } // namespace
 
 file_actor_t::file_actor_t(config_t &cfg)
-    : r::actor_base_t{cfg}, rw_cache(std::move(cfg.rw_cache)), ro_cache(rw_cache->get_max_items()) {}
+    : r::actor_base_t{cfg}, rw_cache(std::move(cfg.rw_cache)), ro_cache(rw_cache->get_max_items()),
+      concurrent_hashes{cfg.concurrent_hashes} {}
 
 void file_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
@@ -29,7 +31,9 @@ void file_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.set_identity(net::names::fs_actor, false);
         log = utils::get_logger(identity);
     });
-    plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
+    plugin.with_casted<hasher::hasher_plugin_t>([&](auto &p) {
+        hasher = &p;
+        p.configure_hashers(concurrent_hashes);
         p.register_name(net::names::fs_actor, address);
         p.discover_name(net::names::coordinator, coordinator, false).link(false).callback([&](auto phase, auto &ee) {
             if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {
@@ -41,7 +45,11 @@ void file_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         });
         p.discover_name(net::names::db, db, true);
     });
-    plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) { p.subscribe_actor(&file_actor_t::on_io_commands); });
+    plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
+        p.subscribe_actor(&file_actor_t::on_exec);
+        p.subscribe_actor(&file_actor_t::on_io_commands);
+        p.subscribe_actor(&file_actor_t::on_create_dir);
+    });
 }
 
 void file_actor_t::on_start() noexcept {
@@ -67,6 +75,13 @@ void file_actor_t::on_io_commands(message::io_commands_t &message) noexcept {
     for (auto &cmd : message.payload) {
         std::visit([&](auto &cmd) { process(cmd); }, cmd);
     }
+}
+
+void file_actor_t::on_exec(message::foreign_executor_t &request) noexcept {
+    LOG_DEBUG(log, "on_exec");
+    auto slave = static_cast<fs::fs_slave_t *>(request.payload.get());
+    slave->ec = {};
+    slave->exec(hasher);
 }
 
 void file_actor_t::on_controller_up(net::message::controller_up_t &message) noexcept {
@@ -257,6 +272,18 @@ void file_actor_t::process(payload::finish_file_t &cmd) noexcept {
         return;
     }
 
+    if (!cmd.no_permissions) {
+        auto perms = static_cast<bfs::perms>(cmd.permissions);
+        auto ec = sys::error_code();
+        bfs::permissions(cmd.path, perms, ec);
+        if (ec) {
+            LOG_ERROR(log, "cannot set permissions {:#o} on file: '{}': {}", cmd.permissions, cmd.path.string(),
+                      ec.message());
+            cmd.result = ec;
+            return;
+        }
+    }
+
     cmd.result = outcome::success();
     LOG_INFO(log, "file {} ({} bytes) is now locally available", path_str, cmd.file_size);
 }
@@ -350,4 +377,10 @@ auto file_actor_t::open_file_ro(const bfs::path &path, bool use_cache) noexcept 
     }
     LOG_TRACE(log, "open_file (r/o, by path), path = {}", path.string());
     return file_ptr_t(new file_t(std::move(opt.assume_value())));
+}
+
+void file_actor_t::on_create_dir(message::create_dir_t &message) noexcept {
+    auto &path = message.payload;
+    LOG_TRACE(log, "on_create_dir, '{}'", boost::nowide::narrow(path.wstring()));
+    bfs::create_directories(path, path.ec);
 }

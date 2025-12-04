@@ -39,7 +39,6 @@ struct SYNCSPIRIT_API hasher_actor_t : public r::actor_base_t {
 
   private:
     void on_digest(message::digest_t &req) noexcept;
-    void on_validation(message::validation_t &req) noexcept;
 
     utils::logger_t log;
     uint32_t index;

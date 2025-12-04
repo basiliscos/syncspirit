@@ -33,7 +33,6 @@ struct SYNCSPIRIT_API cluster_visitor_t {
     virtual outcome::result<void> operator()(const load::remove_corrupted_files_t &, void *custom) noexcept;
 
     virtual outcome::result<void> operator()(const local::blocks_availability_t &, void *custom) noexcept;
-    virtual outcome::result<void> operator()(const local::custom_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const local::file_availability_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const local::io_failure_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const local::scan_finish_t &, void *custom) noexcept;

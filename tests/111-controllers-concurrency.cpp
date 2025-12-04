@@ -2,9 +2,9 @@
 // SPDX-FileCopyrightText: 2025 Ivan Baidakou
 
 #include "test-utils.h"
-#include "hasher/hasher_proxy_actor.h"
 #include "hasher/hasher_actor.h"
 #include "net/controller_actor.h"
+#include "fs/file_cache.h"
 #include "diff-builder.h"
 #include "net/names.h"
 #include "test_peer.h"
@@ -71,11 +71,6 @@ struct fixture_t {
         CHECK(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::OPERATIONAL);
 
         sup->create_actor<hasher::hasher_actor_t>().index(1).timeout(timeout).finish();
-        sup->create_actor<hasher::hasher_proxy_actor_t>()
-            .timeout(timeout)
-            .hasher_threads(1)
-            .name(net::names::hasher_proxy)
-            .finish();
 
         sup->configure_callback = [&](r::plugin::plugin_base_t &plugin) {
             plugin.template with_casted<r::plugin::registry_plugin_t>(
@@ -107,6 +102,7 @@ struct fixture_t {
                                    .cluster(cluster)
                                    .sequencer(sup->sequencer)
                                    .timeout(timeout)
+                                   .hasher_threads(1)
                                    .blocks_max_requested(1)
                                    .finish();
 
@@ -118,6 +114,7 @@ struct fixture_t {
                                    .cluster(cluster)
                                    .sequencer(sup->sequencer)
                                    .timeout(timeout)
+                                   .hasher_threads(1)
                                    .blocks_max_requested(1)
                                    .finish();
 

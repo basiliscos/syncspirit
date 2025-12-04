@@ -4,7 +4,6 @@
 #include "bouncer/messages.hpp"
 #include "cluster_supervisor.h"
 #include "db_actor.h"
-#include "hasher/hasher_proxy_actor.h"
 #include "local_discovery_actor.h"
 #include "model/diff/advance/advance.h"
 #include "model/diff/modify/upsert_folder.h"
@@ -20,6 +19,8 @@
 #include "net/relay_actor.h"
 #include "net/resolver_actor.h"
 #include "net/ssdp_actor.h"
+#include "net/local_keeper.h"
+#include "fs/scan_scheduler.h"
 #include "presentation/folder_entity.h"
 #include "presentation/folder_entity.h"
 #include "proto/proto-helpers-bep.h"
@@ -157,18 +158,20 @@ void net_supervisor_t::launch_early() noexcept {
                   .finish()
                   ->get_address();
 
-    create_actor<hasher::hasher_proxy_actor_t>()
-        .timeout(init_timeout)
-        .hasher_threads(app_config.hasher_threads)
-        .name(net::names::hasher_proxy)
+    create_actor<local_keeper_t>()
+        .concurrent_hashes(app_config.hasher_threads)
+        .files_scan_iteration_limit(app_config.fs_config.files_scan_iteration_limit)
+        .sequencer(sequencer)
+        .escalate_failure()
+        .timeout(timeout)
         .finish();
+
+    create_actor<fs::scan_scheduler_t>().timeout(timeout).escalate_failure().finish();
 }
 
 void net_supervisor_t::seed_model() noexcept {
-    using payload_t = model::payload::model_update_t;
     thread_counter = independent_threads;
-    auto message = r::make_routed_message<payload_t>(address, db_addr, std::move(load_diff), nullptr);
-    put(std::move(message));
+    route<model::payload::model_update_t>(address, db_addr, std::move(load_diff), nullptr);
 }
 
 void net_supervisor_t::on_load_cluster_fail(message::load_cluster_fail_t &message) noexcept {

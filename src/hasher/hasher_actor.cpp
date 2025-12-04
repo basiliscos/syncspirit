@@ -4,7 +4,6 @@
 #include "hasher_actor.h"
 #include "../utils/tls.h"
 #include <fmt/core.h>
-#include <algorithm>
 
 using namespace syncspirit::hasher;
 static const constexpr size_t SZ = SHA256_DIGEST_LENGTH;
@@ -19,10 +18,7 @@ void hasher_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) { p.register_name(identity, get_address()); });
 
-    plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
-        p.subscribe_actor(&hasher_actor_t::on_digest);
-        p.subscribe_actor(&hasher_actor_t::on_validation);
-    });
+    plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) { p.subscribe_actor(&hasher_actor_t::on_digest); });
 }
 
 void hasher_actor_t::on_start() noexcept {
@@ -44,19 +40,4 @@ void hasher_actor_t::on_digest(message::digest_t &req) noexcept {
 
     utils::digest(data.data(), data.size(), digest);
     req.payload.result = utils::bytes_t(digest, digest + SZ);
-}
-
-void hasher_actor_t::on_validation(message::validation_t &req) noexcept {
-    LOG_TRACE(log, "on_validation");
-    auto &h = req.payload.hash;
-
-    unsigned char digest[SZ];
-    auto &data = req.payload.data;
-
-    utils::digest(data.data(), data.size(), digest);
-    bool eq = std::equal(h.begin(), h.end(), digest, digest + SZ);
-
-    if (eq) {
-        req.payload.result = outcome::success();
-    }
 }

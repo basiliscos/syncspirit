@@ -5,6 +5,7 @@
 
 #include <boost/outcome.hpp>
 #include <filesystem>
+#include <cstdint>
 #include <boost/smart_ptr/local_shared_ptr.hpp>
 #include "syncspirit-export.h"
 
@@ -18,8 +19,8 @@ namespace outcome = boost::outcome_v2;
 using fs_time_t = std::filesystem::file_time_type;
 
 struct block_division_t {
-    size_t count;
-    int32_t size;
+    std::int32_t count;
+    std::int32_t size;
 };
 
 SYNCSPIRIT_API bfs::path make_temporal(const bfs::path &path) noexcept;
@@ -30,7 +31,7 @@ SYNCSPIRIT_API std::int64_t to_unix(const fs_time_t &at);
 SYNCSPIRIT_API fs_time_t from_unix(std::int64_t at);
 
 SYNCSPIRIT_API extern const std::size_t block_sizes_sz;
-SYNCSPIRIT_API extern const std::int64_t *block_sizes;
+SYNCSPIRIT_API extern const std::int32_t *block_sizes;
 SYNCSPIRIT_API extern const std::string_view tmp_suffix;
 
 } // namespace fs

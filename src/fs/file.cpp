@@ -136,6 +136,8 @@ auto file_t::close(int64_t modification_s, const bfs::path &local_name) noexcept
     return outcome::success();
 }
 
+bool file_t::has_backend() const noexcept { return backend.get(); }
+
 auto file_t::remove() noexcept -> outcome::result<void> {
     backend.reset();
 

@@ -9,7 +9,6 @@
 
 #include "model/cluster.h"
 #include "diff-builder.h"
-#include "hasher/hasher_proxy_actor.h"
 #include "net/controller_actor.h"
 #include "net/names.h"
 #include "fs/messages.h"
@@ -25,6 +24,11 @@ using namespace syncspirit::net;
 using namespace syncspirit::hasher;
 
 namespace {
+
+struct hash_config_t {
+    std::uint32_t hashers;
+    std::uint32_t concurrent_blocks;
+};
 
 struct mock_supervisor_t : supervisor_t {
     using block_responces_t = std::list<outcome::result<utils::bytes_t>>;
@@ -55,7 +59,8 @@ struct mock_supervisor_t : supervisor_t {
     }
 
     void process_io(fs::payload::finish_file_t &req) noexcept override {
-        auto copy = fs::payload::finish_file_t({}, req.path, req.conflict_path, req.file_size, req.modification_s);
+        auto copy = fs::payload::finish_file_t({}, req.path, req.conflict_path, req.file_size, req.modification_s,
+                                               req.permissions, req.no_permissions);
         file_finishes.emplace_back(std::move(copy));
         supervisor_t::process_io(req);
     }
@@ -116,6 +121,7 @@ struct fixture_t {
 
         sup->do_process();
 
+        auto [hashers, concurrent_blocks] = get_hash_config();
         target = sup->create_actor<controller_actor_t>()
                      .peer(peer_device)
                      .peer_addr(peer_actor->get_address())
@@ -124,7 +130,8 @@ struct fixture_t {
                      .cluster(cluster)
                      .sequencer(sup->sequencer)
                      .timeout(timeout)
-                     .blocks_max_requested(get_blocks_max_requested())
+                     .blocks_max_requested(concurrent_blocks)
+                     .hasher_threads(hashers)
                      .finish();
 
         sup->do_process();
@@ -180,11 +187,6 @@ struct fixture_t {
 
         CHECK(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::OPERATIONAL);
         create_hasher();
-        sup->create_actor<hasher::hasher_proxy_actor_t>()
-            .timeout(timeout)
-            .hasher_threads(1)
-            .name(net::names::hasher_proxy)
-            .finish();
 
         auto &folders = cluster->get_folders();
         folder_1 = folders.by_id(folder_id_1);
@@ -213,7 +215,7 @@ struct fixture_t {
 
     virtual void main(diff_builder_t &) noexcept {}
 
-    virtual std::uint32_t get_blocks_max_requested() { return 8; }
+    virtual hash_config_t get_hash_config() { return hash_config_t{1, 8}; }
 
     virtual r::intrusive_ptr_t<mock_supervisor_t> create_supervisor() {
         return ctx.create_supervisor<mock_supervisor_t>().timeout(timeout).create_registry().finish();
@@ -1035,7 +1037,7 @@ void test_downloading_errors() {
             return ctx.create_supervisor<custom_supervisor_t>().timeout(timeout).create_registry().finish();
         }
 
-        std::uint32_t get_blocks_max_requested() override { return 1; }
+        hash_config_t get_hash_config() override { return hash_config_t{1, 1}; }
 
         void main(diff_builder_t &) noexcept override {
             auto &folder_infos = folder_1->get_folder_infos();
@@ -1749,7 +1751,7 @@ void test_overload_uploading() {
     struct F : fixture_t {
         using fixture_t::fixture_t;
 
-        std::uint32_t get_blocks_max_requested() override { return 2; }
+        hash_config_t get_hash_config() override { return hash_config_t{1, 2}; }
 
         void main(diff_builder_t &) noexcept override {
             static constexpr size_t BLOCKS_COUNT = 20;
@@ -2246,7 +2248,7 @@ void test_change_folder_type() {
     struct F : fixture_t {
         using fixture_t::fixture_t;
 
-        std::uint32_t get_blocks_max_requested() override { return 1; }
+        hash_config_t get_hash_config() override { return hash_config_t{1, 1}; }
 
         void main(diff_builder_t &builder) noexcept override {
             auto &folder_infos = folder_1->get_folder_infos();

@@ -14,6 +14,7 @@ struct SYNCSPIRIT_API folder_presence_t : presence_t {
     folder_presence_t(folder_entity_t &entity, model::folder_info_t &folder_info) noexcept;
 
     model::folder_info_t &get_folder_info() noexcept;
+    const model::folder_info_t &get_folder_info() const noexcept;
 
   protected:
     model::folder_info_t &folder_info;

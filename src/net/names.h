@@ -15,7 +15,6 @@ struct SYNCSPIRIT_API names {
     static const char *http11_gda;
     static const char *http11_relay;
     static const char *db;
-    static const char *hasher_proxy;
     static const char *fs_actor;
     static const char *fs_scanner;
     static const char *fs_scheduler;

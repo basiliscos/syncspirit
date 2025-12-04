@@ -8,15 +8,12 @@
 #include "diff-builder.h"
 
 #include "model/cluster.h"
-#include "hasher/hasher_proxy_actor.h"
 #include "fs/scan_actor.h"
 #include "fs/utils.h"
-#include "net/names.h"
 
 using namespace syncspirit;
 using namespace syncspirit::test;
 using namespace syncspirit::model;
-using namespace syncspirit::net;
 using namespace syncspirit::fs;
 using namespace syncspirit::hasher;
 
@@ -67,13 +64,6 @@ struct fixture_t {
         CHECK(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::OPERATIONAL);
 
         hasher = sup->create_actor<managed_hasher_t>().index(1).auto_reply(true).timeout(timeout).finish().get();
-        auto proxy_addr = sup->create_actor<hasher::hasher_proxy_actor_t>()
-                              .timeout(timeout)
-                              .hasher_threads(1)
-                              .name(net::names::hasher_proxy)
-                              .finish()
-                              ->get_address();
-
         sup->do_process();
 
         auto fs_config = config::fs_config_t{3600, 10, 1024 * 1024, files_scan_iteration_limit};
@@ -84,7 +74,7 @@ struct fixture_t {
                      .rw_cache(rw_cache)
                      .sequencer(make_sequencer(77))
                      .fs_config(fs_config)
-                     .requested_hashes_limit(2ul)
+                     .hasher_threads(1)
                      .finish();
         sup->do_process();
 
@@ -890,7 +880,6 @@ void test_races() {
                     CHECK(fi_my->get_file_infos().size() == 0);
                     rw_cache->clear();
                     CHECK(hasher->digest_queue.size() == 0);
-                    CHECK(hasher->validation_queue.size() == 0);
                 }
                 SECTION("non-finished/flushed existing file") {
                     auto path = root_path / "a.bin.syncspirit-tmp";
@@ -934,7 +923,6 @@ void test_races() {
                     CHECK(fi_my->get_file_infos().size() == 0);
                     rw_cache->clear();
                     CHECK(hasher->digest_queue.size() == 0);
-                    CHECK(hasher->validation_queue.size() == 0);
                     hasher->auto_reply = true;
                 }
                 SECTION("finished, but not flushed new file") {

@@ -353,13 +353,12 @@ int app_main(app_context_t &app_ctx) {
     auto fs_sup = fs_context.create_supervisor<syncspirit::fs::fs_supervisor_t>()
                       .timeout(timeout)
                       .registry_address(sup_net->get_registry_address())
-                      .bouncer_address(bouncer_actor->get_address())
                       .fs_config(cfg.fs_config)
                       .hasher_threads(cfg.hasher_threads)
-                      .sequencer(sequencer)
                       .finish();
 
     // auxiliary payload
+#if 0
     fs_sup->add_launcher([&](model::cluster_ptr_t &cluster) mutable {
         fs_sup->create_actor<governor_actor_t>()
             .commands(std::move(commands))
@@ -369,6 +368,7 @@ int app_main(app_context_t &app_ctx) {
             .autoshutdown_supervisor()
             .finish();
     });
+#endif
     fs_sup->do_process();
 
     /* launch actors */

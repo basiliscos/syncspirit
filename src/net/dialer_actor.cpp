@@ -41,8 +41,6 @@ void dialer_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
             }
         });
     });
-    plugin.with_casted<r::plugin::starter_plugin_t>(
-        [&](auto &p) { p.subscribe_actor(&dialer_actor_t::on_model_update); });
 }
 
 void dialer_actor_t::on_start() noexcept {
@@ -125,8 +123,7 @@ void dialer_actor_t::discover_or_dial(const model::device_ptr_t &peer_device) no
         if (state.is_offline()) {
             auto diff = peer_state_t::create(*cluster, device_id.get_sha256(), {}, state.unknown());
             assert(diff);
-            auto msg = r::make_routed_message<payload_t>(coordinator, address, std::move(diff), this);
-            supervisor->put(std::move(msg));
+            route<payload_t>(coordinator, address, std::move(diff), this);
         }
     }
     if (do_dial) {

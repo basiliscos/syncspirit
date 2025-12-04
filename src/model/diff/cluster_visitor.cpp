@@ -16,12 +16,10 @@
 #include "load/commit.h"
 #include "load/devices.h"
 #include "load/ignored_devices.h"
-#include "load/interrupt.h"
 #include "load/load_cluster.h"
 #include "load/pending_devices.h"
 #include "load/remove_corrupted_files.h"
 #include "local/blocks_availability.h"
-#include "local/custom.h"
 #include "local/io_failure.h"
 #include "local/file_availability.h"
 #include "local/scan_finish.h"
@@ -135,10 +133,6 @@ auto cluster_visitor_t::operator()(const load::load_cluster_t &diff, void *custo
 
 auto cluster_visitor_t::operator()(const load::remove_corrupted_files_t &diff, void *custom) noexcept
     -> outcome::result<void> {
-    return diff.visit_next(*this, custom);
-}
-
-auto cluster_visitor_t::operator()(const local::custom_t &diff, void *custom) noexcept -> outcome::result<void> {
     return diff.visit_next(*this, custom);
 }
 

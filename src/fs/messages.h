@@ -5,30 +5,31 @@
 
 #include "proto/proto-fwd.hpp"
 #include "hasher/messages.h"
-#include "scan_task.h"
-#include "chunk_iterator.h"
-#include "new_chunk_iterator.h"
+#include "hasher/hasher_plugin.h"
 #include "utils/bytes.h"
 #include "utils/error_code.h"
 
 #include <rotor.hpp>
+#include <boost/outcome.hpp>
 #include <variant>
+#include <filesystem>
 
 namespace syncspirit::fs {
 
 namespace r = rotor;
+namespace bfs = std::filesystem;
+namespace outcome = boost::outcome_v2;
+namespace sys = boost::system;
 
 namespace payload {
-
-struct scan_progress_t {
-    scan_task_ptr_t task;
-};
 
 using extendended_context_t = hasher::payload::extendended_context_t;
 using extendended_context_prt_t = hasher::payload::extendended_context_prt_t;
 
-using rehash_ptr_t = std::shared_ptr<chunk_iterator_t>;
-using hash_anew_ptr_t = std::shared_ptr<new_chunk_iterator_t>;
+struct foreign_executor_t : hasher::payload::extendended_context_t {
+    virtual void exec(hasher::hasher_plugin_t *hasher) noexcept = 0;
+};
+using foreign_executor_prt_t = r::intrusive_ptr_t<foreign_executor_t>;
 
 template <typename ReplyType = void> struct payload_base_t {
     outcome::result<ReplyType> result;
@@ -81,11 +82,15 @@ struct finish_file_t : payload_base_t<void> {
     bfs::path conflict_path;
     std::uint64_t file_size;
     std::int64_t modification_s;
+    std::uint32_t permissions;
+    bool no_permissions;
 
     inline finish_file_t(extendended_context_prt_t context_, bfs::path path_, bfs::path conflict_path_,
-                         std::uint64_t file_size_, std::int64_t modification_s_) noexcept
+                         std::uint64_t file_size_, std::int64_t modification_s_, std::uint32_t permissions_,
+                         bool no_permissions_) noexcept
         : parent_t{utils::make_error_code(utils::error_code_t::no_action), std::move(context_)}, path{std::move(path_)},
-          conflict_path{std::move(conflict_path_)}, file_size{file_size_}, modification_s{modification_s_} {}
+          conflict_path{std::move(conflict_path_)}, file_size{file_size_}, modification_s{modification_s_},
+          permissions{permissions_}, no_permissions{no_permissions_} {}
 
     finish_file_t(const finish_file_t &) = delete;
     finish_file_t(finish_file_t &&) noexcept = default;
@@ -131,15 +136,25 @@ struct clone_block_t : payload_base_t<void> {
 using io_command_t = std::variant<block_request_t, remote_copy_t, finish_file_t, append_block_t, clone_block_t>;
 using io_commands_t = std::vector<io_command_t>;
 
+struct create_dir_t : bfs::path {
+    using parent_t = bfs::path;
+    using parent_t::parent_t;
+
+    inline create_dir_t(bfs::path path, std::string_view folder_id_) noexcept
+        : parent_t(std::move(path)), folder_id(folder_id_) {}
+
+    std::string folder_id;
+    sys::error_code ec;
+};
+
 } // namespace payload
 
 namespace message {
 
-using scan_progress_t = r::message_t<payload::scan_progress_t>;
-using rehash_needed_t = r::message_t<payload::rehash_ptr_t>;
-using hash_anew_t = r::message_t<payload::hash_anew_ptr_t>;
+using foreign_executor_t = r::message_t<payload::foreign_executor_prt_t>;
 
 using io_commands_t = r::message_t<payload::io_commands_t>;
+using create_dir_t = r::message_t<payload::create_dir_t>;
 
 } // namespace message
 
