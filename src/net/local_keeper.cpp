@@ -564,6 +564,7 @@ struct folder_slave_t final : fs::fs_slave_t {
         auto comparator = presentation::entity_t::name_comparator_t{};
         auto it = std::lower_bound(entities.begin(), entities.end(), name_view, comparator);
         auto presence = (presentation::presence_t *)(nullptr);
+        auto ignore = false;
         if (it != entities.end()) {
             presence = const_cast<presentation::presence_t *>((*it)->get_best());
             if (presence && presence->get_device() == self_device) {
@@ -576,6 +577,9 @@ struct folder_slave_t final : fs::fs_slave_t {
             auto &peer_file = cp->get_file_info();
             if (peer_file.get_size() != item.size) {
                 presence = nullptr;
+            } else if (peer_file.is_synchronizing()) {
+                LOG_DEBUG(log, "ignoring '{}' (synchronizing)", narrow(item.path.generic_wstring()));
+                ignore = true;
             } else {
                 auto local_file = (const model::file_info_t *)(nullptr);
                 auto local_fi = context->local_folder.get();
@@ -591,15 +595,18 @@ struct folder_slave_t final : fs::fs_slave_t {
             }
         }
 
-        if (!presence || action == model::advance_action_t::ignore) {
-            LOG_DEBUG(log, "scheduling removal of '{}", narrow(item.path.generic_wstring()));
-            auto sub_task = fs::task::remove_file_t(std::move(item.path));
-            pending_io.emplace_back(std::move(sub_task));
-        } else {
-            LOG_TRACE(log, "scheduling rehashing of '{}", narrow(item.path.generic_wstring()));
-            auto &child_info = static_cast<child_info_t &>(item);
-            auto ptr = hash_incomplete_file_ptr_t(new hash_incomplete_file_t(std::move(child_info), presence, action));
-            stack.emplace_front(std::move(ptr));
+        if (!ignore) {
+            if (!presence || action == model::advance_action_t::ignore) {
+                LOG_DEBUG(log, "scheduling removal of '{}'", narrow(item.path.generic_wstring()));
+                auto sub_task = fs::task::remove_file_t(std::move(item.path));
+                pending_io.emplace_back(std::move(sub_task));
+            } else {
+                LOG_TRACE(log, "scheduling rehashing of '{}'", narrow(item.path.generic_wstring()));
+                auto &child_info = static_cast<child_info_t &>(item);
+                auto ptr =
+                    hash_incomplete_file_ptr_t(new hash_incomplete_file_t(std::move(child_info), presence, action));
+                stack.emplace_front(std::move(ptr));
+            }
         }
         return 1;
     }

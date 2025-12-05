@@ -1515,7 +1515,6 @@ void test_incomplete() {
                     proto::set_permissions(pr_file, perms);
                     builder->make_index(sha256, folder->get_id()).add(pr_file, peer_device).finish().apply(*sup);
 
-                    auto max_seq = folder_info->get_max_sequence();
                     builder->scan_start(folder->get_id()).apply(*sup);
                     CHECK(bfs::exists(path));
                     CHECK(!bfs::exists(model_path));
@@ -1533,7 +1532,6 @@ void test_incomplete() {
                     proto::set_permissions(pr_file, perms);
                     builder->make_index(sha256, folder->get_id()).add(pr_file, peer_device).finish().apply(*sup);
 
-                    auto max_seq = folder_info->get_max_sequence();
                     builder->scan_start(folder->get_id()).apply(*sup);
                     CHECK(bfs::exists(path));
                     CHECK(!bfs::exists(model_path));
@@ -1551,7 +1549,27 @@ void test_incomplete() {
                     proto::set_permissions(pr_file, perms);
                     builder->make_index(sha256, folder->get_id()).add(pr_file, peer_device).finish().apply(*sup);
 
-                    auto max_seq = folder_info->get_max_sequence();
+                    builder->scan_start(folder->get_id()).apply(*sup);
+                    CHECK(!bfs::exists(path));
+                    CHECK(!bfs::exists(model_path));
+                    CHECK(files->size() == 0);
+                }
+                SECTION("synchronization lock => ignored") {
+                    write_file(path, "0000000000");
+                    auto status = bfs::status(path);
+                    auto perms = static_cast<uint32_t>(status.permissions());
+                    proto::set_permissions(pr_file, perms);
+                    builder->make_index(sha256, folder->get_id()).add(pr_file, peer_device).finish().apply(*sup);
+
+                    auto f = folder_info_peer->get_file_infos().by_name(file_name);
+                    REQUIRE(f);
+                    f->synchronizing_lock();
+
+                    builder->scan_start(folder->get_id()).apply(*sup);
+                    CHECK(bfs::exists(path));
+                    CHECK(!bfs::exists(model_path));
+
+                    f->synchronizing_unlock();
                     builder->scan_start(folder->get_id()).apply(*sup);
                     CHECK(!bfs::exists(path));
                     CHECK(!bfs::exists(model_path));
