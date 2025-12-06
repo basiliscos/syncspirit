@@ -28,6 +28,7 @@
 
 #include <utility>
 #include <type_traits>
+#include <memory_resource>
 
 using namespace syncspirit;
 using namespace syncspirit::net;
@@ -302,6 +303,7 @@ void controller_actor_t::shutdown_finish() noexcept {
     peer->release_iterator(file_iterator);
     file_iterator.reset();
     synchronizing_folders.clear();
+    postponed_files.clear();
     synchronizing_files.clear();
     if (announced) {
         send<payload::controller_down_t>(coordinator, address, peer_address);
@@ -453,16 +455,27 @@ void controller_actor_t::pull_next(stack_context_t &context) noexcept {
         return !ignore;
     };
 
-    using file_set_t = std::set<model::file_info_t *>;
+    using file_set_t = std::pmr::set<model::file_info_t *>;
+    using allocator_t = std::pmr::polymorphic_allocator<char>;
+
+    auto buffer = std::array<std::byte, 1024 * 16>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = allocator_t(&pool);
+    auto checked_children = file_set_t(allocator);
+
     auto seen_files = file_set_t();
 OUTER:
     while (can_pull_more()) {
         if (block_iterator) {
-            seen_files.emplace(block_iterator->get_source());
+            auto file = block_iterator->get_source();
+            seen_files.emplace(file);
             if (*block_iterator) {
                 auto file_block = block_iterator->next();
+                auto fi = &block_iterator->get_source_folder();
                 if (!file_block.block()->is_locked()) {
-                    preprocess_block(file_block, block_iterator->get_source_folder(), context);
+                    preprocess_block(file_block, *fi, context);
+                } else {
+                    postponed_files[file->get_uuid()] = fi;
                 }
                 continue;
             } else {
@@ -471,14 +484,14 @@ OUTER:
             }
             continue;
         }
-        if (!block_iterator && !synchronizing_files.empty()) {
-            for (auto &[key, guard] : synchronizing_files) {
-                auto file = guard.file.get();
-                if (seen_files.count(file)) {
+        if (!block_iterator && !postponed_files.empty()) {
+            for (auto &[uuid, folder_info] : postponed_files) {
+                auto file = folder_info->get_file_infos().by_uuid(uuid);
+                if (seen_files.count(file.get())) {
                     continue;
                 }
                 auto bi = model::block_iterator_ptr_t();
-                bi = new model::blocks_iterator_t(*file, *guard.folder_info);
+                bi = new model::blocks_iterator_t(*file, *folder_info);
                 if (bi) {
                     block_iterator = bi;
                     goto OUTER;
@@ -830,6 +843,11 @@ auto controller_actor_t::operator()(const model::diff::modify::remove_files_t &d
             }
             auto it = synchronizing_files.find(full_id);
             if (it != synchronizing_files.end()) {
+                auto it_2 = postponed_files.find(full_id);
+                if (it_2 != postponed_files.end()) {
+                    postponed_files.erase(it_2);
+                }
+
                 it->second.forget(); // don't care about unlocking as the file is removed anyway
                 synchronizing_files.erase(it);
             }
@@ -1316,6 +1334,10 @@ void controller_actor_t::cancel_sync(model::file_info_t *file) noexcept {
     }
     auto it = synchronizing_files.find(file->get_full_id());
     if (it != synchronizing_files.end()) {
+        auto it_2 = postponed_files.find(file->get_full_id());
+        if (it_2 != postponed_files.end()) {
+            postponed_files.erase(it_2);
+        }
         synchronizing_files.erase(it);
     }
 }
