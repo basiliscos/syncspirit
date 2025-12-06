@@ -92,9 +92,13 @@ file_info_t::guard_t::guard_t(file_info_t &file_, const folder_info_t *folder_in
 file_info_t::guard_t::~guard_t() {
     if (file) {
         file->synchronizing_unlock();
-        file->recheck(*folder_info);
+        if (folder_info) {
+            file->recheck(*folder_info);
+        }
     }
 }
+
+void file_info_t::guard_t::forget() noexcept { folder_info = {}; }
 
 file_info_t::blocks_iterator_t::blocks_iterator_t(const file_info_t *file_, std::uint32_t start_index_) noexcept
     : file{file_}, next_index{start_index_} {}

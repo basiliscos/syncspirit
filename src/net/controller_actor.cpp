@@ -653,6 +653,9 @@ void controller_actor_t::preprocess_block(model::file_block_t &file_block, const
                 break;
             } else {
                 ++request_id;
+                if (request_id >= blocks_max_requested) {
+                    request_id = 0;
+                }
             }
         }
         assert(!block_requests[request_id]);
@@ -817,6 +820,7 @@ auto controller_actor_t::operator()(const model::diff::modify::remove_files_t &d
             }
             auto it = synchronizing_files.find(full_id);
             if (it != synchronizing_files.end()) {
+                it->second.forget(); // don't care about unlocking as the file is removed anyway
                 synchronizing_files.erase(it);
             }
         }

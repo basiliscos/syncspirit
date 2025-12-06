@@ -71,6 +71,7 @@ struct SYNCSPIRIT_API file_info_t {
         ~guard_t();
 
         guard_t &operator=(guard_t &&) noexcept = default;
+        void forget() noexcept;
 
         bool finished = false;
         file_info_ptr_t file;
