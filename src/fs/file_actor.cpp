@@ -298,7 +298,6 @@ void file_actor_t::process(payload::append_block_t &cmd) noexcept {
         LOG_ERROR(log, "cannot open file: {}: {}", path_str, err.message());
         cmd.result = err;
         return;
-        return;
     }
     auto &backend = file_opt.assume_value();
     cmd.result = backend->write(cmd.offset, cmd.data);

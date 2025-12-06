@@ -95,34 +95,33 @@ using C = controller_actor_t;
 C::stack_context_t::stack_context_t(controller_actor_t &actor_) noexcept : actor{actor_} {}
 
 C::stack_context_t::~stack_context_t() {
-    if (actor.state != r::state_t::OPERATIONAL) {
-        return;
-    }
-    auto requests_left = actor.cluster->get_write_requests();
-    auto sent = 0;
-    while (requests_left > 0 && !actor.block_write_queue.empty()) {
-        auto &io_command = actor.block_write_queue.front();
-        io_commands.emplace_back(std::move(io_command));
-        --requests_left;
-        ++sent;
-        actor.block_write_queue.pop_front();
-    }
-    if (sent) {
-        // LOG_TRACE(log, "{} block writes sent, requests left = {}", sent, requests_left);
-        actor.cluster->modify_write_requests(-sent);
-    }
-    auto max_block_read = actor.blocks_max_requested * constants::tx_blocks_max_factor;
-    while (!actor.block_read_queue.empty() && (actor.tx_blocks_requested <= max_block_read)) {
-        ++actor.tx_blocks_requested;
-        auto &cmd = actor.block_read_queue.front();
-        io_commands.emplace_back(std::move(cmd));
-        actor.block_read_queue.pop_front();
-    }
-    if (!io_commands.empty()) {
-        auto &self = actor.get_address();
-        auto &fs = actor.fs_addr;
-        actor.route<fs::payload::io_commands_t>(fs, self, std::move(io_commands));
-        actor.resources->acquire(resource::fs);
+    if (actor.state == r::state_t::OPERATIONAL) {
+        auto requests_left = actor.cluster->get_write_requests();
+        auto sent = 0;
+        while (requests_left > 0 && !actor.block_write_queue.empty()) {
+            auto &io_command = actor.block_write_queue.front();
+            io_commands.emplace_back(std::move(io_command));
+            --requests_left;
+            ++sent;
+            actor.block_write_queue.pop_front();
+        }
+        if (sent) {
+            // LOG_TRACE(log, "{} block writes sent, requests left = {}", sent, requests_left);
+            actor.cluster->modify_write_requests(-sent);
+        }
+        auto max_block_read = actor.blocks_max_requested * constants::tx_blocks_max_factor;
+        while (!actor.block_read_queue.empty() && (actor.tx_blocks_requested <= max_block_read)) {
+            ++actor.tx_blocks_requested;
+            auto &cmd = actor.block_read_queue.front();
+            io_commands.emplace_back(std::move(cmd));
+            actor.block_read_queue.pop_front();
+        }
+        if (!io_commands.empty()) {
+            auto &self = actor.get_address();
+            auto &fs = actor.fs_addr;
+            actor.route<fs::payload::io_commands_t>(fs, self, std::move(io_commands));
+            actor.resources->acquire(resource::fs);
+        }
     }
     if (next) {
         auto &addr = actor.coordinator;
