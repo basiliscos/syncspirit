@@ -10,22 +10,22 @@ using namespace syncspirit::model;
 static constexpr auto wrong_index = std::numeric_limits<std::uint32_t>::max();
 
 blocks_iterator_t::blocks_iterator_t(file_info_t &source_, const folder_info_t &source_folder_) noexcept
-    : source_folder{source_folder_}, source{&source_}, i{0} {
-    auto &sb = source->content.file.blocks;
+    : source_folder{source_folder_}, source{source_}, i{0} {
+    auto &sb = source.content.file.blocks;
     if (i == sb.size()) {
         i = wrong_index;
         return;
     }
-    sequence = source->get_sequence();
+    sequence = source.get_sequence();
     advance();
 }
 
-blocks_iterator_t::operator bool() const noexcept { return (i != wrong_index) && (source->get_sequence() == sequence); }
+blocks_iterator_t::operator bool() const noexcept { return (i != wrong_index) && (source.get_sequence() == sequence); }
 
-file_info_t *blocks_iterator_t::get_source() noexcept { return source.get(); }
+file_info_t *blocks_iterator_t::get_source() noexcept { return &source; }
 
 void blocks_iterator_t::advance() noexcept {
-    auto &sb = source->content.file.blocks;
+    auto &sb = source.content.file.blocks;
     auto max = sb.size();
     while (i < max && sb[i]) {
         auto ptr = reinterpret_cast<std::uintptr_t>(sb[i]);
@@ -39,7 +39,7 @@ void blocks_iterator_t::advance() noexcept {
 
 void blocks_iterator_t::prepare() noexcept {
     if (i != wrong_index) {
-        bool reset = source->is_unreachable() || (i >= source->content.file.blocks.size());
+        bool reset = source.is_unreachable() || (i >= source.content.file.blocks.size());
         if (reset) {
             i = wrong_index;
         }
@@ -47,13 +47,12 @@ void blocks_iterator_t::prepare() noexcept {
 }
 
 file_block_t blocks_iterator_t::next() noexcept {
-    auto src = source.get();
-    auto &sb = src->content.file.blocks;
+    auto &sb = source.content.file.blocks;
     auto idx = i;
     ++i;
     advance();
 
     auto ptr = reinterpret_cast<std::uintptr_t>(sb[idx]);
     auto block = reinterpret_cast<const block_info_t *>(ptr & file_info_t::PTR_MASK);
-    return {block, src, idx};
+    return {block, &source, idx};
 }
