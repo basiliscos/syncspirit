@@ -557,22 +557,33 @@ void controller_actor_t::io_append_block(model::file_info_t &peer_file, model::f
     ctx.push(std::move(payload));
 }
 
-void controller_actor_t::io_clone_block(const model::file_block_t &file_block, const model::folder_info_t &source_fi,
-                                        model::folder_info_t &target_fi, stack_context_t &ctx) {
+void controller_actor_t::io_clone_block(const model::file_block_t &file_block, model::folder_info_t &target_fi,
+                                        stack_context_t &ctx) {
     auto src = (const model::file_info_t *)(nullptr);
     auto target = const_cast<model::file_info_t *>(file_block.file());
     auto it = file_block.block()->iterate_blocks();
     auto src_block_index = std::uint32_t(0);
+    auto src_fi = (const model::folder_info_t *)(nullptr);
     auto target_block_index = file_block.block_index();
     while (auto b = it.next()) {
         if (b->is_locally_available()) {
-            src = b->file();
             src_block_index = b->block_index();
-            break;
+            src = b->file();
+            auto folder_uuid = src->get_folder_uuid();
+            for (auto &folder_it : cluster->get_folders()) {
+                if (auto fi = folder_it.item->get_folder_infos().by_uuid(folder_uuid)) {
+                    src_fi = fi.get();
+                    break;
+                }
+            }
+            if (src_fi) {
+                break;
+            }
         }
     }
+    assert(src_fi);
 
-    auto source_path = src->get_path(source_fi);
+    auto source_path = src->get_path(*src_fi);
     auto source_offset = src->get_block_offset(src_block_index);
     auto target_path = target->get_path(target_fi);
     auto target_offset = target->get_block_offset(target_block_index);
@@ -638,9 +649,8 @@ void controller_actor_t::preprocess_block(model::file_block_t &file_block, const
         LOG_TRACE(log, "cloning locally available block '{}', file = {}, block index = {} / {}", hash, *file,
                   file_block.block_index(), last_index);
         auto &folder_infos = source_folder.get_folder()->get_folder_infos();
-        auto local_block = block->local_file();
         auto target_fi = folder_infos.by_uuid(file->get_folder_uuid());
-        io_clone_block(file_block, source_folder, *target_fi, ctx);
+        io_clone_block(file_block, *target_fi, ctx);
     } else {
         auto request_id = block_requests_next;
         for (std::uint_fast32_t i = 0; i < blocks_max_requested; ++i) {

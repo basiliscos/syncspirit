@@ -214,8 +214,7 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
                     stack_context_t &);
     void io_append_block(model::file_info_t &, model::folder_info_t &, uint32_t block_index, utils::bytes_t data,
                          stack_context_t &);
-    void io_clone_block(const model::file_block_t &file_block, const model::folder_info_t &source_fi,
-                        model::folder_info_t &target_fi, stack_context_t &);
+    void io_clone_block(const model::file_block_t &file_block, model::folder_info_t &target_fi, stack_context_t &);
     void io_finish_file(model::file_info_t *, model::file_info_t &, model::folder_info_t &, model::advance_action_t,
                         stack_context_t &);
     auto io_make_request_block(model::file_info_t &, model::folder_info_t &, proto::Request)
