@@ -355,14 +355,14 @@ const char *default_location_t::explanation_ = "where folders are created by def
 cert_file_t::cert_file_t(const bfs::path &value, const bfs::path &default_value)
     : parent_t("cert_file", explanation_, value, default_value) {}
 
-void cert_file_t::reflect_to(syncspirit::config::main_t &main) { main.cert_file = value; }
+void cert_file_t::reflect_to(syncspirit::config::main_t &main) { main.cert_file = convert(); }
 
 const char *cert_file_t::explanation_ = "this device certificate location";
 
 key_file_t::key_file_t(const bfs::path &value, const bfs::path &default_value)
     : parent_t("key_file", explanation_, value, default_value) {}
 
-void key_file_t::reflect_to(syncspirit::config::main_t &main) { main.key_file = value; }
+void key_file_t::reflect_to(syncspirit::config::main_t &main) { main.key_file = convert(); }
 
 const char *key_file_t::explanation_ = "this device key location";
 
