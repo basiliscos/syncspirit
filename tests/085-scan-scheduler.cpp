@@ -6,7 +6,7 @@
 #include "test_supervisor.h"
 #include "diff-builder.h"
 #include "model/cluster.h"
-#include "fs/scan_scheduler.h"
+#include "net/scheduler.h"
 #include "net/names.h"
 #include <chrono>
 
@@ -15,7 +15,7 @@ using namespace syncspirit::test;
 using namespace syncspirit::model;
 
 struct fixture_t {
-    using target_ptr_t = r::intrusive_ptr_t<fs::scan_scheduler_t>;
+    using target_ptr_t = r::intrusive_ptr_t<net::scheduler_t>;
 
     fixture_t() noexcept {
         test::init_logging();
@@ -43,7 +43,7 @@ struct fixture_t {
         CHECK(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::OPERATIONAL);
         sup->do_process();
 
-        target = sup->create_actor<fs::scan_scheduler_t>().timeout(timeout).finish();
+        target = sup->create_actor<net::scheduler_t>().timeout(timeout).finish();
         sup->do_process();
 
         sup->send<syncspirit::model::payload::thread_ready_t>(sup->get_address(), cluster, std::this_thread::get_id());

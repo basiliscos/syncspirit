@@ -12,12 +12,12 @@
 #include <list>
 
 namespace syncspirit {
-namespace fs {
+namespace net {
 
 namespace r = rotor;
 namespace outcome = boost::outcome_v2;
 
-struct SYNCSPIRIT_API scan_scheduler_t : public r::actor_base_t, private model::diff::cluster_visitor_t {
+struct SYNCSPIRIT_API scheduler_t : public r::actor_base_t, private model::diff::cluster_visitor_t {
     using parent_t = r::actor_base_t;
     using parent_t::parent_t;
 
@@ -56,5 +56,5 @@ struct SYNCSPIRIT_API scan_scheduler_t : public r::actor_base_t, private model::
     bool scan_in_progress = false;
 };
 
-} // namespace fs
+} // namespace net
 } // namespace syncspirit

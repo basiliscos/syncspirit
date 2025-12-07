@@ -20,7 +20,7 @@
 #include "net/resolver_actor.h"
 #include "net/ssdp_actor.h"
 #include "net/local_keeper.h"
-#include "fs/scan_scheduler.h"
+#include "net/scheduler.h"
 #include "presentation/folder_entity.h"
 #include "presentation/folder_entity.h"
 #include "proto/proto-helpers-bep.h"
@@ -166,7 +166,7 @@ void net_supervisor_t::launch_early() noexcept {
         .timeout(timeout)
         .finish();
 
-    create_actor<fs::scan_scheduler_t>().timeout(timeout).escalate_failure().finish();
+    create_actor<scheduler_t>().timeout(timeout).escalate_failure().finish();
 }
 
 void net_supervisor_t::seed_model() noexcept {

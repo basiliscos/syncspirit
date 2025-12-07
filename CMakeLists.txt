@@ -104,7 +104,6 @@ add_library(syncspirit_core
     src/fs/file_cache.cpp
     src/fs/fs_supervisor.cpp
     src/fs/fs_slave.cpp
-    src/fs/scan_scheduler.cpp
     src/fs/utils.cpp
     src/fs/task/noop.cpp
     src/fs/task/remove_file.cpp
@@ -222,6 +221,7 @@ add_library(syncspirit_core
     src/net/relay_actor.cpp
     src/net/resolver_actor.cpp
     src/net/names.cpp
+    src/net/scheduler.cpp
     src/net/ssdp_actor.cpp
     src/net/upnp_actor.cpp
     src/presentation/entity.cpp

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
 
-#include "scan_scheduler.h"
+#include "scheduler.h"
 #include "net/names.h"
 #include "model/diff/modify/upsert_folder.h"
 #include "model/diff/local/scan_finish.h"
@@ -9,9 +9,9 @@
 #include "model/diff/local/scan_start.h"
 #include "model/diff/local/synchronization_finish.h"
 
-using namespace syncspirit::fs;
+using namespace syncspirit::net;
 
-void scan_scheduler_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
+void scheduler_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
         p.set_identity(net::names::scheduler, false);
@@ -23,15 +23,15 @@ void scan_scheduler_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
             if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {
                 auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
                 auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
-                plugin->subscribe_actor(&scan_scheduler_t::on_model_update, coordinator);
-                plugin->subscribe_actor(&scan_scheduler_t::on_app_ready, coordinator);
-                plugin->subscribe_actor(&scan_scheduler_t::on_thread_ready, supervisor->get_address());
+                plugin->subscribe_actor(&scheduler_t::on_model_update, coordinator);
+                plugin->subscribe_actor(&scheduler_t::on_app_ready, coordinator);
+                plugin->subscribe_actor(&scheduler_t::on_thread_ready, supervisor->get_address());
             }
         });
     });
 }
 
-void scan_scheduler_t::on_thread_ready(model::message::thread_ready_t &message) noexcept {
+void scheduler_t::on_thread_ready(model::message::thread_ready_t &message) noexcept {
     auto &p = message.payload;
     if (p.thread_id == std::this_thread::get_id()) {
         LOG_TRACE(log, "on_thread_ready");
@@ -39,12 +39,12 @@ void scan_scheduler_t::on_thread_ready(model::message::thread_ready_t &message) 
     }
 }
 
-void scan_scheduler_t::on_app_ready(model::message::app_ready_t &) noexcept {
+void scheduler_t::on_app_ready(model::message::app_ready_t &) noexcept {
     LOG_TRACE(log, "on_app_ready");
     scan_next();
 }
 
-void scan_scheduler_t::on_model_update(model::message::model_update_t &message) noexcept {
+void scheduler_t::on_model_update(model::message::model_update_t &message) noexcept {
     LOG_TRACE(log, "on_model_update");
     auto &diff = *message.payload.diff;
     auto r = diff.visit(*this, nullptr);
@@ -54,7 +54,7 @@ void scan_scheduler_t::on_model_update(model::message::model_update_t &message) 
     }
 }
 
-auto scan_scheduler_t::operator()(const model::diff::modify::upsert_folder_t &diff, void *custom) noexcept
+auto scheduler_t::operator()(const model::diff::modify::upsert_folder_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     if (!scan_in_progress) {
         scan_next_or_schedule();
@@ -62,7 +62,7 @@ auto scan_scheduler_t::operator()(const model::diff::modify::upsert_folder_t &di
     return diff.visit_next(*this, custom);
 }
 
-auto scan_scheduler_t::operator()(const model::diff::local::scan_request_t &diff, void *custom) noexcept
+auto scheduler_t::operator()(const model::diff::local::scan_request_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     scan_queue.emplace_back(diff.folder_id);
     if (!scan_in_progress) {
@@ -71,14 +71,14 @@ auto scan_scheduler_t::operator()(const model::diff::local::scan_request_t &diff
     return diff.visit_next(*this, custom);
 }
 
-auto scan_scheduler_t::operator()(const model::diff::local::scan_finish_t &diff, void *custom) noexcept
+auto scheduler_t::operator()(const model::diff::local::scan_finish_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     scan_in_progress = false;
     scan_next_or_schedule();
     return diff.visit_next(*this, custom);
 }
 
-auto scan_scheduler_t::operator()(const model::diff::local::synchronization_finish_t &diff, void *custom) noexcept
+auto scheduler_t::operator()(const model::diff::local::synchronization_finish_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     if (!scan_in_progress) {
         scan_next_or_schedule();
@@ -86,7 +86,7 @@ auto scan_scheduler_t::operator()(const model::diff::local::synchronization_fini
     return diff.visit_next(*this, custom);
 }
 
-void scan_scheduler_t::scan_next_or_schedule() noexcept {
+void scheduler_t::scan_next_or_schedule() noexcept {
     auto next = scan_next();
     if (!next) {
         return;
@@ -103,12 +103,12 @@ void scan_scheduler_t::scan_next_or_schedule() noexcept {
     }
     if (do_start_timer) {
         LOG_DEBUG(log, "scheduling folders after {}s", next->interval.total_seconds());
-        timer_id = start_timer(next->interval, *this, &scan_scheduler_t::on_timer);
+        timer_id = start_timer(next->interval, *this, &scheduler_t::on_timer);
         schedule_option = next;
     }
 }
 
-auto scan_scheduler_t::scan_next() noexcept -> schedule_option_t {
+auto scheduler_t::scan_next() noexcept -> schedule_option_t {
     while (!scan_queue.empty()) {
         auto folder_id = std::move(scan_queue.front());
         scan_queue.pop_front();
@@ -158,7 +158,7 @@ auto scan_scheduler_t::scan_next() noexcept -> schedule_option_t {
     return {};
 }
 
-void scan_scheduler_t::on_timer(r::request_id_t, bool cancelled) noexcept {
+void scheduler_t::on_timer(r::request_id_t, bool cancelled) noexcept {
     timer_id = {};
     if (!cancelled) {
         auto &folder_id = schedule_option->folder_id;
@@ -168,7 +168,7 @@ void scan_scheduler_t::on_timer(r::request_id_t, bool cancelled) noexcept {
     }
 }
 
-void scan_scheduler_t::initiate_scan(std::string_view folder_id) noexcept {
+void scheduler_t::initiate_scan(std::string_view folder_id) noexcept {
     LOG_DEBUG(log, "initiating folder '{}' scan", folder_id);
     auto diff = model::diff::cluster_diff_ptr_t{};
     auto now = r::pt::microsec_clock::local_time();
