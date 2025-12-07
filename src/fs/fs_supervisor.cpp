@@ -28,23 +28,6 @@ void fs_supervisor_t::launch() noexcept {
         .timeout(timeout)
         .escalate_failure()
         .finish();
-
-#if 0
-    scan_actor = create_actor<scan_actor_t>()
-                     .fs_config(fs_config)
-                     .rw_cache(rw_cache)
-                     .sequencer(sequencer)
-                     .hasher_threads(hasher_threads) // * 2 ??
-                     .timeout(timeout)
-                     .autoshutdown_supervisor(true)
-                     .finish();
-    create_actor<scan_scheduler_t>().timeout(timeout).finish();
-
-    for (auto &l : launchers) {
-        l(cluster);
-    }
-    send<syncspirit::model::payload::thread_up_t>(coordinator);
-#endif
 }
 
 void fs_supervisor_t::on_start() noexcept {
