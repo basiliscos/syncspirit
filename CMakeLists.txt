@@ -224,6 +224,11 @@ add_library(syncspirit_core
     src/net/scheduler.cpp
     src/net/ssdp_actor.cpp
     src/net/upnp_actor.cpp
+    src/net/local_keeper/child_info.cpp
+    src/net/local_keeper/hash_base.cpp
+    src/net/local_keeper/folder_slave.cpp
+    src/net/local_keeper/stack_context.cpp
+    src/net/local_keeper/stack.cpp
     src/presentation/entity.cpp
     src/presentation/cluster_file_presence.cpp
     src/presentation/file_entity.cpp
