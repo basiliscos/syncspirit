@@ -377,7 +377,6 @@ int app_main(app_context_t &app_ctx) {
                       .poll_duration(r::pt::microsec{1})
                       .registry_address(sup_net->get_registry_address())
                       .fs_config(cfg.fs_config)
-                      .shutdown_flag(shutdown_flag, r::pt::millisec{50})
                       .hasher_threads(cfg.hasher_threads)
                       .finish();
     fs_sup->do_process();
@@ -434,15 +433,18 @@ int app_main(app_context_t &app_ctx) {
         if (!Fl::wait()) {
             shutdown_flag = true;
             logger->debug("main window is longer show, terminating...");
-            sup_fltk->do_shutdown();
-            while (sup_fltk->state != r::state_t::SHUT_DOWN) {
-                Fl::wait(0.01);
-                sup_fltk->do_process();
-            }
+        }
+    }
+    if (sup_fltk->state != r::state_t::SHUT_DOWN) {
+        sup_fltk->do_shutdown();
+        while (sup_fltk->state != r::state_t::SHUT_DOWN) {
+            Fl::wait(0.01);
+            sup_fltk->do_process();
         }
     }
 
     logger->trace("joining to fs thread");
+    fs_sup->do_shutdown();
     fs_thread.join();
 
     logger->trace("joining to net thread");
