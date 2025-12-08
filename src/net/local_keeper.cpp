@@ -36,54 +36,6 @@ namespace sys = boost::system;
 
 using boost::nowide::narrow;
 
-#if 0
-namespace {
-
-struct folder_slave_t;
-using allocator_t = std::pmr::polymorphic_allocator<char>;
-using F = presentation::presence_t::features_t;
-
-using folder_slave_ptr_t = r::intrusive_ptr_t<folder_slave_t>;
-using hash_base_ptr_t = model::intrusive_ptr_t<hash_base_t>;
-
-struct folder_context_t : boost::intrusive_ref_counter<folder_context_t, boost::thread_safe_counter> {
-    inline folder_context_t(model::folder_info_ptr_t local_folder_) noexcept : local_folder{local_folder_} {}
-    model::folder_info_ptr_t local_folder;
-};
-
-using folder_context_ptr_t = boost::intrusive_ptr<folder_context_t>;
-
-struct hash_context_t final : hasher::payload::extendended_context_t {
-    hash_context_t(folder_slave_ptr_t slave_, hash_base_ptr_t hash_file_)
-        : slave{std::move(slave_)}, hash_file{std::move(hash_file_)} {}
-
-    folder_slave_ptr_t slave;
-    hash_base_ptr_t hash_file;
-};
-using hash_context_ptr_t = r::intrusive_ptr_t<hash_context_t>;
-
-struct rename_context_t final : hasher::payload::extendended_context_t {
-    rename_context_t(rehashed_incomplete_t item_) : item(std::move(item_)) {}
-    rehashed_incomplete_t item;
-};
-
-struct folder_slave_t final : fs::fs_slave_t {
-    using local_keeper_ptr_t = r::intrusive_ptr_t<net::local_keeper_t>;
-
-
-
-    tasks_t pending_io;
-    local_keeper::stack_t stack;
-    folder_context_ptr_t context;
-    local_keeper_ptr_t actor;
-    utils::logger_t log;
-    bool force_completion = false;
-    bool ignore_permissions;
-};
-
-} // namespace
-#endif
-
 local_keeper_t::local_keeper_t(config_t &config)
     : r::actor_base_t(config), sequencer{std::move(config.sequencer)},
       concurrent_hashes_left{static_cast<std::int32_t>(config.concurrent_hashes)},

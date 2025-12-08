@@ -517,7 +517,7 @@ void folder_slave_t::post_process(fs::task::scan_dir_t &task, stack_context_t &c
         actor->log->warn("cannot scan '{}': {}", narrow(task.path.wstring()), ec.message());
     }
 
-    auto parent_presence = task.presence.get();
+    auto dir_presence = task.presence.get();
     auto buffer = std::array<std::byte, 1024 * 128>();
     auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
     auto allocator = allocator_t(&pool);
@@ -546,9 +546,9 @@ void folder_slave_t::post_process(fs::task::scan_dir_t &task, stack_context_t &c
         ++it_disk;
     }
 
-    if (parent_presence) {
+    if (dir_presence) {
         auto dirs_stack = dirs_stack_t(stack);
-        for (auto child : parent_presence->get_children()) {
+        for (auto child : dir_presence->get_children()) {
             auto features = child->get_features();
             if (features & F::local) {
                 auto filename = child->get_entity()->get_path()->get_own_name();
@@ -575,7 +575,7 @@ void folder_slave_t::post_process(fs::task::scan_dir_t &task, stack_context_t &c
 
         using queue_t = std::pmr::list<presentation::entity_t *>;
         auto queue = queue_t(allocator);
-        for (auto child_entity : parent_presence->get_entity()->get_children()) {
+        for (auto child_entity : dir_presence->get_entity()->get_children()) {
             auto filename = child_entity->get_path()->get_own_name();
             if (!checked_children.count(filename)) {
                 auto best = child_entity->get_best();
