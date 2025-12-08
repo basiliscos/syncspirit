@@ -285,8 +285,7 @@ void file_actor_t::process(payload::finish_file_t &cmd) noexcept {
     }
 
     cmd.result = outcome::success();
-    LOG_INFO(log, "file {} ({} bytes) is now locally available (refs: {})", path_str, cmd.file_size,
-             backend->use_count());
+    LOG_INFO(log, "file {} ({} bytes) is now locally available", path_str, cmd.file_size);
 }
 
 void file_actor_t::process(payload::append_block_t &cmd) noexcept {
