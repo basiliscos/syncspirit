@@ -18,7 +18,7 @@
 #include "test_supervisor.h"
 #include "access.h"
 #include "utils/platform.h"
-
+#include <format>
 #include <boost/nowide/convert.hpp>
 
 #ifndef SYNCSPIRIT_WIN
@@ -1876,6 +1876,30 @@ void test_concurrency() {
     F().run();
 }
 
+void test_races() {
+    static constexpr int N = 5;
+
+    struct F : fixture_t {
+        void main() noexcept override {
+            for (int i = 0; i < N; ++i) {
+                auto path = root_path / fmt::format("file-{}", i);
+                write_file(path, "12345");
+            }
+
+            SECTION("shutdown during I/O") {
+                auto diff = builder->scan_start(folder->get_id()).extract();
+                sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
+                target->do_shutdown();
+                sup->do_process();
+
+                CHECK(files->size() == 0);
+                CHECK(hasher->digested_blocks == 0);
+            }
+        }
+    };
+    F().run();
+}
+
 int _init() {
     test::init_logging();
     REGISTER_TEST_CASE(test_simple, "test_simple", "[net]");
@@ -1892,6 +1916,7 @@ int _init() {
     REGISTER_TEST_CASE(test_traversal, "test_traversal", "[net]");
     REGISTER_TEST_CASE(test_importing, "test_importing", "[net]");
     REGISTER_TEST_CASE(test_concurrency, "test_concurrency", "[net]");
+    REGISTER_TEST_CASE(test_races, "test_races", "[net]");
     return 1;
 }
 
