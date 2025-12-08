@@ -96,11 +96,10 @@ file_t &file_t::operator=(file_t &&other) noexcept {
 
 file_t::~file_t() {
     if (backend && file_size) {
-        auto log = utils::get_logger("fs.file");
-        log->warn("error closing file '{}' (changing modification time?)", path_str);
 
         auto result = close(0);
         if (!result) {
+            auto log = utils::get_logger("fs.file");
             auto &ec = result.assume_error();
             log->warn("error closing file '{}': {}", path_str, ec.message());
         }
@@ -127,10 +126,12 @@ auto file_t::close(int64_t modification_s, const bfs::path &local_name) noexcept
         orig_path = &path;
     }
 
-    auto modified = from_unix(modification_s);
-    bfs::last_write_time(*orig_path, modified, ec);
-    if (ec) {
-        return ec;
+    if (modification_s) {
+        auto modified = from_unix(modification_s);
+        bfs::last_write_time(*orig_path, modified, ec);
+        if (ec) {
+            return ec;
+        }
     }
 
     return outcome::success();
