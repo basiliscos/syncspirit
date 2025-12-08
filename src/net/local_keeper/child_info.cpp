@@ -55,6 +55,7 @@ auto child_info_t::serialize(const model::folder_info_t &local_folder, blocks_t 
     }
     if (type == proto::FileInfoType::SYMLINK) {
         proto::set_symlink_target(data, narrow(link_target.generic_wstring()));
+        proto::set_no_permissions(data, true);
     }
     return data;
 }

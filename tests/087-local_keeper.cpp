@@ -16,6 +16,7 @@
 #include "net/names.h"
 #include "test-utils.h"
 #include "test_supervisor.h"
+#include "access.h"
 #include "utils/platform.h"
 
 #include <boost/nowide/convert.hpp>
@@ -310,6 +311,10 @@ void test_simple() {
                     CHECK(bfs::create_directories(root_path / "abc"));
                     auto file_path = root_path / "abc" / "empty.file";
                     write_file(file_path, "");
+                    auto ingore_perms = GENERATE(0, 1);
+                    auto folder_data = static_cast<model::folder_data_t *>(folder.get());
+                    folder_data->access<test::to::ignore_permissions>() = (bool)ingore_perms;
+
                     builder->scan_start(folder->get_id()).apply(*sup);
 
                     auto file = files->by_name("abc/empty.file");
@@ -322,8 +327,13 @@ void test_simple() {
                     CHECK(blocks.size() == 0);
                     REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
 #ifndef SYNCSPIRIT_WIN
-                    CHECK(!file->has_no_permissions());
-                    CHECK(file->get_permissions() == static_cast<uint32_t>(bfs::status(file_path).permissions()));
+                    if (ingore_perms) {
+                        CHECK(file->has_no_permissions());
+                        CHECK(file->get_permissions() == 0666);
+                    } else {
+                        CHECK(!file->has_no_permissions());
+                        CHECK(file->get_permissions() == static_cast<uint32_t>(bfs::status(file_path).permissions()));
+                    }
 #else
                     CHECK(file->has_no_permissions());
                     CHECK(file->get_permissions() == 0666);
@@ -345,6 +355,7 @@ void test_simple() {
                     CHECK(file->get_block_size() == 0);
                     CHECK(file->get_size() == 0);
                     CHECK(file->get_link_target() == target);
+                    CHECK(file->has_no_permissions());
                     CHECK(blocks.size() == 0);
                     REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
                 }
@@ -523,6 +534,20 @@ void test_no_changes() {
                     CHECK(file_1.get() == file_2.get());
                     CHECK(file_1->is_local());
                     REQUIRE(blocks.size() == 1);
+
+#ifndef SYNCSPIRIT_WIN
+                    SECTION("changes on permissions are ignored") {
+                        proto::set_permissions(pr_file, perms - 1);
+                        proto::set_no_permissions(pr_file, true);
+                        builder->local_update(folder_id, pr_file).apply(*sup);
+                        auto seq_1 = file_1->get_sequence();
+                        builder->scan_start(folder_id).apply(*sup);
+                        bfs::permissions(path, bfs::perms::none);
+                        REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
+                        auto seq_2 = file_1->get_sequence();
+                        CHECK(seq_1 == seq_2);
+                    }
+#endif
                 }
 
 #ifndef SYNCSPIRIT_WIN

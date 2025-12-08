@@ -237,6 +237,7 @@ int folder_slave_t::process(unsuspend_scan_t &, stack_context_t &ctx) noexcept {
 
 int folder_slave_t::process(child_ready_t &info, stack_context_t &ctx) noexcept {
     using FT = proto::FileInfoType;
+    using namespace model::diff;
     bool emit_update = false;
     if (!info.self) {
         emit_update = true;
@@ -249,7 +250,8 @@ int folder_slave_t::process(child_ready_t &info, stack_context_t &ctx) noexcept 
             (type == FT::SYMLINK) || (type == FT::DIRECTORY) || (info.last_write_time == file.get_modified_s());
         if (modification_match) {
             if (type == model::file_info_t::as_type(file.get_type())) {
-                auto perms_match = ignore_permissions || info.perms == file.get_permissions();
+                auto ignore_perms = ignore_permissions || file.has_no_permissions();
+                auto perms_match = ignore_perms || info.perms == file.get_permissions();
                 if (perms_match) {
                     if (type == FT::SYMLINK) {
                         auto target = narrow(info.link_target.generic_wstring());
@@ -261,7 +263,6 @@ int folder_slave_t::process(child_ready_t &info, stack_context_t &ctx) noexcept 
             }
         }
         if (match) {
-            using namespace model::diff;
             ctx.push(new local::file_availability_t(&file, *context->local_folder));
         } else {
             if (info.size && info.blocks.empty()) {
@@ -276,8 +277,7 @@ int folder_slave_t::process(child_ready_t &info, stack_context_t &ctx) noexcept 
         auto folder = context->local_folder->get_folder();
         auto folder_id = folder->get_id();
         auto data = info.serialize(*context->local_folder, std::move(info.blocks), ignore_permissions);
-        ctx.push(
-            new model::diff::advance::local_update_t(*actor->cluster, *actor->sequencer, std::move(data), folder_id));
+        ctx.push(new advance::local_update_t(*actor->cluster, *actor->sequencer, std::move(data), folder_id));
     }
     return 1;
 }
