@@ -246,14 +246,15 @@ void test_remote_copy() {
             SECTION("non-empty regular file") {
                 proto::set_size(pr_fi, 5);
                 auto path = root_path / L"папка" / L"файл.txt";
+                write_file(path, "12345");
                 remote_copy(path, pr_fi).check_success();
 
                 auto tmp_path = path.parent_path() / (path.filename().wstring() + L".syncspirit-tmp");
-                REQUIRE(bfs::exists(tmp_path));
-                REQUIRE(bfs::file_size(tmp_path) == 5);
+                REQUIRE(!bfs::exists(tmp_path));
 
-#ifndef SYNCSPIRIT_WIN
                 auto status = bfs::status(path);
+                CHECK(to_unix(bfs::last_write_time(path)) == 1641828421);
+#ifndef SYNCSPIRIT_WIN
                 auto p = status.permissions();
                 CHECK((p & perms_t::owner_read) != perms_t::none);
                 CHECK((p & perms_t::owner_write) != perms_t::none);

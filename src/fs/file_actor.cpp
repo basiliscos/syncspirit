@@ -173,15 +173,7 @@ void file_actor_t::process(payload::remote_copy_t &cmd) noexcept {
         auto sz = cmd.size;
         bool temporal = sz > 0;
         if (temporal) {
-            LOG_TRACE(log, "touching file {} ({} bytes)", path.string(), sz);
-            auto file_opt = open_file_rw(path, sz);
-            if (!file_opt) {
-                auto &err = file_opt.assume_error();
-                LOG_ERROR(log, "cannot open file: {}: {}", path.string(), err.message());
-                cmd.result = err;
-                return;
-            }
-            path = file_opt.assume_value()->get_path();
+            LOG_TRACE(log, "touching existing file {} ({} bytes)", path.string(), sz);
         } else {
             LOG_TRACE(log, "touching empty file {}", path.string());
             auto out = utils::ofstream_t(path, utils::ofstream_t::trunc);
@@ -192,11 +184,11 @@ void file_actor_t::process(payload::remote_copy_t &cmd) noexcept {
                 return;
             }
             out.close();
-            bfs::last_write_time(path, from_unix(cmd.modification_s), ec);
-            if (ec) {
-                cmd.result = ec;
-                return;
-            }
+        }
+        bfs::last_write_time(path, from_unix(cmd.modification_s), ec);
+        if (ec) {
+            cmd.result = ec;
+            return;
         }
         set_perms = !cmd.no_permissions && utils::platform_t::permissions_supported(path);
     } else if (cmd.type == proto::FileInfoType::DIRECTORY) {
