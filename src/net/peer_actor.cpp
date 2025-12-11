@@ -208,6 +208,8 @@ void peer_actor_t::on_read(std::size_t bytes) noexcept {
     auto ptr = initial_ptr;
     auto size_left = rx_idx;
     bool read_next = true;
+    auto messages = payload::forwarded_messages_t();
+
     while (try_parse && size_left) {
         auto buff = utils::bytes_view_t(ptr, size_left);
         auto result = proto::parse_bep(buff);
@@ -222,7 +224,7 @@ void peer_actor_t::on_read(std::size_t bytes) noexcept {
         } else {
             ptr += value.consumed;
             size_left -= value.consumed;
-            read_next = try_parse = (this->*read_action)(std::move(value.message));
+            read_next = try_parse = (this->*read_action)(std::move(value.message), &messages);
         }
     }
 
@@ -240,6 +242,10 @@ void peer_actor_t::on_read(std::size_t bytes) noexcept {
         read_more();
     }
     had_reads = true;
+
+    if (messages.size() && controller) {
+        send<payload::forwarded_messages_t>(controller, std::move(messages));
+    }
 }
 
 void peer_actor_t::shutdown_start() noexcept {
@@ -313,11 +319,8 @@ void peer_actor_t::on_controller_up(message::controller_up_t &message) noexcept 
         controller = p.controller;
         tx_bytes_in_progress = p.tx_size;
 
-        while (!received_queue.empty()) {
-            auto &msg = received_queue.front();
-            auto fwd = payload::forwarded_message_t{std::move(msg)};
-            send<payload::forwarded_message_t>(controller, std::move(fwd));
-            received_queue.pop_front();
+        if (!received_queue.empty()) {
+            send<payload::forwarded_messages_t>(controller, std::move(received_queue));
         }
     }
 }
@@ -342,7 +345,7 @@ void peer_actor_t::on_transfer(message::transfer_data_t &message) noexcept {
     push_write(std::move(message.payload.data), false);
 }
 
-bool peer_actor_t::read_hello(proto::message::message_t &&msg) noexcept {
+bool peer_actor_t::read_hello(proto::message::message_t &&msg, void *) noexcept {
     LOG_TRACE(log, "read_hello");
     return std::visit(
         [&](auto &&msg) -> bool {
@@ -359,7 +362,7 @@ bool peer_actor_t::read_hello(proto::message::message_t &&msg) noexcept {
         msg);
 }
 
-bool peer_actor_t::read_controlled(proto::message::message_t &&msg) noexcept {
+bool peer_actor_t::read_controlled(proto::message::message_t &&msg, void *ctx) noexcept {
     using MT = proto::MessageType;
     LOG_TRACE(log, "read_controlled");
     auto type = MT::UNKNOWN;
@@ -379,8 +382,9 @@ bool peer_actor_t::read_controlled(proto::message::message_t &&msg) noexcept {
                 LOG_WARN(log, "on_message(DownloadProgress), not implemented");
             } else {
                 if (controller) {
-                    auto fwd = payload::forwarded_message_t{std::move(msg)};
-                    send<payload::forwarded_message_t>(controller, std::move(fwd));
+                    auto messages = static_cast<payload::forwarded_messages_t *>(ctx);
+                    auto bep_message = payload::forwarded_message_t{std::move(msg)};
+                    messages->emplace_back(std::move(bep_message));
                 } else {
                     received_queue.emplace_back(std::move(msg));
                 }

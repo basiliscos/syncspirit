@@ -106,7 +106,7 @@ struct fixture_t : private model::diff::cluster_visitor_t {
             plugin.template with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
                 using cluster_diff_ptr_t = r::intrusive_ptr_t<model::message::model_update_t>;
                 using cluster_diff_t = typename cluster_diff_ptr_t::element_type;
-                using forwarded_message_t = net::message::forwarded_message_t;
+                using forwarded_messages_t = net::message::forwarded_messages_t;
 
                 p.subscribe_actor(r::lambda<cluster_diff_t>([&](cluster_diff_t &msg) {
                     LOG_INFO(log, "received cluster diff message");
@@ -120,8 +120,10 @@ struct fixture_t : private model::diff::cluster_visitor_t {
                     std::ignore = diff->visit(*this, nullptr);
                 }));
 
-                p.subscribe_actor(r::lambda<forwarded_message_t>([&](forwarded_message_t &msg) {
-                    std::visit([this](auto &msg) { on_message(msg); }, msg.payload);
+                p.subscribe_actor(r::lambda<forwarded_messages_t>([&](forwarded_messages_t &msg) {
+                    for (auto &bep_msg : msg.payload) {
+                        std::visit([this](auto &msg) { on_message(msg); }, bep_msg);
+                    }
                 }));
             });
         };

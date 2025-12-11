@@ -205,7 +205,7 @@ using controller_predown_t = r::message_t<payload::controller_predown_t>;
 using controller_down_t = r::message_t<payload::controller_down_t>;
 using tx_signal_t = r::message_t<payload::tx_signal_t>;
 using peer_down_t = r::message_t<payload::peer_down_t>;
-using forwarded_message_t = r::message_t<payload::forwarded_message_t>;
+using forwarded_messages_t = r::message_t<payload::forwarded_messages_t>;
 using transfer_data_t = r::message_t<payload::transfer_data_t>;
 
 using connect_request_t = r::request_traits_t<payload::connect_request_t>::request::message_t;

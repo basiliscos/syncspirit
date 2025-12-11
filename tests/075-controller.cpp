@@ -198,10 +198,10 @@ struct fixture_t {
 
         if (auto_start) {
             REQUIRE(peer_actor->reading);
-            REQUIRE(peer_actor->messages.size() == 1);
-            auto &msg = (*peer_actor->messages.front()).payload;
+            REQUIRE(peer_actor->bep_messages.size() == 1);
+            auto &msg = peer_actor->bep_messages.front();
             REQUIRE(std::get_if<proto::ClusterConfig>(&msg));
-            peer_actor->messages.pop_front();
+            peer_actor->bep_messages.pop_front();
         }
         main(builder);
 
@@ -245,19 +245,19 @@ void test_startup() {
         using fixture_t::fixture_t;
         void main(diff_builder_t &) noexcept override {
             REQUIRE(peer_actor->reading);
-            REQUIRE(peer_actor->messages.size() == 1);
-            auto &msg = (*peer_actor->messages.front()).payload;
+            REQUIRE(peer_actor->bep_messages.size() == 1);
+            auto &msg = peer_actor->bep_messages.front();
             REQUIRE(std::get_if<proto::ClusterConfig>(&msg));
 
-            peer_actor->messages.pop_front();
-            CHECK(peer_actor->messages.empty());
+            peer_actor->bep_messages.pop_front();
+            CHECK(peer_actor->bep_messages.empty());
 
             auto cc = proto::ClusterConfig{};
             peer_actor->forward(std::move(cc));
             sup->do_process();
 
             CHECK(static_cast<r::actor_base_t *>(target.get())->access<to::state>() == r::state_t::OPERATIONAL);
-            CHECK(peer_actor->messages.empty());
+            CHECK(peer_actor->bep_messages.empty());
         }
     };
     F(false, 10, false).run();
@@ -268,18 +268,18 @@ void test_overwhelm() {
         using fixture_t::fixture_t;
 
         void main(diff_builder_t &) noexcept override {
-            auto msg = &(*peer_actor->messages.front()).payload;
+            auto msg = &peer_actor->bep_messages.front();
             REQUIRE(std::get_if<proto::ClusterConfig>(msg));
 
-            peer_actor->messages.pop_front();
-            CHECK(peer_actor->messages.empty());
+            peer_actor->bep_messages.pop_front();
+            CHECK(peer_actor->bep_messages.empty());
 
             auto cc = proto::ClusterConfig{};
             peer_actor->forward(cc);
             sup->do_process();
 
             CHECK(static_cast<r::actor_base_t *>(target.get())->access<to::state>() == r::state_t::OPERATIONAL);
-            CHECK(peer_actor->messages.empty());
+            CHECK(peer_actor->bep_messages.empty());
 
             auto ex_peer = peer_actor;
             auto ex_target = target;
@@ -292,16 +292,16 @@ void test_overwhelm() {
             CHECK(static_cast<r::actor_base_t *>(ex_peer.get())->access<to::state>() == r::state_t::SHUT_DOWN);
             CHECK(static_cast<r::actor_base_t *>(ex_target.get())->access<to::state>() == r::state_t::SHUT_DOWN);
 
-            msg = &(*peer_actor->messages.front()).payload;
+            msg = &peer_actor->bep_messages.front();
             REQUIRE(std::get_if<proto::ClusterConfig>(msg));
-            peer_actor->messages.pop_front();
+            peer_actor->bep_messages.pop_front();
 
             peer_actor->forward(std::move(cc));
             sup->do_process();
 
             CHECK(static_cast<r::actor_base_t *>(target.get())->access<to::state>() == r::state_t::OPERATIONAL);
             CHECK(static_cast<r::actor_base_t *>(peer_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
-            CHECK(peer_actor->messages.empty());
+            CHECK(peer_actor->bep_messages.empty());
         }
     };
     F(false, 10, false).run();
@@ -434,9 +434,9 @@ void test_index_sending() {
                 peer_actor->forward(cc);
                 sup->do_process();
 
-                auto &queue = peer_actor->messages;
+                auto &queue = peer_actor->bep_messages;
                 REQUIRE(queue.size() == 1);
-                auto msg = &(*queue.back()).payload;
+                auto msg = &(queue.back());
                 auto my_index_update = std::get_if<proto::Index>(msg);
                 REQUIRE(my_index_update);
                 REQUIRE(proto::get_files_size(*my_index_update) == 1);
@@ -451,9 +451,9 @@ void test_index_sending() {
                 peer_actor->forward(cc);
                 sup->do_process();
 
-                auto &queue = peer_actor->messages;
+                auto &queue = peer_actor->bep_messages;
                 REQUIRE(queue.size() == 1);
-                auto msg = &(*queue.back()).payload;
+                auto msg = &(queue.back());
                 auto my_index_update = std::get_if<proto::Index>(msg);
                 REQUIRE(my_index_update);
                 REQUIRE(proto::get_files_size(*my_index_update) == 1);
@@ -468,8 +468,7 @@ void test_index_sending() {
                 peer_actor->forward(cc);
                 sup->do_process();
 
-                auto &queue = peer_actor->messages;
-                REQUIRE(queue.size() == 0);
+                REQUIRE(peer_actor->bep_messages.size() == 0);
             }
         }
     };
@@ -543,10 +542,10 @@ void test_downloading() {
                 CHECK(f->is_locally_available());
                 CHECK(peer_actor->blocks_requested == 1);
 
-                auto &queue = peer_actor->messages;
+                auto &queue = peer_actor->bep_messages;
                 REQUIRE(queue.size() > 0);
 
-                auto msg = &(*queue.back()).payload;
+                auto msg = &queue.back();
                 auto &my_index_update = std::get<proto::Index>(*msg);
                 REQUIRE(proto::get_files_size(my_index_update) == 1);
 
@@ -1164,7 +1163,7 @@ void test_download_from_scratch() {
         void main(diff_builder_t &) noexcept override {
             cluster->modify_write_requests(10);
             sup->do_process();
-            peer_actor->messages.clear();
+            peer_actor->bep_messages.clear();
 
             auto builder = diff_builder_t(*cluster);
             auto sha256 = peer_device->device_id().get_sha256();
@@ -1189,9 +1188,9 @@ void test_download_from_scratch() {
             sup->do_process();
 
             builder.share_folder(sha256, folder_1->get_id()).apply(*sup);
-            REQUIRE(peer_actor->messages.size() == 1);
+            REQUIRE(peer_actor->bep_messages.size() == 1);
             {
-                auto peer_msg = &peer_actor->messages.front()->payload;
+                auto peer_msg = &peer_actor->bep_messages.front();
                 auto cc = std::get_if<proto::ClusterConfig>(peer_msg);
                 REQUIRE(cc);
                 REQUIRE(proto::get_folders_size(*cc) == 1);
@@ -1258,14 +1257,14 @@ void test_download_from_scratch() {
                 proto::set_index_id(device, fi_my->get_index());
             }
 
-            peer_actor->messages.clear();
+            peer_actor->bep_messages.clear();
             proto::add_folders(cc, folder);
             peer_actor->forward(cc);
             sup->do_process();
 
-            REQUIRE(peer_actor->messages.size() == 1);
+            REQUIRE(peer_actor->bep_messages.size() == 1);
             {
-                auto peer_msg = &peer_actor->messages.front()->payload;
+                auto peer_msg = &peer_actor->bep_messages.front();
                 REQUIRE(std::get_if<proto::Index>(peer_msg));
             }
             CHECK(sup->file_finishes.size() == 1);
@@ -1425,22 +1424,22 @@ void test_initiate_my_sharing() {
             REQUIRE(static_cast<r::actor_base_t *>(target.get())->access<to::state>() == r::state_t::OPERATIONAL);
             REQUIRE(static_cast<r::actor_base_t *>(peer_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
 
-            REQUIRE(peer_actor->messages.size() == 1);
-            auto peer_msg = &peer_actor->messages.front()->payload;
+            REQUIRE(peer_actor->bep_messages.size() == 1);
+            auto peer_msg = &peer_actor->bep_messages.front();
             auto peer_cluster_msg = std::get_if<proto::ClusterConfig>(peer_msg);
             REQUIRE(peer_cluster_msg);
             REQUIRE(proto::get_folders_size(*peer_cluster_msg) == 0);
 
             // share folder_1
-            peer_actor->messages.clear();
+            peer_actor->bep_messages.clear();
             auto sha256 = peer_device->device_id().get_sha256();
             diff_builder_t(*cluster).share_folder(sha256, folder_1->get_id()).apply(*sup);
 
             REQUIRE(static_cast<r::actor_base_t *>(target.get())->access<to::state>() == r::state_t::OPERATIONAL);
             REQUIRE(static_cast<r::actor_base_t *>(peer_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
-            REQUIRE(peer_actor->messages.size() == 1);
+            REQUIRE(peer_actor->bep_messages.size() == 1);
             {
-                auto peer_msg = &peer_actor->messages.front()->payload;
+                auto peer_msg = &peer_actor->bep_messages.front();
                 auto peer_cluster_msg = std::get_if<proto::ClusterConfig>(peer_msg);
                 REQUIRE((peer_cluster_msg && peer_cluster_msg));
                 auto &msg = *peer_cluster_msg;
@@ -1472,12 +1471,12 @@ void test_initiate_my_sharing() {
 
             // unshare folder_1
             auto peer_fi = folder_1->get_folder_infos().by_device(*peer_device);
-            peer_actor->messages.clear();
+            peer_actor->bep_messages.clear();
             diff_builder_t(*cluster).unshare_folder(*peer_fi).apply(*sup);
             REQUIRE(static_cast<r::actor_base_t *>(target.get())->access<to::state>() == r::state_t::OPERATIONAL);
             REQUIRE(static_cast<r::actor_base_t *>(peer_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
-            REQUIRE(peer_actor->messages.size() == 1);
-            peer_msg = &peer_actor->messages.front()->payload;
+            REQUIRE(peer_actor->bep_messages.size() == 1);
+            peer_msg = &peer_actor->bep_messages.front();
             peer_cluster_msg = std::get_if<proto::ClusterConfig>(peer_msg);
             REQUIRE(peer_cluster_msg);
             REQUIRE(proto::get_folders_size(*peer_cluster_msg) == 0);
@@ -1515,16 +1514,16 @@ void test_initiate_peer_sharing() {
             REQUIRE(static_cast<r::actor_base_t *>(target.get())->access<to::state>() == r::state_t::OPERATIONAL);
             REQUIRE(static_cast<r::actor_base_t *>(peer_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
 
-            REQUIRE(peer_actor->messages.size() == 1);
+            REQUIRE(peer_actor->bep_messages.size() == 1);
             {
-                auto peer_msg = &peer_actor->messages.front()->payload;
+                auto peer_msg = &peer_actor->bep_messages.front();
                 auto peer_cluster_msg = std::get_if<proto::ClusterConfig>(peer_msg);
                 REQUIRE(peer_cluster_msg);
                 REQUIRE(proto::get_folders_size(*peer_cluster_msg) == 0);
             }
 
             // share folder_1
-            peer_actor->messages.clear();
+            peer_actor->bep_messages.clear();
             auto sha256 = peer_device->device_id().get_sha256();
             diff_builder_t(*cluster).share_folder(sha256, folder_1->get_id()).apply(*sup);
 
@@ -1532,9 +1531,9 @@ void test_initiate_peer_sharing() {
             REQUIRE(static_cast<r::actor_base_t *>(peer_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
 
             auto folder_my = folder_1->get_folder_infos().by_device(*my_device);
-            REQUIRE(peer_actor->messages.size() == 1);
+            REQUIRE(peer_actor->bep_messages.size() == 1);
             {
-                auto peer_msg = &peer_actor->messages.front()->payload;
+                auto peer_msg = &peer_actor->bep_messages.front();
                 auto peer_cluster_msg = std::get_if<proto::ClusterConfig>(peer_msg);
                 REQUIRE((peer_cluster_msg && peer_cluster_msg));
 
@@ -1582,20 +1581,20 @@ void test_initiate_peer_sharing() {
 
             proto::add_folders(cc, folder);
             peer_actor->forward(cc);
-            peer_actor->messages.clear();
+            peer_actor->bep_messages.clear();
             sup->do_process();
 
-            CHECK(peer_actor->messages.size() == 0);
+            CHECK(peer_actor->bep_messages.size() == 0);
 
             // unshare folder_1
             auto peer_fi = folder_1->get_folder_infos().by_device(*peer_device);
-            peer_actor->messages.clear();
+            peer_actor->bep_messages.clear();
             diff_builder_t(*cluster).unshare_folder(*peer_fi).apply(*sup);
             REQUIRE(static_cast<r::actor_base_t *>(target.get())->access<to::state>() == r::state_t::OPERATIONAL);
             REQUIRE(static_cast<r::actor_base_t *>(peer_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
-            REQUIRE(peer_actor->messages.size() == 1);
+            REQUIRE(peer_actor->bep_messages.size() == 1);
             {
-                auto peer_msg = &peer_actor->messages.front()->payload;
+                auto peer_msg = &peer_actor->bep_messages.front();
                 auto peer_cluster_msg = std::get_if<proto::ClusterConfig>(peer_msg);
                 REQUIRE(peer_cluster_msg);
                 REQUIRE(proto::get_folders_size(*peer_cluster_msg) == 0);
@@ -1635,11 +1634,11 @@ void test_sending_index_updates() {
             auto pr_file = proto::FileInfo();
             proto::set_name(pr_file, "a.txt");
 
-            peer_actor->messages.clear();
+            peer_actor->bep_messages.clear();
             builder.local_update(folder_1->get_id(), pr_file).apply(*sup);
-            REQUIRE(peer_actor->messages.size() == 1);
-            auto &msg = peer_actor->messages.front();
-            auto &index_update = std::get<proto::Index>(msg->payload);
+            REQUIRE(peer_actor->bep_messages.size() == 1);
+            auto &msg = peer_actor->bep_messages.front();
+            auto &index_update = std::get<proto::Index>(msg);
             REQUIRE(proto::get_files_size(index_update) == 1);
             CHECK(proto::get_name(proto::get_files(index_update, 0)) == "a.txt");
         }
@@ -1978,7 +1977,7 @@ void test_conflicts() {
             auto index_update = proto::IndexUpdate{};
             proto::set_folder(index_update, folder_1->get_id());
 
-            peer_actor->messages.clear();
+            peer_actor->bep_messages.clear();
             sup->appended_blocks.clear();
             sup->file_finishes.clear();
             SECTION("local win") {
@@ -1995,7 +1994,7 @@ void test_conflicts() {
                 REQUIRE(local_seq == lf->get_sequence());
                 CHECK(cluster->get_blocks().size() == 2);
 
-                CHECK(peer_actor->messages.size() == 0);
+                CHECK(peer_actor->bep_messages.size() == 0);
                 CHECK(sup->appended_blocks.size() == 0);
                 CHECK(sup->file_finishes.size() == 0);
             }
@@ -2022,9 +2021,9 @@ void test_conflicts() {
 
                 CHECK(cluster->get_blocks().size() == 2);
 
-                auto &msg = peer_actor->messages.back();
-                REQUIRE(peer_actor->messages.size() == 1);
-                auto &index_update_sent = std::get<proto::IndexUpdate>(msg->payload);
+                auto &msg = peer_actor->bep_messages.back();
+                REQUIRE(peer_actor->bep_messages.size() == 1);
+                auto &index_update_sent = std::get<proto::IndexUpdate>(msg);
                 REQUIRE(proto::get_files_size(index_update_sent) == 2);
                 auto &f1 = proto::get_files(index_update_sent, 0);
                 auto &f2 = proto::get_files(index_update_sent, 1);
@@ -2068,9 +2067,9 @@ void test_conflicts() {
                 REQUIRE(file->iterate_blocks().get_total() == 0);
                 CHECK(cluster->get_blocks().size() == 1);
 
-                auto &msg = peer_actor->messages.back();
-                REQUIRE(peer_actor->messages.size() == 1);
-                auto &index_update_sent = std::get<proto::IndexUpdate>(msg->payload);
+                auto &msg = peer_actor->bep_messages.back();
+                REQUIRE(peer_actor->bep_messages.size() == 1);
+                auto &index_update_sent = std::get<proto::IndexUpdate>(msg);
                 REQUIRE(proto::get_files_size(index_update_sent) == 2);
                 auto &f1 = proto::get_files(index_update_sent, 0);
                 auto &f2 = proto::get_files(index_update_sent, 1);
@@ -2355,12 +2354,12 @@ void test_change_folder_type() {
 
                 builder.local_update(folder_1->get_id(), pr_file_1);
                 builder.apply(*sup);
-                REQUIRE(peer_actor->messages.size() >= 1);
-                auto &last_message = *peer_actor->messages.back();
-                auto &index_update_1 = std::get<proto::Index>(last_message.payload);
+                REQUIRE(peer_actor->bep_messages.size() >= 1);
+                auto &last_message = peer_actor->bep_messages.back();
+                auto &index_update_1 = std::get<proto::Index>(last_message);
                 CHECK(proto::get_files_size(index_update_1) == 1);
 
-                peer_actor->messages.clear();
+                peer_actor->bep_messages.clear();
                 proto::FileInfo pr_file_2;
                 auto file_name_2 = std::string_view("file-name.2");
                 proto::set_name(pr_file_2, file_name_2);
@@ -2368,9 +2367,9 @@ void test_change_folder_type() {
                 SECTION("folder type is kept as send/receive") {
                     builder.local_update(folder_1->get_id(), pr_file_1);
                     builder.apply(*sup);
-                    REQUIRE(peer_actor->messages.size() == 1);
-                    auto &last_message = *peer_actor->messages.back();
-                    auto &index_update_2 = std::get<proto::IndexUpdate>(last_message.payload);
+                    REQUIRE(peer_actor->bep_messages.size() == 1);
+                    auto &last_message = peer_actor->bep_messages.back();
+                    auto &index_update_2 = std::get<proto::IndexUpdate>(last_message);
                     CHECK(proto::get_files_size(index_update_2) == 1);
                 }
                 SECTION("folder type changed to send only") {
@@ -2380,15 +2379,15 @@ void test_change_folder_type() {
                     builder.upsert_folder(db_folder, folder_my->get_index()).apply(*sup);
 
                     builder.local_update(folder_1->get_id(), pr_file_1).apply(*sup);
-                    REQUIRE(peer_actor->messages.size() == 0);
+                    REQUIRE(peer_actor->bep_messages.size() == 0);
 
                     SECTION("folder type is send & receive again") {
                         db::set_folder_type(db_folder, db::FolderType::send_and_receive);
                         builder.upsert_folder(db_folder, folder_my->get_index()).apply(*sup);
 
-                        REQUIRE(peer_actor->messages.size() == 1);
-                        auto &last_message = *peer_actor->messages.back();
-                        auto &index = std::get<proto::Index>(last_message.payload);
+                        REQUIRE(peer_actor->bep_messages.size() == 1);
+                        auto &last_message = peer_actor->bep_messages.back();
+                        auto &index = std::get<proto::Index>(last_message);
                         CHECK(proto::get_files_size(index) == 1);
                     }
                 }

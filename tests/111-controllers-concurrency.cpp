@@ -264,14 +264,14 @@ void test_concurrent_downloading() {
 
             int index_updates[2] = {0, 0};
             for (size_t idx = 0; idx < 2; ++idx) {
-                for (auto &m : peer_actors[idx]->messages) {
-                    if (auto u = std::get_if<proto::IndexUpdate>(&m->payload); u) {
+                for (auto &m : peer_actors[idx]->bep_messages) {
+                    if (auto u = std::get_if<proto::IndexUpdate>(&m); u) {
                         ++index_updates[idx];
                         auto peer = peer_devices[idx];
                         auto &file = proto::get_files(*u, 0);
                         auto file_name = proto::get_name(file);
                         log->debug("{} got index update for '{}'", peer->device_id().get_short(), file_name);
-                    } else if (auto u = std::get_if<proto::Index>(&m->payload); u) {
+                    } else if (auto u = std::get_if<proto::Index>(&m); u) {
                         ++index_updates[idx];
                         auto peer = peer_devices[idx];
                         auto &file = proto::get_files(*u, 0);

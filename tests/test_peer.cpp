@@ -100,6 +100,7 @@ void test_peer_t::on_controller_predown(net::message::controller_predown_t &msg)
 void test_peer_t::on_transfer(net::message::transfer_data_t &message) noexcept {
     auto &data = message.payload.data;
     auto buff = utils::bytes_view_t(data);
+    auto messages = net::payload::forwarded_messages_t{};
     while (buff.size()) {
         auto result = proto::parse_bep(buff);
         auto &value = result.value();
@@ -129,17 +130,16 @@ void test_peer_t::on_transfer(net::message::transfer_data_t &message) noexcept {
             orig);
         LOG_TRACE(log, "on_transfer, bytes = {}, type = {}", sz, (int)type);
         if (has_variant) {
-            auto fwd_msg = new net::message::forwarded_message_t(address, std::move(variant));
-            messages.emplace_back(fwd_msg);
+            messages.emplace_back(variant);
+            bep_messages.emplace_back(variant);
         }
 
-        for (auto &msg : messages) {
-            auto &p = msg->payload;
-            if (auto m = std::get_if<proto::Index>(&p); m) {
+        for (auto &msg : bep_messages) {
+            if (auto m = std::get_if<proto::Index>(&msg); m) {
                 auto folder = proto::get_folder(*m);
                 allowed_index_updates.emplace(std::move(folder));
             }
-            if (auto m = std::get_if<proto::IndexUpdate>(&p); m) {
+            if (auto m = std::get_if<proto::IndexUpdate>(&msg); m) {
                 auto folder = std::string(proto::get_folder(*m));
                 if ((allowed_index_updates.count(folder) == 0) && !auto_share) {
                     LOG_WARN(log, "IndexUpdate w/o previously recevied index");
@@ -147,6 +147,10 @@ void test_peer_t::on_transfer(net::message::transfer_data_t &message) noexcept {
                 }
             }
         }
+    }
+    if (messages.size()) {
+        auto fwd_msg = new net::message::forwarded_messages_t(address, std::move(messages));
+        raw_messages.emplace_back(fwd_msg);
     }
 }
 
@@ -163,16 +167,18 @@ void test_peer_t::process_block_requests() noexcept {
         }
         return false;
     };
+    auto replies = net::payload::forwarded_messages_t();
     while (condition()) {
         auto &req = in_requests.front();
         auto &res = out_responses.front();
         auto res_id = proto::get_id(res);
         auto code = proto::get_code(res);
         log->debug("request & responce match by id '{}', replying..., code = {}", res_id, (int)code);
-        send<net::payload::forwarded_message_t>(controller, std::move(res));
+        replies.emplace_back(std::move(res));
         in_requests.pop_front();
         out_responses.pop_front();
     }
+    send<net::payload::forwarded_messages_t>(controller, std::move(replies));
 }
 
 void test_peer_t::push_response(proto::ErrorCode code, std::int32_t request_id) noexcept {
@@ -191,5 +197,6 @@ void test_peer_t::push_response(utils::bytes_view_t data, std::int32_t request_i
 }
 
 void test_peer_t::forward(net::payload::forwarded_message_t payload) noexcept {
-    send<net::payload::forwarded_message_t>(controller, std::move(payload));
+    auto msgs = net::payload::forwarded_messages_t{std::move(payload)};
+    send<net::payload::forwarded_messages_t>(controller, std::move(msgs));
 }

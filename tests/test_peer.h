@@ -67,8 +67,9 @@ struct SYNCSPIRIT_TEST_API test_peer_t : r::actor_base_t {
     using config_t = test_peer_config_t;
     template <typename Actor> using config_builder_t = test_peer_config_builder_t<Actor>;
 
-    using remote_message_t = r::intrusive_ptr_t<net::message::forwarded_message_t>;
+    using remote_message_t = r::intrusive_ptr_t<net::message::forwarded_messages_t>;
     using remote_messages_t = std::list<remote_message_t>;
+    using bep_messages_t = std::list<net::payload::forwarded_message_t>;
     using shutdown_start_callback_t = std::function<void()>;
 
     using allowed_index_updates_t = std::unordered_set<std::string>;
@@ -96,7 +97,8 @@ struct SYNCSPIRIT_TEST_API test_peer_t : r::actor_base_t {
     bool auto_share = false;
     model::cluster_ptr_t cluster;
     std::string url;
-    remote_messages_t messages;
+    remote_messages_t raw_messages;
+    bep_messages_t bep_messages;
     r::address_ptr_t coordinator;
     r::address_ptr_t controller;
     model::device_ptr_t peer_device;

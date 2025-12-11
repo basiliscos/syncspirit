@@ -182,7 +182,7 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     using block_requests_t = std::vector<fs::payload::extendended_context_prt_t>;
 
     void on_peer_down(message::peer_down_t &message) noexcept;
-    void on_forward(message::forwarded_message_t &message) noexcept;
+    void on_forward(message::forwarded_messages_t &message) noexcept;
 
     void on_digest(hasher::message::digest_t &res) noexcept;
     void preprocess_block(model::file_block_t &block, const model::folder_info_t &source_folder,

@@ -718,12 +718,14 @@ void controller_actor_t::preprocess_block(model::file_block_t &file_block, const
     }
 }
 
-void controller_actor_t::on_forward(message::forwarded_message_t &message) noexcept {
+void controller_actor_t::on_forward(message::forwarded_messages_t &message) noexcept {
     if (state != r::state_t::OPERATIONAL) {
         return;
     }
     auto stack_ctx = stack_context_t(*this);
-    std::visit([&](auto &msg) { on_message(msg, stack_ctx); }, message.payload);
+    for (auto &bep_msg : message.payload) {
+        std::visit([&](auto &msg) { on_message(msg, stack_ctx); }, bep_msg);
+    }
 }
 
 void controller_actor_t::on_model_update(model::message::model_update_t &message) noexcept {
