@@ -201,15 +201,17 @@ void C::folder_synchronization_t::start_fetching(model::block_info_t *block, sta
     blocks[block->get_hash()] = model::block_info_ptr_t(block);
 }
 
-void C::folder_synchronization_t::finish_fetching(utils::bytes_view_t hash, stack_context_t &context) noexcept {
+auto C::folder_synchronization_t::finish_fetching(utils::bytes_view_t hash, stack_context_t &context) noexcept
+    -> model::block_info_ptr_t {
     auto it = blocks.find(hash);
-    auto &block = *it->second;
-    block.unlock();
-    assert(!block.is_locked());
+    auto block = it->second;
+    block->unlock();
+    assert(!block->is_locked());
     blocks.erase(it);
     if (blocks.size() == 0 && synchronizing) {
         finish_sync(context);
     }
+    return block;
 }
 
 void C::folder_synchronization_t::start_sync(stack_context_t &context) noexcept {
@@ -472,10 +474,13 @@ OUTER:
             if (*block_iterator) {
                 auto file_block = block_iterator->next();
                 auto fi = &block_iterator->get_source_folder();
+                auto block = file_block.block();
                 if (!file_block.block()->is_locked()) {
                     preprocess_block(file_block, *fi, context);
                 } else {
-                    postponed_files[file->get_uuid()] = fi;
+                    auto b = model::block_info_ptr_t(const_cast<model::block_info_t *>(block));
+                    auto f = model::file_info_ptr_t(file_block.file());
+                    block_2_files.emplace(block_2_file_t{std::move(b), std::move(f)});
                 }
                 continue;
             } else {
@@ -485,16 +490,27 @@ OUTER:
             continue;
         }
         if (!block_iterator && !postponed_files.empty()) {
-            for (auto &[uuid, folder_info] : postponed_files) {
-                auto file = folder_info->get_file_infos().by_uuid(uuid);
+            for (auto it = postponed_files.begin(); it != postponed_files.end();) {
+                auto file = std::move(*it);
+                it = postponed_files.erase(it);
                 if (seen_files.count(file.get())) {
                     continue;
                 }
-                auto bi = model::block_iterator_ptr_t();
-                bi = new model::blocks_iterator_t(*file, *folder_info);
-                if (bi) {
-                    block_iterator = bi;
-                    goto OUTER;
+                auto folder_uuid = file->get_folder_uuid();
+                auto fi = (model::folder_info_t *)(nullptr);
+                for (auto fit : cluster->get_folders()) {
+                    fi = fit.item->get_folder_infos().by_uuid(folder_uuid).get();
+                    if (fi) {
+                        break;
+                    }
+                }
+                if (fi) {
+                    auto bi = model::block_iterator_ptr_t();
+                    bi = new model::blocks_iterator_t(*file, *fi);
+                    if (bi) {
+                        block_iterator = bi;
+                        goto OUTER;
+                    }
                 }
             }
         }
@@ -856,9 +872,11 @@ auto controller_actor_t::operator()(const model::diff::modify::remove_files_t &d
                     requesting_file = nullptr;
                 }
             }
+#if 0
             if (auto it = postponed_files.find(full_id); it != postponed_files.end()) {
                 postponed_files.erase(it);
             }
+#endif
             if (auto it = synchronizing_files.find(full_id); it != synchronizing_files.end()) {
                 it->second.forget(); // don't care about unlocking as the file is removed anyway
                 synchronizing_files.erase(it);
@@ -1337,7 +1355,13 @@ void controller_actor_t::acquire_block(const model::file_block_t &file_block, co
 void controller_actor_t::release_block(std::string_view folder_id, utils::bytes_view_t hash,
                                        stack_context_t &context) noexcept {
     LOG_TRACE(log, "release block '{}'", hash);
-    get_sync_info(folder_id).finish_fetching(hash, context);
+    auto block = get_sync_info(folder_id).finish_fetching(hash, context);
+    auto &block_proj = block_2_files.get<0>();
+    auto &file_proj = block_2_files.get<1>();
+    for (auto it = block_proj.find(block); it != block_proj.end();) {
+        postponed_files.emplace(it->file);
+        it = block_proj.erase(it);
+    }
 }
 
 void controller_actor_t::cancel_sync(model::file_info_t *file) noexcept {
@@ -1345,8 +1369,11 @@ void controller_actor_t::cancel_sync(model::file_info_t *file) noexcept {
         block_iterator.reset();
     }
     auto id = file->get_full_id();
-    if (auto it = postponed_files.find(id); it != postponed_files.end()) {
-        postponed_files.erase(it);
+    auto &block_proj = block_2_files.get<0>();
+    auto &file_proj = block_2_files.get<1>();
+    for (auto it = file_proj.find(file); it != file_proj.end();) {
+        // block_proj.erase(it->block);
+        it = file_proj.erase(it);
     }
     if (auto it = synchronizing_files.find(id); it != synchronizing_files.end()) {
         synchronizing_files.erase(it);

@@ -16,6 +16,9 @@
 #include "utils/log.h"
 #include "fs/messages.h"
 
+#include <boost/multi_index_container.hpp>
+#include <boost/multi_index/ordered_index.hpp>
+#include <boost/multi_index/member.hpp>
 #include <unordered_map>
 #include <optional>
 #include <list>
@@ -24,6 +27,7 @@ namespace syncspirit {
 namespace net {
 
 namespace bfs = std::filesystem;
+namespace mi = boost::multi_index;
 namespace outcome = boost::outcome_v2;
 
 struct controller_actor_config_t : r::actor_config_t {
@@ -150,6 +154,17 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     using peers_map_t = std::unordered_map<r::address_ptr_t, model::device_ptr_t>;
     using io_queue_t = std::list<fs::payload::io_command_t>;
 
+    struct block_2_file_t {
+        model::block_info_ptr_t block;
+        model::file_info_ptr_t file;
+    };
+
+    using block_2_files_t = mi::multi_index_container<
+        block_2_file_t,
+        mi::indexed_by<
+            mi::ordered_non_unique<mi::member<block_2_file_t, model::block_info_ptr_t, &block_2_file_t::block>>,
+            mi::ordered_non_unique<mi::member<block_2_file_t, model::file_info_ptr_t, &block_2_file_t::file>>>>;
+
     struct folder_synchronization_t {
         using block_set_t = std::unordered_map<utils::bytes_view_t, model::block_info_ptr_t>;
         folder_synchronization_t(controller_actor_t &controller, model::folder_t &folder) noexcept;
@@ -162,7 +177,7 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
         void reset() noexcept;
 
         void start_fetching(model::block_info_t *, stack_context_t &) noexcept;
-        void finish_fetching(utils::bytes_view_t hash, stack_context_t &) noexcept;
+        model::block_info_ptr_t finish_fetching(utils::bytes_view_t hash, stack_context_t &) noexcept;
 
         void start_sync(stack_context_t &) noexcept;
         void finish_sync(stack_context_t &) noexcept;
@@ -176,7 +191,7 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
 
     using synchronizing_folders_t = std::unordered_map<model::folder_ptr_t, folder_synchronization_t>;
     using synchronizing_files_t = std::unordered_map<utils::bytes_view_t, model::file_info_t::guard_t>;
-    using postponed_files_t = std::unordered_map<utils::bytes_view_t, const model::folder_info_t *>;
+    using postponed_files_t = std::unordered_set<model::file_info_ptr_t>;
     using updates_streamer_ptr_t = std::unique_ptr<model::updates_streamer_t>;
     using tx_size_ptr_t = payload::controller_up_t::tx_size_ptr_t;
     using block_requests_t = std::vector<fs::payload::extendended_context_prt_t>;
@@ -268,6 +283,7 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     synchronizing_folders_t synchronizing_folders;
     synchronizing_files_t synchronizing_files;
     postponed_files_t postponed_files;
+    block_2_files_t block_2_files;
     io_queue_t block_write_queue;
     io_queue_t block_read_queue;
     block_requests_t block_requests;
