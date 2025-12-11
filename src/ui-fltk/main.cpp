@@ -323,6 +323,7 @@ int app_main(app_context_t &app_ctx) {
                        .independent_threads(independent_threads)
                        .shutdown_flag(shutdown_flag, r::pt::millisec{50})
                        .bouncer_address(bouncer_actor->get_address())
+                       .poll_duration(r::pt::microsec{1})
                        .finish();
     // warm-up
     sup_net->do_process();
