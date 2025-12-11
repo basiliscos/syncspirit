@@ -1334,9 +1334,6 @@ void test_download_resuming() {
 
             target->do_shutdown();
             sup->do_process();
-            // auto fs_timer_id = sup->timers.back()->request_id;
-            // sup->do_invoke_timer(fs_timer_id);
-            // sup->do_process();
 
             CHECK(!folder_1->is_synchronizing());
             for (auto &it : cluster->get_blocks()) {
@@ -1345,7 +1342,16 @@ void test_download_resuming() {
 
             start_target();
             peer_actor->forward(cc);
-            peer_actor->push_response(data_2, 0);
+
+            SECTION("reconnect & download 2nd block") { peer_actor->push_response(data_2, 0); }
+
+            SECTION("mark peer block locally available => just flush unfinished") {
+                auto folder_peer = folder_1->get_folder_infos().by_device(*peer_device);
+                auto f_peer = folder_peer->get_file_infos().by_name(file_name);
+                f_peer->mark_local_available(1);
+
+                peer_actor->forward(cc);
+            }
             sup->do_process();
 
             auto folder_my = folder_1->get_folder_infos().by_device(*my_device);

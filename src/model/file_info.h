@@ -89,6 +89,7 @@ struct SYNCSPIRIT_API file_info_t {
 
         blocks_iterator_t &operator=(blocks_iterator_t &&) = default;
 
+        bool is_locally_available() noexcept;
         const block_info_t *next() noexcept;
         indexed_block_t current() const noexcept;
         std::uint32_t get_total() const noexcept;

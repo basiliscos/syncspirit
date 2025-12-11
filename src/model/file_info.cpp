@@ -103,6 +103,20 @@ void file_info_t::guard_t::forget() noexcept { folder_info = {}; }
 file_info_t::blocks_iterator_t::blocks_iterator_t(const file_info_t *file_, std::uint32_t start_index_) noexcept
     : file{file_}, next_index{start_index_} {}
 
+bool file_info_t::blocks_iterator_t::is_locally_available() noexcept {
+    bool r = file && file->is_file();
+    if (r) {
+        auto &blocks = file->content.file.blocks;
+        for (size_t i = 0; i < blocks.size() && r; ++i) {
+            auto ptr = reinterpret_cast<std::uintptr_t>(blocks[i]);
+            if (!(ptr & LOCAL_MASK)) {
+                r = false;
+            }
+        }
+    }
+    return r;
+}
+
 const block_info_t *file_info_t::blocks_iterator_t::next() noexcept {
     auto r = (const block_info_t *)(nullptr);
     if (file && file->is_file()) {

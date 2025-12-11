@@ -511,7 +511,20 @@ OUTER:
                 continue;
             }
             if (file->is_locally_available()) {
-                io_advance(action, *file, const_cast<model::folder_info_t &>(*peer_folder), context);
+                auto finalize = false;
+                auto &peer_f = const_cast<model::folder_info_t &>(*peer_folder);
+                if (is_unflushed(file, peer_f)) {
+                    LOG_DEBUG(log, "finalizing unfinished file '{}'", file->get_name()->get_full_name());
+                    auto guard = file->guard(*peer_folder);
+                    synchronizing_files[file->get_full_id()] = std::move(guard);
+                    auto &folder_infos = peer_f.get_folder()->get_folder_infos();
+                    auto &local_files = folder_infos.by_device(*cluster->get_device())->get_file_infos();
+                    auto filename = file->get_name()->get_full_name();
+                    auto local_file = local_files.by_name(filename);
+                    io_finish_file(local_file.get(), *file, peer_f, action, context);
+                } else {
+                    io_advance(action, *file, peer_f, context);
+                }
                 ++advances;
             } else if (file->get_size()) {
                 auto bi = model::block_iterator_ptr_t();
@@ -1340,4 +1353,14 @@ void controller_actor_t::cancel_sync(model::file_info_t *file) noexcept {
         }
         synchronizing_files.erase(it);
     }
+}
+
+bool controller_actor_t::is_unflushed(model::file_info_t *peer_file, model::folder_info_t &peer_folder) noexcept {
+    if (peer_file->is_file()) {
+        auto peer_blocks_it = peer_file->iterate_blocks(0);
+        if (peer_blocks_it.get_total() && peer_blocks_it.is_locally_available()) {
+            return true;
+        }
+    }
+    return false;
 }
