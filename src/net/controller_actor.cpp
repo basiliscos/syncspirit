@@ -856,13 +856,10 @@ auto controller_actor_t::operator()(const model::diff::modify::remove_files_t &d
                     requesting_file = nullptr;
                 }
             }
-            auto it = synchronizing_files.find(full_id);
-            if (it != synchronizing_files.end()) {
-                auto it_2 = postponed_files.find(full_id);
-                if (it_2 != postponed_files.end()) {
-                    postponed_files.erase(it_2);
-                }
-
+            if (auto it = postponed_files.find(full_id); it != postponed_files.end()) {
+                postponed_files.erase(it);
+            }
+            if (auto it = synchronizing_files.find(full_id); it != synchronizing_files.end()) {
                 it->second.forget(); // don't care about unlocking as the file is removed anyway
                 synchronizing_files.erase(it);
             }
@@ -1347,12 +1344,11 @@ void controller_actor_t::cancel_sync(model::file_info_t *file) noexcept {
     if (block_iterator && block_iterator->get_source() == file) {
         block_iterator.reset();
     }
-    auto it = synchronizing_files.find(file->get_full_id());
-    if (it != synchronizing_files.end()) {
-        auto it_2 = postponed_files.find(file->get_full_id());
-        if (it_2 != postponed_files.end()) {
-            postponed_files.erase(it_2);
-        }
+    auto id = file->get_full_id();
+    if (auto it = postponed_files.find(id); it != postponed_files.end()) {
+        postponed_files.erase(it);
+    }
+    if (auto it = synchronizing_files.find(id); it != synchronizing_files.end()) {
         synchronizing_files.erase(it);
     }
 }
