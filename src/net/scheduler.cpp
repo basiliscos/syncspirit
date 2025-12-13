@@ -163,7 +163,25 @@ void scheduler_t::on_timer(r::request_id_t, bool cancelled) noexcept {
     if (!cancelled) {
         auto &folder_id = schedule_option->folder_id;
         if (auto folder = cluster->get_folders().by_id(folder_id); folder) {
-            initiate_scan(folder->get_id());
+            bool do_scan = false;
+            auto last_scan = folder->get_scan_finish();
+            if (!last_scan.is_not_a_date_time()) {
+                auto interval = folder->get_rescan_interval();
+                if (interval <= 0) {
+                    interval = 1;
+                }
+                auto interval_s = r::pt::seconds{interval};
+                auto now = r::pt::microsec_clock::local_time();
+                auto passed = now - last_scan;
+                if (passed < interval_s) {
+                    scan_next_or_schedule();
+                } else {
+                    do_scan = true;
+                }
+            }
+            if (do_scan) {
+                initiate_scan(folder->get_id());
+            }
         }
     }
 }
