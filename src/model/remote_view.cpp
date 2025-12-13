@@ -24,7 +24,7 @@ void remote_view_map_t::push(const device_t &device, const folder_t &folder, std
     auto folder_id = std::string(folder.get_id());
     auto device_id = utils::bytes_t(device.device_id().get_sha256());
     auto key = details::remote_view_key_t(std::move(folder_id), std::move(device_id));
-    emplace(std::move(key), remote_view_t{index_id, max_sequence});
+    (*this)[key] = remote_view_t{index_id, max_sequence};
 }
 
 const remote_view_t *remote_view_map_t::get(const device_t &device, const folder_t &folder) const noexcept {

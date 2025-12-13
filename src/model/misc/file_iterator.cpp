@@ -111,6 +111,13 @@ auto file_iterator_t::next() noexcept -> result_t {
         auto &queue = fi.files_queue;
         auto do_scan = !folder->is_paused() && !folder->is_scheduled() && !folder->is_suspended() && !queue->empty();
 
+        if (do_scan) {
+            if (auto view = peer->get_remote_view_map().get(*peer, *folder); view) {
+                do_scan = view->max_sequence <= peer_folder.get_max_sequence();
+            } else {
+                do_scan = false;
+            }
+        }
         // check other files
         if (do_scan) {
             auto it = queue->begin();

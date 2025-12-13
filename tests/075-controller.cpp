@@ -326,11 +326,11 @@ void test_index_receiving() {
             }
 
             SECTION("index is applied") {
+                REQUIRE(cluster->get_pending_folders().size() == 0);
                 auto &folder = proto::add_folders(cc);
                 proto::set_id(folder, folder_1->get_id());
                 auto &d_peer = proto::add_devices(folder);
                 proto::set_id(d_peer, peer_device->device_id().get_sha256());
-                REQUIRE(cluster->get_pending_folders().size() == 0);
                 proto::set_max_sequence(d_peer, 10);
                 proto::set_index_id(d_peer, folder_1_peer->get_index());
                 peer_actor->forward(cc);
@@ -487,7 +487,7 @@ void test_downloading() {
             proto::set_id(folder, folder_1->get_id());
             auto d_peer = &proto::add_devices(folder);
             proto::set_id(*d_peer, peer_device->device_id().get_sha256());
-            proto::set_max_sequence(*d_peer, 10);
+            proto::set_max_sequence(*d_peer, 8);
             proto::set_index_id(*d_peer, folder_1_peer->get_index());
             auto &d_my = proto::add_devices(folder);
             proto::set_id(d_my, my_device->device_id().get_sha256());
@@ -503,7 +503,7 @@ void test_downloading() {
                 auto &file = proto::add_files(index);
                 proto::set_name(file, file_name);
                 proto::set_type(file, proto::FileInfoType::FILE);
-                proto::set_sequence(file, folder_1_peer->get_max_sequence() + 1);
+                proto::set_sequence(file, 10);
                 proto::set_size(file, 5);
                 proto::set_block_size(file, 5);
 
@@ -552,7 +552,7 @@ void test_downloading() {
                 SECTION("don't redownload file only if metadata has changed") {
                     auto index_update = proto::IndexUpdate{};
                     proto::set_folder(index_update, proto::get_folder(index));
-                    proto::set_sequence(file, folder_1_peer->get_max_sequence() + 1);
+                    proto::set_sequence(file, 11);
                     proto::set_value(counter, 2);
                     proto::add_files(index_update, file);
 
@@ -573,7 +573,7 @@ void test_downloading() {
                 auto file_1 = &proto::add_files(index);
                 proto::set_name(*file_1, file_name_1);
                 proto::set_type(*file_1, proto::FileInfoType::FILE);
-                proto::set_sequence(*file_1, folder_1_peer->get_max_sequence() + 1);
+                proto::set_sequence(*file_1, 9);
                 proto::set_size(*file_1, 5);
                 proto::set_block_size(*file_1, 5);
 
@@ -601,7 +601,7 @@ void test_downloading() {
                 auto file_2 = &proto::add_files(index);
                 proto::set_name(*file_2, file_name_2);
                 proto::set_type(*file_2, proto::FileInfoType::FILE);
-                proto::set_sequence(*file_2, folder_1_peer->get_max_sequence() + 2);
+                proto::set_sequence(*file_2, 10);
                 proto::set_size(*file_2, 5);
                 proto::set_block_size(*file_2, 5);
 
@@ -849,7 +849,7 @@ void test_downloading() {
                 auto &file = proto::add_files(index_update);
                 proto::set_name(file, file_name);
                 proto::set_type(file, proto::FileInfoType::FILE);
-                proto::set_sequence(file, folder_1_peer->get_max_sequence() + 1);
+                proto::set_sequence(file, 10);
                 proto::set_block_size(file, 5);
                 proto::set_size(file, 5);
 
@@ -891,7 +891,7 @@ void test_downloading() {
                 auto &file_1 = proto::add_files(index);
                 proto::set_name(file_1, file_name);
                 proto::set_type(file_1, proto::FileInfoType::FILE);
-                proto::set_sequence(file_1, folder_1_peer->get_max_sequence() + 1);
+                proto::set_sequence(file_1, 10);
                 proto::set_deleted(file_1, true);
 
                 auto &v_1 = proto::get_version(file_1);
@@ -909,7 +909,7 @@ void test_downloading() {
                 auto &file_2 = proto::add_files(index_update);
                 proto::set_name(file_2, file_name);
                 proto::set_type(file_2, proto::FileInfoType::FILE);
-                proto::set_sequence(file_2, folder_1_peer->get_max_sequence() + 1);
+                proto::set_sequence(file_2, 11);
                 proto::set_block_size(file_2, 5);
                 proto::set_size(file_2, 5);
 
@@ -947,7 +947,7 @@ void test_downloading() {
                 auto &file_1 = proto::add_files(index);
                 proto::set_name(file_1, file_name_1);
                 proto::set_type(file_1, proto::FileInfoType::FILE);
-                proto::set_sequence(file_1, folder_1_peer->get_max_sequence() + 1);
+                proto::set_sequence(file_1, 10);
                 proto::set_block_size(file_1, 5);
                 proto::set_size(file_1, 10);
 
