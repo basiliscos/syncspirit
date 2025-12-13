@@ -33,8 +33,8 @@ TEST_CASE("updates_streamer", "[model]") {
     auto folder = folders.by_id("1234-5678");
 
     auto add_remote = [&](std::uint64_t index, std::int64_t sequence) {
-        auto remote_folder = remote_folder_info_t::create(index, sequence, *peer_device, *folder).value();
-        peer_device->get_remote_folder_infos().put(remote_folder);
+        auto &views = peer_device->get_remote_view_map();
+        views.push(*my_device, *folder, index, sequence);
     };
 
     SECTION("trivial") {

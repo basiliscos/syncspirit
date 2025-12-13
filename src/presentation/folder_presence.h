@@ -4,6 +4,7 @@
 #pragma once
 
 #include "presence.h"
+#include "model/folder_info.h"
 #include "syncspirit-export.h"
 
 namespace syncspirit::presentation {

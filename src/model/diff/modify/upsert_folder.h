@@ -5,6 +5,7 @@
 
 #include "../cluster_diff.h"
 #include "model/device.h"
+#include "model/folder_info.h"
 #include "model/misc/sequencer.h"
 #include "proto/proto-fwd.hpp"
 

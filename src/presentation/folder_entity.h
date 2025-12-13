@@ -6,6 +6,7 @@
 #include "entity.h"
 #include "orphans.h"
 #include "model/file_info.h"
+#include "model/folder.h"
 
 namespace syncspirit::presentation {
 

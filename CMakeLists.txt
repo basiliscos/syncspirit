@@ -151,7 +151,6 @@ add_library(syncspirit_core
     src/model/diff/local/synchronization_finish.cpp
     src/model/diff/local/synchronization_start.cpp
     src/model/diff/modify/add_blocks.cpp
-    src/model/diff/modify/add_remote_folder_infos.cpp
     src/model/diff/modify/add_ignored_device.cpp
     src/model/diff/modify/add_pending_device.cpp
     src/model/diff/modify/add_pending_folders.cpp
@@ -177,6 +176,7 @@ add_library(syncspirit_core
     src/model/diff/peer/cluster_update.cpp
     src/model/diff/peer/rx_tx.cpp
     src/model/diff/peer/update_folder.cpp
+    src/model/diff/peer/update_remote_views.cpp
     src/model/misc/augmentation.cpp
     src/model/misc/block_iterator.cpp
     src/model/misc/error_code.cpp
@@ -202,7 +202,7 @@ add_library(syncspirit_core
     src/model/ignored_folder.cpp
     src/model/pending_device.cpp
     src/model/pending_folder.cpp
-    src/model/remote_folder_info.cpp
+    src/model/remote_view.cpp
     src/model/some_device.cpp
     src/model/version.cpp
     src/net/acceptor_actor.cpp

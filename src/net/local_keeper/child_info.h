@@ -4,6 +4,7 @@
 #pragma once
 
 #include "presentation/presence.h"
+#include "model/folder_info.h"
 #include "fs/task/scan_dir.h"
 #include <filesystem>
 #include <boost/system/error_code.hpp>

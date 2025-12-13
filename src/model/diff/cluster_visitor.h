@@ -44,12 +44,12 @@ struct SYNCSPIRIT_API cluster_visitor_t {
     virtual outcome::result<void> operator()(const peer::cluster_update_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const peer::rx_tx_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const peer::update_folder_t &, void *custom) noexcept;
+    virtual outcome::result<void> operator()(const peer::update_remote_views_t &, void *custom) noexcept;
 
     virtual outcome::result<void> operator()(const modify::add_blocks_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::add_ignored_device_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::add_pending_device_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::add_pending_folders_t &, void *custom) noexcept;
-    virtual outcome::result<void> operator()(const modify::add_remote_folder_infos_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::block_ack_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::mark_reachable_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const modify::remove_blocks_t &, void *custom) noexcept;

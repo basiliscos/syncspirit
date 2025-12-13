@@ -323,17 +323,17 @@ void controller_actor_t::send_cluster_config(stack_context_t &ctx) noexcept {
 
 void controller_actor_t::send_new_indices() noexcept {
     if (updates_streamer && peer_address) {
-        auto &remote_folders = peer->get_remote_folder_infos();
+        auto &remote_views = peer->get_remote_view_map();
         for (auto it : cluster->get_folders()) {
             auto &folder = *it.item;
             auto peer_folder = folder.is_shared_with(*peer);
             if (peer_folder) {
                 auto local_folder = folder.get_folder_infos().by_device(*cluster->get_device());
-                auto remote_folder = remote_folders.by_folder(folder);
-                if (remote_folder) {
-                    if (remote_folder->get_index() != local_folder->get_index()) {
+                auto remote_view = remote_views.get(*cluster->get_device(), folder);
+                if (remote_view) {
+                    if (remote_view->index_id != local_folder->get_index()) {
                         LOG_DEBUG(log, "peer still has wrong index for '{}' ({:#x} vs {:#x}), refreshing",
-                                  folder.get_id(), remote_folder->get_index(), local_folder->get_index());
+                                  folder.get_id(), remote_view->index_id, local_folder->get_index());
                         updates_streamer->on_remote_refresh();
                     }
                 }

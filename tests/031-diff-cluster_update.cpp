@@ -730,14 +730,14 @@ TEST_CASE("cluster update with remote folders (1)", "[model]") {
     auto &pr_peer = proto::add_devices(pr_folder);
     proto::set_id(pr_peer, peer_id_1.get_sha256());
     proto::set_name(pr_peer, peer_device->get_name());
-    proto::set_max_sequence(pr_peer, 123456u);
-    proto::set_index_id(pr_peer, 7u);
+    proto::set_index_id(pr_peer, 123456u);
+    proto::set_max_sequence(pr_peer, 7u);
 
     auto &pr_peer_my = proto::add_devices(pr_folder);
     proto::set_id(pr_peer_my, my_id.get_sha256());
     proto::set_name(pr_peer_my, my_device->get_name());
-    proto::set_max_sequence(pr_peer_my, 3);
     proto::set_index_id(pr_peer_my, 5ul);
+    proto::set_max_sequence(pr_peer_my, 3);
 
     auto diff_opt = diff::peer::cluster_update_t::create({}, *cluster, *sequencer, *peer_device, *cc);
     REQUIRE(diff_opt);
@@ -745,10 +745,17 @@ TEST_CASE("cluster update with remote folders (1)", "[model]") {
     auto opt = diff_opt.value()->apply(*controller, {});
     REQUIRE(opt);
 
-    auto remote_folder = peer_device->get_remote_folder_infos().by_folder(*folder);
-    REQUIRE(remote_folder);
-    CHECK(remote_folder->get_index() == 5ul);
-    CHECK(remote_folder->get_max_sequence() == 3);
+    auto remote_views = peer_device->get_remote_view_map();
+    REQUIRE(remote_views.size() == 2);
+    auto view_peer = remote_views.get(*peer_device, *folder);
+    REQUIRE(view_peer);
+    CHECK(view_peer->index_id == 123456u);
+    CHECK(view_peer->max_sequence == 7);
+
+    auto view_local = remote_views.get(*my_device, *folder);
+    REQUIRE(view_local);
+    CHECK(view_local->index_id == 5u);
+    CHECK(view_local->max_sequence == 3);
 
     SECTION("unshare by peer") {
         auto cc = std::make_unique<proto::ClusterConfig>();
@@ -758,7 +765,7 @@ TEST_CASE("cluster update with remote folders (1)", "[model]") {
         auto &diff = diff_opt.value();
         REQUIRE(diff->apply(*controller, {}));
 
-        CHECK(peer_device->get_remote_folder_infos().size() == 0);
+        CHECK(peer_device->get_remote_view_map().size() == 0);
         auto fi = folder->get_folder_infos().by_device(*peer_device);
         // we are still sharing the folder with peer
         CHECK(fi);

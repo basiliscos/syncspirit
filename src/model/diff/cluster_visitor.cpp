@@ -31,7 +31,6 @@
 #include "modify/add_ignored_device.h"
 #include "modify/add_pending_device.h"
 #include "modify/add_pending_folders.h"
-#include "modify/add_remote_folder_infos.h"
 #include "modify/block_ack.h"
 #include "modify/mark_reachable.h"
 #include "modify/remove_blocks.h"
@@ -52,6 +51,7 @@
 #include "peer/cluster_update.h"
 #include "peer/rx_tx.h"
 #include "peer/update_folder.h"
+#include "peer/update_remote_views.h"
 
 using namespace syncspirit::model::diff;
 
@@ -179,6 +179,11 @@ auto cluster_visitor_t::operator()(const peer::update_folder_t &diff, void *cust
     return diff.visit_next(*this, custom);
 }
 
+auto cluster_visitor_t::operator()(const peer::update_remote_views_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    return diff.visit_next(*this, custom);
+}
+
 auto cluster_visitor_t::operator()(const local::blocks_availability_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     return diff.visit_next(*this, custom);
@@ -194,11 +199,6 @@ auto cluster_visitor_t::operator()(const modify::upsert_folder_t &diff, void *cu
 }
 
 auto cluster_visitor_t::operator()(const modify::add_blocks_t &diff, void *custom) noexcept -> outcome::result<void> {
-    return diff.visit_next(*this, custom);
-}
-
-auto cluster_visitor_t::operator()(const modify::add_remote_folder_infos_t &diff, void *custom) noexcept
-    -> outcome::result<void> {
     return diff.visit_next(*this, custom);
 }
 

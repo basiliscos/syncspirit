@@ -5,7 +5,6 @@
 #include "model/cluster.h"
 #include "model/misc/error_code.h"
 #include "model/diff/cluster_visitor.h"
-#include "add_remote_folder_infos.h"
 #include "remove_pending_folders.h"
 #include "upsert_folder_info.h"
 #include "utils/format.hpp"
@@ -42,17 +41,12 @@ share_folder_t::share_folder_t(const bu::uuid &uuid, const model::device_t &peer
     LOG_DEBUG(log, "share_folder_t, with peer = {}, folder_id = {}", peer.device_id(), folder_id);
     auto current = assign_child(new upsert_folder_info_t(uuid, peer.device_id(), introducer, folder_id, index_id));
     if (pf) {
-        using container_t = typename add_remote_folder_infos_t::container_t;
-        using item_t = typename container_t::value_type;
         auto keys = remove_pending_folders_t::keys_t{};
         auto key = pf->get_key();
         auto bytes = utils::bytes_t(key.begin(), key.end());
         keys.emplace_back(std::move(bytes));
         auto diff = cluster_diff_ptr_t{};
         current = current->assign_sibling(new remove_pending_folders_t(std::move(keys)));
-
-        auto remote_folders = container_t{{item_t{folder_id, index_id, 0}}};
-        current = current->assign_sibling(new add_remote_folder_infos_t(peer, std::move(remote_folders)));
     }
 }
 

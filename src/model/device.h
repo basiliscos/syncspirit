@@ -7,7 +7,7 @@
 #include "misc/map.hpp"
 #include "device_id.h"
 #include "device_state.h"
-#include "remote_folder_info.h"
+#include "remote_view.h"
 #include "utils/uri.h"
 #include "utils/bytes.h"
 #include "syncspirit-export.h"
@@ -58,7 +58,7 @@ struct SYNCSPIRIT_API device_t : augmentable_t {
     inline bool has_auto_accept() const noexcept { return auto_accept; }
     inline bool is_paused() const noexcept { return paused; }
     inline bool get_skip_introduction_removals() const noexcept { return skip_introduction_removals; }
-    inline auto &get_remote_folder_infos() noexcept { return remote_folder_infos; }
+    inline auto &get_remote_view_map() noexcept { return remote_view_map; }
     inline const pt::ptime &get_last_seen() const noexcept { return last_seen; }
 
     inline const uris_t &get_uris() const noexcept { return uris; }
@@ -98,7 +98,7 @@ struct SYNCSPIRIT_API device_t : augmentable_t {
 
     file_iterator_ptr_t iterator;
 
-    remote_folder_infos_map_t remote_folder_infos;
+    remote_view_map_t remote_view_map;
     pt::ptime last_seen;
     std::size_t rx_bytes;
     std::size_t tx_bytes;
