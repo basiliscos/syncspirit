@@ -12,7 +12,7 @@ namespace syncspirit::model::diff::peer {
 struct SYNCSPIRIT_API update_remote_views_t final : cluster_diff_t {
     struct item_t {
         std::string folder_id;
-        utils::bytes_t device_id;
+        model::device_id_t device_id;
         std::uint64_t index_id;
         std::int64_t max_sequence;
     };

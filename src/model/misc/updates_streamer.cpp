@@ -17,6 +17,7 @@ void updates_streamer_t::refresh_remote() noexcept {
     auto &remote_views = peer->get_remote_view_map();
     auto streaming_folder = (model::folder_info_t *)(nullptr);
     auto prev_seen = std::move(seen_info);
+    auto self_sha256 = cluster.get_device()->device_id().get_sha256();
     seen_info = {};
     for (auto &it : folders) {
         auto &folder = *it.item;
@@ -27,7 +28,7 @@ void updates_streamer_t::refresh_remote() noexcept {
                 if (streaming && streaming->folder_info == local_folder) {
                     streaming_folder = local_folder.get();
                 }
-                auto remote_view = remote_views.get(*cluster.get_device(), folder);
+                auto remote_view = remote_views.get(self_sha256, folder.get_id());
                 if (remote_view) {
                     auto index_match = remote_view->index_id == local_folder->get_index();
                     auto remote_max = index_match ? remote_view->max_sequence : 0;
@@ -42,7 +43,7 @@ void updates_streamer_t::refresh_remote() noexcept {
         streaming.reset();
     } else if (streaming_folder) {
         auto &folder = *streaming_folder->get_folder();
-        auto remote_view = remote_views.get(*cluster.get_device(), folder);
+        auto remote_view = remote_views.get(self_sha256, folder.get_id());
         if (remote_view) {
             if (remote_view->index_id != streaming_folder->get_index()) {
                 streaming.reset();

@@ -11,9 +11,6 @@
 
 namespace syncspirit::model {
 
-struct device_t;
-struct folder_t;
-
 struct remote_view_t {
     std::uint64_t index_id;
     std::int64_t max_sequence;
@@ -50,8 +47,9 @@ using remote_view_map_base_t =
 } // namespace details
 
 struct SYNCSPIRIT_API remote_view_map_t : details::remote_view_map_base_t {
-    void push(const device_t &, const folder_t &, std::uint64_t index_id, std::int64_t max_sequence) noexcept;
-    const remote_view_t *get(const device_t &, const folder_t &) const noexcept;
+    void push(utils::bytes_view_t device_id, std::string_view folder_id, std::uint64_t index_id,
+              std::int64_t max_sequence) noexcept;
+    const remote_view_t *get(utils::bytes_view_t device_id, std::string_view folder_id) const noexcept;
 };
 
 } // namespace syncspirit::model

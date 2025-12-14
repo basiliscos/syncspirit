@@ -328,8 +328,10 @@ void controller_actor_t::send_new_indices() noexcept {
             auto &folder = *it.item;
             auto peer_folder = folder.is_shared_with(*peer);
             if (peer_folder) {
-                auto local_folder = folder.get_folder_infos().by_device(*cluster->get_device());
-                auto remote_view = remote_views.get(*cluster->get_device(), folder);
+                auto &local_device = *cluster->get_device();
+                auto local_folder = folder.get_folder_infos().by_device(local_device);
+                auto local_sha256 = local_device.device_id().get_sha256();
+                auto remote_view = remote_views.get(local_sha256, folder.get_id());
                 if (remote_view) {
                     if (remote_view->index_id != local_folder->get_index()) {
                         LOG_DEBUG(log, "peer still has wrong index for '{}' ({:#x} vs {:#x}), refreshing",

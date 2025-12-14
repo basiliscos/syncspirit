@@ -34,7 +34,7 @@ TEST_CASE("updates_streamer", "[model]") {
 
     auto add_remote = [&](std::uint64_t index, std::int64_t sequence) {
         auto &views = peer_device->get_remote_view_map();
-        views.push(*my_device, *folder, index, sequence);
+        views.push(my_id.get_sha256(), folder->get_id(), index, sequence);
     };
 
     SECTION("trivial") {

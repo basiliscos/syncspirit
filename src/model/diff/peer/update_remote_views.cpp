@@ -24,13 +24,10 @@ auto update_remote_views_t::apply_impl(apply_controller_t &controller, void *cus
     auto &folders = cluster.get_folders();
     auto &devices = cluster.get_devices();
     for (auto &item : container) {
-        auto folder = folders.by_id(item.folder_id);
-        auto device = devices.by_sha256(item.device_id);
-        if (folder && device) {
-            views.push(*device, *folder, item.index_id, item.max_sequence);
-            LOG_TRACE(log, "'{}' update remote view of folder '{}' to max seq. {}", device->device_id().get_short(),
-                      folder->get_id(), item.max_sequence);
-        }
+        auto &d = item.device_id;
+        views.push(d.get_sha256(), item.folder_id, item.index_id, item.max_sequence);
+        LOG_TRACE(log, "'{}' update remote view of folder '{}' to max seq. {}", d.get_short(), item.folder_id,
+                  item.max_sequence);
     }
     return applicator_t::apply_sibling(controller, custom);
 }

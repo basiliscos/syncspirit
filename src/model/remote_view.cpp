@@ -2,8 +2,6 @@
 // SPDX-FileCopyrightText: 2025 Ivan Baidakou
 
 #include "remote_view.h"
-#include "device.h"
-#include "folder.h"
 
 using namespace syncspirit;
 using namespace syncspirit::model;
@@ -19,16 +17,16 @@ std::size_t remote_view_key_hash_t::operator()(const remote_view_key_t &key) con
 
 std::size_t remote_view_key_hash_t::operator()(const transient_view_key_t &key) const noexcept { return get_hash(key); }
 
-void remote_view_map_t::push(const device_t &device, const folder_t &folder, std::uint64_t index_id,
+void remote_view_map_t::push(utils::bytes_view_t device_id, std::string_view folder_id, std::uint64_t index_id,
                              std::int64_t max_sequence) noexcept {
-    auto folder_id = std::string(folder.get_id());
-    auto device_id = utils::bytes_t(device.device_id().get_sha256());
-    auto key = details::remote_view_key_t(std::move(folder_id), std::move(device_id));
+    auto f = std::string(folder_id);
+    auto d = utils::bytes_t(device_id);
+    auto key = details::remote_view_key_t(std::move(f), std::move(d));
     (*this)[key] = remote_view_t{index_id, max_sequence};
 }
 
-const remote_view_t *remote_view_map_t::get(const device_t &device, const folder_t &folder) const noexcept {
-    auto key = details::transient_view_key_t{folder.get_id(), device.device_id().get_sha256()};
+const remote_view_t *remote_view_map_t::get(utils::bytes_view_t device_id, std::string_view folder_id) const noexcept {
+    auto key = details::transient_view_key_t{folder_id, device_id};
     auto it = find(key);
     if (it != end()) {
         return &it->second;

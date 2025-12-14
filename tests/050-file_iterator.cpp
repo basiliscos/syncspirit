@@ -54,7 +54,7 @@ TEST_CASE("file iterator, single folder", "[model]") {
 
     auto &views = peer_device->get_remote_view_map();
     // local seq is always "fresh"
-    views.push(*peer_device, *folder, peer_folder->get_index(), -1);
+    views.push(peer_id.get_sha256(), folder->get_id(), peer_folder->get_index(), -1);
 
     SECTION("cloning (empty files)") {
         SECTION("1 file") {
@@ -71,7 +71,7 @@ TEST_CASE("file iterator, single folder", "[model]") {
                     REQUIRE(ec);
 
                     SECTION("local max sequence is outdated") {
-                        views.push(*peer_device, *folder, peer_folder->get_index(), 100);
+                        views.push(peer_id.get_sha256(), folder->get_id(), peer_folder->get_index(), 100);
                         auto [f, fi, action] = file_iterator->next();
                         REQUIRE(!f);
                     }

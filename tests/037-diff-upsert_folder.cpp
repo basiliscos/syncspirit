@@ -67,7 +67,8 @@ TEST_CASE("folder upsert", "[model]") {
     auto peer_folder = folder_infos->by_device(*peer_device);
     REQUIRE(index.finish().apply());
 
-    peer_device->get_remote_view_map().push(*peer_device, *folder, peer_folder->get_index(), sequence - 1);
+    peer_device->get_remote_view_map().push(peer_id.get_sha256(), folder->get_id(), peer_folder->get_index(),
+                                            sequence - 1);
 
     auto file_iterator = peer_device->create_iterator(*cluster);
     auto names = names_t();

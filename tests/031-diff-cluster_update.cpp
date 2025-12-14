@@ -107,6 +107,10 @@ TEST_CASE("cluster update, new folder", "[model]") {
         CHECK(uf->get_max_sequence() == 10);
         CHECK(uf->get_index() == 22ul);
 
+        auto &remote_views = peer_device->get_remote_view_map();
+        CHECK(remote_views.size() == 1);
+        // auto v = remote_views.get(*peer_device, )
+
         // no changes
         db::PendingFolder db_pf;
         auto &mf = db::get_folder(db_pf);
@@ -747,12 +751,12 @@ TEST_CASE("cluster update with remote folders (1)", "[model]") {
 
     auto remote_views = peer_device->get_remote_view_map();
     REQUIRE(remote_views.size() == 2);
-    auto view_peer = remote_views.get(*peer_device, *folder);
+    auto view_peer = remote_views.get(peer_device->device_id().get_sha256(), folder->get_id());
     REQUIRE(view_peer);
     CHECK(view_peer->index_id == 123456u);
     CHECK(view_peer->max_sequence == 7);
 
-    auto view_local = remote_views.get(*my_device, *folder);
+    auto view_local = remote_views.get(my_device->device_id().get_sha256(), folder->get_id());
     REQUIRE(view_local);
     CHECK(view_local->index_id == 5u);
     CHECK(view_local->max_sequence == 3);

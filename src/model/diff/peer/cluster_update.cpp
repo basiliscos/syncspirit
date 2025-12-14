@@ -290,7 +290,7 @@ cluster_update_t::cluster_update_t(const bfs::path &default_path, const cluster_
                 continue;
             }
 
-            auto view = view_t{std::string(folder_id), utils::bytes_t(device_sha), index_id, max_sequence};
+            auto view = view_t{std::string(folder_id), device_id, index_id, max_sequence};
             remote_views.emplace_back(std::move(view));
 
             if (device.get() == cluster.get_device()) {
