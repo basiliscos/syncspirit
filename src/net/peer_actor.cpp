@@ -189,6 +189,9 @@ void peer_actor_t::on_write(std::size_t sz) noexcept {
             resources->release(resource::finalization);
         }
         cancel_io();
+        if (ping_timer_request) {
+            cancel_timer(*ping_timer_request);
+        }
     } else {
         tx_item.reset();
         process_tx_queue();
@@ -257,10 +260,12 @@ void peer_actor_t::shutdown_start() noexcept {
 
     resources->acquire(resource::finalization);
     if (ping_timer_request) {
-        auto timeout = shutdown_timeout * 8 / 9;
         cancel_timer(*ping_timer_request);
-        ping_timer_request = start_timer(timeout, *this, &peer_actor_t::on_ping_timeout);
-        resources->acquire(resource::ping_timer);
+        if (!finished) {
+            auto timeout = shutdown_timeout * 8 / 9;
+            ping_timer_request = start_timer(timeout, *this, &peer_actor_t::on_ping_timeout);
+            resources->acquire(resource::ping_timer);
+        }
     }
 
     proto::Close close;
