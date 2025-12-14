@@ -387,6 +387,13 @@ void hasher_threads_t::reflect_to(syncspirit::config::main_t &main) { main.hashe
 
 const char *hasher_threads_t::explanation_ = "amount cpu cores used for hashing";
 
+poll_timeout_t::poll_timeout_t(std::uint64_t value, std::uint64_t default_value)
+    : parent_t("poll_timeout", explanation_, value, default_value) {}
+
+void poll_timeout_t::reflect_to(syncspirit::config::main_t &main) { main.poll_timeout = native_value; }
+
+const char *poll_timeout_t::explanation_ = "amount of microseconds of spin-lock polling (0 to save CPU)";
+
 timeout_t::timeout_t(std::uint64_t value, std::uint64_t default_value)
     : parent_t("timeout", explanation_, value, default_value) {}
 

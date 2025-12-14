@@ -253,6 +253,7 @@ int app_main(app_context_t &app_ctx) {
     }
     auto &cfg = cfg_option.value();
     logger->trace("configuration seems OK, timeout = {}ms", cfg.timeout);
+    auto poll_timeout = r::pt::milliseconds{cfg.poll_timeout};
 
     // override default
     if (log_level) {
@@ -323,7 +324,7 @@ int app_main(app_context_t &app_ctx) {
                        .independent_threads(independent_threads)
                        .shutdown_flag(shutdown_flag, r::pt::millisec{50})
                        .bouncer_address(bouncer_actor->get_address())
-                       .poll_duration(r::pt::microsec{1})
+                       .poll_duration(poll_timeout)
                        .finish();
     // warm-up
     sup_net->do_process();
@@ -349,7 +350,7 @@ int app_main(app_context_t &app_ctx) {
         hasher_ctxs.push_back(new thread_sys_context_t{});
         auto &ctx = hasher_ctxs.back();
         auto sup = ctx->create_supervisor<hasher::hasher_supervisor_t>()
-                       .poll_duration(r::pt::microsec{1})
+                       .poll_duration(poll_timeout)
                        .timeout(timeout * 8 / 9)
                        .registry_address(sup_net->get_registry_address())
                        .index(i)
@@ -363,6 +364,7 @@ int app_main(app_context_t &app_ctx) {
     auto fltk_ctx = rf::system_context_ptr_t(new fltk_context_t());
     auto sup_fltk = fltk_ctx->create_supervisor<fltk::app_supervisor_t>()
                         .log_sink(app_ctx.im_memory_sink)
+                        .poll_duration(poll_timeout)
                         .config_path(config_file_path)
                         .app_config(cfg)
                         .timeout(timeout)
@@ -376,7 +378,7 @@ int app_main(app_context_t &app_ctx) {
     thread_sys_context_t fs_context;
     auto fs_sup = fs_context.create_supervisor<syncspirit::fs::fs_supervisor_t>()
                       .timeout(timeout)
-                      .poll_duration(r::pt::microsec{1})
+                      .poll_duration(poll_timeout)
                       .registry_address(sup_net->get_registry_address())
                       .fs_config(cfg.fs_config)
                       .hasher_threads(cfg.hasher_threads)

@@ -62,7 +62,8 @@ bool operator==(const main_t &lhs, const main_t &rhs) noexcept {
            lhs.global_announce_config == rhs.global_announce_config && lhs.bep_config == rhs.bep_config &&
            lhs.db_config == rhs.db_config && lhs.timeout == rhs.timeout && lhs.device_name == rhs.device_name &&
            lhs.config_path == rhs.config_path && lhs.log_configs == rhs.log_configs && lhs.cert_file == rhs.cert_file &&
-           lhs.key_file == rhs.key_file && lhs.hasher_threads == rhs.hasher_threads;
+           lhs.key_file == rhs.key_file && lhs.hasher_threads == rhs.hasher_threads &&
+           lhs.poll_timeout == rhs.poll_timeout;
 }
 
 } // namespace syncspirit::config

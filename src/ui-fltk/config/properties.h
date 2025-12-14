@@ -394,6 +394,15 @@ struct hasher_threads_t final : impl::positive_integer_t {
     void reflect_to(syncspirit::config::main_t &main) override;
 };
 
+struct poll_timeout_t final : impl::positive_integer_t {
+    using parent_t = impl::positive_integer_t;
+
+    static const char *explanation_;
+
+    poll_timeout_t(std::uint64_t value, std::uint64_t default_value);
+    void reflect_to(syncspirit::config::main_t &main) override;
+};
+
 struct timeout_t final : impl::positive_integer_t {
     using parent_t = impl::positive_integer_t;
 

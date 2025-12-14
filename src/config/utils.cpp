@@ -137,6 +137,7 @@ static main_t make_default_config(const bfs::path &config_path, const bfs::path 
     cfg.timeout = 30000;
     cfg.device_name = device;
     cfg.hasher_threads = 3;
+    cfg.poll_timeout = 1;
     cfg.log_configs = {
         // log_config_t {
         //     "default", spdlog::level::level_enum::trace, {"stdout"}
@@ -243,6 +244,7 @@ config_result_t get_config(std::istream &config, const bfs::path &config_path) {
         SAFE_GET_VALUE(device_name, std::string, "main");
         SAFE_GET_PATH(default_location, "main");
         SAFE_GET_VALUE(hasher_threads, std::uint32_t, "main");
+        SAFE_GET_VALUE(poll_timeout, std::uint32_t, "main");
         SAFE_GET_PATH_OPTIONAL(root_ca_file, "main");
         SAFE_GET_PATH_EXPANDED(cert_file, "main");
         SAFE_GET_PATH_EXPANDED(key_file, "main");
@@ -418,6 +420,7 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
     auto tbl = toml::table{{
         {"main", toml::table{{
                      {"hasher_threads", cfg.hasher_threads},
+                     {"poll_timeout", cfg.poll_timeout},
                      {"root_ca_file", narrow(cfg.root_ca_file.wstring())},
                      {"cert_file", narrow(cert_file.wstring())},
                      {"key_file", narrow(key_file.wstring())},
