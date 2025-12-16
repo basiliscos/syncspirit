@@ -959,6 +959,31 @@ void test_changed() {
                     CHECK(seq_2 == seq_1);
                 }
             }
+#ifndef SYNCSPIRIT_WIN
+            SECTION("symlink target changed") {
+                auto file_path = root_path / "symlink";
+                auto target_1 = std::string_view("/some/where");
+                bfs::create_symlink(bfs::path(target_1), file_path, ec);
+                builder->scan_start(folder->get_id()).apply(*sup);
+                REQUIRE(files->size() == 1);
+                auto file_1 = files->by_name(file_path.filename().string());
+                REQUIRE(file_1);
+                auto seq_1 = file_1->get_sequence();
+
+                builder->scan_start(folder->get_id()).apply(*sup);
+                REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
+
+                bfs::remove_all(file_path);
+                auto target_2 = std::string_view("/some/where/2");
+                bfs::create_symlink(bfs::path(target_2), file_path, ec);
+                builder->scan_start(folder->get_id()).apply(*sup);
+
+                auto file_2 = files->by_name(file_path.filename().string());
+                REQUIRE(file_2);
+                auto seq_2 = file_2->get_sequence();
+                CHECK(seq_2 > seq_1);
+            }
+#endif
             SECTION("append new block") {
                 auto block_sz = fs::block_sizes[0];
                 auto b1 = std::string(block_sz, '0');
