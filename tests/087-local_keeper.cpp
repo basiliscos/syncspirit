@@ -1467,7 +1467,7 @@ void test_incomplete() {
         void main() noexcept override {
             auto sha256 = peer_device->device_id().get_sha256();
             auto block_sz = fs::block_sizes[0];
-            auto path = root_path / "файл.syncspirit-tmp";
+            auto path = root_path / L"файл.syncspirit-tmp";
 
             auto pr_file = proto::FileInfo{};
             auto file_name = boost::nowide::narrow(L"файл");
@@ -1476,7 +1476,7 @@ void test_incomplete() {
             auto &v = proto::get_version(pr_file);
             auto &counter = proto::add_counters(v);
             proto::set_id(counter, 55);
-            proto::set_value(counter, 1);
+            proto::set_value(counter, 2);
             proto::set_modified_s(pr_file, 12345);
 
             auto data_1 = as_owned_bytes("12345");
@@ -1509,17 +1509,44 @@ void test_incomplete() {
                 CHECK(files->size() == 1);
                 CHECK(!bfs::exists(path));
             }
-            SECTION("found in peer model, size mismatch => remove") {
-                proto::add_blocks(pr_file, b_1);
-                proto::set_size(pr_file, data_1.size());
-                builder->make_index(sha256, folder->get_id()).add(pr_file, peer_device).finish().apply(*sup);
+            SECTION("found in peer model, remove") {
+                SECTION("size mise mismatch") {
+                    proto::add_blocks(pr_file, b_1);
+                    proto::set_size(pr_file, data_1.size());
+                    builder->make_index(sha256, folder->get_id()).add(pr_file, peer_device).finish().apply(*sup);
 
-                builder->scan_start(folder->get_id()).apply(*sup);
+                    builder->scan_start(folder->get_id()).apply(*sup);
 
-                write_file(path, "");
-                builder->scan_start(folder->get_id()).apply(*sup);
+                    write_file(path, "");
+                    builder->scan_start(folder->get_id()).apply(*sup);
 
-                CHECK(files->size() == 0);
+                    CHECK(files->size() == 0);
+                }
+                SECTION("local version is better than remote (local file does exists)") {
+                    write_file(path, "1234");
+                    auto p = root_path / file_name;
+
+                    write_file(p, "12345");
+                    auto status = bfs::status(p);
+                    auto perms = static_cast<uint32_t>(status.permissions());
+
+                    proto::add_blocks(pr_file, b_1);
+                    proto::set_size(pr_file, data_1.size());
+                    proto::set_permissions(pr_file, perms);
+                    proto::set_modified_s(pr_file, to_unix(bfs::last_write_time(p)));
+
+                    builder->local_update(folder->get_id(), pr_file).apply(*sup);
+
+                    REQUIRE(files->size() == 1);
+                    auto seq_1 = folder_info->get_max_sequence();
+
+                    proto::set_value(counter, 1);
+                    builder->make_index(sha256, folder->get_id()).add(pr_file, peer_device).finish().apply(*sup);
+                    builder->scan_start(folder->get_id()).apply(*sup);
+
+                    auto seq_2 = folder_info->get_max_sequence();
+                    REQUIRE(seq_1 == seq_2);
+                }
                 CHECK(!bfs::exists(path));
             }
             SECTION("2 blocks peer file") {
