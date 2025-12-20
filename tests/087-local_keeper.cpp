@@ -1594,6 +1594,24 @@ void test_incomplete() {
 
                     CHECK(files->size() == 0);
                 }
+#ifndef SYNCSPIRIT_WIN
+                SECTION("cannot read tmp file") {
+                    write_file(path, "12345");
+                    auto status = bfs::status(path);
+                    auto perms = static_cast<uint32_t>(status.permissions());
+
+                    proto::add_blocks(pr_file, b_1);
+                    proto::set_size(pr_file, data_1.size());
+                    proto::set_permissions(pr_file, perms);
+                    proto::set_modified_s(pr_file, to_unix(bfs::last_write_time(path)));
+
+                    builder->make_index(sha256, folder->get_id()).add(pr_file, peer_device).finish().apply(*sup);
+
+                    bfs::permissions(path, bfs::perms::all, bfs::perm_options::remove);
+                    builder->scan_start(folder->get_id()).apply(*sup);
+                    CHECK(files->size() == 0);
+                }
+#endif
                 SECTION("local version is better than remote (local file does exists)") {
                     write_file(path, "1234");
                     auto p = root_path / file_name;
