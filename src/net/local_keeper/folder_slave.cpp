@@ -612,9 +612,16 @@ void folder_slave_t::post_process(fs::task::segment_iterator_t &task, stack_cont
     if (ec) {
         auto hash_ctx = static_cast<hash_context_t *>(task.context.get());
         auto delta = task.block_count - task.current_block;
-        this->actor->concurrent_hashes_left += delta;
+        actor->concurrent_hashes_left += delta;
         if (hash_ctx->hash_file->commit_error(ec, delta)) {
             LOG_WARN(log, "I/O error during processing '{}': {}", narrow(task.path.generic_wstring()), ec.message());
+            auto presence = hash_ctx->hash_file->self.get();
+            if (presence && presence->get_features() & F::local) {
+                auto file_presence = static_cast<presentation::local_file_presence_t *>(presence);
+                auto &file = const_cast<model::file_info_t &>(file_presence->get_file_info());
+                auto local_fi = context->local_folder.get();
+                ctx.push(new model::diff::modify::mark_reachable_t(file, *local_fi, false));
+            }
         }
     }
 }

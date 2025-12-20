@@ -1339,53 +1339,79 @@ void test_read_errors() {
             }
         }
 
-        void main() noexcept override{
+        void main() noexcept override {
 #ifndef SYNCSPIRIT_WIN
-            SECTION("small unknown file") {
+            SECTION("small unknown/new file") {
                 launch_target();
-        auto file_path = root_path / "file.bin";
-        write_file(file_path, "12345");
-        bfs::permissions(file_path, bfs::perms::all, bfs::perm_options::remove);
-        builder->scan_start(folder->get_id()).apply(*sup);
-        CHECK(!folder->is_scanning());
-        CHECK(folder->get_scan_finish() >= folder->get_scan_start());
-        CHECK(files->size() == 0);
-    }
+                auto file_path = root_path / "file.bin";
+                write_file(file_path, "12345");
+                bfs::permissions(file_path, bfs::perms::all, bfs::perm_options::remove);
+                builder->scan_start(folder->get_id()).apply(*sup);
+                CHECK(!folder->is_scanning());
+                CHECK(folder->get_scan_finish() >= folder->get_scan_start());
+                CHECK(files->size() == 0);
+            }
+            SECTION("small known file") {
+                launch_target();
+                auto file_path = root_path / "file.bin";
+                write_file(file_path, "12345");
+
+                builder->scan_start(folder->get_id()).apply(*sup);
+                CHECK(!folder->is_scanning());
+                CHECK(folder->get_scan_finish() >= folder->get_scan_start());
+                REQUIRE(files->size() == 1);
+
+                auto file_1 = *files->begin();
+                CHECK(!file_1->is_unreachable());
+                CHECK(file_1->is_locally_available());
+
+                auto max_seq = folder_info->get_max_sequence();
+
+                bfs::permissions(file_path, bfs::perms::all, bfs::perm_options::remove);
+                builder->scan_start(folder->get_id()).apply(*sup);
+                CHECK(!folder->is_scanning());
+                CHECK(folder->get_scan_finish() >= folder->get_scan_start());
+                REQUIRE(files->size() == 1);
+
+                CHECK(file_1->is_unreachable());
+                CHECK(!file_1->is_locally_available());
+                CHECK(folder_info->get_max_sequence() == max_seq);
+            }
 #endif
-    SECTION("large unknown file") {
-        auto file_path = root_path / "file.bin";
-        auto block_sz = fs::block_sizes[0];
-        auto count = std::uint32_t{5};
-        auto b = std::string(block_sz * count, 'x');
-        write_file(file_path, b);
+            SECTION("large unknown file") {
+                auto file_path = root_path / "file.bin";
+                auto block_sz = fs::block_sizes[0];
+                auto count = std::uint32_t{5};
+                auto b = std::string(block_sz * count, 'x');
+                write_file(file_path, b);
 
-        auto do_mock = [&](std::int32_t block_index) {
-            processor = [&, count, block_index](fs::fs_slave_t *slave) {
-                slave->ec = {};
-                bool do_exec = true;
-                if (!slave->tasks_in.empty()) {
-                    auto task = &slave->tasks_in.front();
-                    auto iterator = std::get_if<fs::task::segment_iterator_t>(task);
-                    if (iterator) {
-                        if (iterator->block_index == block_index) {
-                            do_exec = false;
-                            auto ec = r::make_error_code(r::error_code_t::cancelled);
-                            iterator->ec = ec;
-                            sup->log->info("mocking result {} block", block_index);
-                            slave->tasks_out.emplace_back(std::move(*task));
-                            slave->tasks_in.pop_front();
+                auto do_mock = [&](std::int32_t block_index) {
+                    processor = [&, count, block_index](fs::fs_slave_t *slave) {
+                        slave->ec = {};
+                        bool do_exec = true;
+                        if (!slave->tasks_in.empty()) {
+                            auto task = &slave->tasks_in.front();
+                            auto iterator = std::get_if<fs::task::segment_iterator_t>(task);
+                            if (iterator) {
+                                if (iterator->block_index == block_index) {
+                                    do_exec = false;
+                                    auto ec = r::make_error_code(r::error_code_t::cancelled);
+                                    iterator->ec = ec;
+                                    sup->log->info("mocking result {} block", block_index);
+                                    slave->tasks_out.emplace_back(std::move(*task));
+                                    slave->tasks_in.pop_front();
+                                }
+                            }
                         }
-                    }
-                }
-                if (do_exec) {
-                    sup->log->info("executing foreign task");
-                    slave->exec(executor->hasher);
-                }
-            };
-        };
+                        if (do_exec) {
+                            sup->log->info("executing foreign task");
+                            slave->exec(executor->hasher);
+                        }
+                    };
+                };
 
-        using pair_t = std::tuple<std::int32_t, std::int32_t>;
-        // clang-format off
+                using pair_t = std::tuple<std::int32_t, std::int32_t>;
+                // clang-format off
                 auto pair = GENERATE(table<std::int32_t, std::int32_t>({
                     pair_t{0, 1},
                     pair_t{1, 1},
@@ -1394,76 +1420,74 @@ void test_read_errors() {
                     pair_t{4, 1},
                     pair_t{2, 2},
                 }));
-        // clang-format on
+                // clang-format on
 
-        std::int32_t block_index;
-        std::tie(block_index, hash_limit) = pair;
+                std::int32_t block_index;
+                std::tie(block_index, hash_limit) = pair;
 
-        do_mock(block_index);
-        launch_target();
+                do_mock(block_index);
+                launch_target();
 
-        INFO("block index = " << block_index << ", hash limit = " << hash_limit);
-        builder->scan_start(folder->get_id()).apply(*sup);
-        CHECK(!folder->is_scanning());
-        CHECK(folder->get_scan_finish() >= folder->get_scan_start());
-        CHECK(files->size() == 0);
-        CHECK(hasher->digested_blocks <= block_index + hash_limit);
-    }
+                INFO("block index = " << block_index << ", hash limit = " << hash_limit);
+                builder->scan_start(folder->get_id()).apply(*sup);
+                CHECK(!folder->is_scanning());
+                CHECK(folder->get_scan_finish() >= folder->get_scan_start());
+                CHECK(files->size() == 0);
+                CHECK(hasher->digested_blocks <= block_index + hash_limit);
+            }
+            SECTION("cannot read existing dir") {
 #ifndef SYNCSPIRIT_WIN
-    SECTION("cannot read existing dir") {
-        launch_target();
-        auto dir_path = root_path / L"папка";
-        auto subdir_path = dir_path / L"подпапка";
-        auto file_path = subdir_path / "файл.bin";
-        bfs::create_directories(subdir_path);
-        write_file(file_path, "12345");
-        builder->scan_start(folder->get_id()).apply(*sup);
-        CHECK(!folder->is_scanning());
-        CHECK(folder->get_scan_finish() >= folder->get_scan_start());
-        CHECK(files->size() == 3);
+                launch_target();
+                auto dir_path = root_path / L"папка";
+                auto subdir_path = dir_path / L"подпапка";
+                auto file_path = subdir_path / "файл.bin";
+                bfs::create_directories(subdir_path);
+                write_file(file_path, "12345");
+                builder->scan_start(folder->get_id()).apply(*sup);
+                CHECK(!folder->is_scanning());
+                CHECK(folder->get_scan_finish() >= folder->get_scan_start());
+                CHECK(files->size() == 3);
 
-        auto file_1 = files->by_name(narrow(L"папка"));
-        auto file_2 = files->by_name(narrow(L"папка/подпапка"));
-        auto file_3 = files->by_name(narrow(L"папка/подпапка/файл.bin"));
-        REQUIRE(file_1);
-        REQUIRE(file_2);
-        REQUIRE(file_3);
+                auto file_1 = files->by_name(narrow(L"папка"));
+                auto file_2 = files->by_name(narrow(L"папка/подпапка"));
+                auto file_3 = files->by_name(narrow(L"папка/подпапка/файл.bin"));
+                REQUIRE(file_1);
+                REQUIRE(file_2);
+                REQUIRE(file_3);
 
-        auto max_seq = folder_info->get_max_sequence();
+                auto max_seq = folder_info->get_max_sequence();
 
-        auto perms = bfs::status(dir_path).permissions();
-        bfs::permissions(dir_path, bfs::perms::all, bfs::perm_options::remove);
-        builder->scan_start(folder->get_id()).apply(*sup);
-        bfs::permissions(dir_path, perms, bfs::perm_options::replace);
+                auto perms = bfs::status(dir_path).permissions();
+                bfs::permissions(dir_path, bfs::perms::all, bfs::perm_options::remove);
+                builder->scan_start(folder->get_id()).apply(*sup);
+                bfs::permissions(dir_path, perms, bfs::perm_options::replace);
 
-        CHECK(!folder->is_scanning());
-        CHECK(folder->get_scan_finish() >= folder->get_scan_start());
-        CHECK(files->size() == 3);
-        CHECK(folder_info->get_max_sequence() == max_seq);
+                CHECK(!folder->is_scanning());
+                CHECK(folder->get_scan_finish() >= folder->get_scan_start());
+                CHECK(files->size() == 3);
+                CHECK(folder_info->get_max_sequence() == max_seq);
 
-        CHECK(file_1->is_unreachable());
-        CHECK(file_2->is_unreachable());
-        CHECK(file_3->is_unreachable());
+                CHECK(file_1->is_unreachable());
+                CHECK(file_2->is_unreachable());
+                CHECK(file_3->is_unreachable());
 
-        builder->scan_start(folder->get_id()).apply(*sup);
-        CHECK(folder->get_scan_finish() >= folder->get_scan_start());
-        CHECK(files->size() == 3);
-        CHECK(folder_info->get_max_sequence() == max_seq);
+                builder->scan_start(folder->get_id()).apply(*sup);
+                CHECK(folder->get_scan_finish() >= folder->get_scan_start());
+                CHECK(files->size() == 3);
+                CHECK(folder_info->get_max_sequence() == max_seq);
 
-        CHECK(!file_1->is_unreachable());
-        CHECK(!file_2->is_unreachable());
-        CHECK(!file_3->is_unreachable());
-    }
+                CHECK(!file_1->is_unreachable());
+                CHECK(!file_2->is_unreachable());
+                CHECK(!file_3->is_unreachable());
 #endif
+            }
+        }
+        std::uint32_t exec_pool = 10;
+        task_processor_t processor;
+        std::uint32_t hash_limit = 1;
+    };
+    F().run();
 }
-std::uint32_t exec_pool = 10;
-task_processor_t processor;
-std::uint32_t hash_limit = 1;
-}
-;
-F().run();
-}
-
 
 void test_leaks() {
     struct F : fixture_t {
