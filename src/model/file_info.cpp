@@ -381,7 +381,7 @@ void file_info_t::mark_unreachable(bool value) noexcept {
 
 void file_info_t::mark_local(bool available) noexcept {
     if (available) {
-        flags = flags | f_local;
+        flags = (flags | f_local) & ~f_unreachable;
     } else {
         flags = flags & ~f_local;
         flags = flags & ~f_available;

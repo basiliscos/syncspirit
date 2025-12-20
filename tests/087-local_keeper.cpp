@@ -1431,19 +1431,28 @@ void test_read_errors() {
 
                 auto max_seq = folder_info->get_max_sequence();
 
+                auto perms = bfs::status(dir_path).permissions();
                 bfs::permissions(dir_path, bfs::perms::all, bfs::perm_options::remove);
                 builder->scan_start(folder->get_id()).apply(*sup);
-                bfs::permissions(dir_path, bfs::perms::all, bfs::perm_options::add);
+                bfs::permissions(dir_path, perms, bfs::perm_options::replace);
 
                 CHECK(!folder->is_scanning());
                 CHECK(folder->get_scan_finish() >= folder->get_scan_start());
                 CHECK(files->size() == 3);
                 CHECK(folder_info->get_max_sequence() == max_seq);
-                ;
 
                 CHECK(file_1->is_unreachable());
                 CHECK(file_2->is_unreachable());
                 CHECK(file_3->is_unreachable());
+
+                builder->scan_start(folder->get_id()).apply(*sup);
+                CHECK(folder->get_scan_finish() >= folder->get_scan_start());
+                CHECK(files->size() == 3);
+                CHECK(folder_info->get_max_sequence() == max_seq);
+
+                CHECK(!file_1->is_unreachable());
+                CHECK(!file_2->is_unreachable());
+                CHECK(!file_3->is_unreachable());
             }
 #endif
         }
