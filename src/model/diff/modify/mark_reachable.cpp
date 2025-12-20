@@ -26,6 +26,7 @@ auto mark_reachable_t::apply_impl(apply_controller_t &controller, void *custom) 
 
     LOG_TRACE(log, "applying reachable ({}) for '{}'", reachable, *file);
     file->mark_unreachable(!reachable);
+    file->notify_update();
 
     return applicator_t::apply_sibling(controller, custom);
 }

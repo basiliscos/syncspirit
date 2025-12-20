@@ -34,7 +34,7 @@ struct SYNCSPIRIT_API presence_t : model::proxy_t {
         deleted         = 1 << 7,
         ignored         = 1 << 8,
         symblink        = 1 << 9,
-        conflict        = 1 << 10,
+        unreachable     = 1 << 10,
     };
     static constexpr std::uint32_t mask = 0xFFFFFFFF;
     // clang-format ON

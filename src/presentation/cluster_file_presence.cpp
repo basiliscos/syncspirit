@@ -32,6 +32,9 @@ void cluster_file_presence_t::refresh_features() noexcept {
     if (file_info.is_link()) {
         features |= F::symblink;
     }
+    if (file_info.is_unreachable()) {
+        features |= F::unreachable;
+    }
 }
 
 auto cluster_file_presence_t::get_file_info() const noexcept -> const model::file_info_t & { return file_info; }
