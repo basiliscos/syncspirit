@@ -8,6 +8,7 @@
 #include "proto/proto-helpers-bep.h"
 
 #include <boost/nowide/convert.hpp>
+#include <cassert>
 
 using namespace syncspirit::net::local_keeper;
 using boost::nowide::narrow;
@@ -15,6 +16,7 @@ using boost::nowide::narrow;
 child_info_t::child_info_t(fs::task::scan_dir_t::child_info_t backend, presentation::presence_ptr_t self_,
                            presentation::presence_ptr_t parent_)
     : self(std::move(self_)), parent(std::move(parent_)) {
+    assert(!backend.path.empty());
     path = std::move(backend.path);
     link_target = std::move(backend.target);
     last_write_time = fs::to_unix(backend.last_write_time);

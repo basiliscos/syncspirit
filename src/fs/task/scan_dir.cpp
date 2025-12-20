@@ -22,9 +22,9 @@ struct comparator_t {
     }
 };
 
-scan_dir_t::scan_dir_t(bfs::path path_, presentation::presence_ptr_t presence_) noexcept
+scan_dir_t::scan_dir_t(bfs::path path_, presentation::presence_ptr_t presence_, custom_payload_ptr_t payload_) noexcept
     : path{std::move(path_)}, presence{std::move(presence_)},
-      ec(utils::make_error_code(utils::error_code_t::no_action)) {}
+      ec(utils::make_error_code(utils::error_code_t::no_action)), payload(std::move(payload_)) {}
 
 void scan_dir_t::process(fs_slave_t &slave, hasher::hasher_plugin_t *) noexcept {
     ec = {};

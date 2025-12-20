@@ -26,7 +26,10 @@ local_update_t::local_update_t(const cluster_t &cluster, sequencer_t &sequencer,
     auto &folder_infos = folder->get_folder_infos();
     auto local_folder_info = folder_infos.by_device_id(self_id);
     auto &local_files = local_folder_info->get_file_infos();
-    auto name = std::pmr::string(proto::get_name(proto_file_), allocator);
+    auto proto_name = proto::get_name(proto_file_);
+    assert(proto_name.size());
+
+    auto name = std::pmr::string(proto_name, allocator);
     auto local_file = local_files.by_name(name);
 
     if (auto original_file = get_original(folder_infos, device, proto_file_); original_file) {

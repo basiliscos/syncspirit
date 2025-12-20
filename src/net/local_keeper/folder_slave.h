@@ -80,6 +80,8 @@ struct folder_slave_t final : fs::fs_slave_t {
     void post_process(fs::task::rename_file_t &task, stack_context_t &ctx) noexcept;
     void post_process(fs::task::noop_t &, stack_context_t &) noexcept;
 
+    void handle_scan_error(fs::task::scan_dir_t &task, stack_context_t &ctx) noexcept;
+
     tasks_t pending_io;
     local_keeper::stack_t stack;
     folder_context_ptr_t context;

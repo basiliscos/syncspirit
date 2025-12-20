@@ -32,6 +32,7 @@ using namespace syncspirit::model;
 using namespace syncspirit::net;
 using namespace syncspirit::fs;
 using namespace syncspirit::hasher;
+using boost::nowide::narrow;
 
 using task_processor_t = std::function<void(fs::fs_slave_t *)>;
 
@@ -101,7 +102,7 @@ struct fixture_t {
 
     virtual void create_dir(fs::message::create_dir_t &req) noexcept {
         auto &path = req.payload;
-        sup->log->info("on_create_dir, '{}'", boost::nowide::narrow(path.wstring()));
+        sup->log->info("on_create_dir, '{}'", narrow(path.wstring()));
         bfs::create_directory(path, path.ec);
     }
 
@@ -296,12 +297,12 @@ void test_simple() {
 
                     REQUIRE(cluster->get_blocks().size() == 0);
 
-                    auto f_1 = files->by_name(boost::nowide::narrow(name_1.generic_wstring()));
+                    auto f_1 = files->by_name(narrow(name_1.generic_wstring()));
                     REQUIRE(f_1);
                     CHECK(f_1->is_locally_available());
                     CHECK(f_1->is_dir());
 
-                    auto f_2 = files->by_name(boost::nowide::narrow(name_2.generic_wstring()));
+                    auto f_2 = files->by_name(narrow(name_2.generic_wstring()));
                     REQUIRE(f_2);
                     CHECK(f_2->is_locally_available());
                     CHECK(f_2->is_dir());
@@ -367,7 +368,7 @@ void test_simple() {
                     write_file(file_path, "12345");
                     builder->scan_start(folder->get_id()).apply(*sup);
 
-                    auto file = files->by_name(boost::nowide::narrow(part_path.generic_wstring()));
+                    auto file = files->by_name(narrow(part_path.generic_wstring()));
                     REQUIRE(file);
                     CHECK(file->is_locally_available());
                     CHECK(!file->is_link());
@@ -387,7 +388,7 @@ void test_simple() {
                     write_file(file_path, b1 + b2);
                     builder->scan_start(folder->get_id()).apply(*sup);
 
-                    auto file = files->by_name(boost::nowide::narrow(part_path.generic_wstring()));
+                    auto file = files->by_name(narrow(part_path.generic_wstring()));
                     REQUIRE(file);
                     CHECK(file->is_locally_available());
                     CHECK(!file->is_link());
@@ -408,7 +409,7 @@ void test_simple() {
                     write_file(file_path, b1 + b2 + b3);
                     builder->scan_start(folder->get_id()).apply(*sup);
 
-                    auto file = files->by_name(boost::nowide::narrow(part_path.generic_wstring()));
+                    auto file = files->by_name(narrow(part_path.generic_wstring()));
                     REQUIRE(file);
                     CHECK(file->is_locally_available());
                     CHECK(!file->is_link());
@@ -490,7 +491,7 @@ void test_no_changes() {
 
                     builder->local_update(folder_id, pr_file).apply(*sup);
                     REQUIRE(files->size() == 1);
-                    auto file_1 = files->by_name(boost::nowide::narrow(file_name.wstring()));
+                    auto file_1 = files->by_name(narrow(file_name.wstring()));
                     file_1->mark_local(false);
                     CHECK(!file_1->is_local());
 
@@ -498,7 +499,7 @@ void test_no_changes() {
                     REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
                     REQUIRE(files->size() == 1);
 
-                    auto file_2 = files->by_name(boost::nowide::narrow(file_name.wstring()));
+                    auto file_2 = files->by_name(narrow(file_name.wstring()));
                     CHECK(file_1.get() == file_2.get());
                     CHECK(file_1->is_local());
                 }
@@ -522,7 +523,7 @@ void test_no_changes() {
                     builder->local_update(folder_id, pr_file).apply(*sup);
                     REQUIRE(files->size() == 1);
                     REQUIRE(blocks.size() == 1);
-                    auto file_1 = files->by_name(boost::nowide::narrow(file_name.wstring()));
+                    auto file_1 = files->by_name(narrow(file_name.wstring()));
                     file_1->mark_local(false);
                     CHECK(!file_1->is_local());
 
@@ -530,7 +531,7 @@ void test_no_changes() {
                     REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
                     REQUIRE(files->size() == 1);
 
-                    auto file_2 = files->by_name(boost::nowide::narrow(file_name.wstring()));
+                    auto file_2 = files->by_name(narrow(file_name.wstring()));
                     CHECK(file_1.get() == file_2.get());
                     CHECK(file_1->is_local());
                     REQUIRE(blocks.size() == 1);
@@ -558,23 +559,23 @@ void test_no_changes() {
                     auto status = bfs::symlink_status(file_path);
                     auto perms = static_cast<uint32_t>(status.permissions());
 
-                    proto::set_symlink_target(pr_file, boost::nowide::narrow(target.wstring()));
+                    proto::set_symlink_target(pr_file, narrow(target.wstring()));
                     proto::set_type(pr_file, proto::FileInfoType::SYMLINK);
                     proto::set_permissions(pr_file, perms);
 
                     builder->local_update(folder_id, pr_file).apply(*sup);
                     REQUIRE(files->size() == 1);
-                    auto file_1 = files->by_name(boost::nowide::narrow(file_name.wstring()));
+                    auto file_1 = files->by_name(narrow(file_name.wstring()));
                     file_1->mark_local(false);
                     REQUIRE(file_1->is_link());
-                    REQUIRE(file_1->get_link_target() == boost::nowide::narrow(target.wstring()));
+                    REQUIRE(file_1->get_link_target() == narrow(target.wstring()));
                     CHECK(!file_1->is_local());
 
                     builder->scan_start(folder_id).apply(*sup);
                     REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
                     REQUIRE(files->size() == 1);
 
-                    auto file_2 = files->by_name(boost::nowide::narrow(file_name.wstring()));
+                    auto file_2 = files->by_name(narrow(file_name.wstring()));
                     CHECK(file_1.get() == file_2.get());
                     CHECK(file_1->is_local());
                 }
@@ -668,7 +669,7 @@ void test_deleted() {
 
                 REQUIRE(files->size() == 1);
 
-                auto file_1 = files->by_name(boost::nowide::narrow(file_name.wstring()));
+                auto file_1 = files->by_name(narrow(file_name.wstring()));
                 file_1->mark_local(false);
                 CHECK(!file_1->is_local());
 
@@ -676,7 +677,7 @@ void test_deleted() {
                 REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
                 REQUIRE(files->size() == 1);
 
-                auto file_2 = files->by_name(boost::nowide::narrow(file_name.wstring()));
+                auto file_2 = files->by_name(narrow(file_name.wstring()));
                 CHECK(file_1.get() == file_2.get());
                 CHECK(file_1->is_local());
                 REQUIRE(file_1->is_deleted());
@@ -834,7 +835,7 @@ void test_changed() {
 
                 write_file(file_path, "5432109876");
 
-                auto file_1 = files->by_name(boost::nowide::narrow(file_name.wstring()));
+                auto file_1 = files->by_name(narrow(file_name.wstring()));
                 file_1->mark_local(false);
                 auto seq_1 = file_1->get_sequence();
 
@@ -843,7 +844,7 @@ void test_changed() {
 
                 CHECK(files->size() == 1);
                 CHECK(blocks.size() == 1);
-                auto file_2 = files->by_name(boost::nowide::narrow(file_name.wstring()));
+                auto file_2 = files->by_name(narrow(file_name.wstring()));
                 CHECK(file_2->is_local());
                 REQUIRE(file_2->iterate_blocks().get_total() == 1);
                 CHECK(file_2->iterate_blocks().next()->get_hash() == hash_4);
@@ -891,7 +892,7 @@ void test_changed() {
                 REQUIRE(files->size() == 1);
                 REQUIRE(blocks.size() == 1);
 
-                auto file_1 = files->by_name(boost::nowide::narrow(file_name.wstring()));
+                auto file_1 = files->by_name(narrow(file_name.wstring()));
                 file_1->mark_local(false);
                 auto seq_1 = file_1->get_sequence();
 
@@ -899,7 +900,7 @@ void test_changed() {
                 REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
 
                 CHECK(files->size() == 1);
-                auto file_2 = files->by_name(boost::nowide::narrow(file_name.wstring()));
+                auto file_2 = files->by_name(narrow(file_name.wstring()));
                 CHECK(file_2->is_local());
                 REQUIRE(file_2->iterate_blocks().get_total() == 1);
                 CHECK(file_2->iterate_blocks().next()->get_hash() == hash_1);
@@ -941,7 +942,7 @@ void test_changed() {
                 builder->local_update(folder->get_id(), pr_file).apply(*sup);
                 REQUIRE(files->size() == 1);
 
-                auto file_1 = files->by_name(boost::nowide::narrow(file_name.wstring()));
+                auto file_1 = files->by_name(narrow(file_name.wstring()));
                 file_1->mark_local(false);
                 auto seq_1 = file_1->get_sequence();
 
@@ -949,7 +950,7 @@ void test_changed() {
                 REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
 
                 CHECK(files->size() == 1);
-                auto file_2 = files->by_name(boost::nowide::narrow(file_name.wstring()));
+                auto file_2 = files->by_name(narrow(file_name.wstring()));
                 CHECK(file_2->is_local());
                 auto seq_2 = file_2->get_sequence();
 
@@ -1025,7 +1026,7 @@ void test_changed() {
 
                 write_file(file_path, b1 + b2 + b3);
 
-                auto file_1 = files->by_name(boost::nowide::narrow(file_name.wstring()));
+                auto file_1 = files->by_name(narrow(file_name.wstring()));
                 file_1->mark_local(false);
                 auto seq_1 = file_1->get_sequence();
 
@@ -1034,7 +1035,7 @@ void test_changed() {
 
                 CHECK(files->size() == 1);
                 CHECK(blocks.size() == 3);
-                auto file_2 = files->by_name(boost::nowide::narrow(file_name.wstring()));
+                auto file_2 = files->by_name(narrow(file_name.wstring()));
                 CHECK(file_2->is_local());
                 REQUIRE(file_2->iterate_blocks().get_total() == 3);
                 REQUIRE(file_2->iterate_blocks(2).next()->get_hash() == hash_3);
@@ -1064,7 +1065,7 @@ void test_type_change() {
             SECTION("has been dir") {
                 proto::set_type(pr_file, proto::FileInfoType::DIRECTORY);
                 builder->local_update(folder->get_id(), pr_file).apply(*sup);
-                auto file_1 = files->by_name(boost::nowide::narrow(file_name.wstring()));
+                auto file_1 = files->by_name(narrow(file_name.wstring()));
                 REQUIRE(file_1->is_dir());
                 auto seq_1 = file_1->get_sequence();
 
@@ -1072,7 +1073,7 @@ void test_type_change() {
                     write_file(file_path, "");
                     builder->scan_start(folder->get_id()).apply(*sup);
                     REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
-                    auto file_2 = files->by_name(boost::nowide::narrow(file_name.wstring()));
+                    auto file_2 = files->by_name(narrow(file_name.wstring()));
                     REQUIRE(file_2->is_file());
                     auto seq_2 = file_2->get_sequence();
                     CHECK(seq_2 > seq_1);
@@ -1082,7 +1083,7 @@ void test_type_change() {
                     bfs::create_symlink(bfs::path("/some/where"), file_path);
                     builder->scan_start(folder->get_id()).apply(*sup);
                     REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
-                    auto file_2 = files->by_name(boost::nowide::narrow(file_name.wstring()));
+                    auto file_2 = files->by_name(narrow(file_name.wstring()));
                     REQUIRE(file_2->is_link());
                     auto seq_2 = file_2->get_sequence();
                     CHECK(seq_2 > seq_1);
@@ -1092,14 +1093,14 @@ void test_type_change() {
             SECTION("has been regular file") {
                 proto::set_type(pr_file, proto::FileInfoType::FILE);
                 builder->local_update(folder->get_id(), pr_file).apply(*sup);
-                auto file_1 = files->by_name(boost::nowide::narrow(file_name.wstring()));
+                auto file_1 = files->by_name(narrow(file_name.wstring()));
                 REQUIRE(file_1->is_file());
                 auto seq_1 = file_1->get_sequence();
                 SECTION(" -> dir") {
                     bfs::create_directories(file_path);
                     builder->scan_start(folder->get_id()).apply(*sup);
                     REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
-                    auto file_2 = files->by_name(boost::nowide::narrow(file_name.wstring()));
+                    auto file_2 = files->by_name(narrow(file_name.wstring()));
                     REQUIRE(file_2->is_dir());
                     auto seq_2 = file_2->get_sequence();
                     CHECK(seq_2 > seq_1);
@@ -1109,7 +1110,7 @@ void test_type_change() {
                     bfs::create_symlink(bfs::path("/some/where"), file_path);
                     builder->scan_start(folder->get_id()).apply(*sup);
                     REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
-                    auto file_2 = files->by_name(boost::nowide::narrow(file_name.wstring()));
+                    auto file_2 = files->by_name(narrow(file_name.wstring()));
                     REQUIRE(file_2->is_link());
                     auto seq_2 = file_2->get_sequence();
                     CHECK(seq_2 > seq_1);
@@ -1120,14 +1121,14 @@ void test_type_change() {
             SECTION("has been symlink") {
                 proto::set_type(pr_file, proto::FileInfoType::SYMLINK);
                 builder->local_update(folder->get_id(), pr_file).apply(*sup);
-                auto file_1 = files->by_name(boost::nowide::narrow(file_name.wstring()));
+                auto file_1 = files->by_name(narrow(file_name.wstring()));
                 REQUIRE(file_1->is_link());
                 auto seq_1 = file_1->get_sequence();
                 SECTION(" -> dir") {
                     bfs::create_directories(file_path);
                     builder->scan_start(folder->get_id()).apply(*sup);
                     REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
-                    auto file_2 = files->by_name(boost::nowide::narrow(file_name.wstring()));
+                    auto file_2 = files->by_name(narrow(file_name.wstring()));
                     REQUIRE(file_2->is_dir());
                     auto seq_2 = file_2->get_sequence();
                     CHECK(seq_2 > seq_1);
@@ -1136,7 +1137,7 @@ void test_type_change() {
                     write_file(file_path, "");
                     builder->scan_start(folder->get_id()).apply(*sup);
                     REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
-                    auto file_2 = files->by_name(boost::nowide::narrow(file_name.wstring()));
+                    auto file_2 = files->by_name(narrow(file_name.wstring()));
                     REQUIRE(file_2->is_file());
                     auto seq_2 = file_2->get_sequence();
                     CHECK(seq_2 > seq_1);
@@ -1198,16 +1199,15 @@ void test_scan_errors() {
                 bfs::permissions(d1_path, perms, bfs::perm_options::remove);
 
                 builder->scan_start(folder->get_id()).apply(*sup);
+                bfs::permissions(d1_path, perms, bfs::perm_options::add);
                 REQUIRE(!folder->is_suspended());
                 CHECK(!folder->is_scanning());
                 CHECK(folder->get_scan_finish() >= folder->get_scan_start());
-                CHECK(files->size() == 1);
-                CHECK((*files->begin())->get_name()->get_own_name() == "d1");
-                bfs::permissions(d1_path, perms, bfs::perm_options::add);
+                CHECK(files->size() == 0);
             }
             SECTION("non-sync'able entity (named fifo file)") {
                 auto fifo_path = root_path / "fifo";
-                auto fifo_str = boost::nowide::narrow(fifo_path.wstring());
+                auto fifo_str = narrow(fifo_path.wstring());
                 REQUIRE(mknod(fifo_str.c_str(), S_IFIFO | 0666, 0) == 0);
                 builder->scan_start(folder->get_id()).apply(*sup);
                 CHECK(!folder->is_scanning());
@@ -1224,7 +1224,7 @@ void test_scan_errors() {
                 builder->scan_start(folder->get_id()).apply(*sup);
                 CHECK(!folder->is_scanning());
                 CHECK(folder->get_scan_finish() >= folder->get_scan_start());
-                CHECK(files->size() == 1);
+                CHECK(files->size() == 0);
             }
 
             SECTION("scan dir errors") {
@@ -1409,6 +1409,43 @@ void test_read_errors() {
                 CHECK(files->size() == 0);
                 CHECK(hasher->digested_blocks <= block_index + hash_limit);
             }
+#ifndef SYNCSPIRIT_WIN
+            SECTION("cannot read existing dir") {
+                launch_target();
+                auto dir_path = root_path / L"папка";
+                auto subdir_path = dir_path / L"подпапка";
+                auto file_path = subdir_path / "файл.bin";
+                bfs::create_directories(subdir_path);
+                write_file(file_path, "12345");
+                builder->scan_start(folder->get_id()).apply(*sup);
+                CHECK(!folder->is_scanning());
+                CHECK(folder->get_scan_finish() >= folder->get_scan_start());
+                CHECK(files->size() == 3);
+
+                auto file_1 = files->by_name(narrow(L"папка"));
+                auto file_2 = files->by_name(narrow(L"папка/подпапка"));
+                auto file_3 = files->by_name(narrow(L"папка/подпапка/файл.bin"));
+                REQUIRE(file_1);
+                REQUIRE(file_2);
+                REQUIRE(file_3);
+
+                auto max_seq = folder_info->get_max_sequence();
+
+                bfs::permissions(dir_path, bfs::perms::all, bfs::perm_options::remove);
+                builder->scan_start(folder->get_id()).apply(*sup);
+                bfs::permissions(dir_path, bfs::perms::all, bfs::perm_options::add);
+
+                CHECK(!folder->is_scanning());
+                CHECK(folder->get_scan_finish() >= folder->get_scan_start());
+                CHECK(files->size() == 3);
+                CHECK(folder_info->get_max_sequence() == max_seq);
+                ;
+
+                CHECK(file_1->is_unreachable());
+                CHECK(file_2->is_unreachable());
+                CHECK(file_3->is_unreachable());
+            }
+#endif
         }
         std::uint32_t exec_pool = 10;
         task_processor_t processor;
@@ -1470,7 +1507,7 @@ void test_incomplete() {
             auto path = root_path / L"файл.syncspirit-tmp";
 
             auto pr_file = proto::FileInfo{};
-            auto file_name = boost::nowide::narrow(L"файл");
+            auto file_name = narrow(L"файл");
             proto::set_name(pr_file, file_name);
             proto::set_sequence(pr_file, 4);
             auto &v = proto::get_version(pr_file);
@@ -1723,7 +1760,7 @@ void test_importing() {
                 auto path = root_path / L"файл";
 
                 auto pr_file = proto::FileInfo{};
-                auto file_name = boost::nowide::narrow(L"файл");
+                auto file_name = narrow(L"файл");
                 proto::set_name(pr_file, file_name);
                 proto::set_sequence(pr_file, 4);
                 auto &v = proto::get_version(pr_file);
@@ -1787,7 +1824,7 @@ void test_importing() {
                 auto path = root_path / L"папка";
 
                 auto pr_file = proto::FileInfo{};
-                auto file_name = boost::nowide::narrow(L"папка");
+                auto file_name = narrow(L"папка");
                 proto::set_name(pr_file, file_name);
                 proto::set_sequence(pr_file, 4);
                 proto::set_type(pr_file, proto::FileInfoType::DIRECTORY);
@@ -1846,8 +1883,8 @@ void test_importing() {
 
                     auto dir_path = bfs::path(L"папка");
                     auto file_path = dir_path / L"файл.bin";
-                    auto narrow_dir = boost::nowide::narrow(dir_path.generic_wstring());
-                    auto narrow_file = boost::nowide::narrow(file_path.generic_wstring());
+                    auto narrow_dir = narrow(dir_path.generic_wstring());
+                    auto narrow_file = narrow(file_path.generic_wstring());
 
                     auto pr_dir = proto::FileInfo();
                     proto::set_name(pr_dir, narrow_dir);

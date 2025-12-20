@@ -3,17 +3,18 @@
 
 #include "folder_slave.h"
 #include "fs/utils.h"
-#include "model/diff/local/blocks_availability.h"
-#include "presentation/folder_presence.h"
-#include "proto/proto-helpers-bep.h"
 #include "model/diff/advance/local_update.h"
+#include "model/diff/local/blocks_availability.h"
 #include "model/diff/local/file_availability.h"
+#include "model/diff/local/scan_finish.h"
+#include "model/diff/modify/mark_reachable.h"
+#include "model/diff/modify/suspend_folder.h"
 #include "net/local_keeper.h"
 #include "presentation/folder_entity.h"
+#include "presentation/folder_presence.h"
 #include "presentation/local_file_presence.h"
+#include "proto/proto-helpers-bep.h"
 #include "utils/platform.h"
-#include "model/diff/local/scan_finish.h"
-#include "model/diff/modify/suspend_folder.h"
 
 #include <boost/nowide/convert.hpp>
 
@@ -62,7 +63,7 @@ void folder_slave_t::process_stack(stack_context_t &ctx) noexcept {
 int folder_slave_t::schedule_hash(hash_base_t *item, stack_context_t &ctx) noexcept {
     if (item->errored_blocks) {
         if (item->commit_hash()) {
-            LOG_WARN(actor->log, "I/O error during processing '{}': {}", narrow(item->path.generic_wstring()),
+            LOG_WARN(log, "I/O error during processing '{}': {}", narrow(item->path.generic_wstring()),
                      item->ec.message());
         }
 
@@ -143,7 +144,7 @@ int folder_slave_t::process(complete_scan_t &, stack_context_t &ctx) noexcept {
 }
 
 int folder_slave_t::process(unscanned_dir_t &dir, stack_context_t &ctx) noexcept {
-    auto sub_task = fs::task::scan_dir_t(std::move(dir.path), std::move(dir.presence));
+    auto sub_task = fs::task::scan_dir_t(std::move(dir.path), std::move(dir.presence), std::move(dir.dir_info));
     pending_io.emplace_back(std::move(sub_task));
     return 0;
 }
@@ -152,9 +153,7 @@ int folder_slave_t::process(unexamined_t &child_info, stack_context_t &ctx) noex
     auto &type = child_info.type;
     if (type == proto::FileInfoType::DIRECTORY) {
         auto self = child_info.self;
-        auto path_copy = child_info.path;
-        stack.push_front(child_ready_t(std::move(child_info)));
-        stack.push_front(unscanned_dir_t(std::move(path_copy), self));
+        stack.push_front(unscanned_dir_t(std::move(child_info)));
     } else if (type == proto::FileInfoType::SYMLINK) {
         stack.push_front(child_ready_t(std::move(child_info)));
     } else {
@@ -217,7 +216,7 @@ int folder_slave_t::process(fatal_error_t &item, stack_context_t &ctx) noexcept 
     auto &ec = item.ec;
     auto ee = actor->make_error(ec);
     actor->do_shutdown(ee);
-    LOG_WARN(actor->log, "severe error during processing {}: {}", folder_id, ec.message());
+    LOG_WARN(log, "severe error during processing {}: {}", folder_id, ec.message());
     auto it = stack.begin();
     std::advance(it, 1);
     while (it != stack.end() && (&*it != &stack.back())) {
@@ -501,7 +500,7 @@ void folder_slave_t::post_process(fs::task::scan_dir_t &task, stack_context_t &c
     auto folder = context->local_folder->get_folder();
     auto folder_id = folder->get_id();
     auto &root_path = folder->get_path();
-    bool is_root = task.path == folder->get_path();
+    bool is_root = !task.payload; // task.path == folder->get_path();
     if (is_root) {
         if (ec) {
             stack.push_front(suspend_scan_t(ec));
@@ -514,7 +513,10 @@ void folder_slave_t::post_process(fs::task::scan_dir_t &task, stack_context_t &c
     }
 
     if (task.ec) {
-        actor->log->warn("cannot scan '{}': {}", narrow(task.path.wstring()), ec.message());
+        return handle_scan_error(task, ctx);
+    } else if (!is_root) {
+        auto dir_info = static_cast<child_info_t *>(task.payload.get());
+        stack.push_front(child_ready_t(std::move(*dir_info)));
     }
 
     auto dir_presence = task.presence.get();
@@ -533,7 +535,7 @@ void folder_slave_t::post_process(fs::task::scan_dir_t &task, stack_context_t &c
             checked_children.emplace(filename);
         }
         if (info.ec) {
-            actor->log->warn("scannig of  {} failed: {}", narrow(info.path.wstring()), info.ec.message());
+            log->warn("scannig of  {} failed: {}", narrow(info.path.wstring()), info.ec.message());
         } else {
             if (fs::is_temporal(info.path)) {
                 auto child = incomplete_t(std::move(info), presence, task.presence);
@@ -612,8 +614,7 @@ void folder_slave_t::post_process(fs::task::segment_iterator_t &task, stack_cont
         auto delta = task.block_count - task.current_block;
         this->actor->concurrent_hashes_left += delta;
         if (hash_ctx->hash_file->commit_error(ec, delta)) {
-            LOG_WARN(actor->log, "I/O error during processing '{}': {}", narrow(task.path.generic_wstring()),
-                     ec.message());
+            LOG_WARN(log, "I/O error during processing '{}': {}", narrow(task.path.generic_wstring()), ec.message());
         }
     }
 }
@@ -646,3 +647,35 @@ void folder_slave_t::post_process(fs::task::rename_file_t &task, stack_context_t
 }
 
 void folder_slave_t::post_process(fs::task::noop_t &, stack_context_t &) noexcept {}
+
+void folder_slave_t::handle_scan_error(fs::task::scan_dir_t &task, stack_context_t &ctx) noexcept {
+    auto &ec = task.ec;
+    log->warn("cannot scan '{}': {}", narrow(task.path.wstring()), ec.message());
+    auto dir_presence = task.presence.get();
+    if (dir_presence && dir_presence->get_features() & F::local) {
+        auto buffer = std::array<std::byte, 1024 * 128>();
+        auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+        auto allocator = allocator_t(&pool);
+        using queue_t = std::pmr::list<presentation::presence_t *>;
+        auto queue = queue_t(allocator);
+        queue.emplace_back(dir_presence);
+
+        auto local_fi = context->local_folder.get();
+        while (!queue.empty()) {
+            auto presence = queue.front();
+            queue.pop_front();
+            auto features = presence->get_features();
+            auto file_presence = static_cast<presentation::local_file_presence_t *>(presence);
+            auto &file = file_presence->get_file_info();
+            auto diff = model::diff::cluster_diff_ptr_t();
+            diff.reset(new model::diff::modify::mark_reachable_t(file, *local_fi, false));
+            ctx.push(diff.get());
+
+            for (auto &child : presence->get_children()) {
+                if (child->get_features() & F::local) {
+                    queue.emplace_back(child);
+                }
+            }
+        }
+    }
+}
