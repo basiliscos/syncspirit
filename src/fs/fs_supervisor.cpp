@@ -19,8 +19,9 @@ void fs_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     });
 }
 
-void fs_supervisor_t::launch() noexcept {
-    LOG_DEBUG(log, "launching children actors");
+void fs_supervisor_t::on_start() noexcept {
+    LOG_TRACE(log, "on_start");
+    parent_t::on_start();
     auto timeout = shutdown_timeout * 9 / 10;
     create_actor<file_actor_t>()
         .rw_cache(rw_cache)
@@ -28,12 +29,6 @@ void fs_supervisor_t::launch() noexcept {
         .timeout(timeout)
         .escalate_failure()
         .finish();
-}
-
-void fs_supervisor_t::on_start() noexcept {
-    LOG_TRACE(log, "on_start");
-    parent_t::on_start();
-    launch();
 }
 
 void fs_supervisor_t::on_child_shutdown(actor_base_t *actor) noexcept {

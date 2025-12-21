@@ -377,6 +377,7 @@ int app_main(app_context_t &app_ctx) {
 
     thread_sys_context_t fs_context;
     auto fs_sup = fs_context.create_supervisor<syncspirit::fs::fs_supervisor_t>()
+                      .shutdown_flag(shutdown_flag, r::pt::millisec{50})
                       .timeout(timeout)
                       .poll_duration(poll_timeout)
                       .registry_address(sup_net->get_registry_address())
@@ -448,7 +449,6 @@ int app_main(app_context_t &app_ctx) {
     }
 
     logger->trace("joining to fs thread");
-    fs_sup->do_shutdown();
     fs_thread.join();
 
     logger->trace("joining to net thread");
