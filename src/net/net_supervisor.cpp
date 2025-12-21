@@ -118,7 +118,6 @@ void net_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
         coordinator = address;
         p.register_name(names::coordinator, get_address());
-        send<syncspirit::model::payload::thread_up_t>(address);
     });
     plugin.with_casted<r::plugin::starter_plugin_t>(
         [&](auto &p) {
@@ -185,6 +184,13 @@ void net_supervisor_t::on_load_cluster_success(message::load_cluster_success_t &
 
     send<model::payload::db_loaded_t>(address);
     load_diff = std::move(message.payload.diff);
+    try_seed_model();
+}
+
+void net_supervisor_t::try_seed_model() noexcept {
+    if (thread_counter == 1) { // -1 as no need to seed model to self
+        seed_model();
+    }
 }
 
 void net_supervisor_t::on_model_request(model::message::model_request_t &message) noexcept {
@@ -197,9 +203,7 @@ void net_supervisor_t::on_model_request(model::message::model_request_t &message
     auto cluster_copy = new model::cluster_t(device, static_cast<int32_t>(simultaneous_writes));
     reply_to(message, std::move(cluster_copy));
     assert(load_diff);
-    if (thread_counter == 1) { // -1 as no need to seed model to self
-        seed_model();
-    }
+    try_seed_model();
 }
 
 void net_supervisor_t::on_thread_up(model::message::thread_up_t &) noexcept {
@@ -333,6 +337,10 @@ void net_supervisor_t::on_app_ready(model::message::app_ready_t &) noexcept {
     if (dcfg.enabled) {
         create_actor<dialer_actor_t>().timeout(timeout).dialer_config(dcfg).cluster(cluster).finish();
     }
+
+    for (auto &l : launchers) {
+        l(cluster);
+    }
 }
 
 void net_supervisor_t::commit_loading() noexcept {
@@ -382,6 +390,8 @@ void net_supervisor_t::on_start() noexcept {
         .keep_alive(false)
         .escalate_failure()
         .finish();
+
+    send<syncspirit::model::payload::thread_up_t>(address);
 }
 
 auto net_supervisor_t::apply(const model::diff::modify::upsert_folder_t &diff, void *custom) noexcept
