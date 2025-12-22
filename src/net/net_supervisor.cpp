@@ -139,9 +139,16 @@ void net_supervisor_t::on_child_shutdown(actor_base_t *actor) noexcept {
     LOG_TRACE(log, "on_child_shutdown, '{}' due to {} ", actor->get_identity(), reason->message());
 }
 
+void net_supervisor_t::shutdown_start() noexcept {
+    parent_t::shutdown_start();
+    if (shutdown_flag) {
+        *const_cast<std::atomic_bool *>(shutdown_flag) = true;
+    }
+}
+
 void net_supervisor_t::shutdown_finish() noexcept {
     db_addr.reset();
-    ra::supervisor_asio_t::shutdown_finish();
+    parent_t::shutdown_finish();
 }
 
 void net_supervisor_t::launch_early() noexcept {
@@ -166,6 +173,10 @@ void net_supervisor_t::launch_early() noexcept {
         .finish();
 
     create_actor<scheduler_t>().timeout(timeout).escalate_failure().finish();
+
+    for (auto &l : launchers) {
+        l(cluster);
+    }
 }
 
 void net_supervisor_t::seed_model() noexcept {
@@ -336,10 +347,6 @@ void net_supervisor_t::on_app_ready(model::message::app_ready_t &) noexcept {
     auto dcfg = app_config.dialer_config;
     if (dcfg.enabled) {
         create_actor<dialer_actor_t>().timeout(timeout).dialer_config(dcfg).cluster(cluster).finish();
-    }
-
-    for (auto &l : launchers) {
-        l(cluster);
     }
 }
 

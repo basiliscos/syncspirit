@@ -3,9 +3,6 @@
 
 #include "governor_actor.h"
 #include "net/names.h"
-#include "fs/messages.h"
-#include "utils/format.hpp"
-#include "utils/error_code.h"
 #include "model/diff/advance/remote_copy.h"
 #include "model/diff/local/io_failure.h"
 #include "model/diff/modify/block_ack.h"
@@ -30,6 +27,7 @@ void governor_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
                 auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
                 plugin->subscribe_actor(&governor_actor_t::on_model_update, coordinator);
+                plugin->subscribe_actor(&governor_actor_t::on_app_ready, coordinator);
                 plugin->subscribe_actor(&governor_actor_t::on_command);
             }
         });
@@ -38,13 +36,17 @@ void governor_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 
 void governor_actor_t::on_start() noexcept {
     LOG_TRACE(log, "on_start");
-    process();
     r::actor_base_t::on_start();
 }
 
 void governor_actor_t::shutdown_start() noexcept {
     LOG_TRACE(log, "shutdown_start");
     r::actor_base_t::shutdown_start();
+}
+
+void governor_actor_t::on_app_ready(model::message::app_ready_t &) noexcept {
+    LOG_TRACE(log, "on_app_ready");
+    process();
 }
 
 void governor_actor_t::on_model_update(model::message::model_update_t &message) noexcept {

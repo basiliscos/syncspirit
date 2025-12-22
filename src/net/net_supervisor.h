@@ -68,6 +68,7 @@ struct SYNCSPIRIT_API net_supervisor_t : net_supervisor_base_t<ra::supervisor_as
     void on_child_shutdown(actor_base_t *actor) noexcept override;
     void on_start() noexcept override;
     void shutdown_finish() noexcept override;
+    void shutdown_start() noexcept override;
     template <typename F> void add_launcher(F &&launcher) noexcept { launchers.push_back(std::forward<F>(launcher)); }
 
     using parent_t::state;
