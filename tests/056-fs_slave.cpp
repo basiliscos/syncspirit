@@ -97,7 +97,7 @@ TEST_CASE("fs_slave, scan_dir", "[fs]") {
                 CHECK(c.path.filename() == child_1.filename());
                 CHECK(!c.ec);
                 CHECK(c.status.type() == bfs::file_type::regular);
-                CHECK(c.last_write_time == from_unix(modified));
+                CHECK(to_unix(c.last_write_time) == modified);
                 CHECK(c.size == 3);
             }
             {
@@ -105,7 +105,7 @@ TEST_CASE("fs_slave, scan_dir", "[fs]") {
                 CHECK(c.path.filename() == child_3.filename());
                 CHECK(!c.ec);
                 CHECK(c.status.type() == bfs::file_type::directory);
-                CHECK(c.last_write_time == from_unix(modified));
+                CHECK(to_unix(c.last_write_time) == modified);
             }
         }
 #endif
