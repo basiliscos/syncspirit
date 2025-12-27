@@ -307,6 +307,7 @@ int app_main(app_context_t &app_ctx) {
     std::atomic_bool bouncer_shutdown_flag = false;
     auto bouncer_context = thread_sys_context_t();
     auto bouncer_sup = bouncer_context.create_supervisor<r::thread::supervisor_thread_t>()
+                           .poll_duration(poll_timeout)
                            .timeout(timeout * 9 / 8)
                            .shutdown_flag(bouncer_shutdown_flag, r::pt::millisec{50})
                            .finish();
