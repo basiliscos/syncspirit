@@ -9,7 +9,8 @@ os=Linux
 
 [options]
 */*:shared=True
-fltk/*:with_xft=True
+#fltk/*:with_xft=True
+fltk/*:with_xft=False
 fltk/*:with_gl=False
 boost/*:magic_autolink=False
 boost/*:visibility=hidden
@@ -23,6 +24,12 @@ boost/*:without_process=True
 boost/*:without_stacktrace=True
 boost/*:without_test=True
 boost/*:without_wave=True
+boost/*:without_cobalt=True
+boost/*:without_contract=True
+boost/*:without_coroutine=True
+boost/*:without_filesystem=True
+boost/*:without_json=True
+boost/*:without_regex =True
 pugixml/*:no_exceptions=True
 rotor/*:enable_asio=True
 rotor/*:enable_thread=True
