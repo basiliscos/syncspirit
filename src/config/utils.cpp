@@ -435,7 +435,7 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
         {"main", toml::table{{
                      {"hasher_threads", cfg.hasher_threads},
                      {"poll_timeout", cfg.poll_timeout},
-                     {"root_ca_file", cfg.ssl_verify_store},
+                     {"ssl_verify_store", cfg.ssl_verify_store},
                      {"cert_file", narrow(cert_file.wstring())},
                      {"key_file", narrow(key_file.wstring())},
                      {"timeout", cfg.timeout},
