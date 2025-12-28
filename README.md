@@ -99,6 +99,10 @@ after the core completion.
 ## 0.4.4 (xx-xxx-202x)
  - [fltk] allow to regenereate certificate/key pair and soft restart
  - [fltk] fix fogetting to insert deleted folder into pending list
+ - [core] reduce memory consumption to ~30%
+ - [core] do not consume CPU when idle
+ - [core] govern file system operations (scan, read, write, delete etc.) from
+control thread
 
 ## 0.4.3 (04-Oct-2025)
  - [core] fix compatibility with syncthing v2.0 (i.e. tolerate directory with 
