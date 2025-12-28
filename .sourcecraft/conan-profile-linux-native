@@ -27,7 +27,6 @@ boost/*:without_wave=True
 boost/*:without_cobalt=True
 boost/*:without_contract=True
 boost/*:without_coroutine=True
-boost/*:without_filesystem=True
 boost/*:without_json=True
 pugixml/*:no_exceptions=True
 rotor/*:enable_asio=True
