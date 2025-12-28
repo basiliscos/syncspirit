@@ -53,6 +53,9 @@ add_custom_command(TARGET syncspirit_test_lib PRE_BUILD
                    COMMAND ${CMAKE_COMMAND} -E copy_directory
                    ${CMAKE_SOURCE_DIR}/tests/data ${CMAKE_BINARY_DIR}/data)
 
+# add_executable(ssl ssl.cpp)
+# target_link_libraries(ssl PUBLIC OpenSSL::SSL Boost::system)
+
 create_test(009-uri.cpp)
 create_test(010-upnp-support.cpp)
 create_test(011-tls-util.cpp)
