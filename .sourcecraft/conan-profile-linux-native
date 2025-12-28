@@ -29,7 +29,6 @@ boost/*:without_contract=True
 boost/*:without_coroutine=True
 boost/*:without_filesystem=True
 boost/*:without_json=True
-boost/*:without_regex =True
 pugixml/*:no_exceptions=True
 rotor/*:enable_asio=True
 rotor/*:enable_thread=True
