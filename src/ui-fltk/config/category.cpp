@@ -113,7 +113,7 @@ auto reflect(const main_cfg_t &config, const main_cfg_t &default_config) -> cate
             property_ptr_t(new main::default_location_t(l.default_location, l_def.default_location)),
             property_ptr_t(new main::cert_file_t(l.cert_file, l_def.cert_file)),
             property_ptr_t(new main::key_file_t(l.key_file, l_def.key_file)),
-            property_ptr_t(new main::root_ca_file(l.root_ca_file, l_def.root_ca_file)),
+            property_ptr_t(new main::ssl_verify_store(l.ssl_verify_store, l_def.ssl_verify_store)),
             property_ptr_t(new main::device_name_t(l.device_name, l_def.device_name)),
             property_ptr_t(new main::hasher_threads_t(l.hasher_threads, l_def.hasher_threads)),
             property_ptr_t(new main::poll_timeout_t(l.poll_timeout, l_def.poll_timeout)),

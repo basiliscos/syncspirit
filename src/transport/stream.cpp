@@ -33,17 +33,17 @@ struct tcp_stream_impl_t final : generic_steam_impl_t<tcp_socket_t, upgradeable_
 };
 
 stream_sp_t initiate_tls_passive(ra::supervisor_asio_t &sup, const utils::key_pair_t &my_keys, tcp::socket peer_sock,
-                                 std::string_view alpn, utils::bytes_view_t root_ca) noexcept {
+                                 std::string_view alpn, std::string_view ssl_verify_store) noexcept {
     ssl_junction_t ssl{{}, &my_keys, alpn};
-    transport_config_t cfg{ssl_option_t(ssl), {}, sup, std::move(peer_sock), root_ca, false, false};
+    transport_config_t cfg{ssl_option_t(ssl), {}, sup, std::move(peer_sock), ssl_verify_store, false, false};
     return new ssl_stream_impl_t(cfg);
 }
 
 stream_sp_t initiate_tls_active(ra::supervisor_asio_t &sup, const utils::key_pair_t &my_keys,
                                 const model::device_id_t &expected_peer, const utils::uri_ptr_t &uri, bool sni,
-                                std::string_view alpn, utils::bytes_view_t root_ca) noexcept {
+                                std::string_view alpn, std::string_view ssl_verify_store) noexcept {
     ssl_junction_t ssl{expected_peer, &my_keys, alpn};
-    transport_config_t cfg{ssl_option_t(ssl), uri, sup, {}, root_ca, sni, true};
+    transport_config_t cfg{ssl_option_t(ssl), uri, sup, {}, ssl_verify_store, sni, true};
     return new ssl_stream_impl_t(cfg);
 }
 

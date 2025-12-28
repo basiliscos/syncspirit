@@ -8,7 +8,7 @@
 namespace bfs = std::filesystem;
 namespace ssl = boost::asio::ssl;
 
-int main(int argc, char** argv) {
+int main(int argc, char **argv) {
     try {
 #if 0
         auto cert_path = bfs::path(argv[1]);
@@ -57,10 +57,9 @@ int main(int argc, char** argv) {
         socket.handshake(boost::asio::ssl::stream_base::client);
 
         // Prepare HTTP GET request
-        std::string request = 
-            "GET /endpoint HTTP/1.1\r\n"
-            "Host: relays.syncthing.net\r\n"
-            "Connection: close\r\n\r\n";
+        std::string request = "GET /endpoint HTTP/1.1\r\n"
+                              "Host: relays.syncthing.net\r\n"
+                              "Connection: close\r\n\r\n";
 
         // Send the request
         boost::asio::write(socket, boost::asio::buffer(request));
@@ -97,11 +96,10 @@ int main(int argc, char** argv) {
         // SSL shutdown (not strictly necessary but good practice)
         socket.shutdown();
 
-    } catch (std::exception& e) {
+    } catch (std::exception &e) {
         std::cerr << "Exception: " << e.what() << std::endl;
         return 1;
     }
 
     return 0;
 }
-

@@ -366,12 +366,12 @@ void key_file_t::reflect_to(syncspirit::config::main_t &main) { main.key_file = 
 
 const char *key_file_t::explanation_ = "this device key location";
 
-root_ca_file::root_ca_file(const bfs::path &value, const bfs::path &default_value)
-    : parent_t("root_ca_file", explanation_, value, default_value, property_kind_t::file) {}
+ssl_verify_store::ssl_verify_store(std::string value, std::string default_value)
+    : parent_t("ssl_verify_store", explanation_, std::move(value), std::move(default_value)) {}
 
-void root_ca_file::reflect_to(syncspirit::config::main_t &main) { main.root_ca_file = convert(); }
+void ssl_verify_store::reflect_to(syncspirit::config::main_t &main) { main.ssl_verify_store = value; }
 
-const char *root_ca_file::explanation_ = "root certificate authority (ca) file (PEM format)";
+const char *ssl_verify_store::explanation_ = "where CA certificates for verification purposes are located.";
 
 device_name_t::device_name_t(std::string value, std::string default_value)
     : parent_t("device_name", explanation_, std::move(value), std::move(default_value)) {}

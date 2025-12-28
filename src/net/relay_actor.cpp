@@ -34,7 +34,7 @@ r::plugin::resource_id_t io_write = 3;
 } // namespace
 
 relay_actor_t::relay_actor_t(config_t &config) noexcept
-    : r::actor_base_t(config), cluster{std::move(config.cluster)}, root_ca{config.root_ca}, config{config.config} {
+    : r::actor_base_t(config), cluster{std::move(config.cluster)}, config{config.config} {
     http_rx_buff = std::make_shared<payload::http_request_t::rx_buff_t>();
 }
 

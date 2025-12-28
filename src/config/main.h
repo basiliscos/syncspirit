@@ -22,7 +22,7 @@ namespace bfs = std::filesystem;
 struct main_t {
     bfs::path config_path;
     bfs::path default_location;
-    bfs::path root_ca_file;
+    std::string ssl_verify_store;
     bfs::path cert_file;
     bfs::path key_file;
 

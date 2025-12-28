@@ -103,7 +103,6 @@ struct SYNCSPIRIT_API net_supervisor_t : net_supervisor_base_t<ra::supervisor_as
     model::diff::cluster_diff_ptr_t load_diff;
     r::address_ptr_t db_addr;
     utils::key_pair_t ssl_pair;
-    utils::bytes_t root_ca;
     r::supervisor_ptr_t cluster_sup;
     r::supervisor_ptr_t peer_sup;
     launchers_t launchers;

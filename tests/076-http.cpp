@@ -10,6 +10,7 @@
 #include "utils/beast_support.h"
 #include "utils/format.hpp"
 #include <boost/asio/ssl.hpp>
+#include <boost/nowide/convert.hpp>
 #include <optional>
 
 using namespace std::chrono_literals;
@@ -18,6 +19,7 @@ using namespace syncspirit;
 using namespace syncspirit::test;
 using namespace syncspirit::model;
 using namespace syncspirit::net;
+using boost::nowide::narrow;
 
 using configure_callback_t = std::function<void(r::plugin::plugin_base_t &)>;
 using finish_callback_t = std::function<void()>;
@@ -149,7 +151,7 @@ struct fixture_t {
                          .request_timeout(timeout / 2)
                          .timeout(timeout)
                          .registry_name("http")
-                         .root_ca(root_ca)
+                         .ssl_verify_store(ssl_verify_store)
                          .keep_alive(request_keep_alive())
                          .finish();
         sup->do_process();
@@ -273,7 +275,7 @@ struct fixture_t {
         return sup->create_actor<resolver_actor_t>().resolve_timeout(timeout / 2).timeout(timeout).finish();
     }
 
-    utils::bytes_view_t root_ca;
+    std::string ssl_verify_store;
     asio::io_context io_ctx{1};
     ra::system_context_asio_t ctx;
     acceptor_t acceptor;
@@ -713,17 +715,21 @@ void test_https_200_ok() {
         using ssl_socket_t = ssl::stream<tcp::socket>;
         using ssl_socket_opt_t = std::optional<ssl_socket_t>;
 
-        F() : ctx(boost::asio::ssl::context::tls) {
+        F() : ctx(boost::asio::ssl::context::tls), tmp_path{unique_path()}, tmp_guard{tmp_path} {
+            bfs::create_directories(tmp_path);
             server_keys = utils::generate_pair("test_server").value();
+            auto cert_path = narrow((tmp_path / "cert.pem").wstring());
+            auto private_path = narrow((tmp_path / "priv.pem").wstring());
+            REQUIRE(server_keys.save(cert_path.data(), private_path.data()));
+
+            ssl_verify_store = cert_path;
+
             ctx.set_options(ssl::context::default_workarounds | ssl::context::no_sslv2);
 
             auto &cert = server_keys.cert_data;
             auto &key = server_keys.key_data;
             ctx.use_certificate(asio::const_buffer(cert.data(), cert.size()), ssl::context::asn1);
             ctx.use_private_key(asio::const_buffer(key.data(), key.size()), ssl::context::asn1);
-
-            root_ca_data = std::move(utils::as_serialized_pem(server_keys.cert.get()).value());
-            root_ca = root_ca_data;
         }
 
         utils::uri_ptr_t make_url(std::string_view path) override {
@@ -772,9 +778,10 @@ void test_https_200_ok() {
         }
 
         utils::key_pair_t server_keys;
-        utils::bytes_t root_ca_data;
         ssl::context ctx;
         ssl_socket_opt_t peer_ssl_sock;
+        bfs::path tmp_path;
+        test::path_guard_t tmp_guard;
     };
     F().run();
 }

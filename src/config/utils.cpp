@@ -26,6 +26,14 @@
         }                                                                                                              \
     }
 
+#define SAFE_GET_VALUE_OPTIONAL(property, type, table_name)                                                            \
+    {                                                                                                                  \
+        auto option = t[#property].value<std::string>();                                                               \
+        if (option) {                                                                                                  \
+            c.property = option.value();                                                                               \
+        }                                                                                                              \
+    }
+
 #define SAFE_GET_PATH(property, table_name)                                                                            \
     {                                                                                                                  \
         auto option = t[#property].value<std::string>();                                                               \
@@ -131,7 +139,13 @@ static main_t make_default_config(const bfs::path &config_path, const bfs::path 
     main_t cfg;
     cfg.config_path = config_path;
     cfg.default_location = config_dir / L"shared-data";
-    cfg.root_ca_file = bfs::path{};
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+    cfg.ssl_verify_store = "org.openssl.winstore://";
+#elif defined(__APPLE__)
+    cfg.ssl_verify_store = "/etc/ssl/cert.pem";
+#else
+    cfg.ssl_verify_store = {};
+#endif
     cfg.cert_file = cert_file;
     cfg.key_file = key_file;
     cfg.timeout = 30000;
@@ -245,7 +259,7 @@ config_result_t get_config(std::istream &config, const bfs::path &config_path) {
         SAFE_GET_PATH(default_location, "main");
         SAFE_GET_VALUE(hasher_threads, std::uint32_t, "main");
         SAFE_GET_VALUE(poll_timeout, std::uint32_t, "main");
-        SAFE_GET_PATH_OPTIONAL(root_ca_file, "main");
+        SAFE_GET_VALUE_OPTIONAL(ssl_verify_store, std::string, "main");
         SAFE_GET_PATH_EXPANDED(cert_file, "main");
         SAFE_GET_PATH_EXPANDED(key_file, "main");
     };
@@ -421,7 +435,7 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
         {"main", toml::table{{
                      {"hasher_threads", cfg.hasher_threads},
                      {"poll_timeout", cfg.poll_timeout},
-                     {"root_ca_file", narrow(cfg.root_ca_file.wstring())},
+                     {"root_ca_file", cfg.ssl_verify_store},
                      {"cert_file", narrow(cert_file.wstring())},
                      {"key_file", narrow(key_file.wstring())},
                      {"timeout", cfg.timeout},

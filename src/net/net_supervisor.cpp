@@ -74,27 +74,6 @@ net_supervisor_t::net_supervisor_t(net_supervisor_t::config_t &cfg)
         throw "cannot get common name from certificate";
     }
 
-    if (!app_config.root_ca_file.empty()) {
-        auto &file = app_config.root_ca_file;
-        LOG_TRACE(log, "going to read root ca file fron '{}'", file.string());
-        using in_t = utils::ifstream_t;
-        auto path = bfs::path(file);
-        auto ec = sys::error_code();
-        auto size = bfs::file_size(path, ec);
-        if (ec) {
-            LOG_WARN(log, "cannot read root ca file size: {}", ec.message());
-        } else {
-            auto in = in_t(path, in_t::in | in_t::binary);
-            auto data = utils::bytes_t(size);
-            in.read(reinterpret_cast<char *>(data.data()), size);
-            if (!in.fail()) {
-                root_ca = std::move(data);
-            } else {
-                LOG_WARN(log, "cannot read root ca file '{}'", file.string());
-            }
-        }
-    }
-
     auto &mru_size = app_config.fs_config.mru_size;
     auto &sim_writes = app_config.bep_config.blocks_simultaneous_write;
     if (app_config.fs_config.mru_size <= app_config.bep_config.blocks_simultaneous_write) {
@@ -283,7 +262,7 @@ void net_supervisor_t::on_app_ready(model::message::app_ready_t &) noexcept {
             .request_timeout(io_timeout)
             .resolve_timeout(io_timeout)
             .registry_name(names::http11_gda)
-            .root_ca(root_ca)
+            .ssl_verify_store(app_config.ssl_verify_store)
             .keep_alive(true)
             .escalate_failure()
             .finish();
@@ -314,7 +293,7 @@ void net_supervisor_t::on_app_ready(model::message::app_ready_t &) noexcept {
             .request_timeout(io_timeout)
             .resolve_timeout(io_timeout)
             .registry_name(names::http11_relay)
-            .root_ca(root_ca)
+            .ssl_verify_store(app_config.ssl_verify_store)
             .keep_alive(true)
             .escalate_failure()
             .finish();
@@ -325,7 +304,6 @@ void net_supervisor_t::on_app_ready(model::message::app_ready_t &) noexcept {
                 .timeout(timeout)
                 .relay_config(app_config.relay_config)
                 .cluster(cluster)
-                .root_ca(root_ca)
                 .spawner_address(spawner)
                 .finish();
         };

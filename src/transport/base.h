@@ -44,7 +44,7 @@ struct transport_config_t {
     utils::uri_ptr_t uri;
     ra::supervisor_asio_t &supervisor;
     std::optional<tcp::socket> sock;
-    utils::bytes_view_t root_ca;
+    std::string_view ssl_verify_store;
     bool sni_extension;
     bool active;
 };

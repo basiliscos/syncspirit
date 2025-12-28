@@ -99,7 +99,7 @@ template <> struct base_impl_t<ssl_socket_t> {
     model::device_id_t expected_peer;
     model::device_id_t actual_peer;
     const utils::key_pair_t *me = nullptr;
-    utils::bytes_view_t root_ca;
+    std::string_view ssl_verify_store;
     ssl::context ctx;
     ssl::stream_base::handshake_type role;
     ssl_socket_t sock;
@@ -122,29 +122,24 @@ template <> struct base_impl_t<ssl_socket_t> {
 
         auto log = utils::get_logger("transport.tls");
         bool use_sytem_verify_paths = true;
-        if (source.root_ca.size()) {
-            auto &ca = source.root_ca;
-            auto buffer = asio::const_buffer(ca.data(), ca.size());
+        if (source.ssl_verify_store.size()) {
+            auto r = SSL_CTX_load_verify_store(ctx.native_handle(), source.ssl_verify_store.data());
             auto ec = sys::error_code();
-            ctx.add_certificate_authority(buffer, ec);
+            if (!r) {
+                auto code = ::ERR_get_error();
+                ec = sys::error_code(static_cast<int>(code), asio::error::get_ssl_category());
+            }
             if (ec) {
-                log->warn("cannot add certificate_authority: {}", ec.message());
+                log->warn("cannot load_verify_store: {}", ec.message());
             } else {
-                log->trace("using custom root ca");
+                log->trace("using ssl verify store: {}", source.ssl_verify_store);
                 use_sytem_verify_paths = false;
             }
         }
         if (use_sytem_verify_paths) {
             log->trace("using default verify paths");
             auto ec = sys::error_code();
-#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
-            if (!SSL_CTX_load_verify_store(ctx.native_handle(), "org.openssl.winstore://")) {
-                auto code = ::ERR_get_error();
-                ec = sys::error_code(static_cast<int>(code), asio::error::get_ssl_category());
-            }
-#else
             ctx.set_default_verify_paths(ec);
-#endif
             if (ec) {
                 log->warn("cannot set ssl default verify paths: {}", ec.message());
             }
@@ -175,7 +170,7 @@ template <> struct base_impl_t<ssl_socket_t> {
     }
 
     base_impl_t(transport_config_t &config) noexcept
-        : supervisor{config.supervisor}, strand{supervisor.get_strand()}, root_ca(config.root_ca),
+        : supervisor{config.supervisor}, strand{supervisor.get_strand()}, ssl_verify_store(config.ssl_verify_store),
           ctx(get_context(*this, config.ssl_junction)),
           role(!config.active ? ssl::stream_base::server : ssl::stream_base::client),
           sock(mk_sock(config, ctx, strand)) {

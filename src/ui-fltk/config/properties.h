@@ -365,12 +365,12 @@ struct key_file_t final : impl::path_t {
     void reflect_to(syncspirit::config::main_t &main) override;
 };
 
-struct root_ca_file final : impl::path_t {
-    using parent_t = impl::path_t;
+struct ssl_verify_store final : impl::string_t {
+    using parent_t = impl::string_t;
 
     static const char *explanation_;
 
-    root_ca_file(const bfs::path &value, const bfs::path &default_value);
+    ssl_verify_store(std::string value, std::string default_value);
 
     void reflect_to(syncspirit::config::main_t &main) override;
 };
