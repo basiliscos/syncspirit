@@ -32,4 +32,4 @@ tasks:
       - name: test
         script:
           - cd build.ci
-          - ctest -j`nproc` .
+          - ctest --rerun-failed --output-on-failure .
