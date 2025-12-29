@@ -64,6 +64,7 @@ TEST_CASE("file sink", "[log]") {
     auto log_file = dir / u8"папка" / u8"журнал.txt";
     INFO("log_file = " << log_file);
     auto log_file_str = boost::nowide::narrow(log_file.wstring());
+    INFO("log_file(2) = " << log_file);
 
     auto sink_config = fmt::format("file:{}", log_file_str);
     config::log_configs_t cfg{{"default", L::trace, {sink_config}}};
