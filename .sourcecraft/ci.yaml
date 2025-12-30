@@ -4,6 +4,8 @@ on:
 
 workflows:
   build-package-workflow:
+    settings:
+        max_cube_duration: 35m
     tasks:
       - compile-san-n-test
       
