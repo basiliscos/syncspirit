@@ -44,4 +44,7 @@ tasks:
       - name: test
         script:
           - cd build.ci
+          - ./tests/031-diff-cluster_update -sa
+          - ./tests/087-local_keeper -sa
           - ctest --rerun-failed --output-on-failure .
+
