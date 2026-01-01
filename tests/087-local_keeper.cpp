@@ -1630,6 +1630,8 @@ void test_incomplete() {
                     if (read_file(path) == "") {
                         builder->scan_start(folder->get_id()).apply(*sup);
                         CHECK(files->size() == 0);
+                    } else {
+                        should_not_exist = false;
                     }
                 }
 #endif
