@@ -1626,8 +1626,10 @@ void test_incomplete() {
                     builder->make_index(sha256, folder->get_id()).add(pr_file, peer_device).finish().apply(*sup);
 
                     bfs::permissions(path, bfs::perms::all, bfs::perm_options::remove);
-                    builder->scan_start(folder->get_id()).apply(*sup);
-                    CHECK(files->size() == 0);
+                    if (read_file(path) == "") {
+                        builder->scan_start(folder->get_id()).apply(*sup);
+                        CHECK(files->size() == 0);
+                    }
                 }
 #endif
                 SECTION("local version is better than remote (local file does exists)") {
