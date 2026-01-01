@@ -1011,15 +1011,20 @@ TEST_CASE("auto-accept folders", "[model]") {
         bfs::create_directories(new_root);
         bfs::permissions(new_root, bfs::perms::all, bfs::perm_options::remove);
         auto new_guard = test::path_guard_t(new_root);
+        auto ec = sys::error_code{};
+        bfs::create_directories(new_root / L"авось", ec);
 
-        auto r = builder.configure_cluster(sha256_1, new_root).add(sha256_1, folder_1_id, 5, 4).fail();
-        REQUIRE(r);
-
-        REQUIRE(cluster->get_folders().size() == 0);
-        REQUIRE(!cluster->get_folders().by_id(folder_1_id));
-
-        bfs::permissions(new_root, bfs::perms::all, bfs::perm_options::add);
-        CHECK(!bfs::exists(new_root / folder_1_id));
+        if (ec) {
+            auto r = builder.configure_cluster(sha256_1, new_root).add(sha256_1, folder_1_id, 5, 4).fail();
+            bfs::permissions(new_root, bfs::perms::all, bfs::perm_options::add);
+            REQUIRE(r);
+            REQUIRE(cluster->get_folders().size() == 0);
+            REQUIRE(!cluster->get_folders().by_id(folder_1_id));
+            CHECK(!bfs::exists(new_root / folder_1_id));
+        } else {
+            bfs::permissions(new_root, bfs::perms::all, bfs::perm_options::add);
+            INFO("Skipping due to unability to prohibit directories creation");
+        }
     }
 #endif
     SECTION("auto accept + introduce peer (source first)") {
