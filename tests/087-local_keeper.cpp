@@ -1188,6 +1188,7 @@ void test_scan_errors() {
                 CHECK(folder->get_scan_finish() >= folder->get_scan_start());
                 bfs::permissions(root_path, bfs::perms::all);
             }
+#ifndef SYNCSPIRIT_WIN
             SECTION("non-root errors (non-win32)") {
                 auto dir_path = root_path / "d1" / "d2";
                 auto d1_path = dir_path.parent_path();
@@ -1204,15 +1205,14 @@ void test_scan_errors() {
                 bfs::permissions(d1_path, perms, bfs::perm_options::add);
 
                 if (ec) {
-                    INFO("Skipping due to unability to prohibit directories creation");
-                } else {
                     REQUIRE(!folder->is_suspended());
                     CHECK(!folder->is_scanning());
                     CHECK(folder->get_scan_finish() >= folder->get_scan_start());
                     CHECK(files->size() == 0);
+                } else {
+                    INFO("Skipping due to unability to prohibit directories creation");
                 }
             }
-#ifndef SYNCSPIRIT_WIN
             SECTION("non-sync'able entity (named fifo file)") {
                 auto fifo_path = root_path / "fifo";
                 auto fifo_str = narrow(fifo_path.wstring());
