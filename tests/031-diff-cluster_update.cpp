@@ -1005,7 +1005,6 @@ TEST_CASE("auto-accept folders", "[model]") {
         REQUIRE(folder_1->is_shared_with(*peer_device_1));
         CHECK(bfs::exists(root_path / "zzz"));
     }
-#ifndef SYNCSPIRIT_WIN
     SECTION("not able to create dir by folder_id") {
         auto new_root = root_path / "sub-root";
         bfs::create_directories(new_root);
@@ -1026,7 +1025,6 @@ TEST_CASE("auto-accept folders", "[model]") {
             INFO("Skipping due to unability to prohibit directories creation");
         }
     }
-#endif
     SECTION("auto accept + introduce peer (source first)") {
         auto r = builder.configure_cluster(sha256_1, root_path)
                      .add(sha256_1, folder_1_id, 5, 4)
@@ -1057,27 +1055,33 @@ TEST_CASE("auto-accept folders", "[model]") {
         REQUIRE(folder_1->is_shared_with(*peer_device_2));
         CHECK(bfs::exists(root_path / folder_1_id));
     }
-#ifndef SYNCSPIRIT_WIN
     SECTION("not able to create dir (source second)") {
         auto new_root = root_path / "sub-root";
         bfs::create_directories(new_root);
-        bfs::permissions(new_root, bfs::perms::all, bfs::perm_options::remove);
         auto new_guard = test::path_guard_t(new_root);
+        bfs::permissions(new_root, bfs::perms::all, bfs::perm_options::remove);
 
-        auto r = builder.configure_cluster(sha256_1, new_root)
-                     .add(sha256_2, folder_1_id, 55, 44)
-                     .add(sha256_1, folder_1_id, 5, 4)
-                     .fail();
-        REQUIRE(r);
+        auto ec = sys::error_code{};
+        bfs::create_directories(new_root / L"авось", ec);
 
-        REQUIRE(cluster->get_folders().size() == 0);
-        REQUIRE(cluster->get_devices().size() == 2);
-        REQUIRE(!cluster->get_folders().by_id(folder_1_id));
+        if (ec) {
+            auto r = builder.configure_cluster(sha256_1, new_root)
+                         .add(sha256_2, folder_1_id, 55, 44)
+                         .add(sha256_1, folder_1_id, 5, 4)
+                         .fail();
+            REQUIRE(r);
 
-        bfs::permissions(new_root, bfs::perms::all, bfs::perm_options::add);
-        CHECK(!bfs::exists(new_root / folder_1_id));
+            REQUIRE(cluster->get_folders().size() == 0);
+            REQUIRE(cluster->get_devices().size() == 2);
+            REQUIRE(!cluster->get_folders().by_id(folder_1_id));
+
+            bfs::permissions(new_root, bfs::perms::all, bfs::perm_options::add);
+            CHECK(!bfs::exists(new_root / folder_1_id));
+        } else {
+            bfs::permissions(new_root, bfs::perms::all, bfs::perm_options::add);
+            INFO("Skipping due to unability to prohibit directories creation");
+        }
     }
-#endif
 }
 
 TEST_CASE("redundant shares", "[model]") {
