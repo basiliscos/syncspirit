@@ -1600,6 +1600,7 @@ void test_incomplete() {
                 CHECK(!bfs::exists(path));
             }
             SECTION("found in peer model, remove") {
+                auto should_not_exist = true;
                 SECTION("size mise mismatch") {
                     proto::add_blocks(pr_file, b_1);
                     proto::set_size(pr_file, data_1.size());
@@ -1657,7 +1658,9 @@ void test_incomplete() {
                     auto seq_2 = folder_info->get_max_sequence();
                     REQUIRE(seq_1 == seq_2);
                 }
-                CHECK(!bfs::exists(path));
+                if (should_not_exist) {
+                    CHECK(!bfs::exists(path));
+                }
             }
             SECTION("2 blocks peer file") {
                 proto::add_blocks(pr_file, b_1);
