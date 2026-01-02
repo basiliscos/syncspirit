@@ -9,7 +9,7 @@ tasks:
 workflows:
   build-package-workflow:
     settings:
-        max_cube_duration: 35m
+        max_cube_duration: 120m
     tasks:
       #- [compile-san-n-test, make-app-image]
       - [make-app-image]
@@ -75,5 +75,3 @@ tasks:
         script:
           - mkdir build.chroot
           - conan install -u --build=missing --output-folder . -s build_type=Release  -o '&:shared=True' ..
-
-
