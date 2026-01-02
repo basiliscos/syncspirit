@@ -2,13 +2,17 @@ on:
   push:
     - workflows: build-package-workflow
 
+tasks:
+  - name: compile-san-n-test
+  - name: make-app-image
+
 workflows:
   build-package-workflow:
     settings:
         max_cube_duration: 35m
     tasks:
-      #- compile-san-n-test
-      - make-app-image
+      #- [compile-san-n-test, make-app-image]
+      - [make-app-image]
       
 tasks:
   - name: compile-san-n-test
@@ -46,7 +50,6 @@ tasks:
         script:
           - cd build.ci
           - ctest --rerun-failed --output-on-failure .
-
   - name: make-app-image
     cubes:
       - name: preprate
