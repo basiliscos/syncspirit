@@ -12,8 +12,8 @@ workflows:
         max_cube_duration: 120m
     tasks:
       #- [compile-san-n-test, make-app-image]
-      - [make-app-image]
-      
+      - make-app-image
+
 tasks:
   - name: compile-san-n-test
     cubes:
@@ -56,23 +56,23 @@ tasks:
         image: ubuntu:focal
         script:
          - export PATH=$HOME/my-gcc/bin:$HOME/.local/bin:$PATH
-         # - apt update
-         # - apt install -y software-properties-common
-         # - apt update
-         # - apt-get install -y g++9 gcc-9 wget libxft-dev build-essential python3-pip make cmake git fuse libfuse2 libx11-dev libx11-xcb-dev libfontenc-dev libice-dev libsm-dev libxau-dev libxaw7-dev libxcomposite-dev libxcursor-dev libxdamage-dev libxfixes-dev libxi-dev libxinerama-dev libxkbfile-dev libxmuu-dev libxrandr-dev libxrender-dev libxres-dev libxss-dev libxtst-dev libxv-dev libxxf86vm-dev libxcb-glx0-dev libxcb-render0-dev libxcb-render-util0-dev libxcb-xkb-dev libxcb-icccm4-dev libxcb-image0-dev libxcb-keysyms1-dev libxcb-randr0-dev libxcb-shape0-dev libxcb-sync-dev libxcb-xfixes0-dev libxcb-xinerama0-dev libxcb-dri3-dev uuid-dev libxcb-cursor-dev libxcb-dri2-0-dev libxcb-dri3-dev libxcb-present-dev libxcb-composite0-dev libxcb-ewmh-dev libxcb-res0-dev libxcb-util0-dev libxcb-util-dev libglu1-mesa-dev pkgconf file
-         # - pip3 install --user conan
-         # - pip3 install conan
-         # - conan profile detect
-         # - cp .sourcecraft/conan-profile-linux-appimage /root/.conan2/profiles/default
-         # - wget https://ftp.gnu.org/gnu/gcc/gcc-14.3.0/gcc-14.3.0.tar.xz
-         # - tar -xf gcc-14.3.0.tar.xz
-         # - cd gcc-14.3.0
-         # - ./contrib/download_prerequisites
-         # - ./configure --prefix=/$HOME/my-gcc --enable-languages=c,c++ --disable-multilib --enable-bootstrap
-         # - make -j`nproc`
-         # - make install
+         - apt update
+         - apt install -y software-properties-common
+         - apt update
+         - apt-get install -y g++9 gcc-9 wget libxft-dev build-essential python3-pip make cmake git fuse libfuse2 libx11-dev libx11-xcb-dev libfontenc-dev libice-dev libsm-dev libxau-dev libxaw7-dev libxcomposite-dev libxcursor-dev libxdamage-dev libxfixes-dev libxi-dev libxinerama-dev libxkbfile-dev libxmuu-dev libxrandr-dev libxrender-dev libxres-dev libxss-dev libxtst-dev libxv-dev libxxf86vm-dev libxcb-glx0-dev libxcb-render0-dev libxcb-render-util0-dev libxcb-xkb-dev libxcb-icccm4-dev libxcb-image0-dev libxcb-keysyms1-dev libxcb-randr0-dev libxcb-shape0-dev libxcb-sync-dev libxcb-xfixes0-dev libxcb-xinerama0-dev libxcb-dri3-dev uuid-dev libxcb-cursor-dev libxcb-dri2-0-dev libxcb-dri3-dev libxcb-present-dev libxcb-composite0-dev libxcb-ewmh-dev libxcb-res0-dev libxcb-util0-dev libxcb-util-dev libglu1-mesa-dev pkgconf file
+         - pip3 install --user conan
+         - pip3 install conan
+         - conan profile detect
+         - cp .sourcecraft/conan-profile-linux-appimage /root/.conan2/profiles/default
+         - wget https://ftp.gnu.org/gnu/gcc/gcc-14.3.0/gcc-14.3.0.tar.xz
+         - tar -xf gcc-14.3.0.tar.xz
+         - cd gcc-14.3.0
+         - ./contrib/download_prerequisites
+         - ./configure --prefix=/$HOME/my-gcc --enable-languages=c,c++ --disable-multilib --enable-bootstrap
+         - make -j`nproc`
+         - make install
       - name: setup
         script:
-         - echo $PATH
-          # - mkdir build.chroot
-          # - conan install -u --build=missing --output-folder . -s build_type=Release  -o '&:shared=True' ..
+        - export PATH=$HOME/my-gcc/bin:$HOME/.local/bin:$PATH
+          - mkdir build.chroot
+          - conan install -u --build=missing --output-folder . -s build_type=Release  -o '&:shared=True' ..
