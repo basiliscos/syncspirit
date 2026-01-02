@@ -54,10 +54,8 @@ tasks:
     cubes:
       - name: prepare
         image: ubuntu:focal
-        # env:
-        #   PATH: ${{env.HOME}}/my-gcc/bin:${{env.HOME}}/.local/bin:${{env.PATH}}
         env:
-          PATH: ${{ env.HOME }}/my-gcc/bin
+          PATH: $HOME/my-gcc/bin:$HOME/.local/bin:$PATH
         script:
          - echo $PATH
          - apt update
