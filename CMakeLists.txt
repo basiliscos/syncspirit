@@ -12,7 +12,10 @@ cmake_policy(SET CMP0091 NEW)
 cmake_policy(SET CMP0135 NEW)
 
 include(GenerateExportHeader)
-include (FetchContent)
+include(FetchContent)
+include(CheckIncludeFile)
+
+option(SYNCSPIRIT_BUILD_TESTS "Enable building tests [default: OFF]"  OFF)
 
 if (WIN32)
     # set(CMAKE_CROSSCOMPILING on)
@@ -46,8 +49,10 @@ find_package(nlohmann_json REQUIRED)
 #find_package(c-ares REQUIRED)
 
 set(SYNCSPIRIT_VERSION "v${CMAKE_PROJECT_VERSION}")
-
-option(SYNCSPIRIT_BUILD_TESTS "Enable building tests [default: OFF]"  OFF)
+check_include_file("sys/inotify.h" SYNCSPIRIT_WATCHER_INOTIFY)
+if (WIN32)
+    set(SYNCSPIRIT_WATCHER_WIN32 true)
+endif()
 
 set(dist_dir "${syncspirit_BINARY_DIR}/dist")
 add_custom_target("deploy")
@@ -102,6 +107,7 @@ add_library(syncspirit_core
     src/fs/file.cpp
     src/fs/file_actor.cpp
     src/fs/file_cache.cpp
+    src/fs/fs_context.cpp
     src/fs/fs_supervisor.cpp
     src/fs/fs_slave.cpp
     src/fs/utils.cpp

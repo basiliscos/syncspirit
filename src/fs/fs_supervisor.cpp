@@ -1,8 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "fs_supervisor.h"
 #include "file_actor.h"
+#include "fs_context.hpp"
+
+#if SYNCSPIRIT_WATCHER_INOTIFY
+#include <unistd.h>
+#endif
 
 using namespace syncspirit::fs;
 
@@ -17,6 +22,20 @@ void fs_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.set_identity("fs.supervisor", false);
         log = utils::get_logger(identity);
     });
+}
+
+void fs_supervisor_t::enqueue(r::message_ptr_t message) noexcept {
+#if SYNCSPIRIT_WATCHER_INOTIFY
+    auto ctx = static_cast<fs_context_t *>(context);
+    inbound_queue.push(message.detach());
+    auto &flag = ctx->async_flag;
+    if (!flag.load(std::memory_order_acquire)) {
+        flag.store(true, std::memory_order_release);
+        write(ctx->async_pipes[1], &(ctx->async_pipes[1]), 1);
+    }
+#else
+    parent_t::enqueue(std::move(message));
+#endif
 }
 
 void fs_supervisor_t::on_start() noexcept {

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #pragma once
 
@@ -43,6 +43,7 @@ struct SYNCSPIRIT_API fs_supervisor_t : rth::supervisor_thread_t {
 
     explicit fs_supervisor_t(config_t &cfg);
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
+    void enqueue(r::message_ptr_t message) noexcept override;
     void on_start() noexcept override;
     void on_child_shutdown(actor_base_t *actor) noexcept override;
 

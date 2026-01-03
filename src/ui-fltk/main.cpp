@@ -24,6 +24,7 @@
 #include "net/net_supervisor.h"
 #include "bouncer/bouncer_actor.h"
 #include "fs/fs_supervisor.h"
+#include "fs/fs_context.hpp"
 
 #include <FL/Fl.H>
 #include <FL/Fl_Window.H>
@@ -74,6 +75,14 @@ struct asio_sys_context_t : ra::system_context_asio_t {
 
 struct thread_sys_context_t : rth::system_context_thread_t {
     using parent_t = rth::system_context_thread_t;
+    using parent_t::parent_t;
+    void on_error(r::actor_base_t *actor, const r::extended_error_ptr_t &ec) noexcept override {
+        report_error_and_die(actor, ec);
+    }
+};
+
+struct fs_context_t : fs::fs_context_t {
+    using parent_t = fs::fs_context_t;
     using parent_t::parent_t;
     void on_error(r::actor_base_t *actor, const r::extended_error_ptr_t &ec) noexcept override {
         report_error_and_die(actor, ec);
@@ -376,7 +385,7 @@ int app_main(app_context_t &app_ctx) {
     // warm-up
     sup_fltk->do_process();
 
-    thread_sys_context_t fs_context;
+    auto fs_context = fs_context_t();
     auto fs_sup = fs_context.create_supervisor<syncspirit::fs::fs_supervisor_t>()
                       .shutdown_flag(shutdown_flag, r::pt::millisec{50})
                       .timeout(timeout)
