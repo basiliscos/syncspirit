@@ -25,16 +25,19 @@ void fs_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 }
 
 void fs_supervisor_t::enqueue(r::message_ptr_t message) noexcept {
-#if SYNCSPIRIT_WATCHER_INOTIFY
     auto ctx = static_cast<fs_context_t *>(context);
     inbound_queue.push(message.detach());
+#if SYNCSPIRIT_WATCHER_INOTIFY
     auto &flag = ctx->async_flag;
     if (!flag.load(std::memory_order_acquire)) {
         flag.store(true, std::memory_order_release);
         write(ctx->async_pipes[1], &(ctx->async_pipes[1]), 1);
     }
+#elif SYNCSPIRIT_WATCHER_WIN32
+    ::SetEvent(ctx->async_event);
 #else
-    parent_t::enqueue(std::move(message));
+    std::lock_guard<std::mutex> lock(ctx->mutex);
+    ctx->cv.notify_one();
 #endif
 }
 
