@@ -3,6 +3,8 @@
 
 #include "watcher_actor.h"
 
+#include <boost/nowide/convert.hpp>
+
 #if SYNCSPIRIT_WATCHER_INOTIFY
 #include <sys/inotify.h>
 #include <string.h>
@@ -10,6 +12,8 @@
 #endif
 
 using namespace syncspirit::fs;
+
+using boost::nowide::narrow;
 
 static constexpr auto actor_identity = "fs.watcher";
 
@@ -26,6 +30,12 @@ void watch_actor_t::do_initialize(r::system_context_t *ctx) noexcept {
     parent_t::do_initialize(ctx);
 }
 
+void watch_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
+    r::actor_base_t::configure(plugin);
+    plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) { p.set_identity(actor_identity, false); });
+    plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) { p.subscribe_actor(&watch_actor_t::on_watch); });
+}
+
 void watch_actor_t::shutdown_finish() noexcept {
 #if SYNCSPIRIT_WATCHER_INOTIFY
     if (inotify_lib > 0) {
@@ -33,4 +43,9 @@ void watch_actor_t::shutdown_finish() noexcept {
     }
 #endif
     parent_t::shutdown_finish();
+}
+
+void watch_actor_t::on_watch(message::watch_folder_t &message) noexcept {
+    auto &path = message.payload.path;
+    LOG_TRACE(log, "on watch on '{}'", narrow(path.wstring()));
 }

@@ -29,7 +29,8 @@ struct SYNCSPIRIT_TEST_API supervisor_t : fs::fs_supervisor_t {
 
 struct fixture_t {
     using target_ptr_t = r::intrusive_ptr_t<fs::watch_actor_t>;
-    fixture_t(bool auto_launch = true) noexcept : root_path{unique_path()}, path_guard{root_path} {
+    fixture_t(bool auto_launch_ = true) noexcept
+        : auto_launch{auto_launch_}, root_path{unique_path()}, path_guard{root_path} {
         bfs::create_directory(root_path);
     }
 
@@ -40,6 +41,11 @@ struct fixture_t {
         sup->start();
         sup->do_process();
         REQUIRE(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::OPERATIONAL);
+
+        if (auto_launch) {
+            launch_target();
+            REQUIRE(static_cast<r::actor_base_t *>(target.get())->access<to::state>() == r::state_t::OPERATIONAL);
+        }
 
         main();
 
@@ -56,6 +62,7 @@ struct fixture_t {
 
     virtual void main() noexcept {}
 
+    bool auto_launch;
     bfs::path root_path;
     test::path_guard_t path_guard;
     r::intrusive_ptr_t<supervisor_t> sup;
@@ -81,10 +88,19 @@ void test_start_n_shutdown() {
     F(false).run();
 }
 
+void test_flat_root_folder() {
+    struct F : fixture_t {
+        using fixture_t::fixture_t;
+        void main() noexcept override { CHECK(1 + 1 == 2); }
+    };
+    F().run();
+}
+
 int _init() {
     test::init_logging();
 #if defined(SYNCSPIRIT_WATCHER_ANY)
     REGISTER_TEST_CASE(test_start_n_shutdown, "test_start_n_shutdown", "[fs]");
+    REGISTER_TEST_CASE(test_flat_root_folder, "test_flat_root_folder", "[fs]");
 #endif
     return 1;
 }
