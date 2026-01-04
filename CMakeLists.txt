@@ -111,6 +111,7 @@ add_library(syncspirit_core
     src/fs/fs_supervisor.cpp
     src/fs/fs_slave.cpp
     src/fs/utils.cpp
+    src/fs/watcher_actor.cpp
     src/fs/task/noop.cpp
     src/fs/task/remove_file.cpp
     src/fs/task/rename_file.cpp
