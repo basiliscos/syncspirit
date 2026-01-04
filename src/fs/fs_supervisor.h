@@ -47,6 +47,9 @@ struct SYNCSPIRIT_API fs_supervisor_t : rth::supervisor_thread_t {
     void on_start() noexcept override;
     void on_child_shutdown(actor_base_t *actor) noexcept override;
 
+  protected:
+    virtual void launch_children() noexcept;
+
   private:
     utils::logger_t log;
     config::fs_config_t fs_config;

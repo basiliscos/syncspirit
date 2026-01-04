@@ -44,6 +44,10 @@ void fs_supervisor_t::enqueue(r::message_ptr_t message) noexcept {
 void fs_supervisor_t::on_start() noexcept {
     LOG_TRACE(log, "on_start");
     parent_t::on_start();
+    launch_children();
+}
+
+void fs_supervisor_t::launch_children() noexcept {
     auto timeout = shutdown_timeout * 9 / 10;
     create_actor<file_actor_t>()
         .rw_cache(rw_cache)
