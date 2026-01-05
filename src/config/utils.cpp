@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "utils.h"
 
@@ -151,7 +151,7 @@ static main_t make_default_config(const bfs::path &config_path, const bfs::path 
     cfg.timeout = 30000;
     cfg.device_name = device;
     cfg.hasher_threads = 3;
-    cfg.poll_timeout = 1;
+    cfg.poll_timeout = 0;
     cfg.log_configs = {
         // log_config_t {
         //     "default", spdlog::level::level_enum::trace, {"stdout"}
