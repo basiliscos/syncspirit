@@ -134,7 +134,10 @@ struct clone_block_t : payload_base_t<void> {
 };
 
 using io_command_t = std::variant<block_request_t, remote_copy_t, finish_file_t, append_block_t, clone_block_t>;
-using io_commands_t = std::vector<io_command_t>;
+struct io_commands_t {
+    const void *context;
+    std::vector<io_command_t> commands;
+};
 
 struct create_dir_t : bfs::path {
     using parent_t = bfs::path;

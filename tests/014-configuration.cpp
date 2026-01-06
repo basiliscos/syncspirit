@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "test-utils.h"
 #include "config/utils.h"
@@ -23,7 +23,7 @@ bool operator==(const dialer_config_t &lhs, const dialer_config_t &rhs) noexcept
 }
 
 bool operator==(const fs_config_t &lhs, const fs_config_t &rhs) noexcept {
-    return lhs.temporally_timeout == rhs.temporally_timeout && lhs.mru_size == rhs.mru_size &&
+    return lhs.temporally_timeout == rhs.temporally_timeout &&
            lhs.bytes_scan_iteration_limit == rhs.bytes_scan_iteration_limit &&
            lhs.files_scan_iteration_limit == rhs.files_scan_iteration_limit;
 }

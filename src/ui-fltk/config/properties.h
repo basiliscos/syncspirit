@@ -236,15 +236,6 @@ struct files_scan_iteration_limit_t final : impl::positive_integer_t {
     void reflect_to(syncspirit::config::main_t &main) override;
 };
 
-struct mru_size_t final : impl::positive_integer_t {
-    using parent_t = impl::positive_integer_t;
-
-    static const char *explanation_;
-
-    mru_size_t(std::uint64_t value, std::uint64_t default_value);
-    void reflect_to(syncspirit::config::main_t &main) override;
-};
-
 struct temporally_timeout_t final : impl::positive_integer_t {
     using parent_t = impl::positive_integer_t;
 

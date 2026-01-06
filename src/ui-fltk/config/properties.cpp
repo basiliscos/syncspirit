@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2026 Ivan Baidakou
 
 #include "properties.h"
 #include "utils/log.h"
@@ -268,13 +268,6 @@ const char *skip_discovers_t::explanation_ = "when peer addresses are known, how
 } // namespace dialer
 
 namespace fs {
-
-mru_size_t::mru_size_t(std::uint64_t value, std::uint64_t default_value)
-    : parent_t("mru_size", explanation_, value, default_value) {}
-
-void mru_size_t::reflect_to(syncspirit::config::main_t &main) { main.fs_config.mru_size = native_value; }
-
-const char *mru_size_t::explanation_ = "maximum amount of cached/opened files";
 
 temporally_timeout_t::temporally_timeout_t(std::uint64_t value, std::uint64_t default_value)
     : parent_t("temporally_timeout", explanation_, value, default_value) {}

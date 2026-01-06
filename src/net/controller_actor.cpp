@@ -120,7 +120,8 @@ C::stack_context_t::~stack_context_t() {
         if (!io_commands.empty()) {
             auto &self = actor.get_address();
             auto &fs = actor.fs_addr;
-            actor.route<fs::payload::io_commands_t>(fs, self, std::move(io_commands));
+            auto cache_key = actor.get_address().get();
+            actor.route<fs::payload::io_commands_t>(fs, self, cache_key, std::move(io_commands));
             actor.resources->acquire(resource::fs);
         }
     }
@@ -365,7 +366,7 @@ void controller_actor_t::on_peer_down(message::peer_down_t &message) noexcept {
 void controller_actor_t::on_postprocess_io(fs::message::io_commands_t &message) noexcept {
     auto stack_ctx = stack_context_t(*this);
     resources->release(resource::fs);
-    for (auto &cmd : message.payload) {
+    for (auto &cmd : message.payload.commands) {
         std::visit(
             [&](auto &cmd) {
                 using T = std::decay_t<decltype(cmd)>;

@@ -21,8 +21,7 @@ r::plugin::resource_id_t controller = 0;
 } // namespace resource
 } // namespace
 
-file_actor_t::file_actor_t(config_t &cfg)
-    : r::actor_base_t{cfg}, rw_cache(std::move(cfg.rw_cache)), concurrent_hashes{cfg.concurrent_hashes} {}
+file_actor_t::file_actor_t(config_t &cfg) : r::actor_base_t{cfg}, concurrent_hashes{cfg.concurrent_hashes} {}
 
 void file_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
@@ -66,13 +65,14 @@ void file_actor_t::shutdown_start() noexcept {
 
 void file_actor_t::shutdown_finish() noexcept {
     LOG_TRACE(log, "shutdown_finish");
-    rw_cache->clear();
+    context_cache.clear();
     r::actor_base_t::shutdown_finish();
 }
 
 void file_actor_t::on_io_commands(message::io_commands_t &message) noexcept {
-    for (auto &cmd : message.payload) {
-        std::visit([&](auto &cmd) { process(cmd); }, cmd);
+    auto &p = message.payload;
+    for (auto &cmd : p.commands) {
+        std::visit([&](auto &cmd) { process(cmd, p.context); }, cmd);
     }
 }
 
@@ -92,14 +92,18 @@ void file_actor_t::on_controller_predown(net::message::controller_predown_t &mes
     auto &p = message.payload;
     LOG_DEBUG(log, "on_controller_predown, {}, started: {}", (const void *)p.controller.get(), p.started);
     if (p.started) {
+        auto cache_key = p.controller.get();
+        if (auto it = context_cache.find(cache_key); it != context_cache.end()) {
+            context_cache.erase(it);
+        }
         resources->release(resource::controller);
     }
 }
 
-void file_actor_t::process(payload::block_request_t &cmd) noexcept {
+void file_actor_t::process(payload::block_request_t &cmd, const void *context) noexcept {
     LOG_TRACE(log, "processing block request");
     auto &path = cmd.path;
-    auto file_opt = open_file_ro(path, true);
+    auto file_opt = open_file_ro(path, context);
     auto ec = sys::error_code{};
     auto data = utils::bytes_t{};
     if (!file_opt) {
@@ -123,7 +127,7 @@ void file_actor_t::process(payload::block_request_t &cmd) noexcept {
     cmd.result = std::move(data);
 }
 
-void file_actor_t::process(payload::remote_copy_t &cmd) noexcept {
+void file_actor_t::process(payload::remote_copy_t &cmd, const void *context) noexcept {
     auto &path = cmd.path;
     sys::error_code ec;
 
@@ -233,13 +237,29 @@ void file_actor_t::process(payload::remote_copy_t &cmd) noexcept {
     cmd.result = outcome::success();
 }
 
-void file_actor_t::process(payload::finish_file_t &cmd) noexcept {
+void file_actor_t::process(payload::finish_file_t &cmd, const void *context) noexcept {
     auto path_str = cmd.path.generic_string();
-    auto backend = rw_cache->get(cmd.path);
-    if (!backend) {
-        LOG_WARN(log, "attempt to flush non-opened file {}", path_str);
-        cmd.result = utils::make_error_code(utils::error_code_t::flush_non_opened);
-        return;
+    auto &file_cache = context_cache[context];
+    auto it = file_cache.find(cmd.path);
+    if (it == file_cache.end()) {
+        LOG_DEBUG(log, "attempt to flush non-opened file {}", path_str);
+        auto ec = sys::error_code{};
+        auto tmp_path = make_temporal(cmd.path);
+        if (!bfs::exists(tmp_path, ec)) {
+            cmd.result = utils::make_error_code(utils::error_code_t::flush_non_opened);
+            LOG_WARN(log, "file '{}' does not exist", tmp_path.generic_string());
+            return;
+        }
+
+        auto option = file_t::open_write(cmd.path, cmd.file_size);
+        if (!option) {
+            auto &err = option.assume_error();
+            LOG_ERROR(log, "cannot open file '{}': {}", path_str, err.message());
+            cmd.result = err;
+            return;
+        }
+        auto ptr = file_ptr_t(new file_t(std::move(option.assume_value())));
+        it = file_cache.emplace(cmd.path, ptr).first;
     }
 
     if (!cmd.conflict_path.empty()) {
@@ -254,7 +274,8 @@ void file_actor_t::process(payload::finish_file_t &cmd) noexcept {
         }
     }
 
-    rw_cache->remove(backend);
+    auto backend = it->second;
+    file_cache.erase(it);
     auto ok = backend->close(cmd.modification_s, cmd.path);
     if (!ok) {
         auto &ec = ok.assume_error();
@@ -279,9 +300,9 @@ void file_actor_t::process(payload::finish_file_t &cmd) noexcept {
     LOG_INFO(log, "file {} ({} bytes) is now locally available", path_str, cmd.file_size);
 }
 
-void file_actor_t::process(payload::append_block_t &cmd) noexcept {
+void file_actor_t::process(payload::append_block_t &cmd, const void *context) noexcept {
     auto &path = cmd.path;
-    auto file_opt = open_file_rw(path, cmd.file_size);
+    auto file_opt = open_file_rw(path, cmd.file_size, context);
     if (!file_opt) {
         auto path_str = path.string();
         auto &err = file_opt.assume_error();
@@ -293,9 +314,9 @@ void file_actor_t::process(payload::append_block_t &cmd) noexcept {
     cmd.result = backend->write(cmd.offset, cmd.data);
 }
 
-void file_actor_t::process(payload::clone_block_t &cmd) noexcept {
+void file_actor_t::process(payload::clone_block_t &cmd, const void *context) noexcept {
     auto target_path = cmd.target;
-    auto target_opt = open_file_rw(target_path, cmd.target_size);
+    auto target_opt = open_file_rw(target_path, cmd.target_size, context);
     if (!target_opt) {
         auto path_str = target_path.string();
         auto &err = target_opt.assume_error();
@@ -304,11 +325,13 @@ void file_actor_t::process(payload::clone_block_t &cmd) noexcept {
         return;
     }
     auto target_backend = std::move(target_opt.assume_value());
+    auto &file_cache = context_cache[context];
     auto source_backend_opt = [&]() -> outcome::result<file_ptr_t> {
-        if (auto cached = rw_cache->get(cmd.source); cached) {
-            return cached;
+        auto it = file_cache.find(cmd.source);
+        if (it != file_cache.end()) {
+            return it->second;
         } else {
-            return open_file_ro(cmd.source, false);
+            return open_file_ro(cmd.source, {});
         }
     }();
     if (!source_backend_opt) {
@@ -322,11 +345,12 @@ void file_actor_t::process(payload::clone_block_t &cmd) noexcept {
     cmd.result = target_backend->copy(cmd.target_offset, source_backend, cmd.source_offset, cmd.block_size);
 }
 
-auto file_actor_t::open_file_rw(const std::filesystem::path &path, std::uint64_t file_size) noexcept
-    -> outcome::result<file_ptr_t> {
-    auto item = rw_cache->get(path);
-    if (item) {
-        return item;
+auto file_actor_t::open_file_rw(const std::filesystem::path &path, std::uint64_t file_size,
+                                const void *context) noexcept -> outcome::result<file_ptr_t> {
+    auto &file_cache = context_cache[context];
+    auto it = file_cache.find(path);
+    if (it != file_cache.end()) {
+        return it->second;
     }
     LOG_TRACE(log, "open_file (rw), path = {}, size = {}", path.string(), file_size);
 
@@ -346,16 +370,17 @@ auto file_actor_t::open_file_rw(const std::filesystem::path &path, std::uint64_t
         return option.assume_error();
     }
     auto ptr = file_ptr_t(new file_t(std::move(option.assume_value())));
-    rw_cache->put(ptr);
+    file_cache[path] = ptr;
     return ptr;
 }
 
-auto file_actor_t::open_file_ro(const bfs::path &path, bool use_cache) noexcept -> outcome::result<file_ptr_t> {
-    if (use_cache) {
-        auto file = rw_cache->get(path);
-        if (file) {
+auto file_actor_t::open_file_ro(const bfs::path &path, const void *context) noexcept -> outcome::result<file_ptr_t> {
+    if (context) {
+        auto &file_cache = context_cache[context];
+        auto it = file_cache.find(path);
+        if (it != file_cache.end()) {
             LOG_TRACE(log, "open_file (r/o, by path, cache hit), path = {}", path.string());
-            return file;
+            return it->second;
         }
     }
 

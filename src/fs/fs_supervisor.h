@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #pragma once
 
 #include "config/fs.h"
 #include "syncspirit-export.h"
-#include "file_cache.h"
 #include "utils/log.h"
 #include <rotor/thread.hpp>
 
@@ -14,7 +13,6 @@ namespace fs {
 
 namespace r = rotor;
 namespace rth = rotor::thread;
-namespace outcome = boost::outcome_v2;
 
 struct SYNCSPIRIT_API fs_supervisor_config_t : r::supervisor_config_t {
     config::fs_config_t fs_config;
@@ -50,7 +48,6 @@ struct SYNCSPIRIT_API fs_supervisor_t : rth::supervisor_thread_t {
     utils::logger_t log;
     config::fs_config_t fs_config;
     uint32_t hasher_threads;
-    file_cache_ptr_t rw_cache;
 };
 
 } // namespace fs

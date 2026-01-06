@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "test_supervisor.h"
 #include "model/diff/load/commit.h"
@@ -120,7 +120,7 @@ void supervisor_t::on_package(bouncer::message::package_t &msg) noexcept {
 }
 
 void supervisor_t::on_io(fs::message::io_commands_t &message) noexcept {
-    for (auto &cmd : message.payload) {
+    for (auto &cmd : message.payload.commands) {
         std::visit([&](auto &cmd) { process_io(cmd); }, cmd);
     }
 }
