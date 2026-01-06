@@ -21,7 +21,8 @@ struct positive_integer_t : property_t {
 };
 
 struct non_negative_integer_t : property_t {
-    non_negative_integer_t(std::string label, std::string explanation, std::uint64_t value, std::uint64_t default_value);
+    non_negative_integer_t(std::string label, std::string explanation, std::uint64_t value,
+                           std::uint64_t default_value);
 
     error_ptr_t validate_value() noexcept override;
 

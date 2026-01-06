@@ -40,7 +40,7 @@ error_ptr_t positive_integer_t::validate_value() noexcept {
 }
 
 non_negative_integer_t::non_negative_integer_t(std::string label, std::string explanation, uint64_t value,
-                                       uint64_t default_value)
+                                               uint64_t default_value)
     : property_t(std::move(label), std::move(explanation), std::to_string(value), std::to_string(default_value),
                  property_kind_t::positive_integer),
       native_value{value} {}
