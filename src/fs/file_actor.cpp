@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "file_actor.h"
 #include "fs/fs_slave.h"
@@ -22,8 +22,7 @@ r::plugin::resource_id_t controller = 0;
 } // namespace
 
 file_actor_t::file_actor_t(config_t &cfg)
-    : r::actor_base_t{cfg}, rw_cache(std::move(cfg.rw_cache)), ro_cache(rw_cache->get_max_items()),
-      concurrent_hashes{cfg.concurrent_hashes} {}
+    : r::actor_base_t{cfg}, rw_cache(std::move(cfg.rw_cache)), concurrent_hashes{cfg.concurrent_hashes} {}
 
 void file_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
@@ -307,8 +306,6 @@ void file_actor_t::process(payload::clone_block_t &cmd) noexcept {
     auto target_backend = std::move(target_opt.assume_value());
     auto source_backend_opt = [&]() -> outcome::result<file_ptr_t> {
         if (auto cached = rw_cache->get(cmd.source); cached) {
-            return cached;
-        } else if (auto cached = ro_cache.get(cmd.source); cached) {
             return cached;
         } else {
             return open_file_ro(cmd.source, false);

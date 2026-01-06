@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #pragma once
 
@@ -75,7 +75,6 @@ struct SYNCSPIRIT_API file_actor_t : public r::actor_base_t {
     r::address_ptr_t coordinator;
     r::address_ptr_t db;
     file_cache_ptr_t rw_cache;
-    file_cache_t ro_cache;
     uint32_t concurrent_hashes;
     hasher::hasher_plugin_t *hasher = nullptr;
 };
