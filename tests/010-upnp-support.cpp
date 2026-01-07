@@ -15,10 +15,21 @@ TEST_CASE("ssdp reply-1", "[support]") {
     auto r = parse(body.data(), body.size());
     REQUIRE(r);
 
-    auto& d = r.value();
+    auto &d = r.value();
     CHECK(d.location->c_str() == std::string_view("http://192.168.100.1:49652/49652gatedesc.xml"));
     CHECK(d.search_target == "urn:schemas-upnp-org:device:InternetGatewayDevice:1");
     CHECK(d.usn == "uuid:00e0fc37-2525-2828-2500-E8681986854D::urn:schemas-upnp-org:device:InternetGatewayDevice:1");
+}
+
+TEST_CASE("ssdp reply-2", "[support]") {
+    auto body = read_file(locate_path("data/ssdp-reply-02.bin"));
+    auto r = parse(body.data(), body.size());
+    REQUIRE(r);
+
+    auto &d = r.value();
+    CHECK(d.location->c_str() == std::string_view("http://192.168.1.101:80/description.xml"));
+    CHECK(d.search_target == "upnp:rootdevice");
+    CHECK(d.usn == "uuid:2f402f80-da50-11e1-9b23-ecb5fa92d2ef::upnp:rootdevice");
 }
 
 TEST_CASE("parse IGD description", "[support]") {

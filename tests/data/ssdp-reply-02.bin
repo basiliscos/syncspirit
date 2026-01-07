@@ -1,0 +1,10 @@
+HTTP/1.1 200 OK
+HOST: 239.255.255.250:1900
+EXT:
+CACHE-CONTROL: max-age=100
+LOCATION: http://192.168.1.101:80/description.xml
+SERVER: Hue/1.0 UPnP/1.0 IpBridge/1.74.0
+hue-bridgeid: ECB5FAFFFE92D2EF
+ST: upnp:rootdevice
+USN: uuid:2f402f80-da50-11e1-9b23-ecb5fa92d2ef::upnp:rootdevice
+
