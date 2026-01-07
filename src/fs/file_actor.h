@@ -9,10 +9,11 @@
 #include "hasher/hasher_plugin.h"
 #include "utils/log.h"
 #include "model/file_info.h"
+#include <stdio.h>
 #include <rotor.hpp>
 
 // buggy mingw fix:
-#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+#if defined(WIN32) && defined(__GNUC__) && (__GNUC__ < 12)
 namespace std {
 template <> struct hash<std::filesystem::path> {
     inline size_t operator()(const std::filesystem::path &item) const noexcept {
