@@ -16,11 +16,13 @@
 #include "proto/relay_support.h"
 #include "transport/stream.h"
 #include <rotor/asio.hpp>
+#include <boost/nowide/convert.hpp>
 
 using namespace syncspirit;
 using namespace syncspirit::test;
 using namespace syncspirit::model;
 using namespace syncspirit::net;
+using boost::nowide::narrow;
 
 namespace asio = boost::asio;
 namespace sys = boost::system;
@@ -67,7 +69,9 @@ struct fixture_t : diff::cluster_visitor_t, diff::apply_controller_t {
     using diff_ptr_t = r::intrusive_ptr_t<model::message::model_update_t>;
     using diff_msgs_t = std::vector<diff_ptr_t>;
 
-    fixture_t() noexcept : ctx(io_ctx), acceptor(io_ctx), peer_sock(io_ctx) {
+    fixture_t() noexcept
+        : ctx(io_ctx), acceptor(io_ctx), peer_sock(io_ctx), tmp_path{unique_path()}, tmp_guard{tmp_path} {
+        bfs::create_directories(tmp_path);
         test::init_logging();
         log = utils::get_logger("fixture");
     }
@@ -178,9 +182,13 @@ struct fixture_t : diff::cluster_visitor_t, diff::apply_controller_t {
         auto ep = tcp::endpoint(ip, listening_ep.port());
         auto addresses = std::vector<tcp::endpoint>{ep};
         auto addresses_ptr = std::make_shared<decltype(addresses)>(addresses);
-        root_ca_data = std::move(utils::as_serialized_pem(my_keys.cert.get()).value());
+        auto cert_path = narrow((tmp_path / "i-cert.pem").wstring());
+        auto private_path = narrow((tmp_path / "i-priv.pem").wstring());
+        REQUIRE(my_keys.save(cert_path.c_str(), private_path.c_str()));
+        ssl_verify_store = cert_path;
+
         peer_trans =
-            transport::initiate_tls_active(*sup, peer_keys, my_device->device_id(), peer_uri, {}, {}, root_ca_data);
+            transport::initiate_tls_active(*sup, peer_keys, my_device->device_id(), peer_uri, {}, {}, ssl_verify_store);
 
         transport::error_fn_t on_error = [&](auto &ec) {
             LOG_WARN(log, "initiate_active/connect, err: {}", ec.message());
@@ -251,8 +259,10 @@ struct fixture_t : diff::cluster_visitor_t, diff::apply_controller_t {
     transport::stream_sp_t peer_trans;
     ready_ptr_t connected_message;
     utils::bytes_t relay_session;
-    utils::bytes_t root_ca_data;
     bool use_model = true;
+    bfs::path tmp_path;
+    test::path_guard_t tmp_guard;
+    std::string ssl_verify_store;
 
     bool valid_handshake = false;
 

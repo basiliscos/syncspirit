@@ -96,6 +96,16 @@ after the core completion.
 
 # changes
 
+## 0.4.4 (08-Jan-2026)
+ - [fltk] allow to regenereate certificate/key pair and soft restart
+ - [core] reduce memory consumption to ~30%
+ - [core] do not consume CPU when idle
+ - [core] govern file system operations (scan, read, write, delete etc.) from
+control thread
+ - [core, bugfix] use system/default ssl root CAs to connect to syncthing infrastructure
+(might require to delete configuration from previous installation).
+ - [fltk, bugfix] fogetting to insert deleted folder into pending list
+
 ## 0.4.3 (04-Oct-2025)
  - [core] fix compatibility with syncthing v2.0 (i.e. tolerate directory with 
          non-zero size and without blocks)

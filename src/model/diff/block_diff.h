@@ -15,13 +15,15 @@ namespace diff {
 
 struct SYNCSPIRIT_API block_diff_t : cluster_diff_t {
     block_diff_t(const block_diff_t &) noexcept;
-    block_diff_t(const file_info_t &file, const folder_info_t &fi, size_t block_index = 0) noexcept;
+    block_diff_t(const file_info_t &file, const folder_info_t &fi, std::uint32_t block_index = 0) noexcept;
+    block_diff_t(std::string file_name, std::string folder_id, utils::bytes_t device_id, utils::bytes_t block_hash,
+                 std::uint32_t block_index) noexcept;
 
     std::string file_name;
     std::string folder_id;
     utils::bytes_t device_id;
     utils::bytes_t block_hash;
-    size_t block_index;
+    std::uint32_t block_index;
 };
 
 } // namespace diff

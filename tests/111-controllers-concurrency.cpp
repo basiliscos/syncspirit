@@ -2,9 +2,9 @@
 // SPDX-FileCopyrightText: 2025 Ivan Baidakou
 
 #include "test-utils.h"
-#include "hasher/hasher_proxy_actor.h"
 #include "hasher/hasher_actor.h"
 #include "net/controller_actor.h"
+#include "fs/file_cache.h"
 #include "diff-builder.h"
 #include "net/names.h"
 #include "test_peer.h"
@@ -13,7 +13,6 @@
 #include "model/cluster.h"
 #include "access.h"
 #include <filesystem>
-#include <list>
 
 using namespace syncspirit;
 using namespace syncspirit::db;
@@ -32,7 +31,7 @@ struct fixture_t {
 
     fixture_t() noexcept { log = utils::get_logger("fixture"); }
 
-    virtual supervisor_t::configure_callback_t configure() noexcept {
+    virtual configure_callback_t configure() noexcept {
         return [&](r::plugin::plugin_base_t &plugin) {
             plugin.template with_casted<r::plugin::registry_plugin_t>(
                 [&](auto &p) { p.register_name(net::names::fs_actor, sup->get_address()); });
@@ -60,7 +59,7 @@ struct fixture_t {
         r::system_context_t ctx;
         sup = ctx.create_supervisor<supervisor_t>()
                   .auto_finish(true)
-                  .auto_ack_blocks(true)
+                  .auto_ack_io(true)
                   .timeout(timeout)
                   .create_registry()
                   .make_presentation(true)
@@ -72,20 +71,10 @@ struct fixture_t {
         CHECK(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::OPERATIONAL);
 
         sup->create_actor<hasher::hasher_actor_t>().index(1).timeout(timeout).finish();
-        sup->create_actor<hasher::hasher_proxy_actor_t>()
-            .timeout(timeout)
-            .hasher_threads(1)
-            .name(net::names::hasher_proxy)
-            .finish();
 
         sup->configure_callback = [&](r::plugin::plugin_base_t &plugin) {
             plugin.template with_casted<r::plugin::registry_plugin_t>(
                 [&](auto &p) { p.register_name(net::names::fs_actor, sup->get_address()); });
-        };
-
-        auto block_callback = [&](r::actor_base_t *actor,
-                                  net::message::block_request_t &request) -> block_response_opt_t {
-            return on_block_request(actor, request);
         };
 
         peer_actors[0] = sup->create_actor<test_peer_t>()
@@ -94,7 +83,6 @@ struct fixture_t {
                              .url("relay://1.2.3.4:5")
                              .coordinator(sup->get_address())
                              .timeout(timeout)
-                             .block_callback(block_callback)
                              .finish();
         peer_actors[1] = sup->create_actor<test_peer_t>()
                              .cluster(cluster)
@@ -102,7 +90,6 @@ struct fixture_t {
                              .url("relay://1.2.3.4:6")
                              .coordinator(sup->get_address())
                              .timeout(timeout)
-                             .block_callback(block_callback)
                              .finish();
 
         sup->do_process();
@@ -115,7 +102,7 @@ struct fixture_t {
                                    .cluster(cluster)
                                    .sequencer(sup->sequencer)
                                    .timeout(timeout)
-                                   .request_timeout(timeout)
+                                   .hasher_threads(1)
                                    .blocks_max_requested(1)
                                    .finish();
 
@@ -127,7 +114,7 @@ struct fixture_t {
                                    .cluster(cluster)
                                    .sequencer(sup->sequencer)
                                    .timeout(timeout)
-                                   .request_timeout(timeout)
+                                   .hasher_threads(1)
                                    .blocks_max_requested(1)
                                    .finish();
 
@@ -160,10 +147,6 @@ struct fixture_t {
         CHECK(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::SHUT_DOWN);
     }
 
-    virtual block_response_opt_t on_block_request(r::actor_base_t *, net::message::block_request_t &request) noexcept {
-        return {};
-    }
-
     virtual void main() noexcept {}
 
     r::pt::time_duration timeout = r::pt::millisec{10};
@@ -189,19 +172,11 @@ void test_concurrent_up_n_down() {
     };
     F().run();
 }
+
 void test_concurrent_downloading() {
     struct F : fixture_t {
-        using request_ptr_t = model::intrusive_ptr_t<net::message::block_request_t>;
-        using requests_t = std::list<request_ptr_t>;
         using blocks_map_t = std::unordered_map<utils::bytes_t, utils::bytes_t>;
-        using requested_blocks_t = std::unordered_map<r::actor_base_t *, requests_t>;
         using requested_blocks_sz_t = std::unordered_map<r::actor_base_t *, size_t>;
-
-        block_response_opt_t on_block_request(r::actor_base_t *actor,
-                                              net::message::block_request_t &request) noexcept override {
-            requested[actor].emplace_back(&request);
-            return {};
-        }
 
         void main() noexcept override {
             static constexpr size_t N = 10;
@@ -264,38 +239,39 @@ void test_concurrent_downloading() {
             }
 
             auto pushed_blocks = size_t{0};
-            REQUIRE(requested.size() == 2);
+            // REQUIRE(requested.size() == 2);
             while (pushed_blocks < N) {
-                for (auto &[peer_actor, queue] : requested) {
-                    if (queue.size()) {
-                        auto actor = static_cast<test_peer_t *>(peer_actor);
-                        auto p = queue.front()->payload.request_payload;
-                        auto &bytes = blocks_map.at(p.block_hash);
-                        actor->push_block(bytes, p.block_index, p.file_name);
+                // for (auto &[peer_actor, queue] : requested) {
+                for (auto &actor : peer_actors) {
+                    if (actor->in_requests.size()) {
+                        auto &p = actor->in_requests.front();
+                        auto hash = utils::bytes_t(proto::get_hash(p));
+                        auto request_id = proto::get_id(p);
+                        auto &bytes = blocks_map.at(hash);
+                        actor->push_response(bytes, request_id);
                         actor->process_block_requests();
-                        queue.pop_front();
                         ++pushed_blocks;
-                        ++requested_blocks_sz[actor];
+                        ++requested_blocks_sz[actor.get()];
                     }
                 }
                 sup->do_process();
             }
-            CHECK(requested[peer_actors[0].get()].empty());
-            CHECK(requested[peer_actors[1].get()].empty());
+            CHECK(peer_actors[0]->in_requests.empty());
+            CHECK(peer_actors[1]->in_requests.empty());
             CHECK(requested_blocks_sz[peer_actors[0].get()] == N / 2);
             CHECK(requested_blocks_sz[peer_actors[1].get()] == N / 2);
             CHECK(local_folder->get_file_infos().size() == N);
 
             int index_updates[2] = {0, 0};
             for (size_t idx = 0; idx < 2; ++idx) {
-                for (auto &m : peer_actors[idx]->messages) {
-                    if (auto u = std::get_if<proto::IndexUpdate>(&m->payload); u) {
+                for (auto &m : peer_actors[idx]->bep_messages) {
+                    if (auto u = std::get_if<proto::IndexUpdate>(&m); u) {
                         ++index_updates[idx];
                         auto peer = peer_devices[idx];
                         auto &file = proto::get_files(*u, 0);
                         auto file_name = proto::get_name(file);
                         log->debug("{} got index update for '{}'", peer->device_id().get_short(), file_name);
-                    } else if (auto u = std::get_if<proto::Index>(&m->payload); u) {
+                    } else if (auto u = std::get_if<proto::Index>(&m); u) {
                         ++index_updates[idx];
                         auto peer = peer_devices[idx];
                         auto &file = proto::get_files(*u, 0);
@@ -309,7 +285,6 @@ void test_concurrent_downloading() {
         }
 
         blocks_map_t blocks_map;
-        requested_blocks_t requested;
         requested_blocks_sz_t requested_blocks_sz;
     };
     F().run();

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2026 Ivan Baidakou
 
 #pragma once
 
@@ -14,6 +14,15 @@ namespace impl {
 
 struct positive_integer_t : property_t {
     positive_integer_t(std::string label, std::string explanation, std::uint64_t value, std::uint64_t default_value);
+
+    error_ptr_t validate_value() noexcept override;
+
+    std::uint64_t native_value;
+};
+
+struct non_negative_integer_t : property_t {
+    non_negative_integer_t(std::string label, std::string explanation, std::uint64_t value,
+                           std::uint64_t default_value);
 
     error_ptr_t validate_value() noexcept override;
 
@@ -100,12 +109,12 @@ struct advances_per_iteration_t final : impl::positive_integer_t {
     void reflect_to(syncspirit::config::main_t &main) override;
 };
 
-struct request_timeout_t final : impl::positive_integer_t {
+struct ping_timeout_t final : impl::positive_integer_t {
     using parent_t = impl::positive_integer_t;
 
     static const char *explanation_;
 
-    request_timeout_t(std::uint64_t value, std::uint64_t default_value);
+    ping_timeout_t(std::uint64_t value, std::uint64_t default_value);
     void reflect_to(syncspirit::config::main_t &main) override;
 };
 
@@ -118,30 +127,12 @@ struct rx_buff_size_t final : impl::positive_integer_t {
     void reflect_to(syncspirit::config::main_t &main) override;
 };
 
-struct rx_timeout_t final : impl::positive_integer_t {
-    using parent_t = impl::positive_integer_t;
-
-    static const char *explanation_;
-
-    rx_timeout_t(std::uint64_t value, std::uint64_t default_value);
-    void reflect_to(syncspirit::config::main_t &main) override;
-};
-
 struct tx_buff_limit_t final : impl::positive_integer_t {
     using parent_t = impl::positive_integer_t;
 
     static const char *explanation_;
 
     tx_buff_limit_t(std::uint64_t value, std::uint64_t default_value);
-    void reflect_to(syncspirit::config::main_t &main) override;
-};
-
-struct tx_timeout_t final : impl::positive_integer_t {
-    using parent_t = impl::positive_integer_t;
-
-    static const char *explanation_;
-
-    tx_timeout_t(std::uint64_t value, std::uint64_t default_value);
     void reflect_to(syncspirit::config::main_t &main) override;
 };
 
@@ -242,15 +233,6 @@ struct files_scan_iteration_limit_t final : impl::positive_integer_t {
     static const char *explanation_;
 
     files_scan_iteration_limit_t(std::uint64_t value, std::uint64_t default_value);
-    void reflect_to(syncspirit::config::main_t &main) override;
-};
-
-struct mru_size_t final : impl::positive_integer_t {
-    using parent_t = impl::positive_integer_t;
-
-    static const char *explanation_;
-
-    mru_size_t(std::uint64_t value, std::uint64_t default_value);
     void reflect_to(syncspirit::config::main_t &main) override;
 };
 
@@ -383,12 +365,12 @@ struct key_file_t final : impl::path_t {
     void reflect_to(syncspirit::config::main_t &main) override;
 };
 
-struct root_ca_file final : impl::path_t {
-    using parent_t = impl::path_t;
+struct ssl_verify_store final : impl::string_t {
+    using parent_t = impl::string_t;
 
     static const char *explanation_;
 
-    root_ca_file(const bfs::path &value, const bfs::path &default_value);
+    ssl_verify_store(std::string value, std::string default_value);
 
     void reflect_to(syncspirit::config::main_t &main) override;
 };
@@ -409,6 +391,15 @@ struct hasher_threads_t final : impl::positive_integer_t {
     static const char *explanation_;
 
     hasher_threads_t(std::uint64_t value, std::uint64_t default_value);
+    void reflect_to(syncspirit::config::main_t &main) override;
+};
+
+struct poll_timeout_t final : impl::non_negative_integer_t {
+    using parent_t = impl::non_negative_integer_t;
+
+    static const char *explanation_;
+
+    poll_timeout_t(std::uint64_t value, std::uint64_t default_value);
     void reflect_to(syncspirit::config::main_t &main) override;
 };
 

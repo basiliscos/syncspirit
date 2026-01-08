@@ -59,6 +59,7 @@ template <typename T> using net_supervisor_base_t = model::diff::iterative_contr
 struct SYNCSPIRIT_API net_supervisor_t : net_supervisor_base_t<ra::supervisor_asio_t> {
     using parent_t = net_supervisor_base_t<ra::supervisor_asio_t>;
     using config_t = net_supervisor_config_t;
+    using launcher_t = std::function<void(model::cluster_ptr_t &)>;
 
     template <typename Actor> using config_builder_t = net_supervisor_config_builder_t<Actor>;
 
@@ -67,8 +68,14 @@ struct SYNCSPIRIT_API net_supervisor_t : net_supervisor_base_t<ra::supervisor_as
     void on_child_shutdown(actor_base_t *actor) noexcept override;
     void on_start() noexcept override;
     void shutdown_finish() noexcept override;
+    void shutdown_start() noexcept override;
+    template <typename F> void add_launcher(F &&launcher) noexcept { launchers.push_back(std::forward<F>(launcher)); }
+
+    using parent_t::state;
 
   private:
+    using launchers_t = std::vector<launcher_t>;
+
     void on_load_cluster_success(message::load_cluster_success_t &message) noexcept;
     void on_load_cluster_fail(message::load_cluster_fail_t &message) noexcept;
     void on_model_request(model::message::model_request_t &message) noexcept;
@@ -79,6 +86,12 @@ struct SYNCSPIRIT_API net_supervisor_t : net_supervisor_base_t<ra::supervisor_as
     void dial_peer(const model::device_id_t &peer_device_id, const utils::uri_container_t &uris) noexcept;
     void launch_early() noexcept;
     void seed_model() noexcept;
+    void try_seed_model() noexcept;
+
+    outcome::result<void> apply(const model::diff::advance::advance_t &, void *) noexcept override;
+    outcome::result<void> apply(const model::diff::modify::upsert_folder_t &, void *) noexcept override;
+    outcome::result<void> apply(const model::diff::modify::upsert_folder_info_t &, void *) noexcept override;
+    outcome::result<void> apply(const model::diff::peer::update_folder_t &, void *) noexcept override;
 
     void commit_loading() noexcept override;
     outcome::result<void> save_config(const config::main_t &new_cfg) noexcept;
@@ -90,9 +103,9 @@ struct SYNCSPIRIT_API net_supervisor_t : net_supervisor_base_t<ra::supervisor_as
     model::diff::cluster_diff_ptr_t load_diff;
     r::address_ptr_t db_addr;
     utils::key_pair_t ssl_pair;
-    utils::bytes_t root_ca;
     r::supervisor_ptr_t cluster_sup;
     r::supervisor_ptr_t peer_sup;
+    launchers_t launchers;
 };
 
 } // namespace net

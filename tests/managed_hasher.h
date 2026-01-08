@@ -16,6 +16,7 @@ namespace r = rotor;
 struct managed_hasher_config_t : hasher::hasher_actor_config_t {
     uint32_t index;
     bool auto_reply = true;
+    bool subscribe = true;
 };
 
 template <typename Actor> struct hasher_config_builder_t : hasher::hasher_actor_config_builder_t<Actor> {
@@ -23,8 +24,12 @@ template <typename Actor> struct hasher_config_builder_t : hasher::hasher_actor_
     using parent_t = hasher::hasher_actor_config_builder_t<Actor>;
     using parent_t::parent_t;
 
-    builder_t &&auto_reply(uint32_t value) && noexcept {
+    builder_t &&auto_reply(bool value = true) && noexcept {
         parent_t::config.auto_reply = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+    builder_t &&subscribe(bool value = true) && noexcept {
+        parent_t::config.subscribe = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };
@@ -33,24 +38,22 @@ struct SYNCSPIRIT_TEST_API managed_hasher_t : r::actor_base_t {
     using config_t = managed_hasher_config_t;
     template <typename Actor> using config_builder_t = hasher_config_builder_t<Actor>;
 
-    using validation_request_t = hasher::message::validation_request_t;
-    using validation_request_ptr_t = model::intrusive_ptr_t<validation_request_t>;
-    using digest_request_t = hasher::message::digest_request_t;
+    using digest_request_t = hasher::message::digest_t;
     using digest_request_ptr_t = model::intrusive_ptr_t<digest_request_t>;
-    using validation_queue_t = std::deque<validation_request_ptr_t>;
     using digest_queue_t = std::deque<digest_request_ptr_t>;
 
     managed_hasher_t(config_t &cfg);
 
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
-    void on_validation(validation_request_t &req) noexcept;
     void on_digest(digest_request_t &req) noexcept;
     void process_requests() noexcept;
 
     uint32_t index;
+    std::uint64_t digested_bytes = 0;
+    std::uint32_t digested_blocks = 0;
     bool auto_reply;
+    bool subscribe;
     utils::logger_t log;
-    validation_queue_t validation_queue;
     digest_queue_t digest_queue;
 };
 

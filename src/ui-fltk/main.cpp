@@ -121,7 +121,7 @@ int main(int argc, char **argv) {
     SET_THREAD_EN_LANGUAGE();
     if (!utils::platform_t::startup()) {
         fprintf(stderr, "cannot startup platform\n");
-        return 1;
+        return -1;
     }
 
 #if defined(__unix__) || defined(__APPLE__) || defined(__MACH__)
@@ -130,7 +130,7 @@ int main(int argc, char **argv) {
     act.sa_handler = [](int) { shutdown_flag = true; };
     if (sigaction(SIGINT, &act, nullptr) != 0) {
         fprintf(stderr, "cannot set signal handler\n");
-        return 1;
+        return -1;
     }
 #endif
 
@@ -141,34 +141,41 @@ int main(int argc, char **argv) {
     }
 #endif
 
-    auto [dist_sink, logger] = utils::create_root_logger();
-    auto in_memory_sink = std::make_shared<fltk::in_memory_sink_t>();
-    dist_sink->add_sink(spdlog::sink_ptr(in_memory_sink));
-    if (auto value = std::getenv(constants::console_sink_env); value && value == std::string_view("1")) {
-        auto console_sink = spdlog::sink_ptr(new spdlog::sinks::stderr_color_sink_mt());
-        dist_sink->add_sink(console_sink);
-    }
+    int code = 1;
+    while (code == 1) {
+        auto [dist_sink, logger] = utils::create_root_logger();
+        auto in_memory_sink = std::make_shared<fltk::in_memory_sink_t>();
+        dist_sink->add_sink(spdlog::sink_ptr(in_memory_sink));
+        if (auto value = std::getenv(constants::console_sink_env); value && value == std::string_view("1")) {
+            auto console_sink = spdlog::sink_ptr(new spdlog::sinks::stderr_color_sink_mt());
+            dist_sink->add_sink(console_sink);
+        }
 
-    logger->trace("root logger has been bootstrapped");
+        logger->trace("root logger has been bootstrapped");
 
-    try {
-        app_context_t ctx(argc, argv, logger.get(), dist_sink, in_memory_sink.get(), bootstrap_guard);
-        app_main(ctx);
-    } catch (const po::error &ex) {
-        spdlog::critical("program options exception: {}", ex.what());
-        return 1;
-    } catch (std::exception &ex) {
-        logger->critical("app failure : {}", ex.what());
-    } catch (...) {
-        logger->critical("unknown exception");
-        return 1;
+        try {
+            app_context_t ctx(argc, argv, logger.get(), dist_sink, in_memory_sink.get(), bootstrap_guard);
+            code = app_main(ctx);
+        } catch (const po::error &ex) {
+            spdlog::critical("program options exception: {}", ex.what());
+            return -1;
+        } catch (std::exception &ex) {
+            logger->critical("app failure : {}", ex.what());
+        } catch (...) {
+            logger->critical("unknown exception");
+            return -1;
+        }
+
+        logger->info("normal exit, code = {}", code);
+        if (code == 1) {
+            logger->debug("soft restart has been requested");
+            shutdown_flag = false;
+        }
+        bootstrap_guard.reset();
+        utils::finalize_loggers();
     }
 
     utils::platform_t::shutdown();
-
-    logger->info("normal exit");
-    bootstrap_guard.reset();
-    utils::finalize_loggers();
     return 0;
 }
 
@@ -195,7 +202,7 @@ int app_main(app_context_t &app_ctx) {
     bool show_help = vm.count("help");
     if (show_help) {
         std::cout << cmdline_descr << "\n";
-        return 1;
+        return -1;
     }
 
     auto log_level = utils::get_log_level(vm["log_level"].as<std::string>());
@@ -210,7 +217,7 @@ int app_main(app_context_t &app_ctx) {
             config_file_path = config_default.value();
         } else {
             logger->error("cannot determine default config dir: {}", config_default.error().message());
-            return 1;
+            return -1;
         }
     }
     app_ctx.bootstrap_guard = utils::bootstrap(app_ctx.dist_sink, config_file_path);
@@ -222,7 +229,7 @@ int app_main(app_context_t &app_ctx) {
         auto cfg_opt = config::generate_config(config_file_path);
         if (!cfg_opt) {
             logger->error("cannot generate default config: {}", cfg_opt.error().message());
-            return 1;
+            return -1;
         }
         auto &cfg = cfg_opt.value();
         using F = utils::fstream_t;
@@ -230,22 +237,23 @@ int app_main(app_context_t &app_ctx) {
         auto r = config::serialize(cfg, f_cfg);
         if (!r) {
             logger->error("cannot save default config at :: {}", r.error().message());
-            return 1;
+            return -1;
         }
     }
     auto config_file = utils::ifstream_t(config_file_path);
     if (!config_file) {
         logger->error("Cannot open config file {}", config_file_path.string());
-        return 1;
+        return -1;
     }
 
     config::config_result_t cfg_option = config::get_config(config_file, config_file_path.parent_path());
     if (!cfg_option) {
         logger->error("Config file {} is incorrect: {}", config_file_path.string(), cfg_option.error());
-        return 1;
+        return -1;
     }
     auto &cfg = cfg_option.value();
     logger->trace("configuration seems OK, timeout = {}ms", cfg.timeout);
+    auto poll_timeout = r::pt::milliseconds{cfg.poll_timeout};
 
     // override default
     if (log_level) {
@@ -261,7 +269,7 @@ int app_main(app_context_t &app_ctx) {
     auto init_result = utils::init_loggers(cfg.log_configs);
     if (!init_result) {
         logger->error("loggers initialization failed :: {}", init_result.error().message());
-        return 1;
+        return -1;
     }
 
     {
@@ -276,14 +284,14 @@ int app_main(app_context_t &app_ctx) {
             auto pair = utils::generate_pair(constants::issuer_name);
             if (!pair) {
                 logger->error("cannot generate cryptographic keys :: {}", pair.error().message());
-                return 1;
+                return -1;
             }
             auto &keys = pair.value();
             auto save_result = keys.save(cert_path_str.c_str(), key_path_str.c_str());
             if (!save_result) {
                 logger->error("cannot store cryptographic keys ({} & {}) :: {}", cert_path_str, key_path_str,
                               save_result.error().message());
-                return 1;
+                return -1;
             }
         }
     }
@@ -292,13 +300,14 @@ int app_main(app_context_t &app_ctx) {
     ra::system_context_ptr_t sys_context{new asio_sys_context_t{io_context}};
     auto strand = std::make_shared<asio::io_context::strand>(io_context);
     auto timeout = pt::milliseconds{cfg.timeout};
-    auto independent_threads = 3ul;
+    auto independent_threads = 2ul;
     auto seed = (size_t)std::time(nullptr);
     auto sequencer = model::make_sequencer(seed);
 
-    static std::atomic_bool bouncer_shutdown_flag = false;
+    std::atomic_bool bouncer_shutdown_flag = false;
     auto bouncer_context = thread_sys_context_t();
     auto bouncer_sup = bouncer_context.create_supervisor<r::thread::supervisor_thread_t>()
+                           .poll_duration(poll_timeout)
                            .timeout(timeout * 9 / 8)
                            .shutdown_flag(bouncer_shutdown_flag, r::pt::millisec{50})
                            .finish();
@@ -316,12 +325,13 @@ int app_main(app_context_t &app_ctx) {
                        .independent_threads(independent_threads)
                        .shutdown_flag(shutdown_flag, r::pt::millisec{50})
                        .bouncer_address(bouncer_actor->get_address())
+                       .poll_duration(poll_timeout)
                        .finish();
     // warm-up
     sup_net->do_process();
     if (sup_net->get_shutdown_reason()) {
         logger->debug("net supervisor has not started");
-        return 1;
+        return -1;
     }
 
     auto bouncer_thread = std::thread([&]() {
@@ -341,6 +351,7 @@ int app_main(app_context_t &app_ctx) {
         hasher_ctxs.push_back(new thread_sys_context_t{});
         auto &ctx = hasher_ctxs.back();
         auto sup = ctx->create_supervisor<hasher::hasher_supervisor_t>()
+                       .poll_duration(poll_timeout)
                        .timeout(timeout * 8 / 9)
                        .registry_address(sup_net->get_registry_address())
                        .index(i)
@@ -354,6 +365,7 @@ int app_main(app_context_t &app_ctx) {
     auto fltk_ctx = rf::system_context_ptr_t(new fltk_context_t());
     auto sup_fltk = fltk_ctx->create_supervisor<fltk::app_supervisor_t>()
                         .log_sink(app_ctx.im_memory_sink)
+                        .poll_duration(poll_timeout)
                         .config_path(config_file_path)
                         .app_config(cfg)
                         .timeout(timeout)
@@ -366,12 +378,12 @@ int app_main(app_context_t &app_ctx) {
 
     thread_sys_context_t fs_context;
     auto fs_sup = fs_context.create_supervisor<syncspirit::fs::fs_supervisor_t>()
+                      .shutdown_flag(shutdown_flag, r::pt::millisec{50})
                       .timeout(timeout)
+                      .poll_duration(poll_timeout)
                       .registry_address(sup_net->get_registry_address())
                       .fs_config(cfg.fs_config)
                       .hasher_threads(cfg.hasher_threads)
-                      .bouncer_address(bouncer_actor->get_address())
-                      .sequencer(sequencer)
                       .finish();
     fs_sup->do_process();
 
@@ -427,11 +439,13 @@ int app_main(app_context_t &app_ctx) {
         if (!Fl::wait()) {
             shutdown_flag = true;
             logger->debug("main window is longer show, terminating...");
-            sup_fltk->do_shutdown();
-            while (sup_fltk->state != r::state_t::SHUT_DOWN) {
-                Fl::wait(0.01);
-                sup_fltk->do_process();
-            }
+        }
+    }
+    if (sup_fltk->state != r::state_t::SHUT_DOWN) {
+        sup_fltk->do_shutdown();
+        while (sup_fltk->state != r::state_t::SHUT_DOWN) {
+            Fl::wait(0.01);
+            sup_fltk->do_process();
         }
     }
 
@@ -454,11 +468,14 @@ int app_main(app_context_t &app_ctx) {
         logger->info("app shut down reason: {}", reason->message());
     }
 
+    int code = sup_fltk->is_soft_restart_requested() ? 1 : 0;
+
     logger->trace("everything has been terminated");
     sup_fltk.reset();
     fltk_ctx.reset();
     main_window.reset();
-    logger->trace("fltk context has been destroyed");
+    logger->trace("fltk context has been destroyed, code = {}", code);
 
-    return 0;
+    Fl::unlock();
+    return code;
 }

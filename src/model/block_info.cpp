@@ -44,7 +44,7 @@ std::uint32_t block_info_t::file_blocks_iterator_t::get_total() const noexcept {
 
 block_info_t::file_blocks_union_t::file_blocks_union_t() { new (&multi) file_blocks_t(); }
 
-block_info_t::file_blocks_union_t::~file_blocks_union_t(){};
+block_info_t::file_blocks_union_t::~file_blocks_union_t() {};
 
 auto block_info_t::make_strict_hash(utils::bytes_view_t hash) noexcept -> strict_hash_t {
     assert(hash.size() <= digest_length);

@@ -1,5 +1,5 @@
 cmake_minimum_required (VERSION 3.19)
-project (syncspirit VERSION 0.4.3)
+project (syncspirit VERSION 0.4.4)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -99,18 +99,19 @@ add_library(syncspirit_core
     src/db/prefix.cpp
     src/db/transaction.cpp
     src/db/utils.cpp
-    src/fs/chunk_iterator.cpp
     src/fs/file.cpp
     src/fs/file_actor.cpp
     src/fs/file_cache.cpp
     src/fs/fs_supervisor.cpp
-    src/fs/new_chunk_iterator.cpp
-    src/fs/scan_actor.cpp
-    src/fs/scan_scheduler.cpp
-    src/fs/scan_task.cpp
+    src/fs/fs_slave.cpp
     src/fs/utils.cpp
+    src/fs/task/noop.cpp
+    src/fs/task/remove_file.cpp
+    src/fs/task/rename_file.cpp
+    src/fs/task/segment_iterator.cpp
+    src/fs/task/scan_dir.cpp
     src/hasher/hasher_actor.cpp
-    src/hasher/hasher_proxy_actor.cpp
+    src/hasher/hasher_plugin.cpp
     src/hasher/hasher_supervisor.cpp
     src/model/diff/apply_controller.cpp
     src/model/diff/block_diff.cpp
@@ -142,7 +143,6 @@ add_library(syncspirit_core
     src/model/diff/load/pending_folders.cpp
     src/model/diff/load/remove_corrupted_files.cpp
     src/model/diff/local/blocks_availability.cpp
-    src/model/diff/local/custom.cpp
     src/model/diff/local/file_availability.cpp
     src/model/diff/local/io_failure.cpp
     src/model/diff/local/scan_finish.cpp
@@ -151,16 +151,11 @@ add_library(syncspirit_core
     src/model/diff/local/synchronization_finish.cpp
     src/model/diff/local/synchronization_start.cpp
     src/model/diff/modify/add_blocks.cpp
-    src/model/diff/modify/add_remote_folder_infos.cpp
     src/model/diff/modify/add_ignored_device.cpp
     src/model/diff/modify/add_pending_device.cpp
     src/model/diff/modify/add_pending_folders.cpp
-    src/model/diff/modify/append_block.cpp
     src/model/diff/modify/block_ack.cpp
-    src/model/diff/modify/block_rej.cpp
     src/model/diff/modify/block_transaction.cpp
-    src/model/diff/modify/clone_block.cpp
-    src/model/diff/modify/finish_file.cpp
     src/model/diff/modify/generic_remove.cpp
     src/model/diff/modify/mark_reachable.cpp
     src/model/diff/modify/remove_blocks.cpp
@@ -181,6 +176,7 @@ add_library(syncspirit_core
     src/model/diff/peer/cluster_update.cpp
     src/model/diff/peer/rx_tx.cpp
     src/model/diff/peer/update_folder.cpp
+    src/model/diff/peer/update_remote_views.cpp
     src/model/misc/augmentation.cpp
     src/model/misc/block_iterator.cpp
     src/model/misc/error_code.cpp
@@ -206,7 +202,7 @@ add_library(syncspirit_core
     src/model/ignored_folder.cpp
     src/model/pending_device.cpp
     src/model/pending_folder.cpp
-    src/model/remote_folder_info.cpp
+    src/model/remote_view.cpp
     src/model/some_device.cpp
     src/model/version.cpp
     src/net/acceptor_actor.cpp
@@ -218,15 +214,21 @@ add_library(syncspirit_core
     src/net/http_actor.cpp
     src/net/initiator_actor.cpp
     src/net/local_discovery_actor.cpp
-    src/net/messages.cpp
+    src/net/local_keeper.cpp
     src/net/net_supervisor.cpp
     src/net/peer_actor.cpp
     src/net/peer_supervisor.cpp
     src/net/relay_actor.cpp
     src/net/resolver_actor.cpp
     src/net/names.cpp
+    src/net/scheduler.cpp
     src/net/ssdp_actor.cpp
     src/net/upnp_actor.cpp
+    src/net/local_keeper/child_info.cpp
+    src/net/local_keeper/hash_base.cpp
+    src/net/local_keeper/folder_slave.cpp
+    src/net/local_keeper/stack_context.cpp
+    src/net/local_keeper/stack.cpp
     src/presentation/entity.cpp
     src/presentation/cluster_file_presence.cpp
     src/presentation/file_entity.cpp

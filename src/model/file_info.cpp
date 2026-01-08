@@ -33,11 +33,6 @@ namespace pt = boost::posix_time;
 
 static const constexpr char prefix = (char)(db::prefix::file_info);
 
-static inline proto::FileInfoType as_type(std::uint16_t flags) noexcept {
-    using T = proto::FileInfoType;
-    return flags & file_info_t::f_type_dir ? T::DIRECTORY : flags & file_info_t::f_type_link ? T::SYMLINK : T::FILE;
-}
-
 auto file_info_t::decompose_key(utils::bytes_view_t key) -> decomposed_key_t {
     assert(key.size() == file_info_t::data_length + 1);
     auto fi_key = key.subspan(1, uuid_length);
@@ -87,7 +82,7 @@ static void fill(unsigned char *key, const bu::uuid &uuid, const folder_info_ptr
 }
 
 file_info_t::guard_t::guard_t(file_info_t &file_, const folder_info_t *folder_info_) noexcept
-    : file{&file_}, folder_info{folder_info_} {
+    : file{&file_}, folder_info{folder_info_}, finished{false} {
     file_.synchronizing_lock();
     auto cluster = folder_info->get_folder()->get_cluster();
     path_guard = std::make_unique<path_guard_t>(cluster->lock(file->get_name().get()));
@@ -97,12 +92,30 @@ file_info_t::guard_t::guard_t(file_info_t &file_, const folder_info_t *folder_in
 file_info_t::guard_t::~guard_t() {
     if (file) {
         file->synchronizing_unlock();
-        file->recheck(*folder_info);
+        if (folder_info) {
+            file->recheck(*folder_info);
+        }
     }
 }
 
+void file_info_t::guard_t::forget() noexcept { folder_info = {}; }
+
 file_info_t::blocks_iterator_t::blocks_iterator_t(const file_info_t *file_, std::uint32_t start_index_) noexcept
     : file{file_}, next_index{start_index_} {}
+
+bool file_info_t::blocks_iterator_t::is_locally_available() noexcept {
+    bool r = file && file->is_file();
+    if (r) {
+        auto &blocks = file->content.file.blocks;
+        for (size_t i = 0; i < blocks.size() && r; ++i) {
+            auto ptr = reinterpret_cast<std::uintptr_t>(blocks[i]);
+            if (!(ptr & LOCAL_MASK)) {
+                r = false;
+            }
+        }
+    }
+    return r;
+}
 
 const block_info_t *file_info_t::blocks_iterator_t::next() noexcept {
     auto r = (const block_info_t *)(nullptr);
@@ -368,7 +381,7 @@ void file_info_t::mark_unreachable(bool value) noexcept {
 
 void file_info_t::mark_local(bool available) noexcept {
     if (available) {
-        flags = flags | f_local;
+        flags = (flags | f_local) & ~f_unreachable;
     } else {
         flags = flags & ~f_local;
         flags = flags & ~f_available;
@@ -446,7 +459,7 @@ bool file_info_t::is_locally_available() const noexcept {
     return r;
 };
 
-const std::filesystem::path file_info_t::get_path(const folder_info_t &folder_info) const noexcept {
+std::filesystem::path file_info_t::get_path(const folder_info_t &folder_info) const noexcept {
     auto own_name = boost::nowide::widen(name->get_full_name());
     auto path = folder_info.get_folder()->get_path() / own_name;
     path.make_preferred();

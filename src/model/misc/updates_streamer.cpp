@@ -2,7 +2,6 @@
 // SPDX-FileCopyrightText: 2023-2025 Ivan Baidakou
 
 #include "updates_streamer.h"
-#include "model/remote_folder_info.h"
 #include <algorithm>
 #include <spdlog/spdlog.h>
 
@@ -15,9 +14,10 @@ updates_streamer_t::updates_streamer_t(cluster_t &cluster_, device_t &device) no
 
 void updates_streamer_t::refresh_remote() noexcept {
     auto &folders = cluster.get_folders();
-    auto &remote_folders = peer->get_remote_folder_infos();
+    auto &remote_views = peer->get_remote_view_map();
     auto streaming_folder = (model::folder_info_t *)(nullptr);
     auto prev_seen = std::move(seen_info);
+    auto self_sha256 = cluster.get_device()->device_id().get_sha256();
     seen_info = {};
     for (auto &it : folders) {
         auto &folder = *it.item;
@@ -28,10 +28,10 @@ void updates_streamer_t::refresh_remote() noexcept {
                 if (streaming && streaming->folder_info == local_folder) {
                     streaming_folder = local_folder.get();
                 }
-                auto remote_folder = remote_folders.by_folder(folder);
-                if (remote_folder) {
-                    auto index_match = remote_folder->get_index() == local_folder->get_index();
-                    auto remote_max = index_match ? remote_folder->get_max_sequence() : 0;
+                auto remote_view = remote_views.get(self_sha256, folder.get_id());
+                if (remote_view) {
+                    auto index_match = remote_view->index_id == local_folder->get_index();
+                    auto remote_max = index_match ? remote_view->max_sequence : 0;
                     auto previously_seen = prev_seen[local_folder];
                     auto seen = std::max(remote_max, previously_seen);
                     seen_info[local_folder] = seen;
@@ -42,9 +42,12 @@ void updates_streamer_t::refresh_remote() noexcept {
     if (streaming && !streaming_folder) {
         streaming.reset();
     } else if (streaming_folder) {
-        auto remote_folder = remote_folders.by_folder(*streaming_folder->get_folder());
-        if (!remote_folder) {
-            streaming.reset();
+        auto &folder = *streaming_folder->get_folder();
+        auto remote_view = remote_views.get(self_sha256, folder.get_id());
+        if (remote_view) {
+            if (remote_view->index_id != streaming_folder->get_index()) {
+                streaming.reset();
+            }
         } else {
             // TODO, refresh files?
         }

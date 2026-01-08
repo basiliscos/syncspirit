@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2023-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2023-2025 Ivan Baidakou
 
 #pragma once
 
@@ -7,7 +7,6 @@
 #include "model/file_info.h"
 #include "model/device.h"
 #include "model/folder_info.h"
-#include "model/remote_folder_info.h"
 #include "syncspirit-export.h"
 #include <optional>
 #include <unordered_map>

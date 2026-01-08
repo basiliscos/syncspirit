@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "utils.h"
 
@@ -22,6 +22,14 @@
             spdlog::warn("using default value for {}/{}", table_name, #property);                                      \
             c.property = c_default.property;                                                                           \
         } else {                                                                                                       \
+            c.property = option.value();                                                                               \
+        }                                                                                                              \
+    }
+
+#define SAFE_GET_VALUE_OPTIONAL(property, type, table_name)                                                            \
+    {                                                                                                                  \
+        auto option = t[#property].value<std::string>();                                                               \
+        if (option) {                                                                                                  \
             c.property = option.value();                                                                               \
         }                                                                                                              \
     }
@@ -131,12 +139,19 @@ static main_t make_default_config(const bfs::path &config_path, const bfs::path 
     main_t cfg;
     cfg.config_path = config_path;
     cfg.default_location = config_dir / L"shared-data";
-    cfg.root_ca_file = bfs::path{};
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+    cfg.ssl_verify_store = "org.openssl.winstore://";
+#elif defined(__APPLE__)
+    cfg.ssl_verify_store = "/etc/ssl/cert.pem";
+#else
+    cfg.ssl_verify_store = {};
+#endif
     cfg.cert_file = cert_file;
     cfg.key_file = key_file;
     cfg.timeout = 30000;
     cfg.device_name = device;
     cfg.hasher_threads = 3;
+    cfg.poll_timeout = 0;
     cfg.log_configs = {
         // log_config_t {
         //     "default", spdlog::level::level_enum::trace, {"stdout"}
@@ -167,10 +182,8 @@ static main_t make_default_config(const bfs::path &config_path, const bfs::path 
         16 * 1024 * 1024,   /* rx_buff_size */
         8 * 1024 * 1024,    /* tx_buff_limit */
         5000,               /* connect_timeout */
-        60000,              /* request_timeout */
-        90000,              /* tx_timeout */
-        300000,             /* rx_timeout */
-        64,                 /* blocks_max_requested */
+        90000,              /* ping_timeout */
+        32,                 /* blocks_max_requested */
         64,                 /* blocks_simultaneous_write */
         20,                 /* advances_per_iteration */
         500,                /* stats_interval */
@@ -182,7 +195,6 @@ static main_t make_default_config(const bfs::path &config_path, const bfs::path 
     };
     cfg.fs_config = fs_config_t {
         86400000,   /* temporally_timeout, 24h default */
-        128,        /* mru_size max number of open files for reading and writing */
         1024*1024,  /* bytes_scan_iteration_limit max number of bytes before emitting scan events */
         128,        /* files_scan_iteration_limit max number processed files before emitting scan events */
     };
@@ -245,7 +257,8 @@ config_result_t get_config(std::istream &config, const bfs::path &config_path) {
         SAFE_GET_VALUE(device_name, std::string, "main");
         SAFE_GET_PATH(default_location, "main");
         SAFE_GET_VALUE(hasher_threads, std::uint32_t, "main");
-        SAFE_GET_PATH_OPTIONAL(root_ca_file, "main");
+        SAFE_GET_VALUE(poll_timeout, std::uint32_t, "main");
+        SAFE_GET_VALUE_OPTIONAL(ssl_verify_store, std::string, "main");
         SAFE_GET_PATH_EXPANDED(cert_file, "main");
         SAFE_GET_PATH_EXPANDED(key_file, "main");
     };
@@ -309,9 +322,7 @@ config_result_t get_config(std::istream &config, const bfs::path &config_path) {
         SAFE_GET_VALUE(rx_buff_size, std::uint32_t, "bep");
         SAFE_GET_VALUE(tx_buff_limit, std::uint32_t, "bep");
         SAFE_GET_VALUE(connect_timeout, std::uint32_t, "bep");
-        SAFE_GET_VALUE(request_timeout, std::uint32_t, "bep");
-        SAFE_GET_VALUE(tx_timeout, std::uint32_t, "bep");
-        SAFE_GET_VALUE(rx_timeout, std::uint32_t, "bep");
+        SAFE_GET_VALUE(ping_timeout, std::uint32_t, "bep");
         SAFE_GET_VALUE(blocks_max_requested, std::uint32_t, "bep");
         SAFE_GET_VALUE(blocks_simultaneous_write, std::uint32_t, "bep");
         SAFE_GET_VALUE(advances_per_iteration, std::uint32_t, "bep");
@@ -336,7 +347,6 @@ config_result_t get_config(std::istream &config, const bfs::path &config_path) {
         auto &c_default = default_config.fs_config;
 
         SAFE_GET_VALUE(temporally_timeout, std::uint32_t, "fs");
-        SAFE_GET_VALUE(mru_size, std::uint32_t, "fs");
         SAFE_GET_VALUE(bytes_scan_iteration_limit, std::int64_t, "fs");
         SAFE_GET_VALUE(files_scan_iteration_limit, std::int64_t, "fs");
     }
@@ -422,7 +432,8 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
     auto tbl = toml::table{{
         {"main", toml::table{{
                      {"hasher_threads", cfg.hasher_threads},
-                     {"root_ca_file", narrow(cfg.root_ca_file.wstring())},
+                     {"poll_timeout", cfg.poll_timeout},
+                     {"ssl_verify_store", cfg.ssl_verify_store},
                      {"cert_file", narrow(cert_file.wstring())},
                      {"key_file", narrow(key_file.wstring())},
                      {"timeout", cfg.timeout},
@@ -455,12 +466,10 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
                     {"blocks_max_requested", cfg.bep_config.blocks_max_requested},
                     {"blocks_simultaneous_write", cfg.bep_config.blocks_simultaneous_write},
                     {"connect_timeout", cfg.bep_config.connect_timeout},
-                    {"request_timeout", cfg.bep_config.request_timeout},
+                    {"ping_timeout", cfg.bep_config.ping_timeout},
                     {"rx_buff_size", cfg.bep_config.rx_buff_size},
-                    {"rx_timeout", cfg.bep_config.rx_timeout},
                     {"stats_interval", cfg.bep_config.stats_interval},
                     {"tx_buff_limit", cfg.bep_config.tx_buff_limit},
-                    {"tx_timeout", cfg.bep_config.tx_timeout},
                 }}},
         {"dialer", toml::table{{
                        {"enabled", cfg.dialer_config.enabled},
@@ -469,7 +478,6 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
                    }}},
         {"fs", toml::table{{
                    {"temporally_timeout", cfg.fs_config.temporally_timeout},
-                   {"mru_size", cfg.fs_config.mru_size},
                    {"bytes_scan_iteration_limit", cfg.fs_config.bytes_scan_iteration_limit},
                    {"files_scan_iteration_limit", cfg.fs_config.files_scan_iteration_limit},
                }}},

@@ -434,6 +434,10 @@ inline void set_blocks(FileInfo &msg, std::size_t i, BlockInfo block) {
     using namespace pp;
     msg["blocks"_f][i] = std::move(block);
 }
+inline void set_blocks(FileInfo &msg, std::vector<BlockInfo> blocks) {
+    using namespace pp;
+    msg["blocks"_f] = std::move(blocks);
+}
 inline void add_blocks(FileInfo &msg, BlockInfo block) {
     using namespace pp;
     msg["blocks"_f].emplace_back(std::move(block));
@@ -659,6 +663,10 @@ inline FileInfo &add_files(IndexBase &msg) {
     auto &opt = msg["files"_f];
     opt.emplace_back(FileInfo());
     return opt.back();
+}
+inline void clear_files(IndexBase &msg) {
+    using namespace pp;
+    msg["files"_f].clear();
 }
 
 /***************/

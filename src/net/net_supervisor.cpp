@@ -1,23 +1,32 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
-#include "config/utils.h"
-#include "net_supervisor.h"
-#include "hasher/hasher_proxy_actor.h"
-#include "global_discovery_actor.h"
-#include "local_discovery_actor.h"
-#include "cluster_supervisor.h"
-#include "acceptor_actor.h"
-#include "ssdp_actor.h"
-#include "http_actor.h"
-#include "resolver_actor.h"
-#include "peer_supervisor.h"
-#include "dialer_actor.h"
-#include "db_actor.h"
-#include "relay_actor.h"
-#include "names.h"
-#include "utils/io.h"
 #include "bouncer/messages.hpp"
+#include "cluster_supervisor.h"
+#include "db_actor.h"
+#include "local_discovery_actor.h"
+#include "model/diff/advance/advance.h"
+#include "model/diff/modify/upsert_folder.h"
+#include "model/diff/modify/upsert_folder_info.h"
+#include "model/diff/peer/update_folder.h"
+#include "net/acceptor_actor.h"
+#include "net/dialer_actor.h"
+#include "net/global_discovery_actor.h"
+#include "net/http_actor.h"
+#include "net/names.h"
+#include "net/net_supervisor.h"
+#include "net/peer_supervisor.h"
+#include "net/relay_actor.h"
+#include "net/resolver_actor.h"
+#include "net/ssdp_actor.h"
+#include "net/local_keeper.h"
+#include "net/scheduler.h"
+#include "presentation/folder_entity.h"
+#include "presentation/folder_entity.h"
+#include "proto/proto-helpers-bep.h"
+#include "proto/proto-helpers-db.h"
+#include "utils/io.h"
+
 #include <boost/nowide/convert.hpp>
 #include <filesystem>
 #include <ctime>
@@ -65,27 +74,7 @@ net_supervisor_t::net_supervisor_t(net_supervisor_t::config_t &cfg)
         throw "cannot get common name from certificate";
     }
 
-    if (!app_config.root_ca_file.empty()) {
-        auto &file = app_config.root_ca_file;
-        LOG_TRACE(log, "going to read root ca file fron '{}'", file.string());
-        using in_t = utils::ifstream_t;
-        auto path = bfs::path(file);
-        auto ec = sys::error_code();
-        auto size = bfs::file_size(path, ec);
-        if (ec) {
-            LOG_WARN(log, "cannot read root ca file size: {}", ec.message());
-        } else {
-            auto in = in_t(path, in_t::in | in_t::binary);
-            auto data = utils::bytes_t(size);
-            in.read(reinterpret_cast<char *>(data.data()), size);
-            if (!in.fail()) {
-                root_ca = std::move(data);
-            } else {
-                LOG_WARN(log, "cannot read root ca file '{}'", file.string());
-            }
-        }
-    }
-
+    auto &sim_writes = app_config.bep_config.blocks_simultaneous_write;
     auto device = model::device_ptr_t();
     device = new model::local_device_t(device_id, app_config.device_name, cn.value());
     auto simultaneous_writes = app_config.bep_config.blocks_simultaneous_write;
@@ -101,7 +90,6 @@ void net_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
         coordinator = address;
         p.register_name(names::coordinator, get_address());
-        send<syncspirit::model::payload::thread_up_t>(address);
     });
     plugin.with_casted<r::plugin::starter_plugin_t>(
         [&](auto &p) {
@@ -123,9 +111,16 @@ void net_supervisor_t::on_child_shutdown(actor_base_t *actor) noexcept {
     LOG_TRACE(log, "on_child_shutdown, '{}' due to {} ", actor->get_identity(), reason->message());
 }
 
+void net_supervisor_t::shutdown_start() noexcept {
+    parent_t::shutdown_start();
+    if (shutdown_flag) {
+        *const_cast<std::atomic_bool *>(shutdown_flag) = true;
+    }
+}
+
 void net_supervisor_t::shutdown_finish() noexcept {
     db_addr.reset();
-    ra::supervisor_asio_t::shutdown_finish();
+    parent_t::shutdown_finish();
 }
 
 void net_supervisor_t::launch_early() noexcept {
@@ -141,18 +136,24 @@ void net_supervisor_t::launch_early() noexcept {
                   .finish()
                   ->get_address();
 
-    create_actor<hasher::hasher_proxy_actor_t>()
-        .timeout(init_timeout)
-        .hasher_threads(app_config.hasher_threads)
-        .name(net::names::hasher_proxy)
+    create_actor<local_keeper_t>()
+        .concurrent_hashes(app_config.hasher_threads)
+        .files_scan_iteration_limit(app_config.fs_config.files_scan_iteration_limit)
+        .sequencer(sequencer)
+        .escalate_failure()
+        .timeout(timeout)
         .finish();
+
+    create_actor<scheduler_t>().timeout(timeout).escalate_failure().finish();
+
+    for (auto &l : launchers) {
+        l(cluster);
+    }
 }
 
 void net_supervisor_t::seed_model() noexcept {
-    using payload_t = model::payload::model_update_t;
     thread_counter = independent_threads;
-    auto message = r::make_routed_message<payload_t>(address, db_addr, std::move(load_diff), nullptr);
-    put(std::move(message));
+    route<model::payload::model_update_t>(address, db_addr, std::move(load_diff), nullptr);
 }
 
 void net_supervisor_t::on_load_cluster_fail(message::load_cluster_fail_t &message) noexcept {
@@ -166,6 +167,13 @@ void net_supervisor_t::on_load_cluster_success(message::load_cluster_success_t &
 
     send<model::payload::db_loaded_t>(address);
     load_diff = std::move(message.payload.diff);
+    try_seed_model();
+}
+
+void net_supervisor_t::try_seed_model() noexcept {
+    if (thread_counter == 1) { // -1 as no need to seed model to self
+        seed_model();
+    }
 }
 
 void net_supervisor_t::on_model_request(model::message::model_request_t &message) noexcept {
@@ -178,9 +186,7 @@ void net_supervisor_t::on_model_request(model::message::model_request_t &message
     auto cluster_copy = new model::cluster_t(device, static_cast<int32_t>(simultaneous_writes));
     reply_to(message, std::move(cluster_copy));
     assert(load_diff);
-    if (thread_counter == 1) { // -1 as no need to seed model to self
-        seed_model();
-    }
+    try_seed_model();
 }
 
 void net_supervisor_t::on_thread_up(model::message::thread_up_t &) noexcept {
@@ -249,7 +255,7 @@ void net_supervisor_t::on_app_ready(model::message::app_ready_t &) noexcept {
             .request_timeout(io_timeout)
             .resolve_timeout(io_timeout)
             .registry_name(names::http11_gda)
-            .root_ca(root_ca)
+            .ssl_verify_store(app_config.ssl_verify_store)
             .keep_alive(true)
             .escalate_failure()
             .finish();
@@ -280,7 +286,7 @@ void net_supervisor_t::on_app_ready(model::message::app_ready_t &) noexcept {
             .request_timeout(io_timeout)
             .resolve_timeout(io_timeout)
             .registry_name(names::http11_relay)
-            .root_ca(root_ca)
+            .ssl_verify_store(app_config.ssl_verify_store)
             .keep_alive(true)
             .escalate_failure()
             .finish();
@@ -291,7 +297,6 @@ void net_supervisor_t::on_app_ready(model::message::app_ready_t &) noexcept {
                 .timeout(timeout)
                 .relay_config(app_config.relay_config)
                 .cluster(cluster)
-                .root_ca(root_ca)
                 .spawner_address(spawner)
                 .finish();
         };
@@ -318,6 +323,12 @@ void net_supervisor_t::on_app_ready(model::message::app_ready_t &) noexcept {
 
 void net_supervisor_t::commit_loading() noexcept {
     if (!cluster->is_tainted()) {
+        for (auto &it : cluster->get_folders()) {
+            auto &folder = it.item;
+            auto folder_entity = presentation::folder_entity_ptr_t(new presentation::folder_entity_t(folder));
+            folder->set_augmentation(folder_entity);
+        }
+
         auto &ignored_devices = cluster->get_ignored_devices();
         auto &ignored_folders = cluster->get_ignored_folders();
         auto &pending_folders = cluster->get_pending_folders();
@@ -357,4 +368,81 @@ void net_supervisor_t::on_start() noexcept {
         .keep_alive(false)
         .escalate_failure()
         .finish();
+
+    send<syncspirit::model::payload::thread_up_t>(address);
+}
+
+auto net_supervisor_t::apply(const model::diff::modify::upsert_folder_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    auto r = parent_t::apply(diff, custom);
+    if (r) {
+        auto folder_id = db::get_id(diff.db);
+        auto folder = cluster->get_folders().by_id(folder_id);
+        if (!folder->get_augmentation()) {
+            auto folder_entity = presentation::folder_entity_ptr_t(new presentation::folder_entity_t(folder));
+            folder->set_augmentation(folder_entity);
+        }
+    }
+    return r;
+}
+
+auto net_supervisor_t::apply(const model::diff::modify::upsert_folder_info_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    auto r = parent_t::apply(diff, custom);
+    if (r) {
+        auto &folder = *cluster->get_folders().by_id(diff.folder_id);
+        auto &device = *cluster->get_devices().by_sha256(diff.device_id);
+        auto folder_info = folder.is_shared_with(device);
+        if (&device != cluster->get_device()) {
+            auto augmentation = folder.get_augmentation().get();
+            auto folder_entity = static_cast<presentation::folder_entity_t *>(augmentation);
+            folder_entity->on_insert(*folder_info);
+        }
+    }
+    return r;
+}
+
+auto net_supervisor_t::apply(const model::diff::advance::advance_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    auto r = parent_t::apply(diff, custom);
+    if (r) {
+        auto folder = cluster->get_folders().by_id(diff.folder_id);
+        auto augmentation = folder->get_augmentation().get();
+        auto folder_entity = static_cast<presentation::folder_entity_t *>(augmentation);
+        if (folder_entity) {
+            auto &folder_infos = folder->get_folder_infos();
+            auto &local_fi = *folder_infos.by_device(*cluster->get_device());
+            auto file_name = proto::get_name(diff.proto_local);
+            auto local_file = local_fi.get_file_infos().by_name(file_name);
+            if (local_file) {
+                folder_entity->on_insert(*local_file, local_fi);
+            }
+        }
+    }
+    return r;
+}
+
+auto net_supervisor_t::apply(const model::diff::peer::update_folder_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    auto r = parent_t::apply(diff, custom);
+    if (r) {
+        auto folder = cluster->get_folders().by_id(diff.folder_id);
+        auto folder_aug = folder->get_augmentation().get();
+        auto folder_entity = static_cast<presentation::folder_entity_t *>(folder_aug);
+
+        auto &devices_map = cluster->get_devices();
+        auto peer = devices_map.by_sha256(diff.peer_id);
+        auto &folder_info = *folder->get_folder_infos().by_device(*peer);
+        auto &files_map = folder_info.get_file_infos();
+
+        for (auto &file : diff.files) {
+            auto file_name = proto::get_name(file);
+            auto file_info = files_map.by_name(file_name);
+            auto augmentation = file_info->get_augmentation().get();
+            if (!augmentation) {
+                folder_entity->on_insert(*file_info, folder_info);
+            }
+        }
+    }
+    return r;
 }

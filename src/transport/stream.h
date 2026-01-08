@@ -26,10 +26,10 @@ struct upgradeable_stream_base_t : stream_base_t {
 stream_sp_t SYNCSPIRIT_API initiate_tls_active(ra::supervisor_asio_t &supervisor, const utils::key_pair_t &my_keys,
                                                const model::device_id_t &expected_peer, const utils::uri_ptr_t &uri,
                                                bool sni = false, std::string_view alpn = {},
-                                               utils::bytes_view_t root_ca = {}) noexcept;
+                                               std::string_view ssl_verify_store = {}) noexcept;
 stream_sp_t SYNCSPIRIT_API initiate_tls_passive(ra::supervisor_asio_t &supervisor, const utils::key_pair_t &my_keys,
                                                 tcp::socket sock, std::string_view alpn = "",
-                                                utils::bytes_view_t root_ca = {}) noexcept;
+                                                std::string_view ssl_verify_store = {}) noexcept;
 stream_sp_t SYNCSPIRIT_API initiate_stream(transport_config_t &config) noexcept;
 
 } // namespace syncspirit::transport

@@ -282,8 +282,14 @@ Fl_Color presence_item_t::get_color() const {
             return FL_DARK1;
         } else if (f & F::symblink) {
             return FL_DARK_BLUE;
-        } else if (f & F::conflict) {
+        } else if (f & F::unreachable) {
             return FL_RED;
+        }
+        if (f & F::folder) {
+            auto fp = static_cast<presentation::folder_presence_t *>(presence);
+            if (fp->get_folder_info().get_folder()->is_suspended()) {
+                return FL_RED;
+            }
         }
         auto &ps = presence->get_stats(true);
         auto &s = presence->get_entity()->get_stats();

@@ -43,7 +43,6 @@ TEST_CASE("file iterator, single folder", "[model]") {
     auto &my_files = my_folder->get_file_infos();
 
     auto file_iterator = peer_device->create_iterator(*cluster);
-
     SECTION("emtpy folders (1)") { CHECK(file_iterator->next() == R{{}, {}, A::ignore}); }
 
     REQUIRE(builder.configure_cluster(peer_id.get_sha256())
@@ -52,6 +51,10 @@ TEST_CASE("file iterator, single folder", "[model]") {
                 .apply());
 
     SECTION("emtpy folders (2)") { CHECK(file_iterator->next() == R{{}, {}, A::ignore}); }
+
+    auto &views = peer_device->get_remote_view_map();
+    // local seq is always "fresh"
+    views.push(peer_id.get_sha256(), folder->get_id(), peer_folder->get_index(), -1);
 
     SECTION("cloning (empty files)") {
         SECTION("1 file") {
@@ -66,6 +69,12 @@ TEST_CASE("file iterator, single folder", "[model]") {
                 SECTION("regular file") {
                     auto ec = index_builder.add(pr_fi, peer_device).finish().apply();
                     REQUIRE(ec);
+
+                    SECTION("local max sequence is outdated") {
+                        views.push(peer_id.get_sha256(), folder->get_id(), peer_folder->get_index(), 100);
+                        auto [f, fi, action] = file_iterator->next();
+                        REQUIRE(!f);
+                    }
 
                     SECTION("no path lock") {
                         auto [f, fi, action] = file_iterator->next();
@@ -400,8 +409,8 @@ TEST_CASE("file iterator for 2 folders", "[model]") {
     auto &folders = cluster->get_folders();
     REQUIRE(builder.upsert_folder("1234-5678", "/my/path").apply());
     REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
-    auto folder = folders.by_id("1234-5678");
-    auto &folder_infos = cluster->get_folders().by_id(folder->get_id())->get_folder_infos();
+    auto folder_1 = folders.by_id("1234-5678");
+    auto &folder_infos = cluster->get_folders().by_id(folder_1->get_id())->get_folder_infos();
     REQUIRE(folder_infos.size() == 2u);
 
     auto peer_folder = folder_infos.by_device(*peer_device);
@@ -414,9 +423,14 @@ TEST_CASE("file iterator for 2 folders", "[model]") {
     auto folder1 = folders.by_id("1234");
     auto folder2 = folders.by_id("5678");
 
+    auto local_fi_1 = folder1->get_folder_infos().by_device(*my_device);
+    auto local_fi_2 = folder2->get_folder_infos().by_device(*my_device);
+
     REQUIRE(builder.configure_cluster(sha256)
                 .add(sha256, "1234", 123, 10u)
+                .add(my_device->device_id().get_sha256(), "1234", local_fi_1->get_index(), 10u)
                 .add(sha256, "5678", 1234u, 11)
+                .add(my_device->device_id().get_sha256(), "5678", local_fi_1->get_index(), 11u)
                 .finish()
                 .apply());
 
@@ -509,6 +523,15 @@ TEST_CASE("file iterator, create, share, iterae, unshare, share, iterate", "[mod
     auto folder = folders.by_id("1234-5678");
     auto folder_infos = &folder->get_folder_infos();
     REQUIRE(folder_infos->size() == 2u);
+    auto local_fi = folder_infos->by_device(*my_device);
+
+    auto peer_sha = peer_id.get_sha256();
+    auto local_sha = my_id.get_sha256();
+    REQUIRE(builder.configure_cluster(peer_sha)
+                .add(peer_sha, "1234-5678", 123, 10u)
+                .add(local_sha, "1234-5678", local_fi->get_index(), 10u)
+                .finish()
+                .apply());
 
     auto file_iterator = peer_device->create_iterator(*cluster);
     auto pr_fi = proto::FileInfo();
@@ -583,6 +606,15 @@ TEST_CASE("file pull order", "[model]") {
     auto folder = folders.by_id("1234-5678");
     auto folder_infos = &folder->get_folder_infos();
     REQUIRE(folder_infos->size() == 2u);
+    auto local_fi = folder_infos->by_device(*my_device);
+
+    auto peer_sha = peer_id.get_sha256();
+    auto local_sha = my_id.get_sha256();
+    REQUIRE(builder.configure_cluster(peer_sha)
+                .add(peer_sha, "1234-5678", 123, 10)
+                .add(local_sha, "1234-5678", local_fi->get_index(), -1)
+                .finish()
+                .apply());
 
     auto index = builder.make_index(peer_id.get_sha256(), folder->get_id());
     std::int64_t sequence = 10;
@@ -710,11 +742,21 @@ TEST_CASE("no file iteration for send-only folder", "[model]") {
     auto folder = folders.by_id("1234-5678");
     auto folder_infos = &folder->get_folder_infos();
     REQUIRE(folder_infos->size() == 2u);
+    auto local_fi = folder_infos->by_device(*my_device);
+
+    auto peer_sha = peer_id.get_sha256();
+    auto local_sha = my_id.get_sha256();
+    REQUIRE(builder.configure_cluster(peer_sha)
+                .add(peer_sha, "1234-5678", 123, 10)
+                .add(local_sha, "1234-5678", local_fi->get_index(), -1)
+                .finish()
+                .apply());
 
     auto file_iterator = peer_device->create_iterator(*cluster);
     auto pr_fi = proto::FileInfo();
     proto::set_name(pr_fi, "a.txt");
     proto::set_sequence(pr_fi, 10);
+
     REQUIRE(builder.make_index(peer_id.get_sha256(), folder->get_id()).add(pr_fi, peer_device).finish().apply());
 
     auto [f, fi, action] = file_iterator->next();

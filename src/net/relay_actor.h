@@ -19,7 +19,6 @@ namespace syncspirit::net {
 
 struct relay_actor_config_t : r::actor_config_t {
     model::cluster_ptr_t cluster;
-    utils::bytes_view_t root_ca;
     config::relay_config_t config;
 };
 
@@ -30,11 +29,6 @@ template <typename Actor> struct relay_actor_config_builder_t : r::actor_config_
 
     builder_t &&cluster(const model::cluster_ptr_t &value) && noexcept {
         parent_t::config.cluster = value;
-        return std::move(*static_cast<typename parent_t::builder_t *>(this));
-    }
-
-    builder_t &&root_ca(const utils::bytes_view_t &value) && noexcept {
-        parent_t::config.root_ca = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
@@ -91,7 +85,6 @@ struct SYNCSPIRIT_API relay_actor_t : public r::actor_base_t {
     void on_rx_timer(r::request_id_t, bool cancelled) noexcept;
 
     model::cluster_ptr_t cluster;
-    utils::bytes_view_t root_ca;
     config::relay_config_t config;
     utils::logger_t log;
 

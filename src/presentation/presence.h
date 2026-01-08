@@ -34,7 +34,7 @@ struct SYNCSPIRIT_API presence_t : model::proxy_t {
         deleted         = 1 << 7,
         ignored         = 1 << 8,
         symblink        = 1 << 9,
-        conflict        = 1 << 10,
+        unreachable     = 1 << 10,
     };
     static constexpr std::uint32_t mask = 0xFFFFFFFF;
     // clang-format ON
@@ -55,7 +55,15 @@ struct SYNCSPIRIT_API presence_t : model::proxy_t {
     children_t& get_children() noexcept;
     void clear_children() noexcept;
 
-    static bool compare(const presence_t *l, const presence_t *r) noexcept;
+    struct SYNCSPIRIT_API presence_like_t {
+        std::string_view name;
+        bool is_dir;
+    };
+
+    struct SYNCSPIRIT_API child_comparator_t {
+        bool operator()(const presence_t *l, const presence_t *r) const;
+        bool operator()(const presence_t *l, const presence_like_t& r) const;
+    };
 
     bool is_unique() const noexcept;
 

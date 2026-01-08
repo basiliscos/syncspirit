@@ -64,6 +64,7 @@ struct governor_actor_t : public r::actor_base_t, private model::diff::cluster_v
     using clock_t = r::pt::microsec_clock;
 
     void on_model_update(model::message::model_update_t &message) noexcept;
+    void on_app_ready(model::message::app_ready_t &) noexcept;
     void on_command(model::message::model_update_t &message) noexcept;
     void on_inactivity_timer(r::request_id_t, bool cancelled) noexcept;
 
@@ -71,8 +72,7 @@ struct governor_actor_t : public r::actor_base_t, private model::diff::cluster_v
 
     outcome::result<void> operator()(const model::diff::advance::remote_copy_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::local::io_failure_t &, void *) noexcept override;
-    outcome::result<void> operator()(const model::diff::modify::append_block_t &, void *) noexcept override;
-    outcome::result<void> operator()(const model::diff::modify::clone_block_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::modify::block_ack_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::peer::cluster_update_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::peer::update_folder_t &, void *) noexcept override;
 

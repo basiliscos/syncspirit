@@ -153,6 +153,8 @@ struct app_supervisor_t : app_supervisor_base_t<app_supervisor_t> {
     void set_show_deleted(bool value);
     void set_show_missing(bool value);
     void set_show_colorized(bool value);
+    void soft_restart();
+    inline bool is_soft_restart_requested() { return soft_restart_request; }
 
     callback_ptr_t call_select_folder(std::string_view folder_id);
     callback_ptr_t call_share_folders(std::string_view folder_id, std::vector<utils::bytes_t> devices);
@@ -206,6 +208,7 @@ struct app_supervisor_t : app_supervisor_base_t<app_supervisor_t> {
     db_info_viewer_t *db_info_viewer;
     callbacks_t callbacks;
     main_window_t *main_window;
+    bool soft_restart_request = false;
 
     friend struct db_info_viewer_guard_t;
 };

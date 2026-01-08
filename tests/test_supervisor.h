@@ -10,6 +10,7 @@
 #include "model/diff/cluster_visitor.h"
 #include "model/diff/local/io_failure.h"
 #include "model/misc/sequencer.h"
+#include "fs/messages.h"
 #include "utils/log.h"
 #include "syncspirit-test-export.h"
 
@@ -18,12 +19,15 @@ namespace syncspirit::test {
 namespace r = rotor;
 namespace outcome = boost::outcome_v2;
 
+using configure_callback_t = std::function<void(r::plugin::plugin_base_t &)>;
+
 struct supervisor_config_t : r::supervisor_config_t {
     using parent_t = r::supervisor_config_t;
     using parent_t::parent_t;
     bool auto_finish = true;
-    bool auto_ack_blocks = true;
-    bool make_presentation = false;
+    bool auto_ack_io = true;
+    bool make_presentation = true;
+    configure_callback_t configure_callback;
 };
 
 template <typename Supervisor> struct supervisor_config_builder_t : r::supervisor_config_builder_t<Supervisor> {
@@ -41,13 +45,17 @@ template <typename Supervisor> struct supervisor_config_builder_t : r::superviso
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&auto_ack_blocks(bool value) && noexcept {
-        parent_t::config.auto_ack_blocks = value;
+    builder_t &&auto_ack_io(bool value) && noexcept {
+        parent_t::config.auto_ack_io = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
     builder_t &&make_presentation(bool value) && noexcept {
         parent_t::config.make_presentation = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+    builder_t &&configure_callback(configure_callback_t value) && noexcept {
+        parent_t::config.configure_callback = std::move(value);
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };
@@ -61,7 +69,6 @@ struct SYNCSPIRIT_TEST_API supervisor_t : r::supervisor_t,
     using timers_t = std::list<r::timer_handler_base_t *>;
     using parent_t = r::supervisor_t;
     using io_errors_t = model::diff::local::io_errors_t;
-    using configure_callback_t = std::function<void(r::plugin::plugin_base_t &)>;
 
     supervisor_t(config_t &cfg);
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
@@ -75,12 +82,16 @@ struct SYNCSPIRIT_TEST_API supervisor_t : r::supervisor_t,
     void do_start_timer(const r::pt::time_duration &interval, r::timer_handler_base_t &handler) noexcept override;
     void do_invoke_timer(r::request_id_t timer_id) noexcept;
     void do_cancel_timer(r::request_id_t timer_id) noexcept override;
+    virtual void on_io(fs::message::io_commands_t &) noexcept;
     io_errors_t consume_errors() noexcept;
 
+    virtual void process_io(fs::payload::block_request_t &) noexcept;
+    virtual void process_io(fs::payload::remote_copy_t &) noexcept;
+    virtual void process_io(fs::payload::append_block_t &) noexcept;
+    virtual void process_io(fs::payload::finish_file_t &) noexcept;
+    virtual void process_io(fs::payload::clone_block_t &) noexcept;
+
     outcome::result<void> operator()(const model::diff::local::io_failure_t &, void *) noexcept override;
-    outcome::result<void> operator()(const model::diff::modify::finish_file_t &, void *) noexcept override;
-    outcome::result<void> operator()(const model::diff::modify::append_block_t &, void *) noexcept override;
-    outcome::result<void> operator()(const model::diff::modify::clone_block_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::upsert_folder_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::upsert_folder_info_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::advance::advance_t &, void *) noexcept override;
@@ -89,15 +100,14 @@ struct SYNCSPIRIT_TEST_API supervisor_t : r::supervisor_t,
     outcome::result<void> apply(const model::diff::load::commit_t &, void *) noexcept override;
 
     using model::diff::apply_controller_t::cluster;
+    using model::diff::cluster_visitor_t::operator();
 
     utils::logger_t log;
     model::sequencer_ptr_t sequencer;
     configure_callback_t configure_callback;
-    model::diff::cluster_diff_ptr_t delayed_ack_holder;
-    model::diff::cluster_diff_t *delayed_ack_current;
     timers_t timers;
     bool auto_finish;
-    bool auto_ack_blocks;
+    bool auto_ack_io;
     bool make_presentation;
     io_errors_t io_errors;
 };

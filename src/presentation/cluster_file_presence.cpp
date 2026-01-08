@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2025 Ivan Baidakou
 
 #include "cluster_file_presence.h"
+#include "folder_presence.h"
 #include "file_entity.h"
 #include "presence.h"
 #include "model/file_info.h"
@@ -31,9 +32,22 @@ void cluster_file_presence_t::refresh_features() noexcept {
     if (file_info.is_link()) {
         features |= F::symblink;
     }
+    if (file_info.is_unreachable()) {
+        features |= F::unreachable;
+    }
 }
 
 auto cluster_file_presence_t::get_file_info() const noexcept -> const model::file_info_t & { return file_info; }
+
+const folder_presence_t *cluster_file_presence_t::get_folder() const noexcept {
+    auto presence = parent;
+    while (presence->parent) {
+        presence = presence->parent;
+    }
+    assert(presence);
+    assert(presence->get_features() & F::folder);
+    return static_cast<folder_presence_t *>(presence);
+}
 
 const presence_t *cluster_file_presence_t::determine_best(const presence_t *other) const {
     if (!(other->get_features() & F::cluster)) {

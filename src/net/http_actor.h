@@ -19,7 +19,7 @@ struct http_actor_config_t : public r::actor_config_t {
     r::pt::time_duration resolve_timeout;
     r::pt::time_duration request_timeout;
     std::string registry_name;
-    utils::bytes_view_t root_ca;
+    std::string ssl_verify_store;
     bool keep_alive;
 };
 
@@ -43,8 +43,8 @@ template <typename Actor> struct http_actor_config_builder_t : r::actor_config_b
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&root_ca(const utils::bytes_view_t &value) && noexcept {
-        parent_t::config.root_ca = value;
+    builder_t &&ssl_verify_store(std::string_view value) && noexcept {
+        parent_t::config.ssl_verify_store = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
@@ -102,8 +102,8 @@ struct SYNCSPIRIT_API http_actor_t : public r::actor_base_t {
     pt::time_duration resolve_timeout;
     pt::time_duration request_timeout;
     std::string registry_name;
-    utils::bytes_view_t root_ca;
-    bool keep_alive;
+    std::string ssl_verify_store;
+    bool keep_alive = false;
     bool kept_alive = false;
     r::address_ptr_t resolver;
     queue_t queue;

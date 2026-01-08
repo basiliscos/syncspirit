@@ -69,7 +69,7 @@ std::string read_file(const bfs::path &path) {
 #endif
     if (!in) {
         auto ec = sys::error_code{errno, sys::generic_category()};
-        std::cout << "(test/read) can't open " << copy.string() << " : " << ec.message() << "\n";
+        spdlog::debug("(test/read) can't open '{}': {}", copy.string(), ec.message());
         return "";
     }
 

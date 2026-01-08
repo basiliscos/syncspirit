@@ -235,7 +235,8 @@ int app_main(app_context_t &app_ctx) {
         return 1;
     }
     auto &cfg = cfg_option.value();
-    logger->trace("configuration seems OK");
+    logger->trace("configuration seems OK, timeout = {}ms", cfg.timeout);
+    auto poll_timeout = r::pt::milliseconds{cfg.poll_timeout};
 
     // override default
     if (log_level) {
@@ -293,7 +294,7 @@ int app_main(app_context_t &app_ctx) {
     ra::system_context_ptr_t sys_context{new asio_sys_context_t{io_context}};
     auto strand = std::make_shared<asio::io_context::strand>(io_context);
     auto timeout = pt::milliseconds{cfg.timeout};
-    auto independent_threads = 2ul;
+    auto independent_threads = 1ul;
     auto seed = (size_t)std::time(nullptr);
     auto sequencer = model::make_sequencer(seed);
 
@@ -317,7 +318,20 @@ int app_main(app_context_t &app_ctx) {
                        .independent_threads(independent_threads)
                        .shutdown_flag(shutdown_flag, r::pt::millisec{50})
                        .bouncer_address(bouncer_actor->get_address())
+                       .poll_duration(poll_timeout)
                        .finish();
+
+    // auxiliary payload
+    sup_net->add_launcher([&](model::cluster_ptr_t &cluster) mutable {
+        sup_net->create_actor<governor_actor_t>()
+            .commands(std::move(commands))
+            .cluster(cluster)
+            .sequencer(sequencer)
+            .timeout(timeout)
+            .autoshutdown_supervisor()
+            .finish();
+    });
+
     // warm-up
     sup_net->do_process();
     if (sup_net->get_shutdown_reason()) {
@@ -342,6 +356,7 @@ int app_main(app_context_t &app_ctx) {
         hasher_ctxs.push_back(new thread_sys_context_t{});
         auto &ctx = hasher_ctxs.back();
         auto sup = ctx->create_supervisor<hasher::hasher_supervisor_t>()
+                       .poll_duration(poll_timeout)
                        .timeout(timeout * 8 / 9)
                        .registry_address(sup_net->get_registry_address())
                        .index(i)
@@ -351,26 +366,14 @@ int app_main(app_context_t &app_ctx) {
 
     thread_sys_context_t fs_context;
     auto fs_sup = fs_context.create_supervisor<syncspirit::fs::fs_supervisor_t>()
+                      .shutdown_flag(shutdown_flag, r::pt::millisec{50})
                       .timeout(timeout)
+                      .poll_duration(poll_timeout)
                       .registry_address(sup_net->get_registry_address())
-                      .bouncer_address(bouncer_actor->get_address())
                       .fs_config(cfg.fs_config)
                       .hasher_threads(cfg.hasher_threads)
-                      .sequencer(sequencer)
                       .finish();
-
-    // auxiliary payload
-    fs_sup->add_launcher([&](model::cluster_ptr_t &cluster) mutable {
-        fs_sup->create_actor<governor_actor_t>()
-            .commands(std::move(commands))
-            .cluster(cluster)
-            .sequencer(sequencer)
-            .timeout(timeout)
-            .autoshutdown_supervisor()
-            .finish();
-    });
     fs_sup->do_process();
-
     /* launch actors */
 
     auto hasher_threads = std::vector<std::thread>();

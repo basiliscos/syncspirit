@@ -3,8 +3,9 @@
 
 #include "test-utils.h"
 #include "test_supervisor.h"
-#include "access.h"
 #include "hasher/hasher_actor.h"
+#include "hasher/hasher_plugin.h"
+#include "managed_hasher.h"
 #include "utils/bytes.h"
 #include <net/names.h>
 
@@ -17,8 +18,7 @@ using namespace syncspirit::hasher;
 
 struct hash_consumer_t : r::actor_base_t {
     r::address_ptr_t hasher;
-    r::intrusive_ptr_t<message::digest_response_t> digest_res;
-    r::intrusive_ptr_t<message::validation_response_t> validation_res;
+    r::intrusive_ptr_t<message::digest_t> digest_res;
 
     using r::actor_base_t::actor_base_t;
 
@@ -26,24 +26,15 @@ struct hash_consumer_t : r::actor_base_t {
         r::actor_base_t::configure(plugin);
         plugin.with_casted<r::plugin::registry_plugin_t>(
             [&](auto &p) { p.discover_name("hasher-1", hasher, true).link(); });
-        plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
-            p.subscribe_actor(&hash_consumer_t::on_digest);
-            p.subscribe_actor(&hash_consumer_t::on_validation);
-        });
+        plugin.with_casted<r::plugin::starter_plugin_t>(
+            [&](auto &p) { p.subscribe_actor(&hash_consumer_t::on_digest); });
     }
 
     void request_digest(const utils::bytes_t &data) {
-        request<payload::digest_request_t>(hasher, data).send(init_timeout);
+        supervisor->route<payload::digest_t>(hasher, address, std::move(data), 0);
     }
 
-    void request_validation(const utils::bytes_t &data, utils::bytes_view_t hash) {
-        auto hash_bytes = utils::bytes_t(hash.begin(), hash.end());
-        request<payload::validation_request_t>(hasher, data, std::move(hash_bytes), nullptr).send(init_timeout);
-    }
-
-    void on_digest(message::digest_response_t &res) noexcept { digest_res = &res; }
-
-    void on_validation(message::validation_response_t &res) noexcept { validation_res = &res; }
+    void on_digest(message::digest_t &res) noexcept { digest_res = &res; }
 };
 
 TEST_CASE("hasher-actor", "[hasher]") {
@@ -59,15 +50,96 @@ TEST_CASE("hasher-actor", "[hasher]") {
     consumer->request_digest(data);
     sup->do_process();
     REQUIRE(consumer->digest_res);
-    CHECK(consumer->digest_res->payload.res.weak == 136184406u);
-    auto digest = consumer->digest_res->payload.res.digest;
+    auto &digest = consumer->digest_res->payload.result.value();
     CHECK(digest[2] == 126);
-
-    consumer->request_validation(data, digest);
-    sup->do_process();
-    REQUIRE(consumer->digest_res);
-    CHECK(consumer->digest_res->payload.res.weak == 136184406u);
 
     sup->shutdown();
     sup->do_process();
+}
+
+TEST_CASE("hasher-plugin", "[hasher]") {
+    struct consumer_t : r::actor_base_t {
+        using parent_t = r::actor_base_t;
+        using parent_t::parent_t;
+
+        // clang-format off
+        using plugins_list_t = std::tuple<
+            r::plugin::address_maker_plugin_t,
+            r::plugin::lifetime_plugin_t,
+            r::plugin::init_shutdown_plugin_t,
+            r::plugin::link_server_plugin_t,
+            r::plugin::link_client_plugin_t,
+            h::hasher_plugin_t,
+            r::plugin::resources_plugin_t,
+            r::plugin::starter_plugin_t
+        >;
+        // clang-format on
+
+        void configure(r::plugin::plugin_base_t &plugin) noexcept override {
+            parent_t::configure(plugin);
+            plugin.with_casted<h::hasher_plugin_t>([&](auto &p) { p.configure_hashers(hasher_threads); });
+            plugin.with_casted<r::plugin::starter_plugin_t>(
+                [&](auto &p) { p.subscribe_actor(&consumer_t::on_digest); });
+        }
+
+        void on_start() noexcept override {
+            parent_t::on_start();
+            auto plugin = get_plugin(h::hasher_plugin_t::class_identity);
+            auto hasher = static_cast<h::hasher_plugin_t *>(plugin);
+
+            for (int i = 1; i <= 10; ++i) {
+                auto data = utils::bytes_t(i, i);
+                counter += i;
+                hasher->calc_digest(std::move(data), 0, address, {});
+            }
+        }
+
+        void on_digest(message::digest_t &res) noexcept { counter -= static_cast<int>(res.payload.data.size()); }
+        int counter = 0;
+        std::uint32_t hasher_threads = 0;
+    };
+
+    r::system_context_t ctx;
+    auto timeout = r::pt::milliseconds{10};
+    auto sup = ctx.create_supervisor<st::supervisor_t>().timeout(timeout).create_registry().finish();
+    sup->start();
+    auto h1 = sup->create_actor<test::managed_hasher_t>().auto_reply().index(1).timeout(timeout).finish();
+    auto h2 = sup->create_actor<test::managed_hasher_t>().auto_reply().index(2).timeout(timeout).finish();
+    auto h3 = sup->create_actor<test::managed_hasher_t>().auto_reply().index(3).timeout(timeout).finish();
+    sup->do_process();
+
+    auto consumer = sup->create_actor<consumer_t>().timeout(timeout).finish();
+
+    SECTION("2 threads") {
+        consumer->hasher_threads = 2;
+        sup->do_process();
+        CHECK(consumer->counter == 0);
+        CHECK(h1->digested_bytes > 0);
+        CHECK(h1->digested_bytes + 5 == h2->digested_bytes);
+    }
+
+    SECTION("1 thread") {
+        consumer->hasher_threads = 1;
+        sup->do_process();
+        CHECK(consumer->counter == 0);
+        CHECK(h1->digested_bytes == 55);
+        CHECK(h2->digested_bytes == 0);
+    }
+
+    SECTION("3 threads") {
+        consumer->hasher_threads = 3;
+        sup->do_process();
+        CHECK(consumer->counter == 0);
+        CHECK(h1->digested_bytes > 0);
+        CHECK(h2->digested_bytes > 0);
+        CHECK(h3->digested_bytes > 0);
+    }
+
+    sup->shutdown();
+    sup->do_process();
+}
+
+int _init() {
+    test::init_logging();
+    return 1;
 }

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2026 Ivan Baidakou
 
 #include "properties.h"
 #include "utils/log.h"
@@ -32,6 +32,32 @@ error_ptr_t positive_integer_t::validate_value() noexcept {
 
     if (r <= 0) {
         return error_ptr_t(new std::string("not a positive number"));
+    }
+
+    // all ok
+    native_value = static_cast<std::uint64_t>(r);
+    return {};
+}
+
+non_negative_integer_t::non_negative_integer_t(std::string label, std::string explanation, uint64_t value,
+                                               uint64_t default_value)
+    : property_t(std::move(label), std::move(explanation), std::to_string(value), std::to_string(default_value),
+                 property_kind_t::positive_integer),
+      native_value{value} {}
+
+error_ptr_t non_negative_integer_t::validate_value() noexcept {
+    std::uint64_t r;
+    auto [ptr, ec] = std::from_chars(value.data(), value.data() + value.size(), r);
+
+    if (ec == std::errc::invalid_argument) {
+        return error_ptr_t(new std::string("not a number"));
+    } else if (ec == std::errc::result_out_of_range) {
+        return error_ptr_t(new std::string("too large number"));
+    }
+    assert(ec == std::errc());
+
+    if (r < 0) {
+        return error_ptr_t(new std::string("not a non-negative number"));
     }
 
     // all ok
@@ -148,12 +174,12 @@ void advances_per_iteration_t::reflect_to(syncspirit::config::main_t &main) {
 
 const char *advances_per_iteration_t::explanation_ = "maximum amount of file metadata advances per iteration";
 
-request_timeout_t::request_timeout_t(std::uint64_t value, std::uint64_t default_value)
-    : parent_t("request_timeout", explanation_, value, default_value) {}
+ping_timeout_t::ping_timeout_t(std::uint64_t value, std::uint64_t default_value)
+    : parent_t("ping_timeout", explanation_, value, default_value) {}
 
-void request_timeout_t::reflect_to(syncspirit::config::main_t &main) { main.bep_config.request_timeout = native_value; }
+void ping_timeout_t::reflect_to(syncspirit::config::main_t &main) { main.bep_config.ping_timeout = native_value; }
 
-const char *request_timeout_t::explanation_ = "maximum time for request, milliseconds";
+const char *ping_timeout_t::explanation_ = "maximum interval between pings, milliseconds";
 
 rx_buff_size_t::rx_buff_size_t(std::uint64_t value, std::uint64_t default_value)
     : parent_t("rx_buff_size", explanation_, value, default_value) {}
@@ -162,26 +188,12 @@ void rx_buff_size_t::reflect_to(syncspirit::config::main_t &main) { main.bep_con
 
 const char *rx_buff_size_t::explanation_ = "preallocated receive buffer size, bytes";
 
-rx_timeout_t::rx_timeout_t(std::uint64_t value, std::uint64_t default_value)
-    : parent_t("rx_timeout", explanation_, value, default_value) {}
-
-void rx_timeout_t::reflect_to(syncspirit::config::main_t &main) { main.bep_config.rx_timeout = native_value; }
-
-const char *rx_timeout_t::explanation_ = "rx max time, milliseconds";
-
 tx_buff_limit_t::tx_buff_limit_t(std::uint64_t value, std::uint64_t default_value)
     : parent_t("tx_buff_limit", explanation_, value, default_value) {}
 
 void tx_buff_limit_t::reflect_to(syncspirit::config::main_t &main) { main.bep_config.tx_buff_limit = native_value; }
 
 const char *tx_buff_limit_t::explanation_ = "preallocated transmit buffer size";
-
-tx_timeout_t::tx_timeout_t(std::uint64_t value, std::uint64_t default_value)
-    : parent_t("tx_timeout", explanation_, value, default_value) {}
-
-void tx_timeout_t::reflect_to(syncspirit::config::main_t &main) { main.bep_config.tx_timeout = native_value; }
-
-const char *tx_timeout_t::explanation_ = "tx max time, milliseconds";
 
 stats_interval_t::stats_interval_t(std::int64_t value, std::int64_t default_value)
     : parent_t("tx_timeout", explanation_, value, default_value) {}
@@ -256,13 +268,6 @@ const char *skip_discovers_t::explanation_ = "when peer addresses are known, how
 } // namespace dialer
 
 namespace fs {
-
-mru_size_t::mru_size_t(std::uint64_t value, std::uint64_t default_value)
-    : parent_t("mru_size", explanation_, value, default_value) {}
-
-void mru_size_t::reflect_to(syncspirit::config::main_t &main) { main.fs_config.mru_size = native_value; }
-
-const char *mru_size_t::explanation_ = "maximum amount of cached/opened files";
 
 temporally_timeout_t::temporally_timeout_t(std::uint64_t value, std::uint64_t default_value)
     : parent_t("temporally_timeout", explanation_, value, default_value) {}
@@ -369,23 +374,23 @@ const char *default_location_t::explanation_ = "where folders are created by def
 cert_file_t::cert_file_t(const bfs::path &value, const bfs::path &default_value)
     : parent_t("cert_file", explanation_, value, default_value) {}
 
-void cert_file_t::reflect_to(syncspirit::config::main_t &main) { main.cert_file = value; }
+void cert_file_t::reflect_to(syncspirit::config::main_t &main) { main.cert_file = convert(); }
 
 const char *cert_file_t::explanation_ = "this device certificate location";
 
 key_file_t::key_file_t(const bfs::path &value, const bfs::path &default_value)
     : parent_t("key_file", explanation_, value, default_value) {}
 
-void key_file_t::reflect_to(syncspirit::config::main_t &main) { main.key_file = value; }
+void key_file_t::reflect_to(syncspirit::config::main_t &main) { main.key_file = convert(); }
 
 const char *key_file_t::explanation_ = "this device key location";
 
-root_ca_file::root_ca_file(const bfs::path &value, const bfs::path &default_value)
-    : parent_t("root_ca_file", explanation_, value, default_value, property_kind_t::file) {}
+ssl_verify_store::ssl_verify_store(std::string value, std::string default_value)
+    : parent_t("ssl_verify_store", explanation_, std::move(value), std::move(default_value)) {}
 
-void root_ca_file::reflect_to(syncspirit::config::main_t &main) { main.root_ca_file = convert(); }
+void ssl_verify_store::reflect_to(syncspirit::config::main_t &main) { main.ssl_verify_store = value; }
 
-const char *root_ca_file::explanation_ = "root certificate authority (ca) file (PEM format)";
+const char *ssl_verify_store::explanation_ = "where CA certificates for verification purposes are located.";
 
 device_name_t::device_name_t(std::string value, std::string default_value)
     : parent_t("device_name", explanation_, std::move(value), std::move(default_value)) {}
@@ -400,6 +405,13 @@ hasher_threads_t::hasher_threads_t(std::uint64_t value, std::uint64_t default_va
 void hasher_threads_t::reflect_to(syncspirit::config::main_t &main) { main.hasher_threads = native_value; }
 
 const char *hasher_threads_t::explanation_ = "amount cpu cores used for hashing";
+
+poll_timeout_t::poll_timeout_t(std::uint64_t value, std::uint64_t default_value)
+    : parent_t("poll_timeout", explanation_, value, default_value) {}
+
+void poll_timeout_t::reflect_to(syncspirit::config::main_t &main) { main.poll_timeout = native_value; }
+
+const char *poll_timeout_t::explanation_ = "amount of microseconds of spin-lock polling (0 to save CPU)";
 
 timeout_t::timeout_t(std::uint64_t value, std::uint64_t default_value)
     : parent_t("timeout", explanation_, value, default_value) {}

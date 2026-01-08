@@ -6,7 +6,7 @@
 #include "test_supervisor.h"
 #include "diff-builder.h"
 #include "model/cluster.h"
-#include "fs/scan_scheduler.h"
+#include "net/scheduler.h"
 #include "net/names.h"
 #include <chrono>
 
@@ -14,8 +14,10 @@ using namespace syncspirit;
 using namespace syncspirit::test;
 using namespace syncspirit::model;
 
+using Clock = r::pt::microsec_clock;
+
 struct fixture_t {
-    using target_ptr_t = r::intrusive_ptr_t<fs::scan_scheduler_t>;
+    using target_ptr_t = r::intrusive_ptr_t<net::scheduler_t>;
 
     fixture_t() noexcept {
         test::init_logging();
@@ -34,10 +36,6 @@ struct fixture_t {
         r::system_context_t ctx;
         sup = ctx.create_supervisor<supervisor_t>().timeout(timeout).create_registry().finish();
         sup->cluster = cluster;
-        sup->configure_callback = [&](r::plugin::plugin_base_t &plugin) {
-            plugin.template with_casted<r::plugin::registry_plugin_t>(
-                [&](auto &p) { p.register_name(net::names::fs_scanner, sup->get_address()); });
-        };
 
         sup->start();
         sup->do_process();
@@ -47,7 +45,7 @@ struct fixture_t {
         CHECK(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::OPERATIONAL);
         sup->do_process();
 
-        target = sup->create_actor<fs::scan_scheduler_t>().timeout(timeout).finish();
+        target = sup->create_actor<net::scheduler_t>().timeout(timeout).finish();
         sup->do_process();
 
         sup->send<syncspirit::model::payload::thread_ready_t>(sup->get_address(), cluster, std::this_thread::get_id());
@@ -90,7 +88,7 @@ void test_1_folder() {
             }
 
             SECTION("non-zero rescan time") {
-                db::set_rescan_interval(db_folder, 3600);
+                db::set_rescan_interval(db_folder, 1);
                 builder.upsert_folder(db_folder).apply(*sup);
 
                 auto folder = cluster->get_folders().by_id(folder_id);
@@ -101,7 +99,11 @@ void test_1_folder() {
                     REQUIRE(!folder->is_scanning());
 
                     REQUIRE(sup->timers.size() == 1);
-                    std::this_thread::sleep_for(std::chrono::milliseconds{1});
+                    sup->do_invoke_timer((*sup->timers.begin())->request_id);
+                    REQUIRE(!folder->is_scanning());
+
+                    REQUIRE(sup->timers.size() == 1);
+                    std::this_thread::sleep_for(std::chrono::milliseconds{2100});
 
                     sup->do_invoke_timer((*sup->timers.begin())->request_id);
                     sup->do_process();
@@ -115,7 +117,7 @@ void test_1_folder() {
 
                     builder.synchronization_finish(folder_id).apply(*sup);
                     REQUIRE(sup->timers.size() == 1);
-                    std::this_thread::sleep_for(std::chrono::milliseconds{1});
+                    std::this_thread::sleep_for(std::chrono::milliseconds{2100});
                     sup->do_invoke_timer((*sup->timers.begin())->request_id);
                     sup->do_process();
                     REQUIRE(folder->is_scanning());
@@ -138,6 +140,7 @@ void test_1_folder() {
 
 void test_2_folders() {
     struct F : fixture_t {
+        using C = r::pt::microsec_clock;
         void main() noexcept override {
             auto f1_id = "1111";
             auto f2_id = "2222";
@@ -146,22 +149,24 @@ void test_2_folders() {
             db::set_id(db_folder_1, f1_id);
             db::set_id(db_folder_2, f2_id);
 
-            auto rescan_min = std::uint32_t(2000);
-            db::set_rescan_interval(db_folder_1, 4000);
+            auto rescan_min = std::uint32_t(2);
+            db::set_rescan_interval(db_folder_1, 4);
             db::set_rescan_interval(db_folder_2, rescan_min);
 
             auto builder = diff_builder_t(*cluster);
             builder.upsert_folder(db_folder_1)
                 .upsert_folder(db_folder_2)
                 .apply(*sup)
-                .scan_finish(f2_id)
+                .scan_start(f2_id, C::local_time() - r::pt::seconds{rescan_min + 10})
+                .scan_finish(f2_id, C::local_time() - r::pt::seconds{rescan_min + 1})
                 .apply(*sup)
-                .scan_finish(f1_id)
+                .scan_start(f1_id, C::local_time() - r::pt::seconds{rescan_min + 10})
+                .scan_finish(f1_id, C::local_time() - r::pt::seconds{rescan_min + 1})
                 .apply(*sup);
 
             REQUIRE(sup->timers.size() == 1);
-            std::this_thread::sleep_for(std::chrono::milliseconds{1});
 
+            std::this_thread::sleep_for(std::chrono::milliseconds{1});
             sup->do_invoke_timer((*sup->timers.begin())->request_id);
             sup->do_process();
 
@@ -170,20 +175,16 @@ void test_2_folders() {
 
             REQUIRE(!f1->is_scanning());
             REQUIRE(f2->is_scanning());
-
-            auto at = r::pt::microsec_clock::local_time() + r::pt::seconds{rescan_min + 1};
-            builder.scan_finish(f2_id, at).apply(*sup);
+            builder.scan_finish(f2_id, C::local_time() + r::pt::seconds{rescan_min + 1}).apply(*sup);
+            REQUIRE(!f1->is_scanning());
+            REQUIRE(!f2->is_scanning());
 
             REQUIRE(sup->timers.size() == 1);
+            std::this_thread::sleep_for(std::chrono::milliseconds{1011});
             sup->do_invoke_timer((*sup->timers.begin())->request_id);
             sup->do_process();
             REQUIRE(f1->is_scanning());
             REQUIRE(!f2->is_scanning());
-
-            f2->set_scan_finish({});
-            builder.scan_finish(f1_id, at).scan_request(f2_id).apply(*sup);
-            REQUIRE(!f1->is_scanning());
-            REQUIRE(f2->is_scanning());
         }
     };
     F().run();

@@ -80,12 +80,7 @@ struct SYNCSPIRIT_TEST_API diff_builder_t : private model::diff::apply_controlle
     diff_builder_t &unshare_folder(model::folder_info_t &fi) noexcept;
     diff_builder_t &remote_copy(const model::file_info_t &source, const model::folder_info_t &source_fi) noexcept;
     diff_builder_t &advance(const model::file_info_t &source, const model::folder_info_t &source_fi) noexcept;
-    diff_builder_t &finish_file(const model::file_info_t &file, const model::folder_info_t &source_fi) noexcept;
     diff_builder_t &local_update(std::string_view folder_id, const proto::FileInfo &file_) noexcept;
-    diff_builder_t &append_block(const model::file_info_t &target, const model::folder_info_t &target_fi,
-                                 size_t block_index, utils::bytes_t data) noexcept;
-    diff_builder_t &clone_block(const model::file_block_t &, const model::folder_info_t &target_fi,
-                                const model::folder_info_t &source_fi) noexcept;
     diff_builder_t &ack_block(const model::diff::modify::block_transaction_t &) noexcept;
     diff_builder_t &remove_folder(const model::folder_t &folder) noexcept;
     diff_builder_t &remove_peer(const model::device_t &peer) noexcept;
@@ -103,7 +98,7 @@ struct SYNCSPIRIT_TEST_API diff_builder_t : private model::diff::apply_controlle
     diff_builder_t &synchronization_finish(std::string_view id) noexcept;
     diff_builder_t &mark_reacheable(model::file_info_ptr_t peer_file, const model::folder_info_t &peer_fi,
                                     bool value) noexcept;
-    diff_builder_t &suspend(const model::folder_t &folder) noexcept;
+    diff_builder_t &suspend(const model::folder_t &folder, bool value = true) noexcept;
     diff_builder_t &interrupt() noexcept;
 
     model::sequencer_t &get_sequencer() noexcept;

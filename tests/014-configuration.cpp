@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "test-utils.h"
 #include "config/utils.h"
@@ -12,8 +12,7 @@ namespace syncspirit::config {
 
 bool operator==(const bep_config_t &lhs, const bep_config_t &rhs) noexcept {
     return lhs.rx_buff_size == rhs.rx_buff_size && lhs.tx_buff_limit == rhs.tx_buff_limit &&
-           lhs.connect_timeout == rhs.connect_timeout && lhs.request_timeout == rhs.request_timeout &&
-           lhs.tx_timeout == rhs.tx_timeout && lhs.rx_timeout == rhs.rx_timeout &&
+           lhs.connect_timeout == rhs.connect_timeout && lhs.ping_timeout == rhs.ping_timeout &&
            lhs.blocks_max_requested == rhs.blocks_max_requested &&
            lhs.blocks_simultaneous_write == rhs.blocks_simultaneous_write;
 }
@@ -24,7 +23,7 @@ bool operator==(const dialer_config_t &lhs, const dialer_config_t &rhs) noexcept
 }
 
 bool operator==(const fs_config_t &lhs, const fs_config_t &rhs) noexcept {
-    return lhs.temporally_timeout == rhs.temporally_timeout && lhs.mru_size == rhs.mru_size &&
+    return lhs.temporally_timeout == rhs.temporally_timeout &&
            lhs.bytes_scan_iteration_limit == rhs.bytes_scan_iteration_limit &&
            lhs.files_scan_iteration_limit == rhs.files_scan_iteration_limit;
 }
@@ -63,7 +62,8 @@ bool operator==(const main_t &lhs, const main_t &rhs) noexcept {
            lhs.global_announce_config == rhs.global_announce_config && lhs.bep_config == rhs.bep_config &&
            lhs.db_config == rhs.db_config && lhs.timeout == rhs.timeout && lhs.device_name == rhs.device_name &&
            lhs.config_path == rhs.config_path && lhs.log_configs == rhs.log_configs && lhs.cert_file == rhs.cert_file &&
-           lhs.key_file == rhs.key_file && lhs.hasher_threads == rhs.hasher_threads;
+           lhs.key_file == rhs.key_file && lhs.hasher_threads == rhs.hasher_threads &&
+           lhs.poll_timeout == rhs.poll_timeout;
 }
 
 } // namespace syncspirit::config

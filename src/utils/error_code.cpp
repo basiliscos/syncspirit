@@ -12,13 +12,14 @@ const char *bep_error_code_category::name() const noexcept { return "syncspirit_
 
 const char *protocol_error_code_category::name() const noexcept { return "syncspirit_proto_error"; }
 
-const char *request_error_code_category::name() const noexcept { return "syncspirit_request_error"; }
-
 std::string error_code_category::message(int c) const {
     std::string r;
     switch (static_cast<error_code_t>(c)) {
     case error_code_t::success:
         r = "success";
+        break;
+    case error_code_t::no_action:
+        r = "no action (messages has not been processed)";
         break;
     case error_code_t::no_location:
         r = "no location";
@@ -119,8 +120,8 @@ std::string error_code_category::message(int c) const {
     case error_code_t::cares_failure:
         r = "cares failure";
         break;
-    case error_code_t::nonunique_filename:
-        r = "filename uniqueness violation (OS/filesystem dependent)";
+    case error_code_t::flush_non_opened:
+        r = "attempt to flush a non-opened file";
         break;
     case error_code_t::peer_has_been_removed:
         r = "peer has been removed";
@@ -176,29 +177,6 @@ std::string protocol_error_code_category::message(int c) const {
     return r;
 }
 
-std::string request_error_code_category::message(int c) const {
-    std::string r;
-    switch (static_cast<request_error_code_t>(c)) {
-    case request_error_code_t::success:
-        r = "success";
-        break;
-    case request_error_code_t::generic:
-        r = "generic error";
-        break;
-    case request_error_code_t::no_such_file:
-        r = "no such a file";
-        break;
-    case request_error_code_t::invalid_file:
-        r = "invalid file";
-        break;
-    default:
-        r = "unknown";
-    }
-    r += " (";
-    r += std::to_string(c) + ")";
-    return r;
-}
-
 } // namespace syncspirit::utils::detail
 
 namespace syncspirit::utils {
@@ -206,12 +184,10 @@ namespace syncspirit::utils {
 const static detail::error_code_category category;
 const static detail::bep_error_code_category bep_category;
 const static detail::protocol_error_code_category protocol_category;
-const static detail::request_error_code_category request_category;
 
 const detail::error_code_category &error_code_category() { return category; }
 const detail::bep_error_code_category &bep_error_code_category() { return bep_category; }
 const detail::protocol_error_code_category &protocol_error_code_category() { return protocol_category; }
-const detail::request_error_code_category &request_error_code_category() { return request_category; }
 
 boost::system::error_code adapt(const std::error_code &ec) noexcept {
     struct category_adapter_t : public boost::system::error_category {

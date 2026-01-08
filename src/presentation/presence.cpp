@@ -13,6 +13,51 @@ using namespace syncspirit;
 using namespace syncspirit::presentation;
 
 using F = presence_t::features_t;
+using CP = presence_t::child_comparator_t;
+
+bool CP::operator()(const presence_t *l, const presence_t *r) const {
+    auto lf = l->get_features();
+    if (lf & F::missing) {
+        assert(l->entity->best);
+        l = l->entity->best;
+        lf = l->get_features();
+    }
+    auto rf = r->get_features();
+    if (rf & F::missing) {
+        assert(r->entity->best);
+        r = r->entity->best;
+        rf = r->get_features();
+    }
+
+    auto ld = lf & F::directory;
+    auto rd = rf & F::directory;
+    if (ld && !rd) {
+        return true;
+    } else if (!ld && rd) {
+        return false;
+    }
+    auto l_name = l->entity->get_path()->get_own_name();
+    auto r_name = r->entity->get_path()->get_own_name();
+    return l_name < r_name;
+}
+
+bool CP::operator()(const presence_t *l, const presence_like_t &r) const {
+    auto lf = l->get_features();
+    if (lf & F::missing) {
+        assert(l->entity->best);
+        l = l->entity->best;
+        lf = l->get_features();
+    }
+    auto ld = lf & F::directory;
+    auto rd = r.is_dir;
+
+    if (ld && !rd) {
+        return true;
+    } else if (!ld && rd) {
+        return false;
+    }
+    return l->entity->get_path()->get_own_name() < r.name;
+}
 
 presence_t::presence_t(entity_t *entity_, model::device_t *device_) noexcept
     : entity{entity_}, device{device_}, parent{nullptr} {
@@ -120,32 +165,6 @@ void presence_t::sync_with_entity() const noexcept {
     }
 }
 
-bool presence_t::compare(const presence_t *l, const presence_t *r) noexcept {
-    auto lf = l->get_features();
-    if (lf & F::missing) {
-        assert(l->entity->best);
-        l = l->entity->best;
-        lf = l->get_features();
-    }
-    auto rf = r->get_features();
-    if (rf & F::missing) {
-        assert(r->entity->best);
-        r = r->entity->best;
-        rf = r->get_features();
-    }
-
-    auto ld = lf & F::directory;
-    auto rd = rf & F::directory;
-    if (ld && !rd) {
-        return true;
-    } else if (!ld && rd) {
-        return false;
-    }
-    auto l_name = l->entity->get_path()->get_own_name();
-    auto r_name = r->entity->get_path()->get_own_name();
-    return l_name < r_name;
-}
-
 auto presence_t::get_children() noexcept -> children_t & {
     auto &e_children = entity->children;
     if (children.size() != e_children.size()) {
@@ -157,7 +176,7 @@ auto presence_t::get_children() noexcept -> children_t & {
                 children.emplace_back(p);
             }
         }
-        std::sort(children.begin(), children.end(), compare);
+        std::sort(children.begin(), children.end(), child_comparator_t{});
     }
     return children;
 }

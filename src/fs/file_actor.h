@@ -1,17 +1,32 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #pragma once
 
-#include "file_cache.h"
 #include "messages.h"
+#include "file.h"
 #include "net/messages.h"
-#include "model/cluster.h"
-#include "model/messages.h"
-#include "model/diff/cluster_visitor.h"
-#include "model/misc/sequencer.h"
+#include "hasher/hasher_plugin.h"
 #include "utils/log.h"
+#include "model/file_info.h"
+#include <stdio.h>
 #include <rotor.hpp>
+
+// buggy mingw fix:
+#if defined(WIN32) && defined(__GNUC__) && (__GNUC__ < 12)
+namespace std {
+template <> struct hash<std::filesystem::path> {
+    inline size_t operator()(const std::filesystem::path &item) const noexcept {
+        auto input = item.c_str();
+        auto h = size_t{0};
+        while (*input) {
+            h = (h << 1) | static_cast<size_t>(*input++);
+        }
+        return h;
+    }
+};
+} // namespace std
+#endif
 
 namespace syncspirit::fs {
 
@@ -19,9 +34,7 @@ namespace r = rotor;
 namespace outcome = boost::outcome_v2;
 
 struct SYNCSPIRIT_API file_actor_config_t : r::actor_config_t {
-    model::cluster_ptr_t cluster;
-    model::sequencer_ptr_t sequencer;
-    file_cache_ptr_t rw_cache;
+    uint32_t concurrent_hashes;
 };
 
 template <typename Actor> struct file_actor_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -29,25 +42,19 @@ template <typename Actor> struct file_actor_config_builder_t : r::actor_config_b
     using parent_t = r::actor_config_builder_t<Actor>;
     using parent_t::parent_t;
 
-    builder_t &&cluster(const model::cluster_ptr_t &value) && noexcept {
-        parent_t::config.cluster = value;
-        return std::move(*static_cast<typename parent_t::builder_t *>(this));
-    }
-
-    builder_t &&sequencer(model::sequencer_ptr_t value) && noexcept {
-        parent_t::config.sequencer = std::move(value);
-        return std::move(*static_cast<typename parent_t::builder_t *>(this));
-    }
-
-    builder_t &&rw_cache(file_cache_ptr_t value) && noexcept {
-        parent_t::config.rw_cache = std::move(value);
+    builder_t &&concurrent_hashes(uint32_t value) && noexcept {
+        parent_t::config.concurrent_hashes = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };
 
-struct SYNCSPIRIT_API file_actor_t : public r::actor_base_t, private model::diff::cluster_visitor_t {
-    using config_t = file_actor_config_t;
+struct SYNCSPIRIT_API file_actor_t : public r::actor_base_t {
     template <typename Actor> using config_builder_t = file_actor_config_builder_t<Actor>;
+    using config_t = file_actor_config_t;
+    using plugins_list_t =
+        std::tuple<r::plugin::address_maker_plugin_t, r::plugin::lifetime_plugin_t, r::plugin::init_shutdown_plugin_t,
+                   r::plugin::link_server_plugin_t, r::plugin::link_client_plugin_t, hasher::hasher_plugin_t,
+                   r::plugin::resources_plugin_t, r::plugin::starter_plugin_t>;
 
     explicit file_actor_t(config_t &cfg);
 
@@ -55,22 +62,21 @@ struct SYNCSPIRIT_API file_actor_t : public r::actor_base_t, private model::diff
     void shutdown_start() noexcept override;
     void shutdown_finish() noexcept override;
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
+    template <typename T> auto &access() noexcept;
 
   private:
-    struct write_guard_t {
-        write_guard_t(file_actor_t &actor, const model::diff::modify::block_transaction_t &txn) noexcept;
-        ~write_guard_t();
+    using file_cache_t = std::unordered_map<bfs::path, file_ptr_t>;
+    using context_cache_t = std::unordered_map<const void *, file_cache_t>;
 
-        outcome::result<void> operator()(outcome::result<void> result) noexcept;
+    void on_exec(message::foreign_executor_t &) noexcept;
+    void on_io_commands(message::io_commands_t &) noexcept;
+    void on_create_dir(message::create_dir_t &) noexcept;
+    void process(payload::block_request_t &, const void *) noexcept;
+    void process(payload::remote_copy_t &, const void *) noexcept;
+    void process(payload::append_block_t &, const void *) noexcept;
+    void process(payload::finish_file_t &, const void *) noexcept;
+    void process(payload::clone_block_t &, const void *) noexcept;
 
-        file_actor_t &actor;
-        const model::diff::modify::block_transaction_t &txn;
-        bool success;
-    };
-
-    void on_thread_ready(model::message::thread_ready_t &) noexcept;
-    void on_model_update(model::message::model_update_t &message) noexcept;
-    void on_block_request(message::block_request_t &message) noexcept;
     void on_controller_up(net::message::controller_up_t &message) noexcept;
     void on_controller_predown(net::message::controller_predown_t &message) noexcept;
 
@@ -78,26 +84,16 @@ struct SYNCSPIRIT_API file_actor_t : public r::actor_base_t, private model::diff
                                                        const model::folder_info_t &source_fi,
                                                        const file_ptr_t &target_backend) noexcept;
 
-    outcome::result<file_ptr_t> open_file_rw(const bfs::path &path, model::file_info_ptr_t info,
-                                             const model::folder_info_t &folder_info) noexcept;
-    outcome::result<file_ptr_t> open_file_ro(const bfs::path &path, bool use_cache = false) noexcept;
+    outcome::result<file_ptr_t> open_file_rw(const bfs::path &path, std::uint64_t file_size,
+                                             const void *context) noexcept;
+    outcome::result<file_ptr_t> open_file_ro(const bfs::path &path, const void *context = {}) noexcept;
 
-    outcome::result<void> operator()(const model::diff::advance::remote_copy_t &, void *) noexcept override;
-    outcome::result<void> operator()(const model::diff::advance::remote_win_t &, void *) noexcept override;
-    outcome::result<void> operator()(const model::diff::modify::finish_file_t &, void *) noexcept override;
-    outcome::result<void> operator()(const model::diff::modify::append_block_t &, void *) noexcept override;
-    outcome::result<void> operator()(const model::diff::modify::clone_block_t &, void *) noexcept override;
-
-    outcome::result<void> reflect(model::file_info_ptr_t &file, const model::folder_info_t &fi,
-                                  const bfs::path &path) noexcept;
-
-    model::cluster_ptr_t cluster;
-    model::sequencer_ptr_t sequencer;
     utils::logger_t log;
     r::address_ptr_t coordinator;
     r::address_ptr_t db;
-    file_cache_ptr_t rw_cache;
-    file_cache_t ro_cache;
+    context_cache_t context_cache;
+    uint32_t concurrent_hashes;
+    hasher::hasher_plugin_t *hasher = nullptr;
 };
 
 } // namespace syncspirit::fs

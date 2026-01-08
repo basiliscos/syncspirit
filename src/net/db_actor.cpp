@@ -290,6 +290,10 @@ void db_actor_t::on_controller_down(net::message::controller_down_t &message) no
 
 void db_actor_t::on_cluster_load_trigger(message::load_cluster_trigger_t &) noexcept {
     using namespace model::diff;
+    if (state > r::state_t::OPERATIONAL) {
+        LOG_DEBUG(log, "on_cluster_load_trigger, ignoring");
+        return;
+    }
     r::actor_base_t::on_start();
     LOG_TRACE(log, "on_cluster_load_trigger");
 

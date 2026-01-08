@@ -38,7 +38,6 @@ struct pending_devices_t;
 
 namespace local {
 struct blocks_availability_t;
-struct custom_t;
 struct file_availability_t;
 struct io_failure_t;
 struct scan_finish_t;
@@ -52,6 +51,7 @@ namespace peer {
 struct cluster_update_t;
 struct rx_tx_t;
 struct update_folder_t;
+struct update_remote_views_t;
 } // namespace peer
 
 namespace modify {
@@ -59,13 +59,8 @@ struct add_blocks_t;
 struct add_ignored_device_t;
 struct add_pending_device_t;
 struct add_pending_folders_t;
-struct add_remote_folder_infos_t;
-struct append_block_t;
 struct block_ack_t;
-struct block_rej_t;
 struct block_transaction_t;
-struct clone_block_t;
-struct finish_file_t;
 struct generic_remove_t;
 struct mark_reachable_t;
 struct remove_blocks_t;

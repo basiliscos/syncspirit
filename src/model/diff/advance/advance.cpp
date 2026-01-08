@@ -133,8 +133,9 @@ auto advance_t::apply_impl(apply_controller_t &controller, void *custom) const n
     auto folder = cluster.get_folders().by_id(folder_id);
     auto local_folder = folder->get_folder_infos().by_device(*my_device);
     auto peer_folder = folder->get_folder_infos().by_device_id(peer_id);
+    auto name = proto::get_name(proto_local);
 
-    auto prev_file = local_folder->get_file_infos().by_name(proto::get_name(proto_local));
+    auto prev_file = local_folder->get_file_infos().by_name(name);
     auto local_file_opt = file_info_t::create(uuid, proto_local, local_folder);
     if (!local_file_opt) {
         return local_file_opt.assume_error();

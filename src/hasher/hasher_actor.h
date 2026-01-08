@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #pragma once
 
@@ -38,8 +38,7 @@ struct SYNCSPIRIT_API hasher_actor_t : public r::actor_base_t {
     void shutdown_finish() noexcept override;
 
   private:
-    void on_digest(message::digest_request_t &req) noexcept;
-    void on_validation(message::validation_request_t &req) noexcept;
+    void on_digest(message::digest_t &req) noexcept;
 
     utils::logger_t log;
     uint32_t index;

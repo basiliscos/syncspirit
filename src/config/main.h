@@ -22,7 +22,7 @@ namespace bfs = std::filesystem;
 struct main_t {
     bfs::path config_path;
     bfs::path default_location;
-    bfs::path root_ca_file;
+    std::string ssl_verify_store;
     bfs::path cert_file;
     bfs::path key_file;
 
@@ -40,6 +40,7 @@ struct main_t {
     std::uint32_t timeout;
     std::string device_name;
     std::uint32_t hasher_threads;
+    std::uint32_t poll_timeout; // in microseconds
 };
 
 } // namespace syncspirit::config

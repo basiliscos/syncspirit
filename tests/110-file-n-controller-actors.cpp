@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2025-2026 Ivan Baidakou
 
 #include "test-utils.h"
 #include "fs/file_actor.h"
-#include "hasher/hasher_proxy_actor.h"
 #include "hasher/hasher_actor.h"
 #include "net/controller_actor.h"
 #include "diff-builder.h"
@@ -27,13 +26,27 @@ namespace bfs = std::filesystem;
 
 namespace {
 
+namespace tmp_to {
+struct context_cache {};
+} // namespace tmp_to
+
+} // namespace
+
+namespace syncspirit::fs {
+template <> inline auto &syncspirit::fs::file_actor_t::access<tmp_to::context_cache>() noexcept {
+    return context_cache;
+}
+} // namespace syncspirit::fs
+
+namespace {
+
 struct fixture_t {
     using controller_ptr_t = r::intrusive_ptr_t<net::controller_actor_t>;
     using peer_ptr_t = r::intrusive_ptr_t<test_peer_t>;
 
     fixture_t() noexcept : root_path{unique_path()}, path_guard{root_path} { bfs::create_directory(root_path); }
 
-    virtual supervisor_t::configure_callback_t configure() noexcept {
+    virtual configure_callback_t configure() noexcept {
         return [&](r::plugin::plugin_base_t &plugin) {
             plugin.template with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
                 p.register_name(net::names::db, sup->get_address());
@@ -58,7 +71,7 @@ struct fixture_t {
         r::system_context_t ctx;
         sup = ctx.create_supervisor<supervisor_t>()
                   .auto_finish(false)
-                  .auto_ack_blocks(false)
+                  .auto_ack_io(false)
                   .timeout(timeout)
                   .create_registry()
                   .make_presentation(true)
@@ -70,21 +83,10 @@ struct fixture_t {
         sup->do_process();
         CHECK(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::OPERATIONAL);
 
-        rw_cache.reset(new fs::file_cache_t(2));
-        file_actor = sup->create_actor<fs::file_actor_t>()
-                         .rw_cache(rw_cache)
-                         .cluster(cluster)
-                         .sequencer(sup->sequencer)
-                         .timeout(timeout)
-                         .finish();
+        file_actor = sup->create_actor<fs::file_actor_t>().timeout(timeout).finish();
         sup->do_process();
 
         sup->create_actor<hasher::hasher_actor_t>().index(1).timeout(timeout).finish();
-        sup->create_actor<hasher::hasher_proxy_actor_t>()
-            .timeout(timeout)
-            .hasher_threads(1)
-            .name(net::names::hasher_proxy)
-            .finish();
 
         auto url = "relay://1.2.3.4:5";
 
@@ -105,7 +107,7 @@ struct fixture_t {
                                .cluster(cluster)
                                .sequencer(sup->sequencer)
                                .timeout(timeout)
-                               .request_timeout(timeout)
+                               .hasher_threads(1)
                                .blocks_max_requested(100)
                                .finish();
 
@@ -150,17 +152,26 @@ struct fixture_t {
     test::path_guard_t path_guard;
     r::system_context_t ctx;
     std::string_view folder_id = "1234-5678";
-    fs::file_cache_ptr_t rw_cache;
 };
 } // namespace
 
 void test_shutdown_initiated_by_controller() {
     struct F : fixture_t {
         void main() noexcept override {
+            auto file_path = root_path / L"файл.bin";
+            write_file(file_path, "12345");
+            auto &cache = file_actor->access<tmp_to::context_cache>();
+            auto &file_cache = cache[controller_actor->get_address().get()];
+            auto file_raw = fs::file_t::open_read(file_path).value();
+            auto file = fs::file_ptr_t(new fs::file_t(std::move(file_raw)));
+            file_cache[file_path] = file;
+            REQUIRE(cache.size() == 1);
+
             controller_actor->do_shutdown();
             sup->do_process();
 
             CHECK(static_cast<r::actor_base_t *>(file_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
+            CHECK(cache.size() == 0);
 
             file_actor->do_shutdown();
             sup->do_process();
@@ -217,7 +228,7 @@ void test_fs_actor_error() {
                 .apply(*sup, controller_actor.get());
 
             SECTION("fs error -> controller down") {
-                peer_actor->push_block(data_1, 0);
+                peer_actor->push_response(data_1, 0);
                 write_file(folder_path, ""); // prevent dir creation
 
                 builder.make_index(sha256, folder_id)
@@ -233,7 +244,7 @@ void test_fs_actor_error() {
 
                 CHECK("just 4 logging");
 
-                peer_actor->push_block(data_1, 0);
+                peer_actor->push_response(data_1, 0);
                 controller_actor->do_shutdown();
                 peer_actor->process_block_requests();
                 sup->do_process();
@@ -241,12 +252,12 @@ void test_fs_actor_error() {
                 CHECK(static_cast<r::actor_base_t *>(peer_actor.get())->access<to::state>() == r::state_t::SHUT_DOWN);
                 CHECK(static_cast<r::actor_base_t *>(controller_actor.get())->access<to::state>() ==
                       r::state_t::SHUT_DOWN);
-                CHECK(static_cast<r::actor_base_t *>(file_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
-
-                file_actor->do_shutdown();
                 sup->do_process();
             }
 
+            CHECK(static_cast<r::actor_base_t *>(file_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
+            file_actor->do_shutdown();
+            sup->do_process();
             CHECK(cluster->get_write_requests() == 10);
         }
     };

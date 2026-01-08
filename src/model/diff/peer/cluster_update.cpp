@@ -3,7 +3,6 @@
 
 #include "cluster_update.h"
 #include "model/diff/apply_controller.h"
-#include "model/diff/modify/add_remote_folder_infos.h"
 #include "model/diff/modify/add_pending_folders.h"
 #include "model/diff/modify/remove_blocks.h"
 #include "model/diff/modify/remove_folder_infos.h"
@@ -13,6 +12,7 @@
 #include "model/diff/modify/update_peer.h"
 #include "model/diff/modify/upsert_folder.h"
 #include "model/diff/modify/upsert_folder_info.h"
+#include "model/diff/peer/update_remote_views.h"
 #include "model/diff/cluster_visitor.h"
 #include "model/cluster.h"
 #include "model/misc/orphaned_blocks.h"
@@ -50,6 +50,7 @@ cluster_update_t::cluster_update_t(const bfs::path &default_path, const cluster_
     using allocator_t = std::pmr::polymorphic_allocator<char>;
     using fmt_buff_t = fmt::basic_memory_buffer<char, fmt::inline_buffer_size, allocator_t>;
     using fi_set_t = std::pmr::unordered_set<model::folder_info_ptr_t>;
+    using view_t = peer::update_remote_views_t::item_t;
     struct introduced_device_t {
         db::Device device;
         model::device_id_t device_id;
@@ -74,7 +75,7 @@ cluster_update_t::cluster_update_t(const bfs::path &default_path, const cluster_
 
     auto &known_pending_folders = cluster.get_pending_folders();
     auto new_pending_folders = diff::modify::add_pending_folders_t::container_t{};
-    auto remote_folders = diff::modify::add_remote_folder_infos_t::container_t{};
+    auto remote_views = diff::peer::update_remote_views_t::container_t{};
     uuid_folder_infos_map_t reset_folders;
     uuid_folder_infos_map_t removed_folders;
     auto reshared_folders = fi_set_t(allocator);
@@ -285,19 +286,21 @@ cluster_update_t::cluster_update_t(const bfs::path &default_path, const cluster_
                 folder_info = folder->get_folder_infos().by_device_id(device_sha);
             }
 
+            if (device_sha != sha256 && device.get() != cluster.get_device()) {
+                continue;
+            }
+
+            auto view = view_t{std::string(folder_id), device_id, index_id, max_sequence};
+            remote_views.emplace_back(std::move(view));
+
             if (device.get() == cluster.get_device()) {
                 if (is_shared_with_source(folder_id)) {
-                    remote_folders.emplace_back(std::string(folder_id), index_id, max_sequence);
                     LOG_DEBUG(log, "cluster_update_t, remote folder = {}, device = {}, max seq. = {}", folder_label,
                               device_id.get_short(), max_sequence);
                 } else {
                     LOG_DEBUG(log, "cluster_update_t, our side is no longer shares folder '{}' with {}", folder_id,
                               source.device_id());
                 }
-                continue;
-            }
-
-            if (device_sha != sha256) {
                 continue;
             }
 
@@ -489,8 +492,8 @@ cluster_update_t::cluster_update_t(const bfs::path &default_path, const cluster_
         auto ptr = new modify::add_pending_folders_t(std::move(new_pending_folders));
         update_current(ptr);
     }
-    if (!remote_folders.empty()) {
-        auto ptr = new modify::add_remote_folder_infos_t(source, std::move(remote_folders));
+    if (!remote_views.empty()) {
+        auto ptr = new peer::update_remote_views_t(source, std::move(remote_views));
         update_current(ptr);
     }
     for (auto &id : introduced_devices) {
@@ -509,7 +512,7 @@ auto cluster_update_t::apply_impl(apply_controller_t &controller, void *custom) 
     LOG_TRACE(log, "applying cluster_update_t (self)");
     auto &cluster = controller.get_cluster();
     auto peer = cluster.get_devices().by_sha256(peer_id);
-    peer->get_remote_folder_infos().clear();
+    peer->get_remote_view_map().clear();
 
     LOG_TRACE(log, "applying cluster_update_t (children)");
     auto r = applicator_t::apply_child(controller, custom);

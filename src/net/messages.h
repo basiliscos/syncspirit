@@ -16,7 +16,7 @@
 #include <cstdint>
 
 #include "model/diff/cluster_diff.h"
-#include "model/file_info.h"
+#include "proto/proto-fwd.hpp"
 #include "transport/base.h"
 #include "utils/bytes.h"
 #include "utils/dns.h"
@@ -143,27 +143,8 @@ struct peer_down_t {
 };
 
 using forwarded_message_t =
-    std::variant<proto::ClusterConfig, proto::Index, proto::IndexUpdate, proto::Request, proto::DownloadProgress>;
-
-struct block_response_t {
-    utils::bytes_t data;
-};
-
-struct SYNCSPIRIT_API block_request_t {
-    using response_t = block_response_t;
-    using block_info_t = std::pair<model::file_block_t *, model::folder_info_t *>;
-    std::string folder_id;
-    std::string file_name;
-    std::int64_t sequence;
-    size_t block_index;
-    std::int64_t block_offset;
-    std::uint32_t block_size;
-    utils::bytes_t block_hash;
-    block_request_t(const model::file_info_ptr_t &file, const model::folder_info_t &folder,
-                    size_t block_index) noexcept;
-
-    block_info_t get_block(model::cluster_t &, model::device_t &peer) noexcept;
-};
+    std::variant<proto::ClusterConfig, proto::Index, proto::IndexUpdate, proto::Request, proto::Response>;
+using forwarded_messages_t = std::vector<forwarded_message_t>;
 
 struct connect_response_t {
     transport::stream_sp_t transport;
@@ -224,11 +205,8 @@ using controller_predown_t = r::message_t<payload::controller_predown_t>;
 using controller_down_t = r::message_t<payload::controller_down_t>;
 using tx_signal_t = r::message_t<payload::tx_signal_t>;
 using peer_down_t = r::message_t<payload::peer_down_t>;
-using forwarded_message_t = r::message_t<payload::forwarded_message_t>;
+using forwarded_messages_t = r::message_t<payload::forwarded_messages_t>;
 using transfer_data_t = r::message_t<payload::transfer_data_t>;
-
-using block_request_t = r::request_traits_t<payload::block_request_t>::request::message_t;
-using block_response_t = r::request_traits_t<payload::block_request_t>::response::message_t;
 
 using connect_request_t = r::request_traits_t<payload::connect_request_t>::request::message_t;
 using connect_response_t = r::request_traits_t<payload::connect_request_t>::response::message_t;

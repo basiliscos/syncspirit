@@ -29,8 +29,8 @@ static constexpr std::size_t MAX_TX_CHUNK = 1024 * 1024;
 namespace resource {
 r::plugin::resource_id_t io_read = 0;
 r::plugin::resource_id_t io_write = 1;
-r::plugin::resource_id_t tx_timer = 2;
-r::plugin::resource_id_t rx_timer = 3;
+r::plugin::resource_id_t ping_timer = 2;
+r::plugin::resource_id_t stats_timer = 3;
 r::plugin::resource_id_t finalization = 4;
 } // namespace resource
 } // namespace
@@ -40,6 +40,8 @@ peer_actor_t::peer_actor_t(config_t &config)
       coordinator{config.coordinator}, peer_device_id{config.peer_device_id}, peer_state{std::move(config.peer_state)},
       transport(std::move(config.transport)), url(config.uri), rx_bytes{0}, tx_bytes{0} {
     rx_buff.resize(config.bep_config.rx_buff_size);
+    assert(bep_config.ping_timeout);
+    assert(bep_config.stats_interval);
     assert(url);
 }
 
@@ -61,10 +63,7 @@ void peer_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
             }
         });
     });
-    plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
-        p.subscribe_actor(&peer_actor_t::on_block_request);
-        p.subscribe_actor(&peer_actor_t::on_transfer);
-    });
+    plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) { p.subscribe_actor(&peer_actor_t::on_transfer); });
 }
 
 void peer_actor_t::on_start() noexcept {
@@ -75,6 +74,8 @@ void peer_actor_t::on_start() noexcept {
     push_write(std::move(buff), false);
 
     read_more();
+    reset_ping_timer();
+    reset_stats_timer();
     read_action = &peer_actor_t::read_hello;
 }
 
@@ -165,7 +166,6 @@ void peer_actor_t::read_more() noexcept {
     auto buff = asio::buffer(rx_buff.data() + rx_idx, rx_buff.size() - rx_idx);
     LOG_TRACE(log, "read_more");
     transport->async_recv(buff, on_read, on_error);
-    reset_rx_timer();
 }
 
 void peer_actor_t::on_write(std::size_t sz) noexcept {
@@ -180,7 +180,7 @@ void peer_actor_t::on_write(std::size_t sz) noexcept {
     }
 
     tx_bytes += sz;
-    emit_io_stats();
+    had_writes = true;
 
     assert(tx_item);
     if (tx_item->final) {
@@ -188,10 +188,10 @@ void peer_actor_t::on_write(std::size_t sz) noexcept {
         if (resources->has(resource::finalization)) {
             resources->release(resource::finalization);
         }
-        if (tx_timer_request) {
-            cancel_timer(*tx_timer_request);
-        }
         cancel_io();
+        if (ping_timer_request) {
+            cancel_timer(*ping_timer_request);
+        }
     } else {
         tx_item.reset();
         process_tx_queue();
@@ -203,10 +203,6 @@ void peer_actor_t::on_read(std::size_t bytes) noexcept {
     resources->release(resource::io_read);
     rx_idx += bytes;
 
-    if (rx_timer_request) {
-        r::actor_base_t::cancel_timer(*rx_timer_request);
-    }
-
     LOG_TRACE(log, "on_read, {} bytes, total = {}", bytes, rx_idx);
     rx_bytes += bytes;
 
@@ -215,6 +211,8 @@ void peer_actor_t::on_read(std::size_t bytes) noexcept {
     auto ptr = initial_ptr;
     auto size_left = rx_idx;
     bool read_next = true;
+    auto messages = payload::forwarded_messages_t();
+
     while (try_parse && size_left) {
         auto buff = utils::bytes_view_t(ptr, size_left);
         auto result = proto::parse_bep(buff);
@@ -229,7 +227,7 @@ void peer_actor_t::on_read(std::size_t bytes) noexcept {
         } else {
             ptr += value.consumed;
             size_left -= value.consumed;
-            read_next = try_parse = (this->*read_action)(std::move(value.message));
+            read_next = try_parse = (this->*read_action)(std::move(value.message), &messages);
         }
     }
 
@@ -246,25 +244,29 @@ void peer_actor_t::on_read(std::size_t bytes) noexcept {
     if (read_next && !resources->has(resource::finalization)) {
         read_more();
     }
-    emit_io_stats();
+    had_reads = true;
+
+    if (messages.size() && controller) {
+        send<payload::forwarded_messages_t>(controller, std::move(messages));
+    }
 }
 
 void peer_actor_t::shutdown_start() noexcept {
     LOG_TRACE(log, "shutdown_start");
 
-    if (tx_timer_request) {
-        r::actor_base_t::cancel_timer(*tx_timer_request);
-    }
-    if (rx_timer_request) {
-        r::actor_base_t::cancel_timer(*rx_timer_request);
-    }
     if (controller) {
         send<payload::peer_down_t>(controller, address, shutdown_reason);
     }
 
-    auto timeout = shutdown_timeout * 8 / 9;
-    tx_timer_request = start_timer(timeout, *this, &peer_actor_t::on_tx_timeout);
-    resources->acquire(resource::tx_timer);
+    resources->acquire(resource::finalization);
+    if (ping_timer_request) {
+        cancel_timer(*ping_timer_request);
+        if (!finished) {
+            auto timeout = shutdown_timeout * 8 / 9;
+            ping_timer_request = start_timer(timeout, *this, &peer_actor_t::on_ping_timeout);
+            resources->acquire(resource::ping_timer);
+        }
+    }
 
     proto::Close close;
     proto::set_reason(close, shutdown_reason->message());
@@ -273,28 +275,32 @@ void peer_actor_t::shutdown_start() noexcept {
     push_write(std::move(buff), true);
     LOG_TRACE(log, "going to send close message");
 
+    resources->release(resource::finalization);
     r::actor_base_t::shutdown_start();
 }
 
 void peer_actor_t::shutdown_finish() noexcept {
     LOG_TRACE(log, "shutdown_finish");
-    for (auto &it : block_requests) {
-        auto ec = r::make_error_code(r::error_code_t::cancelled);
-        reply_with_error(*it, make_error(ec));
-    }
-    block_requests.clear();
     if (controller) {
         send<payload::peer_down_t>(controller, address, shutdown_reason);
     }
     r::actor_base_t::shutdown_finish();
     auto sha256 = peer_device_id.get_sha256();
     auto diff = model::diff::contact::peer_state_t::create(*cluster, sha256, address, peer_state.offline());
+    if (rx_bytes || tx_bytes) {
+        auto stats_diff = model::diff::cluster_diff_ptr_t();
+        stats_diff.reset(new model::diff::peer::rx_tx_t(peer_device_id.get_sha256(), rx_bytes, tx_bytes));
+        if (diff) {
+            diff->assign_sibling(stats_diff.get());
+        } else {
+            diff = std::move(stats_diff);
+        }
+    }
     if (diff) {
         send<model::payload::model_update_t>(coordinator, std::move(diff));
     } else {
         LOG_DEBUG(log, "skipping peer state update");
     }
-    emit_io_stats(true);
 }
 
 void peer_actor_t::cancel_io() noexcept {
@@ -318,11 +324,8 @@ void peer_actor_t::on_controller_up(message::controller_up_t &message) noexcept 
         controller = p.controller;
         tx_bytes_in_progress = p.tx_size;
 
-        while (!received_queue.empty()) {
-            auto &msg = received_queue.front();
-            auto fwd = payload::forwarded_message_t{std::move(msg)};
-            send<payload::forwarded_message_t>(controller, std::move(fwd));
-            received_queue.pop_front();
+        if (!received_queue.empty()) {
+            send<payload::forwarded_messages_t>(controller, std::move(received_queue));
         }
     }
 }
@@ -341,29 +344,13 @@ void peer_actor_t::on_controller_predown(message::controller_predown_t &message)
     }
 }
 
-void peer_actor_t::on_block_request(message::block_request_t &message) noexcept {
-    auto req_id = (std::int32_t)message.payload.id;
-    auto &p = message.payload.request_payload;
-    proto::Request req;
-    proto::set_id(req, req_id);
-    proto::set_folder(req, p.folder_id);
-    proto::set_name(req, p.file_name);
-    proto::set_offset(req, p.block_offset);
-    proto::set_size(req, p.block_size);
-    proto::set_hash(req, p.block_hash);
-
-    auto buff = proto::serialize(req);
-    push_write(std::move(buff), false);
-    block_requests.emplace_back(&message);
-}
-
 void peer_actor_t::on_transfer(message::transfer_data_t &message) noexcept {
     LOG_TRACE(log, "on_transfer");
 
     push_write(std::move(message.payload.data), false);
 }
 
-bool peer_actor_t::read_hello(proto::message::message_t &&msg) noexcept {
+bool peer_actor_t::read_hello(proto::message::message_t &&msg, void *) noexcept {
     LOG_TRACE(log, "read_hello");
     return std::visit(
         [&](auto &&msg) -> bool {
@@ -380,7 +367,7 @@ bool peer_actor_t::read_hello(proto::message::message_t &&msg) noexcept {
         msg);
 }
 
-bool peer_actor_t::read_controlled(proto::message::message_t &&msg) noexcept {
+bool peer_actor_t::read_controlled(proto::message::message_t &&msg, void *ctx) noexcept {
     using MT = proto::MessageType;
     LOG_TRACE(log, "read_controlled");
     auto type = MT::UNKNOWN;
@@ -396,12 +383,13 @@ bool peer_actor_t::read_controlled(proto::message::message_t &&msg) noexcept {
                 handle_ping(std::move(msg));
             } else if constexpr (std::is_same_v<T, proto::Close>) {
                 handle_close(std::move(msg));
-            } else if constexpr (std::is_same_v<T, proto::Response>) {
-                handle_response(std::move(msg));
+            } else if constexpr (std::is_same_v<T, proto::DownloadProgress>) {
+                LOG_WARN(log, "on_message(DownloadProgress), not implemented");
             } else {
                 if (controller) {
-                    auto fwd = payload::forwarded_message_t{std::move(msg)};
-                    send<payload::forwarded_message_t>(controller, std::move(fwd));
+                    auto messages = static_cast<payload::forwarded_messages_t *>(ctx);
+                    auto bep_message = payload::forwarded_message_t{std::move(msg)};
+                    messages->emplace_back(std::move(bep_message));
                 } else {
                     received_queue.emplace_back(std::move(msg));
                 }
@@ -480,95 +468,56 @@ void peer_actor_t::handle_close(proto::Close &&message) noexcept {
     do_shutdown(ee);
 }
 
-void peer_actor_t::handle_response(proto::Response &&message) noexcept {
-    auto id = proto::get_id(message);
-    LOG_TRACE(log, "handle_response, message id = {}", id);
-    auto predicate = [id = id](const block_request_ptr_t &it) { return ((std::int32_t)it->payload.id) == id; };
-    auto it = std::find_if(block_requests.begin(), block_requests.end(), predicate);
-    if (it == block_requests.end()) {
-        if (!shutdown_reason) {
-            LOG_WARN(log, "response for unexpected request id {}", id);
-            auto ec = utils::make_error_code(utils::bep_error_code_t::response_mismatch);
-            do_shutdown(make_error(ec));
-        }
+void peer_actor_t::reset_ping_timer() noexcept {
+    if (state == r::state_t::OPERATIONAL) {
+        assert(!ping_timer_request);
+        auto timeout = pt::milliseconds(bep_config.ping_timeout);
+        ping_timer_request = start_timer(timeout, *this, &peer_actor_t::on_ping_timeout);
+        resources->acquire(resource::ping_timer);
     }
+}
 
-    auto error = proto::get_code(message);
-    auto &block_request = *it;
-    if (!shutdown_reason) {
-        if (error != proto::ErrorCode::NO_BEP_ERROR) {
-            auto ec = utils::make_error_code((utils::request_error_code_t)error);
-            LOG_WARN(log, "block request error: {}", ec.message());
-            reply_with_error(*block_request, make_error(ec));
+void peer_actor_t::reset_stats_timer() noexcept {
+    if (state == r::state_t::OPERATIONAL) {
+        assert(!stats_timer_request);
+        auto timeout = pt::milliseconds(bep_config.stats_interval);
+        stats_timer_request = start_timer(timeout, *this, &peer_actor_t::on_stats_timeout);
+        resources->acquire(resource::stats_timer);
+    }
+}
+
+void peer_actor_t::on_ping_timeout(r::request_id_t, bool cancelled) noexcept {
+    resources->release(resource::ping_timer);
+    ping_timer_request.reset();
+    if (!cancelled) {
+        if (resources->has(resource::finalization)) {
+            LOG_DEBUG(log, "going to cancel I/O (finalization)");
+            cancel_io();
+        } else if (had_writes && had_reads) {
+            had_reads = had_writes = had_ping = true;
+            reset_ping_timer();
+        } else if (!had_ping) {
+            had_ping = true;
+            reset_ping_timer();
         } else {
-            auto data = proto::extract_data(message);
-            auto request_sz = block_request->payload.request_payload.block_size;
-            if (data.size() != request_sz) {
-                LOG_WARN(log, "got {} bytes, but requested {}", data.size(), request_sz);
-                auto ec = utils::make_error_code(utils::bep_error_code_t::response_missize);
-                return do_shutdown(make_error(ec));
+            LOG_DEBUG(log, "shudown due to I/O inactivity");
+            cancel_io();
+        }
+    }
+}
+
+void peer_actor_t::on_stats_timeout(r::request_id_t, bool cancelled) noexcept {
+    resources->release(resource::stats_timer);
+    stats_timer_request.reset();
+    if (!cancelled) {
+        if (controller) {
+            reset_stats_timer();
+            if (rx_bytes || tx_bytes) {
+                auto diff = model::diff::cluster_diff_ptr_t();
+                diff.reset(new model::diff::peer::rx_tx_t(peer_device_id.get_sha256(), rx_bytes, tx_bytes));
+                rx_bytes = tx_bytes = 0;
+                send<model::payload::model_update_t>(coordinator, std::move(diff));
             }
-            auto bytes = utils::bytes_t(std::move(data));
-            reply_to(*block_request, std::move(bytes));
         }
-    }
-    block_requests.erase(it);
-}
-
-void peer_actor_t::reset_tx_timer() noexcept {
-    if (state == r::state_t::OPERATIONAL) {
-        if (tx_timer_request) {
-            r::actor_base_t::cancel_timer(*tx_timer_request);
-        }
-        auto timeout = pt::milliseconds(bep_config.tx_timeout);
-        tx_timer_request = start_timer(timeout, *this, &peer_actor_t::on_tx_timeout);
-        resources->acquire(resource::tx_timer);
-    }
-}
-
-void peer_actor_t::on_tx_timeout(r::request_id_t, bool cancelled) noexcept {
-    resources->release(resource::tx_timer);
-    tx_timer_request.reset();
-    if (resources->has(resource::finalization)) {
-        LOG_WARN(log, "on_tx_timeout, during finalization");
-        cancel_io();
-        return;
-    }
-    if (!cancelled) {
-        proto::Ping ping;
-        auto buff = proto::serialize(ping);
-        push_write(std::move(buff), false);
-        reset_tx_timer();
-    }
-}
-
-void peer_actor_t::reset_rx_timer() noexcept {
-    if (state == r::state_t::OPERATIONAL) {
-        assert(!resources->has(resource::rx_timer));
-        auto timeout = pt::milliseconds(bep_config.rx_timeout);
-        rx_timer_request = start_timer(timeout, *this, &peer_actor_t::on_rx_timeout);
-        resources->acquire(resource::rx_timer);
-    }
-}
-
-void peer_actor_t::on_rx_timeout(r::request_id_t, bool cancelled) noexcept {
-    resources->release(resource::rx_timer);
-    rx_timer_request.reset();
-    if (!cancelled) {
-        auto ec = utils::make_error_code(utils::error_code_t::rx_timeout);
-        auto reason = make_error(ec);
-        do_shutdown(reason);
-    }
-}
-
-void peer_actor_t::emit_io_stats(bool force) noexcept {
-    using namespace std::chrono;
-    auto now = clock_t::now();
-    if (force || (now > last_stats + milliseconds{bep_config.stats_interval})) {
-        auto diff = model::diff::cluster_diff_ptr_t();
-        last_stats = now;
-        diff.reset(new model::diff::peer::rx_tx_t(peer_device_id.get_sha256(), rx_bytes, tx_bytes));
-        rx_bytes = tx_bytes = 0;
-        send<model::payload::model_update_t>(coordinator, std::move(diff));
     }
 }

@@ -121,8 +121,15 @@ void folder_t::adjust_synchronization(std::int_fast32_t delta) noexcept {
     assert(synchronizing >= 0);
 }
 
-void folder_t::mark_suspended(bool value) noexcept { suspended = value; }
+void folder_t::mark_suspended(bool value, const sys::error_code &ec) noexcept {
+    suspended = value;
+    suspend_reason = ec;
+    assert(!(!value && ec));
+}
+
 bool folder_t::is_suspended() const noexcept { return suspended; }
+
+auto folder_t::get_suspend_reason() const noexcept -> const sys::error_code & { return suspend_reason; }
 
 template <> SYNCSPIRIT_API utils::bytes_view_t get_index<0>(const folder_ptr_t &item) noexcept {
     return item->get_key();

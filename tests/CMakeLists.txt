@@ -14,7 +14,7 @@ if(MINGW)
     ENABLE_LANGUAGE(RC)
 endif()
 
-add_library(syncspirit_test_lib SHARED
+add_library(syncspirit_test_lib
     $<$<PLATFORM_ID:Windows>:win32-resource.rc>
     managed_hasher.cpp
     test_peer.cpp
@@ -53,6 +53,9 @@ add_custom_command(TARGET syncspirit_test_lib PRE_BUILD
                    COMMAND ${CMAKE_COMMAND} -E copy_directory
                    ${CMAKE_SOURCE_DIR}/tests/data ${CMAKE_BINARY_DIR}/data)
 
+# add_executable(ssl ssl.cpp)
+# target_link_libraries(ssl PUBLIC OpenSSL::SSL Boost::system)
+
 create_test(009-uri.cpp)
 create_test(010-upnp-support.cpp)
 create_test(011-tls-util.cpp)
@@ -90,10 +93,9 @@ create_test(043-diffs-scan.cpp)
 create_test(045-diff-advance.cpp)
 create_test(050-file_iterator.cpp)
 create_test(051-block_iterator.cpp)
-create_test(053-scan_task.cpp)
 create_test(054-updates_streamer.cpp)
 create_test(055-resolver.cpp)
-create_test(056-block-request.cpp)
+create_test(056-fs_slave.cpp)
 create_test(060-bep.cpp)
 create_test(061-presentation.cpp)
 create_test(070-db.cpp)
@@ -108,6 +110,6 @@ create_test(078-relay.cpp)
 create_test(079-peer.cpp)
 create_test(080-resolver.cpp)
 create_test(085-scan-scheduler.cpp)
-create_test(086-scan_actor.cpp)
+create_test(087-local_keeper.cpp)
 create_test(110-file-n-controller-actors.cpp)
 create_test(111-controllers-concurrency.cpp)

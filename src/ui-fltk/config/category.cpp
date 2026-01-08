@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2026 Ivan Baidakou
 
 #include "category.h"
 
@@ -26,11 +26,9 @@ auto reflect(const main_cfg_t &config, const main_cfg_t &default_config) -> cate
             property_ptr_t(new bep::blocks_simultaneous_write_t(bep.blocks_simultaneous_write, bep_def.blocks_simultaneous_write)),
             property_ptr_t(new bep::connect_timeout_t(bep.connect_timeout, bep_def.connect_timeout)),
             property_ptr_t(new bep::advances_per_iteration_t(bep.advances_per_iteration, bep_def.advances_per_iteration)),
-            property_ptr_t(new bep::request_timeout_t(bep.request_timeout, bep_def.request_timeout)),
+            property_ptr_t(new bep::ping_timeout_t(bep.ping_timeout, bep_def.ping_timeout)),
             property_ptr_t(new bep::rx_buff_size_t(bep.rx_buff_size, bep_def.rx_buff_size)),
-            property_ptr_t(new bep::rx_timeout_t(bep.rx_timeout, bep_def.rx_timeout)),
             property_ptr_t(new bep::tx_buff_limit_t(bep.tx_buff_limit, bep_def.tx_buff_limit)),
-            property_ptr_t(new bep::tx_timeout_t(bep.tx_timeout, bep_def.tx_timeout)),
             property_ptr_t(new bep::stats_interval_t(bep.stats_interval, bep_def.stats_interval)),
             // clang-format on
         };
@@ -69,7 +67,6 @@ auto reflect(const main_cfg_t &config, const main_cfg_t &default_config) -> cate
         auto &f_def = default_config.fs_config;
         auto props = properties_t{
             // clang-format off
-            property_ptr_t(new fs::mru_size_t(f.mru_size, f_def.mru_size)),
             property_ptr_t(new fs::temporally_timeout_t(f.temporally_timeout, f_def.temporally_timeout)),
             property_ptr_t(new fs::bytes_scan_iteration_limit_t(f.bytes_scan_iteration_limit, f_def.bytes_scan_iteration_limit)),
             property_ptr_t(new fs::files_scan_iteration_limit_t(f.files_scan_iteration_limit, f_def.files_scan_iteration_limit)),
@@ -115,9 +112,10 @@ auto reflect(const main_cfg_t &config, const main_cfg_t &default_config) -> cate
             property_ptr_t(new main::default_location_t(l.default_location, l_def.default_location)),
             property_ptr_t(new main::cert_file_t(l.cert_file, l_def.cert_file)),
             property_ptr_t(new main::key_file_t(l.key_file, l_def.key_file)),
-            property_ptr_t(new main::root_ca_file(l.root_ca_file, l_def.root_ca_file)),
+            property_ptr_t(new main::ssl_verify_store(l.ssl_verify_store, l_def.ssl_verify_store)),
             property_ptr_t(new main::device_name_t(l.device_name, l_def.device_name)),
             property_ptr_t(new main::hasher_threads_t(l.hasher_threads, l_def.hasher_threads)),
+            property_ptr_t(new main::poll_timeout_t(l.poll_timeout, l_def.poll_timeout)),
             property_ptr_t(new main::timeout_t(l.timeout, l_def.timeout)),
             // clang-format on
         };

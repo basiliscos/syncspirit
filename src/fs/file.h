@@ -6,8 +6,7 @@
 #include <filesystem>
 #include <memory>
 #include <boost/outcome.hpp>
-#include <boost/smart_ptr/local_shared_ptr.hpp>
-#include "model/file_info.h"
+#include "model/misc/arc.hpp"
 #include "utils/io.h"
 #include "utils/bytes.h"
 #include "syncspirit-export.h"
@@ -33,31 +32,30 @@ struct SYNCSPIRIT_API file_t : model::arc_base_t<file_t> {
 
     file_t &operator=(file_t &&) noexcept;
 
+    bool has_backend() const noexcept;
     std::string_view get_path_view() const noexcept;
     const bfs::path &get_path() const noexcept;
 
-    outcome::result<void> close(bool remove_temporal, const bfs::path &local_name = {}) noexcept;
+    outcome::result<void> close(std::int64_t modification_s, const bfs::path &local_name = {}) noexcept;
     outcome::result<void> remove() noexcept;
-    outcome::result<void> write(size_t offset, utils::bytes_view_t data) noexcept;
-    outcome::result<void> copy(size_t my_offset, const file_t &from, size_t source_offset, size_t size) noexcept;
-    outcome::result<utils::bytes_t> read(size_t offset, size_t size) const noexcept;
+    outcome::result<void> write(std::uint64_t offset, utils::bytes_view_t data) noexcept;
+    outcome::result<void> copy(std::uint64_t my_offset, const file_t &from, std::uint64_t source_offset,
+                               std::uint64_t size) noexcept;
+    outcome::result<utils::bytes_t> read(std::uint64_t offset, std::uint64_t size) const noexcept;
 
-    static outcome::result<file_t> open_write(model::file_info_ptr_t model,
-                                              const model::folder_info_t &folder_info) noexcept;
+    static outcome::result<file_t> open_write(const bfs::path &path, std::uint64_t file_size) noexcept;
     static outcome::result<file_t> open_read(const bfs::path &path) noexcept;
 
   private:
     using backend_ptr_t = std::unique_ptr<utils::fstream_t>;
-    file_t(utils::fstream_t backend, model::file_info_ptr_t model, bfs::path path, bfs::path model_path,
-           bool temporal) noexcept;
+    file_t(utils::fstream_t backend, bfs::path path, bfs::path model_path, std::uint64_t file_size) noexcept;
     file_t(utils::fstream_t backend, bfs::path path) noexcept;
 
     backend_ptr_t backend;
-    model::file_info_ptr_t model;
     bfs::path path;
     bfs::path model_path;
     std::string path_str;
-    bool temporal{false};
+    std::uint64_t file_size;
 };
 
 using file_ptr_t = model::intrusive_ptr_t<file_t>;

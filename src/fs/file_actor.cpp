@@ -1,18 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "file_actor.h"
+#include "fs/fs_slave.h"
 #include "net/names.h"
-#include "model/folder_info.h"
-#include "model/file_info.h"
-#include "model/diff/modify/append_block.h"
-#include "model/diff/modify/clone_block.h"
-#include "model/diff/advance/remote_copy.h"
-#include "model/diff/advance/remote_win.h"
-#include "model/diff/modify/finish_file.h"
-#include "model/diff/modify/mark_reachable.h"
-#include "presentation/presence.h"
-#include "presentation/cluster_file_presence.h"
 #include "utils.h"
 #include "utils/io.h"
 #include "utils/format.hpp"
@@ -30,28 +21,7 @@ r::plugin::resource_id_t controller = 0;
 } // namespace resource
 } // namespace
 
-file_actor_t::write_guard_t::write_guard_t(file_actor_t &actor_,
-                                           const model::diff::modify::block_transaction_t &txn_) noexcept
-    : actor{actor_}, txn{txn_}, success{false} {}
-
-auto file_actor_t::write_guard_t::operator()(outcome::result<void> result) noexcept -> outcome::result<void> {
-    success = (bool)result;
-    if (!success) {
-        actor.log->debug("I/O failure on {}: {}", txn.file_name, result.assume_error().message());
-    }
-    return result;
-}
-
-file_actor_t::write_guard_t::~write_guard_t() {
-    auto reply = success ? txn.ack() : txn.rej();
-    actor.send<model::payload::model_update_t>(actor.coordinator, std::move(reply));
-}
-
-file_actor_t::file_actor_t(config_t &cfg)
-    : r::actor_base_t{cfg}, cluster{cfg.cluster}, sequencer(cfg.sequencer), rw_cache(std::move(cfg.rw_cache)),
-      ro_cache(rw_cache->get_max_items()) {
-    assert(sequencer);
-}
+file_actor_t::file_actor_t(config_t &cfg) : r::actor_base_t{cfg}, concurrent_hashes{cfg.concurrent_hashes} {}
 
 void file_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
@@ -59,7 +29,9 @@ void file_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.set_identity(net::names::fs_actor, false);
         log = utils::get_logger(identity);
     });
-    plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
+    plugin.with_casted<hasher::hasher_plugin_t>([&](auto &p) {
+        hasher = &p;
+        p.configure_hashers(concurrent_hashes);
         p.register_name(net::names::fs_actor, address);
         p.discover_name(net::names::coordinator, coordinator, false).link(false).callback([&](auto phase, auto &ee) {
             if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {
@@ -67,25 +39,15 @@ void file_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
                 plugin->subscribe_actor(&file_actor_t::on_controller_up, coordinator);
                 plugin->subscribe_actor(&file_actor_t::on_controller_predown, coordinator);
-                if (!cluster) {
-                    plugin->subscribe_actor(&file_actor_t::on_thread_ready, supervisor->get_address());
-                }
             }
         });
         p.discover_name(net::names::db, db, true);
     });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
-        p.subscribe_actor(&file_actor_t::on_block_request);
-        p.subscribe_actor(&file_actor_t::on_model_update);
+        p.subscribe_actor(&file_actor_t::on_exec);
+        p.subscribe_actor(&file_actor_t::on_io_commands);
+        p.subscribe_actor(&file_actor_t::on_create_dir);
     });
-}
-
-void file_actor_t::on_thread_ready(model::message::thread_ready_t &message) noexcept {
-    auto &p = message.payload;
-    if (p.thread_id == std::this_thread::get_id()) {
-        LOG_TRACE(log, "on_thread_ready");
-        cluster = message.payload.cluster;
-    }
 }
 
 void file_actor_t::on_start() noexcept {
@@ -103,50 +65,22 @@ void file_actor_t::shutdown_start() noexcept {
 
 void file_actor_t::shutdown_finish() noexcept {
     LOG_TRACE(log, "shutdown_finish");
-    rw_cache->clear();
+    context_cache.clear();
     r::actor_base_t::shutdown_finish();
 }
 
-void file_actor_t::on_model_update(model::message::model_update_t &message) noexcept {
-    LOG_TRACE(log, "on_model_update");
-    auto &payload = message.payload;
-    auto &diff = payload.diff;
-    auto r = diff->visit(*this, nullptr);
-    if (!r) {
-        auto ee = make_error(r.assume_error());
-        return do_shutdown(ee);
+void file_actor_t::on_io_commands(message::io_commands_t &message) noexcept {
+    auto &p = message.payload;
+    for (auto &cmd : p.commands) {
+        std::visit([&](auto &cmd) { process(cmd, p.context); }, cmd);
     }
-    send<model::payload::model_update_t>(coordinator, std::move(diff), payload.custom);
 }
 
-void file_actor_t::on_block_request(message::block_request_t &message) noexcept {
-    LOG_TRACE(log, "on_block_request");
-    auto &p = message.payload;
-    auto &dest = p.reply_to;
-    auto &req = message.payload.remote_request;
-    auto folder = cluster->get_folders().by_id(get_folder(req));
-    auto &folder_info = *folder->get_folder_infos().by_device(*cluster->get_device());
-    auto file_info = folder_info.get_file_infos().by_name(get_name(req));
-    auto &path = file_info->get_path(folder_info);
-    auto file_opt = open_file_ro(path, true);
-    auto ec = sys::error_code{};
-    auto data = utils::bytes_t{};
-    if (!file_opt) {
-        ec = file_opt.assume_error();
-        LOG_ERROR(log, "error opening file {}: {}", path.string(), ec.message());
-    } else {
-        auto &file = file_opt.assume_value();
-        auto offset = get_offset(req);
-        auto size = get_size(req);
-        auto block_opt = file->read(offset, size);
-        if (!block_opt) {
-            ec = block_opt.assume_error();
-            LOG_WARN(log, "error requesting block; offset = {}, size = {} :: {} ", offset, size, ec.message());
-        } else {
-            data = std::move(block_opt.assume_value());
-        }
-    }
-    send<payload::block_response_t>(dest, std::move(req), ec, std::move(data));
+void file_actor_t::on_exec(message::foreign_executor_t &request) noexcept {
+    LOG_DEBUG(log, "on_exec");
+    auto slave = static_cast<fs::fs_slave_t *>(request.payload.get());
+    slave->ec = {};
+    slave->exec(hasher);
 }
 
 void file_actor_t::on_controller_up(net::message::controller_up_t &message) noexcept {
@@ -158,33 +92,72 @@ void file_actor_t::on_controller_predown(net::message::controller_predown_t &mes
     auto &p = message.payload;
     LOG_DEBUG(log, "on_controller_predown, {}, started: {}", (const void *)p.controller.get(), p.started);
     if (p.started) {
+        auto cache_key = p.controller.get();
+        if (auto it = context_cache.find(cache_key); it != context_cache.end()) {
+            context_cache.erase(it);
+        }
         resources->release(resource::controller);
     }
 }
 
-auto file_actor_t::reflect(model::file_info_ptr_t &file_ptr, const model::folder_info_t &folder_info,
-                           const bfs::path &path) noexcept -> outcome::result<void> {
-    auto &file = *file_ptr;
+void file_actor_t::process(payload::block_request_t &cmd, const void *context) noexcept {
+    LOG_TRACE(log, "processing block request");
+    auto &path = cmd.path;
+    auto file_opt = open_file_ro(path, context);
+    auto ec = sys::error_code{};
+    auto data = utils::bytes_t{};
+    if (!file_opt) {
+        ec = file_opt.assume_error();
+        LOG_ERROR(log, "error opening file {}: {}", path.string(), ec.message());
+        cmd.result = ec;
+        return;
+    } else {
+        auto &file = file_opt.assume_value();
+        auto block_opt = file->read(cmd.offset, cmd.block_size);
+        if (!block_opt) {
+            ec = block_opt.assume_error();
+            LOG_WARN(log, "error requesting block; offset = {}, size = {} :: {} ", cmd.offset, cmd.block_size,
+                     ec.message());
+            cmd.result = ec;
+            return;
+        } else {
+            data = std::move(block_opt.assume_value());
+        }
+    }
+    cmd.result = std::move(data);
+}
+
+void file_actor_t::process(payload::remote_copy_t &cmd, const void *context) noexcept {
+    auto &path = cmd.path;
     sys::error_code ec;
 
-    if (file.is_deleted()) {
+    if (!cmd.conflict_path.empty()) {
+        auto path_str = path.string();
+        auto conflict_path_str = cmd.conflict_path.generic_string();
+        LOG_DEBUG(log, "renaming {} -> {}", path_str, conflict_path_str);
+        auto ec = sys::error_code();
+        bfs::rename(cmd.path, cmd.conflict_path);
+        if (ec) {
+            LOG_ERROR(log, "cannot rename file: {}: {}", path_str, ec.message());
+            cmd.result = ec;
+            return;
+        }
+    }
+
+    if (cmd.deleted) {
         if (bfs::exists(path, ec)) {
             LOG_DEBUG(log, "removing {}", path.string());
             auto ok = bfs::remove_all(path, ec);
             if (!ok) {
                 LOG_ERROR(log, "error removing {} : {}", path.string(), ec.message());
-                return ec;
+                cmd.result = ec;
+                return;
             }
         } else {
             LOG_TRACE(log, "{} already abscent, noop", path.string());
         }
-        return outcome::success();
-    }
-
-    auto augmentation = file_ptr.get()->get_augmentation();
-    auto presence = static_cast<presentation::presence_t *>(augmentation.get());
-    if (!presence->is_unique()) {
-        return utils::make_error_code(utils::error_code_t::nonunique_filename);
+        cmd.result = outcome::success();
+        return;
     }
 
     auto parent = path.parent_path();
@@ -194,52 +167,44 @@ auto file_actor_t::reflect(model::file_info_ptr_t &file_ptr, const model::folder
     if (!exists) {
         bfs::create_directories(parent, ec);
         if (ec) {
-            return ec;
+            cmd.result = ec;
+            return;
         }
     }
 
-    if (file.is_file()) {
-        auto sz = file.get_size();
-        if (file.is_locally_available() && sz) {
-            return outcome::success();
-        }
-
+    if (cmd.type == proto::FileInfoType::FILE) {
+        auto sz = cmd.size;
         bool temporal = sz > 0;
         if (temporal) {
-            LOG_TRACE(log, "touching file {} ({} bytes)", path.string(), sz);
-            auto file_opt = open_file_rw(path, &file, folder_info);
-            if (!file_opt) {
-                auto &err = file_opt.assume_error();
-                LOG_ERROR(log, "cannot open file: {}: {}", path.string(), err.message());
-                return err;
-            }
+            LOG_TRACE(log, "touching existing file {} ({} bytes)", path.string(), sz);
         } else {
             LOG_TRACE(log, "touching empty file {}", path.string());
             auto out = utils::ofstream_t(path, utils::ofstream_t::trunc);
             if (!out) {
                 auto ec = sys::error_code{errno, sys::system_category()};
                 LOG_ERROR(log, "error creating {}: {}", path.string(), ec.message());
-                return ec;
+                cmd.result = ec;
+                return;
             }
             out.close();
-            bfs::last_write_time(path, from_unix(file.get_modified_s()), ec);
-            if (ec) {
-                return ec;
-            }
         }
-        set_perms = utils::platform_t::permissions_supported(path) && !file.has_no_permissions() &&
-                    !folder_info.get_folder()->are_permissions_ignored();
-    } else if (file.is_dir()) {
+        bfs::last_write_time(path, from_unix(cmd.modification_s), ec);
+        if (ec) {
+            cmd.result = ec;
+            return;
+        }
+        set_perms = !cmd.no_permissions && utils::platform_t::permissions_supported(path);
+    } else if (cmd.type == proto::FileInfoType::DIRECTORY) {
         LOG_DEBUG(log, "creating directory {}", path.string());
         bfs::create_directory(path, ec);
         if (ec) {
-            return ec;
+            cmd.result = ec;
+            return;
         }
-        set_perms = utils::platform_t::permissions_supported(path) && !file.has_no_permissions() &&
-                    !folder_info.get_folder()->are_permissions_ignored();
-    } else if (file.is_link()) {
+        set_perms = !cmd.no_permissions && utils::platform_t::permissions_supported(path);
+    } else if (cmd.type == proto::FileInfoType::SYMLINK) {
         if (utils::platform_t::symlinks_supported()) {
-            auto target = bfs::path(file.get_link_target());
+            auto target = bfs::path(cmd.symlink_target);
             LOG_DEBUG(log, "creating symlink {} -> {}", path.string(), target.string());
 
             bool attempt_create =
@@ -248,7 +213,8 @@ auto file_actor_t::reflect(model::file_info_ptr_t &file_ptr, const model::folder
                 bfs::create_symlink(target, path, ec);
                 if (ec) {
                     LOG_WARN(log, "error symlinking {} -> {} : {}", path.string(), target.string(), ec.message());
-                    return ec;
+                    cmd.result = ec;
+                    return;
                 }
             } else {
                 LOG_TRACE(log, "no need to create symlink {} -> {}", path.string(), target.string());
@@ -259,213 +225,134 @@ auto file_actor_t::reflect(model::file_info_ptr_t &file_ptr, const model::folder
     }
 
     if (set_perms) {
-        auto file_perms = file.get_permissions();
-        auto perms = static_cast<bfs::perms>(file_perms);
+        auto perms = static_cast<bfs::perms>(cmd.permissions);
         bfs::permissions(path, perms, ec);
         if (ec) {
-            LOG_ERROR(log, "cannot set permissions {:#o} on file: '{}': {}", file_perms, path.string(), ec.message());
-            return ec;
+            LOG_ERROR(log, "cannot set permissions {:#o} on file: '{}': {}", cmd.permissions, path.string(),
+                      ec.message());
+            cmd.result = ec;
+            return;
+        }
+    }
+    cmd.result = outcome::success();
+}
+
+void file_actor_t::process(payload::finish_file_t &cmd, const void *context) noexcept {
+    auto path_str = cmd.path.generic_string();
+    auto &file_cache = context_cache[context];
+    auto it = file_cache.find(cmd.path);
+    if (it == file_cache.end()) {
+        LOG_DEBUG(log, "attempt to flush non-opened file {}", path_str);
+        auto ec = sys::error_code{};
+        auto tmp_path = make_temporal(cmd.path);
+        if (!bfs::exists(tmp_path, ec)) {
+            cmd.result = utils::make_error_code(utils::error_code_t::flush_non_opened);
+            LOG_WARN(log, "file '{}' does not exist", tmp_path.generic_string());
+            return;
+        }
+
+        auto option = file_t::open_write(cmd.path, cmd.file_size);
+        if (!option) {
+            auto &err = option.assume_error();
+            LOG_ERROR(log, "cannot open file '{}': {}", path_str, err.message());
+            cmd.result = err;
+            return;
+        }
+        auto ptr = file_ptr_t(new file_t(std::move(option.assume_value())));
+        it = file_cache.emplace(cmd.path, ptr).first;
+    }
+
+    if (!cmd.conflict_path.empty()) {
+        auto conflict_path_str = cmd.conflict_path.generic_string();
+        LOG_DEBUG(log, "renaming {} -> {}", path_str, conflict_path_str);
+        auto ec = sys::error_code();
+        bfs::rename(cmd.path, cmd.conflict_path);
+        if (ec) {
+            LOG_ERROR(log, "cannot rename file: {}: {}", path_str, ec.message());
+            cmd.result = ec;
+            return;
         }
     }
 
-    return outcome::success();
-}
-
-auto file_actor_t::operator()(const model::diff::advance::remote_copy_t &diff, void *custom) noexcept
-    -> outcome::result<void> {
-    auto folder = cluster->get_folders().by_id(diff.folder_id);
-    auto &folder_info = *folder->get_folder_infos().by_device_id(diff.peer_id);
-    auto name = get_name(diff.proto_source);
-    auto file = folder_info.get_file_infos().by_name(name);
-    auto r = reflect(file, folder_info, file->get_path(folder_info));
-    if (!r) {
-        auto msg = r.error().message();
-        LOG_ERROR(log, "cannot reflect (create) file '{}': {}", *file, msg);
-        auto diff = model::diff::cluster_diff_ptr_t();
-        diff = new model::diff::modify::mark_reachable_t(*file, folder_info, false);
-        send<model::payload::model_update_t>(coordinator, std::move(diff), this);
+    auto backend = it->second;
+    file_cache.erase(it);
+    auto ok = backend->close(cmd.modification_s, cmd.path);
+    if (!ok) {
+        auto &ec = ok.assume_error();
+        LOG_ERROR(log, "cannot close file: {}: {}", path_str, ec.message());
+        cmd.result = ec;
+        return;
     }
-    return diff.visit_next(*this, custom);
-}
 
-auto file_actor_t::operator()(const model::diff::advance::remote_win_t &diff, void *custom) noexcept
-    -> outcome::result<void> {
-    auto folder = cluster->get_folders().by_id(diff.folder_id);
-    auto folder_infos = folder->get_folder_infos();
-    auto &folder_info = *folder_infos.by_device_id(diff.peer_id);
-    auto source_name = get_name(diff.proto_source);
-    auto local_name = get_name(diff.proto_local);
-    auto file = folder_info.get_file_infos().by_name(source_name);
-    auto &source_path = file->get_path(folder_info);
-    auto target_path = folder->get_path() / local_name;
-    LOG_DEBUG(log, "renaming {} -> {}", source_path, target_path);
-    auto ec = sys::error_code{};
-    bfs::rename(source_path, target_path);
-
-    if (ec) {
-        LOG_ERROR(log, "cannot rename file '{}': {}", file, ec.message());
-        auto diff = model::diff::cluster_diff_ptr_t();
-        diff = new model::diff::modify::mark_reachable_t(*file, folder_info, false);
-        send<model::payload::model_update_t>(coordinator, std::move(diff), this);
-    }
-    return diff.visit_next(*this, custom);
-}
-
-auto file_actor_t::operator()(const model::diff::modify::finish_file_t &diff, void *custom) noexcept
-    -> outcome::result<void> {
-    auto folder = cluster->get_folders().by_id(diff.folder_id);
-    if (folder) {
-        auto folder_info = folder->get_folder_infos().by_device_id(diff.peer_id);
-        if (folder_info) {
-            auto file = folder_info->get_file_infos().by_name(diff.file_name);
-            if (file) {
-                auto &local_path = file->get_path(*folder_info);
-                auto action = diff.action;
-
-                if (action == model::advance_action_t::resolve_remote_win) {
-                    auto &self = *cluster->get_device();
-                    auto local_fi = folder->get_folder_infos().by_device(self);
-                    auto local_file = local_fi->get_file_infos().by_name(diff.file_name);
-                    auto conflicting_name = local_file->make_conflicting_name();
-                    auto target_path = folder->get_path() / conflicting_name;
-                    auto ec = sys::error_code{};
-                    LOG_DEBUG(log, "renaming {} -> {}", *file, conflicting_name);
-                    bfs::rename(local_path, target_path);
-                    if (ec) {
-                        LOG_ERROR(log, "cannot rename file: {}: {}", local_path.generic_string(), ec.message());
-                        return ec;
-                    }
-                }
-                auto backend = rw_cache->get(local_path);
-                if (!backend) {
-                    LOG_DEBUG(log, "attempt to flush non-opened file {}, re-open it as temporal",
-                              local_path.generic_string());
-                    auto path_tmp = make_temporal(local_path);
-                    auto result = open_file_rw(path_tmp, file, *folder_info);
-                    if (!result) {
-                        auto &ec = result.assume_error();
-                        LOG_ERROR(log, "cannot open file: {}: {}", path_tmp.string(), ec.message());
-                        return ec;
-                    }
-                    backend = std::move(result.assume_value());
-                }
-
-                rw_cache->remove(backend);
-                auto ok = backend->close(true, local_path);
-                if (!ok) {
-                    auto &ec = ok.assume_error();
-                    LOG_ERROR(log, "cannot close file: {}: {}", local_path.generic_string(), ec.message());
-                    return ec;
-                }
-
-                LOG_INFO(log, "file {} ({} bytes) is now locally available", *file, file->get_size());
-
-                auto ack = model::diff::advance::advance_t::create(action, *file, *folder_info, *sequencer);
-                send<model::payload::model_update_t>(coordinator, std::move(ack), this);
-            }
+    if (!cmd.no_permissions) {
+        auto perms = static_cast<bfs::perms>(cmd.permissions);
+        auto ec = sys::error_code();
+        bfs::permissions(cmd.path, perms, ec);
+        if (ec) {
+            LOG_ERROR(log, "cannot set permissions {:#o} on file: '{}': {}", cmd.permissions, cmd.path.string(),
+                      ec.message());
+            cmd.result = ec;
+            return;
         }
     }
-    return diff.visit_next(*this, custom);
+
+    cmd.result = outcome::success();
+    LOG_INFO(log, "file {} ({} bytes) is now locally available", path_str, cmd.file_size);
 }
 
-auto file_actor_t::operator()(const model::diff::modify::append_block_t &diff, void *custom) noexcept
-    -> outcome::result<void> {
-    auto guard = write_guard_t(*this, diff);
-    auto folder = cluster->get_folders().by_id(diff.folder_id);
-    auto &folder_info = *folder->get_folder_infos().by_device_id(diff.device_id);
-    auto file = folder_info.get_file_infos().by_name(diff.file_name);
-    auto &path = file->get_path(folder_info);
-    auto path_str = path.string();
-    auto file_opt = open_file_rw(path, file, folder_info);
+void file_actor_t::process(payload::append_block_t &cmd, const void *context) noexcept {
+    auto &path = cmd.path;
+    auto file_opt = open_file_rw(path, cmd.file_size, context);
     if (!file_opt) {
+        auto path_str = path.string();
         auto &err = file_opt.assume_error();
         LOG_ERROR(log, "cannot open file: {}: {}", path_str, err.message());
-        return err;
+        cmd.result = err;
+        return;
     }
-
-    auto block_index = diff.block_index;
-    auto offset = file->get_block_offset(block_index);
-    auto &backend = file_opt.value();
-    auto r = guard(backend->write(offset, diff.data));
-    return r ? diff.visit_next(*this, custom) : r;
+    auto &backend = file_opt.assume_value();
+    cmd.result = backend->write(cmd.offset, cmd.data);
 }
 
-auto file_actor_t::get_source_for_cloning(model::file_info_ptr_t &source, const model::folder_info_t &source_fi,
-                                          const file_ptr_t &target_backend) noexcept -> outcome::result<file_ptr_t> {
-    auto source_path = source->get_path(source_fi);
-    if (source_path == target_backend->get_path()) {
-        return target_backend;
+void file_actor_t::process(payload::clone_block_t &cmd, const void *context) noexcept {
+    auto target_path = cmd.target;
+    auto target_opt = open_file_rw(target_path, cmd.target_size, context);
+    if (!target_opt) {
+        auto path_str = target_path.string();
+        auto &err = target_opt.assume_error();
+        LOG_ERROR(log, "cannot open file: {}: {}", path_str, err.message());
+        cmd.result = err;
+        return;
     }
-
-    auto source_tmp = make_temporal(source_path);
-
-    if (auto cached = rw_cache->get(source_path); cached) {
-        return cached;
-    } else if (auto cached = rw_cache->get(source_tmp); cached) {
-        return cached;
-    } else if (auto cached = ro_cache.get(source_path); cached) {
-        return cached;
-    } else if (auto cached = ro_cache.get(source_tmp); cached) {
-        return cached;
-    } else if (auto opt = open_file_ro(source_tmp, false)) {
-        return opt.assume_value();
-    }
-
-    return open_file_ro(source_path, false);
-}
-
-auto file_actor_t::operator()(const model::diff::modify::clone_block_t &diff, void *custom) noexcept
-    -> outcome::result<void> {
-    auto guard = write_guard_t(*this, diff);
-    auto folder = cluster->get_folders().by_id(diff.folder_id);
-    auto &target_folder_info = *folder->get_folder_infos().by_device_id(diff.device_id);
-    auto target = target_folder_info.get_file_infos().by_name(diff.file_name);
-
-    auto source_folder = cluster->get_folders().by_id(diff.source_folder_id);
-    auto source_folder_info = source_folder->get_folder_infos().by_device_id(diff.source_device_id);
-    auto source = source_folder_info->get_file_infos().by_name(diff.source_file_name);
-
-    auto &target_path = target->get_path(target_folder_info);
-    auto file_opt = open_file_rw(target_path, target, target_folder_info);
-    if (!file_opt) {
-        auto &err = file_opt.assume_error();
-        LOG_ERROR(log, "cannot open file: {}: {}", target_path.string(), err.message());
-        return err;
-    }
-    auto target_backend = std::move(file_opt.assume_value());
-    auto source_backend_opt = get_source_for_cloning(source, *source_folder_info, target_backend);
+    auto target_backend = std::move(target_opt.assume_value());
+    auto &file_cache = context_cache[context];
+    auto source_backend_opt = [&]() -> outcome::result<file_ptr_t> {
+        auto it = file_cache.find(cmd.source);
+        if (it != file_cache.end()) {
+            return it->second;
+        } else {
+            return open_file_ro(cmd.source, {});
+        }
+    }();
     if (!source_backend_opt) {
+        auto path_str = cmd.source.string();
         auto ec = source_backend_opt.assume_error();
-        LOG_ERROR(log, "cannot open source file for cloning: {}: {}", diff.source_file_name, ec.message());
-        return ec;
+        LOG_ERROR(log, "cannot open source file for cloning: {}: {}", path_str, ec.message());
+        cmd.result = ec;
+        return;
     }
-
-    auto &source_backend = source_backend_opt.assume_value();
-    auto block = source->iterate_blocks(diff.source_block_index).next();
-    auto target_offset = target->get_block_offset(diff.block_index);
-    auto source_offset = source->get_block_offset(diff.source_block_index);
-    auto r = guard(target_backend->copy(target_offset, *source_backend, source_offset, block->get_size()));
-    return r ? diff.visit_next(*this, custom) : r;
+    auto &source_backend = *source_backend_opt.assume_value();
+    cmd.result = target_backend->copy(cmd.target_offset, source_backend, cmd.source_offset, cmd.block_size);
 }
 
-auto file_actor_t::open_file_rw(const std::filesystem::path &path, model::file_info_ptr_t info,
-                                const model::folder_info_t &folder_info) noexcept -> outcome::result<file_ptr_t> {
-    auto augmentation = info.get()->get_augmentation();
-    auto presence = static_cast<presentation::presence_t *>(augmentation.get());
-    if (!presence->is_unique()) {
-        return utils::make_error_code(utils::error_code_t::nonunique_filename);
+auto file_actor_t::open_file_rw(const std::filesystem::path &path, std::uint64_t file_size,
+                                const void *context) noexcept -> outcome::result<file_ptr_t> {
+    auto &file_cache = context_cache[context];
+    auto it = file_cache.find(path);
+    if (it != file_cache.end()) {
+        return it->second;
     }
-
-    LOG_TRACE(log, "open_file (r/w, by path), path = {}", path.string());
-    auto item = rw_cache->get(path);
-    if (item) {
-        return item;
-    }
-
-    auto size = info->get_size();
-    LOG_TRACE(log, "open_file (model), path = {} ({} bytes)", path.string(), size);
-    // auto opt = file_t::open_write(path, )
-    // bfs::path operational_path = temporal ? make_temporal(path) : path;
+    LOG_TRACE(log, "open_file (rw), path = {}, size = {}", path.string(), file_size);
 
     auto parent = path.parent_path();
     sys::error_code ec;
@@ -478,21 +365,22 @@ auto file_actor_t::open_file_rw(const std::filesystem::path &path, model::file_i
         }
     }
 
-    auto option = file_t::open_write(info, folder_info);
+    auto option = file_t::open_write(path, file_size);
     if (!option) {
         return option.assume_error();
     }
     auto ptr = file_ptr_t(new file_t(std::move(option.assume_value())));
-    rw_cache->put(ptr);
+    file_cache[path] = ptr;
     return ptr;
 }
 
-auto file_actor_t::open_file_ro(const bfs::path &path, bool use_cache) noexcept -> outcome::result<file_ptr_t> {
-    if (use_cache) {
-        auto file = rw_cache->get(path);
-        if (file) {
+auto file_actor_t::open_file_ro(const bfs::path &path, const void *context) noexcept -> outcome::result<file_ptr_t> {
+    if (context) {
+        auto &file_cache = context_cache[context];
+        auto it = file_cache.find(path);
+        if (it != file_cache.end()) {
             LOG_TRACE(log, "open_file (r/o, by path, cache hit), path = {}", path.string());
-            return file;
+            return it->second;
         }
     }
 
@@ -502,4 +390,10 @@ auto file_actor_t::open_file_ro(const bfs::path &path, bool use_cache) noexcept 
     }
     LOG_TRACE(log, "open_file (r/o, by path), path = {}", path.string());
     return file_ptr_t(new file_t(std::move(opt.assume_value())));
+}
+
+void file_actor_t::on_create_dir(message::create_dir_t &message) noexcept {
+    auto &path = message.payload;
+    LOG_TRACE(log, "on_create_dir, '{}'", boost::nowide::narrow(path.wstring()));
+    bfs::create_directories(path, path.ec);
 }

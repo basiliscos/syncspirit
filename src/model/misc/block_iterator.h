@@ -28,7 +28,7 @@ struct SYNCSPIRIT_API blocks_iterator_t : arc_base_t<blocks_iterator_t> {
     void advance() noexcept;
 
     const folder_info_t &source_folder;
-    file_info_ptr_t source;
+    file_info_t &source;
     std::int64_t sequence;
     std::uint32_t i = 0;
 };
