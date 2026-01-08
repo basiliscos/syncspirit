@@ -875,11 +875,6 @@ auto controller_actor_t::operator()(const model::diff::modify::remove_files_t &d
                     requesting_file = nullptr;
                 }
             }
-#if 0
-            if (auto it = postponed_files.find(full_id); it != postponed_files.end()) {
-                postponed_files.erase(it);
-            }
-#endif
             if (auto it = synchronizing_files.find(full_id); it != synchronizing_files.end()) {
                 it->second.forget(); // don't care about unlocking as the file is removed anyway
                 synchronizing_files.erase(it);

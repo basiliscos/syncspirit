@@ -96,7 +96,7 @@ after the core completion.
 
 # changes
 
-## 0.4.4 (07-Dec-2026)
+## 0.4.4 (08-Jan-2026)
  - [fltk] allow to regenereate certificate/key pair and soft restart
  - [core] reduce memory consumption to ~30%
  - [core] do not consume CPU when idle
