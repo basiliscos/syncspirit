@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2025-2026 Ivan Baidakou
 
 #include "access.h"
 #include "diff-builder.h"
@@ -171,8 +171,7 @@ struct fixture_t {
         launch_hasher();
         sup->do_process();
 
-        auto fs_config = config::fs_config_t{3600, 10, 1024 * 1024, files_scan_iteration_limit};
-        rw_cache.reset(new fs::file_cache_t(5));
+        auto fs_config = config::fs_config_t{3600, 10, 1024 * 1024};
 
         if (auto_launch) {
             launch_target();
@@ -220,7 +219,6 @@ struct fixture_t {
     model::file_infos_map_t *files_peer;
     model::device_ptr_t peer_device;
     model::sequencer_ptr_t sequencer;
-    fs::file_cache_ptr_t rw_cache;
     bool auto_launch;
 };
 

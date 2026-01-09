@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include <boost/beast/http.hpp>
 #include <pugixml.hpp>
@@ -21,6 +21,7 @@ const char *upnp_fields::usn = "USN";
 const char *upnp_addr = "239.255.255.250";
 
 static const char *igd_v1_st_v = "urn:schemas-upnp-org:device:InternetGatewayDevice:1";
+static const char *igd_rootdevice = "upnp:rootdevice";
 static const char *igd_man_v = "\"ssdp:discover\"";
 static const char *igd_wan_xpath = "//service[../../deviceType = 'urn:schemas-upnp-org:device:WANConnectionDevice:1' "
                                    "and serviceType = 'urn:schemas-upnp-org:service:WANIPConnection:1']";
@@ -91,7 +92,7 @@ outcome::result<discovery_result> parse(const char *data, std::size_t bytes) noe
         return error_code_t::no_usn;
     }
     auto st = it_st->value();
-    if (st != igd_v1_st_v) {
+    if (!((st == igd_v1_st_v) || (st == igd_rootdevice))) {
         std::string v((const char *)st.data(), st.size());
         spdlog::warn("upnp_support, igd version {}", v);
         return error_code_t::igd_mismatch;

@@ -136,10 +136,11 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
         void push(utils::bytes_t data) noexcept;
 
       private:
+        using commands_t = std::vector<fs::payload::io_command_t>;
         controller_actor_t &actor;
         model::diff::cluster_diff_ptr_t diff;
         model::diff::cluster_diff_t *next = nullptr;
-        fs::payload::io_commands_t io_commands;
+        commands_t io_commands;
         utils::bytes_t peer_data;
     };
 

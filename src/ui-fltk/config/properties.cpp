@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2026 Ivan Baidakou
 
 #include "properties.h"
 #include "utils/log.h"
@@ -32,6 +32,32 @@ error_ptr_t positive_integer_t::validate_value() noexcept {
 
     if (r <= 0) {
         return error_ptr_t(new std::string("not a positive number"));
+    }
+
+    // all ok
+    native_value = static_cast<std::uint64_t>(r);
+    return {};
+}
+
+non_negative_integer_t::non_negative_integer_t(std::string label, std::string explanation, uint64_t value,
+                                               uint64_t default_value)
+    : property_t(std::move(label), std::move(explanation), std::to_string(value), std::to_string(default_value),
+                 property_kind_t::positive_integer),
+      native_value{value} {}
+
+error_ptr_t non_negative_integer_t::validate_value() noexcept {
+    std::uint64_t r;
+    auto [ptr, ec] = std::from_chars(value.data(), value.data() + value.size(), r);
+
+    if (ec == std::errc::invalid_argument) {
+        return error_ptr_t(new std::string("not a number"));
+    } else if (ec == std::errc::result_out_of_range) {
+        return error_ptr_t(new std::string("too large number"));
+    }
+    assert(ec == std::errc());
+
+    if (r < 0) {
+        return error_ptr_t(new std::string("not a non-negative number"));
     }
 
     // all ok
@@ -242,13 +268,6 @@ const char *skip_discovers_t::explanation_ = "when peer addresses are known, how
 } // namespace dialer
 
 namespace fs {
-
-mru_size_t::mru_size_t(std::uint64_t value, std::uint64_t default_value)
-    : parent_t("mru_size", explanation_, value, default_value) {}
-
-void mru_size_t::reflect_to(syncspirit::config::main_t &main) { main.fs_config.mru_size = native_value; }
-
-const char *mru_size_t::explanation_ = "maximum amount of cached/opened files";
 
 temporally_timeout_t::temporally_timeout_t(std::uint64_t value, std::uint64_t default_value)
     : parent_t("temporally_timeout", explanation_, value, default_value) {}

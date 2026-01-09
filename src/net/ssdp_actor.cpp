@@ -121,6 +121,10 @@ void ssdp_actor_t::on_discovery_received(std::size_t bytes) noexcept {
     const char *buff = reinterpret_cast<const char *>(rx_buff.data());
     auto discovery_result = parse(buff, bytes);
     if (!discovery_result) {
+        if (upnp_config.debug) {
+            auto view = std::string_view(buff, bytes);
+            LOG_DEBUG(log, "{}", view);
+        }
         auto &ec = discovery_result.error();
         LOG_WARN(log, "can't get discovery result: {}", ec.message());
         return do_shutdown(make_error(ec));

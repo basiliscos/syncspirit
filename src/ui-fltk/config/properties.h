@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2026 Ivan Baidakou
 
 #pragma once
 
@@ -14,6 +14,15 @@ namespace impl {
 
 struct positive_integer_t : property_t {
     positive_integer_t(std::string label, std::string explanation, std::uint64_t value, std::uint64_t default_value);
+
+    error_ptr_t validate_value() noexcept override;
+
+    std::uint64_t native_value;
+};
+
+struct non_negative_integer_t : property_t {
+    non_negative_integer_t(std::string label, std::string explanation, std::uint64_t value,
+                           std::uint64_t default_value);
 
     error_ptr_t validate_value() noexcept override;
 
@@ -227,15 +236,6 @@ struct files_scan_iteration_limit_t final : impl::positive_integer_t {
     void reflect_to(syncspirit::config::main_t &main) override;
 };
 
-struct mru_size_t final : impl::positive_integer_t {
-    using parent_t = impl::positive_integer_t;
-
-    static const char *explanation_;
-
-    mru_size_t(std::uint64_t value, std::uint64_t default_value);
-    void reflect_to(syncspirit::config::main_t &main) override;
-};
-
 struct temporally_timeout_t final : impl::positive_integer_t {
     using parent_t = impl::positive_integer_t;
 
@@ -394,8 +394,8 @@ struct hasher_threads_t final : impl::positive_integer_t {
     void reflect_to(syncspirit::config::main_t &main) override;
 };
 
-struct poll_timeout_t final : impl::positive_integer_t {
-    using parent_t = impl::positive_integer_t;
+struct poll_timeout_t final : impl::non_negative_integer_t {
+    using parent_t = impl::non_negative_integer_t;
 
     static const char *explanation_;
 

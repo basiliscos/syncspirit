@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2025-2026 Ivan Baidakou
 
 #include "test-utils.h"
 #include "fs/file_actor.h"
@@ -23,6 +23,20 @@ using namespace syncspirit::net;
 using namespace syncspirit::fs;
 
 namespace bfs = std::filesystem;
+
+namespace {
+
+namespace tmp_to {
+struct context_cache {};
+} // namespace tmp_to
+
+} // namespace
+
+namespace syncspirit::fs {
+template <> inline auto &syncspirit::fs::file_actor_t::access<tmp_to::context_cache>() noexcept {
+    return context_cache;
+}
+} // namespace syncspirit::fs
 
 namespace {
 
@@ -69,8 +83,7 @@ struct fixture_t {
         sup->do_process();
         CHECK(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::OPERATIONAL);
 
-        rw_cache.reset(new fs::file_cache_t(2));
-        file_actor = sup->create_actor<fs::file_actor_t>().rw_cache(rw_cache).timeout(timeout).finish();
+        file_actor = sup->create_actor<fs::file_actor_t>().timeout(timeout).finish();
         sup->do_process();
 
         sup->create_actor<hasher::hasher_actor_t>().index(1).timeout(timeout).finish();
@@ -139,17 +152,26 @@ struct fixture_t {
     test::path_guard_t path_guard;
     r::system_context_t ctx;
     std::string_view folder_id = "1234-5678";
-    fs::file_cache_ptr_t rw_cache;
 };
 } // namespace
 
 void test_shutdown_initiated_by_controller() {
     struct F : fixture_t {
         void main() noexcept override {
+            auto file_path = root_path / L"файл.bin";
+            write_file(file_path, "12345");
+            auto &cache = file_actor->access<tmp_to::context_cache>();
+            auto &file_cache = cache[controller_actor->get_address().get()];
+            auto file_raw = fs::file_t::open_read(file_path).value();
+            auto file = fs::file_ptr_t(new fs::file_t(std::move(file_raw)));
+            file_cache[file_path] = file;
+            REQUIRE(cache.size() == 1);
+
             controller_actor->do_shutdown();
             sup->do_process();
 
             CHECK(static_cast<r::actor_base_t *>(file_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
+            CHECK(cache.size() == 0);
 
             file_actor->do_shutdown();
             sup->do_process();
