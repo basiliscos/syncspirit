@@ -105,9 +105,12 @@ add_library(syncspirit_core
     src/db/transaction.cpp
     src/db/utils.cpp
     src/fs/platform/context_base.cpp
+    src/fs/platform/watcher_base.cpp
     src/fs/platform/generic/context.cpp
     src/fs/platform/linux/context.cpp
+    src/fs/platform/linux/watcher.cpp
     src/fs/platform/windows/context.cpp
+    src/fs/platform/windows/watcher.cpp
     src/fs/file.cpp
     src/fs/file_actor.cpp
     src/fs/file_cache.cpp
@@ -115,7 +118,6 @@ add_library(syncspirit_core
     src/fs/fs_supervisor.cpp
     src/fs/fs_slave.cpp
     src/fs/utils.cpp
-    src/fs/watcher_actor.cpp
     src/fs/task/noop.cpp
     src/fs/task/remove_file.cpp
     src/fs/task/rename_file.cpp

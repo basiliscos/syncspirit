@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // SPDX-FileCopyrightText: 2026 Ivan Baidakou
 
-#include "watcher_actor.h"
-
-#include <boost/nowide/convert.hpp>
+#include "watcher.h"
 
 #if SYNCSPIRIT_WATCHER_INOTIFY
 #include <sys/inotify.h>
@@ -11,26 +9,13 @@
 #include <unistd.h>
 #include <limits.h>
 #include <fcntl.h>
-#endif
+#include <boost/nowide/convert.hpp>
+#include "fs/fs_supervisor.h"
 
-using namespace syncspirit::fs;
-
+using namespace syncspirit::fs::platform::linux;
 using boost::nowide::narrow;
 
-namespace {
-namespace to {
-struct context {};
-} // namespace to
-} // namespace
-
-template <> auto &rotor::supervisor_t::access<to::context>() noexcept { return context; }
-
-static constexpr auto actor_identity = "fs.watcher";
-
-watch_actor_t::watch_actor_t(config_t &cfg) : parent_t{cfg} { log = utils::get_logger(actor_identity); }
-
-void watch_actor_t::do_initialize(r::system_context_t *ctx) noexcept {
-#if SYNCSPIRIT_WATCHER_INOTIFY
+void watcher_t::do_initialize(r::system_context_t *ctx) noexcept {
     inotify_fd = inotify_init();
     if (inotify_fd < 0) {
         LOG_ERROR(log, "inotify_init failed: {}", strerror(errno));
@@ -47,49 +32,19 @@ void watch_actor_t::do_initialize(r::system_context_t *ctx) noexcept {
             }
         }
     }
-#endif
     parent_t::do_initialize(ctx);
 }
 
-void watch_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
-    r::actor_base_t::configure(plugin);
-    plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) { p.set_identity(actor_identity, false); });
-    plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) { p.subscribe_actor(&watch_actor_t::on_watch); });
-}
-
-void watch_actor_t::shutdown_finish() noexcept {
-#if SYNCSPIRIT_WATCHER_INOTIFY
+void watcher_t::shutdown_finish() noexcept {
     root_guard = {};
     if (inotify_fd > 0) {
         LOG_TRACE(log, "closing inotify fd = {}", inotify_fd);
         close(inotify_fd);
     }
-#endif
     parent_t::shutdown_finish();
 }
 
-void watch_actor_t::on_watch(message::watch_folder_t &message) noexcept {
-    auto &p = message.payload;
-    auto &path = p.path;
-    LOG_TRACE(log, "on watch on '{}'", narrow(path.wstring()));
-#if SYNCSPIRIT_WATCHER_INOTIFY
-    auto generic_context = supervisor->access<to::context>();
-    auto ctx = static_cast<fs::fs_context_t *>(generic_context);
-    auto &path_str = path.native();
-    auto fd = ::inotify_add_watch(inotify_fd, path_str.c_str(), IN_MODIFY | IN_CREATE | IN_DELETE | IN_ATTRIB);
-    if (fd <= 0) {
-        LOG_ERROR(log, "cannot do inotify_add_watch(): {}", strerror(errno));
-    } else {
-        auto cb = [](auto, void *data) { reinterpret_cast<watch_actor_t *>(data)->inotify_callback(); };
-        root_guard = ctx->register_callback(inotify_fd, std::move(cb), this);
-        LOG_TRACE(log, "registering inotify fd = {}", inotify_fd);
-        p.ec = {};
-    }
-#endif
-}
-
-#if SYNCSPIRIT_WATCHER_INOTIFY
-void watch_actor_t::inotify_callback() noexcept {
+void watcher_t::inotify_callback() noexcept {
     char buffer[1024 * (sizeof(struct inotify_event) + NAME_MAX + 1)];
     int length = ::read(inotify_fd, buffer, sizeof(buffer));
     LOG_TRACE(log, "inotify callback, read ({}), result = {}", inotify_fd, length);
@@ -117,4 +72,23 @@ void watch_actor_t::inotify_callback() noexcept {
         i += sizeof(struct inotify_event) + event->len;
     }
 }
+
+void watcher_t::on_watch(message::watch_folder_t &message) noexcept {
+    auto &p = message.payload;
+    auto &path = p.path;
+    LOG_TRACE(log, "on watch on '{}'", narrow(path.wstring()));
+    auto sup = static_cast<fs::fs_supervisor_t*>(supervisor);
+    auto ctx = static_cast<fs::fs_context_t *>(sup->context);
+    auto &path_str = path.native();
+    auto fd = ::inotify_add_watch(inotify_fd, path_str.c_str(), IN_MODIFY | IN_CREATE | IN_DELETE | IN_ATTRIB);
+    if (fd <= 0) {
+        LOG_ERROR(log, "cannot do inotify_add_watch(): {}", strerror(errno));
+    } else {
+        auto cb = [](auto, void *data) { reinterpret_cast<watcher_t *>(data)->inotify_callback(); };
+        root_guard = ctx->register_callback(inotify_fd, std::move(cb), this);
+        LOG_TRACE(log, "registering inotify fd = {}", inotify_fd);
+        p.ec = {};
+    }
+}
+
 #endif
