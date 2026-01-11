@@ -5,6 +5,7 @@
 
 #include "syncspirit-export.h"
 #include "syncspirit-config.h"
+#include "fs_context.hpp"
 #include "utils/log.h"
 #include <rotor.hpp>
 #include <filesystem>
@@ -37,12 +38,12 @@ struct SYNCSPIRIT_API watch_actor_t : r::actor_base_t {
     void do_initialize(r::system_context_t *ctx) noexcept override;
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
     void shutdown_finish() noexcept override;
-
-  private:
     void on_watch(message::watch_folder_t &) noexcept;
+    void inotify_callback() noexcept;
 
 #if SYNCSPIRIT_WATCHER_INOTIFY
     int inotify_lib = -1;
+    fs_context_t::io_guard_t root_guard;
 #endif
     utils::logger_t log;
 };
