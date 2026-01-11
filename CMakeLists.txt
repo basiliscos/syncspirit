@@ -104,6 +104,10 @@ add_library(syncspirit_core
     src/db/prefix.cpp
     src/db/transaction.cpp
     src/db/utils.cpp
+    src/fs/platform/context_base.cpp
+    src/fs/platform/generic/context.cpp
+    src/fs/platform/linux/context.cpp
+    src/fs/platform/windows/context.cpp
     src/fs/file.cpp
     src/fs/file_actor.cpp
     src/fs/file_cache.cpp

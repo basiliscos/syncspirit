@@ -5,7 +5,7 @@
 
 #include "syncspirit-export.h"
 #include "syncspirit-config.h"
-#include "fs_context.hpp"
+#include "fs_context.h"
 #include "utils/log.h"
 #include <rotor.hpp>
 #include <filesystem>
@@ -42,7 +42,7 @@ struct SYNCSPIRIT_API watch_actor_t : r::actor_base_t {
     void inotify_callback() noexcept;
 
 #if SYNCSPIRIT_WATCHER_INOTIFY
-    int inotify_lib = -1;
+    int inotify_fd = -1;
     fs_context_t::io_guard_t root_guard;
 #endif
     utils::logger_t log;

@@ -31,17 +31,19 @@ watch_actor_t::watch_actor_t(config_t &cfg) : parent_t{cfg} { log = utils::get_l
 
 void watch_actor_t::do_initialize(r::system_context_t *ctx) noexcept {
 #if SYNCSPIRIT_WATCHER_INOTIFY
-    inotify_lib = inotify_init();
-    if (inotify_lib < 0) {
+    inotify_fd = inotify_init();
+    if (inotify_fd < 0) {
         LOG_ERROR(log, "inotify_init failed: {}", strerror(errno));
         return do_shutdown();
     } else {
-        int flags = fcntl(inotify_lib, F_GETFL, 0);
+        int flags = fcntl(inotify_fd, F_GETFL, 0);
         if (flags == -1) {
             LOG_CRITICAL(log, "cannot fcntl(): {}", strerror(errno));
         } else {
-            if (fcntl(inotify_lib, F_SETFL, flags | O_NONBLOCK) == -1) {
+            if (fcntl(inotify_fd, F_SETFL, flags | O_NONBLOCK) == -1) {
                 LOG_CRITICAL(log, "cannot fcntl(): {}", strerror(errno));
+            } else {
+                LOG_TRACE(log, "created inotify fd = {}", inotify_fd);
             }
         }
     }
@@ -58,8 +60,9 @@ void watch_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 void watch_actor_t::shutdown_finish() noexcept {
 #if SYNCSPIRIT_WATCHER_INOTIFY
     root_guard = {};
-    if (inotify_lib > 0) {
-        close(inotify_lib);
+    if (inotify_fd > 0) {
+        LOG_TRACE(log, "closing inotify fd = {}", inotify_fd);
+        close(inotify_fd);
     }
 #endif
     parent_t::shutdown_finish();
@@ -73,12 +76,13 @@ void watch_actor_t::on_watch(message::watch_folder_t &message) noexcept {
     auto generic_context = supervisor->access<to::context>();
     auto ctx = static_cast<fs::fs_context_t *>(generic_context);
     auto &path_str = path.native();
-    auto fd = ::inotify_add_watch(inotify_lib, path_str.c_str(), IN_MODIFY | IN_CREATE | IN_DELETE | IN_ATTRIB);
+    auto fd = ::inotify_add_watch(inotify_fd, path_str.c_str(), IN_MODIFY | IN_CREATE | IN_DELETE | IN_ATTRIB);
     if (fd <= 0) {
         LOG_ERROR(log, "cannot do inotify_add_watch(): {}", strerror(errno));
     } else {
-        root_guard = ctx->register_callback(
-            inotify_lib, [](auto, void *data) { reinterpret_cast<watch_actor_t *>(data)->inotify_callback(); }, this);
+        auto cb = [](auto, void *data) { reinterpret_cast<watch_actor_t *>(data)->inotify_callback(); };
+        root_guard = ctx->register_callback(inotify_fd, std::move(cb), this);
+        LOG_TRACE(log, "registering inotify fd = {}", inotify_fd);
         p.ec = {};
     }
 #endif
@@ -87,11 +91,10 @@ void watch_actor_t::on_watch(message::watch_folder_t &message) noexcept {
 #if SYNCSPIRIT_WATCHER_INOTIFY
 void watch_actor_t::inotify_callback() noexcept {
     char buffer[1024 * (sizeof(struct inotify_event) + NAME_MAX + 1)];
-    int length = ::read(inotify_lib, buffer, sizeof(buffer));
-    LOG_TRACE(log, "inotify callback, read result = {}", length);
+    int length = ::read(inotify_fd, buffer, sizeof(buffer));
+    LOG_TRACE(log, "inotify callback, read ({}), result = {}", inotify_fd, length);
     if (length < 0) {
-        perror("read");
-        exit(EXIT_FAILURE);
+        LOG_ERROR(log, "cannot read: {}", strerror(errno));
     }
 
     // Process the events

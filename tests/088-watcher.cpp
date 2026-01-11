@@ -4,7 +4,7 @@
 #include "access.h"
 #include "diff-builder.h"
 #include "config/fs.h"
-#include "fs/fs_context.hpp"
+#include "fs/fs_context.h"
 #include "fs/fs_supervisor.h"
 #include "fs/watcher_actor.h"
 #include "utils/error_code.h"

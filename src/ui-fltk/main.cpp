@@ -24,7 +24,7 @@
 #include "net/net_supervisor.h"
 #include "bouncer/bouncer_actor.h"
 #include "fs/fs_supervisor.h"
-#include "fs/fs_context.hpp"
+#include "fs/fs_context.h"
 
 #include <FL/Fl.H>
 #include <FL/Fl_Window.H>
