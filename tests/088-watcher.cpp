@@ -9,14 +9,17 @@
 #include "fs/watcher_actor.h"
 #include "utils/error_code.h"
 #include "utils/platform.h"
-#include <format>
-#include <boost/nowide/convert.hpp>
+#include "net/names.h"
 #include "syncspirit-config.h"
+#include <format>
+#include <deque>
+#include <boost/nowide/convert.hpp>
 
 using namespace syncspirit;
 using namespace syncspirit::test;
 using namespace syncspirit::model;
 using namespace syncspirit::fs;
+namespace bfs = std::filesystem;
 using boost::nowide::narrow;
 
 struct fixture_t;
@@ -27,7 +30,12 @@ struct supervisor_t : fs::fs_supervisor_t {
 
     void configure(r::plugin::plugin_base_t &plugin) noexcept override {
         parent_t::configure(plugin);
-        plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) { p.subscribe_actor(&supervisor_t::on_watch); });
+        plugin.with_casted<r::plugin::registry_plugin_t>(
+            [&](auto &p) { p.register_name(net::names::coordinator, get_address()); });
+        plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
+            p.subscribe_actor(&supervisor_t::on_watch);
+            p.subscribe_actor(&supervisor_t::on_changes);
+        });
     }
 
     void launch_children() noexcept override {
@@ -35,6 +43,7 @@ struct supervisor_t : fs::fs_supervisor_t {
     }
 
     void on_watch(message::watch_folder_t &) noexcept;
+    void on_changes(message::folder_changes_t &) noexcept;
 
     fixture_t *fixture;
 };
@@ -42,6 +51,8 @@ struct supervisor_t : fs::fs_supervisor_t {
 struct fixture_t {
     using target_ptr_t = r::intrusive_ptr_t<fs::watch_actor_t>;
     using fs_context_ptr_r = r::intrusive_ptr_t<fs::fs_context_t>;
+    using change_message_ptr_t = r::intrusive_ptr_t<fs::message::folder_changes_t>;
+    using change_messages_t = std::deque<change_message_ptr_t>;
 
     fixture_t(bool auto_launch_ = true) noexcept
         : auto_launch{auto_launch_}, root_path{unique_path()}, path_guard{root_path} {
@@ -70,13 +81,16 @@ struct fixture_t {
         CHECK(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::SHUT_DOWN);
     }
 
-    void launch_target() {
-        target = sup->create_actor<target_ptr_t::element_type>().timeout(timeout).finish();
+    virtual void launch_target() {
+        target =
+            sup->create_actor<target_ptr_t::element_type>().timeout(timeout).change_retension(retension()).finish();
         sup->do_process();
     }
 
     void poll() {
+        changes.clear();
         fs_context->wait_next_event();
+        fs_context->update_time();
         sup->do_process();
     }
 
@@ -86,7 +100,11 @@ struct fixture_t {
         ++watched_replies;
     }
 
+    virtual void on_changes(message::folder_changes_t &msg) noexcept { changes.emplace_back(&msg); }
+
     virtual void main() noexcept {}
+
+    r::pt::time_duration retension() { return r::pt::microseconds{1}; }
 
     bool auto_launch;
     bfs::path root_path;
@@ -95,10 +113,66 @@ struct fixture_t {
     r::intrusive_ptr_t<supervisor_t> sup;
     target_ptr_t target;
     r::pt::time_duration timeout = r::pt::millisec{10};
+    change_messages_t changes;
     size_t watched_replies = 0;
 };
 
 void supervisor_t::on_watch(message::watch_folder_t &msg) noexcept { fixture->on_watch(msg); }
+void supervisor_t::on_changes(message::folder_changes_t &msg) noexcept { fixture->on_changes(msg); }
+
+void test_watcher_base() {
+    struct W : fs::watch_actor_t {
+        using parent_t = fs::watch_actor_t;
+        using parent_t::parent_t;
+
+        void on_watch(message::watch_folder_t &msg) noexcept override {
+            auto &p = msg.payload;
+            p.ec = {};
+            LOG_DEBUG(log, "watching {}", p.path.string());
+            folder_map[p.folder_id] = p.path;
+        }
+    };
+
+    struct F : fixture_t {
+        using fixture_t::fixture_t;
+
+        void launch_target() override {
+            target = sup->create_actor<W>().timeout(timeout).change_retension(retension()).finish();
+            sup->do_process();
+        }
+
+        void main() noexcept override {
+            using U = fs::payload::update_type_t;
+            auto folder_id = std::string("my-folder-id");
+            auto back_addr = sup->get_address();
+            auto ec = utils::make_error_code(utils::error_code_t::no_action);
+            sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id, ec);
+            sup->do_process();
+            REQUIRE(watched_replies == 1);
+
+            auto deadline = r::pt::microsec_clock::local_time() + retension();
+            SECTION("dir creation") {
+                auto own_name = bfs::path(L"папка");
+                auto sub_path = root_path / own_name;
+                bfs::create_directories(sub_path);
+                target->push(deadline, folder_id, narrow(own_name.wstring()), U::created);
+                poll();
+                REQUIRE(changes.size() == 1);
+                auto &payload = changes.front()->payload;
+                REQUIRE(payload.size() == 1);
+                auto &folder_change = payload[0];
+                REQUIRE(folder_change.folder_id == folder_id);
+                REQUIRE(folder_change.file_changes.size() == 1);
+                auto &file_change = folder_change.file_changes.front();
+                CHECK(proto::get_name(file_change) == narrow(own_name.wstring()));
+                CHECK(proto::get_size(file_change) == 0);
+                CHECK(proto::get_type(file_change) == proto::FileInfoType::DIRECTORY);
+                CHECK(proto::get_permissions(file_change));
+            }
+        }
+    };
+    F().run();
+}
 
 void test_start_n_shutdown() {
     struct F : fixture_t {
@@ -122,9 +196,10 @@ void test_flat_root_folder() {
     struct F : fixture_t {
         using fixture_t::fixture_t;
         void main() noexcept override {
+            auto folder_id = std::string("my-folder-id");
             auto back_addr = sup->get_address();
             auto ec = utils::make_error_code(utils::error_code_t::no_action);
-            sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, ec);
+            sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id, ec);
             sup->do_process();
             REQUIRE(watched_replies == 1);
 
@@ -140,6 +215,7 @@ void test_flat_root_folder() {
 
 int _init() {
     test::init_logging();
+    REGISTER_TEST_CASE(test_watcher_base, "test_watcher_base", "[fs]");
 #if defined(SYNCSPIRIT_WATCHER_ANY)
     REGISTER_TEST_CASE(test_start_n_shutdown, "test_start_n_shutdown", "[fs]");
     REGISTER_TEST_CASE(test_flat_root_folder, "test_flat_root_folder", "[fs]");

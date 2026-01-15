@@ -17,6 +17,7 @@ struct SYNCSPIRIT_API fs_context_t : platform::context_t {
 
     void run() noexcept override;
     using parent_t::notify;
+    using parent_t::update_time;
 };
 
 } // namespace syncspirit::fs

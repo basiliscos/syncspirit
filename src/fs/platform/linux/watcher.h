@@ -25,6 +25,6 @@ struct SYNCSPIRIT_API watcher_t : watcher_base_t {
     fs_context_t::io_guard_t root_guard;
 };
 
-}
+} // namespace syncspirit::fs::platform::linux
 
 #endif

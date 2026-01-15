@@ -77,7 +77,7 @@ void watcher_t::on_watch(message::watch_folder_t &message) noexcept {
     auto &p = message.payload;
     auto &path = p.path;
     LOG_TRACE(log, "on watch on '{}'", narrow(path.wstring()));
-    auto sup = static_cast<fs::fs_supervisor_t*>(supervisor);
+    auto sup = static_cast<fs::fs_supervisor_t *>(supervisor);
     auto ctx = static_cast<fs::fs_context_t *>(sup->context);
     auto &path_str = path.native();
     auto fd = ::inotify_add_watch(inotify_fd, path_str.c_str(), IN_MODIFY | IN_CREATE | IN_DELETE | IN_ATTRIB);
