@@ -151,23 +151,65 @@ void test_watcher_base() {
             REQUIRE(watched_replies == 1);
 
             auto deadline = r::pt::microsec_clock::local_time() + retension();
-            SECTION("dir creation") {
-                auto own_name = bfs::path(L"папка");
-                auto sub_path = root_path / own_name;
-                bfs::create_directories(sub_path);
-                target->push(deadline, folder_id, narrow(own_name.wstring()), U::created);
-                poll();
-                REQUIRE(changes.size() == 1);
-                auto &payload = changes.front()->payload;
-                REQUIRE(payload.size() == 1);
-                auto &folder_change = payload[0];
-                REQUIRE(folder_change.folder_id == folder_id);
-                REQUIRE(folder_change.file_changes.size() == 1);
-                auto &file_change = folder_change.file_changes.front();
-                CHECK(proto::get_name(file_change) == narrow(own_name.wstring()));
-                CHECK(proto::get_size(file_change) == 0);
-                CHECK(proto::get_type(file_change) == proto::FileInfoType::DIRECTORY);
-                CHECK(proto::get_permissions(file_change));
+            SECTION("simple (creation)") {
+                SECTION("dir") {
+                    auto own_name = bfs::path(L"папка");
+                    auto sub_path = root_path / own_name;
+                    bfs::create_directories(sub_path);
+                    target->push(deadline, folder_id, narrow(own_name.wstring()), U::created);
+                    poll();
+                    REQUIRE(changes.size() == 1);
+                    auto &payload = changes.front()->payload;
+                    REQUIRE(payload.size() == 1);
+                    auto &folder_change = payload[0];
+                    REQUIRE(folder_change.folder_id == folder_id);
+                    REQUIRE(folder_change.file_changes.size() == 1);
+                    auto &file_change = folder_change.file_changes.front();
+                    CHECK(proto::get_name(file_change) == narrow(own_name.wstring()));
+                    CHECK(proto::get_size(file_change) == 0);
+                    CHECK(proto::get_type(file_change) == proto::FileInfoType::DIRECTORY);
+                    CHECK(proto::get_permissions(file_change));
+                }
+                SECTION("file") {
+                    auto own_name = bfs::path(L"файл.bin");
+                    auto sub_path = root_path / own_name;
+                    write_file(sub_path, "12345");
+                    target->push(deadline, folder_id, narrow(own_name.wstring()), U::created);
+                    poll();
+                    REQUIRE(changes.size() == 1);
+                    auto &payload = changes.front()->payload;
+                    REQUIRE(payload.size() == 1);
+                    auto &folder_change = payload[0];
+                    REQUIRE(folder_change.folder_id == folder_id);
+                    REQUIRE(folder_change.file_changes.size() == 1);
+                    auto &file_change = folder_change.file_changes.front();
+                    CHECK(proto::get_name(file_change) == narrow(own_name.wstring()));
+                    CHECK(proto::get_size(file_change) == 5);
+                    CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
+                    CHECK(proto::get_permissions(file_change));
+                }
+#ifndef SYNCSPIRIT_WIN
+                SECTION("symlink") {
+                    auto own_name = bfs::path(L"ссылка");
+                    auto sub_path = root_path / own_name;
+                    auto where = bfs::path("/to/some/where");
+                    bfs::create_symlink(where, sub_path);
+                    target->push(deadline, folder_id, narrow(own_name.wstring()), U::created);
+                    poll();
+                    REQUIRE(changes.size() == 1);
+                    auto &payload = changes.front()->payload;
+                    REQUIRE(payload.size() == 1);
+                    auto &folder_change = payload[0];
+                    REQUIRE(folder_change.folder_id == folder_id);
+                    REQUIRE(folder_change.file_changes.size() == 1);
+                    auto &file_change = folder_change.file_changes.front();
+                    CHECK(proto::get_name(file_change) == narrow(own_name.wstring()));
+                    CHECK(proto::get_size(file_change) == 0);
+                    CHECK(proto::get_type(file_change) == proto::FileInfoType::SYMLINK);
+                    CHECK(proto::get_permissions(file_change));
+                    CHECK(proto::get_symlink_target(file_change) == narrow(where.wstring()));
+                }
+#endif
             }
         }
     };

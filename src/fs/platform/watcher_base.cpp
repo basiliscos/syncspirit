@@ -94,7 +94,7 @@ auto FU::make(const bfs::path &folder_path) noexcept -> payload::file_changes_t 
         } else {
             auto ec = sys::error_code{};
             auto path = folder_path / widen(update.path);
-            auto status = bfs::status(path, ec);
+            auto status = bfs::symlink_status(path, ec);
             if (ec) {
                 LOG_WARN(log, "cannot get status on '{}': {} (update ignored)", narrow(path.generic_wstring()),
                          ec.message());
