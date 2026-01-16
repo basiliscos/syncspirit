@@ -47,7 +47,7 @@ bool BU::has_changes() const noexcept {
 }
 
 auto BU::make(const folder_map_t &folder_map) noexcept -> folder_changes_opt_t {
-    if (deadline.is_not_a_date_time()) {
+    if (!deadline.is_not_a_date_time()) {
         auto r = payload::folder_changes_t();
         for (auto &fi : updates) {
             auto &folder_path = folder_map.at(fi.folder_id);
@@ -190,6 +190,9 @@ void watcher_base_t::push(const timepoint_t &deadline, std::string_view folder_i
     auto &target_fi = target->prepare(folder_id);
     auto source_fi = source ? source->find(folder_id) : (folder_update_t *)(nullptr);
     target_fi.update(relative_path, type, source_fi);
+    if (target->deadline.is_not_a_date_time()) {
+        target->deadline = deadline;
+    }
 }
 
 void watcher_base_t::on_retension_finish(r::request_id_t, bool cancelled) noexcept {
@@ -204,6 +207,7 @@ void watcher_base_t::on_retension_finish(r::request_id_t, bool cancelled) noexce
             LOG_DEBUG(log, "scheduling next changes");
             next = std::move(postponed);
             next.deadline = clock_t::local_time() + retension;
+            start_timer(retension, *this, &watcher_base_t::on_retension_finish);
         }
     }
 }

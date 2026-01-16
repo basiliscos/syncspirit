@@ -211,6 +211,30 @@ void test_watcher_base() {
                 }
 #endif
             }
+            SECTION("changes accumulation") {
+                auto deadline_2 = deadline + retension();
+                SECTION("simple case") {
+                    auto own_name = bfs::path(L"файл.bin");
+                    auto sub_path = root_path / own_name;
+                    write_file(sub_path, "12345");
+                    target->push(deadline, folder_id, narrow(own_name.wstring()), U::created);
+                    target->push(deadline_2, folder_id, narrow(own_name.wstring()), U::content);
+                    poll();
+                    REQUIRE(changes.size() == 0);
+                    poll();
+                    REQUIRE(changes.size() == 1);
+                    auto &payload = changes.front()->payload;
+                    REQUIRE(payload.size() == 1);
+                    auto &folder_change = payload[0];
+                    REQUIRE(folder_change.folder_id == folder_id);
+                    REQUIRE(folder_change.file_changes.size() == 1);
+                    auto &file_change = folder_change.file_changes.front();
+                    CHECK(proto::get_name(file_change) == narrow(own_name.wstring()));
+                    CHECK(proto::get_size(file_change) == 5);
+                    CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
+                    CHECK(proto::get_permissions(file_change));
+                }
+            }
         }
     };
     F().run();
