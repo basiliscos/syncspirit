@@ -234,6 +234,17 @@ void test_watcher_base() {
                     CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
                     CHECK(proto::get_permissions(file_change));
                 }
+                SECTION("create , delete -> collapse to void") {
+                    auto own_name = bfs::path(L"файл.bin");
+                    auto sub_path = root_path / own_name;
+                    write_file(sub_path, "12345");
+                    target->push(deadline, folder_id, narrow(own_name.wstring()), U::created);
+                    target->push(deadline_2, folder_id, narrow(own_name.wstring()), U::deleted);
+                    poll();
+                    REQUIRE(changes.size() == 0);
+                    poll();
+                    REQUIRE(changes.size() == 0);
+                }
             }
         }
     };

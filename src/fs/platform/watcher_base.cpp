@@ -68,16 +68,23 @@ auto BU::make(const folder_map_t &folder_map) noexcept -> folder_changes_opt_t {
 
 void FU::update(std::string_view relative_path, update_type_t type, folder_update_t *prev) noexcept {
     auto it = updates.find(relative_path);
-    if (it == updates.end()) {
-        updates.emplace(file_update_t{std::string(relative_path), type});
-    } else {
-        it->update_type = type;
-    }
+    auto internal = static_cast<payload::update_type_internal_t>(type);
     if (prev) {
         auto &updates = prev->updates;
         if (auto it = updates.find(relative_path); it != updates.end()) {
+            if (it->update_type & payload::update_type::CREATED_1) {
+                internal = internal | payload::update_type::CREATED_1;
+            }
             updates.erase(it);
         }
+    }
+    if (it == updates.end()) {
+        if (type == update_type_t::created) {
+            internal = payload::update_type::CREATED_1;
+        }
+        updates.emplace(file_update_t{std::string(relative_path), internal});
+    } else {
+        it->update_type = (it->update_type & payload::update_type::CREATED_1) | internal;
     }
 }
 
@@ -86,10 +93,15 @@ auto FU::make(const bfs::path &folder_path) noexcept -> payload::file_changes_t 
     files.reserve(updates.size());
     auto log = utils::get_logger(actor_identity);
     for (auto &update : updates) {
+        namespace ut = payload::update_type;
         using UT = payload::update_type_t;
         using FT = bfs::file_type;
         auto r = proto::FileInfo();
-        if (update.update_type == UT::deleted) {
+        if (update.update_type & ut::DELETED) {
+            if (update.update_type & ut::CREATED_1) {
+                // created & deleted within retension interval => ignoore
+                continue;
+            }
             proto::set_deleted(r, true);
         } else {
             auto ec = sys::error_code{};
