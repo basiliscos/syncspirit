@@ -114,14 +114,15 @@ void watcher_t::on_watch(message::watch_folder_t &message) noexcept {
     } else {
         auto cb = [](auto, void *data) { reinterpret_cast<watcher_t *>(data)->inotify_callback(); };
         auto io_guard = ctx->register_callback(inotify_fd, std::move(cb), this);
+        auto it = folder_map.emplace(std::string(p.folder_id), p.path);
+        auto folder_id = std::string_view(it.first->first);
         auto path_guard = path_guard_t{
             path_str,
-            p.folder_id,
+            folder_id,
             std::move(io_guard),
             0,
         };
         LOG_TRACE(log, "registering inotify fd = {}", inotify_fd);
-        folder_map[p.folder_id] = p.path;
         path_map[fd] = std::move(path_guard);
         auto &fds = subdir_map[fd];
         fds.emplace_back(fd);
