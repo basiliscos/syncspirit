@@ -21,8 +21,18 @@ struct SYNCSPIRIT_API watcher_t : watcher_base_t {
     void inotify_callback() noexcept;
     void shutdown_finish() noexcept override;
 
+    struct path_guard_t {
+        std::string rel_path;
+        std::string_view folder_id;
+        fs_context_t::io_guard_t io_guard;
+        int parent_fd;
+    };
+    using path_map_t = std::unordered_map<int, path_guard_t>;
+    using subdir_map_t = std::unordered_map<int, std::vector<int>>;
+
     int inotify_fd = -1;
-    fs_context_t::io_guard_t root_guard;
+    path_map_t path_map;
+    subdir_map_t subdir_map;
 };
 
 } // namespace syncspirit::fs::platform::linux

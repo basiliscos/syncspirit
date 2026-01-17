@@ -19,6 +19,19 @@ using FU = watcher_base_t::folder_update_t;
 using FU_EQ = watcher_base_t::file_update_eq_t;
 using Hash = watcher_base_t::file_update_hash_t;
 
+static std::string_view stringify(payload::update_type_t type) {
+    using U = payload::update_type_t;
+    if (type == U::created) {
+        return "created";
+    } else if (type == U::deleted) {
+        return "deleted";
+    } else if (type == U::meta) {
+        return "metadata changed";
+    } else {
+        return "content changed";
+    }
+}
+
 auto BU::prepare(std::string_view folder_id) noexcept -> folder_update_t & {
     for (auto &fi : updates) {
         if (fi.folder_id == folder_id) {
@@ -190,6 +203,7 @@ void watcher_base_t::push(const timepoint_t &deadline, std::string_view folder_i
                           update_type_t type) noexcept {
     auto source = (bulk_update_t *)(nullptr);
     auto target = (bulk_update_t *)(nullptr);
+    LOG_DEBUG(log, "file event '{}' for '{}' in folder {}", stringify(type), relative_path, folder_id);
     if (next.deadline == deadline) {
         target = &next;
     } else if (next.deadline.is_not_a_date_time()) {

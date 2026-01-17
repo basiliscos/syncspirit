@@ -9,6 +9,7 @@
 #include <unistd.h>
 #include <limits.h>
 #include <fcntl.h>
+#include <algorithm>
 #include <boost/nowide/convert.hpp>
 #include "fs/fs_supervisor.h"
 
@@ -36,7 +37,8 @@ void watcher_t::do_initialize(r::system_context_t *ctx) noexcept {
 }
 
 void watcher_t::shutdown_finish() noexcept {
-    root_guard = {};
+    subdir_map.clear();
+    path_map.clear();
     if (inotify_fd > 0) {
         LOG_TRACE(log, "closing inotify fd = {}", inotify_fd);
         close(inotify_fd);
@@ -45,31 +47,57 @@ void watcher_t::shutdown_finish() noexcept {
 }
 
 void watcher_t::inotify_callback() noexcept {
+    using U = payload::update_type_t;
     char buffer[1024 * (sizeof(struct inotify_event) + NAME_MAX + 1)];
+    char name_buff[PATH_MAX];
+    auto name_ptr = name_buff + sizeof(name_buff) - 1;
+    *name_ptr-- = 0;
     int length = ::read(inotify_fd, buffer, sizeof(buffer));
     LOG_TRACE(log, "inotify callback, read ({}), result = {}", inotify_fd, length);
     if (length < 0) {
         LOG_ERROR(log, "cannot read: {}", strerror(errno));
     }
 
+    auto append_name = [&](std::string_view piece) {
+        auto sz = piece.size();
+        name_ptr -= sz;
+        std::copy(piece.begin(), piece.end(), name_ptr);
+    };
+
     // Process the events
-    for (int i = 0; i < length;) {
-        struct inotify_event *event = (struct inotify_event *)&buffer[i];
-        if (event->len) {
-            if (event->mask & IN_CREATE) {
-                LOG_DEBUG(log, "File created: {}", event->name);
+    if (length) {
+        auto deadline = clock_t::local_time() + retension;
+        for (int i = 0; i < length;) {
+            struct inotify_event *event = (struct inotify_event *)&buffer[i];
+            if (event->len) {
+                auto type = payload::update_type_internal_t{0};
+                if (event->mask & IN_CREATE) {
+                    type = payload::update_type::CREATED;
+                } else if (event->mask & IN_DELETE) {
+                    type = payload::update_type::DELETED;
+                }
+                if (event->mask & IN_MODIFY) {
+                    type = payload::update_type::CONTENT;
+                }
+                if (event->mask & IN_ATTRIB) {
+                    type = payload::update_type::META;
+                }
+                if (type) {
+                    append_name(std::string_view(event->name));
+                    auto guard = &path_map[event->wd];
+                    auto folder_id = guard->folder_id;
+                    while (guard->parent_fd) {
+                        *(--name_ptr) = '/';
+                        append_name(guard->rel_path);
+                        guard = &path_map[guard->parent_fd];
+                    }
+                    auto rel_sz = (name_buff + sizeof(name_buff) - 2) - name_ptr;
+                    auto rel_path = std::string_view(name_ptr, rel_sz);
+                    push(deadline, folder_id, rel_path, U::created);
+                }
             }
-            if (event->mask & IN_DELETE) {
-                LOG_DEBUG(log, "File deleted: {}", event->name);
-            }
-            if (event->mask & IN_MODIFY) {
-                LOG_DEBUG(log, "File modified: {}", event->name);
-            }
-            if (event->mask & IN_ATTRIB) {
-                LOG_DEBUG(log, "File meta changed: {}", event->name);
-            }
+            i += sizeof(struct inotify_event) + event->len;
         }
-        i += sizeof(struct inotify_event) + event->len;
     }
 }
 
@@ -85,8 +113,18 @@ void watcher_t::on_watch(message::watch_folder_t &message) noexcept {
         LOG_ERROR(log, "cannot do inotify_add_watch(): {}", strerror(errno));
     } else {
         auto cb = [](auto, void *data) { reinterpret_cast<watcher_t *>(data)->inotify_callback(); };
-        root_guard = ctx->register_callback(inotify_fd, std::move(cb), this);
+        auto io_guard = ctx->register_callback(inotify_fd, std::move(cb), this);
+        auto path_guard = path_guard_t{
+            path_str,
+            p.folder_id,
+            std::move(io_guard),
+            0,
+        };
         LOG_TRACE(log, "registering inotify fd = {}", inotify_fd);
+        folder_map[p.folder_id] = p.path;
+        path_map[fd] = std::move(path_guard);
+        auto &fds = subdir_map[fd];
+        fds.emplace_back(fd);
         p.ec = {};
     }
 }

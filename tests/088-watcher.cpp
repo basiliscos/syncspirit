@@ -284,6 +284,17 @@ void test_flat_root_folder() {
                 auto path = root_path / "my-dir";
                 bfs::create_directories(path);
                 poll();
+                REQUIRE(changes.size() == 1);
+                auto &payload = changes.front()->payload;
+                REQUIRE(payload.size() == 1);
+                auto &folder_change = payload[0];
+                REQUIRE(folder_change.folder_id == folder_id);
+                REQUIRE(folder_change.file_changes.size() == 1);
+                auto &file_change = folder_change.file_changes.front();
+                CHECK(proto::get_name(file_change) == "my-dir");
+                CHECK(proto::get_size(file_change) == 0);
+                CHECK(proto::get_type(file_change) == proto::FileInfoType::DIRECTORY);
+                CHECK(proto::get_permissions(file_change));
             }
         }
     };
