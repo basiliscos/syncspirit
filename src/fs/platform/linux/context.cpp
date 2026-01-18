@@ -15,14 +15,14 @@ using guard_t = platform_context_t::io_guard_t;
 io_ctx::io_context_t(platform_context_t::io_callback_t callback_, void *data_, int index_)
     : cb(std::move(callback_)), data{data_}, index{index_} {}
 
-guard_t::io_guard_t() : fd{0} {};
+guard_t::io_guard_t() : fd{-1} {};
 guard_t::io_guard_t(platform_context_t *ctx_, int fd_) : ctx{ctx_}, fd{fd_} {};
-guard_t::io_guard_t(io_guard_t &&other) : fd{0} {
+guard_t::io_guard_t(io_guard_t &&other) : fd{-1} {
     std::swap(ctx, other.ctx);
     std::swap(fd, other.fd);
 }
 guard_t::~io_guard_t() {
-    if (fd && ctx) {
+    if (fd >= 0 && ctx) {
         auto log = utils::get_logger("fs");
         auto code = epoll_ctl(ctx->epoll_fd, EPOLL_CTL_DEL, fd, nullptr);
         LOG_DEBUG(log, "epoll_ctl(DEL), fd = {}, code = {}", fd, code);
@@ -37,7 +37,7 @@ guard_t &guard_t::operator=(io_guard_t &&other) {
     std::swap(fd, other.fd);
     return *this;
 }
-guard_t::operator bool() const { return fd; }
+guard_t::operator bool() const { return fd >= 0; }
 
 static void async_cb(int fd, void *data) {
     auto ctx = reinterpret_cast<platform_context_t *>(data);
