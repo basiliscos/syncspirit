@@ -317,6 +317,46 @@ void test_flat_root_folder() {
                 CHECK(proto::get_type(file_change) == proto::FileInfoType::DIRECTORY);
                 CHECK(proto::get_permissions(file_change));
             }
+            SECTION("(create with recursion) new dir + new file") {
+                sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id, ec);
+                sup->do_process();
+                REQUIRE(watched_replies == 1);
+
+                auto path_dir = root_path / "my-dir";
+                bfs::create_directories(path_dir);
+                poll();
+                {
+                    REQUIRE(changes.size() == 1);
+                    auto &payload = changes.front()->payload;
+                    REQUIRE(payload.size() == 1);
+                    auto &folder_change = payload[0];
+                    REQUIRE(folder_change.folder_id == folder_id);
+                    REQUIRE(folder_change.file_changes.size() == 1);
+                    auto &file_change = folder_change.file_changes.front();
+                    CHECK(proto::get_name(file_change) == "my-dir");
+                    CHECK(proto::get_size(file_change) == 0);
+                    CHECK(proto::get_type(file_change) == proto::FileInfoType::DIRECTORY);
+                    CHECK(proto::get_permissions(file_change));
+                }
+
+                auto path_file = path_dir / L"файл.bin";
+                write_file(path_file, "12345");
+                poll();
+                {
+                    REQUIRE(changes.size() == 1);
+                    auto &payload = changes.front()->payload;
+                    REQUIRE(payload.size() == 1);
+                    auto &folder_change = payload[0];
+                    REQUIRE(folder_change.folder_id == folder_id);
+                    REQUIRE(folder_change.file_changes.size() == 1);
+                    auto &file_change = folder_change.file_changes.front();
+                    CHECK(proto::get_name(file_change) == narrow(L"my-dir/файл.bin"));
+                    CHECK(proto::get_size(file_change) == 5);
+                    CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
+                    CHECK(proto::get_permissions(file_change));
+                    CHECK(!file_change.only_meta_changed);
+                }
+            }
             SECTION("(content change) file") {
                 auto path = root_path / "my-file";
                 write_file(path, "12345");

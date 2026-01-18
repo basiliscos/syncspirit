@@ -24,13 +24,15 @@ struct SYNCSPIRIT_API watcher_t : watcher_base_t {
     struct path_guard_t {
         std::string rel_path;
         std::string_view folder_id;
-        fs_context_t::io_guard_t io_guard;
         int parent_fd;
     };
     using path_map_t = std::unordered_map<int, path_guard_t>;
     using subdir_map_t = std::unordered_map<int, std::vector<int>>;
 
-    int inotify_fd = -1;
+    sys::error_code watch_dir(std::string_view path, std::string_view folder_id, int parent) noexcept;
+    void try_watch_recurse(std::string_view name, const path_guard_t &parent_guard, int parent_fd) noexcept;
+
+    fs_context_t::io_guard_t io_guard;
     path_map_t path_map;
     subdir_map_t subdir_map;
 };

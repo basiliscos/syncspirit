@@ -23,10 +23,9 @@ guard_t::io_guard_t(io_guard_t &&other) : fd{0} {
 }
 guard_t::~io_guard_t() {
     if (fd && ctx) {
-        if (epoll_ctl(ctx->epoll_fd, EPOLL_CTL_DEL, fd, nullptr) == -1) {
-            auto log = utils::get_logger("fs");
-            LOG_CRITICAL(log, "cannot epoll_ctl(del): {}", strerror(errno));
-        }
+        auto log = utils::get_logger("fs");
+        auto code = epoll_ctl(ctx->epoll_fd, EPOLL_CTL_DEL, fd, nullptr);
+        LOG_DEBUG(log, "epoll_ctl(DEL), fd = {}, code = {}", fd, code);
         auto it = ctx->io_callbacks.find(fd);
         if (it != ctx->io_callbacks.end()) {
             ctx->io_callbacks.erase(it);
@@ -107,6 +106,7 @@ auto platform_context_t::register_callback(int fd, io_callback_t callback, void 
         LOG_ERROR(log, "cannot epoll_ctl(): {}", strerror(errno));
         return {};
     } else {
+        LOG_DEBUG(log, "epoll_ctl(ADD), fd = {}", fd);
         auto index = static_cast<int>(events.size());
         io_callbacks.emplace(fd, io_context_t(callback, data, index));
         return io_guard_t(this, fd);
