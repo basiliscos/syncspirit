@@ -74,7 +74,11 @@ struct file_update_t {
     mutable update_type_internal_t update_type;
 };
 
-using file_changes_t = std::vector<proto::FileInfo>;
+struct file_info_t : proto::FileInfo {
+    bool only_meta_changed = false;
+};
+
+using file_changes_t = std::vector<file_info_t>;
 
 struct folder_change_t {
     std::string folder_id;

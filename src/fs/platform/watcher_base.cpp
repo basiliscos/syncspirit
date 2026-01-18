@@ -109,7 +109,7 @@ auto FU::make(const bfs::path &folder_path) noexcept -> payload::file_changes_t 
         namespace ut = payload::update_type;
         using UT = payload::update_type_t;
         using FT = bfs::file_type;
-        auto r = proto::FileInfo();
+        auto r = payload::file_info_t{};
         if (update.update_type & ut::DELETED) {
             if (update.update_type & ut::CREATED_1) {
                 // created & deleted within retension interval => ignoore
@@ -142,6 +142,7 @@ auto FU::make(const bfs::path &folder_path) noexcept -> payload::file_changes_t 
                 proto::set_modified_s(r, to_unix(modified));
                 proto::set_type(r, proto::FileInfoType::FILE);
                 proto::set_size(r, static_cast<std::int64_t>(sz));
+                r.only_meta_changed = update.update_type & ut::META;
             } else if (status.type() == FT::directory) {
                 proto::set_type(r, proto::FileInfoType::DIRECTORY);
             } else if (status.type() == FT::symlink) {

@@ -49,25 +49,25 @@ void watcher_t::shutdown_finish() noexcept {
 void watcher_t::inotify_callback() noexcept {
     using U = payload::update_type_t;
     char buffer[1024 * (sizeof(struct inotify_event) + NAME_MAX + 1)];
-    char name_buff[PATH_MAX];
-    auto name_ptr = name_buff + sizeof(name_buff) - 1;
-    *name_ptr-- = 0;
     int length = ::read(inotify_fd, buffer, sizeof(buffer));
     LOG_TRACE(log, "inotify callback, read ({}), result = {}", inotify_fd, length);
     if (length < 0) {
         LOG_ERROR(log, "cannot read: {}", strerror(errno));
     }
 
-    auto append_name = [&](std::string_view piece) {
-        auto sz = piece.size();
-        name_ptr -= sz;
-        std::copy(piece.begin(), piece.end(), name_ptr);
-    };
-
     // Process the events
     if (length) {
         auto deadline = clock_t::local_time() + retension;
         for (int i = 0; i < length;) {
+            char name_buff[PATH_MAX];
+            auto name_ptr = name_buff + sizeof(name_buff) - 1;
+            *name_ptr-- = 0;
+            auto append_name = [&](std::string_view piece) {
+                auto sz = piece.size();
+                name_ptr -= sz;
+                std::copy(piece.begin(), piece.end(), name_ptr);
+            };
+
             struct inotify_event *event = (struct inotify_event *)&buffer[i];
             if (event->len) {
                 auto type = payload::update_type_internal_t{0};
@@ -93,7 +93,7 @@ void watcher_t::inotify_callback() noexcept {
                     }
                     auto rel_sz = (name_buff + sizeof(name_buff) - 2) - name_ptr;
                     auto rel_path = std::string_view(name_ptr, rel_sz);
-                    push(deadline, folder_id, rel_path, U::created);
+                    push(deadline, folder_id, rel_path, static_cast<update_type_t>(type));
                 }
             }
             i += sizeof(struct inotify_event) + event->len;

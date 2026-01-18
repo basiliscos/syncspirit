@@ -276,11 +276,12 @@ void test_flat_root_folder() {
             auto folder_id = std::string("my-folder-id");
             auto back_addr = sup->get_address();
             auto ec = utils::make_error_code(utils::error_code_t::no_action);
-            sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id, ec);
-            sup->do_process();
-            REQUIRE(watched_replies == 1);
 
-            SECTION("new dir") {
+            SECTION("(create) new dir") {
+                sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id, ec);
+                sup->do_process();
+                REQUIRE(watched_replies == 1);
+
                 auto path = root_path / "my-dir";
                 bfs::create_directories(path);
                 poll();
@@ -296,6 +297,105 @@ void test_flat_root_folder() {
                 CHECK(proto::get_type(file_change) == proto::FileInfoType::DIRECTORY);
                 CHECK(proto::get_permissions(file_change));
             }
+            SECTION("(content change) file") {
+                auto path = root_path / "my-file";
+                write_file(path, "12345");
+
+                sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id, ec);
+                sup->do_process();
+                REQUIRE(watched_replies == 1);
+
+                write_file(path, "123456");
+
+                poll();
+                REQUIRE(changes.size() == 1);
+                auto &payload = changes.front()->payload;
+                REQUIRE(payload.size() == 1);
+                auto &folder_change = payload[0];
+                REQUIRE(folder_change.folder_id == folder_id);
+                REQUIRE(folder_change.file_changes.size() == 1);
+                auto &file_change = folder_change.file_changes.front();
+                CHECK(proto::get_name(file_change) == "my-file");
+                CHECK(proto::get_size(file_change) == 6);
+                CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
+                CHECK(proto::get_permissions(file_change));
+                CHECK(!file_change.only_meta_changed);
+            }
+            SECTION("(delete) single file") {
+                auto path = root_path / "my-file";
+                write_file(path, "12345");
+
+                sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id, ec);
+                sup->do_process();
+                REQUIRE(watched_replies == 1);
+
+                bfs::remove(path);
+
+                poll();
+                REQUIRE(changes.size() == 1);
+                auto &payload = changes.front()->payload;
+                REQUIRE(payload.size() == 1);
+                auto &folder_change = payload[0];
+                REQUIRE(folder_change.folder_id == folder_id);
+                REQUIRE(folder_change.file_changes.size() == 1);
+                auto &file_change = folder_change.file_changes.front();
+                CHECK(proto::get_name(file_change) == "my-file");
+                CHECK(proto::get_size(file_change) == 0);
+                CHECK(proto::get_deleted(file_change));
+                CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
+            }
+#ifndef SYNCSPIRIT_WIN
+            SECTION("(permissions) file") {
+                auto path = root_path / "my-file";
+                write_file(path, "12345");
+                bfs::permissions(path, bfs::perms::owner_read);
+
+                sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id, ec);
+                sup->do_process();
+                REQUIRE(watched_replies == 1);
+
+                bfs::permissions(path, bfs::perms::owner_write);
+                poll();
+                REQUIRE(changes.size() == 1);
+                auto &payload = changes.front()->payload;
+                REQUIRE(payload.size() == 1);
+                auto &folder_change = payload[0];
+                REQUIRE(folder_change.folder_id == folder_id);
+                REQUIRE(folder_change.file_changes.size() == 1);
+                auto &file_change = folder_change.file_changes.front();
+                CHECK(proto::get_name(file_change) == "my-file");
+                CHECK(proto::get_size(file_change) == 5);
+                CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
+                CHECK(proto::get_permissions(file_change));
+                CHECK(file_change.only_meta_changed);
+            }
+            SECTION("(delete + create) symlink target change") {
+                auto path = root_path / "my-file";
+                auto link_target_1 = std::string_view("/some/where/1");
+                auto link_target_2 = std::string_view("/some/where/2");
+                bfs::create_symlink(bfs::path(link_target_1), path);
+
+                sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id, ec);
+                sup->do_process();
+                REQUIRE(watched_replies == 1);
+
+                bfs::remove(path);
+                bfs::create_symlink(bfs::path(link_target_2), path);
+
+                poll();
+                REQUIRE(changes.size() == 1);
+                auto &payload = changes.front()->payload;
+                REQUIRE(payload.size() == 1);
+                auto &folder_change = payload[0];
+                REQUIRE(folder_change.folder_id == folder_id);
+                REQUIRE(folder_change.file_changes.size() == 1);
+                auto &file_change = folder_change.file_changes.front();
+                CHECK(proto::get_name(file_change) == "my-file");
+                CHECK(proto::get_size(file_change) == 0);
+                CHECK(proto::get_type(file_change) == proto::FileInfoType::SYMLINK);
+                CHECK(proto::get_symlink_target(file_change) == link_target_2);
+            }
+#endif
         }
     };
     F().run();
