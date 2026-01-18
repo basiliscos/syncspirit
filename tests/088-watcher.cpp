@@ -2,16 +2,13 @@
 // SPDX-FileCopyrightText: 2026 Ivan Baidakou
 
 #include "access.h"
-#include "diff-builder.h"
-#include "config/fs.h"
+#include "test-utils.h"
 #include "fs/fs_context.h"
 #include "fs/fs_supervisor.h"
 #include "fs/watcher_actor.h"
 #include "utils/error_code.h"
-#include "utils/platform.h"
 #include "net/names.h"
 #include "syncspirit-config.h"
-#include <format>
 #include <deque>
 #include <boost/nowide/convert.hpp>
 
@@ -233,6 +230,7 @@ void test_watcher_base() {
                     CHECK(proto::get_size(file_change) == 5);
                     CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
                     CHECK(proto::get_permissions(file_change));
+                    CHECK(!file_change.only_meta_changed);
                 }
                 SECTION("create , delete -> collapse to void") {
                     auto own_name = bfs::path(L"файл.bin");
@@ -244,6 +242,28 @@ void test_watcher_base() {
                     REQUIRE(changes.size() == 0);
                     poll();
                     REQUIRE(changes.size() == 0);
+                }
+                SECTION("content , meta -> collapse to content") {
+                    auto own_name = bfs::path(L"файл.bin");
+                    auto sub_path = root_path / own_name;
+                    write_file(sub_path, "12345");
+                    target->push(deadline, folder_id, narrow(own_name.wstring()), U::content);
+                    target->push(deadline_2, folder_id, narrow(own_name.wstring()), U::meta);
+                    poll();
+                    REQUIRE(changes.size() == 0);
+                    poll();
+                    REQUIRE(changes.size() == 1);
+                    auto &payload = changes.front()->payload;
+                    REQUIRE(payload.size() == 1);
+                    auto &folder_change = payload[0];
+                    REQUIRE(folder_change.folder_id == folder_id);
+                    REQUIRE(folder_change.file_changes.size() == 1);
+                    auto &file_change = folder_change.file_changes.front();
+                    CHECK(proto::get_name(file_change) == narrow(own_name.wstring()));
+                    CHECK(proto::get_size(file_change) == 5);
+                    CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
+                    CHECK(proto::get_permissions(file_change));
+                    CHECK(!file_change.only_meta_changed);
                 }
             }
         }

@@ -85,8 +85,12 @@ void FU::update(std::string_view relative_path, update_type_t type, folder_updat
     if (prev) {
         auto &updates = prev->updates;
         if (auto it = updates.find(relative_path); it != updates.end()) {
-            if (it->update_type & payload::update_type::CREATED_1) {
+            auto ut = it->update_type;
+            if (ut & payload::update_type::CREATED_1) {
                 internal = internal | payload::update_type::CREATED_1;
+            }
+            if ((ut & payload::update_type::CONTENT) && (type == update_type_t::meta)) {
+                internal = ut;
             }
             updates.erase(it);
         }
