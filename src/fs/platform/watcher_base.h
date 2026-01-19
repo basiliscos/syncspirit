@@ -12,9 +12,9 @@
 #include <optional>
 #include <unordered_set>
 #include <unordered_map>
-#include <cstdint>
 #include "utils/log.h"
 #include "proto/proto-fwd.hpp"
+#include "fs/update_type.hpp"
 
 namespace syncspirit::fs::platform {
 
@@ -28,24 +28,6 @@ struct watch_folder_t {
     bfs::path path;
     std::string folder_id;
     sys::error_code ec;
-};
-
-using update_type_internal_t = std::uint32_t;
-namespace update_type {
-// clang-format off
-static constexpr update_type_internal_t CREATED_1 = 0b00001;
-static constexpr update_type_internal_t CREATED   = 0b00010;
-static constexpr update_type_internal_t DELETED   = 0b00100;
-static constexpr update_type_internal_t META      = 0b01000;
-static constexpr update_type_internal_t CONTENT   = 0b10000;
-// clang-format on
-} // namespace update_type
-
-enum class update_type_t : update_type_internal_t {
-    created = update_type::CREATED,
-    deleted = update_type::DELETED,
-    meta = update_type::META,
-    content = update_type::CONTENT,
 };
 
 struct file_update_t {
@@ -95,7 +77,6 @@ struct SYNCSPIRIT_API watcher_base_t : r::actor_base_t {
     template <typename Actor> using config_builder_t = watcher_config_builder_t<Actor>;
     using config_t = watcher_config_t;
 
-    using update_type_t = payload::update_type_t;
     using file_update_t = payload::file_update_t;
     using folder_map_t = std::unordered_map<std::string, bfs::path>;
 
