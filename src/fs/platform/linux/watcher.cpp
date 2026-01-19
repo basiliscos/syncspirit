@@ -54,7 +54,7 @@ void watcher_t::shutdown_finish() noexcept {
 }
 
 void watcher_t::inotify_callback() noexcept {
-    using U = payload::update_type_t;
+    using U = update_type_t;
     char buffer[1024 * (sizeof(struct inotify_event) + NAME_MAX + 1)];
     int length = ::read(io_guard.fd, buffer, sizeof(buffer));
     LOG_TRACE(log, "inotify callback, result = {}", io_guard.fd, length);
@@ -77,17 +77,17 @@ void watcher_t::inotify_callback() noexcept {
 
             struct inotify_event *event = (struct inotify_event *)&buffer[i];
             if (event->len) {
-                auto type = payload::update_type_internal_t{0};
+                auto type = update_type_internal_t{0};
                 if (event->mask & IN_CREATE) {
-                    type = payload::update_type::CREATED;
+                    type = update_type::CREATED;
                 } else if (event->mask & IN_DELETE) {
-                    type = payload::update_type::DELETED;
+                    type = update_type::DELETED;
                 }
                 if (event->mask & IN_MODIFY) {
-                    type = payload::update_type::CONTENT;
+                    type = update_type::CONTENT;
                 }
                 if (event->mask & IN_ATTRIB) {
-                    type = payload::update_type::META;
+                    type = update_type::META;
                 }
                 if (type) {
                     auto filename = std::string_view(event->name);

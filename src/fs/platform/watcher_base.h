@@ -10,11 +10,11 @@
 #include <boost/system.hpp>
 #include <string>
 #include <optional>
-#include <unordered_set>
 #include <unordered_map>
 #include "utils/log.h"
 #include "proto/proto-fwd.hpp"
 #include "fs/update_type.hpp"
+#include "fs/updates_support.h"
 
 namespace syncspirit::fs::platform {
 
@@ -28,11 +28,6 @@ struct watch_folder_t {
     bfs::path path;
     std::string folder_id;
     sys::error_code ec;
-};
-
-struct file_update_t {
-    std::string path;
-    mutable update_type_internal_t update_type;
 };
 
 struct file_info_t : proto::FileInfo {
@@ -77,24 +72,11 @@ struct SYNCSPIRIT_API watcher_base_t : r::actor_base_t {
     template <typename Actor> using config_builder_t = watcher_config_builder_t<Actor>;
     using config_t = watcher_config_t;
 
-    using file_update_t = payload::file_update_t;
     using folder_map_t = std::unordered_map<std::string, bfs::path>;
 
-    struct file_update_hash_t {
-        using is_transparent = void;
-        size_t operator()(const file_update_t &file_update) const noexcept;
-        size_t operator()(std::string_view relative_path) const noexcept;
-    };
-    struct file_update_eq_t {
-        using is_transparent = void;
-        bool operator()(const file_update_t &lhs, const file_update_t &rhs) const noexcept;
-        bool operator()(const file_update_t &lhs, std::string_view rhs) const noexcept;
-        bool operator()(std::string_view lhs, const file_update_t &rhs) const noexcept;
-    };
-    using file_updates_t = std::unordered_set<file_update_t, file_update_hash_t, file_update_eq_t>;
     struct folder_update_t {
         std::string folder_id;
-        file_updates_t updates;
+        support::file_updates_t updates;
 
         void update(std::string_view relative_path, update_type_t type, folder_update_t *prev) noexcept;
         auto make(const bfs::path &folder_path) noexcept -> payload::file_changes_t;

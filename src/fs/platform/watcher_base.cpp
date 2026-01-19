@@ -8,6 +8,7 @@
 #include <boost/nowide/convert.hpp>
 
 using namespace syncspirit;
+using namespace syncspirit::fs;
 using namespace syncspirit::fs::platform;
 using boost::nowide::narrow;
 using boost::nowide::widen;
@@ -16,16 +17,13 @@ static auto actor_identity = net::names::watcher;
 
 using BU = watcher_base_t::bulk_update_t;
 using FU = watcher_base_t::folder_update_t;
-using FU_EQ = watcher_base_t::file_update_eq_t;
-using Hash = watcher_base_t::file_update_hash_t;
 
-static std::string_view stringify(payload::update_type_t type) {
-    using U = payload::update_type_t;
-    if (type == U::created) {
+static std::string_view stringify(update_type_t type) {
+    if (type == update_type_t::created) {
         return "created";
-    } else if (type == U::deleted) {
+    } else if (type == update_type_t::deleted) {
         return "deleted";
-    } else if (type == U::meta) {
+    } else if (type == update_type_t::meta) {
         return "metadata changed";
     } else {
         return "content changed";
@@ -81,15 +79,15 @@ auto BU::make(const folder_map_t &folder_map) noexcept -> folder_changes_opt_t {
 
 void FU::update(std::string_view relative_path, update_type_t type, folder_update_t *prev) noexcept {
     auto it = updates.find(relative_path);
-    auto internal = static_cast<payload::update_type_internal_t>(type);
+    auto internal = static_cast<update_type_internal_t>(type);
     if (prev) {
         auto &updates = prev->updates;
         if (auto it = updates.find(relative_path); it != updates.end()) {
             auto ut = it->update_type;
-            if (ut & payload::update_type::CREATED_1) {
-                internal = internal | payload::update_type::CREATED_1;
+            if (ut & update_type::CREATED_1) {
+                internal = internal | update_type::CREATED_1;
             }
-            if ((ut & payload::update_type::CONTENT) && (type == update_type_t::meta)) {
+            if ((ut & update_type::CONTENT) && (type == update_type_t::meta)) {
                 internal = ut;
             }
             updates.erase(it);
@@ -97,11 +95,11 @@ void FU::update(std::string_view relative_path, update_type_t type, folder_updat
     }
     if (it == updates.end()) {
         if (type == update_type_t::created) {
-            internal = payload::update_type::CREATED_1;
+            internal = update_type::CREATED_1;
         }
-        updates.emplace(file_update_t{std::string(relative_path), internal});
+        updates.emplace(support::file_update_t{std::string(relative_path), internal});
     } else {
-        it->update_type = (it->update_type & payload::update_type::CREATED_1) | internal;
+        it->update_type = (it->update_type & update_type::CREATED_1) | internal;
     }
 }
 
@@ -110,8 +108,8 @@ auto FU::make(const bfs::path &folder_path) noexcept -> payload::file_changes_t 
     files.reserve(updates.size());
     auto log = utils::get_logger(actor_identity);
     for (auto &update : updates) {
-        namespace ut = payload::update_type;
-        using UT = payload::update_type_t;
+        namespace ut = update_type;
+        using UT = update_type_t;
         using FT = bfs::file_type;
         auto r = proto::FileInfo{};
         auto reason = UT{};
@@ -176,19 +174,6 @@ auto FU::make(const bfs::path &folder_path) noexcept -> payload::file_changes_t 
     }
     return files;
 }
-
-size_t Hash::operator()(const file_update_t &file_update) const noexcept {
-    auto path = std::string_view(file_update.path);
-    return (*this)(path);
-}
-
-size_t Hash::operator()(std::string_view path) const noexcept { return std::hash<std::string_view>()(path); }
-
-bool FU_EQ::operator()(const file_update_t &lhs, const file_update_t &rhs) const noexcept {
-    return lhs.path == rhs.path;
-}
-bool FU_EQ::operator()(const file_update_t &lhs, std::string_view rhs) const noexcept { return lhs.path == rhs; }
-bool FU_EQ::operator()(std::string_view lhs, const file_update_t &rhs) const noexcept { return lhs == rhs.path; }
 
 watcher_base_t::watcher_base_t(config_t &cfg) : parent_t{cfg}, retension(cfg.change_retension) {
     log = utils::get_logger(actor_identity);
