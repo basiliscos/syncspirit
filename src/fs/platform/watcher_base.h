@@ -48,34 +48,16 @@ enum class update_type_t : update_type_internal_t {
     content = update_type::CONTENT,
 };
 
-struct file_meta_t {
-    struct data_t {
-        std::int64_t last_write_time;
-        std::uintmax_t size;
-        std::uint32_t perms;
-    };
-
-    file_meta_t(data_t data, proto::FileInfoType type) noexcept;
-    file_meta_t(bfs::path link_target) noexcept;
-    ~file_meta_t();
-
-    union data_union_t {
-        ~data_union_t();
-        bfs::path link_target;
-        data_t data;
-    };
-
-    data_union_t data;
-    proto::FileInfoType type;
-};
-
 struct file_update_t {
     std::string path;
     mutable update_type_internal_t update_type;
 };
 
 struct file_info_t : proto::FileInfo {
-    bool only_meta_changed = false;
+    using parent_t = proto::FileInfo;
+    inline file_info_t(proto::FileInfo file_info, update_type_t update_reason_)
+        : parent_t(std::move(file_info)), update_reason{update_reason_} {};
+    update_type_t update_reason;
 };
 
 using file_changes_t = std::vector<file_info_t>;

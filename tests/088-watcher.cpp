@@ -230,7 +230,7 @@ void test_watcher_base() {
                     CHECK(proto::get_size(file_change) == 5);
                     CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
                     CHECK(proto::get_permissions(file_change));
-                    CHECK(!file_change.only_meta_changed);
+                    CHECK(file_change.update_reason == payload::update_type_t::created);
                 }
                 SECTION("create , delete -> collapse to void") {
                     auto own_name = bfs::path(L"файл.bin");
@@ -263,7 +263,7 @@ void test_watcher_base() {
                     CHECK(proto::get_size(file_change) == 5);
                     CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
                     CHECK(proto::get_permissions(file_change));
-                    CHECK(!file_change.only_meta_changed);
+                    CHECK(file_change.update_reason == payload::update_type_t::content);
                 }
             }
         }
@@ -344,6 +344,7 @@ void test_flat_root_folder() {
                 CHECK(proto::get_size(file_change) == 0);
                 CHECK(proto::get_type(file_change) == proto::FileInfoType::DIRECTORY);
                 CHECK(proto::get_permissions(file_change));
+                CHECK(file_change.update_reason == payload::update_type_t::created);
             }
             SECTION("(create with recursion) new dir + new file") {
                 sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id, ec);
@@ -382,7 +383,7 @@ void test_flat_root_folder() {
                     CHECK(proto::get_size(file_change) == 5);
                     CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
                     CHECK(proto::get_permissions(file_change));
-                    CHECK(!file_change.only_meta_changed);
+                    CHECK(file_change.update_reason == payload::update_type_t::created);
                 }
             }
             SECTION("(content change) file") {
@@ -407,7 +408,7 @@ void test_flat_root_folder() {
                 CHECK(proto::get_size(file_change) == 6);
                 CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
                 CHECK(proto::get_permissions(file_change));
-                CHECK(!file_change.only_meta_changed);
+                CHECK(file_change.update_reason == payload::update_type_t::content);
             }
             SECTION("(delete) single file") {
                 auto path = root_path / "my-file";
@@ -431,6 +432,7 @@ void test_flat_root_folder() {
                 CHECK(proto::get_size(file_change) == 0);
                 CHECK(proto::get_deleted(file_change));
                 CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
+                CHECK(file_change.update_reason == payload::update_type_t::deleted);
             }
 #ifndef SYNCSPIRIT_WIN
             SECTION("(permissions) file") {
@@ -455,7 +457,7 @@ void test_flat_root_folder() {
                 CHECK(proto::get_size(file_change) == 5);
                 CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
                 CHECK(proto::get_permissions(file_change));
-                CHECK(file_change.only_meta_changed);
+                CHECK(file_change.update_reason == payload::update_type_t::meta);
             }
             SECTION("(delete + create) symlink target change") {
                 auto path = root_path / "my-file";

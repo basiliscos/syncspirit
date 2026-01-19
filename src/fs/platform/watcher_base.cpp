@@ -113,13 +113,15 @@ auto FU::make(const bfs::path &folder_path) noexcept -> payload::file_changes_t 
         namespace ut = payload::update_type;
         using UT = payload::update_type_t;
         using FT = bfs::file_type;
-        auto r = payload::file_info_t{};
+        auto r = proto::FileInfo{};
+        auto reason = UT{};
         if (update.update_type & ut::DELETED) {
             if (update.update_type & ut::CREATED_1) {
                 // created & deleted within retension interval => ignoore
                 continue;
             }
             proto::set_deleted(r, true);
+            reason = UT::deleted;
         } else {
             auto ec = sys::error_code{};
             auto path = folder_path / widen(update.path);
@@ -146,7 +148,6 @@ auto FU::make(const bfs::path &folder_path) noexcept -> payload::file_changes_t 
                 proto::set_modified_s(r, to_unix(modified));
                 proto::set_type(r, proto::FileInfoType::FILE);
                 proto::set_size(r, static_cast<std::int64_t>(sz));
-                r.only_meta_changed = update.update_type & ut::META;
             } else if (status.type() == FT::directory) {
                 proto::set_type(r, proto::FileInfoType::DIRECTORY);
             } else if (status.type() == FT::symlink) {
@@ -162,9 +163,16 @@ auto FU::make(const bfs::path &folder_path) noexcept -> payload::file_changes_t 
                 LOG_DEBUG(log, "ignoring '{}'", narrow(path.generic_wstring()));
                 continue;
             }
+            if (update.update_type & (ut::CREATED | ut::CREATED_1)) {
+                reason = UT::created;
+            } else if (update.update_type & ut::CONTENT) {
+                reason = UT::content;
+            } else {
+                reason = UT::meta;
+            }
         }
         proto::set_name(r, std::move(update.path));
-        files.emplace_back(std::move(r));
+        files.emplace_back(payload::file_info_t(std::move(r), reason));
     }
     return files;
 }
