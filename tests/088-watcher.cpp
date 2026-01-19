@@ -289,6 +289,34 @@ void test_start_n_shutdown() {
     F(false).run();
 }
 
+void test_double_watching() {
+    struct F : fixture_t {
+        using fixture_t::fixture_t;
+
+        void on_watch(message::watch_folder_t &msg) noexcept override {
+            auto &counter = msg.payload.ec ? watched_errors : watched_successes;
+            ++counter;
+            ++watched_replies;
+        }
+
+        void main() noexcept override {
+            auto folder_id = std::string("my-folder-id");
+            auto back_addr = sup->get_address();
+            auto ec = utils::make_error_code(utils::error_code_t::no_action);
+            sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id, ec);
+            sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id, ec);
+            sup->do_process();
+            REQUIRE(watched_replies == 2);
+            REQUIRE(watched_successes == 1);
+            REQUIRE(watched_errors == 1);
+        }
+
+        int watched_successes = 0;
+        int watched_errors = 0;
+    };
+    F().run();
+}
+
 void test_flat_root_folder() {
     struct F : fixture_t {
         using fixture_t::fixture_t;
@@ -466,6 +494,7 @@ int _init() {
     REGISTER_TEST_CASE(test_watcher_base, "test_watcher_base", "[fs]");
 #if defined(SYNCSPIRIT_WATCHER_ANY)
     REGISTER_TEST_CASE(test_start_n_shutdown, "test_start_n_shutdown", "[fs]");
+    REGISTER_TEST_CASE(test_double_watching, "test_double_watching", "[fs]");
     REGISTER_TEST_CASE(test_flat_root_folder, "test_flat_root_folder", "[fs]");
 #endif
     return 1;

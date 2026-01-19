@@ -164,15 +164,20 @@ auto watcher_t::watch_dir(std::string_view path, std::string_view folder_id, int
 void watcher_t::on_watch(message::watch_folder_t &message) noexcept {
     auto &p = message.payload;
     auto &path = p.path;
-    LOG_TRACE(log, "on watch on '{}'", narrow(path.wstring()));
+    auto path_str = narrow(path.wstring());
+    LOG_TRACE(log, "on watch on '{}'", path_str);
     if (io_guard.fd) {
-        auto it = folder_map.emplace(std::make_pair(std::string(p.folder_id), p.path)).first;
-        auto &folder_id = it->first;
-        auto ec = watch_dir(path.native(), folder_id, 0);
-        if (ec) {
-            folder_map.erase(it);
+        auto [it, inserted] = folder_map.emplace(std::make_pair(std::string(p.folder_id), p.path));
+        if (!inserted) {
+            LOG_WARN(log, "folder '{}' on '{}' is already watched", p.folder_id, path_str);
+        } else {
+            auto &folder_id = it->first;
+            auto ec = watch_dir(path.native(), folder_id, 0);
+            if (ec) {
+                folder_map.erase(it);
+            }
+            p.ec = ec;
         }
-        p.ec = ec;
     }
 }
 
