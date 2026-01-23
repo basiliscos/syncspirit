@@ -14,6 +14,7 @@
 #include "utils/log.h"
 #include "proto/proto-fwd.hpp"
 #include "fs/update_type.hpp"
+#include "fs/updates_mediator.h"
 #include "fs/updates_support.h"
 
 namespace syncspirit::fs::platform {
@@ -54,6 +55,7 @@ using folder_changes_t = r::message_t<payload::folder_changes_t>;
 
 struct SYNCSPIRIT_API watcher_config_t : r::actor_config_t {
     r::pt::time_duration change_retension;
+    updates_mediator_ptr_t updates_mediator;
 };
 
 template <typename Actor> struct watcher_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -65,6 +67,10 @@ template <typename Actor> struct watcher_config_builder_t : r::actor_config_buil
         parent_t::config.change_retension = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
+    builder_t &&updates_mediator(updates_mediator_ptr_t value) && noexcept {
+        parent_t::config.updates_mediator = std::move(value);
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
 };
 
 struct SYNCSPIRIT_API watcher_base_t : r::actor_base_t {
@@ -72,14 +78,19 @@ struct SYNCSPIRIT_API watcher_base_t : r::actor_base_t {
     template <typename Actor> using config_builder_t = watcher_config_builder_t<Actor>;
     using config_t = watcher_config_t;
 
-    using folder_map_t = std::unordered_map<std::string, bfs::path>;
+    struct folder_info_t {
+        bfs::path path;
+        std::string path_str;
+    };
+
+    using folder_map_t = std::unordered_map<std::string, folder_info_t>;
 
     struct folder_update_t {
         std::string folder_id;
         support::file_updates_t updates;
 
         void update(std::string_view relative_path, update_type_t type, folder_update_t *prev) noexcept;
-        auto make(const bfs::path &folder_path) noexcept -> payload::file_changes_t;
+        auto make(const folder_info_t &folder_info, updates_mediator_t &mediator) noexcept -> payload::file_changes_t;
     };
     using folder_updates_t = std::vector<folder_update_t>;
     using clock_t = r::pt::microsec_clock;
@@ -91,7 +102,7 @@ struct SYNCSPIRIT_API watcher_base_t : r::actor_base_t {
         folder_updates_t updates;
         folder_update_t &prepare(std::string_view folder_id) noexcept;
         folder_update_t *find(std::string_view folder_id) noexcept;
-        folder_changes_opt_t make(const folder_map_t &folder_map) noexcept;
+        folder_changes_opt_t make(const folder_map_t &folder_map, updates_mediator_t &mediator) noexcept;
         bool has_changes() const noexcept;
     };
 
@@ -104,6 +115,7 @@ struct SYNCSPIRIT_API watcher_base_t : r::actor_base_t {
 
     utils::logger_t log;
     interval_t retension;
+    updates_mediator_ptr_t updates_mediator;
     r::address_ptr_t coordinator;
     folder_map_t folder_map;
     bulk_update_t next;

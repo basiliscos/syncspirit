@@ -6,6 +6,7 @@
 #include "proto/proto-helpers-bep.h"
 #include "net/names.h"
 #include <boost/nowide/convert.hpp>
+#include <string.h>
 
 using namespace syncspirit;
 using namespace syncspirit::fs;
@@ -45,20 +46,20 @@ bool BU::has_changes() const noexcept {
     return false;
 }
 
-auto BU::make(const folder_map_t &folder_map) noexcept -> folder_changes_opt_t {
+auto BU::make(const folder_map_t &folder_map, updates_mediator_t &mediator) noexcept -> folder_changes_opt_t {
     if (!deadline.is_not_a_date_time()) {
         auto r = payload::folder_changes_t();
         for (auto &fi : updates) {
             auto &folder_path = folder_map.at(fi.folder_id);
-            auto file_changes = fi.make(folder_path);
+            auto file_changes = fi.make(folder_path, mediator);
             if (!file_changes.empty()) {
                 auto change = payload::folder_change_t(std::move(fi.folder_id), std::move(file_changes));
                 r.emplace_back(std::move(change));
             }
         }
         updates.resize(0);
+        deadline = {};
         if (!r.empty()) {
-            deadline = {};
             return std::move(r);
         }
     }
@@ -91,14 +92,27 @@ void FU::update(std::string_view relative_path, update_type_t type, folder_updat
     }
 }
 
-auto FU::make(const bfs::path &folder_path) noexcept -> payload::file_changes_t {
+auto FU::make(const folder_info_t &folder_info, updates_mediator_t &mediator) noexcept -> payload::file_changes_t {
+    namespace ut = update_type;
+    using UT = update_type_t;
+    using FT = bfs::file_type;
+    static const size_t SS_PATH_MAX = 32 * 1024;
+
     auto files = payload::file_changes_t();
     files.reserve(updates.size());
     auto log = utils::get_logger(actor_identity);
+    char full_path[SS_PATH_MAX];
+    auto folder_path_sz = folder_info.path_str.size();
+    std::memcpy(full_path, folder_info.path_str.data(), folder_path_sz);
     for (auto &update : updates) {
-        namespace ut = update_type;
-        using UT = update_type_t;
-        using FT = bfs::file_type;
+        auto rel_name_ptr = full_path + folder_path_sz;
+        *rel_name_ptr++ = '/';
+        std::memcpy(rel_name_ptr, update.path.data(), update.path.size());
+        auto rel_name_path_sz = folder_path_sz + update.path.size();
+        *(full_path + rel_name_path_sz + 1) = 0;
+        if (mediator.is_masked(std::string_view(full_path, rel_name_path_sz + 1))) {
+            continue;
+        }
         auto r = proto::FileInfo{};
         auto reason = UT{};
         if (update.update_type & ut::DELETED) {
@@ -110,7 +124,7 @@ auto FU::make(const bfs::path &folder_path) noexcept -> payload::file_changes_t 
             reason = UT::deleted;
         } else {
             auto ec = sys::error_code{};
-            auto path = folder_path / widen(update.path);
+            auto path = folder_info.path / widen(update.path);
             auto status = bfs::symlink_status(path, ec);
             if (ec) {
                 LOG_WARN(log, "cannot get status on '{}': {} (update ignored)", narrow(path.generic_wstring()),
@@ -163,12 +177,14 @@ auto FU::make(const bfs::path &folder_path) noexcept -> payload::file_changes_t 
     return files;
 }
 
-watcher_base_t::watcher_base_t(config_t &cfg) : parent_t{cfg}, retension(cfg.change_retension) {
+watcher_base_t::watcher_base_t(config_t &cfg)
+    : parent_t{cfg}, retension(cfg.change_retension), updates_mediator{std::move(cfg.updates_mediator)} {
     log = utils::get_logger(actor_identity);
     if (!retension.is_positive()) {
         LOG_ERROR(log, "retension interval should be positive");
         throw std::runtime_error("retension interval should be positive");
     }
+    assert(updates_mediator);
 }
 
 void watcher_base_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
@@ -210,7 +226,7 @@ void watcher_base_t::push(const timepoint_t &deadline, std::string_view folder_i
 void watcher_base_t::on_retension_finish(r::request_id_t, bool cancelled) noexcept {
     LOG_TRACE(log, "on_retension_finish");
     if (!cancelled) {
-        auto opt = next.make(folder_map);
+        auto opt = next.make(folder_map, *updates_mediator);
         if (opt) {
             LOG_DEBUG(log, "sending changes");
             send<payload::folder_changes_t>(coordinator, std::move(opt).value());

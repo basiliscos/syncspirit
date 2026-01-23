@@ -65,6 +65,7 @@ struct fixture_t {
         sup->do_process();
         REQUIRE(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::OPERATIONAL);
 
+        updates_mediator = new fs::updates_mediator_t(retension() * 2);
         if (auto_launch) {
             launch_target();
             REQUIRE(static_cast<r::actor_base_t *>(target.get())->access<to::state>() == r::state_t::OPERATIONAL);
@@ -79,8 +80,11 @@ struct fixture_t {
     }
 
     virtual void launch_target() {
-        target =
-            sup->create_actor<target_ptr_t::element_type>().timeout(timeout).change_retension(retension()).finish();
+        target = sup->create_actor<target_ptr_t::element_type>()
+                     .timeout(timeout)
+                     .change_retension(retension())
+                     .updates_mediator(updates_mediator)
+                     .finish();
         sup->do_process();
     }
 
@@ -108,6 +112,7 @@ struct fixture_t {
     test::path_guard_t path_guard;
     fs_context_ptr_r fs_context;
     r::intrusive_ptr_t<supervisor_t> sup;
+    fs::updates_mediator_ptr_t updates_mediator;
     target_ptr_t target;
     r::pt::time_duration timeout = r::pt::millisec{10};
     change_messages_t changes;
@@ -125,8 +130,9 @@ void test_watcher_base() {
         void on_watch(message::watch_folder_t &msg) noexcept override {
             auto &p = msg.payload;
             p.ec = {};
-            LOG_DEBUG(log, "watching {}", p.path.string());
-            folder_map[p.folder_id] = p.path;
+            auto path_str = narrow(p.path.generic_wstring());
+            LOG_DEBUG(log, "watching {}", path_str);
+            folder_map[p.folder_id] = folder_info_t(p.path, std::move(path_str));
         }
     };
 
@@ -134,7 +140,11 @@ void test_watcher_base() {
         using fixture_t::fixture_t;
 
         void launch_target() override {
-            target = sup->create_actor<W>().timeout(timeout).change_retension(retension()).finish();
+            target = sup->create_actor<W>()
+                         .timeout(timeout)
+                         .change_retension(retension())
+                         .updates_mediator(updates_mediator)
+                         .finish();
             sup->do_process();
         }
 
@@ -265,6 +275,31 @@ void test_watcher_base() {
                     CHECK(proto::get_permissions(file_change));
                     CHECK(file_change.update_reason == update_type_t::content);
                 }
+            }
+            SECTION("updates mediator") {
+                auto own_name = bfs::path(L"файл.bin");
+                auto sub_path = root_path / own_name;
+                write_file(sub_path, "12345");
+                updates_mediator->push(narrow(sub_path.generic_wstring()), deadline);
+
+                target->push(deadline, folder_id, narrow(own_name.wstring()), U::created);
+                poll();
+                REQUIRE(changes.size() == 0);
+
+                target->push(deadline, folder_id, narrow(own_name.wstring()), U::created);
+                poll();
+                REQUIRE(changes.size() == 1);
+
+                auto &payload = changes.front()->payload;
+                REQUIRE(payload.size() == 1);
+                auto &folder_change = payload[0];
+                REQUIRE(folder_change.folder_id == folder_id);
+                REQUIRE(folder_change.file_changes.size() == 1);
+                auto &file_change = folder_change.file_changes.front();
+                CHECK(proto::get_name(file_change) == narrow(own_name.wstring()));
+                CHECK(proto::get_size(file_change) == 5);
+                CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
+                CHECK(proto::get_permissions(file_change));
             }
         }
     };

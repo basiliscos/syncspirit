@@ -167,7 +167,8 @@ void watcher_t::on_watch(message::watch_folder_t &message) noexcept {
     auto path_str = narrow(path.wstring());
     LOG_TRACE(log, "on watch on '{}'", path_str);
     if (io_guard.fd) {
-        auto [it, inserted] = folder_map.emplace(std::make_pair(std::string(p.folder_id), p.path));
+        auto folder_info = folder_info_t(p.path, narrow(p.path.generic_wstring()));
+        auto [it, inserted] = folder_map.emplace(std::make_pair(std::string(p.folder_id), std::move(folder_info)));
         if (!inserted) {
             LOG_WARN(log, "folder '{}' on '{}' is already watched", p.folder_id, path_str);
         } else {
