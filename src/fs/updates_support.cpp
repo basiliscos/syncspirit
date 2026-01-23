@@ -3,7 +3,7 @@
 
 #include "updates_support.h"
 
-using namespace syncspirit::fs::support;
+namespace syncspirit::fs::support {
 
 bool file_update_eq_t::operator()(const file_update_t &lhs, const file_update_t &rhs) const noexcept {
     return lhs.path == rhs.path;
@@ -25,3 +25,17 @@ size_t file_update_hash_t::operator()(const file_update_t &file_update) const no
 size_t file_update_hash_t::operator()(std::string_view path) const noexcept {
     return std::hash<std::string_view>()(path);
 }
+
+std::string_view stringify(update_type_t type) {
+    if (type == update_type_t::created) {
+        return "created";
+    } else if (type == update_type_t::deleted) {
+        return "deleted";
+    } else if (type == update_type_t::meta) {
+        return "metadata changed";
+    } else {
+        return "content changed";
+    }
+}
+
+} // namespace syncspirit::fs::support

@@ -18,18 +18,6 @@ static auto actor_identity = net::names::watcher;
 using BU = watcher_base_t::bulk_update_t;
 using FU = watcher_base_t::folder_update_t;
 
-static std::string_view stringify(update_type_t type) {
-    if (type == update_type_t::created) {
-        return "created";
-    } else if (type == update_type_t::deleted) {
-        return "deleted";
-    } else if (type == update_type_t::meta) {
-        return "metadata changed";
-    } else {
-        return "content changed";
-    }
-}
-
 auto BU::prepare(std::string_view folder_id) noexcept -> folder_update_t & {
     for (auto &fi : updates) {
         if (fi.folder_id == folder_id) {
@@ -201,7 +189,7 @@ void watcher_base_t::push(const timepoint_t &deadline, std::string_view folder_i
                           update_type_t type) noexcept {
     auto source = (bulk_update_t *)(nullptr);
     auto target = (bulk_update_t *)(nullptr);
-    LOG_DEBUG(log, "file event '{}' for '{}' in folder {}", stringify(type), relative_path, folder_id);
+    LOG_DEBUG(log, "file event '{}' for '{}' in folder {}", support::stringify(type), relative_path, folder_id);
     if (next.deadline == deadline) {
         target = &next;
     } else if (next.deadline.is_not_a_date_time()) {

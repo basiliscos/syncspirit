@@ -29,4 +29,6 @@ struct file_update_eq_t {
 
 using file_updates_t = std::unordered_set<file_update_t, file_update_hash_t, file_update_eq_t>;
 
+std::string_view stringify(update_type_t type);
+
 } // namespace syncspirit::fs::support
