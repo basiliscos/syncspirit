@@ -23,6 +23,7 @@ using namespace syncspirit::fs;
 
 namespace bfs = std::filesystem;
 using perms_t = std::filesystem::perms;
+using boost::nowide::narrow;
 
 namespace {
 
@@ -86,6 +87,10 @@ struct fixture_t {
         };
     }
 
+    virtual void create_file_actor() noexcept {
+        file_actor = sup->create_actor<fs::file_actor_t>().timeout(timeout).finish();
+    }
+
     virtual void run() noexcept {
         r::system_context_t ctx;
         sup = ctx.create_supervisor<supervisor_t>()
@@ -100,7 +105,7 @@ struct fixture_t {
         sup->do_process();
         CHECK(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::OPERATIONAL);
 
-        file_actor = sup->create_actor<fs::file_actor_t>().timeout(timeout).finish();
+        create_file_actor();
         sup->do_process();
         sequencer = sup->sequencer;
 
@@ -618,12 +623,49 @@ void test_requesting_block() {
     F().run();
 }
 
+void test_mediator_interaction() {
+    struct F : fixture_t {
+        void create_file_actor() noexcept override {
+            updates_mediator = new fs::updates_mediator_t(retension);
+            file_actor = sup->create_actor<fs::file_actor_t>()
+                             .change_retension(retension)
+                             .updates_mediator(updates_mediator)
+                             .timeout(timeout)
+                             .finish();
+        }
+
+        void main() noexcept override {
+            proto::FileInfo pr_fi;
+            std::int64_t modified = 1641828421;
+            proto::set_modified_s(pr_fi, modified);
+            proto::set_permissions(pr_fi, 0666);
+
+            auto path = root_path / L"папка" / L"файл.txt";
+            auto path_str = narrow(path.generic_wstring());
+            remote_copy(path, pr_fi).check_success();
+
+            REQUIRE(bfs::exists(path));
+            REQUIRE(bfs::file_size(path) == 0);
+            REQUIRE(to_unix(bfs::last_write_time(path)) == 1641828421);
+            SECTION("is marked") { CHECK(updates_mediator->is_masked(path_str)); }
+            SECTION("is not after marked after timeout") {
+                sup->do_invoke_timer((*sup->timers.begin())->request_id);
+                CHECK(!updates_mediator->is_masked(path_str));
+            }
+        }
+        r::pt::time_duration retension = r::pt::microseconds{1};
+        fs::updates_mediator_ptr_t updates_mediator;
+    };
+    F().run();
+};
+
 int _init() {
     test::init_logging();
     REGISTER_TEST_CASE(test_remote_copy, "test_remote_copy", "[fs]");
     REGISTER_TEST_CASE(test_append_block, "test_append_block", "[fs]");
     REGISTER_TEST_CASE(test_clone_block, "test_clone_block", "[fs]");
     REGISTER_TEST_CASE(test_requesting_block, "test_requesting_block", "[fs]");
+    REGISTER_TEST_CASE(test_mediator_interaction, "test_mediator_interaction", "[fs]");
     return 1;
 }
 

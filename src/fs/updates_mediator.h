@@ -19,7 +19,7 @@ struct SYNCSPIRIT_API updates_mediator_t : model::arc_base_t<updates_mediator_t>
 
     void push(std::string path, const timepoint_t &deadline) noexcept;
     bool is_masked(std::string_view path) noexcept;
-    void clean_expired() noexcept;
+    bool clean_expired() noexcept;
 
   private:
     struct updates_t {

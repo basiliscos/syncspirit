@@ -11,9 +11,11 @@
 #include "utils/error_code.h"
 #include "proto/proto-helpers-bep.h"
 #include <boost/nowide/convert.hpp>
+#include <memory_resource>
 
 using namespace syncspirit::fs;
 using namespace syncspirit::proto;
+using boost::nowide::narrow;
 
 namespace {
 namespace resource {
@@ -21,7 +23,16 @@ r::plugin::resource_id_t controller = 0;
 } // namespace resource
 } // namespace
 
-file_actor_t::file_actor_t(config_t &cfg) : r::actor_base_t{cfg}, concurrent_hashes{cfg.concurrent_hashes} {}
+file_actor_t::file_actor_t(config_t &cfg)
+    : r::actor_base_t{cfg}, concurrent_hashes{cfg.concurrent_hashes}, retension{cfg.change_retension},
+      updates_mediator{cfg.updates_mediator} {
+    if (updates_mediator) {
+        if (!retension.is_positive()) {
+            LOG_ERROR(log, "retension interval should be positive");
+            throw std::runtime_error("retension interval should be positive");
+        }
+    }
+}
 
 void file_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
@@ -70,9 +81,52 @@ void file_actor_t::shutdown_finish() noexcept {
 }
 
 void file_actor_t::on_io_commands(message::io_commands_t &message) noexcept {
+    using clock_t = pt::microsec_clock;
     auto &p = message.payload;
+    auto deadline = updates_mediator ? clock_t::local_time() : pt::ptime();
+    auto updates_sz = int{0};
+
     for (auto &cmd : p.commands) {
-        std::visit([&](auto &cmd) { process(cmd, p.context); }, cmd);
+        static const size_t SS_PATH_MAX = 32 * 1024;
+        auto buffer = std::array<char, SS_PATH_MAX>();
+        auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+        auto allocator = std::pmr::polymorphic_allocator<std::string>(&pool);
+        auto ptr = const_cast<char *>(buffer.data());
+
+        std::visit(
+            [&](auto &cmd) {
+                auto path_wstr = cmd.path.generic_wstring();
+                auto path_wstr_ptr = path_wstr.data();
+                auto path_str = std::string();
+                auto path_view = std::string_view();
+                if (narrow(ptr, buffer.size(), path_wstr_ptr, path_wstr_ptr + path_wstr.size())) {
+                    path_view = std::string_view(ptr);
+                } else {
+                    path_str = narrow(path_wstr);
+                    path_view = path_str;
+                }
+                process(cmd, path_view, p.context);
+                if (updates_mediator) {
+                    updates_mediator->push(std::string(path_view), deadline);
+                    ++updates_sz;
+                }
+            },
+            cmd);
+    }
+
+    if (updates_sz && !expiration_timer) {
+        expiration_timer = start_timer(retension, *this, &file_actor_t::on_retension_finish);
+    }
+}
+
+void file_actor_t::on_retension_finish(r::request_id_t, bool cancelled) noexcept {
+    LOG_TRACE(log, "on_retension_finish");
+    expiration_timer.reset();
+    if (!cancelled) {
+        auto do_respawn = updates_mediator->clean_expired();
+        if (do_respawn) {
+            expiration_timer = start_timer(retension, *this, &file_actor_t::on_retension_finish);
+        }
     }
 }
 
@@ -100,7 +154,7 @@ void file_actor_t::on_controller_predown(net::message::controller_predown_t &mes
     }
 }
 
-void file_actor_t::process(payload::block_request_t &cmd, const void *context) noexcept {
+void file_actor_t::process(payload::block_request_t &cmd, std::string_view path_str, const void *context) noexcept {
     LOG_TRACE(log, "processing block request");
     auto &path = cmd.path;
     auto file_opt = open_file_ro(path, context);
@@ -108,7 +162,7 @@ void file_actor_t::process(payload::block_request_t &cmd, const void *context) n
     auto data = utils::bytes_t{};
     if (!file_opt) {
         ec = file_opt.assume_error();
-        LOG_ERROR(log, "error opening file {}: {}", path.string(), ec.message());
+        LOG_ERROR(log, "error opening file {}: {}", path_str, ec.message());
         cmd.result = ec;
         return;
     } else {
@@ -127,12 +181,11 @@ void file_actor_t::process(payload::block_request_t &cmd, const void *context) n
     cmd.result = std::move(data);
 }
 
-void file_actor_t::process(payload::remote_copy_t &cmd, const void *context) noexcept {
+void file_actor_t::process(payload::remote_copy_t &cmd, std::string_view path_str, const void *context) noexcept {
     auto &path = cmd.path;
     sys::error_code ec;
 
     if (!cmd.conflict_path.empty()) {
-        auto path_str = path.string();
         auto conflict_path_str = cmd.conflict_path.generic_string();
         LOG_DEBUG(log, "renaming {} -> {}", path_str, conflict_path_str);
         auto ec = sys::error_code();
@@ -146,15 +199,15 @@ void file_actor_t::process(payload::remote_copy_t &cmd, const void *context) noe
 
     if (cmd.deleted) {
         if (bfs::exists(path, ec)) {
-            LOG_DEBUG(log, "removing {}", path.string());
+            LOG_DEBUG(log, "removing {}", path_str);
             auto ok = bfs::remove_all(path, ec);
             if (!ok) {
-                LOG_ERROR(log, "error removing {} : {}", path.string(), ec.message());
+                LOG_ERROR(log, "error removing {} : {}", path_str, ec.message());
                 cmd.result = ec;
                 return;
             }
         } else {
-            LOG_TRACE(log, "{} already abscent, noop", path.string());
+            LOG_TRACE(log, "{} already abscent, noop", path_str);
         }
         cmd.result = outcome::success();
         return;
@@ -237,8 +290,7 @@ void file_actor_t::process(payload::remote_copy_t &cmd, const void *context) noe
     cmd.result = outcome::success();
 }
 
-void file_actor_t::process(payload::finish_file_t &cmd, const void *context) noexcept {
-    auto path_str = cmd.path.generic_string();
+void file_actor_t::process(payload::finish_file_t &cmd, std::string_view path_str, const void *context) noexcept {
     auto &file_cache = context_cache[context];
     auto it = file_cache.find(cmd.path);
     if (it == file_cache.end()) {
@@ -268,7 +320,7 @@ void file_actor_t::process(payload::finish_file_t &cmd, const void *context) noe
         auto ec = sys::error_code();
         bfs::rename(cmd.path, cmd.conflict_path);
         if (ec) {
-            LOG_ERROR(log, "cannot rename file: {}: {}", path_str, ec.message());
+            LOG_ERROR(log, "cannot rename file '{}': {}", path_str, ec.message());
             cmd.result = ec;
             return;
         }
@@ -279,7 +331,7 @@ void file_actor_t::process(payload::finish_file_t &cmd, const void *context) noe
     auto ok = backend->close(cmd.modification_s, cmd.path);
     if (!ok) {
         auto &ec = ok.assume_error();
-        LOG_ERROR(log, "cannot close file: {}: {}", path_str, ec.message());
+        LOG_ERROR(log, "cannot close file '{}': {}", path_str, ec.message());
         cmd.result = ec;
         return;
     }
@@ -300,11 +352,10 @@ void file_actor_t::process(payload::finish_file_t &cmd, const void *context) noe
     LOG_INFO(log, "file {} ({} bytes) is now locally available", path_str, cmd.file_size);
 }
 
-void file_actor_t::process(payload::append_block_t &cmd, const void *context) noexcept {
+void file_actor_t::process(payload::append_block_t &cmd, std::string_view path_str, const void *context) noexcept {
     auto &path = cmd.path;
     auto file_opt = open_file_rw(path, cmd.file_size, context);
     if (!file_opt) {
-        auto path_str = path.string();
         auto &err = file_opt.assume_error();
         LOG_ERROR(log, "cannot open file: {}: {}", path_str, err.message());
         cmd.result = err;
@@ -314,11 +365,10 @@ void file_actor_t::process(payload::append_block_t &cmd, const void *context) no
     cmd.result = backend->write(cmd.offset, cmd.data);
 }
 
-void file_actor_t::process(payload::clone_block_t &cmd, const void *context) noexcept {
-    auto target_path = cmd.target;
+void file_actor_t::process(payload::clone_block_t &cmd, std::string_view path_str, const void *context) noexcept {
+    auto &target_path = cmd.path;
     auto target_opt = open_file_rw(target_path, cmd.target_size, context);
     if (!target_opt) {
-        auto path_str = target_path.string();
         auto &err = target_opt.assume_error();
         LOG_ERROR(log, "cannot open file: {}: {}", path_str, err.message());
         cmd.result = err;
@@ -394,6 +444,6 @@ auto file_actor_t::open_file_ro(const bfs::path &path, const void *context) noex
 
 void file_actor_t::on_create_dir(message::create_dir_t &message) noexcept {
     auto &path = message.payload;
-    LOG_TRACE(log, "on_create_dir, '{}'", boost::nowide::narrow(path.wstring()));
+    LOG_TRACE(log, "on_create_dir, '{}'", narrow(path.wstring()));
     bfs::create_directories(path, path.ec);
 }

@@ -115,7 +115,7 @@ struct append_block_t : payload_base_t<void> {
 struct clone_block_t : payload_base_t<void> {
     using parent_t = payload_base_t<void>;
 
-    bfs::path target;
+    bfs::path path; // target, used for universally update mediator
     std::uint64_t target_offset;
     std::uint64_t target_size;
     bfs::path source;
@@ -126,7 +126,7 @@ struct clone_block_t : payload_base_t<void> {
                          std::uint64_t target_size_, bfs::path source_, std::uint64_t source_offset_,
                          std::uint64_t block_size_) noexcept
         : parent_t{utils::make_error_code(utils::error_code_t::no_action), std::move(context_)},
-          target{std::move(target_)}, target_offset{target_offset_}, target_size{target_size_},
+          path{std::move(target_)}, target_offset{target_offset_}, target_size{target_size_},
           source{std::move(source_)}, source_offset{source_offset_}, block_size{block_size_} {}
 
     clone_block_t(const clone_block_t &) = delete;

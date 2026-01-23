@@ -58,7 +58,7 @@ bool updates_mediator_t::is_masked(std::string_view path) noexcept {
     return false;
 }
 
-void updates_mediator_t::clean_expired() noexcept {
+bool updates_mediator_t::clean_expired() noexcept {
     next.deadline = {};
     auto &expired = next.updates;
     if (expired.size()) {
@@ -76,4 +76,5 @@ void updates_mediator_t::clean_expired() noexcept {
         expired.clear();
     }
     std::swap(next, postponed);
+    return next.updates.size();
 }

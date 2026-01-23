@@ -24,19 +24,20 @@ TEST_CASE("block iterator", "[model]") {
         mediator.push("/tmp/path_1", deadline_1);
         mediator.push("/tmp/path_1", deadline_1);
         CHECK(mediator.is_masked("/tmp/path_1"));
-        mediator.clean_expired();
+        CHECK(!mediator.clean_expired());
     }
     SECTION("2 files, successful unmask") {
         mediator.push("/tmp/path_1", deadline_1);
         mediator.push("/tmp/path_2", deadline_1);
         CHECK(mediator.is_masked("/tmp/path_1"));
         CHECK(mediator.is_masked("/tmp/path_2"));
+        CHECK(!mediator.clean_expired());
     }
     SECTION("1 file, postponed update") {
         mediator.push("/tmp/path_1", deadline_1);
         mediator.push("/tmp/path_1", deadline_2);
         CHECK(mediator.is_masked("/tmp/path_1"));
-        mediator.clean_expired();
+        CHECK(mediator.clean_expired());
         CHECK(mediator.is_masked("/tmp/path_1"));
     }
     SECTION("multiple files") {
@@ -52,19 +53,21 @@ TEST_CASE("block iterator", "[model]") {
         CHECK(mediator.is_masked("/tmp/path_2"));
         CHECK(mediator.is_masked("/tmp/path_3"));
 
-        mediator.clean_expired();
+        CHECK(mediator.clean_expired());
         mediator.push("/tmp/path_4", deadline_3);
 
         CHECK(!mediator.is_masked("/tmp/path_1"));
         CHECK(mediator.is_masked("/tmp/path_2"));
         CHECK(!mediator.is_masked("/tmp/path_3"));
 
-        mediator.clean_expired();
+        CHECK(mediator.clean_expired());
         CHECK(!mediator.is_masked("/tmp/path_1"));
         CHECK(!mediator.is_masked("/tmp/path_2"));
         CHECK(!mediator.is_masked("/tmp/path_3"));
         CHECK(mediator.is_masked("/tmp/path_4"));
         CHECK(!mediator.is_masked("/tmp/path_4"));
+
+        CHECK(!mediator.clean_expired());
     }
 }
 
