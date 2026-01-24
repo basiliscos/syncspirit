@@ -21,6 +21,7 @@ add_library(syncspirit_test_lib
     test_supervisor.cpp
     test-db.cpp
     test-utils.cpp
+    test-watcher.cpp
     diff-builder.cpp
 )
 target_link_libraries(syncspirit_test_lib syncspirit_core

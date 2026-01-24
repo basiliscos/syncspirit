@@ -3,6 +3,7 @@
 
 #include "access.h"
 #include "test-utils.h"
+#include "test-watcher.h"
 #include "fs/fs_context.h"
 #include "fs/fs_supervisor.h"
 #include "fs/watcher_actor.h"
@@ -123,24 +124,11 @@ void supervisor_t::on_watch(message::watch_folder_t &msg) noexcept { fixture->on
 void supervisor_t::on_changes(message::folder_changes_t &msg) noexcept { fixture->on_changes(msg); }
 
 void test_watcher_base() {
-    struct W : fs::watch_actor_t {
-        using parent_t = fs::watch_actor_t;
-        using parent_t::parent_t;
-
-        void on_watch(message::watch_folder_t &msg) noexcept override {
-            auto &p = msg.payload;
-            p.ec = {};
-            auto path_str = narrow(p.path.generic_wstring());
-            LOG_DEBUG(log, "watching {}", path_str);
-            folder_map[p.folder_id] = folder_info_t(p.path, std::move(path_str));
-        }
-    };
-
     struct F : fixture_t {
         using fixture_t::fixture_t;
 
         void launch_target() override {
-            target = sup->create_actor<W>()
+            target = sup->create_actor<test::test_watcher_t>()
                          .timeout(timeout)
                          .change_retension(retension())
                          .updates_mediator(updates_mediator)
