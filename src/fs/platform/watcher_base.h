@@ -13,6 +13,7 @@
 #include <unordered_map>
 #include "utils/log.h"
 #include "proto/proto-fwd.hpp"
+#include "fs/messages.h"
 #include "fs/update_type.hpp"
 #include "fs/updates_mediator.h"
 #include "fs/updates_support.h"
@@ -22,36 +23,6 @@ namespace syncspirit::fs::platform {
 namespace r = rotor;
 namespace bfs = std::filesystem;
 namespace sys = boost::system;
-
-namespace payload {
-
-struct watch_folder_t {
-    bfs::path path;
-    std::string folder_id;
-    sys::error_code ec;
-};
-
-struct file_info_t : proto::FileInfo {
-    using parent_t = proto::FileInfo;
-    inline file_info_t(proto::FileInfo file_info, update_type_t update_reason_)
-        : parent_t(std::move(file_info)), update_reason{update_reason_} {};
-    update_type_t update_reason;
-};
-
-using file_changes_t = std::vector<file_info_t>;
-
-struct folder_change_t {
-    std::string folder_id;
-    file_changes_t file_changes;
-};
-using folder_changes_t = std::vector<folder_change_t>;
-
-} // namespace payload
-
-namespace message {
-using watch_folder_t = r::message_t<payload::watch_folder_t>;
-using folder_changes_t = r::message_t<payload::folder_changes_t>;
-} // namespace message
 
 struct SYNCSPIRIT_API watcher_config_t : r::actor_config_t {
     r::pt::time_duration change_retension;
