@@ -81,9 +81,8 @@ void file_actor_t::shutdown_finish() noexcept {
 }
 
 void file_actor_t::on_io_commands(message::io_commands_t &message) noexcept {
-    using clock_t = pt::microsec_clock;
     auto &p = message.payload;
-    auto deadline = updates_mediator ? clock_t::local_time() : pt::ptime();
+    auto deadline = updates_mediator ? clock_t::local_time() + retension : pt::ptime();
     auto updates_sz = int{0};
 
     for (auto &cmd : p.commands) {
@@ -131,10 +130,33 @@ void file_actor_t::on_retension_finish(r::request_id_t, bool cancelled) noexcept
 }
 
 void file_actor_t::on_exec(message::foreign_executor_t &request) noexcept {
+    struct execution_ctx_impl_t final : execution_context_t {
+        execution_ctx_impl_t(file_actor_t *actor_, pt::ptime &deadline_holder_)
+            : actor{actor_}, deadline_holder{deadline_holder_} {
+            plugin = actor->hasher;
+            mediator = actor->updates_mediator.get();
+        }
+
+        pt::ptime get_deadline() const override {
+            if (deadline_holder.is_not_a_date_time()) {
+                deadline_holder = clock_t::local_time() + actor->retension;
+            }
+            return deadline_holder;
+        }
+
+        file_actor_t *actor;
+        pt::ptime &deadline_holder;
+    };
+
     LOG_DEBUG(log, "on_exec");
     auto slave = static_cast<fs::fs_slave_t *>(request.payload.get());
     slave->ec = {};
-    slave->exec(hasher);
+    auto deadline = pt::ptime{};
+    auto ctx = execution_ctx_impl_t(this, deadline);
+    auto updated = slave->exec(ctx);
+    if (updated && !expiration_timer) {
+        expiration_timer = start_timer(retension, *this, &file_actor_t::on_retension_finish);
+    }
 }
 
 void file_actor_t::on_controller_up(net::message::controller_up_t &message) noexcept {

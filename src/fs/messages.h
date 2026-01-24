@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #pragma once
 
@@ -8,6 +8,7 @@
 #include "hasher/hasher_plugin.h"
 #include "utils/bytes.h"
 #include "utils/error_code.h"
+#include "execution_context.h"
 
 #include <rotor.hpp>
 #include <boost/outcome.hpp>
@@ -21,13 +22,15 @@ namespace bfs = std::filesystem;
 namespace outcome = boost::outcome_v2;
 namespace sys = boost::system;
 
+struct fs_slave_t;
+
 namespace payload {
 
 using extendended_context_t = hasher::payload::extendended_context_t;
 using extendended_context_prt_t = hasher::payload::extendended_context_prt_t;
 
 struct foreign_executor_t : hasher::payload::extendended_context_t {
-    virtual void exec(hasher::hasher_plugin_t *hasher) noexcept = 0;
+    virtual bool exec(execution_context_t &context) noexcept = 0;
 };
 using foreign_executor_prt_t = r::intrusive_ptr_t<foreign_executor_t>;
 

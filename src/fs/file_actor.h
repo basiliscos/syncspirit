@@ -76,6 +76,7 @@ struct SYNCSPIRIT_API file_actor_t : public r::actor_base_t {
     template <typename T> auto &access() noexcept;
 
   private:
+    using clock_t = pt::microsec_clock;
     using file_cache_t = std::unordered_map<bfs::path, file_ptr_t>;
     using context_cache_t = std::unordered_map<const void *, file_cache_t>;
     using timer_opt_t = std::optional<r::request_id_t>;

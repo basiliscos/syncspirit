@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2025-2026 Ivan Baidakou
 
 #include "scan_dir.h"
 #include "fs/fs_slave.h"
@@ -26,12 +26,12 @@ scan_dir_t::scan_dir_t(bfs::path path_, presentation::presence_ptr_t presence_, 
     : path{std::move(path_)}, presence{std::move(presence_)},
       ec(utils::make_error_code(utils::error_code_t::no_action)), payload(std::move(payload_)) {}
 
-void scan_dir_t::process(fs_slave_t &slave, hasher::hasher_plugin_t *) noexcept {
+bool scan_dir_t::process(fs_slave_t &slave, execution_context_t &context) noexcept {
     ec = {};
     using FT = bfs::file_type;
     auto it = bfs::directory_iterator(path, ec);
     if (ec) {
-        return;
+        return false;
     }
     for (; it != bfs::directory_iterator(); ++it) {
         auto &child = *it;
@@ -78,4 +78,5 @@ void scan_dir_t::process(fs_slave_t &slave, hasher::hasher_plugin_t *) noexcept 
     auto b = child_infos.begin();
     auto e = child_infos.end();
     std::sort(b, e, comparator_t());
+    return false;
 }

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "segment_iterator.h"
 #include "hasher/messages.h"
@@ -17,13 +17,13 @@ segment_iterator_t::segment_iterator_t(const r::address_ptr_t &back_addr_,
     assert(block_count > 0);
 }
 
-void segment_iterator_t::process(fs_slave_t &fs_slave, hasher::hasher_plugin_t *hasher) noexcept {
+bool segment_iterator_t::process(fs_slave_t &fs_slave, execution_context_t &exec_ctx) noexcept {
     assert(!ec);
     if (!file.has_backend()) {
         auto opt = file_t::open_read(path);
         if (!opt.has_value()) {
             ec = opt.assume_error();
-            return;
+            return false;
         }
         file = std::move(opt.assume_value());
     }
@@ -36,7 +36,8 @@ void segment_iterator_t::process(fs_slave_t &fs_slave, hasher::hasher_plugin_t *
             std::abort();
         }
         auto bytes = std::move(block_opt).value();
-        hasher->calc_digest(std::move(bytes), i, back_addr, context);
+        exec_ctx.plugin->calc_digest(std::move(bytes), i, back_addr, context);
         ++current_block;
     }
+    return false;
 }
