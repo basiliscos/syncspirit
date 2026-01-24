@@ -443,6 +443,8 @@ auto file_actor_t::open_file_ro(const bfs::path &path, const void *context) noex
 }
 
 void file_actor_t::on_create_dir(message::create_dir_t &message) noexcept {
+    // no need to use updates mediator, as it is never watched and used only
+    // for folder creation
     auto &path = message.payload;
     LOG_TRACE(log, "on_create_dir, '{}'", narrow(path.wstring()));
     bfs::create_directories(path, path.ec);
