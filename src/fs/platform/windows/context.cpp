@@ -13,14 +13,16 @@ using guard_t = platform_context_t::io_guard_t;
 using io_ctx_t = platform_context_t::io_context_t;
 
 guard_t::io_guard_t() : ctx{nullptr}, handle{nullptr} {}
-guard_t::io_guard_t(platform_context_t *ctx_, handle_t handle_) : ctx{ctx_}, handle{handle_} {}
-guard_t::io_guard_t(io_guard_t &&other) : ctx{nullptr}, handle{nullptr} {
+guard_t::io_guard_t(platform_context_t *ctx_, close_handle_t close_cb_, handle_t handle_)
+    : ctx{ctx_}, close_cb{close_cb_}, handle{handle_} {}
+guard_t::io_guard_t(io_guard_t &&other) : ctx{nullptr}, close_cb{nullptr}, handle{nullptr} {
     std::swap(ctx, other.ctx);
+    std::swap(close_cb, other.close_cb);
     std::swap(handle, other.handle);
 }
 guard_t::~io_guard_t() {
-    if (handle && ctx) {
-        auto ok = ::CloseHandle(handle);
+    if (handle && ctx && close_cb) {
+        auto ok = close_cb(handle);
         if (!ok) {
             auto log = utils::get_logger("fs");
             LOG_WARN(log, "cannot close handle {}: {}", (void *)handle, utils::platform_t::get_last_error());
@@ -29,6 +31,7 @@ guard_t::~io_guard_t() {
 }
 guard_t &guard_t::operator=(guard_t &&other) noexcept {
     std::swap(ctx, other.ctx);
+    std::swap(close_cb, other.close_cb);
     std::swap(handle, other.handle);
     return *this;
 }
@@ -41,13 +44,15 @@ static void async_cb(HANDLE handle, void *data) {
     ::ResetEvent(ctx->async_guard.handle);
 }
 
+static bool async_close_cb(HANDLE handle) { return ::CloseHandle(handle); }
+
 platform_context_t::platform_context_t() noexcept {
     auto event = ::CreateEvent(nullptr, false, false, nullptr);
     if (!event) {
         LOG_CRITICAL(log, "cannot CreateEvent(): {}", ::GetLastError());
         return;
     }
-    async_guard = register_callback(event, async_cb, this);
+    async_guard = register_callback(event, async_cb, async_close_cb, this);
 }
 
 platform_context_t::~platform_context_t() {
@@ -62,14 +67,15 @@ void platform_context_t::notify() noexcept {
     }
 }
 
-auto platform_context_t::register_callback(handle_t handle, io_callback_t callback, void *data) -> io_guard_t {
+auto platform_context_t::register_callback(handle_t handle, io_callback_t callback, close_handle_t close_cb, void *data)
+    -> io_guard_t {
     auto log = utils::get_logger("fs");
     if (handle) {
         auto [_, inserted] = io_callbacks.emplace(handle, io_context_t(callback, data));
         if (inserted) {
             LOG_TRACE(log, "registered callback for handle {}", (void *)handle);
             handles.emplace_back(handle);
-            return io_guard_t(this, handle);
+            return io_guard_t(this, close_cb, handle);
         } else {
             auto log = utils::get_logger("fs");
             LOG_WARN(log, "callback for the handle is already registered");

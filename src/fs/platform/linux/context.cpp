@@ -134,7 +134,6 @@ void platform_context_t::wait_next_event() noexcept {
 
     auto r = ::epoll_wait(epoll_fd, events.data(), static_cast<int>(events.size()), timeout);
     bool timed_out = r == 0;
-    // LOG_ERROR(log, "zzz r = {}, timeout = {}", r, timeout);
     if (r == -1) {
         LOG_WARN(log, "epoll_wait() failed: {}", strerror(errno));
     } else if (r) {
