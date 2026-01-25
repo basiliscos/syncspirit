@@ -29,7 +29,6 @@ struct SYNCSPIRIT_API watcher_t : watcher_base_t {
         OVERLAPPED overlapped;
         io_guard_t dir_guard;
         io_guard_t event_guard;
-        // std::string rel_path;
     };
     using path_guard_ptr_t = model::intrusive_ptr_t<path_guard_t>;
     using handle_t = fs_context_t::handle_t;

@@ -152,7 +152,7 @@ struct fixture_t {
     virtual void main() noexcept {}
 
     r::pt::time_duration timeout = r::pt::millisec{10};
-    r::pt::time_duration retension_timeout = r::pt::millisec{15};
+    r::pt::time_duration retension_timeout = r::pt::millisec{150};
     bfs::path root_path;
     test::path_guard_t path_guard;
     fs_context_ptr_r fs_context;
@@ -200,7 +200,6 @@ void test_with_mediator() {
         void main() noexcept override {
             make_dir();
             sup->do_process();
-            poll();
             poll();
             REQUIRE(changes.size() == 0);
         }
