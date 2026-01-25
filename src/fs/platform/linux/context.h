@@ -29,6 +29,8 @@ struct SYNCSPIRIT_API platform_context_t : context_base_t {
     using io_callback_t = void (*)(int, void *);
     struct io_context_t {
         io_context_t(platform_context_t::io_callback_t callback_, void *data_, int index_);
+        io_context_t(io_context_t &&) = default;
+        io_context_t(const io_context_t &) = delete;
         io_callback_t cb;
         void *data;
         int index;
@@ -41,7 +43,7 @@ struct SYNCSPIRIT_API platform_context_t : context_base_t {
         io_guard_t(io_guard_t &&);
         ~io_guard_t();
 
-        io_guard_t &operator=(io_guard_t &&);
+        io_guard_t &operator=(io_guard_t &&) noexcept;
         operator bool() const;
         platform_context_t *ctx;
         int fd;

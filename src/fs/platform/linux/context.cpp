@@ -32,7 +32,7 @@ guard_t::~io_guard_t() {
         }
     }
 }
-guard_t &guard_t::operator=(io_guard_t &&other) {
+guard_t &guard_t::operator=(io_guard_t &&other) noexcept {
     std::swap(ctx, other.ctx);
     std::swap(fd, other.fd);
     return *this;

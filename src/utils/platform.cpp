@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "platform.h"
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
@@ -163,3 +163,30 @@ bool platform_t::permissions_supported(const bfs::path &) noexcept {
 #endif
     return true;
 }
+
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+std::string platform_t::get_last_error() noexcept {
+    // Get the error message ID, if any.
+    DWORD errorMessageID = ::GetLastError();
+    if (errorMessageID == 0) {
+        return std::string(); // No error message has been recorded
+    }
+
+    LPSTR messageBuffer = nullptr;
+
+    // Ask Win32 to give us the string version of that message ID.
+    // The parameters we pass in, tell Win32 to create the buffer that holds the message for us (because we don't yet
+    // know how long the message string will be).
+    size_t size =
+        FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+                       NULL, errorMessageID, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPSTR)&messageBuffer, 0, NULL);
+
+    // Copy the error message into a std::string.
+    std::string message(messageBuffer, size);
+
+    // Free the Win32's string's buffer.
+    LocalFree(messageBuffer);
+
+    return message;
+}
+#endif
