@@ -91,7 +91,8 @@ void watcher_t::on_notify(handle_t handle) noexcept {
         return;
     }
     auto &path_guard = it->second;
-    auto &folder_info = folder_map[path_guard->folder_id];
+    auto &folder_id = path_guard->folder_id;
+    auto &folder_info = folder_map[folder_id];
     auto &path_str = folder_info.path_str;
 
     auto bytes = DWORD{0};
@@ -102,12 +103,44 @@ void watcher_t::on_notify(handle_t handle) noexcept {
         return;
     }
 
+    char storage[32 * 1024 * sizeof(wchar_t) + 1];
+    auto deadline = clock_t::local_time() + retension;
+
     auto ptr = (FILE_NOTIFY_INFORMATION *)path_guard->buff;
     do {
+        auto storage_ptr = storage;
         auto sz = ptr->FileNameLength / sizeof(WCHAR);
-        auto file_wname = std::wstring(ptr->FileName, sz);
-        auto file_name = narrow(file_wname);
-        LOG_DEBUG(log, "updated({}) '{}'", path_guard->folder_id, file_name);
+        auto namew_ptr = ptr->FileName;
+        for (auto p = namew_ptr, e = namew_ptr + sz + 1; p != e; ++p) {
+            if (*p == L'\\') {
+                *p = '/';
+            }
+        }
+        auto name_holder = std::string();
+        auto name_view = std::string_view();
+        if (narrow(storage_ptr, sizeof(storage), namew_ptr, namew_ptr + sz)) {
+            name_view = std::string_view(storage_ptr);
+        } else {
+            auto file_wname = std::wstring_view(ptr->FileName, sz);
+            name_holder = narrow(file_wname);
+            name_view = path_str;
+        }
+
+        auto type = update_type_internal_t{0};
+        if (ptr->Action == FILE_ACTION_ADDED) {
+            type = update_type::CREATED;
+        } else if (ptr->Action == FILE_ACTION_REMOVED) {
+            type = update_type::DELETED;
+        } else if (ptr->Action == FILE_ACTION_MODIFIED) {
+            type = update_type::CONTENT;
+        }
+        // no idea how to track metadata changes only
+
+        if (type) {
+            push(deadline, folder_id, name_view, static_cast<update_type_t>(type));
+        } else {
+            LOG_DEBUG(log, "in the folder '{}' updated: '{}'", folder_id, name_view);
+        }
         ptr = (FILE_NOTIFY_INFORMATION *)(((char *)ptr) + ptr->NextEntryOffset);
     } while (ptr->NextEntryOffset != 0);
 
