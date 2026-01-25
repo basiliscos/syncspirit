@@ -5,10 +5,12 @@
 #include "context.h"
 
 #if SYNCSPIRIT_WATCHER_WIN32
+#include <boost/system.hpp>
 #include <utility>
 
 using namespace syncspirit;
 using namespace syncspirit::fs::platform::windows;
+namespace sys = boost::system;
 using guard_t = platform_context_t::io_guard_t;
 using io_ctx_t = platform_context_t::io_context_t;
 
@@ -41,10 +43,15 @@ io_ctx_t::io_context_t(platform_context_t::io_callback_t callback_, void *data_)
 
 static void async_cb(HANDLE handle, void *data) {
     auto ctx = reinterpret_cast<platform_context_t *>(data);
-    ::ResetEvent(ctx->async_guard.handle);
+    ::ResetEvent(handle);
+    if (auto ok = ::ResetEvent(handle); !ok) {
+        auto ec = sys::error_code(::GetLastError(), sys::system_category());
+        auto log = utils::get_logger("fs");
+        LOG_WARN(log, "cannot reset asyn handle {} : {}", (void *)handle, ec.message());
+    }
 }
 
-static bool async_close_cb(HANDLE handle) { return ::CloseHandle(handle); }
+static bool close_handle_cb(HANDLE handle) { return ::CloseHandle(handle); }
 
 platform_context_t::platform_context_t() noexcept {
     auto event = ::CreateEvent(nullptr, false, false, nullptr);
@@ -52,7 +59,7 @@ platform_context_t::platform_context_t() noexcept {
         LOG_CRITICAL(log, "cannot CreateEvent(): {}", ::GetLastError());
         return;
     }
-    async_guard = register_callback(event, async_cb, async_close_cb, this);
+    async_guard = register_callback(event, async_cb, this);
 }
 
 platform_context_t::~platform_context_t() {
@@ -67,15 +74,15 @@ void platform_context_t::notify() noexcept {
     }
 }
 
-auto platform_context_t::register_callback(handle_t handle, io_callback_t callback, close_handle_t close_cb, void *data)
-    -> io_guard_t {
+auto platform_context_t::register_callback(handle_t handle, io_callback_t callback, void *data,
+                                           close_handle_t close_cb) noexcept -> io_guard_t {
     auto log = utils::get_logger("fs");
     if (handle) {
         auto [_, inserted] = io_callbacks.emplace(handle, io_context_t(callback, data));
         if (inserted) {
             LOG_TRACE(log, "registered callback for handle {}", (void *)handle);
             handles.emplace_back(handle);
-            return io_guard_t(this, close_cb, handle);
+            return io_guard_t(this, close_cb ? close_cb : close_handle_cb, handle);
         } else {
             auto log = utils::get_logger("fs");
             LOG_WARN(log, "callback for the handle is already registered");
@@ -84,6 +91,10 @@ auto platform_context_t::register_callback(handle_t handle, io_callback_t callba
         LOG_WARN(log, "attempt to register callback for empty handle (ignored)");
     }
     return {};
+}
+
+auto platform_context_t::guard_handle(handle_t handle, close_handle_t close_cb) noexcept -> io_guard_t {
+    return io_guard_t(this, close_cb ? close_cb : close_handle_cb, handle);
 }
 
 void platform_context_t::wait_next_event() noexcept {
@@ -95,8 +106,7 @@ void platform_context_t::wait_next_event() noexcept {
         if (r >= WAIT_OBJECT_0 && r < WAIT_OBJECT_0 + sz) {
             for (int i = r - WAIT_OBJECT_0; i < WAIT_OBJECT_0 + sz; ++i) {
                 auto h = ptr[i];
-                if (WaitForSingleObject(h, 0) == WAIT_OBJECT_0) {
-                    ::ResetEvent(h);
+                if (::WaitForSingleObject(h, 0) == WAIT_OBJECT_0) {
                     auto it = io_callbacks.find(h);
                     if (it != io_callbacks.end()) {
                         auto &ctx = it->second;

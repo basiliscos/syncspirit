@@ -30,7 +30,7 @@ struct SYNCSPIRIT_API platform_context_t : context_base_t {
         void *data;
     };
     using io_callbacks_map_t = std::unordered_map<handle_t, io_context_t>;
-    struct io_guard_t {
+    struct SYNCSPIRIT_API io_guard_t {
         io_guard_t();
         io_guard_t(platform_context_t *, close_handle_t close_cb_, handle_t handle);
         io_guard_t(io_guard_t &&);
@@ -45,7 +45,8 @@ struct SYNCSPIRIT_API platform_context_t : context_base_t {
         handle_t handle;
     };
 
-    io_guard_t register_callback(handle_t, io_callback_t, close_handle_t, void *data);
+    io_guard_t register_callback(handle_t, io_callback_t, void *data, close_handle_t = {}) noexcept;
+    io_guard_t guard_handle(handle_t, close_handle_t = {}) noexcept;
 
     platform_context_t() noexcept;
     ~platform_context_t();
