@@ -340,7 +340,7 @@ void test_double_watching() {
     F().run();
 }
 
-void test_flat_root_folder() {
+void test_real_impl() {
     struct F : fixture_t {
         using fixture_t::fixture_t;
         void main() noexcept override {
@@ -457,6 +457,62 @@ void test_flat_root_folder() {
                 CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
                 CHECK(file_change.update_reason == update_type_t::deleted);
             }
+            SECTION("move") {
+                auto subdir_path = root_path / "my-root";
+                bfs::create_directories(subdir_path);
+                SECTION("outside of my dir => delete") {
+                    auto path_1 = subdir_path / "my-file.1";
+                    auto path_2 = root_path / "my-file.2";
+                    write_file(path_1, "12345");
+
+                    sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, subdir_path, folder_id,
+                                                            ec);
+                    sup->do_process();
+                    REQUIRE(watched_replies == 1);
+
+                    bfs::rename(path_1, path_2);
+
+                    poll();
+                    REQUIRE(changes.size() == 1);
+                    auto &payload = changes.front()->payload;
+                    REQUIRE(payload.size() == 1);
+                    auto &folder_change = payload[0];
+                    REQUIRE(folder_change.folder_id == folder_id);
+                    REQUIRE(folder_change.file_changes.size() == 1);
+                    auto &file_change = folder_change.file_changes.front();
+                    CHECK(proto::get_name(file_change) == "my-file.1");
+                    CHECK(proto::get_size(file_change) == 0);
+                    CHECK(proto::get_deleted(file_change));
+                    CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
+                    CHECK(file_change.update_reason == update_type_t::deleted);
+                }
+                SECTION("into my dir => create") {
+                    auto path_1 = root_path / "my-file.1";
+                    auto path_2 = subdir_path / "my-file.2";
+                    write_file(path_1, "12345");
+
+                    sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, subdir_path, folder_id,
+                                                            ec);
+                    sup->do_process();
+                    REQUIRE(watched_replies == 1);
+
+                    bfs::rename(path_1, path_2);
+
+                    poll();
+                    REQUIRE(changes.size() == 1);
+                    auto &payload = changes.front()->payload;
+                    REQUIRE(payload.size() == 1);
+                    auto &folder_change = payload[0];
+                    REQUIRE(folder_change.folder_id == folder_id);
+                    REQUIRE(folder_change.file_changes.size() == 1);
+                    auto &file_change = folder_change.file_changes.front();
+                    CHECK(proto::get_name(file_change) == "my-file.2");
+                    CHECK(proto::get_size(file_change) == 5);
+                    CHECK(!proto::get_deleted(file_change));
+                    CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
+                    CHECK(file_change.update_reason == update_type_t::created);
+                }
+            }
 #ifndef SYNCSPIRIT_WIN
             SECTION("(permissions) file") {
                 auto path = root_path / "my-file";
@@ -520,7 +576,7 @@ int _init() {
 #if defined(SYNCSPIRIT_WATCHER_ANY)
     REGISTER_TEST_CASE(test_start_n_shutdown, "test_start_n_shutdown", "[fs]");
     REGISTER_TEST_CASE(test_double_watching, "test_double_watching", "[fs]");
-    REGISTER_TEST_CASE(test_flat_root_folder, "test_flat_root_folder", "[fs]");
+    REGISTER_TEST_CASE(test_real_impl, "test_real_impl", "[fs]");
 #endif
     return 1;
 }

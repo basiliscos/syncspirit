@@ -11,6 +11,7 @@
 #include <limits.h>
 #include <fcntl.h>
 #include <algorithm>
+#include <memory_resource>
 #include <boost/nowide/convert.hpp>
 #include "fs/fs_supervisor.h"
 
@@ -64,16 +65,58 @@ void watcher_t::inotify_callback() noexcept {
 
     // Process the events
     if (length) {
+        using renamed_cookies_t = std::pmr::unordered_map<uint32_t, inotify_event *>;
         auto deadline = clock_t::local_time() + retension;
+        char name_buff[PATH_MAX];
+        auto name_ptr = name_buff;
+        auto append_name = [&](std::string_view piece) {
+            auto sz = piece.size();
+            name_ptr -= sz;
+            std::copy(piece.begin(), piece.end(), name_ptr);
+        };
+
+        auto cookie_buff = std::array<std::byte, 1024>();
+        auto pool = std::pmr::monotonic_buffer_resource(cookie_buff.data(), cookie_buff.size());
+        auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+        auto renamed_cookies = renamed_cookies_t(allocator);
+
+        auto forward = [&](inotify_event *event, update_type_internal_t type) {
+            auto filename = std::string_view(event->name);
+            append_name(filename);
+            auto tail = name_ptr;
+            auto parent_fd = event->wd;
+            auto guard = &path_map[parent_fd];
+            auto parent = guard;
+            auto folder_id = guard->folder_id;
+            *(--name_ptr) = '/';
+            append_name(guard->rel_path);
+
+            int depth = 1;
+            while (guard->parent_fd) {
+                guard = &path_map[guard->parent_fd];
+                ++depth;
+            }
+
+            while (depth) {
+                if (*(tail - 1) == '/') {
+                    --depth;
+                }
+                --tail;
+            }
+            ++tail;
+
+            auto rel_sz = (name_buff + sizeof(name_buff) - 2) - tail;
+            auto rel_path = std::string_view(tail, rel_sz);
+            push(deadline, folder_id, rel_path, static_cast<update_type_t>(type));
+            if (event->mask & IN_CREATE) {
+                auto full_sz = (name_buff + sizeof(name_buff) - 2) - name_ptr;
+                auto full_path = std::string_view(name_ptr, full_sz);
+                try_watch_recurse(full_path, *parent, parent_fd);
+            }
+        };
         for (int i = 0; i < length;) {
-            char name_buff[PATH_MAX];
-            auto name_ptr = name_buff + sizeof(name_buff) - 1;
+            name_ptr = name_buff + sizeof(name_buff) - 1;
             *name_ptr-- = 0;
-            auto append_name = [&](std::string_view piece) {
-                auto sz = piece.size();
-                name_ptr -= sz;
-                std::copy(piece.begin(), piece.end(), name_ptr);
-            };
 
             struct inotify_event *event = (struct inotify_event *)&buffer[i];
             if (event->len) {
@@ -82,6 +125,13 @@ void watcher_t::inotify_callback() noexcept {
                     type = update_type::CREATED;
                 } else if (event->mask & IN_DELETE) {
                     type = update_type::DELETED;
+                } else if (event->mask & IN_MOVED_FROM) {
+                    renamed_cookies.emplace(event->cookie, event);
+                } else if (event->mask & IN_MOVED_TO) {
+                    auto it = renamed_cookies.find(event->cookie);
+                    if (it == renamed_cookies.end()) {
+                        type = update_type::CREATED;
+                    }
                 }
                 if (event->mask & IN_MODIFY) {
                     type = update_type::CONTENT;
@@ -90,41 +140,17 @@ void watcher_t::inotify_callback() noexcept {
                     type = update_type::META;
                 }
                 if (type) {
-                    auto filename = std::string_view(event->name);
-                    append_name(filename);
-                    auto tail = name_ptr;
-                    auto parent_fd = event->wd;
-                    auto guard = &path_map[parent_fd];
-                    auto parent = guard;
-                    auto folder_id = guard->folder_id;
-                    *(--name_ptr) = '/';
-                    append_name(guard->rel_path);
-
-                    int depth = 1;
-                    while (guard->parent_fd) {
-                        guard = &path_map[guard->parent_fd];
-                        ++depth;
-                    }
-
-                    while (depth) {
-                        if (*(tail - 1) == '/') {
-                            --depth;
-                        }
-                        --tail;
-                    }
-                    ++tail;
-
-                    auto rel_sz = (name_buff + sizeof(name_buff) - 2) - tail;
-                    auto rel_path = std::string_view(tail, rel_sz);
-                    push(deadline, folder_id, rel_path, static_cast<update_type_t>(type));
-                    if (event->mask & IN_CREATE) {
-                        auto full_sz = (name_buff + sizeof(name_buff) - 2) - name_ptr;
-                        auto full_path = std::string_view(name_ptr, full_sz);
-                        try_watch_recurse(full_path, *parent, parent_fd);
-                    }
+                    forward(event, type);
+                } else {
+                    LOG_DEBUG(log, "ignoring event 0x{:x} on '{}'", event->mask, event->name);
                 }
             }
             i += sizeof(struct inotify_event) + event->len;
+        }
+        for (auto it = renamed_cookies.begin(); it != renamed_cookies.end(); ++it) {
+            name_ptr = name_buff + sizeof(name_buff) - 1;
+            *name_ptr-- = 0;
+            forward(it->second, update_type::DELETED);
         }
     }
 }
@@ -143,7 +169,7 @@ void watcher_t::try_watch_recurse(std::string_view full_name, const path_guard_t
 
 auto watcher_t::watch_dir(std::string_view path, std::string_view folder_id, int parent) noexcept -> sys::error_code {
     auto path_str = path.data();
-    auto fd = ::inotify_add_watch(io_guard.fd, path_str, IN_MODIFY | IN_CREATE | IN_DELETE | IN_ATTRIB);
+    auto fd = ::inotify_add_watch(io_guard.fd, path_str, IN_MODIFY | IN_CREATE | IN_DELETE | IN_ATTRIB | IN_MOVE);
     if (fd <= 0) {
         LOG_ERROR(log, "cannot do inotify_add_watch() for '{}': {}", path_str, strerror(errno));
         return sys::error_code{errno, sys::system_category()};
