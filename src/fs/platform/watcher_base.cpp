@@ -66,11 +66,19 @@ auto BU::make(const folder_map_t &folder_map, updates_mediator_t &mediator) noex
     return {};
 }
 
-void FU::update(std::string_view relative_path, update_type_t type, folder_update_t *prev) noexcept {
+void FU::update(std::string_view relative_path, update_type_t type, folder_update_t *prev,
+                std::string prev_path_rel) noexcept {
     auto it = updates.find(relative_path);
-    auto internal = static_cast<update_type_internal_t>(type);
+    auto it_prev = (typename decltype(updates)::const_iterator){};
+    auto prev_update = (const support::file_update_t *)(nullptr);
     if (prev) {
         auto &updates = prev->updates;
+        auto target = std::string_view(prev_path_rel.empty() ? relative_path : prev_path_rel);
+        it_prev = prev->updates.find(target);
+        if (it_prev != prev->updates.end()) {
+            prev_update = &*it_prev;
+        }
+#if 0
         if (auto it = updates.find(relative_path); it != updates.end()) {
             auto ut = it->update_type;
             if (ut & update_type::CREATED_1) {
@@ -81,14 +89,27 @@ void FU::update(std::string_view relative_path, update_type_t type, folder_updat
             }
             updates.erase(it);
         }
+#endif
     }
+#if 0
+    auto internal = static_cast<update_type_internal_t>(type);
     if (it == updates.end()) {
         if (type == update_type_t::created) {
             internal = update_type::CREATED_1;
         }
-        updates.emplace(support::file_update_t{std::string(relative_path), internal});
+        updates.emplace(support::file_update_t{std::string(relative_path), std::move(prev_path), internal});
     } else {
         it->update_type = (it->update_type & update_type::CREATED_1) | internal;
+    }
+#endif
+    if (it != updates.end()) {
+        it->update(prev_path_rel, type);
+    } else {
+        auto update = support::file_update_t(std::string(relative_path), std::move(prev_path_rel), type, prev_update);
+        updates.emplace(std::move(update));
+    }
+    if (prev_update) {
+        prev->updates.erase(it_prev);
     }
 }
 
@@ -114,6 +135,8 @@ auto FU::make(const folder_info_t &folder_info, updates_mediator_t &mediator) no
             continue;
         }
         auto r = proto::FileInfo{};
+        auto name = &update.path;
+        auto prev_name = &update.prev_path;
         auto reason = UT{};
         if (update.update_type & ut::DELETED) {
             if (update.update_type & ut::CREATED_1) {
@@ -122,6 +145,10 @@ auto FU::make(const folder_info_t &folder_info, updates_mediator_t &mediator) no
             }
             proto::set_deleted(r, true);
             reason = UT::deleted;
+            if (!update.prev_path.empty()) {
+                name = &update.prev_path;
+                prev_name = nullptr;
+            }
         } else {
             auto ec = sys::error_code{};
             auto path = folder_info.path / widen(update.path);
@@ -171,8 +198,8 @@ auto FU::make(const folder_info_t &folder_info, updates_mediator_t &mediator) no
                 reason = UT::meta;
             }
         }
-        proto::set_name(r, std::move(update.path));
-        files.emplace_back(payload::file_info_t(std::move(r), reason));
+        proto::set_name(r, *name);
+        files.emplace_back(payload::file_info_t(std::move(r), prev_name ? *prev_name : std::string(), reason));
     }
     return files;
 }
@@ -202,7 +229,7 @@ void watcher_base_t::on_watch(message::watch_folder_t &) noexcept {
 }
 
 void watcher_base_t::push(const timepoint_t &deadline, std::string_view folder_id, std::string_view relative_path,
-                          update_type_t type) noexcept {
+                          std::string prev_path, update_type_t type) noexcept {
     auto source = (bulk_update_t *)(nullptr);
     auto target = (bulk_update_t *)(nullptr);
     LOG_DEBUG(log, "file event '{}' for '{}' in folder {}", support::stringify(type), relative_path, folder_id);
@@ -217,7 +244,7 @@ void watcher_base_t::push(const timepoint_t &deadline, std::string_view folder_i
     }
     auto &target_fi = target->prepare(folder_id);
     auto source_fi = source ? source->find(folder_id) : (folder_update_t *)(nullptr);
-    target_fi.update(relative_path, type, source_fi);
+    target_fi.update(relative_path, type, source_fi, std::move(prev_path));
     if (target->deadline.is_not_a_date_time()) {
         target->deadline = deadline;
     }

@@ -106,7 +106,7 @@ void file_actor_t::on_io_commands(message::io_commands_t &message) noexcept {
                 }
                 process(cmd, path_view, p.context);
                 if (updates_mediator) {
-                    updates_mediator->push(std::string(path_view), deadline);
+                    updates_mediator->push(std::string(path_view), {}, deadline);
                     ++updates_sz;
                 }
             },

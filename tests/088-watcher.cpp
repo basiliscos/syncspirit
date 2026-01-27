@@ -151,7 +151,7 @@ void test_watcher_base() {
                     auto own_name = bfs::path(L"папка");
                     auto sub_path = root_path / own_name;
                     bfs::create_directories(sub_path);
-                    target->push(deadline, folder_id, narrow(own_name.wstring()), U::created);
+                    target->push(deadline, folder_id, narrow(own_name.wstring()), {}, U::created);
                     poll();
                     REQUIRE(changes.size() == 1);
                     auto &payload = changes.front()->payload;
@@ -169,7 +169,7 @@ void test_watcher_base() {
                     auto own_name = bfs::path(L"файл.bin");
                     auto sub_path = root_path / own_name;
                     write_file(sub_path, "12345");
-                    target->push(deadline, folder_id, narrow(own_name.wstring()), U::created);
+                    target->push(deadline, folder_id, narrow(own_name.wstring()), {}, U::created);
                     poll();
                     REQUIRE(changes.size() == 1);
                     auto &payload = changes.front()->payload;
@@ -189,7 +189,7 @@ void test_watcher_base() {
                     auto sub_path = root_path / own_name;
                     auto where = bfs::path("/to/some/where");
                     bfs::create_symlink(where, sub_path);
-                    target->push(deadline, folder_id, narrow(own_name.wstring()), U::created);
+                    target->push(deadline, folder_id, narrow(own_name.wstring()), {}, U::created);
                     poll();
                     REQUIRE(changes.size() == 1);
                     auto &payload = changes.front()->payload;
@@ -206,14 +206,37 @@ void test_watcher_base() {
                 }
 #endif
             }
+            SECTION("file moving") {
+                auto name_1 = bfs::path(L"файл-1.bin");
+                auto name_2 = bfs::path(L"файл-2.bin");
+                auto sub_path_1 = root_path / name_1;
+                auto sub_path_2 = root_path / name_2;
+                auto path_2_str = narrow(sub_path_2.generic_wstring());
+                write_file(sub_path_1, "12345");
+                target->push(deadline, folder_id, narrow(name_1.wstring()), path_2_str, U::meta);
+                poll();
+                REQUIRE(changes.size() == 1);
+                auto &payload = changes.front()->payload;
+                REQUIRE(payload.size() == 1);
+                auto &folder_change = payload[0];
+                REQUIRE(folder_change.folder_id == folder_id);
+                REQUIRE(folder_change.file_changes.size() == 1);
+                auto &file_change = folder_change.file_changes.front();
+                CHECK(proto::get_name(file_change) == narrow(name_1.wstring()));
+                CHECK(proto::get_size(file_change) == 5);
+                CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
+                CHECK(proto::get_permissions(file_change));
+                CHECK(file_change.prev_path == path_2_str);
+                CHECK(file_change.update_reason == update_type_t::meta);
+            }
             SECTION("changes accumulation") {
                 auto deadline_2 = deadline + retension();
                 SECTION("simple case") {
                     auto own_name = bfs::path(L"файл.bin");
                     auto sub_path = root_path / own_name;
                     write_file(sub_path, "12345");
-                    target->push(deadline, folder_id, narrow(own_name.wstring()), U::created);
-                    target->push(deadline_2, folder_id, narrow(own_name.wstring()), U::content);
+                    target->push(deadline, folder_id, narrow(own_name.wstring()), {}, U::created);
+                    target->push(deadline_2, folder_id, narrow(own_name.wstring()), {}, U::content);
                     poll();
                     REQUIRE(changes.size() == 0);
                     poll();
@@ -234,8 +257,8 @@ void test_watcher_base() {
                     auto own_name = bfs::path(L"файл.bin");
                     auto sub_path = root_path / own_name;
                     write_file(sub_path, "12345");
-                    target->push(deadline, folder_id, narrow(own_name.wstring()), U::created);
-                    target->push(deadline_2, folder_id, narrow(own_name.wstring()), U::deleted);
+                    target->push(deadline, folder_id, narrow(own_name.wstring()), {}, U::created);
+                    target->push(deadline_2, folder_id, narrow(own_name.wstring()), {}, U::deleted);
                     poll();
                     REQUIRE(changes.size() == 0);
                     poll();
@@ -245,8 +268,8 @@ void test_watcher_base() {
                     auto own_name = bfs::path(L"файл.bin");
                     auto sub_path = root_path / own_name;
                     write_file(sub_path, "12345");
-                    target->push(deadline, folder_id, narrow(own_name.wstring()), U::content);
-                    target->push(deadline_2, folder_id, narrow(own_name.wstring()), U::meta);
+                    target->push(deadline, folder_id, narrow(own_name.wstring()), {}, U::content);
+                    target->push(deadline_2, folder_id, narrow(own_name.wstring()), {}, U::meta);
                     poll();
                     REQUIRE(changes.size() == 0);
                     poll();
@@ -263,18 +286,95 @@ void test_watcher_base() {
                     CHECK(proto::get_permissions(file_change));
                     CHECK(file_change.update_reason == update_type_t::content);
                 }
+                SECTION("move, content, meta -> collapse to content, preserve original name") {
+                    auto name_1 = bfs::path(L"файл-1.bin");
+                    auto name_2 = bfs::path(L"файл-2.bin");
+                    auto name_1_str = narrow(name_1.generic_wstring());
+                    auto name_2_str = narrow(name_2.generic_wstring());
+                    write_file(root_path / name_2, "12345");
+                    target->push(deadline, folder_id, name_2_str, name_1_str, U::meta);
+                    target->push(deadline_2, folder_id, name_2_str, {}, U::content);
+                    target->push(deadline_2, folder_id, name_2_str, {}, U::meta);
+                    poll();
+                    REQUIRE(changes.size() == 0);
+                    poll();
+                    REQUIRE(changes.size() == 1);
+                    auto &payload = changes.front()->payload;
+                    REQUIRE(payload.size() == 1);
+                    auto &folder_change = payload[0];
+                    REQUIRE(folder_change.folder_id == folder_id);
+                    REQUIRE(folder_change.file_changes.size() == 1);
+                    auto &file_change = folder_change.file_changes.front();
+                    CHECK(proto::get_name(file_change) == narrow(name_2.wstring()));
+                    CHECK(proto::get_size(file_change) == 5);
+                    CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
+                    CHECK(proto::get_permissions(file_change));
+                    CHECK(file_change.update_reason == update_type_t::content);
+                    CHECK(file_change.prev_path == name_1_str);
+                }
+                SECTION("move, delete -> collapse to delete of original") {
+                    auto name_1 = bfs::path(L"файл-1.bin");
+                    auto name_2 = bfs::path(L"файл-2.bin");
+                    auto name_1_str = narrow(name_1.generic_wstring());
+                    auto name_2_str = narrow(name_2.generic_wstring());
+                    target->push(deadline, folder_id, name_2_str, name_1_str, U::meta);
+                    target->push(deadline_2, folder_id, name_2_str, {}, U::deleted);
+                    poll();
+                    REQUIRE(changes.size() == 0);
+                    poll();
+                    REQUIRE(changes.size() == 1);
+                    auto &payload = changes.front()->payload;
+                    REQUIRE(payload.size() == 1);
+                    auto &folder_change = payload[0];
+                    REQUIRE(folder_change.folder_id == folder_id);
+                    REQUIRE(folder_change.file_changes.size() == 1);
+                    auto &file_change = folder_change.file_changes.front();
+                    CHECK(proto::get_name(file_change) == name_1_str);
+                    CHECK(proto::get_size(file_change) == 0);
+                    CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
+                    CHECK(proto::get_deleted(file_change));
+                    CHECK(file_change.update_reason == update_type_t::deleted);
+                    CHECK(file_change.prev_path.empty());
+                }
+                SECTION("mv(a, b), mv(b, c) -> collapse to mv(a, c") {
+                    auto name_1 = bfs::path(L"файл-1.bin");
+                    auto name_2 = bfs::path(L"файл-2.bin");
+                    auto name_3 = bfs::path(L"файл-3.bin");
+                    auto name_1_str = narrow(name_1.generic_wstring());
+                    auto name_2_str = narrow(name_2.generic_wstring());
+                    auto name_3_str = narrow(name_3.generic_wstring());
+                    write_file(root_path / name_3, "12345");
+                    target->push(deadline, folder_id, name_2_str, name_1_str, U::meta);
+                    target->push(deadline_2, folder_id, name_3_str, name_2_str, U::meta);
+                    poll();
+                    REQUIRE(changes.size() == 0);
+                    poll();
+                    REQUIRE(changes.size() == 1);
+                    auto &payload = changes.front()->payload;
+                    REQUIRE(payload.size() == 1);
+                    auto &folder_change = payload[0];
+                    REQUIRE(folder_change.folder_id == folder_id);
+                    REQUIRE(folder_change.file_changes.size() == 1);
+                    auto &file_change = folder_change.file_changes.front();
+                    CHECK(proto::get_name(file_change) == name_3_str);
+                    CHECK(proto::get_size(file_change) == 5);
+                    CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
+                    CHECK(proto::get_permissions(file_change));
+                    CHECK(file_change.update_reason == update_type_t::meta);
+                    CHECK(file_change.prev_path == name_1);
+                }
             }
             SECTION("updates mediator") {
                 auto own_name = bfs::path(L"файл.bin");
                 auto sub_path = root_path / own_name;
                 write_file(sub_path, "12345");
-                updates_mediator->push(narrow(sub_path.generic_wstring()), deadline);
+                updates_mediator->push(narrow(sub_path.generic_wstring()), {}, deadline);
 
-                target->push(deadline, folder_id, narrow(own_name.wstring()), U::created);
+                target->push(deadline, folder_id, narrow(own_name.wstring()), {}, U::created);
                 poll();
                 REQUIRE(changes.size() == 0);
 
-                target->push(deadline, folder_id, narrow(own_name.wstring()), U::created);
+                target->push(deadline, folder_id, narrow(own_name.wstring()), {}, U::created);
                 poll();
                 REQUIRE(changes.size() == 1);
 
@@ -511,6 +611,7 @@ void test_real_impl() {
                     CHECK(!proto::get_deleted(file_change));
                     CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
                     CHECK(file_change.update_reason == update_type_t::created);
+                    CHECK(file_change.prev_path.empty());
                 }
             }
 #ifndef SYNCSPIRIT_WIN

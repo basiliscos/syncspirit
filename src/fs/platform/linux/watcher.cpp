@@ -80,7 +80,7 @@ void watcher_t::inotify_callback() noexcept {
         auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
         auto renamed_cookies = renamed_cookies_t(allocator);
 
-        auto forward = [&](inotify_event *event, update_type_internal_t type) {
+        auto forward = [&](inotify_event *event, std::string prev_path, update_type_internal_t type) {
             auto filename = std::string_view(event->name);
             append_name(filename);
             auto tail = name_ptr;
@@ -107,7 +107,7 @@ void watcher_t::inotify_callback() noexcept {
 
             auto rel_sz = (name_buff + sizeof(name_buff) - 2) - tail;
             auto rel_path = std::string_view(tail, rel_sz);
-            push(deadline, folder_id, rel_path, static_cast<update_type_t>(type));
+            push(deadline, folder_id, rel_path, std::move(prev_path), static_cast<update_type_t>(type));
             if (event->mask & IN_CREATE) {
                 auto full_sz = (name_buff + sizeof(name_buff) - 2) - name_ptr;
                 auto full_path = std::string_view(name_ptr, full_sz);
@@ -115,6 +115,7 @@ void watcher_t::inotify_callback() noexcept {
             }
         };
         for (int i = 0; i < length;) {
+            auto prev_name = std::string();
             name_ptr = name_buff + sizeof(name_buff) - 1;
             *name_ptr-- = 0;
 
@@ -131,6 +132,10 @@ void watcher_t::inotify_callback() noexcept {
                     auto it = renamed_cookies.find(event->cookie);
                     if (it == renamed_cookies.end()) {
                         type = update_type::CREATED;
+                    } else {
+                        prev_name = event->name;
+                        LOG_CRITICAL(log, "TODO");
+                        renamed_cookies.erase(it);
                     }
                 }
                 if (event->mask & IN_MODIFY) {
@@ -140,7 +145,7 @@ void watcher_t::inotify_callback() noexcept {
                     type = update_type::META;
                 }
                 if (type) {
-                    forward(event, type);
+                    forward(event, std::move(prev_name), type);
                 } else {
                     LOG_DEBUG(log, "ignoring event 0x{:x} on '{}'", event->mask, event->name);
                 }
@@ -150,7 +155,7 @@ void watcher_t::inotify_callback() noexcept {
         for (auto it = renamed_cookies.begin(); it != renamed_cookies.end(); ++it) {
             name_ptr = name_buff + sizeof(name_buff) - 1;
             *name_ptr-- = 0;
-            forward(it->second, update_type::DELETED);
+            forward(it->second, {}, update_type::DELETED);
         }
     }
 }

@@ -22,8 +22,8 @@ bool rename_file_t::process(fs_slave_t &fs_slave, execution_context_t &context) 
         if (auto mediator = context.mediator; mediator) {
             auto path_str = narrow(path.generic_wstring());
             auto new_path_str = narrow(new_path.generic_wstring());
-            mediator->push(path_str, context.get_deadline());
-            mediator->push(new_path_str, context.get_deadline());
+            mediator->push(std::move(path_str), new_path_str, context.get_deadline());
+            mediator->push(std::move(new_path_str), {}, context.get_deadline());
         }
         auto modified = from_unix(modification_s);
         bfs::last_write_time(new_path, modified, ec);

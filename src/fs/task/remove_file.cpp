@@ -17,7 +17,7 @@ bool remove_file_t::process(fs_slave_t &fs_slave, execution_context_t &context) 
     if (!ec) {
         if (auto mediator = context.mediator; mediator) {
             auto path_str = narrow(path.generic_wstring());
-            mediator->push(path_str, context.get_deadline());
+            mediator->push(std::move(path_str), {}, context.get_deadline());
         }
         return true;
     }

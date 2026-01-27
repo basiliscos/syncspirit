@@ -15,7 +15,7 @@ updates_mediator_t::updates_mediator_t(const pt::time_duration &interval_) : int
     log = utils::get_logger("fs.updates_mediator");
 }
 
-void updates_mediator_t::push(std::string path, const timepoint_t &deadline) noexcept {
+void updates_mediator_t::push(std::string path, std::string prev_path, const timepoint_t &deadline) noexcept {
     auto target = (updates_t *){};
     auto counter = update_type_internal_t{1};
     if (next.deadline == deadline) {
@@ -35,7 +35,8 @@ void updates_mediator_t::push(std::string path, const timepoint_t &deadline) noe
         }
     }
 
-    auto [it, inserted] = target->updates.emplace(support::file_update_t{std::move(path), counter});
+    auto update = support::file_update_t(std::move(path), std::move(prev_path), counter);
+    auto [it, inserted] = target->updates.emplace(std::move(update));
     if (!inserted) {
         it->update_type += counter;
     }

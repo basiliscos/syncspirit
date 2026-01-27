@@ -162,9 +162,10 @@ struct watch_folder_t {
 
 struct file_info_t : proto::FileInfo {
     using parent_t = proto::FileInfo;
-    inline file_info_t(proto::FileInfo file_info, update_type_t update_reason_)
-        : parent_t(std::move(file_info)), update_reason{update_reason_} {};
+    inline file_info_t(proto::FileInfo file_info, std::string prev_path_, update_type_t update_reason_)
+        : parent_t(std::move(file_info)), update_reason{update_reason_}, prev_path{std::move(prev_path_)} {};
     update_type_t update_reason;
+    std::string prev_path;
 };
 
 using file_changes_t = std::vector<file_info_t>;
