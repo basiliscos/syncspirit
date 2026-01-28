@@ -12,11 +12,11 @@
 #include <fcntl.h>
 #include <algorithm>
 #include <memory_resource>
-#include <boost/nowide/convert.hpp>
+#include <list>
+#include <optional>
 #include "fs/fs_supervisor.h"
 
 using namespace syncspirit::fs::platform::linux;
-using boost::nowide::narrow;
 
 void watcher_t::do_initialize(r::system_context_t *ctx) noexcept {
     auto inotify_fd = inotify_init();
@@ -89,24 +89,12 @@ void watcher_t::inotify_callback() noexcept {
             auto parent = guard;
             auto folder_id = guard->folder_id;
             *(--name_ptr) = '/';
-            append_name(guard->rel_path);
+            append_name(guard->path);
 
-            int depth = 1;
-            while (guard->parent_fd) {
-                guard = &path_map[guard->parent_fd];
-                ++depth;
-            }
-
-            while (depth) {
-                if (*(tail - 1) == '/') {
-                    --depth;
-                }
-                --tail;
-            }
-            ++tail;
-
-            auto rel_sz = (name_buff + sizeof(name_buff) - 2) - tail;
-            auto rel_path = std::string_view(tail, rel_sz);
+            auto &folder_path = folder_map.find(folder_id)->second.path_str;
+            auto sub_path_sz = guard->path.size() - folder_path.size();
+            tail -= sub_path_sz;
+            auto rel_path = std::string_view(tail, sub_path_sz + filename.size());
             push(deadline, folder_id, rel_path, std::move(prev_path), static_cast<update_type_t>(type));
             if (event->mask & IN_CREATE) {
                 auto full_sz = (name_buff + sizeof(name_buff) - 2) - name_ptr;
@@ -133,8 +121,28 @@ void watcher_t::inotify_callback() noexcept {
                     if (it == renamed_cookies.end()) {
                         type = update_type::CREATED;
                     } else {
-                        prev_name = event->name;
-                        LOG_CRITICAL(log, "TODO");
+                        auto prev_event = it->second;
+                        auto pn = std::string_view(prev_event->name);
+                        auto &prev_parent_guard = path_map[prev_event->wd];
+                        auto prev_parent_path = std::string_view(prev_parent_guard.path);
+                        auto folder_id = prev_parent_guard.folder_id;
+                        auto &folder_path = folder_map.find(folder_id)->second.path_str;
+                        auto subpath_bytes = prev_parent_path.size() - folder_path.size();
+                        if (subpath_bytes) {
+                            --subpath_bytes; // skip trailing '/'
+                        }
+                        auto sub_path_sz = subpath_bytes + pn.size();
+                        if (subpath_bytes) {
+                            ++sub_path_sz;
+                        };
+                        prev_name.reserve(sub_path_sz + 1);
+                        prev_name += prev_parent_path.substr(prev_parent_path.size() - subpath_bytes);
+                        if (subpath_bytes) {
+                            prev_name += '/';
+                        };
+                        prev_name += pn;
+
+                        type = update_type::META;
                         renamed_cookies.erase(it);
                     }
                 }
@@ -172,12 +180,13 @@ void watcher_t::try_watch_recurse(std::string_view full_name, const path_guard_t
     }
 }
 
-auto watcher_t::watch_dir(std::string_view path, std::string_view folder_id, int parent) noexcept -> sys::error_code {
+auto watcher_t::watch_dir(std::string_view path, std::string_view folder_id, int parent) noexcept -> watch_result_t {
     auto path_str = path.data();
     auto fd = ::inotify_add_watch(io_guard.fd, path_str, IN_MODIFY | IN_CREATE | IN_DELETE | IN_ATTRIB | IN_MOVE);
+    auto ec = sys::error_code{};
     if (fd <= 0) {
         LOG_ERROR(log, "cannot do inotify_add_watch() for '{}': {}", path_str, strerror(errno));
-        return sys::error_code{errno, sys::system_category()};
+        ec = sys::error_code{errno, sys::system_category()};
     } else {
         auto path_guard = path_guard_t{
             path_str,
@@ -188,27 +197,65 @@ auto watcher_t::watch_dir(std::string_view path, std::string_view folder_id, int
         path_map[fd] = std::move(path_guard);
         auto &fds = subdir_map[fd];
         fds.emplace_back(fd);
-        return {};
     }
+    return watch_result_t{ec, fd};
 }
 
 void watcher_t::on_watch(message::watch_folder_t &message) noexcept {
     auto &p = message.payload;
     auto &path = p.path;
-    auto path_str = narrow(path.wstring());
+    auto path_str = std::string_view(path.native());
     LOG_TRACE(log, "on watch on '{}'", path_str);
     if (io_guard.fd) {
-        auto folder_info = folder_info_t(p.path, narrow(p.path.generic_wstring()));
+        auto folder_info = folder_info_t(p.path, std::string(path_str));
         auto [it, inserted] = folder_map.emplace(std::make_pair(std::string(p.folder_id), std::move(folder_info)));
         if (!inserted) {
             LOG_WARN(log, "folder '{}' on '{}' is already watched", p.folder_id, path_str);
         } else {
+            using item_t = std::pair<std::pmr::string, int>;
+            using queue_t = std::pmr::list<item_t>;
+            using ec_opt_t = std::optional<sys::error_code>;
+            auto buff = std::array<std::byte, 1024>();
+            auto pool = std::pmr::monotonic_buffer_resource(buff.data(), buff.size());
+            auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+            auto queue = queue_t(allocator);
+            queue.emplace_back(item_t{path_str, 0});
             auto &folder_id = it->first;
-            auto ec = watch_dir(path.native(), folder_id, 0);
-            if (ec) {
-                folder_map.erase(it);
+            auto result = ec_opt_t{};
+
+            while (!queue.empty()) {
+                auto [path, parent_fd] = queue.front();
+                auto [ec, fd] = watch_dir(path, folder_id, parent_fd);
+                if (!result) {
+                    result = ec;
+                }
+                if (!ec) {
+                    auto it = bfs::directory_iterator(path, ec);
+                    if (ec) {
+                        LOG_WARN(log, "cannot list dir '{}': {}", path, ec.message());
+                    } else {
+                        for (; it != bfs::directory_iterator(); ++it) {
+                            auto &child = *it;
+                            auto ec = sys::error_code{};
+                            auto status = bfs::symlink_status(child, ec);
+                            auto &child_path = child.path().native();
+                            if (ec) {
+                                LOG_WARN(log, "cannot get child '{}' status : {}", child_path, ec.message());
+                            } else {
+                                if (status.type() == bfs::file_type::directory) {
+                                    queue.emplace_back(item_t{child_path, fd});
+                                }
+                            }
+                        }
+                    }
+                }
+                queue.pop_front();
             }
-            p.ec = ec;
+            if (*result) {
+                folder_map.erase(it);
+            } else {
+            }
+            p.ec = *result;
         }
     }
 }

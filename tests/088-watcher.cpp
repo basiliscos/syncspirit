@@ -559,9 +559,13 @@ void test_real_impl() {
             }
             SECTION("move") {
                 auto subdir_path = root_path / "my-root";
-                bfs::create_directories(subdir_path);
+                auto a_path = subdir_path / "a/b/п1";
+                auto x_path = subdir_path / "x/y/п2";
+                bfs::create_directories(a_path);
+                bfs::create_directories(x_path);
+
                 SECTION("outside of my dir => delete") {
-                    auto path_1 = subdir_path / "my-file.1";
+                    auto path_1 = a_path / "my-file.1";
                     auto path_2 = root_path / "my-file.2";
                     write_file(path_1, "12345");
 
@@ -580,7 +584,7 @@ void test_real_impl() {
                     REQUIRE(folder_change.folder_id == folder_id);
                     REQUIRE(folder_change.file_changes.size() == 1);
                     auto &file_change = folder_change.file_changes.front();
-                    CHECK(proto::get_name(file_change) == "my-file.1");
+                    CHECK(proto::get_name(file_change) == narrow(L"a/b/п1/my-file.1"));
                     CHECK(proto::get_size(file_change) == 0);
                     CHECK(proto::get_deleted(file_change));
                     CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
@@ -588,7 +592,7 @@ void test_real_impl() {
                 }
                 SECTION("into my dir => create") {
                     auto path_1 = root_path / "my-file.1";
-                    auto path_2 = subdir_path / "my-file.2";
+                    auto path_2 = x_path / "my-file.2";
                     write_file(path_1, "12345");
 
                     sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, subdir_path, folder_id,
@@ -606,12 +610,39 @@ void test_real_impl() {
                     REQUIRE(folder_change.folder_id == folder_id);
                     REQUIRE(folder_change.file_changes.size() == 1);
                     auto &file_change = folder_change.file_changes.front();
-                    CHECK(proto::get_name(file_change) == "my-file.2");
+                    CHECK(proto::get_name(file_change) == narrow(L"x/y/п2/my-file.2"));
                     CHECK(proto::get_size(file_change) == 5);
                     CHECK(!proto::get_deleted(file_change));
                     CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
                     CHECK(file_change.update_reason == update_type_t::created);
                     CHECK(file_change.prev_path.empty());
+                }
+                SECTION("inside folder => meta") {
+                    auto path_1 = a_path / "my-file.1";
+                    auto path_2 = x_path / "my-file.2";
+                    write_file(path_1, "12345");
+
+                    sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, subdir_path, folder_id,
+                                                            ec);
+                    sup->do_process();
+                    REQUIRE(watched_replies == 1);
+
+                    bfs::rename(path_1, path_2);
+
+                    poll();
+                    REQUIRE(changes.size() == 1);
+                    auto &payload = changes.front()->payload;
+                    REQUIRE(payload.size() == 1);
+                    auto &folder_change = payload[0];
+                    REQUIRE(folder_change.folder_id == folder_id);
+                    REQUIRE(folder_change.file_changes.size() == 1);
+                    auto &file_change = folder_change.file_changes.front();
+                    CHECK(proto::get_name(file_change) == narrow(L"x/y/п2/my-file.2"));
+                    CHECK(proto::get_size(file_change) == 5);
+                    CHECK(!proto::get_deleted(file_change));
+                    CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
+                    CHECK(file_change.update_reason == update_type_t::meta);
+                    CHECK(file_change.prev_path == narrow(L"a/b/п1/my-file.1"));
                 }
             }
 #ifndef SYNCSPIRIT_WIN

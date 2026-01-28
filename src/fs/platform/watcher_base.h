@@ -17,6 +17,7 @@
 #include "fs/update_type.hpp"
 #include "fs/updates_mediator.h"
 #include "fs/updates_support.h"
+#include "utils/string_comparator.hpp"
 
 namespace syncspirit::fs::platform {
 
@@ -54,7 +55,7 @@ struct SYNCSPIRIT_API watcher_base_t : r::actor_base_t {
         std::string path_str;
     };
 
-    using folder_map_t = std::unordered_map<std::string, folder_info_t>;
+    using folder_map_t = std::unordered_map<std::string, folder_info_t, utils::string_hash_t, utils::string_eq_t>;
 
     struct folder_update_t {
         std::string folder_id;
