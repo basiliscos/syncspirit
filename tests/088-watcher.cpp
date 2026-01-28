@@ -361,7 +361,7 @@ void test_watcher_base() {
                     CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
                     CHECK(proto::get_permissions(file_change));
                     CHECK(file_change.update_reason == update_type_t::meta);
-                    CHECK(file_change.prev_path == name_1);
+                    CHECK(file_change.prev_path == name_1_str);
                 }
             }
             SECTION("updates mediator") {

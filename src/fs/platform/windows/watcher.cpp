@@ -137,7 +137,7 @@ void watcher_t::on_notify(handle_t handle) noexcept {
         // no idea how to track metadata changes only
 
         if (type) {
-            push(deadline, folder_id, name_view, static_cast<update_type_t>(type));
+            push(deadline, folder_id, name_view, {}, static_cast<update_type_t>(type));
         } else {
             LOG_DEBUG(log, "in the folder '{}' updated: '{}'", folder_id, name_view);
         }
