@@ -15,13 +15,13 @@ using boost::nowide::narrow;
 
 watcher_t::path_guard_t::path_guard_t(std::string folder_id_, io_guard_t dir_guard_, io_guard_t event_guard_) noexcept
     : folder_id{std::move(folder_id_)}, dir_guard(std::move(dir_guard_)), event_guard(std::move(event_guard_)) {
-    std::memset(&overlapped, 0, sizeof(overlapped));
     overlapped.hEvent = event_guard.handle;
 }
 
 auto watcher_t::path_guard_t::initiate() noexcept -> sys::error_code {
     constexpr auto flags = FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_DIR_NAME | FILE_NOTIFY_CHANGE_ATTRIBUTES |
                            FILE_NOTIFY_CHANGE_SIZE | FILE_NOTIFY_CHANGE_LAST_WRITE;
+    overlapped.Offset = overlapped.OffsetHigh = 0;
     auto ok = ::ReadDirectoryChangesW(dir_guard.handle, buff, BUFF_SZ, true, flags, nullptr, &overlapped, nullptr);
     if (!ok) {
         return sys::error_code(::GetLastError(), sys::system_category());
@@ -102,12 +102,17 @@ void watcher_t::on_notify(handle_t handle) noexcept {
         LOG_WARN(log, "cannot get overlapped result for '{}': {}", path_str, ec.message());
         return;
     }
+    if (!bytes) {
+        LOG_WARN(log, "overflow occured in ReadDirectoryChangesW()");
+        return;
+    }
 
     char storage[32 * 1024 * sizeof(wchar_t) + 1];
     auto deadline = clock_t::local_time() + retension;
 
     auto ptr = (FILE_NOTIFY_INFORMATION *)path_guard->buff;
-    do {
+    auto prev_name = std::string();
+    while (ptr) {
         auto storage_ptr = storage;
         auto sz = ptr->FileNameLength / sizeof(WCHAR);
         auto namew_ptr = ptr->FileName;
@@ -132,17 +137,21 @@ void watcher_t::on_notify(handle_t handle) noexcept {
         } else if (ptr->Action == FILE_ACTION_REMOVED) {
             type = update_type::DELETED;
         } else if (ptr->Action == FILE_ACTION_MODIFIED) {
+            // no idea how to track metadata changes only
             type = update_type::CONTENT;
+        } else if (ptr->Action == FILE_ACTION_RENAMED_OLD_NAME) {
+            prev_name = name_holder.empty() ? std::string(name_view) : std::move(name_holder);
+        } else if (ptr->Action == FILE_ACTION_RENAMED_NEW_NAME) {
+            type = update_type::META;
         }
-        // no idea how to track metadata changes only
 
         if (type) {
-            push(deadline, folder_id, name_view, {}, static_cast<update_type_t>(type));
+            push(deadline, folder_id, name_view, std::move(prev_name), static_cast<update_type_t>(type));
         } else {
-            LOG_DEBUG(log, "in the folder '{}' updated: '{}'", folder_id, name_view);
+            LOG_DEBUG(log, "in the folder '{}' updated ({:x}): '{}'", folder_id, ptr->Action, name_view);
         }
-        ptr = (FILE_NOTIFY_INFORMATION *)(((char *)ptr) + ptr->NextEntryOffset);
-    } while (ptr->NextEntryOffset != 0);
+        ptr = ptr->NextEntryOffset ? (FILE_NOTIFY_INFORMATION *)(((char *)ptr) + ptr->NextEntryOffset) : nullptr;
+    };
 
     if (auto ok = ::ResetEvent(handle); !ok) {
         auto ec = sys::error_code(::GetLastError(), sys::system_category());
