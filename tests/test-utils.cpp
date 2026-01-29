@@ -107,6 +107,7 @@ void write_file(const bfs::path &path_, std::string_view content) {
         assert(r);
         (void)r;
     }
+    fflush(out);
     fclose(out);
 }
 
