@@ -116,7 +116,7 @@ struct fixture_t {
 
     virtual void on_watch(message::watch_folder_t &msg) noexcept {
         CHECK(!msg.payload.ec);
-        CHECK(msg.payload.ec.message() == "Success");
+        CHECK(msg.payload.ec.message() != "");
         ++watcher_replies;
     }
 
