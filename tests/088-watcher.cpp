@@ -123,7 +123,7 @@ struct fixture_t {
         sup->do_process();
     }
 
-    void poll(poll_t poll_type, size_t await_changes = 0) {
+    void poll(poll_t poll_type, size_t await_changes = 0, bool flatten = false) {
         changes.clear();
         do {
             auto prev_sz = changes.size();
@@ -134,6 +134,25 @@ struct fixture_t {
                 fs_context->wait_next_event();
                 fs_context->update_time();
                 sup->do_process();
+            }
+            if (flatten) {
+                auto copy = change_messages_t();
+                for (auto &m : changes) {
+                    for (auto &folder_change : m->payload) {
+                        auto file_changes = folder_change.file_changes;
+                        auto comparator = [](const auto &l, const auto &r) -> bool {
+                            return proto::get_name(l) < proto::get_name(r);
+                        };
+                        std::sort(file_changes.begin(), file_changes.end(), comparator);
+                        for (auto &file_change : file_changes) {
+                            auto solo_changes = payload::folder_change_t{folder_change.folder_id, {file_change}};
+                            auto msg = change_message_ptr_t();
+                            msg.reset(new fs::message::folder_changes_t(sup->get_address(), std::move(solo_changes)));
+                            copy.emplace_back(msg);
+                        }
+                    }
+                }
+                changes = std::move(copy);
             }
         } while (changes.size() < await_changes);
     }
@@ -640,6 +659,7 @@ void test_real_impl() {
 
                         native::rename(path_1, path_2);
 
+#ifndef SYNCSPIRIT_WIN
                         poll(poll_t::trigger_timer, 1);
                         REQUIRE(changes.size() == 1);
 
@@ -655,6 +675,39 @@ void test_real_impl() {
                         CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
                         CHECK(file_change.update_reason == update_type_t::meta);
                         CHECK(file_change.prev_path == narrow(L"my-root/my-file.1"));
+#else
+                        poll(poll_t::trigger_timer, 2, true);
+                        CHECK(changes.size() == 2);
+                        {
+                            auto &payload = changes.front()->payload;
+                            REQUIRE(payload.size() == 1);
+                            auto &folder_change = payload[0];
+                            REQUIRE(folder_change.folder_id == folder_id);
+                            REQUIRE(folder_change.file_changes.size() == 1);
+                            auto &file_change = folder_change.file_changes[0];
+                            CHECK(proto::get_name(file_change) == narrow(L"my-root/my-file.1"));
+                            CHECK(proto::get_size(file_change) == 0);
+                            CHECK(proto::get_deleted(file_change));
+                            CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
+                            CHECK(file_change.update_reason == update_type_t::deleted);
+                            CHECK(file_change.prev_path == "");
+                            changes.pop_front();
+                        }
+                        {
+                            auto &payload = changes.front()->payload;
+                            REQUIRE(payload.size() == 1);
+                            auto &folder_change = payload[0];
+                            REQUIRE(folder_change.folder_id == folder_id);
+                            REQUIRE(folder_change.file_changes.size() == 1);
+                            auto &file_change = folder_change.file_changes[0];
+                            CHECK(proto::get_name(file_change) == narrow(L"my-root/my-file.2"));
+                            CHECK(proto::get_size(file_change) == 5);
+                            CHECK(!proto::get_deleted(file_change));
+                            CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
+                            CHECK(file_change.update_reason == update_type_t::created);
+                            CHECK(file_change.prev_path == "");
+                        }
+#endif
                     }
                 }
                 SECTION("outside of my dir => delete") {
@@ -663,8 +716,8 @@ void test_real_impl() {
                         auto path_2 = root_path / L"my-file.2";
                         write_file(path_1, "12345");
 
-                        sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, subdir_path, folder_id,
-                                                                ec);
+                        sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, subdir_path,
+                                                                folder_id, ec);
                         sup->do_process();
                         REQUIRE(watched_replies == 1);
 
@@ -691,8 +744,8 @@ void test_real_impl() {
                         auto path_2 = x_path / L"my-file.2";
                         write_file(path_1, "12345");
 
-                        sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, subdir_path, folder_id,
-                                                                ec);
+                        sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, subdir_path,
+                                                                folder_id, ec);
                         sup->do_process();
                         REQUIRE(watched_replies == 1);
 
@@ -743,7 +796,7 @@ void test_real_impl() {
                         CHECK(file_change.update_reason == update_type_t::meta);
                         CHECK(file_change.prev_path == narrow(L"a/b/п1/my-file.1"));
 #else
-                        poll(poll_t::trigger_timer, 2);
+                        poll(poll_t::trigger_timer, 2, true);
                         CHECK(changes.size() == 2);
                         {
                             auto &payload = changes.front()->payload;

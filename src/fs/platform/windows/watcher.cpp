@@ -111,7 +111,6 @@ void watcher_t::on_notify(handle_t handle) noexcept {
     auto deadline = clock_t::local_time() + retension;
 
     auto ptr = (FILE_NOTIFY_INFORMATION *)path_guard->buff;
-    auto prev_name = std::string();
     while (ptr) {
         auto storage_ptr = storage;
         auto sz = ptr->FileNameLength / sizeof(WCHAR);
@@ -140,13 +139,15 @@ void watcher_t::on_notify(handle_t handle) noexcept {
             // no idea how to track metadata changes only
             type = update_type::CONTENT;
         } else if (ptr->Action == FILE_ACTION_RENAMED_OLD_NAME) {
-            prev_name = name_holder.empty() ? std::string(name_view) : std::move(name_holder);
+            // it is silly that win32 generates content event for the new file
+            // so it is OK to assume that previous file is always deleted
+            type = update_type::DELETED;
         } else if (ptr->Action == FILE_ACTION_RENAMED_NEW_NAME) {
-            type = update_type::META;
+            type = update_type::CREATED;
         }
 
         if (type) {
-            push(deadline, folder_id, name_view, std::move(prev_name), static_cast<update_type_t>(type));
+            push(deadline, folder_id, name_view, {}, static_cast<update_type_t>(type));
         } else {
             LOG_DEBUG(log, "in the folder '{}' updated ({:x}): '{}'", folder_id, ptr->Action, name_view);
         }
