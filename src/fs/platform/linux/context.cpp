@@ -120,7 +120,7 @@ void platform_context_t::notify() noexcept {
     }
 }
 
-void platform_context_t::wait_next_event() noexcept {
+bool platform_context_t::wait_next_event() noexcept {
     using namespace std::chrono;
     using namespace std::chrono_literals;
 
@@ -133,20 +133,21 @@ void platform_context_t::wait_next_event() noexcept {
     }
 
     auto r = ::epoll_wait(epoll_fd, events.data(), static_cast<int>(events.size()), timeout);
-    bool timed_out = r == 0;
     if (r == -1) {
         LOG_WARN(log, "epoll_wait() failed: {}", strerror(errno));
     } else if (r) {
-        for (auto it = events.begin(); r && it != events.end(); ++it) {
+        auto left = r;
+        for (auto it = events.begin(); left && it != events.end(); ++it) {
             auto &event = *it;
             if (event.events & EPOLLIN) {
-                --r;
+                --left;
                 auto fd = event.data.fd;
                 auto &ctx = io_callbacks.at(fd);
                 ctx.cb(fd, ctx.data);
             }
         }
     }
+    return r > 0;
 }
 
 #endif

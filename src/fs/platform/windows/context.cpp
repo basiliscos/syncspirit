@@ -97,13 +97,15 @@ auto platform_context_t::guard_handle(handle_t handle, close_handle_t close_cb) 
     return io_guard_t(this, close_cb ? close_cb : close_handle_cb, handle);
 }
 
-void platform_context_t::wait_next_event() noexcept {
+bool platform_context_t::wait_next_event() noexcept {
+    auto has_events = false;
     if (handles.size()) {
         auto timeout = determine_wait_ms();
         auto sz = static_cast<DWORD>(handles.size());
         auto ptr = handles.data();
         auto r = ::WaitForMultipleObjects(sz, ptr, false, timeout);
         if (r >= WAIT_OBJECT_0 && r < WAIT_OBJECT_0 + sz) {
+            has_events = true;
             for (int i = r - WAIT_OBJECT_0; i < WAIT_OBJECT_0 + sz; ++i) {
                 auto h = ptr[i];
                 if (::WaitForSingleObject(h, 0) == WAIT_OBJECT_0) {
@@ -123,6 +125,7 @@ void platform_context_t::wait_next_event() noexcept {
             LOG_WARN(log, "WaitFor*Object failed: {}", ::GetLastError());
         }
     }
+    return has_events;
 }
 
 #endif

@@ -131,7 +131,8 @@ auto FU::make(const folder_info_t &folder_info, updates_mediator_t &mediator) no
         std::memcpy(rel_name_ptr, update.path.data(), update.path.size());
         auto rel_name_path_sz = folder_path_sz + update.path.size();
         *(full_path + rel_name_path_sz + 1) = 0;
-        if (mediator.is_masked(std::string_view(full_path, rel_name_path_sz + 1))) {
+        auto full_name = std::string_view(full_path, rel_name_path_sz + 1);
+        if (mediator.is_masked(full_name)) {
             continue;
         }
         auto r = proto::FileInfo{};
@@ -154,40 +155,40 @@ auto FU::make(const folder_info_t &folder_info, updates_mediator_t &mediator) no
             auto path = folder_info.path / widen(update.path);
             auto status = bfs::symlink_status(path, ec);
             if (ec) {
-                LOG_WARN(log, "cannot get status on '{}': {} (update ignored)", narrow(path.generic_wstring()),
-                         ec.message());
+                LOG_WARN(log, "cannot get status on '{}': {} (update ignored)", full_name, ec.message());
                 continue;
             }
             proto::set_permissions(r, static_cast<uint32_t>(status.permissions()));
             if (status.type() == FT::regular) {
                 auto sz = bfs::file_size(path, ec);
                 if (ec) {
-                    LOG_WARN(log, "cannot get size on '{}': {} (update ignored)", narrow(path.generic_wstring()),
-                             ec.message());
+                    LOG_WARN(log, "cannot get size on '{}': {} (update ignored)", full_name, ec.message());
                     continue;
                 }
                 auto modified = bfs::last_write_time(path, ec);
                 if (ec) {
-                    LOG_WARN(log, "cannot get last_write_time on '{}': {} (update ignored)",
-                             narrow(path.generic_wstring()), ec.message());
+                    LOG_WARN(log, "cannot get last_write_time on '{}': {} (update ignored)", full_name, ec.message());
                     continue;
                 }
                 proto::set_modified_s(r, to_unix(modified));
                 proto::set_type(r, proto::FileInfoType::FILE);
                 proto::set_size(r, static_cast<std::int64_t>(sz));
             } else if (status.type() == FT::directory) {
+                if (update.update_type == ut::CONTENT) {
+                    LOG_DEBUG(log, "ignoring content changes in dir '{}'", full_name);
+                    continue;
+                }
                 proto::set_type(r, proto::FileInfoType::DIRECTORY);
             } else if (status.type() == FT::symlink) {
                 auto target = bfs::read_symlink(path, ec);
                 if (ec) {
-                    LOG_WARN(log, "cannot read_symlink on '{}': {} (update ignored)", narrow(path.generic_wstring()),
-                             ec.message());
+                    LOG_WARN(log, "cannot read_symlink on '{}': {} (update ignored)", full_name, ec.message());
                     continue;
                 }
                 proto::set_symlink_target(r, narrow(target.generic_wstring()));
                 proto::set_type(r, proto::FileInfoType::SYMLINK);
             } else {
-                LOG_DEBUG(log, "ignoring '{}'", narrow(path.generic_wstring()));
+                LOG_DEBUG(log, "ignoring '{}'", full_name);
                 continue;
             }
             if (update.update_type & (ut::CREATED | ut::CREATED_1)) {

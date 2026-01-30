@@ -24,7 +24,7 @@ struct SYNCSPIRIT_API platform_context_t : context_base_t {
     ~platform_context_t();
 
     void notify() noexcept;
-    void wait_next_event() noexcept;
+    bool wait_next_event() noexcept;
 
     using io_callback_t = void (*)(int, void *);
     struct io_context_t {

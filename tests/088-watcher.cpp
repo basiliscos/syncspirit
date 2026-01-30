@@ -36,18 +36,23 @@ bool wine_environment() {
     return false;
 }
 
-void rename(const bfs::path& from, const bfs::path& to) {
+void rename(const bfs::path &from, const bfs::path &to) {
 #ifndef SYNCSPIRIT_WIN
     bfs::rename(from, to);
 #else
-    if (!MoveFileW(from.native().data(), to.native().data())) {
+    auto from_native = from.native().data();
+    auto to_native = to.native().data();
+    if (!MoveFileExW(from_native, to_native, MOVEFILE_WRITE_THROUGH)) {
         auto ec = sys::error_code(::GetLastError(), sys::system_category());
         throw std::runtime_error(ec.message());
     }
 #endif
 }
 
-}
+} // namespace native
+
+static const auto RETENSION_TIMEOUT = r::pt::millisec{100};
+static const auto TIMEOUT = r::pt::millisec{70};
 
 struct supervisor_t : fs::fs_supervisor_t {
     using parent_t = fs::fs_supervisor_t;
@@ -72,6 +77,8 @@ struct supervisor_t : fs::fs_supervisor_t {
 
     fixture_t *fixture;
 };
+
+enum class poll_t { single, trigger_timer };
 
 struct fixture_t {
     using target_ptr_t = r::intrusive_ptr_t<fs::watch_actor_t>;
@@ -116,11 +123,19 @@ struct fixture_t {
         sup->do_process();
     }
 
-    void poll() {
+    void poll(poll_t poll_type, size_t await_changes = 0) {
         changes.clear();
-        fs_context->wait_next_event();
-        fs_context->update_time();
-        sup->do_process();
+        do {
+            auto prev_sz = changes.size();
+            auto has_events = fs_context->wait_next_event();
+            fs_context->update_time();
+            sup->do_process();
+            if (has_events && poll_type == poll_t::trigger_timer) {
+                fs_context->wait_next_event();
+                fs_context->update_time();
+                sup->do_process();
+            }
+        } while (changes.size() < await_changes);
     }
 
     virtual void on_watch(message::watch_folder_t &msg) noexcept {
@@ -133,7 +148,7 @@ struct fixture_t {
 
     virtual void main() noexcept {}
 
-    r::pt::time_duration retension() { return r::pt::microseconds{1}; }
+    r::pt::time_duration retension() { return RETENSION_TIMEOUT; }
 
     bool auto_launch;
     bfs::path root_path;
@@ -142,7 +157,7 @@ struct fixture_t {
     r::intrusive_ptr_t<supervisor_t> sup;
     fs::updates_mediator_ptr_t updates_mediator;
     target_ptr_t target;
-    r::pt::time_duration timeout = r::pt::millisec{10};
+    r::pt::time_duration timeout = TIMEOUT;
     change_messages_t changes;
     size_t watched_replies = 0;
 };
@@ -179,7 +194,7 @@ void test_watcher_base() {
                     auto sub_path = root_path / own_name;
                     bfs::create_directories(sub_path);
                     target->push(deadline, folder_id, narrow(own_name.wstring()), {}, U::created);
-                    poll();
+                    poll(poll_t::single);
                     REQUIRE(changes.size() == 1);
                     auto &payload = changes.front()->payload;
                     REQUIRE(payload.size() == 1);
@@ -197,7 +212,7 @@ void test_watcher_base() {
                     auto sub_path = root_path / own_name;
                     write_file(sub_path, "12345");
                     target->push(deadline, folder_id, narrow(own_name.wstring()), {}, U::created);
-                    poll();
+                    poll(poll_t::single);
                     REQUIRE(changes.size() == 1);
                     auto &payload = changes.front()->payload;
                     REQUIRE(payload.size() == 1);
@@ -217,7 +232,7 @@ void test_watcher_base() {
                     auto where = bfs::path("/to/some/where");
                     bfs::create_symlink(where, sub_path);
                     target->push(deadline, folder_id, narrow(own_name.wstring()), {}, U::created);
-                    poll();
+                    poll(poll_t::single);
                     REQUIRE(changes.size() == 1);
                     auto &payload = changes.front()->payload;
                     REQUIRE(payload.size() == 1);
@@ -241,7 +256,7 @@ void test_watcher_base() {
                 auto path_2_str = narrow(sub_path_2.generic_wstring());
                 write_file(sub_path_1, "12345");
                 target->push(deadline, folder_id, narrow(name_1.wstring()), path_2_str, U::meta);
-                poll();
+                poll(poll_t::single);
                 REQUIRE(changes.size() == 1);
                 auto &payload = changes.front()->payload;
                 REQUIRE(payload.size() == 1);
@@ -264,10 +279,13 @@ void test_watcher_base() {
                     write_file(sub_path, "12345");
                     target->push(deadline, folder_id, narrow(own_name.wstring()), {}, U::created);
                     target->push(deadline_2, folder_id, narrow(own_name.wstring()), {}, U::content);
-                    poll();
+
+                    poll(poll_t::single);
                     REQUIRE(changes.size() == 0);
-                    poll();
+
+                    poll(poll_t::trigger_timer);
                     REQUIRE(changes.size() == 1);
+
                     auto &payload = changes.front()->payload;
                     REQUIRE(payload.size() == 1);
                     auto &folder_change = payload[0];
@@ -286,9 +304,15 @@ void test_watcher_base() {
                     write_file(sub_path, "12345");
                     target->push(deadline, folder_id, narrow(own_name.wstring()), {}, U::created);
                     target->push(deadline_2, folder_id, narrow(own_name.wstring()), {}, U::deleted);
-                    poll();
+                    poll(poll_t::trigger_timer);
                     REQUIRE(changes.size() == 0);
-                    poll();
+                }
+                SECTION("content change in dir -> collapse to void") {
+                    auto own_name = bfs::path(L"файл.bin");
+                    auto sub_path = root_path / own_name;
+                    bfs::create_directory(sub_path);
+                    target->push(deadline, folder_id, narrow(own_name.wstring()), {}, U::content);
+                    poll(poll_t::trigger_timer);
                     REQUIRE(changes.size() == 0);
                 }
                 SECTION("content , meta -> collapse to content") {
@@ -297,10 +321,13 @@ void test_watcher_base() {
                     write_file(sub_path, "12345");
                     target->push(deadline, folder_id, narrow(own_name.wstring()), {}, U::content);
                     target->push(deadline_2, folder_id, narrow(own_name.wstring()), {}, U::meta);
-                    poll();
+
+                    poll(poll_t::single);
                     REQUIRE(changes.size() == 0);
-                    poll();
+
+                    poll(poll_t::trigger_timer);
                     REQUIRE(changes.size() == 1);
+
                     auto &payload = changes.front()->payload;
                     REQUIRE(payload.size() == 1);
                     auto &folder_change = payload[0];
@@ -322,10 +349,13 @@ void test_watcher_base() {
                     target->push(deadline, folder_id, name_2_str, name_1_str, U::meta);
                     target->push(deadline_2, folder_id, name_2_str, {}, U::content);
                     target->push(deadline_2, folder_id, name_2_str, {}, U::meta);
-                    poll();
+
+                    poll(poll_t::single);
                     REQUIRE(changes.size() == 0);
-                    poll();
+
+                    poll(poll_t::trigger_timer);
                     REQUIRE(changes.size() == 1);
+
                     auto &payload = changes.front()->payload;
                     REQUIRE(payload.size() == 1);
                     auto &folder_change = payload[0];
@@ -346,10 +376,13 @@ void test_watcher_base() {
                     auto name_2_str = narrow(name_2.generic_wstring());
                     target->push(deadline, folder_id, name_2_str, name_1_str, U::meta);
                     target->push(deadline_2, folder_id, name_2_str, {}, U::deleted);
-                    poll();
+
+                    poll(poll_t::single);
                     REQUIRE(changes.size() == 0);
-                    poll();
+
+                    poll(poll_t::trigger_timer);
                     REQUIRE(changes.size() == 1);
+
                     auto &payload = changes.front()->payload;
                     REQUIRE(payload.size() == 1);
                     auto &folder_change = payload[0];
@@ -373,10 +406,13 @@ void test_watcher_base() {
                     write_file(root_path / name_3, "12345");
                     target->push(deadline, folder_id, name_2_str, name_1_str, U::meta);
                     target->push(deadline_2, folder_id, name_3_str, name_2_str, U::meta);
-                    poll();
+
+                    poll(poll_t::single);
                     REQUIRE(changes.size() == 0);
-                    poll();
+
+                    poll(poll_t::trigger_timer);
                     REQUIRE(changes.size() == 1);
+
                     auto &payload = changes.front()->payload;
                     REQUIRE(payload.size() == 1);
                     auto &folder_change = payload[0];
@@ -398,11 +434,11 @@ void test_watcher_base() {
                 updates_mediator->push(narrow(sub_path.generic_wstring()), {}, deadline);
 
                 target->push(deadline, folder_id, narrow(own_name.wstring()), {}, U::created);
-                poll();
+                poll(poll_t::single);
                 REQUIRE(changes.size() == 0);
 
                 target->push(deadline, folder_id, narrow(own_name.wstring()), {}, U::created);
-                poll();
+                poll(poll_t::single);
                 REQUIRE(changes.size() == 1);
 
                 auto &payload = changes.front()->payload;
@@ -481,7 +517,8 @@ void test_real_impl() {
 
                 auto path = root_path / "my-dir";
                 bfs::create_directories(path);
-                poll();
+                poll(poll_t::trigger_timer, 1);
+
                 REQUIRE(changes.size() == 1);
                 auto &payload = changes.front()->payload;
                 REQUIRE(payload.size() == 1);
@@ -502,7 +539,7 @@ void test_real_impl() {
 
                 auto path_dir = root_path / "my-dir";
                 bfs::create_directories(path_dir);
-                poll();
+                poll(poll_t::trigger_timer, 1);
                 {
                     REQUIRE(changes.size() == 1);
                     auto &payload = changes.front()->payload;
@@ -515,11 +552,12 @@ void test_real_impl() {
                     CHECK(proto::get_size(file_change) == 0);
                     CHECK(proto::get_type(file_change) == proto::FileInfoType::DIRECTORY);
                     CHECK(proto::get_permissions(file_change));
+                    changes.clear();
                 }
 
                 auto path_file = path_dir / L"файл.bin";
                 write_file(path_file, "12345");
-                poll();
+                poll(poll_t::trigger_timer, 1);
                 {
                     REQUIRE(changes.size() == 1);
                     auto &payload = changes.front()->payload;
@@ -545,7 +583,7 @@ void test_real_impl() {
 
                 write_file(path, "123456");
 
-                poll();
+                poll(poll_t::trigger_timer, 1);
                 REQUIRE(changes.size() == 1);
                 auto &payload = changes.front()->payload;
                 REQUIRE(payload.size() == 1);
@@ -569,7 +607,7 @@ void test_real_impl() {
 
                 bfs::remove(path);
 
-                poll();
+                poll(poll_t::trigger_timer);
                 REQUIRE(changes.size() == 1);
                 auto &payload = changes.front()->payload;
                 REQUIRE(payload.size() == 1);
@@ -591,18 +629,18 @@ void test_real_impl() {
                 bfs::create_directories(x_path);
                 SECTION("inside root => meta") {
                     if (!native::wine_environment()) {
-                    auto path_1 = subdir_path / "my-file.1";
-                        auto path_2 = subdir_path / "my-file.2";
+                        auto path_1 = subdir_path / L"my-file.1";
+                        auto path_2 = subdir_path / L"my-file.2";
                         write_file(path_1, "12345");
 
-                        sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id, ec);
+                        sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id,
+                                                                ec);
                         sup->do_process();
                         REQUIRE(watched_replies == 1);
 
                         native::rename(path_1, path_2);
 
-                        poll();
-
+                        poll(poll_t::trigger_timer, 1);
                         REQUIRE(changes.size() == 1);
 
                         auto &payload = changes.front()->payload;
@@ -620,84 +658,127 @@ void test_real_impl() {
                     }
                 }
                 SECTION("outside of my dir => delete") {
-                    auto path_1 = a_path / "my-file.1";
-                    auto path_2 = root_path / "my-file.2";
-                    write_file(path_1, "12345");
+                    if (!native::wine_environment()) {
+                        auto path_1 = a_path / L"my-file.1";
+                        auto path_2 = root_path / L"my-file.2";
+                        write_file(path_1, "12345");
 
-                    sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, subdir_path, folder_id,
-                                                            ec);
-                    sup->do_process();
-                    REQUIRE(watched_replies == 1);
+                        sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, subdir_path, folder_id,
+                                                                ec);
+                        sup->do_process();
+                        REQUIRE(watched_replies == 1);
 
-                    bfs::rename(path_1, path_2);
+                        native::rename(path_1, path_2);
 
-                    poll();
-                    REQUIRE(changes.size() == 1);
-                    auto &payload = changes.front()->payload;
-                    REQUIRE(payload.size() == 1);
-                    auto &folder_change = payload[0];
-                    REQUIRE(folder_change.folder_id == folder_id);
-                    REQUIRE(folder_change.file_changes.size() == 1);
-                    auto &file_change = folder_change.file_changes.front();
-                    CHECK(proto::get_name(file_change) == narrow(L"a/b/п1/my-file.1"));
-                    CHECK(proto::get_size(file_change) == 0);
-                    CHECK(proto::get_deleted(file_change));
-                    CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
-                    CHECK(file_change.update_reason == update_type_t::deleted);
+                        poll(poll_t::trigger_timer, 1);
+                        REQUIRE(changes.size() == 1);
+                        auto &payload = changes.front()->payload;
+                        REQUIRE(payload.size() == 1);
+                        auto &folder_change = payload[0];
+                        REQUIRE(folder_change.folder_id == folder_id);
+                        REQUIRE(folder_change.file_changes.size() == 1);
+                        auto &file_change = folder_change.file_changes.front();
+                        CHECK(proto::get_name(file_change) == narrow(L"a/b/п1/my-file.1"));
+                        CHECK(proto::get_size(file_change) == 0);
+                        CHECK(proto::get_deleted(file_change));
+                        CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
+                        CHECK(file_change.update_reason == update_type_t::deleted);
+                    }
                 }
                 SECTION("into my dir => create") {
-                    auto path_1 = root_path / "my-file.1";
-                    auto path_2 = x_path / "my-file.2";
-                    write_file(path_1, "12345");
+                    if (!native::wine_environment()) {
+                        auto path_1 = root_path / L"my-file.1";
+                        auto path_2 = x_path / L"my-file.2";
+                        write_file(path_1, "12345");
 
-                    sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, subdir_path, folder_id,
-                                                            ec);
-                    sup->do_process();
-                    REQUIRE(watched_replies == 1);
+                        sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, subdir_path, folder_id,
+                                                                ec);
+                        sup->do_process();
+                        REQUIRE(watched_replies == 1);
 
-                    bfs::rename(path_1, path_2);
+                        native::rename(path_1, path_2);
 
-                    poll();
-                    REQUIRE(changes.size() == 1);
-                    auto &payload = changes.front()->payload;
-                    REQUIRE(payload.size() == 1);
-                    auto &folder_change = payload[0];
-                    REQUIRE(folder_change.folder_id == folder_id);
-                    REQUIRE(folder_change.file_changes.size() == 1);
-                    auto &file_change = folder_change.file_changes.front();
-                    CHECK(proto::get_name(file_change) == narrow(L"x/y/п2/my-file.2"));
-                    CHECK(proto::get_size(file_change) == 5);
-                    CHECK(!proto::get_deleted(file_change));
-                    CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
-                    CHECK(file_change.update_reason == update_type_t::created);
-                    CHECK(file_change.prev_path.empty());
+                        poll(poll_t::trigger_timer, 1);
+                        REQUIRE(changes.size() == 1);
+                        auto &payload = changes.front()->payload;
+                        REQUIRE(payload.size() == 1);
+                        auto &folder_change = payload[0];
+                        REQUIRE(folder_change.folder_id == folder_id);
+                        REQUIRE(folder_change.file_changes.size() == 1);
+                        auto &file_change = folder_change.file_changes.front();
+                        CHECK(proto::get_name(file_change) == narrow(L"x/y/п2/my-file.2"));
+                        CHECK(proto::get_size(file_change) == 5);
+                        CHECK(!proto::get_deleted(file_change));
+                        CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
+                        CHECK(file_change.update_reason == update_type_t::created);
+                        CHECK(file_change.prev_path.empty());
+                    }
                 }
-                SECTION("inside folder => meta") {
-                    auto path_1 = a_path / "my-file.1";
-                    auto path_2 = x_path / "my-file.2";
-                    write_file(path_1, "12345");
+                SECTION("inside folder, cross-dir moving => meta") {
+                    if (!native::wine_environment()) {
+                        auto path_1 = a_path / L"my-file.1";
+                        auto path_2 = x_path / L"my-file.2";
+                        write_file(path_1, "12345");
 
-                    sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, subdir_path, folder_id,
-                                                            ec);
-                    sup->do_process();
-                    REQUIRE(watched_replies == 1);
+                        sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, subdir_path,
+                                                                folder_id, ec);
+                        sup->do_process();
+                        REQUIRE(watched_replies == 1);
 
-                    native::rename(path_1, path_2);
+                        native::rename(path_1, path_2);
 
-                    poll();
-                    REQUIRE(changes.size() == 1);
-                    auto &payload = changes.front()->payload;
-                    REQUIRE(payload.size() == 1);
-                    auto &folder_change = payload[0];
-                    REQUIRE(folder_change.folder_id == folder_id);
-                    REQUIRE(folder_change.file_changes.size() == 1);
-                    auto &file_change = folder_change.file_changes.front();
-                    CHECK(proto::get_name(file_change) == narrow(L"x/y/п2/my-file.2"));
-                    CHECK(proto::get_size(file_change) == 5);
-                    CHECK(!proto::get_deleted(file_change));
-                    CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
-                    CHECK(file_change.update_reason == update_type_t::meta);
-                    CHECK(file_change.prev_path == narrow(L"a/b/п1/my-file.1"));
+#ifndef SYNCSPIRIT_WIN
+                        poll(poll_t::trigger_timer, 1);
+                        REQUIRE(changes.size() == 1);
+                        auto &payload = changes.front()->payload;
+                        REQUIRE(payload.size() == 1);
+                        auto &folder_change = payload[0];
+                        REQUIRE(folder_change.folder_id == folder_id);
+                        REQUIRE(folder_change.file_changes.size() == 1);
+                        auto &file_change = folder_change.file_changes.front();
+                        CHECK(proto::get_name(file_change) == narrow(L"x/y/п2/my-file.2"));
+                        CHECK(proto::get_size(file_change) == 5);
+                        CHECK(!proto::get_deleted(file_change));
+                        CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
+                        CHECK(file_change.update_reason == update_type_t::meta);
+                        CHECK(file_change.prev_path == narrow(L"a/b/п1/my-file.1"));
+#else
+                        poll(poll_t::trigger_timer, 2);
+                        CHECK(changes.size() == 2);
+                        {
+                            auto &payload = changes.front()->payload;
+                            REQUIRE(payload.size() == 1);
+                            auto &folder_change = payload[0];
+                            REQUIRE(folder_change.folder_id == folder_id);
+                            REQUIRE(folder_change.file_changes.size() == 1);
+                            auto &file_change = folder_change.file_changes.front();
+                            CHECK(proto::get_name(file_change) == narrow(L"a/b/п1/my-file.1"));
+                            CHECK(proto::get_size(file_change) == 0);
+                            CHECK(proto::get_deleted(file_change));
+                            CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
+                            CHECK(file_change.update_reason == update_type_t::deleted);
+                            CHECK(file_change.prev_path == "");
+                            changes.pop_front();
+                        }
+                        {
+                            auto &payload = changes.front()->payload;
+                            REQUIRE(payload.size() == 1);
+                            auto &folder_change = payload[0];
+                            REQUIRE(folder_change.folder_id == folder_id);
+                            REQUIRE(folder_change.file_changes.size() == 1);
+                            {
+                                auto &file_change = folder_change.file_changes[0];
+                                CHECK(proto::get_name(file_change) == narrow(L"x/y/п2/my-file.2"));
+                                CHECK(proto::get_size(file_change) == 5);
+                                CHECK(!proto::get_deleted(file_change));
+                                CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
+                                CHECK(file_change.update_reason == update_type_t::created);
+                                CHECK(file_change.prev_path == "");
+                            }
+                            changes.pop_front();
+                        }
+#endif
+                    }
                 }
             }
 #ifndef SYNCSPIRIT_WIN
@@ -711,7 +792,7 @@ void test_real_impl() {
                 REQUIRE(watched_replies == 1);
 
                 bfs::permissions(path, bfs::perms::owner_write);
-                poll();
+                poll(poll_t::trigger_timer);
                 REQUIRE(changes.size() == 1);
                 auto &payload = changes.front()->payload;
                 REQUIRE(payload.size() == 1);
@@ -738,7 +819,7 @@ void test_real_impl() {
                 bfs::remove(path);
                 bfs::create_symlink(bfs::path(link_target_2), path);
 
-                poll();
+                poll(poll_t::trigger_timer);
                 REQUIRE(changes.size() == 1);
                 auto &payload = changes.front()->payload;
                 REQUIRE(payload.size() == 1);
