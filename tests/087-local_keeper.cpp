@@ -7,7 +7,7 @@
 #include "fs/fs_slave.h"
 #include "fs/messages.h"
 #include "fs/utils.h"
-#include "fs/file_cache.h"
+#include "fs/updates_mediator.h"
 #include "managed_hasher.h"
 #include "model/cluster.h"
 #include "model/diff/advance/local_update.h"
@@ -85,19 +85,33 @@ struct fixture_t {
 
     fixture_t(bool auto_launch_ = true) noexcept
         : root_path{unique_path()}, path_guard{root_path}, auto_launch{auto_launch_} {
-        test::init_logging();
         bfs::create_directory(root_path);
+        mediator = new fs::updates_mediator_t(pt::microseconds{1});
     }
 
     virtual std::uint32_t get_hash_limit() { return 1; }
 
     virtual std::int64_t get_iterations_limit() { return 100; }
 
+    bool execute_slave(fs::payload::foreign_executor_t &slave) {
+        struct exec_ctx_t final : fs::execution_context_t {
+            exec_ctx_t(fixture_t *fixture, r::pt::ptime &deadline_) {
+                mediator = fixture->mediator.get();
+                plugin = fixture->executor->hasher;
+                deadline = deadline_;
+            }
+            pt::ptime get_deadline() const override { return deadline; };
+            r::pt::ptime deadline;
+        };
+        auto deadline = pt::microsec_clock::local_time() + pt::milliseconds{1};
+        auto ctx = exec_ctx_t(this, deadline);
+        return slave.exec(ctx);
+    }
+
     virtual void execute(fs::message::foreign_executor_t &req) noexcept {
-        sup->log->info("executing foreign task");
         auto slave = static_cast<fs::fs_slave_t *>(req.payload.get());
         slave->ec = {};
-        req.payload->exec(executor->hasher);
+        sup->log->info("executing foreign task: {}", execute_slave(*req.payload));
     }
 
     virtual void create_dir(fs::message::create_dir_t &req) noexcept {
@@ -212,6 +226,7 @@ struct fixture_t {
     bfs::path root_path;
     test::path_guard_t path_guard;
     target_ptr_t target;
+    updates_mediator_ptr_t mediator;
     model::folder_ptr_t folder;
     model::folder_info_ptr_t folder_info;
     model::folder_info_ptr_t folder_info_peer;
@@ -1152,8 +1167,7 @@ void test_scan_errors() {
         F() {
             processor = [&](fs::fs_slave_t *slave) {
                 slave->ec = {};
-                sup->log->info("executing foreign task");
-                slave->exec(executor->hasher);
+                sup->log->info("executing foreign task: {}", execute_slave(*slave));
             };
         }
 
@@ -1264,8 +1278,7 @@ void test_scan_errors() {
                             }
                         }
                         if (do_exec) {
-                            sup->log->info("executing foreign task");
-                            slave->exec(executor->hasher);
+                            sup->log->info("executing foreign task: {}", execute_slave(*slave));
                         }
                     };
                 };
@@ -1327,8 +1340,7 @@ void test_read_errors() {
         F() : fixture_t{false} {
             processor = [&](fs::fs_slave_t *slave) {
                 slave->ec = {};
-                sup->log->info("executing foreign task");
-                slave->exec(executor->hasher);
+                sup->log->info("executing foreign task: {}", execute_slave(*slave));
             };
         }
 
@@ -1415,8 +1427,7 @@ void test_read_errors() {
                             }
                         }
                         if (do_exec) {
-                            sup->log->info("executing foreign task");
-                            slave->exec(executor->hasher);
+                            sup->log->info("executing foreign task: {}", execute_slave(*slave));
                         }
                     };
                 };

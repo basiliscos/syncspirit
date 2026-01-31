@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2026 Ivan Baidakou
 
 #include "test-utils.h"
 #include "fs/fs_slave.h"
 #include "fs/utils.h"
-#include "test_supervisor.h"
+#include "fs/updates_mediator.h"
 #include "test-utils.h"
 #include <boost/nowide/convert.hpp>
 
@@ -13,6 +13,12 @@ using namespace syncspirit::test;
 using namespace syncspirit::utils;
 using namespace syncspirit::model;
 using namespace syncspirit::fs;
+using boost::nowide::narrow;
+
+struct exec_ctx_t final : fs::execution_context_t {
+    exec_ctx_t(fs::updates_mediator_t *mediator_ = nullptr) { mediator = mediator_; }
+    pt::ptime get_deadline() const override { return clock_t::local_time() + pt::milliseconds{1}; };
+};
 
 TEST_CASE("fs_slave, scan_dir", "[fs]") {
     auto root_path = unique_path();
@@ -20,6 +26,7 @@ TEST_CASE("fs_slave, scan_dir", "[fs]") {
     test::path_guard_t path_quard{root_path};
 
     auto slave = fs_slave_t();
+    auto context = exec_ctx_t();
 #if 0
     auto timeout = r::pt::time_duration(r::pt::millisec{10});
     r::system_context_t ctx;
@@ -30,7 +37,7 @@ TEST_CASE("fs_slave, scan_dir", "[fs]") {
     SECTION("dir scan") {
         SECTION("empty dir") {
             slave.push(task::scan_dir_t(root_path, {}, {}));
-            slave.exec({});
+            CHECK(!slave.exec(context));
             REQUIRE(slave.tasks_out.size() == 1);
             auto &t = std::get<task::scan_dir_t>(slave.tasks_out.front());
             CHECK(!t.ec);
@@ -38,7 +45,7 @@ TEST_CASE("fs_slave, scan_dir", "[fs]") {
         }
         SECTION("non-existing dir") {
             slave.push(task::scan_dir_t(root_path / "non-existing", {}, {}));
-            slave.exec({});
+            slave.exec(context);
             REQUIRE(slave.tasks_out.size() == 1);
             auto &t = std::get<task::scan_dir_t>(slave.tasks_out.front());
             CHECK(t.ec);
@@ -47,7 +54,7 @@ TEST_CASE("fs_slave, scan_dir", "[fs]") {
         SECTION("not a dir") {
             slave.push(task::scan_dir_t(root_path / "file", {}, {}));
             write_file(root_path / "file", "");
-            slave.exec({});
+            slave.exec(context);
             REQUIRE(slave.tasks_out.size() == 1);
             auto &t = std::get<task::scan_dir_t>(slave.tasks_out.front());
             CHECK(t.ec);
@@ -56,7 +63,7 @@ TEST_CASE("fs_slave, scan_dir", "[fs]") {
         SECTION("not a dir") {
             slave.push(task::scan_dir_t(root_path / "file", {}, {}));
             write_file(root_path / "file", "");
-            slave.exec({});
+            slave.exec(context);
             REQUIRE(slave.tasks_out.size() == 1);
             auto &t = std::get<task::scan_dir_t>(slave.tasks_out.front());
             CHECK(t.ec);
@@ -79,7 +86,7 @@ TEST_CASE("fs_slave, scan_dir", "[fs]") {
             bfs::create_directories(child_3);
             bfs::last_write_time(child_3, from_unix(modified));
 
-            slave.exec({});
+            slave.exec(context);
 
             REQUIRE(slave.tasks_out.size() == 1);
             auto &t = std::get<task::scan_dir_t>(slave.tasks_out.front());
@@ -122,23 +129,27 @@ TEST_CASE("fs_slave, rm_file", "[fs]") {
     bfs::create_directories(root_path);
     test::path_guard_t path_quard{root_path};
     auto slave = fs_slave_t();
+    auto mediator = fs::updates_mediator_t(pt::milliseconds{1});
+    auto context = exec_ctx_t(&mediator);
 
     SECTION("successfuly remove") {
         auto file = root_path / "file";
         write_file(file, "");
         slave.push(task::remove_file_t(file));
-        slave.exec({});
+        CHECK(slave.exec(context));
         REQUIRE(slave.tasks_out.size() == 1);
         auto &t = std::get<task::remove_file_t>(slave.tasks_out.front());
         CHECK(!t.ec);
         CHECK(!bfs::exists(file));
+        auto path_str = narrow(file.generic_wstring());
+        CHECK(mediator.is_masked(path_str));
     }
 
     SECTION("failed to remove") {
         auto file = root_path / "dir";
         bfs::create_directories(file / "subdir");
         slave.push(task::remove_file_t(file));
-        slave.exec({});
+        CHECK(!slave.exec(context));
         REQUIRE(slave.tasks_out.size() == 1);
         auto &t = std::get<task::remove_file_t>(slave.tasks_out.front());
         CHECK(t.ec);

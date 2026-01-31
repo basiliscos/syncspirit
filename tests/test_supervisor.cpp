@@ -234,7 +234,7 @@ void supervisor_t::process_io(fs::payload::finish_file_t &req) noexcept {
 
 void supervisor_t::process_io(fs::payload::clone_block_t &req) noexcept {
     LOG_TRACE(log, "process_io (ack: {}), clone_block_t, {} bytes,  {}(#{}) -> {}(#{})", auto_ack_io, req.block_size,
-              req.source.string(), req.source_offset, req.target.string(), req.target_offset);
+              req.source.string(), req.source_offset, req.path.string(), req.target_offset);
     if (auto_ack_io) {
         req.result = outcome::success();
     }

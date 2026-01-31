@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #pragma once
 
@@ -8,6 +8,8 @@
 #include "hasher/hasher_plugin.h"
 #include "utils/bytes.h"
 #include "utils/error_code.h"
+#include "update_type.hpp"
+#include "execution_context.h"
 
 #include <rotor.hpp>
 #include <boost/outcome.hpp>
@@ -21,13 +23,15 @@ namespace bfs = std::filesystem;
 namespace outcome = boost::outcome_v2;
 namespace sys = boost::system;
 
+struct fs_slave_t;
+
 namespace payload {
 
 using extendended_context_t = hasher::payload::extendended_context_t;
 using extendended_context_prt_t = hasher::payload::extendended_context_prt_t;
 
 struct foreign_executor_t : hasher::payload::extendended_context_t {
-    virtual void exec(hasher::hasher_plugin_t *hasher) noexcept = 0;
+    virtual bool exec(execution_context_t &context) noexcept = 0;
 };
 using foreign_executor_prt_t = r::intrusive_ptr_t<foreign_executor_t>;
 
@@ -115,7 +119,7 @@ struct append_block_t : payload_base_t<void> {
 struct clone_block_t : payload_base_t<void> {
     using parent_t = payload_base_t<void>;
 
-    bfs::path target;
+    bfs::path path; // target, used for universally update mediator
     std::uint64_t target_offset;
     std::uint64_t target_size;
     bfs::path source;
@@ -126,7 +130,7 @@ struct clone_block_t : payload_base_t<void> {
                          std::uint64_t target_size_, bfs::path source_, std::uint64_t source_offset_,
                          std::uint64_t block_size_) noexcept
         : parent_t{utils::make_error_code(utils::error_code_t::no_action), std::move(context_)},
-          target{std::move(target_)}, target_offset{target_offset_}, target_size{target_size_},
+          path{std::move(target_)}, target_offset{target_offset_}, target_size{target_size_},
           source{std::move(source_)}, source_offset{source_offset_}, block_size{block_size_} {}
 
     clone_block_t(const clone_block_t &) = delete;
@@ -150,6 +154,28 @@ struct create_dir_t : bfs::path {
     sys::error_code ec;
 };
 
+struct watch_folder_t {
+    bfs::path path;
+    std::string folder_id;
+    sys::error_code ec;
+};
+
+struct file_info_t : proto::FileInfo {
+    using parent_t = proto::FileInfo;
+    inline file_info_t(proto::FileInfo file_info, std::string prev_path_, update_type_t update_reason_)
+        : parent_t(std::move(file_info)), update_reason{update_reason_}, prev_path{std::move(prev_path_)} {};
+    update_type_t update_reason;
+    std::string prev_path;
+};
+
+using file_changes_t = std::vector<file_info_t>;
+
+struct folder_change_t {
+    std::string folder_id;
+    file_changes_t file_changes;
+};
+using folder_changes_t = std::vector<folder_change_t>;
+
 } // namespace payload
 
 namespace message {
@@ -158,6 +184,9 @@ using foreign_executor_t = r::message_t<payload::foreign_executor_prt_t>;
 
 using io_commands_t = r::message_t<payload::io_commands_t>;
 using create_dir_t = r::message_t<payload::create_dir_t>;
+
+using watch_folder_t = r::message_t<payload::watch_folder_t>;
+using folder_changes_t = r::message_t<payload::folder_changes_t>;
 
 } // namespace message
 

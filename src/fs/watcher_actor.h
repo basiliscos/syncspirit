@@ -3,48 +3,13 @@
 
 #pragma once
 
-#include "syncspirit-export.h"
-#include "syncspirit-config.h"
-#include "utils/log.h"
-#include <rotor.hpp>
-#include <filesystem>
-#include <boost/system.hpp>
+#include "platform/watcher.h"
 
 namespace syncspirit::fs {
 
 namespace r = rotor;
 namespace bfs = std::filesystem;
 namespace sys = boost::system;
-
-namespace payload {
-
-struct watch_folder_t {
-    bfs::path path;
-    sys::error_code ec;
-};
-
-} // namespace payload
-
-namespace message {
-using watch_folder_t = r::message_t<payload::watch_folder_t>;
-}
-
-struct SYNCSPIRIT_API watch_actor_t : r::actor_base_t {
-    using parent_t = r::actor_base_t;
-    using config_t = parent_t::config_t;
-
-    explicit watch_actor_t(config_t &cfg);
-    void do_initialize(r::system_context_t *ctx) noexcept override;
-    void configure(r::plugin::plugin_base_t &plugin) noexcept override;
-    void shutdown_finish() noexcept override;
-
-  private:
-    void on_watch(message::watch_folder_t &) noexcept;
-
-#if SYNCSPIRIT_WATCHER_INOTIFY
-    int inotify_lib = -1;
-#endif
-    utils::logger_t log;
-};
+using watch_actor_t = platform::watcher_t;
 
 } // namespace syncspirit::fs

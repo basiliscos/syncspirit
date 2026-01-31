@@ -5,12 +5,13 @@
 
 #include "messages.h"
 #include "file.h"
+#include "updates_mediator.h"
 #include "net/messages.h"
 #include "hasher/hasher_plugin.h"
 #include "utils/log.h"
 #include "model/file_info.h"
-#include <stdio.h>
 #include <rotor.hpp>
+#include <optional>
 
 // buggy mingw fix:
 #if defined(WIN32) && defined(__GNUC__) && (__GNUC__ < 12)
@@ -35,6 +36,8 @@ namespace outcome = boost::outcome_v2;
 
 struct SYNCSPIRIT_API file_actor_config_t : r::actor_config_t {
     uint32_t concurrent_hashes;
+    r::pt::time_duration change_retension;
+    updates_mediator_ptr_t updates_mediator;
 };
 
 template <typename Actor> struct file_actor_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -44,6 +47,14 @@ template <typename Actor> struct file_actor_config_builder_t : r::actor_config_b
 
     builder_t &&concurrent_hashes(uint32_t value) && noexcept {
         parent_t::config.concurrent_hashes = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+    builder_t &&change_retension(const r::pt::time_duration &value) && noexcept {
+        parent_t::config.change_retension = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+    builder_t &&updates_mediator(updates_mediator_ptr_t value) && noexcept {
+        parent_t::config.updates_mediator = std::move(value);
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };
@@ -65,20 +76,24 @@ struct SYNCSPIRIT_API file_actor_t : public r::actor_base_t {
     template <typename T> auto &access() noexcept;
 
   private:
+    using clock_t = pt::microsec_clock;
     using file_cache_t = std::unordered_map<bfs::path, file_ptr_t>;
     using context_cache_t = std::unordered_map<const void *, file_cache_t>;
+    using timer_opt_t = std::optional<r::request_id_t>;
 
     void on_exec(message::foreign_executor_t &) noexcept;
     void on_io_commands(message::io_commands_t &) noexcept;
     void on_create_dir(message::create_dir_t &) noexcept;
-    void process(payload::block_request_t &, const void *) noexcept;
-    void process(payload::remote_copy_t &, const void *) noexcept;
-    void process(payload::append_block_t &, const void *) noexcept;
-    void process(payload::finish_file_t &, const void *) noexcept;
-    void process(payload::clone_block_t &, const void *) noexcept;
+    void process(payload::block_request_t &, std::string_view, const void *) noexcept;
+    void process(payload::remote_copy_t &, std::string_view, const void *) noexcept;
+    void process(payload::append_block_t &, std::string_view, const void *) noexcept;
+    void process(payload::finish_file_t &, std::string_view, const void *) noexcept;
+    void process(payload::clone_block_t &, std::string_view, const void *) noexcept;
 
     void on_controller_up(net::message::controller_up_t &message) noexcept;
     void on_controller_predown(net::message::controller_predown_t &message) noexcept;
+
+    void on_retension_finish(r::request_id_t, bool cancelled) noexcept;
 
     outcome::result<file_ptr_t> get_source_for_cloning(model::file_info_ptr_t &source,
                                                        const model::folder_info_t &source_fi,
@@ -89,11 +104,14 @@ struct SYNCSPIRIT_API file_actor_t : public r::actor_base_t {
     outcome::result<file_ptr_t> open_file_ro(const bfs::path &path, const void *context = {}) noexcept;
 
     utils::logger_t log;
+    uint32_t concurrent_hashes;
+    r::pt::time_duration retension;
+    updates_mediator_ptr_t updates_mediator;
     r::address_ptr_t coordinator;
     r::address_ptr_t db;
     context_cache_t context_cache;
-    uint32_t concurrent_hashes;
     hasher::hasher_plugin_t *hasher = nullptr;
+    timer_opt_t expiration_timer;
 };
 
 } // namespace syncspirit::fs

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #pragma once
 
@@ -25,7 +25,7 @@ struct SYNCSPIRIT_API scan_dir_t {
     using custom_payload_ptr_t = std::unique_ptr<custom_payload_t>;
 
     scan_dir_t(bfs::path path, presentation::presence_ptr_t presence, custom_payload_ptr_t payload) noexcept;
-    void process(fs_slave_t &fs_slave, hasher::hasher_plugin_t *) noexcept;
+    bool process(fs_slave_t &fs_slave, execution_context_t &context) noexcept;
 
     bfs::path path;
     presentation::presence_ptr_t presence;

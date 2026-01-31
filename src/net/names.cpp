@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "names.h"
 
@@ -13,4 +13,5 @@ const char *names::http11_gda = "net.http11_gda";
 const char *names::http11_relay = "net.http11_relay";
 const char *names::db = "net.db";
 const char *names::fs_actor = "fs.actor";
+const char *names::watcher = "fs.watcher";
 const char *names::scheduler = "net.scheduler";
