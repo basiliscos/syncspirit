@@ -17,7 +17,6 @@ namespace syncspirit::fs::platform::windows {
 
 struct SYNCSPIRIT_API platform_context_t : context_base_t {
     using parent_t = context_base_t;
-    using parent_t::parent_t;
     using handle_t = HANDLE;
     using handles_t = std::vector<handle_t>;
     using io_callback_t = void (*)(handle_t, void *);
@@ -48,7 +47,7 @@ struct SYNCSPIRIT_API platform_context_t : context_base_t {
     io_guard_t register_callback(handle_t, io_callback_t, void *data, close_handle_t = {}) noexcept;
     io_guard_t guard_handle(handle_t, close_handle_t = {}) noexcept;
 
-    platform_context_t() noexcept;
+    platform_context_t(const pt::time_duration &poll_timeout) noexcept;
     ~platform_context_t();
 
     void notify() noexcept;

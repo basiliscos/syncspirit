@@ -81,7 +81,7 @@ struct fixture_t {
     }
 
     virtual void run() noexcept {
-        fs_context.reset(new fs::fs_context_t());
+        fs_context.reset(new fs::fs_context_t(retension_timeout * 3));
         sup = fs_context->create_supervisor<supervisor_t>().timeout(timeout).create_registry().finish();
         sup->fixture = this;
 

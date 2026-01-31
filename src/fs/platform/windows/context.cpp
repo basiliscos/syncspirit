@@ -53,7 +53,7 @@ static void async_cb(HANDLE handle, void *data) {
 
 static bool close_handle_cb(HANDLE handle) { return ::CloseHandle(handle); }
 
-platform_context_t::platform_context_t() noexcept {
+platform_context_t::platform_context_t(const pt::time_duration &poll_timeout_) noexcept : parent_t(poll_timeout_) {
     auto event = ::CreateEvent(nullptr, false, false, nullptr);
     if (!event) {
         LOG_CRITICAL(log, "cannot CreateEvent(): {}", ::GetLastError());

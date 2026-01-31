@@ -55,7 +55,8 @@ static void async_cb(int fd, void *data) {
     ctx->async_flag.store(false, std::memory_order_release);
 }
 
-platform_context_t::platform_context_t() noexcept : async_flag{false} {
+platform_context_t::platform_context_t(const pt::time_duration &poll_timeout_) noexcept
+    : parent_t(poll_timeout_), async_flag{false} {
     async_pipes[0] = async_pipes[1] = epoll_fd = -1;
 
     epoll_fd = epoll_create1(0);

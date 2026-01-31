@@ -385,7 +385,7 @@ int app_main(app_context_t &app_ctx) {
     // warm-up
     sup_fltk->do_process();
 
-    auto fs_context = fs_context_t();
+    auto fs_context = fs_context_t(r::pt::seconds{1});
     auto fs_sup = fs_context.create_supervisor<syncspirit::fs::fs_supervisor_t>()
                       .shutdown_flag(shutdown_flag, r::pt::millisec{50})
                       .timeout(timeout)

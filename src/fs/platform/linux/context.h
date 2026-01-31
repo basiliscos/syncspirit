@@ -18,9 +18,8 @@ namespace syncspirit::fs::platform::linux {
 
 struct SYNCSPIRIT_API platform_context_t : context_base_t {
     using parent_t = context_base_t;
-    using parent_t::parent_t;
 
-    platform_context_t() noexcept;
+    platform_context_t(const pt::time_duration &poll_timeout) noexcept;
     ~platform_context_t();
 
     void notify() noexcept;
