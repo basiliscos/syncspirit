@@ -27,7 +27,8 @@ guard_t::~io_guard_t() {
         auto ok = close_cb(handle);
         if (!ok) {
             auto log = utils::get_logger("fs");
-            LOG_WARN(log, "cannot close handle {}: {}", (void *)handle, utils::platform_t::get_last_error());
+            auto ec = sys::error_code(::GetLastError(), sys::system_category());
+            LOG_WARN(log, "cannot close handle {}: {}", (void *)handle, ec.message());
         }
     }
 }
@@ -56,7 +57,8 @@ static bool close_handle_cb(HANDLE handle) { return ::CloseHandle(handle); }
 platform_context_t::platform_context_t(const pt::time_duration &poll_timeout_) noexcept : parent_t(poll_timeout_) {
     auto event = ::CreateEvent(nullptr, false, false, nullptr);
     if (!event) {
-        LOG_CRITICAL(log, "cannot CreateEvent(): {}", ::GetLastError());
+        auto ec = sys::error_code(::GetLastError(), sys::system_category());
+        LOG_CRITICAL(log, "cannot CreateEvent(): {}", ec.message());
         return;
     }
     async_guard = register_callback(event, async_cb, this);
@@ -122,7 +124,8 @@ bool platform_context_t::wait_next_event() noexcept {
         } else if (r == WAIT_TIMEOUT) {
             // NO-OP
         } else {
-            LOG_WARN(log, "WaitFor*Object failed: {}", ::GetLastError());
+            auto ec = sys::error_code(::GetLastError(), sys::system_category());
+            LOG_WARN(log, "WaitFor*Object failed: {}", ec.message());
         }
     }
     return has_events;

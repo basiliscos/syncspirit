@@ -17,6 +17,10 @@
 #include "utils/platform.h"
 #endif
 
+#include <boost/system.hpp>
+
+namespace sys = boost::system;
+
 namespace syncspirit::utils {
 
 #if defined(__linux__) || defined(__APPLE__)
@@ -72,7 +76,8 @@ static uri_container_t _local_interfaces(logger_t &log, std::uint16_t port) noex
                                         NULL, adapter_addresses, &adapter_addresses_buffer_size);
 
     if (ERROR_SUCCESS != code) {
-        LOG_WARN(log, "GetAdaptersAddresses failed: ", utils::platform_t::get_last_error());
+        auto ec = sys::error_code(::GetLastError(), sys::system_category());
+        LOG_WARN(log, "GetAdaptersAddresses failed: ", ec.message());
         return r;
     }
 

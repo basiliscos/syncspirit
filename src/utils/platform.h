@@ -23,9 +23,6 @@ struct SYNCSPIRIT_API platform_t {
     static bool symlinks_supported() noexcept;
     static bool path_supported(const bfs::path &) noexcept;
     static bool permissions_supported(const bfs::path &) noexcept;
-#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
-    static std::string get_last_error() noexcept;
-#endif
 };
 
 } // namespace syncspirit::utils
