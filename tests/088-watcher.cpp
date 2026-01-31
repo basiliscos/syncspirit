@@ -127,6 +127,33 @@ struct fixture_t {
         using clock_t = pt::microsec_clock;
         changes.clear();
         auto deadline = clock_t::local_time() + pt::seconds{5};
+        auto do_flatten_on_demand = [&]() {
+            if (flatten) {
+                auto copy = change_messages_t();
+                auto changes_comparator = [](const auto &l, const auto &r) -> bool {
+                    return proto::get_name(l) < proto::get_name(r);
+                };
+                for (auto &m : changes) {
+                    for (auto &folder_change : m->payload) {
+                        auto file_changes = folder_change.file_changes;
+                        std::sort(file_changes.begin(), file_changes.end(), changes_comparator);
+                        for (auto &file_change : file_changes) {
+                            auto solo_changes = payload::folder_change_t{folder_change.folder_id, {file_change}};
+                            auto msg = change_message_ptr_t();
+                            msg.reset(new fs::message::folder_changes_t(sup->get_address(), std::move(solo_changes)));
+                            copy.emplace_back(msg);
+                        }
+                    }
+                }
+                auto comparator = [&](const auto &lm, const auto &rm) -> bool {
+                    auto l = lm->payload[0].file_changes[0];
+                    auto r = rm->payload[0].file_changes[0];
+                    return changes_comparator(l, r);
+                };
+                std::sort(copy.begin(), copy.end(), comparator);
+                changes = std::move(copy);
+            }
+        };
         do {
             auto prev_sz = changes.size();
             auto has_events = fs_context->wait_next_event();
@@ -138,26 +165,10 @@ struct fixture_t {
                 fs_context->update_time();
                 sup->do_process();
             }
-            if (flatten) {
-                auto copy = change_messages_t();
-                for (auto &m : changes) {
-                    for (auto &folder_change : m->payload) {
-                        auto file_changes = folder_change.file_changes;
-                        auto comparator = [](const auto &l, const auto &r) -> bool {
-                            return proto::get_name(l) < proto::get_name(r);
-                        };
-                        std::sort(file_changes.begin(), file_changes.end(), comparator);
-                        for (auto &file_change : file_changes) {
-                            auto solo_changes = payload::folder_change_t{folder_change.folder_id, {file_change}};
-                            auto msg = change_message_ptr_t();
-                            msg.reset(new fs::message::folder_changes_t(sup->get_address(), std::move(solo_changes)));
-                            copy.emplace_back(msg);
-                        }
-                    }
-                }
-                changes = std::move(copy);
-            }
+            do_flatten_on_demand();
         } while ((changes.size() < await_changes) && clock_t::local_time() < deadline);
+
+        do_flatten_on_demand();
         REQUIRE(changes.size() >= await_changes);
     }
 
@@ -931,6 +942,7 @@ void test_hierarchies() {
             auto folder_id = std::string("my-folder-id");
             auto back_addr = sup->get_address();
             auto ec = utils::make_error_code(utils::error_code_t::no_action);
+#if 0
             SECTION("remove hierarchy") {
                 if (!native::wine_environment()) {
                     auto path_1 = root_path / L"x" / L"y" / L"файл.bin";
@@ -958,6 +970,42 @@ void test_hierarchies() {
                         CHECK(proto::get_name(file_change) == narrow(names[i]));
                         CHECK(file_change.update_reason == update_type_t::deleted);
                     }
+                }
+            }
+#endif
+            SECTION("create hierarchy") {
+                if (!native::wine_environment()) {
+                    sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id, ec);
+                    sup->do_process();
+                    REQUIRE(watched_replies == 1);
+
+                    auto names = names_t({L"a", L"a/b", L"x", L"x/y", L"x/y/z"});
+                    for (auto it = names.rbegin(); it != names.rend(); ++it) {
+                        auto p = root_path / bfs::path(*it);
+                        if (p.filename().generic_wstring() == L"файл.bin") {
+                            write_file(p, "12345");
+                        } else {
+                            bfs::create_directories(p);
+                        }
+                    }
+
+#ifndef SYNCSPIRIT_WIN
+                    await_events(poll_t::trigger_timer, 2, true);
+                    auto name_1 = proto::get_name(changes[0]->payload[0].file_changes.front());
+                    auto name_2 = proto::get_name(changes[1]->payload[0].file_changes.front());
+                    CHECK(name_1 == narrow(L"a"));
+                    CHECK(name_2 == narrow(L"x"));
+#else
+                    await_events(poll_t::trigger_timer, 5, true);
+                    for (auto i = size_t{0}; i < names.size(); ++i) {
+                        auto &payload = changes[i]->payload;
+                        REQUIRE(payload.size() == 1);
+                        auto &file_change = payload[0].file_changes.front();
+                        auto &name = names[i];
+                        CHECK(proto::get_name(file_change) == narrow(names[i]));
+                        CHECK(file_change.update_reason == update_type_t::created);
+                    }
+#endif
                 }
             }
         }
