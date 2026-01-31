@@ -9,10 +9,10 @@ on:
 workflows:
   build-package-workflow:
     settings:
-        max_cube_duration: 2400m
+        max_cube_duration: 240m
     tasks:
       - [compile-san-n-test, make-app-image]
-      #- make-app-image
+      #- compile-san-n-test
 
 tasks:
   - name: compile-san-n-test
