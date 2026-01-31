@@ -185,7 +185,7 @@ struct fixture_t {
         launch_hasher();
         sup->do_process();
 
-        auto fs_config = config::fs_config_t{3600, 10, 1024 * 1024};
+        auto fs_config = config::fs_config_t{3600, 10};
 
         if (auto_launch) {
             launch_target();

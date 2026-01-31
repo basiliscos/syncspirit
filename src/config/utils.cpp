@@ -195,7 +195,6 @@ static main_t make_default_config(const bfs::path &config_path, const bfs::path 
     };
     cfg.fs_config = fs_config_t {
         86400000,   /* temporally_timeout, 24h default */
-        1024*1024,  /* bytes_scan_iteration_limit max number of bytes before emitting scan events */
         128,        /* files_scan_iteration_limit max number processed files before emitting scan events */
     };
     cfg.db_config = db_config_t {
@@ -347,7 +346,6 @@ config_result_t get_config(std::istream &config, const bfs::path &config_path) {
         auto &c_default = default_config.fs_config;
 
         SAFE_GET_VALUE(temporally_timeout, std::uint32_t, "fs");
-        SAFE_GET_VALUE(bytes_scan_iteration_limit, std::int64_t, "fs");
         SAFE_GET_VALUE(files_scan_iteration_limit, std::int64_t, "fs");
     }
 
@@ -478,7 +476,6 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
                    }}},
         {"fs", toml::table{{
                    {"temporally_timeout", cfg.fs_config.temporally_timeout},
-                   {"bytes_scan_iteration_limit", cfg.fs_config.bytes_scan_iteration_limit},
                    {"files_scan_iteration_limit", cfg.fs_config.files_scan_iteration_limit},
                }}},
         {"db", toml::table{{

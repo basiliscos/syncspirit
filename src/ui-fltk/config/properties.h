@@ -218,15 +218,6 @@ struct skip_discovers_t final : impl::positive_integer_t {
 
 namespace fs {
 
-struct bytes_scan_iteration_limit_t final : impl::positive_integer_t {
-    using parent_t = impl::positive_integer_t;
-
-    static const char *explanation_;
-
-    bytes_scan_iteration_limit_t(std::uint64_t value, std::uint64_t default_value);
-    void reflect_to(syncspirit::config::main_t &main) override;
-};
-
 struct files_scan_iteration_limit_t final : impl::positive_integer_t {
     using parent_t = impl::positive_integer_t;
 

@@ -68,7 +68,6 @@ auto reflect(const main_cfg_t &config, const main_cfg_t &default_config) -> cate
         auto props = properties_t{
             // clang-format off
             property_ptr_t(new fs::temporally_timeout_t(f.temporally_timeout, f_def.temporally_timeout)),
-            property_ptr_t(new fs::bytes_scan_iteration_limit_t(f.bytes_scan_iteration_limit, f_def.bytes_scan_iteration_limit)),
             property_ptr_t(new fs::files_scan_iteration_limit_t(f.files_scan_iteration_limit, f_def.files_scan_iteration_limit)),
             // clang-format on
         };
