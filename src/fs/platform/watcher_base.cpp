@@ -155,7 +155,7 @@ auto FU::make(const folder_info_t &folder_info, updates_mediator_t &mediator) no
             auto path = folder_info.path / widen(update.path);
             auto status = bfs::symlink_status(path, ec);
             if (ec) {
-                LOG_WARN(log, "cannot get status on '{}': {} (update ignored)", full_name, ec.message());
+                LOG_DEBUG(log, "cannot get status on '{}': {} (update ignored)", full_name, ec.message());
                 continue;
             }
             proto::set_permissions(r, static_cast<uint32_t>(status.permissions()));

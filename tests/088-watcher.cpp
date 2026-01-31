@@ -158,6 +158,7 @@ struct fixture_t {
                 changes = std::move(copy);
             }
         } while ((changes.size() < await_changes) && clock_t::local_time() < deadline);
+        REQUIRE(changes.size() >= await_changes);
     }
 
     virtual void on_watch(message::watch_folder_t &msg) noexcept {
@@ -922,6 +923,48 @@ void test_real_impl() {
     F().run();
 }
 
+void test_hierarchies() {
+    struct F : fixture_t {
+        using fixture_t::fixture_t;
+        void main() noexcept override {
+            using names_t = std::vector<std::wstring_view>;
+            auto folder_id = std::string("my-folder-id");
+            auto back_addr = sup->get_address();
+            auto ec = utils::make_error_code(utils::error_code_t::no_action);
+            SECTION("remove hierarchy") {
+                if (!native::wine_environment()) {
+                    auto path_1 = root_path / L"x" / L"y" / L"файл.bin";
+                    auto path_2 = root_path / L"a" / L"b";
+                    bfs::create_directories(path_1.parent_path());
+                    bfs::create_directories(path_2);
+                    write_file(path_1, "12345");
+
+                    sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id, ec);
+                    sup->do_process();
+                    REQUIRE(watched_replies == 1);
+                    auto names = names_t({L"a", L"a/b", L"x", L"x/y", L"x/y/файл.bin"});
+                    for (auto it = names.rbegin(); it != names.rend(); ++it) {
+                        auto p = root_path / bfs::path(*it);
+                        bfs::remove_all(p);
+                    }
+
+                    await_events(poll_t::trigger_timer, 5, true);
+
+                    for (auto i = size_t{0}; i < names.size(); ++i) {
+                        auto &payload = changes[i]->payload;
+                        REQUIRE(payload.size() == 1);
+                        auto &file_change = payload[0].file_changes.front();
+                        auto &name = names[i];
+                        CHECK(proto::get_name(file_change) == narrow(names[i]));
+                        CHECK(file_change.update_reason == update_type_t::deleted);
+                    }
+                }
+            }
+        }
+    };
+    F().run();
+}
+
 int _init() {
     test::init_logging();
     REGISTER_TEST_CASE(test_watcher_base, "test_watcher_base", "[fs]");
@@ -929,6 +972,7 @@ int _init() {
     REGISTER_TEST_CASE(test_start_n_shutdown, "test_start_n_shutdown", "[fs]");
     REGISTER_TEST_CASE(test_double_watching, "test_double_watching", "[fs]");
     REGISTER_TEST_CASE(test_real_impl, "test_real_impl", "[fs]");
+    REGISTER_TEST_CASE(test_hierarchies, "test_hierarchies", "[fs]");
 #endif
     return 1;
 }
