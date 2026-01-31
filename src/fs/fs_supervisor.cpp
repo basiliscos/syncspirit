@@ -1,9 +1,10 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
+/// SPDX-License-Identifier: GPL-3.0-or-later
 // SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "fs_supervisor.h"
 #include "file_actor.h"
 #include "fs_context.h"
+#include "watcher_actor.h"
 
 #if SYNCSPIRIT_WATCHER_INOTIFY
 #include <unistd.h>
@@ -34,8 +35,15 @@ void fs_supervisor_t::on_start() noexcept {
 }
 
 void fs_supervisor_t::launch_children() noexcept {
+    auto retension = pt::milliseconds{fs_config.retension_timeout};
+    updates_mediator.reset(new updates_mediator_t(retension * 2));
     auto timeout = shutdown_timeout * 9 / 10;
     create_actor<file_actor_t>().concurrent_hashes(hasher_threads).timeout(timeout).escalate_failure().finish();
+    create_actor<watch_actor_t>()
+        .timeout(timeout)
+        .change_retension(retension)
+        .updates_mediator(updates_mediator)
+        .finish();
 }
 
 void fs_supervisor_t::on_child_shutdown(actor_base_t *actor) noexcept {

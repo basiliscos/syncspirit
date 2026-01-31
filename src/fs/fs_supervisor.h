@@ -6,6 +6,7 @@
 #include "config/fs.h"
 #include "syncspirit-export.h"
 #include "utils/log.h"
+#include "updates_mediator.h"
 #include <rotor/thread.hpp>
 
 namespace syncspirit {
@@ -53,6 +54,7 @@ struct SYNCSPIRIT_API fs_supervisor_t : rth::supervisor_thread_t {
     utils::logger_t log;
     config::fs_config_t fs_config;
     uint32_t hasher_threads;
+    updates_mediator_ptr_t updates_mediator;
 };
 
 } // namespace fs

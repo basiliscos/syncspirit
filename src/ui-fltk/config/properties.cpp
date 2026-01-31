@@ -269,15 +269,6 @@ const char *skip_discovers_t::explanation_ = "when peer addresses are known, how
 
 namespace fs {
 
-temporally_timeout_t::temporally_timeout_t(std::uint64_t value, std::uint64_t default_value)
-    : parent_t("temporally_timeout", explanation_, value, default_value) {}
-
-void temporally_timeout_t::reflect_to(syncspirit::config::main_t &main) {
-    main.fs_config.temporally_timeout = native_value;
-}
-
-const char *temporally_timeout_t::explanation_ = "remove incomplete file after this amount of seconds";
-
 files_scan_iteration_limit_t::files_scan_iteration_limit_t(std::uint64_t value, std::uint64_t default_value)
     : parent_t("files_scan_iteration_limit", explanation_, value, default_value) {}
 
@@ -286,6 +277,31 @@ void files_scan_iteration_limit_t::reflect_to(syncspirit::config::main_t &main) 
 }
 
 const char *files_scan_iteration_limit_t::explanation_ = "max number processed files before emitting scan events";
+
+retension_timeout_t::retension_timeout_t(std::uint64_t value, std::uint64_t default_value)
+    : parent_t("retension_timeout", explanation_, value, default_value) {}
+
+void retension_timeout_t::reflect_to(syncspirit::config::main_t &main) {
+    main.fs_config.retension_timeout = native_value;
+}
+
+const char *retension_timeout_t::explanation_ = "delay of file events propagation in milliseconds";
+
+poll_timeout_t::poll_timeout_t(std::uint64_t value, std::uint64_t default_value)
+    : parent_t("poll_timeout", explanation_, value, default_value) {}
+
+void poll_timeout_t::reflect_to(syncspirit::config::main_t &main) { main.fs_config.poll_timeout = native_value; }
+
+const char *poll_timeout_t::explanation_ = "amount of microseconds to do micro-sleeps when there is nothing to do";
+
+temporally_timeout_t::temporally_timeout_t(std::uint64_t value, std::uint64_t default_value)
+    : parent_t("temporally_timeout", explanation_, value, default_value) {}
+
+void temporally_timeout_t::reflect_to(syncspirit::config::main_t &main) {
+    main.fs_config.temporally_timeout = native_value;
+}
+
+const char *temporally_timeout_t::explanation_ = "remove incomplete file after this amount of seconds";
 
 } // namespace fs
 

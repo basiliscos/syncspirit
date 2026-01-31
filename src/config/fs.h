@@ -8,6 +8,8 @@ namespace syncspirit::config {
 
 struct fs_config_t {
     std::uint32_t temporally_timeout;
+    std::uint32_t poll_timeout;
+    std::uint32_t retension_timeout;
     std::int64_t files_scan_iteration_limit;
 };
 
