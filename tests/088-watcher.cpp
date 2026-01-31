@@ -44,7 +44,7 @@ void rename(const bfs::path &from, const bfs::path &to) {
     auto to_native = to.native().data();
     if (!MoveFileExW(from_native, to_native, MOVEFILE_WRITE_THROUGH)) {
         auto ec = sys::error_code(::GetLastError(), sys::system_category());
-        throw std::runtime_error(ec.message());
+        REQUIRE(ec.message() == "");
     }
 #endif
 }
@@ -1004,6 +1004,58 @@ void test_hierarchies() {
                         auto &name = names[i];
                         CHECK(proto::get_name(file_change) == narrow(names[i]));
                         CHECK(file_change.update_reason == update_type_t::created);
+                    }
+#endif
+                }
+            }
+
+            SECTION("move hierarchy (inside folder)") {
+                if (!native::wine_environment()) {
+                    auto names = names_t({L"a", L"a/b", L"x", L"x/y", L"x/y/z"});
+                    auto dir_1 = root_path / "win32-hack" / L"директория-1";
+                    auto dir_2 = root_path / "win32-hack" / L"директория-2";
+                    for (auto it = names.rbegin(); it != names.rend(); ++it) {
+                        auto p = dir_1 / bfs::path(*it);
+                        if (p.filename().generic_wstring() == L"файл.bin") {
+                            write_file(p, "12345");
+                        } else {
+                            bfs::create_directories(p);
+                        }
+                    }
+
+                    sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id, ec);
+                    sup->do_process();
+                    REQUIRE(watched_replies == 1);
+
+                    native::rename(dir_1, dir_2);
+
+#ifndef SYNCSPIRIT_WIN
+                    await_events(poll_t::trigger_timer, 1);
+                    auto &file_change = changes[0]->payload[0].file_changes[0];
+                    CHECK(proto::get_name(file_change) == narrow(L"win32-hack/директория-2"));
+                    CHECK(proto::get_size(file_change) == 0);
+                    CHECK(!proto::get_deleted(file_change));
+                    CHECK(proto::get_type(file_change) == proto::FileInfoType::DIRECTORY);
+                    CHECK(file_change.update_reason == update_type_t::meta);
+                    CHECK(file_change.prev_path == narrow(L"win32-hack/директория-1"));
+#else
+                    await_events(poll_t::trigger_timer, 2, true);
+                    {
+                        auto &file_change = changes[0]->payload[0].file_changes[0];
+                        CHECK(proto::get_name(file_change) == narrow(L"win32-hack/директория-1"));
+                        CHECK(proto::get_size(file_change) == 0);
+                        CHECK(proto::get_deleted(file_change));
+                        CHECK(file_change.update_reason == update_type_t::deleted);
+                        CHECK(file_change.prev_path == "");
+                    }
+                    {
+                        auto &file_change = changes[1]->payload[0].file_changes[0];
+                        CHECK(proto::get_name(file_change) == narrow(L"win32-hack/директория-2"));
+                        CHECK(proto::get_size(file_change) == 0);
+                        CHECK(!proto::get_deleted(file_change));
+                        CHECK(proto::get_type(file_change) == proto::FileInfoType::DIRECTORY);
+                        CHECK(file_change.update_reason == update_type_t::created);
+                        CHECK(file_change.prev_path == "");
                     }
 #endif
                 }
