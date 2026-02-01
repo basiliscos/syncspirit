@@ -26,6 +26,7 @@ void fs_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 void fs_supervisor_t::enqueue(r::message_ptr_t message) noexcept {
     auto ctx = static_cast<fs_context_t *>(context);
     inbound_queue.push(message.detach());
+    ctx->notify();
 }
 
 void fs_supervisor_t::on_start() noexcept {
