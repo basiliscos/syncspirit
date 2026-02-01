@@ -364,6 +364,14 @@ inline void set_scheduled(Folder &msg, bool value) {
     using namespace pp;
     msg["scheduled"_f] = value;
 }
+inline bool get_watched(const Folder &msg) {
+    using namespace pp;
+    return msg["watched"_f].value_or(false);
+}
+inline void set_watched(Folder &msg, bool value) {
+    using namespace pp;
+    msg["watched"_f] = value;
+}
 inline std::string_view get_path(const Folder &msg) {
     using namespace pp;
     auto &opt = msg["path"_f];

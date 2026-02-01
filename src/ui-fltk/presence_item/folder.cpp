@@ -117,6 +117,7 @@ struct table_t : content::folder_table_t {
             data.push_back({"disable temp indixes", make_disable_tmp(*this)});
             data.push_back({"scheduled", make_scheduled(*this, false)});
             data.push_back({"paused", make_paused(*this, false)});
+            data.push_back({"watched", make_watched(*this, false)});
         }
 
         if (is_local) {

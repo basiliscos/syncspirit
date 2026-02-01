@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2025-2026 Ivan Baidakou
 
 #pragma once
 
@@ -230,7 +230,8 @@ using Folder = pp::message<
     pp::string_field    <"path",                  9             >,
     pp::enum_field      <"folder_type",          10, FolderType >,
     pp::enum_field      <"pull_order",           11, PullOrder  >,
-    pp::uint32_field    <"rescan_interval",      12             >
+    pp::uint32_field    <"rescan_interval",      12             >,
+    pp::bool_field      <"watched",              13             >
 >;
 
 using FolderInfo = pp::message<

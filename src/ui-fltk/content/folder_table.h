@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2026 Ivan Baidakou
 
 #pragma once
 
@@ -34,6 +34,7 @@ struct folder_table_t : static_table_t {
     static widgetable_ptr_t make_disable_tmp(folder_table_t &container);
     static widgetable_ptr_t make_scheduled(folder_table_t &container, bool disabled);
     static widgetable_ptr_t make_paused(folder_table_t &container, bool disabled);
+    static widgetable_ptr_t make_watched(folder_table_t &container, bool disabled);
     static widgetable_ptr_t make_shared_with(folder_table_t &container, model::device_ptr_t device, bool disabled);
     static widgetable_ptr_t make_notice(folder_table_t &container);
 

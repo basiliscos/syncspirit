@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2026 Ivan Baidakou
 
 #include "folder_table.h"
 
@@ -543,6 +543,32 @@ auto folder_table_t::make_paused(folder_table_t &container, bool disabled) -> wi
         bool store(void *data) override {
             auto ctx = reinterpret_cast<ctx_t *>(data);
             db::set_paused(ctx->folder, input->value());
+            return true;
+        }
+        bool disabled;
+    };
+    return new widget_t(container, disabled);
+}
+
+auto folder_table_t::make_watched(folder_table_t &container, bool disabled) -> widgetable_ptr_t {
+    struct widget_t final : checkbox_widget_t {
+        using parent_t = checkbox_widget_t;
+        widget_t(Fl_Widget &container, bool disabled_) : parent_t{container}, disabled{disabled_} {}
+
+        Fl_Widget *create_widget(int x, int y, int w, int h) override {
+            auto r = parent_t::create_widget(x, y, w, h);
+            if (disabled) {
+                widget->deactivate();
+            }
+            return r;
+        }
+        void reset() override {
+            auto &container = static_cast<folder_table_t &>(this->container);
+            input->value(container.description.get_folder()->is_watched());
+        }
+        bool store(void *data) override {
+            auto ctx = reinterpret_cast<ctx_t *>(data);
+            db::set_watched(ctx->folder, input->value());
             return true;
         }
         bool disabled;

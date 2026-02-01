@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "folder_data.h"
 #include "proto/proto-helpers.h"
@@ -20,6 +20,7 @@ void folder_data_t::assign_fields(const db::Folder &item) noexcept {
     ignore_delete = db::get_ignore_delete(item);
     disable_temp_indixes = db::get_disable_temp_indexes(item);
     paused = db::get_paused(item);
+    watched = db::get_watched(item);
 }
 
 void folder_data_t::serialize(db::Folder &r) const noexcept {
@@ -29,6 +30,7 @@ void folder_data_t::serialize(db::Folder &r) const noexcept {
     db::set_ignore_delete(r, ignore_delete);
     db::set_disable_temp_indexes(r, disable_temp_indixes);
     db::set_paused(r, paused);
+    db::set_watched(r, watched);
     db::set_scheduled(r, scheduled);
     db::set_path(r, path.string());
     db::set_folder_type(r, folder_type);

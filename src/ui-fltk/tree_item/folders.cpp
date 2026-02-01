@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2026 Ivan Baidakou
 
 #include "folders.h"
 #include "presence_item/folder.h"
@@ -85,6 +85,7 @@ struct table_t : content::folder_table_t {
         data.push_back({"disable temp indixes", make_disable_tmp(*this)});
         data.push_back({"scheduled", make_scheduled(*this, false)});
         data.push_back({"paused", make_paused(*this, false)});
+        data.push_back({"watched", make_watched(*this, false)});
         data.push_back({"shared_with", make_shared_with(*this, {}, false)});
         data.push_back({"", notice = make_notice(*this)});
         data.push_back({"actions", make_actions(*this)});
@@ -204,6 +205,7 @@ bool folders_t::on_select() {
         db::set_rescan_interval(db_folder, 3600);
         db::set_path(db_folder, boost::nowide::narrow(path.wstring()));
         db::set_id(db_folder, id);
+        db::set_watched(db_folder, true);
         auto folder = model::folder_t::create(sequencer.next_uuid(), db_folder).value();
         folder->assign_cluster(cluster);
 
