@@ -222,11 +222,18 @@ void watcher_base_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.register_name(actor_identity, get_address());
         p.discover_name(net::names::coordinator, coordinator, false).link(false);
     });
-    plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) { p.subscribe_actor(&watcher_base_t::on_watch); });
+    plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
+        p.subscribe_actor(&watcher_base_t::on_watch);
+        p.subscribe_actor(&watcher_base_t::on_unwatch);
+    });
 }
 
 void watcher_base_t::on_watch(message::watch_folder_t &) noexcept {
     LOG_WARN(log, "watching directory isn't supported by platform");
+}
+
+void watcher_base_t::on_unwatch(message::unwatch_folder_t &) noexcept {
+    LOG_WARN(log, "unwatching directory isn't supported by platform");
 }
 
 void watcher_base_t::push(const timepoint_t &deadline, std::string_view folder_id, std::string_view relative_path,

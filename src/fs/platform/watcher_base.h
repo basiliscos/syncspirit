@@ -81,7 +81,10 @@ struct SYNCSPIRIT_API watcher_base_t : r::actor_base_t {
 
     explicit watcher_base_t(config_t &cfg);
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
+
     virtual void on_watch(message::watch_folder_t &) noexcept;
+    virtual void on_unwatch(message::unwatch_folder_t &) noexcept;
+
     void on_retension_finish(r::request_id_t, bool cancelled) noexcept;
     void push(const timepoint_t &deadline, std::string_view folder_id, std::string_view relative_path,
               std::string prev_path, update_type_t type) noexcept;

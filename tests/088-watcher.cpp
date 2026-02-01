@@ -64,6 +64,7 @@ struct supervisor_t : fs::fs_supervisor_t {
             [&](auto &p) { p.register_name(net::names::coordinator, get_address()); });
         plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
             p.subscribe_actor(&supervisor_t::on_watch);
+            p.subscribe_actor(&supervisor_t::on_unwatch);
             p.subscribe_actor(&supervisor_t::on_changes);
         });
     }
@@ -73,6 +74,7 @@ struct supervisor_t : fs::fs_supervisor_t {
     }
 
     void on_watch(message::watch_folder_t &) noexcept;
+    void on_unwatch(message::unwatch_folder_t &) noexcept;
     void on_changes(message::folder_changes_t &) noexcept;
 
     fixture_t *fixture;
@@ -81,7 +83,7 @@ struct supervisor_t : fs::fs_supervisor_t {
 enum class poll_t { single, trigger_timer };
 
 struct fixture_t {
-    using target_ptr_t = r::intrusive_ptr_t<fs::watch_actor_t>;
+    using target_ptr_t = r::intrusive_ptr_t<fs::platform::watcher_base_t>;
     using fs_context_ptr_r = r::intrusive_ptr_t<fs::fs_context_t>;
     using change_message_ptr_t = r::intrusive_ptr_t<fs::message::folder_changes_t>;
     using change_messages_t = std::deque<change_message_ptr_t>;
@@ -178,6 +180,12 @@ struct fixture_t {
         ++watched_replies;
     }
 
+    virtual void on_unwatch(message::unwatch_folder_t &msg) noexcept {
+        CHECK(!msg.payload.ec);
+        CHECK(msg.payload.ec.message() != "");
+        ++unwatched_replies;
+    }
+
     virtual void on_changes(message::folder_changes_t &msg) noexcept { changes.emplace_back(&msg); }
 
     virtual void main() noexcept {}
@@ -194,9 +202,11 @@ struct fixture_t {
     r::pt::time_duration timeout = TIMEOUT;
     change_messages_t changes;
     size_t watched_replies = 0;
+    size_t unwatched_replies = 0;
 };
 
 void supervisor_t::on_watch(message::watch_folder_t &msg) noexcept { fixture->on_watch(msg); }
+void supervisor_t::on_unwatch(message::unwatch_folder_t &msg) noexcept { fixture->on_unwatch(msg); }
 void supervisor_t::on_changes(message::folder_changes_t &msg) noexcept { fixture->on_changes(msg); }
 
 void test_watcher_base() {
@@ -470,9 +480,22 @@ void test_watcher_base() {
     F().run();
 }
 
+struct fixture_real_t : fixture_t {
+    using fixture_t::fixture_t;
+
+    void launch_target() override {
+        target = sup->create_actor<fs::watch_actor_t>()
+                     .timeout(timeout)
+                     .change_retension(retension())
+                     .updates_mediator(updates_mediator)
+                     .finish();
+        sup->do_process();
+    }
+};
+
 void test_start_n_shutdown() {
-    struct F : fixture_t {
-        using fixture_t::fixture_t;
+    struct F : fixture_real_t {
+        using fixture_real_t::fixture_real_t;
 
         void main() noexcept override {
             launch_target();
@@ -488,14 +511,20 @@ void test_start_n_shutdown() {
     F(false).run();
 }
 
-void test_double_watching() {
-    struct F : fixture_t {
-        using fixture_t::fixture_t;
+void test_watch_unwatch() {
+    struct F : fixture_real_t {
+        using fixture_real_t::fixture_real_t;
 
         void on_watch(message::watch_folder_t &msg) noexcept override {
             auto &counter = msg.payload.ec ? watched_errors : watched_successes;
             ++counter;
             ++watched_replies;
+        }
+
+        void on_unwatch(message::unwatch_folder_t &msg) noexcept override {
+            auto &counter = msg.payload.ec ? unwatched_errors : unwatched_successes;
+            ++counter;
+            ++unwatched_replies;
         }
 
         void main() noexcept override {
@@ -505,20 +534,40 @@ void test_double_watching() {
             sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id, ec);
             sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id, ec);
             sup->do_process();
-            REQUIRE(watched_replies == 2);
-            REQUIRE(watched_successes == 1);
-            REQUIRE(watched_errors == 1);
+            CHECK(watched_replies == 2);
+            CHECK(watched_successes == 1);
+            CHECK(watched_errors == 1);
+            CHECK(unwatched_replies == 0);
+            CHECK(unwatched_successes == 0);
+            CHECK(unwatched_errors == 0);
+
+            ec = utils::make_error_code(utils::error_code_t::no_action);
+            sup->route<fs::payload::unwatch_folder_t>(target->get_address(), back_addr, folder_id, ec);
+            sup->do_process();
+            CHECK(unwatched_replies == 1);
+            CHECK(unwatched_successes == 1);
+            CHECK(unwatched_errors == 0);
+
+            ec = utils::make_error_code(utils::error_code_t::no_action);
+            sup->route<fs::payload::unwatch_folder_t>(target->get_address(), back_addr, folder_id, ec);
+            sup->do_process();
+            CHECK(unwatched_replies == 2);
+            CHECK(unwatched_successes == 1);
+            CHECK(unwatched_errors == 1);
         }
 
         int watched_successes = 0;
         int watched_errors = 0;
+        int unwatched_successes = 0;
+        int unwatched_errors = 0;
     };
     F().run();
 }
 
 void test_real_impl() {
-    struct F : fixture_t {
-        using fixture_t::fixture_t;
+    struct F : fixture_real_t {
+        using fixture_real_t::fixture_real_t;
+
         void main() noexcept override {
             auto folder_id = std::string("my-folder-id");
             auto back_addr = sup->get_address();
@@ -935,8 +984,9 @@ void test_real_impl() {
 }
 
 void test_hierarchies() {
-    struct F : fixture_t {
-        using fixture_t::fixture_t;
+    struct F : fixture_real_t {
+        using fixture_real_t::fixture_real_t;
+
         void main() noexcept override {
             using names_t = std::vector<std::wstring_view>;
             auto folder_id = std::string("my-folder-id");
@@ -1070,7 +1120,7 @@ int _init() {
     REGISTER_TEST_CASE(test_watcher_base, "test_watcher_base", "[fs]");
 #if defined(SYNCSPIRIT_WATCHER_ANY)
     REGISTER_TEST_CASE(test_start_n_shutdown, "test_start_n_shutdown", "[fs]");
-    REGISTER_TEST_CASE(test_double_watching, "test_double_watching", "[fs]");
+    REGISTER_TEST_CASE(test_watch_unwatch, "test_watch_unwatch", "[fs]");
     REGISTER_TEST_CASE(test_real_impl, "test_real_impl", "[fs]");
     REGISTER_TEST_CASE(test_hierarchies, "test_hierarchies", "[fs]");
 #endif

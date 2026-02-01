@@ -160,6 +160,11 @@ struct watch_folder_t {
     sys::error_code ec;
 };
 
+struct unwatch_folder_t {
+    std::string folder_id;
+    sys::error_code ec;
+};
+
 struct file_info_t : proto::FileInfo {
     using parent_t = proto::FileInfo;
     inline file_info_t(proto::FileInfo file_info, std::string prev_path_, update_type_t update_reason_)
@@ -186,6 +191,7 @@ using io_commands_t = r::message_t<payload::io_commands_t>;
 using create_dir_t = r::message_t<payload::create_dir_t>;
 
 using watch_folder_t = r::message_t<payload::watch_folder_t>;
+using unwatch_folder_t = r::message_t<payload::unwatch_folder_t>;
 using folder_changes_t = r::message_t<payload::folder_changes_t>;
 
 } // namespace message
