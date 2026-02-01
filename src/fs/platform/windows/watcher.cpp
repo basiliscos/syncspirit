@@ -78,9 +78,58 @@ void watcher_t::on_watch(message::watch_folder_t &message) noexcept {
     if (!inserted) {
         LOG_WARN(log, "folder '{}' on '{}' is already watched", p.folder_id, path_str);
     } else {
+        handle_map[it->first] = event_handle;
         path_map[event_handle] = std::move(path_guard);
         p.ec = {};
     }
+}
+
+auto watcher_t::unwatch_dir(std::string_view folder_id) noexcept -> sys::error_code {
+    auto r = sys::error_code();
+    auto handle = handle_map[folder_id];
+    auto it = path_map.find(handle);
+    auto &pg = it->second;
+
+    for (auto guard : {&pg->event_guard, &pg->dir_guard}) {
+        auto handle = guard->handle;
+        guard->handle = {};
+        auto ok = ::CloseHandle(handle);
+        if (!ok) {
+            if (!r) {
+                r = sys::error_code(::GetLastError(), sys::system_category());
+            } else {
+                LOG_WARN(log, "error closing handle {}", (void *)handle);
+            }
+        }
+    }
+    path_map.erase(it);
+
+    return r;
+}
+
+void watcher_t::on_unwatch(message::unwatch_folder_t &message) noexcept {
+    auto &p = message.payload;
+    auto it = folder_map.find(p.folder_id);
+    if (it != folder_map.end()) {
+        LOG_DEBUG(log, "unwatching {}", it->second.path_str);
+        p.ec = unwatch_dir(p.folder_id);
+        folder_map.erase(it);
+    } else {
+        LOG_WARN(log, "cannot unwatch folder '{}' as it has been watched", p.folder_id);
+    }
+}
+
+void watcher_t::shutdown_finish() noexcept {
+    for (auto it = folder_map.begin(); it != folder_map.end();) {
+        auto &folder_id = it->first;
+        auto &path = it->second.path_str;
+        LOG_DEBUG(log, "unwatching {}", path);
+        unwatch_dir(folder_id);
+        it = folder_map.erase(it);
+    }
+    assert(path_map.empty());
+    assert(folder_map.empty());
+    parent_t::shutdown_finish();
 }
 
 void watcher_t::on_notify(handle_t handle) noexcept {
@@ -90,6 +139,7 @@ void watcher_t::on_notify(handle_t handle) noexcept {
         LOG_CRITICAL(log, "cannot find path guard for handle {}", (void *)handle);
         return;
     }
+
     auto &path_guard = it->second;
     auto &folder_id = path_guard->folder_id;
     auto &folder_info = folder_map[folder_id];

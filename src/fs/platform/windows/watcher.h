@@ -32,22 +32,18 @@ struct SYNCSPIRIT_API watcher_t : watcher_base_t {
     };
     using path_guard_ptr_t = model::intrusive_ptr_t<path_guard_t>;
     using handle_t = fs_context_t::handle_t;
+    using handle_map_t = std::unordered_map<std::string_view, handle_t>;
+    using path_map_t = std::unordered_map<handle_t, path_guard_ptr_t>;
 
-    // void do_initialize(r::system_context_t *ctx) noexcept override;
+    sys::error_code unwatch_dir(std::string_view folder_id) noexcept;
+
+    void shutdown_finish() noexcept override;
     void on_watch(message::watch_folder_t &) noexcept override;
-    // void notify_callback() noexcept;
-    // void shutdown_finish() noexcept override;
+    void on_unwatch(message::unwatch_folder_t &) noexcept override;
     void on_notify(handle_t handle) noexcept;
 
-    using path_map_t = std::unordered_map<handle_t, path_guard_ptr_t>;
-    // using subdir_map_t = std::unordered_map<int, std::vector<int>>;
-    //
-    // sys::error_code watch_dir(std::string_view path, std::string_view folder_id, int parent) noexcept;
-    // void try_watch_recurse(std::string_view name, const path_guard_t &parent_guard, int parent_fd) noexcept;
-
-    // fs_context_t::io_guard_t io_guard;
+    handle_map_t handle_map;
     path_map_t path_map;
-    // subdir_map_t subdir_map;
 };
 
 } // namespace syncspirit::fs::platform::windows

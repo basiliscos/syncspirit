@@ -328,7 +328,7 @@ void watcher_t::on_unwatch(message::unwatch_folder_t &message) noexcept {
         root_map.erase(it_root);
         folder_map.erase(it);
     } else {
-        LOG_WARN(log, "cannot unwatch folder '{}' as it is not has been watched", p.folder_id);
+        LOG_WARN(log, "cannot unwatch folder '{}' as it has been watched", p.folder_id);
     }
 }
 
