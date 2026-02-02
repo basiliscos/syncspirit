@@ -859,6 +859,6 @@ void folder_table_t::on_rescan() {
     auto &sup = container.supervisor;
     auto diff = model::diff::cluster_diff_ptr_t{};
     auto folder_id = description.get_folder()->get_id();
-    diff = new model::diff::local::scan_request_t(folder_id);
+    diff = new model::diff::local::scan_request_t(folder_id, {});
     sup.send_model<model::payload::model_update_t>(std::move(diff), this);
 }

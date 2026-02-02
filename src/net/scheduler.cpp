@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2026 Ivan Baidakou
 
 #include "scheduler.h"
 #include "net/names.h"
@@ -10,6 +10,29 @@
 #include "model/diff/local/synchronization_finish.h"
 
 using namespace syncspirit::net;
+
+enum class subpath_comparison_t { equal, includes, is_included, no_intersection };
+
+static inline subpath_comparison_t compare(std::string_view a, std::string_view b) noexcept {
+    using C = subpath_comparison_t;
+    if (a.size() < b.size()) {
+        for (size_t i = 0; i < a.size(); ++i) {
+            if (a[i] != b[i]) {
+                return C::no_intersection;
+            }
+        }
+        return C::includes;
+    } else if (a.size() > b.size()) {
+        for (size_t i = 0; i < b.size(); ++i) {
+            if (a[i] != b[i]) {
+                return C::no_intersection;
+            }
+        }
+        return C::is_included;
+    } else {
+        return a == b ? C::equal : C::no_intersection;
+    }
+}
 
 void scheduler_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
@@ -64,9 +87,35 @@ auto scheduler_t::operator()(const model::diff::modify::upsert_folder_t &diff, v
 
 auto scheduler_t::operator()(const model::diff::local::scan_request_t &diff, void *custom) noexcept
     -> outcome::result<void> {
-    scan_queue.emplace_back(diff.folder_id);
-    if (!scan_in_progress) {
-        scan_next_or_schedule();
+    bool updated = false;
+    bool ignore = false;
+    for (auto it = scan_queue.begin(); it != scan_queue.end();) {
+        if (it->folder_id == diff.folder_id) {
+            using C = subpath_comparison_t;
+            auto r = compare(it->sub_dir, diff.sub_dir);
+            if (r == C::equal || r == C::includes) {
+                LOG_DEBUG(log, "ignored scan request of '{}' of '{}' ", diff.sub_dir, diff.folder_id, it->sub_dir);
+                ignore = true;
+            } else if (r == subpath_comparison_t::is_included) {
+                ignore = true;
+                updated = false;
+                LOG_DEBUG(log, "updated scan request of '{}': '{}' -> '{}'", diff.folder_id, it->sub_dir, diff.sub_dir);
+                it->sub_dir = diff.sub_dir;
+            } else {
+                // NOOP. will be included
+            }
+            break;
+        } else {
+            ++it;
+        }
+    }
+    if (!ignore) {
+        scan_queue.emplace_back(scan_item_t{diff.folder_id, diff.sub_dir});
+    }
+    if (!ignore || updated) {
+        if (!scan_in_progress) {
+            scan_next_or_schedule();
+        }
     }
     return diff.visit_next(*this, custom);
 }
@@ -110,20 +159,20 @@ void scheduler_t::scan_next_or_schedule() noexcept {
 
 auto scheduler_t::scan_next() noexcept -> schedule_option_t {
     while (!scan_queue.empty()) {
-        auto folder_id = std::move(scan_queue.front());
+        auto item = std::move(scan_queue.front());
         scan_queue.pop_front();
-        auto folder = cluster->get_folders().by_id(folder_id);
+        auto folder = cluster->get_folders().by_id(item.folder_id);
         if (!folder || folder->is_synchronizing() || ((folder->is_suspended() && !folder->get_suspend_reason()))) {
             continue;
         }
         for (auto it = scan_queue.begin(); it != scan_queue.end();) {
-            if (*it == folder_id) {
+            if (it->folder_id == item.folder_id && it->sub_dir == item.sub_dir) {
                 it = scan_queue.erase(it);
             } else {
                 ++it;
             }
         }
-        initiate_scan(folder_id);
+        initiate_scan(item.folder_id, item.sub_dir);
         return {};
     }
 
@@ -148,12 +197,13 @@ auto scheduler_t::scan_next() noexcept -> schedule_option_t {
     }
 
     if (folder && deadline <= now) {
-        initiate_scan(folder->get_id());
+        initiate_scan(folder->get_id(), {});
         return {};
     }
     if (folder) {
         auto folder_id = std::string(folder->get_id());
-        return next_schedule_t{deadline - now, deadline, folder_id};
+        auto item = scan_item_t{folder_id, {}};
+        return next_schedule_t{std::move(item), deadline - now, deadline};
     }
     return {};
 }
@@ -161,8 +211,8 @@ auto scheduler_t::scan_next() noexcept -> schedule_option_t {
 void scheduler_t::on_timer(r::request_id_t, bool cancelled) noexcept {
     timer_id = {};
     if (!cancelled) {
-        auto &folder_id = schedule_option->folder_id;
-        if (auto folder = cluster->get_folders().by_id(folder_id); folder) {
+        auto item = std::move(schedule_option->item);
+        if (auto folder = cluster->get_folders().by_id(item.folder_id); folder) {
             bool do_scan = false;
             auto last_scan = folder->get_scan_finish();
             if (!last_scan.is_not_a_date_time()) {
@@ -180,17 +230,17 @@ void scheduler_t::on_timer(r::request_id_t, bool cancelled) noexcept {
                 }
             }
             if (do_scan) {
-                initiate_scan(folder->get_id());
+                initiate_scan(item.folder_id, item.sub_dir);
             }
         }
     }
 }
 
-void scheduler_t::initiate_scan(std::string_view folder_id) noexcept {
-    LOG_DEBUG(log, "initiating folder '{}' scan", folder_id);
+void scheduler_t::initiate_scan(std::string_view folder_id, std::string_view sub_dir) noexcept {
+    LOG_DEBUG(log, "initiating folder '{}' scan (sub_dir: {})", folder_id, sub_dir);
     auto diff = model::diff::cluster_diff_ptr_t{};
     auto now = r::pt::microsec_clock::local_time();
-    diff = new model::diff::local::scan_start_t(folder_id, now);
+    diff = new model::diff::local::scan_start_t(folder_id, sub_dir, now);
     send<model::payload::model_update_t>(coordinator, std::move(diff));
     scan_in_progress = true;
 }

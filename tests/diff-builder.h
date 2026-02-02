@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #pragma once
 
@@ -91,9 +91,9 @@ struct SYNCSPIRIT_TEST_API diff_builder_t : private model::diff::apply_controlle
     diff_builder_t &add_unknown_device(const model::device_id_t &device, db::SomeDevice db_device) noexcept;
     diff_builder_t &remove_ignored_device(const model::ignored_device_t &device) noexcept;
     diff_builder_t &remove_unknown_device(const model::pending_device_t &device) noexcept;
-    diff_builder_t &scan_start(std::string_view id, const r::pt::ptime & = {}) noexcept;
+    diff_builder_t &scan_start(std::string_view id, std::string_view sub_dir = {}, const r::pt::ptime & = {}) noexcept;
     diff_builder_t &scan_finish(std::string_view id, const r::pt::ptime & = {}) noexcept;
-    diff_builder_t &scan_request(std::string_view id) noexcept;
+    diff_builder_t &scan_request(std::string_view id, std::string_view sub_dir = {}) noexcept;
     diff_builder_t &synchronization_start(std::string_view id) noexcept;
     diff_builder_t &synchronization_finish(std::string_view id) noexcept;
     diff_builder_t &mark_reacheable(model::file_info_ptr_t peer_file, const model::folder_info_t &peer_fi,

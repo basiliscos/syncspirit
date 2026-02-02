@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2026 Ivan Baidakou
 
 #pragma once
 
@@ -23,14 +23,21 @@ struct SYNCSPIRIT_API scheduler_t : public r::actor_base_t, private model::diff:
 
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
 
+    template <typename T> auto &access() noexcept;
+
   private:
+    struct scan_item_t {
+        std::string folder_id;
+        std::string sub_dir;
+    };
     struct next_schedule_t {
+        scan_item_t item;
         r::pt::time_duration interval;
         r::pt::ptime at;
-        std::string folder_id;
     };
+
     using schedule_option_t = std::optional<next_schedule_t>;
-    using scan_queue_t = std::list<std::string>;
+    using scan_queue_t = std::list<scan_item_t>;
 
     void on_model_update(model::message::model_update_t &message) noexcept;
     void on_thread_ready(model::message::thread_ready_t &) noexcept;
@@ -39,7 +46,7 @@ struct SYNCSPIRIT_API scheduler_t : public r::actor_base_t, private model::diff:
 
     schedule_option_t scan_next() noexcept;
     void scan_next_or_schedule() noexcept;
-    void initiate_scan(std::string_view folder_id) noexcept;
+    void initiate_scan(std::string_view folder_id, std::string_view sub_dir) noexcept;
 
     outcome::result<void> operator()(const model::diff::modify::upsert_folder_t &, void *custom) noexcept override;
     outcome::result<void> operator()(const model::diff::local::scan_request_t &, void *custom) noexcept override;

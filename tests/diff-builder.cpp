@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "diff-builder.h"
 #include "model/messages.h"
@@ -314,9 +314,10 @@ diff_builder_t &diff_builder_t::remove_unknown_device(const model::pending_devic
     return assign(new diff::modify::remove_pending_device_t(device));
 }
 
-diff_builder_t &diff_builder_t::scan_start(std::string_view id, const r::pt::ptime &at) noexcept {
+diff_builder_t &diff_builder_t::scan_start(std::string_view id, std::string_view sub_dir,
+                                           const r::pt::ptime &at) noexcept {
     auto final_at = at.is_not_a_date_time() ? r::pt::microsec_clock::local_time() : at;
-    return assign(new model::diff::local::scan_start_t(std::string(id), final_at));
+    return assign(new model::diff::local::scan_start_t(id, sub_dir, final_at));
 }
 
 diff_builder_t &diff_builder_t::scan_finish(std::string_view id, const r::pt::ptime &at) noexcept {
@@ -324,8 +325,8 @@ diff_builder_t &diff_builder_t::scan_finish(std::string_view id, const r::pt::pt
     return assign(new model::diff::local::scan_finish_t(std::string(id), final_at));
 }
 
-diff_builder_t &diff_builder_t::scan_request(std::string_view id) noexcept {
-    return assign(new model::diff::local::scan_request_t(std::string(id)));
+diff_builder_t &diff_builder_t::scan_request(std::string_view id, std::string_view sub_dir) noexcept {
+    return assign(new model::diff::local::scan_request_t(id, sub_dir));
 }
 
 diff_builder_t &diff_builder_t::synchronization_start(std::string_view id) noexcept {

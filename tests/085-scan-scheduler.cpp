@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "test-utils.h"
 #include "access.h"
@@ -13,6 +13,20 @@
 using namespace syncspirit;
 using namespace syncspirit::test;
 using namespace syncspirit::model;
+
+namespace {
+namespace ns {
+namespace to {
+struct scan_queue {};
+} // namespace to
+} // namespace ns
+} // namespace
+
+namespace syncspirit::net {
+
+template <> inline auto &scheduler_t::access<ns::to::scan_queue>() noexcept { return scan_queue; }
+
+} // namespace syncspirit::net
 
 using Clock = r::pt::microsec_clock;
 
@@ -122,6 +136,22 @@ void test_1_folder() {
                     sup->do_process();
                     REQUIRE(folder->is_scanning());
                 }
+
+                SECTION("subdir coverage") {
+                    REQUIRE(sup->timers.size() == 0);
+                    REQUIRE(target->access<ns::to::scan_queue>().size() == 0);
+
+                    builder.scan_request(folder_id, "a-dir").apply(*sup);
+                    REQUIRE(target->access<ns::to::scan_queue>().size() == 1);
+
+                    builder.scan_request(folder_id, "a-dir/b-subdir").apply(*sup);
+                    REQUIRE(target->access<ns::to::scan_queue>().size() == 1);
+                    CHECK(target->access<ns::to::scan_queue>().front().sub_dir == "a-dir");
+
+                    builder.scan_request(folder_id, "").apply(*sup);
+                    REQUIRE(target->access<ns::to::scan_queue>().size() == 1);
+                    CHECK(target->access<ns::to::scan_queue>().front().sub_dir == "");
+                }
             }
 
             SECTION("suspending") {
@@ -157,10 +187,10 @@ void test_2_folders() {
             builder.upsert_folder(db_folder_1)
                 .upsert_folder(db_folder_2)
                 .apply(*sup)
-                .scan_start(f2_id, C::local_time() - r::pt::seconds{rescan_min + 10})
+                .scan_start(f2_id, {}, C::local_time() - r::pt::seconds{rescan_min + 10})
                 .scan_finish(f2_id, C::local_time() - r::pt::seconds{rescan_min + 1})
                 .apply(*sup)
-                .scan_start(f1_id, C::local_time() - r::pt::seconds{rescan_min + 10})
+                .scan_start(f1_id, {}, C::local_time() - r::pt::seconds{rescan_min + 10})
                 .scan_finish(f1_id, C::local_time() - r::pt::seconds{rescan_min + 1})
                 .apply(*sup);
 
