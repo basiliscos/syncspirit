@@ -9,6 +9,12 @@ using namespace syncspirit::fltk::tree_item;
 
 using F = syncspirit::presentation::presence_t::features_t;
 
+struct table_t : content::file_table_t {
+    using parent_t = content::file_table_t;
+
+    table_t(presence_item_t &container_, int x, int y, int w, int h) : parent_t(container_, x, y, w, h) {}
+};
+
 bool file_t::on_select() {
     content = supervisor.replace_content([&](content_t *content) -> content_t * {
         auto prev = content->get_widget();

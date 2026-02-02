@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2026 Ivan Baidakou
 
 #include "file_table.h"
 
 #include "table_widget/checkbox.h"
 #include "utils.hpp"
 #include "proto/proto-helpers-bep.h"
+#include "model/diff/local/scan_request.h"
 #include "presentation/cluster_file_presence.h"
+#include "presentation/folder_presence.h"
 
 #include <memory_resource>
 #include <algorithm>
@@ -18,6 +20,13 @@ using namespace syncspirit::fltk::content;
 using F = presence_t::features_t;
 
 static constexpr size_t max_history_records = 5;
+static constexpr int padding = 2;
+
+static inline bool is_scan_enabled(presence_t &p) {
+    using F = presence_t::features_t;
+    auto f = p.get_features();
+    return (f & ~F::deleted) && (f & F::cluster) && (f & F::local) && (f & F::directory);
+}
 
 namespace {
 
@@ -37,6 +46,40 @@ struct ro_checkbox_t : table_widget::checkbox_t {
 };
 
 auto make_checkbox(Fl_Widget &container, bool value) -> widgetable_ptr_t { return new ro_checkbox_t(container, value); }
+
+static auto make_actions(file_table_t &container) -> widgetable_ptr_t {
+    struct widget_t final : widgetable_t {
+        using parent_t = widgetable_t;
+        using parent_t::parent_t;
+
+        Fl_Widget *create_widget(int x, int y, int w, int h) override {
+            auto &container = static_cast<file_table_t &>(this->container);
+            auto &presence = container.container.get_presence();
+
+            auto group = new Fl_Group(x, y, w, h);
+            group->begin();
+            group->box(FL_FLAT_BOX);
+
+            auto yy = y + padding, ww = 100, hh = h - padding * 2;
+
+            auto button = new Fl_Button(x + padding, yy, ww, hh, "rescan");
+            auto enabled = is_scan_enabled(presence);
+            if (enabled) {
+                button->callback([](auto, void *data) { static_cast<file_table_t *>(data)->on_scan(); }, &container);
+            } else {
+                button->deactivate();
+            }
+
+            group->resizable(nullptr);
+            group->end();
+            widget = group;
+
+            this->reset();
+            return widget;
+        }
+    };
+    return new widget_t(container);
+}
 
 } // namespace
 
@@ -71,6 +114,7 @@ file_table_t::file_table_t(presence_item_t &container_, int x, int y, int w, int
     entries_cell = new static_string_provider_t("");
     entries_size_cell = new static_string_provider_t("");
     local_entries_cell = new static_string_provider_t("");
+    notice_cell = new static_string_provider_t("");
 
     data.push_back({"name", name_cell});
     data.push_back({"device", device_cell});
@@ -92,6 +136,8 @@ file_table_t::file_table_t(presence_item_t &container_, int x, int y, int w, int
     data.push_back({"entries", entries_cell});
     data.push_back({"entries size", entries_size_cell});
     data.push_back({"cluster/local/avail", local_entries_cell});
+    data.push_back({"", notice_cell});
+    data.push_back({"actions", make_actions(*this)});
 
     assign_rows(std::move(data));
 
@@ -173,4 +219,23 @@ void file_table_t::refresh() {
     local_entries_cell->update(entries_stats);
 
     redraw();
+}
+
+void file_table_t::on_scan() {
+    auto &sup = container.supervisor;
+    auto &presence = container.get_presence();
+    if (is_scan_enabled(presence)) {
+        auto &cluster_presence = static_cast<cluster_file_presence_t &>(presence);
+        auto &entity = cluster_presence.get_file_info();
+        auto subdir = entity.get_name()->get_full_name();
+        auto parent = presence.get_parent();
+        while (auto prev = parent->get_parent()) {
+            parent = prev;
+        }
+        auto folder_presence = static_cast<folder_presence_t *>(parent);
+        auto folder_id = folder_presence->get_folder_info().get_folder()->get_id();
+        auto diff = model::diff::cluster_diff_ptr_t{};
+        diff = new model::diff::local::scan_request_t(folder_id, subdir);
+        sup.send_model<model::payload::model_update_t>(std::move(diff), this);
+    }
 }

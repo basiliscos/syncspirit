@@ -3,7 +3,6 @@
 
 #include "folder_table.h"
 
-#include "model/diff/load/interrupt.h"
 #include "model/diff/modify/remove_folder.h"
 #include "model/diff/modify/remove_blocks.h"
 #include "model/diff/modify/share_folder.h"
