@@ -2,29 +2,14 @@
 // SPDX-FileCopyrightText: 2025-2026 Ivan Baidakou
 
 #include "local_keeper.h"
-#include "model/diff/advance/advance.h"
-#include "model/diff/advance/local_update.h"
-#include "model/diff/local/blocks_availability.h"
 #include "model/diff/local/scan_start.h"
 #include "model/diff/local/scan_finish.h"
-#include "model/diff/local/file_availability.h"
 #include "model/diff/modify/suspend_folder.h"
 #include "model/diff/modify/upsert_folder.h"
-#include "model/misc/resolver.h"
-#include "presentation/folder_entity.h"
-#include "fs/fs_slave.h"
-#include "fs/utils.h"
 #include "names.h"
-#include "presentation/folder_presence.h"
-#include "presentation/local_file_presence.h"
-#include "presentation/presence.h"
-#include "presentation/cluster_file_presence.h"
-#include "proto/proto-helpers.h"
+#include "proto/proto-helpers-db.h"
 #include "local_keeper/folder_slave.h"
-#include "utils/platform.h"
 
-#include <algorithm>
-#include <memory_resource>
 #include <boost/nowide/convert.hpp>
 
 using namespace syncspirit;
@@ -39,7 +24,8 @@ using boost::nowide::narrow;
 local_keeper_t::local_keeper_t(config_t &config)
     : r::actor_base_t(config), sequencer{std::move(config.sequencer)},
       concurrent_hashes_left{static_cast<std::int32_t>(config.concurrent_hashes)},
-      concurrent_hashes_limit{concurrent_hashes_left}, files_scan_iteration_limit{config.files_scan_iteration_limit} {
+      concurrent_hashes_limit{concurrent_hashes_left}, files_scan_iteration_limit{config.files_scan_iteration_limit},
+      watcher_impl{config.watcher_impl} {
     assert(sequencer);
     assert(concurrent_hashes_left);
     assert(files_scan_iteration_limit);
@@ -53,6 +39,9 @@ void local_keeper_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
         p.discover_name(names::fs_actor, fs_addr, true).link(false);
+        if (watcher_impl != syncspirit_watcher_impl_t::none) {
+            p.discover_name(names::watcher, watcher_addr, true).link(false);
+        }
         p.discover_name(net::names::coordinator, coordinator, false).link(false).callback([&](auto phase, auto &ee) {
             if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {
                 auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);

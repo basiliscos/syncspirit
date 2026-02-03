@@ -1,7 +1,22 @@
+#pragma once
+
 #cmakedefine SYNCSPIRIT_VERSION "@SYNCSPIRIT_VERSION@"
 #cmakedefine SYNCSPIRIT_WATCHER_INOTIFY @SYNCSPIRIT_WATCHER_INOTIFY@
 #cmakedefine SYNCSPIRIT_WATCHER_WIN32 @SYNCSPIRIT_WATCHER_WIN32@
 
+enum class syncspirit_watcher_impl_t {
+   none, inotify, win32
+};
+
 #if defined(SYNCSPIRIT_WATCHER_INOTIFY) || defined(SYNCSPIRIT_WATCHER_WIN32)
 #define SYNCSPIRIT_WATCHER_ANY 1
+#endif
+
+static constexpr syncspirit_watcher_impl_t syncspirit_watcher_impl =
+#if defined(SYNCSPIRIT_WATCHER_INOTIFY)
+    syncspirit_watcher_impl_t::inotify;
+#elif defined(SYNCSPIRIT_WATCHER_WIN32)
+    syncspirit_watcher_impl_t::win32;
+#else
+    syncspirit_watcher_impl_t::none;
 #endif

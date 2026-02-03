@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2025-2026 Ivan Baidakou
 
 #pragma once
 
@@ -9,6 +9,7 @@
 #include "model/cluster.h"
 #include "model/diff/cluster_visitor.h"
 #include "model/misc/sequencer.h"
+#include "syncspirit-config.h"
 
 namespace syncspirit::net {
 
@@ -19,6 +20,7 @@ struct local_keeper_config_t : r::actor_config_t {
     model::sequencer_ptr_t sequencer;
     uint32_t concurrent_hashes;
     std::int64_t files_scan_iteration_limit;
+    syncspirit_watcher_impl_t watcher_impl = syncspirit_watcher_impl_t::none;
 };
 
 template <typename Actor> struct local_keeper_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -36,6 +38,10 @@ template <typename Actor> struct local_keeper_config_builder_t : r::actor_config
     }
     builder_t &&files_scan_iteration_limit(std::int64_t value) && noexcept {
         parent_t::config.files_scan_iteration_limit = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+    builder_t &&watcher_impl(syncspirit_watcher_impl_t value) && noexcept {
+        parent_t::config.watcher_impl = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };
@@ -66,7 +72,9 @@ struct SYNCSPIRIT_API local_keeper_t final : public r::actor_base_t, private mod
     model::cluster_ptr_t cluster;
     r::address_ptr_t coordinator;
     r::address_ptr_t fs_addr;
+    r::address_ptr_t watcher_addr;
     std::int64_t files_scan_iteration_limit;
+    syncspirit_watcher_impl_t watcher_impl;
     std::int32_t concurrent_hashes_left;
     std::int32_t concurrent_hashes_limit;
     std::int32_t fs_tasks = 0;

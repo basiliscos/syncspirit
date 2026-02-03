@@ -78,30 +78,7 @@ void FU::update(std::string_view relative_path, update_type_t type, folder_updat
         if (it_prev != prev->updates.end()) {
             prev_update = &*it_prev;
         }
-#if 0
-        if (auto it = updates.find(relative_path); it != updates.end()) {
-            auto ut = it->update_type;
-            if (ut & update_type::CREATED_1) {
-                internal = internal | update_type::CREATED_1;
-            }
-            if ((ut & update_type::CONTENT) && (type == update_type_t::meta)) {
-                internal = ut;
-            }
-            updates.erase(it);
-        }
-#endif
     }
-#if 0
-    auto internal = static_cast<update_type_internal_t>(type);
-    if (it == updates.end()) {
-        if (type == update_type_t::created) {
-            internal = update_type::CREATED_1;
-        }
-        updates.emplace(support::file_update_t{std::string(relative_path), std::move(prev_path), internal});
-    } else {
-        it->update_type = (it->update_type & update_type::CREATED_1) | internal;
-    }
-#endif
     if (it != updates.end()) {
         it->update(prev_path_rel, type);
     } else {
