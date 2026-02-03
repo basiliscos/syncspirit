@@ -136,9 +136,10 @@ apply_controller_ptr_t make_apply_controller(model::cluster_ptr_t cluster) {
 }
 
 void init_logging() {
-    auto [dist_sink, _] = utils::create_root_logger();
+    auto [dist_sink, logger] = utils::create_root_logger();
     auto console_sink = std::make_shared<spdlog::sinks::stderr_color_sink_mt>();
     dist_sink->add_sink(console_sink);
+    logger->set_pattern(utils::log_pattern);
 }
 
 static std::random_device rd;

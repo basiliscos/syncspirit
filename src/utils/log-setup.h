@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #pragma once
 
@@ -38,5 +38,7 @@ SYNCSPIRIT_API void finalize_loggers() noexcept;
 SYNCSPIRIT_API std::pair<dist_sink_t, logger_t> create_root_logger() noexcept;
 SYNCSPIRIT_API logger_t get_root_logger() noexcept;
 SYNCSPIRIT_API bootstrap_guard_ptr_t bootstrap(dist_sink_t &, const bfs::path &dir) noexcept;
+
+SYNCSPIRIT_API extern const char *log_pattern;
 
 } // namespace syncspirit::utils
