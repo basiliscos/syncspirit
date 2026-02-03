@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2025-2026 Ivan Baidakou
 
 #pragma once
 
@@ -26,8 +26,10 @@ using folder_slave_ptr_t = r::intrusive_ptr_t<folder_slave_t>;
 using hash_base_ptr_t = model::intrusive_ptr_t<hash_base_t>;
 
 struct folder_context_t : boost::intrusive_ref_counter<folder_context_t, boost::thread_safe_counter> {
-    inline folder_context_t(model::folder_info_ptr_t local_folder_) noexcept : local_folder{local_folder_} {}
+    inline folder_context_t(model::folder_info_ptr_t local_folder_, std::string_view start_subdir_) noexcept
+        : local_folder{local_folder_}, start_subdir{start_subdir_} {}
     model::folder_info_ptr_t local_folder;
+    std::string start_subdir;
 };
 
 using folder_context_ptr_t = boost::intrusive_ptr<folder_context_t>;
@@ -52,6 +54,7 @@ struct folder_slave_t final : fs::fs_slave_t {
     folder_slave_t(folder_context_ptr_t context_, local_keeper_ptr_t actor_) noexcept;
     ~folder_slave_t();
 
+    sys::error_code initialize() noexcept;
     void process_stack(stack_context_t &ctx) noexcept;
     int schedule_hash(hash_base_t *item, stack_context_t &ctx) noexcept;
     void prepare_task();

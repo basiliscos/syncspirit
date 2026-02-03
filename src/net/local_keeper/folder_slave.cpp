@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2025-2026 Ivan Baidakou
 
 #include "folder_slave.h"
 #include "fs/utils.h"
@@ -17,26 +17,59 @@
 #include "utils/platform.h"
 
 #include <boost/nowide/convert.hpp>
+#include <system_error>
 
 using namespace syncspirit::net;
 using namespace syncspirit::net::local_keeper;
 using boost::nowide::narrow;
+using boost::nowide::widen;
 
 folder_slave_t::folder_slave_t(folder_context_ptr_t context_, local_keeper_ptr_t actor_) noexcept
     : context{context_}, actor{std::move(actor_)} {
     log = actor->log;
+}
+
+folder_slave_t::~folder_slave_t() {}
+
+auto folder_slave_t::initialize() noexcept -> sys::error_code {
     auto folder = context->local_folder->get_folder();
     auto augmentation = folder->get_augmentation().get();
     auto folder_entity = static_cast<presentation::folder_entity_t *>(augmentation);
     auto local_device = folder->get_cluster()->get_device();
     auto folder_presence = folder_entity->get_presence(local_device.get());
-    auto path = folder->get_path();
+    auto presence = folder_presence;
+    auto skip_path = bfs::path(context->start_subdir);
+
+    auto comparator = presentation::presence_t::child_comparator_t{};
+    for (auto &item : skip_path) {
+        auto &children = presence->get_children();
+        auto name = narrow(item.filename().generic_wstring());
+        auto criterium = presentation::presence_t::presence_like_t{name, true};
+        auto it = std::lower_bound(children.begin(), children.end(), criterium, comparator);
+        if (it != children.end()) {
+            auto &p = *it;
+            if (!(p->get_features() & F::missing)) {
+                presence = p;
+            }
+        } else {
+            LOG_ERROR(log, "no dir '{}' in the folder '{}'", context->start_subdir, folder->get_label());
+            return std::make_error_code(std::errc::no_such_file_or_directory);
+        }
+    }
+    auto path = [&]() -> bfs::path {
+        if (presence == folder_presence)
+            return folder->get_path();
+        auto dir_presence = static_cast<presentation::cluster_file_presence_t *>(presence);
+        auto &file = dir_presence->get_file_info();
+        assert(file.is_dir());
+        auto sub_path = bfs::path(widen(file.get_name()->get_full_name()));
+        return folder->get_path() / sub_path;
+    }();
     ignore_permissions = folder->are_permissions_ignored() || !utils::platform_t::permissions_supported(path);
     stack.push_front(complete_scan_t{});
-    stack.push_front(unscanned_dir_t(std::move(path), folder_presence));
+    stack.push_front(unscanned_dir_t(std::move(path), presence));
+    return {};
 }
-
-folder_slave_t::~folder_slave_t() {}
 
 void folder_slave_t::process_stack(stack_context_t &ctx) noexcept {
     auto try_next = true;

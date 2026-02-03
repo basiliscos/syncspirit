@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2025-2026 Ivan Baidakou
 
 #include "local_keeper.h"
 #include "model/diff/advance/advance.h"
@@ -105,16 +105,25 @@ auto local_keeper_t::operator()(const model::diff::local::scan_start_t &diff, vo
         do_scan = false;
     }
     if (do_scan) {
-        LOG_DEBUG(log, "initiating scan of {}", diff.folder_id);
+        LOG_DEBUG(log, "initiating scan of {} from '{}'", diff.folder_id, diff.sub_dir);
         auto local_folder = folder->get_folder_infos().by_device(*cluster->get_device());
-        auto ctx = folder_context_ptr_t(new folder_context_t(local_folder));
+        auto ctx = folder_context_ptr_t(new folder_context_t(local_folder, diff.sub_dir));
         auto backend = new folder_slave_t(std::move(ctx), this);
-        auto stack_ctx = stack_context_t(concurrent_hashes_left);
-        backend->process_stack(stack_ctx);
-        backend->prepare_task();
-        auto slave = fs::payload::foreign_executor_prt_t(backend);
-        route<fs::payload::foreign_executor_prt_t>(fs_addr, address, std::move(slave));
-        ++fs_tasks;
+        auto backend_keeper = fs::payload::foreign_executor_prt_t(backend);
+        auto ec = backend->initialize();
+        if (ec) {
+            LOG_ERROR(log, "cannot initialize backend: {}", ec.message());
+            auto now = r::pt::microsec_clock::local_time();
+            auto finish = model::diff::cluster_diff_ptr_t();
+            finish = new model::diff::local::scan_finish_t(diff.folder_id, now);
+            send<model::payload::model_update_t>(coordinator, std::move(finish));
+        } else {
+            auto stack_ctx = stack_context_t(concurrent_hashes_left);
+            backend->process_stack(stack_ctx);
+            backend->prepare_task();
+            route<fs::payload::foreign_executor_prt_t>(fs_addr, address, std::move(backend_keeper));
+            ++fs_tasks;
+        }
     } else {
         LOG_DEBUG(log, "skipping scan of {}", diff.folder_id);
     }

@@ -1162,6 +1162,44 @@ void test_type_change() {
     F().run();
 }
 
+void test_partial_scan() {
+    struct F : fixture_t {
+        void main() noexcept override {
+            auto my_short_id = my_device->device_id().get_uint();
+            auto dir_1 = root_path / L"a/b/c";
+            auto dir_2 = root_path / L"x/y/z";
+            auto file_1 = dir_1 / L"файл-1.bin";
+            auto file_2 = dir_2 / L"файл-2.bin";
+
+            bfs::create_directories(dir_1);
+            bfs::create_directories(dir_2);
+            write_file(file_1, "12345");
+            write_file(file_2, "67890");
+            builder->scan_start(folder->get_id()).apply(*sup);
+            auto &files = folder_info->get_file_infos();
+            REQUIRE(files.size() == 6 + 2);
+
+            auto f_1 = files.by_name(narrow(L"a/b/c/файл-1.bin"));
+            auto f_2 = files.by_name(narrow(L"x/y/z/файл-2.bin"));
+
+            REQUIRE(f_1);
+            REQUIRE(f_2);
+
+            auto seq_1 = f_1->get_sequence();
+            auto seq_2 = f_2->get_sequence();
+
+            write_file(file_1, "1234567890");
+            write_file(file_2, "6789012345");
+            auto subdir = GENERATE("a", "a/b", "a/b/c");
+            builder->scan_start(folder->get_id(), subdir).apply(*sup);
+            REQUIRE(files.size() == 6 + 2);
+            CHECK(f_1->get_sequence() != seq_1);
+            CHECK(f_2->get_sequence() == seq_2);
+        }
+    };
+    F().run();
+}
+
 void test_scan_errors() {
     struct F : fixture_t {
         F() {
@@ -1172,6 +1210,7 @@ void test_scan_errors() {
         }
 
         void execute(fs::message::foreign_executor_t &req) noexcept override {
+            ++exec_attempts;
             if (exec_pool) {
                 sup->log->info("processing foreign task (left = {})", exec_pool);
                 auto slave = static_cast<fs::fs_slave_t *>(req.payload.get());
@@ -1199,6 +1238,13 @@ void test_scan_errors() {
                 CHECK(!folder->is_scanning());
                 CHECK(folder->get_scan_finish() >= folder->get_scan_start());
                 bfs::permissions(root_path, bfs::perms::all);
+                CHECK(exec_attempts == 1);
+            }
+            SECTION("missing start dir (in model)") {
+                builder->scan_start(folder->get_id(), "non-existing-dir").apply(*sup);
+                CHECK(!folder->is_scanning());
+                CHECK(folder->get_scan_finish() >= folder->get_scan_start());
+                CHECK(exec_attempts == 0);
             }
 #ifndef SYNCSPIRIT_WIN
             SECTION("non-root errors (non-win32)") {
@@ -1330,6 +1376,7 @@ void test_scan_errors() {
         }
 
         std::uint32_t exec_pool = 5;
+        std::uint32_t exec_attempts = 0;
         task_processor_t processor;
     };
     F().run();
@@ -2085,6 +2132,7 @@ int _init() {
     REGISTER_TEST_CASE(test_deleted, "test_deleted", "[net]");
     REGISTER_TEST_CASE(test_changed, "test_changed", "[net]");
     REGISTER_TEST_CASE(test_type_change, "test_type_change", "[net]");
+    REGISTER_TEST_CASE(test_partial_scan, "test_partial_scan", "[net]");
     REGISTER_TEST_CASE(test_scan_errors, "test_scan_errors", "[net]");
     REGISTER_TEST_CASE(test_read_errors, "test_read_errors", "[net]");
     REGISTER_TEST_CASE(test_leaks, "test_leaks", "[net]");
