@@ -48,6 +48,7 @@ void local_keeper_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
                 plugin->subscribe_actor(&local_keeper_t::on_model_update, coordinator);
                 plugin->subscribe_actor(&local_keeper_t::on_thread_ready, coordinator);
+                plugin->subscribe_actor(&local_keeper_t::on_app_ready, coordinator);
             }
         });
     });
@@ -85,6 +86,17 @@ void local_keeper_t::on_thread_ready(model::message::thread_ready_t &message) no
     if (p.thread_id == std::this_thread::get_id()) {
         LOG_TRACE(log, "on_thread_ready");
         cluster = message.payload.cluster;
+    }
+}
+
+void local_keeper_t::on_app_ready(model::message::app_ready_t &) noexcept {
+    if (watcher_impl != syncspirit_watcher_impl_t::none) {
+        for (auto &[folder, _] : cluster->get_folders()) {
+            auto &f = *folder;
+            if (f.is_watched()) {
+                send<fs::payload::watch_folder_t>(watcher_addr, f.get_path(), f.get_id());
+            }
+        }
     }
 }
 

@@ -60,6 +60,7 @@ struct SYNCSPIRIT_API local_keeper_t final : public r::actor_base_t, private mod
     void on_post_process(fs::message::foreign_executor_t &) noexcept;
     void on_digest(hasher::message::digest_t &res) noexcept;
     void on_thread_ready(model::message::thread_ready_t &) noexcept;
+    void on_app_ready(model::message::app_ready_t &) noexcept;
     void on_create_dir(fs::message::create_dir_t &) noexcept;
     void on_watch_dir(fs::message::watch_folder_t &) noexcept;
     void on_unwatch_dir(fs::message::unwatch_folder_t &) noexcept;

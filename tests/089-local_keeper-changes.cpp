@@ -121,7 +121,7 @@ struct fixture_t {
         CHECK(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::SHUT_DOWN);
     }
 
-    void launch_target(syncspirit_watcher_impl_t impl, bool send_ready = true) {
+    void launch_target(syncspirit_watcher_impl_t impl, bool app_ready = true) {
         target = sup->create_actor<net::local_keeper_t>()
                      .timeout(timeout)
                      .sequencer(sequencer)
@@ -131,9 +131,10 @@ struct fixture_t {
                      .finish();
         sup->do_process();
 
-        if (send_ready) {
-            sup->send<syncspirit::model::payload::thread_ready_t>(sup->get_address(), cluster,
-                                                                  std::this_thread::get_id());
+        sup->send<syncspirit::model::payload::thread_ready_t>(sup->get_address(), cluster, std::this_thread::get_id());
+        sup->do_process();
+        if (app_ready) {
+            sup->send<syncspirit::model::payload::app_ready_t>(sup->get_address());
             sup->do_process();
         }
     }
@@ -179,33 +180,55 @@ void test_watch_unwatch() {
         using fixture_t::fixture_t;
         void main() noexcept override {
             auto impl = GENERATE(I::inotify, I::win32);
-            launch_target(impl, true);
-            CHECK(static_cast<r::actor_base_t *>(target.get())->access<to::state>() == r::state_t::OPERATIONAL);
-            sup->do_process();
 
-            auto folder_id = "1234-5678";
-            db::Folder db_folder;
-            db::set_id(db_folder, folder_id);
-            db::set_label(db_folder, folder_id);
-            db::set_path(db_folder, boost::nowide::narrow(root_path.generic_wstring()));
-            db::set_folder_type(db_folder, db::FolderType::send_and_receive);
-            SECTION("create non-watched folder") {
-                db::set_watched(db_folder, false);
-                builder->upsert_folder(db_folder, 5).apply(*sup);
-                CHECK(create_dir_msg);
-                REQUIRE(!watch_folder_payload);
-            }
-            SECTION("create watched folder") {
+            SECTION("folder is created before start => watched upon app start") {
+                auto folder_id = "1234-5678";
+                db::Folder db_folder;
+                db::set_id(db_folder, folder_id);
+                db::set_label(db_folder, folder_id);
+                db::set_path(db_folder, boost::nowide::narrow(root_path.generic_wstring()));
+                db::set_folder_type(db_folder, db::FolderType::send_and_receive);
                 db::set_watched(db_folder, true);
                 builder->upsert_folder(db_folder, 5).apply(*sup);
-                REQUIRE(create_dir_msg);
-                create_dir_msg->payload.ec = {};
-                submit(std::move(create_dir_msg));
+                REQUIRE(!create_dir_msg);
 
+                launch_target(impl, true);
+
+                REQUIRE(!create_dir_msg);
                 REQUIRE(watch_folder_payload);
                 auto &p = watch_folder_payload.value();
                 CHECK(p.folder_id == folder_id);
                 CHECK(p.path == root_path);
+            }
+            SECTION("post-start create folder & watch") {
+                launch_target(impl);
+                CHECK(static_cast<r::actor_base_t *>(target.get())->access<to::state>() == r::state_t::OPERATIONAL);
+                sup->do_process();
+
+                auto folder_id = "1234-5678";
+                db::Folder db_folder;
+                db::set_id(db_folder, folder_id);
+                db::set_label(db_folder, folder_id);
+                db::set_path(db_folder, boost::nowide::narrow(root_path.generic_wstring()));
+                db::set_folder_type(db_folder, db::FolderType::send_and_receive);
+                SECTION("create non-watched folder") {
+                    db::set_watched(db_folder, false);
+                    builder->upsert_folder(db_folder, 5).apply(*sup);
+                    CHECK(create_dir_msg);
+                    REQUIRE(!watch_folder_payload);
+                }
+                SECTION("create watched folder") {
+                    db::set_watched(db_folder, true);
+                    builder->upsert_folder(db_folder, 5).apply(*sup);
+                    REQUIRE(create_dir_msg);
+                    create_dir_msg->payload.ec = {};
+                    submit(std::move(create_dir_msg));
+
+                    REQUIRE(watch_folder_payload);
+                    auto &p = watch_folder_payload.value();
+                    CHECK(p.folder_id == folder_id);
+                    CHECK(p.path == root_path);
+                }
             }
         }
     };
