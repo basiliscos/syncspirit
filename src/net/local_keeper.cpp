@@ -55,6 +55,8 @@ void local_keeper_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.subscribe_actor(&local_keeper_t::on_post_process);
         p.subscribe_actor(&local_keeper_t::on_digest);
         p.subscribe_actor(&local_keeper_t::on_create_dir);
+        p.subscribe_actor(&local_keeper_t::on_watch_dir);
+        p.subscribe_actor(&local_keeper_t::on_unwatch_dir);
     });
 }
 
@@ -140,6 +142,10 @@ void local_keeper_t::on_create_dir(fs::message::create_dir_t &message) noexcept 
             auto diff = model::diff::cluster_diff_ptr_t();
             diff = new model::diff::modify::suspend_folder_t(*folder, true, ec);
             send<model::payload::model_update_t>(coordinator, std::move(diff));
+        } else {
+            if (folder->is_watched() && watcher_impl != syncspirit_watcher_impl_t::none) {
+                send<fs::payload::watch_folder_t>(watcher_addr, folder->get_path(), p.folder_id);
+            }
         }
     }
 }
@@ -184,4 +190,19 @@ void local_keeper_t::on_digest(hasher::message::digest_t &msg) noexcept {
     } else {
         LOG_DEBUG(log, "skipping post-processing of hashed digest (non-operational)");
     }
+}
+
+void local_keeper_t::on_watch_dir(fs::message::watch_folder_t &message) noexcept {
+    auto &p = message.payload;
+    auto &ec = p.ec;
+    if (ec) {
+        LOG_WARN(log, "cannot watch folder '{}': {}", p.folder_id, ec.message());
+    } else {
+        LOG_DEBUG(log, "watching fodler '{}'", p.folder_id);
+        watched_folders.emplace(std::string(p.folder_id));
+    }
+}
+
+void local_keeper_t::on_unwatch_dir(fs::message::unwatch_folder_t &message) noexcept {
+    LOG_DEBUG(log, "on_unwatch_dir: {}", message.payload.folder_id);
 }

@@ -148,19 +148,25 @@ struct create_dir_t : bfs::path {
     using parent_t::parent_t;
 
     inline create_dir_t(bfs::path path, std::string_view folder_id_) noexcept
-        : parent_t(std::move(path)), folder_id(folder_id_) {}
+        : parent_t(std::move(path)), folder_id(folder_id_), ec{utils::make_error_code(utils::error_code_t::no_action)} {
+
+    }
 
     std::string folder_id;
     sys::error_code ec;
 };
 
 struct watch_folder_t {
+    inline watch_folder_t(bfs::path path_, std::string_view folder_id_) noexcept
+        : path(std::move(path_)), folder_id(folder_id_), ec{utils::make_error_code(utils::error_code_t::no_action)} {}
     bfs::path path;
     std::string folder_id;
     sys::error_code ec;
 };
 
 struct unwatch_folder_t {
+    inline unwatch_folder_t(std::string folder_id_) noexcept
+        : folder_id{folder_id_}, ec{utils::make_error_code(utils::error_code_t::no_action)} {}
     std::string folder_id;
     sys::error_code ec;
 };

@@ -226,8 +226,7 @@ void test_watcher_base() {
             using U = fs::update_type_t;
             auto folder_id = std::string("my-folder-id");
             auto back_addr = sup->get_address();
-            auto ec = utils::make_error_code(utils::error_code_t::no_action);
-            sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id, ec);
+            sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id);
             sup->do_process();
             REQUIRE(watched_replies == 1);
 
@@ -530,9 +529,8 @@ void test_watch_unwatch() {
         void main() noexcept override {
             auto folder_id = std::string("my-folder-id");
             auto back_addr = sup->get_address();
-            auto ec = utils::make_error_code(utils::error_code_t::no_action);
-            sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id, ec);
-            sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id, ec);
+            sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id);
+            sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id);
             sup->do_process();
             CHECK(watched_replies == 2);
             CHECK(watched_successes == 1);
@@ -541,15 +539,13 @@ void test_watch_unwatch() {
             CHECK(unwatched_successes == 0);
             CHECK(unwatched_errors == 0);
 
-            ec = utils::make_error_code(utils::error_code_t::no_action);
-            sup->route<fs::payload::unwatch_folder_t>(target->get_address(), back_addr, folder_id, ec);
+            sup->route<fs::payload::unwatch_folder_t>(target->get_address(), back_addr, folder_id);
             sup->do_process();
             CHECK(unwatched_replies == 1);
             CHECK(unwatched_successes == 1);
             CHECK(unwatched_errors == 0);
 
-            ec = utils::make_error_code(utils::error_code_t::no_action);
-            sup->route<fs::payload::unwatch_folder_t>(target->get_address(), back_addr, folder_id, ec);
+            sup->route<fs::payload::unwatch_folder_t>(target->get_address(), back_addr, folder_id);
             sup->do_process();
             CHECK(unwatched_replies == 2);
             CHECK(unwatched_successes == 1);
@@ -571,9 +567,8 @@ void test_real_impl() {
         void main() noexcept override {
             auto folder_id = std::string("my-folder-id");
             auto back_addr = sup->get_address();
-            auto ec = utils::make_error_code(utils::error_code_t::no_action);
             SECTION("(create) new dir") {
-                sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id, ec);
+                sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id);
                 sup->do_process();
                 REQUIRE(watched_replies == 1);
 
@@ -594,7 +589,7 @@ void test_real_impl() {
                 CHECK(file_change.update_reason == update_type_t::created);
             }
             SECTION("(create with recursion) new dir + new file") {
-                sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id, ec);
+                sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id);
                 sup->do_process();
                 REQUIRE(watched_replies == 1);
 
@@ -636,7 +631,7 @@ void test_real_impl() {
                 auto path = root_path / "my-file";
                 write_file(path, "12345");
 
-                sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id, ec);
+                sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id);
                 sup->do_process();
                 REQUIRE(watched_replies == 1);
 
@@ -659,7 +654,7 @@ void test_real_impl() {
                 auto path = root_path / "my-file";
                 write_file(path, "12345");
 
-                sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id, ec);
+                sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id);
                 sup->do_process();
                 REQUIRE(watched_replies == 1);
 
@@ -690,8 +685,7 @@ void test_real_impl() {
                         auto path_2 = subdir_path / L"my-file.2";
                         write_file(path_1, "12345");
 
-                        sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id,
-                                                                ec);
+                        sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id);
                         sup->do_process();
                         REQUIRE(watched_replies == 1);
 
@@ -752,8 +746,7 @@ void test_real_impl() {
                         auto path_2 = subdir_path / L"папка2";
                         bfs::create_directories(path_1);
 
-                        sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id,
-                                                                ec);
+                        sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id);
                         sup->do_process();
                         REQUIRE(watched_replies == 1);
 
@@ -815,7 +808,7 @@ void test_real_impl() {
                         write_file(path_1, "12345");
 
                         sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, subdir_path,
-                                                                folder_id, ec);
+                                                                folder_id);
                         sup->do_process();
                         REQUIRE(watched_replies == 1);
 
@@ -842,7 +835,7 @@ void test_real_impl() {
                         write_file(path_1, "12345");
 
                         sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, subdir_path,
-                                                                folder_id, ec);
+                                                                folder_id);
                         sup->do_process();
                         REQUIRE(watched_replies == 1);
 
@@ -870,7 +863,7 @@ void test_real_impl() {
                         write_file(path_1, "12345");
 
                         sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, subdir_path,
-                                                                folder_id, ec);
+                                                                folder_id);
                         sup->do_process();
                         REQUIRE(watched_replies == 1);
 
@@ -934,7 +927,7 @@ void test_real_impl() {
                 write_file(path, "12345");
                 bfs::permissions(path, bfs::perms::owner_read);
 
-                sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id, ec);
+                sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id);
                 sup->do_process();
                 REQUIRE(watched_replies == 1);
 
@@ -958,7 +951,7 @@ void test_real_impl() {
                 auto link_target_2 = std::string_view("/some/where/2");
                 bfs::create_symlink(bfs::path(link_target_1), path);
 
-                sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id, ec);
+                sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id);
                 sup->do_process();
                 REQUIRE(watched_replies == 1);
 
@@ -991,8 +984,6 @@ void test_hierarchies() {
             using names_t = std::vector<std::wstring_view>;
             auto folder_id = std::string("my-folder-id");
             auto back_addr = sup->get_address();
-            auto ec = utils::make_error_code(utils::error_code_t::no_action);
-#if 0
             SECTION("remove hierarchy") {
                 if (!native::wine_environment()) {
                     auto path_1 = root_path / L"x" / L"y" / L"файл.bin";
@@ -1001,7 +992,7 @@ void test_hierarchies() {
                     bfs::create_directories(path_2);
                     write_file(path_1, "12345");
 
-                    sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id, ec);
+                    sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id);
                     sup->do_process();
                     REQUIRE(watched_replies == 1);
                     auto names = names_t({L"a", L"a/b", L"x", L"x/y", L"x/y/файл.bin"});
@@ -1022,10 +1013,9 @@ void test_hierarchies() {
                     }
                 }
             }
-#endif
             SECTION("create hierarchy") {
                 if (!native::wine_environment()) {
-                    sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id, ec);
+                    sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id);
                     sup->do_process();
                     REQUIRE(watched_replies == 1);
 
@@ -1073,7 +1063,7 @@ void test_hierarchies() {
                         }
                     }
 
-                    sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id, ec);
+                    sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id);
                     sup->do_process();
                     REQUIRE(watched_replies == 1);
 

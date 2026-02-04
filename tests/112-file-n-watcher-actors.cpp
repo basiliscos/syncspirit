@@ -99,8 +99,7 @@ struct fixture_t {
 
         auto folder_id = std::string("my-folder-id");
         auto back_addr = sup->get_address();
-        auto ec = utils::make_error_code(utils::error_code_t::no_action);
-        sup->route<fs::payload::watch_folder_t>(watcher_actor->get_address(), back_addr, root_path, folder_id, ec);
+        sup->route<fs::payload::watch_folder_t>(watcher_actor->get_address(), back_addr, root_path, folder_id);
         sup->do_process();
 
         REQUIRE(watcher_replies == 1);

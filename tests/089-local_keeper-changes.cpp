@@ -47,7 +47,7 @@ struct fixture_t {
     using builder_ptr_t = std::unique_ptr<diff_builder_t>;
     using watch_folder_opt_t = std::optional<fs::payload::watch_folder_t>;
     using unwatch_folder_opt_t = std::optional<fs::payload::unwatch_folder_t>;
-    using create_dir_opt_t = std::optional<fs::payload::create_dir_t>;
+    using create_dir_msg_t = r::intrusive_ptr_t<fs::message::create_dir_t>;
 
     fixture_t() noexcept : root_path{unique_path()}, path_guard{root_path} { bfs::create_directory(root_path); }
 
@@ -65,8 +65,8 @@ struct fixture_t {
         unwatch_folder_payload = msg.payload;
     }
     virtual void on_create_dir(fs::message::create_dir_t &msg) {
-        CHECK(!create_dir_opt);
-        create_dir_opt = msg.payload;
+        CHECK(!create_dir_msg);
+        create_dir_msg = &msg;
     }
 
     void run() noexcept {
@@ -138,6 +138,12 @@ struct fixture_t {
         }
     }
 
+    void submit(r::message_ptr_t message) noexcept {
+        message->address = std::move(message->next_route);
+        sup->put(message);
+        sup->do_process();
+    }
+
     virtual void main() noexcept {}
 
     std::int64_t files_scan_iteration_limit = 100;
@@ -152,7 +158,7 @@ struct fixture_t {
     model::sequencer_ptr_t sequencer;
     watch_folder_opt_t watch_folder_payload;
     unwatch_folder_opt_t unwatch_folder_payload;
-    create_dir_opt_t create_dir_opt;
+    create_dir_msg_t create_dir_msg;
 };
 
 void test_just_start() {
@@ -186,13 +192,16 @@ void test_watch_unwatch() {
             SECTION("create non-watched folder") {
                 db::set_watched(db_folder, false);
                 builder->upsert_folder(db_folder, 5).apply(*sup);
-                CHECK(create_dir_opt);
+                CHECK(create_dir_msg);
                 REQUIRE(!watch_folder_payload);
             }
             SECTION("create watched folder") {
                 db::set_watched(db_folder, true);
                 builder->upsert_folder(db_folder, 5).apply(*sup);
-                CHECK(create_dir_opt);
+                REQUIRE(create_dir_msg);
+                create_dir_msg->payload.ec = {};
+                submit(std::move(create_dir_msg));
+
                 REQUIRE(watch_folder_payload);
                 auto &p = watch_folder_payload.value();
                 CHECK(p.folder_id == folder_id);

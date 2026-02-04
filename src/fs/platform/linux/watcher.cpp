@@ -218,7 +218,6 @@ auto watcher_t::watch_dir(std::string_view path, std::string_view folder_id, int
 
 auto watcher_t::unwatch_recurse(std::string_view folder_id) noexcept -> sys::error_code {
     using queue_t = std::pmr::list<int>;
-    using ec_opt_t = std::optional<sys::error_code>;
     auto buff = std::array<std::byte, 1024>();
     auto pool = std::pmr::monotonic_buffer_resource(buff.data(), buff.size());
     auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
