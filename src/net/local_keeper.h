@@ -68,6 +68,7 @@ struct SYNCSPIRIT_API local_keeper_t final : public r::actor_base_t, private mod
 
     outcome::result<void> operator()(const model::diff::local::scan_start_t &, void *custom) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::upsert_folder_t &, void *custom) noexcept override;
+    outcome::result<void> operator()(const model::diff::modify::remove_folder_t &, void *custom) noexcept override;
 
     using r::actor_base_t::make_error;
 

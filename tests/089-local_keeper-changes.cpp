@@ -189,6 +189,7 @@ void test_watch_unwatch() {
             SECTION("folder is created before start => watched upon app start") {
                 db::set_watched(db_folder, true);
                 builder->upsert_folder(db_folder, 5).apply(*sup);
+                auto folder = cluster->get_folders().by_id(folder_id);
                 REQUIRE(!create_dir_msg);
 
                 launch_target(impl, true);
@@ -212,6 +213,12 @@ void test_watch_unwatch() {
                     db::set_watched(db_folder, false);
                     builder->upsert_folder(db_folder, 5).apply(*sup);
                     CHECK(!watch_folder_msg);
+                    REQUIRE(unwatch_folder_msg);
+                    auto &p = unwatch_folder_msg->payload;
+                    CHECK(p.folder_id == folder_id);
+                }
+                SECTION("remove folder => send unwatch") {
+                    builder->remove_folder(*folder).apply(*sup);
                     REQUIRE(unwatch_folder_msg);
                     auto &p = unwatch_folder_msg->payload;
                     CHECK(p.folder_id == folder_id);

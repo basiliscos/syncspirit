@@ -4,6 +4,7 @@
 #include "local_keeper.h"
 #include "model/diff/local/scan_start.h"
 #include "model/diff/local/scan_finish.h"
+#include "model/diff/modify/remove_folder.h"
 #include "model/diff/modify/suspend_folder.h"
 #include "model/diff/modify/upsert_folder.h"
 #include "names.h"
@@ -157,6 +158,18 @@ auto local_keeper_t::operator()(const model::diff::modify::upsert_folder_t &diff
     return diff.visit_next(*this, custom);
 }
 
+auto local_keeper_t::operator()(const model::diff::modify::remove_folder_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    auto &folder_id = diff.folder_id;
+    if (watcher_impl != syncspirit_watcher_impl_t::none) {
+        auto count = watched_folders.count(folder_id);
+        if (count) {
+            route<fs::payload::unwatch_folder_t>(watcher_addr, address, std::string(folder_id));
+        }
+    }
+    return diff.visit_next(*this, custom);
+}
+
 void local_keeper_t::on_create_dir(fs::message::create_dir_t &message) noexcept {
     auto &p = message.payload;
     auto &ec = message.payload.ec;
@@ -231,5 +244,10 @@ void local_keeper_t::on_watch_dir(fs::message::watch_folder_t &message) noexcept
 }
 
 void local_keeper_t::on_unwatch_dir(fs::message::unwatch_folder_t &message) noexcept {
-    LOG_DEBUG(log, "on_unwatch_dir: {}", message.payload.folder_id);
+    auto &folder_id = message.payload.folder_id;
+    LOG_DEBUG(log, "on_unwatch_dir: {}", folder_id);
+    auto it = watched_folders.find(folder_id);
+    if (it != watched_folders.end()) {
+        watched_folders.erase(it);
+    }
 }
