@@ -9,6 +9,7 @@
 #include "model/cluster.h"
 #include "model/diff/cluster_visitor.h"
 #include "model/misc/sequencer.h"
+#include "utils/string_comparator.hpp"
 #include "syncspirit-config.h"
 
 namespace syncspirit::net {
@@ -70,7 +71,7 @@ struct SYNCSPIRIT_API local_keeper_t final : public r::actor_base_t, private mod
 
     using r::actor_base_t::make_error;
 
-    using watched_folders_t = std::unordered_set<std::string>;
+    using watched_folders_t = std::unordered_set<std::string, utils::string_hash_t, utils::string_eq_t>;
 
     utils::logger_t log;
     model::sequencer_ptr_t sequencer;

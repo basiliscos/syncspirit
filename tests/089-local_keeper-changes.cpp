@@ -16,7 +16,6 @@
 #include "utils/platform.h"
 #include <format>
 #include <boost/nowide/convert.hpp>
-#include <optional>
 
 #ifndef SYNCSPIRIT_WIN
 #include <sys/types.h>
@@ -45,8 +44,8 @@ struct my_supervisort_t : supervisor_t {
 struct fixture_t {
     using target_ptr_t = r::intrusive_ptr_t<net::local_keeper_t>;
     using builder_ptr_t = std::unique_ptr<diff_builder_t>;
-    using watch_folder_opt_t = std::optional<fs::payload::watch_folder_t>;
-    using unwatch_folder_opt_t = std::optional<fs::payload::unwatch_folder_t>;
+    using watch_folder_msg_t = r::intrusive_ptr_t<fs::message::watch_folder_t>;
+    using unwatch_folder_msg_t = r::intrusive_ptr_t<fs::message::unwatch_folder_t>;
     using create_dir_msg_t = r::intrusive_ptr_t<fs::message::create_dir_t>;
 
     fixture_t() noexcept : root_path{unique_path()}, path_guard{root_path} { bfs::create_directory(root_path); }
@@ -56,13 +55,13 @@ struct fixture_t {
     virtual std::int64_t get_iterations_limit() { return 100; }
 
     virtual void on_watch_folder(fs::message::watch_folder_t &msg) {
-        CHECK(!watch_folder_payload);
-        watch_folder_payload = msg.payload;
+        CHECK(!watch_folder_msg);
+        watch_folder_msg = &msg;
     }
 
     virtual void on_unwatch_folder(fs::message::unwatch_folder_t &msg) {
-        CHECK(!unwatch_folder_payload);
-        unwatch_folder_payload = msg.payload;
+        CHECK(!unwatch_folder_msg);
+        unwatch_folder_msg = &msg;
     }
     virtual void on_create_dir(fs::message::create_dir_t &msg) {
         CHECK(!create_dir_msg);
@@ -157,8 +156,8 @@ struct fixture_t {
     test::path_guard_t path_guard;
     target_ptr_t target;
     model::sequencer_ptr_t sequencer;
-    watch_folder_opt_t watch_folder_payload;
-    unwatch_folder_opt_t unwatch_folder_payload;
+    watch_folder_msg_t watch_folder_msg;
+    unwatch_folder_msg_t unwatch_folder_msg;
     create_dir_msg_t create_dir_msg;
 };
 
@@ -180,14 +179,14 @@ void test_watch_unwatch() {
         using fixture_t::fixture_t;
         void main() noexcept override {
             auto impl = GENERATE(I::inotify, I::win32);
+            auto folder_id = "1234-5678";
+            db::Folder db_folder;
+            db::set_id(db_folder, folder_id);
+            db::set_label(db_folder, folder_id);
+            db::set_path(db_folder, boost::nowide::narrow(root_path.generic_wstring()));
+            db::set_folder_type(db_folder, db::FolderType::send_and_receive);
 
             SECTION("folder is created before start => watched upon app start") {
-                auto folder_id = "1234-5678";
-                db::Folder db_folder;
-                db::set_id(db_folder, folder_id);
-                db::set_label(db_folder, folder_id);
-                db::set_path(db_folder, boost::nowide::narrow(root_path.generic_wstring()));
-                db::set_folder_type(db_folder, db::FolderType::send_and_receive);
                 db::set_watched(db_folder, true);
                 builder->upsert_folder(db_folder, 5).apply(*sup);
                 REQUIRE(!create_dir_msg);
@@ -195,28 +194,41 @@ void test_watch_unwatch() {
                 launch_target(impl, true);
 
                 REQUIRE(!create_dir_msg);
-                REQUIRE(watch_folder_payload);
-                auto &p = watch_folder_payload.value();
+                REQUIRE(watch_folder_msg);
+                REQUIRE(!unwatch_folder_msg);
+                auto &p = watch_folder_msg->payload;
                 CHECK(p.folder_id == folder_id);
                 CHECK(p.path == root_path);
+                p.ec = {};
+                submit(std::move(watch_folder_msg));
+
+                SECTION("another upsert") {
+                    builder->upsert_folder(db_folder, 5).apply(*sup);
+                    REQUIRE(!watch_folder_msg);
+                    REQUIRE(!unwatch_folder_msg);
+                }
+
+                SECTION("update folder (non-wached) => send unwatch") {
+                    db::set_watched(db_folder, false);
+                    builder->upsert_folder(db_folder, 5).apply(*sup);
+                    CHECK(!watch_folder_msg);
+                    REQUIRE(unwatch_folder_msg);
+                    auto &p = unwatch_folder_msg->payload;
+                    CHECK(p.folder_id == folder_id);
+                }
             }
             SECTION("post-start create folder & watch") {
                 launch_target(impl);
                 CHECK(static_cast<r::actor_base_t *>(target.get())->access<to::state>() == r::state_t::OPERATIONAL);
                 sup->do_process();
 
-                auto folder_id = "1234-5678";
-                db::Folder db_folder;
-                db::set_id(db_folder, folder_id);
-                db::set_label(db_folder, folder_id);
-                db::set_path(db_folder, boost::nowide::narrow(root_path.generic_wstring()));
-                db::set_folder_type(db_folder, db::FolderType::send_and_receive);
                 SECTION("create non-watched folder") {
                     db::set_watched(db_folder, false);
                     builder->upsert_folder(db_folder, 5).apply(*sup);
                     CHECK(create_dir_msg);
-                    REQUIRE(!watch_folder_payload);
+                    REQUIRE(!watch_folder_msg);
                 }
+
                 SECTION("create watched folder") {
                     db::set_watched(db_folder, true);
                     builder->upsert_folder(db_folder, 5).apply(*sup);
@@ -224,8 +236,8 @@ void test_watch_unwatch() {
                     create_dir_msg->payload.ec = {};
                     submit(std::move(create_dir_msg));
 
-                    REQUIRE(watch_folder_payload);
-                    auto &p = watch_folder_payload.value();
+                    REQUIRE(watch_folder_msg);
+                    auto &p = watch_folder_msg->payload;
                     CHECK(p.folder_id == folder_id);
                     CHECK(p.path == root_path);
                 }

@@ -149,7 +149,6 @@ struct create_dir_t : bfs::path {
 
     inline create_dir_t(bfs::path path, std::string_view folder_id_) noexcept
         : parent_t(std::move(path)), folder_id(folder_id_), ec{utils::make_error_code(utils::error_code_t::no_action)} {
-
     }
 
     std::string folder_id;

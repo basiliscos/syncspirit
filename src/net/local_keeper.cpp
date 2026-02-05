@@ -94,7 +94,7 @@ void local_keeper_t::on_app_ready(model::message::app_ready_t &) noexcept {
         for (auto &[folder, _] : cluster->get_folders()) {
             auto &f = *folder;
             if (f.is_watched()) {
-                send<fs::payload::watch_folder_t>(watcher_addr, f.get_path(), f.get_id());
+                route<fs::payload::watch_folder_t>(watcher_addr, address, f.get_path(), f.get_id());
             }
         }
     }
@@ -137,8 +137,23 @@ auto local_keeper_t::operator()(const model::diff::modify::upsert_folder_t &diff
     -> outcome::result<void> {
     auto folder_id = db::get_id(diff.db);
     auto folder = cluster->get_folders().by_id(folder_id);
-    auto path = fs::payload::create_dir_t(folder->get_path(), folder_id);
-    route<fs::payload::create_dir_t>(fs_addr, address, std::move((path)));
+    if (diff.is_new) {
+        auto create_dir = fs::payload::create_dir_t(folder->get_path(), folder_id);
+        route<fs::payload::create_dir_t>(fs_addr, address, std::move((create_dir)));
+    } else {
+        if (watcher_impl != syncspirit_watcher_impl_t::none) {
+            auto count = watched_folders.count(folder_id);
+            if (folder->is_watched()) {
+                if (!count) {
+                    route<fs::payload::watch_folder_t>(watcher_addr, address, folder->get_path(), folder_id);
+                }
+            } else {
+                if (count) {
+                    route<fs::payload::unwatch_folder_t>(watcher_addr, address, std::string(folder_id));
+                }
+            }
+        }
+    }
     return diff.visit_next(*this, custom);
 }
 
@@ -156,7 +171,7 @@ void local_keeper_t::on_create_dir(fs::message::create_dir_t &message) noexcept 
             send<model::payload::model_update_t>(coordinator, std::move(diff));
         } else {
             if (folder->is_watched() && watcher_impl != syncspirit_watcher_impl_t::none) {
-                send<fs::payload::watch_folder_t>(watcher_addr, folder->get_path(), p.folder_id);
+                route<fs::payload::watch_folder_t>(watcher_addr, address, folder->get_path(), p.folder_id);
             }
         }
     }
