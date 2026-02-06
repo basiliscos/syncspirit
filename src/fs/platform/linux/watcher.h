@@ -35,6 +35,7 @@ struct SYNCSPIRIT_API watcher_t : watcher_base_t {
 
     watch_result_t watch_dir(std::string_view path, std::string_view folder_id, int parent) noexcept;
     void try_watch_recurse(std::string_view name, const path_guard_t &parent_guard, int parent_fd) noexcept;
+    watch_result_t watch_recurse(const bfs::path &path, std::string_view folder_id, int parent_fd) noexcept;
     sys::error_code unwatch_recurse(std::string_view folder_id) noexcept;
 
     fs_context_t::io_guard_t io_guard;

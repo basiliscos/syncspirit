@@ -251,6 +251,52 @@ auto watcher_t::unwatch_recurse(std::string_view folder_id) noexcept -> sys::err
     return ec;
 }
 
+auto watcher_t::watch_recurse(const bfs::path &path, std::string_view folder_id, int parent_fd) noexcept
+    -> watch_result_t {
+    using item_t = std::pair<std::pmr::string, int>;
+    using queue_t = std::pmr::list<item_t>;
+    using ec_opt_t = std::optional<sys::error_code>;
+    auto path_str = std::string_view(path.native());
+    auto buff = std::array<std::byte, 1024>();
+    auto pool = std::pmr::monotonic_buffer_resource(buff.data(), buff.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+    auto queue = queue_t(allocator);
+    queue.emplace_back(item_t{path_str, 0});
+    auto result = watch_result_t{{}, -1};
+    while (!queue.empty()) {
+        auto [path, parent_fd] = queue.front();
+        auto [ec, fd] = watch_dir(path, folder_id, parent_fd);
+        if (!result.first) {
+            result.first = ec;
+        }
+        if (!ec) {
+            if (result.second < 0) {
+                result.second = fd;
+            }
+            auto it = bfs::directory_iterator(path, ec);
+            if (ec) {
+                LOG_WARN(log, "cannot list dir '{}': {}", path, ec.message());
+            } else {
+                for (; it != bfs::directory_iterator(); ++it) {
+                    auto &child = *it;
+                    auto ec = sys::error_code{};
+                    auto status = bfs::symlink_status(child, ec);
+                    auto &child_path = child.path().native();
+                    if (ec) {
+                        LOG_WARN(log, "cannot get child '{}' status : {}", child_path, ec.message());
+                    } else {
+                        if (status.type() == bfs::file_type::directory) {
+                            queue.emplace_back(item_t{child_path, fd});
+                        }
+                    }
+                }
+            }
+        }
+        queue.pop_front();
+    }
+    return result;
+}
+
 void watcher_t::on_watch(message::watch_folder_t &message) noexcept {
     auto &p = message.payload;
     auto &path = p.path;
@@ -262,55 +308,14 @@ void watcher_t::on_watch(message::watch_folder_t &message) noexcept {
         if (!inserted) {
             LOG_WARN(log, "folder '{}' on '{}' is already watched", p.folder_id, path_str);
         } else {
-            using item_t = std::pair<std::pmr::string, int>;
-            using queue_t = std::pmr::list<item_t>;
-            using ec_opt_t = std::optional<sys::error_code>;
-            auto buff = std::array<std::byte, 1024>();
-            auto pool = std::pmr::monotonic_buffer_resource(buff.data(), buff.size());
-            auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
-            auto queue = queue_t(allocator);
-            queue.emplace_back(item_t{path_str, 0});
             auto &folder_id = it->first;
-            auto result = ec_opt_t{};
-            auto root_fd = int{-1};
-
-            while (!queue.empty()) {
-                auto [path, parent_fd] = queue.front();
-                auto [ec, fd] = watch_dir(path, folder_id, parent_fd);
-                if (!result) {
-                    result = ec;
-                }
-                if (!ec) {
-                    if (root_fd < 0) {
-                        root_fd = fd;
-                    }
-                    auto it = bfs::directory_iterator(path, ec);
-                    if (ec) {
-                        LOG_WARN(log, "cannot list dir '{}': {}", path, ec.message());
-                    } else {
-                        for (; it != bfs::directory_iterator(); ++it) {
-                            auto &child = *it;
-                            auto ec = sys::error_code{};
-                            auto status = bfs::symlink_status(child, ec);
-                            auto &child_path = child.path().native();
-                            if (ec) {
-                                LOG_WARN(log, "cannot get child '{}' status : {}", child_path, ec.message());
-                            } else {
-                                if (status.type() == bfs::file_type::directory) {
-                                    queue.emplace_back(item_t{child_path, fd});
-                                }
-                            }
-                        }
-                    }
-                }
-                queue.pop_front();
-            }
-            if (*result) {
+            auto [ec, wd] = watch_recurse(path, folder_id, -1);
+            if (ec) {
                 folder_map.erase(it);
             } else {
-                root_map.emplace(folder_id, root_fd);
+                root_map.emplace(folder_id, wd);
             }
-            p.ec = *result;
+            p.ec = ec;
         }
     }
 }
