@@ -128,7 +128,7 @@ struct fixture_t {
     void await_events(poll_t poll_type, size_t await_changes = 0, bool flatten = false) {
         using clock_t = pt::microsec_clock;
         changes.clear();
-        auto deadline = clock_t::local_time() + pt::seconds{5};
+        auto deadline = clock_t::local_time() + timeout * 10;
         auto do_flatten_on_demand = [&]() {
             if (flatten) {
                 auto copy = change_messages_t();
@@ -1022,11 +1022,7 @@ void test_hierarchies() {
                     auto names = names_t({L"a", L"a/b", L"x", L"x/y", L"x/y/z"});
                     for (auto it = names.rbegin(); it != names.rend(); ++it) {
                         auto p = root_path / bfs::path(*it);
-                        if (p.filename().generic_wstring() == L"файл.bin") {
-                            write_file(p, "12345");
-                        } else {
-                            bfs::create_directories(p);
-                        }
+                        bfs::create_directories(p);
                     }
 
 #ifndef SYNCSPIRIT_WIN
@@ -1046,6 +1042,11 @@ void test_hierarchies() {
                         CHECK(file_change.update_reason == update_type_t::created);
                     }
 #endif
+                    auto path_f = root_path / L"x/y/z" / L"f.bin";
+                    write_file(path_f, "12345");
+                    await_events(poll_t::trigger_timer, 1, true);
+                    auto name_f = proto::get_name(changes[0]->payload[0].file_changes.front());
+                    CHECK(name_f == narrow(L"x/y/z/f.bin"));
                 }
             }
 
