@@ -48,7 +48,7 @@ struct fixture_t {
     using unwatch_folder_msg_t = r::intrusive_ptr_t<fs::message::unwatch_folder_t>;
     using create_dir_msg_t = r::intrusive_ptr_t<fs::message::create_dir_t>;
 
-    fixture_t() noexcept : root_path{unique_path()}, path_guard{root_path} { bfs::create_directory(root_path); }
+    fixture_t() noexcept { log = utils::get_logger("fixture"); }
 
     virtual std::uint32_t get_hash_limit() { return 1; }
 
@@ -152,8 +152,7 @@ struct fixture_t {
     r::intrusive_ptr_t<supervisor_t> sup;
     cluster_ptr_t cluster;
     device_ptr_t my_device;
-    bfs::path root_path;
-    test::path_guard_t path_guard;
+    utils::logger_t log;
     target_ptr_t target;
     model::sequencer_ptr_t sequencer;
     watch_folder_msg_t watch_folder_msg;
@@ -183,7 +182,7 @@ void test_watch_unwatch() {
             db::Folder db_folder;
             db::set_id(db_folder, folder_id);
             db::set_label(db_folder, folder_id);
-            db::set_path(db_folder, boost::nowide::narrow(root_path.generic_wstring()));
+            db::set_path(db_folder, "/some/path");
             db::set_folder_type(db_folder, db::FolderType::send_and_receive);
 
             SECTION("folder is created before start => watched upon app start") {
@@ -199,7 +198,7 @@ void test_watch_unwatch() {
                 REQUIRE(!unwatch_folder_msg);
                 auto &p = watch_folder_msg->payload;
                 CHECK(p.folder_id == folder_id);
-                CHECK(p.path == root_path);
+                CHECK(p.path == "/some/path");
                 p.ec = {};
                 submit(std::move(watch_folder_msg));
 
@@ -246,8 +245,107 @@ void test_watch_unwatch() {
                     REQUIRE(watch_folder_msg);
                     auto &p = watch_folder_msg->payload;
                     CHECK(p.folder_id == folder_id);
-                    CHECK(p.path == root_path);
+                    CHECK(p.path == "/some/path");
                 }
+            }
+        }
+    };
+    F().run();
+}
+
+struct folder_fixture_t : fixture_t {
+    using parent_t = fixture_t;
+    using parent_t::parent_t;
+
+    void on_watch_folder(fs::message::watch_folder_t &msg) override {
+        auto &p = msg.payload;
+        p.ec = {};
+        LOG_DEBUG(log, "watching {}", p.folder_id);
+        watched_ack = true;
+    }
+
+    virtual void on_unwatch_folder(fs::message::unwatch_folder_t &msg) override {
+        watched_ack = false;
+        auto &p = msg.payload;
+        p.ec = {};
+        LOG_DEBUG(log, "unwatching {}", p.folder_id);
+    }
+    virtual void on_create_dir(fs::message::create_dir_t &msg) override {
+        auto &p = msg.payload;
+        p.ec = {};
+        LOG_DEBUG(log, "creating a dir for {}", p.folder_id, narrow(p.generic_wstring()));
+    }
+
+    void prepare(syncspirit_watcher_impl_t impl) noexcept {
+        db::Folder db_folder;
+        db::set_id(db_folder, folder_id);
+        db::set_label(db_folder, folder_id);
+        db::set_path(db_folder, "/some/path");
+        db::set_watched(db_folder, true);
+        builder->upsert_folder(db_folder, 5).apply(*sup);
+
+        folder = cluster->get_folders().by_id(folder_id);
+        folder_local = folder->get_folder_infos().by_device(*my_device);
+        files_local = &folder_local->get_file_infos();
+
+        launch_target(impl);
+        REQUIRE(watched_ack);
+    }
+
+    void create_new(proto::FileInfo info) noexcept {
+        auto change = fs::payload::file_info_t(std::move(info), {}, fs::update_type_t::created);
+        auto changes = fs::payload::file_changes_t{{std::move(change)}};
+        auto folder_change = fs::payload::folder_change_t{folder_id, std::move(changes)};
+        auto folder_changes = fs::payload::folder_changes_t{{std::move(folder_change)}};
+        auto &addr = sup->get_address();
+        sup->send<fs::payload::folder_changes_t>(addr, std::move(folder_changes));
+        sup->do_process();
+    }
+
+    std::string folder_id = "1234-5678";
+    bool watched_ack = false;
+    model::folder_ptr_t folder;
+    model::folder_info_ptr_t folder_local;
+    model::file_infos_map_t *files_local = nullptr;
+};
+
+void test_create_changes_zero_size() {
+    struct F : folder_fixture_t {
+        using parent_t = folder_fixture_t;
+        using parent_t::parent_t;
+        void main() noexcept override {
+            auto impl = GENERATE(I::inotify, I::win32);
+            prepare(impl);
+
+            auto file = proto::FileInfo();
+            auto file_name = std::string_view("some/file/name");
+            proto::set_name(file, file_name);
+            proto::set_permissions(file, 0123);
+            proto::set_modified_s(file, 12345);
+
+            auto file_type =
+                GENERATE(proto::FileInfoType::DIRECTORY, proto::FileInfoType::FILE, proto::FileInfoType::SYMLINK);
+            proto::set_type(file, file_type);
+            if (file_type == proto::FileInfoType::SYMLINK) {
+                proto::set_symlink_target(file, "/some/target");
+            }
+            create_new(file);
+
+            CHECK(files_local->size() == 1);
+            auto f = files_local->by_name(file_name);
+            REQUIRE(f);
+            CHECK(f->get_permissions() == 0123);
+            CHECK(f->get_modified_s() == 12345);
+            CHECK(f->get_size() == 0);
+            if (file_type == proto::FileInfoType::DIRECTORY) {
+                CHECK(f->is_dir());
+            }
+            if (file_type == proto::FileInfoType::FILE) {
+                CHECK(f->is_file());
+            }
+            if (file_type == proto::FileInfoType::SYMLINK) {
+                CHECK(f->is_link());
+                CHECK(f->get_link_target() == "/some/target");
             }
         }
     };
@@ -256,8 +354,9 @@ void test_watch_unwatch() {
 
 int _init() {
     test::init_logging();
-    REGISTER_TEST_CASE(test_just_start, "test_just_start", "[net]");
-    REGISTER_TEST_CASE(test_watch_unwatch, "test_watch_unwatch", "[net]");
+    REGISTER_TEST_CASE(test_just_start, "test_just_start", "[fs]");
+    REGISTER_TEST_CASE(test_watch_unwatch, "test_watch_unwatch", "[fs]");
+    REGISTER_TEST_CASE(test_create_changes_zero_size, "test_create_changes_zero_size", "[fs]");
     return 1;
 }
 

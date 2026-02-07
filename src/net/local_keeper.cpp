@@ -2,12 +2,14 @@
 // SPDX-FileCopyrightText: 2025-2026 Ivan Baidakou
 
 #include "local_keeper.h"
+#include "model/diff/advance/local_update.h"
 #include "model/diff/local/scan_start.h"
 #include "model/diff/local/scan_finish.h"
 #include "model/diff/modify/remove_folder.h"
 #include "model/diff/modify/suspend_folder.h"
 #include "model/diff/modify/upsert_folder.h"
 #include "names.h"
+#include "proto/proto-helpers-bep.h"
 #include "proto/proto-helpers-db.h"
 #include "local_keeper/folder_slave.h"
 
@@ -21,6 +23,7 @@ namespace bfs = std::filesystem;
 namespace sys = boost::system;
 
 using boost::nowide::narrow;
+using UT = fs::update_type_t;
 
 local_keeper_t::local_keeper_t(config_t &config)
     : r::actor_base_t(config), sequencer{std::move(config.sequencer)},
@@ -47,6 +50,7 @@ void local_keeper_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
             if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {
                 auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
                 auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
+                plugin->subscribe_actor(&local_keeper_t::on_change, coordinator);
                 plugin->subscribe_actor(&local_keeper_t::on_model_update, coordinator);
                 plugin->subscribe_actor(&local_keeper_t::on_thread_ready, coordinator);
                 plugin->subscribe_actor(&local_keeper_t::on_app_ready, coordinator);
@@ -249,5 +253,38 @@ void local_keeper_t::on_unwatch_dir(fs::message::unwatch_folder_t &message) noex
     auto it = watched_folders.find(folder_id);
     if (it != watched_folders.end()) {
         watched_folders.erase(it);
+    }
+}
+
+void local_keeper_t::on_change(fs::message::folder_changes_t &message) noexcept {
+    auto &p = message.payload;
+    LOG_DEBUG(log, "on_change, affects {} folder(s)", p.size());
+    auto &folders_map = cluster->get_folders();
+    for (auto &folder_change : p) {
+        auto &folder_id = folder_change.folder_id;
+        auto folder = folders_map.by_id(folder_id);
+        if (!folder) {
+            LOG_DEBUG(log, "there is no folder '{}' in the model", folder_id);
+        } else {
+            auto local_folder = folder->get_folder_infos().by_device(*cluster->get_device());
+            on_changes(*local_folder, folder_change.file_changes);
+        }
+    }
+}
+
+void local_keeper_t::on_changes(model::folder_info_t &folder, fs::payload::file_changes_t &changes) noexcept {
+    using namespace model::diff;
+    auto stack_ctx = stack_context_t(concurrent_hashes_left);
+    auto folder_id = folder.get_folder()->get_id();
+    ++fs_tasks;
+    for (auto &change : changes) {
+        if (change.update_reason == UT::created) {
+            if (proto::get_size(change) == 0) {
+                stack_ctx.push(new advance::local_update_t(*cluster, *sequencer, std::move(change), folder_id));
+            }
+        }
+    }
+    if (stack_ctx.diff) {
+        send<model::payload::model_update_t>(coordinator, std::move(stack_ctx.diff));
     }
 }

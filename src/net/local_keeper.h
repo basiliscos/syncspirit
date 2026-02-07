@@ -65,6 +65,8 @@ struct SYNCSPIRIT_API local_keeper_t final : public r::actor_base_t, private mod
     void on_create_dir(fs::message::create_dir_t &) noexcept;
     void on_watch_dir(fs::message::watch_folder_t &) noexcept;
     void on_unwatch_dir(fs::message::unwatch_folder_t &) noexcept;
+    void on_change(fs::message::folder_changes_t &) noexcept;
+    void on_changes(model::folder_info_t &, fs::payload::file_changes_t &) noexcept;
 
     outcome::result<void> operator()(const model::diff::local::scan_start_t &, void *custom) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::upsert_folder_t &, void *custom) noexcept override;
