@@ -995,10 +995,20 @@ void test_hierarchies() {
                     sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id);
                     sup->do_process();
                     REQUIRE(watched_replies == 1);
+
                     auto names = names_t({L"a", L"a/b", L"x", L"x/y", L"x/y/файл.bin"});
-                    for (auto it = names.rbegin(); it != names.rend(); ++it) {
-                        auto p = root_path / bfs::path(*it);
-                        bfs::remove_all(p);
+                    SECTION("remove files individually") {
+                        for (auto it = names.rbegin(); it != names.rend(); ++it) {
+                            auto p = root_path / bfs::path(*it);
+                            bfs::remove_all(p);
+                        }
+                    }
+                    SECTION("remove subdirs ") {
+                        auto for_removal = names_t({L"a", L"x"});
+                        for (auto it = for_removal.rbegin(); it != for_removal.rend(); ++it) {
+                            auto p = root_path / bfs::path(*it);
+                            bfs::remove_all(p);
+                        }
                     }
 
                     await_events(poll_t::trigger_timer, 5, true);
@@ -1011,6 +1021,11 @@ void test_hierarchies() {
                         CHECK(proto::get_name(file_change) == narrow(names[i]));
                         CHECK(file_change.update_reason == update_type_t::deleted);
                     }
+#ifndef SYNCSPIRIT_WIN
+                    auto impl = static_cast<watch_actor_t *>(target.get());
+                    CHECK(impl->path_map.size() == 1);
+                    CHECK(impl->subdir_map.size() == 1);
+#endif
                 }
             }
             SECTION("create hierarchy") {

@@ -4,7 +4,6 @@
 #include "watcher.h"
 
 #if SYNCSPIRIT_WATCHER_INOTIFY
-#include <sys/inotify.h>
 #include <sys/stat.h>
 #include <string.h>
 #include <unistd.h>
@@ -68,6 +67,23 @@ void watcher_t::shutdown_finish() noexcept {
     parent_t::shutdown_finish();
 }
 
+void watcher_t::forward(const pt::ptime &deadline, std::string_view folder_id, update_type_internal_t type,
+                        std::string_view rel_path, std::string_view full_path, std::string prev_path,
+                        const path_guard_t &parent_guard, int parent_wd) noexcept {
+    push(deadline, folder_id, rel_path, std::move(prev_path), static_cast<update_type_t>(type));
+    if (type & update_type::CREATED) {
+        struct stat info;
+        if (lstat(full_path.data(), &info) != 0) {
+            LOG_WARN(log, "cannot lstat() for '{}': {}", full_path, strerror(errno));
+        }
+        if (S_ISDIR(info.st_mode)) {
+            watch_recurse(full_path, parent_guard.folder_id, parent_wd);
+        }
+    } else if (type & update_type::DELETED) {
+        // auto it_path = path_map.find();
+    }
+}
+
 void watcher_t::inotify_callback() noexcept {
     using U = update_type_t;
     char buffer[1024 * (sizeof(struct inotify_event) + NAME_MAX + 1)];
@@ -94,12 +110,12 @@ void watcher_t::inotify_callback() noexcept {
         auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
         auto renamed_cookies = renamed_cookies_t(allocator);
 
-        auto forward = [&](inotify_event *event, std::string prev_path, update_type_internal_t type) {
+        auto forward_update = [&](inotify_event *event, std::string prev_path, update_type_internal_t type) {
             auto filename = std::string_view(event->name);
             append_name(filename);
             auto tail = name_ptr;
-            auto parent_fd = event->wd;
-            auto guard = &path_map[parent_fd];
+            auto parent_wd = event->wd;
+            auto guard = &path_map[parent_wd];
             auto parent = guard;
             auto folder_id = guard->folder_id;
             *(--name_ptr) = '/';
@@ -109,12 +125,9 @@ void watcher_t::inotify_callback() noexcept {
             auto sub_path_sz = guard->path.size() - folder_path.size();
             tail -= sub_path_sz;
             auto rel_path = std::string_view(tail, sub_path_sz + filename.size());
-            push(deadline, folder_id, rel_path, std::move(prev_path), static_cast<update_type_t>(type));
-            if (event->mask & IN_CREATE) {
-                auto full_sz = (name_buff + sizeof(name_buff) - 2) - name_ptr;
-                auto full_path = std::string_view(name_ptr, full_sz);
-                try_watch_recurse(full_path, *parent, parent_fd);
-            }
+            auto full_sz = (name_buff + sizeof(name_buff) - 2) - name_ptr;
+            auto full_path = std::string_view(name_ptr, full_sz);
+            forward(deadline, folder_id, type, rel_path, full_path, std::move(prev_path), *parent, parent_wd);
         };
         for (int i = 0; i < length;) {
             auto prev_name = std::string();
@@ -159,43 +172,35 @@ void watcher_t::inotify_callback() noexcept {
                         type = update_type::META;
                         renamed_cookies.erase(it);
                     }
-                }
-                if (event->mask & IN_MODIFY) {
+                } else if (event->mask & IN_MODIFY) {
                     type = update_type::CONTENT;
-                }
-                if (event->mask & IN_ATTRIB) {
+                } else if (event->mask & IN_ATTRIB) {
                     type = update_type::META;
                 }
+
                 if (type) {
-                    forward(event, std::move(prev_name), type);
+                    forward_update(event, std::move(prev_name), type);
                 } else {
                     LOG_DEBUG(log, "ignoring event 0x{:x} on '{}'", event->mask, event->name);
                 }
+            }
+            if (event->mask & IN_IGNORED) {
+                forget(event->wd);
             }
             i += sizeof(struct inotify_event) + event->len;
         }
         for (auto it = renamed_cookies.begin(); it != renamed_cookies.end(); ++it) {
             name_ptr = name_buff + sizeof(name_buff) - 1;
             *name_ptr-- = 0;
-            forward(it->second, {}, update_type::DELETED);
+            forward_update(it->second, {}, update_type::DELETED);
         }
     }
 }
 
-void watcher_t::try_watch_recurse(std::string_view full_name, const path_guard_t &parent_guard,
-                                  int parent_fd) noexcept {
-    struct stat info;
-    if (lstat(full_name.data(), &info) != 0) {
-        LOG_WARN(log, "cannot lstat() for '{}': {}", full_name, strerror(errno));
-    }
-    if (S_ISDIR(info.st_mode)) {
-        watch_recurse(full_name, parent_guard.folder_id, parent_fd);
-    }
-}
-
 auto watcher_t::watch_dir(std::string_view path, std::string_view folder_id, int parent) noexcept -> watch_result_t {
+    static constexpr auto FLAGS = IN_MODIFY | IN_CREATE | IN_DELETE | IN_ATTRIB | IN_MOVE;
     auto path_str = path.data();
-    auto wd = ::inotify_add_watch(io_guard.fd, path_str, IN_MODIFY | IN_CREATE | IN_DELETE | IN_ATTRIB | IN_MOVE);
+    auto wd = ::inotify_add_watch(io_guard.fd, path_str, FLAGS);
     auto ec = sys::error_code{};
     auto guard_ptr = (path_guard_t *)(nullptr);
     if (wd <= 0) {
@@ -213,7 +218,7 @@ auto watcher_t::watch_dir(std::string_view path, std::string_view folder_id, int
         (void)inserted;
         guard_ptr = &it->second;
         if (parent >= 0) {
-            subdir_map[parent].emplace_back(wd);
+            subdir_map[parent].emplace(wd);
         }
     }
     return watch_result_t{ec, guard_ptr, wd};
@@ -252,6 +257,29 @@ auto watcher_t::unwatch_recurse(std::string_view folder_id) noexcept -> sys::err
         queue.pop_front();
     }
     return ec;
+}
+
+void watcher_t::forget(int wd) noexcept {
+    auto it_subdir = subdir_map.find(wd);
+    auto it_guard = path_map.find(wd);
+    auto &guard = it_guard->second;
+    auto &path = guard.path;
+    LOG_TRACE(log, "forgetting '{}'", path);
+    if (it_subdir != subdir_map.end()) {
+        auto &children = it_subdir->second;
+        if (children.empty()) {
+            LOG_WARN(log, "forgetting watching '{}' still having '{}' watched children", path, children.size());
+        }
+        subdir_map.erase(it_subdir);
+    }
+    if (guard.parent_fd >= 0) {
+        auto &siblings = subdir_map[guard.parent_fd];
+        auto removed = siblings.erase(wd);
+        if (!removed) {
+            LOG_WARN(log, "cannot remove '{}' from parent, is it orphand?", path);
+        }
+    }
+    path_map.erase(it_guard);
 }
 
 auto watcher_t::watch_recurse(std::string_view path, std::string_view folder_id, int parent_fd) noexcept

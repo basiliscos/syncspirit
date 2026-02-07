@@ -9,7 +9,9 @@
 
 #include "fs/platform/watcher_base.h"
 #include "fs/fs_context.h"
-#include <utility>
+#include <sys/inotify.h>
+#include <set>
+#include <tuple>
 
 namespace syncspirit::fs::platform::linux {
 
@@ -29,14 +31,18 @@ struct SYNCSPIRIT_API watcher_t : watcher_base_t {
         int parent_fd;
     };
     using path_map_t = std::unordered_map<int, path_guard_t>;
+    using children_t = std::set<int>;
     using watch_result_t = std::tuple<sys::error_code, path_guard_t *, int>;
-    using subdir_map_t = std::unordered_map<int, std::vector<int>>;
+    using subdir_map_t = std::unordered_map<int, children_t>;
     using root_map_t = std::unordered_map<std::string_view, int>;
 
     watch_result_t watch_dir(std::string_view path, std::string_view folder_id, int parent) noexcept;
-    void try_watch_recurse(std::string_view name, const path_guard_t &parent_guard, int parent_fd) noexcept;
     watch_result_t watch_recurse(std::string_view path, std::string_view folder_id, int parent_fd) noexcept;
     sys::error_code unwatch_recurse(std::string_view folder_id) noexcept;
+    void forget(int wd) noexcept;
+    void forward(const pt::ptime &deadline, std::string_view folder_id, update_type_internal_t type,
+                 std::string_view rel_path, std::string_view full_path, std::string prev_path,
+                 const path_guard_t &parent_guard, int parent_wd) noexcept;
 
     fs_context_t::io_guard_t io_guard;
     path_map_t path_map;
