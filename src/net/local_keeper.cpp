@@ -278,10 +278,25 @@ void local_keeper_t::on_changes(model::folder_info_t &folder, fs::payload::file_
     auto folder_id = folder.get_folder()->get_id();
     ++fs_tasks;
     for (auto &change : changes) {
-        if (change.update_reason == UT::created) {
+        switch (change.update_reason) {
+        case UT::created: {
             if (proto::get_size(change) == 0) {
                 stack_ctx.push(new advance::local_update_t(*cluster, *sequencer, std::move(change), folder_id));
+            } else {
+                LOG_WARN(log, "not implemented");
             }
+            break;
+        }
+        case UT::meta: {
+            stack_ctx.push(new advance::local_update_t(*cluster, *sequencer, std::move(change), folder_id));
+            break;
+        }
+        case UT::deleted: {
+            stack_ctx.push(new advance::local_update_t(*cluster, *sequencer, std::move(change), folder_id));
+            break;
+        }
+        default:
+            LOG_WARN(log, "not implemented");
         }
     }
     if (stack_ctx.diff) {

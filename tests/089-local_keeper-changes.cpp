@@ -292,12 +292,13 @@ struct folder_fixture_t : fixture_t {
         REQUIRE(watched_ack);
     }
 
-    void create_new(proto::FileInfo info) noexcept {
-        auto change = fs::payload::file_info_t(std::move(info), {}, fs::update_type_t::created);
+    void make_update(proto::FileInfo info, fs::update_type_t update_type) noexcept {
+        auto change = fs::payload::file_info_t(std::move(info), {}, update_type);
         auto changes = fs::payload::file_changes_t{{std::move(change)}};
         auto folder_change = fs::payload::folder_change_t{folder_id, std::move(changes)};
         auto folder_changes = fs::payload::folder_changes_t{{std::move(folder_change)}};
         auto &addr = sup->get_address();
+
         sup->send<fs::payload::folder_changes_t>(addr, std::move(folder_changes));
         sup->do_process();
     }
@@ -309,7 +310,7 @@ struct folder_fixture_t : fixture_t {
     model::file_infos_map_t *files_local = nullptr;
 };
 
-void test_create_changes_zero_size() {
+void test_trivial_changes() {
     struct F : folder_fixture_t {
         using parent_t = folder_fixture_t;
         using parent_t::parent_t;
@@ -318,34 +319,63 @@ void test_create_changes_zero_size() {
             prepare(impl);
 
             auto file = proto::FileInfo();
-            auto file_name = std::string_view("some/file/name");
+            auto file_name = std::string_view("some-file-name.bin");
             proto::set_name(file, file_name);
             proto::set_permissions(file, 0123);
             proto::set_modified_s(file, 12345);
 
-            auto file_type =
-                GENERATE(proto::FileInfoType::DIRECTORY, proto::FileInfoType::FILE, proto::FileInfoType::SYMLINK);
-            proto::set_type(file, file_type);
-            if (file_type == proto::FileInfoType::SYMLINK) {
-                proto::set_symlink_target(file, "/some/target");
-            }
-            create_new(file);
+            SECTION("create new") {
+                auto file_type =
+                    GENERATE(proto::FileInfoType::DIRECTORY, proto::FileInfoType::FILE, proto::FileInfoType::SYMLINK);
+                proto::set_type(file, file_type);
+                if (file_type == proto::FileInfoType::SYMLINK) {
+                    proto::set_symlink_target(file, "/some/target");
+                }
+                make_update(file, fs::update_type_t::created);
 
-            CHECK(files_local->size() == 1);
-            auto f = files_local->by_name(file_name);
-            REQUIRE(f);
-            CHECK(f->get_permissions() == 0123);
-            CHECK(f->get_modified_s() == 12345);
-            CHECK(f->get_size() == 0);
-            if (file_type == proto::FileInfoType::DIRECTORY) {
-                CHECK(f->is_dir());
+                CHECK(files_local->size() == 1);
+                auto f = files_local->by_name(file_name);
+                REQUIRE(f);
+                CHECK(f->get_permissions() == 0123);
+                CHECK(f->get_modified_s() == 12345);
+                CHECK(f->get_size() == 0);
+                if (file_type == proto::FileInfoType::DIRECTORY) {
+                    CHECK(f->is_dir());
+                }
+                if (file_type == proto::FileInfoType::FILE) {
+                    CHECK(f->is_file());
+                }
+                if (file_type == proto::FileInfoType::SYMLINK) {
+                    CHECK(f->is_link());
+                    CHECK(f->get_link_target() == "/some/target");
+                }
             }
-            if (file_type == proto::FileInfoType::FILE) {
-                CHECK(f->is_file());
-            }
-            if (file_type == proto::FileInfoType::SYMLINK) {
-                CHECK(f->is_link());
-                CHECK(f->get_link_target() == "/some/target");
+            SECTION("updates on existing") {
+                proto::set_type(file, proto::FileInfoType::FILE);
+                builder->local_update(folder_id, file).apply(*sup);
+
+                auto f = files_local->by_name(file_name);
+                CHECK(f->get_permissions() == 0123);
+                REQUIRE(f);
+
+                auto file_seq = f->get_sequence();
+                auto folder_seq = folder_local->get_max_sequence();
+
+                SECTION("update metadata") {
+                    proto::set_permissions(file, 0777);
+                    make_update(file, fs::update_type_t::meta);
+                    CHECK(f->get_permissions() == 0777);
+                    CHECK(!f->is_deleted());
+                }
+                SECTION("delete file") {
+                    proto::set_deleted(file, true);
+                    make_update(file, fs::update_type_t::deleted);
+                    CHECK(f->get_permissions() == 0123);
+                    CHECK(f->is_deleted());
+                }
+
+                CHECK(f->get_sequence() > file_seq);
+                CHECK(folder_local->get_max_sequence() > folder_seq);
             }
         }
     };
@@ -356,7 +386,7 @@ int _init() {
     test::init_logging();
     REGISTER_TEST_CASE(test_just_start, "test_just_start", "[fs]");
     REGISTER_TEST_CASE(test_watch_unwatch, "test_watch_unwatch", "[fs]");
-    REGISTER_TEST_CASE(test_create_changes_zero_size, "test_create_changes_zero_size", "[fs]");
+    REGISTER_TEST_CASE(test_trivial_changes, "test_trivial_changes", "[fs]");
     return 1;
 }
 
