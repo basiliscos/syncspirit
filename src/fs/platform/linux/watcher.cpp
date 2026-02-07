@@ -4,6 +4,7 @@
 #include "watcher.h"
 
 #if SYNCSPIRIT_WATCHER_INOTIFY
+#include <sys/inotify.h>
 #include <sys/stat.h>
 #include <string.h>
 #include <unistd.h>
@@ -67,23 +68,6 @@ void watcher_t::shutdown_finish() noexcept {
     parent_t::shutdown_finish();
 }
 
-void watcher_t::forward(const pt::ptime &deadline, std::string_view folder_id, update_type_internal_t type,
-                        std::string_view rel_path, std::string_view full_path, std::string prev_path,
-                        const path_guard_t &parent_guard, int parent_wd) noexcept {
-    push(deadline, folder_id, rel_path, std::move(prev_path), static_cast<update_type_t>(type));
-    if (type & update_type::CREATED) {
-        struct stat info;
-        if (lstat(full_path.data(), &info) != 0) {
-            LOG_WARN(log, "cannot lstat() for '{}': {}", full_path, strerror(errno));
-        }
-        if (S_ISDIR(info.st_mode)) {
-            watch_recurse(full_path, parent_guard.folder_id, parent_wd);
-        }
-    } else if (type & update_type::DELETED) {
-        // auto it_path = path_map.find();
-    }
-}
-
 void watcher_t::inotify_callback() noexcept {
     using U = update_type_t;
     char buffer[1024 * (sizeof(struct inotify_event) + NAME_MAX + 1)];
@@ -127,7 +111,12 @@ void watcher_t::inotify_callback() noexcept {
             auto rel_path = std::string_view(tail, sub_path_sz + filename.size());
             auto full_sz = (name_buff + sizeof(name_buff) - 2) - name_ptr;
             auto full_path = std::string_view(name_ptr, full_sz);
-            forward(deadline, folder_id, type, rel_path, full_path, std::move(prev_path), *parent, parent_wd);
+            auto is_dir = event->mask & IN_ISDIR;
+            push(deadline, folder_id, rel_path, std::move(prev_path), static_cast<update_type_t>(type));
+            if ((type & update_type::CREATED) && is_dir) {
+                watch_recurse(full_path, parent->folder_id, parent_wd);
+            }
+
         };
         for (int i = 0; i < length;) {
             auto prev_name = std::string();
@@ -276,7 +265,7 @@ void watcher_t::forget(int wd) noexcept {
         auto &siblings = subdir_map[guard.parent_fd];
         auto removed = siblings.erase(wd);
         if (!removed) {
-            LOG_WARN(log, "cannot remove '{}' from parent, is it orphand?", path);
+            LOG_WARN(log, "cannot remove '{}' from parent, is it orphaned?", path);
         }
     }
     path_map.erase(it_guard);

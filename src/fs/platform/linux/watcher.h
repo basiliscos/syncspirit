@@ -9,7 +9,6 @@
 
 #include "fs/platform/watcher_base.h"
 #include "fs/fs_context.h"
-#include <sys/inotify.h>
 #include <set>
 #include <tuple>
 
@@ -40,9 +39,6 @@ struct SYNCSPIRIT_API watcher_t : watcher_base_t {
     watch_result_t watch_recurse(std::string_view path, std::string_view folder_id, int parent_fd) noexcept;
     sys::error_code unwatch_recurse(std::string_view folder_id) noexcept;
     void forget(int wd) noexcept;
-    void forward(const pt::ptime &deadline, std::string_view folder_id, update_type_internal_t type,
-                 std::string_view rel_path, std::string_view full_path, std::string prev_path,
-                 const path_guard_t &parent_guard, int parent_wd) noexcept;
 
     fs_context_t::io_guard_t io_guard;
     path_map_t path_map;
