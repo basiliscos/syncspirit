@@ -172,7 +172,7 @@ void watcher_t::inotify_callback() noexcept {
                     LOG_DEBUG(log, "ignoring event 0x{:x} on '{}'", event->mask, event->name);
                 }
             }
-            if (event->mask & IN_IGNORED) {
+            if (event->mask & IN_DELETE_SELF) {
                 forget(event->wd);
             }
             if (event->mask & IN_Q_OVERFLOW) {
@@ -189,7 +189,7 @@ void watcher_t::inotify_callback() noexcept {
 }
 
 auto watcher_t::watch_dir(std::string_view path, std::string_view folder_id, int parent) noexcept -> watch_result_t {
-    static constexpr auto FLAGS = IN_MODIFY | IN_CREATE | IN_DELETE | IN_ATTRIB | IN_MOVE;
+    static constexpr auto FLAGS = IN_MODIFY | IN_CREATE | IN_DELETE | IN_ATTRIB | IN_MOVE | IN_DELETE_SELF;
     auto path_str = path.data();
     auto wd = ::inotify_add_watch(io_guard.fd, path_str, FLAGS);
     auto ec = sys::error_code{};
@@ -251,26 +251,28 @@ auto watcher_t::unwatch_recurse(std::string_view folder_id) noexcept -> sys::err
 }
 
 void watcher_t::forget(int wd) noexcept {
-    auto it_subdir = subdir_map.find(wd);
     auto it_guard = path_map.find(wd);
-    auto &guard = it_guard->second;
-    auto &path = guard.path;
-    LOG_TRACE(log, "forgetting '{}'", path);
-    if (it_subdir != subdir_map.end()) {
-        auto &children = it_subdir->second;
-        if (children.empty()) {
-            LOG_WARN(log, "forgetting watching '{}' still having '{}' watched children", path, children.size());
+    if (it_guard != path_map.end()) {
+        auto it_subdir = subdir_map.find(wd);
+        auto &guard = it_guard->second;
+        auto &path = guard.path;
+        LOG_TRACE(log, "forgetting '{}'", path);
+        if (it_subdir != subdir_map.end()) {
+            auto &children = it_subdir->second;
+            if (children.empty()) {
+                LOG_WARN(log, "forgetting watching '{}' still having '{}' watched children", path, children.size());
+            }
+            subdir_map.erase(it_subdir);
         }
-        subdir_map.erase(it_subdir);
-    }
-    if (guard.parent_fd >= 0) {
-        auto &siblings = subdir_map[guard.parent_fd];
-        auto removed = siblings.erase(wd);
-        if (!removed) {
-            LOG_WARN(log, "cannot remove '{}' from parent, is it orphaned?", path);
+        if (guard.parent_fd >= 0) {
+            auto &siblings = subdir_map[guard.parent_fd];
+            auto removed = siblings.erase(wd);
+            if (!removed) {
+                LOG_WARN(log, "cannot remove '{}' from parent, is it orphaned?", path);
+            }
         }
+        path_map.erase(it_guard);
     }
-    path_map.erase(it_guard);
 }
 
 auto watcher_t::watch_recurse(std::string_view path, std::string_view folder_id, int parent_fd) noexcept
