@@ -116,7 +116,6 @@ void watcher_t::inotify_callback() noexcept {
             if ((type & update_type::CREATED) && is_dir) {
                 watch_recurse(full_path, parent->folder_id, parent_wd);
             }
-
         };
         for (int i = 0; i < length;) {
             auto prev_name = std::string();
@@ -175,6 +174,9 @@ void watcher_t::inotify_callback() noexcept {
             }
             if (event->mask & IN_IGNORED) {
                 forget(event->wd);
+            }
+            if (event->mask & IN_Q_OVERFLOW) {
+                LOG_ERROR(log, "event queue overflow");
             }
             i += sizeof(struct inotify_event) + event->len;
         }
