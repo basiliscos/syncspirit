@@ -36,7 +36,7 @@ TEST_CASE("fs_slave, scan_dir", "[fs]") {
 
     SECTION("dir scan") {
         SECTION("empty dir") {
-            slave.push(task::scan_dir_t(root_path, {}, {}));
+            slave.push(task::scan_dir_t(root_path, {}, {}, {}));
             CHECK(!slave.exec(context));
             REQUIRE(slave.tasks_out.size() == 1);
             auto &t = std::get<task::scan_dir_t>(slave.tasks_out.front());
@@ -44,7 +44,7 @@ TEST_CASE("fs_slave, scan_dir", "[fs]") {
             CHECK(t.child_infos.size() == 0);
         }
         SECTION("non-existing dir") {
-            slave.push(task::scan_dir_t(root_path / "non-existing", {}, {}));
+            slave.push(task::scan_dir_t(root_path / "non-existing", {}, {}, {}));
             slave.exec(context);
             REQUIRE(slave.tasks_out.size() == 1);
             auto &t = std::get<task::scan_dir_t>(slave.tasks_out.front());
@@ -52,7 +52,7 @@ TEST_CASE("fs_slave, scan_dir", "[fs]") {
             CHECK(t.ec.message() != "");
         }
         SECTION("not a dir") {
-            slave.push(task::scan_dir_t(root_path / "file", {}, {}));
+            slave.push(task::scan_dir_t(root_path / "file", {}, {}, {}));
             write_file(root_path / "file", "");
             slave.exec(context);
             REQUIRE(slave.tasks_out.size() == 1);
@@ -60,19 +60,39 @@ TEST_CASE("fs_slave, scan_dir", "[fs]") {
             CHECK(t.ec);
             CHECK(t.ec.message() != "");
         }
-        SECTION("not a dir") {
-            slave.push(task::scan_dir_t(root_path / "file", {}, {}));
-            write_file(root_path / "file", "");
-            slave.exec(context);
-            REQUIRE(slave.tasks_out.size() == 1);
-            auto &t = std::get<task::scan_dir_t>(slave.tasks_out.front());
-            CHECK(t.ec);
-            CHECK(t.ec.message() != "");
+        SECTION("dir with 2 children") {
+            write_file(root_path / "file-1", "");
+            write_file(root_path / "file-2", "");
+
+            SECTION("scan whole dir") {
+                slave.push(task::scan_dir_t(root_path, {}, {}, {}));
+                slave.exec(context);
+                REQUIRE(slave.tasks_out.size() == 1);
+                auto &t = std::get<task::scan_dir_t>(slave.tasks_out.front());
+                CHECK(!t.ec);
+                CHECK(t.child_infos.size() == 2);
+            }
+            SECTION("single child scan (1)") {
+                slave.push(task::scan_dir_t(root_path, {}, {}, "file-1"));
+                slave.exec(context);
+                REQUIRE(slave.tasks_out.size() == 1);
+                auto &t = std::get<task::scan_dir_t>(slave.tasks_out.front());
+                CHECK(!t.ec);
+                CHECK(t.child_infos.size() == 1);
+            }
+            SECTION("single child scan (2)") {
+                slave.push(task::scan_dir_t(root_path, {}, {}, "file-x"));
+                slave.exec(context);
+                REQUIRE(slave.tasks_out.size() == 1);
+                auto &t = std::get<task::scan_dir_t>(slave.tasks_out.front());
+                CHECK(!t.ec);
+                CHECK(t.child_infos.size() == 0);
+            }
         }
 
 #ifndef SYNCSPIRIT_WIN
         SECTION("dir with a file, dir & symlink") {
-            slave.push(task::scan_dir_t(root_path, {}, {}));
+            slave.push(task::scan_dir_t(root_path, {}, {}, {}));
 
             auto modified = std::int64_t{1642007468};
             auto child_1 = root_path / L"a_файл";

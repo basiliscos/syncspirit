@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2025-2026 Ivan Baidakou
 
 #pragma once
 
@@ -15,8 +15,8 @@ namespace bfs = std::filesystem;
 struct unscanned_dir_t {
     using dir_info_t = std::unique_ptr<child_info_t>;
 
-    unscanned_dir_t(bfs::path path_, presentation::presence_ptr_t presence_)
-        : path(std::move(path_)), presence(std::move(presence_)) {}
+    unscanned_dir_t(bfs::path path_, presentation::presence_ptr_t presence_, bfs::path single_child_)
+        : path(std::move(path_)), presence(std::move(presence_)), single_child{std::move(single_child_)} {}
 
     unscanned_dir_t(child_info_t dir_info_) : dir_info(new child_info_t(std::move(dir_info_))) {
         path = dir_info->path;
@@ -25,6 +25,7 @@ struct unscanned_dir_t {
 
     bfs::path path;
     presentation::presence_ptr_t presence;
+    bfs::path single_child;
     dir_info_t dir_info;
 };
 

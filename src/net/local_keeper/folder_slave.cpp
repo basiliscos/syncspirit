@@ -56,18 +56,26 @@ auto folder_slave_t::initialize() noexcept -> sys::error_code {
             return std::make_error_code(std::errc::no_such_file_or_directory);
         }
     }
-    auto path = [&]() -> bfs::path {
+    auto [path, child] = [&]() -> std::pair<bfs::path, bfs::path> {
+        auto &folder_path = folder->get_path();
         if (presence == folder_presence)
-            return folder->get_path();
-        auto dir_presence = static_cast<presentation::cluster_file_presence_t *>(presence);
-        auto &file = dir_presence->get_file_info();
-        assert(file.is_dir());
-        auto sub_path = bfs::path(widen(file.get_name()->get_full_name()));
-        return folder->get_path() / sub_path;
+            return {folder_path, ""};
+        auto parent = presence->get_parent();
+        auto path = bfs::path();
+        if (parent == folder_presence) {
+            path = folder_path;
+        } else {
+            auto dir_presence = static_cast<presentation::cluster_file_presence_t *>(parent);
+            auto &file = dir_presence->get_file_info();
+            path = folder_path / bfs::path(widen(file.get_name()->get_full_name()));
+        }
+        auto name = bfs::path(widen(presence->get_entity()->get_path()->get_own_name()));
+        presence = parent;
+        return {path, std::move(name)};
     }();
     ignore_permissions = folder->are_permissions_ignored() || !utils::platform_t::permissions_supported(path);
-    stack.push_front(complete_scan_t{});
-    stack.push_front(unscanned_dir_t(std::move(path), presence));
+    stack.push_front(complete_scan_t{true});
+    stack.push_front(unscanned_dir_t(std::move(path), presence, std::move(child)));
     return {};
 }
 
@@ -177,7 +185,8 @@ int folder_slave_t::process(complete_scan_t &, stack_context_t &ctx) noexcept {
 }
 
 int folder_slave_t::process(unscanned_dir_t &dir, stack_context_t &ctx) noexcept {
-    auto sub_task = fs::task::scan_dir_t(std::move(dir.path), std::move(dir.presence), std::move(dir.dir_info));
+    auto sub_task = fs::task::scan_dir_t(std::move(dir.path), std::move(dir.presence), std::move(dir.dir_info),
+                                         std::move(dir.single_child));
     pending_io.emplace_back(std::move(sub_task));
     return 0;
 }
@@ -533,7 +542,7 @@ void folder_slave_t::post_process(fs::task::scan_dir_t &task, stack_context_t &c
     auto folder = context->local_folder->get_folder();
     auto folder_id = folder->get_id();
     auto &root_path = folder->get_path();
-    bool is_root = !task.payload; // task.path == folder->get_path();
+    bool is_root = task.path == root_path;
     if (is_root) {
         if (ec) {
             stack.push_front(suspend_scan_t(ec));
@@ -547,7 +556,7 @@ void folder_slave_t::post_process(fs::task::scan_dir_t &task, stack_context_t &c
 
     if (task.ec) {
         return handle_scan_error(task, ctx);
-    } else if (!is_root) {
+    } else if (!is_root && task.payload) {
         auto dir_info = static_cast<child_info_t *>(task.payload.get());
         stack.push_front(child_ready_t(std::move(*dir_info)));
     }
@@ -589,6 +598,11 @@ void folder_slave_t::post_process(fs::task::scan_dir_t &task, stack_context_t &c
                 auto filename = child->get_entity()->get_path()->get_own_name();
                 if (!checked_children.count(filename)) {
                     checked_children.emplace(filename);
+                    if (!task.single_child.empty()) {
+                        if (task.single_child.generic_wstring() != widen(filename)) {
+                            continue;
+                        }
+                    }
                     auto is_dir = features & F::directory;
                     if (!(features & F::deleted)) {
                         if (is_dir) {

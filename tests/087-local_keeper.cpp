@@ -18,6 +18,7 @@
 #include "test_supervisor.h"
 #include "access.h"
 #include "utils/platform.h"
+#include "presentation/folder_entity.h"
 #include <format>
 #include <boost/nowide/convert.hpp>
 
@@ -1190,11 +1191,32 @@ void test_partial_scan() {
 
             write_file(file_1, "1234567890");
             write_file(file_2, "6789012345");
-            auto subdir = GENERATE("a", "a/b", "a/b/c");
-            builder->scan_start(folder->get_id(), subdir).apply(*sup);
-            REQUIRE(files.size() == 6 + 2);
-            CHECK(f_1->get_sequence() != seq_1);
-            CHECK(f_2->get_sequence() == seq_2);
+            SECTION("existing dir") {
+                auto subdir = GENERATE("a", "a/b", "a/b/c");
+                builder->scan_start(folder->get_id(), subdir).apply(*sup);
+                CHECK(subdir != std::string_view(""));
+                REQUIRE(files.size() == 6 + 2);
+                CHECK(f_1->get_sequence() != seq_1);
+                CHECK(f_2->get_sequence() == seq_2);
+            }
+            SECTION("non-existing dir") {
+                builder->scan_start(folder->get_id()).apply(*sup);
+                bfs::remove_all(dir_1);
+                builder->scan_start(folder->get_id(), "a/b/c").apply(*sup);
+                auto dir = files.by_name("a/b/c");
+                REQUIRE(dir);
+                auto aug = folder->get_augmentation().get();
+                auto folder_entity = static_cast<presentation::folder_entity_t *>(aug);
+                auto &a_entity = *folder_entity->get_children().begin();
+                auto &b_entity = *a_entity->get_children().begin();
+                auto &c_entity = *b_entity->get_children().begin();
+                auto presence = c_entity->get_presence(my_device.get());
+                auto &entity_stats = c_entity->get_stats();
+                auto &presence_stats = presence->get_stats();
+                CHECK(entity_stats.entities == 2);
+                CHECK(entity_stats.entities == presence_stats.local_entries);
+                CHECK(!folder->is_suspended());
+            }
         }
     };
     F().run();

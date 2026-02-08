@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2025-2026 Ivan Baidakou
 
 #pragma once
 
@@ -18,7 +18,9 @@ using hash_new_file_ptr_t = boost::intrusive_ptr<hash_new_file_t>;
 using hash_existing_file_ptr_t = boost::intrusive_ptr<hash_existing_file_t>;
 using hash_incomplete_file_ptr_t = boost::intrusive_ptr<hash_incomplete_file_t>;
 
-struct complete_scan_t {};
+struct complete_scan_t {
+    bool partial = false;
+};
 struct suspend_scan_t {
     sys::error_code ec;
 };
