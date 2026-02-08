@@ -360,22 +360,31 @@ void test_trivial_changes() {
 
                 auto file_seq = f->get_sequence();
                 auto folder_seq = folder_local->get_max_sequence();
+                auto update_type = fs::update_type_t::meta;
 
                 SECTION("update metadata") {
                     proto::set_permissions(file, 0777);
-                    make_update(file, fs::update_type_t::meta);
+                    update_type = fs::update_type_t::meta;
+                    make_update(file, update_type);
                     CHECK(f->get_permissions() == 0777);
                     CHECK(!f->is_deleted());
                 }
                 SECTION("delete file") {
                     proto::set_deleted(file, true);
-                    make_update(file, fs::update_type_t::deleted);
+                    update_type = fs::update_type_t::deleted;
+                    make_update(file, update_type);
                     CHECK(f->get_permissions() == 0123);
                     CHECK(f->is_deleted());
                 }
 
-                CHECK(f->get_sequence() > file_seq);
-                CHECK(folder_local->get_max_sequence() > folder_seq);
+                auto file_seq_2 = f->get_sequence();
+                auto folder_seq_2 = folder_local->get_max_sequence();
+                CHECK(file_seq_2 > file_seq);
+                CHECK(folder_seq_2 > folder_seq);
+
+                make_update(file, update_type);
+                CHECK(f->get_sequence() == file_seq_2);
+                CHECK(folder_local->get_max_sequence() == folder_seq_2);
             }
         }
     };

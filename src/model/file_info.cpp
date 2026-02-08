@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "cluster.h"
 #include "file_info.h"
@@ -662,6 +662,39 @@ bool file_info_t::identical_to(const proto::FileInfo &file) const noexcept {
         }
     }
     return false;
+}
+
+bool file_info_t::identical_by_content_to(const proto::FileInfo &file) const noexcept {
+    assert(proto::get_name(file) == name->get_full_name());
+    auto sz = proto::get_size(file);
+    auto file_size = get_size();
+    if (sz != file_size) {
+        return false;
+    }
+    auto main_meta_eq = proto::get_type(file) == as_type(flags) && proto::get_modified_s(file) == get_modified_s() &&
+                        proto::get_modified_ns(file) == get_modified_ns() && proto::get_deleted(file) == is_deleted() &&
+                        proto::get_invalid(file) == is_invalid();
+
+    if (!main_meta_eq) {
+        return false;
+    }
+    if (is_link()) {
+        if (proto::get_symlink_target(file) != get_link_target()) {
+            return false;
+        }
+    }
+    if (!has_no_permissions()) {
+        if (proto::get_permissions(file) != get_permissions()) {
+            return false;
+        }
+    }
+
+    if (sz) {
+        if (proto::get_block_size(file) != get_block_size()) {
+            return false;
+        }
+    }
+    return true;
 }
 
 void file_info_t::set_augmentation(augmentation_t &value) noexcept { extension = &value; }

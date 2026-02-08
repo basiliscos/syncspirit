@@ -276,23 +276,36 @@ void local_keeper_t::on_changes(model::folder_info_t &folder, fs::payload::file_
     using namespace model::diff;
     auto stack_ctx = stack_context_t(concurrent_hashes_left);
     auto folder_id = folder.get_folder()->get_id();
-    ++fs_tasks;
+    auto &files_map = folder.get_file_infos();
+    auto immediate_update = [&](fs::payload::file_info_t &change) {
+        auto name = proto::get_name(change);
+        auto file = files_map.by_name(name);
+        bool update = true;
+        if (file) {
+            update = !file->identical_by_content_to(change);
+        }
+        if (update) {
+            stack_ctx.push(new advance::local_update_t(*cluster, *sequencer, std::move(change), folder_id));
+        } else {
+            LOG_DEBUG(log, "ignroing update on '{}'", name);
+        }
+    };
     for (auto &change : changes) {
         switch (change.update_reason) {
         case UT::created: {
             if (proto::get_size(change) == 0) {
-                stack_ctx.push(new advance::local_update_t(*cluster, *sequencer, std::move(change), folder_id));
+                immediate_update(change);
             } else {
                 LOG_WARN(log, "not implemented");
             }
             break;
         }
         case UT::meta: {
-            stack_ctx.push(new advance::local_update_t(*cluster, *sequencer, std::move(change), folder_id));
+            immediate_update(change);
             break;
         }
         case UT::deleted: {
-            stack_ctx.push(new advance::local_update_t(*cluster, *sequencer, std::move(change), folder_id));
+            immediate_update(change);
             break;
         }
         default:
