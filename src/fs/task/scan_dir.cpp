@@ -22,11 +22,9 @@ struct comparator_t {
     }
 };
 
-scan_dir_t::scan_dir_t(bfs::path path_, presentation::presence_ptr_t presence_, custom_payload_ptr_t payload_,
-                       bfs::path single_child_) noexcept
+scan_dir_t::scan_dir_t(bfs::path path_, presentation::presence_ptr_t presence_, bfs::path single_child_) noexcept
     : path{std::move(path_)}, presence{std::move(presence_)},
-      ec(utils::make_error_code(utils::error_code_t::no_action)), payload(std::move(payload_)),
-      single_child{std::move(single_child_)} {}
+      ec(utils::make_error_code(utils::error_code_t::no_action)), single_child{std::move(single_child_)} {}
 
 bool scan_dir_t::process(fs_slave_t &slave, execution_context_t &context) noexcept {
     ec = {};

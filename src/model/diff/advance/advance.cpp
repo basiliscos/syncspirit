@@ -99,9 +99,11 @@ void advance_t::initialize(const cluster_t &cluster, sequencer_t &sequencer, pro
         }
     }
 
-    LOG_DEBUG(log, "advance_t ({}), folder = {}, name = {} ( -> {}), blocks = {}, removed blocks = {}, new blocks = {}",
+    LOG_DEBUG(log,
+              "advance_t ({}), folder = {}, name = {} ( -> {}), blocks = {}, removed blocks = {}, new blocks = {} [{}]",
               stringify(action), folder_id, proto::get_name(proto_source), proto::get_name(proto_local),
-              proto::get_blocks_size(proto_local), orphans.size(), new_blocks.size());
+              proto::get_blocks_size(proto_local), orphans.size(), new_blocks.size(),
+              (proto::get_deleted(proto_local) ? "D" : ""));
 
     auto current = (cluster_diff_t *){};
     if (!new_blocks.empty()) {

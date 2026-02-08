@@ -24,6 +24,8 @@ using namespace syncspirit::net::local_keeper;
 using boost::nowide::narrow;
 using boost::nowide::widen;
 
+using local_update_t = syncspirit::model::diff::advance::local_update_t;
+
 folder_slave_t::folder_slave_t(folder_context_ptr_t context_, local_keeper_ptr_t actor_) noexcept
     : context{context_}, actor{std::move(actor_)} {
     log = actor->log;
@@ -185,8 +187,7 @@ int folder_slave_t::process(complete_scan_t &, stack_context_t &ctx) noexcept {
 }
 
 int folder_slave_t::process(unscanned_dir_t &dir, stack_context_t &ctx) noexcept {
-    auto sub_task = fs::task::scan_dir_t(std::move(dir.path), std::move(dir.presence), std::move(dir.dir_info),
-                                         std::move(dir.single_child));
+    auto sub_task = fs::task::scan_dir_t(std::move(dir.path), std::move(dir.presence), std::move(dir.single_child));
     pending_io.emplace_back(std::move(sub_task));
     return 0;
 }
@@ -195,6 +196,7 @@ int folder_slave_t::process(unexamined_t &child_info, stack_context_t &ctx) noex
     auto &type = child_info.type;
     if (type == proto::FileInfoType::DIRECTORY) {
         auto self = child_info.self;
+        stack.push_front(child_ready_t(child_info));
         stack.push_front(unscanned_dir_t(std::move(child_info)));
     } else if (type == proto::FileInfoType::SYMLINK) {
         stack.push_front(child_ready_t(std::move(child_info)));
@@ -280,7 +282,7 @@ int folder_slave_t::process(child_ready_t &info, stack_context_t &ctx) noexcept 
     using FT = proto::FileInfoType;
     using namespace model::diff;
     bool emit_update = false;
-    if (!info.self) {
+    if (!info.self || (info.self->get_features() & F::deleted)) {
         emit_update = true;
     } else {
         auto presence = static_cast<presentation::cluster_file_presence_t *>(info.self.get());
@@ -323,6 +325,20 @@ int folder_slave_t::process(child_ready_t &info, stack_context_t &ctx) noexcept 
     return 1;
 }
 
+int folder_slave_t::process(undo_child_ready_t &info, stack_context_t &ctx) noexcept {
+
+    for (auto it = stack.begin()++; it != stack.end(); ++it) {
+        if (auto item = std::get_if<child_ready_t>(&*it)) {
+            if (item->path == info.path) {
+                stack.erase(it);
+                break;
+            }
+        }
+    }
+    LOG_WARN(log, "cannot undo child ready for {}", narrow(info.path.generic_wstring()));
+    return 1;
+}
+
 int folder_slave_t::process(hash_existing_file_ptr_t &item, stack_context_t &ctx) noexcept {
     return schedule_hash(item.get(), ctx);
 }
@@ -340,8 +356,7 @@ int folder_slave_t::process(removed_dir_t &item, stack_context_t &ctx) noexcept 
     auto dir = static_cast<presentation::local_file_presence_t *>(item.presence.get());
     auto dir_data = dir->get_file_info().as_proto(false);
     proto::set_deleted(dir_data, true);
-    ctx.push(
-        new model::diff::advance::local_update_t(*actor->cluster, *actor->sequencer, std::move(dir_data), folder_id));
+    ctx.push(new local_update_t(*actor->cluster, *actor->sequencer, std::move(dir_data), folder_id));
     auto dirs_stack = dirs_stack_t(stack);
     auto children = item.presence->get_children();
     for (auto child : item.presence->get_children()) {
@@ -351,8 +366,7 @@ int folder_slave_t::process(removed_dir_t &item, stack_context_t &ctx) noexcept 
             auto file = static_cast<presentation::local_file_presence_t *>(child);
             auto file_data = file->get_file_info().as_proto(false);
             proto::set_deleted(file_data, true);
-            ctx.push(new model::diff::advance::local_update_t(*actor->cluster, *actor->sequencer, std::move(file_data),
-                                                              folder_id));
+            ctx.push(new local_update_t(*actor->cluster, *actor->sequencer, std::move(file_data), folder_id));
         }
     }
     return 1;
@@ -558,9 +572,6 @@ void folder_slave_t::post_process(fs::task::scan_dir_t &task, stack_context_t &c
         if (task.single_child.empty() || task.ec != std::errc::no_such_file_or_directory) {
             return handle_scan_error(task, ctx);
         }
-    } else if (!is_root && task.payload) {
-        auto dir_info = static_cast<child_info_t *>(task.payload.get());
-        stack.push_front(child_ready_t(std::move(*dir_info)));
     }
 
     auto dir_presence = task.presence.get();
@@ -613,8 +624,8 @@ void folder_slave_t::post_process(fs::task::scan_dir_t &task, stack_context_t &c
                             auto file = static_cast<presentation::local_file_presence_t *>(child);
                             auto file_data = file->get_file_info().as_proto(false);
                             proto::set_deleted(file_data, true);
-                            ctx.push(new model::diff::advance::local_update_t(*actor->cluster, *actor->sequencer,
-                                                                              std::move(file_data), folder_id));
+                            ctx.push(new local_update_t(*actor->cluster, *actor->sequencer, std::move(file_data),
+                                                        folder_id));
                         }
                     } else {
                         auto &target_stack = is_dir ? dirs_stack : stack;
@@ -642,8 +653,7 @@ void folder_slave_t::post_process(fs::task::scan_dir_t &task, stack_context_t &c
             auto presence = static_cast<const presentation::cluster_file_presence_t *>(best);
             auto &peer_file = presence->get_file_info();
             auto pr_file = peer_file.as_proto(true);
-            ctx.push(new model::diff::advance::local_update_t(*actor->cluster, *actor->sequencer, std::move(pr_file),
-                                                              folder_id));
+            ctx.push(new local_update_t(*actor->cluster, *actor->sequencer, std::move(pr_file), folder_id));
             if (best->get_features() & F::directory) {
                 for (auto c : child_entity->get_children()) {
                     auto best = child_entity->get_best();
@@ -740,4 +750,5 @@ void folder_slave_t::handle_scan_error(fs::task::scan_dir_t &task, stack_context
             }
         }
     }
+    stack.push_front(undo_child_ready_t(task.path));
 }

@@ -67,6 +67,7 @@ struct folder_slave_t final : fs::fs_slave_t {
     int process(fatal_error_t &item, stack_context_t &ctx) noexcept;
     int process(unsuspend_scan_t &, stack_context_t &ctx) noexcept;
     int process(child_ready_t &info, stack_context_t &ctx) noexcept;
+    int process(undo_child_ready_t &info, stack_context_t &ctx) noexcept;
     int process(hash_existing_file_ptr_t &item, stack_context_t &ctx) noexcept;
     int process(hash_new_file_ptr_t &item, stack_context_t &ctx) noexcept;
     int process(hash_incomplete_file_ptr_t &item, stack_context_t &ctx) noexcept;

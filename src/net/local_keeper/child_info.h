@@ -14,11 +14,12 @@ namespace syncspirit::net::local_keeper {
 namespace bfs = std::filesystem;
 namespace sys = boost::system;
 
-struct child_info_t : fs::task::scan_dir_t::custom_payload_t {
+struct child_info_t {
     using blocks_t = std::vector<proto::BlockInfo>;
 
     child_info_t(fs::task::scan_dir_t::child_info_t backend, presentation::presence_ptr_t self_,
                  presentation::presence_ptr_t parent_);
+    virtual ~child_info_t() = default;
 
     proto::FileInfo serialize(const model::folder_info_t &local_folder, blocks_t blocks, bool ignore_permissions);
 
