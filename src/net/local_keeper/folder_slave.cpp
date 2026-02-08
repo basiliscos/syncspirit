@@ -555,7 +555,9 @@ void folder_slave_t::post_process(fs::task::scan_dir_t &task, stack_context_t &c
     }
 
     if (task.ec) {
-        return handle_scan_error(task, ctx);
+        if (task.single_child.empty() || task.ec != std::errc::no_such_file_or_directory) {
+            return handle_scan_error(task, ctx);
+        }
     } else if (!is_root && task.payload) {
         auto dir_info = static_cast<child_info_t *>(task.payload.get());
         stack.push_front(child_ready_t(std::move(*dir_info)));

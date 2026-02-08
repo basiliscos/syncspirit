@@ -1201,7 +1201,8 @@ void test_partial_scan() {
             }
             SECTION("non-existing dir") {
                 builder->scan_start(folder->get_id()).apply(*sup);
-                bfs::remove_all(dir_1);
+                auto subdir = GENERATE("a", "a/b", "a/b/c");
+                bfs::remove_all(root_path / subdir);
                 builder->scan_start(folder->get_id(), "a/b/c").apply(*sup);
                 auto dir = files.by_name("a/b/c");
                 REQUIRE(dir);
