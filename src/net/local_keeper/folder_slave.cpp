@@ -561,7 +561,7 @@ void folder_slave_t::post_process(fs::task::scan_dir_t &task, stack_context_t &c
     auto folder = context->local_folder->get_folder();
     auto folder_id = folder->get_id();
     auto &root_path = folder->get_path();
-    bool is_root = task.path == root_path;
+    bool is_root = task.path == root_path && task.single_child.empty();
     if (is_root) {
         if (ec) {
             stack.push_front(suspend_scan_t(ec));
@@ -579,9 +579,8 @@ void folder_slave_t::post_process(fs::task::scan_dir_t &task, stack_context_t &c
         } else {
             auto path = task.path.parent_path();
             auto p = static_cast<presentation::local_file_presence_t *>(task.presence.get());
-            auto child = bfs::path(widen(p->get_file_info().get_name()->get_full_name()));
-            auto sub_task =
-                fs::task::scan_dir_t(std::move(path), std::move(task.presence->get_parent()), std::move(child));
+            auto child = bfs::path(widen(p->get_file_info().get_name()->get_own_name()));
+            auto sub_task = fs::task::scan_dir_t(std::move(path), std::move(p->get_parent()), std::move(child));
             pending_io.emplace_back(std::move(sub_task));
             return;
         }

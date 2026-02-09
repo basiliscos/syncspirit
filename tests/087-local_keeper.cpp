@@ -1238,11 +1238,12 @@ void test_partial_scan() {
                 CHECK(f_1->get_sequence() != seq_1);
                 CHECK(f_2->get_sequence() == seq_2);
             }
-#if 0
             SECTION("non-existing dir") {
                 builder->scan_start(folder->get_id()).apply(*sup);
                 auto subdir = GENERATE("a", "a/b", "a/b/c");
                 bfs::remove_all(root_path / subdir);
+                INFO("subdir: " << subdir);
+                CHECK(subdir != std::string_view{});
                 builder->scan_start(folder->get_id(), "a/b/c").apply(*sup);
                 auto dir = files.by_name("a/b/c");
                 REQUIRE(dir);
@@ -1258,7 +1259,6 @@ void test_partial_scan() {
                 CHECK(entity_stats.entities == presence_stats.local_entries);
                 CHECK(!folder->is_suspended());
             }
-#endif
             SECTION("resurrection") {
                 bfs::remove_all(root_path / "a");
                 auto dir_a = files.by_name("a");
