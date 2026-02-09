@@ -62,7 +62,12 @@ auto folder_slave_t::initialize() noexcept -> sys::error_code {
         auto &folder_path = folder->get_path();
         if (presence == folder_presence)
             return {folder_path, ""};
+
         auto parent = presence->get_parent();
+        while (parent && (parent->get_features() & F::deleted)) {
+            presence = parent;
+            parent = parent->get_parent();
+        }
         auto path = bfs::path();
         if (parent == folder_presence) {
             path = folder_path;
@@ -571,6 +576,14 @@ void folder_slave_t::post_process(fs::task::scan_dir_t &task, stack_context_t &c
     if (task.ec) {
         if (task.single_child.empty() || task.ec != std::errc::no_such_file_or_directory) {
             return handle_scan_error(task, ctx);
+        } else {
+            auto path = task.path.parent_path();
+            auto p = static_cast<presentation::local_file_presence_t *>(task.presence.get());
+            auto child = bfs::path(widen(p->get_file_info().get_name()->get_full_name()));
+            auto sub_task =
+                fs::task::scan_dir_t(std::move(path), std::move(task.presence->get_parent()), std::move(child));
+            pending_io.emplace_back(std::move(sub_task));
+            return;
         }
     }
 
@@ -616,6 +629,7 @@ void folder_slave_t::post_process(fs::task::scan_dir_t &task, stack_context_t &c
                             continue;
                         }
                     }
+
                     auto is_dir = features & F::directory;
                     if (!(features & F::deleted)) {
                         if (is_dir) {

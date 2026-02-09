@@ -1228,7 +1228,6 @@ void test_partial_scan() {
             auto seq_1 = f_1->get_sequence();
             auto seq_2 = f_2->get_sequence();
 
-#if 0
             write_file(file_1, "1234567890");
             write_file(file_2, "6789012345");
             SECTION("existing dir") {
@@ -1239,6 +1238,7 @@ void test_partial_scan() {
                 CHECK(f_1->get_sequence() != seq_1);
                 CHECK(f_2->get_sequence() == seq_2);
             }
+#if 0
             SECTION("non-existing dir") {
                 builder->scan_start(folder->get_id()).apply(*sup);
                 auto subdir = GENERATE("a", "a/b", "a/b/c");
@@ -1259,26 +1259,26 @@ void test_partial_scan() {
                 CHECK(!folder->is_suspended());
             }
 #endif
-
             SECTION("resurrection") {
                 bfs::remove_all(root_path / "a");
                 auto dir_a = files.by_name("a");
+                auto dir_x = files.by_name("x");
                 auto dir_b = files.by_name("a/b");
                 auto dir_c = files.by_name("a/b/c");
-                // builder->scan_start(folder->get_id(), "a/b").apply(*sup);
-                builder->scan_start(folder->get_id()).apply(*sup);
+                builder->scan_start(folder->get_id(), "a/b").apply(*sup);
 
                 REQUIRE(dir_a->is_deleted());
                 REQUIRE(dir_b->is_deleted());
                 REQUIRE(dir_c->is_deleted());
+                CHECK(!dir_x->is_deleted());
 
                 bfs::create_directories(root_path / "a/b/c");
-                // builder->scan_start(folder->get_id(), "a/b").apply(*sup);
-                builder->scan_start(folder->get_id()).apply(*sup);
+                builder->scan_start(folder->get_id(), "a/b").apply(*sup);
 
                 CHECK(!dir_a->is_deleted());
                 CHECK(!dir_b->is_deleted());
                 CHECK(!dir_c->is_deleted());
+                CHECK(!dir_x->is_deleted());
             }
         }
     };
@@ -2218,9 +2218,7 @@ int _init() {
     REGISTER_TEST_CASE(test_changed, "test_changed", "[net]");
     REGISTER_TEST_CASE(test_type_change, "test_type_change", "[net]");
     REGISTER_TEST_CASE(test_resurrection, "test_resurrection", "[net]");
-#if 0
     REGISTER_TEST_CASE(test_partial_scan, "test_partial_scan", "[net]");
-#endif
     REGISTER_TEST_CASE(test_scan_errors, "test_scan_errors", "[net]");
     REGISTER_TEST_CASE(test_read_errors, "test_read_errors", "[net]");
     REGISTER_TEST_CASE(test_leaks, "test_leaks", "[net]");
