@@ -5,6 +5,7 @@
 
 #include "fs/messages.h"
 #include "hasher/messages.h"
+#include "hasher/hasher_plugin.h"
 #include "model/messages.h"
 #include "model/cluster.h"
 #include "model/diff/cluster_visitor.h"

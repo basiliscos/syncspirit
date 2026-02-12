@@ -5,7 +5,6 @@
 
 #include "proto/proto-fwd.hpp"
 #include "hasher/messages.h"
-#include "hasher/hasher_plugin.h"
 #include "utils/bytes.h"
 #include "utils/error_code.h"
 #include "update_type.hpp"

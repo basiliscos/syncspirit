@@ -2,15 +2,17 @@
 // SPDX-FileCopyrightText: 2025-2026 Ivan Baidakou
 
 #include "local_keeper.h"
+#include "names.h"
 #include "model/diff/advance/local_update.h"
 #include "model/diff/local/scan_start.h"
 #include "model/diff/local/scan_finish.h"
 #include "model/diff/modify/remove_folder.h"
 #include "model/diff/modify/suspend_folder.h"
 #include "model/diff/modify/upsert_folder.h"
-#include "names.h"
 #include "proto/proto-helpers-bep.h"
 #include "proto/proto-helpers-db.h"
+#include "local_keeper/hash_context.h"
+#include "local_keeper/folder_context.h"
 #include "local_keeper/folder_slave.h"
 
 #include <boost/nowide/convert.hpp>
@@ -115,18 +117,19 @@ auto local_keeper_t::operator()(const model::diff::local::scan_start_t &diff, vo
     if (do_scan) {
         LOG_DEBUG(log, "initiating scan of {} from '{}'", diff.folder_id, diff.sub_dir);
         auto local_folder = folder->get_folder_infos().by_device(*cluster->get_device());
-        auto ctx = folder_context_ptr_t(new folder_context_t(local_folder, diff.sub_dir));
-        auto backend = new folder_slave_t(std::move(ctx), this);
-        auto backend_keeper = fs::payload::foreign_executor_prt_t(backend);
-        auto ec = backend->initialize();
-        if (ec) {
+        auto opt = local_keeper::make_context(local_folder, diff.sub_dir);
+        if (!opt) {
+            auto &ec = opt.assume_error();
             LOG_ERROR(log, "cannot initialize backend: {}", ec.message());
             auto now = r::pt::microsec_clock::local_time();
             auto finish = model::diff::cluster_diff_ptr_t();
             finish = new model::diff::local::scan_finish_t(diff.folder_id, now);
             send<model::payload::model_update_t>(coordinator, std::move(finish));
         } else {
-            auto stack_ctx = stack_context_t(concurrent_hashes_left);
+            auto backend = new folder_slave_t();
+            auto backend_keeper = fs::payload::foreign_executor_prt_t(backend);
+            backend->push(std::move(opt.value()));
+            auto stack_ctx = stack_context_t(concurrent_hashes_left, this);
             backend->process_stack(stack_ctx);
             backend->prepare_task();
             route<fs::payload::foreign_executor_prt_t>(fs_addr, address, std::move(backend_keeper));
@@ -200,8 +203,8 @@ void local_keeper_t::on_post_process(fs::message::foreign_executor_t &msg) noexc
     assert(fs_tasks >= 0);
     if (state == r::state_t::OPERATIONAL) {
         auto &slave = static_cast<folder_slave_t &>(*msg.payload.get());
-        auto folder_id = slave.context->local_folder->get_folder()->get_id();
-        auto has_pending = slave.post_process();
+        auto stack_ctx = stack_context_t(concurrent_hashes_left, this);
+        auto has_pending = slave.post_process(stack_ctx);
         if (has_pending && fs_tasks == 0) {
             if (slave.ec) {
                 LOG_ERROR(log, "cannot process folder any longer: {}", slave.ec.message());
@@ -224,7 +227,8 @@ void local_keeper_t::on_digest(hasher::message::digest_t &msg) noexcept {
     if (state == r::state_t::OPERATIONAL) {
         auto hash_ctx = *static_cast<hash_context_t *>(p.context.get());
         auto &slave = *hash_ctx.slave.get();
-        auto has_pending = slave.post_process(*hash_ctx.hash_file.get(), msg);
+        auto stack_ctx = stack_context_t(concurrent_hashes_left, this);
+        auto has_pending = slave.post_process(*hash_ctx.hash_file.get(), msg, stack_ctx);
         if (has_pending && fs_tasks == 0) {
             slave.prepare_task();
             LOG_TRACE(log, "routed {}", (void *)&slave);
@@ -274,7 +278,7 @@ void local_keeper_t::on_change(fs::message::folder_changes_t &message) noexcept 
 
 void local_keeper_t::on_changes(model::folder_info_t &folder, fs::payload::file_changes_t &changes) noexcept {
     using namespace model::diff;
-    auto stack_ctx = stack_context_t(concurrent_hashes_left);
+    auto stack_ctx = stack_context_t(concurrent_hashes_left, this);
     auto folder_id = folder.get_folder()->get_id();
     auto &files_map = folder.get_file_infos();
     auto immediate_update = [&](fs::payload::file_info_t &change) {
@@ -287,7 +291,7 @@ void local_keeper_t::on_changes(model::folder_info_t &folder, fs::payload::file_
         if (update) {
             stack_ctx.push(new advance::local_update_t(*cluster, *sequencer, std::move(change), folder_id));
         } else {
-            LOG_DEBUG(log, "ignroing update on '{}'", name);
+            LOG_DEBUG(log, "ignoring update on '{}'", name);
         }
     };
     for (auto &change : changes) {

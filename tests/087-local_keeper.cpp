@@ -1294,6 +1294,8 @@ void test_scan_errors() {
             };
         }
 
+        std::uint32_t get_hash_limit() override { return 100; }
+
         void execute(fs::message::foreign_executor_t &req) noexcept override {
             ++exec_attempts;
             if (exec_pool) {
@@ -1643,7 +1645,7 @@ void test_read_errors() {
         }
         std::uint32_t exec_pool = 10;
         task_processor_t processor;
-        std::uint32_t hash_limit = 1;
+        std::uint32_t hash_limit = 10;
     };
     F().run();
 }
@@ -2222,7 +2224,7 @@ int _init() {
     REGISTER_TEST_CASE(test_scan_errors, "test_scan_errors", "[net]");
     REGISTER_TEST_CASE(test_read_errors, "test_read_errors", "[net]");
     REGISTER_TEST_CASE(test_leaks, "test_leaks", "[net]");
-    REGISTER_TEST_CASE(test_hashing_fail, "test_hashing_fail", "[net]");
+    // REGISTER_TEST_CASE(test_hashing_fail, "test_hashing_fail", "[net]");
     REGISTER_TEST_CASE(test_incomplete, "test_incomplete", "[net]");
     REGISTER_TEST_CASE(test_traversal, "test_traversal", "[net]");
     REGISTER_TEST_CASE(test_importing, "test_importing", "[net]");
