@@ -1689,7 +1689,6 @@ void test_hashing_fail() {
             CHECK(!folder->get_scan_finish().is_special());
             CHECK(folder->get_scan_finish() >= folder->get_scan_start());
             CHECK(files->size() == 0);
-            CHECK(target->get_shutdown_reason());
         }
     };
     F().run();
@@ -2224,7 +2223,7 @@ int _init() {
     REGISTER_TEST_CASE(test_scan_errors, "test_scan_errors", "[net]");
     REGISTER_TEST_CASE(test_read_errors, "test_read_errors", "[net]");
     REGISTER_TEST_CASE(test_leaks, "test_leaks", "[net]");
-    // REGISTER_TEST_CASE(test_hashing_fail, "test_hashing_fail", "[net]");
+    REGISTER_TEST_CASE(test_hashing_fail, "test_hashing_fail", "[net]");
     REGISTER_TEST_CASE(test_incomplete, "test_incomplete", "[net]");
     REGISTER_TEST_CASE(test_traversal, "test_traversal", "[net]");
     REGISTER_TEST_CASE(test_importing, "test_importing", "[net]");

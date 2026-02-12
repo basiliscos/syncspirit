@@ -121,7 +121,7 @@ void folder_context_t::process_stack(stack_context_t &ctx) noexcept {
 int folder_context_t::process(complete_scan_t &, stack_context_t &ctx) noexcept {
     auto nothing_left = has_no_tasks() && (ctx.actor->concurrent_hashes_left == ctx.actor->concurrent_hashes_limit) &&
                         (ctx.actor->fs_tasks == 0);
-    if (nothing_left || force_completion) {
+    if (nothing_left) {
         auto folder = local_folder->get_folder();
         auto folder_id = folder->get_id();
         auto now = r::pt::microsec_clock::local_time();
@@ -199,22 +199,6 @@ int folder_context_t::process(suspend_scan_t &item, stack_context_t &ctx) noexce
     return 1;
 }
 
-int folder_context_t::process(fatal_error_t &item, stack_context_t &ctx) noexcept {
-    auto folder = local_folder->get_folder();
-    auto folder_id = folder->get_id();
-    auto &ec = item.ec;
-    auto ee = ctx.actor->make_error(ec);
-    ctx.actor->do_shutdown(ee);
-    LOG_WARN(log, "severe error during processing: {}", ec.message());
-    auto it = stack.begin();
-    std::advance(it, 1);
-    while (it != stack.end() && (&*it != &stack.back())) {
-        it = stack.erase(it);
-    }
-    force_completion = true;
-    return 1;
-}
-
 int folder_context_t::process(unsuspend_scan_t &, stack_context_t &ctx) noexcept {
     auto folder = local_folder->get_folder();
     LOG_TRACE(log, "un-suspending");
@@ -271,7 +255,6 @@ int folder_context_t::process(child_ready_t &info, stack_context_t &ctx) noexcep
 }
 
 int folder_context_t::process(undo_child_ready_t &info, stack_context_t &ctx) noexcept {
-
     for (auto it = stack.begin()++; it != stack.end(); ++it) {
         if (auto item = std::get_if<child_ready_t>(&*it)) {
             if (item->path == info.path) {
@@ -449,6 +432,15 @@ int folder_context_t::process(rehashed_incomplete_t &item, stack_context_t &ctx)
     return 1;
 }
 
+int folder_context_t::process(abort_hashing_t &item, stack_context_t &ctx) noexcept {
+    auto it = stack.begin()++;
+    if (it != stack.end()) {
+        stack.erase(it);
+        LOG_DEBUG(log, "aborted hashing of '{}'", narrow(item.path.generic_wstring()));
+    }
+    return 1;
+}
+
 bool folder_context_t::post_process(stack_context_t &ctx) noexcept {
     LOG_TRACE(log, "postpocessing");
 
@@ -465,9 +457,11 @@ bool folder_context_t::post_process(hash_base_t &hash_file, hasher::message::dig
                                     stack_context_t &ctx) noexcept {
     auto &p = msg.payload;
     auto &result = msg.payload.result;
+    --hash_file.unhashed_blocks;
     if (result.has_error()) {
         auto &ec = result.assume_error();
-        stack.push_front(fatal_error_t(ec));
+        LOG_WARN(log, "cannot hash '{}': {}", narrow(hash_file.path.generic_wstring()), ec.message());
+        ++hash_file.errored_blocks;
     } else {
         auto index = p.block_index;
         auto offset = index * hash_file.block_size;
@@ -476,18 +470,19 @@ bool folder_context_t::post_process(hash_base_t &hash_file, hasher::message::dig
         proto::set_size(bi, static_cast<std::int32_t>(p.data.size()));
         proto::set_hash(bi, std::move(result).assume_value());
         hash_file.blocks[index] = std::move(bi);
-        --hash_file.unhashed_blocks;
-        if (!hash_file.unhashed_blocks) {
-            auto blocks = std::move(hash_file.blocks);
-            auto copy = static_cast<child_info_t &>(hash_file);
-            if (hash_file.incomplete) {
-                stack.push_front(rehashed_incomplete_t(std::move(copy), std::move(blocks), hash_file.action));
-            } else {
-                stack.push_front(child_ready_t(std::move(copy), std::move(blocks)));
-            }
-        }
-        ++ctx.actor->concurrent_hashes_left;
     }
+    if (!hash_file.unhashed_blocks) {
+        auto blocks = std::move(hash_file.blocks);
+        auto copy = static_cast<child_info_t &>(hash_file);
+        if (hash_file.errored_blocks) {
+            stack.push_front(abort_hashing_t{std::move(copy.path)});
+        } else if (hash_file.incomplete) {
+            stack.push_front(rehashed_incomplete_t(std::move(copy), std::move(blocks), hash_file.action));
+        } else {
+            stack.push_front(child_ready_t(std::move(copy), std::move(blocks)));
+        }
+    }
+    ++ctx.actor->concurrent_hashes_left;
     return post_process(ctx);
 }
 

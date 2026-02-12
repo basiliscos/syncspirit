@@ -27,7 +27,6 @@ struct folder_context_t : boost::intrusive_ref_counter<folder_context_t, boost::
     int process(unscanned_dir_t &dir, stack_context_t &ctx) noexcept;
     int process(unexamined_t &child_info, stack_context_t &ctx) noexcept;
     int process(suspend_scan_t &item, stack_context_t &ctx) noexcept;
-    int process(fatal_error_t &item, stack_context_t &ctx) noexcept;
     int process(unsuspend_scan_t &, stack_context_t &ctx) noexcept;
     int process(child_ready_t &info, stack_context_t &ctx) noexcept;
     int process(undo_child_ready_t &info, stack_context_t &ctx) noexcept;
@@ -38,6 +37,7 @@ struct folder_context_t : boost::intrusive_ref_counter<folder_context_t, boost::
     int process(confirmed_deleted_t &item, stack_context_t &ctx);
     int process(incomplete_t &item, stack_context_t &ctx) noexcept;
     int process(rehashed_incomplete_t &item, stack_context_t &ctx) noexcept;
+    int process(abort_hashing_t &item, stack_context_t &ctx) noexcept;
 
     bool post_process(stack_context_t &ctx) noexcept;
     bool post_process(hash_base_t &hash_file, hasher::message::digest_t &msg, stack_context_t &ctx) noexcept;
@@ -57,7 +57,6 @@ struct folder_context_t : boost::intrusive_ref_counter<folder_context_t, boost::
     local_keeper::stack_t stack;
     utils::logger_t log;
     fs::tasks_t pending_io;
-    bool force_completion = false;
     bool ignore_permissions;
 };
 

@@ -32,14 +32,14 @@ struct confirmed_deleted_t {
     presentation::presence_ptr_t presence;
 };
 
-struct fatal_error_t {
-    sys::error_code ec;
+struct abort_hashing_t {
+    bfs::path path;
 };
 
 using stack_item_t =
     std::variant<unscanned_dir_t, unexamined_t, incomplete_t, complete_scan_t, child_ready_t, undo_child_ready_t,
                  hash_new_file_ptr_t, hash_existing_file_ptr_t, hash_incomplete_file_ptr_t, rehashed_incomplete_t,
-                 removed_dir_t, confirmed_deleted_t, suspend_scan_t, unsuspend_scan_t, fatal_error_t>;
+                 abort_hashing_t, removed_dir_t, confirmed_deleted_t, suspend_scan_t, unsuspend_scan_t>;
 using stack_t = std::list<stack_item_t>;
 
 struct dirs_stack_t : stack_t {
