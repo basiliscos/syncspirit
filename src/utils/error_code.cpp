@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "error_code.h"
 #include <map>
@@ -19,7 +19,7 @@ std::string error_code_category::message(int c) const {
         r = "success";
         break;
     case error_code_t::no_action:
-        r = "no action (messages has not been processed)";
+        r = "no action (message has not been processed)";
         break;
     case error_code_t::no_location:
         r = "no location";

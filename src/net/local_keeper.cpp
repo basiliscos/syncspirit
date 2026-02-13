@@ -27,6 +27,27 @@ namespace sys = boost::system;
 using boost::nowide::narrow;
 using UT = fs::update_type_t;
 
+struct lc_context_t final : local_keeper::stack_context_t {
+    using parent_t = local_keeper::stack_context_t;
+    lc_context_t(local_keeper_t *k) noexcept
+        : parent_t(*k->cluster, *k->sequencer, k->concurrent_hashes_left, k->concurrent_hashes_limit,
+                   k->files_scan_iteration_limit),
+          actor(k) {}
+
+    ~lc_context_t() {
+        if (diff) {
+            actor->send<model::payload::model_update_t>(actor->coordinator, std::move(diff));
+        }
+        actor->concurrent_hashes_left = hashes_pool;
+    }
+
+    bool has_in_progress_io() const noexcept override { return actor->fs_tasks != 0; }
+
+    virtual rotor::address_ptr_t get_back_address() const noexcept override { return actor->get_address(); }
+
+    local_keeper_t *actor;
+};
+
 local_keeper_t::local_keeper_t(config_t &config)
     : r::actor_base_t(config), sequencer{std::move(config.sequencer)},
       concurrent_hashes_left{static_cast<std::int32_t>(config.concurrent_hashes)},
@@ -129,7 +150,7 @@ auto local_keeper_t::operator()(const model::diff::local::scan_start_t &diff, vo
             auto backend = new folder_slave_t();
             auto backend_keeper = fs::payload::foreign_executor_prt_t(backend);
             backend->push(std::move(opt.value()));
-            auto stack_ctx = stack_context_t(concurrent_hashes_left, this);
+            auto stack_ctx = lc_context_t(this);
             backend->process_stack(stack_ctx);
             backend->prepare_task();
             route<fs::payload::foreign_executor_prt_t>(fs_addr, address, std::move(backend_keeper));
@@ -203,7 +224,7 @@ void local_keeper_t::on_post_process(fs::message::foreign_executor_t &msg) noexc
     assert(fs_tasks >= 0);
     if (state == r::state_t::OPERATIONAL) {
         auto &slave = static_cast<folder_slave_t &>(*msg.payload.get());
-        auto stack_ctx = stack_context_t(concurrent_hashes_left, this);
+        auto stack_ctx = lc_context_t(this);
         auto has_pending = slave.post_process(stack_ctx);
         if (has_pending && fs_tasks == 0) {
             if (slave.ec) {
@@ -227,7 +248,7 @@ void local_keeper_t::on_digest(hasher::message::digest_t &msg) noexcept {
     if (state == r::state_t::OPERATIONAL) {
         auto hash_ctx = *static_cast<hash_context_t *>(p.context.get());
         auto &slave = *hash_ctx.slave.get();
-        auto stack_ctx = stack_context_t(concurrent_hashes_left, this);
+        auto stack_ctx = lc_context_t(this);
         auto has_pending = slave.post_process(*hash_ctx.hash_file.get(), msg, stack_ctx);
         if (has_pending && fs_tasks == 0) {
             slave.prepare_task();
@@ -278,7 +299,7 @@ void local_keeper_t::on_change(fs::message::folder_changes_t &message) noexcept 
 
 void local_keeper_t::on_changes(model::folder_info_t &folder, fs::payload::file_changes_t &changes) noexcept {
     using namespace model::diff;
-    auto stack_ctx = stack_context_t(concurrent_hashes_left, this);
+    auto stack_ctx = lc_context_t(this);
     auto folder_id = folder.get_folder()->get_id();
     auto &files_map = folder.get_file_infos();
     auto immediate_update = [&](fs::payload::file_info_t &change) {

@@ -5,7 +5,6 @@
 #include "folder_context.h"
 #include "hash_context.h"
 #include "fs/utils.h"
-#include "net/local_keeper.h"
 #include "model/diff/advance/local_update.h"
 #include "model/diff/local/blocks_availability.h"
 #include "model/diff/local/file_availability.h"
@@ -119,8 +118,7 @@ void folder_context_t::process_stack(stack_context_t &ctx) noexcept {
 }
 
 int folder_context_t::process(complete_scan_t &, stack_context_t &ctx) noexcept {
-    auto nothing_left = has_no_tasks() && (ctx.actor->concurrent_hashes_left == ctx.actor->concurrent_hashes_limit) &&
-                        (ctx.actor->fs_tasks == 0);
+    auto nothing_left = has_no_tasks() && (ctx.hashes_pool == ctx.hashes_pool_max) && !ctx.has_in_progress_io();
     if (nothing_left) {
         auto folder = local_folder->get_folder();
         auto folder_id = folder->get_id();
@@ -248,8 +246,7 @@ int folder_context_t::process(child_ready_t &info, stack_context_t &ctx) noexcep
         auto folder = local_folder->get_folder();
         auto folder_id = folder->get_id();
         auto data = info.serialize(*local_folder, std::move(info.blocks), ignore_permissions);
-        auto actor = ctx.actor;
-        ctx.push(new advance::local_update_t(*actor->cluster, *actor->sequencer, std::move(data), folder_id));
+        ctx.push(new advance::local_update_t(ctx.cluster, ctx.sequencer, std::move(data), folder_id));
     }
     return 1;
 }
@@ -284,8 +281,7 @@ int folder_context_t::process(removed_dir_t &item, stack_context_t &ctx) noexcep
     auto dir = static_cast<presentation::local_file_presence_t *>(item.presence.get());
     auto dir_data = dir->get_file_info().as_proto(false);
     proto::set_deleted(dir_data, true);
-    auto actor = ctx.actor;
-    ctx.push(new local_update_t(*actor->cluster, *actor->sequencer, std::move(dir_data), folder_id));
+    ctx.push(new local_update_t(ctx.cluster, ctx.sequencer, std::move(dir_data), folder_id));
     auto dirs_stack = dirs_stack_t(stack);
     auto children = item.presence->get_children();
     for (auto child : item.presence->get_children()) {
@@ -295,7 +291,7 @@ int folder_context_t::process(removed_dir_t &item, stack_context_t &ctx) noexcep
             auto file = static_cast<presentation::local_file_presence_t *>(child);
             auto file_data = file->get_file_info().as_proto(false);
             proto::set_deleted(file_data, true);
-            ctx.push(new local_update_t(*actor->cluster, *actor->sequencer, std::move(file_data), folder_id));
+            ctx.push(new local_update_t(ctx.cluster, ctx.sequencer, std::move(file_data), folder_id));
         }
     }
     return 1;
@@ -325,7 +321,7 @@ int folder_context_t::process(confirmed_deleted_t &item, stack_context_t &ctx) {
 int folder_context_t::process(incomplete_t &item, stack_context_t &ctx) noexcept {
     auto name = narrow(item.path.stem().generic_wstring());
     auto name_view = std::string_view(name);
-    auto self_device = ctx.actor->cluster->get_device().get();
+    auto self_device = ctx.cluster.get_device().get();
     auto &entities = item.parent->get_entity()->get_children();
     auto comparator = presentation::entity_t::name_comparator_t{};
     auto it = std::lower_bound(entities.begin(), entities.end(), name_view, comparator);
@@ -402,7 +398,7 @@ int folder_context_t::process(rehashed_incomplete_t &item, stack_context_t &ctx)
                     return bfs::path(peer_file.get_name()->get_own_name());
                 } else {
                     assert(item.action == model::advance_action_t::resolve_remote_win);
-                    auto self_device = ctx.actor->cluster->get_device().get();
+                    auto self_device = ctx.cluster.get_device().get();
                     auto local_presence = item.self->get_entity()->get_presence(self_device);
                     assert(local_presence->get_features() & F::cluster);
                     auto lp = static_cast<const presentation::cluster_file_presence_t *>(local_presence);
@@ -482,7 +478,7 @@ bool folder_context_t::post_process(hash_base_t &hash_file, hasher::message::dig
             stack.push_front(child_ready_t(std::move(copy), std::move(blocks)));
         }
     }
-    ++ctx.actor->concurrent_hashes_left;
+    ++ctx.hashes_pool;
     return post_process(ctx);
 }
 
@@ -522,7 +518,6 @@ void folder_context_t::post_process(fs::task::scan_dir_t &task, stack_context_t 
     auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
     auto allocator = allocator_t(&pool);
     auto checked_children = checked_chidren_t(allocator);
-    auto actor = ctx.actor;
 
     auto it_disk = task.child_infos.begin();
     while (it_disk != task.child_infos.end()) {
@@ -570,8 +565,7 @@ void folder_context_t::post_process(fs::task::scan_dir_t &task, stack_context_t 
                             auto file = static_cast<presentation::local_file_presence_t *>(child);
                             auto file_data = file->get_file_info().as_proto(false);
                             proto::set_deleted(file_data, true);
-                            ctx.push(new local_update_t(*actor->cluster, *actor->sequencer, std::move(file_data),
-                                                        folder_id));
+                            ctx.push(new local_update_t(ctx.cluster, ctx.sequencer, std::move(file_data), folder_id));
                         }
                     } else {
                         auto &target_stack = is_dir ? dirs_stack : stack;
@@ -599,7 +593,7 @@ void folder_context_t::post_process(fs::task::scan_dir_t &task, stack_context_t 
             auto presence = static_cast<const presentation::cluster_file_presence_t *>(best);
             auto &peer_file = presence->get_file_info();
             auto pr_file = peer_file.as_proto(true);
-            ctx.push(new local_update_t(*actor->cluster, *actor->sequencer, std::move(pr_file), folder_id));
+            ctx.push(new local_update_t(ctx.cluster, ctx.sequencer, std::move(pr_file), folder_id));
             if (best->get_features() & F::directory) {
                 for (auto c : child_entity->get_children()) {
                     auto best = child_entity->get_best();
@@ -616,9 +610,8 @@ void folder_context_t::post_process(fs::task::segment_iterator_t &task, stack_co
     auto &ec = task.ec;
     if (ec) {
         auto hash_ctx = static_cast<hash_context_t *>(task.context.get());
-        auto actor = ctx.actor;
         auto delta = task.block_count - task.current_block;
-        actor->concurrent_hashes_left += delta;
+        ctx.hashes_pool += delta;
         auto &hash_file = *hash_ctx->hash_file;
         if (hash_file.commit_error(ec, delta)) {
             auto path_str = narrow(task.path.generic_wstring());
@@ -659,7 +652,7 @@ void folder_context_t::post_process(fs::task::rename_file_t &task, stack_context
         auto &peer_file = cp->get_file_info();
         auto peer = cp->get_device();
         auto &peer_folder = cp->get_folder()->get_folder_info();
-        auto &sequencer = *ctx.actor->sequencer;
+        auto &sequencer = ctx.sequencer;
         auto diff = model::diff::advance::advance_t::create(item.action, peer_file, peer_folder, sequencer);
         ctx.push(diff.get());
     }
@@ -680,8 +673,8 @@ int folder_context_t::schedule_hash(hash_base_t *item, stack_context_t &ctx) noe
 
         return 1;
     }
-    auto actor = ctx.actor;
-    if (!actor->concurrent_hashes_left) {
+    auto &blocks_limit = ctx.hashes_pool;
+    if (!blocks_limit) {
         return -1;
     }
     auto folder = local_folder->get_folder();
@@ -690,7 +683,6 @@ int folder_context_t::schedule_hash(hash_base_t *item, stack_context_t &ctx) noe
 
     auto total_blocks = item->total_blocks;
     auto block_size = item->block_size;
-    auto &blocks_limit = actor->concurrent_hashes_left;
     auto first_block = item->total_blocks - item->unprocessed_blocks;
     auto max_blocks = std::min(blocks_limit, item->unprocessed_blocks);
     auto last_block_sz = [&]() -> std::int32_t {
@@ -705,8 +697,8 @@ int folder_context_t::schedule_hash(hash_base_t *item, stack_context_t &ctx) noe
     assert(last_block_sz > 0);
     auto offset = std::int64_t{first_block} * block_size;
     auto hash_context = hash_context_ptr_t(new hash_context_t(ctx.slave, item));
-    auto sub_task = segment_iterator_t(actor->get_address(), hash_context, item->path, offset, first_block, max_blocks,
-                                       block_size, last_block_sz);
+    auto sub_task = segment_iterator_t(ctx.get_back_address(), hash_context, item->path, offset, first_block,
+                                       max_blocks, block_size, last_block_sz);
     push(std::move(sub_task));
     blocks_limit -= max_blocks;
     auto blocks_left = item->unprocessed_blocks -= max_blocks;
