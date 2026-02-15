@@ -61,8 +61,11 @@ struct folder_context_t : boost::intrusive_ref_counter<folder_context_t, boost::
 };
 
 using folder_context_ptr_t = boost::intrusive_ptr<folder_context_t>;
+using unexamined_items_t = std::vector<unexamined_t>;
 
 outcome::result<folder_context_ptr_t> make_context(model::folder_info_ptr_t local_folder,
                                                    std::string_view start_subdir) noexcept;
+
+folder_context_ptr_t make_context(model::folder_info_ptr_t local_folder, unexamined_items_t items) noexcept;
 
 } // namespace syncspirit::net::local_keeper

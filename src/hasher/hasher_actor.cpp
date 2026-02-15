@@ -17,7 +17,6 @@ void hasher_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         log = utils::get_logger(identity);
     });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) { p.register_name(identity, get_address()); });
-
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) { p.subscribe_actor(&hasher_actor_t::on_digest); });
 }
 

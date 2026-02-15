@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2025-2026 Ivan Baidakou
 
 #include "folder_presence.h"
 #include "folder_entity.h"
@@ -17,3 +17,19 @@ folder_presence_t::folder_presence_t(folder_entity_t &entity_, model::folder_inf
 
 auto folder_presence_t::get_folder_info() noexcept -> model::folder_info_t & { return folder_info; }
 auto folder_presence_t::get_folder_info() const noexcept -> const model::folder_info_t & { return folder_info; }
+
+auto folder_presence_t::get_link(std::string_view name, bool is_dir) const noexcept -> presence_link_t {
+    auto parent = const_cast<folder_presence_t *>(this);
+    auto path = name;
+    while (!path.empty()) {
+        auto index = path.find("/");
+        if (index == std::string_view::npos) {
+            break;
+        } else {
+            std::abort();
+        }
+    }
+
+    auto child = presentation::get_child(parent, path, is_dir);
+    return {parent, child};
+}

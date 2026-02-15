@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2025-2026 Ivan Baidakou
 
 #pragma once
 
@@ -18,7 +18,9 @@ struct child_info_t {
     using blocks_t = std::vector<proto::BlockInfo>;
 
     child_info_t(fs::task::scan_dir_t::child_info_t backend, presentation::presence_ptr_t self_,
-                 presentation::presence_ptr_t parent_);
+                 presentation::presence_ptr_t parent_) noexcept;
+    child_info_t(proto::FileInfo file_info, bfs::path path, presentation::presence_ptr_t self_,
+                 presentation::presence_ptr_t parent_) noexcept;
     virtual ~child_info_t() = default;
 
     proto::FileInfo serialize(const model::folder_info_t &local_folder, blocks_t blocks, bool ignore_permissions);

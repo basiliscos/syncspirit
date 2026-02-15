@@ -52,6 +52,9 @@ struct SYNCSPIRIT_API local_keeper_t final : public r::actor_base_t, private mod
     using config_t = local_keeper_config_t;
     template <typename Actor> using config_builder_t = local_keeper_config_builder_t<Actor>;
 
+    struct lc_context_t;
+    using watched_folders_t = std::unordered_set<std::string, utils::string_hash_t, utils::string_eq_t>;
+
     explicit local_keeper_t(config_t &cfg);
 
     void on_start() noexcept override;
@@ -67,15 +70,13 @@ struct SYNCSPIRIT_API local_keeper_t final : public r::actor_base_t, private mod
     void on_watch_dir(fs::message::watch_folder_t &) noexcept;
     void on_unwatch_dir(fs::message::unwatch_folder_t &) noexcept;
     void on_change(fs::message::folder_changes_t &) noexcept;
-    void on_changes(model::folder_info_t &, fs::payload::file_changes_t &) noexcept;
+    void on_changes(model::folder_info_t &, fs::payload::file_changes_t &, lc_context_t &) noexcept;
 
     outcome::result<void> operator()(const model::diff::local::scan_start_t &, void *custom) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::upsert_folder_t &, void *custom) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::remove_folder_t &, void *custom) noexcept override;
 
     using r::actor_base_t::make_error;
-
-    using watched_folders_t = std::unordered_set<std::string, utils::string_hash_t, utils::string_eq_t>;
 
     utils::logger_t log;
     model::sequencer_ptr_t sequencer;

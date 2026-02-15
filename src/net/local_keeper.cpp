@@ -14,6 +14,8 @@
 #include "local_keeper/hash_context.h"
 #include "local_keeper/folder_context.h"
 #include "local_keeper/folder_slave.h"
+#include "presentation/folder_entity.h"
+#include "presentation/folder_presence.h"
 
 #include <boost/nowide/convert.hpp>
 
@@ -25,10 +27,12 @@ namespace bfs = std::filesystem;
 namespace sys = boost::system;
 
 using boost::nowide::narrow;
+using boost::nowide::widen;
 using UT = fs::update_type_t;
 
-struct lc_context_t final : local_keeper::stack_context_t {
+struct local_keeper_t::lc_context_t final : local_keeper::stack_context_t {
     using parent_t = local_keeper::stack_context_t;
+    using folder_contexts_t = local_keeper::folder_slave_t::folder_contexts_t;
     lc_context_t(local_keeper_t *k) noexcept
         : parent_t(*k->cluster, *k->sequencer, k->concurrent_hashes_left, k->concurrent_hashes_limit,
                    k->files_scan_iteration_limit),
@@ -46,6 +50,7 @@ struct lc_context_t final : local_keeper::stack_context_t {
     virtual rotor::address_ptr_t get_back_address() const noexcept override { return actor->get_address(); }
 
     local_keeper_t *actor;
+    folder_contexts_t new_contexts;
 };
 
 local_keeper_t::local_keeper_t(config_t &config)
@@ -287,6 +292,7 @@ void local_keeper_t::on_change(fs::message::folder_changes_t &message) noexcept 
     auto &p = message.payload;
     LOG_DEBUG(log, "on_change, affects {} folder(s)", p.size());
     auto &folders_map = cluster->get_folders();
+    auto stack_ctx = lc_context_t(this);
     for (auto &folder_change : p) {
         auto &folder_id = folder_change.folder_id;
         auto folder = folders_map.by_id(folder_id);
@@ -294,16 +300,31 @@ void local_keeper_t::on_change(fs::message::folder_changes_t &message) noexcept 
             LOG_DEBUG(log, "there is no folder '{}' in the model", folder_id);
         } else {
             auto local_folder = folder->get_folder_infos().by_device(*cluster->get_device());
-            on_changes(*local_folder, folder_change.file_changes);
+            on_changes(*local_folder, folder_change.file_changes, stack_ctx);
         }
+    }
+    if (stack_ctx.new_contexts.size()) {
+        assert(!fs_tasks && "TODO");
+        auto backend = new folder_slave_t();
+        auto backend_keeper = fs::payload::foreign_executor_prt_t(backend);
+        backend->push(std::move(stack_ctx.new_contexts));
+        backend->process_stack(stack_ctx);
+        backend->prepare_task();
+        route<fs::payload::foreign_executor_prt_t>(fs_addr, address, std::move(backend_keeper));
+        ++fs_tasks;
     }
 }
 
-void local_keeper_t::on_changes(model::folder_info_t &folder, fs::payload::file_changes_t &changes) noexcept {
+void local_keeper_t::on_changes(model::folder_info_t &local_folder, fs::payload::file_changes_t &changes,
+                                lc_context_t &stack_ctx) noexcept {
     using namespace model::diff;
-    auto stack_ctx = lc_context_t(this);
-    auto folder_id = folder.get_folder()->get_id();
-    auto &files_map = folder.get_file_infos();
+    auto folder = local_folder.get_folder();
+    auto folder_id = folder->get_id();
+    auto &files_map = local_folder.get_file_infos();
+    auto unexamined = local_keeper::unexamined_items_t();
+    auto augmentation = local_folder.get_augmentation().get();
+    auto folder_presence = static_cast<presentation::folder_presence_t *>(augmentation);
+
     auto immediate_update = [&](fs::payload::file_info_t &change) {
         auto name = proto::get_name(change);
         auto file = files_map.by_name(name);
@@ -317,13 +338,26 @@ void local_keeper_t::on_changes(model::folder_info_t &folder, fs::payload::file_
             LOG_DEBUG(log, "ignoring update on '{}'", name);
         }
     };
+    auto delayed_update = [&](fs::payload::file_info_t &change) {
+        auto name = proto::get_name(change);
+        auto is_dir = proto::get_type(change) == proto::FileInfoType::DIRECTORY;
+        auto relation = folder_presence->get_link(name, is_dir);
+        if (!relation.parent) {
+            LOG_WARN(log, "no presentation for parent '{}' in folder '{}', ignoring", name, folder_id);
+        } else {
+            auto path = folder->get_path() / widen(name);
+            auto child_info =
+                local_keeper::child_info_t(std::move(change), std::move(path), relation.child, relation.parent);
+            unexamined.emplace_back(std::move(child_info));
+        }
+    };
     for (auto &change : changes) {
         switch (change.update_reason) {
         case UT::created: {
             if (proto::get_size(change) == 0) {
                 immediate_update(change);
             } else {
-                LOG_WARN(log, "not implemented");
+                delayed_update(change);
             }
             break;
         }
@@ -335,11 +369,16 @@ void local_keeper_t::on_changes(model::folder_info_t &folder, fs::payload::file_
             immediate_update(change);
             break;
         }
+        case UT::content: {
+            delayed_update(change);
+            break;
+        }
         default:
             LOG_WARN(log, "not implemented");
         }
     }
-    if (stack_ctx.diff) {
-        send<model::payload::model_update_t>(coordinator, std::move(stack_ctx.diff));
+    if (!unexamined.empty()) {
+        auto folder_ctx = local_keeper::make_context(&local_folder, std::move(unexamined));
+        stack_ctx.new_contexts.emplace_back(std::move(folder_ctx));
     }
 }

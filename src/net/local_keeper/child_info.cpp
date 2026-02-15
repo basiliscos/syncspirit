@@ -14,7 +14,7 @@ using namespace syncspirit::net::local_keeper;
 using boost::nowide::narrow;
 
 child_info_t::child_info_t(fs::task::scan_dir_t::child_info_t backend, presentation::presence_ptr_t self_,
-                           presentation::presence_ptr_t parent_)
+                           presentation::presence_ptr_t parent_) noexcept
     : self(std::move(self_)), parent(std::move(parent_)) {
     assert(!backend.path.empty());
     path = std::move(backend.path);
@@ -34,6 +34,17 @@ child_info_t::child_info_t(fs::task::scan_dir_t::child_info_t backend, presentat
     auto &status = backend.status;
     perms = static_cast<std::uint32_t>(status.permissions());
     ec = backend.ec;
+}
+
+child_info_t::child_info_t(proto::FileInfo info, bfs::path path_, presentation::presence_ptr_t self_,
+                           presentation::presence_ptr_t parent_) noexcept
+    : path{std::move(path_)} {
+    size = proto::get_size(info);
+    link_target = proto::get_symlink_target(info);
+    last_write_time = proto::get_modified_s(info);
+    size = proto::get_size(info);
+    type = proto::get_type(info);
+    perms = proto::get_permissions(info);
 }
 
 auto child_info_t::serialize(const model::folder_info_t &local_folder, blocks_t blocks, bool ignore_permissions)

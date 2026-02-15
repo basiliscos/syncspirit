@@ -33,6 +33,7 @@ using boost::nowide::narrow;
 struct fixture_t;
 
 using I = syncspirit_watcher_impl_t;
+using FT = proto::FileInfoType;
 
 struct my_supervisort_t : supervisor_t {
     using parent_t = supervisor_t;
@@ -68,6 +69,8 @@ struct fixture_t {
         create_dir_msg = &msg;
     }
 
+    virtual void on_exec(fs::message::foreign_executor_t &msg) { LOG_WARN(log, "on_exec() is not implemented"); }
+
     void run() noexcept {
         sequencer = make_sequencer(1234);
         auto my_hash = "KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD";
@@ -95,10 +98,12 @@ struct fixture_t {
                 using watch_msg_t = fs::message::watch_folder_t;
                 using unwatch_msg_t = fs::message::unwatch_folder_t;
                 using create_dir_msg_t = fs::message::create_dir_t;
+                using exec_msg_t = fs::message::foreign_executor_t;
 
                 p.subscribe_actor(r::lambda<watch_msg_t>([&](watch_msg_t &msg) { on_watch_folder(msg); }));
                 p.subscribe_actor(r::lambda<unwatch_msg_t>([&](unwatch_msg_t &msg) { on_unwatch_folder(msg); }));
                 p.subscribe_actor(r::lambda<create_dir_msg_t>([&](create_dir_msg_t &msg) { on_create_dir(msg); }));
+                p.subscribe_actor(r::lambda<exec_msg_t>([&](exec_msg_t &msg) { on_exec(msg); }));
             });
         };
 
@@ -256,6 +261,7 @@ void test_watch_unwatch() {
 struct folder_fixture_t : fixture_t {
     using parent_t = fixture_t;
     using parent_t::parent_t;
+    using hashed_blocks_t = std::list<utils::bytes_t>;
 
     void on_watch_folder(fs::message::watch_folder_t &msg) override {
         auto &p = msg.payload;
@@ -264,16 +270,58 @@ struct folder_fixture_t : fixture_t {
         watched_ack = true;
     }
 
-    virtual void on_unwatch_folder(fs::message::unwatch_folder_t &msg) override {
+    void on_unwatch_folder(fs::message::unwatch_folder_t &msg) override {
         watched_ack = false;
         auto &p = msg.payload;
         p.ec = {};
         LOG_DEBUG(log, "unwatching {}", p.folder_id);
     }
-    virtual void on_create_dir(fs::message::create_dir_t &msg) override {
+
+    void on_create_dir(fs::message::create_dir_t &msg) override {
         auto &p = msg.payload;
         p.ec = {};
         LOG_DEBUG(log, "creating a dir for {}", p.folder_id, narrow(p.generic_wstring()));
+    }
+
+    virtual void process_cmd(fs::task::scan_dir_t &task) noexcept {
+        LOG_DEBUG(log, "process_cmd(scan_dir_t) {}", narrow(task.path.generic_wstring()));
+    }
+    virtual void process_cmd(fs::task::segment_iterator_t &task) noexcept {
+        static const constexpr size_t SZ = SHA256_DIGEST_LENGTH;
+        LOG_DEBUG(log, "process_cmd(segment_iterator_t) {}", narrow(task.path.generic_wstring()));
+        for (std::int32_t i = task.block_index, j = 0; j < task.block_count; ++i, ++j) {
+            auto bs = (j + 1 == task.block_count) ? task.last_block_size : task.block_size;
+            auto off = task.offset + std::int64_t{task.block_size} * j;
+            REQUIRE(hashed_blocks.size());
+            auto &data = hashed_blocks.front();
+            auto tmp_addr = sup->get_registry_address();
+            auto dst_addr = target->get_address();
+            auto digest = r::make_routed_message<hasher::payload::digest_t>(tmp_addr, dst_addr, data, i, task.context);
+            auto digetst_backend = static_cast<hasher::message::digest_t *>(digest.get());
+            unsigned char d[SZ];
+            utils::digest(data.data(), data.size(), d);
+            digetst_backend->payload.result = utils::bytes_t(d, d + SZ);
+            hashed_blocks.pop_front();
+            sup->put(std::move(digest));
+        }
+    }
+
+    virtual void process_cmd(fs::task::remove_file_t &task) noexcept {
+        LOG_DEBUG(log, "process_cmd(remove_file_t) {}", narrow(task.path.generic_wstring()));
+    }
+
+    virtual void process_cmd(fs::task::rename_file_t &task) noexcept {
+        LOG_DEBUG(log, "process_cmd(rename_file_t) {}", narrow(task.path.generic_wstring()));
+    }
+    virtual void process_cmd(fs::task::noop_t &task) noexcept { LOG_DEBUG(log, "process_cmd(noop_t"); }
+
+    void on_exec(fs::message::foreign_executor_t &msg) override {
+        LOG_INFO(log, "on_exec()");
+        auto slave = dynamic_cast<fs::fs_slave_t *>(msg.payload.get());
+        for (auto &t : slave->tasks_in) {
+            std::visit([&](auto &task) { process_cmd(task); }, t);
+        }
+        slave->tasks_out = std::move(slave->tasks_in);
     }
 
     void prepare(syncspirit_watcher_impl_t impl) noexcept {
@@ -292,6 +340,8 @@ struct folder_fixture_t : fixture_t {
         REQUIRE(watched_ack);
     }
 
+    void expect_bytes_hash(utils::bytes_view_t bytes) noexcept { hashed_blocks.emplace_back(utils::bytes_t(bytes)); }
+
     void make_update(proto::FileInfo info, fs::update_type_t update_type) noexcept {
         auto change = fs::payload::file_info_t(std::move(info), {}, update_type);
         auto changes = fs::payload::file_changes_t{{std::move(change)}};
@@ -308,6 +358,7 @@ struct folder_fixture_t : fixture_t {
     model::folder_ptr_t folder;
     model::folder_info_ptr_t folder_local;
     model::file_infos_map_t *files_local = nullptr;
+    hashed_blocks_t hashed_blocks;
 };
 
 void test_trivial_changes() {
@@ -324,11 +375,10 @@ void test_trivial_changes() {
             proto::set_permissions(file, 0123);
             proto::set_modified_s(file, 12345);
 
-            SECTION("create new") {
-                auto file_type =
-                    GENERATE(proto::FileInfoType::DIRECTORY, proto::FileInfoType::FILE, proto::FileInfoType::SYMLINK);
+            SECTION("create new dir/symlink/emty-file") {
+                auto file_type = GENERATE(FT::DIRECTORY, FT::FILE, FT::SYMLINK);
                 proto::set_type(file, file_type);
-                if (file_type == proto::FileInfoType::SYMLINK) {
+                if (file_type == FT::SYMLINK) {
                     proto::set_symlink_target(file, "/some/target");
                 }
                 make_update(file, fs::update_type_t::created);
@@ -339,19 +389,19 @@ void test_trivial_changes() {
                 CHECK(f->get_permissions() == 0123);
                 CHECK(f->get_modified_s() == 12345);
                 CHECK(f->get_size() == 0);
-                if (file_type == proto::FileInfoType::DIRECTORY) {
+                if (file_type == FT::DIRECTORY) {
                     CHECK(f->is_dir());
                 }
-                if (file_type == proto::FileInfoType::FILE) {
+                if (file_type == FT::FILE) {
                     CHECK(f->is_file());
                 }
-                if (file_type == proto::FileInfoType::SYMLINK) {
+                if (file_type == FT::SYMLINK) {
                     CHECK(f->is_link());
                     CHECK(f->get_link_target() == "/some/target");
                 }
             }
             SECTION("updates on existing") {
-                proto::set_type(file, proto::FileInfoType::FILE);
+                proto::set_type(file, FT::FILE);
                 builder->local_update(folder_id, file).apply(*sup);
 
                 auto f = files_local->by_name(file_name);
@@ -376,7 +426,6 @@ void test_trivial_changes() {
                     CHECK(f->get_permissions() == 0123);
                     CHECK(f->is_deleted());
                 }
-
                 auto file_seq_2 = f->get_sequence();
                 auto folder_seq_2 = folder_local->get_max_sequence();
                 CHECK(file_seq_2 > file_seq);
@@ -391,11 +440,47 @@ void test_trivial_changes() {
     F().run();
 }
 
+void test_hashing() {
+    struct F : folder_fixture_t {
+        using parent_t = folder_fixture_t;
+        using parent_t::parent_t;
+        void main() noexcept override {
+            auto impl = GENERATE(I::inotify, I::win32);
+            prepare(impl);
+
+            auto file = proto::FileInfo();
+            auto file_name = std::string_view("some-file-name.bin");
+            proto::set_name(file, file_name);
+            proto::set_permissions(file, 0123);
+            proto::set_modified_s(file, 12345);
+            auto file_type = FT::FILE;
+            proto::set_type(file, file_type);
+            proto::set_size(file, 5);
+
+            expect_bytes_hash(as_bytes("12345"));
+            make_update(file, fs::update_type_t::created);
+
+            CHECK(files_local->size() == 1);
+            auto f = files_local->by_name(file_name);
+            REQUIRE(f);
+
+#ifndef SYNCSPIRIT_WIN
+            CHECK(f->get_permissions() == 0123);
+#endif
+            CHECK(f->get_modified_s() == 12345);
+            CHECK(f->get_size() == 5);
+            CHECK(f->is_file());
+        }
+    };
+    F().run();
+}
+
 int _init() {
     test::init_logging();
     REGISTER_TEST_CASE(test_just_start, "test_just_start", "[fs]");
     REGISTER_TEST_CASE(test_watch_unwatch, "test_watch_unwatch", "[fs]");
     REGISTER_TEST_CASE(test_trivial_changes, "test_trivial_changes", "[fs]");
+    REGISTER_TEST_CASE(test_hashing, "test_hashing", "[fs]");
     return 1;
 }
 

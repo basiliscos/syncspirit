@@ -90,6 +90,16 @@ auto make_context(model::folder_info_ptr_t local_folder, std::string_view start_
     return outcome::success(std::move(ptr));
 }
 
+folder_context_ptr_t make_context(model::folder_info_ptr_t local_folder, unexamined_items_t items) noexcept {
+    auto stack = local_keeper::stack_t();
+    for (auto &item : items) {
+        stack.emplace_back(std::move(item));
+    }
+    auto ptr = folder_context_ptr_t();
+    ptr.reset(new folder_context_t(std::move(local_folder), std::move(stack), {}));
+    return ptr;
+}
+
 folder_context_t::folder_context_t(model::folder_info_ptr_t local_folder_, local_keeper::stack_t stack_,
                                    const bfs::path &initial_path) noexcept
     : local_folder{local_folder_}, stack(std::move(stack_)) {
