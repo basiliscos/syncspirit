@@ -247,9 +247,11 @@ void local_keeper_t::on_digest(hasher::message::digest_t &msg) noexcept {
     LOG_TRACE(log, "on_digest, block size: {}, index: {}", p.data.size(), p.block_index);
     if (state == r::state_t::OPERATIONAL) {
         auto hash_ctx = *static_cast<hash_context_t *>(p.context.get());
+        auto &hash_file = *hash_ctx.hash_file.get();
         auto &slave = *hash_ctx.slave.get();
+        auto folder_ctx = hash_ctx.folder_context.get();
         auto stack_ctx = lc_context_t(this);
-        auto has_pending = slave.post_process(*hash_ctx.hash_file.get(), msg, stack_ctx);
+        auto has_pending = slave.post_process(hash_file, folder_ctx, msg, stack_ctx);
         if (has_pending && fs_tasks == 0) {
             slave.prepare_task();
             LOG_TRACE(log, "routed {}", (void *)&slave);

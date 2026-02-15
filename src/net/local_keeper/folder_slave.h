@@ -38,7 +38,7 @@ struct folder_slave_t final : fs::fs_slave_t {
     void prepare_task() noexcept;
 
     bool post_process(stack_context_t &ctx) noexcept;
-    bool post_process(hash_base_t &hash_file, hasher::message::digest_t &msg, stack_context_t &ctx) noexcept;
+    bool post_process(hash_base_t &hash_file, folder_context_t* folder_ctx, hasher::message::digest_t &msg, stack_context_t &ctx) noexcept;
 
     folder_contexts_t folder_contexts;
 };

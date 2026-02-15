@@ -696,7 +696,7 @@ int folder_context_t::schedule_hash(hash_base_t *item, stack_context_t &ctx) noe
     }();
     assert(last_block_sz > 0);
     auto offset = std::int64_t{first_block} * block_size;
-    auto hash_context = hash_context_ptr_t(new hash_context_t(ctx.slave, item));
+    auto hash_context = hash_context_ptr_t(new hash_context_t(ctx.slave, this, item));
     auto sub_task = segment_iterator_t(ctx.get_back_address(), hash_context, item->path, offset, first_block,
                                        max_blocks, block_size, last_block_sz);
     push(std::move(sub_task));
