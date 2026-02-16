@@ -35,6 +35,14 @@ struct fixture_t;
 using I = syncspirit_watcher_impl_t;
 using FT = proto::FileInfoType;
 
+static constexpr auto default_perms = std::uint32_t{0123};
+
+#ifndef SYNCSPIRIT_WIN
+static constexpr auto expected_perms = std::uint32_t{0123};
+#else
+static constexpr auto expected_perms = std::uint32_t{0666};
+#endif
+
 struct my_supervisort_t : supervisor_t {
     using parent_t = supervisor_t;
     using parent_t::parent_t;
@@ -448,25 +456,36 @@ void test_hashing() {
             auto impl = GENERATE(I::inotify, I::win32);
             prepare(impl);
 
-            auto file = proto::FileInfo();
-            auto file_name = std::string_view("some-file-name.bin");
-            proto::set_name(file, file_name);
-            proto::set_permissions(file, 0123);
-            proto::set_modified_s(file, 12345);
-            auto file_type = FT::FILE;
-            proto::set_type(file, file_type);
-            proto::set_size(file, 5);
+            auto pr_dir_1 = proto::FileInfo();
+            proto::set_name(pr_dir_1, narrow(L"папка1"));
+            proto::set_type(pr_dir_1, FT::FILE);
+            builder->local_update(folder_id, pr_dir_1).apply(*sup);
+
+            auto pr_dir_2 = proto::FileInfo();
+            proto::set_name(pr_dir_2, narrow(L"папка1/подпапка2"));
+            proto::set_type(pr_dir_2, FT::FILE);
+            builder->local_update(folder_id, pr_dir_2).apply(*sup);
+
+            auto pr_file = proto::FileInfo();
+            auto file_namew = GENERATE(L"файл.bin", L"папка1/файл.bin", L"папка1/подпапка2/файл.bin");
+            auto file_name = narrow(file_namew);
+            proto::set_name(pr_file, file_name);
+            proto::set_permissions(pr_file, default_perms);
+            proto::set_modified_s(pr_file, 12345);
+            proto::set_type(pr_file, FT::FILE);
+            proto::set_size(pr_file, 5);
 
             expect_bytes_hash(as_bytes("12345"));
-            make_update(file, fs::update_type_t::created);
+            SECTION("new file created") { make_update(pr_file, fs::update_type_t::created); }
+            SECTION("existing file content updated") {
+                proto::set_size(pr_file, 4);
+                builder->local_update(folder_id, pr_file).apply(*sup);
+                make_update(pr_file, fs::update_type_t::content);
+            }
 
-            CHECK(files_local->size() == 1);
             auto f = files_local->by_name(file_name);
             REQUIRE(f);
-
-#ifndef SYNCSPIRIT_WIN
-            CHECK(f->get_permissions() == 0123);
-#endif
+            CHECK(f->get_permissions() == expected_perms);
             CHECK(f->get_modified_s() == 12345);
             CHECK(f->get_size() == 5);
             CHECK(f->is_file());
