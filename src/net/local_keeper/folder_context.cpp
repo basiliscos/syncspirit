@@ -449,6 +449,7 @@ int folder_context_t::process(abort_hashing_t &item, stack_context_t &ctx) noexc
 
 bool folder_context_t::post_process(stack_context_t &ctx) noexcept {
     LOG_TRACE(log, "postpocessing");
+    --in_progress;
 
     for (auto &t : ctx.slave->tasks_out) {
         std::visit([&](auto &t) { post_process(t, ctx); }, t);
@@ -461,6 +462,7 @@ bool folder_context_t::post_process(stack_context_t &ctx) noexcept {
 
 bool folder_context_t::post_process(hash_base_t &hash_file, hasher::message::digest_t &msg,
                                     stack_context_t &ctx) noexcept {
+    --in_progress;
     auto &p = msg.payload;
     auto &result = msg.payload.result;
     --hash_file.unhashed_blocks;
@@ -751,10 +753,13 @@ void folder_context_t::handle_scan_error(fs::task::scan_dir_t &task, stack_conte
     stack.push_front(undo_child_ready_t(task.path));
 }
 
+bool folder_context_t::is_done() const noexcept { return in_progress == 0 && stack.empty() && pending_io.empty(); }
+
 fs::task_t folder_context_t::pop_task() noexcept {
     assert(pending_io.size());
     auto task = std::move(pending_io.front());
     pending_io.pop_front();
+    ++in_progress;
     return task;
 }
 

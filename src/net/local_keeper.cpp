@@ -338,7 +338,7 @@ void local_keeper_t::on_changes(model::folder_info_t &local_folder, fs::payload:
             LOG_DEBUG(log, "ignoring update on '{}'", name);
         }
     };
-    auto delayed_update = [&](fs::payload::file_info_t &change) {
+    auto delayed_update = [&](fs::payload::file_info_t change) {
         auto name = proto::get_name(change);
         auto is_dir = proto::get_type(change) == proto::FileInfoType::DIRECTORY;
         auto relation = folder_presence->get_link(name, is_dir);
@@ -355,9 +355,14 @@ void local_keeper_t::on_changes(model::folder_info_t &local_folder, fs::payload:
         switch (change.update_reason) {
         case UT::created: {
             if (proto::get_size(change) == 0) {
+                auto schedule_scan = (watcher_impl == syncspirit_watcher_impl_t::inotify) &&
+                                     proto::get_type(change) == proto::FileInfoType::DIRECTORY;
+                if (schedule_scan) {
+                    delayed_update(change);
+                }
                 immediate_update(change);
             } else {
-                delayed_update(change);
+                delayed_update(std::move(change));
             }
             break;
         }
@@ -370,7 +375,7 @@ void local_keeper_t::on_changes(model::folder_info_t &local_folder, fs::payload:
             break;
         }
         case UT::content: {
-            delayed_update(change);
+            delayed_update(std::move(change));
             break;
         }
         default:

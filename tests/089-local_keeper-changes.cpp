@@ -36,6 +36,7 @@ using I = syncspirit_watcher_impl_t;
 using FT = proto::FileInfoType;
 
 static constexpr auto default_perms = std::uint32_t{0123};
+static constexpr auto default_perms_fs = static_cast<bfs::perms>(default_perms);
 
 #ifndef SYNCSPIRIT_WIN
 static constexpr auto expected_perms = std::uint32_t{0123};
@@ -270,6 +271,8 @@ struct folder_fixture_t : fixture_t {
     using parent_t = fixture_t;
     using parent_t::parent_t;
     using hashed_blocks_t = std::list<utils::bytes_t>;
+    using child_infos_t = fs::task::scan_dir_t::child_infos_t;
+    using dir_children_t = std::list<child_infos_t>;
 
     void on_watch_folder(fs::message::watch_folder_t &msg) override {
         auto &p = msg.payload;
@@ -291,10 +294,18 @@ struct folder_fixture_t : fixture_t {
         LOG_DEBUG(log, "creating a dir for {}", p.folder_id, narrow(p.generic_wstring()));
     }
 
-    virtual void process_cmd(fs::task::scan_dir_t &task) noexcept {
+    virtual bool process_cmd(fs::task::scan_dir_t &task) noexcept {
         LOG_DEBUG(log, "process_cmd(scan_dir_t) {}", narrow(task.path.generic_wstring()));
+        if (!dir_children.empty()) {
+            task.ec = {};
+            task.child_infos = std::move(dir_children.front());
+            dir_children.pop_front();
+            return true;
+        }
+        return false;
     }
-    virtual void process_cmd(fs::task::segment_iterator_t &task) noexcept {
+
+    virtual bool process_cmd(fs::task::segment_iterator_t &task) noexcept {
         static const constexpr size_t SZ = SHA256_DIGEST_LENGTH;
         LOG_DEBUG(log, "process_cmd(segment_iterator_t) {}", narrow(task.path.generic_wstring()));
         for (std::int32_t i = task.block_index, j = 0; j < task.block_count; ++i, ++j) {
@@ -311,23 +322,34 @@ struct folder_fixture_t : fixture_t {
             digetst_backend->payload.result = utils::bytes_t(d, d + SZ);
             hashed_blocks.pop_front();
             sup->put(std::move(digest));
+            return true;
         }
+        return false;
     }
 
-    virtual void process_cmd(fs::task::remove_file_t &task) noexcept {
+    virtual bool process_cmd(fs::task::remove_file_t &task) noexcept {
         LOG_DEBUG(log, "process_cmd(remove_file_t) {}", narrow(task.path.generic_wstring()));
+        return false;
     }
 
-    virtual void process_cmd(fs::task::rename_file_t &task) noexcept {
+    virtual bool process_cmd(fs::task::rename_file_t &task) noexcept {
         LOG_DEBUG(log, "process_cmd(rename_file_t) {}", narrow(task.path.generic_wstring()));
+        return false;
     }
-    virtual void process_cmd(fs::task::noop_t &task) noexcept { LOG_DEBUG(log, "process_cmd(noop_t"); }
+
+    virtual bool process_cmd(fs::task::noop_t &task) noexcept {
+        LOG_DEBUG(log, "process_cmd(noop_t");
+        return false;
+    }
 
     void on_exec(fs::message::foreign_executor_t &msg) override {
         LOG_INFO(log, "on_exec()");
         auto slave = dynamic_cast<fs::fs_slave_t *>(msg.payload.get());
         for (auto &t : slave->tasks_in) {
-            std::visit([&](auto &task) { process_cmd(task); }, t);
+            auto processed = std::visit([&](auto &task) -> bool { return process_cmd(task); }, t);
+            if (processed) {
+                slave->ec = {};
+            }
         }
         slave->tasks_out = std::move(slave->tasks_in);
     }
@@ -349,6 +371,7 @@ struct folder_fixture_t : fixture_t {
     }
 
     void expect_bytes_hash(utils::bytes_view_t bytes) noexcept { hashed_blocks.emplace_back(utils::bytes_t(bytes)); }
+    void expect_dir_scan(child_infos_t children) noexcept { dir_children.emplace_back(std::move(children)); }
 
     void make_update(proto::FileInfo info, fs::update_type_t update_type) noexcept {
         auto change = fs::payload::file_info_t(std::move(info), {}, update_type);
@@ -367,6 +390,7 @@ struct folder_fixture_t : fixture_t {
     model::folder_info_ptr_t folder_local;
     model::file_infos_map_t *files_local = nullptr;
     hashed_blocks_t hashed_blocks;
+    dir_children_t dir_children;
 };
 
 void test_trivial_changes() {
@@ -494,12 +518,78 @@ void test_hashing() {
     F().run();
 }
 
+void test_linux_new_dir() {
+    struct F : folder_fixture_t {
+        using parent_t = folder_fixture_t;
+        using parent_t::parent_t;
+        using child_info_t = fs::task::scan_dir_t::child_info_t;
+
+        void main() noexcept override {
+            prepare(I::inotify);
+
+            auto make_child = [](std::string_view name, bfs::file_type type = bfs::file_type::directory,
+                                 std::uintmax_t size = 0, std::uint32_t perms = default_perms) -> child_info_t {
+                auto child = child_info_t{};
+                child.path = bfs::path(name);
+                child.status = bfs::file_status(type, static_cast<bfs::perms>(perms));
+                child.size = size;
+                return child;
+            };
+
+            auto data = as_owned_bytes("12345");
+            auto data_h = utils::sha256_digest(data).value();
+
+            auto pr_dir = proto::FileInfo();
+            proto::set_name(pr_dir, "dir-a");
+            proto::set_permissions(pr_dir, default_perms);
+            proto::set_modified_s(pr_dir, 12345);
+            proto::set_type(pr_dir, FT::DIRECTORY);
+
+            expect_dir_scan({make_child("/some/path/dir-a/dir-b")});
+            expect_dir_scan({make_child("/some/path/dir-a/dir-b/dir-c"),
+                             make_child("/some/path/dir-a/dir-b/file.bin", bfs::file_type::regular, 5)});
+            expect_dir_scan({});
+            expect_bytes_hash(as_bytes("12345"));
+
+            make_update(pr_dir, fs::update_type_t::created);
+
+            auto dir_a = files_local->by_name("dir-a");
+            REQUIRE(dir_a);
+            CHECK(dir_a->is_dir());
+            CHECK(dir_a->is_locally_available());
+
+            auto dir_b = files_local->by_name("dir-a/dir-b");
+            REQUIRE(dir_b);
+            CHECK(dir_b->is_dir());
+            CHECK(dir_b->is_locally_available());
+
+            auto dir_c = files_local->by_name("dir-a/dir-b/dir-c");
+            REQUIRE(dir_c);
+            CHECK(dir_c->is_dir());
+            CHECK(dir_c->is_locally_available());
+
+            auto file = files_local->by_name("dir-a/dir-b/file.bin");
+            REQUIRE(file);
+            CHECK(file->is_file());
+            CHECK(file->is_locally_available());
+            CHECK(file->get_size() == 5);
+            REQUIRE(file->get_block_size() == 5);
+
+            auto b = file->iterate_blocks().next();
+            REQUIRE(b);
+            CHECK(b->get_hash() == data_h);
+        }
+    };
+    F().run();
+}
+
 int _init() {
     test::init_logging();
     REGISTER_TEST_CASE(test_just_start, "test_just_start", "[fs]");
     REGISTER_TEST_CASE(test_watch_unwatch, "test_watch_unwatch", "[fs]");
     REGISTER_TEST_CASE(test_trivial_changes, "test_trivial_changes", "[fs]");
     REGISTER_TEST_CASE(test_hashing, "test_hashing", "[fs]");
+    REGISTER_TEST_CASE(test_linux_new_dir, "test_linux_new_dir", "[fs]");
     return 1;
 }
 

@@ -33,7 +33,7 @@ bool folder_slave_t::post_process(stack_context_t &ctx) noexcept {
     ctx.slave = this;
     auto folder_ctx = folder_contexts.front().get();
     auto has_pending_io = folder_ctx->post_process(ctx);
-    if (folder_ctx->stack.empty()) {
+    while (!folder_contexts.empty() && folder_contexts.front()->is_done()) {
         folder_contexts.pop_front();
     }
     return has_pending_io;
@@ -43,12 +43,8 @@ bool folder_slave_t::post_process(hash_base_t &hash_file, folder_context_t *fold
                                   stack_context_t &ctx) noexcept {
     ctx.slave = this;
     auto has_pending_io = folder_ctx->post_process(hash_file, msg, ctx);
-    if (!folder_contexts.empty() && folder_contexts.front().get() == folder_ctx) {
-        if (folder_ctx->stack.empty()) {
-            folder_contexts.pop_front();
-        }
-        return has_pending_io;
-    } else {
-        return false;
+    while (!folder_contexts.empty() && folder_contexts.front()->is_done()) {
+        folder_contexts.pop_front();
     }
+    return has_pending_io;
 }

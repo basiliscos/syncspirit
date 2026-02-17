@@ -11,6 +11,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ref_counter.hpp>
 #include <boost/outcome.hpp>
+#include <cstdint>
 
 namespace syncspirit::net::local_keeper {
 
@@ -22,7 +23,14 @@ struct folder_context_t : boost::intrusive_ref_counter<folder_context_t, boost::
                      const bfs::path &initial_path) noexcept;
 
     void process_stack(stack_context_t &ctx) noexcept;
+    bool is_done() const noexcept;
 
+    bool post_process(stack_context_t &ctx) noexcept;
+    bool post_process(hash_base_t &hash_file, hasher::message::digest_t &msg, stack_context_t &ctx) noexcept;
+
+    fs::task_t pop_task() noexcept;
+
+  private:
     int process(complete_scan_t &, stack_context_t &ctx) noexcept;
     int process(unscanned_dir_t &dir, stack_context_t &ctx) noexcept;
     int process(unexamined_t &child_info, stack_context_t &ctx) noexcept;
@@ -39,8 +47,6 @@ struct folder_context_t : boost::intrusive_ref_counter<folder_context_t, boost::
     int process(rehashed_incomplete_t &item, stack_context_t &ctx) noexcept;
     int process(abort_hashing_t &item, stack_context_t &ctx) noexcept;
 
-    bool post_process(stack_context_t &ctx) noexcept;
-    bool post_process(hash_base_t &hash_file, hasher::message::digest_t &msg, stack_context_t &ctx) noexcept;
     void post_process(fs::task::scan_dir_t &task, stack_context_t &ctx) noexcept;
     void post_process(fs::task::segment_iterator_t &task, stack_context_t &ctx);
     void post_process(fs::task::remove_file_t &task, stack_context_t &ctx) noexcept;
@@ -50,7 +56,6 @@ struct folder_context_t : boost::intrusive_ref_counter<folder_context_t, boost::
     void push(fs::task_t task) noexcept;
     bool has_no_tasks() const noexcept;
     int schedule_hash(hash_base_t *item, stack_context_t &ctx) noexcept;
-    fs::task_t pop_task() noexcept;
     void handle_scan_error(fs::task::scan_dir_t &task, stack_context_t &ctx) noexcept;
 
     model::folder_info_ptr_t local_folder;
@@ -58,6 +63,7 @@ struct folder_context_t : boost::intrusive_ref_counter<folder_context_t, boost::
     utils::logger_t log;
     fs::tasks_t pending_io;
     bool ignore_permissions;
+    std::uint_fast32_t in_progress = 0;
 };
 
 using folder_context_ptr_t = boost::intrusive_ptr<folder_context_t>;
