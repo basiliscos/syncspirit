@@ -22,9 +22,11 @@ struct comparator_t {
     }
 };
 
-scan_dir_t::scan_dir_t(bfs::path path_, presentation::presence_ptr_t presence_, bfs::path single_child_) noexcept
+scan_dir_t::scan_dir_t(bfs::path path_, presentation::presence_ptr_t presence_, bfs::path single_child_,
+                       bool notify_) noexcept
     : path{std::move(path_)}, presence{std::move(presence_)},
-      ec(utils::make_error_code(utils::error_code_t::no_action)), single_child{std::move(single_child_)} {}
+      ec(utils::make_error_code(utils::error_code_t::no_action)), single_child{std::move(single_child_)},
+      notify{notify_} {}
 
 bool scan_dir_t::process(fs_slave_t &slave, execution_context_t &context) noexcept {
     ec = {};
@@ -83,5 +85,10 @@ bool scan_dir_t::process(fs_slave_t &slave, execution_context_t &context) noexce
     auto b = child_infos.begin();
     auto e = child_infos.end();
     std::sort(b, e, comparator_t());
+
+    if (notify && context.scan_dir_callback) {
+        context.scan_dir_callback(*this);
+    }
+
     return false;
 }

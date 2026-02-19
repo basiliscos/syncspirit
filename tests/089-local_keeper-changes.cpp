@@ -524,6 +524,13 @@ void test_linux_new_dir() {
         using parent_t::parent_t;
         using child_info_t = fs::task::scan_dir_t::child_info_t;
 
+        bool process_cmd(fs::task::scan_dir_t &task) noexcept override {
+            if (task.notify) {
+                ++watcher_notifications;
+            }
+            return parent_t::process_cmd(task);
+        }
+
         void main() noexcept override {
             prepare(I::inotify);
 
@@ -578,7 +585,10 @@ void test_linux_new_dir() {
             auto b = file->iterate_blocks().next();
             REQUIRE(b);
             CHECK(b->get_hash() == data_h);
+            CHECK(watcher_notifications == 3);
         }
+
+        int watcher_notifications = 0;
     };
     F().run();
 }

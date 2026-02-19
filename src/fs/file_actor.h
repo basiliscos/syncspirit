@@ -35,9 +35,11 @@ namespace r = rotor;
 namespace outcome = boost::outcome_v2;
 
 struct SYNCSPIRIT_API file_actor_config_t : r::actor_config_t {
+    using scan_dir_callback_t = execution_context_t::scan_dir_callback_t;
     uint32_t concurrent_hashes;
     r::pt::time_duration change_retension;
     updates_mediator_ptr_t updates_mediator;
+    scan_dir_callback_t scan_dir_callback;
 };
 
 template <typename Actor> struct file_actor_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -55,6 +57,10 @@ template <typename Actor> struct file_actor_config_builder_t : r::actor_config_b
     }
     builder_t &&updates_mediator(updates_mediator_ptr_t value) && noexcept {
         parent_t::config.updates_mediator = std::move(value);
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+    builder_t &&scan_dir_callback(execution_context_t::scan_dir_callback_t value) && noexcept {
+        parent_t::config.scan_dir_callback = std::move(value);
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };
@@ -80,6 +86,7 @@ struct SYNCSPIRIT_API file_actor_t : public r::actor_base_t {
     using file_cache_t = std::unordered_map<bfs::path, file_ptr_t>;
     using context_cache_t = std::unordered_map<const void *, file_cache_t>;
     using timer_opt_t = std::optional<r::request_id_t>;
+    using scan_dir_callback_t = execution_context_t::scan_dir_callback_t;
 
     void on_exec(message::foreign_executor_t &) noexcept;
     void on_io_commands(message::io_commands_t &) noexcept;
@@ -112,6 +119,7 @@ struct SYNCSPIRIT_API file_actor_t : public r::actor_base_t {
     context_cache_t context_cache;
     hasher::hasher_plugin_t *hasher = nullptr;
     timer_opt_t expiration_timer;
+    scan_dir_callback_t scan_dir_callback;
 };
 
 } // namespace syncspirit::fs

@@ -135,6 +135,7 @@ void file_actor_t::on_exec(message::foreign_executor_t &request) noexcept {
             : actor{actor_}, deadline_holder{deadline_holder_} {
             plugin = actor->hasher;
             mediator = actor->updates_mediator.get();
+            scan_dir_callback = actor->scan_dir_callback;
         }
 
         pt::ptime get_deadline() const override {

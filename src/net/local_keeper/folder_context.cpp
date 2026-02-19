@@ -140,8 +140,10 @@ int folder_context_t::process(complete_scan_t &, stack_context_t &ctx) noexcept 
 }
 
 int folder_context_t::process(unscanned_dir_t &dir, stack_context_t &ctx) noexcept {
+    auto notify_watcher = !dir.presence && ctx.watcher_impl == syncspirit_watcher_impl_t::inotify;
     LOG_TRACE(log, "scheduling scan of '{}'", narrow(dir.path.generic_wstring()));
-    auto sub_task = scan_dir_t(std::move(dir.path), std::move(dir.presence), std::move(dir.single_child));
+    auto sub_task =
+        scan_dir_t(std::move(dir.path), std::move(dir.presence), std::move(dir.single_child), notify_watcher);
     push(std::move(sub_task));
     return 0;
 }
@@ -519,7 +521,7 @@ void folder_context_t::post_process(fs::task::scan_dir_t &task, stack_context_t 
             auto path = task.path.parent_path();
             auto p = static_cast<presentation::local_file_presence_t *>(task.presence.get());
             auto child = bfs::path(widen(p->get_file_info().get_name()->get_own_name()));
-            auto sub_task = fs::task::scan_dir_t(std::move(path), std::move(p->get_parent()), std::move(child));
+            auto sub_task = fs::task::scan_dir_t(std::move(path), std::move(p->get_parent()), std::move(child), false);
             push(std::move(sub_task));
             return;
         }

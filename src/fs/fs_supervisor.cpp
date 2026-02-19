@@ -37,13 +37,23 @@ void fs_supervisor_t::on_start() noexcept {
 
 void fs_supervisor_t::launch_children() noexcept {
     auto retension = pt::milliseconds{fs_config.retension_timeout};
-    updates_mediator.reset(new updates_mediator_t(retension * 2));
+    auto retension_x2 = retension * 2;
+    updates_mediator.reset(new updates_mediator_t(retension_x2));
     auto timeout = shutdown_timeout * 9 / 10;
-    create_actor<file_actor_t>().concurrent_hashes(hasher_threads).timeout(timeout).escalate_failure().finish();
-    create_actor<watch_actor_t>()
-        .timeout(timeout)
-        .change_retension(retension)
+    auto watcher = create_actor<watch_actor_t>()
+                       .timeout(timeout)
+                       .change_retension(retension)
+                       .updates_mediator(updates_mediator)
+                       .finish()
+                       .get();
+
+    auto notify_watcher = [watcher](const fs::task::scan_dir_t &scan_dir) { watcher->notify(scan_dir); };
+    create_actor<file_actor_t>()
+        .concurrent_hashes(hasher_threads)
+        .change_retension(retension_x2)
         .updates_mediator(updates_mediator)
+        .timeout(timeout)
+        .escalate_failure()
         .finish();
 }
 

@@ -188,12 +188,13 @@ diff_builder_t &diff_builder_t::then() noexcept {
 }
 
 diff_builder_t &diff_builder_t::upsert_folder(std::string_view id, const bfs::path &path, std::string_view label,
-                                              std::uint64_t index_id) noexcept {
+                                              std::uint64_t index_id, bool watched) noexcept {
     db::Folder db_folder;
     db::set_id(db_folder, id);
     db::set_label(db_folder, label);
     db::set_path(db_folder, boost::nowide::narrow(path.generic_wstring()));
     db::set_folder_type(db_folder, db::FolderType::send_and_receive);
+    db::set_watched(db_folder, watched);
     auto opt = diff::modify::upsert_folder_t::create(*cluster, *sequencer, std::move(db_folder), index_id);
     return assign(opt.value().get());
 }

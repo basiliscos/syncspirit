@@ -35,7 +35,7 @@ struct local_keeper_t::lc_context_t final : local_keeper::stack_context_t {
     using folder_contexts_t = local_keeper::folder_slave_t::folder_contexts_t;
     lc_context_t(local_keeper_t *k) noexcept
         : parent_t(*k->cluster, *k->sequencer, k->concurrent_hashes_left, k->concurrent_hashes_limit,
-                   k->files_scan_iteration_limit),
+                   k->files_scan_iteration_limit, k->watcher_impl),
           actor(k) {}
 
     ~lc_context_t() {

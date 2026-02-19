@@ -23,6 +23,7 @@ struct SYNCSPIRIT_API watcher_t : watcher_base_t {
     void on_unwatch(message::unwatch_folder_t &) noexcept override;
     void inotify_callback() noexcept;
     void shutdown_finish() noexcept override;
+    void notify(const fs::task::scan_dir_t &) noexcept override;
 
     struct path_guard_t {
         std::string path;
@@ -30,10 +31,10 @@ struct SYNCSPIRIT_API watcher_t : watcher_base_t {
         int parent_fd;
     };
     using path_map_t = std::unordered_map<int, path_guard_t>;
+    using path_to_wd_t = std::unordered_map<std::string_view, int>;
     using children_t = std::set<int>;
     using watch_result_t = std::tuple<sys::error_code, path_guard_t *, int>;
     using subdir_map_t = std::unordered_map<int, children_t>;
-    using root_map_t = std::unordered_map<std::string_view, int>;
 
     watch_result_t watch_dir(std::string_view path, std::string_view folder_id, int parent) noexcept;
     watch_result_t watch_recurse(std::string_view path, std::string_view folder_id, int parent_fd) noexcept;
@@ -43,7 +44,7 @@ struct SYNCSPIRIT_API watcher_t : watcher_base_t {
     fs_context_t::io_guard_t io_guard;
     path_map_t path_map;
     subdir_map_t subdir_map;
-    root_map_t root_map;
+    path_to_wd_t path_to_wd;
 };
 
 } // namespace syncspirit::fs::platform::linux

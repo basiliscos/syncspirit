@@ -50,7 +50,6 @@ struct SYNCSPIRIT_API fs_supervisor_t : rth::supervisor_thread_t {
   protected:
     virtual void launch_children() noexcept;
 
-  private:
     utils::logger_t log;
     config::fs_config_t fs_config;
     uint32_t hasher_threads;

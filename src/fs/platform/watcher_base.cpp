@@ -251,3 +251,5 @@ void watcher_base_t::on_retension_finish(r::request_id_t, bool cancelled) noexce
         }
     }
 }
+
+void watcher_base_t::notify(const fs::task::scan_dir_t &) noexcept {}

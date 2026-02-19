@@ -15,6 +15,7 @@
 #include <list>
 #include <optional>
 #include "fs/fs_supervisor.h"
+#include "fs/task/scan_dir.h"
 
 using namespace syncspirit::fs::platform::linux;
 
@@ -47,14 +48,10 @@ void watcher_t::shutdown_finish() noexcept {
         auto &folder_id = it->first;
         auto &path = it->second.path_str;
         LOG_DEBUG(log, "unwatching {}", path);
-        auto it_root = root_map.find(folder_id);
-        assert(it_root != root_map.end());
-        auto root_fd = root_map[folder_id];
         auto ec = unwatch_recurse(folder_id);
         if (ec) {
             LOG_WARN(log, "cannot unwatch '{}' : {}", path, ec.message());
         }
-        root_map.erase(it_root);
         it = folder_map.erase(it);
     }
     assert(subdir_map.empty());
@@ -198,16 +195,17 @@ auto watcher_t::watch_dir(std::string_view path, std::string_view folder_id, int
         LOG_ERROR(log, "cannot do inotify_add_watch() for '{}': {}", path_str, strerror(errno));
         ec = sys::error_code{errno, sys::system_category()};
     } else {
+        LOG_TRACE(log, "watching for '{}' ({}, parent: {})", path_str, wd, parent);
         auto path_guard = path_guard_t{
             path_str,
             folder_id,
             parent,
         };
-        LOG_TRACE(log, "watching for '{}' ({}, parent: {})", path_str, wd, parent);
         auto [it, inserted] = path_map.emplace(wd, std::move(path_guard));
         assert(inserted);
         (void)inserted;
         guard_ptr = &it->second;
+        path_to_wd.emplace(guard_ptr->path, wd);
         if (parent >= 0) {
             subdir_map[parent].emplace(wd);
         }
@@ -222,7 +220,8 @@ auto watcher_t::unwatch_recurse(std::string_view folder_id) noexcept -> sys::err
     auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
     auto queue = queue_t(allocator);
     auto ec = sys::error_code{};
-    queue.emplace_back(root_map[folder_id]);
+    auto &path = folder_map.find(folder_id)->second.path_str;
+    queue.emplace_back(path_to_wd[path]);
     while (!queue.empty()) {
         auto wd = queue.front();
         auto it_subdir = subdir_map.find(wd);
@@ -244,6 +243,7 @@ auto watcher_t::unwatch_recurse(std::string_view folder_id) noexcept -> sys::err
         } else {
             LOG_TRACE(log, "unwatched '{}'", path);
         }
+        path_to_wd.erase(path);
         path_map.erase(it_guard);
         queue.pop_front();
     }
@@ -271,6 +271,7 @@ void watcher_t::forget(int wd) noexcept {
                 LOG_WARN(log, "cannot remove '{}' from parent, is it orphaned?", path);
             }
         }
+        path_to_wd.erase(path);
         path_map.erase(it_guard);
     }
 }
@@ -317,6 +318,7 @@ auto watcher_t::watch_recurse(std::string_view path, std::string_view folder_id,
         }
         queue.pop_front();
     }
+
     return r;
 }
 
@@ -335,8 +337,6 @@ void watcher_t::on_watch(message::watch_folder_t &message) noexcept {
             auto [ec, _, wd] = watch_recurse(path_str, folder_id, -1);
             if (ec) {
                 folder_map.erase(it);
-            } else {
-                root_map.emplace(folder_id, wd);
             }
             p.ec = ec;
         }
@@ -347,15 +347,38 @@ void watcher_t::on_unwatch(message::unwatch_folder_t &message) noexcept {
     auto &p = message.payload;
     auto it = folder_map.find(p.folder_id);
     if (it != folder_map.end()) {
-        LOG_DEBUG(log, "unwatching {}", it->second.path_str);
-        auto it_root = root_map.find(p.folder_id);
-        assert(it_root != root_map.end());
-        auto root_fd = root_map[p.folder_id];
+        auto &path = it->second.path_str;
+        LOG_DEBUG(log, "unwatching {}", path);
+        auto it_wd = path_to_wd.find(path);
+        assert(it_wd != path_to_wd.end());
         p.ec = unwatch_recurse(p.folder_id);
-        root_map.erase(it_root);
         folder_map.erase(it);
     } else {
         LOG_WARN(log, "cannot unwatch folder '{}' as it has not been watched", p.folder_id);
+    }
+}
+
+void watcher_t::notify(const fs::task::scan_dir_t &scan_dir) noexcept {
+    auto parent_path = std::string_view(scan_dir.path.native());
+    auto it = path_to_wd.find(parent_path);
+    if (it != path_to_wd.end()) {
+        auto &parent_wd = it->second;
+        auto &folder_id = path_map[parent_wd].folder_id;
+        for (auto &child : scan_dir.child_infos) {
+            if (child.status.type() == bfs::file_type::directory) {
+                auto path = std::string_view(child.path.native());
+                if (path_to_wd.count(path) == 0) {
+                    auto [ec, guard_ptr, wd] = watch_dir(path, folder_id, parent_wd);
+                    if (ec) {
+                        LOG_ERROR(log, "cannot watch {}: {}", path, ec.message());
+                    }
+                } else {
+                    LOG_TRACE(log, "dir '{}' is already watched", path);
+                }
+            }
+        }
+    } else {
+        LOG_WARN(log, "notification upon non-watched '{}'", parent_path);
     }
 }
 
