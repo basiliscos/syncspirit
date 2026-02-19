@@ -25,7 +25,7 @@ r::plugin::resource_id_t controller = 0;
 
 file_actor_t::file_actor_t(config_t &cfg)
     : r::actor_base_t{cfg}, concurrent_hashes{cfg.concurrent_hashes}, retension{cfg.change_retension},
-      updates_mediator{cfg.updates_mediator} {
+      updates_mediator{cfg.updates_mediator}, scan_dir_callback(cfg.scan_dir_callback) {
     if (updates_mediator) {
         if (!retension.is_positive()) {
             LOG_ERROR(log, "retension interval should be positive");

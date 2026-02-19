@@ -26,17 +26,6 @@ struct fixture_t;
 
 namespace native {
 
-bool wine_environment() {
-#ifdef SYNCSPIRIT_WIN
-    if (auto handle = GetModuleHandle("ntdll.dll")) {
-        if (GetProcAddress(handle, "wine_get_version")) {
-            return true;
-        }
-    }
-#endif
-    return false;
-}
-
 void rename(const bfs::path &from, const bfs::path &to) {
 #ifndef SYNCSPIRIT_WIN
     bfs::rename(from, to);
@@ -681,7 +670,7 @@ void test_real_impl() {
                 bfs::create_directories(a_path);
                 bfs::create_directories(x_path);
                 SECTION("file inside root => meta") {
-                    if (!native::wine_environment()) {
+                    if (!test::wine_environment()) {
                         auto path_1 = subdir_path / L"my-file.1";
                         auto path_2 = subdir_path / L"my-file.2";
                         write_file(path_1, "12345");
@@ -742,7 +731,7 @@ void test_real_impl() {
                     }
                 }
                 SECTION("dirs inside folder => meta") {
-                    if (!native::wine_environment()) {
+                    if (!test::wine_environment()) {
                         auto path_1 = subdir_path / L"папка1";
                         auto path_2 = subdir_path / L"папка2";
                         bfs::create_directories(path_1);
@@ -803,7 +792,7 @@ void test_real_impl() {
                 }
 
                 SECTION("outside of my dir => delete") {
-                    if (!native::wine_environment()) {
+                    if (!test::wine_environment()) {
                         auto path_1 = a_path / L"my-file.1";
                         auto path_2 = root_path / L"my-file.2";
                         write_file(path_1, "12345");
@@ -830,7 +819,7 @@ void test_real_impl() {
                     }
                 }
                 SECTION("into my dir => create") {
-                    if (!native::wine_environment()) {
+                    if (!test::wine_environment()) {
                         auto path_1 = root_path / L"my-file.1";
                         auto path_2 = x_path / L"my-file.2";
                         write_file(path_1, "12345");
@@ -858,7 +847,7 @@ void test_real_impl() {
                     }
                 }
                 SECTION("inside folder, cross-dir moving => meta") {
-                    if (!native::wine_environment()) {
+                    if (!test::wine_environment()) {
                         auto path_1 = a_path / L"my-file.1";
                         auto path_2 = x_path / L"my-file.2";
                         write_file(path_1, "12345");
@@ -986,7 +975,7 @@ void test_hierarchies() {
             auto folder_id = std::string("my-folder-id");
             auto back_addr = sup->get_address();
             SECTION("remove hierarchy") {
-                if (!native::wine_environment()) {
+                if (!test::wine_environment()) {
                     auto path_1 = root_path / L"x" / L"y" / L"файл.bin";
                     auto path_2 = root_path / L"a" / L"b";
                     bfs::create_directories(path_1.parent_path());
@@ -1030,7 +1019,7 @@ void test_hierarchies() {
                 }
             }
             SECTION("create hierarchy") {
-                if (!native::wine_environment()) {
+                if (!test::wine_environment()) {
                     sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id);
                     sup->do_process();
                     REQUIRE(watched_replies == 1);
@@ -1067,7 +1056,7 @@ void test_hierarchies() {
             }
 
             SECTION("move hierarchy (inside folder)") {
-                if (!native::wine_environment()) {
+                if (!test::wine_environment()) {
                     auto names = names_t({L"a", L"a/b", L"x", L"x/y", L"x/y/z"});
                     auto dir_1 = root_path / "win32-hack" / L"директория-1";
                     auto dir_2 = root_path / "win32-hack" / L"директория-2";

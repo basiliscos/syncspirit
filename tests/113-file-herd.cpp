@@ -130,10 +130,12 @@ struct fixture_t {
     virtual void create_updates_mediator() { updates_mediator = new fs::updates_mediator_t(retension_timeout * 2); }
 
     virtual void create_file_actor() {
+        auto notify_watcher = [this](const fs::task::scan_dir_t &scan_dir) { watcher_actor->notify(scan_dir); };
         file_actor = sup->create_actor<fs::file_actor_t>()
                          .concurrent_hashes(1)
                          .change_retension(retension_timeout * 2)
                          .updates_mediator(updates_mediator)
+                         .scan_dir_callback(notify_watcher)
                          .timeout(timeout)
                          .finish();
         fs_addr = file_actor->get_address();
@@ -188,8 +190,8 @@ struct fixture_t {
         REQUIRE(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::OPERATIONAL);
 
         sup->create_actor<hasher::hasher_actor_t>().index(1).timeout(timeout).finish();
-        create_file_actor();
         create_watcher_actor();
+        create_file_actor();
         create_local_keeper();
         sup->do_process();
 
@@ -247,8 +249,9 @@ struct fixture_t {
 void test_fs() {
     struct F : fixture_t {
         void main() noexcept override {
+            int expected_events = test::wine_environment() ? 4 : 2;
             bfs::create_directories(root_path / "a/b/c/d/e");
-            await_events(2);
+            await_events(expected_events);
             REQUIRE(local_files->size() == 5);
             REQUIRE(local_files->by_name("a"));
             REQUIRE(local_files->by_name("a/b"));
@@ -258,7 +261,7 @@ void test_fs() {
 
             bfs::create_directories(root_path / L"a/b/c/подпапка");
             write_file(root_path / L"a/b/c/файлик.bin", "12345");
-            await_events(2);
+            await_events(expected_events);
             REQUIRE(local_files->by_name(narrow(L"a/b/c/подпапка")));
             auto file = local_files->by_name(narrow(L"a/b/c/файлик.bin"));
             REQUIRE(file);

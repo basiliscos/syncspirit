@@ -183,4 +183,15 @@ utils::bytes_t make_key(model::block_info_ptr_t block) {
     return key;
 }
 
+bool wine_environment() {
+#ifdef SYNCSPIRIT_WIN
+    if (auto handle = GetModuleHandle("ntdll.dll")) {
+        if (GetProcAddress(handle, "wine_get_version")) {
+            return true;
+        }
+    }
+#endif
+    return false;
+}
+
 } // namespace syncspirit::test
