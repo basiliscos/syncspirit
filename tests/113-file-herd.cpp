@@ -3,6 +3,7 @@
 
 #include "access.h"
 #include "test-utils.h"
+#include "diff-builder.h"
 #include "fs/fs_supervisor.h"
 #include "fs/file_actor.h"
 #include "fs/messages.h"
@@ -11,8 +12,12 @@
 #include "fs/fs_context.h"
 #include "net/local_keeper.h"
 #include "net/names.h"
+#include "hasher/hasher_actor.h"
 #include "model/cluster.h"
-#include "diff-builder.h"
+#include "model/diff/modify/upsert_folder.h"
+#include "model/diff/modify/upsert_folder_info.h"
+#include "model/diff/advance/advance.h"
+#include "presentation/folder_entity.h"
 #include <filesystem>
 #include <boost/nowide/convert.hpp>
 
@@ -64,6 +69,47 @@ struct supervisor_t : fs::fs_supervisor_t, model::diff::apply_controller_t, prot
         }
     }
 
+    outcome::result<void> operator()(const model::diff::modify::upsert_folder_t &diff, void *custom) noexcept override {
+        auto folder_id = db::get_id(diff.db);
+        auto folder = cluster->get_folders().by_id(folder_id);
+        if (!folder->get_augmentation()) {
+            auto folder_entity = presentation::folder_entity_ptr_t();
+            folder_entity = new presentation::folder_entity_t(folder);
+            folder->set_augmentation(folder_entity);
+        }
+        return diff.visit_next(*this, custom);
+    }
+
+    outcome::result<void> operator()(const model::diff::modify::upsert_folder_info_t &diff,
+                                     void *custom) noexcept override {
+        auto r = diff.visit_next(*this, custom);
+        auto &folder = *cluster->get_folders().by_id(diff.folder_id);
+        auto &device = *cluster->get_devices().by_sha256(diff.device_id);
+        auto folder_info = folder.is_shared_with(device);
+        if (&device != cluster->get_device()) {
+            auto augmentation = folder.get_augmentation().get();
+            auto folder_entity = static_cast<presentation::folder_entity_t *>(augmentation);
+            folder_entity->on_insert(*folder_info);
+        }
+        return r;
+    }
+
+    outcome::result<void> operator()(const model::diff::advance::advance_t &diff, void *custom) noexcept override {
+        auto folder = cluster->get_folders().by_id(diff.folder_id);
+        auto augmentation = folder->get_augmentation().get();
+        auto folder_entity = static_cast<presentation::folder_entity_t *>(augmentation);
+        if (folder_entity) {
+            auto &folder_infos = folder->get_folder_infos();
+            auto local_fi = folder_infos.by_device(*cluster->get_device());
+            auto file_name = proto::get_name(diff.proto_local);
+            auto local_file = local_fi->get_file_infos().by_name(file_name);
+            if (local_file) {
+                folder_entity->on_insert(*local_file, *local_fi);
+            }
+        }
+        return diff.visit_next(*this, custom);
+    }
+
     model::sequencer_ptr_t sequencer;
     fixture_t *fixture;
 };
@@ -85,6 +131,7 @@ struct fixture_t {
 
     virtual void create_file_actor() {
         file_actor = sup->create_actor<fs::file_actor_t>()
+                         .concurrent_hashes(1)
                          .change_retension(retension_timeout * 2)
                          .updates_mediator(updates_mediator)
                          .timeout(timeout)
@@ -140,6 +187,7 @@ struct fixture_t {
         sup->do_process();
         REQUIRE(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::OPERATIONAL);
 
+        sup->create_actor<hasher::hasher_actor_t>().index(1).timeout(timeout).finish();
         create_file_actor();
         create_watcher_actor();
         create_local_keeper();
@@ -160,7 +208,8 @@ struct fixture_t {
         auto folder = cluster->get_folders().by_id(folder_id);
         REQUIRE(folder);
         local_folder = folder->get_folder_infos().by_device(*local_device);
-        REQUIRE(folder);
+        REQUIRE(local_folder);
+        local_files = &local_folder->get_file_infos();
 
         main();
 
@@ -175,7 +224,7 @@ struct fixture_t {
     virtual void main() noexcept {}
 
     r::pt::time_duration timeout = r::pt::millisec{10};
-    r::pt::time_duration retension_timeout = r::pt::millisec{150};
+    r::pt::time_duration retension_timeout = r::pt::millisec{15};
     cluster_ptr_t cluster;
     model::sequencer_ptr_t sequencer;
     model::device_ptr_t local_device;
@@ -191,7 +240,7 @@ struct fixture_t {
     utils::logger_t log;
     r::address_ptr_t fs_addr;
     model::folder_info_ptr_t local_folder;
-    int watcher_replies = 0;
+    model::file_infos_map_t *local_files;
 };
 } // namespace
 
@@ -199,9 +248,21 @@ void test_fs() {
     struct F : fixture_t {
         void main() noexcept override {
             bfs::create_directories(root_path / "a/b/c/d/e");
-            await_events();
-            auto &files = local_folder->get_file_infos();
-            REQUIRE(files.size() == 5);
+            await_events(2);
+            REQUIRE(local_files->size() == 5);
+            REQUIRE(local_files->by_name("a"));
+            REQUIRE(local_files->by_name("a/b"));
+            REQUIRE(local_files->by_name("a/b/c"));
+            REQUIRE(local_files->by_name("a/b/c/d"));
+            REQUIRE(local_files->by_name("a/b/c/d/e"));
+
+            bfs::create_directories(root_path / L"a/b/c/подпапка");
+            write_file(root_path / L"a/b/c/файлик.bin", "12345");
+            await_events(2);
+            REQUIRE(local_files->by_name(narrow(L"a/b/c/подпапка")));
+            auto file = local_files->by_name(narrow(L"a/b/c/файлик.bin"));
+            REQUIRE(file);
+            CHECK(file->get_size() == 5);
         }
     };
     F().run();
