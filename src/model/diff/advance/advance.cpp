@@ -109,13 +109,14 @@ void advance_t::initialize(const cluster_t &cluster, sequencer_t &sequencer, pro
         if (type == proto::FileInfoType::FILE) {
             auto sz = proto::get_size(proto_local);
             auto blocks_number = proto::get_blocks_size(proto_local);
-            return fmt::format(", sz: {}, blocks: {} (new: {}, removed: {})", sz, blocks_number, orphans.size(), new_blocks.size());
+            return fmt::format(", sz: {}, blocks: {} (new: {}, removed: {})", sz, blocks_number, orphans.size(),
+                               new_blocks.size());
         } else {
             return {};
         }
     }();
-    LOG_DEBUG(log,"advance_t ({}), folder = {}, {}{} name = {}{}",
-              stringify(action), folder_id,  type_str, flags, name, file_str);
+    LOG_DEBUG(log, "advance_t ({}), folder = {}, {}{} name = {}{}", stringify(action), folder_id, type_str, flags, name,
+              file_str);
 
     auto current = (cluster_diff_t *){};
     if (!new_blocks.empty()) {

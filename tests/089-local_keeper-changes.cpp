@@ -299,16 +299,18 @@ struct folder_fixture_t : fixture_t {
     virtual bool process_cmd(fs::task::scan_dir_t &task) noexcept {
         LOG_DEBUG(log, "process_cmd(scan_dir_t) {}", narrow(task.path.generic_wstring()));
         if (!dir_children.empty()) {
-            std::visit([&](auto& item) {
-                using T = std::decay_t<decltype(item)>;
-                if constexpr (std::is_same_v<T, sys::error_code>) {
-                    task.ec = item;
-                    task.child_infos.clear();
-                } else {
-                    task.ec = {};
-                    task.child_infos = std::move(item);
-                }
-            }, dir_children.front());
+            std::visit(
+                [&](auto &item) {
+                    using T = std::decay_t<decltype(item)>;
+                    if constexpr (std::is_same_v<T, sys::error_code>) {
+                        task.ec = item;
+                        task.child_infos.clear();
+                    } else {
+                        task.ec = {};
+                        task.child_infos = std::move(item);
+                    }
+                },
+                dir_children.front());
             dir_children.pop_front();
             return true;
         }
@@ -364,12 +366,12 @@ struct folder_fixture_t : fixture_t {
         slave->tasks_out = std::move(slave->tasks_in);
     }
 
-    void prepare(syncspirit_watcher_impl_t impl) noexcept {
+    void prepare(syncspirit_watcher_impl_t impl, bool watch_folder = true) noexcept {
         db::Folder db_folder;
         db::set_id(db_folder, folder_id);
         db::set_label(db_folder, folder_id);
         db::set_path(db_folder, "/some/path");
-        db::set_watched(db_folder, true);
+        db::set_watched(db_folder, watch_folder);
         builder->upsert_folder(db_folder, 5).apply(*sup);
 
         folder = cluster->get_folders().by_id(folder_id);
@@ -616,7 +618,6 @@ void test_dir_scan_errors() {
         using parent_t::parent_t;
         using child_info_t = fs::task::scan_dir_t::child_info_t;
 
-
         void main() noexcept override {
             auto impl = GENERATE(I::inotify, I::win32);
             prepare(impl);
@@ -628,7 +629,8 @@ void test_dir_scan_errors() {
                 return child;
             };
 
-            expect_dir_scan({make_child("/some/path/dir-a/A"), make_child("/some/path/dir-a/B"), make_child("/some/path/dir-a/C")});
+            expect_dir_scan(
+                {make_child("/some/path/dir-a/A"), make_child("/some/path/dir-a/B"), make_child("/some/path/dir-a/C")});
             expect_dir_scan({});
             expect_dir_scan_error(utils::make_error_code(utils::error_code_t::no_action));
             expect_dir_scan({});
@@ -663,7 +665,7 @@ void test_dir_scan_errors() {
                 }
             }
             SECTION("existing dirs") {
-                for (auto& p: {"dir-a", "dir-a/A", "dir-a/B", "dir-a/C"}) {
+                for (auto &p : {"dir-a", "dir-a/A", "dir-a/B", "dir-a/C"}) {
                     proto::set_name(pr_dir, p);
                     builder->local_update(folder_id, pr_dir).apply(*sup);
                 }
@@ -721,6 +723,44 @@ void test_dir_scan_errors() {
     F().run();
 }
 
+void test_read_file_errors() {
+    struct F : folder_fixture_t {
+        using parent_t = folder_fixture_t;
+        using parent_t::parent_t;
+        using child_info_t = fs::task::scan_dir_t::child_info_t;
+
+        bool process_cmd(fs::task::segment_iterator_t &task) noexcept override {
+            LOG_DEBUG(log, "process_cmd(segment_iterator_t) {}", narrow(task.path.generic_wstring()));
+            task.ec = std::make_error_code(std::errc::no_such_file_or_directory);
+            return true;
+        }
+
+        std::uint32_t get_hash_limit() override { return concurrency; }
+
+        void main() noexcept override {
+            auto impl = GENERATE(I::inotify, I::win32);
+            concurrency = GENERATE(1, 5, 10, 100);
+            prepare(impl);
+
+            auto multiplier = GENERATE(1, 3, 5, 11);
+
+            auto block_sz = fs::block_sizes[0];
+            auto child = child_info_t{};
+            child.path = bfs::path("/some/path/file.bin");
+            child.status = bfs::file_status(bfs::file_type::regular);
+            child.size = block_sz * multiplier;
+
+            expect_dir_scan({child});
+            LOG_INFO(log, "triggering scan...");
+            builder->scan_start(folder_id).apply(*sup);
+            CHECK(files_local->size() == 0);
+        }
+
+        std::uint32_t concurrency = 1;
+    };
+    F().run();
+};
+
 int _init() {
     test::init_logging();
     REGISTER_TEST_CASE(test_just_start, "test_just_start", "[fs]");
@@ -729,6 +769,7 @@ int _init() {
     REGISTER_TEST_CASE(test_hashing, "test_hashing", "[fs]");
     REGISTER_TEST_CASE(test_linux_new_dir, "test_linux_new_dir", "[fs]");
     REGISTER_TEST_CASE(test_dir_scan_errors, "test_dir_scan_errors", "[fs]");
+    REGISTER_TEST_CASE(test_read_file_errors, "test_read_file_errors", "[fs]");
     return 1;
 }
 
