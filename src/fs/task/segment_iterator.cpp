@@ -4,6 +4,7 @@
 #include "segment_iterator.h"
 #include "hasher/messages.h"
 #include "hasher/hasher_plugin.h"
+#include <boost/system/errc.hpp>
 
 using namespace syncspirit::fs;
 using namespace syncspirit::fs::task;
@@ -32,12 +33,17 @@ bool segment_iterator_t::process(fs_slave_t &fs_slave, execution_context_t &exec
         auto bs = (j + 1 == block_count) ? last_block_size : block_size;
         auto off = offset + std::int64_t{block_size} * j;
         auto block_opt = file.read(off, bs);
-        if (!block_opt) {
-            std::abort();
-        }
-        auto bytes = std::move(block_opt).value();
-        exec_ctx.plugin->calc_digest(std::move(bytes), i, back_addr, context);
         ++current_block;
+        if (!block_opt) {
+            if (errno) {
+                ec = sys::error_code{errno, sys::system_category()};
+            } else {
+                ec = sys::error_code{sys::errc::io_error, sys::system_category()};
+            }
+        } else {
+            auto bytes = std::move(block_opt).value();
+            exec_ctx.plugin->calc_digest(std::move(bytes), i, back_addr, context);
+        }
     }
     return false;
 }

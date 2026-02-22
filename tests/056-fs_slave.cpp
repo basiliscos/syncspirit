@@ -6,6 +6,7 @@
 #include "fs/utils.h"
 #include "fs/updates_mediator.h"
 #include "test-utils.h"
+#include "test_supervisor.h"
 #include <boost/nowide/convert.hpp>
 
 using namespace syncspirit;
@@ -18,6 +19,11 @@ using boost::nowide::narrow;
 struct exec_ctx_t final : fs::execution_context_t {
     exec_ctx_t(fs::updates_mediator_t *mediator_ = nullptr) { mediator = mediator_; }
     pt::ptime get_deadline() const override { return clock_t::local_time() + pt::milliseconds{1}; };
+};
+
+struct my_supervisor_t final : test::supervisor_t {
+    using parent_t = test::supervisor_t;
+    using parent_t::parent_t;
 };
 
 TEST_CASE("fs_slave, scan_dir", "[fs]") {
@@ -187,6 +193,38 @@ TEST_CASE("fs_slave, rm_file", "[fs]") {
         CHECK(t.ec.message() != "");
         CHECK(bfs::exists(file));
     }
+}
+
+TEST_CASE("fs_slave, segment-iterator (errors only)", "[fs]") {
+    auto root_path = unique_path();
+    bfs::create_directories(root_path);
+    test::path_guard_t path_quard{root_path};
+
+    auto slave = fs_slave_t();
+    auto context = exec_ctx_t();
+    auto back_addr = r::address_ptr_t();
+    auto hash_context = hasher::payload::extendended_context_prt_t();
+    hash_context = new hasher::payload::extendended_context_t();
+
+    SECTION("attempt to read a dir") {
+        auto task = fs::task::segment_iterator_t(back_addr, hash_context, root_path, 0, 0, 1, 5, 5);
+        slave.push(std::move(task));
+        CHECK(!slave.exec(context));
+        REQUIRE(slave.tasks_out.size() == 1);
+        auto &t = std::get<task::segment_iterator_t>(slave.tasks_out.front());
+        CHECK(t.ec);
+        CHECK(t.ec.message() != "");
+    };
+    SECTION("attempt to read a dir") {
+        auto task =
+            fs::task::segment_iterator_t(back_addr, hash_context, root_path / "not-existing-file", 0, 0, 1, 5, 5);
+        slave.push(std::move(task));
+        CHECK(!slave.exec(context));
+        REQUIRE(slave.tasks_out.size() == 1);
+        auto &t = std::get<task::segment_iterator_t>(slave.tasks_out.front());
+        CHECK(t.ec);
+        CHECK(t.ec.message() != "");
+    };
 }
 
 int _init() {
