@@ -99,11 +99,23 @@ void advance_t::initialize(const cluster_t &cluster, sequencer_t &sequencer, pro
         }
     }
 
-    LOG_DEBUG(log,
-              "advance_t ({}), folder = {}, name = {} ( -> {}), blocks = {}, removed blocks = {}, new blocks = {} [{}]",
-              stringify(action), folder_id, proto::get_name(proto_source), proto::get_name(proto_local),
-              proto::get_blocks_size(proto_local), orphans.size(), new_blocks.size(),
-              (proto::get_deleted(proto_local) ? "D" : ""));
+    auto type = proto::get_type(proto_local);
+    auto type_str = type == proto::FileInfoType::DIRECTORY ? "d" : type == proto::FileInfoType::SYMLINK ? "l" : "f";
+    auto name = proto::get_name(proto_source);
+    auto name_local = proto::get_name(proto_local);
+    auto name_out = name == name_local ? std::string(name) : fmt::format("{} (-> {})", name, name_local);
+    auto flags = proto::get_deleted(proto_local) ? "[D]" : "";
+    auto file_str = [&]() -> std::string {
+        if (type == proto::FileInfoType::FILE) {
+            auto sz = proto::get_size(proto_local);
+            auto blocks_number = proto::get_blocks_size(proto_local);
+            return fmt::format(", sz: {}, blocks: {} (new: {}, removed: {})", sz, blocks_number, orphans.size(), new_blocks.size());
+        } else {
+            return {};
+        }
+    }();
+    LOG_DEBUG(log,"advance_t ({}), folder = {}, {}{} name = {}{}",
+              stringify(action), folder_id,  type_str, flags, name, file_str);
 
     auto current = (cluster_diff_t *){};
     if (!new_blocks.empty()) {

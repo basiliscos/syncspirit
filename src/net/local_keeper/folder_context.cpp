@@ -268,7 +268,7 @@ int folder_context_t::process(undo_child_ready_t &info, stack_context_t &ctx) no
         if (auto item = std::get_if<child_ready_t>(&*it)) {
             if (item->path == info.path) {
                 stack.erase(it);
-                break;
+                return 1;
             }
         }
     }

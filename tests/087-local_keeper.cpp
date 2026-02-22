@@ -714,12 +714,40 @@ void test_deleted() {
                     f->mark_local(false);
                 }
 
-                builder->scan_start(folder->get_id()).apply(*sup);
-                REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
-                CHECK(files->size() == 4);
-                for (auto f : *files) {
-                    CHECK(f->is_local());
-                    CHECK(f->is_deleted());
+                SECTION("whole hierarchy removal") {
+                    builder->scan_start(folder->get_id()).apply(*sup);
+                    REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
+                    CHECK(files->size() == 4);
+                    for (auto f : *files) {
+                        CHECK(f->is_local());
+                        CHECK(f->is_deleted());
+                    }
+                }
+                SECTION("sub hierarchy removal") {
+                    bfs::create_directories(root_path / "a" / "cc");
+                    builder->scan_start(folder->get_id()).apply(*sup);
+                    REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
+                    CHECK(files->size() == 4);
+
+                    auto dir_a = files->by_name("a");
+                    REQUIRE(dir_a);
+                    REQUIRE(dir_a->is_local());
+                    REQUIRE(!dir_a->is_deleted());
+
+                    auto dir_cc = files->by_name("a/cc");
+                    REQUIRE(dir_cc);
+                    REQUIRE(dir_cc->is_local());
+                    REQUIRE(!dir_cc->is_deleted());
+
+                    auto dir_bb = files->by_name("a/bb");
+                    REQUIRE(dir_bb);
+                    REQUIRE(dir_bb->is_local());
+                    REQUIRE(dir_bb->is_deleted());
+
+                    auto dir_dd = files->by_name("a/bb/ddd");
+                    REQUIRE(dir_dd);
+                    REQUIRE(dir_dd->is_local());
+                    REQUIRE(dir_dd->is_deleted());
                 }
             }
             SECTION("order of deletion (1)") {

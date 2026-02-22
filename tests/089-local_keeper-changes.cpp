@@ -15,6 +15,7 @@
 #include "access.h"
 #include "utils/platform.h"
 #include <format>
+#include <variant>
 #include <boost/nowide/convert.hpp>
 
 #ifndef SYNCSPIRIT_WIN
@@ -272,7 +273,8 @@ struct folder_fixture_t : fixture_t {
     using parent_t::parent_t;
     using hashed_blocks_t = std::list<utils::bytes_t>;
     using child_infos_t = fs::task::scan_dir_t::child_infos_t;
-    using dir_children_t = std::list<child_infos_t>;
+    using dir_result_t = std::variant<fs::task::scan_dir_t::child_infos_t, sys::error_code>;
+    using dir_children_t = std::list<dir_result_t>;
 
     void on_watch_folder(fs::message::watch_folder_t &msg) override {
         auto &p = msg.payload;
@@ -297,8 +299,16 @@ struct folder_fixture_t : fixture_t {
     virtual bool process_cmd(fs::task::scan_dir_t &task) noexcept {
         LOG_DEBUG(log, "process_cmd(scan_dir_t) {}", narrow(task.path.generic_wstring()));
         if (!dir_children.empty()) {
-            task.ec = {};
-            task.child_infos = std::move(dir_children.front());
+            std::visit([&](auto& item) {
+                using T = std::decay_t<decltype(item)>;
+                if constexpr (std::is_same_v<T, sys::error_code>) {
+                    task.ec = item;
+                    task.child_infos.clear();
+                } else {
+                    task.ec = {};
+                    task.child_infos = std::move(item);
+                }
+            }, dir_children.front());
             dir_children.pop_front();
             return true;
         }
@@ -371,7 +381,14 @@ struct folder_fixture_t : fixture_t {
     }
 
     void expect_bytes_hash(utils::bytes_view_t bytes) noexcept { hashed_blocks.emplace_back(utils::bytes_t(bytes)); }
-    void expect_dir_scan(child_infos_t children) noexcept { dir_children.emplace_back(std::move(children)); }
+    void expect_dir_scan(child_infos_t children, bool back = true) noexcept {
+        if (back) {
+            dir_children.emplace_back(std::move(children));
+        } else {
+            dir_children.emplace_front(std::move(children));
+        }
+    }
+    void expect_dir_scan_error(sys::error_code ec) noexcept { dir_children.emplace_back(std::move(ec)); }
 
     void make_update(proto::FileInfo info, fs::update_type_t update_type) noexcept {
         auto change = fs::payload::file_info_t(std::move(info), {}, update_type);
@@ -593,6 +610,117 @@ void test_linux_new_dir() {
     F().run();
 }
 
+void test_dir_scan_errors() {
+    struct F : folder_fixture_t {
+        using parent_t = folder_fixture_t;
+        using parent_t::parent_t;
+        using child_info_t = fs::task::scan_dir_t::child_info_t;
+
+
+        void main() noexcept override {
+            auto impl = GENERATE(I::inotify, I::win32);
+            prepare(impl);
+
+            auto make_child = [](std::string_view name) -> child_info_t {
+                auto child = child_info_t{};
+                child.path = bfs::path(name);
+                child.status = bfs::file_status(bfs::file_type::directory);
+                return child;
+            };
+
+            expect_dir_scan({make_child("/some/path/dir-a/A"), make_child("/some/path/dir-a/B"), make_child("/some/path/dir-a/C")});
+            expect_dir_scan({});
+            expect_dir_scan_error(utils::make_error_code(utils::error_code_t::no_action));
+            expect_dir_scan({});
+
+            auto pr_dir = proto::FileInfo();
+            proto::set_name(pr_dir, "dir-a");
+            proto::set_permissions(pr_dir, default_perms);
+            proto::set_modified_s(pr_dir, 12345);
+            proto::set_type(pr_dir, FT::DIRECTORY);
+
+            if (impl == I::inotify) {
+                SECTION("new dir/update") {
+                    make_update(pr_dir, fs::update_type_t::created);
+
+                    auto dir_a = files_local->by_name("dir-a");
+                    REQUIRE(dir_a);
+                    CHECK(dir_a->is_dir());
+                    CHECK(dir_a->is_locally_available());
+
+                    auto dir_A = files_local->by_name("dir-a/A");
+                    REQUIRE(dir_A);
+                    CHECK(dir_A->is_dir());
+                    CHECK(dir_A->is_locally_available());
+
+                    auto dir_B = files_local->by_name("dir-a/B");
+                    CHECK(!dir_B);
+
+                    auto dir_C = files_local->by_name("dir-a/C");
+                    REQUIRE(dir_C);
+                    CHECK(dir_C->is_dir());
+                    CHECK(dir_C->is_locally_available());
+                }
+            }
+            SECTION("existing dirs") {
+                for (auto& p: {"dir-a", "dir-a/A", "dir-a/B", "dir-a/C"}) {
+                    proto::set_name(pr_dir, p);
+                    builder->local_update(folder_id, pr_dir).apply(*sup);
+                }
+
+                auto data = as_bytes("12345");
+                auto data_h = utils::sha256_digest(as_bytes("12345")).value();
+
+                auto b = proto::BlockInfo();
+                proto::set_hash(b, data_h);
+                proto::set_offset(b, 0);
+                proto::set_size(b, 5);
+                proto::set_name(pr_dir, "dir-a/B/x.bin");
+                proto::set_type(pr_dir, proto::FileInfoType::FILE);
+                proto::set_size(pr_dir, 5);
+                proto::add_blocks(pr_dir, b);
+
+                expect_bytes_hash(data);
+                builder->local_update(folder_id, pr_dir).apply(*sup);
+
+                expect_dir_scan({make_child("/some/path/dir-a")}, false);
+                LOG_INFO(log, "triggering scan...");
+                builder->scan_start(folder_id).apply(*sup);
+
+                auto dir_a = files_local->by_name("dir-a");
+                REQUIRE(dir_a);
+                CHECK(dir_a->is_dir());
+                CHECK(dir_a->is_locally_available());
+
+                auto dir_A = files_local->by_name("dir-a/A");
+                REQUIRE(dir_A);
+                CHECK(dir_A->is_dir());
+                CHECK(dir_A->is_locally_available());
+
+                auto dir_B = files_local->by_name("dir-a/B");
+                REQUIRE(dir_B);
+                CHECK(dir_B->is_dir());
+                CHECK(dir_B->is_locally_available());
+                CHECK(dir_B->is_unreachable());
+
+                auto file_X = files_local->by_name("dir-a/B/x.bin");
+                REQUIRE(file_X);
+                CHECK(file_X->is_file());
+                CHECK(!file_X->is_locally_available());
+                CHECK(file_X->is_unreachable());
+
+                auto dir_C = files_local->by_name("dir-a/C");
+                REQUIRE(dir_C);
+                CHECK(dir_C->is_dir());
+                CHECK(dir_C->is_locally_available());
+            }
+        }
+
+        int watcher_notifications = 0;
+    };
+    F().run();
+}
+
 int _init() {
     test::init_logging();
     REGISTER_TEST_CASE(test_just_start, "test_just_start", "[fs]");
@@ -600,6 +728,7 @@ int _init() {
     REGISTER_TEST_CASE(test_trivial_changes, "test_trivial_changes", "[fs]");
     REGISTER_TEST_CASE(test_hashing, "test_hashing", "[fs]");
     REGISTER_TEST_CASE(test_linux_new_dir, "test_linux_new_dir", "[fs]");
+    REGISTER_TEST_CASE(test_dir_scan_errors, "test_dir_scan_errors", "[fs]");
     return 1;
 }
 
