@@ -215,7 +215,7 @@ TEST_CASE("fs_slave, segment-iterator (errors only)", "[fs]") {
         CHECK(t.ec);
         CHECK(t.ec.message() != "");
     };
-    SECTION("attempt to read a dir") {
+    SECTION("attempt to non-existing dir") {
         auto task =
             fs::task::segment_iterator_t(back_addr, hash_context, root_path / "not-existing-file", 0, 0, 1, 5, 5);
         slave.push(std::move(task));

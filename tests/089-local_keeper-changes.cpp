@@ -822,6 +822,42 @@ void test_read_file_errors_partial() {
     F().run();
 };
 
+void test_duplicates() {
+    struct F : folder_fixture_t {
+        using parent_t = folder_fixture_t;
+        using parent_t::parent_t;
+        void main() noexcept override {
+            auto impl = GENERATE(I::inotify, I::win32);
+            prepare(impl);
+
+            auto file = proto::FileInfo();
+            auto file_name = std::string_view("some-file-name.bin");
+            proto::set_name(file, file_name);
+            proto::set_permissions(file, 0123);
+            proto::set_modified_s(file, 12345);
+
+            auto file_type = GENERATE(FT::DIRECTORY, FT::FILE, FT::SYMLINK);
+            proto::set_type(file, file_type);
+            if (file_type == FT::SYMLINK) {
+                proto::set_symlink_target(file, "/some/target");
+            }
+            make_update(file, fs::update_type_t::created);
+
+            auto seq = folder_local->get_max_sequence();
+            make_update(file, fs::update_type_t::created);
+            CHECK(folder_local->get_max_sequence() == seq);
+
+            proto::set_modified_s(file, 123456);
+            make_update(file, fs::update_type_t::meta);
+            CHECK(folder_local->get_max_sequence() == seq + 1);
+
+            make_update(file, fs::update_type_t::meta);
+            CHECK(folder_local->get_max_sequence() == seq + 1);
+        }
+    };
+    F().run();
+}
+
 int _init() {
     test::init_logging();
     REGISTER_TEST_CASE(test_just_start, "test_just_start", "[fs]");
@@ -832,6 +868,7 @@ int _init() {
     REGISTER_TEST_CASE(test_dir_scan_errors, "test_dir_scan_errors", "[fs]");
     REGISTER_TEST_CASE(test_read_file_errors, "test_read_file_errors", "[fs]");
     REGISTER_TEST_CASE(test_read_file_errors_partial, "test_read_file_errors_partial", "[fs]");
+    REGISTER_TEST_CASE(test_duplicates, "test_duplicates", "[fs]");
     return 1;
 }
 
