@@ -822,6 +822,81 @@ void test_read_file_errors_partial() {
     F().run();
 };
 
+void test_read_file_error_recovery() {
+    struct F : folder_fixture_t {
+        using parent_t = folder_fixture_t;
+        using parent_t::parent_t;
+        using child_info_t = fs::task::scan_dir_t::child_info_t;
+
+        bool process_cmd(fs::task::segment_iterator_t &task) noexcept override {
+            static const constexpr size_t SZ = SHA256_DIGEST_LENGTH;
+            LOG_DEBUG(log, "process_cmd(segment_iterator_t) {}, error index = {}", narrow(task.path.generic_wstring()),
+                      error_index);
+
+            for (std::int32_t i = task.block_index, j = 0; j < task.block_count; ++i, ++j) {
+                ++blocks_read;
+                if (i == error_index) {
+                    task.ec = std::make_error_code(std::errc::no_such_file_or_directory);
+                } else {
+                    auto bs = (j + 1 == task.block_count) ? task.last_block_size : task.block_size;
+                    auto off = task.offset + std::int64_t{task.block_size} * j;
+                    auto data = as_owned_bytes(std::string(fs::block_sizes[0], 'a' + i));
+                    auto tmp_addr = sup->get_registry_address();
+                    auto dst_addr = target->get_address();
+                    auto digest =
+                        r::make_routed_message<hasher::payload::digest_t>(tmp_addr, dst_addr, data, i, task.context);
+                    auto digetst_backend = static_cast<hasher::message::digest_t *>(digest.get());
+                    unsigned char d[SZ];
+                    utils::digest(data.data(), data.size(), d);
+                    digetst_backend->payload.result = utils::bytes_t(d, d + SZ);
+                    sup->put(std::move(digest));
+                }
+            }
+
+            return true;
+        }
+
+        std::uint32_t get_hash_limit() override { return concurrency; }
+
+        void main() noexcept override {
+            auto impl = GENERATE(I::inotify, I::win32);
+            error_index = 3;
+            prepare(impl);
+
+            auto multiplier = 5;
+
+            auto block_sz = fs::block_sizes[0];
+            auto child = child_info_t{};
+            child.path = bfs::path("/some/path/file.bin");
+            child.status = bfs::file_status(bfs::file_type::regular);
+            child.size = block_sz * multiplier;
+
+            expect_dir_scan({child});
+            LOG_INFO(log, "triggering scan...");
+            builder->scan_start(folder_id).apply(*sup);
+            CHECK(files_local->size() == 0);
+            CHECK(blocks_read == concurrency);
+
+            error_index = 99;
+
+            expect_dir_scan({child});
+            LOG_INFO(log, "triggering scan...");
+            builder->scan_start(folder_id).apply(*sup);
+            CHECK(files_local->size() == 1);
+            auto file = files_local->begin()->get();
+            REQUIRE(file);
+            REQUIRE(file->get_size() == child.size);
+            REQUIRE(file->iterate_blocks().get_total() == 5);
+            CHECK(blocks_read == 4 + 5);
+        }
+
+        std::uint32_t concurrency = 4;
+        std::uint32_t error_index = 0;
+        std::uint32_t blocks_read = 0;
+    };
+    F().run();
+};
+
 void test_duplicates() {
     struct F : folder_fixture_t {
         using parent_t = folder_fixture_t;
@@ -868,6 +943,7 @@ int _init() {
     REGISTER_TEST_CASE(test_dir_scan_errors, "test_dir_scan_errors", "[fs]");
     REGISTER_TEST_CASE(test_read_file_errors, "test_read_file_errors", "[fs]");
     REGISTER_TEST_CASE(test_read_file_errors_partial, "test_read_file_errors_partial", "[fs]");
+    REGISTER_TEST_CASE(test_read_file_error_recovery, "test_read_file_error_recovery", "[fs]");
     REGISTER_TEST_CASE(test_duplicates, "test_duplicates", "[fs]");
     return 1;
 }
