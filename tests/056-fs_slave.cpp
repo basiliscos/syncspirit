@@ -207,7 +207,7 @@ TEST_CASE("fs_slave, segment-iterator (errors only)", "[fs]") {
     hash_context = new hasher::payload::extendended_context_t();
 
     SECTION("attempt to read a dir") {
-        auto task = fs::task::segment_iterator_t(back_addr, hash_context, root_path, 0, 0, 1, 5, 5);
+        auto task = fs::task::segment_iterator_t(back_addr, hash_context, root_path, 0, 0, 1, 5, 5, 0);
         slave.push(std::move(task));
         CHECK(!slave.exec(context));
         REQUIRE(slave.tasks_out.size() == 1);
@@ -216,8 +216,8 @@ TEST_CASE("fs_slave, segment-iterator (errors only)", "[fs]") {
         CHECK(t.ec.message() != "");
     };
     SECTION("attempt to non-existing dir") {
-        auto task =
-            fs::task::segment_iterator_t(back_addr, hash_context, root_path / "not-existing-file", 0, 0, 1, 5, 5);
+        auto path = root_path / "not-existing-file";
+        auto task = fs::task::segment_iterator_t(back_addr, hash_context, path, 0, 0, 1, 5, 5, 0);
         slave.push(std::move(task));
         CHECK(!slave.exec(context));
         REQUIRE(slave.tasks_out.size() == 1);
@@ -225,6 +225,23 @@ TEST_CASE("fs_slave, segment-iterator (errors only)", "[fs]") {
         CHECK(t.ec);
         CHECK(t.ec.message() != "");
     };
+#ifndef SYNCSPIRIT_WIN
+    SECTION("concurrent file modification") {
+        auto path = root_path / "file.bin";
+        write_file(path, "12345");
+        auto modified = fs::to_unix(bfs::last_write_time(path));
+        last_write_time(path, fs::from_unix(modified - 100));
+
+        auto task = fs::task::segment_iterator_t(back_addr, hash_context, path, 0, 0, 1, 5, 5, modified);
+        slave.push(std::move(task));
+        CHECK(!slave.exec(context));
+        REQUIRE(slave.tasks_out.size() == 1);
+        auto &t = std::get<task::segment_iterator_t>(slave.tasks_out.front());
+        CHECK(t.ec);
+        CHECK(t.ec.message() != "");
+        CHECK(t.ec == utils::error_code_t::concurrent_file_modification);
+    };
+#endif
 }
 
 int _init() {
