@@ -85,11 +85,11 @@ struct fixture_t {
         sequencer = make_sequencer(1234);
         auto my_hash = "KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD";
         auto my_id = device_id_t::from_string(my_hash).value();
-        my_device = device_t::create(my_id, "my-device").value();
+        local_device = device_t::create(my_id, "my-device").value();
 
-        cluster = new cluster_t(my_device, 1);
+        cluster = new cluster_t(local_device, 1);
 
-        cluster->get_devices().put(my_device);
+        cluster->get_devices().put(local_device);
 
         r::system_context_t ctx;
         sup = ctx.create_supervisor<my_supervisort_t>()
@@ -166,7 +166,7 @@ struct fixture_t {
     r::pt::time_duration timeout = r::pt::millisec{10};
     r::intrusive_ptr_t<supervisor_t> sup;
     cluster_ptr_t cluster;
-    device_ptr_t my_device;
+    device_ptr_t local_device;
     utils::logger_t log;
     target_ptr_t target;
     model::sequencer_ptr_t sequencer;
@@ -275,6 +275,7 @@ struct folder_fixture_t : fixture_t {
     using child_infos_t = fs::task::scan_dir_t::child_infos_t;
     using dir_result_t = std::variant<fs::task::scan_dir_t::child_infos_t, sys::error_code>;
     using dir_children_t = std::list<dir_result_t>;
+    using child_info_t = fs::task::scan_dir_t::child_info_t;
 
     void on_watch_folder(fs::message::watch_folder_t &msg) override {
         auto &p = msg.payload;
@@ -295,6 +296,15 @@ struct folder_fixture_t : fixture_t {
         p.ec = {};
         LOG_DEBUG(log, "creating a dir for {}", p.folder_id, narrow(p.generic_wstring()));
     }
+
+    static child_info_t make_child(std::string_view name, bfs::file_type type = bfs::file_type::directory,
+                                   std::uintmax_t size = 0, std::uint32_t perms = default_perms) {
+        auto child = child_info_t{};
+        child.path = bfs::path(name);
+        child.status = bfs::file_status(type, static_cast<bfs::perms>(perms));
+        child.size = size;
+        return child;
+    };
 
     virtual bool process_cmd(fs::task::scan_dir_t &task) noexcept {
         LOG_DEBUG(log, "process_cmd(scan_dir_t) {}", narrow(task.path.generic_wstring()));
@@ -375,7 +385,7 @@ struct folder_fixture_t : fixture_t {
         builder->upsert_folder(db_folder, 5).apply(*sup);
 
         folder = cluster->get_folders().by_id(folder_id);
-        folder_local = folder->get_folder_infos().by_device(*my_device);
+        folder_local = folder->get_folder_infos().by_device(*local_device);
         files_local = &folder_local->get_file_infos();
 
         launch_target(impl);
@@ -553,15 +563,6 @@ void test_linux_new_dir() {
         void main() noexcept override {
             prepare(I::inotify);
 
-            auto make_child = [](std::string_view name, bfs::file_type type = bfs::file_type::directory,
-                                 std::uintmax_t size = 0, std::uint32_t perms = default_perms) -> child_info_t {
-                auto child = child_info_t{};
-                child.path = bfs::path(name);
-                child.status = bfs::file_status(type, static_cast<bfs::perms>(perms));
-                child.size = size;
-                return child;
-            };
-
             auto data = as_owned_bytes("12345");
             auto data_h = utils::sha256_digest(data).value();
 
@@ -621,13 +622,6 @@ void test_dir_scan_errors() {
         void main() noexcept override {
             auto impl = GENERATE(I::inotify, I::win32);
             prepare(impl);
-
-            auto make_child = [](std::string_view name) -> child_info_t {
-                auto child = child_info_t{};
-                child.path = bfs::path(name);
-                child.status = bfs::file_status(bfs::file_type::directory);
-                return child;
-            };
 
             expect_dir_scan(
                 {make_child("/some/path/dir-a/A"), make_child("/some/path/dir-a/B"), make_child("/some/path/dir-a/C")});
@@ -953,21 +947,6 @@ void test_multi_folders_update() {
             auto impl = GENERATE(I::inotify, I::win32);
             launch_target(impl);
 
-            auto make_child = [](std::string_view name, bfs::file_type type = bfs::file_type::directory,
-                                 std::uintmax_t size = 0, std::uint32_t perms = default_perms) -> child_info_t {
-                auto child = child_info_t{};
-                child.path = bfs::path(name);
-                child.status = bfs::file_status(type, static_cast<bfs::perms>(perms));
-                child.size = size;
-                return child;
-            };
-
-            auto pr_dir = proto::FileInfo();
-            proto::set_name(pr_dir, "dir-a");
-            proto::set_permissions(pr_dir, default_perms);
-            proto::set_modified_s(pr_dir, 12345);
-            proto::set_type(pr_dir, FT::DIRECTORY);
-
             expect_dir_scan({make_child("/some/p1/A")});
             expect_dir_scan({make_child("/some/p1/A/a1"), make_child("/some/p1/A/a2"), make_child("/some/p1/A/a3")});
             expect_dir_scan({});
@@ -1015,6 +994,87 @@ void test_multi_folders_update() {
             auto &addr = sup->get_address();
             sup->send<fs::payload::folder_changes_t>(addr, std::move(folder_changes));
             sup->do_process();
+
+            auto &folders_map = cluster->get_folders();
+            auto f1 = folders_map.by_id("p1");
+            auto f2 = folders_map.by_id("p2");
+            auto f3 = folders_map.by_id("p3");
+
+            auto &f1_files = f1->get_folder_infos().by_device(*local_device)->get_file_infos();
+            auto f_A = f1_files.by_name("A");
+            auto f_a1 = f1_files.by_name("A/a1");
+            auto f_a2 = f1_files.by_name("A/a2");
+            auto f_a3 = f1_files.by_name("A/a3");
+            CHECK(f_A);
+            CHECK(f_a1);
+            CHECK(f_a2);
+            CHECK(f_a3);
+
+            auto &f2_files = f2->get_folder_infos().by_device(*local_device)->get_file_infos();
+            auto f_B = f2_files.by_name("B");
+            auto f_b1 = f2_files.by_name("B/b1");
+            auto f_b2 = f2_files.by_name("B/b2");
+            auto f_b3 = f2_files.by_name("B/b3");
+            CHECK(f_B);
+            CHECK(f_b1);
+            CHECK(f_b2);
+            CHECK(f_b3);
+
+            auto &f3_files = f3->get_folder_infos().by_device(*local_device)->get_file_infos();
+            auto f_C = f3_files.by_name("C");
+            auto f_c1 = f3_files.by_name("C/c1");
+            auto f_c2 = f3_files.by_name("C/c2");
+            auto f_c3 = f3_files.by_name("C/c3");
+            CHECK(f_C);
+            CHECK(f_c1);
+            CHECK(f_c2);
+            CHECK(f_c3);
+        }
+    };
+    F().run();
+}
+
+void test_hierarchy_update_dirs_only() {
+    struct F : folder_fixture_t {
+        using parent_t = folder_fixture_t;
+        using parent_t::parent_t;
+
+        void main() noexcept override {
+            auto impl = GENERATE(I::inotify, I::win32);
+            prepare(impl);
+
+            expect_dir_scan({make_child("/some/path/dir/subdir")});
+            expect_dir_scan({});
+
+            struct D {
+                std::string_view folder_id;
+                std::initializer_list<std::string_view> names;
+            };
+
+            auto folder_changes = fs::payload::folder_changes_t{};
+            auto file_changes = fs::payload::file_changes_t{};
+            for (auto &name : {"dir", "dir/subdir"}) {
+                auto file = proto::FileInfo();
+                proto::set_name(file, name);
+                proto::set_permissions(file, default_perms);
+                proto::set_modified_s(file, 12345);
+                proto::set_type(file, FT::DIRECTORY);
+                auto change = fs::payload::file_info_t(file, {}, fs::update_type_t::created);
+                file_changes.emplace_back(std::move(change));
+            }
+            auto folder_change = fs::payload::folder_change_t{folder_id, std::move(file_changes)};
+            folder_changes.emplace_back(std::move(folder_change));
+
+            auto &addr = sup->get_address();
+            sup->send<fs::payload::folder_changes_t>(addr, std::move(folder_changes));
+            sup->do_process();
+
+            CHECK(files_local->size() == 2);
+            auto d = files_local->by_name("dir");
+            CHECK(d);
+
+            auto subdir = files_local->by_name("dir/subdir");
+            CHECK(subdir);
         }
     };
     F().run();
@@ -1033,6 +1093,7 @@ int _init() {
     REGISTER_TEST_CASE(test_read_file_error_recovery, "test_read_file_error_recovery", "[fs]");
     REGISTER_TEST_CASE(test_duplicates, "test_duplicates", "[fs]");
     REGISTER_TEST_CASE(test_multi_folders_update, "test_multi_folders_update", "[fs]");
+    REGISTER_TEST_CASE(test_hierarchy_update_dirs_only, "test_hierarchy_update_dirs_only", "[fs]");
     return 1;
 }
 
