@@ -933,6 +933,93 @@ void test_duplicates() {
     F().run();
 }
 
+void test_multi_folders_update() {
+    struct F : folder_fixture_t {
+        using parent_t = folder_fixture_t;
+        using parent_t::parent_t;
+        using child_info_t = fs::task::scan_dir_t::child_info_t;
+
+        void main() noexcept override {
+            for (auto folder_id : {"p1", "p2", "p3"}) {
+                db::Folder db_folder;
+                db::set_id(db_folder, folder_id);
+                db::set_label(db_folder, folder_id);
+                db::set_path(db_folder, "/some/path");
+                db::set_folder_type(db_folder, db::FolderType::send_and_receive);
+                db::set_watched(db_folder, true);
+                builder->upsert_folder(db_folder, 5).apply(*sup);
+            }
+
+            auto impl = GENERATE(I::inotify, I::win32);
+            launch_target(impl);
+
+            auto make_child = [](std::string_view name, bfs::file_type type = bfs::file_type::directory,
+                                 std::uintmax_t size = 0, std::uint32_t perms = default_perms) -> child_info_t {
+                auto child = child_info_t{};
+                child.path = bfs::path(name);
+                child.status = bfs::file_status(type, static_cast<bfs::perms>(perms));
+                child.size = size;
+                return child;
+            };
+
+            auto pr_dir = proto::FileInfo();
+            proto::set_name(pr_dir, "dir-a");
+            proto::set_permissions(pr_dir, default_perms);
+            proto::set_modified_s(pr_dir, 12345);
+            proto::set_type(pr_dir, FT::DIRECTORY);
+
+            expect_dir_scan({make_child("/some/p1/A")});
+            expect_dir_scan({make_child("/some/p1/A/a1"), make_child("/some/p1/A/a2"), make_child("/some/p1/A/a3")});
+            expect_dir_scan({});
+            expect_dir_scan({});
+            expect_dir_scan({});
+
+            expect_dir_scan({make_child("/some/p2/B")});
+            expect_dir_scan({make_child("/some/p2/B/b1"), make_child("/some/p2/B/b2"), make_child("/some/p2/B/b3")});
+            expect_dir_scan({});
+            expect_dir_scan({});
+            expect_dir_scan({});
+
+            expect_dir_scan({make_child("/some/p3/C")});
+            expect_dir_scan({make_child("/some/p3/C/c1"), make_child("/some/p3/C/c2"), make_child("/some/p3/C/c3")});
+            expect_dir_scan({});
+            expect_dir_scan({});
+            expect_dir_scan({});
+
+            struct D {
+                std::string_view folder_id;
+                std::initializer_list<std::string_view> names;
+            };
+
+            D changes[] = {{"p1", {"A", "A/a1", "A/a2", "A/a3"}},
+                           {"p2", {"B", "B/b1", "B/b2", "B/b3"}},
+                           {"p3", {"C", "C/c1", "C/c2", "C/c3"}}};
+
+            auto folder_changes = fs::payload::folder_changes_t{};
+            for (auto &c : changes) {
+                auto file_changes = fs::payload::file_changes_t{};
+                for (auto &name : c.names) {
+                    auto file = proto::FileInfo();
+                    proto::set_name(file, name);
+                    proto::set_permissions(file, default_perms);
+                    proto::set_modified_s(file, 12345);
+                    proto::set_type(file, FT::DIRECTORY);
+                    auto change = fs::payload::file_info_t(file, {}, fs::update_type_t::created);
+                    file_changes.emplace_back(std::move(change));
+                }
+                auto folder_id = std::string(c.folder_id);
+                auto folder_change = fs::payload::folder_change_t{folder_id, std::move(file_changes)};
+                folder_changes.emplace_back(std::move(folder_change));
+            }
+
+            auto &addr = sup->get_address();
+            sup->send<fs::payload::folder_changes_t>(addr, std::move(folder_changes));
+            sup->do_process();
+        }
+    };
+    F().run();
+}
+
 int _init() {
     test::init_logging();
     REGISTER_TEST_CASE(test_just_start, "test_just_start", "[fs]");
@@ -945,6 +1032,7 @@ int _init() {
     REGISTER_TEST_CASE(test_read_file_errors_partial, "test_read_file_errors_partial", "[fs]");
     REGISTER_TEST_CASE(test_read_file_error_recovery, "test_read_file_error_recovery", "[fs]");
     REGISTER_TEST_CASE(test_duplicates, "test_duplicates", "[fs]");
+    REGISTER_TEST_CASE(test_multi_folders_update, "test_multi_folders_update", "[fs]");
     return 1;
 }
 
