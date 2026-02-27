@@ -1046,11 +1046,6 @@ void test_hierarchy_update_dirs_only() {
             expect_dir_scan({make_child("/some/path/dir/subdir")});
             expect_dir_scan({});
 
-            struct D {
-                std::string_view folder_id;
-                std::initializer_list<std::string_view> names;
-            };
-
             auto folder_changes = fs::payload::folder_changes_t{};
             auto file_changes = fs::payload::file_changes_t{};
             for (auto &name : {"dir", "dir/subdir"}) {
@@ -1080,6 +1075,100 @@ void test_hierarchy_update_dirs_only() {
     F().run();
 }
 
+void test_hierarchy_update_with_content() {
+    struct F : folder_fixture_t {
+        using parent_t = folder_fixture_t;
+        using parent_t::parent_t;
+
+        void main() noexcept override {
+            auto impl = GENERATE(I::inotify, I::win32);
+            // auto impl = I::win32;
+            prepare(impl);
+
+            expect_dir_scan({make_child("/some/path/dir/file.bin", bfs::file_type::regular, 5)});
+            expect_dir_scan({});
+            expect_bytes_hash(as_bytes("12345"));
+
+            auto folder_changes = fs::payload::folder_changes_t{};
+            auto file_changes = fs::payload::file_changes_t{};
+            [&]() {
+                auto file = proto::FileInfo();
+                proto::set_name(file, "dir");
+                proto::set_permissions(file, default_perms);
+                proto::set_modified_s(file, 12345);
+                proto::set_type(file, FT::DIRECTORY);
+                auto change = fs::payload::file_info_t(file, {}, fs::update_type_t::created);
+                file_changes.emplace_back(std::move(change));
+            }();
+            [&]() {
+                auto file = proto::FileInfo();
+                proto::set_name(file, "dir/file.bin");
+                proto::set_permissions(file, default_perms);
+                proto::set_modified_s(file, 12345);
+                proto::set_type(file, FT::FILE);
+                proto::set_size(file, 5);
+                auto change = fs::payload::file_info_t(file, {}, fs::update_type_t::created);
+                file_changes.emplace_back(std::move(change));
+            }();
+            auto folder_change = fs::payload::folder_change_t{folder_id, std::move(file_changes)};
+            folder_changes.emplace_back(std::move(folder_change));
+
+            auto &addr = sup->get_address();
+            sup->send<fs::payload::folder_changes_t>(addr, std::move(folder_changes));
+            sup->do_process();
+
+            CHECK(files_local->size() == 2);
+            auto d = files_local->by_name("dir");
+            CHECK(d);
+
+            auto f = files_local->by_name("dir/file.bin");
+            REQUIRE(f);
+            CHECK(f->get_size() == 5);
+            CHECK(f->iterate_blocks().get_total() == 1);
+            CHECK(f->is_locally_available());
+        }
+    };
+    F().run();
+}
+
+void test_malformed_hierarchy_update() {
+    struct F : folder_fixture_t {
+        using parent_t = folder_fixture_t;
+        using parent_t::parent_t;
+
+        void main() noexcept override {
+            auto impl = GENERATE(I::inotify, I::win32);
+            prepare(impl);
+
+            expect_dir_scan({make_child("/some/path/dir/file.bin", bfs::file_type::regular, 5)});
+            expect_dir_scan({});
+            expect_bytes_hash(as_bytes("12345"));
+
+            auto folder_changes = fs::payload::folder_changes_t{};
+            auto file_changes = fs::payload::file_changes_t{};
+            [&]() {
+                auto file = proto::FileInfo();
+                proto::set_name(file, "dir/file.bin");
+                proto::set_permissions(file, default_perms);
+                proto::set_modified_s(file, 12345);
+                proto::set_type(file, FT::FILE);
+                proto::set_size(file, 5);
+                auto change = fs::payload::file_info_t(file, {}, fs::update_type_t::created);
+                file_changes.emplace_back(std::move(change));
+            }();
+            auto folder_change = fs::payload::folder_change_t{folder_id, std::move(file_changes)};
+            folder_changes.emplace_back(std::move(folder_change));
+
+            auto &addr = sup->get_address();
+            sup->send<fs::payload::folder_changes_t>(addr, std::move(folder_changes));
+            sup->do_process();
+
+            CHECK(files_local->size() == 0);
+        }
+    };
+    F().run();
+}
+
 int _init() {
     test::init_logging();
     REGISTER_TEST_CASE(test_just_start, "test_just_start", "[fs]");
@@ -1094,6 +1183,8 @@ int _init() {
     REGISTER_TEST_CASE(test_duplicates, "test_duplicates", "[fs]");
     REGISTER_TEST_CASE(test_multi_folders_update, "test_multi_folders_update", "[fs]");
     REGISTER_TEST_CASE(test_hierarchy_update_dirs_only, "test_hierarchy_update_dirs_only", "[fs]");
+    REGISTER_TEST_CASE(test_hierarchy_update_with_content, "test_hierarchy_update_with_content", "[fs]");
+    REGISTER_TEST_CASE(test_malformed_hierarchy_update, "test_malformed_hierarchy_update", "[fs]");
     return 1;
 }
 

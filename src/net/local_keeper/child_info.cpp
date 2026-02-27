@@ -38,7 +38,7 @@ child_info_t::child_info_t(fs::task::scan_dir_t::child_info_t backend, presentat
 
 child_info_t::child_info_t(proto::FileInfo info, bfs::path path_, presentation::presence_ptr_t self_,
                            presentation::presence_ptr_t parent_) noexcept
-    : path{std::move(path_)} {
+    : path{std::move(path_)}, parent(std::move(parent_)) {
     size = proto::get_size(info);
     link_target = proto::get_symlink_target(info);
     last_write_time = proto::get_modified_s(info);

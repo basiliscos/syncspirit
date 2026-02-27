@@ -16,8 +16,10 @@
 #include "local_keeper/folder_slave.h"
 #include "presentation/folder_entity.h"
 #include "presentation/folder_presence.h"
+#include "utils/string_comparator.hpp"
 
 #include <boost/nowide/convert.hpp>
+#include <memory_resource>
 
 using namespace syncspirit;
 using namespace syncspirit::net;
@@ -318,6 +320,13 @@ void local_keeper_t::on_change(fs::message::folder_changes_t &message) noexcept 
 void local_keeper_t::on_changes(model::folder_info_t &local_folder, fs::payload::file_changes_t &changes,
                                 lc_context_t &stack_ctx) noexcept {
     using namespace model::diff;
+    using scheduled_dirs_t = std::pmr::unordered_set<std::pmr::string, utils::string_hash_t, utils::string_eq_t>;
+
+    auto buffer = std::array<std::byte, 1024 * 8>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+    auto scheduled_dirs = scheduled_dirs_t(allocator);
+
     auto folder = local_folder.get_folder();
     auto folder_id = folder->get_id();
     auto &files_map = local_folder.get_file_infos();
@@ -332,6 +341,10 @@ void local_keeper_t::on_changes(model::folder_info_t &local_folder, fs::payload:
         if (file) {
             update = !file->identical_by_content_to(change);
         }
+        if (proto::get_type(change) == proto::FileInfoType::DIRECTORY) {
+            auto n = std::pmr::string(name, allocator);
+            scheduled_dirs.emplace(n);
+        }
         if (update) {
             stack_ctx.push(new advance::local_update_t(*cluster, *sequencer, std::move(change), folder_id));
         } else {
@@ -339,17 +352,27 @@ void local_keeper_t::on_changes(model::folder_info_t &local_folder, fs::payload:
         }
     };
     auto delayed_update = [&](fs::payload::file_info_t change) {
+        using CI = local_keeper::child_info_t;
         auto name = proto::get_name(change);
         auto is_dir = proto::get_type(change) == proto::FileInfoType::DIRECTORY;
         auto relation = folder_presence->get_link(name, is_dir);
-        if (!relation.parent) {
-            LOG_WARN(log, "no presentation for parent '{}' in folder '{}', ignoring", name, folder_id);
-        } else {
-            auto path = folder->get_path() / widen(name);
-            auto child_info =
-                local_keeper::child_info_t(std::move(change), std::move(path), relation.child, relation.parent);
-            unexamined.emplace_back(std::move(child_info));
+        auto has_parent = relation.parent;
+        auto inside_subdir = name.find_last_of('/');
+        auto subdir = std::string_view{};
+        if (inside_subdir != std::string::npos) {
+            subdir = name.substr(0, inside_subdir);
         }
+        if (!has_parent && !subdir.empty() && !scheduled_dirs.count(subdir)) {
+            LOG_WARN(log, "no parent for '{}' in folder '{}', ignoring orphan", name, folder_id);
+            return;
+        }
+        if (watcher_impl == syncspirit_watcher_impl_t::inotify && !subdir.empty() && scheduled_dirs.count(subdir)) {
+            LOG_DEBUG(log, "ignoring '{}' in folder '{}', parent dir scan is scheduled", name, folder_id);
+            return;
+        }
+        auto path = folder->get_path() / widen(name);
+        auto child_info = CI(std::move(change), std::move(path), relation.child, relation.parent);
+        unexamined.emplace_back(std::move(child_info));
     };
     for (auto &change : changes) {
         switch (change.update_reason) {

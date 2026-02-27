@@ -115,7 +115,9 @@ void folder_context_t::process_stack(stack_context_t &ctx) noexcept {
         auto &item = *it;
         auto r = std::visit([&](auto &item) { return process(item, ctx); }, item);
         if (r >= 0) {
-            stack.erase(it);
+            if (!stack.empty()) {
+                stack.erase(it);
+            }
         }
         try_next = r > 0;
         if (try_next) {
@@ -443,8 +445,8 @@ int folder_context_t::process(rehashed_incomplete_t &item, stack_context_t &ctx)
 int folder_context_t::process(abort_hashing_t &item, stack_context_t &ctx) noexcept {
     auto it = stack.begin()++;
     if (it != stack.end()) {
-        stack.erase(it);
         LOG_DEBUG(log, "aborted hashing of '{}'", narrow(item.path.generic_wstring()));
+        stack.erase(it);
     }
     return 1;
 }
@@ -484,7 +486,8 @@ bool folder_context_t::post_process(hash_base_t &hash_file, hasher::message::dig
     if (!hash_file.unhashed_blocks) {
         auto blocks = std::move(hash_file.blocks);
         auto copy = static_cast<child_info_t &>(hash_file);
-        if (hash_file.errored_blocks) {
+        auto abort_hashing = hash_file.errored_blocks;
+        if (abort_hashing) {
             stack.push_front(abort_hashing_t{std::move(copy.path)});
         } else if (hash_file.incomplete) {
             stack.push_front(rehashed_incomplete_t(std::move(copy), std::move(blocks), hash_file.action));

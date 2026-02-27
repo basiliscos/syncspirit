@@ -26,7 +26,7 @@ auto folder_presence_t::get_link(std::string_view name, bool is_dir) const noexc
         if (index == std::string_view::npos) {
             break;
         } else {
-            auto subdir_name = path.substr(0, index - 1);
+            auto subdir_name = path.substr(0, index);
             path = path.substr(index + 1);
             parent = presentation::get_child(parent, subdir_name, true);
         }
