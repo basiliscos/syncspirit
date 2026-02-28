@@ -22,11 +22,11 @@ struct folder_context_t : boost::intrusive_ref_counter<folder_context_t, boost::
     folder_context_t(model::folder_info_ptr_t local_folder, local_keeper::stack_t stack,
                      const bfs::path &initial_path) noexcept;
 
-    void process_stack(stack_context_t &ctx) noexcept;
+    bool process_stack(stack_context_t &ctx) noexcept;
     bool is_done() const noexcept;
 
     bool post_process(stack_context_t &ctx) noexcept;
-    bool post_process(hash_base_t &hash_file, hasher::message::digest_t &msg, stack_context_t &ctx) noexcept;
+    void post_process(hash_base_t &hash_file, hasher::message::digest_t &msg, stack_context_t &ctx) noexcept;
 
     fs::task_t pop_task() noexcept;
 
@@ -63,7 +63,7 @@ struct folder_context_t : boost::intrusive_ref_counter<folder_context_t, boost::
     utils::logger_t log;
     fs::tasks_t pending_io;
     bool ignore_permissions;
-    std::uint_fast32_t in_progress = 0;
+    std::int_fast32_t in_progress = 0;
 };
 
 using folder_context_ptr_t = boost::intrusive_ptr<folder_context_t>;

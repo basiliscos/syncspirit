@@ -18,6 +18,13 @@ namespace syncspirit::net {
 namespace outcome = boost::outcome_v2;
 namespace r = rotor;
 
+namespace local_keeper {
+
+struct folder_context_t;
+using folder_context_ptr_t = boost::intrusive_ptr<folder_context_t>;
+
+} // namespace local_keeper
+
 struct local_keeper_config_t : r::actor_config_t {
     model::sequencer_ptr_t sequencer;
     uint32_t concurrent_hashes;
@@ -54,6 +61,7 @@ struct SYNCSPIRIT_API local_keeper_t final : public r::actor_base_t, private mod
 
     struct lc_context_t;
     using watched_folders_t = std::unordered_set<std::string, utils::string_hash_t, utils::string_eq_t>;
+    using folder_contexts_t = std::list<local_keeper::folder_context_ptr_t>;
 
     explicit local_keeper_t(config_t &cfg);
 
@@ -89,6 +97,8 @@ struct SYNCSPIRIT_API local_keeper_t final : public r::actor_base_t, private mod
     std::int32_t concurrent_hashes_left;
     std::int32_t concurrent_hashes_limit;
     std::int32_t fs_tasks = 0;
+    folder_contexts_t delayed;
+
     watched_folders_t watched_folders;
 };
 

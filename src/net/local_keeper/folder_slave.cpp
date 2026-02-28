@@ -42,8 +42,17 @@ bool folder_slave_t::post_process(stack_context_t &ctx) noexcept {
 bool folder_slave_t::post_process(hash_base_t &hash_file, folder_context_t *folder_ctx, hasher::message::digest_t &msg,
                                   stack_context_t &ctx) noexcept {
     ctx.slave = this;
-    auto has_pending_io = folder_ctx->post_process(hash_file, msg, ctx);
-    while (!folder_contexts.empty() && folder_contexts.front()->is_done()) {
+    folder_ctx->post_process(hash_file, msg, ctx);
+    auto [next_ctx, check] = [&]() -> std::pair<folder_context_t *, bool> {
+        if (folder_contexts.empty()) {
+            return {folder_ctx, false};
+        } else {
+            auto &front = folder_contexts.front();
+            return {front.get(), true};
+        }
+    }();
+    auto has_pending_io = next_ctx->process_stack(ctx);
+    if (check && next_ctx->is_done()) {
         folder_contexts.pop_front();
     }
     return has_pending_io;

@@ -20,6 +20,7 @@
 
 #include <boost/nowide/convert.hpp>
 #include <memory_resource>
+#include <iterator>
 
 using namespace syncspirit;
 using namespace syncspirit::net;
@@ -35,23 +36,31 @@ using UT = fs::update_type_t;
 struct local_keeper_t::lc_context_t final : local_keeper::stack_context_t {
     using parent_t = local_keeper::stack_context_t;
     using folder_contexts_t = local_keeper::folder_slave_t::folder_contexts_t;
-    lc_context_t(local_keeper_t *k) noexcept
+    lc_context_t(local_keeper_t *k, folder_slave_t *slave) noexcept
         : parent_t(*k->cluster, *k->sequencer, k->concurrent_hashes_left, k->concurrent_hashes_limit,
                    k->files_scan_iteration_limit, k->watcher_impl),
-          actor(k) {}
+          actor(k) {
+        if (slave && !actor->delayed.empty()) {
+            slave->push(std::move(actor->delayed));
+        }
+    }
 
     ~lc_context_t() {
         if (new_contexts.size()) {
-            assert(!actor->fs_tasks && "TODO");
-            auto backend = new folder_slave_t();
-            auto backend_keeper = fs::payload::foreign_executor_prt_t(backend);
-            backend->push(std::move(new_contexts));
-            backend->process_stack(*this);
-            backend->prepare_task();
-            auto &fs_addr = actor->fs_addr;
-            auto &back_addr = actor->address;
-            actor->route<fs::payload::foreign_executor_prt_t>(fs_addr, back_addr, std::move(backend_keeper));
-            ++actor->fs_tasks;
+            if (!actor->fs_tasks) {
+                auto backend = new folder_slave_t();
+                auto backend_keeper = fs::payload::foreign_executor_prt_t(backend);
+                backend->push(std::move(new_contexts));
+                backend->process_stack(*this);
+                backend->prepare_task();
+                auto &fs_addr = actor->fs_addr;
+                auto &back_addr = actor->address;
+                actor->route<fs::payload::foreign_executor_prt_t>(fs_addr, back_addr, std::move(backend_keeper));
+                ++actor->fs_tasks;
+            } else {
+                auto inserter = std::back_insert_iterator(actor->delayed);
+                std::move(new_contexts.begin(), new_contexts.end(), inserter);
+            }
         }
         if (diff) {
             actor->send<model::payload::model_update_t>(actor->coordinator, std::move(diff));
@@ -166,7 +175,7 @@ auto local_keeper_t::operator()(const model::diff::local::scan_start_t &diff, vo
             finish = new model::diff::local::scan_finish_t(diff.folder_id, now);
             send<model::payload::model_update_t>(coordinator, std::move(finish));
         } else {
-            lc_context_t(this).new_contexts.emplace_back(std::move(opt.value()));
+            lc_context_t(this, {}).new_contexts.emplace_back(std::move(opt.value()));
         }
     } else {
         LOG_DEBUG(log, "skipping scan of {}", diff.folder_id);
@@ -236,7 +245,7 @@ void local_keeper_t::on_post_process(fs::message::foreign_executor_t &msg) noexc
     assert(fs_tasks >= 0);
     if (state == r::state_t::OPERATIONAL) {
         auto &slave = static_cast<folder_slave_t &>(*msg.payload.get());
-        auto stack_ctx = lc_context_t(this);
+        auto stack_ctx = lc_context_t(this, &slave);
         auto has_pending = slave.post_process(stack_ctx);
         if (has_pending && fs_tasks == 0) {
             if (slave.ec) {
@@ -262,7 +271,7 @@ void local_keeper_t::on_digest(hasher::message::digest_t &msg) noexcept {
         auto &hash_file = *hash_ctx.hash_file.get();
         auto &slave = *hash_ctx.slave.get();
         auto folder_ctx = hash_ctx.folder_context.get();
-        auto stack_ctx = lc_context_t(this);
+        auto stack_ctx = lc_context_t(this, &slave);
         auto has_pending = slave.post_process(hash_file, folder_ctx, msg, stack_ctx);
         if (has_pending && fs_tasks == 0) {
             slave.prepare_task();
@@ -299,7 +308,7 @@ void local_keeper_t::on_change(fs::message::folder_changes_t &message) noexcept 
     auto &p = message.payload;
     LOG_DEBUG(log, "on_change, affects {} folder(s)", p.size());
     auto &folders_map = cluster->get_folders();
-    auto stack_ctx = lc_context_t(this);
+    auto stack_ctx = lc_context_t(this, {});
     for (auto &folder_change : p) {
         auto &folder_id = folder_change.folder_id;
         auto folder = folders_map.by_id(folder_id);

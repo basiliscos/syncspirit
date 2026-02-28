@@ -108,7 +108,7 @@ folder_context_t::folder_context_t(model::folder_info_ptr_t local_folder_, local
     ignore_permissions = folder->are_permissions_ignored() || !utils::platform_t::permissions_supported(initial_path);
 }
 
-void folder_context_t::process_stack(stack_context_t &ctx) noexcept {
+bool folder_context_t::process_stack(stack_context_t &ctx) noexcept {
     auto try_next = true;
     while (!stack.empty() && try_next) {
         auto it = stack.begin();
@@ -127,6 +127,7 @@ void folder_context_t::process_stack(stack_context_t &ctx) noexcept {
             }
         }
     }
+    return pending_io.size();
 }
 
 int folder_context_t::process(complete_scan_t &, stack_context_t &ctx) noexcept {
@@ -453,6 +454,7 @@ int folder_context_t::process(abort_hashing_t &item, stack_context_t &ctx) noexc
 
 bool folder_context_t::post_process(stack_context_t &ctx) noexcept {
     LOG_TRACE(log, "postpocessing");
+    assert(in_progress > 0);
     --in_progress;
 
     for (auto &t : ctx.slave->tasks_out) {
@@ -464,9 +466,8 @@ bool folder_context_t::post_process(stack_context_t &ctx) noexcept {
     return pending_io.size();
 }
 
-bool folder_context_t::post_process(hash_base_t &hash_file, hasher::message::digest_t &msg,
+void folder_context_t::post_process(hash_base_t &hash_file, hasher::message::digest_t &msg,
                                     stack_context_t &ctx) noexcept {
-    --in_progress;
     auto &p = msg.payload;
     auto &result = msg.payload.result;
     --hash_file.unhashed_blocks;
@@ -496,7 +497,6 @@ bool folder_context_t::post_process(hash_base_t &hash_file, hasher::message::dig
         }
     }
     ++ctx.hashes_pool;
-    return post_process(ctx);
 }
 
 void folder_context_t::post_process(fs::task::scan_dir_t &task, stack_context_t &ctx) noexcept {
