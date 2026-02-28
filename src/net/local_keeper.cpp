@@ -41,6 +41,18 @@ struct local_keeper_t::lc_context_t final : local_keeper::stack_context_t {
           actor(k) {}
 
     ~lc_context_t() {
+        if (new_contexts.size()) {
+            assert(!actor->fs_tasks && "TODO");
+            auto backend = new folder_slave_t();
+            auto backend_keeper = fs::payload::foreign_executor_prt_t(backend);
+            backend->push(std::move(new_contexts));
+            backend->process_stack(*this);
+            backend->prepare_task();
+            auto &fs_addr = actor->fs_addr;
+            auto &back_addr = actor->address;
+            actor->route<fs::payload::foreign_executor_prt_t>(fs_addr, back_addr, std::move(backend_keeper));
+            ++actor->fs_tasks;
+        }
         if (diff) {
             actor->send<model::payload::model_update_t>(actor->coordinator, std::move(diff));
         }
@@ -154,14 +166,7 @@ auto local_keeper_t::operator()(const model::diff::local::scan_start_t &diff, vo
             finish = new model::diff::local::scan_finish_t(diff.folder_id, now);
             send<model::payload::model_update_t>(coordinator, std::move(finish));
         } else {
-            auto backend = new folder_slave_t();
-            auto backend_keeper = fs::payload::foreign_executor_prt_t(backend);
-            backend->push(std::move(opt.value()));
-            auto stack_ctx = lc_context_t(this);
-            backend->process_stack(stack_ctx);
-            backend->prepare_task();
-            route<fs::payload::foreign_executor_prt_t>(fs_addr, address, std::move(backend_keeper));
-            ++fs_tasks;
+            lc_context_t(this).new_contexts.emplace_back(std::move(opt.value()));
         }
     } else {
         LOG_DEBUG(log, "skipping scan of {}", diff.folder_id);
@@ -304,16 +309,6 @@ void local_keeper_t::on_change(fs::message::folder_changes_t &message) noexcept 
             auto local_folder = folder->get_folder_infos().by_device(*cluster->get_device());
             on_changes(*local_folder, folder_change.file_changes, stack_ctx);
         }
-    }
-    if (stack_ctx.new_contexts.size()) {
-        assert(!fs_tasks && "TODO");
-        auto backend = new folder_slave_t();
-        auto backend_keeper = fs::payload::foreign_executor_prt_t(backend);
-        backend->push(std::move(stack_ctx.new_contexts));
-        backend->process_stack(stack_ctx);
-        backend->prepare_task();
-        route<fs::payload::foreign_executor_prt_t>(fs_addr, address, std::move(backend_keeper));
-        ++fs_tasks;
     }
 }
 
