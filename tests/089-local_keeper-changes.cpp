@@ -307,22 +307,26 @@ struct folder_fixture_t : fixture_t {
     };
 
     virtual bool process_cmd(fs::task::scan_dir_t &task) noexcept {
-        LOG_DEBUG(log, "process_cmd(scan_dir_t) {}", narrow(task.path.generic_wstring()));
+        auto path = narrow(task.path.generic_wstring());
         if (!dir_children.empty()) {
             std::visit(
                 [&](auto &item) {
                     using T = std::decay_t<decltype(item)>;
                     if constexpr (std::is_same_v<T, sys::error_code>) {
                         task.ec = item;
+                        LOG_DEBUG(log, "process_cmd(scan_dir_t) '{}' -> error: {}", path, item.message());
                         task.child_infos.clear();
                     } else {
                         task.ec = {};
+                        LOG_DEBUG(log, "process_cmd(scan_dir_t) '{}' -> {} items", path, item.size());
                         task.child_infos = std::move(item);
                     }
                 },
                 dir_children.front());
             dir_children.pop_front();
             return true;
+        } else {
+            LOG_DEBUG(log, "process_cmd(scan_dir_t) '{}' -> no results", path);
         }
         return false;
     }
@@ -1226,6 +1230,49 @@ void test_scan_dirs_race_linux() {
     F().run();
 }
 
+void test_scan_dirs_race_linux_2() {
+    struct F : folder_fixture_t {
+        using parent_t = folder_fixture_t;
+        using parent_t::parent_t;
+
+        void main() noexcept override {
+            prepare(I::inotify);
+
+            expect_dir_scan({make_child("/some/path/a")});
+            expect_dir_scan({});
+            LOG_INFO(log, "triggering scan (1)...");
+            builder->scan_start(folder_id).apply(*sup);
+            REQUIRE(files_local->size() == 1);
+
+            auto pr_dir = proto::FileInfo();
+            proto::set_name(pr_dir, "x");
+            proto::set_permissions(pr_dir, default_perms);
+            proto::set_modified_s(pr_dir, 12345);
+            proto::set_type(pr_dir, FT::DIRECTORY);
+            make_update(pr_dir, fs::update_type_t::created, false);
+
+            proto::set_name(pr_dir, "y");
+            make_update(pr_dir, fs::update_type_t::created, false);
+
+            expect_dir_scan({});
+            expect_dir_scan({});
+            expect_dir_scan({make_child("/some/path/a"), make_child("/some/path/x"), make_child("/some/path/y")});
+            expect_dir_scan({});
+            expect_dir_scan({});
+            expect_dir_scan({make_child("/some/path/a/b")});
+            expect_dir_scan({make_child("/some/path/a/b/c")});
+            expect_dir_scan({});
+
+            LOG_INFO(log, "triggering scan (2)...");
+            builder->scan_start(folder_id).apply(*sup);
+
+            CHECK(files_local->size() == 5);
+            CHECK(folder_local->get_max_sequence() == 5);
+        }
+    };
+    F().run();
+}
+
 void test_scan_dirs_race_win32() {
     struct F : folder_fixture_t {
         using parent_t = folder_fixture_t;
@@ -1265,6 +1312,50 @@ void test_scan_dirs_race_win32() {
     F().run();
 }
 
+void test_scan_dirs_race_win32_2() {
+    struct F : folder_fixture_t {
+        using parent_t = folder_fixture_t;
+        using parent_t::parent_t;
+
+        void main() noexcept override {
+            prepare(I::win32);
+
+            expect_dir_scan({make_child("/some/path/a")});
+            expect_dir_scan({make_child("/some/path/a/b")});
+            expect_dir_scan({make_child("/some/path/a/b/c")});
+            expect_dir_scan({});
+            LOG_INFO(log, "triggering scan (1)...");
+            builder->scan_start(folder_id).apply(*sup);
+            REQUIRE(files_local->size() == 3);
+
+            auto pr_dir = proto::FileInfo();
+            proto::set_name(pr_dir, "x");
+            proto::set_permissions(pr_dir, default_perms);
+            proto::set_modified_s(pr_dir, 12345);
+            proto::set_type(pr_dir, FT::DIRECTORY);
+            make_update(pr_dir, fs::update_type_t::created, false);
+
+            proto::set_name(pr_dir, "y");
+            make_update(pr_dir, fs::update_type_t::created, false);
+
+            expect_dir_scan({make_child("/some/path/a"), make_child("/some/path/x"), make_child("/some/path/y")});
+            expect_dir_scan({});
+            expect_dir_scan({});
+            expect_dir_scan({make_child("/some/path/a/b")});
+            expect_dir_scan({make_child("/some/path/a/b/c")});
+            expect_dir_scan({});
+
+            LOG_INFO(log, "triggering scan (2)...");
+            builder->scan_start(folder_id).apply(*sup);
+
+            CHECK(files_local->size() == 5);
+            CHECK(folder_local->get_max_sequence() == 5);
+        }
+    };
+    F().run();
+}
+
+
 int _init() {
     test::init_logging();
     REGISTER_TEST_CASE(test_just_start, "test_just_start", "[fs]");
@@ -1282,7 +1373,9 @@ int _init() {
     REGISTER_TEST_CASE(test_hierarchy_update_with_content, "test_hierarchy_update_with_content", "[fs]");
     REGISTER_TEST_CASE(test_malformed_hierarchy_update, "test_malformed_hierarchy_update", "[fs]");
     REGISTER_TEST_CASE(test_scan_dirs_race_linux, "test_scan_dirs_race_linux", "[fs]");
+    REGISTER_TEST_CASE(test_scan_dirs_race_linux_2, "test_scan_dirs_race_linux_2", "[fs]");
     REGISTER_TEST_CASE(test_scan_dirs_race_win32, "test_scan_dirs_race_win32", "[fs]");
+    REGISTER_TEST_CASE(test_scan_dirs_race_win32_2, "test_scan_dirs_race_win32_2", "[fs]");
     return 1;
 }
 
