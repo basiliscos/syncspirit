@@ -1226,6 +1226,45 @@ void test_scan_dirs_race_linux() {
     F().run();
 }
 
+void test_scan_dirs_race_win32() {
+    struct F : folder_fixture_t {
+        using parent_t = folder_fixture_t;
+        using parent_t::parent_t;
+
+        bool process_cmd(fs::task::scan_dir_t &task) noexcept override {
+            if (task.path == bfs::path("/some/path/a")) {
+                LOG_INFO(log, "mix-in update");
+                auto pr_dir = proto::FileInfo();
+                proto::set_permissions(pr_dir, default_perms);
+                proto::set_modified_s(pr_dir, 12345);
+                proto::set_type(pr_dir, FT::DIRECTORY);
+
+                for (auto name : {"x", "x/x1", "x/x1/x2", "y", "y/y1", "y/y1/y2"}) {
+                    proto::set_name(pr_dir, name);
+                    make_update(pr_dir, fs::update_type_t::created, false);
+                }
+            }
+            return parent_t::process_cmd(task);
+        }
+
+        void main() noexcept override {
+            prepare(I::win32);
+
+            expect_dir_scan({make_child("/some/path/a")});
+            expect_dir_scan({make_child("/some/path/a/b")});
+            expect_dir_scan({make_child("/some/path/a/b/c")});
+            expect_dir_scan({});
+
+            LOG_INFO(log, "triggering scan...");
+            builder->scan_start(folder_id).apply(*sup);
+
+            CHECK(files_local->size() == 9);
+            CHECK(folder_local->get_max_sequence() == 9);
+        }
+    };
+    F().run();
+}
+
 int _init() {
     test::init_logging();
     REGISTER_TEST_CASE(test_just_start, "test_just_start", "[fs]");
@@ -1243,6 +1282,7 @@ int _init() {
     REGISTER_TEST_CASE(test_hierarchy_update_with_content, "test_hierarchy_update_with_content", "[fs]");
     REGISTER_TEST_CASE(test_malformed_hierarchy_update, "test_malformed_hierarchy_update", "[fs]");
     REGISTER_TEST_CASE(test_scan_dirs_race_linux, "test_scan_dirs_race_linux", "[fs]");
+    REGISTER_TEST_CASE(test_scan_dirs_race_win32, "test_scan_dirs_race_win32", "[fs]");
     return 1;
 }
 
