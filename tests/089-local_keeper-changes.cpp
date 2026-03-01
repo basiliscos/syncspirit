@@ -402,7 +402,7 @@ struct folder_fixture_t : fixture_t {
     }
     void expect_dir_scan_error(sys::error_code ec) noexcept { dir_children.emplace_back(std::move(ec)); }
 
-    void make_update(proto::FileInfo info, fs::update_type_t update_type) noexcept {
+    void make_update(proto::FileInfo info, fs::update_type_t update_type, bool process = true) noexcept {
         auto change = fs::payload::file_info_t(std::move(info), {}, update_type);
         auto changes = fs::payload::file_changes_t{{std::move(change)}};
         auto folder_change = fs::payload::folder_change_t{folder_id, std::move(changes)};
@@ -410,7 +410,9 @@ struct folder_fixture_t : fixture_t {
         auto &addr = sup->get_address();
 
         sup->send<fs::payload::folder_changes_t>(addr, std::move(folder_changes));
-        sup->do_process();
+        if (process) {
+            sup->do_process();
+        }
     }
 
     std::string folder_id = "1234-5678";
@@ -429,11 +431,12 @@ void test_trivial_changes() {
         void main() noexcept override {
             auto impl = GENERATE(I::inotify, I::win32);
             prepare(impl);
+            LOG_INFO(log, "impl: {}", static_cast<int>(impl));
 
             auto file = proto::FileInfo();
             auto file_name = std::string_view("some-file-name.bin");
             proto::set_name(file, file_name);
-            proto::set_permissions(file, 0123);
+            proto::set_permissions(file, default_perms);
             proto::set_modified_s(file, 12345);
 
             SECTION("create new dir/symlink/emty-file") {
@@ -442,12 +445,17 @@ void test_trivial_changes() {
                 if (file_type == FT::SYMLINK) {
                     proto::set_symlink_target(file, "/some/target");
                 }
+                if (file_type == FT::DIRECTORY) {
+                    expect_dir_scan({});
+                }
                 make_update(file, fs::update_type_t::created);
 
                 CHECK(files_local->size() == 1);
                 auto f = files_local->by_name(file_name);
                 REQUIRE(f);
-                CHECK(f->get_permissions() == 0123);
+#ifndef SYNCSPIRIT_WIN
+                CHECK(f->get_permissions() == expected_perms);
+#endif
                 CHECK(f->get_modified_s() == 12345);
                 CHECK(f->get_size() == 0);
                 if (file_type == FT::DIRECTORY) {
@@ -763,20 +771,22 @@ void test_read_file_errors_partial() {
 
         bool process_cmd(fs::task::segment_iterator_t &task) noexcept override {
             static const constexpr size_t SZ = SHA256_DIGEST_LENGTH;
-            LOG_DEBUG(log, "process_cmd(segment_iterator_t) {}, error index = {}", narrow(task.path.generic_wstring()),
-                      error_index);
+            auto from = task.block_index;
+            auto to = from + task.block_count;
+            LOG_DEBUG(log, "process_cmd(segment_iterator_t) {}[{}..{}], error index = {}",
+                      narrow(task.path.generic_wstring()), from, to, error_index);
 
-            for (std::int32_t i = task.block_index, j = 0; j < task.block_count; ++i, ++j) {
-                if (i == error_index) {
-                    task.ec = std::make_error_code(std::errc::no_such_file_or_directory);
-                } else {
+            if (error_index >= from && error_index < to) {
+                task.ec = std::make_error_code(std::errc::io_error);
+            } else {
+                for (std::int32_t i = from, j = 0; j < task.block_count; ++i, ++j) {
+                    using digest_t = hasher::payload::digest_t;
                     auto bs = (j + 1 == task.block_count) ? task.last_block_size : task.block_size;
                     auto off = task.offset + std::int64_t{task.block_size} * j;
                     auto data = as_owned_bytes(std::string(fs::block_sizes[0], 'a' + i));
                     auto tmp_addr = sup->get_registry_address();
                     auto dst_addr = target->get_address();
-                    auto digest =
-                        r::make_routed_message<hasher::payload::digest_t>(tmp_addr, dst_addr, data, i, task.context);
+                    auto digest = r::make_routed_message<digest_t>(tmp_addr, dst_addr, data, i, task.context);
                     auto digetst_backend = static_cast<hasher::message::digest_t *>(digest.get());
                     unsigned char d[SZ];
                     utils::digest(data.data(), data.size(), d);
@@ -805,7 +815,7 @@ void test_read_file_errors_partial() {
             child.size = block_sz * multiplier;
 
             expect_dir_scan({child});
-            LOG_INFO(log, "triggering scan...");
+            LOG_INFO(log, "triggering scan... concurrency: {}, error_index: {}", concurrency, error_index);
             builder->scan_start(folder_id).apply(*sup);
             CHECK(files_local->size() == 0);
         }
@@ -824,27 +834,29 @@ void test_read_file_error_recovery() {
 
         bool process_cmd(fs::task::segment_iterator_t &task) noexcept override {
             static const constexpr size_t SZ = SHA256_DIGEST_LENGTH;
-            LOG_DEBUG(log, "process_cmd(segment_iterator_t) {}, error index = {}", narrow(task.path.generic_wstring()),
-                      error_index);
+            auto from = task.block_index;
+            auto to = from + task.block_count;
+            LOG_DEBUG(log, "process_cmd(segment_iterator_t) {}[{}..{}], error index = {}",
+                      narrow(task.path.generic_wstring()), from, to, error_index);
 
-            for (std::int32_t i = task.block_index, j = 0; j < task.block_count; ++i, ++j) {
-                ++blocks_read;
-                if (i == error_index) {
-                    task.ec = std::make_error_code(std::errc::no_such_file_or_directory);
-                } else {
+            if (error_index >= from && error_index < to) {
+                task.ec = std::make_error_code(std::errc::io_error);
+            } else {
+                for (std::int32_t i = from, j = 0; j < task.block_count; ++i, ++j) {
+                    using digest_t = hasher::payload::digest_t;
                     auto bs = (j + 1 == task.block_count) ? task.last_block_size : task.block_size;
                     auto off = task.offset + std::int64_t{task.block_size} * j;
                     auto data = as_owned_bytes(std::string(fs::block_sizes[0], 'a' + i));
                     auto tmp_addr = sup->get_registry_address();
                     auto dst_addr = target->get_address();
-                    auto digest =
-                        r::make_routed_message<hasher::payload::digest_t>(tmp_addr, dst_addr, data, i, task.context);
+                    auto digest = r::make_routed_message<digest_t>(tmp_addr, dst_addr, data, i, task.context);
                     auto digetst_backend = static_cast<hasher::message::digest_t *>(digest.get());
                     unsigned char d[SZ];
                     utils::digest(data.data(), data.size(), d);
                     digetst_backend->payload.result = utils::bytes_t(d, d + SZ);
                     sup->put(std::move(digest));
                 }
+                blocks_read += task.block_count;
             }
 
             return true;
@@ -869,7 +881,7 @@ void test_read_file_error_recovery() {
             LOG_INFO(log, "triggering scan...");
             builder->scan_start(folder_id).apply(*sup);
             CHECK(files_local->size() == 0);
-            CHECK(blocks_read == concurrency);
+            CHECK(blocks_read == 0);
 
             error_index = 99;
 
@@ -881,7 +893,7 @@ void test_read_file_error_recovery() {
             REQUIRE(file);
             REQUIRE(file->get_size() == child.size);
             REQUIRE(file->iterate_blocks().get_total() == 5);
-            CHECK(blocks_read == 4 + 5);
+            CHECK(blocks_read == 5);
         }
 
         std::uint32_t concurrency = 4;
@@ -938,7 +950,7 @@ void test_multi_folders_update() {
                 db::Folder db_folder;
                 db::set_id(db_folder, folder_id);
                 db::set_label(db_folder, folder_id);
-                db::set_path(db_folder, "/some/path");
+                db::set_path(db_folder, fmt::format("/some/{}", folder_id));
                 db::set_folder_type(db_folder, db::FolderType::send_and_receive);
                 db::set_watched(db_folder, true);
                 builder->upsert_folder(db_folder, 5).apply(*sup);
@@ -1169,6 +1181,51 @@ void test_malformed_hierarchy_update() {
     F().run();
 }
 
+void test_scan_dirs_race_linux() {
+    struct F : folder_fixture_t {
+        using parent_t = folder_fixture_t;
+        using parent_t::parent_t;
+
+        bool process_cmd(fs::task::scan_dir_t &task) noexcept override {
+            if (task.path == bfs::path("/some/path/a")) {
+                LOG_INFO(log, "mix-in update");
+                auto pr_dir = proto::FileInfo();
+                proto::set_name(pr_dir, "x");
+                proto::set_permissions(pr_dir, default_perms);
+                proto::set_modified_s(pr_dir, 12345);
+                proto::set_type(pr_dir, FT::DIRECTORY);
+                make_update(pr_dir, fs::update_type_t::created, false);
+
+                proto::set_name(pr_dir, "y");
+                make_update(pr_dir, fs::update_type_t::created, false);
+            }
+            return parent_t::process_cmd(task);
+        }
+
+        void main() noexcept override {
+            prepare(I::inotify);
+
+            expect_dir_scan({make_child("/some/path/a")});
+            expect_dir_scan({make_child("/some/path/a/b")});
+            expect_dir_scan({make_child("/some/path/a/b/c")});
+            expect_dir_scan({});
+            expect_dir_scan({make_child("/some/path/x/x1")});
+            expect_dir_scan({make_child("/some/path/x/x1/x2")});
+            expect_dir_scan({});
+            expect_dir_scan({make_child("/some/path/y/y1")});
+            expect_dir_scan({make_child("/some/path/y/y1/y2")});
+            expect_dir_scan({});
+
+            LOG_INFO(log, "triggering scan...");
+            builder->scan_start(folder_id).apply(*sup);
+
+            CHECK(files_local->size() == 9);
+            CHECK(folder_local->get_max_sequence() == 9);
+        }
+    };
+    F().run();
+}
+
 int _init() {
     test::init_logging();
     REGISTER_TEST_CASE(test_just_start, "test_just_start", "[fs]");
@@ -1185,6 +1242,7 @@ int _init() {
     REGISTER_TEST_CASE(test_hierarchy_update_dirs_only, "test_hierarchy_update_dirs_only", "[fs]");
     REGISTER_TEST_CASE(test_hierarchy_update_with_content, "test_hierarchy_update_with_content", "[fs]");
     REGISTER_TEST_CASE(test_malformed_hierarchy_update, "test_malformed_hierarchy_update", "[fs]");
+    REGISTER_TEST_CASE(test_scan_dirs_race_linux, "test_scan_dirs_race_linux", "[fs]");
     return 1;
 }
 

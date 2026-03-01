@@ -131,13 +131,14 @@ bool folder_context_t::process_stack(stack_context_t &ctx) noexcept {
 }
 
 int folder_context_t::process(complete_scan_t &, stack_context_t &ctx) noexcept {
-    auto nothing_left = has_no_tasks() && (ctx.hashes_pool == ctx.hashes_pool_max) && !ctx.has_in_progress_io();
+    auto nothing_left = has_no_tasks() && !ctx.has_in_progress_io() && hashing == 0;
     if (nothing_left) {
         auto folder = local_folder->get_folder();
         auto folder_id = folder->get_id();
         auto now = r::pt::microsec_clock::local_time();
         LOG_DEBUG(log, "pushing scan_finish");
         ctx.push(new model::diff::local::scan_finish_t(folder_id, now));
+        return 1;
     }
     return -1;
 }
@@ -452,7 +453,7 @@ int folder_context_t::process(abort_hashing_t &item, stack_context_t &ctx) noexc
     return 1;
 }
 
-bool folder_context_t::post_process(stack_context_t &ctx) noexcept {
+folder_context_t &folder_context_t::post_process(stack_context_t &ctx) noexcept {
     LOG_TRACE(log, "postpocessing");
     assert(in_progress > 0);
     --in_progress;
@@ -461,13 +462,13 @@ bool folder_context_t::post_process(stack_context_t &ctx) noexcept {
         std::visit([&](auto &t) { post_process(t, ctx); }, t);
     }
     ctx.slave->tasks_out.clear();
-    process_stack(ctx);
-
-    return pending_io.size();
+    return *this;
 }
 
 void folder_context_t::post_process(hash_base_t &hash_file, hasher::message::digest_t &msg,
                                     stack_context_t &ctx) noexcept {
+    assert(hashing > 0);
+    --hashing;
     auto &p = msg.payload;
     auto &result = msg.payload.result;
     --hash_file.unhashed_blocks;
@@ -644,6 +645,8 @@ void folder_context_t::post_process(fs::task::segment_iterator_t &task, stack_co
                 push(fs::task::remove_file_t(task.path));
             }
         }
+    } else {
+        hashing += task.block_count;
     }
 }
 
@@ -722,7 +725,7 @@ int folder_context_t::schedule_hash(hash_base_t *item, stack_context_t &ctx) noe
 
     LOG_TRACE(log, "going to rehash {} block(s) ({}..{}) of '{}'", max_blocks, first_block, first_block + max_blocks,
               narrow(item->path.wstring()));
-    return blocks_left ? -1 : 1;
+    return blocks_left ? -1 : 0;
 }
 
 void folder_context_t::handle_scan_error(fs::task::scan_dir_t &task, stack_context_t &ctx) noexcept {

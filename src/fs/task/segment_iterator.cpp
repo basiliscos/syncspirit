@@ -6,6 +6,7 @@
 #include "hasher/hasher_plugin.h"
 #include "fs/utils.h"
 #include <boost/system/errc.hpp>
+#include <memory_resource>
 
 using namespace syncspirit::fs;
 using namespace syncspirit::fs::task;
@@ -22,6 +23,11 @@ segment_iterator_t::segment_iterator_t(const r::address_ptr_t &back_addr_,
 }
 
 bool segment_iterator_t::process(fs_slave_t &fs_slave, execution_context_t &exec_ctx) noexcept {
+    using byte_chunks_t = std::pmr::vector<utils::bytes_t>;
+    auto buffer = std::array<std::byte, 1024>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+
     assert(!ec);
     if (!file.has_backend()) {
         auto opt = file_t::open_read(path);
@@ -43,7 +49,9 @@ bool segment_iterator_t::process(fs_slave_t &fs_slave, execution_context_t &exec
         return false;
     }
 
-    for (std::int32_t i = block_index, j = 0; j < block_count; ++i, ++j) {
+    auto byte_chunks = byte_chunks_t(allocator);
+
+    for (std::int32_t j = 0; j < block_count && !ec; ++j) {
         auto bs = (j + 1 == block_count) ? last_block_size : block_size;
         auto off = offset + std::int64_t{block_size} * j;
         auto block_opt = file.read(off, bs);
@@ -54,10 +62,17 @@ bool segment_iterator_t::process(fs_slave_t &fs_slave, execution_context_t &exec
             } else {
                 ec = sys::error_code{sys::errc::io_error, sys::system_category()};
             }
+            return false;
         } else {
             auto bytes = std::move(block_opt).value();
-            exec_ctx.plugin->calc_digest(std::move(bytes), i, back_addr, context);
+            byte_chunks.emplace_back(std::move(bytes));
         }
     }
+
+    for (std::int32_t i = block_index, j = 0; j < block_count && !ec; ++i, ++j) {
+        auto &bytes = byte_chunks[j];
+        exec_ctx.plugin->calc_digest(std::move(bytes), i, back_addr, context);
+    }
+
     return false;
 }

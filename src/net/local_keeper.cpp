@@ -386,8 +386,9 @@ void local_keeper_t::on_changes(model::folder_info_t &local_folder, fs::payload:
                                      proto::get_type(change) == proto::FileInfoType::DIRECTORY;
                 if (schedule_scan) {
                     delayed_update(change);
+                } else {
+                    immediate_update(change);
                 }
-                immediate_update(change);
             } else {
                 delayed_update(std::move(change));
             }

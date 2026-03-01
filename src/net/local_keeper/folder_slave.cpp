@@ -12,7 +12,7 @@ void folder_slave_t::push(folder_context_ptr_t context) noexcept { folder_contex
 
 void folder_slave_t::push(folder_contexts_t contexts_) noexcept {
     for (auto &ctx : contexts_) {
-        folder_contexts.push_front(std::move(ctx));
+        folder_contexts.push_back(std::move(ctx));
     }
 }
 
@@ -32,9 +32,19 @@ bool folder_slave_t::post_process(stack_context_t &ctx) noexcept {
     assert(folder_contexts.size());
     ctx.slave = this;
     auto folder_ctx = folder_contexts.front().get();
-    auto has_pending_io = folder_ctx->post_process(ctx);
-    while (!folder_contexts.empty() && folder_contexts.front()->is_done()) {
+    auto has_pending_io = folder_ctx->post_process(ctx).process_stack(ctx);
+    if (folder_ctx->is_done() && !has_pending_io) {
         folder_contexts.pop_front();
+    }
+
+    while (!folder_contexts.empty() && !has_pending_io) {
+        auto folder_ctx = folder_contexts.front().get();
+        has_pending_io = folder_ctx->process_stack(ctx);
+        if (folder_ctx->is_done()) {
+            folder_contexts.pop_front();
+        } else {
+            break;
+        }
     }
     return has_pending_io;
 }
