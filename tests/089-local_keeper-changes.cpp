@@ -1355,6 +1355,72 @@ void test_scan_dirs_race_win32_2() {
     F().run();
 }
 
+void test_hashing_race() {
+    struct F : folder_fixture_t {
+        using parent_t = folder_fixture_t;
+        using parent_t::parent_t;
+        using trigger_t = std::function<void()>;
+
+        bool process_cmd(fs::task::segment_iterator_t &task) noexcept override {
+            auto r = parent_t::process_cmd(task);
+            if (trigger) {
+                trigger();
+                trigger = {};
+            }
+            return r;
+        }
+
+        void main() noexcept override {
+            auto impl = GENERATE(I::inotify, I::win32);
+            prepare(impl);
+
+            auto number = std::uint32_t{5};
+            auto sz = fs::block_sizes[0] * number;
+            expect_dir_scan({make_child("/some/path/file.bin", bfs::file_type::regular, sz)});
+
+            auto block_a = as_owned_bytes(std::string(fs::block_sizes[0], 'a'));
+            auto block_b = as_owned_bytes(std::string(fs::block_sizes[0], 'b'));
+            auto hash_a = utils::sha256_digest(block_a).value();
+            auto hash_b = utils::sha256_digest(block_b).value();
+
+            for (std::uint32_t i = 0; i < number; ++i) {
+                expect_bytes_hash(block_a);
+            }
+            for (std::uint32_t i = 0; i < number; ++i) {
+                expect_bytes_hash(block_b);
+            }
+
+            LOG_INFO(log, "triggering scan...");
+            trigger = [&]() {
+                LOG_INFO(log, "triggering update...");
+                auto pr_file = proto::FileInfo();
+                proto::set_name(pr_file, "file.bin");
+                proto::set_permissions(pr_file, default_perms);
+                proto::set_modified_s(pr_file, 12345);
+                proto::set_type(pr_file, FT::FILE);
+                proto::set_size(pr_file, sz);
+                make_update(pr_file, fs::update_type_t::content, false);
+            };
+
+            builder->scan_start(folder_id).apply(*sup);
+
+            REQUIRE(files_local->size() == 1);
+            auto f = files_local->by_name("file.bin");
+            REQUIRE(f);
+            REQUIRE(f->get_size() == sz);
+            REQUIRE(f->iterate_blocks().get_total() == number);
+            for (auto it = f->iterate_blocks(); it.current().first; it.next()) {
+                auto b = it.current().first->get_hash();
+                CHECK(b == hash_b);
+            }
+            CHECK(hashed_blocks.size() == 0);
+            CHECK(folder_local->get_max_sequence() == 2);
+        }
+
+        trigger_t trigger;
+    };
+    F().run();
+}
 
 int _init() {
     test::init_logging();
@@ -1376,6 +1442,7 @@ int _init() {
     REGISTER_TEST_CASE(test_scan_dirs_race_linux_2, "test_scan_dirs_race_linux_2", "[fs]");
     REGISTER_TEST_CASE(test_scan_dirs_race_win32, "test_scan_dirs_race_win32", "[fs]");
     REGISTER_TEST_CASE(test_scan_dirs_race_win32_2, "test_scan_dirs_race_win32_2", "[fs]");
+    REGISTER_TEST_CASE(test_hashing_race, "test_hashing_race", "[fs]");
     return 1;
 }
 

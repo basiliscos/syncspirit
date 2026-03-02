@@ -53,17 +53,16 @@ bool folder_slave_t::post_process(hash_base_t &hash_file, folder_context_t *fold
                                   stack_context_t &ctx) noexcept {
     ctx.slave = this;
     folder_ctx->post_process(hash_file, msg, ctx);
-    auto [next_ctx, check] = [&]() -> std::pair<folder_context_t *, bool> {
-        if (folder_contexts.empty()) {
-            return {folder_ctx, false};
+
+    auto has_pending_io = false;
+    while (!folder_contexts.empty() && !has_pending_io) {
+        auto folder_ctx = folder_contexts.front().get();
+        has_pending_io = folder_ctx->process_stack(ctx);
+        if (folder_ctx->is_done()) {
+            folder_contexts.pop_front();
         } else {
-            auto &front = folder_contexts.front();
-            return {front.get(), true};
+            break;
         }
-    }();
-    auto has_pending_io = next_ctx->process_stack(ctx);
-    if (check && next_ctx->is_done()) {
-        folder_contexts.pop_front();
     }
     return has_pending_io;
 }

@@ -761,7 +761,9 @@ void folder_context_t::handle_scan_error(fs::task::scan_dir_t &task, stack_conte
     stack.push_front(undo_child_ready_t(task.path));
 }
 
-bool folder_context_t::is_done() const noexcept { return in_progress == 0 && stack.empty() && pending_io.empty(); }
+bool folder_context_t::is_done() const noexcept {
+    return in_progress == 0 && hashing == 0 && stack.empty() && pending_io.empty();
+}
 
 fs::task_t folder_context_t::pop_task() noexcept {
     assert(pending_io.size());
