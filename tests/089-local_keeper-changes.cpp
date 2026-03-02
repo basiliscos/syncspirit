@@ -298,11 +298,13 @@ struct folder_fixture_t : fixture_t {
     }
 
     static child_info_t make_child(std::string_view name, bfs::file_type type = bfs::file_type::directory,
-                                   std::uintmax_t size = 0, std::uint32_t perms = default_perms) {
+                                   std::uintmax_t size = 0, std::uint32_t perms = default_perms,
+                                   std::int64_t modified = 0) {
         auto child = child_info_t{};
         child.path = bfs::path(name);
         child.status = bfs::file_status(type, static_cast<bfs::perms>(perms));
         child.size = size;
+        child.last_write_time = fs::from_unix(modified);
         return child;
     };
 
@@ -1376,22 +1378,40 @@ void test_hashing_race() {
 
             auto number = std::uint32_t{5};
             auto sz = fs::block_sizes[0] * number;
-            expect_dir_scan({make_child("/some/path/file.bin", bfs::file_type::regular, sz)});
+            expect_dir_scan({make_child("/some/path/file.bin", bfs::file_type::regular, sz, default_perms, 12345)});
 
             auto block_a = as_owned_bytes(std::string(fs::block_sizes[0], 'a'));
             auto block_b = as_owned_bytes(std::string(fs::block_sizes[0], 'b'));
             auto hash_a = utils::sha256_digest(block_a).value();
             auto hash_b = utils::sha256_digest(block_b).value();
 
-            for (std::uint32_t i = 0; i < number; ++i) {
-                expect_bytes_hash(block_a);
-            }
-            for (std::uint32_t i = 0; i < number; ++i) {
-                expect_bytes_hash(block_b);
-            }
+            SECTION("scan, then update") {
+                for (std::uint32_t i = 0; i < number; ++i) {
+                    expect_bytes_hash(block_a);
+                }
+                for (std::uint32_t i = 0; i < number; ++i) {
+                    expect_bytes_hash(block_b);
+                }
 
-            LOG_INFO(log, "triggering scan...");
-            trigger = [&]() {
+                LOG_INFO(log, "triggering scan...");
+                trigger = [&]() {
+                    LOG_INFO(log, "triggering update...");
+                    auto pr_file = proto::FileInfo();
+                    proto::set_name(pr_file, "file.bin");
+                    proto::set_permissions(pr_file, default_perms);
+                    proto::set_modified_s(pr_file, 12348);
+                    proto::set_type(pr_file, FT::FILE);
+                    proto::set_size(pr_file, sz);
+                    make_update(pr_file, fs::update_type_t::content, false);
+                };
+
+                builder->scan_start(folder_id).apply(*sup);
+                CHECK(folder_local->get_max_sequence() == 2);
+            }
+            SECTION("update, then scan") {
+                for (std::uint32_t i = 0; i < number; ++i) {
+                    expect_bytes_hash(block_b);
+                }
                 LOG_INFO(log, "triggering update...");
                 auto pr_file = proto::FileInfo();
                 proto::set_name(pr_file, "file.bin");
@@ -1400,10 +1420,9 @@ void test_hashing_race() {
                 proto::set_type(pr_file, FT::FILE);
                 proto::set_size(pr_file, sz);
                 make_update(pr_file, fs::update_type_t::content, false);
-            };
-
-            builder->scan_start(folder_id).apply(*sup);
-
+                builder->scan_start(folder_id).apply(*sup);
+                CHECK(folder_local->get_max_sequence() == 1);
+            }
             REQUIRE(files_local->size() == 1);
             auto f = files_local->by_name("file.bin");
             REQUIRE(f);
@@ -1414,7 +1433,6 @@ void test_hashing_race() {
                 CHECK(b == hash_b);
             }
             CHECK(hashed_blocks.size() == 0);
-            CHECK(folder_local->get_max_sequence() == 2);
         }
 
         trigger_t trigger;
