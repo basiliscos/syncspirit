@@ -66,28 +66,54 @@ auto BU::make(const folder_map_t &folder_map, updates_mediator_t &mediator) noex
     return {};
 }
 
-void FU::update(std::string_view relative_path, update_type_t type, folder_update_t *prev,
+bool FU::update(std::string_view relative_path, update_type_t type, folder_update_t *prev,
                 std::string prev_path_rel) noexcept {
+    namespace ut = update_type;
+    using UT = update_type_t;
+
+    bool recorded = true;
     auto it = updates.find(relative_path);
     auto it_prev = (typename decltype(updates)::const_iterator){};
     auto prev_update = (const support::file_update_t *)(nullptr);
     if (prev) {
         auto &updates = prev->updates;
         auto target = std::string_view(prev_path_rel.empty() ? relative_path : prev_path_rel);
-        it_prev = prev->updates.find(target);
-        if (it_prev != prev->updates.end()) {
+        it_prev = updates.find(target);
+        if (it_prev != updates.end()) {
             prev_update = &*it_prev;
         }
     }
-    if (it != updates.end()) {
-        it->update(prev_path_rel, type);
-    } else {
-        auto update = support::file_update_t(std::string(relative_path), std::move(prev_path_rel), type, prev_update);
-        updates.emplace(std::move(update));
+    if (prev_update) {
+        if (prev_update->update_type == ut::META && type == UT::meta) {
+            if (prev_update->prev_path == relative_path) {
+                auto log = utils::get_logger(actor_identity);
+                LOG_DEBUG(log, "collpasing renaming back-n-forth '{}'", relative_path);
+                recorded = false;
+            }
+        }
+        if (prev_update->update_type == ut::META && type == UT::content && !prev_update->prev_path.empty()) {
+            auto log = utils::get_logger(actor_identity);
+            LOG_DEBUG(log, "splitting event rename + change ('{}' => '{}') into delete + change",
+                      prev_update->prev_path, relative_path);
+            auto pu = support::file_update_t(std::move(prev_update->prev_path), {}, update_type_t::deleted, {});
+            prev->updates.erase(it_prev);
+            prev->updates.insert(std::move(pu));
+            prev_update = nullptr;
+        }
+    }
+    if (recorded) {
+        if (it != updates.end()) {
+            it->update(prev_path_rel, type);
+        } else {
+            auto update =
+                support::file_update_t(std::string(relative_path), std::move(prev_path_rel), type, prev_update);
+            updates.emplace(std::move(update));
+        }
     }
     if (prev_update) {
         prev->updates.erase(it_prev);
     }
+    return recorded;
 }
 
 auto FU::make(const folder_info_t &folder_info, updates_mediator_t &mediator) noexcept -> payload::file_changes_t {
@@ -118,7 +144,8 @@ auto FU::make(const folder_info_t &folder_info, updates_mediator_t &mediator) no
         auto reason = UT{};
         if (update.update_type & ut::DELETED) {
             if (update.update_type & ut::CREATED_1) {
-                // created & deleted within retension interval => ignoore
+                LOG_DEBUG(log, "ignoring creation & deletion of '{}'", full_name);
+                // created & deleted within retension interval => ignore
                 continue;
             }
             proto::set_deleted(r, true);
@@ -229,9 +256,11 @@ void watcher_base_t::push(const timepoint_t &deadline, std::string_view folder_i
     }
     auto &target_fi = target->prepare(folder_id);
     auto source_fi = source ? source->find(folder_id) : (folder_update_t *)(nullptr);
-    target_fi.update(relative_path, type, source_fi, std::move(prev_path));
-    if (target->deadline.is_not_a_date_time()) {
-        target->deadline = deadline;
+    auto recorded = target_fi.update(relative_path, type, source_fi, std::move(prev_path));
+    if (recorded) {
+        if (target->deadline.is_not_a_date_time()) {
+            target->deadline = deadline;
+        }
     }
 }
 

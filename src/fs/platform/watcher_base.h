@@ -61,7 +61,7 @@ struct SYNCSPIRIT_API watcher_base_t : r::actor_base_t {
         std::string folder_id;
         support::file_updates_t updates;
 
-        void update(std::string_view relative_path, update_type_t type, folder_update_t *prev,
+        bool update(std::string_view relative_path, update_type_t type, folder_update_t *prev,
                     std::string prev_path_rel) noexcept;
         auto make(const folder_info_t &folder_info, updates_mediator_t &mediator) noexcept -> payload::file_changes_t;
     };

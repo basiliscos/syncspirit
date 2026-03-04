@@ -219,7 +219,6 @@ void test_watcher_base() {
             sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id);
             sup->do_process();
             REQUIRE(watched_replies == 1);
-
             auto deadline = r::pt::microsec_clock::local_time() + retension();
             SECTION("simple (creation)") {
                 SECTION("dir") {
@@ -374,20 +373,31 @@ void test_watcher_base() {
                     target->push(deadline_2, folder_id, name_2_str, {}, U::content);
                     target->push(deadline_2, folder_id, name_2_str, {}, U::meta);
 
-                    await_events(poll_t::trigger_timer, 1);
+                    await_events(poll_t::trigger_timer, 2, true);
 
-                    auto &payload = changes.front()->payload;
-                    REQUIRE(payload.size() == 1);
-                    auto &folder_change = payload[0];
-                    REQUIRE(folder_change.folder_id == folder_id);
-                    REQUIRE(folder_change.file_changes.size() == 1);
-                    auto &file_change = folder_change.file_changes.front();
-                    CHECK(proto::get_name(file_change) == narrow(name_2.wstring()));
-                    CHECK(proto::get_size(file_change) == 5);
-                    CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
-                    CHECK(proto::get_permissions(file_change));
-                    CHECK(file_change.update_reason == update_type_t::content);
-                    CHECK(file_change.prev_path == name_1_str);
+                    auto &payload_1 = changes[0]->payload;
+                    REQUIRE(payload_1.size() == 1);
+                    auto &folder_change_1 = payload_1[0];
+                    REQUIRE(folder_change_1.folder_id == folder_id);
+                    REQUIRE(folder_change_1.file_changes.size() == 1);
+
+                    auto &change_0 = folder_change_1.file_changes[0];
+                    CHECK(proto::get_name(change_0) == narrow(name_1.wstring()));
+                    CHECK(proto::get_size(change_0) == 0);
+                    CHECK(proto::get_type(change_0) == proto::FileInfoType::FILE);
+                    CHECK(change_0.update_reason == update_type_t::deleted);
+                    CHECK(change_0.prev_path == "");
+
+                    auto &payload_2 = changes[1]->payload;
+                    REQUIRE(payload_2.size() == 1);
+                    auto &folder_change_2 = payload_2[0];
+                    auto &change_1 = folder_change_2.file_changes[0];
+                    CHECK(proto::get_name(change_1) == narrow(name_2.wstring()));
+                    CHECK(proto::get_size(change_1) == 5);
+                    CHECK(proto::get_type(change_1) == proto::FileInfoType::FILE);
+                    CHECK(proto::get_permissions(change_1));
+                    CHECK(change_1.update_reason == update_type_t::content);
+                    CHECK(change_1.prev_path == "");
                 }
                 SECTION("move, delete -> collapse to delete of original") {
                     auto name_1 = bfs::path(L"файл-1.bin");
@@ -437,6 +447,17 @@ void test_watcher_base() {
                     CHECK(proto::get_permissions(file_change));
                     CHECK(file_change.update_reason == update_type_t::meta);
                     CHECK(file_change.prev_path == name_1_str);
+                }
+                SECTION("mv(a, b) -> mv(b, a) -> noop") {
+                    auto name_1 = bfs::path(L"файл-1.bin");
+                    auto name_2 = bfs::path(L"файл-2.bin");
+                    auto name_1_str = narrow(name_1.generic_wstring());
+                    auto name_2_str = narrow(name_2.generic_wstring());
+                    write_file(root_path / name_1, "12345");
+                    target->push(deadline, folder_id, name_2_str, name_1_str, U::meta);
+                    target->push(deadline_2, folder_id, name_1_str, name_2_str, U::meta);
+                    await_events(poll_t::trigger_timer);
+                    REQUIRE(changes.size() == 0);
                 }
             }
             SECTION("updates mediator") {
