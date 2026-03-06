@@ -40,6 +40,7 @@ struct SYNCSPIRIT_API watcher_t : watcher_base_t {
     watch_result_t watch_recurse(std::string_view path, std::string_view folder_id, int parent_fd) noexcept;
     sys::error_code unwatch_recurse(std::string_view folder_id) noexcept;
     void forget(int wd) noexcept;
+    void rename_self_descending(int parent_wd, std::string_view prev_path, std::string_view new_path) noexcept;
 
     fs_context_t::io_guard_t io_guard;
     path_map_t path_map;

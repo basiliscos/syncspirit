@@ -65,6 +65,51 @@ void watcher_t::shutdown_finish() noexcept {
     parent_t::shutdown_finish();
 }
 
+void watcher_t::rename_self_descending(int parent_wd, std::string_view prev_path, std::string_view new_path) noexcept {
+    using queue_t = std::pmr::list<int>;
+    int sz_diff = static_cast<int>(new_path.size()) - static_cast<int>(prev_path.size());
+    auto parent_path = std::string_view(path_map[parent_wd].path);
+    for (auto &wd : subdir_map[parent_wd]) {
+        auto &current_guard = path_map[wd];
+        auto current_path = std::string_view(current_guard.path);
+        auto rel_path = current_path.substr(current_path.size() - prev_path.size());
+        if (rel_path == prev_path) {
+            auto folder_path_sz = current_path.size() - prev_path.size();
+            auto folder_path = parent_path.substr(0, folder_path_sz);
+            auto number = 0;
+            auto buff = std::array<std::byte, 1024>();
+            auto pool = std::pmr::monotonic_buffer_resource(buff.data(), buff.size());
+            auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+            auto queue = queue_t(allocator);
+            queue.emplace_back(wd);
+            while (!queue.empty()) {
+                auto wd = queue.front();
+                queue.pop_front();
+                auto &guard = path_map[wd];
+                auto prev_view = std::string_view(guard.path);
+                auto tail_index = folder_path_sz + prev_path.size();
+                auto tail = prev_view.substr(tail_index);
+                auto new_sz = prev_view.size() + sz_diff;
+                auto new_value = std::string();
+                auto ex_path = std::string_view(guard.path);
+                new_value.reserve(static_cast<std::size_t>(new_sz));
+                new_value += folder_path;
+                new_value += new_path;
+                new_value += tail;
+                path_to_wd.erase(prev_view);
+                guard.path = std::move(new_value);
+                path_to_wd.emplace(guard.path, wd);
+                ++number;
+                auto &children = subdir_map[wd];
+                auto inserter = std::back_insert_iterator(queue);
+                std::copy(children.begin(), children.end(), inserter);
+            }
+            LOG_DEBUG(log, "updated self & descendants ({}) '{}' -> '{}'", number, prev_path, new_path);
+            break;
+        }
+    }
+}
+
 void watcher_t::inotify_callback() noexcept {
     using U = update_type_t;
     char buffer[1024 * (sizeof(struct inotify_event) + NAME_MAX + 1)];
@@ -96,23 +141,27 @@ void watcher_t::inotify_callback() noexcept {
             append_name(filename);
             auto tail = name_ptr;
             auto parent_wd = event->wd;
-            auto guard = &path_map[parent_wd];
-            auto parent = guard;
-            auto folder_id = guard->folder_id;
+            auto parent_guard = &path_map[parent_wd];
+            auto parent = parent_guard;
+            auto folder_id = parent_guard->folder_id;
             *(--name_ptr) = '/';
-            append_name(guard->path);
+            append_name(parent_guard->path);
 
             auto &folder_path = folder_map.find(folder_id)->second.path_str;
-            auto sub_path_sz = guard->path.size() - folder_path.size();
+            auto sub_path_sz = parent_guard->path.size() - folder_path.size();
             tail -= sub_path_sz;
             auto rel_path = std::string_view(tail, sub_path_sz + filename.size());
             auto full_sz = (name_buff + sizeof(name_buff) - 2) - name_ptr;
             auto full_path = std::string_view(name_ptr, full_sz);
             auto is_dir = event->mask & IN_ISDIR;
-            push(deadline, folder_id, rel_path, std::move(prev_path), static_cast<update_type_t>(type));
-            if ((type & update_type::CREATED) && is_dir) {
-                watch_recurse(full_path, parent->folder_id, parent_wd);
+            if (is_dir) {
+                if (type & update_type::CREATED) {
+                    watch_recurse(full_path, parent->folder_id, parent_wd);
+                } else if (event->mask & IN_MOVED_TO) {
+                    rename_self_descending(parent_wd, prev_path, rel_path);
+                }
             }
+            push(deadline, folder_id, rel_path, std::move(prev_path), static_cast<update_type_t>(type));
         };
         for (int i = 0; i < length;) {
             auto prev_name = std::string();
@@ -120,6 +169,7 @@ void watcher_t::inotify_callback() noexcept {
             *name_ptr-- = 0;
 
             struct inotify_event *event = (struct inotify_event *)&buffer[i];
+            LOG_TRACE(log, "event 0x{:x}, cookie: 0x{:x}, on '{}'", event->mask, event->cookie, event->name);
             if (event->len) {
                 auto type = update_type_internal_t{0};
                 if (event->mask & IN_CREATE) {

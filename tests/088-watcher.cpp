@@ -1075,10 +1075,9 @@ void test_hierarchies() {
                     CHECK(name_f == narrow(L"x/y/z/f.bin"));
                 }
             }
-
             SECTION("move hierarchy (inside folder)") {
                 if (!test::wine_environment()) {
-                    auto names = names_t({L"a", L"a/b", L"x", L"x/y", L"x/y/z"});
+                    auto names = names_t({L"a", L"a/b", L"x", L"x/y", L"x/y/z", L"a/файл.bin"});
                     auto dir_1 = root_path / "win32-hack" / L"директория-1";
                     auto dir_2 = root_path / "win32-hack" / L"директория-2";
                     for (auto it = names.rbegin(); it != names.rend(); ++it) {
@@ -1105,6 +1104,19 @@ void test_hierarchies() {
                     CHECK(proto::get_type(file_change) == proto::FileInfoType::DIRECTORY);
                     CHECK(file_change.update_reason == update_type_t::meta);
                     CHECK(file_change.prev_path == narrow(L"win32-hack/директория-1"));
+                    {
+                        auto file_prev = root_path / "win32-hack" / L"директория-2" / "a" / L"файл.bin";
+                        auto file_new = root_path / "win32-hack" / L"директория-2" / "a" / L"ф.bin";
+                        native::rename(file_prev, file_new);
+                        await_events(poll_t::trigger_timer, 1);
+                        auto &file_change = changes[0]->payload[0].file_changes[0];
+                        CHECK(proto::get_name(file_change) == narrow(L"win32-hack/директория-2/a/ф.bin"));
+                        CHECK(proto::get_size(file_change) == 5);
+                        CHECK(!proto::get_deleted(file_change));
+                        CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
+                        CHECK(file_change.update_reason == update_type_t::meta);
+                        CHECK(file_change.prev_path == narrow(L"win32-hack/директория-2/a/файл.bin"));
+                    }
 #else
                     await_events(poll_t::trigger_timer, 2, true);
                     {
