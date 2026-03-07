@@ -421,6 +421,19 @@ struct folder_fixture_t : fixture_t {
         }
     }
 
+    void make_update_rename(proto::FileInfo info, std::string_view prev_name, bool process = true) noexcept {
+        auto change = fs::payload::file_info_t(std::move(info), std::string(prev_name), fs::update_type_t::meta);
+        auto changes = fs::payload::file_changes_t{{std::move(change)}};
+        auto folder_change = fs::payload::folder_change_t{folder_id, std::move(changes)};
+        auto folder_changes = fs::payload::folder_changes_t{{std::move(folder_change)}};
+        auto &addr = sup->get_address();
+
+        sup->send<fs::payload::folder_changes_t>(addr, std::move(folder_changes));
+        if (process) {
+            sup->do_process();
+        }
+    }
+
     std::string folder_id = "1234-5678";
     bool watched_ack = false;
     model::folder_ptr_t folder;
@@ -1440,6 +1453,108 @@ void test_hashing_race() {
     F().run();
 }
 
+void test_renaming_simple() {
+    struct F : folder_fixture_t {
+        using parent_t = folder_fixture_t;
+        using parent_t::parent_t;
+        using trigger_t = std::function<void()>;
+
+        void main() noexcept override {
+            prepare(I::inotify);
+
+            {
+                auto dir = proto::FileInfo();
+                proto::set_name(dir, narrow(L"папка"));
+                proto::set_permissions(dir, default_perms);
+                proto::set_modified_s(dir, 12345);
+                proto::set_type(dir, FT::DIRECTORY);
+                builder->local_update(folder_id, dir).apply(*sup);
+            }
+
+            auto file_name_1 = narrow(L"папка/файл-1.bin");
+            auto file_name_2 = narrow(L"папка/файл-2.bin");
+            auto file = proto::FileInfo();
+            proto::set_permissions(file, default_perms);
+            proto::set_modified_s(file, 12345);
+            proto::set_name(file, file_name_1);
+
+            SECTION("empty dir/file/link") {
+                auto file_type = GENERATE(FT::DIRECTORY, FT::FILE, FT::SYMLINK);
+                proto::set_type(file, file_type);
+                if (file_type == FT::SYMLINK) {
+                    proto::set_symlink_target(file, "/some/target");
+                }
+                if (file_type == FT::DIRECTORY) {
+                    expect_dir_scan({});
+                }
+                builder->local_update(folder_id, file).apply(*sup);
+
+                proto::set_name(file, file_name_2);
+
+                auto seq_1 = folder_local->get_max_sequence();
+                make_update_rename(file, file_name_1);
+
+                CHECK(folder_local->get_max_sequence() > seq_1);
+
+                auto f2 = files_local->by_name(file_name_2);
+                REQUIRE(f2);
+                CHECK(f2->get_permissions() == default_perms);
+                CHECK(f2->get_modified_s() == 12345);
+                CHECK(!f2->is_deleted());
+                CHECK(model::file_info_t::as_type(f2->get_type()) == file_type);
+
+                auto f1 = files_local->by_name(file_name_1);
+                REQUIRE(f1);
+                CHECK(f1->get_permissions() == default_perms);
+                CHECK(f1->get_modified_s() == 12345);
+                CHECK(f1->is_deleted());
+            }
+
+            SECTION("non-empty file") {
+                proto::set_type(file, FT::FILE);
+                auto data = as_bytes("12345");
+                auto data_h = utils::sha256_digest(as_bytes("12345")).value();
+
+                auto b = proto::BlockInfo();
+                proto::set_hash(b, data_h);
+                proto::set_offset(b, 0);
+                proto::set_size(b, 5);
+                proto::set_size(file, 5);
+                proto::add_blocks(file, b);
+
+                builder->local_update(folder_id, file).apply(*sup);
+                auto &blocks = cluster->get_blocks();
+                REQUIRE(blocks.size() == 1);
+
+                proto::set_name(file, file_name_2);
+
+                auto seq_1 = folder_local->get_max_sequence();
+                make_update_rename(file, file_name_1);
+
+                CHECK(folder_local->get_max_sequence() > seq_1);
+
+                auto f2 = files_local->by_name(file_name_2);
+                REQUIRE(f2);
+                CHECK(f2->get_permissions() == default_perms);
+                CHECK(f2->get_modified_s() == 12345);
+                CHECK(!f2->is_deleted());
+                CHECK(model::file_info_t::as_type(f2->get_type()) == FT::FILE);
+                CHECK(f2->get_block_size() == 5);
+                CHECK(f2->iterate_blocks(0).get_total() == 1);
+                CHECK(f2->iterate_blocks(0).current().first->get_hash() == data_h);
+
+                auto f1 = files_local->by_name(file_name_1);
+                REQUIRE(f1);
+                CHECK(f1->get_permissions() == default_perms);
+                CHECK(f1->get_modified_s() == 12345);
+                CHECK(f1->is_deleted());
+                CHECK(blocks.size() == 1);
+            }
+        }
+    };
+    F().run();
+}
+
 int _init() {
     test::init_logging();
     REGISTER_TEST_CASE(test_just_start, "test_just_start", "[fs]");
@@ -1461,6 +1576,7 @@ int _init() {
     REGISTER_TEST_CASE(test_scan_dirs_race_win32, "test_scan_dirs_race_win32", "[fs]");
     REGISTER_TEST_CASE(test_scan_dirs_race_win32_2, "test_scan_dirs_race_win32_2", "[fs]");
     REGISTER_TEST_CASE(test_hashing_race, "test_hashing_race", "[fs]");
+    REGISTER_TEST_CASE(test_renaming_simple, "test_renaming_simple", "[fs]");
     return 1;
 }
 

@@ -321,6 +321,30 @@ void local_keeper_t::on_change(fs::message::folder_changes_t &message) noexcept 
     }
 }
 
+void local_keeper_t::handle_rename(fs::payload::file_info_t &change, const model::folder_info_t &local_folder,
+                                   lc_context_t &stack_ctx) noexcept {
+    using namespace model::diff;
+
+    auto folder_id = local_folder.get_folder()->get_id();
+    auto new_name = proto::get_name(change);
+    auto &prev_name = change.prev_path;
+    LOG_DEBUG(log, "handle rename '{}' -> '{}' in folder '{}'", prev_name, new_name, folder_id);
+    auto &local_files = local_folder.get_file_infos();
+    auto f_prev = local_files.by_name(prev_name);
+    if (!f_prev) {
+        LOG_WARN(log, "no '{}' in local folder", prev_name);
+        return;
+    }
+
+    auto pr_new = f_prev->as_proto(true);
+    auto pr_prev = f_prev->as_proto(false);
+
+    proto::set_name(pr_new, new_name);
+    proto::set_deleted(pr_prev, true);
+    stack_ctx.push(new advance::local_update_t(*cluster, *sequencer, std::move(pr_new), folder_id));
+    stack_ctx.push(new advance::local_update_t(*cluster, *sequencer, std::move(pr_prev), folder_id, true));
+}
+
 void local_keeper_t::on_changes(model::folder_info_t &local_folder, fs::payload::file_changes_t &changes,
                                 lc_context_t &stack_ctx) noexcept {
     using namespace model::diff;
@@ -350,7 +374,12 @@ void local_keeper_t::on_changes(model::folder_info_t &local_folder, fs::payload:
             scheduled_dirs.emplace(n);
         }
         if (update) {
-            stack_ctx.push(new advance::local_update_t(*cluster, *sequencer, std::move(change), folder_id));
+            auto renamed = (change.update_reason == UT::meta) && !change.prev_path.empty();
+            if (renamed) {
+                handle_rename(change, local_folder, stack_ctx);
+            } else {
+                stack_ctx.push(new advance::local_update_t(*cluster, *sequencer, std::move(change), folder_id));
+            }
         } else {
             LOG_DEBUG(log, "ignoring update on '{}'", name);
         }

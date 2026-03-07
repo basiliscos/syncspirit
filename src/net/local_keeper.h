@@ -80,6 +80,9 @@ struct SYNCSPIRIT_API local_keeper_t final : public r::actor_base_t, private mod
     void on_change(fs::message::folder_changes_t &) noexcept;
     void on_changes(model::folder_info_t &, fs::payload::file_changes_t &, lc_context_t &) noexcept;
 
+    void handle_rename(fs::payload::file_info_t &change, const model::folder_info_t &local_folder,
+                       lc_context_t &stack_ctx) noexcept;
+
     outcome::result<void> operator()(const model::diff::local::scan_start_t &, void *custom) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::upsert_folder_t &, void *custom) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::remove_folder_t &, void *custom) noexcept override;
