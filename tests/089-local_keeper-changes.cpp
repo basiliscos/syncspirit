@@ -1555,6 +1555,99 @@ void test_renaming_simple() {
     F().run();
 }
 
+void test_renaming_hierarchy() {
+    struct F : folder_fixture_t {
+        using parent_t = folder_fixture_t;
+        using parent_t::parent_t;
+        using trigger_t = std::function<void()>;
+
+        void main() noexcept override {
+            prepare(I::inotify);
+
+            auto data_1 = as_bytes("12345");
+            auto data1_h = utils::sha256_digest(data_1).value();
+
+            auto data_2 = as_bytes("67890");
+            auto data2_h = utils::sha256_digest(data_2).value();
+
+            auto data_3 = as_bytes("55555");
+            auto data3_h = utils::sha256_digest(data_3).value();
+
+            auto b1 = proto::BlockInfo();
+            proto::set_hash(b1, data1_h);
+            proto::set_offset(b1, 0);
+            proto::set_size(b1, 5);
+
+            auto b2 = proto::BlockInfo();
+            proto::set_hash(b2, data2_h);
+            proto::set_offset(b2, 0);
+            proto::set_size(b2, 5);
+
+            auto b3 = proto::BlockInfo();
+            proto::set_hash(b3, data2_h);
+            proto::set_offset(b3, 5);
+            proto::set_size(b3, 5);
+            {
+                auto pr = proto::FileInfo();
+                proto::set_permissions(pr, default_perms);
+                proto::set_modified_s(pr, 12345);
+                proto::set_type(pr, FT::DIRECTORY);
+                auto names = {
+                    L"папка", L"папка/sd", L"папка/sd/f1.bin", L"папка/sd/f2.bin", L"папка/kept",
+                };
+                for (auto &name_w : names) {
+                    auto name = narrow(name_w);
+                    proto::set_name(pr, name);
+                    proto::clear_blocks(pr);
+                    if (name.find("f1") != std::string::npos) {
+                        proto::set_type(pr, FT::FILE);
+                        proto::set_size(pr, 5);
+                        proto::set_block_size(pr, 5);
+                        proto::add_blocks(pr, b1);
+                    }
+                    if (name.find("f2") != std::string::npos) {
+                        proto::set_type(pr, FT::FILE);
+                        proto::set_size(pr, 10);
+                        proto::set_block_size(pr, 5);
+                        proto::add_blocks(pr, b2);
+                        proto::add_blocks(pr, b3);
+                    }
+                    builder->local_update(folder_id, pr).apply(*sup);
+                }
+            }
+
+            auto file_name_1 = narrow(L"папка/sd");
+            auto file_name_2 = narrow(L"папка/подпапка");
+            auto pr = proto::FileInfo();
+            proto::set_permissions(pr, default_perms);
+            proto::set_modified_s(pr, 12345);
+            proto::set_type(pr, FT::DIRECTORY);
+            proto::set_name(pr, file_name_2);
+            make_update_rename(pr, file_name_1);
+
+            auto ex_names = {L"папка/sd", L"папка/sd/f1.bin", L"папка/sd/f2.bin"};
+            for (auto &name_w : ex_names) {
+                auto name = narrow(name_w);
+                auto f = files_local->by_name(name);
+                REQUIRE(f);
+                log->debug("f = {}", f->get_name()->get_full_name());
+                CHECK(f->is_deleted());
+            }
+
+            auto exising_names = {L"папка", L"папка/подпапка", L"папка/подпапка/f1.bin", L"папка/подпапка/f2.bin",
+                                  L"папка/kept"};
+            for (auto &name_w : exising_names) {
+                auto name = narrow(name_w);
+                log->debug("f = {}", name);
+                auto f = files_local->by_name(name);
+                REQUIRE(f);
+                CHECK(!f->is_deleted());
+            }
+        }
+    };
+    F().run();
+}
+
 int _init() {
     test::init_logging();
     REGISTER_TEST_CASE(test_just_start, "test_just_start", "[fs]");
@@ -1577,6 +1670,7 @@ int _init() {
     REGISTER_TEST_CASE(test_scan_dirs_race_win32_2, "test_scan_dirs_race_win32_2", "[fs]");
     REGISTER_TEST_CASE(test_hashing_race, "test_hashing_race", "[fs]");
     REGISTER_TEST_CASE(test_renaming_simple, "test_renaming_simple", "[fs]");
+    REGISTER_TEST_CASE(test_renaming_hierarchy, "test_renaming_hierarchy", "[fs]");
     return 1;
 }
 

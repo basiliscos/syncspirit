@@ -324,25 +324,57 @@ void local_keeper_t::on_change(fs::message::folder_changes_t &message) noexcept 
 void local_keeper_t::handle_rename(fs::payload::file_info_t &change, const model::folder_info_t &local_folder,
                                    lc_context_t &stack_ctx) noexcept {
     using namespace model::diff;
+    using queue_t = std::pmr::list<model::file_info_t *>;
+    using F = presentation::presence_t::features_t;
+
+    auto buffer = std::array<std::byte, 1024 * 128>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
 
     auto folder_id = local_folder.get_folder()->get_id();
     auto new_name = proto::get_name(change);
     auto &prev_name = change.prev_path;
-    LOG_DEBUG(log, "handle rename '{}' -> '{}' in folder '{}'", prev_name, new_name, folder_id);
+    LOG_DEBUG(log, "(input) handle rename '{}' -> '{}' in folder '{}'", prev_name, new_name, folder_id);
     auto &local_files = local_folder.get_file_infos();
-    auto f_prev = local_files.by_name(prev_name);
-    if (!f_prev) {
+
+    auto f_root = local_files.by_name(prev_name);
+    if (!f_root) {
         LOG_WARN(log, "no '{}' in local folder", prev_name);
         return;
     }
 
-    auto pr_new = f_prev->as_proto(true);
-    auto pr_prev = f_prev->as_proto(false);
+    auto queue = queue_t(allocator);
+    queue.emplace_back(f_root.get());
+    while (!queue.empty()) {
+        auto f = queue.front();
+        queue.pop_front();
+        auto p_name = f->get_name()->get_full_name();
+        auto sub_name = std::pmr::string(allocator);
+        sub_name += new_name;
+        sub_name += p_name.substr(prev_name.size());
 
-    proto::set_name(pr_new, new_name);
-    proto::set_deleted(pr_prev, true);
-    stack_ctx.push(new advance::local_update_t(*cluster, *sequencer, std::move(pr_new), folder_id));
-    stack_ctx.push(new advance::local_update_t(*cluster, *sequencer, std::move(pr_prev), folder_id, true));
+        auto pr_new = f->as_proto(true);
+        auto pr_prev = f->as_proto(false);
+        auto new_sub_name = std::string_view(sub_name);
+
+        LOG_DEBUG(log, "renaming '{}' -> '{}' in folder '{}'", p_name, new_sub_name, folder_id);
+        proto::set_name(pr_new, new_sub_name);
+        proto::set_deleted(pr_prev, true);
+        stack_ctx.push(new advance::local_update_t(*cluster, *sequencer, std::move(pr_new), folder_id));
+        stack_ctx.push(new advance::local_update_t(*cluster, *sequencer, std::move(pr_prev), folder_id, true));
+
+        if (f->is_dir()) {
+            auto presence = static_cast<presentation::presence_t *>(f->get_augmentation().get());
+            for (auto c : presence->get_children()) {
+                auto features = c->get_features();
+                if (!(features & F::deleted) && !(features & F::missing) && (features & F::local)) {
+                    auto cp = static_cast<presentation::cluster_file_presence_t *>(c);
+                    auto file_info = const_cast<model::file_info_t *>(&cp->get_file_info());
+                    queue.emplace_back(file_info);
+                }
+            }
+        }
+    }
 }
 
 void local_keeper_t::on_changes(model::folder_info_t &local_folder, fs::payload::file_changes_t &changes,

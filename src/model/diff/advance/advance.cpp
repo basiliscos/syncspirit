@@ -109,8 +109,8 @@ void advance_t::initialize(const cluster_t &cluster, sequencer_t &sequencer, pro
         if (type == proto::FileInfoType::FILE) {
             auto sz = proto::get_size(proto_local);
             auto blocks_number = proto::get_blocks_size(proto_local);
-            return fmt::format(", sz: {}, blocks: {} (new: {}, removed: {})", sz, blocks_number, orphans.size(),
-                               new_blocks.size());
+            return fmt::format(", sz: {}, blocks: {} (new: {}, removed: {})", sz, blocks_number, new_blocks.size(),
+                               orphans.size());
         } else {
             return {};
         }

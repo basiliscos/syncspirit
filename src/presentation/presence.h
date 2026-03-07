@@ -8,7 +8,6 @@
 #include "statistics.h"
 #include "syncspirit-export.h"
 #include <cstdint>
-#include <utility>
 
 namespace syncspirit::presentation {
 
