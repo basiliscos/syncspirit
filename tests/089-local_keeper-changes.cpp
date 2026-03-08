@@ -1648,6 +1648,78 @@ void test_renaming_hierarchy() {
     F().run();
 }
 
+void test_renaming_race() {
+    struct F : folder_fixture_t {
+        using parent_t = folder_fixture_t;
+        using parent_t::parent_t;
+        using trigger_t = std::function<void()>;
+        using rename_pair_t = std::pair<std::string_view, std::string_view>;
+
+        void main() noexcept override {
+            prepare(I::inotify);
+
+            {
+                auto pr = proto::FileInfo();
+                proto::set_permissions(pr, default_perms);
+                proto::set_modified_s(pr, 12345);
+                proto::set_type(pr, FT::DIRECTORY);
+                auto names = {"dir_a0", "dir_a0/b0", "dir_a0/c0"};
+                for (auto &name : names) {
+                    proto::set_name(pr, name);
+                    builder->local_update(folder_id, pr).apply(*sup);
+                }
+            }
+            CHECK(folder_local->get_max_sequence() == 3);
+
+            // clang-format off
+            auto pairs = {
+                rename_pair_t{"dir_a0/b0", "dir_a0/b1"},
+                rename_pair_t{"dir_a0", "dir_a2"},
+                rename_pair_t{"dir_a2/c0", "dir_a2/c3"},
+                rename_pair_t{"dir_a2/b1", "dir_a2/b4"},
+            };
+            // clang-format on
+
+            auto changes = fs::payload::file_changes_t{};
+            for (auto &[from, to] : pairs) {
+                auto pr = proto::FileInfo();
+                proto::set_permissions(pr, default_perms);
+                proto::set_modified_s(pr, 12345);
+                proto::set_type(pr, FT::DIRECTORY);
+                proto::set_name(pr, to);
+                auto change = fs::payload::file_info_t(std::move(pr), std::string(from), fs::update_type_t::meta);
+                changes.push_back(std::move(change));
+            }
+            auto folder_change = fs::payload::folder_change_t{folder_id, std::move(changes)};
+            auto folder_changes = fs::payload::folder_changes_t{{std::move(folder_change)}};
+            auto &addr = sup->get_address();
+            sup->send<fs::payload::folder_changes_t>(addr, std::move(folder_changes));
+            sup->do_process();
+
+            CHECK(folder_local->get_max_sequence() == 15);
+            auto deleted = {"dir_a0/b0", "dir_a0", "dir_a0/b1", "dir_a0/c0", "dir_a2/c0", "dir_a2/b1"};
+            auto prev_seq = std::int64_t{4};
+            for (auto &name : deleted) {
+                auto f = files_local->by_name(name);
+                log->debug("f = {}", name);
+                REQUIRE(f);
+                CHECK(f->is_deleted());
+                CHECK(prev_seq < f->get_sequence());
+                prev_seq = f->get_sequence();
+            }
+
+            auto existing = {"dir_a2", "dir_a2/b4", "dir_a2/c3"};
+            for (auto &name : existing) {
+                auto f = files_local->by_name(name);
+                log->debug("f = {}", name);
+                REQUIRE(f);
+                CHECK(!f->is_deleted());
+            }
+        }
+    };
+    F().run();
+}
+
 int _init() {
     test::init_logging();
     REGISTER_TEST_CASE(test_just_start, "test_just_start", "[fs]");
@@ -1671,6 +1743,7 @@ int _init() {
     REGISTER_TEST_CASE(test_hashing_race, "test_hashing_race", "[fs]");
     REGISTER_TEST_CASE(test_renaming_simple, "test_renaming_simple", "[fs]");
     REGISTER_TEST_CASE(test_renaming_hierarchy, "test_renaming_hierarchy", "[fs]");
+    REGISTER_TEST_CASE(test_renaming_race, "test_renaming_race", "[fs]");
     return 1;
 }
 

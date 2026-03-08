@@ -4,6 +4,7 @@
 #include "access.h"
 #include "diff-builder.h"
 #include "config/fs.h"
+#include "hasher/hasher_plugin.h"
 #include "fs/fs_slave.h"
 #include "fs/messages.h"
 #include "fs/utils.h"

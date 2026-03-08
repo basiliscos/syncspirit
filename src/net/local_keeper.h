@@ -5,13 +5,14 @@
 
 #include "fs/messages.h"
 #include "hasher/messages.h"
-#include "hasher/hasher_plugin.h"
 #include "model/messages.h"
 #include "model/cluster.h"
 #include "model/diff/cluster_visitor.h"
 #include "model/misc/sequencer.h"
 #include "utils/string_comparator.hpp"
 #include "syncspirit-config.h"
+
+#include <memory_resource>
 
 namespace syncspirit::net {
 

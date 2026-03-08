@@ -19,7 +19,6 @@
 #include "utils/string_comparator.hpp"
 
 #include <boost/nowide/convert.hpp>
-#include <memory_resource>
 #include <iterator>
 
 using namespace syncspirit;
@@ -36,10 +35,15 @@ using UT = fs::update_type_t;
 struct local_keeper_t::lc_context_t final : local_keeper::stack_context_t {
     using parent_t = local_keeper::stack_context_t;
     using folder_contexts_t = local_keeper::folder_slave_t::folder_contexts_t;
+    using name_2_file_t =
+        std::pmr::unordered_map<std::pmr::string, model::file_info_t *, utils::string_hash_t, utils::string_eq_t>;
+    using file_2_name_t = std::pmr::unordered_map<model::file_info_t *, std::pmr::string>;
+
     lc_context_t(local_keeper_t *k, folder_slave_t *slave) noexcept
         : parent_t(*k->cluster, *k->sequencer, k->concurrent_hashes_left, k->concurrent_hashes_limit,
                    k->files_scan_iteration_limit, k->watcher_impl),
-          actor(k) {
+          actor(k), pool(buffer.data(), buffer.size()), allocator(&pool), name_2_file(allocator),
+          file_2_name(allocator) {
         if (slave && !actor->delayed.empty()) {
             slave->push(std::move(actor->delayed));
         }
@@ -74,6 +78,11 @@ struct local_keeper_t::lc_context_t final : local_keeper::stack_context_t {
 
     local_keeper_t *actor;
     folder_contexts_t new_contexts;
+    std::array<std::byte, 1024 * 128> buffer = {};
+    std::pmr::monotonic_buffer_resource pool;
+    std::pmr::polymorphic_allocator<char> allocator;
+    name_2_file_t name_2_file;
+    file_2_name_t file_2_name;
 };
 
 local_keeper_t::local_keeper_t(config_t &config)
@@ -327,10 +336,6 @@ void local_keeper_t::handle_rename(fs::payload::file_info_t &change, const model
     using queue_t = std::pmr::list<model::file_info_t *>;
     using F = presentation::presence_t::features_t;
 
-    auto buffer = std::array<std::byte, 1024 * 128>();
-    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
-    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
-
     auto folder_id = local_folder.get_folder()->get_id();
     auto new_name = proto::get_name(change);
     auto &prev_name = change.prev_path;
@@ -339,22 +344,35 @@ void local_keeper_t::handle_rename(fs::payload::file_info_t &change, const model
 
     auto f_root = local_files.by_name(prev_name);
     if (!f_root) {
-        LOG_WARN(log, "no '{}' in local folder", prev_name);
-        return;
+        auto it = stack_ctx.name_2_file.find(prev_name);
+        if (it != stack_ctx.name_2_file.end()) {
+            f_root = it->second;
+        } else {
+            LOG_WARN(log, "no '{}' in local folder", prev_name);
+            return;
+        }
     }
 
-    auto queue = queue_t(allocator);
+    auto queue = queue_t(stack_ctx.allocator);
     queue.emplace_back(f_root.get());
     while (!queue.empty()) {
         auto f = queue.front();
         queue.pop_front();
-        auto p_name = f->get_name()->get_full_name();
-        auto sub_name = std::pmr::string(allocator);
+        auto it = stack_ctx.file_2_name.find(f);
+        auto p_name = [&]() -> std::string_view {
+            if (it == stack_ctx.file_2_name.end()) {
+                return f->get_name()->get_full_name();
+            }
+            return it->second;
+        }();
+        auto sub_name = std::pmr::string(stack_ctx.allocator);
+
         sub_name += new_name;
         sub_name += p_name.substr(prev_name.size());
 
         auto pr_new = f->as_proto(true);
         auto pr_prev = f->as_proto(false);
+        proto::set_name(pr_prev, p_name);
         auto new_sub_name = std::string_view(sub_name);
 
         LOG_DEBUG(log, "renaming '{}' -> '{}' in folder '{}'", p_name, new_sub_name, folder_id);
@@ -362,6 +380,8 @@ void local_keeper_t::handle_rename(fs::payload::file_info_t &change, const model
         proto::set_deleted(pr_prev, true);
         stack_ctx.push(new advance::local_update_t(*cluster, *sequencer, std::move(pr_new), folder_id));
         stack_ctx.push(new advance::local_update_t(*cluster, *sequencer, std::move(pr_prev), folder_id, true));
+        stack_ctx.name_2_file.emplace(new_sub_name, f);
+        stack_ctx.file_2_name.insert_or_assign(f, new_sub_name);
 
         if (f->is_dir()) {
             auto presence = static_cast<presentation::presence_t *>(f->get_augmentation().get());
@@ -381,11 +401,7 @@ void local_keeper_t::on_changes(model::folder_info_t &local_folder, fs::payload:
                                 lc_context_t &stack_ctx) noexcept {
     using namespace model::diff;
     using scheduled_dirs_t = std::pmr::unordered_set<std::pmr::string, utils::string_hash_t, utils::string_eq_t>;
-
-    auto buffer = std::array<std::byte, 1024 * 8>();
-    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
-    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
-    auto scheduled_dirs = scheduled_dirs_t(allocator);
+    auto scheduled_dirs = scheduled_dirs_t(stack_ctx.allocator);
 
     auto folder = local_folder.get_folder();
     auto folder_id = folder->get_id();
@@ -402,7 +418,7 @@ void local_keeper_t::on_changes(model::folder_info_t &local_folder, fs::payload:
             update = !file->identical_by_content_to(change);
         }
         if (proto::get_type(change) == proto::FileInfoType::DIRECTORY) {
-            auto n = std::pmr::string(name, allocator);
+            auto n = std::pmr::string(name, stack_ctx.allocator);
             scheduled_dirs.emplace(n);
         }
         if (update) {
