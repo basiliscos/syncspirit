@@ -266,6 +266,23 @@ void test_fs() {
             auto file = local_files->by_name(narrow(L"a/b/c/файлик.bin"));
             REQUIRE(file);
             CHECK(file->get_size() == 5);
+
+            auto long_name = "2026_Project_Report_Sales_Analysis_Financial_Quarter_One_Overview_Data_Insights_and_"
+                             "Strategies_v1.0.pdf";
+            bfs::create_directories(root_path / "a/xx");
+            await_events(2);
+            auto dir_1 = local_files->by_name("a/xx");
+            REQUIRE(dir_1);
+
+            bfs::rename(root_path / "a" / "xx", root_path / "a" / long_name);
+            await_events(2);
+            auto dir_2 = local_files->by_name(fmt::format("a/{}", long_name));
+            REQUIRE(dir_2);
+
+            bfs::rename(root_path / "a" / long_name, root_path / "a" / "yy");
+            await_events(2);
+            auto dir_3 = local_files->by_name("a/yy");
+            REQUIRE(dir_3);
         }
     };
     F().run();

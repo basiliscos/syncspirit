@@ -72,8 +72,14 @@ void watcher_t::rename_self_descending(int parent_wd, std::string_view prev_path
     for (auto &wd : subdir_map[parent_wd]) {
         auto &current_guard = path_map[wd];
         auto current_path = std::string_view(current_guard.path);
-        auto rel_path = current_path.substr(current_path.size() - prev_path.size());
-        if (rel_path == prev_path) {
+        auto ends_with = [&]() -> bool {
+            if (current_path.size() < prev_path.size()) {
+                return false;
+            }
+            auto rel_path = current_path.substr(current_path.size() - prev_path.size());
+            return rel_path == prev_path;
+        }();
+        if (ends_with) {
             auto folder_path_sz = current_path.size() - prev_path.size();
             auto folder_path = parent_path.substr(0, folder_path_sz);
             auto number = 0;
