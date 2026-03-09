@@ -224,8 +224,13 @@ int folder_context_t::process(child_ready_t &info, stack_context_t &ctx) noexcep
     using FT = proto::FileInfoType;
     using namespace model::diff;
     bool emit_update = false;
+    bool emit_hashing = false;
     if (!info.self || (info.self->get_features() & F::deleted)) {
-        emit_update = true;
+        if (info.size && info.blocks.empty()) {
+            emit_hashing = true;
+        } else {
+            emit_update = true;
+        }
     } else {
         auto presence = static_cast<presentation::cluster_file_presence_t *>(info.self.get());
         auto &file = const_cast<model::file_info_t &>(presence->get_file_info());
@@ -251,14 +256,16 @@ int folder_context_t::process(child_ready_t &info, stack_context_t &ctx) noexcep
             ctx.push(new local::file_availability_t(&file, *local_folder));
         } else {
             if (info.size && info.blocks.empty()) {
-                auto ptr = hash_existing_file_ptr_t(new hash_existing_file_t(std::move(info)));
-                stack.emplace_front(std::move(ptr));
+                emit_hashing = true;
             } else {
                 emit_update = true;
             }
         }
     }
-    if (emit_update) {
+    if (emit_hashing) {
+        auto ptr = hash_existing_file_ptr_t(new hash_existing_file_t(std::move(info)));
+        stack.emplace_front(std::move(ptr));
+    } else if (emit_update) {
         auto folder = local_folder->get_folder();
         auto folder_id = folder->get_id();
         auto data = info.serialize(*local_folder, std::move(info.blocks), ignore_permissions);

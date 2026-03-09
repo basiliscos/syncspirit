@@ -1196,22 +1196,27 @@ void test_resurrection() {
     struct F : fixture_t {
         void main() noexcept override {
             bfs::create_directories(root_path / L"a/b/c");
+            write_file(root_path / "a/b/c/file.bin", "12345");
 
             builder->scan_start(folder->get_id()).apply(*sup);
             auto &files = folder_info->get_file_infos();
-            CHECK(files.size() == 3);
+            CHECK(files.size() == 4);
 
             auto dir_a = files.by_name("a");
             auto dir_b = files.by_name("a/b");
             auto dir_c = files.by_name("a/b/c");
+            auto file = files.by_name("a/b/c/file.bin");
 
             REQUIRE(dir_a);
             REQUIRE(dir_b);
             REQUIRE(dir_c);
+            REQUIRE(file);
+            REQUIRE(file->get_size() == 5);
 
             CHECK(!dir_a->is_deleted());
             CHECK(!dir_b->is_deleted());
             CHECK(!dir_c->is_deleted());
+            CHECK(!file->is_deleted());
 
             bfs::remove_all(root_path / L"a");
             builder->scan_start(folder->get_id()).apply(*sup);
@@ -1219,13 +1224,18 @@ void test_resurrection() {
             CHECK(dir_a->is_deleted());
             CHECK(dir_b->is_deleted());
             CHECK(dir_c->is_deleted());
+            CHECK(file->is_deleted());
 
             bfs::create_directories(root_path / L"a/b/c");
+            write_file(root_path / "a/b/c/file.bin", "12345");
+
             builder->scan_start(folder->get_id()).apply(*sup);
 
             CHECK(!dir_a->is_deleted());
             CHECK(!dir_b->is_deleted());
             CHECK(!dir_c->is_deleted());
+            CHECK(!file->is_deleted());
+            REQUIRE(file->get_size() == 5);
         }
     };
     F().run();
