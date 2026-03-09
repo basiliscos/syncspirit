@@ -329,3 +329,14 @@ void presence_item_t::insert_node(presence_item_ptr_t node, int position) {
 bool presence_item_t::is_expanded() const { return expanded; }
 
 void presence_item_t::on_delete() noexcept { presence = {}; }
+
+void presence_item_t::on_update() noexcept {
+    if (presence) {
+        if (presence->get_features() & F::directory && children() == 0 && !is_expanded()) {
+            if (presence->get_children().size() > 0) {
+                populate_dummy_child();
+            }
+        }
+    }
+    parent_t::on_update();
+}
