@@ -1988,15 +1988,15 @@ void test_traversal() {
 
             // clang-format off
             auto expected = paths_t{
-                "a/c/file_2.bin",
-                "a/c",
-                "a/file.bin",
                 "a",
+                "a/c",
+                "a/c/file_2.bin",
+                "a/file.bin",
                 "b",
-                "d/d1/file_3.bin",
-                "d/d1",
-                "d/d2",
                 "d",
+                "d/d1",
+                "d/d1/file_3.bin",
+                "d/d2",
                 "x.bin",
                 "y.bin",
             };

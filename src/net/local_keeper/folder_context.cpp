@@ -524,6 +524,10 @@ void folder_context_t::post_process(fs::task::scan_dir_t &task, stack_context_t 
             }
         }
     }
+    auto it_done = stack.begin();
+    if (auto ptr = std::get_if<child_ready_t>(&*it_done); !ptr) {
+        it_done = stack.end();
+    }
 
     if (task.ec) {
         if (task.single_child.empty() || task.ec != std::errc::no_such_file_or_directory) {
@@ -628,6 +632,11 @@ void folder_context_t::post_process(fs::task::scan_dir_t &task, stack_context_t 
                 }
             }
         }
+    }
+
+    if (it_done != stack.end()) {
+        stack.insert(stack.begin(), std::move(*it_done));
+        stack.erase(it_done);
     }
 }
 
