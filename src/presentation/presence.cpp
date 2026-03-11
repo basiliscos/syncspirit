@@ -4,6 +4,7 @@
 #include "entity.h"
 #include "presence.h"
 #include "cluster_file_presence.h"
+#include <spdlog/spdlog.h>
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32) || defined(__APPLE__)
 #include <uni_algo/case.h>
@@ -192,8 +193,13 @@ presence_t *presence_t::get_child(std::string_view name, bool is_dir) noexcept {
     auto it = std::lower_bound(children.begin(), children.end(), presence_like, comparator);
     if (it != children.end()) {
         auto &p = *it;
-        if (!(p->get_features() & F::missing)) {
-            return p;
+        if (p->get_entity()->get_path()->get_own_name() == name) {
+            auto p_dir = (bool)(p->features & F::directory);
+            if (!(p_dir xor is_dir)) {
+                if (!(p->features & F::missing)) {
+                    return p;
+                }
+            }
         }
     }
     return nullptr;

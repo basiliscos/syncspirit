@@ -538,12 +538,12 @@ void test_hashing() {
 
             auto pr_dir_1 = proto::FileInfo();
             proto::set_name(pr_dir_1, narrow(L"папка1"));
-            proto::set_type(pr_dir_1, FT::FILE);
+            proto::set_type(pr_dir_1, FT::DIRECTORY);
             builder->local_update(folder_id, pr_dir_1).apply(*sup);
 
             auto pr_dir_2 = proto::FileInfo();
             proto::set_name(pr_dir_2, narrow(L"папка1/подпапка2"));
-            proto::set_type(pr_dir_2, FT::FILE);
+            proto::set_type(pr_dir_2, FT::DIRECTORY);
             builder->local_update(folder_id, pr_dir_2).apply(*sup);
 
             auto pr_file = proto::FileInfo();

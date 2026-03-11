@@ -1798,6 +1798,48 @@ TEST_CASE("file uniqueness", "[presentation]") {
 #endif
 }
 
+TEST_CASE("get_child", "[presentation]") {
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
+    auto sequencer = make_sequencer(4);
+    cluster->get_devices().put(my_device);
+
+    auto builder = diff_builder_t(*cluster);
+    REQUIRE(builder.upsert_folder("1234-5678", "some/path", "my-label").apply());
+    auto folder = cluster->get_folders().by_id("1234-5678");
+    auto local_folder = folder->get_folder_infos().by_device(*my_device);
+
+    auto add_file = [&](std::string_view name, proto::FileInfoType type = proto::FileInfoType::DIRECTORY) {
+        proto::FileInfo pr_fi;
+        proto::set_name(pr_fi, name);
+        proto::set_sequence(pr_fi, local_folder->get_max_sequence() + 1);
+        proto::set_type(pr_fi, type);
+
+        auto &v = proto::get_version(pr_fi);
+        auto modified_device = my_device->device_id().get_uint();
+        auto modified_version = 1;
+        proto::add_counters(v, proto::Counter(modified_device, modified_version));
+        proto::set_modified_s(pr_fi, modified_version);
+
+        auto file = model::file_info_t::create(sequencer->next_uuid(), pr_fi, local_folder.get()).value();
+        local_folder->add_strict(file);
+        return file;
+    };
+
+    auto dir = add_file("dir");
+    auto file = add_file("dir/b");
+    auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
+
+    auto p_dir = static_cast<presentation::file_presence_t *>(dir->get_augmentation().get());
+    auto p_file = static_cast<presentation::file_presence_t *>(file->get_augmentation().get());
+    CHECK(p_dir->get_child("a", true) == nullptr);
+    CHECK(p_dir->get_child("b", true) == p_file);
+    CHECK(p_dir->get_child("c", true) == nullptr);
+
+    CHECK(p_dir->get_child("a", false) == nullptr);
+    CHECK(p_dir->get_child("b", false) == nullptr);
+    CHECK(p_dir->get_child("c", false) == nullptr);
+}
+
 static bool _init = []() -> bool {
     test::init_logging();
     return true;

@@ -35,6 +35,7 @@ using namespace syncspirit::net;
 using namespace syncspirit::fs;
 using namespace syncspirit::hasher;
 using boost::nowide::narrow;
+using boost::nowide::widen;
 
 using task_processor_t = std::function<void(fs::fs_slave_t *)>;
 
@@ -1819,7 +1820,7 @@ void test_incomplete() {
 #endif
                 SECTION("local version is better than remote (local file does exists)") {
                     write_file(path, "1234");
-                    auto p = root_path / file_name;
+                    auto p = root_path / widen(file_name);
 
                     write_file(p, "12345");
                     auto status = bfs::status(p);
@@ -1851,7 +1852,7 @@ void test_incomplete() {
                 proto::add_blocks(pr_file, b_2);
                 proto::set_size(pr_file, data_1.size() + data_2.size());
 
-                auto model_path = root_path / file_name;
+                auto model_path = root_path / widen(file_name);
                 SECTION("all blocks match => rename & add into model") {
                     write_file(path, "1234567890");
                     auto status = bfs::status(path);

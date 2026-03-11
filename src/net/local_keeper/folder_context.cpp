@@ -45,15 +45,9 @@ auto make_context(model::folder_info_ptr_t local_folder, std::string_view start_
 
     auto comparator = presentation::presence_t::child_comparator_t{};
     for (auto &item : skip_path) {
-        auto &children = presence->get_children();
         auto name = narrow(item.filename().generic_wstring());
-        auto criterium = presentation::presence_t::presence_like_t{name, true};
-        auto it = std::lower_bound(children.begin(), children.end(), criterium, comparator);
-        if (it != children.end()) {
-            auto &p = *it;
-            if (!(p->get_features() & F::missing)) {
-                presence = p;
-            }
+        if (auto p = presence->get_child(name, true); p) {
+            presence = p;
         } else {
             return std::make_error_code(std::errc::no_such_file_or_directory);
         }
@@ -350,7 +344,7 @@ int folder_context_t::process(incomplete_t &item, stack_context_t &ctx) noexcept
     auto it = std::lower_bound(entities.begin(), entities.end(), name_view, comparator);
     auto presence = (presentation::presence_t *)(nullptr);
     auto ignore = false;
-    if (it != entities.end()) {
+    if (it != entities.end() && (*it)->get_path()->get_own_name() == name_view) {
         presence = const_cast<presentation::presence_t *>((*it)->get_best());
         if (presence && presence->get_device() == self_device) {
             presence = nullptr;
@@ -382,7 +376,7 @@ int folder_context_t::process(incomplete_t &item, stack_context_t &ctx) noexcept
 
     if (!ignore) {
         if (!presence || action == model::advance_action_t::ignore) {
-            LOG_DEBUG(log, "scheduling removal of '{}'", narrow(item.path.generic_wstring()));
+            LOG_DEBUG(log, "scheduling(1) removal of '{}'", narrow(item.path.generic_wstring()));
             push(remove_file_t(std::move(item.path)));
         } else {
             LOG_TRACE(log, "scheduling rehashing of '{}'", narrow(item.path.generic_wstring()));
@@ -418,7 +412,8 @@ int folder_context_t::process(rehashed_incomplete_t &item, stack_context_t &ctx)
             auto modified_s = peer_file.get_modified_s();
             auto name = [&]() -> bfs::path {
                 if (item.action == model::advance_action_t::remote_copy) {
-                    return bfs::path(peer_file.get_name()->get_own_name());
+                    auto own_name = peer_file.get_name()->get_own_name();
+                    return bfs::path(widen(own_name));
                 } else {
                     assert(item.action == model::advance_action_t::resolve_remote_win);
                     auto self_device = ctx.cluster.get_device().get();
@@ -445,7 +440,7 @@ int folder_context_t::process(rehashed_incomplete_t &item, stack_context_t &ctx)
         }
     }
     if (schedule_removal) {
-        LOG_DEBUG(log, "scheduling removal of '{}", narrow(item.path.generic_wstring()));
+        LOG_DEBUG(log, "scheduling(2) removal of '{}", narrow(item.path.generic_wstring()));
         push(remove_file_t(std::move(item.path)));
     }
     return 1;
@@ -657,7 +652,7 @@ void folder_context_t::post_process(fs::task::segment_iterator_t &task, stack_co
                 auto local_fi = local_folder.get();
                 ctx.push(new model::diff::modify::mark_reachable_t(file, *local_fi, false));
             } else if (hash_file.incomplete) {
-                LOG_DEBUG(log, "scheduling removal of '{}", path_str);
+                LOG_DEBUG(log, "scheduling(3) removal of '{}", path_str);
                 push(fs::task::remove_file_t(task.path));
             }
         }
