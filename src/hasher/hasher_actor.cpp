@@ -32,10 +32,10 @@ void hasher_actor_t::shutdown_finish() noexcept {
 }
 
 void hasher_actor_t::on_digest(message::digest_t &req) noexcept {
-    LOG_TRACE(log, "{}, on_digest");
 
     unsigned char digest[SZ];
     auto &data = req.payload.data;
+    LOG_TRACE(log, "on_digest ({} bytes)", data.size());
 
     utils::digest(data.data(), data.size(), digest);
     req.payload.result = utils::bytes_t(digest, digest + SZ);
