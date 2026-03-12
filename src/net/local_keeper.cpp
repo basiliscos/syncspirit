@@ -444,7 +444,7 @@ void local_keeper_t::on_changes(model::folder_info_t &local_folder, fs::payload:
             subdir = name.substr(0, inside_subdir);
         }
         if (!has_parent && !subdir.empty() && !scheduled_dirs.count(subdir)) {
-            LOG_WARN(log, "no parent for '{}' in folder '{}', ignoring orphan", name, folder_id);
+            LOG_DEBUG(log, "no parent for '{}' in folder '{}', ignoring (temporal) orphan", name, folder_id);
             return;
         }
         if (watcher_impl == syncspirit_watcher_impl_t::inotify && !subdir.empty() && scheduled_dirs.count(subdir)) {

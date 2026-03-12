@@ -10,7 +10,6 @@
 #include "fs/platform/watcher_base.h"
 #include "fs/fs_context.h"
 #include <set>
-#include <tuple>
 
 namespace syncspirit::fs::platform::linux {
 
@@ -30,10 +29,16 @@ struct SYNCSPIRIT_API watcher_t : watcher_base_t {
         std::string_view folder_id;
         int parent_fd;
     };
+
+    struct watch_result_t {
+        sys::error_code ec{};
+        path_guard_t *guard{nullptr};
+        int wd{-1};
+    };
+
     using path_map_t = std::unordered_map<int, path_guard_t>;
     using path_to_wd_t = std::unordered_map<std::string_view, int>;
     using children_t = std::set<int>;
-    using watch_result_t = std::tuple<sys::error_code, path_guard_t *, int>;
     using subdir_map_t = std::unordered_map<int, children_t>;
 
     watch_result_t watch_dir(std::string_view path, std::string_view folder_id, int parent) noexcept;
