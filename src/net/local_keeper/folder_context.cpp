@@ -469,6 +469,7 @@ folder_context_t &folder_context_t::post_process(stack_context_t &ctx) noexcept 
 
 void folder_context_t::post_process(hash_base_t &hash_file, hasher::message::digest_t &msg,
                                     stack_context_t &ctx) noexcept {
+    LOG_TRACE(log, "post_process, hasn_file {} blocks are hashing", hashing);
     assert(hashing > 0);
     --hashing;
     auto &p = msg.payload;
@@ -520,8 +521,10 @@ void folder_context_t::post_process(fs::task::scan_dir_t &task, stack_context_t 
         }
     }
     auto it_done = stack.begin();
-    if (auto ptr = std::get_if<child_ready_t>(&*it_done); !ptr) {
-        it_done = stack.end();
+    if (it_done != stack.end()) {
+        if (auto ptr = std::get_if<child_ready_t>(&*it_done); !ptr) {
+            it_done = stack.end();
+        }
     }
 
     if (task.ec) {
@@ -638,6 +641,7 @@ void folder_context_t::post_process(fs::task::scan_dir_t &task, stack_context_t 
 void folder_context_t::post_process(fs::task::segment_iterator_t &task, stack_context_t &ctx) {
     auto &ec = task.ec;
     if (ec) {
+        hashing -= task.block_count;
         auto hash_ctx = static_cast<hash_context_t *>(task.context.get());
         auto delta = task.block_count - task.current_block;
         ctx.hashes_pool += delta;
@@ -656,8 +660,6 @@ void folder_context_t::post_process(fs::task::segment_iterator_t &task, stack_co
                 push(fs::task::remove_file_t(task.path));
             }
         }
-    } else {
-        hashing += task.block_count;
     }
 }
 
@@ -734,8 +736,8 @@ int folder_context_t::schedule_hash(hash_base_t *item, stack_context_t &ctx) noe
     blocks_limit -= max_blocks;
     auto blocks_left = item->unprocessed_blocks -= max_blocks;
 
-    LOG_TRACE(log, "going to rehash {} block(s) ({}..{}) of '{}'", max_blocks, first_block, first_block + max_blocks,
-              narrow(item->path.wstring()));
+    LOG_TRACE(log, "going to rehash {} block(s) ({}..{}) of '{}' (this = {})", max_blocks, first_block,
+              first_block + max_blocks, narrow(item->path.wstring()), (void *)this);
     return blocks_left ? -1 : 0;
 }
 
@@ -780,6 +782,9 @@ fs::task_t folder_context_t::pop_task() noexcept {
     assert(pending_io.size());
     auto task = std::move(pending_io.front());
     pending_io.pop_front();
+    if (auto *si = std::get_if<fs::task::segment_iterator_t>(&task); si) {
+        hashing += si->block_count;
+    }
     ++in_progress;
     return task;
 }
