@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2025-2026 Ivan Baidakou
 
 #pragma once
 
@@ -44,7 +44,8 @@ struct SYNCSPIRIT_API iterative_controller_base_t : apply_controller_t {
     bool interrupted = false;
 };
 
-template <typename T, typename Parent> struct iterative_controller_t : iterative_controller_base_t, Parent {
+template <typename T, typename Parent, typename... Ts>
+struct iterative_controller_t : iterative_controller_base_t, Parent, Ts... {
     using base_t = iterative_controller_base_t;
 
     template <typename... Args>

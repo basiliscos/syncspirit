@@ -7,6 +7,7 @@
 #include "model/diff/apply_controller.h"
 #include "model/diff/iterative_controller.h"
 #include "model/diff/advance/local_update.h"
+#include "model/diff/cluster_visitor.h"
 #include "bouncer/messages.hpp"
 #include "net/names.h"
 #include "test-utils.h"
@@ -50,7 +51,9 @@ struct my_diff_builder_t : diff_builder_t {
     }
 };
 
-template <typename T> using sample_supervisor_base_t = model::diff::iterative_controller_t<T, rth::supervisor_thread_t>;
+template <typename T>
+using sample_supervisor_base_t =
+    model::diff::iterative_controller_t<T, rth::supervisor_thread_t, model::diff::cluster_visitor_t>;
 
 struct sample_supervisor_t : sample_supervisor_base_t<sample_supervisor_t> {
     using parent_t = sample_supervisor_base_t<sample_supervisor_t>;
@@ -94,7 +97,7 @@ struct fixture_t {
         cluster->get_devices().put(local_device);
 
         auto ctx = rth::system_context_ptr_t(new rth::system_context_thread_t());
-        sup = ctx->create_supervisor<sample_supervisor_t>().timeout(timeout).create_registry().finish().get();
+        sup = create_sup(ctx.get());
         sup->cluster = cluster;
         sup->start();
         sup->do_process();
@@ -112,6 +115,10 @@ struct fixture_t {
         sup->do_shutdown();
         sup->do_process();
         REQUIRE(static_cast<r::actor_base_t *>(sup)->access<to::state>() == r::state_t::SHUT_DOWN);
+    }
+
+    virtual sample_supervisor_t *create_sup(r::system_context_t *ctx) noexcept {
+        return ctx->create_supervisor<sample_supervisor_t>().timeout(timeout).create_registry().finish().get();
     }
 
     virtual void main(diff_builder_t &builder) noexcept = 0;
@@ -152,8 +159,32 @@ void test_updates_intermixture() {
     static constexpr size_t I = 2;
     static constexpr size_t N = 10;
 
+    struct sup_t : sample_supervisor_t {
+        using parent_t = sample_supervisor_t;
+        using parent_t::parent_t;
+
+        void process(model::diff::cluster_diff_t &diff, apply_context_t &context) noexcept override {
+            parent_t::process(diff, context);
+
+            auto r = diff.visit(*this, {});
+            CHECK(r);
+        }
+
+        outcome::result<void> operator()(const model::diff::advance::local_update_t &diff,
+                                         void *custom) noexcept override {
+            ++update_visits;
+            return parent_t::operator()(diff, custom);
+        }
+
+        int update_visits = 0;
+    };
+
     struct F : fixture_t {
         using fixture_t::fixture_t;
+
+        sample_supervisor_t *create_sup(r::system_context_t *ctx) noexcept override {
+            return ctx->create_supervisor<sup_t>().timeout(timeout).create_registry().finish().get();
+        }
 
         void main(diff_builder_t &builder) noexcept override {
             auto pr_file = proto::FileInfo();
@@ -177,6 +208,9 @@ void test_updates_intermixture() {
             builder.local_update(folder_id, pr_file).apply(*sup);
             CHECK(local_files->size() == N + 3);
             CHECK(sup->bounces == N / I);
+
+            auto impl = static_cast<sup_t *>(sup);
+            CHECK(impl->update_visits == local_files->size());
         }
     };
     F().run();
