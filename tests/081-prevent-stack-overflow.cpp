@@ -100,7 +100,7 @@ struct fixture_t {
         sup->do_process();
         REQUIRE(static_cast<r::actor_base_t *>(sup)->access<to::state>() == r::state_t::OPERATIONAL);
 
-        auto builder = my_diff_builder_t(*cluster);
+        auto builder = my_diff_builder_t(*cluster, sup->get_address());
         folder_id = "1234-5678";
 
         builder.upsert_folder(folder_id, "").apply(*sup);
@@ -148,9 +148,44 @@ void test_large_diffs_chain() {
     F().run();
 }
 
+void test_updates_intermixture() {
+    static constexpr size_t I = 2;
+    static constexpr size_t N = 10;
+
+    struct F : fixture_t {
+        using fixture_t::fixture_t;
+
+        void main(diff_builder_t &builder) noexcept override {
+            auto pr_file = proto::FileInfo();
+            proto::set_name(pr_file, "root");
+            proto::set_type(pr_file, proto::FileInfoType::DIRECTORY);
+
+            builder.local_update(folder_id, pr_file);
+            for (size_t i = 0; i < N; ++i) {
+                auto name = fmt::format("subdir-{}", i);
+                proto::set_name(pr_file, name);
+                builder.local_update(folder_id, pr_file);
+                if (i % I == 0) {
+                    builder.interrupt();
+                }
+            }
+
+            builder.send(*sup);
+            proto::set_name(pr_file, "n1");
+            builder.local_update(folder_id, pr_file).send(*sup);
+            proto::set_name(pr_file, "n2");
+            builder.local_update(folder_id, pr_file).apply(*sup);
+            CHECK(local_files->size() == N + 3);
+            CHECK(sup->bounces == N / I);
+        }
+    };
+    F().run();
+}
+
 int _init() {
     test::init_logging();
     REGISTER_TEST_CASE(test_large_diffs_chain, "test_large_diffs_chain", "[model]");
+    REGISTER_TEST_CASE(test_updates_intermixture, "test_updates_intermixture", "[model]");
     return 1;
 }
 
