@@ -8,7 +8,7 @@
 
 namespace syncspirit::model::diff::advance {
 
-struct SYNCSPIRIT_API local_update_t final : advance_t {
+struct SYNCSPIRIT_API local_update_t : advance_t {
     using parent_t = advance_t;
     using parent_t::parent_t;
 

@@ -4,7 +4,9 @@
 #include <catch2/catch_all.hpp>
 #include <rotor.hpp>
 #include <rotor/thread.hpp>
+#include "model/diff/apply_controller.h"
 #include "model/diff/iterative_controller.h"
+#include "model/diff/advance/local_update.h"
 #include "bouncer/messages.hpp"
 #include "net/names.h"
 #include "test-utils.h"
@@ -25,11 +27,30 @@ r::plugin::resource_id_t interrupt = 0;
 } // namespace resource
 } // namespace
 
-template <typename T> using sample_supervisor_base_t = model::diff::iterative_controller_t<T, rth::supervisor_thread_t>;
-
 static const r::pt::time_duration timeout = r::pt::millisec{10};
 static constexpr size_t I = 50;
-static constexpr size_t N = 15'000;
+static constexpr size_t N = 2500;
+
+struct my_local_update_t : diff::advance::local_update_t {
+    using parent_t = diff::advance::local_update_t;
+    using parent_t::parent_t;
+
+    outcome::result<void> apply_impl(diff::apply_controller_t &controller, void *custom) const noexcept override {
+        char buff[1024 * 100] = {0};
+        return parent_t::apply_impl(controller, custom);
+    }
+};
+
+struct my_diff_builder_t : diff_builder_t {
+    using parent_t = diff_builder_t;
+    using parent_t::parent_t;
+
+    diff_builder_t &local_update(std::string_view folder_id, const proto::FileInfo &file_) noexcept override {
+        return assign(new my_local_update_t(*cluster, *sequencer, file_, folder_id));
+    }
+};
+
+template <typename T> using sample_supervisor_base_t = model::diff::iterative_controller_t<T, rth::supervisor_thread_t>;
 
 struct sample_supervisor_t : sample_supervisor_base_t<sample_supervisor_t> {
     using parent_t = sample_supervisor_base_t<sample_supervisor_t>;
@@ -79,7 +100,7 @@ struct fixture_t {
         sup->do_process();
         REQUIRE(static_cast<r::actor_base_t *>(sup)->access<to::state>() == r::state_t::OPERATIONAL);
 
-        auto builder = diff_builder_t(*cluster);
+        auto builder = my_diff_builder_t(*cluster);
         folder_id = "1234-5678";
 
         builder.upsert_folder(folder_id, "").apply(*sup);

@@ -56,7 +56,7 @@ struct SYNCSPIRIT_TEST_API index_maker_t {
     utils::bytes_view_t peer_sha256;
 };
 
-struct SYNCSPIRIT_TEST_API diff_builder_t : private model::diff::apply_controller_t {
+struct SYNCSPIRIT_TEST_API diff_builder_t : protected model::diff::apply_controller_t {
     using blocks_t = std::vector<proto::BlockInfo>;
 
     diff_builder_t(model::cluster_t &, r::address_ptr_t receiver = {}, model::sequencer_ptr_t sequencer = {}) noexcept;
@@ -80,7 +80,7 @@ struct SYNCSPIRIT_TEST_API diff_builder_t : private model::diff::apply_controlle
     diff_builder_t &unshare_folder(model::folder_info_t &fi) noexcept;
     diff_builder_t &remote_copy(const model::file_info_t &source, const model::folder_info_t &source_fi) noexcept;
     diff_builder_t &advance(const model::file_info_t &source, const model::folder_info_t &source_fi) noexcept;
-    diff_builder_t &local_update(std::string_view folder_id, const proto::FileInfo &file_) noexcept;
+    virtual diff_builder_t &local_update(std::string_view folder_id, const proto::FileInfo &file_) noexcept;
     diff_builder_t &ack_block(const model::diff::modify::block_transaction_t &) noexcept;
     diff_builder_t &remove_folder(const model::folder_t &folder) noexcept;
     diff_builder_t &remove_peer(const model::device_t &peer) noexcept;
@@ -105,7 +105,7 @@ struct SYNCSPIRIT_TEST_API diff_builder_t : private model::diff::apply_controlle
 
     diff_builder_t &assign(model::diff::cluster_diff_t *) noexcept;
 
-  private:
+  protected:
     model::sequencer_ptr_t sequencer;
     apply_controller_ptr_t controller;
     model::diff::cluster_diff_ptr_t cluster_diff;
