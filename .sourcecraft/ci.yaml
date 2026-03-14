@@ -65,7 +65,7 @@ tasks:
          - cd gcc-14.3.0
          - ./contrib/download_prerequisites
          - ./configure --prefix=/$HOME/my-gcc --enable-languages=c,c++ --disable-multilib --enable-bootstrap
-         - make -j`nproc`
+         - make -j`nproc` > /dev/null
          - make install
          - pip install conan
          - export PATH=$HOME/my-gcc/bin:$HOME/.local/bin:$PATH
