@@ -4,6 +4,7 @@
 #include "local_keeper.h"
 #include "names.h"
 #include "model/diff/advance/local_update.h"
+#include "model/diff/load/interrupt.h"
 #include "model/diff/local/scan_start.h"
 #include "model/diff/local/scan_finish.h"
 #include "model/diff/modify/remove_folder.h"
@@ -331,7 +332,7 @@ void local_keeper_t::on_change(fs::message::folder_changes_t &message) noexcept 
 }
 
 void local_keeper_t::handle_rename(fs::payload::file_info_t &change, const model::folder_info_t &local_folder,
-                                   lc_context_t &stack_ctx) noexcept {
+                                   lc_context_t &stack_ctx, int64_t &diff_counter) noexcept {
     using namespace model::diff;
     using queue_t = std::pmr::list<model::file_info_t *>;
     using F = presentation::presence_t::features_t;
@@ -380,6 +381,11 @@ void local_keeper_t::handle_rename(fs::payload::file_info_t &change, const model
         proto::set_deleted(pr_prev, true);
         stack_ctx.push(new advance::local_update_t(*cluster, *sequencer, std::move(pr_new), folder_id));
         stack_ctx.push(new advance::local_update_t(*cluster, *sequencer, std::move(pr_prev), folder_id, true));
+        ++diff_counter;
+        if ((diff_counter % files_scan_iteration_limit) == 0) {
+            stack_ctx.push(new load::interrupt_t());
+        }
+
         stack_ctx.name_2_file.emplace(new_sub_name, f);
         stack_ctx.file_2_name.insert_or_assign(f, new_sub_name);
 
@@ -409,6 +415,7 @@ void local_keeper_t::on_changes(model::folder_info_t &local_folder, fs::payload:
     auto unexamined = local_keeper::unexamined_items_t();
     auto augmentation = local_folder.get_augmentation().get();
     auto folder_presence = static_cast<presentation::folder_presence_t *>(augmentation);
+    auto diff_counter = std::int64_t{0};
 
     auto immediate_update = [&](fs::payload::file_info_t &change) {
         auto name = proto::get_name(change);
@@ -424,7 +431,7 @@ void local_keeper_t::on_changes(model::folder_info_t &local_folder, fs::payload:
         if (update) {
             auto renamed = (change.update_reason == UT::meta) && !change.prev_path.empty();
             if (renamed) {
-                handle_rename(change, local_folder, stack_ctx);
+                handle_rename(change, local_folder, stack_ctx, diff_counter);
             } else {
                 stack_ctx.push(new advance::local_update_t(*cluster, *sequencer, std::move(change), folder_id));
             }
