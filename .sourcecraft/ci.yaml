@@ -68,6 +68,8 @@ tasks:
          - make -j`nproc` > /dev/null
          - make install
          - cd ..
+         - python3 -m venv myenv
+         - source myenv/bin/activate
          - pip install conan
          - export PATH=$HOME/my-gcc/bin:$HOME/.local/bin:$PATH
          - conan profile detect
@@ -75,6 +77,7 @@ tasks:
       - name: setup
         script:
           - export PATH=$HOME/my-gcc/bin:$HOME/.local/bin:$PATH
+          - source myenv/bin/activate
           - mkdir build.ci
           - echo `pwd`
           - conan install -u --build=missing --output-folder . -s build_type=Release  -o '&:shared=True' ..
