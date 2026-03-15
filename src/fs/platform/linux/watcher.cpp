@@ -280,31 +280,34 @@ auto watcher_t::unwatch_recurse(std::string_view folder_id) noexcept -> sys::err
     auto queue = queue_t(allocator);
     auto ec = sys::error_code{};
     auto &path = folder_map.find(folder_id)->second.path_str;
-    queue.emplace_back(path_to_wd[path]);
-    while (!queue.empty()) {
-        auto wd = queue.front();
-        auto it_subdir = subdir_map.find(wd);
-        auto it_guard = path_map.find(wd);
-        if (it_subdir != subdir_map.end()) {
-            auto &children = it_subdir->second;
-            for (auto child_wd : children) {
-                queue.emplace_back(child_wd);
+    auto it_path = path_to_wd.find(path);
+    if (it_path != path_to_wd.end()) {
+        queue.emplace_back(path_to_wd[path]);
+        while (!queue.empty()) {
+            auto wd = queue.front();
+            auto it_subdir = subdir_map.find(wd);
+            auto it_guard = path_map.find(wd);
+            if (it_subdir != subdir_map.end()) {
+                auto &children = it_subdir->second;
+                for (auto child_wd : children) {
+                    queue.emplace_back(child_wd);
+                }
+                subdir_map.erase(it_subdir);
             }
-            subdir_map.erase(it_subdir);
-        }
-        auto &path = it_guard->second.path;
-        if (auto r = ::inotify_rm_watch(io_guard.fd, wd); r != 0) {
-            if (!ec) {
-                ec = sys::error_code{errno, sys::system_category()};
+            auto &path = it_guard->second.path;
+            if (auto r = ::inotify_rm_watch(io_guard.fd, wd); r != 0) {
+                if (!ec) {
+                    ec = sys::error_code{errno, sys::system_category()};
+                } else {
+                    LOG_ERROR(log, "cannot do inotify_rm_watch() for '{}': {}", path, strerror(errno));
+                }
             } else {
-                LOG_ERROR(log, "cannot do inotify_rm_watch() for '{}': {}", path, strerror(errno));
+                LOG_TRACE(log, "unwatched '{}'", path);
             }
-        } else {
-            LOG_TRACE(log, "unwatched '{}'", path);
+            path_to_wd.erase(path);
+            path_map.erase(it_guard);
+            queue.pop_front();
         }
-        path_to_wd.erase(path);
-        path_map.erase(it_guard);
-        queue.pop_front();
     }
     return ec;
 }
