@@ -67,13 +67,22 @@ tasks:
          - ./configure --prefix=/$HOME/my-gcc --enable-languages=c,c++ --disable-multilib --enable-bootstrap
          - make -j`nproc` > /dev/null
          - make install
+         - cd ..
          - pip install conan
          - export PATH=$HOME/my-gcc/bin:$HOME/.local/bin:$PATH
          - conan profile detect
          - cp .sourcecraft/conan-profile-linux-appimage /root/.conan2/profiles/default
-
       - name: setup
         script:
           - export PATH=$HOME/my-gcc/bin:$HOME/.local/bin:$PATH
-          - mkdir build.chroot
+          - mkdir build.ci
+          - echo `pwd`
           - conan install -u --build=missing --output-folder . -s build_type=Release  -o '&:shared=True' ..
+      - name: compile
+        script:
+          - cd build.ci
+          - make -j`nproc`
+      - name: test
+        script:
+          - cd build.ci
+          - ctest --rerun-failed --output-on-failure .
