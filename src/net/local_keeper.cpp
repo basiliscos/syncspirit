@@ -354,6 +354,14 @@ void local_keeper_t::handle_rename(fs::payload::file_info_t &change, const model
         }
     }
 
+    auto delete_diff = model::diff::cluster_diff_ptr_t();
+    auto push_delete = [&](model::diff::cluster_diff_t *diff) {
+        auto ex = std::move(delete_diff);
+        delete_diff = diff;
+        if (ex) {
+            delete_diff->sibling = std::move(ex);
+        }
+    };
     auto queue = queue_t(stack_ctx.allocator);
     queue.emplace_back(f_root.get());
     while (!queue.empty()) {
@@ -380,10 +388,11 @@ void local_keeper_t::handle_rename(fs::payload::file_info_t &change, const model
         proto::set_name(pr_new, new_sub_name);
         proto::set_deleted(pr_prev, true);
         stack_ctx.push(new advance::local_update_t(*cluster, *sequencer, std::move(pr_new), folder_id));
-        stack_ctx.push(new advance::local_update_t(*cluster, *sequencer, std::move(pr_prev), folder_id, true));
+        push_delete(new advance::local_update_t(*cluster, *sequencer, std::move(pr_prev), folder_id, true));
         ++diff_counter;
         if ((diff_counter % files_scan_iteration_limit) == 0) {
             stack_ctx.push(new load::interrupt_t());
+            push_delete(new load::interrupt_t());
         }
 
         stack_ctx.name_2_file.emplace(new_sub_name, f);
@@ -400,6 +409,9 @@ void local_keeper_t::handle_rename(fs::payload::file_info_t &change, const model
                 }
             }
         }
+    }
+    if (delete_diff) {
+        stack_ctx.push(delete_diff.get());
     }
 }
 

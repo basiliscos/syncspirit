@@ -1697,11 +1697,11 @@ void test_renaming_race() {
             sup->do_process();
 
             CHECK(folder_local->get_max_sequence() == 15);
-            auto deleted = {"dir_a0/b0", "dir_a0", "dir_a0/b1", "dir_a0/c0", "dir_a2/c0", "dir_a2/b1"};
+            auto deleted = {"dir_a0/b0", "dir_a0/c0", "dir_a0/b1", "dir_a0", "dir_a2/c0", "dir_a2/b1"};
             auto prev_seq = std::int64_t{4};
             for (auto &name : deleted) {
                 auto f = files_local->by_name(name);
-                log->debug("f = {}", name);
+                log->debug("f = {}, seq = {}", name, f->get_sequence());
                 REQUIRE(f);
                 CHECK(f->is_deleted());
                 CHECK(prev_seq < f->get_sequence());
