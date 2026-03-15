@@ -64,12 +64,14 @@ tasks:
          - wget https://ftp.gnu.org/gnu/gcc/gcc-14.3.0/gcc-14.3.0.tar.xz
          - tar -xf gcc-14.3.0.tar.xz
          - cd gcc-14.3.0
-         - ./contrib/download_prerequisites
-         - ./configure --prefix=/$HOME/my-gcc --enable-languages=c,c++ --disable-multilib --enable-bootstrap
-         - make -j`nproc` > /dev/null
-         - make install
+         # - ./contrib/download_prerequisites
+         # - ./configure --prefix=/$HOME/my-gcc --enable-languages=c,c++ --disable-multilib --enable-bootstrap
+         # - make -j`nproc` > /dev/null
+         # - make install
          - cd ..
          - python3 -m venv myenv
+         - echo `pwd`
+         - find .
          - source myenv/bin/activate
          - pip install conan
          - export PATH=$HOME/my-gcc/bin:$HOME/.local/bin:$PATH
