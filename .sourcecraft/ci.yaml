@@ -76,12 +76,15 @@ tasks:
          - conan profile detect
          - cp .sourcecraft/conan-profile-linux-appimage /root/.conan2/profiles/default
          - whereis conan
+         - echo $PATH
       - name: setup
         script:
-          - export PATH=$HOME/my-gcc/bin:$HOME/.local/bin:$PATH
+          - ls -lah ./myenv/bin/activate
           - . ./myenv/bin/activate
           - mkdir build.ci
           - echo `pwd`
+          - export PATH=$HOME/my-gcc/bin:$HOME/.local/bin:$PATH
+          - echo $PATH
           - whereis conan
           - conan install -u --build=missing --output-folder . -s build_type=Release  -o '&:shared=True' ..
       - name: compile
