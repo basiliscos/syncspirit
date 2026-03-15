@@ -71,7 +71,7 @@ tasks:
          # - cd ..
          - python3 -m venv myenv
          - ls -lah ./myenv/bin/activate
-         - source ./myenv/bin/activate
+         - . ./myenv/bin/activate
          - echo "z1"
          - pip install conan
          - echo "z2"
