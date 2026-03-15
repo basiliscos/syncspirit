@@ -75,12 +75,21 @@ bool FU::update(std::string_view relative_path, update_type_t type, folder_updat
     auto it = updates.find(relative_path);
     auto it_prev = (typename decltype(updates)::const_iterator){};
     auto prev_update = (const support::file_update_t *)(nullptr);
+    auto prev_update_source = (support::file_updates_t *)(nullptr);
     if (prev) {
         auto &updates = prev->updates;
         auto target = std::string_view(prev_path_rel.empty() ? relative_path : prev_path_rel);
         it_prev = updates.find(target);
         if (it_prev != updates.end()) {
             prev_update = &*it_prev;
+            prev_update_source = &updates;
+        }
+    }
+    if (!prev_update && !prev_path_rel.empty()) {
+        it_prev = updates.find(prev_path_rel);
+        if (it_prev != updates.end()) {
+            prev_update = &*it_prev;
+            prev_update_source = &updates;
         }
     }
     if (prev_update) {
@@ -96,9 +105,20 @@ bool FU::update(std::string_view relative_path, update_type_t type, folder_updat
             LOG_DEBUG(log, "splitting event rename + change ('{}' => '{}') into delete + change",
                       prev_update->prev_path, relative_path);
             auto pu = support::file_update_t(std::move(prev_update->prev_path), {}, update_type_t::deleted, {});
-            prev->updates.erase(it_prev);
-            prev->updates.insert(std::move(pu));
+            prev_update_source->erase(it_prev);
+            prev_update_source->insert(std::move(pu));
             prev_update = nullptr;
+        }
+        if (prev_update && prev_update->update_type & (ut::CREATED_1 | ut::CREATED)) {
+            auto log = utils::get_logger(actor_identity);
+            if (type == UT::deleted) {
+                type = UT::created;
+                recorded = false;
+                LOG_DEBUG(log, "collapsing create & delete event '{}' -> '{}'", prev_update->path, relative_path);
+            } else {
+                LOG_DEBUG(log, "transferring creation event '{}' -> '{}'", prev_update->path, relative_path);
+            }
+            prev_path_rel = {};
         }
     }
     if (recorded) {
@@ -111,7 +131,7 @@ bool FU::update(std::string_view relative_path, update_type_t type, folder_updat
         }
     }
     if (prev_update) {
-        prev->updates.erase(it_prev);
+        prev_update_source->erase(it_prev);
     }
     return recorded;
 }

@@ -7,6 +7,7 @@
 #include "fs/fs_context.h"
 #include "fs/fs_supervisor.h"
 #include "fs/watcher_actor.h"
+#include "fs/utils.h"
 #include "fs/task/scan_dir.h"
 #include "utils/error_code.h"
 #include "net/names.h"
@@ -1211,6 +1212,29 @@ void test_manual_notification() {
     F().run();
 }
 
+void test_create_modify_rename() {
+    struct F : fixture_real_t {
+        using fixture_real_t::fixture_real_t;
+        void main() noexcept override {
+            auto folder_id = std::string("my-folder-id");
+            auto back_addr = sup->get_address();
+            sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id);
+            sup->do_process();
+            REQUIRE(watched_replies == 1);
+#ifndef SYNCSPIRIT_WIN
+            auto path_file_tmp = root_path / L"файл.bin-tmp";
+            auto path_file_final = root_path / L"файл.bin";
+            write_file(path_file_tmp, "12345");
+            native::rename(path_file_tmp, path_file_final);
+            auto modified = fs::from_unix(123456);
+            bfs::last_write_time(path_file_final, modified);
+            await_events(poll_t::trigger_timer, 1);
+#endif
+        };
+    };
+    F().run();
+}
+
 int _init() {
     test::init_logging();
     REGISTER_TEST_CASE(test_watcher_base, "test_watcher_base", "[fs]");
@@ -1220,6 +1244,7 @@ int _init() {
     REGISTER_TEST_CASE(test_real_impl, "test_real_impl", "[fs]");
     REGISTER_TEST_CASE(test_hierarchies, "test_hierarchies", "[fs]");
     REGISTER_TEST_CASE(test_manual_notification, "test_manual_notification", "[fs]");
+    REGISTER_TEST_CASE(test_create_modify_rename, "test_create_modify_rename", "[fs]");
 #endif
     return 1;
 }
