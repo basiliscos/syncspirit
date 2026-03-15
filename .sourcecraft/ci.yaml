@@ -70,13 +70,13 @@ tasks:
          # - make install
          # - cd ..
          - python3 -m venv myenv
-         - echo `pwd`
-         - find `pwd`
          - ls -lah ./myenv/bin/activate
          - source ./myenv/bin/activate
+         - echo "z1"
          - pip install conan
-         - export PATH=$HOME/my-gcc/bin:$HOME/.local/bin:$PATH
+         - echo "z2"
          - conan profile detect
+         - echo "z3"
          - cp .sourcecraft/conan-profile-linux-appimage /root/.conan2/profiles/default
       - name: setup
         script:
