@@ -70,8 +70,9 @@ tasks:
          # - make install
          # - cd ..
          - python3 -m venv myenv
-         - ls -lah ./myenv/bin/activate
+         - echo $PATH
          - . ./myenv/bin/activate
+         - echo $PATH
          - pip install conan
          - conan profile detect
          - cp .sourcecraft/conan-profile-linux-appimage /root/.conan2/profiles/default
@@ -79,11 +80,12 @@ tasks:
          - echo $PATH
       - name: setup
         script:
-          - ls -lah ./myenv/bin/activate
+          - export PATH=$HOME/my-gcc/bin:$HOME/.local/bin:$PATH
+          - echo $PATH
           - . ./myenv/bin/activate
+          - ./myenv/bin/activate
           - mkdir build.ci
           - echo `pwd`
-          - export PATH=$HOME/my-gcc/bin:$HOME/.local/bin:$PATH
           - echo $PATH
           - whereis conan
           - conan install -u --build=missing --output-folder . -s build_type=Release  -o '&:shared=True' ..
