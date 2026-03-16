@@ -55,7 +55,7 @@ tasks:
       - name: prepare
         image: ubuntu:focal
         script:
-         - export PATH=$HOME/my-gcc/bin:$HOME/.local/bin:$PATH
+         # - export PATH=$HOME/my-gcc/bin:$HOME/.local/bin:$PATH
          - apt update
          - apt install -y software-properties-common
          - apt update
@@ -69,28 +69,20 @@ tasks:
          # - make -j`nproc` > /dev/null
          # - make install
          # - cd ..
-         - python3 -m venv myenv
+         - python3 -m venv ~/myenv
          - echo $PATH
-         - . ./myenv/bin/activate
+         - . ~/myenv/bin/activate
          - echo $PATH
          - pip install conan
          - conan profile detect
          - cp .sourcecraft/conan-profile-linux-appimage /root/.conan2/profiles/default
-         - whereis conan
-         - echo $PATH
+         - mkdir build.ci
+         - cd build.ci
+         - conan install -u --build=missing --output-folder . -s build_type=Release  -o '&:shared=True' ..
       - name: setup
         script:
-          - export PATH=$HOME/my-gcc/bin:$HOME/.local/bin:$PATH
-          - echo $PATH
-          - . ./myenv/bin/activate
-          - chmod +x ./myenv/bin/activate
-          - ./myenv/bin/activate
-          - mkdir build.ci
-          - echo `pwd`
-          - echo $PATH
-          - whereis conan
           - cd build.ci
-          - conan install -u --build=missing --output-folder . -s build_type=Release  -o '&:shared=True' ..
+          - make -j`nproc`
       - name: compile
         script:
           - cd build.ci
