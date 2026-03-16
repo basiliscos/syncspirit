@@ -83,11 +83,13 @@ tasks:
           - export PATH=$HOME/my-gcc/bin:$HOME/.local/bin:$PATH
           - echo $PATH
           - . ./myenv/bin/activate
+          - chmod +x ./myenv/bin/activate
           - ./myenv/bin/activate
           - mkdir build.ci
           - echo `pwd`
           - echo $PATH
           - whereis conan
+          - cd build.ci
           - conan install -u --build=missing --output-folder . -s build_type=Release  -o '&:shared=True' ..
       - name: compile
         script:
