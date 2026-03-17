@@ -77,7 +77,10 @@ tasks:
          - conan profile detect
          - cp .sourcecraft/conan-profile-linux-appimage /root/.conan2/profiles/default
          - mkdir build.ci
+         - apt-get remove -y g++9 gcc-9
          - cd build.ci
+         - whereis gcc
+         - whereis x86_64-pc-linux-gnu-gcc
          - conan install -u --build=missing --output-folder . -s build_type=Release  -o '&:shared=True' ..
       - name: setup
         script:
