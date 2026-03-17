@@ -81,6 +81,7 @@ tasks:
          - cd build.ci
          - whereis gcc
          - whereis x86_64-pc-linux-gnu-gcc
+         - conan install -r conancenter --tool-requires=b2/5.3.3 --build="&"
          - conan install -u --build=missing --output-folder . -s build_type=Release  -o '&:shared=True' ..
       - name: setup
         script:
