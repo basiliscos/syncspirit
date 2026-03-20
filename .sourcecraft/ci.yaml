@@ -63,7 +63,7 @@ tasks:
          - apt install -y cmake python3-venv pkgconf
          - pip install conan
          - conan profile detect
-         - conan install -r conancenter --tool-requires=b2/5.3.3 -o "&:use_cxx_env=True" --build="&"
+         - conan install -r conancenter --tool-requires=b2/5.4.2 -o "&:use_cxx_env=True" --build="&"
          - wget https://ftp.gnu.org/gnu/gcc/gcc-14.3.0/gcc-14.3.0.tar.xz
          - tar -xf gcc-14.3.0.tar.xz
          - cd gcc-14.3.0
