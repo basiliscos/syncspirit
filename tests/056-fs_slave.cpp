@@ -17,12 +17,10 @@ using namespace syncspirit::model;
 using namespace syncspirit::fs;
 using boost::nowide::narrow;
 
-// using clock_t = pt::microsec_clock;
-
 inline static auto retension = pt::milliseconds{1};
 
 struct exec_ctx_t final : fs::execution_context_t {
-    exec_ctx_t() : mediator(retension), proxy_holder(mediator, clock_t::local_time() + retension) {
+    exec_ctx_t() : mediator(retension, true), proxy_holder(mediator, clock_t::local_time() + retension) {
         fs_proxy = &proxy_holder;
     }
 

@@ -100,7 +100,6 @@ struct fixture_t {
         REQUIRE(static_cast<r::actor_base_t *>(file_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
         REQUIRE(static_cast<r::actor_base_t *>(watcher_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
 
-        auto folder_id = std::string("my-folder-id");
         auto back_addr = sup->get_address();
         sup->route<fs::payload::watch_folder_t>(watcher_actor->get_address(), back_addr, root_path, folder_id);
         sup->do_process();
@@ -145,8 +144,8 @@ struct fixture_t {
         auto perms = 0666;
         auto target = std::string();
 
-        auto payload = fs::payload::remote_copy_t(std::move(context), path, conflict_path, type, size, perms, modified,
-                                                  target, deleted, false);
+        auto payload = fs::payload::remote_copy_t(std::move(context), folder_id, path, conflict_path, type, size, perms,
+                                                  modified, target, deleted, false);
         auto cmd = fs::payload::io_command_t(std::move(payload));
         auto cmds = fs::payload::io_commands_t{nullptr};
         cmds.commands.emplace_back(std::move(cmd));
@@ -165,7 +164,7 @@ struct fixture_t {
     r::intrusive_ptr_t<supervisor_t> sup;
     watcher_actor_ptr_t watcher_actor;
     file_actor_ptr_t file_actor;
-    std::string_view folder_id = "1234-5678";
+    std::string folder_id = "1234-5678";
     utils::logger_t log;
     change_messages_t changes;
     r::address_ptr_t fs_addr;
@@ -196,7 +195,7 @@ void test_with_mediator() {
             auto bytes = as_owned_bytes("12345");
 
             auto context = fs::payload::extendended_context_prt_t{};
-            auto payload = fs::payload::append_block_t(std::move(context), path, std::move(bytes), 0, 5);
+            auto payload = fs::payload::append_block_t(std::move(context), folder_id, path, std::move(bytes), 0, 5);
             auto cmd = fs::payload::io_command_t(std::move(payload));
             auto cmds = fs::payload::io_commands_t{nullptr};
             cmds.commands.emplace_back(std::move(cmd));
@@ -209,7 +208,7 @@ void test_with_mediator() {
             auto path = root_path / L"файл";
             std::int64_t modified = 1641828421;
             auto perms = 0666;
-            auto payload = fs::payload::finish_file_t(std::move(context), path, {}, 5, modified, 0666, true);
+            auto payload = fs::payload::finish_file_t(std::move(context), folder_id, path, {}, 5, modified, 0666, true);
             auto cmd = fs::payload::io_command_t(std::move(payload));
             auto cmds = fs::payload::io_commands_t{nullptr};
             cmds.commands.emplace_back(std::move(cmd));

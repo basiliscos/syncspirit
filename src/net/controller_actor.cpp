@@ -585,8 +585,9 @@ void controller_actor_t::io_advance(model::advance_action_t action, model::file_
 
     auto context = fs::payload::extendended_context_prt_t{};
     context.reset(new remote_copy_context_t(action, peer_file, peer_folder));
-    auto payload = fs::payload::remote_copy_t(std::move(context), path, conflict_path, type, size, perms, modified,
-                                              target, deleted, no_permissions);
+    auto folder_id = std::string(peer_folder.get_folder()->get_id());
+    auto payload = fs::payload::remote_copy_t(std::move(context), std::move(folder_id), path, conflict_path, type, size,
+                                              perms, modified, target, deleted, no_permissions);
     ctx.push(std::move(payload));
 }
 
@@ -598,7 +599,9 @@ void controller_actor_t::io_append_block(model::file_info_t &peer_file, model::f
     auto offset = peer_file.get_block_offset(block_index);
     auto context = fs::payload::extendended_context_prt_t{};
     context.reset(new block_ack_context_t(block, peer_file, peer_folder, block_index));
-    auto payload = fs::payload::append_block_t(std::move(context), path, std::move(data), offset, file_size);
+    auto folder_id = std::string(peer_folder.get_folder()->get_id());
+    auto payload =
+        fs::payload::append_block_t(std::move(context), std::move(folder_id), path, std::move(data), offset, file_size);
     ctx.push(std::move(payload));
 }
 
@@ -637,8 +640,9 @@ void controller_actor_t::io_clone_block(const model::file_block_t &file_block, m
     auto context = fs::payload::extendended_context_prt_t{};
     auto block = const_cast<model::block_info_t *>(file_block.block());
     context.reset(new block_ack_context_t(block, *target, target_fi, target_block_index));
-    auto payload = fs::payload::clone_block_t(std::move(context), target_path, target_offset, target_sz, source_path,
-                                              source_offset, block_sz);
+    auto folder_id = std::string(target_fi.get_folder()->get_id());
+    auto payload = fs::payload::clone_block_t(std::move(context), std::move(folder_id), target_path, target_offset,
+                                              target_sz, source_path, source_offset, block_sz);
     ctx.push(std::move(payload));
 }
 
@@ -660,8 +664,9 @@ void controller_actor_t::io_finish_file(model::file_info_t *local_file, model::f
 
     auto context = fs::payload::extendended_context_prt_t{};
     context.reset(new finish_file_context_t(peer_file, peer_folder, action));
-    auto payload = fs::payload::finish_file_t(std::move(context), std::move(path), std::move(conflict_path), file_size,
-                                              modified_s, perms, no_permissions);
+    auto folder_id = std::string(peer_folder.get_folder()->get_id());
+    auto payload = fs::payload::finish_file_t(std::move(context), std::move(folder_id), std::move(path),
+                                              std::move(conflict_path), file_size, modified_s, perms, no_permissions);
     ctx.push(std::move(payload));
 }
 

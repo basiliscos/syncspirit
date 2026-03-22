@@ -14,7 +14,8 @@ using boost::nowide::narrow;
 
 static constexpr size_t MAX_LOG_ITEMS = 5;
 
-updates_mediator_t::updates_mediator_t(const pt::time_duration &interval_) : interval{interval_} {
+updates_mediator_t::updates_mediator_t(const pt::time_duration &interval_, bool enabled_)
+    : interval{interval_}, enabled{enabled_} {
     log = utils::get_logger("fs.updates_mediator");
 }
 
@@ -34,6 +35,11 @@ void updates_mediator_t::mask(const bfs::path &path, const bfs::path &prev_path,
     using result_t = decltype(path.native());
     using native_type_t = std::remove_cv_t<std::remove_reference_t<result_t>>;
     using char_t = typename native_type_t::value_type;
+
+    if (!enabled) {
+        return;
+    }
+
     auto target = (updates_t *){};
     auto counter = update_type_internal_t{1};
     auto path_str = Stringizer<char_t>::get(path);
@@ -99,3 +105,5 @@ bool updates_mediator_t::clean_expired() noexcept {
     std::swap(next, postponed);
     return next.updates.size();
 }
+
+void updates_mediator_t::enable(bool value) noexcept { enabled = value; }

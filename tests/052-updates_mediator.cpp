@@ -13,7 +13,7 @@ using P = std::filesystem::path;
 
 TEST_CASE("update_mediator", "[fs]") {
     auto interval = pt::microseconds{1};
-    auto mediator = updates_mediator_t(interval);
+    auto mediator = updates_mediator_t(interval, true);
     auto deadline_1 = pt::microsec_clock::local_time() + interval;
     auto deadline_2 = pt::microsec_clock::local_time() + interval * 2;
     auto deadline_3 = pt::microsec_clock::local_time() + interval * 3;
@@ -22,6 +22,11 @@ TEST_CASE("update_mediator", "[fs]") {
     SECTION("1 file, successful unmask") {
         mediator.mask(P("/tmp/path_1"), {}, deadline_1);
         CHECK(mediator.is_masked("/tmp/path_1"));
+    }
+    SECTION("1 file, successful unmask") {
+        mediator.enable(false);
+        mediator.mask(P("/tmp/path_1"), {}, deadline_1);
+        CHECK(!mediator.is_masked("/tmp/path_1"));
     }
     SECTION("1 file, double updates") {
         mediator.mask(P("/tmp/path_1"), {}, deadline_1);

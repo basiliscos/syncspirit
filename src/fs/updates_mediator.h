@@ -18,11 +18,12 @@ namespace bfs = std::filesystem;
 
 struct SYNCSPIRIT_API updates_mediator_t : model::arc_base_t<updates_mediator_t> {
     using timepoint_t = pt::ptime;
-    updates_mediator_t(const pt::time_duration &interval);
+    updates_mediator_t(const pt::time_duration &interval, bool enabled = false);
 
     void mask(const bfs::path &path, const bfs::path &prev_path, const timepoint_t &deadline) noexcept;
     std::uint32_t is_masked(std::string_view path) noexcept;
     bool clean_expired() noexcept;
+    void enable(bool value) noexcept;
 
   private:
     struct updates_t {
@@ -34,6 +35,7 @@ struct SYNCSPIRIT_API updates_mediator_t : model::arc_base_t<updates_mediator_t>
     updates_t next;
     updates_t postponed;
     utils::logger_t log;
+    bool enabled;
 };
 
 using updates_mediator_ptr_t = model::intrusive_ptr_t<updates_mediator_t>;

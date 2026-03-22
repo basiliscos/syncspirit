@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "test-utils.h"
 #include "access.h"
@@ -53,14 +53,14 @@ struct mock_supervisor_t : supervisor_t {
     }
 
     void process_io(fs::payload::append_block_t &req) noexcept override {
-        auto copy = fs::payload::append_block_t({}, req.path, req.data, req.offset, req.file_size);
+        auto copy = fs::payload::append_block_t({}, req.folder_id, req.path, req.data, req.offset, req.file_size);
         appended_blocks.emplace_back(std::move(copy));
         supervisor_t::process_io(req);
     }
 
     void process_io(fs::payload::finish_file_t &req) noexcept override {
-        auto copy = fs::payload::finish_file_t({}, req.path, req.conflict_path, req.file_size, req.modification_s,
-                                               req.permissions, req.no_permissions);
+        auto copy = fs::payload::finish_file_t({}, req.folder_id, req.path, req.conflict_path, req.file_size,
+                                               req.modification_s, req.permissions, req.no_permissions);
         file_finishes.emplace_back(std::move(copy));
         supervisor_t::process_io(req);
     }

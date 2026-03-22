@@ -19,7 +19,7 @@ TEST_CASE("block iterator", "[model]") {
     auto path_guard = test::path_guard_t(root_path);
 
     auto interval = pt::microseconds{1};
-    auto mediator = updates_mediator_t(interval);
+    auto mediator = updates_mediator_t(interval, true);
     auto deadline = pt::microsec_clock::local_time() + interval;
 
     auto proxy = fs_proxy_t(mediator, deadline);

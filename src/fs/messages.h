@@ -35,9 +35,19 @@ struct foreign_executor_t : hasher::payload::extendended_context_t {
 };
 using foreign_executor_prt_t = r::intrusive_ptr_t<foreign_executor_t>;
 
-template <typename ReplyType = void> struct payload_base_t {
-    outcome::result<ReplyType> result;
+struct payload_generic_base_t {
     extendended_context_prt_t context;
+    std::string folder_id;
+};
+
+template <typename ReplyType = void> struct payload_base_t : payload_generic_base_t {
+    using parent_t = payload_generic_base_t;
+    payload_base_t() = default;
+    payload_base_t(extendended_context_prt_t context, std::string folder_id_)
+        : parent_t{std::move(context), std::move(folder_id_)},
+          result(utils::make_error_code(utils::error_code_t::no_action)) {}
+
+    outcome::result<ReplyType> result;
 };
 
 struct block_request_t : payload_base_t<utils::bytes_t> {
@@ -48,8 +58,7 @@ struct block_request_t : payload_base_t<utils::bytes_t> {
 
     inline block_request_t(extendended_context_prt_t context_, bfs::path path_, std::uint64_t offset_,
                            std::uint64_t block_size_) noexcept
-        : parent_t{utils::make_error_code(utils::error_code_t::no_action), std::move(context_)}, path{std::move(path_)},
-          offset{offset_}, block_size{block_size_} {}
+        : parent_t(std::move(context_), {}), path{std::move(path_)}, offset{offset_}, block_size{block_size_} {}
 
     block_request_t(const block_request_t &) = delete;
     block_request_t(block_request_t &&) noexcept = default;
@@ -67,11 +76,11 @@ struct remote_copy_t : payload_base_t<void> {
     bool deleted;
     bool no_permissions;
 
-    inline remote_copy_t(extendended_context_prt_t context_, bfs::path path_, bfs::path conflict_path_,
-                         proto::FileInfoType type_, std::uint64_t size_, std::uint32_t permissions_,
-                         std::int64_t modification_s_, std::string symlink_target_, bool deleted_,
-                         bool no_permissions_) noexcept
-        : parent_t{utils::make_error_code(utils::error_code_t::no_action), std::move(context_)}, path{std::move(path_)},
+    inline remote_copy_t(extendended_context_prt_t context_, std::string folder_id_, bfs::path path_,
+                         bfs::path conflict_path_, proto::FileInfoType type_, std::uint64_t size_,
+                         std::uint32_t permissions_, std::int64_t modification_s_, std::string symlink_target_,
+                         bool deleted_, bool no_permissions_) noexcept
+        : parent_t(std::move(context_), std::move(folder_id_)), path{std::move(path_)},
           conflict_path{std::move(conflict_path_)}, type{type_}, size{size_}, permissions{permissions_},
           modification_s{modification_s_}, symlink_target(std::move(symlink_target_)), deleted{deleted_},
           no_permissions{no_permissions_} {}
@@ -89,10 +98,10 @@ struct finish_file_t : payload_base_t<void> {
     std::uint32_t permissions;
     bool no_permissions;
 
-    inline finish_file_t(extendended_context_prt_t context_, bfs::path path_, bfs::path conflict_path_,
-                         std::uint64_t file_size_, std::int64_t modification_s_, std::uint32_t permissions_,
-                         bool no_permissions_) noexcept
-        : parent_t{utils::make_error_code(utils::error_code_t::no_action), std::move(context_)}, path{std::move(path_)},
+    inline finish_file_t(extendended_context_prt_t context_, std::string folder_id_, bfs::path path_,
+                         bfs::path conflict_path_, std::uint64_t file_size_, std::int64_t modification_s_,
+                         std::uint32_t permissions_, bool no_permissions_) noexcept
+        : parent_t(std::move(context_), std::move(folder_id_)), path{std::move(path_)},
           conflict_path{std::move(conflict_path_)}, file_size{file_size_}, modification_s{modification_s_},
           permissions{permissions_}, no_permissions{no_permissions_} {}
 
@@ -107,10 +116,10 @@ struct append_block_t : payload_base_t<void> {
     std::uint64_t offset;
     std::uint64_t file_size;
 
-    inline append_block_t(extendended_context_prt_t context_, bfs::path path_, utils::bytes_t data_,
-                          std::uint64_t offset_, std::uint64_t file_size_)
-        : parent_t{utils::make_error_code(utils::error_code_t::no_action), std::move(context_)}, path{std::move(path_)},
-          data{std::move(data_)}, offset{offset_}, file_size{file_size_} {}
+    inline append_block_t(extendended_context_prt_t context_, std::string folder_id_, bfs::path path_,
+                          utils::bytes_t data_, std::uint64_t offset_, std::uint64_t file_size_)
+        : parent_t(std::move(context_), std::move(folder_id_)), path{std::move(path_)}, data{std::move(data_)},
+          offset{offset_}, file_size{file_size_} {}
 
     append_block_t(const append_block_t &) = delete;
     append_block_t(append_block_t &&) noexcept = default;
@@ -126,12 +135,12 @@ struct clone_block_t : payload_base_t<void> {
     std::uint64_t source_offset;
     std::uint64_t block_size;
 
-    inline clone_block_t(extendended_context_prt_t context_, bfs::path target_, std::uint64_t target_offset_,
-                         std::uint64_t target_size_, bfs::path source_, std::uint64_t source_offset_,
-                         std::uint64_t block_size_) noexcept
-        : parent_t{utils::make_error_code(utils::error_code_t::no_action), std::move(context_)},
-          path{std::move(target_)}, target_offset{target_offset_}, target_size{target_size_},
-          source{std::move(source_)}, source_offset{source_offset_}, block_size{block_size_} {}
+    inline clone_block_t(extendended_context_prt_t context_, std::string folder_id, bfs::path target_,
+                         std::uint64_t target_offset_, std::uint64_t target_size_, bfs::path source_,
+                         std::uint64_t source_offset_, std::uint64_t block_size_) noexcept
+        : parent_t(std::move(context_), std::move(folder_id)), path{std::move(target_)}, target_offset{target_offset_},
+          target_size{target_size_}, source{std::move(source_)}, source_offset{source_offset_},
+          block_size{block_size_} {}
 
     clone_block_t(const clone_block_t &) = delete;
     clone_block_t(clone_block_t &&) noexcept = default;

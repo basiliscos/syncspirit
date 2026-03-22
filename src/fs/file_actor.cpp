@@ -101,6 +101,7 @@ void file_actor_t::on_io_commands(message::io_commands_t &message) noexcept {
 
         std::visit(
             [&](auto &cmd) {
+                ctx.updates_mediator.enable(watched_folders->contains(cmd.folder_id));
                 auto path_wstr = cmd.path.generic_wstring();
                 auto path_wstr_ptr = path_wstr.data();
                 auto path_str = std::string();

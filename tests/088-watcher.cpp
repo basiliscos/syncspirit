@@ -470,6 +470,7 @@ void test_watcher_base() {
                 auto own_name = bfs::path(L"файл.bin");
                 auto sub_path = root_path / own_name;
                 write_file(sub_path, "12345");
+                updates_mediator->enable(true);
                 updates_mediator->mask(sub_path, {}, deadline);
 
                 target->push(deadline, folder_id, narrow(own_name.wstring()), {}, U::created);

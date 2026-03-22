@@ -112,6 +112,10 @@ struct fixture_t {
 
         updates_mediator = new fs::updates_mediator_t(retension);
         watched_folders.reset(new watched_folders_t());
+
+        auto folder_info = fs::folder_info_t(root_path, narrow(root_path.generic_wstring()));
+        watched_folders->emplace(std::make_pair(folder_id, std::move(folder_info)));
+
         create_file_actor();
         sup->do_process();
         sequencer = sup->sequencer;
@@ -134,7 +138,8 @@ struct fixture_t {
         auto bytes = utils::bytes_t(data.begin(), data.end());
 
         auto context = fs::payload::extendended_context_prt_t{};
-        auto payload = fs::payload::append_block_t(std::move(context), path, std::move(bytes), offset, file_size);
+        auto payload =
+            fs::payload::append_block_t(std::move(context), folder_id, path, std::move(bytes), offset, file_size);
         auto cmd = fs::payload::io_command_t(std::move(payload));
         auto cmds = fs::payload::io_commands_t{nullptr};
         cmds.commands.emplace_back(std::move(cmd));
@@ -148,8 +153,8 @@ struct fixture_t {
                                 std::uint64_t block_size) noexcept {
         auto context = fs::payload::extendended_context_prt_t{};
 
-        auto payload = fs::payload::clone_block_t(std::move(context), target, target_offset, target_size, source,
-                                                  source_offset, block_size);
+        auto payload = fs::payload::clone_block_t(std::move(context), folder_id, target, target_offset, target_size,
+                                                  source, source_offset, block_size);
         auto cmd = fs::payload::io_command_t(std::move(payload));
         auto cmds = fs::payload::io_commands_t{nullptr};
         cmds.commands.emplace_back(std::move(cmd));
@@ -162,8 +167,8 @@ struct fixture_t {
                                 std::uint32_t permissions, bool no_permissions,
                                 const bfs::path &conflict_path = {}) noexcept {
         auto context = fs::payload::extendended_context_prt_t{};
-        auto payload = fs::payload::finish_file_t(std::move(context), path, conflict_path, file_size, modification_s,
-                                                  permissions, no_permissions);
+        auto payload = fs::payload::finish_file_t(std::move(context), folder_id, path, conflict_path, file_size,
+                                                  modification_s, permissions, no_permissions);
         auto cmd = fs::payload::io_command_t(std::move(payload));
         auto cmds = fs::payload::io_commands_t{nullptr};
         cmds.commands.emplace_back(std::move(cmd));
@@ -182,7 +187,7 @@ struct fixture_t {
         auto modificaiton = proto::get_modified_s(meta);
         auto target = std::string(proto::get_symlink_target(meta));
 
-        auto payload = fs::payload::remote_copy_t(std::move(context), path, conflict_path, type, size, perms,
+        auto payload = fs::payload::remote_copy_t(std::move(context), folder_id, path, conflict_path, type, size, perms,
                                                   modificaiton, target, deleted, false);
         auto cmd = fs::payload::io_command_t(std::move(payload));
         auto cmds = fs::payload::io_commands_t{nullptr};
@@ -204,7 +209,7 @@ struct fixture_t {
     test::path_guard_t path_guard;
     r::system_context_t ctx;
     io_commands_t_ptr_t reply;
-    std::string_view folder_id = "1234-5678";
+    std::string folder_id = "1234-5678";
 };
 } // namespace
 
