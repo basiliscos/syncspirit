@@ -2,17 +2,12 @@ on:
   push:
     - workflows: build-package-workflow
 
-# tasks:
-#   - name: compile-san-n-test
-#   - name: make-app-image
-
 workflows:
   build-package-workflow:
     settings:
         max_cube_duration: 240m
     tasks:
-      - [compile-san-n-test, make-app-image]
-      #- compile-san-n-test
+      - [compile-san-n-test, make-win32-build]
 
 tasks:
   - name: compile-san-n-test
