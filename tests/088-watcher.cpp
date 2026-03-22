@@ -465,7 +465,7 @@ void test_watcher_base() {
                 auto own_name = bfs::path(L"файл.bin");
                 auto sub_path = root_path / own_name;
                 write_file(sub_path, "12345");
-                updates_mediator->push(narrow(sub_path.generic_wstring()), {}, deadline);
+                updates_mediator->mask(sub_path, {}, deadline);
 
                 target->push(deadline, folder_id, narrow(own_name.wstring()), {}, U::created);
                 await_events(poll_t::single);

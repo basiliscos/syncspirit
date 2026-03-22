@@ -72,6 +72,7 @@ struct SYNCSPIRIT_API file_actor_t : public r::actor_base_t {
         std::tuple<r::plugin::address_maker_plugin_t, r::plugin::lifetime_plugin_t, r::plugin::init_shutdown_plugin_t,
                    r::plugin::link_server_plugin_t, r::plugin::link_client_plugin_t, hasher::hasher_plugin_t,
                    r::plugin::resources_plugin_t, r::plugin::starter_plugin_t>;
+    struct process_context_t;
 
     explicit file_actor_t(config_t &cfg);
 
@@ -91,11 +92,11 @@ struct SYNCSPIRIT_API file_actor_t : public r::actor_base_t {
     void on_exec(message::foreign_executor_t &) noexcept;
     void on_io_commands(message::io_commands_t &) noexcept;
     void on_create_dir(message::create_dir_t &) noexcept;
-    void process(payload::block_request_t &, std::string_view, const void *) noexcept;
-    void process(payload::remote_copy_t &, std::string_view, const void *) noexcept;
-    void process(payload::append_block_t &, std::string_view, const void *) noexcept;
-    void process(payload::finish_file_t &, std::string_view, const void *) noexcept;
-    void process(payload::clone_block_t &, std::string_view, const void *) noexcept;
+    void process(payload::block_request_t &, std::string_view, process_context_t &) noexcept;
+    void process(payload::remote_copy_t &, std::string_view, process_context_t &) noexcept;
+    void process(payload::append_block_t &, std::string_view, process_context_t &) noexcept;
+    void process(payload::finish_file_t &, std::string_view, process_context_t &) noexcept;
+    void process(payload::clone_block_t &, std::string_view, process_context_t &) noexcept;
 
     void on_controller_up(net::message::controller_up_t &message) noexcept;
     void on_controller_predown(net::message::controller_predown_t &message) noexcept;
@@ -107,7 +108,7 @@ struct SYNCSPIRIT_API file_actor_t : public r::actor_base_t {
                                                        const file_ptr_t &target_backend) noexcept;
 
     outcome::result<file_ptr_t> open_file_rw(const bfs::path &path, std::uint64_t file_size,
-                                             const void *context) noexcept;
+                                             process_context_t &) noexcept;
     outcome::result<file_ptr_t> open_file_ro(const bfs::path &path, const void *context = {}) noexcept;
 
     utils::logger_t log;

@@ -115,6 +115,7 @@ add_library(syncspirit_core
     src/fs/file_actor.cpp
     src/fs/file_cache.cpp
     src/fs/fs_context.cpp
+    src/fs/fs_proxy.cpp
     src/fs/fs_supervisor.cpp
     src/fs/fs_slave.cpp
     src/fs/updates_mediator.cpp

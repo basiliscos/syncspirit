@@ -2,7 +2,8 @@
 // SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "file_actor.h"
-#include "fs/fs_slave.h"
+#include "fs_proxy.h"
+#include "fs_slave.h"
 #include "net/names.h"
 #include "utils.h"
 #include "utils/io.h"
@@ -23,14 +24,19 @@ r::plugin::resource_id_t controller = 0;
 } // namespace resource
 } // namespace
 
+struct file_actor_t::process_context_t : fs_proxy_t {
+    process_context_t(const void *cache_key_, file_actor_t &actor)
+        : fs_proxy_t(*actor.updates_mediator, clock_t::local_time() + actor.retension), cache_key{cache_key_} {}
+    const void *cache_key;
+};
+
 file_actor_t::file_actor_t(config_t &cfg)
     : r::actor_base_t{cfg}, concurrent_hashes{cfg.concurrent_hashes}, retension{cfg.change_retension},
       updates_mediator{cfg.updates_mediator}, scan_dir_callback(cfg.scan_dir_callback) {
-    if (updates_mediator) {
-        if (!retension.is_positive()) {
-            LOG_ERROR(log, "retension interval should be positive");
-            throw std::runtime_error("retension interval should be positive");
-        }
+    assert(updates_mediator);
+    if (!retension.is_positive()) {
+        LOG_ERROR(log, "retension interval should be positive");
+        throw std::runtime_error("retension interval should be positive");
     }
 }
 
@@ -82,8 +88,7 @@ void file_actor_t::shutdown_finish() noexcept {
 
 void file_actor_t::on_io_commands(message::io_commands_t &message) noexcept {
     auto &p = message.payload;
-    auto deadline = updates_mediator ? clock_t::local_time() + retension : pt::ptime();
-    auto updates_sz = int{0};
+    auto ctx = process_context_t(p.context, *this);
 
     for (auto &cmd : p.commands) {
         static const size_t SS_PATH_MAX = 32 * 1024;
@@ -104,16 +109,12 @@ void file_actor_t::on_io_commands(message::io_commands_t &message) noexcept {
                     path_str = narrow(path_wstr);
                     path_view = path_str;
                 }
-                process(cmd, path_view, p.context);
-                if (updates_mediator) {
-                    updates_mediator->push(std::string(path_view), {}, deadline);
-                    ++updates_sz;
-                }
+                process(cmd, path_view, ctx);
             },
             cmd);
     }
 
-    if (updates_sz && !expiration_timer) {
+    if (ctx.mediator_updates && !expiration_timer) {
         expiration_timer = start_timer(retension, *this, &file_actor_t::on_retension_finish);
     }
 }
@@ -131,29 +132,21 @@ void file_actor_t::on_retension_finish(r::request_id_t, bool cancelled) noexcept
 
 void file_actor_t::on_exec(message::foreign_executor_t &request) noexcept {
     struct execution_ctx_impl_t final : execution_context_t {
-        execution_ctx_impl_t(file_actor_t *actor_, pt::ptime &deadline_holder_)
-            : actor{actor_}, deadline_holder{deadline_holder_} {
+        execution_ctx_impl_t(file_actor_t &actor_)
+            : actor{&actor_}, fs_proxy_holder(*actor_.updates_mediator, clock_t::local_time() + actor_.retension) {
             plugin = actor->hasher;
-            mediator = actor->updates_mediator.get();
+            fs_proxy = &fs_proxy_holder;
             scan_dir_callback = actor->scan_dir_callback;
         }
 
-        pt::ptime get_deadline() const override {
-            if (deadline_holder.is_not_a_date_time()) {
-                deadline_holder = clock_t::local_time() + actor->retension;
-            }
-            return deadline_holder;
-        }
-
+        fs_proxy_t fs_proxy_holder;
         file_actor_t *actor;
-        pt::ptime &deadline_holder;
     };
 
     LOG_DEBUG(log, "on_exec");
     auto slave = static_cast<fs::fs_slave_t *>(request.payload.get());
     slave->ec = {};
-    auto deadline = pt::ptime{};
-    auto ctx = execution_ctx_impl_t(this, deadline);
+    auto ctx = execution_ctx_impl_t(*this);
     auto updated = slave->exec(ctx);
     if (updated && !expiration_timer) {
         expiration_timer = start_timer(retension, *this, &file_actor_t::on_retension_finish);
@@ -177,10 +170,11 @@ void file_actor_t::on_controller_predown(net::message::controller_predown_t &mes
     }
 }
 
-void file_actor_t::process(payload::block_request_t &cmd, std::string_view path_str, const void *context) noexcept {
+void file_actor_t::process(payload::block_request_t &cmd, std::string_view path_str,
+                           process_context_t &context) noexcept {
     LOG_TRACE(log, "processing block request");
     auto &path = cmd.path;
-    auto file_opt = open_file_ro(path, context);
+    auto file_opt = open_file_ro(path, context.cache_key);
     auto ec = sys::error_code{};
     auto data = utils::bytes_t{};
     if (!file_opt) {
@@ -204,16 +198,15 @@ void file_actor_t::process(payload::block_request_t &cmd, std::string_view path_
     cmd.result = std::move(data);
 }
 
-void file_actor_t::process(payload::remote_copy_t &cmd, std::string_view path_str, const void *context) noexcept {
+void file_actor_t::process(payload::remote_copy_t &cmd, std::string_view path_str,
+                           process_context_t &context) noexcept {
     auto &path = cmd.path;
     sys::error_code ec;
 
     if (!cmd.conflict_path.empty()) {
         auto conflict_path_str = cmd.conflict_path.generic_string();
         LOG_DEBUG(log, "renaming {} -> {}", path_str, conflict_path_str);
-        auto ec = sys::error_code();
-        bfs::rename(cmd.path, cmd.conflict_path);
-        if (ec) {
+        if (auto ec = context.rename(cmd.path, cmd.conflict_path); ec) {
             LOG_ERROR(log, "cannot rename file: {}: {}", path_str, ec.message());
             cmd.result = ec;
             return;
@@ -223,8 +216,7 @@ void file_actor_t::process(payload::remote_copy_t &cmd, std::string_view path_st
     if (cmd.deleted) {
         if (bfs::exists(path, ec)) {
             LOG_DEBUG(log, "removing {}", path_str);
-            auto ok = bfs::remove_all(path, ec);
-            if (!ok) {
+            if (auto ec = context.remove(path); ec) {
                 LOG_ERROR(log, "error removing {} : {}", path_str, ec.message());
                 cmd.result = ec;
                 return;
@@ -241,8 +233,7 @@ void file_actor_t::process(payload::remote_copy_t &cmd, std::string_view path_st
 
     bool exists = bfs::exists(parent, ec);
     if (!exists) {
-        bfs::create_directories(parent, ec);
-        if (ec) {
+        if (auto ec = context.create_directories(parent); ec) {
             cmd.result = ec;
             return;
         }
@@ -250,30 +241,23 @@ void file_actor_t::process(payload::remote_copy_t &cmd, std::string_view path_st
 
     if (cmd.type == proto::FileInfoType::FILE) {
         auto sz = cmd.size;
-        bool temporal = sz > 0;
-        if (temporal) {
+        auto file_opt = context.open_write(path, sz);
+        if (file_opt.has_value()) {
             LOG_TRACE(log, "touching existing file {} ({} bytes)", path.string(), sz);
         } else {
-            LOG_TRACE(log, "touching empty file {}", path.string());
-            auto out = utils::ofstream_t(path, utils::ofstream_t::trunc);
-            if (!out) {
-                auto ec = sys::error_code{errno, sys::system_category()};
-                LOG_ERROR(log, "error creating {}: {}", path.string(), ec.message());
-                cmd.result = ec;
-                return;
-            }
-            out.close();
+            auto &ec = file_opt.assume_error();
+            LOG_ERROR(log, "error creating {}: {}", path.string(), ec.message());
+            cmd.result = ec;
+            return;
         }
-        bfs::last_write_time(path, from_unix(cmd.modification_s), ec);
-        if (ec) {
+        if (auto ec = context.last_write_time(path, cmd.modification_s); ec) {
             cmd.result = ec;
             return;
         }
         set_perms = !cmd.no_permissions && utils::platform_t::permissions_supported(path);
     } else if (cmd.type == proto::FileInfoType::DIRECTORY) {
         LOG_DEBUG(log, "creating directory {}", path.string());
-        bfs::create_directory(path, ec);
-        if (ec) {
+        if (auto ec = context.create_directories(path); ec) {
             cmd.result = ec;
             return;
         }
@@ -282,12 +266,10 @@ void file_actor_t::process(payload::remote_copy_t &cmd, std::string_view path_st
         if (utils::platform_t::symlinks_supported()) {
             auto target = bfs::path(cmd.symlink_target);
             LOG_DEBUG(log, "creating symlink {} -> {}", path.string(), target.string());
-
             bool attempt_create =
                 !bfs::exists(path, ec) || !bfs::is_symlink(path, ec) || (bfs::read_symlink(path, ec) != target);
             if (attempt_create) {
-                bfs::create_symlink(target, path, ec);
-                if (ec) {
+                if (auto ec = context.create_link(target, path); ec) {
                     LOG_WARN(log, "error symlinking {} -> {} : {}", path.string(), target.string(), ec.message());
                     cmd.result = ec;
                     return;
@@ -301,9 +283,7 @@ void file_actor_t::process(payload::remote_copy_t &cmd, std::string_view path_st
     }
 
     if (set_perms) {
-        auto perms = static_cast<bfs::perms>(cmd.permissions);
-        bfs::permissions(path, perms, ec);
-        if (ec) {
+        if (auto ec = context.set_perms(path, cmd.permissions); ec) {
             LOG_ERROR(log, "cannot set permissions {:#o} on file: '{}': {}", cmd.permissions, path.string(),
                       ec.message());
             cmd.result = ec;
@@ -313,8 +293,9 @@ void file_actor_t::process(payload::remote_copy_t &cmd, std::string_view path_st
     cmd.result = outcome::success();
 }
 
-void file_actor_t::process(payload::finish_file_t &cmd, std::string_view path_str, const void *context) noexcept {
-    auto &file_cache = context_cache[context];
+void file_actor_t::process(payload::finish_file_t &cmd, std::string_view path_str,
+                           process_context_t &context) noexcept {
+    auto &file_cache = context_cache[context.cache_key];
     auto it = file_cache.find(cmd.path);
     if (it == file_cache.end()) {
         LOG_DEBUG(log, "attempt to flush non-opened file {}", path_str);
@@ -326,7 +307,7 @@ void file_actor_t::process(payload::finish_file_t &cmd, std::string_view path_st
             return;
         }
 
-        auto option = file_t::open_write(cmd.path, cmd.file_size);
+        auto option = file_t::open_write(context, cmd.path, cmd.file_size);
         if (!option) {
             auto &err = option.assume_error();
             LOG_ERROR(log, "cannot open file '{}': {}", path_str, err.message());
@@ -337,21 +318,20 @@ void file_actor_t::process(payload::finish_file_t &cmd, std::string_view path_st
         it = file_cache.emplace(cmd.path, ptr).first;
     }
 
+    auto backend = it->second;
     if (!cmd.conflict_path.empty()) {
-        auto conflict_path_str = cmd.conflict_path.generic_string();
-        LOG_DEBUG(log, "renaming {} -> {}", path_str, conflict_path_str);
+        auto new_name = narrow(cmd.conflict_path.generic_wstring());
+        LOG_DEBUG(log, "renaming {} -> {}", path_str, new_name);
         auto ec = sys::error_code();
-        bfs::rename(cmd.path, cmd.conflict_path);
-        if (ec) {
+        if (auto ec = context.rename(cmd.path, cmd.conflict_path); ec) {
             LOG_ERROR(log, "cannot rename file '{}': {}", path_str, ec.message());
             cmd.result = ec;
             return;
         }
     }
 
-    auto backend = it->second;
     file_cache.erase(it);
-    auto ok = backend->close(cmd.modification_s, cmd.path);
+    auto ok = backend->close(&context, cmd.modification_s, cmd.path);
     if (!ok) {
         auto &ec = ok.assume_error();
         LOG_ERROR(log, "cannot close file '{}': {}", path_str, ec.message());
@@ -360,10 +340,7 @@ void file_actor_t::process(payload::finish_file_t &cmd, std::string_view path_st
     }
 
     if (!cmd.no_permissions) {
-        auto perms = static_cast<bfs::perms>(cmd.permissions);
-        auto ec = sys::error_code();
-        bfs::permissions(cmd.path, perms, ec);
-        if (ec) {
+        if (auto ec = context.set_perms(cmd.path, cmd.permissions); !ec) {
             LOG_ERROR(log, "cannot set permissions {:#o} on file: '{}': {}", cmd.permissions, cmd.path.string(),
                       ec.message());
             cmd.result = ec;
@@ -375,7 +352,8 @@ void file_actor_t::process(payload::finish_file_t &cmd, std::string_view path_st
     LOG_INFO(log, "file {} ({} bytes) is now locally available", path_str, cmd.file_size);
 }
 
-void file_actor_t::process(payload::append_block_t &cmd, std::string_view path_str, const void *context) noexcept {
+void file_actor_t::process(payload::append_block_t &cmd, std::string_view path_str,
+                           process_context_t &context) noexcept {
     auto &path = cmd.path;
     auto file_opt = open_file_rw(path, cmd.file_size, context);
     if (!file_opt) {
@@ -385,10 +363,11 @@ void file_actor_t::process(payload::append_block_t &cmd, std::string_view path_s
         return;
     }
     auto &backend = file_opt.assume_value();
-    cmd.result = backend->write(cmd.offset, cmd.data);
+    cmd.result = backend->write(context, cmd.offset, cmd.data);
 }
 
-void file_actor_t::process(payload::clone_block_t &cmd, std::string_view path_str, const void *context) noexcept {
+void file_actor_t::process(payload::clone_block_t &cmd, std::string_view path_str,
+                           process_context_t &context) noexcept {
     auto &target_path = cmd.path;
     auto target_opt = open_file_rw(target_path, cmd.target_size, context);
     if (!target_opt) {
@@ -398,7 +377,7 @@ void file_actor_t::process(payload::clone_block_t &cmd, std::string_view path_st
         return;
     }
     auto target_backend = std::move(target_opt.assume_value());
-    auto &file_cache = context_cache[context];
+    auto &file_cache = context_cache[context.cache_key];
     auto source_backend_opt = [&]() -> outcome::result<file_ptr_t> {
         auto it = file_cache.find(cmd.source);
         if (it != file_cache.end()) {
@@ -415,12 +394,12 @@ void file_actor_t::process(payload::clone_block_t &cmd, std::string_view path_st
         return;
     }
     auto &source_backend = *source_backend_opt.assume_value();
-    cmd.result = target_backend->copy(cmd.target_offset, source_backend, cmd.source_offset, cmd.block_size);
+    cmd.result = target_backend->copy(context, cmd.target_offset, source_backend, cmd.source_offset, cmd.block_size);
 }
 
 auto file_actor_t::open_file_rw(const std::filesystem::path &path, std::uint64_t file_size,
-                                const void *context) noexcept -> outcome::result<file_ptr_t> {
-    auto &file_cache = context_cache[context];
+                                process_context_t &context) noexcept -> outcome::result<file_ptr_t> {
+    auto &file_cache = context_cache[context.cache_key];
     auto it = file_cache.find(path);
     if (it != file_cache.end()) {
         return it->second;
@@ -438,7 +417,7 @@ auto file_actor_t::open_file_rw(const std::filesystem::path &path, std::uint64_t
         }
     }
 
-    auto option = file_t::open_write(path, file_size);
+    auto option = file_t::open_write(context, path, file_size);
     if (!option) {
         return option.assume_error();
     }

@@ -8,17 +8,20 @@
 #include "model/misc/arc.hpp"
 #include "utils/log.h"
 #include <boost/date_time/posix_time/posix_time.hpp>
+#include <cstdint>
+#include <filesystem>
 
 namespace syncspirit::fs {
 
 namespace pt = boost::posix_time;
+namespace bfs = std::filesystem;
 
 struct SYNCSPIRIT_API updates_mediator_t : model::arc_base_t<updates_mediator_t> {
     using timepoint_t = pt::ptime;
     updates_mediator_t(const pt::time_duration &interval);
 
-    void push(std::string path, std::string prev_path, const timepoint_t &deadline) noexcept;
-    bool is_masked(std::string_view path) noexcept;
+    void mask(const bfs::path &path, const bfs::path &prev_path, const timepoint_t &deadline) noexcept;
+    std::uint32_t is_masked(std::string_view path) noexcept;
     bool clean_expired() noexcept;
 
   private:

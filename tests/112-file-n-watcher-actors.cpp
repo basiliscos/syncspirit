@@ -66,7 +66,7 @@ struct fixture_t {
     virtual void create_file_actor() {
         file_actor = sup->create_actor<fs::file_actor_t>()
                          .change_retension(retension_timeout * 2)
-                         // .updates_mediator(updates_mediator)
+                         .updates_mediator(updates_mediator)
                          .timeout(timeout)
                          .finish();
         fs_addr = file_actor->get_address();
@@ -121,11 +121,13 @@ struct fixture_t {
 
     virtual void on_changes(message::folder_changes_t &msg) noexcept { changes.emplace_back(&msg); }
 
-    void poll() {
+    void poll(int times = 1) {
         changes.clear();
-        fs_context->wait_next_event();
-        fs_context->update_time();
-        sup->do_process();
+        for (int i = 0; i < times; ++i) {
+            fs_context->wait_next_event();
+            fs_context->update_time();
+            sup->do_process();
+        }
     }
 
     void make_dir() {
@@ -171,19 +173,6 @@ void supervisor_t::on_changes(message::folder_changes_t &msg) noexcept { fixture
 
 } // namespace
 
-void test_without_mediator() {
-    struct F : fixture_t {
-        void main() noexcept override {
-            make_dir();
-            sup->do_process();
-            poll();
-            poll();
-            REQUIRE(changes.size() == 1);
-        }
-    };
-    F().run();
-}
-
 void test_with_mediator() {
     struct F : fixture_t {
 
@@ -196,11 +185,49 @@ void test_with_mediator() {
             fs_addr = file_actor->get_address();
         }
 
-        void main() noexcept override {
-            make_dir();
+        void append_block() {
+            auto path = root_path / L"файл";
+            std::int64_t modified = 1641828421;
+            auto bytes = as_owned_bytes("12345");
+
+            auto context = fs::payload::extendended_context_prt_t{};
+            auto payload = fs::payload::append_block_t(std::move(context), path, std::move(bytes), 0, 5);
+            auto cmd = fs::payload::io_command_t(std::move(payload));
+            auto cmds = fs::payload::io_commands_t{nullptr};
+            cmds.commands.emplace_back(std::move(cmd));
+            sup->route<fs::payload::io_commands_t>(fs_addr, sup->get_address(), std::move(cmds));
             sup->do_process();
-            poll();
-            REQUIRE(changes.size() == 0);
+        }
+
+        void finish_file() {
+            auto context = fs::payload::extendended_context_prt_t{};
+            auto path = root_path / L"файл";
+            std::int64_t modified = 1641828421;
+            auto perms = 0666;
+            auto payload = fs::payload::finish_file_t(std::move(context), path, {}, 5, modified, 0666, true);
+            auto cmd = fs::payload::io_command_t(std::move(payload));
+            auto cmds = fs::payload::io_commands_t{nullptr};
+            cmds.commands.emplace_back(std::move(cmd));
+            sup->route<fs::payload::io_commands_t>(fs_addr, sup->get_address(), std::move(cmds));
+            sup->do_process();
+        }
+
+        void main() noexcept override {
+            SECTION("create a dir") {
+                make_dir();
+                sup->do_process();
+                poll();
+                REQUIRE(changes.size() == 0);
+            }
+            SECTION("downloading file (append block & finish)") {
+                append_block();
+                poll(2);
+                CHECK(changes.size() == 0);
+
+                finish_file();
+                poll(2);
+                CHECK(changes.size() == 0);
+            }
         }
     };
     F().run();
@@ -208,7 +235,6 @@ void test_with_mediator() {
 
 int _init() {
     test::init_logging();
-    REGISTER_TEST_CASE(test_without_mediator, "test_without_mediator", "[fs]");
     REGISTER_TEST_CASE(test_with_mediator, "test_with_mediator", "[fs]");
     return 1;
 }

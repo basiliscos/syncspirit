@@ -6,8 +6,11 @@
 #include <algorithm>
 #include <memory_resource>
 #include <fmt/ranges.h>
+#include <type_traits>
+#include <boost/nowide/convert.hpp>
 
 using namespace syncspirit::fs;
+using boost::nowide::narrow;
 
 static constexpr size_t MAX_LOG_ITEMS = 5;
 
@@ -15,9 +18,26 @@ updates_mediator_t::updates_mediator_t(const pt::time_duration &interval_) : int
     log = utils::get_logger("fs.updates_mediator");
 }
 
-void updates_mediator_t::push(std::string path, std::string prev_path, const timepoint_t &deadline) noexcept {
+template <typename T> struct Stringizer;
+
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+template <> struct Stringizer<wchar_t> {
+    static std::string get(const bfs::path &path) { return narrow(path.generic_wstring()); }
+};
+#else
+template <> struct Stringizer<char> {
+    static std::string get(const bfs::path &path) { return path.native(); }
+};
+#endif
+
+void updates_mediator_t::mask(const bfs::path &path, const bfs::path &prev_path, const timepoint_t &deadline) noexcept {
+    using result_t = decltype(path.native());
+    using native_type_t = std::remove_cv_t<std::remove_reference_t<result_t>>;
+    using char_t = typename native_type_t::value_type;
     auto target = (updates_t *){};
     auto counter = update_type_internal_t{1};
+    auto path_str = Stringizer<char_t>::get(path);
+    auto prev_path_str = Stringizer<char_t>::get(prev_path);
     if (next.deadline == deadline) {
         target = &next;
     } else if (next.deadline.is_not_a_date_time()) {
@@ -25,7 +45,7 @@ void updates_mediator_t::push(std::string path, std::string prev_path, const tim
         next.deadline = deadline;
     } else {
         target = &postponed;
-        auto it = next.updates.find(path);
+        auto it = next.updates.find(path_str);
         if (it != next.updates.end()) {
             counter += it->update_type;
             next.updates.erase(it);
@@ -35,28 +55,28 @@ void updates_mediator_t::push(std::string path, std::string prev_path, const tim
         }
     }
 
-    auto update = support::file_update_t(std::move(path), std::move(prev_path), counter);
+    auto update = support::file_update_t(std::move(path_str), std::move(prev_path_str), counter);
     auto [it, inserted] = target->updates.emplace(std::move(update));
     if (!inserted) {
         it->update_type += counter;
     }
 }
 
-bool updates_mediator_t::is_masked(std::string_view path) noexcept {
+std::uint32_t updates_mediator_t::is_masked(std::string_view path) noexcept {
     for (auto target : {&postponed, &next}) {
         if (!target->deadline.is_not_a_date_time()) {
             auto &updates = target->updates;
             auto it = updates.find(path);
             if (it != updates.end()) {
-                --it->update_type;
+                auto events = it->update_type--;
                 if (!it->update_type) {
                     updates.erase(it);
                 }
-                return true;
+                return events;
             }
         }
     }
-    return false;
+    return 0;
 }
 
 bool updates_mediator_t::clean_expired() noexcept {

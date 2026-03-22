@@ -5,6 +5,7 @@
 #include "fs/fs_slave.h"
 #include "fs/utils.h"
 #include "fs/updates_mediator.h"
+#include "fs/fs_proxy.h"
 #include "test-utils.h"
 #include "test_supervisor.h"
 #include <boost/nowide/convert.hpp>
@@ -16,9 +17,17 @@ using namespace syncspirit::model;
 using namespace syncspirit::fs;
 using boost::nowide::narrow;
 
+// using clock_t = pt::microsec_clock;
+
+inline static auto retension = pt::milliseconds{1};
+
 struct exec_ctx_t final : fs::execution_context_t {
-    exec_ctx_t(fs::updates_mediator_t *mediator_ = nullptr) { mediator = mediator_; }
-    pt::ptime get_deadline() const override { return clock_t::local_time() + pt::milliseconds{1}; };
+    exec_ctx_t() : mediator(retension), proxy_holder(mediator, clock_t::local_time() + retension) {
+        fs_proxy = &proxy_holder;
+    }
+
+    fs::updates_mediator_t mediator;
+    fs::fs_proxy_t proxy_holder;
 };
 
 struct my_supervisor_t final : test::supervisor_t {
@@ -33,12 +42,6 @@ TEST_CASE("fs_slave, scan_dir", "[fs]") {
 
     auto slave = fs_slave_t();
     auto context = exec_ctx_t();
-#if 0
-    auto timeout = r::pt::time_duration(r::pt::millisec{10});
-    r::system_context_t ctx;
-    auto sup = ctx.create_supervisor<supervisor_t>().timeout(timeout).create_registry().finish();
-    sup->do_process();
-#endif
 
     SECTION("dir scan") {
         SECTION("empty dir") {
@@ -166,8 +169,8 @@ TEST_CASE("fs_slave, rm_file", "[fs]") {
     bfs::create_directories(root_path);
     test::path_guard_t path_quard{root_path};
     auto slave = fs_slave_t();
-    auto mediator = fs::updates_mediator_t(pt::milliseconds{1});
-    auto context = exec_ctx_t(&mediator);
+    auto context = exec_ctx_t();
+    auto &mediator = context.mediator;
 
     SECTION("successfuly remove") {
         auto file = root_path / "file";

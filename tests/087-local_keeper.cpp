@@ -5,6 +5,7 @@
 #include "diff-builder.h"
 #include "config/fs.h"
 #include "hasher/hasher_plugin.h"
+#include "fs/fs_proxy.h"
 #include "fs/fs_slave.h"
 #include "fs/messages.h"
 #include "fs/utils.h"
@@ -97,17 +98,12 @@ struct fixture_t {
     virtual std::int64_t get_iterations_limit() { return 100; }
 
     bool execute_slave(fs::payload::foreign_executor_t &slave) {
-        struct exec_ctx_t final : fs::execution_context_t {
-            exec_ctx_t(fixture_t *fixture, r::pt::ptime &deadline_) {
-                mediator = fixture->mediator.get();
-                plugin = fixture->executor->hasher;
-                deadline = deadline_;
-            }
-            pt::ptime get_deadline() const override { return deadline; };
-            r::pt::ptime deadline;
-        };
-        auto deadline = pt::microsec_clock::local_time() + pt::milliseconds{1};
-        auto ctx = exec_ctx_t(this, deadline);
+        static constexpr auto retension = pt::milliseconds{1};
+        auto deadline = pt::microsec_clock::local_time() + retension;
+        auto fs_proxy = fs_proxy_t(*mediator, deadline);
+        auto ctx = execution_context_t();
+        ctx.fs_proxy = &fs_proxy;
+        ctx.plugin = executor->hasher;
         return slave.exec(ctx);
     }
 

@@ -3,12 +3,15 @@
 
 #include "test-utils.h"
 #include "fs/updates_mediator.h"
+#include <filesystem>
 
 using namespace syncspirit;
 using namespace syncspirit::test;
 using namespace syncspirit::fs;
 
-TEST_CASE("block iterator", "[model]") {
+using P = std::filesystem::path;
+
+TEST_CASE("update_mediator", "[fs]") {
     auto interval = pt::microseconds{1};
     auto mediator = updates_mediator_t(interval);
     auto deadline_1 = pt::microsec_clock::local_time() + interval;
@@ -17,36 +20,36 @@ TEST_CASE("block iterator", "[model]") {
 
     SECTION("non-masked file") { CHECK(!mediator.is_masked("/tmp/path_1")); }
     SECTION("1 file, successful unmask") {
-        mediator.push("/tmp/path_1", {}, deadline_1);
+        mediator.mask(P("/tmp/path_1"), {}, deadline_1);
         CHECK(mediator.is_masked("/tmp/path_1"));
     }
     SECTION("1 file, double updates") {
-        mediator.push("/tmp/path_1", {}, deadline_1);
-        mediator.push("/tmp/path_1", {}, deadline_1);
+        mediator.mask(P("/tmp/path_1"), {}, deadline_1);
+        mediator.mask(P("/tmp/path_1"), {}, deadline_1);
         CHECK(mediator.is_masked("/tmp/path_1"));
         CHECK(!mediator.clean_expired());
     }
     SECTION("2 files, successful unmask") {
-        mediator.push("/tmp/path_1", {}, deadline_1);
-        mediator.push("/tmp/path_2", {}, deadline_1);
+        mediator.mask(P("/tmp/path_1"), {}, deadline_1);
+        mediator.mask(P("/tmp/path_2"), {}, deadline_1);
         CHECK(mediator.is_masked("/tmp/path_1"));
         CHECK(mediator.is_masked("/tmp/path_2"));
         CHECK(!mediator.clean_expired());
     }
     SECTION("1 file, postponed update") {
-        mediator.push("/tmp/path_1", {}, deadline_1);
-        mediator.push("/tmp/path_1", {}, deadline_2);
+        mediator.mask(P("/tmp/path_1"), {}, deadline_1);
+        mediator.mask(P("/tmp/path_1"), {}, deadline_2);
         CHECK(mediator.is_masked("/tmp/path_1"));
         CHECK(mediator.clean_expired());
         CHECK(mediator.is_masked("/tmp/path_1"));
     }
     SECTION("multiple files") {
         CHECK(!mediator.is_masked("/tmp/path_0"));
-        mediator.push("/tmp/path_1", {}, deadline_1);
-        mediator.push("/tmp/path_1", {}, deadline_1);
-        mediator.push("/tmp/path_2", {}, deadline_1);
-        mediator.push("/tmp/path_2", {}, deadline_2);
-        mediator.push("/tmp/path_3", {}, deadline_2);
+        mediator.mask(P("/tmp/path_1"), {}, deadline_1);
+        mediator.mask(P("/tmp/path_1"), {}, deadline_1);
+        mediator.mask(P("/tmp/path_2"), {}, deadline_1);
+        mediator.mask(P("/tmp/path_2"), {}, deadline_2);
+        mediator.mask(P("/tmp/path_3"), {}, deadline_2);
 
         CHECK(mediator.is_masked("/tmp/path_1"));
         CHECK(mediator.is_masked("/tmp/path_1"));
@@ -54,7 +57,7 @@ TEST_CASE("block iterator", "[model]") {
         CHECK(mediator.is_masked("/tmp/path_3"));
 
         CHECK(mediator.clean_expired());
-        mediator.push("/tmp/path_4", {}, deadline_3);
+        mediator.mask(P("/tmp/path_4"), {}, deadline_3);
 
         CHECK(!mediator.is_masked("/tmp/path_1"));
         CHECK(mediator.is_masked("/tmp/path_2"));

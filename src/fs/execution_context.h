@@ -23,20 +23,18 @@ struct scan_dir_t;
 namespace pt = boost::posix_time;
 
 struct fs_slave_t;
-struct updates_mediator_t;
+struct fs_proxy_t;
 
 struct execution_context_t {
     using clock_t = boost::posix_time::microsec_clock;
     using scan_dir_callback_t = std::function<void(const task::scan_dir_t &)>;
 
-    execution_context_t() = default;
+    inline execution_context_t() = default;
     execution_context_t(const execution_context_t &) = delete;
     execution_context_t(execution_context_t &&) = delete;
 
-    virtual pt::ptime get_deadline() const = 0;
-
-    hasher::hasher_plugin_t *plugin;
-    updates_mediator_t *mediator = nullptr;
+    fs_proxy_t *fs_proxy{};
+    hasher::hasher_plugin_t *plugin{};
     scan_dir_callback_t scan_dir_callback;
 };
 } // namespace fs
