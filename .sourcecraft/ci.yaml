@@ -67,6 +67,7 @@ tasks:
           - python3 -m venv myenv
           - . myenv/bin/activate
           - pip install conan
+          - pip install pefile
           - conan profile detect
           - cp .sourcecraft/conan-profile-xp /root/.conan2/profiles/xp
           - mkdir build.ci && cd build.ci
