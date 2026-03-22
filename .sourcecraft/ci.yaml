@@ -58,9 +58,10 @@ tasks:
           - g++ --version
           - gcc --version
           - git clone --branch build-2022-04-09  --depth 1 https://github.com/mxe/mxe
-          - cp .sourcecraft/mxe-settings.mk ./mxe
+          - cp .sourcecraft/mxe-settings.mk ./mxe/settings.mk
           - cd mxe
           - make zip
+          - find usr/bin
 
   # does not work as it requires fuse kernel module
   # - name: make-app-image
