@@ -46,11 +46,11 @@ bool BU::has_changes() const noexcept {
     return false;
 }
 
-auto BU::make(const folder_map_t &folder_map, updates_mediator_t &mediator) noexcept -> folder_changes_opt_t {
+auto BU::make(const watched_folders_t &watched_folders, updates_mediator_t &mediator) noexcept -> folder_changes_opt_t {
     if (!deadline.is_not_a_date_time()) {
         auto r = payload::folder_changes_t();
         for (auto &fi : updates) {
-            auto &folder_path = folder_map.at(fi.folder_id);
+            auto &folder_path = watched_folders.at(fi.folder_id);
             auto file_changes = fi.make(folder_path, mediator);
             if (!file_changes.empty()) {
                 auto change = payload::folder_change_t(std::move(fi.folder_id), std::move(file_changes));
@@ -237,6 +237,7 @@ watcher_base_t::watcher_base_t(config_t &cfg)
         throw std::runtime_error("retension interval should be positive");
     }
     assert(updates_mediator);
+    watched_folders.reset(new watched_folders_t());
 }
 
 void watcher_base_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
@@ -287,7 +288,7 @@ void watcher_base_t::push(const timepoint_t &deadline, std::string_view folder_i
 void watcher_base_t::on_retension_finish(r::request_id_t, bool cancelled) noexcept {
     LOG_TRACE(log, "on_retension_finish");
     if (!cancelled) {
-        auto opt = next.make(folder_map, *updates_mediator);
+        auto opt = next.make(*watched_folders, *updates_mediator);
         if (opt) {
             LOG_DEBUG(log, "sending changes");
             send<payload::folder_changes_t>(coordinator, std::move(opt).value());

@@ -74,7 +74,7 @@ void watcher_t::on_watch(message::watch_folder_t &message) noexcept {
     }
 
     auto folder_info = folder_info_t(p.path, path_str);
-    auto [it, inserted] = folder_map.emplace(std::make_pair(std::string(p.folder_id), std::move(folder_info)));
+    auto [it, inserted] = watched_folders->emplace(std::make_pair(std::string(p.folder_id), std::move(folder_info)));
     if (!inserted) {
         LOG_WARN(log, "folder '{}' on '{}' is already watched", p.folder_id, path_str);
     } else {
@@ -109,23 +109,23 @@ auto watcher_t::unwatch_dir(std::string_view folder_id) noexcept -> sys::error_c
 
 void watcher_t::on_unwatch(message::unwatch_folder_t &message) noexcept {
     auto &p = message.payload;
-    auto it = folder_map.find(p.folder_id);
-    if (it != folder_map.end()) {
+    auto it = watched_folders->find(p.folder_id);
+    if (it != watched_folders->end()) {
         LOG_DEBUG(log, "unwatching {}", it->second.path_str);
         p.ec = unwatch_dir(p.folder_id);
-        folder_map.erase(it);
+        watched_folders->erase(it);
     } else {
         LOG_WARN(log, "cannot unwatch folder '{}' as it has been watched", p.folder_id);
     }
 }
 
 void watcher_t::shutdown_finish() noexcept {
-    for (auto it = folder_map.begin(); it != folder_map.end();) {
+    for (auto it = watched_folders->begin(); it != watched_folders->end();) {
         auto &folder_id = it->first;
         auto &path = it->second.path_str;
         LOG_DEBUG(log, "unwatching {}", path);
         unwatch_dir(folder_id);
-        it = folder_map.erase(it);
+        it = watched_folders->erase(it);
     }
     assert(path_map.empty());
     assert(folder_map.empty());
@@ -142,7 +142,7 @@ void watcher_t::on_notify(handle_t handle) noexcept {
 
     auto &path_guard = it->second;
     auto &folder_id = path_guard->folder_id;
-    auto &folder_info = folder_map[folder_id];
+    auto &folder_info = (*watched_folders)[folder_id];
     auto &path_str = folder_info.path_str;
 
     auto bytes = DWORD{0};

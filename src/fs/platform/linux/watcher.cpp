@@ -44,7 +44,7 @@ void watcher_t::do_initialize(r::system_context_t *ctx) noexcept {
 }
 
 void watcher_t::shutdown_finish() noexcept {
-    for (auto it = folder_map.begin(); it != folder_map.end();) {
+    for (auto it = watched_folders->begin(); it != watched_folders->end();) {
         auto &folder_id = it->first;
         auto &path = it->second.path_str;
         LOG_DEBUG(log, "unwatching {}", path);
@@ -52,7 +52,7 @@ void watcher_t::shutdown_finish() noexcept {
         if (ec) {
             LOG_WARN(log, "cannot unwatch '{}' : {}", path, ec.message());
         }
-        it = folder_map.erase(it);
+        it = watched_folders->erase(it);
     }
     assert(subdir_map.empty());
     assert(path_map.empty());
@@ -153,7 +153,7 @@ void watcher_t::inotify_callback() noexcept {
             *(--name_ptr) = '/';
             append_name(parent_guard->path);
 
-            auto &folder_path = folder_map.find(folder_id)->second.path_str;
+            auto &folder_path = watched_folders->find(folder_id)->second.path_str;
             auto sub_path_sz = parent_guard->path.size() - folder_path.size();
             tail -= sub_path_sz;
             auto rel_path = std::string_view(tail, sub_path_sz + filename.size());
@@ -194,7 +194,7 @@ void watcher_t::inotify_callback() noexcept {
                         auto &prev_parent_guard = path_map[prev_event->wd];
                         auto prev_parent_path = std::string_view(prev_parent_guard.path);
                         auto folder_id = prev_parent_guard.folder_id;
-                        auto &folder_path = folder_map.find(folder_id)->second.path_str;
+                        auto &folder_path = watched_folders->find(folder_id)->second.path_str;
                         auto subpath_bytes = prev_parent_path.size() - folder_path.size();
                         if (subpath_bytes) {
                             --subpath_bytes; // skip trailing '/'
@@ -279,7 +279,7 @@ auto watcher_t::unwatch_recurse(std::string_view folder_id) noexcept -> sys::err
     auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
     auto queue = queue_t(allocator);
     auto ec = sys::error_code{};
-    auto &path = folder_map.find(folder_id)->second.path_str;
+    auto &path = watched_folders->find(folder_id)->second.path_str;
     auto it_path = path_to_wd.find(path);
     if (it_path != path_to_wd.end()) {
         queue.emplace_back(path_to_wd[path]);
@@ -389,14 +389,15 @@ void watcher_t::on_watch(message::watch_folder_t &message) noexcept {
     LOG_TRACE(log, "on watch on '{}'", path_str);
     if (io_guard.fd) {
         auto folder_info = folder_info_t(p.path, std::string(path_str));
-        auto [it, inserted] = folder_map.emplace(std::make_pair(std::string(p.folder_id), std::move(folder_info)));
+        auto [it, inserted] =
+            watched_folders->emplace(std::make_pair(std::string(p.folder_id), std::move(folder_info)));
         if (!inserted) {
             LOG_WARN(log, "folder '{}' on '{}' is already watched", p.folder_id, path_str);
         } else {
             auto &folder_id = it->first;
             auto [ec, _, wd] = watch_recurse(path_str, folder_id, -1);
             if (ec) {
-                folder_map.erase(it);
+                watched_folders->erase(it);
             }
             p.ec = ec;
         }
@@ -405,14 +406,14 @@ void watcher_t::on_watch(message::watch_folder_t &message) noexcept {
 
 void watcher_t::on_unwatch(message::unwatch_folder_t &message) noexcept {
     auto &p = message.payload;
-    auto it = folder_map.find(p.folder_id);
-    if (it != folder_map.end()) {
+    auto it = watched_folders->find(p.folder_id);
+    if (it != watched_folders->end()) {
         auto &path = it->second.path_str;
         LOG_DEBUG(log, "unwatching {}", path);
         auto it_wd = path_to_wd.find(path);
         assert(it_wd != path_to_wd.end());
         p.ec = unwatch_recurse(p.folder_id);
-        folder_map.erase(it);
+        watched_folders->erase(it);
     } else {
         LOG_WARN(log, "cannot unwatch folder '{}' as it has not been watched", p.folder_id);
     }

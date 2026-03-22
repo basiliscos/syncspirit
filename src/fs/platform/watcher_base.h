@@ -6,23 +6,20 @@
 #include "syncspirit-export.h"
 
 #include <rotor.hpp>
-#include <filesystem>
 #include <boost/system.hpp>
 #include <string>
 #include <optional>
-#include <unordered_map>
 #include "utils/log.h"
 #include "proto/proto-fwd.hpp"
 #include "fs/messages.h"
 #include "fs/update_type.hpp"
 #include "fs/updates_mediator.h"
 #include "fs/updates_support.h"
-#include "utils/string_comparator.hpp"
+#include "fs/watched_folders.h"
 
 namespace syncspirit::fs::platform {
 
 namespace r = rotor;
-namespace bfs = std::filesystem;
 namespace sys = boost::system;
 
 struct SYNCSPIRIT_API watcher_config_t : r::actor_config_t {
@@ -50,13 +47,6 @@ struct SYNCSPIRIT_API watcher_base_t : r::actor_base_t {
     template <typename Actor> using config_builder_t = watcher_config_builder_t<Actor>;
     using config_t = watcher_config_t;
 
-    struct folder_info_t {
-        bfs::path path;
-        std::string path_str;
-    };
-
-    using folder_map_t = std::unordered_map<std::string, folder_info_t, utils::string_hash_t, utils::string_eq_t>;
-
     struct folder_update_t {
         std::string folder_id;
         support::file_updates_t updates;
@@ -75,7 +65,7 @@ struct SYNCSPIRIT_API watcher_base_t : r::actor_base_t {
         folder_updates_t updates;
         folder_update_t &prepare(std::string_view folder_id) noexcept;
         folder_update_t *find(std::string_view folder_id) noexcept;
-        folder_changes_opt_t make(const folder_map_t &folder_map, updates_mediator_t &mediator) noexcept;
+        folder_changes_opt_t make(const watched_folders_t &watched_folders, updates_mediator_t &mediator) noexcept;
         bool has_changes() const noexcept;
     };
 
@@ -94,7 +84,7 @@ struct SYNCSPIRIT_API watcher_base_t : r::actor_base_t {
     interval_t retension;
     updates_mediator_ptr_t updates_mediator;
     r::address_ptr_t coordinator;
-    folder_map_t folder_map;
+    watched_folders_ptr_t watched_folders;
     bulk_update_t next;
     bulk_update_t postponed;
 };
