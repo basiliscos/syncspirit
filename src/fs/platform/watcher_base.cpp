@@ -230,14 +230,15 @@ auto FU::make(const folder_info_t &folder_info, updates_mediator_t &mediator) no
 }
 
 watcher_base_t::watcher_base_t(config_t &cfg)
-    : parent_t{cfg}, retension(cfg.change_retension), updates_mediator{std::move(cfg.updates_mediator)} {
+    : parent_t{cfg}, retension(cfg.change_retension), updates_mediator{std::move(cfg.updates_mediator)},
+      watched_folders(cfg.watched_folders) {
     log = utils::get_logger(actor_identity);
     if (!retension.is_positive()) {
         LOG_ERROR(log, "retension interval should be positive");
         throw std::runtime_error("retension interval should be positive");
     }
     assert(updates_mediator);
-    watched_folders.reset(new watched_folders_t());
+    assert(watched_folders);
 }
 
 void watcher_base_t::configure(r::plugin::plugin_base_t &plugin) noexcept {

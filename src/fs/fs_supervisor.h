@@ -7,6 +7,7 @@
 #include "syncspirit-export.h"
 #include "utils/log.h"
 #include "updates_mediator.h"
+#include "watched_folders.h"
 #include <rotor/thread.hpp>
 
 namespace syncspirit {
@@ -54,6 +55,7 @@ struct SYNCSPIRIT_API fs_supervisor_t : rth::supervisor_thread_t {
     config::fs_config_t fs_config;
     uint32_t hasher_threads;
     updates_mediator_ptr_t updates_mediator;
+    watched_folders_ptr_t watched_folders;
 };
 
 } // namespace fs

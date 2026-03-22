@@ -92,6 +92,7 @@ struct fixture_t {
                          .timeout(timeout)
                          .change_retension(retension)
                          .updates_mediator(updates_mediator)
+                         .watched_folders(watched_folders)
                          .finish();
     }
 
@@ -110,6 +111,7 @@ struct fixture_t {
         CHECK(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::OPERATIONAL);
 
         updates_mediator = new fs::updates_mediator_t(retension);
+        watched_folders.reset(new watched_folders_t());
         create_file_actor();
         sup->do_process();
         sequencer = sup->sequencer;
@@ -197,6 +199,7 @@ struct fixture_t {
     r::intrusive_ptr_t<supervisor_t> sup;
     r::intrusive_ptr_t<fs::file_actor_t> file_actor;
     fs::updates_mediator_ptr_t updates_mediator;
+    fs::watched_folders_ptr_t watched_folders;
     bfs::path root_path;
     test::path_guard_t path_guard;
     r::system_context_t ctx;

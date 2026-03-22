@@ -32,8 +32,10 @@ struct file_actor_t::process_context_t : fs_proxy_t {
 
 file_actor_t::file_actor_t(config_t &cfg)
     : r::actor_base_t{cfg}, concurrent_hashes{cfg.concurrent_hashes}, retension{cfg.change_retension},
-      updates_mediator{cfg.updates_mediator}, scan_dir_callback(cfg.scan_dir_callback) {
+      updates_mediator{cfg.updates_mediator}, scan_dir_callback(cfg.scan_dir_callback),
+      watched_folders(cfg.watched_folders) {
     assert(updates_mediator);
+    assert(watched_folders);
     if (!retension.is_positive()) {
         LOG_ERROR(log, "retension interval should be positive");
         throw std::runtime_error("retension interval should be positive");

@@ -25,6 +25,7 @@ namespace sys = boost::system;
 struct SYNCSPIRIT_API watcher_config_t : r::actor_config_t {
     r::pt::time_duration change_retension;
     updates_mediator_ptr_t updates_mediator;
+    watched_folders_ptr_t watched_folders;
 };
 
 template <typename Actor> struct watcher_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -38,6 +39,10 @@ template <typename Actor> struct watcher_config_builder_t : r::actor_config_buil
     }
     builder_t &&updates_mediator(updates_mediator_ptr_t value) && noexcept {
         parent_t::config.updates_mediator = std::move(value);
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+    builder_t &&watched_folders(watched_folders_ptr_t value) && noexcept {
+        parent_t::config.watched_folders = std::move(value);
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };

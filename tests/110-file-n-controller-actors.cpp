@@ -83,10 +83,13 @@ struct fixture_t {
         sup->do_process();
         CHECK(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::OPERATIONAL);
 
-        auto updates_mediator = new fs::updates_mediator_t(retension);
+        auto updates_mediator = fs::updates_mediator_ptr_t(new fs::updates_mediator_t(retension));
+        auto watched_folders = fs::watched_folders_ptr_t(new watched_folders_t());
+
         file_actor = sup->create_actor<fs::file_actor_t>()
                          .change_retension(retension)
                          .updates_mediator(updates_mediator)
+                         .watched_folders(watched_folders)
                          .timeout(timeout)
                          .finish();
         sup->do_process();

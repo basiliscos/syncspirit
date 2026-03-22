@@ -94,6 +94,8 @@ struct fixture_t {
         REQUIRE(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::OPERATIONAL);
 
         updates_mediator = new fs::updates_mediator_t(retension() * 2);
+        watched_folders.reset(new watched_folders_t());
+
         if (auto_launch) {
             launch_target();
             REQUIRE(static_cast<r::actor_base_t *>(target.get())->access<to::state>() == r::state_t::OPERATIONAL);
@@ -112,6 +114,7 @@ struct fixture_t {
                      .timeout(timeout)
                      .change_retension(retension())
                      .updates_mediator(updates_mediator)
+                     .watched_folders(watched_folders)
                      .finish();
         sup->do_process();
     }
@@ -189,6 +192,7 @@ struct fixture_t {
     fs_context_ptr_r fs_context;
     r::intrusive_ptr_t<supervisor_t> sup;
     fs::updates_mediator_ptr_t updates_mediator;
+    fs::watched_folders_ptr_t watched_folders;
     target_ptr_t target;
     r::pt::time_duration timeout = TIMEOUT;
     change_messages_t changes;
@@ -209,6 +213,7 @@ void test_watcher_base() {
                          .timeout(timeout)
                          .change_retension(retension())
                          .updates_mediator(updates_mediator)
+                         .watched_folders(watched_folders)
                          .finish();
             sup->do_process();
         }
@@ -499,6 +504,7 @@ struct fixture_real_t : fixture_t {
                      .timeout(timeout)
                      .change_retension(retension())
                      .updates_mediator(updates_mediator)
+                     .watched_folders(watched_folders)
                      .finish();
         sup->do_process();
     }

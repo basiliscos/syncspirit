@@ -6,6 +6,7 @@
 #include "messages.h"
 #include "file.h"
 #include "updates_mediator.h"
+#include "watched_folders.h"
 #include "net/messages.h"
 #include "hasher/hasher_plugin.h"
 #include "utils/log.h"
@@ -39,6 +40,7 @@ struct SYNCSPIRIT_API file_actor_config_t : r::actor_config_t {
     uint32_t concurrent_hashes;
     r::pt::time_duration change_retension;
     updates_mediator_ptr_t updates_mediator;
+    watched_folders_ptr_t watched_folders;
     scan_dir_callback_t scan_dir_callback;
 };
 
@@ -57,6 +59,10 @@ template <typename Actor> struct file_actor_config_builder_t : r::actor_config_b
     }
     builder_t &&updates_mediator(updates_mediator_ptr_t value) && noexcept {
         parent_t::config.updates_mediator = std::move(value);
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+    builder_t &&watched_folders(watched_folders_ptr_t value) && noexcept {
+        parent_t::config.watched_folders = std::move(value);
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
     builder_t &&scan_dir_callback(execution_context_t::scan_dir_callback_t value) && noexcept {
@@ -115,6 +121,7 @@ struct SYNCSPIRIT_API file_actor_t : public r::actor_base_t {
     uint32_t concurrent_hashes;
     r::pt::time_duration retension;
     updates_mediator_ptr_t updates_mediator;
+    watched_folders_ptr_t watched_folders;
     r::address_ptr_t coordinator;
     r::address_ptr_t db;
     context_cache_t context_cache;

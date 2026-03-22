@@ -127,14 +127,13 @@ struct fixture_t {
         bfs::create_directory(root_path);
     }
 
-    virtual void create_updates_mediator() { updates_mediator = new fs::updates_mediator_t(retension_timeout * 2); }
-
     virtual void create_file_actor() {
         auto notify_watcher = [this](const fs::task::scan_dir_t &scan_dir) { watcher_actor->notify(scan_dir); };
         file_actor = sup->create_actor<fs::file_actor_t>()
                          .concurrent_hashes(1)
                          .change_retension(retension_timeout * 2)
                          .updates_mediator(updates_mediator)
+                         .watched_folders(watched_folders)
                          .scan_dir_callback(notify_watcher)
                          .timeout(timeout)
                          .finish();
@@ -146,6 +145,7 @@ struct fixture_t {
                             .timeout(timeout)
                             .change_retension(retension_timeout)
                             .updates_mediator(updates_mediator)
+                            .watched_folders(watched_folders)
                             .finish();
     }
 
@@ -184,7 +184,8 @@ struct fixture_t {
         sup->cluster = cluster;
         sup->do_process();
 
-        create_updates_mediator();
+        updates_mediator.reset(new fs::updates_mediator_t(retension_timeout * 2));
+        watched_folders.reset(new fs::watched_folders_t());
         sup->start();
         sup->do_process();
         REQUIRE(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::OPERATIONAL);
@@ -234,6 +235,7 @@ struct fixture_t {
     test::path_guard_t path_guard;
     fs_context_ptr_r fs_context;
     fs::updates_mediator_ptr_t updates_mediator;
+    fs::watched_folders_ptr_t watched_folders;
     r::intrusive_ptr_t<supervisor_t> sup;
     watcher_actor_ptr_t watcher_actor;
     file_actor_ptr_t file_actor;

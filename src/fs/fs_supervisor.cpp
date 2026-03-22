@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
+// mingw hack:
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+#include <memory_resource>
+#endif
+
 #include "fs_supervisor.h"
 #include "file_actor.h"
 #include "fs_context.h"
@@ -13,7 +18,9 @@
 using namespace syncspirit::fs;
 
 fs_supervisor_t::fs_supervisor_t(config_t &cfg)
-    : parent_t(cfg), fs_config{cfg.fs_config}, hasher_threads{cfg.hasher_threads} {}
+    : parent_t(cfg), fs_config{cfg.fs_config}, hasher_threads{cfg.hasher_threads} {
+    watched_folders.reset(new watched_folders_t());
+}
 
 void fs_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     parent_t::configure(plugin);
@@ -44,6 +51,7 @@ void fs_supervisor_t::launch_children() noexcept {
                        .timeout(timeout)
                        .change_retension(retension)
                        .updates_mediator(updates_mediator)
+                       .watched_folders(watched_folders)
                        .finish()
                        .get();
 

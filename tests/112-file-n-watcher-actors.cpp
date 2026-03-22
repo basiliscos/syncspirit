@@ -67,6 +67,7 @@ struct fixture_t {
         file_actor = sup->create_actor<fs::file_actor_t>()
                          .change_retension(retension_timeout * 2)
                          .updates_mediator(updates_mediator)
+                         .watched_folders(watched_folders)
                          .timeout(timeout)
                          .finish();
         fs_addr = file_actor->get_address();
@@ -77,6 +78,7 @@ struct fixture_t {
                             .timeout(timeout)
                             .change_retension(retension_timeout)
                             .updates_mediator(updates_mediator)
+                            .watched_folders(watched_folders)
                             .finish();
     }
 
@@ -86,6 +88,7 @@ struct fixture_t {
         sup->fixture = this;
 
         create_updates_mediator();
+        watched_folders.reset(new watched_folders_t());
         sup->start();
         sup->do_process();
         REQUIRE(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::OPERATIONAL);
@@ -158,6 +161,7 @@ struct fixture_t {
     test::path_guard_t path_guard;
     fs_context_ptr_r fs_context;
     fs::updates_mediator_ptr_t updates_mediator;
+    fs::watched_folders_ptr_t watched_folders;
     r::intrusive_ptr_t<supervisor_t> sup;
     watcher_actor_ptr_t watcher_actor;
     file_actor_ptr_t file_actor;
@@ -180,6 +184,7 @@ void test_with_mediator() {
             file_actor = sup->create_actor<fs::file_actor_t>()
                              .change_retension(retension_timeout * 2)
                              .updates_mediator(updates_mediator)
+                             .watched_folders(watched_folders)
                              .timeout(timeout)
                              .finish();
             fs_addr = file_actor->get_address();
