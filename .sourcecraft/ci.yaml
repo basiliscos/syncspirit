@@ -50,6 +50,23 @@ tasks:
         script:
           - cd build.ci
           - ctest --rerun-failed --output-on-failure .
+  - name: make-win32-build
+    cubes:
+      - name: make-binary
+        script:
+          - sudo apt update
+          - sudo apt install software-properties-common
+          - sudo add-apt-repository ppa:ubuntu-toolchain-r/test
+          - sudo apt update
+          - sudo apt install -y build-essential
+          - sudo apt install -y apt-get install autoconf automake autopoint bash bison bzip2 flex g++ g++-multilib gettext git gperf intltool libc6-dev-i386 libclang-dev libgdk-pixbuf2.0-dev libltdl-dev libgl-dev libpcre2-dev libssl-dev libtool-bin libxml-parser-perl lzip make openssl p7zip-full patch perl python3 python3-mako python3-packaging python3-pkg-resources python3-setuptools python-is-python3 ruby sed sqlite3 unzip wget xz-utils
+          - g++ --version
+          - gcc --version
+          - git clone --branch build-2022-04-09  --depth 1 https://github.com/mxe/mxe
+          - cp .sourcecraft/mxe-settings.mk ./mxe
+          - cd mxe
+          - make zip
+
   # does not work as it requires fuse kernel module
   # - name: make-app-image
   #   cubes:
