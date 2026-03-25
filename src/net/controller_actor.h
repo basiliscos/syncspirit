@@ -144,6 +144,11 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
         utils::bytes_t peer_data;
     };
 
+    struct block_2_file_t {
+        model::block_info_ptr_t block;
+        model::file_info_ptr_t file;
+    };
+
   private:
     struct update_context_t : stack_context_t {
         update_context_t(controller_actor_t &actor, bool from_self_, bool cluster_config_sent_) noexcept;
@@ -154,11 +159,6 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
 
     using peers_map_t = std::unordered_map<r::address_ptr_t, model::device_ptr_t>;
     using io_queue_t = std::list<fs::payload::io_command_t>;
-
-    struct block_2_file_t {
-        model::block_info_ptr_t block;
-        model::file_info_ptr_t file;
-    };
 
     using block_2_files_t = mi::multi_index_container<
         block_2_file_t,
