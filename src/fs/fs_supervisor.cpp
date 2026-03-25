@@ -9,6 +9,8 @@
 #include "fs_supervisor.h"
 #include "file_actor.h"
 #include "fs_context.h"
+#include "updates_mediator.h"
+#include "watched_folders.h"
 #include "watcher_actor.h"
 
 #if SYNCSPIRIT_WATCHER_INOTIFY
@@ -19,7 +21,6 @@ using namespace syncspirit::fs;
 
 fs_supervisor_t::fs_supervisor_t(config_t &cfg)
     : parent_t(cfg), fs_config{cfg.fs_config}, hasher_threads{cfg.hasher_threads} {
-    watched_folders.reset(new watched_folders_t());
 }
 
 void fs_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
@@ -45,7 +46,12 @@ void fs_supervisor_t::on_start() noexcept {
 void fs_supervisor_t::launch_children() noexcept {
     auto retension = pt::milliseconds{fs_config.retension_timeout};
     auto retension_x2 = retension * 2;
+    updates_mediator_ptr_t updates_mediator;
+    watched_folders_ptr_t watched_folders;
+
     updates_mediator.reset(new updates_mediator_t(retension_x2));
+    watched_folders.reset(new watched_folders_t());
+
     auto timeout = shutdown_timeout * 9 / 10;
     auto watcher = create_actor<watch_actor_t>()
                        .timeout(timeout)
@@ -60,6 +66,7 @@ void fs_supervisor_t::launch_children() noexcept {
         .concurrent_hashes(hasher_threads)
         .change_retension(retension_x2)
         .updates_mediator(updates_mediator)
+        .watched_folders(watched_folders)
         .timeout(timeout)
         .escalate_failure()
         .finish();
