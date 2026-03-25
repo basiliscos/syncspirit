@@ -343,7 +343,7 @@ void file_actor_t::process(payload::finish_file_t &cmd, std::string_view path_st
     }
 
     if (!cmd.no_permissions) {
-        if (auto ec = context.set_perms(cmd.path, cmd.permissions); !ec) {
+        if (auto ec = context.set_perms(cmd.path, cmd.permissions); ec) {
             LOG_ERROR(log, "cannot set permissions {:#o} on file: '{}': {}", cmd.permissions, cmd.path.string(),
                       ec.message());
             cmd.result = ec;
