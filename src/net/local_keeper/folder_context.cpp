@@ -432,6 +432,8 @@ int folder_context_t::process(rehashed_incomplete_t &item, stack_context_t &ctx)
         } else {
             if (matched) {
                 using namespace model::diff::local;
+                LOG_DEBUG(log, "matched {} of {} blocks of '{}'", matched, blocks.size(),
+                          narrow(item.path.generic_wstring()));
                 auto &peer_folder = cp->get_folder()->get_folder_info();
                 ctx.push(new blocks_availability_t(peer_file, peer_folder, std::move(valid_blocks)));
             } else {
@@ -440,7 +442,7 @@ int folder_context_t::process(rehashed_incomplete_t &item, stack_context_t &ctx)
         }
     }
     if (schedule_removal) {
-        LOG_DEBUG(log, "scheduling(2) removal of '{}", narrow(item.path.generic_wstring()));
+        LOG_DEBUG(log, "scheduling(2) removal of '{}'", narrow(item.path.generic_wstring()));
         push(remove_file_t(std::move(item.path)));
     }
     return 1;
@@ -656,7 +658,7 @@ void folder_context_t::post_process(fs::task::segment_iterator_t &task, stack_co
                 auto local_fi = local_folder.get();
                 ctx.push(new model::diff::modify::mark_reachable_t(file, *local_fi, false));
             } else if (hash_file.incomplete) {
-                LOG_DEBUG(log, "scheduling(3) removal of '{}", path_str);
+                LOG_DEBUG(log, "scheduling(3) removal of '{}'", path_str);
                 push(fs::task::remove_file_t(task.path));
             }
         }
