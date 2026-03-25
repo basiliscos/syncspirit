@@ -13,6 +13,7 @@
 #include "net/names.h"
 #include "fs/messages.h"
 #include "utils/error_code.h"
+#include "utils/format.hpp"
 #include "utils/tls.h"
 #include <type_traits>
 #include <boost/nowide/convert.hpp>
@@ -106,7 +107,7 @@ struct fixture_t {
 
     fixture_t(bool auto_start_, int64_t max_sequence_, bool auto_share_ = true) noexcept
         : auto_start{auto_start_}, auto_share{auto_share_}, max_sequence{max_sequence_} {
-        test::init_logging();
+        log = utils::get_logger("fixture");
     }
 
     void _start_target(std::string_view url) {
@@ -221,6 +222,7 @@ struct fixture_t {
         return ctx.create_supervisor<mock_supervisor_t>().timeout(timeout).create_registry().finish();
     }
 
+    utils::logger_t log;
     bool auto_start;
     bool auto_share;
     int64_t max_sequence;
@@ -478,6 +480,7 @@ void test_index_sending() {
 void test_downloading() {
     struct F : fixture_t {
         using fixture_t::fixture_t;
+
         void main(diff_builder_t &) noexcept override {
             auto &folder_infos = folder_1->get_folder_infos();
             auto folder_my = folder_infos.by_device(*my_device);
@@ -587,7 +590,6 @@ void test_downloading() {
 
                 auto data_2 = as_owned_bytes("67890");
                 auto data_2_hash = utils::sha256_digest(data_2).value();
-
                 auto &b1 = proto::add_blocks(*file_1);
                 proto::set_hash(b1, data_1_hash);
                 proto::set_size(b1, 5);
@@ -1005,6 +1007,155 @@ void test_downloading() {
                 CHECK(f->get_name()->get_full_name() == file_name_1);
                 CHECK(f->get_size() == 10);
                 CHECK(f->iterate_blocks().get_total() == 2);
+                CHECK(f->is_locally_available());
+            }
+        }
+    };
+    F(true, 10).run();
+}
+
+void test_downloading_special() {
+    struct F : fixture_t {
+        using fixture_t::fixture_t;
+        hash_config_t get_hash_config() override { return hash_config_t{1, 2}; }
+
+        void main(diff_builder_t &) noexcept override {
+            auto &folder_infos = folder_1->get_folder_infos();
+            auto folder_my = folder_infos.by_device(*my_device);
+
+            auto cc = proto::ClusterConfig{};
+            auto &folder = proto::add_folders(cc);
+            proto::set_id(folder, folder_1->get_id());
+            auto d_peer = &proto::add_devices(folder);
+            proto::set_id(*d_peer, peer_device->device_id().get_sha256());
+            proto::set_max_sequence(*d_peer, 8);
+            proto::set_index_id(*d_peer, folder_1_peer->get_index());
+            auto &d_my = proto::add_devices(folder);
+            proto::set_id(d_my, my_device->device_id().get_sha256());
+            proto::set_max_sequence(d_my, folder_my->get_max_sequence());
+            proto::set_index_id(d_my, folder_my->get_index());
+
+            d_peer = &proto::get_devices(folder, 0);
+
+            SECTION("downloa single file with multiple duplicated blocks") {
+                cluster->modify_write_requests(2);
+                auto data_1 = as_owned_bytes("12345");
+                auto data_1_hash = utils::sha256_digest(data_1).value();
+
+                auto data_2 = as_owned_bytes("67890");
+                auto data_2_hash = utils::sha256_digest(data_2).value();
+
+                auto data_3 = as_owned_bytes("abcde");
+                auto data_3_hash = utils::sha256_digest(data_3).value();
+
+                auto data_4 = as_owned_bytes("a1c2e");
+                auto data_4_hash = utils::sha256_digest(data_4).value();
+
+                auto data_5 = as_owned_bytes("55555");
+                auto data_5_hash = utils::sha256_digest(data_5).value();
+
+                auto data_6 = as_owned_bytes("66666");
+                auto data_6_hash = utils::sha256_digest(data_6).value();
+
+                LOG_INFO(log, "b1 = {}", data_1_hash);
+                LOG_INFO(log, "b2 = {}", data_2_hash);
+                LOG_INFO(log, "b3 = {}", data_3_hash);
+                LOG_INFO(log, "b4 = {}", data_4_hash);
+                LOG_INFO(log, "b5 = {}", data_5_hash);
+                LOG_INFO(log, "b6 = {}", data_6_hash);
+
+                auto b1 = proto::BlockInfo();
+                proto::set_hash(b1, data_1_hash);
+                proto::set_size(b1, 5);
+
+                auto b2 = proto::BlockInfo();
+                proto::set_hash(b2, data_2_hash);
+                proto::set_size(b2, 5);
+
+                auto b3 = proto::BlockInfo();
+                proto::set_hash(b3, data_3_hash);
+                proto::set_size(b3, 5);
+
+                auto b4 = proto::BlockInfo();
+                proto::set_hash(b4, data_4_hash);
+                proto::set_size(b4, 5);
+
+                auto b5 = proto::BlockInfo();
+                proto::set_hash(b5, data_5_hash);
+                proto::set_size(b5, 5);
+
+                auto b6 = proto::BlockInfo();
+                proto::set_hash(b6, data_6_hash);
+                proto::set_size(b6, 5);
+
+                peer_actor->forward(cc);
+                sup->do_process();
+
+                auto index = proto::Index{};
+                proto::set_folder(index, folder_1->get_id());
+
+                auto file_name = std::string_view("file-1");
+                auto &file = proto::add_files(index);
+                proto::set_name(file, file_name);
+                proto::set_type(file, proto::FileInfoType::FILE);
+                proto::set_sequence(file, 10);
+                proto::set_block_size(file, 5);
+                proto::set_size(file, 9 * 5);
+
+                proto::add_blocks(file, b1);
+                for (int i = 0; i < 4; ++i) {
+                    auto b2_copy = b2;
+                    proto::set_offset(b2_copy, (i + 1) * 5);
+                    proto::add_blocks(file, b2_copy);
+                }
+
+                proto::set_offset(b3, 25);
+                proto::add_blocks(file, b3);
+
+                proto::set_offset(b4, 30);
+                proto::add_blocks(file, b4);
+
+                proto::set_offset(b5, 35);
+                proto::add_blocks(file, b5);
+
+                proto::set_offset(b6, 40);
+                proto::add_blocks(file, b6);
+
+                auto &v = proto::get_version(file);
+                proto::add_counters(v, proto::Counter(1, 1));
+
+                peer_actor->forward(index);
+                peer_actor->push_response(data_1, 0);
+                LOG_INFO(log, "pushing block #1");
+                sup->do_process();
+
+                peer_actor->push_response(data_3, 0);
+                peer_actor->process_any_block_requests();
+                LOG_INFO(log, "pushing block #3");
+                sup->do_process();
+
+                peer_actor->push_response(data_2, 1);
+                peer_actor->push_response(data_4, 0);
+                peer_actor->process_any_block_requests();
+                LOG_INFO(log, "pushing blocks #4 & #3");
+                sup->do_process();
+
+                peer_actor->push_response(data_5, 1);
+                peer_actor->push_response(data_6, 0);
+                peer_actor->process_any_block_requests();
+                LOG_INFO(log, "pushing blocks #5 & #6");
+                sup->do_process();
+
+                CHECK(!folder_my->get_folder()->is_synchronizing());
+                CHECK(peer_actor->blocks_requested == 6);
+                REQUIRE(folder_my);
+                CHECK(folder_my->get_max_sequence() == 1ul);
+                REQUIRE(folder_my->get_file_infos().size() == 1);
+
+                auto f = folder_my->get_file_infos().by_name(file_name);
+                REQUIRE(f);
+                CHECK(f->get_size() == 9 * 5);
+                CHECK(f->iterate_blocks().get_total() == 9);
                 CHECK(f->is_locally_available());
             }
         }
@@ -2530,11 +2681,13 @@ void test_races() {
 };
 
 int _init() {
+    test::init_logging();
     REGISTER_TEST_CASE(test_startup, "test_startup", "[net]");
     REGISTER_TEST_CASE(test_overwhelm, "test_overwhelm", "[net]");
     REGISTER_TEST_CASE(test_index_receiving, "test_index_receiving", "[net]");
     REGISTER_TEST_CASE(test_index_sending, "test_index_sending", "[net]");
     REGISTER_TEST_CASE(test_downloading, "test_downloading", "[net]");
+    REGISTER_TEST_CASE(test_downloading_special, "test_downloading_special", "[net]");
     REGISTER_TEST_CASE(test_downloading_errors, "test_downloading_errors", "[net]");
     REGISTER_TEST_CASE(test_download_from_scratch, "test_download_from_scratch", "[net]");
     REGISTER_TEST_CASE(test_download_resuming, "test_download_resuming", "[net]");
