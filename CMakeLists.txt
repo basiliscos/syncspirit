@@ -15,7 +15,8 @@ include(GenerateExportHeader)
 include(FetchContent)
 include(CheckIncludeFile)
 
-option(SYNCSPIRIT_BUILD_TESTS "Enable building tests [default: OFF]"  OFF)
+option(SYNCSPIRIT_BUILD_TESTS   "Enable building tests [default: OFF]"  OFF)
+option(SYNCSPIRIT_FRONTEND_FLTK "Enable building FLTK frontend [default: ON]"  ON)
 
 if (WIN32)
     # set(CMAKE_CROSSCOMPILING on)
@@ -371,4 +372,7 @@ if (SYNCSPIRIT_BUILD_TESTS)
 endif()
 
 add_subdirectory("src/ui-daemon")
-add_subdirectory("src/ui-fltk")
+
+if (SYNCSPIRIT_FRONTEND_FLTK)
+    add_subdirectory("src/ui-fltk")
+endif()
