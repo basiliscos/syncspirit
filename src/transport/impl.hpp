@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #pragma once
 
@@ -8,12 +8,6 @@
 #include "utils/log.h"
 #include "stream.h"
 #include <boost/asio/ssl.hpp>
-
-#ifdef WIN32_LEAN_AND_MEAN
-#include <malloc.h>
-#else
-#include <alloca.h>
-#endif
 
 namespace syncspirit::transport {
 
@@ -147,7 +141,7 @@ template <> struct base_impl_t<ssl_socket_t> {
 
         if (opt && opt->alpn.size()) {
             auto alpn = opt->alpn;
-            std::byte *wire_alpn = (std::byte *)alloca(alpn.size() + 1);
+            std::byte wire_alpn[512];
             wire_alpn[0] = (std::byte)(alpn.size());
             auto b = reinterpret_cast<const std::byte *>(alpn.data());
             std::copy(b, b + alpn.size(), wire_alpn + 1);
