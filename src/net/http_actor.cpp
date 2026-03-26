@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "http_actor.h"
 #include "utils/error_code.h"
@@ -13,7 +13,7 @@ namespace resource {
 r::plugin::resource_id_t io = 0;
 r::plugin::resource_id_t request_timer = 1;
 r::plugin::resource_id_t resolver = 2;
-r::plugin::resource_id_t lock = 2;
+r::plugin::resource_id_t lock = 3;
 } // namespace resource
 } // namespace
 
