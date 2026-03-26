@@ -1,8 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // SPDX-FileCopyrightText: 2026 Ivan Baidakou
 
-#include "access.h"
+#include "syncspirit-config.h"
 #include "test-utils.h"
+
+#if defined(SYNCSPIRIT_WATCHER_ANY)
+
+#include "access.h"
 #include "test-watcher.h"
 #include "fs/fs_context.h"
 #include "fs/fs_supervisor.h"
@@ -11,7 +15,6 @@
 #include "fs/task/scan_dir.h"
 #include "utils/error_code.h"
 #include "net/names.h"
-#include "syncspirit-config.h"
 #include <deque>
 #include <boost/nowide/convert.hpp>
 #include <stdexcept>
@@ -1245,15 +1248,17 @@ void test_create_modify_rename() {
 int _init() {
     test::init_logging();
     REGISTER_TEST_CASE(test_watcher_base, "test_watcher_base", "[fs]");
-#if defined(SYNCSPIRIT_WATCHER_ANY)
     REGISTER_TEST_CASE(test_start_n_shutdown, "test_start_n_shutdown", "[fs]");
     REGISTER_TEST_CASE(test_watch_unwatch, "test_watch_unwatch", "[fs]");
     REGISTER_TEST_CASE(test_real_impl, "test_real_impl", "[fs]");
     REGISTER_TEST_CASE(test_hierarchies, "test_hierarchies", "[fs]");
     REGISTER_TEST_CASE(test_manual_notification, "test_manual_notification", "[fs]");
     REGISTER_TEST_CASE(test_create_modify_rename, "test_create_modify_rename", "[fs]");
-#endif
     return 1;
 }
 
 static int v = _init();
+
+#endif
+
+TEST_CASE("dummy-test", "test") { CHECK(true); }

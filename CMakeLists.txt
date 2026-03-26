@@ -50,8 +50,9 @@ find_package(nlohmann_json REQUIRED)
 #find_package(c-ares REQUIRED)
 
 set(SYNCSPIRIT_VERSION "v${CMAKE_PROJECT_VERSION}")
-check_include_file("sys/inotify.h" SYNCSPIRIT_WATCHER_INOTIFY)
-if (WIN32)
+if (LINUX)
+    check_include_file("sys/inotify.h" SYNCSPIRIT_WATCHER_INOTIFY)
+elseif (WIN32)
     set(SYNCSPIRIT_WATCHER_WIN32 true)
 endif()
 

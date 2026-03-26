@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2025-2026 Ivan Baidakou
 
 #pragma once
+
+#include "syncspirit-export.h"
 
 #include "model/misc/arc.hpp"
 #include "model/misc/path.h"
@@ -18,8 +20,8 @@ using entity_ptr_t = model::intrusive_ptr_t<entity_t>;
 namespace details {
 namespace mi = boost::multi_index;
 
-model::path_t *get_path(const entity_ptr_t &) noexcept;
-std::string_view get_parent(const entity_ptr_t &) noexcept;
+SYNCSPIRIT_API model::path_t *get_path(const entity_ptr_t &) noexcept;
+SYNCSPIRIT_API std::string_view get_parent(const entity_ptr_t &) noexcept;
 
 // clang-format off
 using orphans_map_t = mi::multi_index_container<

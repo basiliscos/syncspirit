@@ -44,7 +44,7 @@ auto make_context(model::folder_info_ptr_t local_folder, std::string_view start_
     auto skip_path = bfs::path(start_subdir);
 
     auto comparator = presentation::presence_t::child_comparator_t{};
-    for (auto &item : skip_path) {
+    for (const auto &item : skip_path) {
         auto name = narrow(item.filename().generic_wstring());
         if (auto p = presence->get_child(name, true); p) {
             presence = p;

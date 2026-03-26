@@ -1,8 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // SPDX-FileCopyrightText: 2026 Ivan Baidakou
 
-#include "access.h"
+#include "syncspirit-config.h"
 #include "test-utils.h"
+
+#if defined(SYNCSPIRIT_WATCHER_ANY)
+
+#include "access.h"
 #include "fs/fs_supervisor.h"
 #include "fs/file_actor.h"
 #include "fs/messages.h"
@@ -244,3 +248,7 @@ int _init() {
 }
 
 static int v = _init();
+
+#endif
+
+TEST_CASE("dummy-test", "test") { CHECK(true); }

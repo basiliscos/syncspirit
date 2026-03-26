@@ -17,8 +17,8 @@ struct inbound_queue {};
 template <> auto &supervisor_t::access<to::inbound_queue>() noexcept { return inbound_queue; }
 
 void platform_context_t::notify() noexcept {
-    std::lock_guard<std::mutex> lock(ctx->mutex);
-    ctx->cv.notify_one();
+    std::lock_guard<std::mutex> lock(mutex);
+    cv.notify_one();
 }
 
 void platform_context_t::wait_next_event() noexcept {

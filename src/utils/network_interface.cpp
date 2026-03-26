@@ -3,7 +3,7 @@
 
 #include "network_interface.h"
 
-#if defined(__linux__) || defined(__APPLE__)
+#if defined(__unix__) || defined(__APPLE__)
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <netdb.h>
@@ -23,7 +23,7 @@ namespace sys = boost::system;
 
 namespace syncspirit::utils {
 
-#if defined(__linux__) || defined(__APPLE__)
+#if defined(__unix__) || defined(__APPLE__)
 static uri_container_t _local_interfaces(logger_t &log, std::uint16_t port) noexcept {
     uri_container_t r{};
 
