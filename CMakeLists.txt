@@ -114,6 +114,7 @@ add_library(syncspirit_core
     src/fs/platform/generic/context.cpp
     src/fs/platform/linux/context.cpp
     src/fs/platform/linux/watcher.cpp
+    src/fs/platform/unix/watcher.cpp
     src/fs/platform/windows/context.cpp
     src/fs/platform/windows/watcher.cpp
     src/fs/file.cpp
