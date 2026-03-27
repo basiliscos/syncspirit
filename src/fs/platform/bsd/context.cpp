@@ -9,8 +9,8 @@
 
 using namespace syncspirit::fs::platform::bsd;
 
-void bsd_backend_t::async_cb(int fd, void *data, std::uint32_t) {
-    auto ctx = reinterpret_cast<bsd::platform_context_t *>(data);
+static void async_cb(int fd, void *data, std::uint32_t) {
+    auto ctx = reinterpret_cast<platform_context_t *>(data);
     char dummy[4];
     bool do_read = true;
     while (do_read) {
@@ -27,13 +27,13 @@ void bsd_backend_t::async_cb(int fd, void *data, std::uint32_t) {
 
 bsd_backend_t::bsd_backend_t() { log = utils::get_logger("fs.bsd"); }
 
-bool bsd_backend_t::initialize() {
+bool bsd_backend_t::initialize(int pipe_read_fd, void *platform_context) {
     monitor = kqueue();
     if (monitor <= 0) {
         LOG_CRITICAL(log, "cannot create monitor(): {}", strerror(errno));
         return false;
     }
-    return true;
+    return watch(pipe_read_fd, async_cb, platform_context, EVFILT_READ, EV_ADD, 0);
 }
 
 void bsd_backend_t::destroy() {
@@ -56,11 +56,12 @@ void bsd_backend_t::unwatch(int fd) {
     }
 }
 
-bool bsd_backend_t::watch(int fd, io_callback_t callback, void *data) {
+bool bsd_backend_t::watch(int fd, io_callback_t callback, void *data, short filter, u_short flags, u_int fflags) {
     struct kevent change{};
     auto sz = events.size();
 
-    EV_SET(&change, fd, EVFILT_VNODE, EV_ADD | EV_CLEAR, NOTE_WRITE | NOTE_DELETE, 0, nullptr);
+    // EV_SET(&change, fd, EVFILT_VNODE, EV_ADD | EV_CLEAR, NOTE_WRITE | NOTE_DELETE, 0, nullptr);
+    EV_SET(&change, fd, filter, flags, fflags, 0, nullptr);
 
     if (int r = kevent(monitor, &change, 1, nullptr, 0, NULL); r == -1) {
         LOG_ERROR(log, "cannot kevent(/add) for fd {}: {}", fd, strerror(errno));

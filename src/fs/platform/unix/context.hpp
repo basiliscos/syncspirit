@@ -90,8 +90,9 @@ template <typename Backend> struct SYNCSPIRIT_API platform_context_t : context_b
         }
     }
 
-    io_guard_t register_callback(int fd, io_callback_t callback, void *data) {
-        if (backend.watch(fd, callback, data)) {
+    template <typename... Args>
+    io_guard_t register_callback(int fd, io_callback_t callback, void *data, Args &&...args) {
+        if (backend.watch(fd, callback, data, std::forward<Args>(args)...)) {
             return io_guard_t(this, fd);
         } else {
             return {};

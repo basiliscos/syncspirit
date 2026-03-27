@@ -26,13 +26,11 @@ struct SYNCSPIRIT_API bsd_backend_t {
     };
     using io_callbacks_map_t = std::unordered_map<int, io_context_t>;
 
-    static void async_cb(int fd, void *data, std::uint32_t);
-
     bsd_backend_t();
-    bool initialize();
+    bool initialize(int pipe_read_fd, void *platform_context);
     void destroy();
 
-    bool watch(int, io_callback_t, void *);
+    bool watch(int, io_callback_t, void *, short filter, u_short flags, u_int fflags);
     void unwatch(int);
 
     bool poll(std::uint32_t timeout);
