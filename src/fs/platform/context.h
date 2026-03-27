@@ -7,6 +7,8 @@
 
 #if SYNCSPIRIT_WATCHER_INOTIFY
 #include "linux/context.h"
+#elif SYNCSPIRIT_WATCHER_KQUEUE
+#include "bsd/context.h"
 #elif SYNCSPIRIT_WATCHER_WIN32
 #include "windows/context.h"
 #else
@@ -17,6 +19,8 @@ namespace syncspirit::fs::platform {
 
 #if SYNCSPIRIT_WATCHER_INOTIFY
 using context_t = linux::platform_context_t;
+#elif SYNCSPIRIT_WATCHER_KQUEUE
+using context_t = bsd::platform_context_t;
 #elif SYNCSPIRIT_WATCHER_WIN32
 using context_t = windows::platform_context_t;
 #else

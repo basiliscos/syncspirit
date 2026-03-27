@@ -52,6 +52,8 @@ find_package(nlohmann_json REQUIRED)
 set(SYNCSPIRIT_VERSION "v${CMAKE_PROJECT_VERSION}")
 if (LINUX)
     check_include_file("sys/inotify.h" SYNCSPIRIT_WATCHER_INOTIFY)
+elseif (BSD)
+    check_include_file("sys/event.h" SYNCSPIRIT_WATCHER_KQUEUE)
 elseif (WIN32)
     set(SYNCSPIRIT_WATCHER_WIN32 true)
 endif()
@@ -108,6 +110,7 @@ add_library(syncspirit_core
     src/db/utils.cpp
     src/fs/platform/context_base.cpp
     src/fs/platform/watcher_base.cpp
+    src/fs/platform/bsd/context.cpp
     src/fs/platform/generic/context.cpp
     src/fs/platform/linux/context.cpp
     src/fs/platform/linux/watcher.cpp

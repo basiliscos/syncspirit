@@ -8,15 +8,32 @@
 
 using namespace syncspirit::fs::platform::linux;
 
-linux_backend_t::linux_backend_t() { log = utils::get_logger("fs.linux_backend"); }
+static void async_cb(int fd, void *data) {
+    auto ctx = reinterpret_cast<platform_context_t *>(data);
+    char dummy[4];
+    bool do_read = true;
+    while (do_read) {
+        auto r = ::read(fd, &dummy, sizeof(dummy));
+        do_read = r > 0;
+        if (r < 0) {
+            if (errno != EAGAIN) {
+                LOG_WARN(ctx->log, "read() failed: {}", strerror(errno));
+            }
+        }
+    }
+    ctx->async_flag.store(false, std::memory_order_release);
+}
 
-bool linux_backend_t::initialize() {
+linux_backend_t::linux_backend_t() { log = utils::get_logger("fs.linux"); }
+
+bool linux_backend_t::initialize(int pipe_read_fd, void *platform_context) {
     monitor = epoll_create1(0);
     if (monitor <= 0) {
         LOG_CRITICAL(log, "cannot create monitor(): {}", strerror(errno));
         return false;
     }
-    return true;
+
+    return watch(pipe_read_fd, async_cb, platform_context);
 }
 
 void linux_backend_t::destroy() {
@@ -28,25 +45,33 @@ void linux_backend_t::destroy() {
 void linux_backend_t::unwatch(int fd) {
     auto code = epoll_ctl(monitor, EPOLL_CTL_DEL, fd, nullptr);
     LOG_DEBUG(log, "epoll_ctl(DEL), fd = {}, code = {}", fd, code);
+
+    auto it = io_callbacks.find(fd);
+    if (it != io_callbacks.end()) {
+        io_callbacks.erase(it);
+    }
+
     events.resize(events.size() - 1);
 }
 
-bool linux_backend_t::watch(int fd) {
+bool linux_backend_t::watch(int fd, io_callback_t callback, void *data) {
     auto &event = events.emplace_back(epoll_event{});
     event.data.fd = fd;
     event.events = EPOLLIN;
     auto sz = events.size();
+
     if (epoll_ctl(monitor, EPOLL_CTL_ADD, fd, &event) == -1) {
         LOG_ERROR(log, "cannot epoll_ctl(ADD) for {}: {}", fd, strerror(errno));
         events.resize(sz - 1);
         return false;
     } else {
         LOG_DEBUG(log, "epoll_ctl(ADD), fd = {}", fd);
+        io_callbacks.emplace(fd, io_context_t(callback, data));
         return true;
     }
 }
 
-bool linux_backend_t::poll(std::uint32_t timeout, unix::io_callbacks_map_t &io_callbacks) {
+bool linux_backend_t::poll(std::uint32_t timeout) {
     int i = 0;
     assert(io_callbacks.size() == events.size());
     for (auto &[fd, i_ctx] : io_callbacks) {
