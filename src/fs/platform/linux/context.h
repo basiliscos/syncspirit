@@ -7,55 +7,36 @@
 
 #if SYNCSPIRIT_WATCHER_INOTIFY
 
-#include "fs/platform/context_base.h"
-
-#include <atomic>
-#include <vector>
-#include <unordered_map>
+#include "fs/platform/unix/context.hpp"
+#include "utils/log.h"
 #include <sys/epoll.h>
 
 namespace syncspirit::fs::platform::linux {
 
-struct SYNCSPIRIT_API platform_context_t : context_base_t {
-    using parent_t = context_base_t;
-
-    platform_context_t(const pt::time_duration &poll_timeout) noexcept;
-    ~platform_context_t();
-
-    void notify() noexcept;
-    bool wait_next_event() noexcept;
-
-    using io_callback_t = void (*)(int, void *);
-    struct io_context_t {
-        io_context_t(platform_context_t::io_callback_t callback_, void *data_, int index_);
-        io_context_t(io_context_t &&) = default;
-        io_context_t(const io_context_t &) = delete;
-        io_callback_t cb;
-        void *data;
-        int index;
-    };
-    using io_callbacks_map_t = std::unordered_map<int, io_context_t>;
+struct SYNCSPIRIT_API linux_backend_t {
     using events_t = std::vector<epoll_event>;
-    struct io_guard_t {
-        io_guard_t();
-        io_guard_t(platform_context_t *, int fd);
-        io_guard_t(io_guard_t &&);
-        ~io_guard_t();
 
-        io_guard_t &operator=(io_guard_t &&) noexcept;
-        operator bool() const;
-        platform_context_t *ctx;
-        int fd;
-    };
+    linux_backend_t();
+    bool initialize();
+    void destroy();
 
-    io_guard_t register_callback(int, io_callback_t, void *data);
+    bool watch(int);
+    void unwatch(int);
 
-    int epoll_fd;
-    int async_pipes[2];
-    std::atomic_bool async_flag;
-    io_callbacks_map_t io_callbacks;
+    bool poll(std::uint32_t timeout, unix::io_callbacks_map_t &callbacks);
+
+    int monitor{-1};
+    utils::logger_t log;
     events_t events;
-    io_guard_t async_guard;
+};
+
+namespace details {
+using base_t = platform::unix::platform_context_t<linux_backend_t>;
+}
+
+struct SYNCSPIRIT_API platform_context_t : details::base_t {
+    using parent_t = details::base_t;
+    using parent_t::parent_t;
 };
 
 } // namespace syncspirit::fs::platform::linux
