@@ -1177,7 +1177,7 @@ void test_manual_notification() {
                 return child;
             };
 
-            auto w = static_cast<fs::platform::linux::watcher_t *>(target.get());
+            auto w = static_cast<fs::platform::unix::watcher_t *>(target.get());
             CHECK(w->path_map.size() == 1);
             CHECK(w->subdir_map.size() == 0);
 

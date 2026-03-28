@@ -36,7 +36,7 @@ auto watcher_t::watch_dir(std::string_view path) noexcept -> outcome::result<int
 auto watcher_t::unwatch_dir(int wd) noexcept -> sys::error_code {
     auto sup = static_cast<fs::fs_supervisor_t *>(supervisor);
     auto ctx = static_cast<platform_context_t *>(sup->context);
-    ctx->backend.unwatch(wd);
+    ctx->backend.unwatch(wd, EVFILT_VNODE, EV_DELETE, NOTE_WRITE | NOTE_DELETE);
     if (close(wd) == -1) {
         return sys::error_code{errno, sys::system_category()};
     }

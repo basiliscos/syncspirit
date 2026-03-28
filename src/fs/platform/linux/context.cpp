@@ -24,16 +24,26 @@ static void async_cb(int fd, void *data) {
     ctx->async_flag.store(false, std::memory_order_release);
 }
 
+linux_backend_t::io_guard_t::~io_guard_t() {
+    if (fd && ctx) {
+        reinterpret_cast<platform_context_t *>(ctx)->backend.unwatch(fd);
+    }
+}
+
 linux_backend_t::linux_backend_t() { log = utils::get_logger("fs.linux"); }
 
-bool linux_backend_t::initialize(int pipe_read_fd, void *platform_context) {
+auto linux_backend_t::initialize(int pipe_read_fd, void *platform_context) -> io_guard_holder_t {
     monitor = epoll_create1(0);
     if (monitor <= 0) {
         LOG_CRITICAL(log, "cannot create monitor(): {}", strerror(errno));
-        return false;
+        return {};
     }
 
-    return watch(pipe_read_fd, async_cb, platform_context);
+    auto ok = watch(pipe_read_fd, async_cb, platform_context);
+    if (ok) {
+        return io_guard_t(platform_context, pipe_read_fd);
+    }
+    return {};
 }
 
 void linux_backend_t::destroy() {

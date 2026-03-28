@@ -15,33 +15,26 @@
 #include <atomic>
 
 namespace syncspirit::fs::platform::unix {
+struct io_guard_t {
+    io_guard_t() : ctx{nullptr}, fd{-1} {}
+    io_guard_t(void *ctx_, int fd_) : ctx{ctx_}, fd{fd_} {};
+
+    io_guard_t &operator=(io_guard_t &&other) noexcept {
+        std::swap(ctx, other.ctx);
+        std::swap(fd, other.fd);
+        return *this;
+    }
+    void *ctx;
+    int fd;
+};
 
 template <typename Backend> struct SYNCSPIRIT_API platform_context_t : context_base_t {
     using parent_t = context_base_t;
     using backend_t = Backend;
     using io_callback_t = typename backend_t::io_callback_t;
     using io_callbacks_map_t = typename backend_t::io_callbacks_map_t;
-
-    struct io_guard_t {
-        io_guard_t() : ctx{nullptr}, fd{-1} {}
-        io_guard_t(platform_context_t *ctx_, int fd_) : ctx{ctx_}, fd{fd_} {};
-        io_guard_t(io_guard_t &&other) : ctx{nullptr}, fd{-1} {
-            std::swap(ctx, other.ctx);
-            std::swap(fd, other.fd);
-        }
-        ~io_guard_t() {
-            if (fd >= 0 && ctx) {
-                ctx->backend.unwatch(fd);
-            }
-        }
-        io_guard_t &operator=(io_guard_t &&other) noexcept {
-            std::swap(ctx, other.ctx);
-            std::swap(fd, other.fd);
-            return *this;
-        }
-        platform_context_t *ctx;
-        int fd;
-    };
+    using io_guard_t = typename backend_t::io_guard_t;
+    using io_guard_holder_t = typename backend_t::io_guard_holder_t;
 
     platform_context_t(const pt::time_duration &poll_timeout_) noexcept : parent_t(poll_timeout_), async_flag{false} {
         async_pipes[0] = async_pipes[1] = -1;
@@ -65,9 +58,7 @@ template <typename Backend> struct SYNCSPIRIT_API platform_context_t : context_b
             }
 
             auto read_fd = async_pipes[0];
-            if (backend.initialize(read_fd, this)) {
-                async_guard = io_guard_t(this, read_fd);
-            }
+            async_guard = backend.initialize(read_fd, this);
         } else {
             LOG_CRITICAL(log, "cannot pipe(): {}", strerror(errno));
         }
@@ -103,7 +94,7 @@ template <typename Backend> struct SYNCSPIRIT_API platform_context_t : context_b
 
     int async_pipes[2];
     std::atomic_bool async_flag;
-    io_guard_t async_guard;
+    io_guard_holder_t async_guard;
     backend_t backend;
 };
 

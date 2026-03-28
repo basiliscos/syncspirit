@@ -11,6 +11,7 @@
 #include "utils/log.h"
 #include <sys/event.h>
 #include <cstdint>
+#include <memory>
 
 namespace syncspirit::fs::platform::bsd {
 
@@ -25,9 +26,25 @@ struct SYNCSPIRIT_API bsd_backend_t {
         void *data;
     };
     using io_callbacks_map_t = std::unordered_map<int, io_context_t>;
+    struct io_guard_t : unix::io_guard_t {
+        using parent_t = unix::io_guard_t;
+        using parent_t::parent_t;
+
+        io_guard_t(io_guard_t &&other) : parent_t(nullptr, -1) {
+            std::swap(ctx, other.ctx);
+            std::swap(fd, other.fd);
+        }
+        io_guard_t &operator=(io_guard_t &&other) noexcept {
+            std::swap(ctx, other.ctx);
+            std::swap(fd, other.fd);
+            return *this;
+        }
+        virtual ~io_guard_t() = default;
+    };
+    using io_guard_holder_t = std::unique_ptr<io_guard_t>;
 
     bsd_backend_t();
-    bool initialize(int pipe_read_fd, void *platform_context);
+    io_guard_holder_t initialize(int pipe_read_fd, void *platform_context);
     void destroy();
 
     bool watch(int, io_callback_t, void *, short filter, u_short flags, u_int fflags);

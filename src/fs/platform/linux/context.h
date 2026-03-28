@@ -26,8 +26,25 @@ struct SYNCSPIRIT_API linux_backend_t {
     };
     using io_callbacks_map_t = std::unordered_map<int, io_context_t>;
 
+    struct io_guard_t : unix::io_guard_t {
+        using parent_t = unix::io_guard_t;
+        using parent_t::parent_t;
+
+        io_guard_t(io_guard_t &&other) : parent_t(nullptr, -1) {
+            std::swap(ctx, other.ctx);
+            std::swap(fd, other.fd);
+        }
+        io_guard_t &operator=(io_guard_t &&other) noexcept {
+            std::swap(ctx, other.ctx);
+            std::swap(fd, other.fd);
+            return *this;
+        }
+        ~io_guard_t();
+    };
+    using io_guard_holder_t = io_guard_t;
+
     linux_backend_t();
-    bool initialize(int pipe_read_fd, void *platform_context);
+    io_guard_holder_t initialize(int pipe_read_fd, void *platform_context);
     void destroy();
 
     bool watch(int, io_callback_t, void *);

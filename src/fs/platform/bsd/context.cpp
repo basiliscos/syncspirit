@@ -27,13 +27,29 @@ static void async_cb(int fd, void *data, std::uint32_t) {
 
 bsd_backend_t::bsd_backend_t() { log = utils::get_logger("fs.bsd"); }
 
-bool bsd_backend_t::initialize(int pipe_read_fd, void *platform_context) {
+auto bsd_backend_t::initialize(int pipe_read_fd, void *platform_context) -> io_guard_holder_t {
+    struct pipe_guard_t final : io_guard_t {
+        using parent_t = io_guard_t;
+        using parent_t::parent_t;
+        ~pipe_guard_t() {
+            if (fd && ctx) {
+                auto &backend = reinterpret_cast<platform_context_t *>(ctx)->backend;
+                backend.unwatch(fd, EVFILT_READ, EV_DELETE, 0);
+            }
+        }
+    };
+
     monitor = kqueue();
     if (monitor <= 0) {
         LOG_CRITICAL(log, "cannot create monitor(): {}", strerror(errno));
-        return false;
+        return {};
     }
-    return watch(pipe_read_fd, async_cb, platform_context, EVFILT_READ, EV_ADD, 0);
+    auto ok = watch(pipe_read_fd, async_cb, platform_context, EVFILT_READ, EV_ADD, 0);
+    if (ok) {
+        return std::make_unique<pipe_guard_t>(platform_context, pipe_read_fd);
+    } else {
+        return {};
+    }
 }
 
 void bsd_backend_t::destroy() {
