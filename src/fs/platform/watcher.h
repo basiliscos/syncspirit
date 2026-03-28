@@ -7,6 +7,8 @@
 
 #if SYNCSPIRIT_WATCHER_INOTIFY
 #include "linux/watcher.h"
+#elif SYNCSPIRIT_WATCHER_KQUEUE
+#include "bsd/watcher.h"
 #elif SYNCSPIRIT_WATCHER_WIN32
 #include "windows/watcher.h"
 #else
@@ -17,6 +19,8 @@ namespace syncspirit::fs::platform {
 
 #if SYNCSPIRIT_WATCHER_INOTIFY
 using watcher_t = linux::watcher_t;
+#elif SYNCSPIRIT_WATCHER_KQUEUE
+using watcher_t = bsd::watcher_t;
 #elif SYNCSPIRIT_WATCHER_WIN32
 using watcher_t = windows::watcher_t;
 #else

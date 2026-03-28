@@ -74,7 +74,7 @@ void watcher_t::inotify_callback() noexcept {
     using U = update_type_t;
     char buffer[1024 * (sizeof(struct inotify_event) + NAME_MAX + 1)];
     int length = ::read(inotify_guard.fd, buffer, sizeof(buffer));
-    LOG_TRACE(log, "inotify callback, result = {}", inotify_guard.fd, length);
+    LOG_TRACE(log, "inotify callback, result = {}, length = {}", inotify_guard.fd, length);
     if (length < 0) {
         LOG_ERROR(log, "cannot read: {}", strerror(errno));
     }

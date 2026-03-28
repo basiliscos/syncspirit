@@ -42,11 +42,12 @@ void bsd_backend_t::destroy() {
     }
 }
 
-void bsd_backend_t::unwatch(int fd) {
+void bsd_backend_t::unwatch(int fd, short filter, u_short flags, u_int fflags) {
     auto &change = events.back();
     auto sz = events.size();
 
-    EV_SET(&change, fd, EVFILT_VNODE, EV_DELETE, NOTE_WRITE | NOTE_DELETE, 0, nullptr);
+    // EV_SET(&change, fd, EVFILT_VNODE, EV_DELETE, NOTE_WRITE | NOTE_DELETE, 0, nullptr);
+    EV_SET(&change, fd, filter, flags, fflags, 0, nullptr);
 
     if (int r = kevent(monitor, &change, 1, nullptr, 0, NULL); r == -1) {
         LOG_ERROR(log, "cannot kevent(/del) for fd {}: {}", fd, strerror(errno));
@@ -65,11 +66,11 @@ bool bsd_backend_t::watch(int fd, io_callback_t callback, void *data, short filt
 
     if (int r = kevent(monitor, &change, 1, nullptr, 0, NULL); r == -1) {
         LOG_ERROR(log, "cannot kevent(/add) for fd {}: {}", fd, strerror(errno));
-        events.push_back(std::move(change));
         events.resize(sz - 1);
         return false;
     } else {
         LOG_DEBUG(log, "kevent(/add), fd = {}", fd);
+        events.push_back(std::move(change));
         io_callbacks.emplace(fd, io_context_t(callback, data));
         return true;
     }

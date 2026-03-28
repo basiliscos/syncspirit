@@ -31,7 +31,7 @@ struct SYNCSPIRIT_API bsd_backend_t {
     void destroy();
 
     bool watch(int, io_callback_t, void *, short filter, u_short flags, u_int fflags);
-    void unwatch(int);
+    void unwatch(int, short filter, u_short flags, u_int fflags);
 
     bool poll(std::uint32_t timeout);
 
