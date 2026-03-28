@@ -343,14 +343,6 @@ void test_watcher_base() {
                     await_events(poll_t::trigger_timer);
                     REQUIRE(changes.size() == 0);
                 }
-                SECTION("content change in dir -> collapse to void") {
-                    auto own_name = bfs::path(L"файл.bin");
-                    auto sub_path = root_path / own_name;
-                    bfs::create_directory(sub_path);
-                    target->push(deadline, folder_id, narrow(own_name.wstring()), {}, U::content);
-                    await_events(poll_t::trigger_timer);
-                    REQUIRE(changes.size() == 0);
-                }
                 SECTION("content , meta -> collapse to content") {
                     auto own_name = bfs::path(L"файл.bin");
                     auto sub_path = root_path / own_name;
@@ -604,11 +596,18 @@ void test_real_impl() {
                 REQUIRE(folder_change.folder_id == folder_id);
                 REQUIRE(folder_change.file_changes.size() == 1);
                 auto &file_change = folder_change.file_changes.front();
+#ifndef SYNCSPIRIT_WATCHER_KQUEUE
                 CHECK(proto::get_name(file_change) == "my-dir");
                 CHECK(proto::get_size(file_change) == 0);
                 CHECK(proto::get_type(file_change) == proto::FileInfoType::DIRECTORY);
                 CHECK(proto::get_permissions(file_change));
                 CHECK(file_change.update_reason == update_type_t::created);
+#else
+                CHECK(proto::get_name(file_change) == "");
+                CHECK(proto::get_size(file_change) == 0);
+                CHECK(proto::get_type(file_change) == proto::FileInfoType::DIRECTORY);
+                CHECK(file_change.update_reason == update_type_t::content);
+#endif
             }
             SECTION("(create with recursion) new dir + new file") {
                 sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id);

@@ -64,6 +64,7 @@ void bsd_backend_t::unwatch(int fd, short filter, u_short flags, u_int fflags) {
 
     // EV_SET(&change, fd, EVFILT_VNODE, EV_DELETE, NOTE_WRITE | NOTE_DELETE, 0, nullptr);
     EV_SET(&change, fd, filter, flags, fflags, 0, nullptr);
+    assert(flags & EV_DELETE);
 
     if (int r = kevent(monitor, &change, 1, nullptr, 0, NULL); r == -1) {
         LOG_ERROR(log, "cannot kevent(/del) for fd {}: {}", fd, strerror(errno));
@@ -79,6 +80,7 @@ bool bsd_backend_t::watch(int fd, io_callback_t callback, void *data, short filt
 
     // EV_SET(&change, fd, EVFILT_VNODE, EV_ADD | EV_CLEAR, NOTE_WRITE | NOTE_DELETE, 0, nullptr);
     EV_SET(&change, fd, filter, flags, fflags, 0, nullptr);
+    assert(flags & EV_ADD);
 
     if (int r = kevent(monitor, &change, 1, nullptr, 0, NULL); r == -1) {
         LOG_ERROR(log, "cannot kevent(/add) for fd {}: {}", fd, strerror(errno));

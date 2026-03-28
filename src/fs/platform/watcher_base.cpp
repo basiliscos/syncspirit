@@ -198,10 +198,6 @@ auto FU::make(const folder_info_t &folder_info, updates_mediator_t &mediator) no
                 proto::set_type(r, proto::FileInfoType::FILE);
                 proto::set_size(r, static_cast<std::int64_t>(sz));
             } else if (status.type() == FT::directory) {
-                if (update.update_type == ut::CONTENT) {
-                    LOG_DEBUG(log, "ignoring content changes in dir '{}'", full_name);
-                    continue;
-                }
                 proto::set_type(r, proto::FileInfoType::DIRECTORY);
             } else if (status.type() == FT::symlink) {
                 auto target = bfs::read_symlink(path, ec);
