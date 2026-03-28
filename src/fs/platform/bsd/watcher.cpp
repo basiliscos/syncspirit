@@ -17,6 +17,11 @@ static void node_cb(int fd, void *data, std::uint32_t flags) {
     watcher->kqueue_callback(fd, flags);
 }
 
+void watcher_t::do_initialize(r::system_context_t *ctx) noexcept {
+    ready = true;
+    parent_t::do_initialize(ctx);
+}
+
 auto watcher_t::watch_dir(std::string_view path) noexcept -> outcome::result<int> {
     int fd = open(path.data(), O_RDONLY);
     if (fd == -1) {
@@ -40,6 +45,7 @@ auto watcher_t::unwatch_dir(int wd) noexcept -> sys::error_code {
     if (close(wd) == -1) {
         return sys::error_code{errno, sys::system_category()};
     }
+    return {};
 }
 
 void watcher_t::kqueue_callback(int wd, std::uint32_t flags) noexcept {

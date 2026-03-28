@@ -16,6 +16,7 @@ struct SYNCSPIRIT_API watcher_t final : unix::watcher_t {
     using parent_t = unix::watcher_t;
     using parent_t::parent_t;
 
+    void do_initialize(r::system_context_t *ctx) noexcept override;
     sys::error_code unwatch_dir(int wd) noexcept override;
     outcome::result<int> watch_dir(std::string_view path) noexcept override;
 
