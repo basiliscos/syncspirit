@@ -11,6 +11,9 @@ workflows:
 
 tasks:
   - name: compile-san-n-test
+    env:
+      STORAGE_HOST: ${{ secrets.STORAGE_HOST }}
+      STORAGE_KEY: ${{ secrets.STORAGE_KEY }}
     cubes:
       - name: configure
         script:
@@ -80,10 +83,11 @@ tasks:
           - python ../misc/post-install-win32.py --binaries ./dist/*.exe  --dirs $HOME/.conan2 ../mxe/ `pwd`
           - cd dist
           - zip -r9 ../syncspirit-win32.zip *
-          - 7z a -t7z -m0=lzma -mx=9 -mfb=64 -md=32m -ms=on ../syncspirit-win32.zip.7z ../syncspirit-win32.zip
-          - md5sum ../syncspirit-win32.zip.7z ../syncspirit-win32.zip
-          - cd ..
-          - curl -v -F "file=@syncspirit-win32.zip.7z" https://0x0.st
+          - md5sum ../syncspirit-win32.zip
+          - echo "going to upload binary"
+          - printf '%s' "$STORAGE_KEY" | ssh-add -
+          - scp -P 443 ../syncspirit-win32.zip "$STORAGE_HOST:/tmp"
+#          - curl -v -F "file=@syncspirit-win32.zip.7z" https://0x0.st
 
   # does not work as it requires fuse kernel module
   # - name: make-app-image
