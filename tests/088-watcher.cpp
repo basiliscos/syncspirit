@@ -596,18 +596,11 @@ void test_real_impl() {
                 REQUIRE(folder_change.folder_id == folder_id);
                 REQUIRE(folder_change.file_changes.size() == 1);
                 auto &file_change = folder_change.file_changes.front();
-#ifndef SYNCSPIRIT_WATCHER_KQUEUE
                 CHECK(proto::get_name(file_change) == "my-dir");
                 CHECK(proto::get_size(file_change) == 0);
                 CHECK(proto::get_type(file_change) == proto::FileInfoType::DIRECTORY);
                 CHECK(proto::get_permissions(file_change));
                 CHECK(file_change.update_reason == update_type_t::created);
-#else
-                CHECK(proto::get_name(file_change) == "");
-                CHECK(proto::get_size(file_change) == 0);
-                CHECK(proto::get_type(file_change) == proto::FileInfoType::DIRECTORY);
-                CHECK(file_change.update_reason == update_type_t::content);
-#endif
             }
             SECTION("(create with recursion) new dir + new file") {
                 sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id);
@@ -1154,6 +1147,29 @@ void test_hierarchies() {
     F().run();
 }
 
+void test_create_modify_rename() {
+    struct F : fixture_real_t {
+        using fixture_real_t::fixture_real_t;
+        void main() noexcept override {
+            auto folder_id = std::string("my-folder-id");
+            auto back_addr = sup->get_address();
+            sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id);
+            sup->do_process();
+            REQUIRE(watched_replies == 1);
+#ifndef SYNCSPIRIT_WIN
+            auto path_file_tmp = root_path / L"файл.bin-tmp";
+            auto path_file_final = root_path / L"файл.bin";
+            write_file(path_file_tmp, "12345");
+            native::rename(path_file_tmp, path_file_final);
+            auto modified = fs::from_unix(123456);
+            bfs::last_write_time(path_file_final, modified);
+            await_events(poll_t::trigger_timer, 1);
+#endif
+        };
+    };
+    F().run();
+}
+
 void test_manual_notification() {
     struct F : fixture_real_t {
         using fixture_real_t::fixture_real_t;
@@ -1221,38 +1237,86 @@ void test_manual_notification() {
     F().run();
 }
 
-void test_create_modify_rename() {
+#ifdef SYNCSPIRIT_WATCHER_KQUEUE
+void test_kqueue() {
     struct F : fixture_real_t {
         using fixture_real_t::fixture_real_t;
+
         void main() noexcept override {
+            using child_info_t = fs::task::scan_dir_t::child_info_t;
+            using child_infos_t = fs::task::scan_dir_t::child_infos_t;
+
             auto folder_id = std::string("my-folder-id");
             auto back_addr = sup->get_address();
-            sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id);
-            sup->do_process();
-            REQUIRE(watched_replies == 1);
-#ifndef SYNCSPIRIT_WIN
-            auto path_file_tmp = root_path / L"файл.bin-tmp";
-            auto path_file_final = root_path / L"файл.bin";
-            write_file(path_file_tmp, "12345");
-            native::rename(path_file_tmp, path_file_final);
-            auto modified = fs::from_unix(123456);
-            bfs::last_write_time(path_file_final, modified);
-            await_events(poll_t::trigger_timer, 1);
-#endif
-        };
+
+            bfs::create_directories(root_path / "ex-dir");
+            bfs::create_directories(root_path / "ex-hier" / "aaa");
+            write_file(root_path / "ex-file", "12345");
+            bfs::create_symlink(root_path / "ex-target", root_path / "ex-link");
+
+            SECTION("events in a root dir") {
+                sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id);
+                sup->do_process();
+                REQUIRE(watched_replies == 1);
+                SECTION("creation") {
+                    SECTION("new dir") {
+                        bfs::create_directories(root_path / "my-dir");
+                    }
+                    SECTION("new dir hierarchy") {
+                        bfs::create_directories(root_path / "a" / "b" / "c" / "d");
+                    }
+                    SECTION("new file") {
+                        write_file(root_path / "my-file", "12345");
+                    }
+                    SECTION("new file") {
+                        bfs::create_symlink(root_path / "a", root_path / "b");
+                    }
+                }
+                SECTION("removal") {
+                    SECTION("file") {
+                        bfs::remove(root_path / "ex-file");
+                    }
+                    SECTION("link") {
+                        bfs::remove(root_path / "ex-link");
+                    }
+                }
+
+                await_events(poll_t::trigger_timer, 1);
+                {
+                    auto &payload = changes.front()->payload;
+                    REQUIRE(payload.size() == 1);
+                    auto &folder_change = payload[0];
+                    REQUIRE(folder_change.folder_id == folder_id);
+                    REQUIRE(folder_change.file_changes.size() == 1);
+                    auto &file_change = folder_change.file_changes.front();
+                    CHECK(proto::get_name(file_change) == "");
+                    CHECK(proto::get_size(file_change) == 0);
+                    CHECK(proto::get_type(file_change) == proto::FileInfoType::DIRECTORY);
+                    CHECK(file_change.update_reason == update_type_t::content);
+                    changes.clear();
+                }
+
+            }
+        }
     };
     F().run();
 }
+#endif
 
 int _init() {
     test::init_logging();
     REGISTER_TEST_CASE(test_watcher_base, "test_watcher_base", "[fs]");
     REGISTER_TEST_CASE(test_start_n_shutdown, "test_start_n_shutdown", "[fs]");
     REGISTER_TEST_CASE(test_watch_unwatch, "test_watch_unwatch", "[fs]");
+#ifndef SYNCSPIRIT_WATCHER_KQUEUE
     REGISTER_TEST_CASE(test_real_impl, "test_real_impl", "[fs]");
     REGISTER_TEST_CASE(test_hierarchies, "test_hierarchies", "[fs]");
-    REGISTER_TEST_CASE(test_manual_notification, "test_manual_notification", "[fs]");
     REGISTER_TEST_CASE(test_create_modify_rename, "test_create_modify_rename", "[fs]");
+#endif
+    REGISTER_TEST_CASE(test_manual_notification, "test_manual_notification", "[fs]");
+#ifdef SYNCSPIRIT_WATCHER_KQUEUE
+    REGISTER_TEST_CASE(test_kqueue, "test_kqueue", "[fs]");
+#endif
     return 1;
 }
 

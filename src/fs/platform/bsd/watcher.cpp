@@ -12,7 +12,7 @@
 
 using namespace syncspirit::fs::platform::bsd;
 
-static constexpr auto FILTER_FLAGS = NOTE_WRITE | NOTE_DELETE | NOTE_ATTRIB | NOTE_RENAME;
+static constexpr auto FILTER_FLAGS = NOTE_WRITE | NOTE_DELETE | NOTE_ATTRIB | NOTE_RENAME | NOTE_EXTEND | NOTE_LINK;
 
 static void node_cb(int fd, void *data, std::uint32_t flags) {
     auto watcher = reinterpret_cast<watcher_t *>(data);
