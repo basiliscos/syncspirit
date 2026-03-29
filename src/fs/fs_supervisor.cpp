@@ -66,6 +66,7 @@ void fs_supervisor_t::launch_children() noexcept {
         .change_retension(retension_x2)
         .updates_mediator(updates_mediator)
         .watched_folders(watched_folders)
+        .scan_dir_callback(notify_watcher)
         .timeout(timeout)
         .escalate_failure()
         .finish();

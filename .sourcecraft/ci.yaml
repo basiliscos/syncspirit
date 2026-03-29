@@ -85,6 +85,7 @@ tasks:
           - zip -r9 ../syncspirit-win32.zip *
           - md5sum ../syncspirit-win32.zip
           - echo "going to upload binary"
+          - eval `ssh-agent -s`
           - printf '%s' "$STORAGE_KEY" | ssh-add -
           - scp -P 443 ../syncspirit-win32.zip "$STORAGE_HOST:/tmp"
 #          - curl -v -F "file=@syncspirit-win32.zip.7z" https://0x0.st
