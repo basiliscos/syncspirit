@@ -85,7 +85,7 @@ tasks:
           - zip -r9 ../syncspirit-win32.zip *
           - md5sum ../syncspirit-win32.zip
           - echo "going to upload binary"
-          - echo "STORAGE_HOST: ${STORAGE_HOST}"
+          - echo "STORAGE_HOST is ${STORAGE_HOST}"
           - eval `ssh-agent -s`
           - ssh-agent
 #          - printf '%s' "$STORAGE_KEY" | ssh-add -
