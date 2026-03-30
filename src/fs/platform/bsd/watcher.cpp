@@ -12,7 +12,19 @@
 
 using namespace syncspirit::fs::platform::bsd;
 
+namespace {
+
+namespace dir {
+static constexpr auto FILTER = EVFILT_VNODE;
 static constexpr auto FILTER_FLAGS = NOTE_WRITE | NOTE_DELETE | NOTE_ATTRIB | NOTE_RENAME | NOTE_EXTEND | NOTE_LINK;
+} // namespace dir
+
+namespace regular {
+static constexpr auto FILTER = EVFILT_VNODE;
+static constexpr auto FILTER_FLAGS = NOTE_WRITE | NOTE_DELETE | NOTE_ATTRIB | NOTE_RENAME | NOTE_EXTEND | NOTE_LINK;
+} // namespace regular
+
+} // namespace
 
 static void node_cb(int fd, void *data, std::uint32_t flags) {
     auto watcher = reinterpret_cast<watcher_t *>(data);
@@ -24,29 +36,60 @@ void watcher_t::do_initialize(r::system_context_t *ctx) noexcept {
     parent_t::do_initialize(ctx);
 }
 
-auto watcher_t::watch_dir(std::string_view path) noexcept -> outcome::result<int> {
-    int fd = open(path.data(), O_RDONLY);
-    if (fd == -1) {
-        return sys::error_code{errno, sys::system_category()};
+auto watcher_t::watch_path(std::string_view path, file_type_t type) noexcept -> std::optional<int> {
+    static constexpr auto FLAGS = EV_ADD | EV_CLEAR;
+
+    auto r = std::optional<int>{};
+    short filter;
+    u_int fflags;
+
+    if (type == file_type_t::directory) {
+        r = open(path.data(), O_RDONLY);
+        filter = dir::FILTER;
+        fflags = dir::FILTER_FLAGS;
+    } else if (type == file_type_t::regular) {
+        r = open(path.data(), O_RDONLY);
+        filter = regular::FILTER;
+        fflags = regular::FILTER_FLAGS;
+    }
+
+    if (!r || *r < 0) {
+        return r;
     }
 
     auto sup = static_cast<fs::fs_supervisor_t *>(supervisor);
     auto ctx = static_cast<platform_context_t *>(sup->context);
-    auto ok = ctx->backend.watch(fd, node_cb, this, EVFILT_VNODE, EV_ADD | EV_CLEAR, FILTER_FLAGS);
+    auto ok = ctx->backend.watch(*r, node_cb, this, filter, FLAGS, fflags);
     if (!ok) {
-        close(fd);
-        return sys::error_code{sys::errc::io_error, sys::generic_category()};
+        close(*r);
+        return -1;
     }
-    return fd;
+    return r;
 }
 
-auto watcher_t::unwatch_dir(int wd) noexcept -> sys::error_code {
-    auto sup = static_cast<fs::fs_supervisor_t *>(supervisor);
-    auto ctx = static_cast<platform_context_t *>(sup->context);
-    ctx->backend.unwatch(wd, EVFILT_VNODE, EV_DELETE, FILTER_FLAGS);
-    if (close(wd) == -1) {
-        return sys::error_code{errno, sys::system_category()};
+auto watcher_t::unwatch_path(int wd, file_type_t type) noexcept -> sys::error_code {
+    static constexpr auto FLAGS = EV_DELETE;
+
+    short filter{0};
+    u_int fflags{0};
+
+    if (type == file_type_t::directory) {
+        filter = dir::FILTER;
+        fflags = dir::FILTER_FLAGS;
+    } else if (type == file_type_t::regular) {
+        filter = regular::FILTER;
+        fflags = regular::FILTER_FLAGS;
     }
+
+    if (filter) {
+        auto sup = static_cast<fs::fs_supervisor_t *>(supervisor);
+        auto ctx = static_cast<platform_context_t *>(sup->context);
+        ctx->backend.unwatch(wd, filter, FLAGS, fflags);
+        if (close(wd) == -1) {
+            return sys::error_code{errno, sys::system_category()};
+        }
+    }
+
     return {};
 }
 

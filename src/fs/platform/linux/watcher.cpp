@@ -54,20 +54,21 @@ void watcher_t::shutdown_finish() noexcept {
     return;
 }
 
-auto watcher_t::unwatch_dir(int wd) noexcept -> sys::error_code {
+auto watcher_t::unwatch_path(int wd, file_type_t type) noexcept -> sys::error_code {
+    assert(type == file_type_t::directory);
     if (auto r = ::inotify_rm_watch(inotify_guard.fd, wd); r != 0) {
         return sys::error_code{errno, sys::system_category()};
     }
     return {};
 }
 
-auto watcher_t::watch_dir(std::string_view path) noexcept -> outcome::result<int> {
+auto watcher_t::watch_path(std::string_view path, file_type_t type) noexcept -> std::optional<int> {
     static constexpr auto FLAGS = IN_MODIFY | IN_CREATE | IN_DELETE | IN_ATTRIB | IN_MOVE | IN_DELETE_SELF;
-    auto wd = ::inotify_add_watch(inotify_guard.fd, path.data(), FLAGS);
-    if (wd <= 0) {
-        return sys::error_code{errno, sys::system_category()};
+    if (type != file_type_t::directory) {
+        return {};
     }
-    return outcome::success(wd);
+    auto wd = ::inotify_add_watch(inotify_guard.fd, path.data(), FLAGS);
+    return wd;
 }
 
 void watcher_t::inotify_callback() noexcept {

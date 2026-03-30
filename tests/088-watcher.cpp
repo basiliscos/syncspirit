@@ -1259,26 +1259,14 @@ void test_kqueue() {
                 sup->do_process();
                 REQUIRE(watched_replies == 1);
                 SECTION("creation") {
-                    SECTION("new dir") {
-                        bfs::create_directories(root_path / "my-dir");
-                    }
-                    SECTION("new dir hierarchy") {
-                        bfs::create_directories(root_path / "a" / "b" / "c" / "d");
-                    }
-                    SECTION("new file") {
-                        write_file(root_path / "my-file", "12345");
-                    }
-                    SECTION("new file") {
-                        bfs::create_symlink(root_path / "a", root_path / "b");
-                    }
+                    SECTION("new dir") { bfs::create_directories(root_path / "my-dir"); }
+                    SECTION("new dir hierarchy") { bfs::create_directories(root_path / "a" / "b" / "c" / "d"); }
+                    SECTION("new file") { write_file(root_path / "my-file", "12345"); }
+                    SECTION("new file") { bfs::create_symlink(root_path / "a", root_path / "b"); }
                 }
                 SECTION("removal") {
-                    SECTION("file") {
-                        bfs::remove(root_path / "ex-file");
-                    }
-                    SECTION("link") {
-                        bfs::remove(root_path / "ex-link");
-                    }
+                    SECTION("file") { bfs::remove(root_path / "ex-file"); }
+                    SECTION("link") { bfs::remove(root_path / "ex-link"); }
                 }
 
                 await_events(poll_t::trigger_timer, 1);
@@ -1295,7 +1283,6 @@ void test_kqueue() {
                     CHECK(file_change.update_reason == update_type_t::content);
                     changes.clear();
                 }
-
             }
         }
     };
