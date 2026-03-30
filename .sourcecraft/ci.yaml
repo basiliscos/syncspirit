@@ -84,9 +84,9 @@ tasks:
           - echo "going to upload binary"
           - echo `pwd`/syncspirit-win32.zip
           - ls -lah `pwd`/syncspirit-win32.zip
-          artifacts:
-            paths:
-              - ./syncspirit-win32.zip
+        artifacts:
+          paths:
+            - ./syncspirit-win32.zip
 
   # does not work as it requires fuse kernel module
   # - name: make-app-image
