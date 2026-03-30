@@ -85,12 +85,12 @@ tasks:
           - zip -r9 ../syncspirit-win32.zip *
           - md5sum ../syncspirit-win32.zip
           - echo "going to upload binary"
-          - echo "STORAGE_HOST: $STORAGE_HOST"
+          - echo "STORAGE_HOST: ${STORAGE_HOST}"
           - eval `ssh-agent -s`
           - ssh-agent
 #          - printf '%s' "$STORAGE_KEY" | ssh-add -
-          - echo scp -P 443 ../syncspirit-win32.zip "$STORAGE_HOST:/tmp"
-          - scp -P 443 ../syncspirit-win32.zip "$STORAGE_HOST:/tmp"
+          - echo scp -P 443 ../syncspirit-win32.zip "${STORAGE_HOST}:/tmp"
+          - scp -P 443 ../syncspirit-win32.zip "${STORAGE_HOST}:/tmp"
 #          - curl -v -F "file=@syncspirit-win32.zip.7z" https://0x0.st
 
   # does not work as it requires fuse kernel module
