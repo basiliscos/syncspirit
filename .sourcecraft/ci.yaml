@@ -82,6 +82,7 @@ tasks:
           - zip -r9 ../syncspirit-win32.zip *
           - md5sum ../syncspirit-win32.zip
           - echo "going to upload binary"
+          - cd ..
           - echo `pwd`/syncspirit-win32.zip
           - ls -lah `pwd`/syncspirit-win32.zip
         artifacts:
