@@ -87,7 +87,7 @@ tasks:
           - ls -lah `pwd`/syncspirit-win32.zip
         artifacts:
           paths:
-            - ./syncspirit-win32.zip
+            - ./build.ci/syncspirit-win32.zip
 
   # does not work as it requires fuse kernel module
   # - name: make-app-image
