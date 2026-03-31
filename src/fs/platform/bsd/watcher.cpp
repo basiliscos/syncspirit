@@ -14,14 +14,16 @@ using namespace syncspirit::fs::platform::bsd;
 
 namespace {
 
+// NOTE_DELETE & NOTE_RENAME are catch by NOTE_WRITE of parent dir .. and trigger dir rescan
+
 namespace dir {
 static constexpr auto FILTER = EVFILT_VNODE;
-static constexpr auto FILTER_FLAGS = NOTE_WRITE | NOTE_DELETE | NOTE_ATTRIB | NOTE_RENAME | NOTE_EXTEND;
+static constexpr auto FILTER_FLAGS = NOTE_WRITE | NOTE_ATTRIB | NOTE_EXTEND;
 } // namespace dir
 
 namespace regular {
 static constexpr auto FILTER = EVFILT_VNODE;
-static constexpr auto FILTER_FLAGS = NOTE_WRITE | NOTE_DELETE | NOTE_ATTRIB | NOTE_RENAME;
+static constexpr auto FILTER_FLAGS = NOTE_WRITE | NOTE_ATTRIB;
 } // namespace regular
 
 } // namespace

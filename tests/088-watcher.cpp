@@ -1254,15 +1254,27 @@ void test_kqueue() {
             write_file(root_path / "ex-file", "12345");
             bfs::create_symlink(root_path / "ex-target", root_path / "ex-link");
 
-            SECTION("creation events in a root dir") {
-                sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id);
-                sup->do_process();
-                REQUIRE(watched_replies == 1);
+            sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id);
+            sup->do_process();
+            REQUIRE(watched_replies == 1);
 
-                SECTION("new dir") { bfs::create_directories(root_path / "my-dir"); }
-                SECTION("new dir hierarchy") { bfs::create_directories(root_path / "a" / "b" / "c" / "d"); }
-                SECTION("new file") { write_file(root_path / "my-file", "12345"); }
-                SECTION("new file") { bfs::create_symlink(root_path / "a", root_path / "b"); }
+            SECTION("metadata (vnode/dir) events") {
+                SECTION("creation") {
+                    SECTION("new dir") { bfs::create_directories(root_path / "my-dir"); }
+                    SECTION("new dir hierarchy") { bfs::create_directories(root_path / "a" / "b" / "c" / "d"); }
+                    SECTION("new file") { write_file(root_path / "my-file", "12345"); }
+                    SECTION("new link") { bfs::create_symlink(root_path / "a", root_path / "b"); }
+                }
+                SECTION("removal") {
+                    auto name_raw = GENERATE("ex-file", "ex-dir", "ex-link");
+                    auto name = std::string_view(name_raw);
+                    bfs::remove(root_path / name);
+                }
+                SECTION("renaming") {
+                    auto name_raw = GENERATE("ex-file", "ex-dir", "ex-link", "ex-hier");
+                    auto name = std::string_view(name_raw);
+                    bfs::rename(root_path / name, root_path / L"новое-имя");
+                }
 
                 await_events(poll_t::trigger_timer, 1);
                 {
@@ -1282,32 +1294,6 @@ void test_kqueue() {
                 await_events(poll_t::trigger_timer);
                 REQUIRE(changes.size() == 0);
             }
-#if 0
-            SECTION("removal events in a root dir") {
-                sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id);
-                sup->do_process();
-                REQUIRE(watched_replies == 1);
-
-                SECTION("file") { bfs::remove(root_path / "ex-file"); }
-                SECTION("link") { bfs::remove(root_path / "ex-link"); }
-                SECTION("dir") { bfs::remove(root_path / "ex-dir"); }
-
-                await_events(poll_t::trigger_timer, 2);
-                {
-                    auto &payload = changes.front()->payload;
-                    REQUIRE(payload.size() == 1);
-                    auto &folder_change = payload[0];
-                    REQUIRE(folder_change.folder_id == folder_id);
-                    REQUIRE(folder_change.file_changes.size() == 1);
-                    auto &file_change = folder_change.file_changes.front();
-                    CHECK(proto::get_name(file_change) == "");
-                    CHECK(proto::get_size(file_change) == 0);
-                    CHECK(proto::get_type(file_change) == proto::FileInfoType::DIRECTORY);
-                    CHECK(file_change.update_reason == update_type_t::content);
-                    changes.clear();
-                }
-            }
-#endif
         }
     };
     F().run();
