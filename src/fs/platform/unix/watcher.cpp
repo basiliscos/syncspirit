@@ -13,7 +13,7 @@ void watcher_t::shutdown_finish() noexcept {
     for (auto it = watched_folders->begin(); it != watched_folders->end();) {
         auto &folder_id = it->first;
         auto &path = it->second.path_str;
-        LOG_DEBUG(log, "unwatching {}", path);
+        LOG_DEBUG(log, "unwatching folder '{}' on {}", folder_id, path);
         auto ec = unwatch_recurse(folder_id);
         if (ec) {
             LOG_WARN(log, "cannot unwatch '{}' : {}", path, ec.message());
@@ -146,7 +146,7 @@ void watcher_t::on_unwatch(message::unwatch_folder_t &message) noexcept {
     auto it = watched_folders->find(p.folder_id);
     if (it != watched_folders->end()) {
         auto &path = it->second.path_str;
-        LOG_DEBUG(log, "unwatching {}", path);
+        LOG_DEBUG(log, "unwatching folder '{}' on {}", p.folder_id, path);
         auto it_wd = path_to_wd.find(path);
         assert(it_wd != path_to_wd.end());
         p.ec = unwatch_recurse(p.folder_id);

@@ -45,6 +45,7 @@ auto bsd_backend_t::initialize(int pipe_read_fd, void *platform_context) -> io_g
         return {};
     }
     auto ok = watch(pipe_read_fd, async_cb, platform_context, EVFILT_READ, EV_ADD, 0);
+    LOG_DEBUG(log, "pipe/async ({}) callback is monitored", pipe_read_fd);
     if (ok) {
         return std::make_unique<pipe_guard_t>(platform_context, pipe_read_fd);
     } else {
@@ -70,7 +71,7 @@ void bsd_backend_t::unwatch(int fd, short filter, u_short flags, u_int fflags) {
         LOG_ERROR(log, "cannot kevent(/del) for fd {}: {}", fd, strerror(errno));
     } else {
         events.resize(sz - 1);
-        LOG_DEBUG(log, "kevent(/del), fd = {}", fd);
+        // LOG_DEBUG(log, "kevent(/del), fd = {}", fd);
     }
 }
 
@@ -87,7 +88,7 @@ bool bsd_backend_t::watch(int fd, io_callback_t callback, void *data, short filt
         events.resize(sz - 1);
         return false;
     } else {
-        LOG_DEBUG(log, "kevent(/add), fd = {}", fd);
+        // LOG_DEBUG(log, "kevent(/add), fd = {}", fd);
         events.push_back(std::move(change));
         io_callbacks.emplace(fd, io_context_t(callback, data));
         return true;

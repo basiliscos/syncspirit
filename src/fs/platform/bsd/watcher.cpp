@@ -16,12 +16,12 @@ namespace {
 
 namespace dir {
 static constexpr auto FILTER = EVFILT_VNODE;
-static constexpr auto FILTER_FLAGS = NOTE_WRITE | NOTE_DELETE | NOTE_ATTRIB | NOTE_RENAME | NOTE_EXTEND | NOTE_LINK;
+static constexpr auto FILTER_FLAGS = NOTE_WRITE | NOTE_DELETE | NOTE_ATTRIB | NOTE_RENAME | NOTE_EXTEND;
 } // namespace dir
 
 namespace regular {
 static constexpr auto FILTER = EVFILT_VNODE;
-static constexpr auto FILTER_FLAGS = NOTE_WRITE | NOTE_DELETE | NOTE_ATTRIB | NOTE_RENAME | NOTE_EXTEND | NOTE_LINK;
+static constexpr auto FILTER_FLAGS = NOTE_WRITE | NOTE_DELETE | NOTE_ATTRIB | NOTE_RENAME;
 } // namespace regular
 
 } // namespace
