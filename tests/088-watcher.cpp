@@ -1337,6 +1337,29 @@ void test_kqueue() {
                 await_events(poll_t::trigger_timer);
                 REQUIRE(changes.size() == 0);
             }
+            SECTION("changes agggeration (2 new files + new perms => dir content change)") {
+                auto perms = 0777;
+                write_file(root_path / "ex-dir" / L"ф1.bin", "abcde");
+                write_file(root_path / "ex-dir" / L"ф2.bin", "12345");
+                bfs::permissions(root_path / "ex-dir", static_cast<bfs::perms>(perms));
+                await_events(poll_t::trigger_timer, 1);
+                {
+                    auto &payload = changes.front()->payload;
+                    REQUIRE(payload.size() == 1);
+                    auto &folder_change = payload[0];
+                    REQUIRE(folder_change.folder_id == folder_id);
+                    REQUIRE(folder_change.file_changes.size() == 1);
+                    auto &file_change = folder_change.file_changes.front();
+                    CHECK(proto::get_name(file_change) == "ex-dir");
+                    CHECK(proto::get_permissions(file_change) == perms);
+                    CHECK(proto::get_size(file_change) == 0);
+                    CHECK(proto::get_type(file_change) == proto::FileInfoType::DIRECTORY);
+                    CHECK(file_change.update_reason == update_type_t::content);
+                    changes.clear();
+                }
+                await_events(poll_t::trigger_timer);
+                REQUIRE(changes.size() == 0);
+            }
         }
     };
     F().run();

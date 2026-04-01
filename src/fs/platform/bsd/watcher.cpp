@@ -121,6 +121,9 @@ void watcher_t::kqueue_callback(int wd, std::uint32_t flags, const pt::ptime &no
         if (flags & NOTE_DELETE) {
             type = update_type::DELETED;
         }
+        if (flags & NOTE_WRITE) {
+            type = update_type::CONTENT;
+        }
         if (!type) {
             type = update_type::CONTENT;
         }
