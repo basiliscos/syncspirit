@@ -9,15 +9,19 @@
 
 #include "fs/platform/unix/context.hpp"
 #include "utils/log.h"
+#include <boost/date_time/posix_time/posix_time.hpp>
 #include <sys/event.h>
 #include <cstdint>
 #include <memory>
 
 namespace syncspirit::fs::platform::bsd {
 
+namespace pt = boost::posix_time;
+
 struct SYNCSPIRIT_API bsd_backend_t {
+    using clock_t = pt::microsec_clock;
     using events_t = std::vector<struct kevent>;
-    using io_callback_t = void (*)(int, void *, std::uint32_t);
+    using io_callback_t = void (*)(int, void *, std::uint32_t, const pt::ptime &);
     struct io_context_t {
         io_context_t(io_callback_t callback_, void *data_) : cb(std::move(callback_)), data{data_} {}
         io_context_t(io_context_t &&) = default;

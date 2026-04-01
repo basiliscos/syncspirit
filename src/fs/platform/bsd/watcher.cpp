@@ -28,9 +28,9 @@ static constexpr auto FILTER_FLAGS = NOTE_WRITE | NOTE_ATTRIB;
 
 } // namespace
 
-static void node_cb(int fd, void *data, std::uint32_t flags) {
+static void node_cb(int fd, void *data, std::uint32_t flags, const pt::ptime &now) {
     auto watcher = reinterpret_cast<watcher_t *>(data);
-    watcher->kqueue_callback(fd, flags);
+    watcher->kqueue_callback(fd, flags, now);
 }
 
 void watcher_t::do_initialize(r::system_context_t *ctx) noexcept {
@@ -95,7 +95,7 @@ auto watcher_t::unwatch_path(int wd, file_type_t type) noexcept -> sys::error_co
     return {};
 }
 
-void watcher_t::kqueue_callback(int wd, std::uint32_t flags) noexcept {
+void watcher_t::kqueue_callback(int wd, std::uint32_t flags, const pt::ptime &now) noexcept {
     auto &guard = path_map[wd];
     auto &folder_id = guard.folder_id;
     auto full_path = std::string_view(guard.path);
@@ -126,7 +126,7 @@ void watcher_t::kqueue_callback(int wd, std::uint32_t flags) noexcept {
         }
     }
 
-    auto deadline = clock_t::local_time() + retension;
+    auto deadline = now + retension;
     push(deadline, folder_id, rel_path, {}, static_cast<update_type_t>(type));
 }
 

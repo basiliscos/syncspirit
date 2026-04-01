@@ -9,7 +9,7 @@
 
 using namespace syncspirit::fs::platform::bsd;
 
-static void async_cb(int fd, void *data, std::uint32_t) {
+static void async_cb(int fd, void *data, std::uint32_t, const pt::ptime &) {
     auto ctx = reinterpret_cast<platform_context_t *>(data);
     char dummy[4];
     bool do_read = true;
@@ -112,13 +112,14 @@ bool bsd_backend_t::poll(std::uint32_t timeout) {
         LOG_WARN(log, "kevent() failed: {}", strerror(errno));
     } else if (r) {
         auto left = r;
+        auto now = clock_t::local_time();
         for (auto it = events.begin(); left && it != events.end(); ++it) {
             auto &event = *it;
             if (event.fflags) {
                 --left;
                 auto fd = static_cast<int>(event.ident);
                 auto &ctx = io_callbacks.at(fd);
-                ctx.cb(fd, ctx.data, static_cast<std::uint32_t>(event.fflags));
+                ctx.cb(fd, ctx.data, static_cast<std::uint32_t>(event.fflags), now);
             }
         }
     }
