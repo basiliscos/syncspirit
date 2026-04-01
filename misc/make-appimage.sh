@@ -23,6 +23,7 @@ if [ ! -e "./linuxdeploy-x86_64.AppImage" ]; then
     echo "going to download linux-deploy..."
     wget https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
     chmod +x linuxdeploy-x86_64.AppImage
+    ./linuxdeploy-x86_64.AppImage --appimage-extract
 fi
 
 DESKTOP_FILE="../../misc/$APP.desktop"
@@ -37,5 +38,6 @@ if [ -e "$ICON_FILE" ]; then
     ADD_ICON_FILE="--icon-file $ICON_FILE"
 fi
 
-./linuxdeploy-x86_64.AppImage -l`g++ -print-file-name=libstdc++.so.6` --custom-apprun "../../misc/$APP.sh" -v 2 --appdir "$APP_DIR" --output appimage -e "$APP_DIR/$APP" $ADD_ICON_FILE $ADD_DESKTOP_FILE
+export LD_LIBRARY_PATH="$(pwd)/squashfs-root/usr/lib:${LD_LIBRARY_PATH:-}"
+./squashfs-root/AppRun -l`g++ -print-file-name=libstdc++.so.6` --custom-apprun "../../misc/$APP.sh" -v 2 --appdir "$APP_DIR" --output appimage -e "$APP_DIR/$APP" $ADD_ICON_FILE $ADD_DESKTOP_FILE
 cd ..
