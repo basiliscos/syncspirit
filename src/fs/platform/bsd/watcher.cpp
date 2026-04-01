@@ -103,18 +103,27 @@ void watcher_t::kqueue_callback(int wd, std::uint32_t flags) noexcept {
     assert(it_folder != watched_folders->end());
     auto &folder_info = it_folder->second;
     auto folder_path = std::string_view(folder_info.path_str);
+    auto is_regular = guard.file_type == file_type_t::regular;
     auto rel_path = full_path.size() > folder_path.size() ? full_path.substr(folder_path.size() + 1) : "";
     LOG_TRACE(log, "kqueue_callback ({}), fd: {} ({:#x}), {}", folder_id, wd, flags, rel_path);
 
     auto type = update_type_internal_t{0};
-    if (flags & NOTE_ATTRIB) {
-        type = update_type::META;
-    }
-    if (flags & NOTE_DELETE) {
-        type = update_type::DELETED;
-    }
-    if (!type) {
-        type = update_type::CONTENT;
+    if (is_regular) {
+        if (flags & NOTE_WRITE) {
+            type = update_type::CONTENT;
+        } else {
+            type = update_type::META;
+        }
+    } else {
+        if (flags & NOTE_ATTRIB) {
+            type = update_type::META;
+        }
+        if (flags & NOTE_DELETE) {
+            type = update_type::DELETED;
+        }
+        if (!type) {
+            type = update_type::CONTENT;
+        }
     }
 
     auto deadline = clock_t::local_time() + retension;

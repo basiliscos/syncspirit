@@ -1257,7 +1257,6 @@ void test_kqueue() {
             sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id);
             sup->do_process();
             REQUIRE(watched_replies == 1);
-
             SECTION("metadata (vnode/dir) events") {
                 SECTION("creation") {
                     SECTION("new dir") { bfs::create_directories(root_path / "my-dir"); }
@@ -1288,6 +1287,50 @@ void test_kqueue() {
                     CHECK(proto::get_size(file_change) == 0);
                     CHECK(proto::get_type(file_change) == proto::FileInfoType::DIRECTORY);
                     CHECK(file_change.update_reason == update_type_t::content);
+                    changes.clear();
+                }
+
+                await_events(poll_t::trigger_timer);
+                REQUIRE(changes.size() == 0);
+            }
+            SECTION("file content change") {
+                write_file(root_path / "ex-file", "abcdef");
+                await_events(poll_t::trigger_timer, 1);
+                {
+                    auto &payload = changes.front()->payload;
+                    REQUIRE(payload.size() == 1);
+                    auto &folder_change = payload[0];
+                    REQUIRE(folder_change.folder_id == folder_id);
+                    REQUIRE(folder_change.file_changes.size() == 1);
+                    auto &file_change = folder_change.file_changes.front();
+                    CHECK(proto::get_name(file_change) == "ex-file");
+                    CHECK(proto::get_size(file_change) == 6);
+                    CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
+                    CHECK(file_change.update_reason == update_type_t::content);
+                    changes.clear();
+                }
+
+                await_events(poll_t::trigger_timer);
+                REQUIRE(changes.size() == 0);
+            }
+            SECTION("permissions change") {
+                auto name_raw = GENERATE("ex-file", "ex-dir", "ex-hier");
+                auto name = std::string_view(name_raw);
+                auto path = root_path / name;
+                auto perms = 0777;
+                bfs::permissions(path, static_cast<bfs::perms>(perms));
+
+                await_events(poll_t::trigger_timer, 1);
+                {
+                    auto &payload = changes.front()->payload;
+                    REQUIRE(payload.size() == 1);
+                    auto &folder_change = payload[0];
+                    REQUIRE(folder_change.folder_id == folder_id);
+                    REQUIRE(folder_change.file_changes.size() == 1);
+                    auto &file_change = folder_change.file_changes.front();
+                    CHECK(proto::get_name(file_change) == name);
+                    CHECK(proto::get_permissions(file_change) == perms);
+                    CHECK(file_change.update_reason == update_type_t::meta);
                     changes.clear();
                 }
 
