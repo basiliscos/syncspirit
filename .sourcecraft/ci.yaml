@@ -125,6 +125,8 @@ tasks:
          - cmake .. -G "Unix Makefiles" -DCMAKE_TOOLCHAIN_FILE=conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Release
          - make -j`nproc`
          - make deploy_syncspirit-daemon deploy_syncspirit-fltk
+         - cd ..
+         - ls -lah ./build.ci/AppDir/*.AppImage
          artifacts:
            paths:
              - ./build.ci/AppDir/syncspirit-fltk-x86_64.AppImage
