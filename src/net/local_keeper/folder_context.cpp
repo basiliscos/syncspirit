@@ -138,7 +138,8 @@ int folder_context_t::process(complete_scan_t &, stack_context_t &ctx) noexcept 
 }
 
 int folder_context_t::process(unscanned_dir_t &dir, stack_context_t &ctx) noexcept {
-    auto notify_watcher = !dir.presence && ctx.watcher_impl == syncspirit_watcher_impl_t::inotify;
+    using I = syncspirit_watcher_impl_t;
+    auto notify_watcher = !dir.presence && ((ctx.watcher_impl == I::inotify) || ctx.watcher_impl == I::kqueue);
     LOG_TRACE(log, "scheduling scan of '{}' (notify: {})", narrow(dir.path.generic_wstring()), notify_watcher);
     auto sub_task =
         scan_dir_t(std::move(dir.path), std::move(dir.presence), std::move(dir.single_child), notify_watcher);

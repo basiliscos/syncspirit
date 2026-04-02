@@ -419,6 +419,7 @@ void local_keeper_t::on_changes(model::folder_info_t &local_folder, fs::payload:
                                 lc_context_t &stack_ctx) noexcept {
     using namespace model::diff;
     using scheduled_dirs_t = std::pmr::unordered_set<std::pmr::string, utils::string_hash_t, utils::string_eq_t>;
+    using I = syncspirit_watcher_impl_t;
     auto scheduled_dirs = scheduled_dirs_t(stack_ctx.allocator);
 
     auto folder = local_folder.get_folder();
@@ -466,7 +467,8 @@ void local_keeper_t::on_changes(model::folder_info_t &local_folder, fs::payload:
             LOG_DEBUG(log, "no parent for '{}' in folder '{}', ignoring (temporal) orphan", name, folder_id);
             return;
         }
-        if (watcher_impl == syncspirit_watcher_impl_t::inotify && !subdir.empty() && scheduled_dirs.count(subdir)) {
+        if (((watcher_impl == I::inotify) || (watcher_impl == I::kqueue)) && !subdir.empty() &&
+            scheduled_dirs.count(subdir)) {
             LOG_DEBUG(log, "ignoring '{}' in folder '{}', parent dir scan is scheduled", name, folder_id);
             return;
         }
@@ -478,7 +480,7 @@ void local_keeper_t::on_changes(model::folder_info_t &local_folder, fs::payload:
         switch (change.update_reason) {
         case UT::created: {
             if (proto::get_size(change) == 0) {
-                auto schedule_scan = (watcher_impl == syncspirit_watcher_impl_t::inotify) &&
+                auto schedule_scan = ((watcher_impl == I::inotify) || (watcher_impl == I::kqueue)) &&
                                      proto::get_type(change) == proto::FileInfoType::DIRECTORY;
                 if (schedule_scan) {
                     delayed_update(change);

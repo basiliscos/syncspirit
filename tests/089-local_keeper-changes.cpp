@@ -179,7 +179,7 @@ void test_just_start() {
     struct F : fixture_t {
         using fixture_t::fixture_t;
         void main() noexcept override {
-            auto impl = GENERATE(I::none, I::inotify, I::win32);
+            auto impl = GENERATE(I::none, I::inotify, I::kqueue, I::win32);
             launch_target(impl);
             CHECK(static_cast<r::actor_base_t *>(target.get())->access<to::state>() == r::state_t::OPERATIONAL);
             sup->do_process();
@@ -192,7 +192,7 @@ void test_watch_unwatch() {
     struct F : fixture_t {
         using fixture_t::fixture_t;
         void main() noexcept override {
-            auto impl = GENERATE(I::inotify, I::win32);
+            auto impl = GENERATE(I::inotify, I::kqueue, I::win32);
             auto folder_id = "1234-5678";
             db::Folder db_folder;
             db::set_id(db_folder, folder_id);
@@ -448,7 +448,7 @@ void test_trivial_changes() {
         using parent_t = folder_fixture_t;
         using parent_t::parent_t;
         void main() noexcept override {
-            auto impl = GENERATE(I::inotify, I::win32);
+            auto impl = GENERATE(I::inotify, I::kqueue, I::win32);
             prepare(impl);
             LOG_INFO(log, "impl: {}", static_cast<int>(impl));
 
@@ -533,7 +533,7 @@ void test_hashing() {
         using parent_t = folder_fixture_t;
         using parent_t::parent_t;
         void main() noexcept override {
-            auto impl = GENERATE(I::inotify, I::win32);
+            auto impl = GENERATE(I::inotify, I::kqueue, I::win32);
             prepare(impl);
 
             auto pr_dir_1 = proto::FileInfo();
@@ -574,7 +574,7 @@ void test_hashing() {
     F().run();
 }
 
-void test_linux_new_dir() {
+void test_unix_new_dir() {
     struct F : folder_fixture_t {
         using parent_t = folder_fixture_t;
         using parent_t::parent_t;
@@ -588,7 +588,9 @@ void test_linux_new_dir() {
         }
 
         void main() noexcept override {
-            prepare(I::inotify);
+            // auto impl = GENERATE(I::inotify, I::kqueue);
+            auto impl = GENERATE(I::kqueue);
+            prepare(impl);
 
             auto data = as_owned_bytes("12345");
             auto data_h = utils::sha256_digest(data).value();
@@ -647,7 +649,7 @@ void test_dir_scan_errors() {
         using child_info_t = fs::task::scan_dir_t::child_info_t;
 
         void main() noexcept override {
-            auto impl = GENERATE(I::inotify, I::win32);
+            auto impl = GENERATE(I::inotify, I::kqueue, I::win32);
             prepare(impl);
 
             expect_dir_scan(
@@ -759,7 +761,7 @@ void test_read_file_errors() {
         std::uint32_t get_hash_limit() override { return concurrency; }
 
         void main() noexcept override {
-            auto impl = GENERATE(I::inotify, I::win32);
+            auto impl = GENERATE(I::inotify, I::kqueue, I::win32);
             concurrency = GENERATE(1, 5, 10, 100);
             prepare(impl);
 
@@ -820,7 +822,7 @@ void test_read_file_errors_partial() {
         std::uint32_t get_hash_limit() override { return concurrency; }
 
         void main() noexcept override {
-            auto impl = GENERATE(I::inotify, I::win32);
+            auto impl = GENERATE(I::inotify, I::kqueue, I::win32);
             concurrency = GENERATE(1, 2, 3, 4, 5);
             error_index = GENERATE(0, 1, 2, 3, 4);
             prepare(impl);
@@ -884,7 +886,7 @@ void test_read_file_error_recovery() {
         std::uint32_t get_hash_limit() override { return concurrency; }
 
         void main() noexcept override {
-            auto impl = GENERATE(I::inotify, I::win32);
+            auto impl = GENERATE(I::inotify, I::kqueue, I::win32);
             error_index = 3;
             prepare(impl);
 
@@ -927,7 +929,7 @@ void test_duplicates() {
         using parent_t = folder_fixture_t;
         using parent_t::parent_t;
         void main() noexcept override {
-            auto impl = GENERATE(I::inotify, I::win32);
+            auto impl = GENERATE(I::inotify, I::kqueue, I::win32);
             prepare(impl);
 
             auto file = proto::FileInfo();
@@ -975,7 +977,7 @@ void test_multi_folders_update() {
                 builder->upsert_folder(db_folder, 5).apply(*sup);
             }
 
-            auto impl = GENERATE(I::inotify, I::win32);
+            auto impl = GENERATE(I::inotify, I::kqueue, I::win32);
             launch_target(impl);
 
             expect_dir_scan({make_child("/some/p1/A")});
@@ -1071,7 +1073,7 @@ void test_hierarchy_update_dirs_only() {
         using parent_t::parent_t;
 
         void main() noexcept override {
-            auto impl = GENERATE(I::inotify, I::win32);
+            auto impl = GENERATE(I::inotify, I::kqueue, I::win32);
             prepare(impl);
 
             expect_dir_scan({make_child("/some/path/dir/subdir")});
@@ -1112,7 +1114,7 @@ void test_hierarchy_update_with_content() {
         using parent_t::parent_t;
 
         void main() noexcept override {
-            auto impl = GENERATE(I::inotify, I::win32);
+            auto impl = GENERATE(I::inotify, I::kqueue, I::win32);
             // auto impl = I::win32;
             prepare(impl);
 
@@ -1168,7 +1170,7 @@ void test_malformed_hierarchy_update() {
         using parent_t::parent_t;
 
         void main() noexcept override {
-            auto impl = GENERATE(I::inotify, I::win32);
+            auto impl = GENERATE(I::inotify, I::kqueue, I::win32);
             prepare(impl);
 
             expect_dir_scan({make_child("/some/path/dir/file.bin", bfs::file_type::regular, 5)});
@@ -1200,7 +1202,7 @@ void test_malformed_hierarchy_update() {
     F().run();
 }
 
-void test_scan_dirs_race_linux() {
+void test_scan_dirs_race_unix() {
     struct F : folder_fixture_t {
         using parent_t = folder_fixture_t;
         using parent_t::parent_t;
@@ -1222,7 +1224,8 @@ void test_scan_dirs_race_linux() {
         }
 
         void main() noexcept override {
-            prepare(I::inotify);
+            auto impl = GENERATE(I::inotify, I::kqueue);
+            prepare(impl);
 
             expect_dir_scan({make_child("/some/path/a")});
             expect_dir_scan({make_child("/some/path/a/b")});
@@ -1245,13 +1248,14 @@ void test_scan_dirs_race_linux() {
     F().run();
 }
 
-void test_scan_dirs_race_linux_2() {
+void test_scan_dirs_race_unix_2() {
     struct F : folder_fixture_t {
         using parent_t = folder_fixture_t;
         using parent_t::parent_t;
 
         void main() noexcept override {
-            prepare(I::inotify);
+            auto impl = GENERATE(I::inotify, I::kqueue);
+            prepare(impl);
 
             expect_dir_scan({make_child("/some/path/a")});
             expect_dir_scan({});
@@ -1386,7 +1390,7 @@ void test_hashing_race() {
         }
 
         void main() noexcept override {
-            auto impl = GENERATE(I::inotify, I::win32);
+            auto impl = GENERATE(I::inotify, I::kqueue, I::win32);
             prepare(impl);
 
             auto number = std::uint32_t{5};
@@ -1726,7 +1730,7 @@ int _init() {
     REGISTER_TEST_CASE(test_watch_unwatch, "test_watch_unwatch", "[fs]");
     REGISTER_TEST_CASE(test_trivial_changes, "test_trivial_changes", "[fs]");
     REGISTER_TEST_CASE(test_hashing, "test_hashing", "[fs]");
-    REGISTER_TEST_CASE(test_linux_new_dir, "test_linux_new_dir", "[fs]");
+    REGISTER_TEST_CASE(test_unix_new_dir, "test_unix_new_dir", "[fs]");
     REGISTER_TEST_CASE(test_dir_scan_errors, "test_dir_scan_errors", "[fs]");
     REGISTER_TEST_CASE(test_read_file_errors, "test_read_file_errors", "[fs]");
     REGISTER_TEST_CASE(test_read_file_errors_partial, "test_read_file_errors_partial", "[fs]");
@@ -1736,8 +1740,8 @@ int _init() {
     REGISTER_TEST_CASE(test_hierarchy_update_dirs_only, "test_hierarchy_update_dirs_only", "[fs]");
     REGISTER_TEST_CASE(test_hierarchy_update_with_content, "test_hierarchy_update_with_content", "[fs]");
     REGISTER_TEST_CASE(test_malformed_hierarchy_update, "test_malformed_hierarchy_update", "[fs]");
-    REGISTER_TEST_CASE(test_scan_dirs_race_linux, "test_scan_dirs_race_linux", "[fs]");
-    REGISTER_TEST_CASE(test_scan_dirs_race_linux_2, "test_scan_dirs_race_linux_2", "[fs]");
+    REGISTER_TEST_CASE(test_scan_dirs_race_unix, "test_scan_dirs_race_unix", "[fs]");
+    REGISTER_TEST_CASE(test_scan_dirs_race_unix_2, "test_scan_dirs_race_unix_2", "[fs]");
     REGISTER_TEST_CASE(test_scan_dirs_race_win32, "test_scan_dirs_race_win32", "[fs]");
     REGISTER_TEST_CASE(test_scan_dirs_race_win32_2, "test_scan_dirs_race_win32_2", "[fs]");
     REGISTER_TEST_CASE(test_hashing_race, "test_hashing_race", "[fs]");
