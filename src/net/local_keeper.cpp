@@ -176,16 +176,15 @@ auto local_keeper_t::operator()(const model::diff::local::scan_start_t &diff, vo
     if (do_scan) {
         LOG_DEBUG(log, "initiating scan of {} from '{}'", diff.folder_id, diff.sub_dir);
         auto local_folder = folder->get_folder_infos().by_device(*cluster->get_device());
-        auto opt = local_keeper::make_context(local_folder, diff.sub_dir);
-        if (!opt) {
-            auto &ec = opt.assume_error();
-            LOG_ERROR(log, "cannot initialize backend: {}", ec.message());
+        auto folder_ctx = local_keeper::make_context(local_folder, diff.sub_dir);
+        if (!folder_ctx) {
+            LOG_ERROR(log, "cannot initialize scan of '{}'({})", diff.folder_id, diff.sub_dir);
             auto now = r::pt::microsec_clock::local_time();
             auto finish = model::diff::cluster_diff_ptr_t();
             finish = new model::diff::local::scan_finish_t(diff.folder_id, now);
             send<model::payload::model_update_t>(coordinator, std::move(finish));
         } else {
-            lc_context_t(this, {}).new_contexts.emplace_back(std::move(opt.value()));
+            lc_context_t(this, {}).new_contexts.emplace_back(std::move(folder_ctx));
         }
     } else {
         LOG_DEBUG(log, "skipping scan of {}", diff.folder_id);

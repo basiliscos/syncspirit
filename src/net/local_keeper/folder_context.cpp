@@ -34,7 +34,7 @@ struct rename_context_t final : hasher::payload::extendended_context_t {
 };
 
 auto make_context(model::folder_info_ptr_t local_folder, std::string_view start_subdir) noexcept
-    -> outcome::result<folder_context_ptr_t> {
+    -> folder_context_ptr_t {
     auto folder = local_folder->get_folder();
     auto augmentation = folder->get_augmentation().get();
     auto folder_entity = static_cast<presentation::folder_entity_t *>(augmentation);
@@ -49,7 +49,7 @@ auto make_context(model::folder_info_ptr_t local_folder, std::string_view start_
         if (auto p = presence->get_child(name, true); p) {
             presence = p;
         } else {
-            return std::make_error_code(std::errc::no_such_file_or_directory);
+            return {};
         }
     }
     auto [path, child] = [&]() -> std::pair<bfs::path, bfs::path> {
@@ -78,10 +78,10 @@ auto make_context(model::folder_info_ptr_t local_folder, std::string_view start_
     auto stack = local_keeper::stack_t();
     stack.push_front(complete_scan_t{!child.empty()});
     stack.push_front(unscanned_dir_t(std::move(path), presence, std::move(child)));
-    auto ptr = folder_context_ptr_t();
 
+    auto ptr = folder_context_ptr_t();
     ptr.reset(new folder_context_t(std::move(local_folder), std::move(stack), path));
-    return outcome::success(std::move(ptr));
+    return ptr;
 }
 
 folder_context_ptr_t make_context(model::folder_info_ptr_t local_folder, unexamined_items_t items) noexcept {
