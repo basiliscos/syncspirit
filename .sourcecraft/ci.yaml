@@ -1,6 +1,7 @@
 on:
   push:
-    - workflows: workflow_1, workflow_2
+    - workflow_1
+    - workflow_2
 
 workflows:
   workflow_1:
