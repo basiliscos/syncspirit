@@ -1170,12 +1170,12 @@ void test_create_modify_rename() {
     F().run();
 }
 
+#ifndef SYNCSPIRIT_WIN
 void test_manual_notification() {
     struct F : fixture_real_t {
         using fixture_real_t::fixture_real_t;
 
         void main() noexcept override {
-#ifndef SYNCSPIRIT_WIN
             using child_info_t = fs::task::scan_dir_t::child_info_t;
             using child_infos_t = fs::task::scan_dir_t::child_infos_t;
 
@@ -1195,7 +1195,6 @@ void test_manual_notification() {
             auto w = static_cast<fs::platform::unix::watcher_t *>(target.get());
             CHECK(w->path_map.size() == 1);
             CHECK(w->subdir_map.size() == 0);
-
             SECTION("non-watched dir") {
                 auto task = fs::task::scan_dir_t(bfs::path("/some/path"), {}, {}, true, true);
                 task.child_infos = {make_child(bfs::path("/some/path/a"))};
@@ -1223,6 +1222,29 @@ void test_manual_notification() {
                 CHECK(w->path_map.size() == 3);
                 CHECK(w->path_to_wd.size() == 3);
             }
+            SECTION("watched sub-dir") {
+                auto sub_dir = root_path / L"папка";
+                bfs::create_directories(sub_dir);
+                await_events(poll_t::trigger_timer, 1);
+                auto path_a = sub_dir / "a";
+                auto path_b = sub_dir / "b";
+                auto path_c = sub_dir / "c";
+                bfs::create_directories(path_a);
+                bfs::create_directories(path_c);
+                write_file(path_b, "");
+                auto children = child_infos_t(
+                    {make_child(path_a), make_child(path_b, bfs::file_type::regular), make_child(path_c)});
+                auto task = fs::task::scan_dir_t(sub_dir, {}, {}, true, true);
+                task.child_infos = children;
+                w->notify(task);
+                CHECK(w->path_map.size() == 4);
+                CHECK(w->path_to_wd.size() == 4);
+
+                // no-harm in double watch
+                w->notify(task);
+                CHECK(w->path_map.size() == 4);
+                CHECK(w->path_to_wd.size() == 4);
+            }
             SECTION("error in watching") {
                 auto path_x = root_path / "a";
                 auto task = fs::task::scan_dir_t(root_path, {}, {}, true, true);
@@ -1231,11 +1253,11 @@ void test_manual_notification() {
                 CHECK(w->path_map.size() == 1);
                 CHECK(w->path_to_wd.size() == 1);
             }
-#endif
         }
     };
     F().run();
 }
+#endif
 
 #ifdef SYNCSPIRIT_WATCHER_KQUEUE
 void test_kqueue() {
@@ -1376,7 +1398,9 @@ int _init() {
     REGISTER_TEST_CASE(test_hierarchies, "test_hierarchies", "[fs]");
     REGISTER_TEST_CASE(test_create_modify_rename, "test_create_modify_rename", "[fs]");
 #endif
+#ifndef SYNCSPIRIT_WIN
     REGISTER_TEST_CASE(test_manual_notification, "test_manual_notification", "[fs]");
+#endif
 #ifdef SYNCSPIRIT_WATCHER_KQUEUE
     REGISTER_TEST_CASE(test_kqueue, "test_kqueue", "[fs]");
 #endif

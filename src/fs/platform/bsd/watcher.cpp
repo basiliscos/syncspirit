@@ -8,6 +8,7 @@
 #if SYNCSPIRIT_WATCHER_KQUEUE
 
 #include "fs/fs_supervisor.h"
+#include "fs/task/scan_dir.h"
 #include <fcntl.h>
 
 using namespace syncspirit::fs::platform::bsd;
@@ -93,6 +94,37 @@ auto watcher_t::unwatch_path(int wd, file_type_t type) noexcept -> sys::error_co
     }
 
     return {};
+}
+
+void watcher_t::notify(const fs::task::scan_dir_t &scan_dir) noexcept {
+    auto path = std::string_view(scan_dir.path.native());
+    if (path_to_wd.find(path) != path_to_wd.end()) {
+        return parent_t::notify(scan_dir);
+    }
+    auto pos = path.rfind('/');
+    if (pos != std::string::npos && path.size() > 2) {
+        auto parent_path = path.substr(0, pos);
+        auto it = path_to_wd.find(parent_path);
+        if (it != path_to_wd.end()) {
+            auto &parent_wd = it->second;
+            auto &parent_guard = path_map[parent_wd];
+            auto &folder_id = parent_guard.folder_id;
+            auto opt = parent_t::watch_path(path, folder_id, file_type_t::directory, parent_wd);
+            if (!opt) {
+                return;
+            }
+            auto &[_, fd] = *opt;
+            if (fd < 0) {
+                LOG_ERROR(log, "cannot watch {}: {}", path, strerror(errno));
+            } else {
+                parent_t::notify(scan_dir);
+            }
+        } else {
+            LOG_WARN(log, "notification upon non-watched parent of '{}'", path);
+        }
+    } else {
+        LOG_TRACE(log, "(notify) cannot find parent path for '{}'", path);
+    }
 }
 
 void watcher_t::kqueue_callback(int wd, std::uint32_t flags, const pt::ptime &now) noexcept {
