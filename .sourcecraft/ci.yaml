@@ -1,19 +1,25 @@
 on:
   push:
-    - workflow_1
-    - workflow_2
+    - workflow_general
+    - workflow_windows
+    - workflow_linux
 
 workflows:
-  workflow_1:
+  workflow_general:
     settings:
         max_cube_duration: 240m
     tasks:
-      - [compile-san-n-test, make-app-image]
-  workflow_2:
+      - [compile-san-n-test]
+  workflow_windows:
     settings:
         max_cube_duration: 240m
     tasks:
       - [make-win32-build, make-win64-build]
+  workflow_linux:
+    settings:
+        max_cube_duration: 240m
+    tasks:
+      - [make-app-image]
 
 tasks:
   - name: compile-san-n-test
