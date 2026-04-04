@@ -7,7 +7,7 @@ workflows:
     settings:
         max_cube_duration: 240m
     tasks:
-      - [compile-san-n-test, make-win32-build, make-app-image]
+      - [compile-san-n-test, make-win32-build, make-win64-build, make-app-image]
 
 tasks:
   - name: compile-san-n-test
@@ -59,7 +59,7 @@ tasks:
           - g++ --version
           - gcc --version
           - git clone --branch build-2022-04-09  --depth 1 https://github.com/mxe/mxe
-          - cp .sourcecraft/mxe-settings.mk ./mxe/settings.mk
+          - cp .sourcecraft/mxe-settings-win32.mk ./mxe/settings.mk
           - cd mxe
           - make zip
           - find usr/bin
@@ -70,9 +70,9 @@ tasks:
           - pip install conan
           - pip install pefile
           - conan profile detect
-          - cp .sourcecraft/conan-profile-xp /root/.conan2/profiles/xp
+          - cp .sourcecraft/conan-profile-win32 /root/.conan2/profiles/win32
           - mkdir build.ci && cd build.ci
-          - conan install --build=missing --profile=xp --output-folder . -s build_type=Release -o "&:shared=True" ..
+          - conan install --build=missing --profile=win32 --output-folder . -s build_type=Release -o "&:shared=True" ..
           - . ./conanbuild.sh
           - cmake .. -G "Unix Makefiles" -DCMAKE_TOOLCHAIN_FILE=conan_toolchain.cmake -DCMAKE_POLICY_DEFAULT_CMP0091=NEW  -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS="-D_WIN32_WINNT=0x0501 -DBOOST_ASIO_ENABLE_CANCELIO=1" -DCMAKE_SYSTEM_NAME=Windows -DCMAKE_CROSSCOMPILING=on -DCMAKE_CROSSCOMPILING_EMULATOR=wine
           - make -j`nproc`
@@ -88,6 +88,49 @@ tasks:
         artifacts:
           paths:
             - ./build.ci/syncspirit-win32.zip
+  - name: make-win64-build
+    cubes:
+      - name: make-binary
+        script:
+          - sudo apt update
+          - sudo apt install software-properties-common
+          - sudo add-apt-repository ppa:ubuntu-toolchain-r/test
+          - sudo apt update
+          - sudo apt install -y build-essential
+          - sudo apt install -y autoconf automake autopoint bash bison bzip2 flex g++ g++-multilib gettext git gperf intltool libc6-dev-i386 libclang-dev libgdk-pixbuf2.0-dev libltdl-dev libgl-dev libpcre2-dev libssl-dev libtool-bin libxml-parser-perl lzip make openssl p7zip-full patch perl python3 python3-mako python3-packaging python3-pkg-resources python3-setuptools python-is-python3 ruby sed sqlite3 unzip wget xz-utils
+          - sudo apt install -y curl p7zip-full coreutils zip
+          - g++ --version
+          - gcc --version
+          - git clone --branch build-2022-04-09  --depth 1 https://github.com/mxe/mxe
+          - cp .sourcecraft/mxe-settings-win64.mk ./mxe/settings.mk
+          - cd mxe
+          - make zip
+          - find usr/bin
+          - export PATH=`pwd`/usr/bin:$PATH
+          - cd ..
+          - python3 -m venv myenv
+          - . myenv/bin/activate
+          - pip install conan
+          - pip install pefile
+          - conan profile detect
+          - cp .sourcecraft/conan-profile-win64 /root/.conan2/profiles/win64
+          - mkdir build.ci && cd build.ci
+          - conan install --build=missing --profile=win64 --output-folder . -s build_type=Release -o "&:shared=True" ..
+          - . ./conanbuild.sh
+          - cmake .. -G "Unix Makefiles" -DCMAKE_TOOLCHAIN_FILE=conan_toolchain.cmake -DCMAKE_POLICY_DEFAULT_CMP0091=NEW  -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS="-D_WIN32_WINNT=0x0501 -DBOOST_ASIO_ENABLE_CANCELIO=1" -DCMAKE_SYSTEM_NAME=Windows -DCMAKE_CROSSCOMPILING=on -DCMAKE_CROSSCOMPILING_EMULATOR=wine
+          - make -j`nproc`
+          - make -j`nproc` deploy_deps
+          - python ../misc/post-install-win32.py --binaries ./dist/*.exe  --dirs $HOME/.conan2 ../mxe/ `pwd`
+          - cd dist
+          - zip -r9 ../syncspirit-win64.zip *
+          - md5sum ../syncspirit-win64.zip
+          - echo "going to upload binary"
+          - cd ..
+          - echo `pwd`/syncspirit-win64.zip
+          - ls -lah `pwd`/syncspirit-win64.zip
+        artifacts:
+          paths:
+            - ./build.ci/syncspirit-win64.zip
   - name: make-app-image
     cubes:
       - name: prepare
