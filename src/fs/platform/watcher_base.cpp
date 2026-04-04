@@ -150,11 +150,16 @@ auto FU::make(const folder_info_t &folder_info, updates_mediator_t &mediator) no
     std::memcpy(full_path, folder_info.path_str.data(), folder_path_sz);
     for (auto &update : updates) {
         auto rel_name_ptr = full_path + folder_path_sz;
-        *rel_name_ptr++ = '/';
-        std::memcpy(rel_name_ptr, update.path.data(), update.path.size());
+        auto &sub_path = update.path;
+        auto rel_offset = 0;
+        if (sub_path.size()) {
+            rel_offset = 1;
+            *rel_name_ptr++ = '/';
+            std::memcpy(rel_name_ptr, update.path.data(), update.path.size());
+        }
         auto rel_name_path_sz = folder_path_sz + update.path.size();
-        *(full_path + rel_name_path_sz + 1) = 0;
-        auto full_name = std::string_view(full_path, rel_name_path_sz + 1);
+        *(full_path + rel_name_path_sz + rel_offset) = 0;
+        auto full_name = std::string_view(full_path, rel_name_path_sz + rel_offset);
         if (mediator.is_masked(full_name)) {
             continue;
         }

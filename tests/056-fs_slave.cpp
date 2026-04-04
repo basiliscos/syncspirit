@@ -8,6 +8,7 @@
 #include "fs/fs_proxy.h"
 #include "test-utils.h"
 #include "test_supervisor.h"
+#include "syncspirit-config.h"
 #include <boost/nowide/convert.hpp>
 
 using namespace syncspirit;
@@ -180,7 +181,11 @@ TEST_CASE("fs_slave, rm_file", "[fs]") {
         CHECK(!t.ec);
         CHECK(!bfs::exists(file));
         auto path_str = narrow(file.generic_wstring());
+#ifndef SYNCSPIRIT_WATCHER_KQUEUE
         CHECK(mediator.is_masked(path_str));
+#else
+        CHECK(mediator.is_masked(root_path.string()));
+#endif
     }
 
     SECTION("failed to remove") {

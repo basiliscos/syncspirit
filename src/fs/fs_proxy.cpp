@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // SPDX-FileCopyrightText: 2026 Ivan Baidakou
 
+#include "syncspirit-config.h"
 #include "fs_proxy.h"
 #include "updates_mediator.h"
 #include "utils.h"
@@ -44,7 +45,11 @@ auto fs_proxy_t::open_write(const bfs::path &path, std::uint64_t file_size) noex
             if (!file) {
                 return sys::error_code{errno, sys::system_category()};
             } else {
+#ifndef SYNCSPIRIT_WATCHER_KQUEUE
                 updates_mediator.mask(path, {}, deadline);
+#else
+                updates_mediator.mask(path.parent_path(), {}, deadline);
+#endif
                 ++mediator_updates;
             }
 
@@ -72,6 +77,9 @@ sys::error_code fs_proxy_t::rename(const bfs::path &from, const bfs::path &to) n
     bfs::rename(from, to, ec);
     if (!ec) {
         updates_mediator.mask(to, from, deadline);
+#ifdef SYNCSPIRIT_WATCHER_KQUEUE
+        updates_mediator.mask(to.parent_path(), {}, deadline);
+#endif
         ++mediator_updates;
     }
     return ec;
@@ -91,7 +99,11 @@ sys::error_code fs_proxy_t::remove(const bfs::path &path) noexcept {
     sys::error_code ec;
     bfs::remove_all(path, ec);
     if (!ec) {
+#ifndef SYNCSPIRIT_WATCHER_KQUEUE
         updates_mediator.mask(path, {}, deadline);
+#else
+        updates_mediator.mask(path.parent_path(), {}, deadline);
+#endif
         ++mediator_updates;
     }
     return ec;
@@ -101,7 +113,11 @@ sys::error_code fs_proxy_t::remove_file(const bfs::path &path) noexcept {
     sys::error_code ec;
     bfs::remove(path, ec);
     if (!ec) {
+#ifndef SYNCSPIRIT_WATCHER_KQUEUE
         updates_mediator.mask(path, {}, deadline);
+#else
+        updates_mediator.mask(path.parent_path(), {}, deadline);
+#endif
         ++mediator_updates;
     }
     return ec;

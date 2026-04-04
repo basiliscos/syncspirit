@@ -8,6 +8,7 @@
 #include "test_supervisor.h"
 #include "access.h"
 #include "utils/error_code.h"
+#include "syncspirit-config.h"
 #include <filesystem>
 #include <boost/nowide/convert.hpp>
 #include <optional>
@@ -348,8 +349,11 @@ void test_remote_copy() {
 
                 remote_copy(target, pr_fi).check_success();
                 REQUIRE(!bfs::exists(target));
+#ifndef SYNCSPIRIT_WATCHER_KQUEUE
                 CHECK(updates_mediator->is_masked(path_str) == 1);
-
+#else
+                CHECK(updates_mediator->is_masked(target.parent_path().string()) == 1);
+#endif
                 remote_copy(target, pr_fi).check_success();
                 CHECK(updates_mediator->is_masked(path_str) == 0);
                 REQUIRE(!bfs::exists(target));
@@ -432,7 +436,12 @@ void test_append_block() {
                 CHECK(data_1 == as_bytes(read_file(path)));
                 CHECK(to_unix(bfs::last_write_time(path)) == 1641828421);
                 CHECK(updates_mediator->is_masked(path_str) >= 2);
+#ifndef SYNCSPIRIT_WATCHER_KQUEUE
                 CHECK(updates_mediator->is_masked(tmp_path) >= 4);
+#else
+                CHECK(updates_mediator->is_masked(tmp_path) >= 3);
+                CHECK(updates_mediator->is_masked(path.parent_path().string()) == 2);
+#endif
                 if (!no_perms) {
                     CHECK(static_cast<std::uint32_t>(bfs::status(path).permissions()) == perms);
                 }
@@ -460,7 +469,12 @@ void test_append_block() {
                 CHECK(bfs::file_size(conflict_path) == 6);
                 CHECK(as_bytes(read_file(conflict_path)) == as_owned_bytes("abcdef"));
                 CHECK(updates_mediator->is_masked(path_str) >= 2);
+#ifndef SYNCSPIRIT_WATCHER_KQUEUE
                 CHECK(updates_mediator->is_masked(tmp_path) >= 4);
+#else
+                CHECK(updates_mediator->is_masked(tmp_path) >= 3);
+                CHECK(updates_mediator->is_masked(path.parent_path().string()) == 3);
+#endif
             }
             SECTION("file with 2 different blocks") {
                 auto wfilename = boost::nowide::widen(path_str) + L".syncspirit-tmp";
@@ -540,7 +554,12 @@ void test_clone_block() {
                     REQUIRE(bfs::file_size(target_path) == 5);
                     CHECK(read_file(target_path) == "12345");
                     CHECK(to_unix(bfs::last_write_time(target_path)) == modified);
+#ifndef SYNCSPIRIT_WATCHER_KQUEUE
                     CHECK(updates_mediator->is_masked(tmp_path_str) >= 4);
+#else
+                    CHECK(updates_mediator->is_masked(tmp_path_str) == 3);
+                    CHECK(updates_mediator->is_masked(target_path.parent_path().string()) == 4);
+#endif
                 }
                 SECTION("multi block target file") {
                     auto data_1 = as_owned_bytes("12345");
@@ -562,7 +581,12 @@ void test_clone_block() {
                     REQUIRE(bfs::file_size(target_path) == 10);
                     CHECK(read_file(target_path) == "1234567890");
                     CHECK(to_unix(bfs::last_write_time(target_path)) == modified);
+#ifndef SYNCSPIRIT_WATCHER_KQUEUE
                     CHECK(updates_mediator->is_masked(tmp_path_str) >= 6);
+#else
+                    CHECK(updates_mediator->is_masked(tmp_path_str) == 5);
+                    CHECK(updates_mediator->is_masked(target_path.parent_path().string()) == 4);
+#endif
                 }
                 SECTION("source/target different sizes") {
                     auto data_1 = as_owned_bytes("12345");

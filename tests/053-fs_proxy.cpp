@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 Ivan Baidakou
 
 #include "test-utils.h"
+#include "syncspirit-config.h"
 #include "fs/updates_mediator.h"
 #include "fs/fs_proxy.h"
 #include "fs/utils.h"
@@ -43,7 +44,12 @@ TEST_CASE("block iterator", "[model]") {
         SECTION("empty file") {
             auto f = proxy.open_write(path, 0);
             REQUIRE(f);
+#ifndef SYNCSPIRIT_WATCHER_KQUEUE
             CHECK(mediator.is_masked(path_str) == 2);
+#else
+            CHECK(mediator.is_masked(path_str) == 1);
+            CHECK(mediator.is_masked(path.parent_path().string()) == 1);
+#endif
             CHECK(proxy.mediator_updates == 2);
             REQUIRE(bfs::exists(path));
             CHECK(bfs::file_size(path) == 0);
@@ -51,7 +57,12 @@ TEST_CASE("block iterator", "[model]") {
         SECTION("non-empty file") {
             auto f = proxy.open_write(path, 10);
             REQUIRE(f);
+#ifndef SYNCSPIRIT_WATCHER_KQUEUE
             CHECK(mediator.is_masked(path_str) == 2);
+#else
+            CHECK(mediator.is_masked(path_str) == 1);
+            CHECK(mediator.is_masked(path.parent_path().string()) == 1);
+#endif
             CHECK(proxy.mediator_updates == 2);
             REQUIRE(bfs::exists(path));
             CHECK(bfs::file_size(path) == 10);
@@ -64,8 +75,12 @@ TEST_CASE("block iterator", "[model]") {
         write_file(path, "");
         auto ec = proxy.remove(path);
         CHECK(!ec);
+#ifndef SYNCSPIRIT_WATCHER_KQUEUE
         CHECK(mediator.is_masked(path_str) == 1);
-        CHECK(proxy.mediator_updates == 1);
+#else
+        CHECK(mediator.is_masked(path_str) == 0);
+        CHECK(mediator.is_masked(path.parent_path().string()) == 1);
+#endif
         CHECK(!bfs::exists(path));
     }
 
@@ -76,21 +91,36 @@ TEST_CASE("block iterator", "[model]") {
             write_file(path, "");
             auto ec = proxy.remove(path);
             CHECK(!ec);
+#ifndef SYNCSPIRIT_WATCHER_KQUEUE
             CHECK(mediator.is_masked(path_str) == 1);
+#else
+            CHECK(mediator.is_masked(path_str) == 0);
+            CHECK(mediator.is_masked(path.parent_path().string()) == 1);
+#endif
             CHECK(proxy.mediator_updates == 1);
         }
         SECTION("empty dir") {
             bfs::create_directory(path);
             auto ec = proxy.remove(path);
             CHECK(!ec);
+#ifndef SYNCSPIRIT_WATCHER_KQUEUE
             CHECK(mediator.is_masked(path_str) == 1);
+#else
+            CHECK(mediator.is_masked(path_str) == 0);
+            CHECK(mediator.is_masked(path.parent_path().string()) == 1);
+#endif
             CHECK(proxy.mediator_updates == 1);
         }
         SECTION("non-dir") {
             bfs::create_directories(path / "bla-bla");
             auto ec = proxy.remove(path);
             CHECK(!ec);
+#ifndef SYNCSPIRIT_WATCHER_KQUEUE
             CHECK(mediator.is_masked(path_str) == 1);
+#else
+            CHECK(mediator.is_masked(path_str) == 0);
+            CHECK(mediator.is_masked(path.parent_path().string()) == 1);
+#endif
             CHECK(proxy.mediator_updates == 1);
         }
         CHECK(!bfs::exists(path));
