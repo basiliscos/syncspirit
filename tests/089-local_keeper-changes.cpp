@@ -715,6 +715,42 @@ void test_unix_new_dir() {
     F().run();
 }
 
+void test_kqueue_changes() {
+    struct F : folder_fixture_t {
+        using parent_t = folder_fixture_t;
+        using parent_t::parent_t;
+        using child_info_t = fs::task::scan_dir_t::child_info_t;
+
+        void main() noexcept override {
+            auto impl = I::kqueue;
+            prepare(impl);
+
+            SECTION("root dir content") {
+                auto pr_dir = proto::FileInfo();
+                proto::set_name(pr_dir, "");
+                proto::set_type(pr_dir, FT::DIRECTORY);
+
+                expect_dir_scan({make_child("/some/path/dir-a")});
+                expect_dir_scan({make_child("/some/path/dir-a/dir-b")});
+                expect_dir_scan({});
+
+                make_update(pr_dir, fs::update_type_t::content);
+
+                auto dir_a = files_local->by_name("dir-a");
+                REQUIRE(dir_a);
+                CHECK(dir_a->is_dir());
+                CHECK(dir_a->is_locally_available());
+
+                auto dir_b = files_local->by_name("dir-a/dir-b");
+                REQUIRE(dir_b);
+                CHECK(dir_b->is_dir());
+                CHECK(dir_b->is_locally_available());
+            }
+        }
+    };
+    F().run();
+}
+
 void test_dir_scan_errors() {
     struct F : folder_fixture_t {
         using parent_t = folder_fixture_t;
@@ -1805,6 +1841,7 @@ int _init() {
     REGISTER_TEST_CASE(test_hashing, "test_hashing", "[fs]");
     REGISTER_TEST_CASE(test_skip_scan_known, "test_skip_scan_known", "[fs]");
     REGISTER_TEST_CASE(test_unix_new_dir, "test_unix_new_dir", "[fs]");
+    REGISTER_TEST_CASE(test_kqueue_changes, "test_kqueue_changes", "[fs]");
     REGISTER_TEST_CASE(test_dir_scan_errors, "test_dir_scan_errors", "[fs]");
     REGISTER_TEST_CASE(test_read_file_errors, "test_read_file_errors", "[fs]");
     REGISTER_TEST_CASE(test_read_file_errors_partial, "test_read_file_errors_partial", "[fs]");

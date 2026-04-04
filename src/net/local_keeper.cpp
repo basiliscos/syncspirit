@@ -453,9 +453,10 @@ void local_keeper_t::on_changes(model::folder_info_t &local_folder, fs::payload:
     };
     auto delayed_update = [&](fs::payload::file_info_t change, bool recurse_children) {
         using CI = local_keeper::child_info_t;
+        using R = presentation::presence_link_t;
         auto name = proto::get_name(change);
         auto is_dir = proto::get_type(change) == proto::FileInfoType::DIRECTORY;
-        auto relation = folder_presence->get_link(name, is_dir);
+        auto relation = !name.empty() ? folder_presence->get_link(name, is_dir) : R{{}, folder_presence};
         auto has_parent = relation.parent;
         auto inside_subdir = name.find_last_of('/');
         auto subdir = std::string_view{};

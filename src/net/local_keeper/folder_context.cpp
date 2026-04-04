@@ -152,7 +152,10 @@ int folder_context_t::process(unexamined_t &child_info, stack_context_t &ctx) no
     if (type == proto::FileInfoType::DIRECTORY) {
         auto &self = child_info.self;
         auto recurse = child_info.recurse || !self;
-        stack.push_front(child_ready_t(child_info));
+        auto skip_self_update = self && (self->get_features() & F::folder);
+        if (!skip_self_update) {
+            stack.push_front(child_ready_t(child_info));
+        }
         if (recurse) {
             stack.push_front(unscanned_dir_t(std::move(child_info), child_info.recurse_children));
         }
