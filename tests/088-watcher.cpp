@@ -1197,7 +1197,7 @@ void test_manual_notification() {
             CHECK(w->subdir_map.size() == 0);
 
             SECTION("non-watched dir") {
-                auto task = fs::task::scan_dir_t(bfs::path("/some/path"), {}, {}, true);
+                auto task = fs::task::scan_dir_t(bfs::path("/some/path"), {}, {}, true, true);
                 task.child_infos = {make_child(bfs::path("/some/path/a"))};
                 w->notify(task);
                 CHECK(w->path_map.size() == 1);
@@ -1212,7 +1212,7 @@ void test_manual_notification() {
                 write_file(path_b, "");
                 auto children = child_infos_t(
                     {make_child(path_a), make_child(path_b, bfs::file_type::regular), make_child(path_c)});
-                auto task = fs::task::scan_dir_t(root_path, {}, {}, true);
+                auto task = fs::task::scan_dir_t(root_path, {}, {}, true, true);
                 task.child_infos = children;
                 w->notify(task);
                 CHECK(w->path_map.size() == 3);
@@ -1225,7 +1225,7 @@ void test_manual_notification() {
             }
             SECTION("error in watching") {
                 auto path_x = root_path / "a";
-                auto task = fs::task::scan_dir_t(root_path, {}, {}, true);
+                auto task = fs::task::scan_dir_t(root_path, {}, {}, true, true);
                 task.child_infos = {make_child(path_x)};
                 w->notify(task);
                 CHECK(w->path_map.size() == 1);

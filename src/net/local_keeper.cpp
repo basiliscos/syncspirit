@@ -176,7 +176,7 @@ auto local_keeper_t::operator()(const model::diff::local::scan_start_t &diff, vo
     if (do_scan) {
         LOG_DEBUG(log, "initiating scan of {} from '{}'", diff.folder_id, diff.sub_dir);
         auto local_folder = folder->get_folder_infos().by_device(*cluster->get_device());
-        auto folder_ctx = local_keeper::make_context(local_folder, diff.sub_dir);
+        auto folder_ctx = local_keeper::make_context(local_folder, diff.sub_dir, true);
         if (!folder_ctx) {
             LOG_ERROR(log, "cannot initialize scan of '{}'({})", diff.folder_id, diff.sub_dir);
             auto now = r::pt::microsec_clock::local_time();
@@ -451,7 +451,7 @@ void local_keeper_t::on_changes(model::folder_info_t &local_folder, fs::payload:
             LOG_DEBUG(log, "ignoring update on '{}'", name);
         }
     };
-    auto delayed_update = [&](fs::payload::file_info_t change) {
+    auto delayed_update = [&](fs::payload::file_info_t change, bool recurse_children) {
         using CI = local_keeper::child_info_t;
         auto name = proto::get_name(change);
         auto is_dir = proto::get_type(change) == proto::FileInfoType::DIRECTORY;
@@ -473,7 +473,8 @@ void local_keeper_t::on_changes(model::folder_info_t &local_folder, fs::payload:
         }
         auto path = folder->get_path() / widen(name);
         auto child_info = CI(std::move(change), std::move(path), relation.child, relation.parent);
-        unexamined.emplace_back(std::move(child_info));
+        auto item = unexamined_t(std::move(child_info), true, recurse_children);
+        unexamined.push_back(std::move(item));
     };
     for (auto &change : changes) {
         switch (change.update_reason) {
@@ -482,12 +483,12 @@ void local_keeper_t::on_changes(model::folder_info_t &local_folder, fs::payload:
                 auto schedule_scan = ((watcher_impl == I::inotify) || (watcher_impl == I::kqueue)) &&
                                      proto::get_type(change) == proto::FileInfoType::DIRECTORY;
                 if (schedule_scan) {
-                    delayed_update(change);
+                    delayed_update(change, true);
                 } else {
                     immediate_update(change);
                 }
             } else {
-                delayed_update(std::move(change));
+                delayed_update(std::move(change), true);
             }
             break;
         }
@@ -500,7 +501,7 @@ void local_keeper_t::on_changes(model::folder_info_t &local_folder, fs::payload:
             break;
         }
         case UT::content: {
-            delayed_update(std::move(change));
+            delayed_update(std::move(change), false);
             break;
         }
         default:

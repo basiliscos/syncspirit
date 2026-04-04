@@ -19,7 +19,8 @@ struct SYNCSPIRIT_API scan_dir_t {
     };
     using child_infos_t = std::vector<child_info_t>;
 
-    scan_dir_t(bfs::path path, presentation::presence_ptr_t presence, bfs::path single_child, bool notify) noexcept;
+    scan_dir_t(bfs::path path, presentation::presence_ptr_t presence, bfs::path single_child, bool notify,
+               bool recurse) noexcept;
     bool process(fs_slave_t &fs_slave, execution_context_t &context) noexcept;
 
     bfs::path path;
@@ -28,6 +29,7 @@ struct SYNCSPIRIT_API scan_dir_t {
     child_infos_t child_infos;
     bfs::path single_child;
     bool notify;
+    bool recurse;
 };
 
 } // namespace syncspirit::fs::task

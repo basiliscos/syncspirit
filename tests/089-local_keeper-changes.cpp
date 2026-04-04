@@ -415,6 +415,7 @@ struct folder_fixture_t : fixture_t {
         auto folder_changes = fs::payload::folder_changes_t{{std::move(folder_change)}};
         auto &addr = sup->get_address();
 
+        LOG_DEBUG(log, "making update...");
         sup->send<fs::payload::folder_changes_t>(addr, std::move(folder_changes));
         if (process) {
             sup->do_process();
@@ -570,6 +571,78 @@ void test_hashing() {
             CHECK(f->get_size() == 5);
             CHECK(f->is_file());
         }
+    };
+    F().run();
+}
+
+void test_skip_scan_known() {
+    struct F : folder_fixture_t {
+        using parent_t = folder_fixture_t;
+        using parent_t::parent_t;
+        using child_info_t = fs::task::scan_dir_t::child_info_t;
+
+        bool process_cmd(fs::task::scan_dir_t &task) noexcept override {
+            ++dir_scans;
+            return parent_t::process_cmd(task);
+        }
+
+        void main() noexcept override {
+            auto impl = GENERATE(I::inotify, I::kqueue);
+            prepare(impl);
+
+            auto pr_dir = proto::FileInfo();
+            proto::set_name(pr_dir, "dir-a");
+            proto::set_permissions(pr_dir, default_perms);
+            proto::set_modified_s(pr_dir, 12345);
+            proto::set_type(pr_dir, FT::DIRECTORY);
+
+            for (auto &p : {"dir-a", "dir-a/A", "dir-a/A/1", "dir-a/C"}) {
+                proto::set_name(pr_dir, p);
+                builder->local_update(folder_id, pr_dir).apply(*sup);
+            }
+
+            expect_dir_scan(
+                {make_child("/some/path/dir-a/A"), make_child("/some/path/dir-a/B"), make_child("/some/path/dir-a/C")});
+            expect_dir_scan({make_child("/some/path/dir-a/B/2")});
+            expect_dir_scan({});
+
+            proto::set_name(pr_dir, "dir-a");
+            proto::set_modified_s(pr_dir, 12346);
+            make_update(pr_dir, fs::update_type_t::content);
+
+            CHECK(files_local->size() == 6);
+
+            auto dir_b = files_local->by_name("dir-a/B");
+            REQUIRE(dir_b);
+            CHECK(dir_b->is_dir());
+            CHECK(dir_b->is_locally_available());
+
+            auto dir_b2 = files_local->by_name("dir-a/B/2");
+            REQUIRE(dir_b2);
+            CHECK(dir_b2->is_dir());
+            CHECK(dir_b2->is_locally_available());
+
+            auto dir_c = files_local->by_name("dir-a/C");
+            REQUIRE(dir_c);
+            CHECK(dir_c->is_dir());
+            CHECK(dir_c->is_locally_available());
+            auto dir_c_seq = dir_c->get_sequence();
+
+            CHECK(dir_scans == 3);
+
+            expect_dir_scan({make_child("/some/path/dir-a/A"), make_child("/some/path/dir-a/B")});
+            make_update(pr_dir, fs::update_type_t::content);
+
+            auto dir_c_new = files_local->by_name("dir-a/C");
+            REQUIRE(dir_c_new);
+            CHECK(dir_c_new->is_dir());
+            CHECK(dir_c_new->is_deleted());
+            CHECK(dir_c_new->get_sequence() > dir_c_seq);
+
+            CHECK(dir_scans == 4);
+        }
+
+        int dir_scans = 0;
     };
     F().run();
 }
@@ -1730,6 +1803,7 @@ int _init() {
     REGISTER_TEST_CASE(test_watch_unwatch, "test_watch_unwatch", "[fs]");
     REGISTER_TEST_CASE(test_trivial_changes, "test_trivial_changes", "[fs]");
     REGISTER_TEST_CASE(test_hashing, "test_hashing", "[fs]");
+    REGISTER_TEST_CASE(test_skip_scan_known, "test_skip_scan_known", "[fs]");
     REGISTER_TEST_CASE(test_unix_new_dir, "test_unix_new_dir", "[fs]");
     REGISTER_TEST_CASE(test_dir_scan_errors, "test_dir_scan_errors", "[fs]");
     REGISTER_TEST_CASE(test_read_file_errors, "test_read_file_errors", "[fs]");
