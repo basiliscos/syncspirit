@@ -16,15 +16,17 @@ using namespace syncspirit::fs::platform::bsd;
 namespace {
 
 // NOTE_DELETE & NOTE_RENAME are catch by NOTE_WRITE of parent dir .. and trigger dir rescan
-
+// they are used only to unwatch
 namespace dir {
 static constexpr auto FILTER = EVFILT_VNODE;
-static constexpr auto FILTER_FLAGS = NOTE_WRITE | NOTE_ATTRIB | NOTE_EXTEND;
+static constexpr auto FILTER_FLAGS = NOTE_WRITE | NOTE_ATTRIB | NOTE_EXTEND | NOTE_RENAME | NOTE_DELETE;
+// static constexpr auto FILTER_FLAGS = NOTE_WRITE | NOTE_ATTRIB | NOTE_EXTEND;
 } // namespace dir
 
 namespace regular {
 static constexpr auto FILTER = EVFILT_VNODE;
-static constexpr auto FILTER_FLAGS = NOTE_WRITE | NOTE_ATTRIB;
+static constexpr auto FILTER_FLAGS = NOTE_WRITE | NOTE_ATTRIB | NOTE_EXTEND | NOTE_RENAME | NOTE_DELETE;
+// static constexpr auto FILTER_FLAGS = NOTE_WRITE | NOTE_ATTRIB;
 } // namespace regular
 
 } // namespace
@@ -140,25 +142,31 @@ void watcher_t::kqueue_callback(int wd, std::uint32_t flags, const pt::ptime &no
     LOG_TRACE(log, "kqueue_callback ({}), fd: {} ({:#x}), {}", folder_id, wd, flags, rel_path);
 
     auto type = update_type_internal_t{0};
-    if (is_regular) {
-        if (flags & NOTE_WRITE) {
-            type = update_type::CONTENT;
-        } else {
-            type = update_type::META;
+
+    if (flags & NOTE_RENAME) {
+        auto ec = unwatch_recurse(full_path);
+        if (ec) {
+            LOG_WARN(log, "cannot unwatch(1) '{}': {}", guard.path, ec.message());
         }
-    } else {
-        if (flags & NOTE_ATTRIB) {
-            type = update_type::META;
+        return;
+    } else if (flags & NOTE_DELETE) {
+        auto ec = unwatch_wd(wd);
+        if (ec) {
+            LOG_WARN(log, "cannot unwatch(2) '{}': {}", guard.path, ec.message());
         }
-        if (flags & NOTE_DELETE) {
-            type = update_type::DELETED;
-        }
-        if (flags & NOTE_WRITE) {
-            type = update_type::CONTENT;
-        }
-        if (!type) {
-            type = update_type::CONTENT;
-        }
+        return;
+    } else if (flags & (NOTE_WRITE | NOTE_EXTEND)) {
+        type = update_type::CONTENT;
+    } else if (flags & NOTE_ATTRIB) {
+        type = update_type::META;
+    }
+
+    if (!type && is_regular) {
+        type = update_type::CONTENT;
+    }
+    if (!type) {
+        LOG_TRACE(log, "unexpected kqueue_callback ({}), fd: {} ({:#x}), {}", folder_id, wd, flags, rel_path);
+        return;
     }
 
     auto deadline = now + retension;

@@ -73,6 +73,13 @@ void bsd_backend_t::unwatch(int fd, short filter, u_short flags, u_int fflags) {
         events.resize(sz - 1);
         // LOG_DEBUG(log, "kevent(/del), fd = {}", fd);
     }
+
+    auto it_cb = io_callbacks.find(fd);
+    if (it_cb != io_callbacks.end()) {
+        io_callbacks.erase(it_cb);
+    } else {
+        LOG_ERROR(log, "no io_callback for fd {}", fd, strerror(errno));
+    }
 }
 
 bool bsd_backend_t::watch(int fd, io_callback_t callback, void *data, short filter, u_short flags, u_int fflags) {

@@ -14,7 +14,7 @@ void watcher_t::shutdown_finish() noexcept {
         auto &folder_id = it->first;
         auto &path = it->second.path_str;
         LOG_DEBUG(log, "unwatching folder '{}' on {}", folder_id, path);
-        auto ec = unwatch_recurse(folder_id);
+        auto ec = unwatch_folder(folder_id);
         if (ec) {
             LOG_WARN(log, "cannot unwatch '{}' : {}", path, ec.message());
         }
@@ -74,14 +74,13 @@ void watcher_t::rename_self_descending(int parent_wd, std::string_view prev_path
     }
 }
 
-auto watcher_t::unwatch_recurse(std::string_view folder_id) noexcept -> sys::error_code {
+auto watcher_t::unwatch_recurse(std::string_view path) noexcept -> sys::error_code {
     using queue_t = std::pmr::list<int>;
     auto buff = std::array<std::byte, 1024>();
     auto pool = std::pmr::monotonic_buffer_resource(buff.data(), buff.size());
     auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
     auto queue = queue_t(allocator);
     auto ec = sys::error_code{};
-    auto &path = watched_folders->find(folder_id)->second.path_str;
     auto it_path = path_to_wd.find(path);
     if (it_path != path_to_wd.end()) {
         queue.emplace_back(path_to_wd[path]);
@@ -96,23 +95,57 @@ auto watcher_t::unwatch_recurse(std::string_view folder_id) noexcept -> sys::err
                 }
                 subdir_map.erase(it_subdir);
             }
-            auto &guard = it_guard->second;
-            auto &path = guard.path;
-            if (auto ec_rm = unwatch_path(wd, guard.file_type); ec_rm) {
+            auto ec_rm = unwatch_wd(wd);
+
+            if (ec_rm) {
                 if (!ec) {
                     ec = ec_rm;
                 } else {
-                    LOG_ERROR(log, "cannot unwatch dir for '{}': {}", path, ec_rm.message());
+                    LOG_ERROR(log, "cannot unwatch '{}': {}", path, ec_rm.message());
                 }
             } else {
                 LOG_TRACE(log, "unwatched '{}'", path);
             }
-            path_to_wd.erase(path);
-            path_map.erase(it_guard);
+
+            if (ec_rm && !ec) {
+                ec = ec_rm;
+            }
             queue.pop_front();
         }
     }
     return ec;
+}
+
+sys::error_code watcher_t::unwatch_wd(int wd) noexcept {
+    auto it_guard = path_map.find(wd);
+    auto &guard = it_guard->second;
+    auto parent_wd = guard.parent_fd;
+    if (parent_wd >= 0) {
+        auto it_children = subdir_map.find(parent_wd);
+        if (it_children != subdir_map.end()) {
+            auto &children = it_children->second;
+            children.erase(wd);
+        }
+    }
+    auto &path = guard.path;
+    if (auto it_children = subdir_map.find(parent_wd); it_children != subdir_map.end()) {
+        auto &children = it_children->second;
+        if (children.size()) {
+            LOG_WARN(log, "unwatched '{}' still has watched {} children", path, children.size());
+        } else {
+            subdir_map.erase(it_children);
+        }
+    }
+    auto ec = unwatch_path(wd, guard.file_type);
+    path_to_wd.erase(path);
+    path_map.erase(it_guard);
+
+    return ec;
+}
+
+auto watcher_t::unwatch_folder(std::string_view folder_id) noexcept -> sys::error_code {
+    auto &path = watched_folders->find(folder_id)->second.path_str;
+    return unwatch_recurse(path);
 }
 
 void watcher_t::on_watch(message::watch_folder_t &message) noexcept {
@@ -149,7 +182,7 @@ void watcher_t::on_unwatch(message::unwatch_folder_t &message) noexcept {
         LOG_DEBUG(log, "unwatching folder '{}' on {}", p.folder_id, path);
         auto it_wd = path_to_wd.find(path);
         assert(it_wd != path_to_wd.end());
-        p.ec = unwatch_recurse(p.folder_id);
+        p.ec = unwatch_folder(p.folder_id);
         watched_folders->erase(it);
     } else {
         LOG_WARN(log, "cannot unwatch folder '{}' as it has not been watched", p.folder_id);

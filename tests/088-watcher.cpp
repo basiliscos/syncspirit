@@ -1279,7 +1279,12 @@ void test_kqueue() {
             sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id);
             sup->do_process();
             REQUIRE(watched_replies == 1);
+            auto w = static_cast<fs::platform::unix::watcher_t *>(target.get());
+
             SECTION("metadata (vnode/dir) events") {
+                auto watched_paths = w->path_map.size();
+                REQUIRE(watched_paths == 5);
+                auto expected_watches = watched_paths;
                 SECTION("creation") {
                     SECTION("new dir") { bfs::create_directories(root_path / "my-dir"); }
                     SECTION("new dir hierarchy") { bfs::create_directories(root_path / "a" / "b" / "c" / "d"); }
@@ -1287,14 +1292,31 @@ void test_kqueue() {
                     SECTION("new link") { bfs::create_symlink(root_path / "a", root_path / "b"); }
                 }
                 SECTION("removal") {
-                    auto name_raw = GENERATE("ex-file", "ex-dir", "ex-link");
-                    auto name = std::string_view(name_raw);
-                    bfs::remove(root_path / name);
+                    SECTION("simple") {
+                        auto name_raw = GENERATE("ex-file", "ex-dir");
+                        auto name = std::string_view(name_raw);
+                        bfs::remove(root_path / name);
+                        --expected_watches;
+                    }
+                    SECTION("link") { bfs::remove(root_path / "ex-link"); }
+                    SECTION("hierarchy") {
+                        bfs::remove_all(root_path / "ex-hier");
+                        expected_watches -= 2;
+                    }
                 }
                 SECTION("renaming") {
-                    auto name_raw = GENERATE("ex-file", "ex-dir", "ex-link", "ex-hier");
-                    auto name = std::string_view(name_raw);
-                    bfs::rename(root_path / name, root_path / L"новое-имя");
+                    SECTION("simple") {
+                        auto name_raw = GENERATE("ex-file", "ex-dir");
+                        auto name = std::string_view(name_raw);
+                        spdlog::info("renaming {}", name);
+                        bfs::rename(root_path / name, root_path / L"новое-имя");
+                        --expected_watches;
+                    }
+                    SECTION("link") { bfs::rename(root_path / "ex-link", root_path / L"новое-имя"); }
+                    SECTION("hierarchy") {
+                        bfs::rename(root_path / "ex-hier", root_path / L"новое-имя");
+                        expected_watches -= 2;
+                    }
                 }
 
                 await_events(poll_t::trigger_timer, 1);
@@ -1314,6 +1336,7 @@ void test_kqueue() {
 
                 await_events(poll_t::trigger_timer);
                 REQUIRE(changes.size() == 0);
+                CHECK(w->path_map.size() == expected_watches);
             }
             SECTION("file content change") {
                 write_file(root_path / "ex-file", "abcdef");
