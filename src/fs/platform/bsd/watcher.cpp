@@ -13,23 +13,8 @@
 
 using namespace syncspirit::fs::platform::bsd;
 
-namespace {
-
-// NOTE_DELETE & NOTE_RENAME are catch by NOTE_WRITE of parent dir .. and trigger dir rescan
-// they are used only to unwatch
-namespace dir {
 static constexpr auto FILTER = EVFILT_VNODE;
 static constexpr auto FILTER_FLAGS = NOTE_WRITE | NOTE_ATTRIB | NOTE_EXTEND | NOTE_RENAME | NOTE_DELETE;
-// static constexpr auto FILTER_FLAGS = NOTE_WRITE | NOTE_ATTRIB | NOTE_EXTEND;
-} // namespace dir
-
-namespace regular {
-static constexpr auto FILTER = EVFILT_VNODE;
-static constexpr auto FILTER_FLAGS = NOTE_WRITE | NOTE_ATTRIB | NOTE_EXTEND | NOTE_RENAME | NOTE_DELETE;
-// static constexpr auto FILTER_FLAGS = NOTE_WRITE | NOTE_ATTRIB;
-} // namespace regular
-
-} // namespace
 
 static void node_cb(int fd, void *data, std::uint32_t flags, const pt::ptime &now) {
     auto watcher = reinterpret_cast<watcher_t *>(data);
@@ -45,17 +30,11 @@ auto watcher_t::watch_path(std::string_view path, file_type_t type) noexcept -> 
     static constexpr auto FLAGS = EV_ADD | EV_CLEAR;
 
     auto r = std::optional<int>{};
-    short filter;
-    u_int fflags;
 
     if (type == file_type_t::directory) {
         r = open(path.data(), O_RDONLY);
-        filter = dir::FILTER;
-        fflags = dir::FILTER_FLAGS;
     } else if (type == file_type_t::regular) {
         r = open(path.data(), O_RDONLY);
-        filter = regular::FILTER;
-        fflags = regular::FILTER_FLAGS;
     }
 
     if (!r || *r < 0) {
@@ -64,7 +43,7 @@ auto watcher_t::watch_path(std::string_view path, file_type_t type) noexcept -> 
 
     auto sup = static_cast<fs::fs_supervisor_t *>(supervisor);
     auto ctx = static_cast<platform_context_t *>(sup->context);
-    auto ok = ctx->backend.watch(*r, node_cb, this, filter, FLAGS, fflags);
+    auto ok = ctx->backend.watch(*r, node_cb, this, FILTER, FLAGS, FILTER_FLAGS);
     if (!ok) {
         close(*r);
         return -1;
@@ -75,24 +54,15 @@ auto watcher_t::watch_path(std::string_view path, file_type_t type) noexcept -> 
 auto watcher_t::unwatch_path(int wd, file_type_t type) noexcept -> sys::error_code {
     static constexpr auto FLAGS = EV_DELETE;
 
-    short filter{0};
-    u_int fflags{0};
-
-    if (type == file_type_t::directory) {
-        filter = dir::FILTER;
-        fflags = dir::FILTER_FLAGS;
-    } else if (type == file_type_t::regular) {
-        filter = regular::FILTER;
-        fflags = regular::FILTER_FLAGS;
+    if (!((type == file_type_t::directory) || (type == file_type_t::regular))) {
+        return {};
     }
 
-    if (filter) {
-        auto sup = static_cast<fs::fs_supervisor_t *>(supervisor);
-        auto ctx = static_cast<platform_context_t *>(sup->context);
-        ctx->backend.unwatch(wd, filter, FLAGS, fflags);
-        if (close(wd) == -1) {
-            return sys::error_code{errno, sys::system_category()};
-        }
+    auto sup = static_cast<fs::fs_supervisor_t *>(supervisor);
+    auto ctx = static_cast<platform_context_t *>(sup->context);
+    ctx->backend.unwatch(wd, FILTER, FLAGS, FILTER_FLAGS);
+    if (close(wd) == -1) {
+        return sys::error_code{errno, sys::system_category()};
     }
 
     return {};
