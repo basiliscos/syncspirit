@@ -77,7 +77,7 @@ auto make_context(model::folder_info_ptr_t local_folder, std::string_view start_
 
     auto stack = local_keeper::stack_t();
     stack.push_front(complete_scan_t{!child.empty()});
-    stack.push_front(unscanned_dir_t(std::move(path), presence, std::move(child), recurse));
+    stack.push_front(unscanned_dir_t(std::move(path), presence, std::move(child), 0, recurse));
 
     auto ptr = folder_context_ptr_t();
     ptr.reset(new folder_context_t(std::move(local_folder), std::move(stack), path));
@@ -139,12 +139,24 @@ int folder_context_t::process(complete_scan_t &, stack_context_t &ctx) noexcept 
 
 int folder_context_t::process(unscanned_dir_t &dir, stack_context_t &ctx) noexcept {
     using I = syncspirit_watcher_impl_t;
-    auto notify_watcher = !dir.presence && ((ctx.watcher_impl == I::inotify) || ctx.watcher_impl == I::kqueue);
-    LOG_TRACE(log, "scheduling scan of '{}' (notify: {})", narrow(dir.path.generic_wstring()), notify_watcher);
-    auto sub_task = scan_dir_t(std::move(dir.path), std::move(dir.presence), std::move(dir.single_child),
-                               notify_watcher, dir.recurse);
-    push(std::move(sub_task));
-    return 0;
+    auto it = scan_generation.find(dir.path.generic_string());
+    auto skip_scan = false;
+    if (it != scan_generation.end()) {
+        skip_scan = it->second > dir.generation;
+    }
+
+    auto dir_str = narrow(dir.path.generic_wstring());
+    if (!skip_scan) {
+        auto notify_watcher = !dir.presence && ((ctx.watcher_impl == I::inotify) || ctx.watcher_impl == I::kqueue);
+        LOG_TRACE(log, "scheduling scan of '{}' (notify: {})", dir_str, notify_watcher);
+        auto sub_task = scan_dir_t(std::move(dir.path), std::move(dir.presence), std::move(dir.single_child),
+                                   notify_watcher, dir.recurse);
+        push(std::move(sub_task));
+        return 0;
+    } else {
+        LOG_DEBUG(log, "skipping scanning of '{}'", dir_str);
+        return 1;
+    }
 }
 
 int folder_context_t::process(unexamined_t &child_info, stack_context_t &ctx) noexcept {
@@ -226,14 +238,15 @@ int folder_context_t::process(child_ready_t &info, stack_context_t &ctx) noexcep
     using namespace model::diff;
     bool emit_update = false;
     bool emit_hashing = false;
-    if (!info.self || (info.self->get_features() & F::deleted)) {
+    auto self = info.fetch_self();
+    if (!self || (self->get_features() & F::deleted)) {
         if (info.size && info.blocks.empty()) {
             emit_hashing = true;
         } else {
             emit_update = true;
         }
     } else {
-        auto presence = static_cast<presentation::cluster_file_presence_t *>(info.self.get());
+        auto presence = static_cast<presentation::cluster_file_presence_t *>(self);
         auto &file = const_cast<model::file_info_t &>(presence->get_file_info());
         bool match = false;
         auto &type = info.type;
@@ -514,6 +527,7 @@ void folder_context_t::post_process(hash_base_t &hash_file, hasher::message::dig
 
 void folder_context_t::post_process(fs::task::scan_dir_t &task, stack_context_t &ctx) noexcept {
     using checked_chidren_t = std::pmr::set<std::string_view>;
+    scan_generation[task.path.generic_string()] = ++io_generation;
     auto &ec = task.ec;
     auto folder = local_folder->get_folder();
     auto folder_id = folder->get_id();
@@ -570,10 +584,10 @@ void folder_context_t::post_process(fs::task::scan_dir_t &task, stack_context_t 
             log->warn("scannig of  {} failed: {}", name, info.ec.message());
         } else {
             if (fs::is_temporal(info.path)) {
-                auto child = incomplete_t(std::move(info), presence, task.presence);
+                auto child = incomplete_t(std::move(info), presence, task.presence, io_generation);
                 stack.push_front(std::move(child));
             } else {
-                auto child = child_info_t(std::move(info), presence, task.presence);
+                auto child = child_info_t(std::move(info), presence, task.presence, io_generation);
                 auto recurse = task.recurse;
                 stack.push_front(unexamined_t(std::move(child), recurse, recurse));
             }
@@ -650,6 +664,7 @@ void folder_context_t::post_process(fs::task::scan_dir_t &task, stack_context_t 
 }
 
 void folder_context_t::post_process(fs::task::segment_iterator_t &task, stack_context_t &ctx) {
+    ++io_generation;
     auto &ec = task.ec;
     if (ec) {
         hashing -= task.block_count;
@@ -798,6 +813,26 @@ fs::task_t folder_context_t::pop_task() noexcept {
     }
     ++in_progress;
     return task;
+}
+
+void folder_context_t::consume(folder_context_t &previous) noexcept {
+    io_generation = previous.io_generation;
+    scan_generation = std::move(previous.scan_generation);
+}
+
+auto folder_context_t::get_generation() const noexcept -> generation_t { return io_generation; }
+
+void folder_context_t::adjust_generation(generation_t generation) noexcept {
+    for (auto &item : stack) {
+        std::visit(
+            [&](auto &item) {
+                using T = std::decay_t<decltype(item)>;
+                if constexpr (std::is_same_v<T, unexamined_t>) {
+                    item.generation = generation;
+                }
+            },
+            item);
+    }
 }
 
 } // namespace syncspirit::net::local_keeper

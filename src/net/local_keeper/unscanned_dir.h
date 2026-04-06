@@ -14,13 +14,15 @@ namespace bfs = std::filesystem;
 
 struct unscanned_dir_t {
     using dir_info_t = std::unique_ptr<child_info_t>;
+    using generation_t = child_info_t::generation_t;
 
-    unscanned_dir_t(bfs::path path_, presentation::presence_ptr_t presence_, bfs::path single_child_, bool recurse_)
+    unscanned_dir_t(bfs::path path_, presentation::presence_ptr_t presence_, bfs::path single_child_,
+                    generation_t generation_, bool recurse_)
         : path(std::move(path_)), presence(std::move(presence_)), single_child{std::move(single_child_)},
-          recurse{recurse_} {}
+          generation{generation_}, recurse{recurse_} {}
 
     unscanned_dir_t(child_info_t dir_info_, bool recurse_)
-        : dir_info(new child_info_t(std::move(dir_info_))), recurse{recurse_} {
+        : dir_info(new child_info_t(std::move(dir_info_))), generation{dir_info_.generation}, recurse{recurse_} {
         path = dir_info->path;
         presence = dir_info->self;
     }
@@ -29,6 +31,7 @@ struct unscanned_dir_t {
     presentation::presence_ptr_t presence;
     bfs::path single_child;
     dir_info_t dir_info;
+    generation_t generation;
     bool recurse;
 };
 

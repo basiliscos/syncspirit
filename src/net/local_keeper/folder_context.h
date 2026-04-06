@@ -19,6 +19,7 @@ struct folder_slave_t;
 namespace outcome = boost::outcome_v2;
 
 struct folder_context_t : boost::intrusive_ref_counter<folder_context_t, boost::thread_safe_counter> {
+    using generation_t = child_info_t::generation_t;
     folder_context_t(model::folder_info_ptr_t local_folder, local_keeper::stack_t stack,
                      const bfs::path &initial_path) noexcept;
 
@@ -29,8 +30,13 @@ struct folder_context_t : boost::intrusive_ref_counter<folder_context_t, boost::
     void post_process(hash_base_t &hash_file, hasher::message::digest_t &msg, stack_context_t &ctx) noexcept;
 
     fs::task_t pop_task() noexcept;
+    void consume(folder_context_t &) noexcept;
+    generation_t get_generation() const noexcept;
+    void adjust_generation(generation_t generation) noexcept;
 
   private:
+    using scan_generation_t = std::unordered_map<std::string, generation_t>;
+
     int process(complete_scan_t &, stack_context_t &ctx) noexcept;
     int process(unscanned_dir_t &dir, stack_context_t &ctx) noexcept;
     int process(unexamined_t &child_info, stack_context_t &ctx) noexcept;
@@ -65,6 +71,8 @@ struct folder_context_t : boost::intrusive_ref_counter<folder_context_t, boost::
     bool ignore_permissions;
     std::int_fast32_t in_progress = 0;
     std::int_fast32_t hashing = 0;
+    child_info_t::generation_t io_generation = 0;
+    scan_generation_t scan_generation;
 };
 
 using folder_context_ptr_t = boost::intrusive_ptr<folder_context_t>;

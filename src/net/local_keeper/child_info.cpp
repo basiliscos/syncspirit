@@ -9,13 +9,14 @@
 
 #include <boost/nowide/convert.hpp>
 #include <cassert>
+#include <memory_resource>
 
 using namespace syncspirit::net::local_keeper;
 using boost::nowide::narrow;
 
 child_info_t::child_info_t(fs::task::scan_dir_t::child_info_t backend, presentation::presence_ptr_t self_,
-                           presentation::presence_ptr_t parent_) noexcept
-    : self(std::move(self_)), parent(std::move(parent_)) {
+                           presentation::presence_ptr_t parent_, generation_t generation_) noexcept
+    : self(std::move(self_)), parent(std::move(parent_)), generation{generation_} {
     assert(!backend.path.empty());
     path = std::move(backend.path);
     link_target = std::move(backend.target);
@@ -37,8 +38,8 @@ child_info_t::child_info_t(fs::task::scan_dir_t::child_info_t backend, presentat
 }
 
 child_info_t::child_info_t(proto::FileInfo info, bfs::path path_, presentation::presence_ptr_t self_,
-                           presentation::presence_ptr_t parent_) noexcept
-    : path{std::move(path_)}, self{std::move(self_)}, parent(std::move(parent_)) {
+                           presentation::presence_ptr_t parent_, generation_t generation_) noexcept
+    : path{std::move(path_)}, self{std::move(self_)}, parent(std::move(parent_)), generation{generation_} {
     size = proto::get_size(info);
     link_target = proto::get_symlink_target(info);
     last_write_time = proto::get_modified_s(info);
@@ -71,4 +72,17 @@ auto child_info_t::serialize(const model::folder_info_t &local_folder, blocks_t 
         proto::set_no_permissions(data, true);
     }
     return data;
+}
+
+auto child_info_t::fetch_self() -> presentation::presence_t * {
+    if (self) {
+        return self.get();
+    }
+    if (!parent) {
+        return {};
+    }
+    auto is_dir = type == proto::FileInfoType::DIRECTORY;
+    auto name = narrow(path.filename().generic_wstring());
+    self = parent->get_child(name, is_dir);
+    return self.get();
 }

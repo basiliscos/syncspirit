@@ -8,6 +8,7 @@
 #include "fs/task/scan_dir.h"
 #include <filesystem>
 #include <boost/system/error_code.hpp>
+#include <cstdint>
 
 namespace syncspirit::net::local_keeper {
 
@@ -16,14 +17,16 @@ namespace sys = boost::system;
 
 struct child_info_t {
     using blocks_t = std::vector<proto::BlockInfo>;
+    using generation_t = std::uint_fast32_t;
 
     child_info_t(fs::task::scan_dir_t::child_info_t backend, presentation::presence_ptr_t self_,
-                 presentation::presence_ptr_t parent_) noexcept;
+                 presentation::presence_ptr_t parent_, generation_t generation_) noexcept;
     child_info_t(proto::FileInfo file_info, bfs::path path, presentation::presence_ptr_t self_,
-                 presentation::presence_ptr_t parent_) noexcept;
+                 presentation::presence_ptr_t parent_, generation_t generation_) noexcept;
     virtual ~child_info_t() = default;
 
     proto::FileInfo serialize(const model::folder_info_t &local_folder, blocks_t blocks, bool ignore_permissions);
+    presentation::presence_t *fetch_self();
 
     bfs::path path;
     bfs::path link_target;
@@ -34,6 +37,7 @@ struct child_info_t {
     sys::error_code ec;
     presentation::presence_ptr_t self;
     presentation::presence_ptr_t parent;
+    generation_t generation;
 };
 
 } // namespace syncspirit::net::local_keeper

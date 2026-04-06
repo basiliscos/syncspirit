@@ -1833,6 +1833,59 @@ void test_renaming_race() {
     F().run();
 }
 
+void test_avoid_dir_rescan() {
+    struct F : folder_fixture_t {
+        using parent_t = folder_fixture_t;
+        using parent_t::parent_t;
+
+        bool process_cmd(fs::task::scan_dir_t &task) noexcept override {
+            ++dir_scans;
+            return parent_t::process_cmd(task);
+        }
+
+        void main() noexcept override {
+            auto impl = GENERATE(I::inotify, I::kqueue);
+            prepare(impl);
+
+            expect_dir_scan({make_child("/some/path/dir/a-file")});
+            expect_dir_scan({});
+
+            auto file = proto::FileInfo();
+            auto file_name = std::string_view("dir");
+            proto::set_name(file, file_name);
+            proto::set_permissions(file, default_perms);
+            proto::set_modified_s(file, 12345);
+            proto::set_type(file, FT::DIRECTORY);
+
+            SECTION("within the same update") {
+                auto change = fs::payload::file_info_t(file, {}, fs::update_type_t::created);
+                auto changes = fs::payload::file_changes_t{change, change};
+                auto folder_change = fs::payload::folder_change_t{folder_id, std::move(changes)};
+                auto folder_changes = fs::payload::folder_changes_t{{std::move(folder_change)}};
+                auto &addr = sup->get_address();
+
+                LOG_DEBUG(log, "making update...");
+                sup->send<fs::payload::folder_changes_t>(addr, std::move(folder_changes));
+                sup->do_process();
+            }
+            SECTION("spread across different updates") {
+                make_update(file, fs::update_type_t::created, false);
+                make_update(file, fs::update_type_t::created);
+            }
+
+            CHECK(files_local->size() == 2);
+            REQUIRE(files_local->by_name("dir"));
+            REQUIRE(files_local->by_name("dir/a-file"));
+            CHECK(folder_local->get_max_sequence() == 2);
+
+            CHECK(dir_scans == 2);
+        }
+
+        int dir_scans = 0;
+    };
+    F().run();
+}
+
 int _init() {
     test::init_logging();
     REGISTER_TEST_CASE(test_just_start, "test_just_start", "[fs]");
@@ -1859,6 +1912,7 @@ int _init() {
     REGISTER_TEST_CASE(test_renaming_simple, "test_renaming_simple", "[fs]");
     REGISTER_TEST_CASE(test_renaming_hierarchy, "test_renaming_hierarchy", "[fs]");
     REGISTER_TEST_CASE(test_renaming_race, "test_renaming_race", "[fs]");
+    REGISTER_TEST_CASE(test_avoid_dir_rescan, "test_avoid_dir_rescan", "[fs]");
     return 1;
 }
 
