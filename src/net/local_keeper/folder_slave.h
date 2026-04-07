@@ -36,7 +36,7 @@ struct folder_slave_t final : fs::fs_slave_t {
     void push(folder_context_ptr_t context_) noexcept;
     void push(folder_contexts_t folders) noexcept;
 
-    void process_stack(stack_context_t &ctx) noexcept;
+    bool process_stack(stack_context_t &ctx) noexcept;
     void prepare_task() noexcept;
 
     bool post_process(stack_context_t &ctx) noexcept;

@@ -56,12 +56,14 @@ struct local_keeper_t::lc_context_t final : local_keeper::stack_context_t {
                 auto backend = new folder_slave_t();
                 auto backend_keeper = fs::payload::foreign_executor_prt_t(backend);
                 backend->push(std::move(new_contexts));
-                backend->process_stack(*this);
-                backend->prepare_task();
-                auto &fs_addr = actor->fs_addr;
-                auto &back_addr = actor->address;
-                actor->route<fs::payload::foreign_executor_prt_t>(fs_addr, back_addr, std::move(backend_keeper));
-                ++actor->fs_tasks;
+                auto has_pending_io = backend->process_stack(*this);
+                if (has_pending_io) {
+                    backend->prepare_task();
+                    auto &fs_addr = actor->fs_addr;
+                    auto &back_addr = actor->address;
+                    actor->route<fs::payload::foreign_executor_prt_t>(fs_addr, back_addr, std::move(backend_keeper));
+                    ++actor->fs_tasks;
+                }
             } else {
                 auto inserter = std::back_insert_iterator(actor->delayed);
                 std::move(new_contexts.begin(), new_contexts.end(), inserter);

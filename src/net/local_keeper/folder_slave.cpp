@@ -26,10 +26,25 @@ void folder_slave_t::prepare_task() noexcept {
     tasks_in.emplace_back(folder_ctx->pop_task());
 }
 
-void folder_slave_t::process_stack(stack_context_t &ctx) noexcept {
+bool folder_slave_t::process_stack(stack_context_t &ctx) noexcept {
+    assert(folder_contexts.size());
     ctx.slave = this;
     auto folder_ctx = folder_contexts.front().get();
-    folder_ctx->process_stack(ctx);
+    auto has_pending_io = folder_ctx->process_stack(ctx);
+    if (folder_ctx->is_done() && !has_pending_io) {
+        pop_context();
+    }
+
+    while (!folder_contexts.empty() && !has_pending_io) {
+        auto folder_ctx = folder_contexts.front().get();
+        has_pending_io = folder_ctx->process_stack(ctx);
+        if (folder_ctx->is_done()) {
+            pop_context();
+        } else {
+            break;
+        }
+    }
+    return has_pending_io;
 }
 
 bool folder_slave_t::post_process(stack_context_t &ctx) noexcept {
