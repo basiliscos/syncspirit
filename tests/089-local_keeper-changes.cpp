@@ -1897,9 +1897,6 @@ void test_no_pending_io() {
             auto impl = GENERATE(I::inotify, I::kqueue);
             prepare(impl);
 
-            expect_dir_scan({make_child("/some/path/dir/a-file")});
-            expect_dir_scan({});
-
             auto file = proto::FileInfo();
             auto file_name = std::string_view("a-file");
             proto::set_name(file, file_name);
