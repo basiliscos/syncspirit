@@ -160,9 +160,9 @@ int folder_context_t::process(unscanned_dir_t &dir, stack_context_t &ctx) noexce
 }
 
 int folder_context_t::process(unexamined_t &child_info, stack_context_t &ctx) noexcept {
+    auto self = child_info.fetch_self();
     auto &type = child_info.type;
     if (type == proto::FileInfoType::DIRECTORY) {
-        auto &self = child_info.self;
         auto recurse = child_info.recurse || !self;
         auto skip_self_update = self && (self->get_features() & F::folder);
         if (!skip_self_update) {
@@ -175,39 +175,44 @@ int folder_context_t::process(unexamined_t &child_info, stack_context_t &ctx) no
         stack.push_front(child_ready_t(std::move(child_info)));
     } else {
         assert(type == proto::FileInfoType::FILE);
-        if (!child_info.size || child_info.self) {
+        if (!child_info.size || self) {
             stack.emplace_front(child_ready_t(std::move(child_info)));
         } else {
-            auto block_size = [&]() -> std::int32_t {
-                // for possible correct importing later at local-update.
-                if (!child_info.self) {
-                    using namespace presentation;
-                    auto folder = local_folder->get_folder();
-                    auto &folder_path = folder->get_path();
-                    auto rel_path = fs::relativize(child_info.path, folder_path);
-                    auto name = narrow(rel_path.generic_wstring());
-                    auto folder_infos = folder->get_folder_infos();
-                    for (auto &it : folder_infos) {
-                        if (auto file = it.item->get_file_infos().by_name(name)) {
-                            auto augmentation = file->get_augmentation().get();
-                            auto file_presence = static_cast<cluster_file_presence_t *>(augmentation);
-                            auto best = file_presence->get_entity()->get_best();
-                            if (best && best->get_features() & F::cluster) {
-                                auto mutable_best = const_cast<presentation::presence_t *>(best);
-                                auto cp = static_cast<cluster_file_presence_t *>(mutable_best);
-                                auto &best_file = cp->get_file_info();
-                                auto match = best_file.is_file() && best_file.get_size() == child_info.size;
-                                if (match) {
-                                    return best_file.get_block_size();
+            auto path_str = narrow(child_info.path.generic_wstring());
+            if (hashing_files.contains(path_str)) {
+                LOG_DEBUG(log, "file '{}' is already scheduled for hashing", path_str);
+            } else {
+                auto block_size = [&]() -> std::int32_t {
+                    // for possible correct importing later at local-update.
+                    if (!self) {
+                        using namespace presentation;
+                        auto folder = local_folder->get_folder();
+                        auto &folder_path = folder->get_path();
+                        auto rel_path = fs::relativize(child_info.path, folder_path);
+                        auto name = narrow(rel_path.generic_wstring());
+                        auto folder_infos = folder->get_folder_infos();
+                        for (auto &it : folder_infos) {
+                            if (auto file = it.item->get_file_infos().by_name(name)) {
+                                auto augmentation = file->get_augmentation().get();
+                                auto file_presence = static_cast<cluster_file_presence_t *>(augmentation);
+                                auto best = file_presence->get_entity()->get_best();
+                                if (best && best->get_features() & F::cluster) {
+                                    auto mutable_best = const_cast<presentation::presence_t *>(best);
+                                    auto cp = static_cast<cluster_file_presence_t *>(mutable_best);
+                                    auto &best_file = cp->get_file_info();
+                                    auto match = best_file.is_file() && best_file.get_size() == child_info.size;
+                                    if (match) {
+                                        return best_file.get_block_size();
+                                    }
                                 }
                             }
                         }
                     }
-                }
-                return 0;
-            }();
-            auto ptr = hash_new_file_ptr_t(new hash_new_file_t(std::move(child_info), block_size));
-            stack.emplace_front(std::move(ptr));
+                    return 0;
+                }();
+                auto ptr = hash_new_file_ptr_t(new hash_new_file_t(std::move(child_info), block_size));
+                stack.emplace_front(std::move(ptr));
+            }
         }
     }
     return 1;
@@ -491,15 +496,21 @@ folder_context_t &folder_context_t::post_process(stack_context_t &ctx) noexcept 
 
 void folder_context_t::post_process(hash_base_t &hash_file, hasher::message::digest_t &msg,
                                     stack_context_t &ctx) noexcept {
-    LOG_TRACE(log, "post_process, hasn_file {} blocks are hashing", hashing);
+    auto path_str = narrow(hash_file.path.generic_wstring());
+    LOG_TRACE(log, "post_process of '{}', hasn_file {} blocks are hashing", path_str, hashing);
     assert(hashing > 0);
     --hashing;
+    auto it_h = hashing_files.find(path_str);
+    if (--it_h->second == 0) {
+        hashing_files.erase(it_h);
+    }
     auto &p = msg.payload;
     auto &result = msg.payload.result;
     --hash_file.unhashed_blocks;
+
     if (result.has_error()) {
         auto &ec = result.assume_error();
-        LOG_WARN(log, "cannot hash '{}': {}", narrow(hash_file.path.generic_wstring()), ec.message());
+        LOG_WARN(log, "cannot hash '{}': {}", path_str, ec.message());
         ++hash_file.errored_blocks;
     } else {
         auto index = p.block_index;
@@ -672,8 +683,13 @@ void folder_context_t::post_process(fs::task::segment_iterator_t &task, stack_co
         auto delta = task.block_count - task.current_block;
         ctx.hashes_pool += delta;
         auto &hash_file = *hash_ctx->hash_file;
+        auto path_str = narrow(task.path.generic_wstring());
+        auto it_h = hashing_files.find(path_str);
+        it_h->second -= task.block_count;
+        if (it_h->second == 0) {
+            hashing_files.erase(it_h);
+        }
         if (hash_file.commit_error(ec, delta)) {
-            auto path_str = narrow(task.path.generic_wstring());
             LOG_WARN(log, "I/O error during processing '{}': {}", path_str, ec.message());
             auto presence = hash_file.self.get();
             if (presence && presence->get_features() & F::local) {
@@ -762,8 +778,9 @@ int folder_context_t::schedule_hash(hash_base_t *item, stack_context_t &ctx) noe
     blocks_limit -= max_blocks;
     auto blocks_left = item->unprocessed_blocks -= max_blocks;
 
+    auto path = narrow(item->path.wstring());
     LOG_TRACE(log, "going to rehash {} block(s) ({}..{}) of '{}' (this = {})", max_blocks, first_block,
-              first_block + max_blocks, narrow(item->path.wstring()), (void *)this);
+              first_block + max_blocks, path, (void *)this);
     return blocks_left ? -1 : 0;
 }
 
@@ -810,6 +827,8 @@ fs::task_t folder_context_t::pop_task() noexcept {
     pending_io.pop_front();
     if (auto *si = std::get_if<fs::task::segment_iterator_t>(&task); si) {
         hashing += si->block_count;
+        auto path = narrow(si->path.generic_wstring());
+        hashing_files[std::move(path)] += si->block_count;
     }
     ++in_progress;
     return task;

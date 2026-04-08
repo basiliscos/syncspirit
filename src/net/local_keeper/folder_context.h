@@ -11,6 +11,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ref_counter.hpp>
 #include <boost/outcome.hpp>
+#include <unordered_map>
 #include <cstdint>
 
 namespace syncspirit::net::local_keeper {
@@ -36,6 +37,7 @@ struct folder_context_t : boost::intrusive_ref_counter<folder_context_t, boost::
 
   private:
     using scan_generation_t = std::unordered_map<std::string, generation_t>;
+    using hasing_files_t = std::unordered_map<std::string, int>;
 
     int process(complete_scan_t &, stack_context_t &ctx) noexcept;
     int process(unscanned_dir_t &dir, stack_context_t &ctx) noexcept;
@@ -73,6 +75,7 @@ struct folder_context_t : boost::intrusive_ref_counter<folder_context_t, boost::
     std::int_fast32_t hashing = 0;
     child_info_t::generation_t io_generation = 0;
     scan_generation_t scan_generation;
+    hasing_files_t hashing_files;
 };
 
 using folder_context_ptr_t = boost::intrusive_ptr<folder_context_t>;

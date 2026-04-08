@@ -1918,8 +1918,58 @@ void test_no_pending_io() {
             auto folder_changes = fs::payload::folder_changes_t{{std::move(folder_change)}};
             auto &addr = sup->get_address();
 
-            LOG_DEBUG(log, "making update...");
             builder->local_update(folder_id, file).apply(*sup);
+
+            LOG_DEBUG(log, "making update...");
+            sup->send<fs::payload::folder_changes_t>(addr, std::move(folder_changes));
+            sup->do_process();
+
+            CHECK(files_local->size() == 1);
+            CHECK(folder_local->get_max_sequence() == 1);
+            auto f = files_local->by_name("a-file");
+            REQUIRE(f);
+            CHECK(f->get_size() == 5);
+        }
+    };
+    F().run();
+}
+
+void test_double_content_update() {
+    struct F : folder_fixture_t {
+        using parent_t = folder_fixture_t;
+        using parent_t::parent_t;
+
+        bool process_cmd(fs::task::scan_dir_t &task) noexcept override { return parent_t::process_cmd(task); }
+
+        void main() noexcept override {
+            auto impl = GENERATE(I::inotify, I::kqueue);
+            prepare(impl);
+
+            auto file = proto::FileInfo();
+            auto file_name = std::string_view("a-file");
+            proto::set_name(file, file_name);
+            proto::set_permissions(file, default_perms);
+            proto::set_modified_s(file, 12345);
+            proto::set_type(file, FT::FILE);
+            proto::set_size(file, 5);
+            proto::set_block_size(file, 5);
+
+            auto data = as_owned_bytes("12345");
+            auto data_h = utils::sha256_digest(data).value();
+            auto &b1 = proto::add_blocks(file);
+            proto::set_hash(b1, data_h);
+            proto::set_size(b1, data.size());
+
+            auto change_1 = fs::payload::file_info_t(file, {}, fs::update_type_t::created);
+            auto change_2 = fs::payload::file_info_t(file, {}, fs::update_type_t::content);
+            auto changes = fs::payload::file_changes_t{change_1, change_2};
+            auto folder_change = fs::payload::folder_change_t{folder_id, std::move(changes)};
+            auto folder_changes = fs::payload::folder_changes_t{{std::move(folder_change)}};
+            auto &addr = sup->get_address();
+
+            expect_bytes_hash(data);
+
+            LOG_DEBUG(log, "making update...");
             sup->send<fs::payload::folder_changes_t>(addr, std::move(folder_changes));
             sup->do_process();
 
@@ -1961,6 +2011,7 @@ int _init() {
     REGISTER_TEST_CASE(test_renaming_race, "test_renaming_race", "[fs]");
     REGISTER_TEST_CASE(test_avoid_dir_rescan, "test_avoid_dir_rescan", "[fs]");
     REGISTER_TEST_CASE(test_no_pending_io, "test_dir_scan_and_hashing_race", "[fs]");
+    REGISTER_TEST_CASE(test_double_content_update, "test_double_content_update", "[fs]");
     return 1;
 }
 
