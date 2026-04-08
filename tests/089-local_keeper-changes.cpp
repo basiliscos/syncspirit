@@ -1983,6 +1983,59 @@ void test_double_content_update() {
     F().run();
 }
 
+void test_dir_scan_and_hashing_race() {
+    struct F : folder_fixture_t {
+        using parent_t = folder_fixture_t;
+        using parent_t::parent_t;
+
+        bool process_cmd(fs::task::segment_iterator_t &task) noexcept override {
+            if (task.path == "/some/path/dir/f2.bin") {
+                auto file = proto::FileInfo();
+                auto file_name = std::string_view("dir/f1.bin");
+                proto::set_name(file, file_name);
+                proto::set_permissions(file, default_perms);
+                proto::set_type(file, FT::FILE);
+                proto::set_size(file, 5);
+                proto::set_block_size(file, 5);
+
+                auto data = as_owned_bytes("67890");
+                auto data_h = utils::sha256_digest(data).value();
+                auto &b1 = proto::add_blocks(file);
+                proto::set_hash(b1, data_h);
+                proto::set_size(b1, data.size());
+                auto diff = builder->local_update(folder_id, file).extract();
+                sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff), nullptr);
+            }
+            return parent_t::process_cmd(task);
+        }
+
+        void main() noexcept override {
+            auto impl = GENERATE(I::inotify, I::kqueue);
+            prepare(impl);
+
+            expect_dir_scan({make_child("/some/path/dir/f1.bin", bfs::file_type::regular, 5),
+                             make_child("/some/path/dir/f2.bin", bfs::file_type::regular, 5)});
+            expect_dir_scan({});
+
+            auto file = proto::FileInfo();
+            auto file_name = std::string_view("dir");
+            proto::set_name(file, file_name);
+            proto::set_permissions(file, default_perms);
+            proto::set_type(file, FT::DIRECTORY);
+
+            expect_bytes_hash(as_bytes("12345"));
+            make_update(file, fs::update_type_t::created);
+
+            CHECK(files_local->size() == 3);
+            REQUIRE(files_local->by_name("dir"));
+            REQUIRE(files_local->by_name("dir/f1.bin"));
+            REQUIRE(files_local->by_name("dir/f2.bin"));
+            CHECK(folder_local->get_max_sequence() == 3);
+        }
+    };
+    F().run();
+}
+
 int _init() {
     test::init_logging();
     REGISTER_TEST_CASE(test_just_start, "test_just_start", "[fs]");
@@ -2010,8 +2063,9 @@ int _init() {
     REGISTER_TEST_CASE(test_renaming_hierarchy, "test_renaming_hierarchy", "[fs]");
     REGISTER_TEST_CASE(test_renaming_race, "test_renaming_race", "[fs]");
     REGISTER_TEST_CASE(test_avoid_dir_rescan, "test_avoid_dir_rescan", "[fs]");
-    REGISTER_TEST_CASE(test_no_pending_io, "test_dir_scan_and_hashing_race", "[fs]");
+    REGISTER_TEST_CASE(test_no_pending_io, "test_no_pending_io", "[fs]");
     REGISTER_TEST_CASE(test_double_content_update, "test_double_content_update", "[fs]");
+    REGISTER_TEST_CASE(test_dir_scan_and_hashing_race, "test_dir_scan_and_hashing_race", "[fs]");
     return 1;
 }
 

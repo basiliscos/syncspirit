@@ -174,18 +174,33 @@ int folder_context_t::process(unexamined_t &child_info, stack_context_t &ctx) no
     } else if (type == proto::FileInfoType::SYMLINK) {
         stack.push_front(child_ready_t(std::move(child_info)));
     } else {
+        using namespace presentation;
         assert(type == proto::FileInfoType::FILE);
         if (!child_info.size || self) {
             stack.emplace_front(child_ready_t(std::move(child_info)));
         } else {
             auto path_str = narrow(child_info.path.generic_wstring());
+            auto already_in_model = [&]() -> presence_t * {
+                auto rel_path = fs::relativize(child_info.path, local_folder->get_folder()->get_path());
+                auto rel_path_str = narrow(rel_path.generic_wstring());
+                auto file = local_folder->get_file_infos().by_name(rel_path_str);
+                if (!file) {
+                    return {};
+                }
+                auto augmentation = file->get_augmentation().get();
+                auto presence = static_cast<cluster_file_presence_t *>(augmentation);
+                return presence;
+            };
             if (hashing_files.contains(path_str)) {
                 LOG_DEBUG(log, "file '{}' is already scheduled for hashing", path_str);
+            } else if (auto found_self = already_in_model(); found_self) {
+                child_info.self = found_self;
+                child_info.parent = found_self->get_parent();
+                stack.emplace_front(child_ready_t(std::move(child_info)));
             } else {
                 auto block_size = [&]() -> std::int32_t {
                     // for possible correct importing later at local-update.
                     if (!self) {
-                        using namespace presentation;
                         auto folder = local_folder->get_folder();
                         auto &folder_path = folder->get_path();
                         auto rel_path = fs::relativize(child_info.path, folder_path);
