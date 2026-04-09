@@ -76,7 +76,7 @@ void watcher_t::rename_self_descending(int parent_wd, std::string_view prev_path
 
 auto watcher_t::unwatch_recurse(std::string_view path) noexcept -> sys::error_code {
     using queue_t = std::pmr::list<int>;
-    auto buff = std::array<std::byte, 1024>();
+    auto buff = std::array<std::byte, 1024 * 32>();
     auto pool = std::pmr::monotonic_buffer_resource(buff.data(), buff.size());
     auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
     auto queue = queue_t(allocator);
@@ -90,11 +90,14 @@ auto watcher_t::unwatch_recurse(std::string_view path) noexcept -> sys::error_co
             auto it_guard = path_map.find(wd);
             if (it_subdir != subdir_map.end()) {
                 auto &children = it_subdir->second;
-                for (auto child_wd : children) {
-                    queue.emplace_back(child_wd);
+                if (children.size()) {
+                    for (auto child_wd : children) {
+                        queue.emplace_front(child_wd);
+                    }
+                    continue;
                 }
-                subdir_map.erase(it_subdir);
             }
+            LOG_TRACE(log, "unwatching '{}'", path);
             auto ec_rm = unwatch_wd(wd);
 
             if (ec_rm) {
@@ -103,8 +106,6 @@ auto watcher_t::unwatch_recurse(std::string_view path) noexcept -> sys::error_co
                 } else {
                     LOG_ERROR(log, "cannot unwatch '{}': {}", path, ec_rm.message());
                 }
-            } else {
-                LOG_TRACE(log, "unwatched '{}'", path);
             }
 
             if (ec_rm && !ec) {
@@ -121,14 +122,17 @@ sys::error_code watcher_t::unwatch_wd(int wd) noexcept {
     auto &guard = it_guard->second;
     auto parent_wd = guard.parent_fd;
     if (parent_wd >= 0) {
-        auto it_children = subdir_map.find(parent_wd);
-        if (it_children != subdir_map.end()) {
-            auto &children = it_children->second;
-            children.erase(wd);
+        auto it_siblings = subdir_map.find(parent_wd);
+        if (it_siblings != subdir_map.end()) {
+            auto &children = it_siblings->second;
+            auto it_self = children.find(wd);
+            if (it_self != children.end()) {
+                children.erase(it_self);
+            }
         }
     }
     auto &path = guard.path;
-    if (auto it_children = subdir_map.find(parent_wd); it_children != subdir_map.end()) {
+    if (auto it_children = subdir_map.find(wd); it_children != subdir_map.end()) {
         auto &children = it_children->second;
         if (children.size()) {
             LOG_WARN(log, "unwatched '{}' still has watched {} children", path, children.size());
