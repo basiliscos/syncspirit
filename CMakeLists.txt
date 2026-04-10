@@ -365,6 +365,7 @@ target_link_libraries(syncspirit_core
         $<$<PLATFORM_ID:Windows>:iphlpapi>
         $<$<PLATFORM_ID:Windows>:ws2_32>
         $<$<PLATFORM_ID:Windows>:wsock32>
+        $<$<PLATFORM_ID:Windows>:dbghelp.dll>
     PRIVATE
         ZLIB::ZLIB
         c-ares::cares

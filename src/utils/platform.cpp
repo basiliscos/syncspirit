@@ -3,11 +3,132 @@
 
 #include "platform.h"
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+#include <dbghelp.h>
 #include <array>
+#include <cstring>
 #include <zlib.h>
+#include <spdlog/spdlog.h>
 #endif
 
 using namespace syncspirit::utils;
+
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+
+struct handle_guard_t {
+    handle_guard_t() = default;
+    handle_guard_t(HANDLE handle_) noexcept : handle{handle_} {}
+    ~handle_guard_t() {
+        if (handle != INVALID_HANDLE_VALUE) {
+            CloseHandle(handle);
+        }
+    }
+
+    handle_guard_t &operator=(handle_guard_t &&other) noexcept {
+        std::swap(handle, other.handle);
+        return *this;
+    }
+
+    operator HANDLE() const noexcept { return handle; }
+    operator bool() const noexcept { return handle != INVALID_HANDLE_VALUE; }
+
+    HANDLE handle{INVALID_HANDLE_VALUE};
+};
+
+static handle_guard_t open_dump_file() {
+    return CreateFileA("crash_dump.txt", FILE_APPEND_DATA, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_ALWAYS,
+                       FILE_ATTRIBUTE_NORMAL, nullptr);
+}
+
+static void safe_write(const char *s) {
+    HANDLE h = CreateFileA("crash_dump.txt", FILE_APPEND_DATA, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_ALWAYS,
+                           FILE_ATTRIBUTE_NORMAL, NULL);
+    if (h == INVALID_HANDLE_VALUE)
+        return;
+    DWORD written = 0;
+    WriteFile(h, s, (DWORD)strlen(s), &written, NULL);
+    CloseHandle(h);
+}
+
+static void dump_traces(EXCEPTION_POINTERS *ep) {
+    auto ctx = ep->ContextRecord;
+    auto process = GetCurrentProcess();
+    auto thread = GetCurrentThread();
+    auto file = open_dump_file();
+    if (!file) {
+        return;
+    }
+
+    STACKFRAME64 frame;
+    memset(&frame, 0, sizeof(frame));
+#if defined(_M_X64) || defined(__x86_64__)
+    DWORD machine = IMAGE_FILE_MACHINE_AMD64;
+    frame.AddrPC.Offset = ctx->Rip;
+    frame.AddrPC.Mode = AddrModeFlat;
+    frame.AddrFrame.Offset = ctx->Rbp;
+    frame.AddrFrame.Mode = AddrModeFlat;
+    frame.AddrStack.Offset = ctx->Rsp;
+    frame.AddrStack.Mode = AddrModeFlat;
+#else
+    DWORD machine = IMAGE_FILE_MACHINE_I386;
+    frame.AddrPC.Offset = ctx->Eip;
+    frame.AddrPC.Mode = AddrModeFlat;
+    frame.AddrFrame.Offset = ctx->Ebp;
+    frame.AddrFrame.Mode = AddrModeFlat;
+    frame.AddrStack.Offset = ctx->Esp;
+    frame.AddrStack.Mode = AddrModeFlat;
+#endif
+
+    int frame_idx = 0;
+    while (true) {
+        auto ok = StackWalk64(machine, process, thread, &frame, ctx, NULL, SymFunctionTableAccess64, SymGetModuleBase64,
+                              NULL);
+        if (!ok || frame.AddrPC.Offset == 0) {
+            return;
+        }
+
+        char sym_buff[sizeof(SYMBOL_INFO) + 512] = {0};
+        auto sym_info = (PSYMBOL_INFO)sym_buff;
+        sym_info->SizeOfStruct = sizeof(SYMBOL_INFO);
+        sym_info->MaxNameLen = 512;
+
+        auto module_base = SymGetModuleBase64(process, frame.AddrPC.Offset);
+        auto module_name = std::string_view("unknown module");
+        auto symbol_name = std::string_view("unknown symbol");
+        auto symbol_offset = DWORD64{0};
+
+        auto module_info = IMAGEHLP_MODULE64{};
+        std::memset(&module_info, 0, sizeof(module_info));
+        module_info.SizeOfStruct = sizeof(module_info);
+
+        if (module_base && SymGetModuleInfo64(process, module_base, &module_info)) {
+            module_name = module_info.ModuleName;
+        }
+
+        if (SymFromAddr(process, frame.AddrPC.Offset, &symbol_offset, sym_info)) {
+            symbol_name = sym_info->Name;
+        } else if (module_base) {
+            symbol_offset = (DWORD64)(frame.AddrPC.Offset - module_base);
+        } else {
+            symbol_offset = 0;
+        }
+
+        char buff[512];
+        auto out_bytes =
+            snprintf(buff, sizeof(buff), "(#%d) %p %s(0x%p) %s + 0x%llx\n", frame_idx++, (void *)frame.AddrPC.Offset,
+                     module_name.data(), (void *)module_base, symbol_name.data(), symbol_offset);
+
+        DWORD written = 0;
+        WriteFile(file, buff, out_bytes, &written, {});
+        (void)written;
+    }
+}
+
+static LONG WINAPI seh_handler(EXCEPTION_POINTERS *ep) {
+    dump_traces(ep);
+
+    return EXCEPTION_EXECUTE_HANDLER;
+}
+#endif
 
 bool platform_t::startup() {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
@@ -22,6 +143,14 @@ bool platform_t::startup() {
     if (err != 0) {
         return false;
     }
+
+    SymSetOptions(SYMOPT_DEFERRED_LOADS | SYMOPT_UNDNAME | SYMOPT_LOAD_LINES);
+
+    if (!SymInitialize(GetCurrentProcess(), NULL, TRUE)) {
+        return EXCEPTION_EXECUTE_HANDLER;
+    }
+
+    SetUnhandledExceptionFilter(seh_handler);
 #endif
     return true;
 }
