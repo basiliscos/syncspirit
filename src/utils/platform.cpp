@@ -8,6 +8,7 @@
 #include <cstring>
 #include <zlib.h>
 #include <spdlog/spdlog.h>
+#include <cxxabi.h>
 #endif
 
 using namespace syncspirit::utils;
@@ -105,7 +106,29 @@ static void dump_traces(EXCEPTION_POINTERS *ep) {
         }
 
         if (SymFromAddr(process, frame.AddrPC.Offset, &symbol_offset, sym_info)) {
-            symbol_name = sym_info->Name;
+            char buff[512];
+            auto ptr = sym_info->Name;
+            if (*ptr != '_') {
+                --ptr;
+                *ptr = '_';
+            }
+
+            int status;
+            auto sz = size_t{0};
+            auto result = abi::__cxa_demangle(ptr, buff, &sz, &status);
+            if (result) {
+                std::memcpy(sym_buff, result, sz);
+                symbol_name = std::string_view(sym_buff, sz);
+            } else {
+                ptr++;
+                result = abi::__cxa_demangle(ptr, buff, &sz, &status);
+            }
+            if (result) {
+                std::memcpy(sym_buff, result, sz);
+                symbol_name = std::string_view(sym_buff, sz);
+            } else {
+                symbol_name = sym_info->Name;
+            }
         } else if (module_base) {
             symbol_offset = (DWORD64)(frame.AddrPC.Offset - module_base);
         } else {
