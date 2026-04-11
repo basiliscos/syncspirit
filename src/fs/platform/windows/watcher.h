@@ -24,7 +24,7 @@ struct SYNCSPIRIT_API watcher_t : watcher_base_t {
         path_guard_t(std::string folder_id, io_guard_t dir_guard, io_guard_t event_guard) noexcept;
         sys::error_code initiate() noexcept;
 
-        char buff[BUFF_SZ];
+        alignas(DWORD) char buff[BUFF_SZ];
         std::string folder_id;
         OVERLAPPED overlapped;
         io_guard_t dir_guard;

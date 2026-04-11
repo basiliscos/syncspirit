@@ -123,7 +123,7 @@ void file_actor_t::on_io_commands(message::io_commands_t &message) noexcept {
 }
 
 void file_actor_t::on_retension_finish(r::request_id_t, bool cancelled) noexcept {
-    LOG_TRACE(log, "on_retension_finish");
+    LOG_TRACE(log, "on_retension_finish ({} ms)", retension.total_milliseconds());
     expiration_timer.reset();
     if (!cancelled) {
         auto do_respawn = updates_mediator->clean_expired();

@@ -165,11 +165,13 @@ void watcher_t::on_notify(handle_t handle) noexcept {
         auto storage_ptr = storage;
         auto sz = ptr->FileNameLength / sizeof(WCHAR);
         auto namew_ptr = ptr->FileName;
-        for (auto p = namew_ptr, e = namew_ptr + sz + 1; p != e; ++p) {
+
+        for (auto p = namew_ptr, e = namew_ptr + sz; p != e; ++p) {
             if (*p == L'\\') {
-                *p = '/';
+                *p = L'/';
             }
         }
+
         auto name_holder = std::string();
         auto name_view = std::string_view();
         if (narrow(storage_ptr, sizeof(storage), namew_ptr, namew_ptr + sz)) {

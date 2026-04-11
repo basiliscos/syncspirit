@@ -272,6 +272,7 @@ void watcher_base_t::push(const timepoint_t &deadline, std::string_view folder_i
         target = &next;
     } else if (next.deadline.is_not_a_date_time()) {
         target = &next;
+        LOG_DEBUG(log, "starting retension timer...");
         start_timer(retension, *this, &watcher_base_t::on_retension_finish);
     } else {
         source = &next;
@@ -288,7 +289,7 @@ void watcher_base_t::push(const timepoint_t &deadline, std::string_view folder_i
 }
 
 void watcher_base_t::on_retension_finish(r::request_id_t, bool cancelled) noexcept {
-    LOG_TRACE(log, "on_retension_finish");
+    LOG_TRACE(log, "on_retension_finish ({} ms)", retension.total_milliseconds());
     if (!cancelled) {
         auto opt = next.make(*watched_folders, *updates_mediator);
         if (opt) {
