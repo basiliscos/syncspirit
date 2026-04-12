@@ -40,6 +40,8 @@ struct SYNCSPIRIT_API watcher_t : watcher_base_t {
     void shutdown_finish() noexcept override;
     void on_watch(message::watch_folder_t &) noexcept override;
     void on_unwatch(message::unwatch_folder_t &) noexcept override;
+    bool accept_update(const support::file_update_t &, const bfs::file_status &) noexcept override;
+
     void on_notify(handle_t handle) noexcept;
 
     handle_map_t handle_map;

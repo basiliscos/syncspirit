@@ -85,6 +85,7 @@ struct fixture_t {
     fixture_t(bool auto_launch_ = true) noexcept
         : auto_launch{auto_launch_}, root_path{unique_path()}, path_guard{root_path} {
         bfs::create_directory(root_path);
+        log = utils::get_logger("fixture");
     }
 
     void run() noexcept {
@@ -104,6 +105,7 @@ struct fixture_t {
             REQUIRE(static_cast<r::actor_base_t *>(target.get())->access<to::state>() == r::state_t::OPERATIONAL);
         }
 
+        fs_context->update_time();
         main();
 
         sup->do_process();
@@ -157,6 +159,7 @@ struct fixture_t {
             auto prev_sz = changes.size();
             auto has_events = fs_context->wait_next_event();
             fs_context->update_time();
+            LOG_TRACE(log, "updating time... already has {} changes", changes.size());
             sup->do_process();
             auto wait_next = (changes.size() < await_changes) || (!has_events && poll_type == poll_t::trigger_timer);
             if (wait_next) {
@@ -201,6 +204,7 @@ struct fixture_t {
     change_messages_t changes;
     size_t watched_replies = 0;
     size_t unwatched_replies = 0;
+    utils::logger_t log;
 };
 
 void supervisor_t::on_watch(message::watch_folder_t &msg) noexcept { fixture->on_watch(msg); }
@@ -504,6 +508,16 @@ struct fixture_real_t : fixture_t {
                      .finish();
         sup->do_process();
     }
+
+    void watch_folder(std::string_view folder_id, const bfs::path &folder_path = {}) noexcept {
+        auto watched_path = folder_path.empty() ? root_path : folder_path;
+        auto back_addr = sup->get_address();
+        sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, watched_path, folder_id);
+        sup->do_process();
+        REQUIRE(watched_replies == 1);
+        LOG_TRACE(log, "folder is being watched on '{}', updating time...", narrow(watched_path.wstring()));
+        fs_context->update_time();
+    }
 };
 
 void test_start_n_shutdown() {
@@ -582,9 +596,7 @@ void test_real_impl() {
             auto folder_id = std::string("my-folder-id");
             auto back_addr = sup->get_address();
             SECTION("(create) new dir") {
-                sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id);
-                sup->do_process();
-                REQUIRE(watched_replies == 1);
+                watch_folder(folder_id);
 
                 auto path = root_path / "my-dir";
                 bfs::create_directories(path);
@@ -603,9 +615,7 @@ void test_real_impl() {
                 CHECK(file_change.update_reason == update_type_t::created);
             }
             SECTION("(create with recursion) new dir + new file") {
-                sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id);
-                sup->do_process();
-                REQUIRE(watched_replies == 1);
+                watch_folder(folder_id);
 
                 auto path_dir = root_path / "my-dir";
                 bfs::create_directories(path_dir);
@@ -645,9 +655,7 @@ void test_real_impl() {
                 auto path = root_path / "my-file";
                 write_file(path, "12345");
 
-                sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id);
-                sup->do_process();
-                REQUIRE(watched_replies == 1);
+                watch_folder(folder_id);
 
                 write_file(path, "123456");
 
@@ -668,9 +676,7 @@ void test_real_impl() {
                 auto path = root_path / "my-file";
                 write_file(path, "12345");
 
-                sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id);
-                sup->do_process();
-                REQUIRE(watched_replies == 1);
+                watch_folder(folder_id);
 
                 bfs::remove(path);
 
@@ -699,9 +705,7 @@ void test_real_impl() {
                         auto path_2 = subdir_path / L"my-file.2";
                         write_file(path_1, "12345");
 
-                        sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id);
-                        sup->do_process();
-                        REQUIRE(watched_replies == 1);
+                        watch_folder(folder_id);
 
                         native::rename(path_1, path_2);
 
@@ -760,9 +764,7 @@ void test_real_impl() {
                         auto path_2 = subdir_path / L"папка2";
                         bfs::create_directories(path_1);
 
-                        sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id);
-                        sup->do_process();
-                        REQUIRE(watched_replies == 1);
+                        watch_folder(folder_id);
 
                         native::rename(path_1, path_2);
 
@@ -821,10 +823,7 @@ void test_real_impl() {
                         auto path_2 = root_path / L"my-file.2";
                         write_file(path_1, "12345");
 
-                        sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, subdir_path,
-                                                                folder_id);
-                        sup->do_process();
-                        REQUIRE(watched_replies == 1);
+                        watch_folder(folder_id, subdir_path);
 
                         native::rename(path_1, path_2);
 
@@ -848,10 +847,7 @@ void test_real_impl() {
                         auto path_2 = x_path / L"my-file.2";
                         write_file(path_1, "12345");
 
-                        sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, subdir_path,
-                                                                folder_id);
-                        sup->do_process();
-                        REQUIRE(watched_replies == 1);
+                        watch_folder(folder_id, subdir_path);
 
                         native::rename(path_1, path_2);
 
@@ -876,10 +872,7 @@ void test_real_impl() {
                         auto path_2 = x_path / L"my-file.2";
                         write_file(path_1, "12345");
 
-                        sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, subdir_path,
-                                                                folder_id);
-                        sup->do_process();
-                        REQUIRE(watched_replies == 1);
+                        watch_folder(folder_id, subdir_path);
 
                         native::rename(path_1, path_2);
 
@@ -941,9 +934,7 @@ void test_real_impl() {
                 write_file(path, "12345");
                 bfs::permissions(path, bfs::perms::owner_read);
 
-                sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id);
-                sup->do_process();
-                REQUIRE(watched_replies == 1);
+                watch_folder(folder_id);
 
                 bfs::permissions(path, bfs::perms::owner_write);
                 await_events(poll_t::trigger_timer, 1);
@@ -965,9 +956,7 @@ void test_real_impl() {
                 auto link_target_2 = std::string_view("/some/where/2");
                 bfs::create_symlink(bfs::path(link_target_1), path);
 
-                sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id);
-                sup->do_process();
-                REQUIRE(watched_replies == 1);
+                watch_folder(folder_id);
 
                 bfs::remove(path);
                 bfs::create_symlink(bfs::path(link_target_2), path);
@@ -1006,9 +995,7 @@ void test_hierarchies() {
                     bfs::create_directories(path_2);
                     write_file(path_1, "12345");
 
-                    sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id);
-                    sup->do_process();
-                    REQUIRE(watched_replies == 1);
+                    watch_folder(folder_id);
 
                     auto names = names_t({L"a", L"a/b", L"x", L"x/y", L"x/y/файл.bin"});
                     SECTION("remove files individually") {
@@ -1044,9 +1031,7 @@ void test_hierarchies() {
             }
             SECTION("create hierarchy") {
                 if (!test::wine_environment()) {
-                    sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id);
-                    sup->do_process();
-                    REQUIRE(watched_replies == 1);
+                    watch_folder(folder_id);
 
                     auto names = names_t({L"a", L"a/b", L"x", L"x/y", L"x/y/z"});
                     for (auto it = names.rbegin(); it != names.rend(); ++it) {
@@ -1067,6 +1052,7 @@ void test_hierarchies() {
                         REQUIRE(payload.size() == 1);
                         auto &file_change = payload[0].file_changes.front();
                         auto &name = names[i];
+                        LOG_DEBUG(log, "i = {}", i);
                         CHECK(proto::get_name(file_change) == narrow(names[i]));
                         CHECK(file_change.update_reason == update_type_t::created);
                     }
@@ -1092,9 +1078,7 @@ void test_hierarchies() {
                         }
                     }
 
-                    sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id);
-                    sup->do_process();
-                    REQUIRE(watched_replies == 1);
+                    watch_folder(folder_id);
 
                     native::rename(dir_1, dir_2);
 
@@ -1153,9 +1137,7 @@ void test_create_modify_rename() {
         void main() noexcept override {
             auto folder_id = std::string("my-folder-id");
             auto back_addr = sup->get_address();
-            sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id);
-            sup->do_process();
-            REQUIRE(watched_replies == 1);
+            watch_folder(folder_id);
 #ifndef SYNCSPIRIT_WIN
             auto path_file_tmp = root_path / L"файл.bin-tmp";
             auto path_file_final = root_path / L"файл.bin";
@@ -1181,9 +1163,7 @@ void test_manual_notification() {
 
             auto folder_id = std::string("my-folder-id");
             auto back_addr = sup->get_address();
-            sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id);
-            sup->do_process();
-            REQUIRE(watched_replies == 1);
+            watch_folder(folder_id);
 
             auto make_child = [](bfs::path path, bfs::file_type type = bfs::file_type::directory) -> child_info_t {
                 auto child = child_info_t{};
@@ -1276,9 +1256,7 @@ void test_kqueue() {
             write_file(root_path / "ex-file", "12345");
             bfs::create_symlink(root_path / "ex-target", root_path / "ex-link");
 
-            sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id);
-            sup->do_process();
-            REQUIRE(watched_replies == 1);
+            watch_folder(folder_id);
             auto w = static_cast<fs::platform::unix::watcher_t *>(target.get());
 
             SECTION("metadata (vnode/dir) events") {

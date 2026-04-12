@@ -218,4 +218,11 @@ void watcher_t::on_notify(handle_t handle) noexcept {
     }
 }
 
+bool watcher_t::accept_update(const support::file_update_t &update, const bfs::file_status &status) noexcept {
+    if (update.update_type == update_type::CONTENT && status.type() == bfs::file_type::directory) {
+        return false;
+    }
+    return true;
+}
+
 #endif

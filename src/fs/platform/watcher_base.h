@@ -58,7 +58,7 @@ struct SYNCSPIRIT_API watcher_base_t : r::actor_base_t {
 
         bool update(std::string_view relative_path, update_type_t type, folder_update_t *prev,
                     std::string prev_path_rel) noexcept;
-        auto make(const folder_info_t &folder_info, updates_mediator_t &mediator) noexcept -> payload::file_changes_t;
+        auto make(const folder_info_t &folder_info, watcher_base_t &actor) noexcept -> payload::file_changes_t;
     };
     using folder_updates_t = std::vector<folder_update_t>;
     using clock_t = r::pt::microsec_clock;
@@ -70,7 +70,7 @@ struct SYNCSPIRIT_API watcher_base_t : r::actor_base_t {
         folder_updates_t updates;
         folder_update_t &prepare(std::string_view folder_id) noexcept;
         folder_update_t *find(std::string_view folder_id) noexcept;
-        folder_changes_opt_t make(const watched_folders_t &watched_folders, updates_mediator_t &mediator) noexcept;
+        folder_changes_opt_t make(const watched_folders_t &watched_folders, watcher_base_t &) noexcept;
         bool has_changes() const noexcept;
     };
 
@@ -80,6 +80,7 @@ struct SYNCSPIRIT_API watcher_base_t : r::actor_base_t {
     virtual void on_watch(message::watch_folder_t &) noexcept;
     virtual void on_unwatch(message::unwatch_folder_t &) noexcept;
     virtual void notify(const fs::task::scan_dir_t &) noexcept;
+    virtual bool accept_update(const support::file_update_t &, const bfs::file_status &) noexcept;
 
     void on_retension_finish(r::request_id_t, bool cancelled) noexcept;
     void push(const timepoint_t &deadline, std::string_view folder_id, std::string_view relative_path,

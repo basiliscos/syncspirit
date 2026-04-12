@@ -276,7 +276,7 @@ void test_fs() {
             auto long_name = "2026_Project_Report_Sales_Analysis_Financial_Quarter_One_Overview_Data_Insights_and_"
                              "Strategies_v1.0.pdf";
             bfs::create_directories(root_path / "a/xx");
-            await_events(2);
+            await_events(3);
             auto dir_1 = local_files->by_name("a/xx");
             REQUIRE(dir_1);
 

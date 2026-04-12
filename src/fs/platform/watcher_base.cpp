@@ -46,12 +46,12 @@ bool BU::has_changes() const noexcept {
     return false;
 }
 
-auto BU::make(const watched_folders_t &watched_folders, updates_mediator_t &mediator) noexcept -> folder_changes_opt_t {
+auto BU::make(const watched_folders_t &watched_folders, watcher_base_t &actor) noexcept -> folder_changes_opt_t {
     if (!deadline.is_not_a_date_time()) {
         auto r = payload::folder_changes_t();
         for (auto &fi : updates) {
             auto &folder_path = watched_folders.at(fi.folder_id);
-            auto file_changes = fi.make(folder_path, mediator);
+            auto file_changes = fi.make(folder_path, actor);
             if (!file_changes.empty()) {
                 auto change = payload::folder_change_t(std::move(fi.folder_id), std::move(file_changes));
                 r.emplace_back(std::move(change));
@@ -136,13 +136,14 @@ bool FU::update(std::string_view relative_path, update_type_t type, folder_updat
     return recorded;
 }
 
-auto FU::make(const folder_info_t &folder_info, updates_mediator_t &mediator) noexcept -> payload::file_changes_t {
+auto FU::make(const folder_info_t &folder_info, watcher_base_t &actor) noexcept -> payload::file_changes_t {
     namespace ut = update_type;
     using UT = update_type_t;
     using FT = bfs::file_type;
     static const size_t SS_PATH_MAX = 32 * 1024;
 
     auto files = payload::file_changes_t();
+    auto &mediator = *actor.updates_mediator;
     files.reserve(updates.size());
     auto log = utils::get_logger(actor_identity);
     char full_path[SS_PATH_MAX];
@@ -185,6 +186,10 @@ auto FU::make(const folder_info_t &folder_info, updates_mediator_t &mediator) no
             auto status = bfs::symlink_status(path, ec);
             if (ec) {
                 LOG_DEBUG(log, "cannot get status on '{}': {} (update ignored)", full_name, ec.message());
+                continue;
+            }
+            if (!actor.accept_update(update, status)) {
+                LOG_TRACE(log, "skipping update on {}", full_name);
                 continue;
             }
             proto::set_permissions(r, static_cast<uint32_t>(status.permissions()));
@@ -291,7 +296,7 @@ void watcher_base_t::push(const timepoint_t &deadline, std::string_view folder_i
 void watcher_base_t::on_retension_finish(r::request_id_t, bool cancelled) noexcept {
     LOG_TRACE(log, "on_retension_finish ({} ms)", retension.total_milliseconds());
     if (!cancelled) {
-        auto opt = next.make(*watched_folders, *updates_mediator);
+        auto opt = next.make(*watched_folders, *this);
         if (opt) {
             LOG_DEBUG(log, "sending changes");
             send<payload::folder_changes_t>(coordinator, std::move(opt).value());
@@ -304,5 +309,7 @@ void watcher_base_t::on_retension_finish(r::request_id_t, bool cancelled) noexce
         }
     }
 }
+
+bool watcher_base_t::accept_update(const support::file_update_t &, const bfs::file_status &) noexcept { return true; }
 
 void watcher_base_t::notify(const fs::task::scan_dir_t &) noexcept {}
