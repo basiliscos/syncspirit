@@ -597,13 +597,13 @@ void test_real_impl() {
         void main() noexcept override {
             auto folder_id = std::string("my-folder-id");
             auto back_addr = sup->get_address();
-#ifndef SYNCSPIRIT_WIN
-            auto expected_refinement = true;
-#else
-            auto expected_refinement = false;
-#endif
 
             SECTION("(create) new dir") {
+#ifndef SYNCSPIRIT_WIN
+                auto expected_refinement = true;
+#else
+                auto expected_refinement = false;
+#endif
                 watch_folder(folder_id);
 
                 auto path = root_path / "my-dir";
@@ -625,6 +625,11 @@ void test_real_impl() {
             }
             SECTION("(create with recursion) new dir + new file") {
                 watch_folder(folder_id);
+#ifndef SYNCSPIRIT_WIN
+                auto expected_refinement = true;
+#else
+                auto expected_refinement = false;
+#endif
 
                 auto path_dir = root_path / "my-dir";
                 bfs::create_directories(path_dir);
@@ -681,6 +686,7 @@ void test_real_impl() {
                 CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
                 CHECK(proto::get_permissions(file_change));
                 CHECK(file_change.update_reason == update_type_t::content);
+                CHECK(!file_change.requires_refinement);
             }
             SECTION("(delete) single file") {
                 auto path = root_path / "my-file";
@@ -701,6 +707,7 @@ void test_real_impl() {
                 CHECK(proto::get_size(file_change) == 0);
                 CHECK(proto::get_deleted(file_change));
                 CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
+                CHECK(!file_change.requires_refinement);
                 CHECK(file_change.update_reason == update_type_t::deleted);
             }
             SECTION("move") {
@@ -959,6 +966,7 @@ void test_real_impl() {
                 CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
                 CHECK(proto::get_permissions(file_change));
                 CHECK(file_change.update_reason == update_type_t::meta);
+                CHECK(!file_change.requires_refinement);
             }
             SECTION("(delete + create) symlink target change") {
                 auto path = root_path / "my-file";
@@ -982,6 +990,7 @@ void test_real_impl() {
                 CHECK(proto::get_size(file_change) == 0);
                 CHECK(proto::get_type(file_change) == proto::FileInfoType::SYMLINK);
                 CHECK(proto::get_symlink_target(file_change) == link_target_2);
+                CHECK(!file_change.requires_refinement);
             }
 #endif
         }
