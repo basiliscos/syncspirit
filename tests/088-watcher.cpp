@@ -237,8 +237,9 @@ void test_watcher_base() {
                 SECTION("dir") {
                     auto own_name = bfs::path(L"папка");
                     auto sub_path = root_path / own_name;
+                    auto requires_refinement = GENERATE(true, false);
                     bfs::create_directories(sub_path);
-                    target->push(deadline, folder_id, narrow(own_name.wstring()), {}, U::created);
+                    target->push(deadline, folder_id, narrow(own_name.wstring()), {}, U::created, requires_refinement);
                     await_events(poll_t::single, 1);
                     auto &payload = changes.front()->payload;
                     REQUIRE(payload.size() == 1);
@@ -250,12 +251,13 @@ void test_watcher_base() {
                     CHECK(proto::get_size(file_change) == 0);
                     CHECK(proto::get_type(file_change) == proto::FileInfoType::DIRECTORY);
                     CHECK(proto::get_permissions(file_change));
+                    CHECK(file_change.requires_refinement == requires_refinement);
                 }
                 SECTION("file") {
                     auto own_name = bfs::path(L"файл.bin");
                     auto sub_path = root_path / own_name;
                     write_file(sub_path, "12345");
-                    target->push(deadline, folder_id, narrow(own_name.wstring()), {}, U::created);
+                    target->push(deadline, folder_id, narrow(own_name.wstring()), {}, U::created, false);
                     await_events(poll_t::single, 1);
                     auto &payload = changes.front()->payload;
                     REQUIRE(payload.size() == 1);
@@ -274,7 +276,7 @@ void test_watcher_base() {
                     auto sub_path = root_path / own_name;
                     auto where = bfs::path("/to/some/where");
                     bfs::create_symlink(where, sub_path);
-                    target->push(deadline, folder_id, narrow(own_name.wstring()), {}, U::created);
+                    target->push(deadline, folder_id, narrow(own_name.wstring()), {}, U::created, false);
                     await_events(poll_t::single, 1);
                     auto &payload = changes.front()->payload;
                     REQUIRE(payload.size() == 1);
@@ -297,7 +299,7 @@ void test_watcher_base() {
                 auto sub_path_2 = root_path / name_2;
                 auto path_2_str = narrow(sub_path_2.generic_wstring());
                 write_file(sub_path_1, "12345");
-                target->push(deadline, folder_id, narrow(name_1.wstring()), path_2_str, U::meta);
+                target->push(deadline, folder_id, narrow(name_1.wstring()), path_2_str, U::meta, false);
                 await_events(poll_t::single, 1);
                 auto &payload = changes.front()->payload;
                 REQUIRE(payload.size() == 1);
@@ -318,8 +320,8 @@ void test_watcher_base() {
                     auto own_name = bfs::path(L"файл.bin");
                     auto sub_path = root_path / own_name;
                     write_file(sub_path, "12345");
-                    target->push(deadline, folder_id, narrow(own_name.wstring()), {}, U::created);
-                    target->push(deadline_2, folder_id, narrow(own_name.wstring()), {}, U::content);
+                    target->push(deadline, folder_id, narrow(own_name.wstring()), {}, U::created, false);
+                    target->push(deadline_2, folder_id, narrow(own_name.wstring()), {}, U::content, false);
 
                     await_events(poll_t::single);
                     REQUIRE(changes.size() == 0);
@@ -342,8 +344,8 @@ void test_watcher_base() {
                     auto own_name = bfs::path(L"файл.bin");
                     auto sub_path = root_path / own_name;
                     write_file(sub_path, "12345");
-                    target->push(deadline, folder_id, narrow(own_name.wstring()), {}, U::created);
-                    target->push(deadline_2, folder_id, narrow(own_name.wstring()), {}, U::deleted);
+                    target->push(deadline, folder_id, narrow(own_name.wstring()), {}, U::created, false);
+                    target->push(deadline_2, folder_id, narrow(own_name.wstring()), {}, U::deleted, false);
                     await_events(poll_t::trigger_timer);
                     REQUIRE(changes.size() == 0);
                 }
@@ -351,8 +353,8 @@ void test_watcher_base() {
                     auto own_name = bfs::path(L"файл.bin");
                     auto sub_path = root_path / own_name;
                     write_file(sub_path, "12345");
-                    target->push(deadline, folder_id, narrow(own_name.wstring()), {}, U::content);
-                    target->push(deadline_2, folder_id, narrow(own_name.wstring()), {}, U::meta);
+                    target->push(deadline, folder_id, narrow(own_name.wstring()), {}, U::content, false);
+                    target->push(deadline_2, folder_id, narrow(own_name.wstring()), {}, U::meta, false);
 
                     await_events(poll_t::trigger_timer, 1);
 
@@ -374,9 +376,9 @@ void test_watcher_base() {
                     auto name_1_str = narrow(name_1.generic_wstring());
                     auto name_2_str = narrow(name_2.generic_wstring());
                     write_file(root_path / name_2, "12345");
-                    target->push(deadline, folder_id, name_2_str, name_1_str, U::meta);
-                    target->push(deadline_2, folder_id, name_2_str, {}, U::content);
-                    target->push(deadline_2, folder_id, name_2_str, {}, U::meta);
+                    target->push(deadline, folder_id, name_2_str, name_1_str, U::meta, false);
+                    target->push(deadline_2, folder_id, name_2_str, {}, U::content, false);
+                    target->push(deadline_2, folder_id, name_2_str, {}, U::meta, false);
 
                     await_events(poll_t::trigger_timer, 2, true);
 
@@ -409,8 +411,8 @@ void test_watcher_base() {
                     auto name_2 = bfs::path(L"файл-2.bin");
                     auto name_1_str = narrow(name_1.generic_wstring());
                     auto name_2_str = narrow(name_2.generic_wstring());
-                    target->push(deadline, folder_id, name_2_str, name_1_str, U::meta);
-                    target->push(deadline_2, folder_id, name_2_str, {}, U::deleted);
+                    target->push(deadline, folder_id, name_2_str, name_1_str, U::meta, false);
+                    target->push(deadline_2, folder_id, name_2_str, {}, U::deleted, false);
 
                     await_events(poll_t::trigger_timer, 1);
 
@@ -435,8 +437,8 @@ void test_watcher_base() {
                     auto name_2_str = narrow(name_2.generic_wstring());
                     auto name_3_str = narrow(name_3.generic_wstring());
                     write_file(root_path / name_3, "12345");
-                    target->push(deadline, folder_id, name_2_str, name_1_str, U::meta);
-                    target->push(deadline_2, folder_id, name_3_str, name_2_str, U::meta);
+                    target->push(deadline, folder_id, name_2_str, name_1_str, U::meta, false);
+                    target->push(deadline_2, folder_id, name_3_str, name_2_str, U::meta, false);
 
                     await_events(poll_t::trigger_timer);
 
@@ -459,8 +461,8 @@ void test_watcher_base() {
                     auto name_1_str = narrow(name_1.generic_wstring());
                     auto name_2_str = narrow(name_2.generic_wstring());
                     write_file(root_path / name_1, "12345");
-                    target->push(deadline, folder_id, name_2_str, name_1_str, U::meta);
-                    target->push(deadline_2, folder_id, name_1_str, name_2_str, U::meta);
+                    target->push(deadline, folder_id, name_2_str, name_1_str, U::meta, false);
+                    target->push(deadline_2, folder_id, name_1_str, name_2_str, U::meta, false);
                     await_events(poll_t::trigger_timer);
                     REQUIRE(changes.size() == 0);
                 }
@@ -472,11 +474,11 @@ void test_watcher_base() {
                 updates_mediator->enable(true);
                 updates_mediator->mask(sub_path, {}, deadline);
 
-                target->push(deadline, folder_id, narrow(own_name.wstring()), {}, U::created);
+                target->push(deadline, folder_id, narrow(own_name.wstring()), {}, U::created, false);
                 await_events(poll_t::single);
                 REQUIRE(changes.size() == 0);
 
-                target->push(deadline, folder_id, narrow(own_name.wstring()), {}, U::created);
+                target->push(deadline, folder_id, narrow(own_name.wstring()), {}, U::created, false);
                 await_events(poll_t::single);
                 REQUIRE(changes.size() == 1);
 
@@ -595,6 +597,12 @@ void test_real_impl() {
         void main() noexcept override {
             auto folder_id = std::string("my-folder-id");
             auto back_addr = sup->get_address();
+#ifndef SYNCSPIRIT_WIN
+            auto expected_refinement = true;
+#else
+            auto expected_refinement = false;
+#endif
+
             SECTION("(create) new dir") {
                 watch_folder(folder_id);
 
@@ -613,6 +621,7 @@ void test_real_impl() {
                 CHECK(proto::get_type(file_change) == proto::FileInfoType::DIRECTORY);
                 CHECK(proto::get_permissions(file_change));
                 CHECK(file_change.update_reason == update_type_t::created);
+                CHECK(file_change.requires_refinement == expected_refinement);
             }
             SECTION("(create with recursion) new dir + new file") {
                 watch_folder(folder_id);
@@ -631,6 +640,7 @@ void test_real_impl() {
                     CHECK(proto::get_size(file_change) == 0);
                     CHECK(proto::get_type(file_change) == proto::FileInfoType::DIRECTORY);
                     CHECK(proto::get_permissions(file_change));
+                    CHECK(file_change.requires_refinement == expected_refinement);
                     changes.clear();
                 }
 

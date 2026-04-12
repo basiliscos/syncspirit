@@ -408,8 +408,8 @@ struct folder_fixture_t : fixture_t {
     }
     void expect_dir_scan_error(sys::error_code ec) noexcept { dir_children.emplace_back(std::move(ec)); }
 
-    void make_update(proto::FileInfo info, fs::update_type_t update_type, bool process = true) noexcept {
-        auto change = fs::payload::file_info_t(std::move(info), {}, update_type);
+    void mk_update(proto::FileInfo info, fs::update_type_t update_type, bool refine, bool process = true) noexcept {
+        auto change = fs::payload::file_info_t(std::move(info), {}, update_type, refine);
         auto changes = fs::payload::file_changes_t{{std::move(change)}};
         auto folder_change = fs::payload::folder_change_t{folder_id, std::move(changes)};
         auto folder_changes = fs::payload::folder_changes_t{{std::move(folder_change)}};
@@ -423,7 +423,7 @@ struct folder_fixture_t : fixture_t {
     }
 
     void make_update_rename(proto::FileInfo info, std::string_view prev_name, bool process = true) noexcept {
-        auto change = fs::payload::file_info_t(std::move(info), std::string(prev_name), fs::update_type_t::meta);
+        auto change = fs::payload::file_info_t(std::move(info), std::string(prev_name), fs::update_type_t::meta, false);
         auto changes = fs::payload::file_changes_t{{std::move(change)}};
         auto folder_change = fs::payload::folder_change_t{folder_id, std::move(changes)};
         auto folder_changes = fs::payload::folder_changes_t{{std::move(folder_change)}};
@@ -468,7 +468,7 @@ void test_trivial_changes() {
                 if (file_type == FT::DIRECTORY) {
                     expect_dir_scan({});
                 }
-                make_update(file, fs::update_type_t::created);
+                mk_update(file, fs::update_type_t::created, file_type == FT::DIRECTORY);
 
                 CHECK(files_local->size() == 1);
                 auto f = files_local->by_name(file_name);
@@ -504,14 +504,14 @@ void test_trivial_changes() {
                 SECTION("update metadata") {
                     proto::set_permissions(file, 0777);
                     update_type = fs::update_type_t::meta;
-                    make_update(file, update_type);
+                    mk_update(file, update_type, false);
                     CHECK(f->get_permissions() == 0777);
                     CHECK(!f->is_deleted());
                 }
                 SECTION("delete file") {
                     proto::set_deleted(file, true);
                     update_type = fs::update_type_t::deleted;
-                    make_update(file, update_type);
+                    mk_update(file, update_type, false);
                     CHECK(f->get_permissions() == 0123);
                     CHECK(f->is_deleted());
                 }
@@ -520,7 +520,7 @@ void test_trivial_changes() {
                 CHECK(file_seq_2 > file_seq);
                 CHECK(folder_seq_2 > folder_seq);
 
-                make_update(file, update_type);
+                mk_update(file, update_type, false);
                 CHECK(f->get_sequence() == file_seq_2);
                 CHECK(folder_local->get_max_sequence() == folder_seq_2);
             }
@@ -557,11 +557,11 @@ void test_hashing() {
             proto::set_size(pr_file, 5);
 
             expect_bytes_hash(as_bytes("12345"));
-            SECTION("new file created") { make_update(pr_file, fs::update_type_t::created); }
+            SECTION("new file created") { mk_update(pr_file, fs::update_type_t::created, false); }
             SECTION("existing file content updated") {
                 proto::set_size(pr_file, 4);
                 builder->local_update(folder_id, pr_file).apply(*sup);
-                make_update(pr_file, fs::update_type_t::content);
+                mk_update(pr_file, fs::update_type_t::content, false);
             }
 
             auto f = files_local->by_name(file_name);
@@ -608,7 +608,7 @@ void test_skip_scan_known() {
 
             proto::set_name(pr_dir, "dir-a");
             proto::set_modified_s(pr_dir, 12346);
-            make_update(pr_dir, fs::update_type_t::content);
+            mk_update(pr_dir, fs::update_type_t::content, false);
 
             CHECK(files_local->size() == 6);
 
@@ -631,7 +631,7 @@ void test_skip_scan_known() {
             CHECK(dir_scans == 3);
 
             expect_dir_scan({make_child("/some/path/dir-a/A"), make_child("/some/path/dir-a/B")});
-            make_update(pr_dir, fs::update_type_t::content);
+            mk_update(pr_dir, fs::update_type_t::content, false);
 
             auto dir_c_new = files_local->by_name("dir-a/C");
             REQUIRE(dir_c_new);
@@ -647,7 +647,7 @@ void test_skip_scan_known() {
     F().run();
 }
 
-void test_unix_new_dir() {
+void test_new_dir_refinement() {
     struct F : folder_fixture_t {
         using parent_t = folder_fixture_t;
         using parent_t::parent_t;
@@ -661,8 +661,7 @@ void test_unix_new_dir() {
         }
 
         void main() noexcept override {
-            // auto impl = GENERATE(I::inotify, I::kqueue);
-            auto impl = GENERATE(I::kqueue);
+            auto impl = GENERATE(I::inotify, I::kqueue);
             prepare(impl);
 
             auto data = as_owned_bytes("12345");
@@ -680,7 +679,7 @@ void test_unix_new_dir() {
             expect_dir_scan({});
             expect_bytes_hash(as_bytes("12345"));
 
-            make_update(pr_dir, fs::update_type_t::created);
+            mk_update(pr_dir, fs::update_type_t::created, true);
 
             auto dir_a = files_local->by_name("dir-a");
             REQUIRE(dir_a);
@@ -715,6 +714,37 @@ void test_unix_new_dir() {
     F().run();
 }
 
+void test_new_dir_without_refinement() {
+    struct F : folder_fixture_t {
+        using parent_t = folder_fixture_t;
+        using parent_t::parent_t;
+        using child_info_t = fs::task::scan_dir_t::child_info_t;
+
+        void main() noexcept override {
+            auto impl = GENERATE(I::inotify, I::kqueue);
+            prepare(impl);
+
+            auto data = as_owned_bytes("12345");
+            auto data_h = utils::sha256_digest(data).value();
+
+            auto pr_dir = proto::FileInfo();
+            proto::set_name(pr_dir, "dir-a");
+            proto::set_permissions(pr_dir, default_perms);
+            proto::set_modified_s(pr_dir, 12345);
+            proto::set_type(pr_dir, FT::DIRECTORY);
+
+            mk_update(pr_dir, fs::update_type_t::created, false);
+
+            CHECK(files_local->size() == 1);
+            auto dir_a = files_local->by_name("dir-a");
+            REQUIRE(dir_a);
+            CHECK(dir_a->is_dir());
+            CHECK(dir_a->is_locally_available());
+        }
+    };
+    F().run();
+}
+
 void test_kqueue_changes() {
     struct F : folder_fixture_t {
         using parent_t = folder_fixture_t;
@@ -734,7 +764,7 @@ void test_kqueue_changes() {
                 expect_dir_scan({make_child("/some/path/dir-a/dir-b")});
                 expect_dir_scan({});
 
-                make_update(pr_dir, fs::update_type_t::content);
+                mk_update(pr_dir, fs::update_type_t::content, false);
 
                 auto dir_a = files_local->by_name("dir-a");
                 REQUIRE(dir_a);
@@ -773,29 +803,29 @@ void test_dir_scan_errors() {
             proto::set_modified_s(pr_dir, 12345);
             proto::set_type(pr_dir, FT::DIRECTORY);
 
-            if (impl == I::inotify) {
-                SECTION("new dir/update") {
-                    make_update(pr_dir, fs::update_type_t::created);
+            // if (impl == I::inotify) {
+            SECTION("new dir/update") {
+                mk_update(pr_dir, fs::update_type_t::created, true);
 
-                    auto dir_a = files_local->by_name("dir-a");
-                    REQUIRE(dir_a);
-                    CHECK(dir_a->is_dir());
-                    CHECK(dir_a->is_locally_available());
+                auto dir_a = files_local->by_name("dir-a");
+                REQUIRE(dir_a);
+                CHECK(dir_a->is_dir());
+                CHECK(dir_a->is_locally_available());
 
-                    auto dir_A = files_local->by_name("dir-a/A");
-                    REQUIRE(dir_A);
-                    CHECK(dir_A->is_dir());
-                    CHECK(dir_A->is_locally_available());
+                auto dir_A = files_local->by_name("dir-a/A");
+                REQUIRE(dir_A);
+                CHECK(dir_A->is_dir());
+                CHECK(dir_A->is_locally_available());
 
-                    auto dir_B = files_local->by_name("dir-a/B");
-                    CHECK(!dir_B);
+                auto dir_B = files_local->by_name("dir-a/B");
+                CHECK(!dir_B);
 
-                    auto dir_C = files_local->by_name("dir-a/C");
-                    REQUIRE(dir_C);
-                    CHECK(dir_C->is_dir());
-                    CHECK(dir_C->is_locally_available());
-                }
+                auto dir_C = files_local->by_name("dir-a/C");
+                REQUIRE(dir_C);
+                CHECK(dir_C->is_dir());
+                CHECK(dir_C->is_locally_available());
             }
+            // }
             SECTION("existing dirs") {
                 for (auto &p : {"dir-a", "dir-a/A", "dir-a/B", "dir-a/C"}) {
                     proto::set_name(pr_dir, p);
@@ -1052,17 +1082,17 @@ void test_duplicates() {
             if (file_type == FT::SYMLINK) {
                 proto::set_symlink_target(file, "/some/target");
             }
-            make_update(file, fs::update_type_t::created);
+            mk_update(file, fs::update_type_t::created, false);
 
             auto seq = folder_local->get_max_sequence();
-            make_update(file, fs::update_type_t::created);
+            mk_update(file, fs::update_type_t::created, false);
             CHECK(folder_local->get_max_sequence() == seq);
 
             proto::set_modified_s(file, 123456);
-            make_update(file, fs::update_type_t::meta);
+            mk_update(file, fs::update_type_t::meta, false);
             CHECK(folder_local->get_max_sequence() == seq + 1);
 
-            make_update(file, fs::update_type_t::meta);
+            mk_update(file, fs::update_type_t::meta, false);
             CHECK(folder_local->get_max_sequence() == seq + 1);
         }
     };
@@ -1125,7 +1155,7 @@ void test_multi_folders_update() {
                     proto::set_permissions(file, default_perms);
                     proto::set_modified_s(file, 12345);
                     proto::set_type(file, FT::DIRECTORY);
-                    auto change = fs::payload::file_info_t(file, {}, fs::update_type_t::created);
+                    auto change = fs::payload::file_info_t(file, {}, fs::update_type_t::created, true);
                     file_changes.emplace_back(std::move(change));
                 }
                 auto folder_id = std::string(c.folder_id);
@@ -1196,7 +1226,7 @@ void test_hierarchy_update_dirs_only() {
                 proto::set_permissions(file, default_perms);
                 proto::set_modified_s(file, 12345);
                 proto::set_type(file, FT::DIRECTORY);
-                auto change = fs::payload::file_info_t(file, {}, fs::update_type_t::created);
+                auto change = fs::payload::file_info_t(file, {}, fs::update_type_t::created, true);
                 file_changes.emplace_back(std::move(change));
             }
             auto folder_change = fs::payload::folder_change_t{folder_id, std::move(file_changes)};
@@ -1224,7 +1254,6 @@ void test_hierarchy_update_with_content() {
 
         void main() noexcept override {
             auto impl = GENERATE(I::inotify, I::kqueue, I::win32);
-            // auto impl = I::win32;
             prepare(impl);
 
             expect_dir_scan({make_child("/some/path/dir/file.bin", bfs::file_type::regular, 5)});
@@ -1239,7 +1268,7 @@ void test_hierarchy_update_with_content() {
                 proto::set_permissions(file, default_perms);
                 proto::set_modified_s(file, 12345);
                 proto::set_type(file, FT::DIRECTORY);
-                auto change = fs::payload::file_info_t(file, {}, fs::update_type_t::created);
+                auto change = fs::payload::file_info_t(file, {}, fs::update_type_t::created, true);
                 file_changes.emplace_back(std::move(change));
             }();
             [&]() {
@@ -1249,7 +1278,7 @@ void test_hierarchy_update_with_content() {
                 proto::set_modified_s(file, 12345);
                 proto::set_type(file, FT::FILE);
                 proto::set_size(file, 5);
-                auto change = fs::payload::file_info_t(file, {}, fs::update_type_t::created);
+                auto change = fs::payload::file_info_t(file, {}, fs::update_type_t::created, false);
                 file_changes.emplace_back(std::move(change));
             }();
             auto folder_change = fs::payload::folder_change_t{folder_id, std::move(file_changes)};
@@ -1295,7 +1324,7 @@ void test_malformed_hierarchy_update() {
                 proto::set_modified_s(file, 12345);
                 proto::set_type(file, FT::FILE);
                 proto::set_size(file, 5);
-                auto change = fs::payload::file_info_t(file, {}, fs::update_type_t::created);
+                auto change = fs::payload::file_info_t(file, {}, fs::update_type_t::created, false);
                 file_changes.emplace_back(std::move(change));
             }();
             auto folder_change = fs::payload::folder_change_t{folder_id, std::move(file_changes)};
@@ -1324,10 +1353,10 @@ void test_scan_dirs_race_unix() {
                 proto::set_permissions(pr_dir, default_perms);
                 proto::set_modified_s(pr_dir, 12345);
                 proto::set_type(pr_dir, FT::DIRECTORY);
-                make_update(pr_dir, fs::update_type_t::created, false);
+                mk_update(pr_dir, fs::update_type_t::created, true, false);
 
                 proto::set_name(pr_dir, "y");
-                make_update(pr_dir, fs::update_type_t::created, false);
+                mk_update(pr_dir, fs::update_type_t::created, true, false);
             }
             return parent_t::process_cmd(task);
         }
@@ -1377,10 +1406,10 @@ void test_scan_dirs_race_unix_2() {
             proto::set_permissions(pr_dir, default_perms);
             proto::set_modified_s(pr_dir, 12345);
             proto::set_type(pr_dir, FT::DIRECTORY);
-            make_update(pr_dir, fs::update_type_t::created, false);
+            mk_update(pr_dir, fs::update_type_t::created, true, false);
 
             proto::set_name(pr_dir, "y");
-            make_update(pr_dir, fs::update_type_t::created, false);
+            mk_update(pr_dir, fs::update_type_t::created, true, false);
 
             expect_dir_scan({});
             expect_dir_scan({});
@@ -1416,7 +1445,7 @@ void test_scan_dirs_race_win32() {
 
                 for (auto name : {"x", "x/x1", "x/x1/x2", "y", "y/y1", "y/y1/y2"}) {
                     proto::set_name(pr_dir, name);
-                    make_update(pr_dir, fs::update_type_t::created, false);
+                    mk_update(pr_dir, fs::update_type_t::created, false, false);
                 }
             }
             return parent_t::process_cmd(task);
@@ -1461,10 +1490,10 @@ void test_scan_dirs_race_win32_2() {
             proto::set_permissions(pr_dir, default_perms);
             proto::set_modified_s(pr_dir, 12345);
             proto::set_type(pr_dir, FT::DIRECTORY);
-            make_update(pr_dir, fs::update_type_t::created, false);
+            mk_update(pr_dir, fs::update_type_t::created, false, false);
 
             proto::set_name(pr_dir, "y");
-            make_update(pr_dir, fs::update_type_t::created, false);
+            mk_update(pr_dir, fs::update_type_t::created, false, false);
 
             expect_dir_scan({make_child("/some/path/a"), make_child("/some/path/x"), make_child("/some/path/y")});
             expect_dir_scan({});
@@ -1528,7 +1557,7 @@ void test_hashing_race() {
                     proto::set_modified_s(pr_file, 12348);
                     proto::set_type(pr_file, FT::FILE);
                     proto::set_size(pr_file, sz);
-                    make_update(pr_file, fs::update_type_t::content, false);
+                    mk_update(pr_file, fs::update_type_t::content, false, false);
                 };
 
                 builder->scan_start(folder_id).apply(*sup);
@@ -1545,7 +1574,7 @@ void test_hashing_race() {
                 proto::set_modified_s(pr_file, 12345);
                 proto::set_type(pr_file, FT::FILE);
                 proto::set_size(pr_file, sz);
-                make_update(pr_file, fs::update_type_t::content, false);
+                mk_update(pr_file, fs::update_type_t::content, false, false);
                 builder->scan_start(folder_id).apply(*sup);
                 CHECK(folder_local->get_max_sequence() == 1);
             }
@@ -1800,7 +1829,8 @@ void test_renaming_race() {
                 proto::set_modified_s(pr, 12345);
                 proto::set_type(pr, FT::DIRECTORY);
                 proto::set_name(pr, to);
-                auto change = fs::payload::file_info_t(std::move(pr), std::string(from), fs::update_type_t::meta);
+                auto change =
+                    fs::payload::file_info_t(std::move(pr), std::string(from), fs::update_type_t::meta, false);
                 changes.push_back(std::move(change));
             }
             auto folder_change = fs::payload::folder_change_t{folder_id, std::move(changes)};
@@ -1858,7 +1888,7 @@ void test_avoid_dir_rescan() {
             proto::set_type(file, FT::DIRECTORY);
 
             SECTION("within the same update") {
-                auto change = fs::payload::file_info_t(file, {}, fs::update_type_t::created);
+                auto change = fs::payload::file_info_t(file, {}, fs::update_type_t::created, true);
                 auto changes = fs::payload::file_changes_t{change, change};
                 auto folder_change = fs::payload::folder_change_t{folder_id, std::move(changes)};
                 auto folder_changes = fs::payload::folder_changes_t{{std::move(folder_change)}};
@@ -1869,8 +1899,8 @@ void test_avoid_dir_rescan() {
                 sup->do_process();
             }
             SECTION("spread across different updates") {
-                make_update(file, fs::update_type_t::created, false);
-                make_update(file, fs::update_type_t::created);
+                mk_update(file, fs::update_type_t::created, true, false);
+                mk_update(file, fs::update_type_t::created, true);
             }
 
             CHECK(files_local->size() == 2);
@@ -1912,7 +1942,7 @@ void test_no_pending_io() {
             proto::set_hash(b1, data_h);
             proto::set_size(b1, data.size());
 
-            auto change = fs::payload::file_info_t(file, {}, fs::update_type_t::created);
+            auto change = fs::payload::file_info_t(file, {}, fs::update_type_t::created, false);
             auto changes = fs::payload::file_changes_t{change, change};
             auto folder_change = fs::payload::folder_change_t{folder_id, std::move(changes)};
             auto folder_changes = fs::payload::folder_changes_t{{std::move(folder_change)}};
@@ -1960,8 +1990,8 @@ void test_double_content_update() {
             proto::set_hash(b1, data_h);
             proto::set_size(b1, data.size());
 
-            auto change_1 = fs::payload::file_info_t(file, {}, fs::update_type_t::created);
-            auto change_2 = fs::payload::file_info_t(file, {}, fs::update_type_t::content);
+            auto change_1 = fs::payload::file_info_t(file, {}, fs::update_type_t::created, false);
+            auto change_2 = fs::payload::file_info_t(file, {}, fs::update_type_t::content, false);
             auto changes = fs::payload::file_changes_t{change_1, change_2};
             auto folder_change = fs::payload::folder_change_t{folder_id, std::move(changes)};
             auto folder_changes = fs::payload::folder_changes_t{{std::move(folder_change)}};
@@ -2024,7 +2054,7 @@ void test_dir_scan_and_hashing_race() {
             proto::set_type(file, FT::DIRECTORY);
 
             expect_bytes_hash(as_bytes("12345"));
-            make_update(file, fs::update_type_t::created);
+            mk_update(file, fs::update_type_t::created, true);
 
             CHECK(files_local->size() == 3);
             REQUIRE(files_local->by_name("dir"));
@@ -2043,7 +2073,8 @@ int _init() {
     REGISTER_TEST_CASE(test_trivial_changes, "test_trivial_changes", "[fs]");
     REGISTER_TEST_CASE(test_hashing, "test_hashing", "[fs]");
     REGISTER_TEST_CASE(test_skip_scan_known, "test_skip_scan_known", "[fs]");
-    REGISTER_TEST_CASE(test_unix_new_dir, "test_unix_new_dir", "[fs]");
+    REGISTER_TEST_CASE(test_new_dir_refinement, "test_unix_new_dir", "[fs]");
+    REGISTER_TEST_CASE(test_new_dir_without_refinement, "test_new_dir_without_refinement", "[fs]");
     REGISTER_TEST_CASE(test_kqueue_changes, "test_kqueue_changes", "[fs]");
     REGISTER_TEST_CASE(test_dir_scan_errors, "test_dir_scan_errors", "[fs]");
     REGISTER_TEST_CASE(test_read_file_errors, "test_read_file_errors", "[fs]");

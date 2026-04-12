@@ -183,6 +183,7 @@ void watcher_t::on_notify(handle_t handle) noexcept {
         }
 
         auto type = update_type_internal_t{0};
+        auto requires_refinement = false;
         if (ptr->Action == FILE_ACTION_ADDED) {
             type = update_type::CREATED;
         } else if (ptr->Action == FILE_ACTION_REMOVED) {
@@ -194,12 +195,14 @@ void watcher_t::on_notify(handle_t handle) noexcept {
             // it is silly that win32 generates content event for the new file
             // so it is OK to assume that previous file is always deleted
             type = update_type::DELETED;
+            requires_refinement = true;
         } else if (ptr->Action == FILE_ACTION_RENAMED_NEW_NAME) {
             type = update_type::CREATED;
+            requires_refinement = true;
         }
 
         if (type) {
-            push(deadline, folder_id, name_view, {}, static_cast<update_type_t>(type));
+            push(deadline, folder_id, name_view, {}, static_cast<update_type_t>(type), requires_refinement);
         } else {
             LOG_DEBUG(log, "in the folder '{}' updated ({:x}): '{}'", folder_id, ptr->Action, name_view);
         }

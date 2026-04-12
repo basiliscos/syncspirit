@@ -61,7 +61,7 @@ void updates_mediator_t::mask(const bfs::path &path, const bfs::path &prev_path,
         }
     }
 
-    auto update = support::file_update_t(std::move(path_str), std::move(prev_path_str), counter);
+    auto update = support::file_update_t(std::move(path_str), std::move(prev_path_str), counter, false);
     auto [it, inserted] = target->updates.emplace(std::move(update));
     if (!inserted) {
         it->update_type += counter;

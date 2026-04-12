@@ -19,8 +19,8 @@ inline static update_type_internal_t deduce(update_type_t update_type, const upd
 }
 
 file_update_t::file_update_t(std::string path_, std::string prev_path_, update_type_t update_type_,
-                             const file_update_t *prev) noexcept
-    : path{std::move(path_)} {
+                             const file_update_t *prev, bool requires_refinement_) noexcept
+    : path{std::move(path_)}, requires_refinement{requires_refinement_} {
     auto initial = (prev == nullptr);
     if (initial && (update_type_ == update_type_t::created)) {
         update_type = update_type::CREATED_1;
@@ -30,8 +30,10 @@ file_update_t::file_update_t(std::string path_, std::string prev_path_, update_t
     prev_path = (prev && !prev->prev_path.empty()) ? std::move(prev->prev_path) : std::move(prev_path_);
 }
 
-file_update_t::file_update_t(std::string path_, std::string prev_path_, update_type_internal_t update_type_) noexcept
-    : path{std::move(path_)}, prev_path{std::move(prev_path_)}, update_type{update_type_} {}
+file_update_t::file_update_t(std::string path_, std::string prev_path_, update_type_internal_t update_type_,
+                             bool requires_refinement_) noexcept
+    : path{std::move(path_)}, prev_path{std::move(prev_path_)}, update_type{update_type_},
+      requires_refinement{requires_refinement_} {}
 
 void file_update_t::update(std::string prev_path_, update_type_t type_) const {
     if (prev_path.empty()) {

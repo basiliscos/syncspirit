@@ -469,9 +469,8 @@ void local_keeper_t::on_changes(model::folder_info_t &local_folder, fs::payload:
             LOG_DEBUG(log, "no parent for '{}' in folder '{}', ignoring (temporal) orphan", name, folder_id);
             return;
         }
-        if (((watcher_impl == I::inotify) || (watcher_impl == I::kqueue)) && !subdir.empty() &&
-            scheduled_dirs.count(subdir)) {
-            LOG_DEBUG(log, "ignoring '{}' in folder '{}', parent dir scan is scheduled", name, folder_id);
+        if (change.requires_refinement && !subdir.empty() && scheduled_dirs.count(subdir)) {
+            LOG_DEBUG(log, "ignoring change '{}' in folder '{}', parent dir scan is scheduled", name, folder_id);
             return;
         }
         auto path = folder->get_path() / widen(name);
@@ -482,10 +481,8 @@ void local_keeper_t::on_changes(model::folder_info_t &local_folder, fs::payload:
     for (auto &change : changes) {
         switch (change.update_reason) {
         case UT::created: {
-            if (proto::get_size(change) == 0) {
-                auto schedule_scan = ((watcher_impl == I::inotify) || (watcher_impl == I::kqueue)) &&
-                                     proto::get_type(change) == proto::FileInfoType::DIRECTORY;
-                if (schedule_scan) {
+            if (proto::get_type(change) == proto::FileInfoType::DIRECTORY) {
+                if (change.requires_refinement) {
                     delayed_update(change, true);
                 } else {
                     immediate_update(change);

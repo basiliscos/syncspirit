@@ -115,14 +115,17 @@ void watcher_t::inotify_callback() noexcept {
             auto full_sz = (name_buff + sizeof(name_buff) - 2) - name_ptr;
             auto full_path = std::string_view(name_ptr, full_sz);
             auto is_dir = event->mask & IN_ISDIR;
+            auto requires_refinement = false;
             if (is_dir) {
                 if (type & update_type::CREATED) {
                     watch_recurse(full_path, parent->folder_id, parent_wd);
+                    requires_refinement = true;
                 } else if (event->mask & IN_MOVED_TO) {
                     rename_self_descending(parent_wd, prev_path, rel_path);
                 }
             }
-            push(deadline, folder_id, rel_path, std::move(prev_path), static_cast<update_type_t>(type));
+            push(deadline, folder_id, rel_path, std::move(prev_path), static_cast<update_type_t>(type),
+                 requires_refinement);
         };
         for (int i = 0; i < length;) {
             auto prev_name = std::string();

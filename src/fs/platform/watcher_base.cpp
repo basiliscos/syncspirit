@@ -66,8 +66,8 @@ auto BU::make(const watched_folders_t &watched_folders, watcher_base_t &actor) n
     return {};
 }
 
-bool FU::update(std::string_view relative_path, update_type_t type, folder_update_t *prev,
-                std::string prev_path_rel) noexcept {
+bool FU::update(std::string_view relative_path, update_type_t type, folder_update_t *prev, std::string prev_path_rel,
+                bool requires_refinement) noexcept {
     namespace ut = update_type;
     using UT = update_type_t;
 
@@ -104,7 +104,7 @@ bool FU::update(std::string_view relative_path, update_type_t type, folder_updat
             auto log = utils::get_logger(actor_identity);
             LOG_DEBUG(log, "splitting event rename + change ('{}' => '{}') into delete + change",
                       prev_update->prev_path, relative_path);
-            auto pu = support::file_update_t(std::move(prev_update->prev_path), {}, update_type_t::deleted, {});
+            auto pu = support::file_update_t(std::move(prev_update->prev_path), {}, update_type_t::deleted, {}, false);
             prev_update_source->erase(it_prev);
             prev_update_source->insert(std::move(pu));
             prev_update = nullptr;
@@ -125,8 +125,8 @@ bool FU::update(std::string_view relative_path, update_type_t type, folder_updat
         if (it != updates.end()) {
             it->update(prev_path_rel, type);
         } else {
-            auto update =
-                support::file_update_t(std::string(relative_path), std::move(prev_path_rel), type, prev_update);
+            auto update = support::file_update_t(std::string(relative_path), std::move(prev_path_rel), type,
+                                                 prev_update, requires_refinement);
             updates.emplace(std::move(update));
         }
     }
@@ -230,7 +230,9 @@ auto FU::make(const folder_info_t &folder_info, watcher_base_t &actor) noexcept 
             }
         }
         proto::set_name(r, *name);
-        files.emplace_back(payload::file_info_t(std::move(r), prev_name ? *prev_name : std::string(), reason));
+        auto info = payload::file_info_t(std::move(r), prev_name ? *prev_name : std::string(), reason,
+                                         update.requires_refinement);
+        files.push_back(std::move(info));
     }
     return files;
 }
@@ -269,7 +271,7 @@ void watcher_base_t::on_unwatch(message::unwatch_folder_t &) noexcept {
 }
 
 void watcher_base_t::push(const timepoint_t &deadline, std::string_view folder_id, std::string_view relative_path,
-                          std::string prev_path, update_type_t type) noexcept {
+                          std::string prev_path, update_type_t type, bool requires_refinement) noexcept {
     auto source = (bulk_update_t *)(nullptr);
     auto target = (bulk_update_t *)(nullptr);
     LOG_DEBUG(log, "file event '{}' for '{}' in folder {}", support::stringify(type), relative_path, folder_id);
@@ -285,7 +287,7 @@ void watcher_base_t::push(const timepoint_t &deadline, std::string_view folder_i
     }
     auto &target_fi = target->prepare(folder_id);
     auto source_fi = source ? source->find(folder_id) : (folder_update_t *)(nullptr);
-    auto recorded = target_fi.update(relative_path, type, source_fi, std::move(prev_path));
+    auto recorded = target_fi.update(relative_path, type, source_fi, std::move(prev_path), requires_refinement);
     if (recorded) {
         if (target->deadline.is_not_a_date_time()) {
             target->deadline = deadline;

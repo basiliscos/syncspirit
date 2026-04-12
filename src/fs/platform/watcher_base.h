@@ -57,7 +57,7 @@ struct SYNCSPIRIT_API watcher_base_t : r::actor_base_t {
         support::file_updates_t updates;
 
         bool update(std::string_view relative_path, update_type_t type, folder_update_t *prev,
-                    std::string prev_path_rel) noexcept;
+                    std::string prev_path_rel, bool requires_refinement) noexcept;
         auto make(const folder_info_t &folder_info, watcher_base_t &actor) noexcept -> payload::file_changes_t;
     };
     using folder_updates_t = std::vector<folder_update_t>;
@@ -84,7 +84,7 @@ struct SYNCSPIRIT_API watcher_base_t : r::actor_base_t {
 
     void on_retension_finish(r::request_id_t, bool cancelled) noexcept;
     void push(const timepoint_t &deadline, std::string_view folder_id, std::string_view relative_path,
-              std::string prev_path, update_type_t type) noexcept;
+              std::string prev_path, update_type_t type, bool requires_refinement) noexcept;
 
     utils::logger_t log;
     interval_t retension;
