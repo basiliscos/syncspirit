@@ -140,7 +140,8 @@ void watcher_t::kqueue_callback(int wd, std::uint32_t flags, const pt::ptime &no
     }
 
     auto deadline = now + retension;
-    push(deadline, folder_id, rel_path, {}, static_cast<update_type_t>(type));
+    auto requires_refinement = !is_regular && type == update_type::CONTENT;
+    push(deadline, folder_id, rel_path, {}, static_cast<update_type_t>(type), requires_refinement);
 }
 
 #endif
