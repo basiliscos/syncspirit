@@ -97,6 +97,7 @@ auto watcher_t::unwatch_recurse(std::string_view path) noexcept -> sys::error_co
                     continue;
                 }
             }
+            auto &path = it_guard->second.path;
             LOG_TRACE(log, "unwatching '{}'", path);
             auto ec_rm = unwatch_wd(wd);
 
@@ -104,7 +105,7 @@ auto watcher_t::unwatch_recurse(std::string_view path) noexcept -> sys::error_co
                 if (!ec) {
                     ec = ec_rm;
                 } else {
-                    LOG_ERROR(log, "cannot unwatch '{}': {}", path, ec_rm.message());
+                    LOG_ERROR(log, "cannot unwatch '{}': {}", wd, ec_rm.message());
                 }
             }
 

@@ -289,6 +289,31 @@ void test_fs() {
             await_events(2);
             auto dir_3 = local_files->by_name("a/yy");
             REQUIRE(dir_3);
+
+            bfs::rename(root_path / "a" / "b", root_path / "a" / "BB");
+            await_events(7);
+            {
+                auto wnames = {L"a/b", L"a/b/c", L"a/b/c/d", L"a/b/c/d/e", L"a/b/c/подпапка", L"a/b/c/файлик.bin"};
+                for (auto &wname : wnames) {
+                    auto name = narrow(wname);
+                    auto file = local_files->by_name(name);
+                    LOG_INFO(log, "cheking for absence of {}", name);
+                    REQUIRE(file);
+                    CHECK(file->is_deleted());
+                }
+            }
+
+            {
+                auto wnames = {L"a/BB",       L"a/BB/c",          L"a/BB/c/d",
+                               L"a/BB/c/d/e", L"a/BB/c/подпапка", L"a/BB/c/файлик.bin"};
+                for (auto &wname : wnames) {
+                    auto name = narrow(wname);
+                    LOG_INFO(log, "cheking for presence of {}", name);
+                    auto file = local_files->by_name(name);
+                    REQUIRE(file);
+                    CHECK(!file->is_deleted());
+                }
+            }
         }
     };
     F().run();

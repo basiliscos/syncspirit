@@ -745,6 +745,54 @@ void test_new_dir_without_refinement() {
     F().run();
 }
 
+void test_remove_dir_refinement() {
+    struct F : folder_fixture_t {
+        using parent_t = folder_fixture_t;
+        using parent_t::parent_t;
+        using child_info_t = fs::task::scan_dir_t::child_info_t;
+
+        void main() noexcept override {
+            auto impl = GENERATE(I::inotify, I::kqueue, I::win32);
+            prepare(impl);
+
+            expect_dir_scan({});
+
+            auto pr_dir = proto::FileInfo();
+            proto::set_permissions(pr_dir, default_perms);
+            proto::set_modified_s(pr_dir, 12345);
+            proto::set_type(pr_dir, FT::DIRECTORY);
+
+            auto names = {"dir", "dir/subdir_1", "dir/subdir_2"};
+            for (auto &name : names) {
+                proto::set_name(pr_dir, name);
+                builder->local_update(folder_id, pr_dir).apply(*sup);
+            }
+            REQUIRE(files_local->size() == 3);
+            auto seq = folder_local->get_max_sequence();
+
+            proto::set_name(pr_dir, "dir");
+            mk_update(pr_dir, fs::update_type_t::deleted, true, true);
+            CHECK(folder_local->get_max_sequence() == seq + 3);
+
+            auto dir = files_local->by_name("dir");
+            REQUIRE(dir);
+            CHECK(dir->is_dir());
+            CHECK(dir->is_deleted());
+
+            auto sub_dir_1 = files_local->by_name("dir/subdir_1");
+            REQUIRE(sub_dir_1);
+            CHECK(sub_dir_1->is_dir());
+            CHECK(sub_dir_1->is_deleted());
+
+            auto sub_dir_2 = files_local->by_name("dir/subdir_2");
+            REQUIRE(sub_dir_2);
+            CHECK(sub_dir_2->is_dir());
+            CHECK(sub_dir_2->is_deleted());
+        }
+    };
+    F().run();
+}
+
 void test_kqueue_changes() {
     struct F : folder_fixture_t {
         using parent_t = folder_fixture_t;
@@ -2073,8 +2121,9 @@ int _init() {
     REGISTER_TEST_CASE(test_trivial_changes, "test_trivial_changes", "[fs]");
     REGISTER_TEST_CASE(test_hashing, "test_hashing", "[fs]");
     REGISTER_TEST_CASE(test_skip_scan_known, "test_skip_scan_known", "[fs]");
-    REGISTER_TEST_CASE(test_new_dir_refinement, "test_unix_new_dir", "[fs]");
+    REGISTER_TEST_CASE(test_new_dir_refinement, "test_new_dir_refinement", "[fs]");
     REGISTER_TEST_CASE(test_new_dir_without_refinement, "test_new_dir_without_refinement", "[fs]");
+    REGISTER_TEST_CASE(test_remove_dir_refinement, "test_remove_dir_refinement", "[fs]");
     REGISTER_TEST_CASE(test_kqueue_changes, "test_kqueue_changes", "[fs]");
     REGISTER_TEST_CASE(test_dir_scan_errors, "test_dir_scan_errors", "[fs]");
     REGISTER_TEST_CASE(test_read_file_errors, "test_read_file_errors", "[fs]");

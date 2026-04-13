@@ -421,6 +421,7 @@ void local_keeper_t::on_changes(model::folder_info_t &local_folder, fs::payload:
     using namespace model::diff;
     using scheduled_dirs_t = std::pmr::unordered_set<std::pmr::string, utils::string_hash_t, utils::string_eq_t>;
     using I = syncspirit_watcher_impl_t;
+    using CI = local_keeper::child_info_t;
     auto scheduled_dirs = scheduled_dirs_t(stack_ctx.allocator);
 
     auto folder = local_folder.get_folder();
@@ -454,7 +455,6 @@ void local_keeper_t::on_changes(model::folder_info_t &local_folder, fs::payload:
         }
     };
     auto delayed_update = [&](fs::payload::file_info_t change, bool recurse_children) {
-        using CI = local_keeper::child_info_t;
         using R = presentation::presence_link_t;
         auto name = proto::get_name(change);
         auto is_dir = proto::get_type(change) == proto::FileInfoType::DIRECTORY;
@@ -478,6 +478,30 @@ void local_keeper_t::on_changes(model::folder_info_t &local_folder, fs::payload:
         auto item = unexamined_t(std::move(child_info), true, recurse_children);
         unexamined.push_back(std::move(item));
     };
+    auto handle_delete = [&](fs::payload::file_info_t change) {
+        auto name = proto::get_name(change);
+        auto file = local_folder.get_file_infos().by_name(name);
+        if (!file || file->is_deleted()) {
+            LOG_DEBUG(log, "ignoring removal '{}' in folder '{}' as it is already missing", name, folder_id);
+            return;
+        }
+        if (file->is_dir() && change.requires_refinement) {
+            auto aug = file->get_augmentation().get();
+            auto presence = static_cast<presentation::presence_t *>(aug);
+            auto parent = presence->get_parent();
+            if (!parent) {
+                LOG_ERROR(log, "missing parent for '{}' in local folder '{}'", name, folder_id);
+                return;
+            }
+
+            auto path = folder->get_path() / widen(parent->get_entity()->get_path()->get_full_name());
+            auto child_name = bfs::path(widen(presence->get_entity()->get_path()->get_own_name()));
+            auto item = unscanned_dir_t(std::move(path), parent, std::move(child_name), 0, true);
+            unexamined.push_back(std::move(item));
+        } else {
+            immediate_update(change);
+        }
+    };
     for (auto &change : changes) {
         switch (change.update_reason) {
         case UT::created: {
@@ -492,18 +516,15 @@ void local_keeper_t::on_changes(model::folder_info_t &local_folder, fs::payload:
             }
             break;
         }
-        case UT::meta: {
+        case UT::meta:
             immediate_update(change);
             break;
-        }
-        case UT::deleted: {
-            immediate_update(change);
+        case UT::deleted:
+            handle_delete(change);
             break;
-        }
-        case UT::content: {
+        case UT::content:
             delayed_update(std::move(change), false);
             break;
-        }
         default:
             LOG_WARN(log, "not implemented");
         }
