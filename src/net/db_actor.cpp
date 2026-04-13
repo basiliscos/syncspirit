@@ -234,6 +234,7 @@ void db_actor_t::on_start() noexcept {
     r::actor_base_t::on_start();
     LOG_TRACE(log, "on_start, triggering cluster loading");
     send<net::payload::load_cluster_trigger_t>(address);
+    send<model::payload::local_up_t>(coordinator);
 }
 
 void db_actor_t::shutdown_start() noexcept {

@@ -25,7 +25,6 @@
 #include "presentation/folder_entity.h"
 #include "proto/proto-helpers-bep.h"
 #include "proto/proto-helpers-db.h"
-#include "utils/io.h"
 
 #include <boost/nowide/convert.hpp>
 #include <filesystem>
@@ -101,6 +100,7 @@ void net_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
             p.subscribe_actor(&net_supervisor_t::on_thread_up);
             p.subscribe_actor(&net_supervisor_t::on_thread_ready);
             p.subscribe_actor(&net_supervisor_t::on_app_ready);
+            p.subscribe_actor(&net_supervisor_t::on_local_up);
         },
         r::plugin::config_phase_t::PREINIT);
 }
@@ -135,6 +135,7 @@ void net_supervisor_t::launch_early() noexcept {
                   .escalate_failure()
                   .finish()
                   ->get_address();
+    ++local_counter;
 
     create_actor<local_keeper_t>()
         .concurrent_hashes(app_config.hasher_threads)
@@ -144,8 +145,10 @@ void net_supervisor_t::launch_early() noexcept {
         .escalate_failure()
         .timeout(timeout)
         .finish();
+    ++local_counter;
 
     create_actor<scheduler_t>().timeout(timeout).escalate_failure().finish();
+    ++local_counter;
 
     for (auto &l : launchers) {
         l(cluster);
@@ -190,6 +193,14 @@ void net_supervisor_t::on_model_request(model::message::model_request_t &message
     try_seed_model();
 }
 
+void net_supervisor_t::on_local_up(model::message::local_up_t &) noexcept {
+    --local_counter;
+    LOG_DEBUG(log, "on_local_up, left = {}", local_counter);
+    if (local_counter == 0) {
+        send<model::payload::local_ready_t>(coordinator);
+    }
+}
+
 void net_supervisor_t::on_thread_up(model::message::thread_up_t &) noexcept {
     --thread_counter;
     LOG_DEBUG(log, "on_thread_up, left = {}", thread_counter);
@@ -219,6 +230,7 @@ void net_supervisor_t::on_app_ready(model::message::app_ready_t &) noexcept {
                       .config(app_config)
                       .escalate_failure()
                       .finish();
+    ++local_counter;
 
     if (app_config.upnp_config.enabled) {
         auto factory = [this](r::supervisor_t &, const r::address_ptr_t &spawner) -> r::actor_ptr_t {
@@ -306,6 +318,8 @@ void net_supervisor_t::on_app_ready(model::message::app_ready_t &) noexcept {
 
     auto timeout = shutdown_timeout * 9 / 10;
     create_actor<acceptor_actor_t>().cluster(cluster).timeout(timeout).escalate_failure().finish();
+    ++local_counter;
+
     peer_sup = create_actor<peer_supervisor_t>()
                    .cluster(cluster)
                    .ssl_pair(&ssl_pair)
@@ -316,9 +330,12 @@ void net_supervisor_t::on_app_ready(model::message::app_ready_t &) noexcept {
                    .relay_config(app_config.relay_config)
                    .escalate_failure()
                    .finish();
+    ++local_counter;
+
     auto dcfg = app_config.dialer_config;
     if (dcfg.enabled) {
         create_actor<dialer_actor_t>().timeout(timeout).dialer_config(dcfg).cluster(cluster).finish();
+        ++local_counter;
     }
 }
 

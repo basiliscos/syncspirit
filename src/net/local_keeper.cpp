@@ -131,6 +131,7 @@ void local_keeper_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 
 void local_keeper_t::on_start() noexcept {
     LOG_TRACE(log, "on_start");
+    send<model::payload::local_up_t>(coordinator);
     r::actor_base_t::on_start();
 }
 

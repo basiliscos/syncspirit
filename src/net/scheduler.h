@@ -22,6 +22,7 @@ struct SYNCSPIRIT_API scheduler_t : public r::actor_base_t, private model::diff:
     using parent_t::parent_t;
 
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
+    void on_start() noexcept override;
 
     template <typename T> auto &access() noexcept;
 

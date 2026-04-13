@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "dialer_actor.h"
 #include "model/diff/modify/remove_peer.h"
@@ -45,6 +45,7 @@ void dialer_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 
 void dialer_actor_t::on_start() noexcept {
     LOG_TRACE(log, "on_start");
+    send<model::payload::local_up_t>(coordinator);
     r::actor_base_t::on_start();
     auto &devices = cluster->get_devices();
     for (auto it : devices) {

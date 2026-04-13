@@ -46,6 +46,9 @@ struct thread_ready_t {
 struct db_loaded_t {};
 struct app_ready_t {};
 
+struct local_up_t {};
+struct local_ready_t {};
+
 } // namespace payload
 
 namespace message {
@@ -53,6 +56,8 @@ namespace message {
 using model_update_t = r::message_t<payload::model_update_t>;
 using thread_up_t = r::message_t<payload::thread_up_t>;
 using thread_ready_t = r::message_t<payload::thread_ready_t>;
+using local_up_t = r::message_t<payload::local_up_t>;
+using local_ready_t = r::message_t<payload::local_ready_t>;
 using app_ready_t = r::message_t<payload::app_ready_t>;
 using db_loaded_t = r::message_t<payload::db_loaded_t>;
 

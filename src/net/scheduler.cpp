@@ -54,6 +54,12 @@ void scheduler_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     });
 }
 
+void scheduler_t::on_start() noexcept {
+    LOG_TRACE(log, "on_start");
+    send<model::payload::local_up_t>(coordinator);
+    r::actor_base_t::on_start();
+}
+
 void scheduler_t::on_thread_ready(model::message::thread_ready_t &message) noexcept {
     auto &p = message.payload;
     if (p.thread_id == std::this_thread::get_id()) {

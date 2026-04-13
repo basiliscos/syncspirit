@@ -52,6 +52,7 @@ void peer_supervisor_t::on_child_shutdown(actor_base_t *actor) noexcept {
 
 void peer_supervisor_t::on_start() noexcept {
     LOG_TRACE(log, "on_start");
+    send<model::payload::local_up_t>(coordinator);
     parent_t::on_start();
 }
 

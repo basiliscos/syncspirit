@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "cluster_supervisor.h"
 #include "controller_actor.h"
 #include "names.h"
-#include "utils/error_code.h"
 #include "utils/format.hpp"
 #include "model/diff/contact/peer_state.h"
 
@@ -31,12 +30,13 @@ void cluster_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept 
 }
 
 void cluster_supervisor_t::on_start() noexcept {
-    log->trace("on_start");
-    ra::supervisor_asio_t::on_start();
+    LOG_TRACE(log, "on_start");
+    send<model::payload::local_up_t>(coordinator);
+    parent_t::on_start();
 }
 
 void cluster_supervisor_t::shutdown_start() noexcept {
-    log->trace("shutdown_start");
+    LOG_TRACE(log, "shutdown_start");
     ra::supervisor_asio_t::shutdown_start();
 }
 
