@@ -314,6 +314,29 @@ void test_fs() {
                     CHECK(!file->is_deleted());
                 }
             }
+
+            bfs::create_directories(root_path / "new-dir");
+            await_events(2);
+
+            auto dir_4 = local_files->by_name("new-dir");
+            REQUIRE(dir_4);
+
+            bfs::create_directories(root_path / "new-dir" / "sub_dir");
+            write_file(root_path / "new-dir" / "f", "12345");
+
+            await_events(4);
+            auto dir_4_d = local_files->by_name("new-dir/sub_dir");
+            REQUIRE(dir_4_d);
+            REQUIRE(dir_4_d->is_dir());
+
+            auto dir_4_f = local_files->by_name("new-dir/f");
+            REQUIRE(dir_4_f);
+            REQUIRE(dir_4_f->is_file());
+            REQUIRE(dir_4_f->get_size() == 5);
+
+            write_file(root_path / "new-dir" / "f", "123456");
+            await_events(4);
+            REQUIRE(dir_4_f->get_size() == 6);
         }
     };
     F().run();
