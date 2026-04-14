@@ -41,7 +41,8 @@ r::plugin::resource_id_t interrupt = 0;
 
 net_supervisor_t::net_supervisor_t(net_supervisor_t::config_t &cfg)
     : parent_t(this, resource::interrupt, cfg), sequencer{cfg.sequencer}, app_config{cfg.app_config},
-      independent_threads{cfg.independent_threads}, thread_counter{independent_threads} {
+      independent_threads{cfg.independent_threads}, thread_counter{independent_threads},
+      local_counter{cfg.local_counter} {
     using boost::nowide::narrow;
     bouncer = cfg.bouncer_address;
     auto log = utils::get_logger(names::coordinator);

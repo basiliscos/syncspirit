@@ -5,6 +5,7 @@
 #include "fs/utils.h"
 #include "proto/proto-helpers-bep.h"
 #include "net/names.h"
+#include "model/messages.h"
 #include <boost/nowide/convert.hpp>
 #include <string.h>
 
@@ -260,6 +261,12 @@ void watcher_base_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.subscribe_actor(&watcher_base_t::on_watch);
         p.subscribe_actor(&watcher_base_t::on_unwatch);
     });
+}
+
+void watcher_base_t::on_start() noexcept {
+    LOG_TRACE(log, "on_start");
+    send<model::payload::local_up_t>(coordinator);
+    r::actor_base_t::on_start();
 }
 
 void watcher_base_t::on_watch(message::watch_folder_t &) noexcept {

@@ -304,6 +304,7 @@ int app_main(app_context_t &app_ctx) {
     auto strand = std::make_shared<asio::io_context::strand>(io_context);
     auto timeout = pt::milliseconds{cfg.timeout};
     auto independent_threads = 1ul;
+    auto local_counter = std::uint_fast32_t{2ul}; /* fs_actor + watcher */
     auto seed = (size_t)std::time(nullptr);
     auto sequencer = model::make_sequencer(seed);
 
@@ -325,6 +326,7 @@ int app_main(app_context_t &app_ctx) {
                        .guard_context(true)
                        .sequencer(sequencer)
                        .independent_threads(independent_threads)
+                       .local_counter(local_counter)
                        .shutdown_flag(shutdown_flag, r::pt::millisec{50})
                        .bouncer_address(bouncer_actor->get_address())
                        .poll_duration(poll_timeout)

@@ -11,6 +11,7 @@
 #include "config/main.h"
 #include "utils/log.h"
 #include "messages.h"
+#include <cstdint>
 #include <boost/asio.hpp>
 #include <rotor/asio.hpp>
 #include <boost/outcome.hpp>
@@ -22,7 +23,8 @@ namespace outcome = boost::outcome_v2;
 
 struct net_supervisor_config_t : ra::supervisor_config_asio_t {
     config::main_t app_config;
-    size_t independent_threads = 0;
+    std::uint_fast32_t independent_threads = 0;
+    std::uint_fast32_t local_counter = 0;
     model::sequencer_ptr_t sequencer;
     r::address_ptr_t bouncer_address;
 };
@@ -38,8 +40,13 @@ struct net_supervisor_config_builder_t : ra::supervisor_config_asio_builder_t<Su
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&independent_threads(size_t value) && noexcept {
+    builder_t &&independent_threads(std::uint_fast32_t value) && noexcept {
         parent_t::config.independent_threads = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+
+    builder_t &&local_counter(std::uint_fast32_t value) && noexcept {
+        parent_t::config.local_counter = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
@@ -99,9 +106,9 @@ struct SYNCSPIRIT_API net_supervisor_t : net_supervisor_base_t<ra::supervisor_as
 
     model::sequencer_ptr_t sequencer;
     config::main_t app_config;
-    size_t independent_threads;
-    size_t thread_counter;
-    size_t local_counter;
+    std::uint_fast32_t independent_threads;
+    std::uint_fast32_t thread_counter;
+    std::uint_fast32_t local_counter;
     model::diff::cluster_diff_ptr_t load_diff;
     r::address_ptr_t db_addr;
     utils::key_pair_t ssl_pair;

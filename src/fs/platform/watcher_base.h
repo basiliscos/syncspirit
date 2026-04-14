@@ -76,6 +76,7 @@ struct SYNCSPIRIT_API watcher_base_t : r::actor_base_t {
 
     explicit watcher_base_t(config_t &cfg);
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
+    void on_start() noexcept override;
 
     virtual void on_watch(message::watch_folder_t &) noexcept;
     virtual void on_unwatch(message::unwatch_folder_t &) noexcept;

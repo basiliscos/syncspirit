@@ -11,6 +11,7 @@
 #include "utils/platform.h"
 #include "utils/error_code.h"
 #include "proto/proto-helpers-bep.h"
+#include "model/messages.h"
 #include <boost/nowide/convert.hpp>
 #include <memory_resource>
 
@@ -71,6 +72,7 @@ void file_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 
 void file_actor_t::on_start() noexcept {
     LOG_TRACE(log, "on_start");
+    send<model::payload::local_up_t>(coordinator);
     r::actor_base_t::on_start();
 }
 
