@@ -114,6 +114,7 @@ bool bsd_backend_t::poll(std::uint32_t timeout) {
     tm.tv_sec = seconds;
     tm.tv_nsec = nanoseconds_t(1000 * 1000) * subsecond;
 
+    std::memset(events.data(), 0, events.size() * sizeof(struct kevent));
     auto r = ::kevent(monitor, nullptr, 0, events.data(), static_cast<int>(events.size()), &tm);
     if (r == -1) {
         LOG_WARN(log, "kevent() failed: {}", strerror(errno));
