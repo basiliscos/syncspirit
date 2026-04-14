@@ -380,10 +380,7 @@ inline std::string_view get_path(const Folder &msg) {
     }
     return {};
 }
-inline void set_path(Folder &msg, std::string_view value) {
-    using namespace pp;
-    msg["path"_f] = std::string(value);
-}
+SYNCSPIRIT_API void set_path(Folder &msg, std::string_view value);
 template <typename T = void> inline void set_path(Folder &msg, std::string value) {
     using namespace pp;
     msg["path"_f] = std::move(value);

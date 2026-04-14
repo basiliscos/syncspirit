@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #pragma once
 
 #include <catch2/catch_all.hpp>
 #include <filesystem>
-#include <memory>
 
 #include "model/device.h"
 #include "model/cluster.h"
