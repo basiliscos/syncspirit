@@ -476,7 +476,7 @@ void local_keeper_t::on_changes(model::folder_info_t &local_folder, fs::payload:
         }
         auto path = folder->get_path() / widen(name);
         auto child_info = CI(std::move(change), std::move(path), relation.child, relation.parent, 0);
-        auto item = unexamined_t(std::move(child_info), true, recurse_children);
+        auto item = unexamined_t(std::move(child_info), true, recurse_children, change.requires_refinement);
         unexamined.push_back(std::move(item));
     };
     auto handle_delete = [&](fs::payload::file_info_t change) {
@@ -497,7 +497,8 @@ void local_keeper_t::on_changes(model::folder_info_t &local_folder, fs::payload:
 
             auto path = folder->get_path() / widen(parent->get_entity()->get_path()->get_full_name());
             auto child_name = bfs::path(widen(presence->get_entity()->get_path()->get_own_name()));
-            auto item = unscanned_dir_t(std::move(path), parent, std::move(child_name), 0, true);
+            auto item =
+                unscanned_dir_t(std::move(path), parent, std::move(child_name), 0, true, change.requires_refinement);
             unexamined.push_back(std::move(item));
         } else {
             immediate_update(change);

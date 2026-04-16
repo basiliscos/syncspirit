@@ -10,6 +10,8 @@
 #include "fs/fs_supervisor.h"
 #include "fs/task/scan_dir.h"
 #include <fcntl.h>
+#include <limits.h>
+#include <memory_resource>
 
 using namespace syncspirit::fs::platform::bsd;
 
@@ -69,33 +71,86 @@ auto watcher_t::unwatch_path(int wd, file_type_t type) noexcept -> sys::error_co
 }
 
 void watcher_t::notify(const fs::task::scan_dir_t &scan_dir) noexcept {
-    auto path = std::string_view(scan_dir.path.native());
-    if (path_to_wd.find(path) != path_to_wd.end()) {
-        return parent_t::notify(scan_dir);
-    }
-    auto pos = path.rfind('/');
-    if (pos != std::string::npos && path.size() > 2) {
-        auto parent_path = path.substr(0, pos);
-        auto it = path_to_wd.find(parent_path);
-        if (it != path_to_wd.end()) {
-            auto &parent_wd = it->second;
-            auto &parent_guard = path_map[parent_wd];
-            auto &folder_id = parent_guard.folder_id;
-            auto opt = parent_t::watch_path(path, folder_id, file_type_t::directory, parent_wd);
-            if (!opt) {
-                return;
-            }
-            auto &[_, fd] = *opt;
-            if (fd < 0) {
-                LOG_ERROR(log, "cannot watch {}: {}", path, strerror(errno));
-            } else {
-                parent_t::notify(scan_dir);
-            }
-        } else {
-            LOG_WARN(log, "notification upon non-watched parent of '{}'", path);
+    struct item_t {
+        std::string_view filename;
+        file_type_t file_type;
+    };
+    using queue_t = std::pmr::list<item_t>;
+    char path_buff[NAME_MAX + 1];
+    auto buff = std::array<std::byte, 1024 * 10>();
+    auto pool = std::pmr::monotonic_buffer_resource(buff.data(), buff.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+    auto queue = queue_t(allocator);
+
+    for (auto &child : scan_dir.child_infos) {
+        auto child_path = std::string_view(child.path.native());
+        auto pos = child_path.rfind('/');
+        if (pos != std::string::npos) {
+            auto filename = child_path.substr(pos);
+            queue.emplace_back(filename, child.status.type());
         }
-    } else {
-        LOG_TRACE(log, "(notify) cannot find parent path for '{}'", path);
+    }
+
+    auto dir_path = std::string_view(scan_dir.path.native());
+    if (dir_path.size() && dir_path.back() == '/') {
+        dir_path = dir_path.substr(0, dir_path.size() - 1);
+    }
+    auto it_wd = path_to_wd.find(dir_path);
+    if (it_wd == path_to_wd.end()) {
+        auto pos = dir_path.rfind('/');
+        if (pos != std::string::npos) {
+            auto parent_path = dir_path.substr(0, pos);
+            auto it_parent_wd = path_to_wd.find(parent_path);
+            if (it_parent_wd != path_to_wd.end()) {
+                auto parent_wd = it_parent_wd->second;
+                auto &parent_guard = path_map[parent_wd];
+                auto &folder_id = parent_guard.folder_id;
+                auto opt = parent_t::watch_path(dir_path, folder_id, file_type_t::directory, parent_wd);
+                if (!opt) {
+                    LOG_WARN(log, "cannot watch '{}'", dir_path);
+                    return;
+                }
+                auto &[_, fd] = *opt;
+                if (fd < 0) {
+                    LOG_ERROR(log, "cannot watch {}: {}", dir_path, strerror(errno));
+                } else {
+                    it_wd = path_to_wd.find(dir_path);
+                }
+            }
+        }
+        if (it_wd == path_to_wd.end()) {
+            LOG_WARN(log, "notification upon non-watched '{}' (by parent)", dir_path);
+            return;
+        }
+    }
+    auto parent_wd = it_wd->second;
+    auto &parent_guard = path_map[parent_wd];
+    auto &folder_id = parent_guard.folder_id;
+
+    std::memcpy(path_buff, dir_path.data(), dir_path.size());
+
+    while (!queue.empty()) {
+        auto ptr = path_buff + dir_path.size();
+        auto [item_path, type] = queue.front();
+        queue.pop_front();
+        std::memcpy(ptr, item_path.data(), item_path.size());
+        ptr += item_path.size();
+        *ptr = 0;
+        auto full_sz = (ptr - 1) - path_buff;
+        auto full_path = std::string_view(path_buff, full_sz);
+        auto it = path_to_wd.find(full_path);
+        if (it != path_to_wd.end()) {
+            continue;
+        }
+
+        auto opt = parent_t::watch_path(full_path, folder_id, type, parent_wd);
+        if (!opt) {
+            continue;
+        }
+        auto &[_, fd] = *opt;
+        if (fd < 0) {
+            LOG_ERROR(log, "cannot watch {}: {}", full_path, strerror(errno));
+        }
     }
 }
 

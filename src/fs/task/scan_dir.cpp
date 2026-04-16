@@ -23,10 +23,10 @@ struct comparator_t {
 };
 
 scan_dir_t::scan_dir_t(bfs::path path_, presentation::presence_ptr_t presence_, bfs::path single_child_, bool notify_,
-                       bool recurse_) noexcept
+                       bool recurse_, bool requires_refinement_) noexcept
     : path{std::move(path_)}, presence{std::move(presence_)},
       ec(utils::make_error_code(utils::error_code_t::no_action)), single_child{std::move(single_child_)},
-      notify{notify_}, recurse{recurse_} {}
+      notify{notify_ ? 1u : 0}, recurse{recurse_ ? 1u : 0}, requires_refinement{requires_refinement_ ? 1u : 0} {}
 
 bool scan_dir_t::process(fs_slave_t &slave, execution_context_t &context) noexcept {
     ec = {};
