@@ -587,6 +587,11 @@ void test_rescan() {
         using parent_t::parent_t;
         using child_info_t = fs::task::scan_dir_t::child_info_t;
 
+        bool process_cmd(fs::task::scan_dir_t &task) noexcept override {
+            ++dir_scans;
+            return parent_t::process_cmd(task);
+        }
+
         void main() noexcept override {
             auto impl = GENERATE(I::inotify, I::kqueue);
             prepare(impl);
@@ -617,6 +622,7 @@ void test_rescan() {
                 CHECK(sup->file_availabilities == 3);
                 CHECK(folder_local->get_max_sequence() == sequence);
                 CHECK(files_local->size() == 3);
+                CHECK(dir_scans == 4);
             }
             SECTION("content update with recurse on") {
                 expect_dir_scan(root_children);
@@ -628,8 +634,11 @@ void test_rescan() {
                 CHECK(sup->file_availabilities == 0);
                 CHECK(folder_local->get_max_sequence() == sequence);
                 CHECK(files_local->size() == 3);
+                CHECK(dir_scans == 1);
             }
         }
+
+        int dir_scans = 0;
     };
     F().run();
 }
