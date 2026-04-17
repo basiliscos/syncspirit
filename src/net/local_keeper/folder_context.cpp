@@ -289,7 +289,9 @@ int folder_context_t::process(child_ready_t &info, stack_context_t &ctx) noexcep
             }
         }
         if (match) {
-            ctx.push(new local::file_availability_t(&file, *local_folder));
+            if (!file.is_local()) {
+                ctx.push(new local::file_availability_t(&file, *local_folder));
+            }
         } else {
             if (info.size && info.blocks.empty()) {
                 emit_hashing = true;

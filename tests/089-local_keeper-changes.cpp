@@ -49,6 +49,12 @@ struct my_supervisort_t : supervisor_t {
     using parent_t = supervisor_t;
     using parent_t::parent_t;
 
+    outcome::result<void> operator()(const model::diff::local::file_availability_t &diff, void *custom) noexcept override {
+        ++file_availabilities;
+        return parent_t::operator()(diff, custom);
+    }
+
+    std::uint_fast32_t file_availabilities = 0;
     fixture_t *fixture = nullptr;
 };
 
@@ -164,7 +170,7 @@ struct fixture_t {
     std::int64_t files_scan_iteration_limit = 100;
     builder_ptr_t builder;
     r::pt::time_duration timeout = r::pt::millisec{10};
-    r::intrusive_ptr_t<supervisor_t> sup;
+    r::intrusive_ptr_t<my_supervisort_t> sup;
     cluster_ptr_t cluster;
     device_ptr_t local_device;
     utils::logger_t log;
@@ -570,6 +576,59 @@ void test_hashing() {
             CHECK(f->get_modified_s() == 12345);
             CHECK(f->get_size() == 5);
             CHECK(f->is_file());
+        }
+    };
+    F().run();
+}
+
+void test_rescan() {
+    struct F : folder_fixture_t {
+        using parent_t = folder_fixture_t;
+        using parent_t::parent_t;
+        using child_info_t = fs::task::scan_dir_t::child_info_t;
+
+        void main() noexcept override {
+            auto impl = GENERATE(I::inotify, I::kqueue);
+            prepare(impl);
+
+            auto pr_dir = proto::FileInfo();
+            proto::set_permissions(pr_dir, default_perms);
+            proto::set_type(pr_dir, FT::DIRECTORY);
+
+            for (auto &p : {"dir-a", "dir-b", "dir-a/x"}) {
+                proto::set_name(pr_dir, p);
+                builder->local_update(folder_id, pr_dir);
+            }
+            builder->apply(*sup);
+            CHECK(sup->file_availabilities == 0);
+            auto sequence = folder_local->get_max_sequence();
+            CHECK(sequence == 3);
+
+            auto root_children = child_infos_t {make_child("/some/path/dir-a"), make_child("/some/path/dir-b") };
+            auto a_children = child_infos_t {make_child("/some/path/dir-a/x") };
+            auto no_children = child_infos_t {};
+
+            SECTION("rescan whole dir => get updates") {
+                expect_dir_scan(root_children);
+                expect_dir_scan(no_children);
+                expect_dir_scan(a_children);
+                expect_dir_scan(no_children);
+                builder->scan_start(folder_id).apply(*sup);
+                CHECK(sup->file_availabilities == 3);
+                CHECK(folder_local->get_max_sequence() == sequence);
+                CHECK(files_local->size() == 3);
+            }
+            SECTION("content update with recurse on") {
+                expect_dir_scan(root_children);
+                expect_dir_scan(no_children);
+                expect_dir_scan(a_children);
+                expect_dir_scan(no_children);
+                proto::set_name(pr_dir, "");
+                mk_update(pr_dir, fs::update_type_t::content, true, true);
+                CHECK(sup->file_availabilities == 0);
+                CHECK(folder_local->get_max_sequence() == sequence);
+                CHECK(files_local->size() == 3);
+            }
         }
     };
     F().run();
@@ -2120,6 +2179,7 @@ int _init() {
     REGISTER_TEST_CASE(test_watch_unwatch, "test_watch_unwatch", "[fs]");
     REGISTER_TEST_CASE(test_trivial_changes, "test_trivial_changes", "[fs]");
     REGISTER_TEST_CASE(test_hashing, "test_hashing", "[fs]");
+    REGISTER_TEST_CASE(test_rescan, "test_rescan", "[fs]");
     REGISTER_TEST_CASE(test_skip_scan_known, "test_skip_scan_known", "[fs]");
     REGISTER_TEST_CASE(test_new_dir_refinement, "test_new_dir_refinement", "[fs]");
     REGISTER_TEST_CASE(test_new_dir_without_refinement, "test_new_dir_without_refinement", "[fs]");
