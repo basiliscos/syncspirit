@@ -183,7 +183,7 @@ int folder_context_t::process(unexamined_t &child_info, stack_context_t &ctx) no
             auto seconds_ago = ctx.get_now() - child_info.last_write_time;
             if (seconds_ago < constants::tmp_min_age) {
                 auto path_str = narrow(child_info.path.generic_wstring());
-                LOG_DEBUG(log, "file '{}' is recently modified, ignoring", path_str);
+                LOG_DEBUG(log, "temporary file '{}' is recently modified, ignoring", path_str);
                 return 1;
             }
         }
@@ -392,18 +392,28 @@ int folder_context_t::process(incomplete_t &item, stack_context_t &ctx) noexcept
     auto name = narrow(item.path.stem().generic_wstring());
     auto name_view = std::string_view(name);
     auto self_device = ctx.cluster.get_device().get();
-    auto &entities = item.parent->get_entity()->get_children();
-    auto comparator = presentation::entity_t::name_comparator_t{};
-    auto it = std::lower_bound(entities.begin(), entities.end(), name_view, comparator);
+    auto action = model::advance_action_t::ignore;
     auto presence = (presentation::presence_t *)(nullptr);
-    auto ignore = false;
-    if (it != entities.end() && (*it)->get_path()->get_own_name() == name_view) {
-        presence = const_cast<presentation::presence_t *>((*it)->get_best());
-        if (presence && presence->get_device() == self_device) {
-            presence = nullptr;
+    auto ignore = [&]() -> bool {
+        auto seconds_ago = ctx.get_now() - item.last_write_time;
+        if (seconds_ago < constants::tmp_min_age) {
+            LOG_DEBUG(log, "temporary file '{}' is recently modified, ignoring", name);
+            return true;
+        } else {
+            return false;
+        }
+    }();
+    if (!ignore && item.parent) {
+        auto &entities = item.parent->get_entity()->get_children();
+        auto comparator = presentation::entity_t::name_comparator_t{};
+        auto it = std::lower_bound(entities.begin(), entities.end(), name_view, comparator);
+        if (it != entities.end() && (*it)->get_path()->get_own_name() == name_view) {
+            presence = const_cast<presentation::presence_t *>((*it)->get_best());
+            if (presence && presence->get_device() == self_device) {
+                presence = nullptr;
+            }
         }
     }
-    auto action = model::advance_action_t::ignore;
     if (presence) {
         auto cp = static_cast<const presentation::cluster_file_presence_t *>(presence);
         auto &peer_file = cp->get_file_info();

@@ -255,9 +255,8 @@ struct fixture_t {
 void test_fs() {
     struct F : fixture_t {
         void main() noexcept override {
-            int expected_events = test::wine_environment() ? 4 : 2;
             bfs::create_directories(root_path / "a/b/c/d/e");
-            await_events(expected_events);
+            await_events(4);
             REQUIRE(local_files->size() == 5);
             REQUIRE(local_files->by_name("a"));
             REQUIRE(local_files->by_name("a/b"));
@@ -267,7 +266,7 @@ void test_fs() {
 
             bfs::create_directories(root_path / L"a/b/c/подпапка");
             write_file(root_path / L"a/b/c/файлик.bin", "12345");
-            await_events(expected_events);
+            await_events(4);
             REQUIRE(local_files->by_name(narrow(L"a/b/c/подпапка")));
             auto file = local_files->by_name(narrow(L"a/b/c/файлик.bin"));
             REQUIRE(file);

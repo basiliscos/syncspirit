@@ -5,6 +5,7 @@
 #include "diff-builder.h"
 #include "config/fs.h"
 #include "hasher/hasher_plugin.h"
+#include "constants.h"
 #include "fs/fs_proxy.h"
 #include "fs/fs_slave.h"
 #include "fs/messages.h"
@@ -21,7 +22,7 @@
 #include "access.h"
 #include "utils/platform.h"
 #include "presentation/folder_entity.h"
-#include <format>
+#include <chrono>
 #include <boost/nowide/convert.hpp>
 
 #ifndef SYNCSPIRIT_WIN
@@ -1733,6 +1734,7 @@ void test_hashing_fail() {
 void test_incomplete() {
     struct F : fixture_t {
         void main() noexcept override {
+            using clock_t = std::chrono::system_clock;
             auto sha256 = peer_device->device_id().get_sha256();
             auto block_sz = fs::block_sizes[0];
             auto path = root_path / L"файл.syncspirit-tmp";
@@ -1758,9 +1760,11 @@ void test_incomplete() {
             proto::set_hash(b_2, hash_2);
             proto::set_offset(b_2, data_1.size());
             proto::set_size(b_2, data_2.size());
+            auto m_time = clock_t::to_time_t(clock_t::now()) - (constants::tmp_min_age * 2);
 
             SECTION("no in model => remove") {
                 write_file(path, "");
+                last_write_time(path, fs::from_unix(m_time));
                 builder->scan_start(folder->get_id()).apply(*sup);
 
                 CHECK(files->size() == 0);
@@ -1768,6 +1772,7 @@ void test_incomplete() {
             }
             SECTION("exists only in my model => remove") {
                 write_file(path, "");
+                last_write_time(path, fs::from_unix(m_time));
                 builder->local_update(folder->get_id(), pr_file)
                     .apply(*sup)
                     .then()
@@ -1787,6 +1792,8 @@ void test_incomplete() {
                     builder->scan_start(folder->get_id()).apply(*sup);
 
                     write_file(path, "");
+                    last_write_time(path, fs::from_unix(m_time));
+
                     builder->scan_start(folder->get_id()).apply(*sup);
 
                     CHECK(files->size() == 0);
@@ -1794,6 +1801,7 @@ void test_incomplete() {
 #ifndef SYNCSPIRIT_WIN
                 SECTION("cannot read tmp file") {
                     write_file(path, "12345");
+                    last_write_time(path, fs::from_unix(m_time));
                     auto status = bfs::status(path);
                     auto perms = static_cast<uint32_t>(status.permissions());
 
@@ -1816,9 +1824,11 @@ void test_incomplete() {
 #endif
                 SECTION("local version is better than remote (local file does exists)") {
                     write_file(path, "1234");
+                    last_write_time(path, fs::from_unix(m_time));
                     auto p = root_path / widen(file_name);
 
                     write_file(p, "12345");
+                    last_write_time(path, fs::from_unix(m_time));
                     auto status = bfs::status(p);
                     auto perms = static_cast<uint32_t>(status.permissions());
 
@@ -1851,6 +1861,7 @@ void test_incomplete() {
                 auto model_path = root_path / widen(file_name);
                 SECTION("all blocks match => rename & add into model") {
                     write_file(path, "1234567890");
+                    last_write_time(path, fs::from_unix(m_time));
                     auto status = bfs::status(path);
                     auto perms = static_cast<uint32_t>(status.permissions());
 
@@ -1880,6 +1891,7 @@ void test_incomplete() {
                 }
                 SECTION("1st block match") {
                     write_file(path, "1234500000");
+                    last_write_time(path, fs::from_unix(m_time));
                     auto status = bfs::status(path);
                     auto perms = static_cast<uint32_t>(status.permissions());
 
@@ -1897,6 +1909,7 @@ void test_incomplete() {
                 }
                 SECTION("2nd block match") {
                     write_file(path, "0000067890");
+                    last_write_time(path, fs::from_unix(m_time));
                     auto status = bfs::status(path);
                     auto perms = static_cast<uint32_t>(status.permissions());
 
@@ -1914,6 +1927,7 @@ void test_incomplete() {
                 }
                 SECTION("no block match") {
                     write_file(path, "0000000000");
+                    last_write_time(path, fs::from_unix(m_time));
                     auto status = bfs::status(path);
                     auto perms = static_cast<uint32_t>(status.permissions());
 
@@ -1927,6 +1941,7 @@ void test_incomplete() {
                 }
                 SECTION("synchronization lock => ignored") {
                     write_file(path, "0000000000");
+                    last_write_time(path, fs::from_unix(m_time));
                     auto status = bfs::status(path);
                     auto perms = static_cast<uint32_t>(status.permissions());
                     proto::set_permissions(pr_file, perms);

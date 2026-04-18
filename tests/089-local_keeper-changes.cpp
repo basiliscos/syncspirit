@@ -546,24 +546,45 @@ void test_ignoring_tmps() {
             using UT = fs::update_type_t;
             using Clock = steady_clock;
 
-            auto impl = GENERATE(I::inotify, I::kqueue, I::win32);
-            prepare(impl);
-            LOG_INFO(log, "impl: {}", static_cast<int>(impl));
-
             auto now = std::chrono::system_clock::now();
             auto seconds = std::chrono::system_clock::to_time_t(now);
 
-            auto file = proto::FileInfo();
-            auto file_name = fmt::format("some-file-name.bin{}", fs::tmp_suffix);
-            proto::set_name(file, file_name);
-            proto::set_permissions(file, default_perms);
-            proto::set_modified_s(file, seconds);
-            proto::set_type(file, FT::FILE);
+            SECTION("direct update of tmp") {
+                auto impl = GENERATE(I::inotify, I::kqueue, I::win32);
+                prepare(impl);
+                auto file_name = fmt::format("some-file-name.bin{}", fs::tmp_suffix);
 
-            auto update_type = GENERATE(UT::created, UT::content, UT::deleted, UT::meta);
+                auto file = proto::FileInfo();
+                proto::set_name(file, file_name);
+                proto::set_permissions(file, default_perms);
+                proto::set_modified_s(file, seconds);
+                proto::set_type(file, FT::FILE);
 
-            mk_update(file, update_type, false);
-            CHECK(files_local->size() == 0);
+                auto update_type = GENERATE(UT::created, UT::content, UT::deleted, UT::meta);
+                mk_update(file, update_type, false);
+                CHECK(files_local->size() == 0);
+            }
+
+            SECTION("indirect update of tmp") {
+                auto impl = GENERATE(I::kqueue);
+                prepare(impl);
+
+                auto file = proto::FileInfo();
+                proto::set_name(file, "dir");
+                proto::set_permissions(file, default_perms);
+                proto::set_type(file, FT::DIRECTORY);
+
+                expect_dir_scan({});
+                mk_update(file, UT::content, true);
+
+                auto path = fmt::format("/some/path/dir/some-file-name.bin{}", fs::tmp_suffix);
+                CHECK(files_local->size() == 1);
+
+                auto dir_children = child_infos_t{make_child(path, bfs::file_type::regular, 5, default_perms, seconds)};
+                expect_dir_scan(dir_children);
+                CHECK(files_local->size() == 1);
+                mk_update(file, UT::content, true);
+            }
         }
     };
     F().run();
