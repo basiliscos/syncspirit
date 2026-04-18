@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "utils.h"
 #include <cstdint>
@@ -7,6 +7,17 @@
 namespace syncspirit::fs {
 
 const std::string_view tmp_suffix = ".syncspirit-tmp";
+const std::wstring_view tmp_wsuffix = L".syncspirit-tmp";
+
+template <typename T> struct tmp_suffix_t;
+
+template <> struct tmp_suffix_t<char> {
+    inline static auto value = tmp_suffix;
+};
+
+template <> struct tmp_suffix_t<wchar_t> {
+    inline static auto value = tmp_wsuffix;
+};
 
 static const std::int32_t _block_sizes[] = {
     // clang-format off
@@ -69,13 +80,22 @@ bfs::path make_temporal(const bfs::path &path) noexcept {
     return copy;
 }
 
-bool is_temporal(const bfs::path &path) noexcept {
-    if (!path.has_extension()) {
-        return false;
+template <typename T> static bool _is_temporal(const T &full_name) {
+    auto tmp_suffix = tmp_suffix_t<typename T::value_type>::value;
+    if (full_name.size() >= tmp_suffix.size()) {
+        auto ptr_1 = full_name.data() + full_name.size() - tmp_suffix.size();
+        auto ptr_2 = tmp_suffix.data();
+        for (size_t i = 0; i < tmp_suffix.size(); ++i, ++ptr_1, ++ptr_2) {
+            if (*ptr_1 != *ptr_2) {
+                return false;
+            }
+        }
+        return true;
     }
-    auto ext = path.extension().generic_string();
-    return ext == tmp_suffix;
+    return false;
 }
+
+bool is_temporal(const bfs::path &path) noexcept { return _is_temporal(path.native()); }
 
 bfs::path relativize(const bfs::path &path, const bfs::path &root) noexcept {
     auto it_path = path.begin();
