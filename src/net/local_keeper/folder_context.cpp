@@ -4,6 +4,7 @@
 #include "folder_slave.h"
 #include "folder_context.h"
 #include "hash_context.h"
+#include "constants.h"
 #include "fs/utils.h"
 #include "model/diff/advance/local_update.h"
 #include "model/diff/local/blocks_availability.h"
@@ -178,6 +179,14 @@ int folder_context_t::process(unexamined_t &child_info, stack_context_t &ctx) no
     } else {
         using namespace presentation;
         assert(type == proto::FileInfoType::FILE);
+        if (fs::is_temporal(child_info.path)) {
+            auto seconds_ago = ctx.get_now() - child_info.last_write_time;
+            if (seconds_ago < constants::tmp_min_age) {
+                auto path_str = narrow(child_info.path.generic_wstring());
+                LOG_DEBUG(log, "file '{}' is recently modified, ignoring", path_str);
+                return 1;
+            }
+        }
         if (!child_info.size || self) {
             stack.emplace_front(child_ready_t(std::move(child_info)));
         } else {

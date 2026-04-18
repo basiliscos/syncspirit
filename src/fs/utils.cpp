@@ -80,10 +80,9 @@ bfs::path make_temporal(const bfs::path &path) noexcept {
     return copy;
 }
 
-template <typename T> static bool _is_temporal(const T &full_name) {
-    auto tmp_suffix = tmp_suffix_t<typename T::value_type>::value;
-    if (full_name.size() >= tmp_suffix.size()) {
-        auto ptr_1 = full_name.data() + full_name.size() - tmp_suffix.size();
+template <typename T> static bool _is_temporal(const T *ptr, const T *end) {
+    if ((end - ptr) >= tmp_suffix.size()) {
+        auto ptr_1 = end - tmp_suffix.size();
         auto ptr_2 = tmp_suffix.data();
         for (size_t i = 0; i < tmp_suffix.size(); ++i, ++ptr_1, ++ptr_2) {
             if (*ptr_1 != *ptr_2) {
@@ -95,7 +94,12 @@ template <typename T> static bool _is_temporal(const T &full_name) {
     return false;
 }
 
-bool is_temporal(const bfs::path &path) noexcept { return _is_temporal(path.native()); }
+bool is_temporal(const bfs::path &path) noexcept {
+    auto &str = path.native();
+    return _is_temporal(str.data(), str.data() + str.size());
+}
+
+bool is_temporal(const std::string_view path) noexcept { return _is_temporal(path.data(), path.data() + path.size()); }
 
 bfs::path relativize(const bfs::path &path, const bfs::path &root) noexcept {
     auto it_path = path.begin();

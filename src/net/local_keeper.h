@@ -89,7 +89,6 @@ struct SYNCSPIRIT_API local_keeper_t final : public r::actor_base_t, private mod
     outcome::result<void> operator()(const model::diff::modify::remove_folder_t &, void *custom) noexcept override;
 
     using r::actor_base_t::make_error;
-
     utils::logger_t log;
     model::sequencer_ptr_t sequencer;
     model::cluster_ptr_t cluster;

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #pragma once
 
@@ -25,6 +25,7 @@ struct block_division_t {
 
 SYNCSPIRIT_API bfs::path make_temporal(const bfs::path &path) noexcept;
 SYNCSPIRIT_API bool is_temporal(const bfs::path &path) noexcept;
+SYNCSPIRIT_API bool is_temporal(const std::string_view path) noexcept;
 SYNCSPIRIT_API block_division_t get_block_size(int64_t file_size, int32_t prev_size) noexcept;
 SYNCSPIRIT_API bfs::path relativize(const bfs::path &path, const bfs::path &root) noexcept;
 SYNCSPIRIT_API std::int64_t to_unix(const fs_time_t &at);

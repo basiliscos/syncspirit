@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Ivan Baidakou
 
 #include "stack_context.h"
+#include <chrono>
 
 using namespace syncspirit::net::local_keeper;
 
@@ -9,7 +10,7 @@ stack_context_t::stack_context_t(model::cluster_t &cluster_, model::sequencer_t 
                                  std::int32_t hashes_pool_max_, std::int32_t diffs_left_,
                                  syncspirit_watcher_impl_t watcher_impl_) noexcept
     : cluster{cluster_}, sequencer{sequencer_}, hashes_pool{hashes_pool_}, hashes_pool_max{hashes_pool_max_},
-      slave{nullptr}, next{nullptr}, diffs_left{diffs_left_}, watcher_impl{watcher_impl_} {}
+      slave{nullptr}, next{nullptr}, diffs_left{diffs_left_}, watcher_impl{watcher_impl_}, now{0} {}
 
 void stack_context_t::push(model::diff::cluster_diff_t *d) noexcept {
     --diffs_left;
@@ -19,4 +20,12 @@ void stack_context_t::push(model::diff::cluster_diff_t *d) noexcept {
         next = d;
         diff = d;
     }
+}
+
+std::int64_t stack_context_t::get_now() noexcept {
+    using clock_t = std::chrono::system_clock;
+    if (!now) {
+        now = clock_t::to_time_t(clock_t::now());
+    }
+    return now;
 }

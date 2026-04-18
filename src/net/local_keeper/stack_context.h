@@ -24,6 +24,8 @@ struct stack_context_t {
     virtual bool has_in_progress_io() const noexcept = 0;
     virtual rotor::address_ptr_t get_back_address() const noexcept = 0;
 
+    std::int64_t get_now() noexcept;
+
     model::cluster_t &cluster;
     model::sequencer_t &sequencer;
 
@@ -35,6 +37,7 @@ struct stack_context_t {
     folder_slave_t *slave;
     model::diff::cluster_diff_ptr_t diff;
     model::diff::cluster_diff_t *next;
+    std::int64_t now;
 };
 
 } // namespace local_keeper

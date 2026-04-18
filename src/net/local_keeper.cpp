@@ -18,6 +18,8 @@
 #include "presentation/folder_entity.h"
 #include "presentation/folder_presence.h"
 #include "utils/string_comparator.hpp"
+#include "fs/utils.h"
+#include "constants.h"
 
 #include <boost/nowide/convert.hpp>
 #include <iterator>
@@ -445,6 +447,16 @@ void local_keeper_t::on_changes(model::folder_info_t &local_folder, fs::payload:
             scheduled_dirs.emplace(n);
         }
         if (update) {
+            if (proto::get_type(change) == proto::FileInfoType::FILE) {
+                if (fs::is_temporal(name)) {
+                    auto seconds_ago = stack_ctx.get_now() - proto::get_modified_s(change);
+                    if (seconds_ago < constants::tmp_min_age) {
+                        LOG_DEBUG(log, "file '{}' is recently modified, ignoring", name);
+                        return;
+                    }
+                }
+            }
+
             auto renamed = (change.update_reason == UT::meta) && !change.prev_path.empty();
             if (renamed) {
                 handle_rename(change, local_folder, stack_ctx, diff_counter);

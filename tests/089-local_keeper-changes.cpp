@@ -14,6 +14,7 @@
 #include "test_supervisor.h"
 #include "access.h"
 #include "utils/platform.h"
+#include <chrono>
 #include <format>
 #include <variant>
 #include <boost/nowide/convert.hpp>
@@ -49,7 +50,8 @@ struct my_supervisort_t : supervisor_t {
     using parent_t = supervisor_t;
     using parent_t::parent_t;
 
-    outcome::result<void> operator()(const model::diff::local::file_availability_t &diff, void *custom) noexcept override {
+    outcome::result<void> operator()(const model::diff::local::file_availability_t &diff,
+                                     void *custom) noexcept override {
         ++file_availabilities;
         return parent_t::operator()(diff, custom);
     }
@@ -535,6 +537,38 @@ void test_trivial_changes() {
     F().run();
 }
 
+void test_ignoring_tmps() {
+    struct F : folder_fixture_t {
+        using parent_t = folder_fixture_t;
+        using parent_t::parent_t;
+        void main() noexcept override {
+            using namespace std::chrono;
+            using UT = fs::update_type_t;
+            using Clock = steady_clock;
+
+            auto impl = GENERATE(I::inotify, I::kqueue, I::win32);
+            prepare(impl);
+            LOG_INFO(log, "impl: {}", static_cast<int>(impl));
+
+            auto now = std::chrono::system_clock::now();
+            auto seconds = std::chrono::system_clock::to_time_t(now);
+
+            auto file = proto::FileInfo();
+            auto file_name = fmt::format("some-file-name.bin{}", fs::tmp_suffix);
+            proto::set_name(file, file_name);
+            proto::set_permissions(file, default_perms);
+            proto::set_modified_s(file, seconds);
+            proto::set_type(file, FT::FILE);
+
+            auto update_type = GENERATE(UT::created, UT::content, UT::deleted, UT::meta);
+
+            mk_update(file, update_type, false);
+            CHECK(files_local->size() == 0);
+        }
+    };
+    F().run();
+}
+
 void test_hashing() {
     struct F : folder_fixture_t {
         using parent_t = folder_fixture_t;
@@ -609,9 +643,9 @@ void test_rescan() {
             auto sequence = folder_local->get_max_sequence();
             CHECK(sequence == 3);
 
-            auto root_children = child_infos_t {make_child("/some/path/dir-a"), make_child("/some/path/dir-b") };
-            auto a_children = child_infos_t {make_child("/some/path/dir-a/x") };
-            auto no_children = child_infos_t {};
+            auto root_children = child_infos_t{make_child("/some/path/dir-a"), make_child("/some/path/dir-b")};
+            auto a_children = child_infos_t{make_child("/some/path/dir-a/x")};
+            auto no_children = child_infos_t{};
 
             SECTION("rescan whole dir => get updates") {
                 expect_dir_scan(root_children);
@@ -2187,6 +2221,7 @@ int _init() {
     REGISTER_TEST_CASE(test_just_start, "test_just_start", "[fs]");
     REGISTER_TEST_CASE(test_watch_unwatch, "test_watch_unwatch", "[fs]");
     REGISTER_TEST_CASE(test_trivial_changes, "test_trivial_changes", "[fs]");
+    REGISTER_TEST_CASE(test_ignoring_tmps, "test_ignoring_tmps", "[fs]");
     REGISTER_TEST_CASE(test_hashing, "test_hashing", "[fs]");
     REGISTER_TEST_CASE(test_rescan, "test_rescan", "[fs]");
     REGISTER_TEST_CASE(test_skip_scan_known, "test_skip_scan_known", "[fs]");
