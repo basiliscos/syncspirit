@@ -4,7 +4,6 @@
 #include "local_keeper.h"
 #include "names.h"
 #include "model/diff/advance/local_update.h"
-#include "model/diff/load/interrupt.h"
 #include "model/diff/local/scan_start.h"
 #include "model/diff/local/scan_finish.h"
 #include "model/diff/modify/remove_folder.h"
@@ -34,12 +33,6 @@ namespace sys = boost::system;
 using boost::nowide::narrow;
 using boost::nowide::widen;
 using UT = fs::update_type_t;
-
-namespace {
-namespace resource {
-r::plugin::resource_id_t cluster = 0;
-} // namespace resource
-} // namespace
 
 struct local_keeper_t::lc_context_t final : local_keeper::stack_context_t {
     using parent_t = local_keeper::stack_context_t;
@@ -121,7 +114,6 @@ void local_keeper_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 plugin->subscribe_actor(&local_keeper_t::on_change, coordinator);
                 plugin->subscribe_actor(&local_keeper_t::on_model_update, coordinator);
                 plugin->subscribe_actor(&local_keeper_t::on_thread_ready, coordinator);
-                resources->acquire(resource::cluster);
             }
         });
     });
@@ -134,19 +126,26 @@ void local_keeper_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     });
 }
 
+void local_keeper_t::try_start_watching() noexcept {
+    if (watcher_impl != syncspirit_watcher_impl_t::none && !started_watching) {
+        if (cluster && fs_addr && watcher_addr) {
+            LOG_DEBUG(log, "starting watching...");
+            started_watching = true;
+            for (auto &[folder, _] : cluster->get_folders()) {
+                auto &f = *folder;
+                if (f.is_watched()) {
+                    route<fs::payload::watch_folder_t>(watcher_addr, address, f.get_path(), f.get_id());
+                }
+            }
+        }
+    }
+}
+
 void local_keeper_t::on_start() noexcept {
     LOG_TRACE(log, "on_start");
     send<model::payload::local_up_t>(coordinator);
     r::actor_base_t::on_start();
-
-    if (watcher_impl != syncspirit_watcher_impl_t::none) {
-        for (auto &[folder, _] : cluster->get_folders()) {
-            auto &f = *folder;
-            if (f.is_watched()) {
-                route<fs::payload::watch_folder_t>(watcher_addr, address, f.get_path(), f.get_id());
-            }
-        }
-    }
+    try_start_watching();
 }
 
 void local_keeper_t::shutdown_start() noexcept {
@@ -169,7 +168,7 @@ void local_keeper_t::on_thread_ready(model::message::thread_ready_t &message) no
     if (p.thread_id == std::this_thread::get_id()) {
         LOG_TRACE(log, "on_thread_ready");
         cluster = message.payload.cluster;
-        resources->release(resource::cluster);
+        try_start_watching();
     }
 }
 
