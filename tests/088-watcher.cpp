@@ -1426,7 +1426,6 @@ void test_kqueue_notification() {
                 child.status = bfs::file_status(type);
                 return child;
             };
-
             auto w = static_cast<fs::platform::unix::watcher_t *>(target.get());
             CHECK(w->path_map.size() == 1);
             CHECK(w->subdir_map.size() == 0);
@@ -1499,6 +1498,16 @@ void test_kqueue_notification() {
                 w->notify(task);
                 CHECK(w->path_map.size() == 5);
                 CHECK(w->path_to_wd.size() == 5);
+            }
+            SECTION("tmp-file in a dir") {
+                auto path_tmp = root_path / "my-file.syncspirit-tmp";
+                write_file(path_tmp / "my-file.syncspirit-tmp", "12345");
+                auto children = child_infos_t({make_child(path_tmp, bfs::file_type::regular)});
+                auto task = fs::task::scan_dir_t(root_path, {}, {}, true, true, false);
+                task.child_infos = children;
+                w->notify(task);
+                CHECK(w->path_map.size() == 1);
+                CHECK(w->path_to_wd.size() == 1);
             }
             SECTION("error in watching") {
                 auto path_x = root_path / "a";

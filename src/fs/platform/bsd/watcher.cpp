@@ -9,6 +9,7 @@
 
 #include "fs/fs_supervisor.h"
 #include "fs/task/scan_dir.h"
+#include "fs/utils.h"
 #include <fcntl.h>
 #include <limits.h>
 #include <memory_resource>
@@ -36,7 +37,9 @@ auto watcher_t::watch_path(std::string_view path, file_type_t type) noexcept -> 
     if (type == file_type_t::directory) {
         r = open(path.data(), O_RDONLY);
     } else if (type == file_type_t::regular) {
-        r = open(path.data(), O_RDONLY);
+        if (!is_temporal(path)) {
+            r = open(path.data(), O_RDONLY);
+        }
     }
 
     if (!r || *r < 0) {
