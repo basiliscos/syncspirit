@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "db_actor.h"
 #include "bouncer/messages.hpp"
@@ -98,9 +98,10 @@ db_actor_t::payload::commit_t::~commit_t() {
 
 db_actor_t::db_actor_t(config_t &config)
     : r::actor_base_t{config}, env{nullptr}, db_dir{config.db_dir}, db_config{config.db_config},
-      cluster{config.cluster} {
+      cluster{config.cluster}, max_files_per_diff(config.max_files_per_diff) {
     // mdbx_module_handler({}, {}, {});
     // mdbx_setup_debug(MDBX_LOG_TRACE, MDBX_DBG_ASSERT, &_my_log);
+    assert(max_files_per_diff);
     auto r = mdbx_env_create(&env);
     if (r != MDBX_SUCCESS) {
         auto log = utils::get_logger("net.db");
@@ -479,7 +480,7 @@ void db_actor_t::on_patrial_load(partial_load_t &message) noexcept {
 
     if (p.files_next) {
         bounce_again = true;
-        auto max_files = db_config.max_files_per_diff;
+        auto max_files = max_files_per_diff;
         auto ptr = p.files_next;
         auto begin = p.files.data();
         auto end = begin + p.files.size();

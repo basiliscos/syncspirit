@@ -12,8 +12,6 @@
 #include "utils/string_comparator.hpp"
 #include "syncspirit-config.h"
 
-#include <memory_resource>
-
 namespace syncspirit::net {
 
 namespace outcome = boost::outcome_v2;
@@ -29,7 +27,6 @@ using folder_context_ptr_t = boost::intrusive_ptr<folder_context_t>;
 struct local_keeper_config_t : r::actor_config_t {
     model::sequencer_ptr_t sequencer;
     uint32_t concurrent_hashes;
-    std::int64_t files_scan_iteration_limit;
     syncspirit_watcher_impl_t watcher_impl = syncspirit_watcher_impl_t::none;
 };
 
@@ -44,10 +41,6 @@ template <typename Actor> struct local_keeper_config_builder_t : r::actor_config
     }
     builder_t &&concurrent_hashes(uint32_t value) && noexcept {
         parent_t::config.concurrent_hashes = value;
-        return std::move(*static_cast<typename parent_t::builder_t *>(this));
-    }
-    builder_t &&files_scan_iteration_limit(std::int64_t value) && noexcept {
-        parent_t::config.files_scan_iteration_limit = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
     builder_t &&watcher_impl(syncspirit_watcher_impl_t value) && noexcept {
@@ -81,7 +74,7 @@ struct SYNCSPIRIT_API local_keeper_t final : public r::actor_base_t, private mod
     void on_changes(model::folder_info_t &, fs::payload::file_changes_t &, lc_context_t &) noexcept;
 
     void handle_rename(fs::payload::file_info_t &change, const model::folder_info_t &local_folder,
-                       lc_context_t &stack_ctx, std::int64_t &diff_counter) noexcept;
+                       lc_context_t &stack_ctx) noexcept;
 
     outcome::result<void> operator()(const model::diff::local::scan_start_t &, void *custom) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::upsert_folder_t &, void *custom) noexcept override;
@@ -94,7 +87,6 @@ struct SYNCSPIRIT_API local_keeper_t final : public r::actor_base_t, private mod
     r::address_ptr_t coordinator;
     r::address_ptr_t fs_addr;
     r::address_ptr_t watcher_addr;
-    std::int64_t files_scan_iteration_limit;
     syncspirit_watcher_impl_t watcher_impl;
     std::int32_t concurrent_hashes_left;
     std::int32_t concurrent_hashes_limit;

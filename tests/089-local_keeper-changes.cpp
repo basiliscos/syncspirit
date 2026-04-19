@@ -71,8 +71,6 @@ struct fixture_t {
 
     virtual std::uint32_t get_hash_limit() { return 1; }
 
-    virtual std::int64_t get_iterations_limit() { return 100; }
-
     virtual void on_watch_folder(fs::message::watch_folder_t &msg) {
         CHECK(!watch_folder_msg);
         watch_folder_msg = &msg;
@@ -148,7 +146,6 @@ struct fixture_t {
                      .timeout(timeout)
                      .sequencer(sequencer)
                      .concurrent_hashes(get_hash_limit())
-                     .files_scan_iteration_limit(get_iterations_limit())
                      .watcher_impl(impl)
                      .finish();
         sup->do_process();

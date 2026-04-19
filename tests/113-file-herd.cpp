@@ -158,7 +158,6 @@ struct fixture_t {
                            .timeout(timeout)
                            .sequencer(sequencer)
                            .concurrent_hashes(10)
-                           .files_scan_iteration_limit(100)
                            .watcher_impl(syncspirit_watcher_impl)
                            .finish();
     }

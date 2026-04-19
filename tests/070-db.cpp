@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include <catch2/catch_all.hpp>
 #include "db/error_code.h"
@@ -104,7 +104,7 @@ struct fixture_t {
         return cluster;
     }
 
-    virtual config::db_config_t make_config() noexcept { return config::db_config_t{1024 * 1024, 0, 64, 32}; }
+    virtual config::db_config_t make_config() noexcept { return config::db_config_t{1024 * 1024, 0, 64}; }
 
     virtual supervisor_ptr_t make_supervisor(r::system_context_t &ctx) noexcept {
         return ctx.create_supervisor<db_supervisor_t>().timeout(timeout).create_registry().finish();
@@ -156,6 +156,8 @@ struct fixture_t {
         return counter;
     }
 
+    virtual std::uint32_t get_max_files_per_diff() const { return 32; }
+
     virtual void launch_db() {
         db_actor = sup->create_actor<db_actor_t>()
                        .bouncer_address(sup->get_address())
@@ -163,6 +165,7 @@ struct fixture_t {
                        .db_dir(root_path)
                        .db_config(make_config())
                        .timeout(timeout)
+                       .max_files_per_diff(get_max_files_per_diff())
                        .finish();
         db_addr = db_actor->get_address();
         sup->do_process();
@@ -1362,7 +1365,7 @@ void test_corrupted_file() {
 void test_flush_on_shutdown() {
     struct F : fixture_t {
 
-        config::db_config_t make_config() noexcept override { return config::db_config_t{1024 * 1024, 100, 64, 32}; }
+        config::db_config_t make_config() noexcept override { return config::db_config_t{1024 * 1024, 100, 64}; }
 
         void main() noexcept override {
 
@@ -1406,10 +1409,17 @@ void test_flush_on_shutdown() {
     F().run();
 };
 
-void test_iterative_loading() {
-    struct F : fixture_t {
+struct min_concurrencty_fixture_t : fixture_t {
+    using parent_t = fixture_t;
+    using parent_t::parent_t;
 
-        config::db_config_t make_config() noexcept override { return config::db_config_t{1024 * 1024, 0, 1, 1}; }
+    std::uint32_t get_max_files_per_diff() const override { return 1; }
+};
+
+void test_iterative_loading() {
+    struct F : min_concurrencty_fixture_t {
+
+        config::db_config_t make_config() noexcept override { return config::db_config_t{1024 * 1024, 0, 1}; }
 
         void main() noexcept override {
 
@@ -1443,9 +1453,9 @@ void test_iterative_loading() {
 };
 
 void test_iterative_loading_interrupt() {
-    struct F : fixture_t {
+    struct F : min_concurrencty_fixture_t {
 
-        config::db_config_t make_config() noexcept override { return config::db_config_t{1024 * 1024, 0, 1, 1}; }
+        config::db_config_t make_config() noexcept override { return config::db_config_t{1024 * 1024, 0, 1}; }
 
         supervisor_ptr_t make_supervisor(r::system_context_t &ctx) noexcept override {
             struct sup_t : db_supervisor_t {
@@ -1494,9 +1504,9 @@ void test_iterative_loading_interrupt() {
 
 template <typename T> using my_controller_base_t = model::diff::iterative_controller_t<T, r::actor_base_t>;
 void test_iterative_application_interrupt() {
-    struct F : fixture_t {
+    struct F : min_concurrencty_fixture_t {
 
-        config::db_config_t make_config() noexcept override { return config::db_config_t{1024 * 1024, 0, 1, 1}; }
+        config::db_config_t make_config() noexcept override { return config::db_config_t{1024 * 1024, 0, 1}; }
 
         void main() noexcept override {
 

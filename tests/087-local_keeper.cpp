@@ -96,8 +96,6 @@ struct fixture_t {
 
     virtual std::uint32_t get_hash_limit() { return 1; }
 
-    virtual std::int64_t get_iterations_limit() { return 100; }
-
     bool execute_slave(fs::payload::foreign_executor_t &slave) {
         static constexpr auto retension = pt::milliseconds{1};
         auto deadline = pt::microsec_clock::local_time() + retension;
@@ -205,7 +203,6 @@ struct fixture_t {
                      .timeout(timeout)
                      .sequencer(sequencer)
                      .concurrent_hashes(get_hash_limit())
-                     .files_scan_iteration_limit(get_iterations_limit())
                      .finish();
         sup->do_process();
 
@@ -2199,14 +2196,12 @@ void test_importing() {
 }
 
 void test_concurrency() {
-    static constexpr int N = 5;
-    static constexpr int M = 3;
+    static constexpr std::uint_fast32_t N = 5;
+    static constexpr auto M = constants::diffs_batch;
 
     struct F : fixture_t {
 
         void on_model_update(model::message::model_update_t &) noexcept override { ++local_updates; }
-
-        std::int64_t get_iterations_limit() override { return M; }
 
         void main() noexcept override {
             for (int i = 0; i < N; ++i) {
@@ -2214,9 +2209,8 @@ void test_concurrency() {
                 auto dir_name = std::string_view(&letter, 1);
                 auto dir_path = root_path / "sub-dir" / dir_name;
                 bfs::create_directories(dir_path);
-                for (int j = 0; j < M; ++j) {
-                    auto letter = static_cast<char>('1' + j);
-                    auto file_name = std::string_view(&letter, 1);
+                for (std::uint_fast32_t j = 0; j < M; ++j) {
+                    auto file_name = fmt::format("{:03}.bin", j);
                     auto file_path = dir_path / file_name;
                     write_file(file_path, "");
                 }

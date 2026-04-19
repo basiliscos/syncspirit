@@ -158,15 +158,6 @@ struct max_blocks_per_diff_t final : impl::positive_integer_t {
     void reflect_to(syncspirit::config::main_t &main) override;
 };
 
-struct max_files_per_diff_t final : impl::positive_integer_t {
-    using parent_t = impl::positive_integer_t;
-
-    static const char *explanation_;
-
-    max_files_per_diff_t(std::uint64_t value, std::uint64_t default_value);
-    void reflect_to(syncspirit::config::main_t &main) override;
-};
-
 struct uncommitted_threshold_t final : impl::positive_integer_t {
     using parent_t = impl::positive_integer_t;
 
@@ -217,15 +208,6 @@ struct skip_discovers_t final : impl::positive_integer_t {
 } // namespace dialer
 
 namespace fs {
-
-struct files_scan_iteration_limit_t final : impl::positive_integer_t {
-    using parent_t = impl::positive_integer_t;
-
-    static const char *explanation_;
-
-    files_scan_iteration_limit_t(std::uint64_t value, std::uint64_t default_value);
-    void reflect_to(syncspirit::config::main_t &main) override;
-};
 
 struct poll_timeout_t final : impl::positive_integer_t {
     using parent_t = impl::positive_integer_t;

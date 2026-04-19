@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "update_peer.h"
+#include "constants.h"
 #include "remove_ignored_device.h"
 #include "remove_pending_device.h"
 #include "db/prefix.h"
 #include "model/cluster.h"
 #include "model/misc/error_code.h"
+#include "model/diff/diff_assembler.h"
 #include "model/diff/cluster_visitor.h"
 #include "model/diff/apply_controller.h"
 #include "utils/format.hpp"
@@ -20,16 +22,16 @@ update_peer_t::update_peer_t(db::Device db, const model::device_id_t &device_id,
     LOG_DEBUG(log, "update_peer_t, peer = {}", device_id.get_short());
     auto &ignored_devices = cluster.get_ignored_devices();
     auto &pending_devices = cluster.get_pending_devices();
-    auto current = (cluster_diff_t *){nullptr};
+
+    auto assember = model::diff::diff_assember_t(constants::diffs_batch);
     if (auto pending_device = pending_devices.by_sha256(peer_id); pending_device) {
-        auto diff = cluster_diff_ptr_t{};
-        diff = new remove_pending_device_t(*pending_device);
-        current = assign_child(diff);
+        assember.push_back(new remove_pending_device_t(*pending_device));
     }
     if (auto ignored_device = ignored_devices.by_sha256(peer_id); ignored_device) {
-        auto diff = cluster_diff_ptr_t{};
-        diff = new remove_ignored_device_t(*ignored_device);
-        current = current ? current->assign_sibling(diff.get()) : assign_child(diff);
+        assember.push_back(new remove_ignored_device_t(*ignored_device));
+    }
+    if (assember.has_diffs()) {
+        assign_child(assember.consume());
     }
 }
 

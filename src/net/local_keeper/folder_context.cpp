@@ -116,7 +116,7 @@ bool folder_context_t::process_stack(stack_context_t &ctx) noexcept {
         }
         try_next = r > 0;
         if (try_next) {
-            if (ctx.diffs_left <= 0 && !stack.empty() && has_no_tasks()) {
+            if (ctx.is_overused() && !stack.empty() && has_no_tasks()) {
                 push(fs::task::noop_t());
                 break;
             }
@@ -132,7 +132,7 @@ int folder_context_t::process(complete_scan_t &, stack_context_t &ctx) noexcept 
         auto folder_id = folder->get_id();
         auto now = r::pt::microsec_clock::local_time();
         LOG_DEBUG(log, "pushing scan_finish");
-        ctx.push(new model::diff::local::scan_finish_t(folder_id, now));
+        ctx.push_back(new model::diff::local::scan_finish_t(folder_id, now));
         return 1;
     }
     return -1;
@@ -248,7 +248,7 @@ int folder_context_t::process(suspend_scan_t &item, stack_context_t &ctx) noexce
     auto folder = local_folder->get_folder();
     auto &ec = item.ec;
     LOG_WARN(log, "suspending due to: {}", ec.message());
-    ctx.push(new model::diff::modify::suspend_folder_t(*folder, true, ec));
+    ctx.push_back(new model::diff::modify::suspend_folder_t(*folder, true, ec));
     auto it = stack.begin();
     std::advance(it, 1);
     while (it != stack.end() && (&*it != &stack.back())) {
@@ -260,7 +260,7 @@ int folder_context_t::process(suspend_scan_t &item, stack_context_t &ctx) noexce
 int folder_context_t::process(unsuspend_scan_t &, stack_context_t &ctx) noexcept {
     auto folder = local_folder->get_folder();
     LOG_TRACE(log, "un-suspending");
-    ctx.push(new model::diff::modify::suspend_folder_t(*folder, false));
+    ctx.push_back(new model::diff::modify::suspend_folder_t(*folder, false));
     return 1;
 }
 
@@ -299,7 +299,7 @@ int folder_context_t::process(child_ready_t &info, stack_context_t &ctx) noexcep
         }
         if (match) {
             if (!file.is_local()) {
-                ctx.push(new local::file_availability_t(&file, *local_folder));
+                ctx.push_back(new local::file_availability_t(&file, *local_folder));
             }
         } else {
             if (info.size && info.blocks.empty()) {
@@ -316,7 +316,7 @@ int folder_context_t::process(child_ready_t &info, stack_context_t &ctx) noexcep
         auto folder = local_folder->get_folder();
         auto folder_id = folder->get_id();
         auto data = info.serialize(*local_folder, std::move(info.blocks), ignore_permissions);
-        ctx.push(new advance::local_update_t(ctx.cluster, ctx.sequencer, std::move(data), folder_id));
+        ctx.push_back(new advance::local_update_t(ctx.cluster, ctx.sequencer, std::move(data), folder_id));
     }
     return 1;
 }
@@ -351,7 +351,7 @@ int folder_context_t::process(removed_dir_t &item, stack_context_t &ctx) noexcep
     auto dir = static_cast<presentation::local_file_presence_t *>(item.presence.get());
     auto dir_data = dir->get_file_info().as_proto(false);
     proto::set_deleted(dir_data, true);
-    ctx.push(new local_update_t(ctx.cluster, ctx.sequencer, std::move(dir_data), folder_id));
+    ctx.push_back(new local_update_t(ctx.cluster, ctx.sequencer, std::move(dir_data), folder_id));
     auto dirs_stack = dirs_stack_t(stack);
     auto children = item.presence->get_children();
     for (auto child : item.presence->get_children()) {
@@ -361,7 +361,7 @@ int folder_context_t::process(removed_dir_t &item, stack_context_t &ctx) noexcep
             auto file = static_cast<presentation::local_file_presence_t *>(child);
             auto file_data = file->get_file_info().as_proto(false);
             proto::set_deleted(file_data, true);
-            ctx.push(new local_update_t(ctx.cluster, ctx.sequencer, std::move(file_data), folder_id));
+            ctx.push_back(new local_update_t(ctx.cluster, ctx.sequencer, std::move(file_data), folder_id));
         }
     }
     return 1;
@@ -370,7 +370,7 @@ int folder_context_t::process(removed_dir_t &item, stack_context_t &ctx) noexcep
 int folder_context_t::process(confirmed_deleted_t &item, stack_context_t &ctx) {
     auto dir_presence = static_cast<presentation::local_file_presence_t *>(item.presence.get());
     auto &dir = const_cast<model::file_info_t &>(dir_presence->get_file_info());
-    ctx.push(new model::diff::local::file_availability_t(&dir, *local_folder));
+    ctx.push_back(new model::diff::local::file_availability_t(&dir, *local_folder));
 
     auto dirs_stack = dirs_stack_t(stack);
     for (auto child : item.presence->get_children()) {
@@ -381,7 +381,7 @@ int folder_context_t::process(confirmed_deleted_t &item, stack_context_t &ctx) {
             } else {
                 auto file_presence = static_cast<presentation::local_file_presence_t *>(child);
                 auto &file = const_cast<model::file_info_t &>(file_presence->get_file_info());
-                ctx.push(new model::diff::local::file_availability_t(&file, *local_folder));
+                ctx.push_back(new model::diff::local::file_availability_t(&file, *local_folder));
             }
         }
     }
@@ -498,7 +498,7 @@ int folder_context_t::process(rehashed_incomplete_t &item, stack_context_t &ctx)
                 LOG_DEBUG(log, "matched {} of {} blocks of '{}'", matched, blocks.size(),
                           narrow(item.path.generic_wstring()));
                 auto &peer_folder = cp->get_folder()->get_folder_info();
-                ctx.push(new blocks_availability_t(peer_file, peer_folder, std::move(valid_blocks)));
+                ctx.push_back(new blocks_availability_t(peer_file, peer_folder, std::move(valid_blocks)));
             } else {
                 schedule_removal = true;
             }
@@ -668,7 +668,8 @@ void folder_context_t::post_process(fs::task::scan_dir_t &task, stack_context_t 
                             auto file = static_cast<presentation::local_file_presence_t *>(child);
                             auto file_data = file->get_file_info().as_proto(false);
                             proto::set_deleted(file_data, true);
-                            ctx.push(new local_update_t(ctx.cluster, ctx.sequencer, std::move(file_data), folder_id));
+                            ctx.push_back(
+                                new local_update_t(ctx.cluster, ctx.sequencer, std::move(file_data), folder_id));
                         }
                     } else {
                         auto &target_stack = is_dir ? dirs_stack : stack;
@@ -696,7 +697,7 @@ void folder_context_t::post_process(fs::task::scan_dir_t &task, stack_context_t 
             auto presence = static_cast<const presentation::cluster_file_presence_t *>(best);
             auto &peer_file = presence->get_file_info();
             auto pr_file = peer_file.as_proto(true);
-            ctx.push(new local_update_t(ctx.cluster, ctx.sequencer, std::move(pr_file), folder_id));
+            ctx.push_back(new local_update_t(ctx.cluster, ctx.sequencer, std::move(pr_file), folder_id));
             if (best->get_features() & F::directory) {
                 for (auto c : child_entity->get_children()) {
                     auto best = child_entity->get_best();
@@ -736,7 +737,7 @@ void folder_context_t::post_process(fs::task::segment_iterator_t &task, stack_co
                 auto file_presence = static_cast<presentation::local_file_presence_t *>(presence);
                 auto &file = const_cast<model::file_info_t &>(file_presence->get_file_info());
                 auto local_fi = local_folder.get();
-                ctx.push(new model::diff::modify::mark_reachable_t(file, *local_fi, false));
+                ctx.push_back(new model::diff::modify::mark_reachable_t(file, *local_fi, false));
             } else if (hash_file.incomplete) {
                 LOG_DEBUG(log, "scheduling(3) removal of '{}'", path_str);
                 push(fs::task::remove_file_t(task.path));
@@ -769,7 +770,7 @@ void folder_context_t::post_process(fs::task::rename_file_t &task, stack_context
         auto &peer_folder = cp->get_folder()->get_folder_info();
         auto &sequencer = ctx.sequencer;
         auto diff = model::diff::advance::advance_t::create(item.action, peer_file, peer_folder, sequencer);
-        ctx.push(diff.get());
+        ctx.push_back(diff.get());
     }
 }
 
@@ -845,7 +846,7 @@ void folder_context_t::handle_scan_error(fs::task::scan_dir_t &task, stack_conte
             auto &file = file_presence->get_file_info();
             auto diff = model::diff::cluster_diff_ptr_t();
             diff.reset(new model::diff::modify::mark_reachable_t(file, *local_fi, false));
-            ctx.push(diff.get());
+            ctx.push_back(diff.get());
 
             for (auto &child : presence->get_children()) {
                 if (child->get_features() & F::local) {

@@ -3,6 +3,7 @@
 
 #include "bouncer/messages.hpp"
 #include "cluster_supervisor.h"
+#include "constants.h"
 #include "db_actor.h"
 #include "local_discovery_actor.h"
 #include "model/diff/advance/advance.h"
@@ -133,6 +134,7 @@ void net_supervisor_t::launch_early() noexcept {
                   .db_dir(app_config.config_path / "mdbx-db")
                   .db_config(app_config.db_config)
                   .cluster(cluster)
+                  .max_files_per_diff(constants::diffs_batch)
                   .escalate_failure()
                   .finish()
                   ->get_address();
@@ -140,7 +142,6 @@ void net_supervisor_t::launch_early() noexcept {
 
     create_actor<local_keeper_t>()
         .concurrent_hashes(app_config.hasher_threads)
-        .files_scan_iteration_limit(app_config.fs_config.files_scan_iteration_limit)
         .watcher_impl(syncspirit_watcher_impl)
         .sequencer(sequencer)
         .escalate_failure()

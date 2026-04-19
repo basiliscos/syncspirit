@@ -41,7 +41,6 @@ auto reflect(const main_cfg_t &config, const main_cfg_t &default_config) -> cate
         auto props = properties_t{
             // clang-format off
             property_ptr_t(new db::max_blocks_per_diff_t(db.max_blocks_per_diff, db_def.max_blocks_per_diff)),
-            property_ptr_t(new db::max_files_per_diff_t(db.max_files_per_diff, db_def.max_files_per_diff)),
             property_ptr_t(new db::uncommitted_threshold_t(db.uncommitted_threshold, db_def.uncommitted_threshold)),
             property_ptr_t(new db::upper_limit_t(db.upper_limit, db_def.upper_limit)),
             // clang-format on
@@ -70,7 +69,6 @@ auto reflect(const main_cfg_t &config, const main_cfg_t &default_config) -> cate
             property_ptr_t(new fs::temporally_timeout_t(f.temporally_timeout, f_def.temporally_timeout)),
             property_ptr_t(new fs::poll_timeout_t(f.poll_timeout, f_def.poll_timeout)),
             property_ptr_t(new fs::retension_timeout_t(f.retension_timeout, f_def.retension_timeout)),
-            property_ptr_t(new fs::files_scan_iteration_limit_t(f.files_scan_iteration_limit, f_def.files_scan_iteration_limit)),
             // clang-format on
         };
         return new category_t("fs", "filesystem settings", std::move(props));

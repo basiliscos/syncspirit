@@ -3,7 +3,6 @@
 
 #include "properties.h"
 #include "utils/log.h"
-#include "model/device_id.h"
 #include <charconv>
 #include <boost/nowide/convert.hpp>
 #include <filesystem>
@@ -216,15 +215,6 @@ void max_blocks_per_diff_t::reflect_to(syncspirit::config::main_t &main) {
 const char *max_blocks_per_diff_t::explanation_ =
     "maximum number of blocks per single diff (to display progress in UI)";
 
-max_files_per_diff_t::max_files_per_diff_t(std::uint64_t value, std::uint64_t default_value)
-    : parent_t("max_files_per_diff", explanation_, value, default_value) {}
-
-void max_files_per_diff_t::reflect_to(syncspirit::config::main_t &main) {
-    main.db_config.max_files_per_diff = native_value;
-}
-
-const char *max_files_per_diff_t::explanation_ = "maximum number of files per single diff (to display progress in UI)";
-
 uncommitted_threshold_t::uncommitted_threshold_t(std::uint64_t value, std::uint64_t default_value)
     : parent_t("uncommitted_threshold", explanation_, value, default_value) {}
 
@@ -268,15 +258,6 @@ const char *skip_discovers_t::explanation_ = "when peer addresses are known, how
 } // namespace dialer
 
 namespace fs {
-
-files_scan_iteration_limit_t::files_scan_iteration_limit_t(std::uint64_t value, std::uint64_t default_value)
-    : parent_t("files_scan_iteration_limit", explanation_, value, default_value) {}
-
-void files_scan_iteration_limit_t::reflect_to(syncspirit::config::main_t &main) {
-    main.fs_config.files_scan_iteration_limit = native_value;
-}
-
-const char *files_scan_iteration_limit_t::explanation_ = "max number processed files before emitting scan events";
 
 retension_timeout_t::retension_timeout_t(std::uint64_t value, std::uint64_t default_value)
     : parent_t("retension_timeout", explanation_, value, default_value) {}

@@ -13,6 +13,7 @@
 #include "db/transaction.h"
 #include "db/utils.h"
 #include "utils/bytes_comparator.hpp"
+#include <cstdint>
 
 namespace syncspirit {
 namespace net {
@@ -26,6 +27,7 @@ struct db_actor_config_t : r::actor_config_t {
     model::cluster_ptr_t cluster;
     size_t uncommitted_threshold = {100};
     r::address_ptr_t bouncer_address;
+    std::uint_fast32_t max_files_per_diff;
 };
 
 template <typename Actor> struct db_actor_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -47,6 +49,10 @@ template <typename Actor> struct db_actor_config_builder_t : r::actor_config_bui
     }
     builder_t &&bouncer_address(const r::address_ptr_t &value) && noexcept {
         parent_t::config.bouncer_address = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+    builder_t &&max_files_per_diff(std::uint_fast32_t value) && noexcept {
+        parent_t::config.max_files_per_diff = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };
@@ -155,6 +161,7 @@ struct SYNCSPIRIT_API db_actor_t : public r::actor_base_t, private model::diff::
     model::cluster_ptr_t cluster;
     transaction_ptr_t txn_holder;
     std::int_fast32_t uncommitted;
+    std::uint_fast32_t max_files_per_diff;
 };
 
 } // namespace net

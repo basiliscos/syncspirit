@@ -24,13 +24,12 @@ bool operator==(const dialer_config_t &lhs, const dialer_config_t &rhs) noexcept
 
 bool operator==(const fs_config_t &lhs, const fs_config_t &rhs) noexcept {
     return lhs.temporally_timeout == rhs.temporally_timeout && lhs.poll_timeout == rhs.poll_timeout &&
-           lhs.retension_timeout == rhs.retension_timeout &&
-           lhs.files_scan_iteration_limit == rhs.files_scan_iteration_limit;
+           lhs.retension_timeout == rhs.retension_timeout;
 }
 
 bool operator==(const db_config_t &lhs, const db_config_t &rhs) noexcept {
     return lhs.upper_limit == rhs.upper_limit && lhs.uncommitted_threshold == rhs.uncommitted_threshold &&
-           lhs.max_blocks_per_diff == rhs.max_blocks_per_diff && lhs.max_files_per_diff == rhs.max_files_per_diff;
+           lhs.max_blocks_per_diff == rhs.max_blocks_per_diff;
 }
 
 bool operator==(const global_announce_config_t &lhs, const global_announce_config_t &rhs) noexcept {

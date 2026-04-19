@@ -49,8 +49,7 @@ struct local_keeper_t::lc_context_t final : local_keeper::stack_context_t {
     using file_2_name_t = std::pmr::unordered_map<model::file_info_t *, std::pmr::string>;
 
     lc_context_t(local_keeper_t *k, folder_slave_t *slave) noexcept
-        : parent_t(*k->cluster, *k->sequencer, k->concurrent_hashes_left, k->concurrent_hashes_limit,
-                   k->files_scan_iteration_limit, k->watcher_impl),
+        : parent_t(*k->cluster, *k->sequencer, k->concurrent_hashes_left, k->concurrent_hashes_limit, k->watcher_impl),
           actor(k), pool(buffer.data(), buffer.size()), allocator(&pool), name_2_file(allocator),
           file_2_name(allocator) {
         if (slave && !actor->delayed.empty()) {
@@ -77,8 +76,8 @@ struct local_keeper_t::lc_context_t final : local_keeper::stack_context_t {
                 std::move(new_contexts.begin(), new_contexts.end(), inserter);
             }
         }
-        if (diff) {
-            actor->send<model::payload::model_update_t>(actor->coordinator, std::move(diff));
+        if (has_diffs()) {
+            actor->send<model::payload::model_update_t>(actor->coordinator, consume());
         }
         actor->concurrent_hashes_left = hashes_pool;
     }
@@ -99,11 +98,9 @@ struct local_keeper_t::lc_context_t final : local_keeper::stack_context_t {
 local_keeper_t::local_keeper_t(config_t &config)
     : r::actor_base_t(config), sequencer{std::move(config.sequencer)},
       concurrent_hashes_left{static_cast<std::int32_t>(config.concurrent_hashes)},
-      concurrent_hashes_limit{concurrent_hashes_left}, files_scan_iteration_limit{config.files_scan_iteration_limit},
-      watcher_impl{config.watcher_impl} {
+      concurrent_hashes_limit{concurrent_hashes_left}, watcher_impl{config.watcher_impl} {
     assert(sequencer);
     assert(concurrent_hashes_left);
-    assert(files_scan_iteration_limit);
 }
 
 void local_keeper_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
@@ -341,7 +338,7 @@ void local_keeper_t::on_change(fs::message::folder_changes_t &message) noexcept 
 }
 
 void local_keeper_t::handle_rename(fs::payload::file_info_t &change, const model::folder_info_t &local_folder,
-                                   lc_context_t &stack_ctx, int64_t &diff_counter) noexcept {
+                                   lc_context_t &stack_ctx) noexcept {
     using namespace model::diff;
     using queue_t = std::pmr::list<model::file_info_t *>;
     using F = presentation::presence_t::features_t;
@@ -363,14 +360,7 @@ void local_keeper_t::handle_rename(fs::payload::file_info_t &change, const model
         }
     }
 
-    auto delete_diff = model::diff::cluster_diff_ptr_t();
-    auto push_delete = [&](model::diff::cluster_diff_t *diff) {
-        auto ex = std::move(delete_diff);
-        delete_diff = diff;
-        if (ex) {
-            delete_diff->sibling = std::move(ex);
-        }
-    };
+    auto assembler = model::diff::diff_assember_t(constants::diffs_batch);
     auto queue = queue_t(stack_ctx.allocator);
     queue.emplace_back(f_root.get());
     while (!queue.empty()) {
@@ -396,13 +386,8 @@ void local_keeper_t::handle_rename(fs::payload::file_info_t &change, const model
         LOG_DEBUG(log, "renaming '{}' -> '{}' in folder '{}'", p_name, new_sub_name, folder_id);
         proto::set_name(pr_new, new_sub_name);
         proto::set_deleted(pr_prev, true);
-        stack_ctx.push(new advance::local_update_t(*cluster, *sequencer, std::move(pr_new), folder_id));
-        push_delete(new advance::local_update_t(*cluster, *sequencer, std::move(pr_prev), folder_id, true));
-        ++diff_counter;
-        if ((diff_counter % files_scan_iteration_limit) == 0) {
-            stack_ctx.push(new load::interrupt_t());
-            push_delete(new load::interrupt_t());
-        }
+        stack_ctx.push_back(new advance::local_update_t(*cluster, *sequencer, std::move(pr_new), folder_id));
+        assembler.push_front(new advance::local_update_t(*cluster, *sequencer, std::move(pr_prev), folder_id, true));
 
         stack_ctx.name_2_file.emplace(new_sub_name, f);
         stack_ctx.file_2_name.insert_or_assign(f, new_sub_name);
@@ -419,8 +404,9 @@ void local_keeper_t::handle_rename(fs::payload::file_info_t &change, const model
             }
         }
     }
-    if (delete_diff) {
-        stack_ctx.push(delete_diff.get());
+    if (assembler.has_diffs()) {
+        auto diff = assembler.consume();
+        stack_ctx.push_back(diff.get());
     }
 }
 
@@ -438,7 +424,6 @@ void local_keeper_t::on_changes(model::folder_info_t &local_folder, fs::payload:
     auto unexamined = local_keeper::unexamined_items_t();
     auto augmentation = local_folder.get_augmentation().get();
     auto folder_presence = static_cast<presentation::folder_presence_t *>(augmentation);
-    auto diff_counter = std::int64_t{0};
 
     auto immediate_update = [&](fs::payload::file_info_t &change) {
         auto name = proto::get_name(change);
@@ -464,9 +449,9 @@ void local_keeper_t::on_changes(model::folder_info_t &local_folder, fs::payload:
 
             auto renamed = (change.update_reason == UT::meta) && !change.prev_path.empty();
             if (renamed) {
-                handle_rename(change, local_folder, stack_ctx, diff_counter);
+                handle_rename(change, local_folder, stack_ctx);
             } else {
-                stack_ctx.push(new advance::local_update_t(*cluster, *sequencer, std::move(change), folder_id));
+                stack_ctx.push_back(new advance::local_update_t(*cluster, *sequencer, std::move(change), folder_id));
             }
         } else {
             LOG_DEBUG(log, "ignoring update on '{}'", name);

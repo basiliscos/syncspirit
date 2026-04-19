@@ -197,13 +197,11 @@ static main_t make_default_config(const bfs::path &config_path, const bfs::path 
         86400000,   /* temporally_timeout, 24h default */
         1000,       /* poll_timeout, 1s by default */
         10'000,     /* retension_timeout, 10s by default */
-        128,        /* files_scan_iteration_limit max number processed files before emitting scan events */
     };
     cfg.db_config = db_config_t {
         0x0,           /* upper_limit, auto-adjust */
         150,           /* uncommitted_threshold */
         50*1024,       /* max blocks per diff */
-        5*1024,        /* max files per diff */
     };
 
     cfg.relay_config = relay_config_t {
@@ -350,7 +348,6 @@ config_result_t get_config(std::istream &config, const bfs::path &config_path) {
         SAFE_GET_VALUE(temporally_timeout, std::uint32_t, "fs");
         SAFE_GET_VALUE(poll_timeout, std::uint32_t, "fs");
         SAFE_GET_VALUE(retension_timeout, std::uint32_t, "fs");
-        SAFE_GET_VALUE(files_scan_iteration_limit, std::int64_t, "fs");
     }
 
     // db
@@ -362,7 +359,6 @@ config_result_t get_config(std::istream &config, const bfs::path &config_path) {
         SAFE_GET_VALUE(upper_limit, std::int64_t, "db");
         SAFE_GET_VALUE(uncommitted_threshold, std::uint32_t, "db");
         SAFE_GET_VALUE(max_blocks_per_diff, std::uint32_t, "db");
-        SAFE_GET_VALUE(max_files_per_diff, std::uint32_t, "db");
     }
 
     // fltk
@@ -482,13 +478,11 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
                    {"temporally_timeout", cfg.fs_config.temporally_timeout},
                    {"poll_timeout", cfg.fs_config.poll_timeout},
                    {"retension_timeout", cfg.fs_config.retension_timeout},
-                   {"files_scan_iteration_limit", cfg.fs_config.files_scan_iteration_limit},
                }}},
         {"db", toml::table{{
                    {"upper_limit", cfg.db_config.upper_limit},
                    {"uncommitted_threshold", cfg.db_config.uncommitted_threshold},
                    {"max_blocks_per_diff", cfg.db_config.max_blocks_per_diff},
-                   {"max_files_per_diff", cfg.db_config.max_files_per_diff},
                }}},
         {"relay", toml::table{{
                       {"enabled", cfg.relay_config.enabled},

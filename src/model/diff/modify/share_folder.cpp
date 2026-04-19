@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "share_folder.h"
+#include "constants.h"
 #include "model/cluster.h"
 #include "model/misc/error_code.h"
 #include "model/diff/cluster_visitor.h"
+#include "model/diff/diff_assembler.h"
 #include "remove_pending_folders.h"
 #include "upsert_folder_info.h"
 #include "utils/format.hpp"
@@ -39,15 +41,16 @@ share_folder_t::share_folder_t(const bu::uuid &uuid, const model::device_t &peer
     : folder_id{folder_id_} {
     peer_id = peer.device_id().get_sha256();
     LOG_DEBUG(log, "share_folder_t, with peer = {}, folder_id = {}", peer.device_id(), folder_id);
-    auto current = assign_child(new upsert_folder_info_t(uuid, peer.device_id(), introducer, folder_id, index_id));
+    auto assember = model::diff::diff_assember_t(constants::diffs_batch);
+    assember.push_back(new upsert_folder_info_t(uuid, peer.device_id(), introducer, folder_id, index_id));
     if (pf) {
         auto keys = remove_pending_folders_t::keys_t{};
         auto key = pf->get_key();
         auto bytes = utils::bytes_t(key.begin(), key.end());
         keys.emplace_back(std::move(bytes));
-        auto diff = cluster_diff_ptr_t{};
-        current = current->assign_sibling(new remove_pending_folders_t(std::move(keys)));
+        assember.push_back(new remove_pending_folders_t(std::move(keys)));
     }
+    assign_child(assember.consume());
 }
 
 auto share_folder_t::apply_impl(apply_controller_t &controller, void *custom) const noexcept -> outcome::result<void> {
