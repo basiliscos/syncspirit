@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
 
 #include "remove_folder.h"
+#include "constants.h"
 #include "unshare_folder.h"
 #include "remove_blocks.h"
 #include "model/cluster.h"
@@ -9,6 +10,7 @@
 #include "model/misc/orphaned_blocks.h"
 #include "model/diff/apply_controller.h"
 #include "model/diff/cluster_visitor.h"
+#include "model/diff/diff_assembler.h"
 #include "proto/proto-helpers-db.h"
 
 using namespace syncspirit::model::diff::modify;
@@ -19,21 +21,13 @@ remove_folder_t::remove_folder_t(const model::cluster_t &cluster, model::sequenc
     folder_key = folder.get_key();
     auto orphaned_blocks = orphaned_blocks_t();
     auto &folder_infos = folder.get_folder_infos();
-    auto current = (cluster_diff_t *){nullptr};
+    auto assember = model::diff::diff_assember_t(constants::diffs_batch);
     auto self = cluster.get_device();
     auto pending_folders = add_pending_folders_t::container_t();
-    auto assign = [&](cluster_diff_t *next) {
-        if (current) {
-            current = current->assign_sibling(next);
-        } else {
-            current = assign_child(next);
-        }
-    };
-
     for (auto &it : folder_infos) {
         auto &fi = *it.item;
         auto d = fi.get_device();
-        assign(new unshare_folder_t(cluster, *it.item, &orphaned_blocks));
+        assember.push_back(new unshare_folder_t(cluster, *it.item, &orphaned_blocks));
         if (d != self && fi.get_index()) {
             auto db = db::PendingFolder();
             auto &db_fi = db::get_folder_info(db);
@@ -60,12 +54,15 @@ remove_folder_t::remove_folder_t(const model::cluster_t &cluster, model::sequenc
 
     auto block_keys = orphaned_blocks.deduce();
     if (block_keys.size()) {
-        assign(new remove_blocks_t(std::move(block_keys)));
+        assember.push_back(new remove_blocks_t(std::move(block_keys)));
     }
     if (pending_folders.size()) {
-        assign(new add_pending_folders_t(std::move(pending_folders)));
+        assember.push_back(new add_pending_folders_t(std::move(pending_folders)));
     }
 
+    if (assember.has_diffs()) {
+        assign_child(assember.consume());
+    }
     LOG_DEBUG(log, "remove_folder_t, folder_id = {}", folder_id);
 }
 

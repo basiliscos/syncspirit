@@ -94,7 +94,8 @@ struct peer_request_context_t final : fs::payload::extendended_context_t {
 
 using C = controller_actor_t;
 
-C::stack_context_t::stack_context_t(controller_actor_t &actor_) noexcept : actor{actor_} {}
+C::stack_context_t::stack_context_t(controller_actor_t &actor_) noexcept
+    : parent_t{constants::diffs_batch}, actor{actor_} {}
 
 C::stack_context_t::~stack_context_t() {
     if (actor.state == r::state_t::OPERATIONAL) {
@@ -126,9 +127,9 @@ C::stack_context_t::~stack_context_t() {
             actor.resources->acquire(resource::fs);
         }
     }
-    if (next) {
+    if (has_diffs()) {
         auto &addr = actor.coordinator;
-        actor.send<model::payload::model_update_t>(addr, std::move(diff), &actor);
+        actor.send<model::payload::model_update_t>(addr, consume(), &actor);
     }
     if (!peer_data.empty()) {
         if (actor.peer_address) {
@@ -153,15 +154,6 @@ void C::stack_context_t::push(fs::payload::append_block_t command) noexcept {
         } else {
             actor.block_write_queue.emplace_back(std::move(command));
         }
-    }
-}
-
-void C::stack_context_t::push(model::diff::cluster_diff_ptr_t diff_) noexcept {
-    if (next) {
-        next = next->assign_sibling(diff_.get());
-    } else {
-        diff = std::move(diff_);
-        next = diff.get();
     }
 }
 
@@ -217,12 +209,12 @@ auto C::folder_synchronization_t::finish_fetching(utils::bytes_view_t hash, stac
 }
 
 void C::folder_synchronization_t::start_sync(stack_context_t &context) noexcept {
-    context.push(new model::diff::local::synchronization_start_t(folder->get_id()));
+    context.push_back(new model::diff::local::synchronization_start_t(folder->get_id()));
     synchronizing = true;
 }
 
 void C::folder_synchronization_t::finish_sync(stack_context_t &context) noexcept {
-    context.push(new model::diff::local::synchronization_finish_t(folder->get_id()));
+    context.push_back(new model::diff::local::synchronization_finish_t(folder->get_id()));
     synchronizing = false;
 }
 
@@ -1018,7 +1010,7 @@ void controller_actor_t::on_message(proto::ClusterConfig &message, stack_context
         LOG_ERROR(log, "error processing message from {} : {}", peer->device_id(), ec.message());
         return do_shutdown(make_error(ec));
     }
-    ctx.push(std::move(diff_opt).assume_value());
+    ctx.push_back(std::move(diff_opt).assume_value().get());
 }
 
 void controller_actor_t::on_message(proto::Index &msg, stack_context_t &ctx) noexcept {
@@ -1033,7 +1025,7 @@ void controller_actor_t::on_message(proto::Index &msg, stack_context_t &ctx) noe
     auto folder = cluster->get_folders().by_id(proto::get_folder(msg));
     auto file_count = proto::get_files_size(msg);
     LOG_DEBUG(log, "on_message (Index), folder = {}, files = {}", folder->get_label(), file_count);
-    ctx.push(std::move(diff_opt).assume_value());
+    ctx.push_back(std::move(diff_opt).assume_value().get());
 }
 
 void controller_actor_t::on_message(proto::IndexUpdate &msg, stack_context_t &ctx) noexcept {
@@ -1048,7 +1040,7 @@ void controller_actor_t::on_message(proto::IndexUpdate &msg, stack_context_t &ct
     auto folder = cluster->get_folders().by_id(proto::get_folder(msg));
     auto file_count = proto::get_files_size(msg);
     LOG_DEBUG(log, "on_message (IndexUpdate), folder = {}, files = {}", folder->get_label(), file_count);
-    ctx.push(std::move(diff_opt).assume_value());
+    ctx.push_back(diff_opt.assume_value().get());
 }
 
 void controller_actor_t::on_message(proto::Request &req, stack_context_t &ctx) noexcept {
@@ -1177,7 +1169,7 @@ void controller_actor_t::on_message(proto::Response &message, stack_context_t &c
             if (!file->is_unreachable()) {
                 LOG_WARN(log, "can't receive block from file '{}': {}; marking unreachable", *file, code_int);
                 file->mark_unreachable(true);
-                stack_ctx.push(new model::diff::modify::mark_reachable_t(*file, *peer_folder, false));
+                stack_ctx.push_back(new model::diff::modify::mark_reachable_t(*file, *peer_folder, false));
                 cancel_sync(file.get());
             }
         } else {
@@ -1202,13 +1194,12 @@ static inline void ack_block(block_ack_context_t *io_ctx, model::cluster_t *clus
                              controller_actor_t::stack_context_t &ctx) noexcept {
     using namespace model::diff;
     auto folder_id = io_ctx->folder->get_id();
-    auto diff = cluster_diff_ptr_t();
     auto name = std::string(io_ctx->target_file->get_name()->get_full_name());
     auto device_id = utils::bytes_t(io_ctx->target_folder->get_device()->device_id().get_sha256());
     auto hash = utils::bytes_t(io_ctx->block->get_hash());
-    diff.reset(new modify::block_ack_t(std::move(name), std::string(folder_id), std::move(device_id), std::move(hash),
-                                       io_ctx->block_index));
-    ctx.push(std::move(diff));
+    auto diff = new modify::block_ack_t(std::move(name), std::string(folder_id), std::move(device_id), std::move(hash),
+                                        io_ctx->block_index);
+    ctx.push_back(diff);
 }
 
 void controller_actor_t::postprocess_io(fs::payload::block_request_t &res, stack_context_t &ctx) noexcept {
@@ -1236,7 +1227,7 @@ void controller_actor_t::postprocess_io(fs::payload::remote_copy_t &res, stack_c
     assert(res.result);
     auto io_ctx = static_cast<remote_copy_context_t *>(res.context.get());
     auto diff = advance_t::create(io_ctx->action, *io_ctx->peer_file, *io_ctx->peer_folder, *sequencer);
-    ctx.push(std::move(diff));
+    ctx.push_back(diff.get());
 }
 
 void controller_actor_t::postprocess_io(fs::payload::append_block_t &res, stack_context_t &ctx) noexcept {
@@ -1254,7 +1245,7 @@ void controller_actor_t::postprocess_io(fs::payload::finish_file_t &res, stack_c
     auto io_ctx = static_cast<finish_file_context_t *>(res.context.get());
 
     auto diff = advance::advance_t::create(io_ctx->action, *io_ctx->peer_file, *io_ctx->peer_folder, *sequencer);
-    ctx.push(std::move(diff));
+    ctx.push_back(diff.get());
 }
 
 void controller_actor_t::on_digest(hasher::message::digest_t &res) noexcept {
@@ -1315,7 +1306,7 @@ void controller_actor_t::on_digest(hasher::message::digest_t &res) noexcept {
                 LOG_WARN(log, "digest mismatch for file '{}', expected = {}; marking unreachable", *file,
                          block->get_hash());
                 file->mark_unreachable(true);
-                stack_ctx.push(new model::diff::modify::mark_reachable_t(*file, *peer_folder, false));
+                stack_ctx.push_back(new model::diff::modify::mark_reachable_t(*file, *peer_folder, false));
             }
             do_release_block = true;
             try_next = true;

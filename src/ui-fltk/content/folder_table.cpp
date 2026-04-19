@@ -3,6 +3,8 @@
 
 #include "folder_table.h"
 
+#include "constants.h"
+#include "model/diff/diff_assembler.h"
 #include "model/diff/modify/remove_folder.h"
 #include "model/diff/modify/remove_blocks.h"
 #include "model/diff/modify/share_folder.h"
@@ -765,8 +767,8 @@ void folder_table_t::on_apply() {
         log->error("cannot create folder: {}", opt.assume_error().message());
         return;
     }
-    auto &diff = opt.value();
-    auto current = diff.get();
+    auto assember = model::diff::diff_assember_t(constants::diffs_batch);
+    assember.push_back(opt.assume_value().get());
 
     if (initially_shared_with.size()) {
         auto folder = description.get_folder();
@@ -780,16 +782,14 @@ void folder_table_t::on_apply() {
                     log->info("going to unshare folder '{}' with {}({})", folder->get_label(), device->get_name(),
                               device->device_id().get_short());
                     auto sub_diff = model::diff::cluster_diff_ptr_t{};
-                    sub_diff = new modify::unshare_folder_t(cluster, *folder_info, &orphaned_blocks);
-                    current = current->assign_sibling(sub_diff.get());
+                    assember.push_back(new modify::unshare_folder_t(cluster, *folder_info, &orphaned_blocks));
                 }
             }
         }
         if (auto orphaned_set = orphaned_blocks.deduce(); orphaned_set.size()) {
             log->info("going to remove {} orphaned blocks", orphaned_set.size());
             auto sub_diff = model::diff::cluster_diff_ptr_t{};
-            sub_diff = new modify::remove_blocks_t(std::move(orphaned_set));
-            current = current->assign_sibling(sub_diff.get());
+            assember.push_back(new modify::remove_blocks_t(std::move(orphaned_set)));
         }
     }
 
@@ -805,7 +805,7 @@ void folder_table_t::on_apply() {
     auto folder_id = db::get_id(folder_db);
     auto cb =
         devices.empty() ? sup.call_select_folder(folder_id) : sup.call_share_folders(folder_id, std::move(devices));
-    sup.send_model<model::payload::model_update_t>(diff, cb.get());
+    sup.send_model<model::payload::model_update_t>(assember.consume(), cb.get());
 }
 
 void folder_table_t::on_reset() {

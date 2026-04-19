@@ -140,6 +140,7 @@ add_library(syncspirit_core
     src/model/diff/block_diff.cpp
     src/model/diff/cluster_diff.cpp
     src/model/diff/cluster_visitor.cpp
+    src/model/diff/diff_assembler.cpp
     src/model/diff/iterative_controller.cpp
     src/model/diff/advance/advance.cpp
     src/model/diff/advance/local_update.cpp

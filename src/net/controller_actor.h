@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #pragma once
 
@@ -7,6 +7,7 @@
 #include "model/messages.h"
 #include "model/cluster.h"
 #include "model/diff/cluster_visitor.h"
+#include "model/diff/diff_assembler.h"
 #include "model/misc/file_iterator.h"
 #include "model/misc/block_iterator.h"
 #include "model/misc/updates_streamer.h"
@@ -127,19 +128,17 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     void shutdown_start() noexcept override;
     void shutdown_finish() noexcept override;
 
-    struct stack_context_t {
+    struct stack_context_t : model::diff::diff_assember_t {
+        using parent_t = model::diff::diff_assember_t;
         stack_context_t(controller_actor_t &actor_) noexcept;
         ~stack_context_t();
         void push(fs::payload::io_command_t command) noexcept;
         void push(fs::payload::append_block_t command) noexcept;
-        void push(model::diff::cluster_diff_ptr_t diff_) noexcept;
         void push(utils::bytes_t data) noexcept;
 
       private:
         using commands_t = std::vector<fs::payload::io_command_t>;
         controller_actor_t &actor;
-        model::diff::cluster_diff_ptr_t diff;
-        model::diff::cluster_diff_t *next = nullptr;
         commands_t io_commands;
         utils::bytes_t peer_data;
     };

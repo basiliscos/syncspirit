@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2026 Ivan Baidakou
 
 #include "app_supervisor.h"
 #include "augmentation.h"
+#include "constants.h"
 #include "main_window.h"
 #include "presence_item/folder.h"
 #include "tree_item/devices.h"
@@ -14,6 +15,7 @@
 #include "tree_item/peer_folders.h"
 #include "net/names.h"
 #include "config/utils.h"
+#include "model/diff/diff_assembler.h"
 #include "model/diff/advance/advance.h"
 #include "model/diff/local/io_failure.h"
 #include "model/diff/load/blocks.h"
@@ -315,8 +317,7 @@ callback_ptr_t app_supervisor_t::call_select_folder(std::string_view folder_id) 
 callback_ptr_t app_supervisor_t::call_share_folders(std::string_view folder_id, std::vector<utils::bytes_t> devices) {
     assert(devices.size());
     auto fn = callback_fn_t([this, folder_id = std::string(folder_id), devices = std::move(devices)]() {
-        auto diff = model::diff::cluster_diff_ptr_t{};
-        auto current = diff.get();
+        auto assember = model::diff::diff_assember_t(constants::diffs_batch);
         auto &self = cluster->get_device()->device_id();
         for (auto &sha256 : devices) {
             auto device = cluster->get_devices().by_sha256(sha256);
@@ -336,16 +337,10 @@ callback_ptr_t app_supervisor_t::call_share_folders(std::string_view folder_id, 
                 log->error("cannot share folder {} with {} : {}", folder_id, device->device_id(), message);
                 return;
             }
-            auto &sub_diff = opt.assume_value();
-            if (!current) {
-                diff = sub_diff;
-                current = diff.get();
-            } else {
-                current = current->assign_sibling(sub_diff.get());
-            }
+            assember.push_back(opt.assume_value().get());
         }
         auto cb = call_select_folder(folder_id);
-        send_model<model::payload::model_update_t>(std::move(diff), cb.get());
+        send_model<model::payload::model_update_t>(assember.consume(), cb.get());
     });
     auto cb = callback_ptr_t(new callback_impl_t(std::move(fn)));
     callbacks.push_back(cb);
