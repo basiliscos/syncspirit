@@ -45,7 +45,7 @@ void governor_actor_t::shutdown_start() noexcept {
 }
 
 void governor_actor_t::on_local_ready(model::message::local_ready_t &) noexcept {
-    LOG_TRACE(log, "on_local_ready");
+    LOG_INFO(log, "on_local_ready");
     process();
 }
 

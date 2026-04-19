@@ -143,7 +143,7 @@ struct fixture_t {
         CHECK(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::SHUT_DOWN);
     }
 
-    void launch_target(syncspirit_watcher_impl_t impl, bool app_ready = true) {
+    void launch_target(syncspirit_watcher_impl_t impl) {
         target = sup->create_actor<net::local_keeper_t>()
                      .timeout(timeout)
                      .sequencer(sequencer)
@@ -155,10 +155,6 @@ struct fixture_t {
 
         sup->send<syncspirit::model::payload::thread_ready_t>(sup->get_address(), cluster, std::this_thread::get_id());
         sup->do_process();
-        if (app_ready) {
-            sup->send<syncspirit::model::payload::app_ready_t>(sup->get_address());
-            sup->do_process();
-        }
     }
 
     void submit(r::message_ptr_t message) noexcept {
@@ -214,7 +210,7 @@ void test_watch_unwatch() {
                 auto folder = cluster->get_folders().by_id(folder_id);
                 REQUIRE(!create_dir_msg);
 
-                launch_target(impl, true);
+                launch_target(impl);
 
                 REQUIRE(!create_dir_msg);
                 REQUIRE(watch_folder_msg);
