@@ -5,6 +5,7 @@
 #include <rotor.hpp>
 #include <rotor/thread.hpp>
 #include "model/diff/apply_controller.h"
+#include "model/diff/diff_assembler.h"
 #include "model/diff/iterative_controller.h"
 #include "model/diff/advance/local_update.h"
 #include "model/diff/cluster_visitor.h"
@@ -138,16 +139,30 @@ void test_large_diffs_chain() {
             proto::set_name(pr_file, "root");
             proto::set_type(pr_file, proto::FileInfoType::DIRECTORY);
 
-            builder.local_update(folder_id, pr_file);
-            for (size_t i = 0; i < N; ++i) {
-                auto name = fmt::format("subdir-{}", i);
-                proto::set_name(pr_file, name);
-                builder.local_update(folder_id, pr_file);
-                if (i % I == 0) {
-                    builder.interrupt();
+            SECTION("via builder") {
+                builder.local_update(folder_id, pr_file).apply(*sup);
+                for (size_t i = 0; i < N; ++i) {
+                    auto name = fmt::format("subdir-{}", i);
+                    proto::set_name(pr_file, name);
+                    builder.local_update(folder_id, pr_file);
+                    if (i % I == 0) {
+                        builder.interrupt();
+                    }
                 }
+                builder.apply(*sup);
             }
-            builder.apply(*sup);
+            SECTION("via assembler") {
+                auto assember = model::diff::diff_assember_t(I);
+                assember.push_back(builder.local_update(folder_id, pr_file).extract().get());
+                for (size_t i = 0; i < N; ++i) {
+                    auto name = fmt::format("subdir-{}", i);
+                    proto::set_name(pr_file, name);
+                    auto diff = builder.local_update(folder_id, pr_file).extract();
+                    assember.push_back(diff.get());
+                }
+                sup->send<model::payload::model_update_t>(sup->get_address(), assember.consume(), nullptr);
+                sup->do_process();
+            }
             CHECK(local_files->size() == N + 1);
             CHECK(sup->bounces == N / I);
         }
