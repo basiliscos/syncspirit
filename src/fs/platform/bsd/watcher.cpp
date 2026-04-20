@@ -10,6 +10,7 @@
 #include "fs/fs_supervisor.h"
 #include "fs/task/scan_dir.h"
 #include "fs/utils.h"
+#include "utils/utf8.h"
 #include <fcntl.h>
 #include <limits.h>
 #include <memory_resource>
@@ -31,8 +32,10 @@ void watcher_t::do_initialize(r::system_context_t *ctx) noexcept {
 
 auto watcher_t::watch_path(std::string_view path, file_type_t type) noexcept -> std::optional<int> {
     static constexpr auto FLAGS = EV_ADD | EV_CLEAR;
-
     auto r = std::optional<int>{};
+    if (!utils::is_utf8_valid(path)) {
+        return {};
+    }
 
     if (type == file_type_t::directory) {
         r = open(path.data(), O_RDONLY);
