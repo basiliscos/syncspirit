@@ -1201,6 +1201,17 @@ void test_inotify_notification() {
                 CHECK(w->path_map.size() == 1);
                 CHECK(w->path_to_wd.size() == 1);
             }
+            SECTION("dir with invalid name") {
+                auto invalid = std::uint8_t{201};
+                auto ptr = reinterpret_cast<char *>(&invalid);
+                auto invalid_name = std::string_view(ptr, ptr + 1);
+
+                auto task = fs::task::scan_dir_t(root_path, {}, {}, true, true, false);
+                task.child_infos = {make_child(bfs::path(invalid_name))};
+                w->notify(task);
+                CHECK(w->path_map.size() == 1);
+                CHECK(w->path_to_wd.size() == 1);
+            }
             SECTION("watched dir") {
                 auto path_a = root_path / "a";
                 auto path_b = root_path / "b";

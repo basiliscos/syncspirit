@@ -17,8 +17,10 @@
 #include "presentation/local_file_presence.h"
 #include "proto/proto-helpers-bep.h"
 #include "utils/platform.h"
+#include "utils/utf8.h"
 
 #include <boost/nowide/convert.hpp>
+#include <spdlog/fmt/bin_to_hex.h>
 
 using namespace syncspirit::fs::task;
 
@@ -619,9 +621,15 @@ void folder_context_t::post_process(fs::task::scan_dir_t &task, stack_context_t 
     auto allocator = allocator_t(&pool);
     auto checked_children = checked_chidren_t(allocator);
 
-    auto it_disk = task.child_infos.begin();
-    while (it_disk != task.child_infos.end()) {
+    auto &infos = task.child_infos;
+    for (auto it_disk = infos.begin(); it_disk != infos.end(); ++it_disk) {
         auto &info = *it_disk;
+        auto name_str = info.path.filename().string();
+        if (!utils::is_utf8_valid(name_str)) {
+            auto name_hex = spdlog::to_hex(name_str.begin(), name_str.end());
+            LOG_WARN(log, "invalid filename : {}, ignored", name_hex);
+            continue;
+        }
         auto name = narrow(info.path.filename().wstring());
         auto is_dir = info.status.type() == bfs::file_type::directory;
         auto presence = presentation::get_child(task.presence.get(), name, is_dir);
@@ -643,7 +651,6 @@ void folder_context_t::post_process(fs::task::scan_dir_t &task, stack_context_t 
                 stack.push_front(std::move(task));
             }
         }
-        ++it_disk;
     }
 
     if (dir_presence) {

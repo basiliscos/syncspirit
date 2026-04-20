@@ -2,25 +2,27 @@
 // SPDX-FileCopyrightText: 2025-2026 Ivan Baidakou
 
 #include "local_keeper.h"
-#include "names.h"
+#include "constants.h"
+#include "fs/utils.h"
+#include "local_keeper/folder_context.h"
+#include "local_keeper/folder_slave.h"
+#include "local_keeper/hash_context.h"
 #include "model/diff/advance/local_update.h"
-#include "model/diff/local/scan_start.h"
 #include "model/diff/local/scan_finish.h"
+#include "model/diff/local/scan_start.h"
 #include "model/diff/modify/remove_folder.h"
 #include "model/diff/modify/suspend_folder.h"
 #include "model/diff/modify/upsert_folder.h"
-#include "proto/proto-helpers-bep.h"
-#include "proto/proto-helpers-db.h"
-#include "local_keeper/hash_context.h"
-#include "local_keeper/folder_context.h"
-#include "local_keeper/folder_slave.h"
+#include "names.h"
 #include "presentation/folder_entity.h"
 #include "presentation/folder_presence.h"
+#include "proto/proto-helpers-bep.h"
+#include "proto/proto-helpers-db.h"
 #include "utils/string_comparator.hpp"
-#include "fs/utils.h"
-#include "constants.h"
+#include "utils/utf8.h"
 
 #include <boost/nowide/convert.hpp>
+#include <spdlog/fmt/bin_to_hex.h>
 #include <iterator>
 
 using namespace syncspirit;
@@ -505,7 +507,25 @@ void local_keeper_t::on_changes(model::folder_info_t &local_folder, fs::payload:
             immediate_update(change);
         }
     };
+    auto check_validity = [&](fs::payload::file_info_t &change) -> bool {
+        auto name = proto::get_name(change);
+        if (!utils::is_utf8_valid(name)) {
+            auto name_hex = spdlog::to_hex(name.begin(), name.end());
+            LOG_WARN(log, "invalid filename : {} in folder '{}' ", name_hex, folder_id);
+            return false;
+        }
+        auto link = proto::get_symlink_target(change);
+        if (!link.empty() && !utils::is_utf8_valid(link)) {
+            auto link_hex = spdlog::to_hex(link.begin(), link.end());
+            LOG_WARN(log, "invalid symlink target of  : {} in folder '{}':\n{} ", name, folder_id, link_hex);
+            return false;
+        }
+        return true;
+    };
     for (auto &change : changes) {
+        if (!check_validity(change)) {
+            continue;
+        }
         switch (change.update_reason) {
         case UT::created: {
             if (proto::get_type(change) == proto::FileInfoType::DIRECTORY) {

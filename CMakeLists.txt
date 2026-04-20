@@ -287,6 +287,7 @@ add_library(syncspirit_core
     src/utils/time.cpp
     src/utils/tls.cpp
     src/utils/uri.cpp
+    src/utils/utf8.cpp
 )
 
 set_source_files_properties(

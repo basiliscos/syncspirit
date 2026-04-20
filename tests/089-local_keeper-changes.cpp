@@ -14,8 +14,8 @@
 #include "test_supervisor.h"
 #include "access.h"
 #include "utils/platform.h"
+#include "utils/utf8.h"
 #include <chrono>
-#include <format>
 #include <variant>
 #include <boost/nowide/convert.hpp>
 
@@ -2230,6 +2230,47 @@ void test_dir_scan_and_hashing_race() {
     F().run();
 }
 
+void test_invalid_utf8_names() {
+    struct F : folder_fixture_t {
+        using parent_t = folder_fixture_t;
+        using parent_t::parent_t;
+
+        void main() noexcept override {
+            auto impl = GENERATE(I::inotify, I::kqueue, I::win32);
+            prepare(impl);
+
+            auto invalid = std::uint8_t{201};
+            auto ptr = reinterpret_cast<char *>(&invalid);
+            auto invalid_name = std::string_view(ptr, ptr + 1);
+            REQUIRE(!utils::is_utf8_valid(invalid_name));
+            auto file = proto::FileInfo();
+
+            SECTION("update regular") {
+                proto::set_name(file, invalid_name);
+                proto::set_type(file, FT::FILE);
+                mk_update(file, fs::update_type_t::created, true);
+                CHECK(files_local->size() == 0);
+            }
+#ifndef SYNCSPIRIT_WIN
+            SECTION("update symlink") {
+                proto::set_name(file, "symlink");
+                proto::set_symlink_target(file, invalid_name);
+                proto::set_type(file, FT::SYMLINK);
+                mk_update(file, fs::update_type_t::created, true);
+                CHECK(files_local->size() == 0);
+            }
+            SECTION("in dir content") {
+                auto children = child_infos_t{make_child(invalid_name, bfs::file_type::regular)};
+                expect_dir_scan(children);
+                builder->scan_start(folder_id).apply(*sup);
+                CHECK(files_local->size() == 0);
+            }
+#endif
+        }
+    };
+    F().run();
+}
+
 int _init() {
     test::init_logging();
     REGISTER_TEST_CASE(test_just_start, "test_just_start", "[fs]");
@@ -2264,6 +2305,7 @@ int _init() {
     REGISTER_TEST_CASE(test_no_pending_io, "test_no_pending_io", "[fs]");
     REGISTER_TEST_CASE(test_double_content_update, "test_double_content_update", "[fs]");
     REGISTER_TEST_CASE(test_dir_scan_and_hashing_race, "test_dir_scan_and_hashing_race", "[fs]");
+    REGISTER_TEST_CASE(test_invalid_utf8_names, "test_invalid_utf8_names", "[fs]");
     return 1;
 }
 

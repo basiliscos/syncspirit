@@ -4,6 +4,9 @@
 #include "watcher.h"
 
 #if SYNCSPIRIT_WATCHER_INOTIFY
+#include "fs/fs_supervisor.h"
+#include "utils/utf8.h"
+
 #include <sys/inotify.h>
 #include <sys/stat.h>
 #include <string.h>
@@ -12,7 +15,6 @@
 #include <fcntl.h>
 #include <algorithm>
 #include <memory_resource>
-#include "fs/fs_supervisor.h"
 
 using namespace syncspirit::fs::platform::linux;
 
@@ -64,7 +66,7 @@ auto watcher_t::unwatch_path(int wd, file_type_t type) noexcept -> sys::error_co
 
 auto watcher_t::watch_path(std::string_view path, file_type_t type) noexcept -> std::optional<int> {
     static constexpr auto FLAGS = IN_MODIFY | IN_CREATE | IN_DELETE | IN_ATTRIB | IN_MOVE | IN_DELETE_SELF;
-    if (type != file_type_t::directory) {
+    if (type != file_type_t::directory || !utils::is_utf8_valid(path)) {
         return {};
     }
     auto wd = ::inotify_add_watch(inotify_guard.fd, path.data(), FLAGS);
