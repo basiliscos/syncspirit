@@ -6,7 +6,6 @@
 #include "model/diff/contact/dial_request.h"
 #include "model/diff/contact/peer_state.h"
 #include "model/diff/contact/update_contact.h"
-#include "names.h"
 #include "utils/format.hpp"
 #include <cassert>
 
@@ -21,32 +20,27 @@ r::plugin::resource_id_t timer = 0;
 } // namespace
 
 dialer_actor_t::dialer_actor_t(config_t &config)
-    : r::actor_base_t{config}, cluster{config.cluster},
-      redial_timeout{r::pt::milliseconds{config.dialer_config.redial_timeout}},
+    : parent_t{config}, redial_timeout{r::pt::milliseconds{config.dialer_config.redial_timeout}},
       skip_discovers{config.dialer_config.skip_discovers}, announced{false} {}
 
 void dialer_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
-    r::actor_base_t::configure(plugin);
+    parent_t::configure(plugin);
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
         p.set_identity("net.dialer", false);
         log = utils::get_logger(identity);
     });
-    plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
-        p.discover_name(net::names::coordinator, coordinator, false).link(false).callback([&](auto phase, auto &ee) {
-            if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {
-                auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
-                auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
-                plugin->subscribe_actor(&dialer_actor_t::on_announce, coordinator);
-                plugin->subscribe_actor(&dialer_actor_t::on_model_update, coordinator);
-            }
-        });
-    });
+}
+
+void dialer_actor_t::post_configure_coordinator() noexcept {
+    parent_t::post_configure_coordinator();
+    auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
+    auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
+    plugin->subscribe_actor(&dialer_actor_t::on_announce, coordinator);
 }
 
 void dialer_actor_t::on_start() noexcept {
-    LOG_TRACE(log, "on_start");
     send<model::payload::local_up_t>(coordinator);
-    r::actor_base_t::on_start();
+    parent_t::on_start();
     auto &devices = cluster->get_devices();
     for (auto it : devices) {
         auto &d = it.item;
@@ -58,12 +52,11 @@ void dialer_actor_t::on_start() noexcept {
 
 void dialer_actor_t::shutdown_finish() noexcept {
     LOG_TRACE(log, "shutdown_finish");
-    r::actor_base_t::shutdown_finish();
+    parent_t::shutdown_finish();
 }
 
 void dialer_actor_t::shutdown_start() noexcept {
-    LOG_TRACE(log, "shutdown_start");
-    r::actor_base_t::shutdown_start();
+    parent_t::shutdown_start();
     while (!redial_map.empty()) {
         auto it = redial_map.begin();
         auto &info = it->second;
@@ -180,10 +173,9 @@ void dialer_actor_t::on_timer(r::request_id_t request_id, bool cancelled) noexce
     }
 }
 
-void dialer_actor_t::on_model_update(model::message::model_update_t &msg) noexcept {
-    LOG_TRACE(log, "on_model_update");
-    auto &diff = *msg.payload.diff;
-    auto r = diff.visit(*this, const_cast<void *>(msg.payload.custom));
+void dialer_actor_t::visit(const model::diff::cluster_diff_t &diff, model::payload::apply_context_t &ctx) noexcept {
+    LOG_TRACE(log, "visit");
+    auto r = diff.visit(*this, const_cast<void *>(ctx.message_payload));
     if (!r) {
         auto ee = make_error(r.assume_error());
         do_shutdown(ee);

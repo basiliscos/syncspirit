@@ -91,7 +91,7 @@ struct local_keeper_t::lc_context_t final : local_keeper::stack_context_t {
 };
 
 local_keeper_t::local_keeper_t(config_t &config)
-    : r::actor_base_t(config), sequencer{std::move(config.sequencer)},
+    : parent_t(config), sequencer{std::move(config.sequencer)},
       concurrent_hashes_left{static_cast<std::int32_t>(config.concurrent_hashes)},
       concurrent_hashes_limit{concurrent_hashes_left}, watcher_impl{config.watcher_impl} {
     assert(sequencer);
@@ -99,7 +99,7 @@ local_keeper_t::local_keeper_t(config_t &config)
 }
 
 void local_keeper_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
-    r::actor_base_t::configure(plugin);
+    parent_t::configure(plugin);
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
         p.set_identity("net.local_keeper", false);
         log = utils::get_logger(identity);
@@ -109,15 +109,6 @@ void local_keeper_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         if (watcher_impl != syncspirit_watcher_impl_t::none) {
             p.discover_name(names::watcher, watcher_addr, true).link(true);
         }
-        p.discover_name(net::names::coordinator, coordinator, false).link(false).callback([&](auto phase, auto &ee) {
-            if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {
-                auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
-                auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
-                plugin->subscribe_actor(&local_keeper_t::on_change, coordinator);
-                plugin->subscribe_actor(&local_keeper_t::on_model_update, coordinator);
-                plugin->subscribe_actor(&local_keeper_t::on_thread_ready, coordinator);
-            }
-        });
     });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&local_keeper_t::on_post_process);
@@ -126,6 +117,14 @@ void local_keeper_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.subscribe_actor(&local_keeper_t::on_watch_dir);
         p.subscribe_actor(&local_keeper_t::on_unwatch_dir);
     });
+}
+
+void local_keeper_t::post_configure_coordinator() noexcept {
+    parent_t::post_configure_coordinator();
+    auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
+    auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
+    plugin->subscribe_actor(&local_keeper_t::on_change, coordinator);
+    plugin->subscribe_actor(&local_keeper_t::on_thread_ready, coordinator);
 }
 
 void local_keeper_t::try_start_watching() noexcept {
@@ -144,21 +143,14 @@ void local_keeper_t::try_start_watching() noexcept {
 }
 
 void local_keeper_t::on_start() noexcept {
-    LOG_TRACE(log, "on_start");
+    parent_t::on_start();
     send<model::payload::local_up_t>(coordinator);
-    r::actor_base_t::on_start();
     try_start_watching();
 }
 
-void local_keeper_t::shutdown_start() noexcept {
-    LOG_TRACE(log, "shutdown_start");
-    r::actor_base_t::shutdown_start();
-}
-
-void local_keeper_t::on_model_update(model::message::model_update_t &msg) noexcept {
-    LOG_TRACE(log, "on_model_update");
-    auto &diff = *msg.payload.diff;
-    auto r = diff.visit(*this, const_cast<void *>(msg.payload.custom));
+void local_keeper_t::visit(const model::diff::cluster_diff_t &diff, model::payload::apply_context_t &ctx) noexcept {
+    LOG_TRACE(log, "visit");
+    auto r = diff.visit(*this, const_cast<void *>(ctx.message_payload));
     if (!r) {
         auto ee = make_error(r.assume_error());
         do_shutdown(ee);

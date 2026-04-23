@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "global_discovery_actor.h"
 #include "names.h"
@@ -20,11 +20,11 @@ r::plugin::resource_id_t http = 1;
 } // namespace
 
 global_discovery_actor_t::global_discovery_actor_t(config_t &cfg)
-    : r::actor_base_t{cfg}, announce_url{cfg.announce_url}, lookup_url{cfg.lookup_url}, ssl_pair{*cfg.ssl_pair},
-      rx_buff_size{cfg.rx_buff_size}, io_timeout(cfg.io_timeout), debug{cfg.debug}, cluster{cfg.cluster} {}
+    : parent_t{cfg}, announce_url{cfg.announce_url}, lookup_url{cfg.lookup_url}, ssl_pair{*cfg.ssl_pair},
+      rx_buff_size{cfg.rx_buff_size}, io_timeout(cfg.io_timeout), debug{cfg.debug} {}
 
 void global_discovery_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
-    r::actor_base_t::configure(plugin);
+    parent_t::configure(plugin);
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
         addr_announce = p.create_address();
         addr_discovery = p.create_address();
@@ -55,16 +55,8 @@ void global_discovery_actor_t::configure(r::plugin::plugin_base_t &plugin) noexc
         }
         lookup_url->params().clear();
     });
-    plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
-        p.discover_name(names::http11_gda, http_client, true).link(true);
-        p.discover_name(names::coordinator, coordinator, false).link(false).callback([&](auto phase, auto &ee) {
-            if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {
-                auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
-                auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
-                plugin->subscribe_actor(&global_discovery_actor_t::on_model_update, coordinator);
-            }
-        });
-    });
+    plugin.with_casted<r::plugin::registry_plugin_t>(
+        [&](auto &p) { p.discover_name(names::http11_gda, http_client, true).link(true); });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&global_discovery_actor_t::on_announce_response, addr_announce);
         p.subscribe_actor(&global_discovery_actor_t::on_discovery_response, addr_discovery);
@@ -72,9 +64,8 @@ void global_discovery_actor_t::configure(r::plugin::plugin_base_t &plugin) noexc
 }
 
 void global_discovery_actor_t::on_start() noexcept {
-    LOG_TRACE(log, "on_start (addr = {})", (void *)address.get());
+    parent_t::on_start();
     announce();
-    r::actor_base_t::on_start();
 }
 
 void global_discovery_actor_t::announce() noexcept {
@@ -216,10 +207,10 @@ void global_discovery_actor_t::on_discovery_response(message::http_response_t &m
     send<model::payload::model_update_t>(coordinator, std::move(reply_diff));
 }
 
-void global_discovery_actor_t::on_model_update(model::message::model_update_t &message) noexcept {
-    LOG_TRACE(log, "on_model_update");
-    auto &diff = *message.payload.diff;
-    auto r = diff.visit(*this, &message);
+void global_discovery_actor_t::visit(const model::diff::cluster_diff_t &diff,
+                                     model::payload::apply_context_t &ctx) noexcept {
+    LOG_TRACE(log, "visit");
+    auto r = diff.visit(*this, ctx.source);
     if (!r) {
         auto ee = make_error(r.assume_error());
         do_shutdown(ee);
@@ -256,7 +247,7 @@ void global_discovery_actor_t::shutdown_start() noexcept {
     if (resources->has(resource::timer)) {
         cancel_timer(*timer_request);
     }
-    r::actor_base_t::shutdown_start();
+    parent_t::shutdown_start();
 }
 
 auto global_discovery_actor_t::operator()(const model::diff::contact::update_contact_t &diff, void *custom) noexcept

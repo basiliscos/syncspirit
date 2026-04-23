@@ -5,8 +5,8 @@
 
 #include "fs/messages.h"
 #include "hasher/messages.h"
+#include "model_actor.hpp"
 #include "model/messages.h"
-#include "model/cluster.h"
 #include "model/diff/cluster_visitor.h"
 #include "model/misc/sequencer.h"
 #include "utils/string_comparator.hpp"
@@ -24,34 +24,36 @@ using folder_context_ptr_t = boost::intrusive_ptr<folder_context_t>;
 
 } // namespace local_keeper
 
-struct local_keeper_config_t : r::actor_config_t {
-    model::sequencer_ptr_t sequencer;
-    uint32_t concurrent_hashes;
-    syncspirit_watcher_impl_t watcher_impl = syncspirit_watcher_impl_t::none;
-};
+struct SYNCSPIRIT_API local_keeper_t final : public model_actor_t<r::actor_base_t>,
+                                             private model::diff::cluster_visitor_t {
+    using parent_t = model_actor_t<r::actor_base_t>;
 
-template <typename Actor> struct local_keeper_config_builder_t : r::actor_config_builder_t<Actor> {
-    using builder_t = typename Actor::template config_builder_t<Actor>;
-    using parent_t = r::actor_config_builder_t<Actor>;
-    using parent_t::parent_t;
+    struct config_t : parent_t::config_t {
+        using base_t = model_actor_t<r::actor_base_t>::config_t;
+        using base_t::base_t;
+        model::sequencer_ptr_t sequencer;
+        uint32_t concurrent_hashes;
+        syncspirit_watcher_impl_t watcher_impl = syncspirit_watcher_impl_t::none;
+    };
 
-    builder_t &&sequencer(model::sequencer_ptr_t value) && noexcept {
-        parent_t::config.sequencer = std::move(value);
-        return std::move(*static_cast<typename parent_t::builder_t *>(this));
-    }
-    builder_t &&concurrent_hashes(uint32_t value) && noexcept {
-        parent_t::config.concurrent_hashes = value;
-        return std::move(*static_cast<typename parent_t::builder_t *>(this));
-    }
-    builder_t &&watcher_impl(syncspirit_watcher_impl_t value) && noexcept {
-        parent_t::config.watcher_impl = value;
-        return std::move(*static_cast<typename parent_t::builder_t *>(this));
-    }
-};
+    template <typename Actor> struct config_builder_t : parent_t::template config_builder_t<Actor> {
+        using builder_t = typename Actor::template config_builder_t<Actor>;
+        using base_t = parent_t::template config_builder_t<Actor>;
+        using base_t::base_t;
 
-struct SYNCSPIRIT_API local_keeper_t final : public r::actor_base_t, private model::diff::cluster_visitor_t {
-    using config_t = local_keeper_config_t;
-    template <typename Actor> using config_builder_t = local_keeper_config_builder_t<Actor>;
+        builder_t &&sequencer(model::sequencer_ptr_t value) && noexcept {
+            base_t::config.sequencer = std::move(value);
+            return std::move(*static_cast<typename base_t::builder_t *>(this));
+        }
+        builder_t &&concurrent_hashes(uint32_t value) && noexcept {
+            base_t::config.concurrent_hashes = value;
+            return std::move(*static_cast<typename base_t::builder_t *>(this));
+        }
+        builder_t &&watcher_impl(syncspirit_watcher_impl_t value) && noexcept {
+            base_t::config.watcher_impl = value;
+            return std::move(*static_cast<typename base_t::builder_t *>(this));
+        }
+    };
 
     struct lc_context_t;
     using watched_folders_t = std::unordered_set<std::string, utils::string_hash_t, utils::string_eq_t>;
@@ -60,10 +62,10 @@ struct SYNCSPIRIT_API local_keeper_t final : public r::actor_base_t, private mod
     explicit local_keeper_t(config_t &cfg);
 
     void on_start() noexcept override;
-    void shutdown_start() noexcept override;
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
+    void post_configure_coordinator() noexcept override;
 
-    void on_model_update(model::message::model_update_t &) noexcept;
+    void visit(const model::diff::cluster_diff_t &, model::payload::apply_context_t &) noexcept override;
     void on_post_process(fs::message::foreign_executor_t &) noexcept;
     void on_digest(hasher::message::digest_t &res) noexcept;
     void on_thread_ready(model::message::thread_ready_t &) noexcept;
@@ -83,10 +85,7 @@ struct SYNCSPIRIT_API local_keeper_t final : public r::actor_base_t, private mod
     outcome::result<void> operator()(const model::diff::modify::remove_folder_t &, void *custom) noexcept override;
 
     using r::actor_base_t::make_error;
-    utils::logger_t log;
     model::sequencer_ptr_t sequencer;
-    model::cluster_ptr_t cluster;
-    r::address_ptr_t coordinator;
     r::address_ptr_t fs_addr;
     r::address_ptr_t watcher_addr;
     syncspirit_watcher_impl_t watcher_impl;

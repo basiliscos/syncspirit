@@ -243,7 +243,7 @@ template <> struct hash<block_2_file_non_owning_t> {
 } // namespace std
 
 controller_actor_t::controller_actor_t(config_t &config)
-    : r::actor_base_t{config}, sequencer{std::move(config.sequencer)}, cluster{config.cluster}, peer{config.peer},
+    : parent_t{config}, sequencer{std::move(config.sequencer)}, peer{config.peer},
       peer_state{peer->get_state().clone()}, peer_address{config.peer_addr}, rx_blocks_requested{0},
       tx_blocks_requested{0}, outgoing_buffer_max{config.outgoing_buffer_max}, request_pool{config.request_pool},
       hasher_threads{config.hasher_threads}, advances_per_iteration{config.advances_per_iteration},
@@ -260,7 +260,7 @@ controller_actor_t::controller_actor_t(config_t &config)
 }
 
 void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
-    r::actor_base_t::configure(plugin);
+    parent_t::configure(plugin);
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
         std::string id = "net.controller/";
         id += peer->device_id().get_short();
@@ -273,9 +273,9 @@ void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.discover_name(names::fs_actor, fs_addr, false).link(false);
         p.discover_name(names::coordinator, coordinator, false).link(false).callback([&](auto phase, auto &ee) {
             if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {
+                parent_t::post_configure_coordinator();
                 auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
                 auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
-                plugin->subscribe_actor(&controller_actor_t::on_model_update, coordinator);
                 plugin->subscribe_actor(&controller_actor_t::on_fs_predown, coordinator);
             }
         });
@@ -291,7 +291,7 @@ void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 }
 
 void controller_actor_t::on_start() noexcept {
-    r::actor_base_t::on_start();
+    parent_t::on_start();
     LOG_TRACE(log, "on_start");
     auto my_url = peer_state.get_url();
     if (peer_state < peer->get_state()) {
@@ -315,7 +315,7 @@ void controller_actor_t::shutdown_start() noexcept {
     if (fs_requests) {
         fs_ack_timer = start_timer(shutdown_timeout * 8 / 9, *this, &controller_actor_t::on_fs_ack_timer);
     }
-    r::actor_base_t::shutdown_start();
+    parent_t::shutdown_start();
 }
 
 void controller_actor_t::shutdown_finish() noexcept {
@@ -328,7 +328,7 @@ void controller_actor_t::shutdown_finish() noexcept {
     if (announced) {
         send<payload::controller_down_t>(coordinator, address, peer_address);
     }
-    r::actor_base_t::shutdown_finish();
+    parent_t::shutdown_finish();
 }
 
 void controller_actor_t::send_cluster_config(stack_context_t &ctx) noexcept {
@@ -776,11 +776,11 @@ void controller_actor_t::on_forward(message::forwarded_messages_t &message) noex
     }
 }
 
-void controller_actor_t::on_model_update(model::message::model_update_t &message) noexcept {
-    auto custom = const_cast<void *>(message.payload.custom);
-    auto ctx = update_context_t(*this, custom == this, false);
-    LOG_TRACE(log, "on_model_update");
-    auto &diff = *message.payload.diff;
+void controller_actor_t::visit(const model::diff::cluster_diff_t &diff,
+                               model::payload::apply_context_t &context) noexcept {
+    LOG_TRACE(log, "visit");
+    auto ctx = update_context_t(*this, context.message_payload == this, false);
+
     auto r = diff.visit(*this, &ctx);
     if (!r) {
         auto ee = make_error(r.assume_error());

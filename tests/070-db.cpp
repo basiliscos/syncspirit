@@ -1539,7 +1539,8 @@ void test_iterative_application_interrupt() {
                         r::plugin::config_phase_t::PREINIT);
                 }
 
-                void process(model::diff::cluster_diff_t &diff, apply_context_t &context) noexcept override {
+                void process(model::diff::cluster_diff_t &diff,
+                             model::payload::apply_context_t &context) noexcept override {
                     parent_t::process(diff, context);
                     auto &folder = cluster->get_folders().begin()->item;
                     auto &fi = folder->get_folder_infos().begin()->item;

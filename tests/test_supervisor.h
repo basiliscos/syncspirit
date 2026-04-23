@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #pragma once
 
@@ -69,6 +69,7 @@ struct SYNCSPIRIT_TEST_API supervisor_t : r::supervisor_t,
     using timers_t = std::list<r::timer_handler_base_t *>;
     using parent_t = r::supervisor_t;
     using io_errors_t = model::diff::local::io_errors_t;
+    using model_subscribers_t = std::vector<model::payload::model_subscription_t>;
 
     supervisor_t(config_t &cfg);
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
@@ -78,6 +79,9 @@ struct SYNCSPIRIT_TEST_API supervisor_t : r::supervisor_t,
 
     virtual void on_model_update(model::message::model_update_t &) noexcept;
     virtual void on_package(bouncer::message::package_t &) noexcept;
+    void on_model_subscribe(model::message::model_subscription_t &message) noexcept;
+    void on_model_unsubscribe(model::message::model_unsubscription_t &message) noexcept;
+
     void on_model_sink(model::message::model_update_t &) noexcept;
     void do_start_timer(const r::pt::time_duration &interval, r::timer_handler_base_t &handler) noexcept override;
     void do_invoke_timer(r::request_id_t timer_id) noexcept;
@@ -105,6 +109,7 @@ struct SYNCSPIRIT_TEST_API supervisor_t : r::supervisor_t,
     utils::logger_t log;
     model::sequencer_ptr_t sequencer;
     configure_callback_t configure_callback;
+    model_subscribers_t model_subscribers;
     timers_t timers;
     bool auto_finish;
     bool auto_ack_io;

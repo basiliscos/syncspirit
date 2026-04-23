@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #pragma once
 
@@ -7,9 +7,7 @@
 #include "model/cluster.h"
 #include "model/misc/sequencer.h"
 #include "model/diff/iterative_controller.h"
-#include "model/diff/cluster_visitor.h"
 #include "config/main.h"
-#include "utils/log.h"
 #include "messages.h"
 #include <cstdint>
 #include <boost/asio.hpp>

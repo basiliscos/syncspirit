@@ -96,6 +96,8 @@ void net_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         [&](auto &p) {
             p.subscribe_actor(&net_supervisor_t::on_model_update);
             p.subscribe_actor(&net_supervisor_t::on_model_interrupt);
+            p.subscribe_actor(&net_supervisor_t::on_model_subscribe);
+            p.subscribe_actor(&net_supervisor_t::on_model_unsubscribe);
             p.subscribe_actor(&net_supervisor_t::on_load_cluster_success);
             p.subscribe_actor(&net_supervisor_t::on_load_cluster_fail);
             p.subscribe_actor(&net_supervisor_t::on_model_request);

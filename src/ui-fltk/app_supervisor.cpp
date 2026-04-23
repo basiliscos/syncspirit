@@ -200,7 +200,7 @@ void app_supervisor_t::on_model_response(model::message::model_response_t &res) 
     cluster = std::move(res.payload.res.cluster);
 }
 
-void app_supervisor_t::process(model::diff::cluster_diff_t &diff, apply_context_t &context) noexcept {
+void app_supervisor_t::process(model::diff::cluster_diff_t &diff, model::payload::apply_context_t &context) noexcept {
     auto buffer = std::array<std::byte, 16 * 1024>();
     auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
     auto allocator = std::pmr::polymorphic_allocator<std::string>(&pool);
@@ -465,7 +465,7 @@ auto app_supervisor_t::apply(const model::diff::modify::upsert_folder_t &diff, v
             auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
             folders_node->add_folder(*folder_entity);
             folder->set_augmentation(folder_entity);
-            auto ctx = static_cast<apply_context_t *>(custom);
+            auto ctx = static_cast<model::payload::apply_context_t *>(custom);
             auto attachment = static_cast<app_context_attachment *>(ctx->custom_payload);
             attachment->guards.emplace_back(folder_entity->monitor(&attachment->monitor));
         }
@@ -556,7 +556,7 @@ auto app_supervisor_t::apply(const model::diff::peer::update_folder_t &diff, voi
 auto app_supervisor_t::apply(const model::diff::load::blocks_t &diff, void *custom) noexcept -> outcome::result<void> {
     auto r = apply_controller_t::apply(diff, custom);
     if (r) {
-        auto ctx = static_cast<apply_context_t *>(custom);
+        auto ctx = static_cast<model::payload::apply_context_t *>(custom);
         ctx->loaded_blocks += diff.blocks.size();
         auto blocks = ctx->loaded_blocks;
         auto total = ctx->total_blocks;
@@ -571,7 +571,7 @@ auto app_supervisor_t::apply(const model::diff::load::file_infos_t &diff, void *
     -> outcome::result<void> {
     auto r = apply_controller_t::apply(diff, custom);
     if (r) {
-        auto ctx = static_cast<apply_context_t *>(custom);
+        auto ctx = static_cast<model::payload::apply_context_t *>(custom);
         ctx->loaded_files += diff.container.size();
         auto files = ctx->loaded_files;
         auto total = ctx->total_files;
@@ -629,7 +629,7 @@ void app_supervisor_t::commit_loading() noexcept {
 auto app_supervisor_t::apply(const model::diff::load::load_cluster_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     main_window->set_splash_text("populating model (1/3)...");
-    auto ctx = static_cast<apply_context_t *>(custom);
+    auto ctx = static_cast<model::payload::apply_context_t *>(custom);
     ctx->total_blocks = diff.blocks_count;
     ctx->total_files = diff.files_count;
     return apply_controller_t::apply(diff, custom);

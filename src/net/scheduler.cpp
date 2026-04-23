@@ -35,29 +35,26 @@ static inline subpath_comparison_t compare(std::string_view a, std::string_view 
 }
 
 void scheduler_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
-    r::actor_base_t::configure(plugin);
+    parent_t::configure(plugin);
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
         p.set_identity(net::names::scheduler, false);
         log = utils::get_logger(identity);
     });
-    plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
-        p.register_name(net::names::scheduler, address);
-        p.discover_name(net::names::coordinator, coordinator, true).link(false).callback([&](auto phase, auto &ee) {
-            if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {
-                auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
-                auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
-                plugin->subscribe_actor(&scheduler_t::on_model_update, coordinator);
-                plugin->subscribe_actor(&scheduler_t::on_app_ready, coordinator);
-                plugin->subscribe_actor(&scheduler_t::on_thread_ready, supervisor->get_address());
-            }
-        });
-    });
+    plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) { p.register_name(net::names::scheduler, address); });
 }
 
 void scheduler_t::on_start() noexcept {
     LOG_TRACE(log, "on_start");
     send<model::payload::local_up_t>(coordinator);
-    r::actor_base_t::on_start();
+    parent_t::on_start();
+}
+
+void scheduler_t::post_configure_coordinator() noexcept {
+    parent_t::post_configure_coordinator();
+    auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
+    auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
+    plugin->subscribe_actor(&scheduler_t::on_app_ready, coordinator);
+    plugin->subscribe_actor(&scheduler_t::on_thread_ready, supervisor->get_address());
 }
 
 void scheduler_t::on_thread_ready(model::message::thread_ready_t &message) noexcept {
@@ -73,10 +70,9 @@ void scheduler_t::on_app_ready(model::message::app_ready_t &) noexcept {
     scan_next();
 }
 
-void scheduler_t::on_model_update(model::message::model_update_t &message) noexcept {
-    LOG_TRACE(log, "on_model_update");
-    auto &diff = *message.payload.diff;
-    auto r = diff.visit(*this, nullptr);
+void scheduler_t::visit(const model::diff::cluster_diff_t &diff, model::payload::apply_context_t &ctx) noexcept {
+    LOG_TRACE(log, "visit");
+    auto r = diff.visit(*this, {});
     if (!r) {
         auto ee = make_error(r.assume_error());
         do_shutdown(ee);

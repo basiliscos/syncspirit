@@ -4,8 +4,8 @@
 #pragma once
 
 #include "messages.h"
+#include "model_actor.hpp"
 #include "model/messages.h"
-#include "model/cluster.h"
 #include "model/diff/cluster_visitor.h"
 #include "model/diff/diff_assembler.h"
 #include "model/misc/file_iterator.h"
@@ -14,7 +14,6 @@
 #include "model/misc/sequencer.h"
 #include "hasher/messages.h"
 #include "hasher/hasher_plugin.h"
-#include "utils/log.h"
 #include "fs/messages.h"
 
 #include <boost/multi_index_container.hpp>
@@ -31,83 +30,79 @@ namespace bfs = std::filesystem;
 namespace mi = boost::multi_index;
 namespace outcome = boost::outcome_v2;
 
-struct controller_actor_config_t : r::actor_config_t {
-    int64_t request_pool;
-    model::cluster_ptr_t cluster;
-    model::sequencer_ptr_t sequencer;
-    model::device_ptr_t peer;
-    r::address_ptr_t peer_addr;
-    uint32_t hasher_threads;
-    uint32_t blocks_max_requested = 0;
-    uint32_t outgoing_buffer_max = 0;
-    std::uint32_t advances_per_iteration = 10;
-    bfs::path default_path;
-};
+struct SYNCSPIRIT_API controller_actor_t final : public model_actor_t<r::actor_base_t>,
+                                                 private model::diff::cluster_visitor_t {
+    using parent_t = model_actor_t<r::actor_base_t>;
 
-template <typename Actor> struct controller_actor_config_builder_t : r::actor_config_builder_t<Actor> {
-    using builder_t = typename Actor::template config_builder_t<Actor>;
-    using parent_t = r::actor_config_builder_t<Actor>;
-    using parent_t::parent_t;
+    struct config_t : parent_t::config_t {
+        using base_t = model_actor_t<r::actor_base_t>::config_t;
+        using base_t::base_t;
+        int64_t request_pool;
+        model::sequencer_ptr_t sequencer;
+        model::device_ptr_t peer;
+        r::address_ptr_t peer_addr;
+        uint32_t hasher_threads;
+        uint32_t blocks_max_requested = 0;
+        uint32_t outgoing_buffer_max = 0;
+        std::uint32_t advances_per_iteration = 10;
+        bfs::path default_path;
+    };
 
-    builder_t &&request_pool(int64_t value) && noexcept {
-        parent_t::config.request_pool = value;
-        return std::move(*static_cast<typename parent_t::builder_t *>(this));
-    }
+    template <typename Actor> struct config_builder_t : parent_t::template config_builder_t<Actor> {
+        using builder_t = typename Actor::template config_builder_t<Actor>;
+        using base_t = parent_t::template config_builder_t<Actor>;
+        using base_t::base_t;
 
-    builder_t &&cluster(const model::cluster_ptr_t &value) && noexcept {
-        parent_t::config.cluster = value;
-        return std::move(*static_cast<typename parent_t::builder_t *>(this));
-    }
+        builder_t &&request_pool(int64_t value) && noexcept {
+            base_t::config.request_pool = value;
+            return std::move(*static_cast<typename base_t::builder_t *>(this));
+        }
 
-    builder_t &&peer(const model::device_ptr_t &value) && noexcept {
-        parent_t::config.peer = value;
-        return std::move(*static_cast<typename parent_t::builder_t *>(this));
-    }
+        builder_t &&peer(const model::device_ptr_t &value) && noexcept {
+            base_t::config.peer = value;
+            return std::move(*static_cast<typename base_t::builder_t *>(this));
+        }
 
-    builder_t &&peer_addr(const r::address_ptr_t &value) && noexcept {
-        parent_t::config.peer_addr = value;
-        return std::move(*static_cast<typename parent_t::builder_t *>(this));
-    }
+        builder_t &&peer_addr(const r::address_ptr_t &value) && noexcept {
+            base_t::config.peer_addr = value;
+            return std::move(*static_cast<typename base_t::builder_t *>(this));
+        }
 
-    builder_t &&blocks_max_kept(size_t value) && noexcept {
-        parent_t::config.blocks_max_kept = value;
-        return std::move(*static_cast<typename parent_t::builder_t *>(this));
-    }
+        builder_t &&blocks_max_kept(size_t value) && noexcept {
+            base_t::config.blocks_max_kept = value;
+            return std::move(*static_cast<typename base_t::builder_t *>(this));
+        }
 
-    builder_t &&hasher_threads(uint32_t value) && noexcept {
-        parent_t::config.hasher_threads = value;
-        return std::move(*static_cast<typename parent_t::builder_t *>(this));
-    }
+        builder_t &&hasher_threads(uint32_t value) && noexcept {
+            base_t::config.hasher_threads = value;
+            return std::move(*static_cast<typename base_t::builder_t *>(this));
+        }
 
-    builder_t &&blocks_max_requested(uint32_t value) && noexcept {
-        parent_t::config.blocks_max_requested = value;
-        return std::move(*static_cast<typename parent_t::builder_t *>(this));
-    }
+        builder_t &&blocks_max_requested(uint32_t value) && noexcept {
+            base_t::config.blocks_max_requested = value;
+            return std::move(*static_cast<typename base_t::builder_t *>(this));
+        }
 
-    builder_t &&advances_per_iteration(uint32_t value) && noexcept {
-        parent_t::config.advances_per_iteration = value;
-        return std::move(*static_cast<typename parent_t::builder_t *>(this));
-    }
+        builder_t &&advances_per_iteration(uint32_t value) && noexcept {
+            base_t::config.advances_per_iteration = value;
+            return std::move(*static_cast<typename base_t::builder_t *>(this));
+        }
 
-    builder_t &&outgoing_buffer_max(uint32_t value) && noexcept {
-        parent_t::config.outgoing_buffer_max = value;
-        return std::move(*static_cast<typename parent_t::builder_t *>(this));
-    }
+        builder_t &&outgoing_buffer_max(uint32_t value) && noexcept {
+            base_t::config.outgoing_buffer_max = value;
+            return std::move(*static_cast<typename base_t::builder_t *>(this));
+        }
 
-    builder_t &&sequencer(model::sequencer_ptr_t value) && noexcept {
-        parent_t::config.sequencer = std::move(value);
-        return std::move(*static_cast<typename parent_t::builder_t *>(this));
-    }
+        builder_t &&sequencer(model::sequencer_ptr_t value) && noexcept {
+            base_t::config.sequencer = std::move(value);
+            return std::move(*static_cast<typename base_t::builder_t *>(this));
+        }
 
-    builder_t &&default_path(const bfs::path &value) && noexcept {
-        parent_t::config.default_path = value;
-        return std::move(*static_cast<typename parent_t::builder_t *>(this));
-    }
-};
-
-struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model::diff::cluster_visitor_t {
-    using config_t = controller_actor_config_t;
-    template <typename Actor> using config_builder_t = controller_actor_config_builder_t<Actor>;
+        builder_t &&default_path(const bfs::path &value) && noexcept {
+            base_t::config.default_path = value;
+            return std::move(*static_cast<typename base_t::builder_t *>(this));
+        }
+    };
 
     // clang-format off
     using plugins_list_t = std::tuple<
@@ -127,6 +122,7 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     void on_start() noexcept override;
     void shutdown_start() noexcept override;
     void shutdown_finish() noexcept override;
+    void visit(const model::diff::cluster_diff_t &, model::payload::apply_context_t &) noexcept override;
 
     struct stack_context_t : model::diff::diff_assember_t {
         using parent_t = model::diff::diff_assember_t;
@@ -202,7 +198,6 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     void on_digest(hasher::message::digest_t &res) noexcept;
     void preprocess_block(model::file_block_t &block, const model::folder_info_t &source_folder,
                           stack_context_t &) noexcept;
-    void on_model_update(model::message::model_update_t &message) noexcept;
     void on_tx_signal(net::message::tx_signal_t &message) noexcept;
     void on_postprocess_io(fs::message::io_commands_t &) noexcept;
     void on_fs_predown(message::fs_predown_t &message) noexcept;
@@ -257,10 +252,8 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     outcome::result<void> operator()(const model::diff::peer::update_folder_t &, void *) noexcept override;
 
     model::sequencer_ptr_t sequencer;
-    model::cluster_ptr_t cluster;
     model::device_ptr_t peer;
     model::device_state_t peer_state;
-    r::address_ptr_t coordinator;
     r::address_ptr_t peer_address;
     r::address_ptr_t fs_addr;
     model::ignored_folders_map_t *ignored_folders;
@@ -277,7 +270,6 @@ struct SYNCSPIRIT_API controller_actor_t : public r::actor_base_t, private model
     uint32_t advances_per_iteration;
     bfs::path default_path;
     updates_streamer_ptr_t updates_streamer;
-    utils::logger_t log;
     model::file_iterator_ptr_t file_iterator;
     model::block_iterator_ptr_t block_iterator;
     synchronizing_folders_t synchronizing_folders;

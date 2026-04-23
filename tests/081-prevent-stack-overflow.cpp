@@ -178,15 +178,14 @@ void test_updates_intermixture() {
         using parent_t = sample_supervisor_t;
         using parent_t::parent_t;
 
-        void process(model::diff::cluster_diff_t &diff, apply_context_t &context) noexcept override {
+        void process(diff::cluster_diff_t &diff, model::payload::apply_context_t &context) noexcept override {
             parent_t::process(diff, context);
 
             auto r = diff.visit(*this, {});
             CHECK(r);
         }
 
-        outcome::result<void> operator()(const model::diff::advance::local_update_t &diff,
-                                         void *custom) noexcept override {
+        outcome::result<void> operator()(const diff::advance::local_update_t &diff, void *custom) noexcept override {
             ++update_visits;
             return parent_t::operator()(diff, custom);
         }

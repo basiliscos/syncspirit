@@ -3,47 +3,31 @@
 
 #include "cluster_supervisor.h"
 #include "controller_actor.h"
-#include "names.h"
 #include "utils/format.hpp"
 #include "model/diff/contact/peer_state.h"
 
 using namespace syncspirit::net;
 
-cluster_supervisor_t::cluster_supervisor_t(cluster_supervisor_config_t &config)
-    : ra::supervisor_asio_t{config}, config{config.config}, cluster{config.cluster}, sequencer{config.sequencer} {}
+cluster_supervisor_t::cluster_supervisor_t(config_t &config)
+    : parent_t{config}, config{config.config}, sequencer{config.sequencer} {}
 
 void cluster_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
-    ra::supervisor_asio_t::configure(plugin);
+    parent_t::configure(plugin);
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
         p.set_identity("net.cluster", false);
         log = utils::get_logger(identity);
     });
-    plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
-        p.discover_name(names::coordinator, coordinator, false).link(false).callback([&](auto phase, auto &ee) {
-            if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {
-                auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
-                auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
-                plugin->subscribe_actor(&cluster_supervisor_t::on_model_update, coordinator);
-            }
-        });
-    });
 }
 
 void cluster_supervisor_t::on_start() noexcept {
-    LOG_TRACE(log, "on_start");
     send<model::payload::local_up_t>(coordinator);
     parent_t::on_start();
 }
 
-void cluster_supervisor_t::shutdown_start() noexcept {
-    LOG_TRACE(log, "shutdown_start");
-    ra::supervisor_asio_t::shutdown_start();
-}
-
-void cluster_supervisor_t::on_model_update(model::message::model_update_t &message) noexcept {
-    LOG_TRACE(log, "on_model_update");
-    auto &diff = *message.payload.diff;
-    auto r = diff.visit(*this, nullptr);
+void cluster_supervisor_t::visit(const model::diff::cluster_diff_t &diff,
+                                 model::payload::apply_context_t &ctx) noexcept {
+    LOG_TRACE(log, "visit");
+    auto r = diff.visit(*this, {});
     if (!r) {
         auto ee = make_error(r.assume_error());
         do_shutdown(ee);
@@ -80,7 +64,7 @@ auto cluster_supervisor_t::operator()(const model::diff::contact::peer_state_t &
 
 void cluster_supervisor_t::on_child_shutdown(actor_base_t *actor) noexcept {
     LOG_TRACE(log, "on_child_shutdown: {}({})", actor->get_identity(), actor->use_count());
-    ra::supervisor_asio_t::on_child_shutdown(actor);
+    parent_t::on_child_shutdown(actor);
     auto &reason = actor->get_shutdown_reason();
     if (state == r::state_t::OPERATIONAL) {
         log->debug("on_child_shutdown, child {} termination: {}", actor->get_identity(), reason->message());

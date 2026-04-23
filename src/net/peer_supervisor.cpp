@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "peer_supervisor.h"
 #include "peer_actor.h"
@@ -11,36 +11,33 @@
 #include "model/diff/contact/connect_request.h"
 #include "model/diff/contact/relay_connect_request.h"
 #include "model/diff/contact/dial_request.h"
-#include "model/misc/error_code.h"
 
 using namespace syncspirit::net;
 
 template <class> inline constexpr bool always_false_v = false;
 
-peer_supervisor_t::peer_supervisor_t(peer_supervisor_config_t &cfg)
-    : parent_t{cfg}, cluster{cfg.cluster}, device_name{cfg.device_name}, ssl_pair{*cfg.ssl_pair},
-      bep_config(cfg.bep_config), relay_config{cfg.relay_config} {}
+peer_supervisor_t::peer_supervisor_t(config_t &cfg)
+    : parent_t{cfg}, device_name{cfg.device_name}, ssl_pair{*cfg.ssl_pair}, bep_config(cfg.bep_config),
+      relay_config{cfg.relay_config} {}
 
 void peer_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
-    r::actor_base_t::configure(plugin);
+    parent_t::configure(plugin);
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
         p.set_identity(names::peer_supervisor, false);
         log = utils::get_logger(identity);
         addr_unknown = p.create_address();
     });
-    plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
-        p.register_name(names::peer_supervisor, get_address());
-        p.discover_name(names::coordinator, coordinator, true).link(false).callback([&](auto phase, auto &ee) {
-            if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {
-                auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
-                auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
-                plugin->subscribe_actor(&peer_supervisor_t::on_model_update, coordinator);
-                plugin->subscribe_actor(&peer_supervisor_t::on_peer_ready);
-                plugin->subscribe_actor(&peer_supervisor_t::on_connect);
-                plugin->subscribe_actor(&peer_supervisor_t::on_connected, addr_unknown);
-            }
-        });
-    });
+    plugin.with_casted<r::plugin::registry_plugin_t>(
+        [&](auto &p) { p.register_name(names::peer_supervisor, get_address()); });
+}
+
+void peer_supervisor_t::post_configure_coordinator() noexcept {
+    parent_t::post_configure_coordinator();
+    auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
+    auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
+    plugin->subscribe_actor(&peer_supervisor_t::on_peer_ready);
+    plugin->subscribe_actor(&peer_supervisor_t::on_connect);
+    plugin->subscribe_actor(&peer_supervisor_t::on_connected, addr_unknown);
 }
 
 void peer_supervisor_t::on_child_shutdown(actor_base_t *actor) noexcept {
@@ -51,15 +48,13 @@ void peer_supervisor_t::on_child_shutdown(actor_base_t *actor) noexcept {
 }
 
 void peer_supervisor_t::on_start() noexcept {
-    LOG_TRACE(log, "on_start");
-    send<model::payload::local_up_t>(coordinator);
     parent_t::on_start();
+    send<model::payload::local_up_t>(coordinator);
 }
 
-void peer_supervisor_t::on_model_update(model::message::model_update_t &msg) noexcept {
-    LOG_TRACE(log, "on_model_update");
-    auto &diff = *msg.payload.diff;
-    auto r = diff.visit(*this, nullptr);
+void peer_supervisor_t::visit(const model::diff::cluster_diff_t &diff, model::payload::apply_context_t &ctx) noexcept {
+    LOG_TRACE(log, "visit");
+    auto r = diff.visit(*this, {});
     if (!r) {
         auto ee = make_error(r.assume_error());
         do_shutdown(ee);

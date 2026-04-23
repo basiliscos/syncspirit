@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2026 Ivan Baidakou
 
 #pragma once
 
@@ -177,7 +177,7 @@ struct app_supervisor_t : app_supervisor_base_t<app_supervisor_t> {
     void redisplay_folder_nodes(bool refresh_labels);
     void detach_main_window() noexcept;
 
-    void process(model::diff::cluster_diff_t &diff, apply_context_t &context) noexcept override;
+    void process(model::diff::cluster_diff_t &diff, model::payload::apply_context_t &context) noexcept override;
 
     outcome::result<void> apply(const model::diff::advance::advance_t &, void *) noexcept override;
     outcome::result<void> apply(const model::diff::load::blocks_t &, void *) noexcept override;

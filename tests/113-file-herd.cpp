@@ -42,6 +42,7 @@ struct supervisor_t : fs::fs_supervisor_t, model::diff::apply_controller_t, prot
     using model::diff::apply_controller_t::cluster;
     using parent_t::parent_t;
     using model::diff::cluster_visitor_t::operator();
+    using model_subscribers_t = std::vector<model::payload::model_subscription_t>;
 
     void configure(r::plugin::plugin_base_t &plugin) noexcept override {
         parent_t::configure(plugin);
@@ -50,6 +51,10 @@ struct supervisor_t : fs::fs_supervisor_t, model::diff::apply_controller_t, prot
         plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
             p.register_name(net::names::coordinator, get_address());
             p.register_name(net::names::db, get_address());
+        });
+        plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
+            p.subscribe_actor(&supervisor_t::on_model_subscribe);
+            p.subscribe_actor(&supervisor_t::on_model_unsubscribe);
         });
     }
 
@@ -71,6 +76,21 @@ struct supervisor_t : fs::fs_supervisor_t, model::diff::apply_controller_t, prot
             LOG_ERROR(log, "error visiting model: {}", r.assume_error().message());
             do_shutdown(make_error(r.assume_error()));
         }
+
+        auto context = model::payload::apply_context_t(&msg, const_cast<void *>(msg.payload.custom));
+        for (auto &subscriber : model_subscribers) {
+            subscriber.fn(*diff, context, subscriber.custom);
+        }
+    }
+
+    void on_model_subscribe(model::message::model_subscription_t &message) noexcept {
+        model_subscribers.push_back(message.payload);
+    }
+
+    void on_model_unsubscribe(model::message::model_unsubscription_t &message) noexcept {
+        auto &item = static_cast<const model::payload::model_subscription_t &>(message.payload);
+        auto it = std::find(model_subscribers.begin(), model_subscribers.end(), item);
+        model_subscribers.erase(it);
     }
 
     outcome::result<void> operator()(const model::diff::modify::upsert_folder_t &diff, void *custom) noexcept override {
@@ -114,6 +134,7 @@ struct supervisor_t : fs::fs_supervisor_t, model::diff::apply_controller_t, prot
         return diff.visit_next(*this, custom);
     }
 
+    model_subscribers_t model_subscribers;
     model::sequencer_ptr_t sequencer;
     fixture_t *fixture;
 };

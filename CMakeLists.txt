@@ -136,6 +136,7 @@ add_library(syncspirit_core
     src/hasher/hasher_actor.cpp
     src/hasher/hasher_plugin.cpp
     src/hasher/hasher_supervisor.cpp
+    src/model/messages.cpp
     src/model/diff/apply_controller.cpp
     src/model/diff/block_diff.cpp
     src/model/diff/cluster_diff.cpp

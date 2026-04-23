@@ -7,37 +7,39 @@
 #include "apply_controller.h"
 #include "model/messages.h"
 #include <list>
+#include <vector>
 #include <rotor/plugin/plugin_base.h>
 #include <rotor/plugin/resources.h>
 
 namespace syncspirit::model::diff {
 
 struct SYNCSPIRIT_API iterative_controller_base_t : apply_controller_t {
-    using model_update_ptr_t = r::intrusive_ptr_t<model::message::model_update_t>;
+    using model_update_ptr_t = r::intrusive_ptr_t<message::model_update_t>;
     using delayed_updates_t = std::list<model_update_ptr_t>;
+    using model_subscribers_t = std::vector<payload::model_subscription_t>;
 
-    struct apply_context_t : payload::model_interrupt_t {
-        const void *message_payload = nullptr;
-        void *custom_payload = nullptr;
-    };
+    ~iterative_controller_base_t();
 
   protected:
     iterative_controller_base_t(r::actor_base_t *owner, r::plugin::resource_id_t interrupt) noexcept;
 
-    void on_model_update(model::message::model_update_t &message) noexcept;
-    void on_model_interrupt(model::message::model_interrupt_t &message) noexcept;
-    void process_impl(model::diff::cluster_diff_t &diff, apply_context_t &apply_context) noexcept;
-    virtual void process(model::diff::cluster_diff_t &diff, apply_context_t &context) noexcept;
+    void on_model_update(message::model_update_t &message) noexcept;
+    void on_model_interrupt(message::model_interrupt_t &message) noexcept;
+    void on_model_subscribe(message::model_subscription_t &message) noexcept;
+    void on_model_unsubscribe(message::model_unsubscription_t &message) noexcept;
+    void process_impl(diff::cluster_diff_t &diff, payload::apply_context_t &apply_context) noexcept;
+    virtual void process(diff::cluster_diff_t &diff, payload::apply_context_t &context) noexcept;
     virtual void commit_loading() noexcept;
 
     using apply_controller_t::apply;
-    outcome::result<void> apply(const model::diff::load::interrupt_t &, void *) noexcept override;
-    outcome::result<void> apply(const model::diff::load::commit_t &, void *) noexcept override;
+    outcome::result<void> apply(const diff::load::interrupt_t &, void *) noexcept override;
+    outcome::result<void> apply(const diff::load::commit_t &, void *) noexcept override;
 
     r::actor_base_t *owner;
     utils::logger_t log;
 
     delayed_updates_t delayed_updates;
+    model_subscribers_t model_subscribers;
     r::address_ptr_t coordinator;
     r::address_ptr_t bouncer;
     r::plugin::resource_id_t interrupt;
@@ -51,9 +53,11 @@ struct iterative_controller_t : iterative_controller_base_t, Parent, Ts... {
     template <typename... Args>
     iterative_controller_t(T *self, r::plugin::resource_id_t interrupt, Args &&...args) noexcept
         : base_t(self, interrupt), Parent(std::forward<Args>(args)...) {}
-    void on_model_update(model::message::model_update_t &message) noexcept { base_t::on_model_update(message); }
-    void on_model_interrupt(model::message::model_interrupt_t &message) noexcept {
-        base_t::on_model_interrupt(message);
+    void on_model_update(message::model_update_t &message) noexcept { base_t::on_model_update(message); }
+    void on_model_interrupt(message::model_interrupt_t &message) noexcept { base_t::on_model_interrupt(message); }
+    void on_model_subscribe(message::model_subscription_t &message) noexcept { base_t::on_model_subscribe(message); }
+    void on_model_unsubscribe(message::model_unsubscription_t &message) noexcept {
+        base_t::on_model_unsubscribe(message);
     }
 };
 

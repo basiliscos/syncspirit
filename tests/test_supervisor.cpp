@@ -51,6 +51,8 @@ void supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         [&](auto &p) { p.register_name(names::coordinator, get_address()); });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&supervisor_t::on_model_update);
+        p.subscribe_actor(&supervisor_t::on_model_subscribe);
+        p.subscribe_actor(&supervisor_t::on_model_unsubscribe);
         p.subscribe_actor(&supervisor_t::on_package);
         p.subscribe_actor(&supervisor_t::on_io);
     });
@@ -98,6 +100,18 @@ void supervisor_t::enqueue(r::message_ptr_t message) noexcept {
     locality_leader->access<to::queue>().emplace_back(std::move(message));
 }
 
+void supervisor_t::on_model_subscribe(model::message::model_subscription_t &message) noexcept {
+    model_subscribers.push_back(message.payload);
+}
+
+void supervisor_t::on_model_unsubscribe(model::message::model_unsubscription_t &message) noexcept {
+    auto &item = static_cast<const model::payload::model_subscription_t &>(message.payload);
+    auto it = std::find(model_subscribers.begin(), model_subscribers.end(), item);
+    if (it != model_subscribers.end()) {
+        model_subscribers.erase(it);
+    }
+}
+
 void supervisor_t::on_model_update(model::message::model_update_t &msg) noexcept {
     LOG_TRACE(log, "updating model");
     auto &diff = msg.payload.diff;
@@ -111,6 +125,10 @@ void supervisor_t::on_model_update(model::message::model_update_t &msg) noexcept
     if (!r) {
         LOG_ERROR(log, "error visiting model: {}", r.assume_error().message());
         do_shutdown(make_error(r.assume_error()));
+    }
+    auto context = model::payload::apply_context_t(&msg, const_cast<void *>(msg.payload.custom));
+    for (auto &subscriber : model_subscribers) {
+        subscriber.fn(*diff, context, subscriber.custom);
     }
 }
 
