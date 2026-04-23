@@ -2271,6 +2271,31 @@ void test_invalid_utf8_names() {
     F().run();
 }
 
+void test_rm_folder_on_scan() {
+    struct F : folder_fixture_t {
+        using parent_t = folder_fixture_t;
+        using parent_t::parent_t;
+
+        void on_exec(fs::message::foreign_executor_t &msg) override {
+            auto diff = builder->remove_folder(*folder).extract();
+            sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff));
+            folder.reset();
+            folder_local.reset();
+            parent_t::on_exec(msg);
+        }
+
+        void main() noexcept override {
+            auto impl = GENERATE(I::inotify, I::kqueue, I::win32);
+            prepare(impl);
+
+            auto children = child_infos_t{make_child("a-file", bfs::file_type::regular)};
+            expect_dir_scan(children);
+            builder->scan_start(folder_id).apply(*sup);
+        }
+    };
+    F().run();
+}
+
 int _init() {
     test::init_logging();
     REGISTER_TEST_CASE(test_just_start, "test_just_start", "[fs]");
@@ -2306,6 +2331,7 @@ int _init() {
     REGISTER_TEST_CASE(test_double_content_update, "test_double_content_update", "[fs]");
     REGISTER_TEST_CASE(test_dir_scan_and_hashing_race, "test_dir_scan_and_hashing_race", "[fs]");
     REGISTER_TEST_CASE(test_invalid_utf8_names, "test_invalid_utf8_names", "[fs]");
+    REGISTER_TEST_CASE(test_rm_folder_on_scan, "test_rm_folder_on_scan", "[fs]");
     return 1;
 }
 

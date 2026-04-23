@@ -578,9 +578,12 @@ void folder_context_t::post_process(hash_base_t &hash_file, hasher::message::dig
 
 void folder_context_t::post_process(fs::task::scan_dir_t &task, stack_context_t &ctx) noexcept {
     using checked_chidren_t = std::pmr::set<std::string_view>;
+    if (!ensure_folder_existance(ctx)) {
+        return;
+    }
     scan_generation[task.path.generic_string()] = ++io_generation;
-    auto &ec = task.ec;
     auto folder = local_folder->get_folder();
+    auto &ec = task.ec;
     auto folder_id = folder->get_id();
     auto &root_path = folder->get_path();
     bool is_root = task.path == root_path && task.single_child.empty();
@@ -723,6 +726,9 @@ void folder_context_t::post_process(fs::task::scan_dir_t &task, stack_context_t 
 }
 
 void folder_context_t::post_process(fs::task::segment_iterator_t &task, stack_context_t &ctx) {
+    if (!ensure_folder_existance(ctx)) {
+        return;
+    }
     ++io_generation;
     auto &ec = task.ec;
     if (ec) {
@@ -761,6 +767,9 @@ void folder_context_t::post_process(fs::task::remove_file_t &task, stack_context
 }
 
 void folder_context_t::post_process(fs::task::rename_file_t &task, stack_context_t &ctx) noexcept {
+    if (!ensure_folder_existance(ctx)) {
+        return;
+    }
     auto raname_ctx = static_cast<rename_context_t *>(task.context.get());
     auto &ec = task.ec;
     if (ec) {
@@ -901,5 +910,18 @@ void folder_context_t::adjust_generation(generation_t generation) noexcept {
             item);
     }
 }
+
+bool folder_context_t::ensure_folder_existance(stack_context_t &ctx) noexcept {
+    auto decomposed = model::folder_info_t::decompose_key(local_folder->get_key());
+    auto folder = ctx.cluster.get_folders().by_key(decomposed.folder_key_raw);
+    if (!folder) {
+        LOG_WARN(log, "the folder does not exist in the model");
+        stack.clear();
+        pending_io.clear();
+        return false;
+    }
+    return true;
+}
+
 
 } // namespace syncspirit::net::local_keeper

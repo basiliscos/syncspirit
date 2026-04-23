@@ -63,8 +63,10 @@ struct folder_context_t : boost::intrusive_ref_counter<folder_context_t, boost::
 
     void push(fs::task_t task) noexcept;
     bool has_no_tasks() const noexcept;
+    bool ensure_folder_existance(stack_context_t &ctx) noexcept;
     int schedule_hash(hash_base_t *item, stack_context_t &ctx) noexcept;
     void handle_scan_error(fs::task::scan_dir_t &task, stack_context_t &ctx) noexcept;
+
 
     model::folder_info_ptr_t local_folder;
     local_keeper::stack_t stack;
