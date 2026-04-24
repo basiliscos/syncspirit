@@ -524,11 +524,13 @@ int folder_context_t::process(abort_hashing_t &item, stack_context_t &ctx) noexc
 
 folder_context_t &folder_context_t::post_process(stack_context_t &ctx) noexcept {
     LOG_TRACE(log, "postpocessing");
-    assert(in_progress > 0);
-    --in_progress;
+    if (ensure_folder_existance(ctx)) {
+        assert(in_progress > 0);
+        --in_progress;
 
-    for (auto &t : ctx.slave->tasks_out) {
-        std::visit([&](auto &t) { post_process(t, ctx); }, t);
+        for (auto &t : ctx.slave->tasks_out) {
+            std::visit([&](auto &t) { post_process(t, ctx); }, t);
+        }
     }
     ctx.slave->tasks_out.clear();
     return *this;
@@ -536,10 +538,14 @@ folder_context_t &folder_context_t::post_process(stack_context_t &ctx) noexcept 
 
 void folder_context_t::post_process(hash_base_t &hash_file, hasher::message::digest_t &msg,
                                     stack_context_t &ctx) noexcept {
+    if (!ensure_folder_existance(ctx)) {
+        return;
+    }
     auto path_str = narrow(hash_file.path.generic_wstring());
     LOG_TRACE(log, "post_process of '{}', hasn_file {} blocks are hashing", path_str, hashing);
     assert(hashing > 0);
     --hashing;
+
     auto it_h = hashing_files.find(path_str);
     if (--it_h->second == 0) {
         hashing_files.erase(it_h);
@@ -578,9 +584,6 @@ void folder_context_t::post_process(hash_base_t &hash_file, hasher::message::dig
 
 void folder_context_t::post_process(fs::task::scan_dir_t &task, stack_context_t &ctx) noexcept {
     using checked_chidren_t = std::pmr::set<std::string_view>;
-    if (!ensure_folder_existance(ctx)) {
-        return;
-    }
     scan_generation[task.path.generic_string()] = ++io_generation;
     auto folder = local_folder->get_folder();
     auto &ec = task.ec;
@@ -726,9 +729,6 @@ void folder_context_t::post_process(fs::task::scan_dir_t &task, stack_context_t 
 }
 
 void folder_context_t::post_process(fs::task::segment_iterator_t &task, stack_context_t &ctx) {
-    if (!ensure_folder_existance(ctx)) {
-        return;
-    }
     ++io_generation;
     auto &ec = task.ec;
     if (ec) {
@@ -767,9 +767,6 @@ void folder_context_t::post_process(fs::task::remove_file_t &task, stack_context
 }
 
 void folder_context_t::post_process(fs::task::rename_file_t &task, stack_context_t &ctx) noexcept {
-    if (!ensure_folder_existance(ctx)) {
-        return;
-    }
     auto raname_ctx = static_cast<rename_context_t *>(task.context.get());
     auto &ec = task.ec;
     if (ec) {
@@ -922,6 +919,5 @@ bool folder_context_t::ensure_folder_existance(stack_context_t &ctx) noexcept {
     }
     return true;
 }
-
 
 } // namespace syncspirit::net::local_keeper
