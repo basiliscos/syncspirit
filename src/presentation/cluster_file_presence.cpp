@@ -59,20 +59,8 @@ const presence_t *cluster_file_presence_t::determine_best(const presence_t *othe
 }
 
 presence_stats_t cluster_file_presence_t::refresh_own_stats() noexcept {
-    std::int64_t size;
-    std::int32_t local;
-    if (features & F::local) {
-        if (file_info.is_local() && file_info.is_locally_available()) {
-            local = 1;
-            size = file_info.get_size();
-        } else {
-            local = 0;
-            size = 0;
-        }
-    } else {
-        local = 0;
-        size = file_info.get_size();
-    }
+    std::int64_t size = file_info.get_size();
+    std::int32_t local = features & F::local && (file_info.is_local() && file_info.is_locally_available());
     return {size, 1, 0, local};
 }
 
