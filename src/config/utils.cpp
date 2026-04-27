@@ -194,9 +194,12 @@ static main_t make_default_config(const bfs::path &config_path, const bfs::path 
         10          /* skip_discovers */
     };
     cfg.fs_config = fs_config_t {
-        86400000,   /* temporally_timeout, 24h default */
-        1000,       /* poll_timeout, 1s by default */
-        10'000,     /* retension_timeout, 10s by default */
+        86400000,    /* temporally_timeout, 24h default */
+        1000,        /* poll_timeout, 1s by default */
+        10'000,      /* retension_timeout, 10s by default */
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+        1024 * 1024, /* win32 watcher buffer size */
+#endif
     };
     cfg.db_config = db_config_t {
         0x0,           /* upper_limit, auto-adjust */
@@ -348,6 +351,9 @@ config_result_t get_config(std::istream &config, const bfs::path &config_path) {
         SAFE_GET_VALUE(temporally_timeout, std::uint32_t, "fs");
         SAFE_GET_VALUE(poll_timeout, std::uint32_t, "fs");
         SAFE_GET_VALUE(retension_timeout, std::uint32_t, "fs");
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+        SAFE_GET_VALUE(win32_watcher_buff, std::uint32_t, "fs");
+#endif
     }
 
     // db
@@ -478,6 +484,9 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
                    {"temporally_timeout", cfg.fs_config.temporally_timeout},
                    {"poll_timeout", cfg.fs_config.poll_timeout},
                    {"retension_timeout", cfg.fs_config.retension_timeout},
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+                   {"win32_watcher_buff", cfg.fs_config.win32_watcher_buff},
+#endif
                }}},
         {"db", toml::table{{
                    {"upper_limit", cfg.db_config.upper_limit},

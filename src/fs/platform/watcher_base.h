@@ -11,6 +11,7 @@
 #include <optional>
 #include "utils/log.h"
 #include "proto/proto-fwd.hpp"
+#include "config/fs.h"
 #include "fs/messages.h"
 #include "fs/update_type.hpp"
 #include "fs/updates_mediator.h"
@@ -26,6 +27,7 @@ struct SYNCSPIRIT_API watcher_config_t : r::actor_config_t {
     r::pt::time_duration change_retension;
     updates_mediator_ptr_t updates_mediator;
     watched_folders_ptr_t watched_folders;
+    config::fs_config_t fs_config;
 };
 
 template <typename Actor> struct watcher_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -43,6 +45,10 @@ template <typename Actor> struct watcher_config_builder_t : r::actor_config_buil
     }
     builder_t &&watched_folders(watched_folders_ptr_t value) && noexcept {
         parent_t::config.watched_folders = std::move(value);
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+    builder_t &&fs_config(const config::fs_config_t &value) && noexcept {
+        parent_t::config.fs_config = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };
@@ -92,6 +98,7 @@ struct SYNCSPIRIT_API watcher_base_t : r::actor_base_t {
     updates_mediator_ptr_t updates_mediator;
     r::address_ptr_t coordinator;
     watched_folders_ptr_t watched_folders;
+    config::fs_config_t fs_config;
     bulk_update_t next;
     bulk_update_t postponed;
 };

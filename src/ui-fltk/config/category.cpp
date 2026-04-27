@@ -69,6 +69,9 @@ auto reflect(const main_cfg_t &config, const main_cfg_t &default_config) -> cate
             property_ptr_t(new fs::temporally_timeout_t(f.temporally_timeout, f_def.temporally_timeout)),
             property_ptr_t(new fs::poll_timeout_t(f.poll_timeout, f_def.poll_timeout)),
             property_ptr_t(new fs::retension_timeout_t(f.retension_timeout, f_def.retension_timeout)),
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+            property_ptr_t(new fs::win32_watcher_buff_t(f.win32_watcher_buff, f_def.win32_watcher_buff)),
+#endif
             // clang-format on
         };
         return new category_t("fs", "filesystem settings", std::move(props));

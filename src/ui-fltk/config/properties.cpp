@@ -284,6 +284,19 @@ void temporally_timeout_t::reflect_to(syncspirit::config::main_t &main) {
 
 const char *temporally_timeout_t::explanation_ = "remove incomplete file after this amount of seconds";
 
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+
+win32_watcher_buff_t::win32_watcher_buff_t(std::uint64_t value, std::uint64_t default_value)
+    : parent_t("win32_watcher_buff", explanation_, value, default_value) {}
+
+void win32_watcher_buff_t::reflect_to(syncspirit::config::main_t &main) {
+    main.fs_config.win32_watcher_buff = native_value;
+}
+
+const char *win32_watcher_buff_t::explanation_ = "per folder watching buffer (in bytes)";
+
+#endif
+
 } // namespace fs
 
 namespace global_discovery {

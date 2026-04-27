@@ -236,6 +236,17 @@ struct temporally_timeout_t final : impl::positive_integer_t {
     void reflect_to(syncspirit::config::main_t &main) override;
 };
 
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+struct win32_watcher_buff_t final : impl::positive_integer_t {
+    using parent_t = impl::positive_integer_t;
+
+    static const char *explanation_;
+
+    win32_watcher_buff_t(std::uint64_t value, std::uint64_t default_value);
+    void reflect_to(syncspirit::config::main_t &main) override;
+};
+#endif
+
 } // namespace fs
 
 namespace global_discovery {

@@ -24,7 +24,11 @@ bool operator==(const dialer_config_t &lhs, const dialer_config_t &rhs) noexcept
 
 bool operator==(const fs_config_t &lhs, const fs_config_t &rhs) noexcept {
     return lhs.temporally_timeout == rhs.temporally_timeout && lhs.poll_timeout == rhs.poll_timeout &&
-           lhs.retension_timeout == rhs.retension_timeout;
+           lhs.retension_timeout == rhs.retension_timeout
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+           && lhs.win32_watcher_buff == rhs.win32_watcher_buff
+#endif
+        ;
 }
 
 bool operator==(const db_config_t &lhs, const db_config_t &rhs) noexcept {

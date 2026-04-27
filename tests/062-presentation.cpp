@@ -980,7 +980,7 @@ TEST_CASE("statistics (size & locality are idenpendent)", "[presentation]") {
     auto f_my = add_file("b.txt", *my_device, 5, proto::FileInfoType::FILE);
 
     auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
-    auto file_b = *folder_entity ->get_children().begin();
+    auto file_b = *folder_entity->get_children().begin();
     auto file_b_my = file_b->get_presence(my_device.get());
     auto file_b_peer = file_b->get_presence(peer_device.get());
 
@@ -999,7 +999,6 @@ TEST_CASE("statistics (size & locality are idenpendent)", "[presentation]") {
 
     CHECK(file_b_my->get_own_stats().size == 5);
     CHECK(file_b_my->get_own_stats().local_entries == 1);
-
 }
 
 TEST_CASE("statistics", "[presentation]") {

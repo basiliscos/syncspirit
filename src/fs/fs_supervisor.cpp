@@ -57,6 +57,7 @@ void fs_supervisor_t::launch_children() noexcept {
                        .change_retension(retension)
                        .updates_mediator(updates_mediator)
                        .watched_folders(watched_folders)
+                       .fs_config(fs_config)
                        .finish()
                        .get();
 

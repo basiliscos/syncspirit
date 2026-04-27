@@ -240,7 +240,7 @@ auto FU::make(const folder_info_t &folder_info, watcher_base_t &actor) noexcept 
 
 watcher_base_t::watcher_base_t(config_t &cfg)
     : parent_t{cfg}, retension(cfg.change_retension), updates_mediator{std::move(cfg.updates_mediator)},
-      watched_folders(cfg.watched_folders) {
+      watched_folders(cfg.watched_folders), fs_config{cfg.fs_config} {
     log = utils::get_logger(actor_identity);
     if (!retension.is_positive()) {
         LOG_ERROR(log, "retension interval should be positive");
