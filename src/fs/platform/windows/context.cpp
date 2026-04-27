@@ -14,21 +14,38 @@ namespace sys = boost::system;
 using guard_t = platform_context_t::io_guard_t;
 using io_ctx_t = platform_context_t::io_context_t;
 
-guard_t::io_guard_t() : ctx{nullptr}, handle{nullptr} {}
-guard_t::io_guard_t(platform_context_t *ctx_, close_handle_t close_cb_, handle_t handle_)
-    : ctx{ctx_}, close_cb{close_cb_}, handle{handle_} {}
-guard_t::io_guard_t(io_guard_t &&other) : ctx{nullptr}, close_cb{nullptr}, handle{nullptr} {
+guard_t::io_guard_t() : ctx{nullptr}, close_cb{nullptr}, handle{nullptr}, registered{false} {}
+guard_t::io_guard_t(platform_context_t *ctx_, close_handle_t close_cb_, handle_t handle_, bool registered_)
+    : ctx{ctx_}, close_cb{close_cb_}, handle{handle_}, registered{registered_} {}
+guard_t::io_guard_t(io_guard_t &&other) : ctx{nullptr}, close_cb{nullptr}, handle{nullptr}, registered{false} {
     std::swap(ctx, other.ctx);
     std::swap(close_cb, other.close_cb);
     std::swap(handle, other.handle);
+    std::swap(registered, other.registered);
 }
 guard_t::~io_guard_t() {
     if (handle && ctx && close_cb) {
-        auto ok = close_cb(handle);
-        if (!ok) {
-            auto log = utils::get_logger("fs");
+        auto log = utils::get_logger("fs");
+        LOG_TRACE(log, "removing handle {}", (void *)handle);
+        if (!close_cb(handle)) {
             auto ec = sys::error_code(::GetLastError(), sys::system_category());
             LOG_WARN(log, "cannot close handle {}: {}", (void *)handle, ec.message());
+        }
+        if (registered) {
+            auto &handles = ctx->handles;
+            auto it_handle = std::find(handles.begin(), handles.end(), handle);
+            if (it_handle != handles.end()) {
+                LOG_TRACE(log, "unregistered handle {}", (void *)handle);
+                handles.erase(it_handle);
+            } else {
+                LOG_WARN(log, "registered handle {} not found", (void *)handle);
+            }
+            auto &callbacks = ctx->io_callbacks;
+            auto it_cb = callbacks.find(handle);
+            if (it_cb != callbacks.end()) {
+                LOG_TRACE(log, "removed callback for handle {}", (void *)handle);
+                callbacks.erase(it_cb);
+            }
         }
     }
 }
@@ -36,6 +53,7 @@ guard_t &guard_t::operator=(guard_t &&other) noexcept {
     std::swap(ctx, other.ctx);
     std::swap(close_cb, other.close_cb);
     std::swap(handle, other.handle);
+    std::swap(registered, other.registered);
     return *this;
 }
 guard_t::operator bool() const { return (bool)handle; }
@@ -84,7 +102,7 @@ auto platform_context_t::register_callback(handle_t handle, io_callback_t callba
         if (inserted) {
             LOG_TRACE(log, "registered callback for handle {}", (void *)handle);
             handles.emplace_back(handle);
-            return io_guard_t(this, close_cb ? close_cb : close_handle_cb, handle);
+            return io_guard_t(this, close_cb ? close_cb : close_handle_cb, handle, true);
         } else {
             auto log = utils::get_logger("fs");
             LOG_WARN(log, "callback for the handle is already registered");
@@ -96,7 +114,7 @@ auto platform_context_t::register_callback(handle_t handle, io_callback_t callba
 }
 
 auto platform_context_t::guard_handle(handle_t handle, close_handle_t close_cb) noexcept -> io_guard_t {
-    return io_guard_t(this, close_cb ? close_cb : close_handle_cb, handle);
+    return io_guard_t(this, close_cb ? close_cb : close_handle_cb, handle, false);
 }
 
 bool platform_context_t::wait_next_event() noexcept {

@@ -14,6 +14,8 @@
 using namespace syncspirit::fs::platform::windows;
 using boost::nowide::narrow;
 
+static bool _close_handle(handle_t handle) { return ::CloseHandle(handle); }
+
 auto watcher_t::folder_guard_t::make(std::uint32_t buff_sz, std::string folder_id, io_guard_t dir_guard,
                                      io_guard_t event_guard) noexcept -> folder_guard_ptr_t {
     auto buff = (char *)malloc(buff_sz);
@@ -77,7 +79,7 @@ void watcher_t::on_watch(message::watch_folder_t &message) noexcept {
         p.ec = ec;
         return;
     }
-    auto event_guard = ctx->register_callback(event_handle, notify_cb, this);
+    auto event_guard = ctx->register_callback(event_handle, notify_cb, this, _close_handle);
 
     LOG_TRACE(log, "dir handle = {}, event_handle = {}", (void *)dir_handle, (void *)event_handle);
 
@@ -107,22 +109,12 @@ void watcher_t::on_watch(message::watch_folder_t &message) noexcept {
 
 auto watcher_t::unwatch_dir(std::string_view folder_id) noexcept -> sys::error_code {
     auto r = sys::error_code();
-    auto handle = handle_map[folder_id];
+    auto it_handle = handle_map.find(folder_id);
+    auto handle = it_handle->second;
     auto it = path_map.find(handle);
     auto &pg = it->second;
 
-    for (auto guard : {&pg->event_guard, &pg->dir_guard}) {
-        auto handle = guard->handle;
-        guard->handle = {};
-        auto ok = ::CloseHandle(handle);
-        if (!ok) {
-            if (!r) {
-                r = sys::error_code(::GetLastError(), sys::system_category());
-            } else {
-                LOG_WARN(log, "error closing handle {}", (void *)handle);
-            }
-        }
-    }
+    handle_map.erase(it_handle);
     path_map.erase(it);
 
     return r;
@@ -132,7 +124,7 @@ void watcher_t::on_unwatch(message::unwatch_folder_t &message) noexcept {
     auto &p = message.payload;
     auto it = watched_folders->find(p.folder_id);
     if (it != watched_folders->end()) {
-        LOG_DEBUG(log, "unwatching {}", it->second.path_str);
+        LOG_DEBUG(log, "unwatching(1) {}", it->second.path_str);
         p.ec = unwatch_dir(p.folder_id);
         watched_folders->erase(it);
     } else {
@@ -144,7 +136,7 @@ void watcher_t::shutdown_finish() noexcept {
     for (auto it = watched_folders->begin(); it != watched_folders->end();) {
         auto &folder_id = it->first;
         auto &path = it->second.path_str;
-        LOG_DEBUG(log, "unwatching {}", path);
+        LOG_DEBUG(log, "unwatching(2) {}", path);
         unwatch_dir(folder_id);
         it = watched_folders->erase(it);
     }
