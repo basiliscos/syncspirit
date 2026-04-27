@@ -50,6 +50,8 @@ static void notify_cb(HANDLE handle, void *data) {
 }
 
 void watcher_t::on_watch(message::watch_folder_t &message) noexcept {
+    constexpr auto SHARE_MODE = FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE;
+    constexpr auto FILE_FLAGS = FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OVERLAPPED;
     auto sup = static_cast<fs::fs_supervisor_t *>(supervisor);
     auto ctx = static_cast<fs::fs_context_t *>(sup->context);
     auto &p = message.payload;
@@ -57,8 +59,8 @@ void watcher_t::on_watch(message::watch_folder_t &message) noexcept {
     auto path_str = narrow(path_native);
     LOG_TRACE(log, "on watch on '{}' (buffer size: {} bytes)", path_str, fs_config.win32_watcher_buff);
 
-    auto dir_handle = ::CreateFileW(path_native.c_str(), FILE_LIST_DIRECTORY, FILE_SHARE_READ, nullptr, OPEN_EXISTING,
-                                    FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OVERLAPPED, nullptr);
+    auto dir_handle = ::CreateFileW(path_native.c_str(), FILE_LIST_DIRECTORY, SHARE_MODE, nullptr, OPEN_EXISTING,
+                                    FILE_FLAGS, nullptr);
 
     if (dir_handle == INVALID_HANDLE_VALUE) {
         auto ec = sys::error_code(::GetLastError(), sys::system_category());
