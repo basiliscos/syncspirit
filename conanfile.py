@@ -24,7 +24,7 @@ class SyncspiritRecipe(ConanFile):
         self.requires("rotor/0.40", options=rotor_options)
         self.requires("lz4/1.10.0")
         self.requires("nlohmann_json/3.12.0")
-        self.requires("openssl/3.5.2")
+        self.requires("openssl/3.6.2")
         self.requires("protopuf/3.0.0")
         self.requires("pugixml/1.15")
         self.requires("spdlog/1.15.3")
