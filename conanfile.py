@@ -17,7 +17,7 @@ class SyncspiritRecipe(ConanFile):
 
         if self.options.get_safe("frontend_fltk", False):
             self.requires("freetype/2.12.1", headers=True, libs=True, transitive_libs=True, force=True)
-            self.requires("fltk/1.3.9", libs=True, transitive_libs=True, force=True)
+            self.requires("fltk/1.4.5")
             self.requires("libqrencode/4.1.1")
             rotor_options["enable_fltk"] = True
 
