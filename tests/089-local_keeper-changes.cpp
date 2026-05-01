@@ -525,6 +525,23 @@ void test_trivial_changes() {
                 CHECK(f->get_sequence() == file_seq_2);
                 CHECK(folder_local->get_max_sequence() == folder_seq_2);
             }
+            SECTION("create & remove a dir") {
+                proto::set_type(file, FT::DIRECTORY);
+                expect_dir_scan({});
+                mk_update(file, fs::update_type_t::created, true);
+                CHECK(files_local->size() == 1);
+                auto f = files_local->by_name(file_name);
+                REQUIRE(f);
+                CHECK(f->is_dir());
+                auto seq = f->get_sequence();
+
+                proto::set_type(file, FT::FILE); // it not known type of already removed file
+                proto::set_deleted(file, true);
+                mk_update(file, fs::update_type_t::deleted, false);
+                CHECK(f->get_sequence() > seq);
+                CHECK(f->is_deleted());
+                CHECK(f->is_dir());
+            }
         }
     };
     F().run();

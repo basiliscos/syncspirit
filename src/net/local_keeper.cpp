@@ -423,7 +423,14 @@ void local_keeper_t::on_changes(model::folder_info_t &local_folder, fs::payload:
         auto file = files_map.by_name(name);
         bool update = true;
         if (file) {
-            update = !file->identical_by_content_to(change);
+            if (proto::get_deleted(change)) {
+                // migrare relevant metadata
+                proto::set_type(change, model::file_info_t::as_type(file->get_type()));
+                proto::set_modified_s(change, file->get_modified_s());
+                proto::set_modified_ns(change, file->get_modified_ns());
+            } else {
+                update = !file->identical_by_content_to(change);
+            }
         }
         if (proto::get_type(change) == proto::FileInfoType::DIRECTORY) {
             auto n = std::pmr::string(name, stack_ctx.allocator);

@@ -657,14 +657,17 @@ void test_deleted() {
             proto::set_id(counter, my_short_id);
             proto::set_value(counter, 1);
 
-            SECTION("sigle items") {
+            SECTION("single items") {
                 auto pr_file = proto::FileInfo{};
                 auto file_name = bfs::path(L"неизменное.bin");
                 proto::set_name(pr_file, file_name.string());
                 proto::set_sequence(pr_file, 4);
                 proto::set_version(pr_file, v);
 
-                SECTION("regular file") { builder->local_update(folder->get_id(), pr_file).apply(*sup); }
+                SECTION("regular file") {
+                    proto::set_type(pr_file, proto::FileInfoType::FILE);
+                    builder->local_update(folder->get_id(), pr_file).apply(*sup);
+                }
 #ifndef SYNCSPIRIT_WIN
                 SECTION("symlink") {
                     proto::set_symlink_target(pr_file, "does/not/matter");
@@ -691,6 +694,7 @@ void test_deleted() {
                 CHECK(file_1.get() == file_2.get());
                 CHECK(file_1->is_local());
                 REQUIRE(file_1->is_deleted());
+                CHECK(file_info_t::as_type(file_1->get_type()) == proto::get_type(pr_file));
             }
             SECTION("deleted hierarchy of dirs") {
                 auto pr_file = proto::FileInfo{};
