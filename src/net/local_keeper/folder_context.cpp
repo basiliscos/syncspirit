@@ -44,7 +44,7 @@ auto make_context(model::folder_info_ptr_t local_folder, std::string_view start_
     auto local_device = folder->get_cluster()->get_device();
     auto folder_presence = folder_entity->get_presence(local_device.get());
     auto presence = folder_presence;
-    auto skip_path = bfs::path(start_subdir);
+    auto skip_path = bfs::path(widen(start_subdir));
 
     auto comparator = presentation::presence_t::child_comparator_t{};
     for (const auto &item : skip_path) {

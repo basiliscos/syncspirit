@@ -1240,7 +1240,7 @@ void test_partial_scan() {
     struct F : fixture_t {
         void main() noexcept override {
             auto my_short_id = my_device->device_id().get_uint();
-            auto dir_1 = root_path / L"a/b/c";
+            auto dir_1 = root_path / L"а/б/в";
             auto dir_2 = root_path / L"x/y/z";
             auto file_1 = dir_1 / L"файл-1.bin";
             auto file_2 = dir_2 / L"файл-2.bin";
@@ -1253,7 +1253,7 @@ void test_partial_scan() {
             auto &files = folder_info->get_file_infos();
             REQUIRE(files.size() == 6 + 2);
 
-            auto f_1 = files.by_name(narrow(L"a/b/c/файл-1.bin"));
+            auto f_1 = files.by_name(narrow(L"а/б/в/файл-1.bin"));
             auto f_2 = files.by_name(narrow(L"x/y/z/файл-2.bin"));
 
             REQUIRE(f_1);
@@ -1265,21 +1265,21 @@ void test_partial_scan() {
             write_file(file_1, "1234567890");
             write_file(file_2, "6789012345");
             SECTION("existing dir") {
-                auto subdir = GENERATE("a", "a/b", "a/b/c");
-                builder->scan_start(folder->get_id(), subdir).apply(*sup);
-                CHECK(subdir != std::string_view(""));
+                auto subdir = GENERATE(L"а", L"а/б", L"а/б/в");
+                builder->scan_start(folder->get_id(), narrow(subdir)).apply(*sup);
+                CHECK(subdir != std::wstring_view());
                 REQUIRE(files.size() == 6 + 2);
                 CHECK(f_1->get_sequence() != seq_1);
                 CHECK(f_2->get_sequence() == seq_2);
             }
             SECTION("non-existing dir") {
                 builder->scan_start(folder->get_id()).apply(*sup);
-                auto subdir = GENERATE("a", "a/b", "a/b/c");
+                auto subdir = narrow(GENERATE(L"а", L"а/б", L"а/б/в"));
                 bfs::remove_all(root_path / subdir);
                 INFO("subdir: " << subdir);
                 CHECK(subdir != std::string_view{});
-                builder->scan_start(folder->get_id(), "a/b/c").apply(*sup);
-                auto dir = files.by_name("a/b/c");
+                builder->scan_start(folder->get_id(), narrow(L"а/б/в")).apply(*sup);
+                auto dir = files.by_name(narrow(L"а/б/в"));
                 REQUIRE(dir);
                 auto aug = folder->get_augmentation().get();
                 auto folder_entity = static_cast<presentation::folder_entity_t *>(aug);
@@ -1294,20 +1294,20 @@ void test_partial_scan() {
                 CHECK(!folder->is_suspended());
             }
             SECTION("resurrection") {
-                bfs::remove_all(root_path / "a");
-                auto dir_a = files.by_name("a");
+                bfs::remove_all(root_path / L"а");
+                auto dir_a = files.by_name(narrow(L"а"));
                 auto dir_x = files.by_name("x");
-                auto dir_b = files.by_name("a/b");
-                auto dir_c = files.by_name("a/b/c");
-                builder->scan_start(folder->get_id(), "a/b").apply(*sup);
+                auto dir_b = files.by_name(narrow(L"а/б"));
+                auto dir_c = files.by_name(narrow(L"а/б/в"));
+                builder->scan_start(folder->get_id(), narrow(L"а/б")).apply(*sup);
 
                 REQUIRE(dir_a->is_deleted());
                 REQUIRE(dir_b->is_deleted());
                 REQUIRE(dir_c->is_deleted());
                 CHECK(!dir_x->is_deleted());
 
-                bfs::create_directories(root_path / "a/b/c");
-                builder->scan_start(folder->get_id(), "a/b").apply(*sup);
+                bfs::create_directories(root_path / L"а/б/в");
+                builder->scan_start(folder->get_id(), narrow(L"а/б")).apply(*sup);
 
                 CHECK(!dir_a->is_deleted());
                 CHECK(!dir_b->is_deleted());
