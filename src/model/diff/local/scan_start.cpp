@@ -29,10 +29,15 @@ auto scan_start_t::apply_impl(apply_controller_t &controller, void *custom) cons
             auto name = local_file.get_name()->get_full_name();
             if (name.size() >= sub_dir.size()) {
                 bool match = true;
-                for (size_t i = 0; i < sub_dir.size(); ++i) {
-                    if (sub_dir[i] != name[i]) {
-                        match = false;
-                        break;
+                if (sub_dir.size()) {
+                    for (size_t i = 0; i < sub_dir.size(); ++i) {
+                        if (sub_dir[i] != name[i]) {
+                            match = false;
+                            break;
+                        }
+                    }
+                    if (match && name.size() > sub_dir.size()) {
+                        match = name[sub_dir.size()] == '/';
                     }
                 }
                 if (match) {

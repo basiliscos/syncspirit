@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "model/diff/load/interrupt.h"
 #include "test-utils.h"
@@ -13,14 +13,10 @@ using namespace syncspirit;
 using namespace syncspirit::test;
 using namespace syncspirit::model;
 
-TEST_CASE("scan_start", "[model]") {
-    test::init_logging();
+auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
+auto my_device = device_ptr_t(new model::local_device_t(my_id, "my-device", "my-device"));
 
-    auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
-
-    auto my_device = device_ptr_t{};
-    my_device = new model::local_device_t(my_id, "my-device", "my-device");
-
+TEST_CASE("scan_start, full", "[model]") {
     auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
     auto sequencer = make_sequencer(4);
     auto &devices = cluster->get_devices();
@@ -56,6 +52,39 @@ TEST_CASE("scan_start", "[model]") {
     REQUIRE(builder.scan_start("f1").apply());
     CHECK(!f1->is_local());
     CHECK(!f2->is_local());
+}
+
+TEST_CASE("scan_start, partial", "[model]") {
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
+    auto sequencer = make_sequencer(4);
+    auto &devices = cluster->get_devices();
+    devices.put(my_device);
+
+    auto &blocks_map = cluster->get_blocks();
+    auto builder = diff_builder_t(*cluster);
+    REQUIRE(builder.upsert_folder("f1", "some/path-1", "my-label-1").apply());
+
+    auto folder = cluster->get_folders().by_id("f1");
+    auto folder_my = folder->get_folder_infos().by_device(*my_device);
+    auto &file_infos = folder_my->get_file_infos();
+
+    auto names = {"dir", "dir_x", "dir/sub_dir"};
+    for (auto &name : names) {
+        proto::FileInfo pr_fi;
+        proto::set_name(pr_fi, name);
+        proto::set_type(pr_fi, proto::FileInfoType::DIRECTORY);
+        auto &v_1 = proto::get_version(pr_fi);
+        proto::add_counters(v_1, proto::Counter(my_id.get_uint(), 0));
+        REQUIRE(builder.local_update("f1", pr_fi).apply());
+        auto f = file_infos.by_name(name);
+        REQUIRE(f);
+        REQUIRE(f->is_local());
+    }
+
+    REQUIRE(builder.scan_start("f1", "dir").apply());
+    CHECK(!file_infos.by_name("dir")->is_local());
+    CHECK(!file_infos.by_name("dir/sub_dir")->is_local());
+    CHECK(file_infos.by_name("dir_x")->is_local());
 }
 
 int _init() {
