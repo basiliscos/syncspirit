@@ -5,7 +5,6 @@
 #include "augmentation.h"
 #include "constants.h"
 #include "main_window.h"
-#include "presence_item/folder.h"
 #include "tree_item/devices.h"
 #include "tree_item/folders.h"
 #include "tree_item/ignored_devices.h"
@@ -13,6 +12,7 @@
 #include "tree_item/pending_devices.h"
 #include "tree_item/pending_folders.h"
 #include "tree_item/peer_folders.h"
+#include "presence_item.h"
 #include "net/names.h"
 #include "config/utils.h"
 #include "model/diff/diff_assembler.h"
@@ -49,6 +49,7 @@ using namespace syncspirit::fltk;
 using namespace syncspirit::presentation;
 
 static auto MAX_DEPTH = std::numeric_limits<std::int32_t>::max();
+static auto UPDATE_DELAY = r::pt::milliseconds{40};
 
 using entities_ptrs_t = std::pmr::unordered_set<const entity_t *>;
 using entities_t = std::pmr::unordered_set<entity_ptr_t>;
@@ -133,6 +134,7 @@ app_supervisor_t::app_supervisor_t(config_t &config)
 }
 
 app_supervisor_t::~app_supervisor_t() {
+    delayed_items.clear();
     detach_main_window();
     utils::get_root_logger()->debug("~app_supervisor_t()");
 }
@@ -238,13 +240,22 @@ void app_supervisor_t::process(model::diff::cluster_diff_t &diff, model::payload
     for (auto &entity : deleted_entities) {
         updated_entities.erase(entity.get());
     }
+
+    bool check_timer = false;
     for (auto entity : updated_entities) {
         for (auto p : entity->get_presences()) {
             auto augmentation = p->get_augmentation().get();
             if (augmentation) {
                 auto item = static_cast<presence_item_t *>(augmentation);
-                item->on_update();
+                delayed_items.insert(item);
+                check_timer = true;
             }
+        }
+    }
+    if (check_timer) {
+        if (!display_posponed) {
+            auto method = &app_supervisor_t::on_display_delayed_timer;
+            display_posponed = start_timer(UPDATE_DELAY, *this, method);
         }
     }
 }
@@ -431,7 +442,6 @@ auto app_supervisor_t::apply(const model::diff::advance::advance_t &diff, void *
             if (local_file) {
                 auto entity = folder_entity->on_insert(*local_file, *local_fi);
                 if (entity) {
-                    auto parent = entity->get_parent();
                     auto mask = mask_nodes();
                     for (auto presence : entity->get_presences()) {
                         using F = presence_t::features_t;
@@ -706,4 +716,16 @@ void app_supervisor_t::soft_restart() {
     log->debug("soft restart has been requested");
     soft_restart_request = true;
     main_window->hide();
+}
+
+void app_supervisor_t::on_display_delayed_timer(r::request_id_t, bool cancelled) noexcept {
+    display_posponed.reset();
+    auto items = std::move(delayed_items);
+    if (!cancelled) {
+        for (auto &item : items) {
+            if (item->use_count() > 1) {
+                item->on_update();
+            }
+        }
+    }
 }
