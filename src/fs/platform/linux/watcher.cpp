@@ -135,7 +135,8 @@ void watcher_t::inotify_callback() noexcept {
             *name_ptr-- = 0;
 
             struct inotify_event *event = (struct inotify_event *)&buffer[i];
-            LOG_TRACE(log, "event 0x{:x}, cookie: 0x{:x}, on '{}'", event->mask, event->cookie, event->name);
+            auto event_name = std::string_view(event->name, event->len);
+            LOG_TRACE(log, "event 0x{:x}, cookie: 0x{:x}, on '{}'", event->mask, event->cookie, event_name);
             if (event->len) {
                 auto type = update_type_internal_t{0};
                 if (event->mask & IN_CREATE) {

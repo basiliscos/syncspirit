@@ -406,6 +406,40 @@ void test_watcher_base() {
                     CHECK(change_1.update_reason == update_type_t::content);
                     CHECK(change_1.prev_path == "");
                 }
+                SECTION("content change + rename => remove + content change") {
+                    auto name_1 = bfs::path(L"файл-1.bin");
+                    auto name_2 = bfs::path(L"файл-2.bin");
+                    auto name_1_str = narrow(name_1.generic_wstring());
+                    auto name_2_str = narrow(name_2.generic_wstring());
+                    write_file(root_path / name_2, "12345");
+                    target->push(deadline, folder_id, name_2_str, {}, U::content, false);
+                    target->push(deadline, folder_id, name_2_str, name_1_str, U::meta, false);
+                    await_events(poll_t::trigger_timer, 1, true);
+
+                    auto &payload_1 = changes[0]->payload;
+                    REQUIRE(payload_1.size() == 1);
+                    auto &folder_change_1 = payload_1[0];
+                    REQUIRE(folder_change_1.folder_id == folder_id);
+                    REQUIRE(folder_change_1.file_changes.size() == 1);
+
+                    auto &change_0 = folder_change_1.file_changes[0];
+                    CHECK(proto::get_name(change_0) == narrow(name_1.wstring()));
+                    CHECK(proto::get_size(change_0) == 0);
+                    CHECK(proto::get_type(change_0) == proto::FileInfoType::FILE);
+                    CHECK(change_0.update_reason == update_type_t::deleted);
+                    CHECK(change_0.prev_path == "");
+
+                    auto &payload_2 = changes[1]->payload;
+                    REQUIRE(payload_2.size() == 1);
+                    auto &folder_change_2 = payload_2[0];
+                    auto &change_1 = folder_change_2.file_changes[0];
+                    CHECK(proto::get_name(change_1) == narrow(name_2.wstring()));
+                    CHECK(proto::get_size(change_1) == 5);
+                    CHECK(proto::get_type(change_1) == proto::FileInfoType::FILE);
+                    CHECK(proto::get_permissions(change_1));
+                    CHECK(change_1.update_reason == update_type_t::created);
+                    CHECK(change_1.prev_path == "");
+                }
                 SECTION("move, delete -> collapse to delete of original") {
                     auto name_1 = bfs::path(L"файл-1.bin");
                     auto name_2 = bfs::path(L"файл-2.bin");

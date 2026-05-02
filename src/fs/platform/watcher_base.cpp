@@ -124,7 +124,18 @@ bool FU::update(std::string_view relative_path, update_type_t type, folder_updat
     }
     if (recorded) {
         if (it != updates.end()) {
-            it->update(prev_path_rel, type);
+            if (!prev_path_rel.empty() && (it->update_type & ut::CONTENT)) {
+                auto log = utils::get_logger(actor_identity);
+                LOG_DEBUG(log, "splitting event change + rename ('{}' => '{}') into delete + created", prev_path_rel,
+                          relative_path);
+                auto pu = support::file_update_t(std::move(prev_path_rel), {}, update_type_t::deleted, {}, false);
+                updates.insert(pu);
+                auto nu = support::file_update_t(std::string(relative_path), {}, update_type_t::created, {}, false);
+                updates.erase(it);
+                updates.insert(nu);
+            } else {
+                it->update(prev_path_rel, type);
+            }
         } else {
             auto update = support::file_update_t(std::string(relative_path), std::move(prev_path_rel), type,
                                                  prev_update, requires_refinement);
