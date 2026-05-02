@@ -318,7 +318,7 @@ void watcher_t::forget(int wd) noexcept {
         LOG_TRACE(log, "forgetting '{}'", path);
         if (it_subdir != subdir_map.end()) {
             auto &children = it_subdir->second;
-            if (children.empty()) {
+            if (!children.empty()) {
                 LOG_WARN(log, "forgetting watching '{}' still having '{}' watched children", path, children.size());
             }
             subdir_map.erase(it_subdir);
