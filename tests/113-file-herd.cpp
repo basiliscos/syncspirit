@@ -300,7 +300,7 @@ void test_fs() {
             REQUIRE(dir_1);
 
             bfs::rename(root_path / "a" / "xx", root_path / "a" / long_name);
-            await_events(3);
+            await_events(4);
             auto dir_2 = local_files->by_name(fmt::format("a/{}", long_name));
             REQUIRE(dir_2);
 
