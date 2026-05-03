@@ -550,10 +550,8 @@ void test_clone_block() {
                     REQUIRE(bfs::file_size(target_path) == 5);
                     CHECK(read_file(target_path) == "12345");
                     CHECK(to_unix(bfs::last_write_time(target_path)) == modified);
-#ifndef SYNCSPIRIT_WATCHER_KQUEUE
                     CHECK(updates_mediator->is_masked(tmp_path_str) >= 4);
-#else
-                    CHECK(updates_mediator->is_masked(tmp_path_str) == 3);
+#ifdef SYNCSPIRIT_WATCHER_KQUEUE
                     CHECK(updates_mediator->is_masked(target_path.parent_path().string()) == 4);
 #endif
                 }
@@ -577,10 +575,8 @@ void test_clone_block() {
                     REQUIRE(bfs::file_size(target_path) == 10);
                     CHECK(read_file(target_path) == "1234567890");
                     CHECK(to_unix(bfs::last_write_time(target_path)) == modified);
-#ifndef SYNCSPIRIT_WATCHER_KQUEUE
                     CHECK(updates_mediator->is_masked(tmp_path_str) >= 6);
-#else
-                    CHECK(updates_mediator->is_masked(tmp_path_str) == 5);
+#ifdef SYNCSPIRIT_WATCHER_KQUEUE
                     CHECK(updates_mediator->is_masked(target_path.parent_path().string()) == 4);
 #endif
                 }
