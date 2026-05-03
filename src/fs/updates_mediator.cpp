@@ -43,7 +43,6 @@ void updates_mediator_t::mask(const bfs::path &path, const bfs::path &prev_path,
     auto target = (updates_t *){};
     auto counter = update_type_internal_t{1};
     auto path_str = Stringizer<char_t>::get(path);
-    auto prev_path_str = Stringizer<char_t>::get(prev_path);
     if (next.deadline == deadline) {
         target = &next;
     } else if (next.deadline.is_not_a_date_time()) {
@@ -61,10 +60,17 @@ void updates_mediator_t::mask(const bfs::path &path, const bfs::path &prev_path,
         }
     }
 
-    auto update = support::file_update_t(std::move(path_str), std::move(prev_path_str), counter, false);
-    auto [it, inserted] = target->updates.emplace(std::move(update));
-    if (!inserted) {
-        it->update_type += counter;
+    auto insert = [&](std::string path) {
+        auto update = support::file_update_t(std::move(path), {}, counter, false);
+        auto [it, inserted] = target->updates.emplace(std::move(update));
+        if (!inserted) {
+            it->update_type += counter;
+        }
+    };
+
+    insert(std::move(path_str));
+    if (!prev_path.empty()) {
+        insert(std::move(Stringizer<char_t>::get(prev_path)));
     }
 }
 

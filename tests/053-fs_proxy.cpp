@@ -170,7 +170,7 @@ TEST_CASE("block iterator", "[model]") {
         auto ec = proxy.rename(path_1, path_2);
         CHECK(!ec);
         CHECK(bfs::exists(path_2));
-        CHECK(mediator.is_masked(path_1_str) == 0);
+        CHECK(mediator.is_masked(path_1_str) == 1);
         CHECK(mediator.is_masked(path_2_str) == 1);
         CHECK(proxy.mediator_updates == 1);
     }

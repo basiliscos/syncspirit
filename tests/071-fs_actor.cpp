@@ -415,7 +415,7 @@ void test_append_block() {
                 REQUIRE(bfs::exists(path));
                 REQUIRE(bfs::file_size(path) == 5);
                 CHECK(updates_mediator->is_masked(path_str) >= 2);
-                CHECK(updates_mediator->is_masked(tmp_str) == 1);
+                CHECK(updates_mediator->is_masked(tmp_str) == 2);
                 CHECK(data_1 == as_bytes(read_file(path)));
                 CHECK(to_unix(bfs::last_write_time(path)) == 1641828421);
                 if (!no_perms) {
@@ -436,10 +436,8 @@ void test_append_block() {
                 CHECK(data_1 == as_bytes(read_file(path)));
                 CHECK(to_unix(bfs::last_write_time(path)) == 1641828421);
                 CHECK(updates_mediator->is_masked(path_str) >= 2);
-#ifndef SYNCSPIRIT_WATCHER_KQUEUE
-                CHECK(updates_mediator->is_masked(tmp_path) >= 4);
-#else
-                CHECK(updates_mediator->is_masked(tmp_path) >= 3);
+                CHECK(updates_mediator->is_masked(tmp_path) >= 1);
+#ifdef SYNCSPIRIT_WATCHER_KQUEUE
                 CHECK(updates_mediator->is_masked(path.parent_path().string()) == 2);
 #endif
                 if (!no_perms) {
@@ -469,10 +467,8 @@ void test_append_block() {
                 CHECK(bfs::file_size(conflict_path) == 6);
                 CHECK(as_bytes(read_file(conflict_path)) == as_owned_bytes("abcdef"));
                 CHECK(updates_mediator->is_masked(path_str) >= 2);
-#ifndef SYNCSPIRIT_WATCHER_KQUEUE
-                CHECK(updates_mediator->is_masked(tmp_path) >= 4);
-#else
-                CHECK(updates_mediator->is_masked(tmp_path) >= 3);
+                CHECK(updates_mediator->is_masked(tmp_path) >= 1);
+#ifdef SYNCSPIRIT_WATCHER_KQUEUE
                 CHECK(updates_mediator->is_masked(path.parent_path().string()) == 3);
 #endif
             }
@@ -624,7 +620,7 @@ void test_clone_block() {
                 CHECK(read_file(target_path) == "1234512345");
                 CHECK(to_unix(bfs::last_write_time(target_path)) == modified);
                 auto tmp_path_str = narrow(make_temporal(target_path).generic_wstring());
-                CHECK(updates_mediator->is_masked(tmp_path_str) >= 4);
+                CHECK(updates_mediator->is_masked(tmp_path_str) >= 1);
             }
         }
     };

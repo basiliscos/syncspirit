@@ -10,13 +10,9 @@
 namespace syncspirit::fs::support {
 
 struct file_update_t {
-    file_update_t(std::string path, std::string prev_path, update_type_t update_type, const file_update_t *prev,
-                  bool requires_refinement) noexcept;
     file_update_t(std::string path, std::string prev_path, update_type_internal_t update_type,
                   bool requires_refinement) noexcept;
     file_update_t() = delete;
-
-    void update(std::string prev_path, update_type_t type) const;
 
     std::string path;
     mutable std::string prev_path;

@@ -67,98 +67,88 @@ auto BU::make(const watched_folders_t &watched_folders, watcher_base_t &actor) n
     return {};
 }
 
-bool FU::update(std::string_view relative_path, update_type_t type, folder_update_t *prev, std::string prev_path_rel,
-                bool requires_refinement) noexcept {
-    namespace ut = update_type;
-    using UT = update_type_t;
-
-    bool recorded = true;
-    auto it = updates.find(relative_path);
-    auto it_prev = (typename decltype(updates)::const_iterator){};
-    auto prev_update = (const support::file_update_t *)(nullptr);
-    auto prev_update_source = (support::file_updates_t *)(nullptr);
+bool FU::update(support::file_update_t &record, folder_update_t *prev) noexcept {
+    if (auto it = updates.find(record.path); it != updates.end()) {
+        return update(record, it, updates);
+    }
+    if (auto it = updates.find(record.prev_path); it != updates.end()) {
+        return update(record, it, updates);
+    }
     if (prev) {
         auto &updates = prev->updates;
-        auto target = std::string_view(prev_path_rel.empty() ? relative_path : prev_path_rel);
-        it_prev = updates.find(target);
-        if (it_prev != updates.end()) {
-            prev_update = &*it_prev;
-            prev_update_source = &updates;
+        if (auto it = updates.find(record.path); it != updates.end()) {
+            return update(record, it, updates);
+        }
+        if (auto it = updates.find(record.prev_path); it != updates.end()) {
+            return update(record, it, updates);
         }
     }
-    if (!prev_update && !prev_path_rel.empty()) {
-        it_prev = updates.find(prev_path_rel);
-        if (it_prev != updates.end()) {
-            prev_update = &*it_prev;
-            prev_update_source = &updates;
+    updates.emplace(std::move(record));
+    return true;
+}
+
+bool FU::update(support::file_update_t &new_record, it_t it_prev, support::file_updates_t &prev_source) noexcept {
+    namespace ut = update_type;
+    static constexpr auto CONTENT_LIKE = (ut::CONTENT | ut::CREATED | ut::CREATED_1);
+    auto log = utils::get_logger(actor_identity);
+    auto &prev = *it_prev;
+    if (prev.update_type == ut::META && new_record.update_type == ut::META) {
+        if (prev.prev_path == new_record.path) {
+            auto log = utils::get_logger(actor_identity);
+            LOG_DEBUG(log, "collpasing renaming back-n-forth '{}'", new_record.path);
+            return false;
         }
     }
-    if (prev_update) {
-        if (prev_update->update_type == ut::META && type == UT::meta) {
-            if (prev_update->prev_path == relative_path) {
-                auto log = utils::get_logger(actor_identity);
-                LOG_DEBUG(log, "collpasing renaming back-n-forth '{}'", relative_path);
-                recorded = false;
-            }
-        }
-        if (prev_update->update_type == ut::META && type == UT::content && !prev_update->prev_path.empty()) {
-            auto log = utils::get_logger(actor_identity);
-            LOG_DEBUG(log, "splitting event rename + change ('{}' => '{}') into delete + change",
-                      prev_update->prev_path, relative_path);
-            auto pu = support::file_update_t(std::move(prev_update->prev_path), {}, update_type_t::deleted, {}, false);
-            prev_update_source->erase(it_prev);
-            prev_update_source->insert(std::move(pu));
-            prev_update = nullptr;
-        }
-        if (type == UT::meta && !prev_path_rel.empty() && relative_path != prev_path_rel &&
-            prev_update->update_type & ut::CONTENT) {
-            auto log = utils::get_logger(actor_identity);
-            LOG_DEBUG(log, "splitting event change + rename ('{}' => '{}') into delete + create", prev_update->path,
-                      relative_path);
-            auto pu = support::file_update_t(std::move(prev_update->path), {}, update_type_t::deleted, {}, false);
-            type = update_type_t::created;
-            prev_update = {};
-            prev_path_rel = {};
-            prev_update_source->erase(it_prev);
-            prev_update_source->insert(std::move(pu));
-            it = updates.end();
-        }
-        if (prev_update && prev_update->update_type & (ut::CREATED_1 | ut::CREATED)) {
-            auto log = utils::get_logger(actor_identity);
-            if (type == UT::deleted) {
-                type = UT::created;
-                recorded = false;
-                LOG_DEBUG(log, "collapsing create & delete event '{}' -> '{}'", prev_update->path, relative_path);
-            } else {
-                LOG_DEBUG(log, "transferring creation event '{}' -> '{}'", prev_update->path, relative_path);
-            }
-            prev_path_rel = {};
-        }
-    }
-    if (recorded) {
-        if (it != updates.end()) {
-            if (!prev_path_rel.empty() && (it->update_type & ut::CONTENT)) {
-                auto log = utils::get_logger(actor_identity);
-                LOG_DEBUG(log, "splitting event change + rename ('{}' => '{}') into delete + created", prev_path_rel,
-                          relative_path);
-                auto pu = support::file_update_t(std::move(prev_path_rel), {}, update_type_t::deleted, {}, false);
-                updates.insert(pu);
-                auto nu = support::file_update_t(std::string(relative_path), {}, update_type_t::created, {}, false);
-                updates.erase(it);
-                updates.insert(nu);
-            } else {
-                it->update(prev_path_rel, type);
-            }
+    if ((prev.update_type & CONTENT_LIKE) && (new_record.update_type & ut::META)) {
+        if (!new_record.prev_path.empty()) {
+            LOG_DEBUG(log, "splitting event change + rename ('{}' => '{}') into delete + create", prev.prev_path,
+                      new_record.path);
+            auto new_del =
+                support::file_update_t(std::move(new_record.prev_path), {}, ut::DELETED, prev.requires_refinement);
+            prev_source.erase(it_prev);
+            updates.insert(std::move(new_del));
+            new_record.update_type = ut::CREATED_1;
+            new_record.prev_path = {};
+            updates.emplace(std::move(new_record));
+            return true;
         } else {
-            auto update = support::file_update_t(std::string(relative_path), std::move(prev_path_rel), type,
-                                                 prev_update, requires_refinement);
-            updates.emplace(std::move(update));
+            new_record.update_type = prev.update_type;
+            LOG_DEBUG(log, "discarding new meta changes in the sake of previous content of '{}'", new_record.path);
         }
     }
-    if (prev_update) {
-        prev_update_source->erase(it_prev);
+    if ((prev.update_type & ut::META && !prev.prev_path.empty()) && (new_record.update_type & CONTENT_LIKE)) {
+        LOG_DEBUG(log, "splitting event rename + change ('{}' => '{}') into delete + create", prev.prev_path,
+                  new_record.path);
+        auto new_del = support::file_update_t(std::move(prev.prev_path), {}, ut::DELETED, prev.requires_refinement);
+        prev_source.erase(it_prev);
+        updates.insert(std::move(new_del));
+        new_record.update_type = ut::CREATED_1;
+        new_record.prev_path = {};
+        updates.emplace(std::move(new_record));
+        return true;
     }
-    return recorded;
+
+    if (!prev.prev_path.empty()) {
+        new_record.prev_path = std::move(prev.prev_path);
+        LOG_DEBUG(log, "preserving prev path '{}'  for '{}'", new_record.prev_path, new_record.path);
+    }
+    if (prev.update_type & ut::CREATED_1) {
+        new_record.update_type |= ut::CREATED_1;
+        LOG_DEBUG(log, "preserving creation flag for '{}'", new_record.path);
+    }
+
+    prev_source.erase(it_prev);
+    updates.emplace(std::move(new_record));
+    return true;
+}
+
+bool FU::update(std::string_view relative_path, update_type_t type, folder_update_t *prev, std::string prev_path_rel,
+                bool requires_refinement) noexcept {
+    auto record_type =
+        type == update_type_t::created ? update_type::CREATED_1 : static_cast<update_type_internal_t>(type);
+    auto record =
+        support::file_update_t(std::string(relative_path), std::move(prev_path_rel), record_type, requires_refinement);
+    return update(record, prev);
 }
 
 auto FU::make(const folder_info_t &folder_info, watcher_base_t &actor) noexcept -> payload::file_changes_t {
