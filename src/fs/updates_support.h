@@ -5,7 +5,7 @@
 
 #include "update_type.hpp"
 #include <string>
-#include <unordered_set>
+#include <set>
 
 namespace syncspirit::fs::support {
 
@@ -20,20 +20,14 @@ struct file_update_t {
     mutable bool requires_refinement;
 };
 
-struct file_update_hash_t {
-    using is_transparent = void;
-    size_t operator()(const file_update_t &file_update) const noexcept;
-    size_t operator()(std::string_view relative_path) const noexcept;
-};
-
-struct file_update_eq_t {
+struct file_update_comparator_t {
     using is_transparent = void;
     bool operator()(const file_update_t &lhs, const file_update_t &rhs) const noexcept;
     bool operator()(const file_update_t &lhs, std::string_view rhs) const noexcept;
     bool operator()(std::string_view lhs, const file_update_t &rhs) const noexcept;
 };
 
-using file_updates_t = std::unordered_set<file_update_t, file_update_hash_t, file_update_eq_t>;
+using file_updates_t = std::set<file_update_t, file_update_comparator_t>;
 
 std::string_view stringify(update_type_t type);
 
