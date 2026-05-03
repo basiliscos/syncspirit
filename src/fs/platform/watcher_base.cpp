@@ -110,6 +110,19 @@ bool FU::update(std::string_view relative_path, update_type_t type, folder_updat
             prev_update_source->insert(std::move(pu));
             prev_update = nullptr;
         }
+        if (type == UT::meta && !prev_path_rel.empty() && relative_path != prev_path_rel &&
+            prev_update->update_type & ut::CONTENT) {
+            auto log = utils::get_logger(actor_identity);
+            LOG_DEBUG(log, "splitting event change + rename ('{}' => '{}') into delete + create", prev_update->path,
+                      relative_path);
+            auto pu = support::file_update_t(std::move(prev_update->path), {}, update_type_t::deleted, {}, false);
+            type = update_type_t::created;
+            prev_update = {};
+            prev_path_rel = {};
+            prev_update_source->erase(it_prev);
+            prev_update_source->insert(std::move(pu));
+            it = updates.end();
+        }
         if (prev_update && prev_update->update_type & (ut::CREATED_1 | ut::CREATED)) {
             auto log = utils::get_logger(actor_identity);
             if (type == UT::deleted) {

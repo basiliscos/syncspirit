@@ -500,6 +500,39 @@ void test_watcher_base() {
                     await_events(poll_t::trigger_timer);
                     REQUIRE(changes.size() == 0);
                 }
+                SECTION("change(a), mv(a, b) -> rm(a), create(b)") {
+                    auto name_1 = bfs::path(L"файл-1.bin");
+                    auto name_2 = bfs::path(L"файл-2.bin");
+                    auto name_1_str = narrow(name_1.generic_wstring());
+                    auto name_2_str = narrow(name_2.generic_wstring());
+                    write_file(root_path / name_2, "12345");
+                    target->push(deadline, folder_id, name_1_str, {}, U::content, false);
+                    target->push(deadline, folder_id, name_2_str, name_1_str, U::meta, false);
+                    await_events(poll_t::trigger_timer, 2, true);
+
+                    auto &payload_1 = changes[0]->payload;
+                    REQUIRE(payload_1.size() == 1);
+                    auto &folder_change_1 = payload_1[0];
+                    REQUIRE(folder_change_1.folder_id == folder_id);
+                    REQUIRE(folder_change_1.file_changes.size() == 1);
+                    auto &change_1 = folder_change_1.file_changes.front();
+                    CHECK(change_1.update_reason == update_type_t::deleted);
+                    CHECK(proto::get_name(change_1) == name_1_str);
+                    CHECK(proto::get_size(change_1) == 0);
+                    CHECK(proto::get_type(change_1) == proto::FileInfoType::FILE);
+                    CHECK(change_1.prev_path.empty());
+
+                    auto &payload_2 = changes[1]->payload;
+                    REQUIRE(payload_2.size() == 1);
+                    auto &folder_change_2 = payload_2[0];
+                    auto &change_2 = folder_change_2.file_changes[0];
+                    CHECK(proto::get_name(change_2) == narrow(name_2.wstring()));
+                    CHECK(proto::get_size(change_2) == 5);
+                    CHECK(proto::get_type(change_2) == proto::FileInfoType::FILE);
+                    CHECK(proto::get_permissions(change_2));
+                    CHECK(change_2.update_reason == update_type_t::created);
+                    CHECK(change_2.prev_path == "");
+                }
             }
             SECTION("updates mediator") {
                 auto own_name = bfs::path(L"файл.bin");
