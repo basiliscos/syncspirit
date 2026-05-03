@@ -58,6 +58,7 @@ struct SYNCSPIRIT_API local_keeper_t final : public model_actor_t<r::actor_base_
     struct lc_context_t;
     using watched_folders_t = std::unordered_set<std::string, utils::string_hash_t, utils::string_eq_t>;
     using folder_contexts_t = std::list<local_keeper::folder_context_ptr_t>;
+    using dirs_t = std::unordered_set<std::string, utils::string_hash_t, utils::string_eq_t>;
 
     explicit local_keeper_t(config_t &cfg);
 
@@ -80,6 +81,7 @@ struct SYNCSPIRIT_API local_keeper_t final : public model_actor_t<r::actor_base_
 
     void try_start_watching() noexcept;
 
+    outcome::result<void> operator()(const model::diff::advance::local_update_t &, void *custom) noexcept override;
     outcome::result<void> operator()(const model::diff::local::scan_start_t &, void *custom) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::upsert_folder_t &, void *custom) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::remove_folder_t &, void *custom) noexcept override;
@@ -93,6 +95,7 @@ struct SYNCSPIRIT_API local_keeper_t final : public model_actor_t<r::actor_base_
     std::int32_t concurrent_hashes_limit;
     std::int32_t fs_tasks = 0;
     folder_contexts_t delayed;
+    dirs_t just_created_dirs;
     bool started_watching = false;
 
     watched_folders_t watched_folders;

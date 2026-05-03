@@ -542,6 +542,12 @@ void test_trivial_changes() {
                 CHECK(f->is_deleted());
                 CHECK(f->is_dir());
             }
+            SECTION("ignore parent-less dir creation") {
+                proto::set_name(file, "dir/sub-dir");
+                proto::set_type(file, FT::DIRECTORY);
+                mk_update(file, fs::update_type_t::created, false);
+                CHECK(files_local->size() == 0);
+            }
         }
     };
     F().run();

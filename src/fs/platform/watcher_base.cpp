@@ -101,7 +101,7 @@ bool FU::update(support::file_update_t &new_record, it_t it_prev, support::file_
     }
     if ((prev.update_type & CONTENT_LIKE) && (new_record.update_type & ut::META)) {
         if (!new_record.prev_path.empty()) {
-            LOG_DEBUG(log, "splitting event change + rename ('{}' => '{}') into delete + create", prev.prev_path,
+            LOG_DEBUG(log, "splitting event change + rename ('{}' => '{}') into delete + create", new_record.prev_path,
                       new_record.path);
             auto new_del =
                 support::file_update_t(std::move(new_record.prev_path), {}, ut::DELETED, prev.requires_refinement);

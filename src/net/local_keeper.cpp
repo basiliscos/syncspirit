@@ -166,6 +166,22 @@ void local_keeper_t::on_thread_ready(model::message::thread_ready_t &message) no
     }
 }
 
+auto local_keeper_t::operator()(const model::diff::advance::local_update_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    if (!just_created_dirs.empty()) {
+        auto folder = cluster->get_folders().by_id(diff.folder_id);
+        auto folder_path = narrow(folder->get_path().generic_wstring());
+        auto name = proto::get_name(diff.proto_local);
+        auto full_path = fmt::format("{}/{}", folder_path, name);
+        auto it = just_created_dirs.find(full_path);
+        if (it != just_created_dirs.end()) {
+            just_created_dirs.erase(it);
+            LOG_TRACE(log, "removed temporal dir record '{}'", full_path);
+        }
+    }
+    return diff.visit_next(*this, custom);
+}
+
 auto local_keeper_t::operator()(const model::diff::local::scan_start_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     bool do_scan = true;
@@ -336,7 +352,8 @@ void local_keeper_t::handle_rename(fs::payload::file_info_t &change, const model
     using queue_t = std::pmr::list<model::file_info_t *>;
     using F = presentation::presence_t::features_t;
 
-    auto folder_id = local_folder.get_folder()->get_id();
+    auto folder = local_folder.get_folder();
+    auto folder_id = folder->get_id();
     auto new_name = proto::get_name(change);
     auto &prev_name = change.prev_path;
     LOG_DEBUG(log, "(input) handle rename '{}' -> '{}' in folder '{}'", prev_name, new_name, folder_id);
@@ -386,6 +403,10 @@ void local_keeper_t::handle_rename(fs::payload::file_info_t &change, const model
         stack_ctx.file_2_name.insert_or_assign(f, new_sub_name);
 
         if (f->is_dir()) {
+            auto folder_path = narrow(folder->get_path().generic_wstring());
+            auto full_path = fmt::format("{}/{}", folder_path, new_sub_name);
+            just_created_dirs.insert(std::move(full_path));
+
             auto presence = static_cast<presentation::presence_t *>(f->get_augmentation().get());
             for (auto c : presence->get_children()) {
                 auto features = c->get_features();
@@ -406,10 +427,10 @@ void local_keeper_t::handle_rename(fs::payload::file_info_t &change, const model
 void local_keeper_t::on_changes(model::folder_info_t &local_folder, fs::payload::file_changes_t &changes,
                                 lc_context_t &stack_ctx) noexcept {
     using namespace model::diff;
-    using scheduled_dirs_t = std::pmr::unordered_set<std::pmr::string, utils::string_hash_t, utils::string_eq_t>;
+    using strings_t = std::pmr::unordered_set<std::pmr::string, utils::string_hash_t, utils::string_eq_t>;
     using I = syncspirit_watcher_impl_t;
     using CI = local_keeper::child_info_t;
-    auto scheduled_dirs = scheduled_dirs_t(stack_ctx.allocator);
+    auto scheduled_dirs = strings_t(stack_ctx.allocator);
 
     auto folder = local_folder.get_folder();
     auto folder_id = folder->get_id();
@@ -418,9 +439,17 @@ void local_keeper_t::on_changes(model::folder_info_t &local_folder, fs::payload:
     auto augmentation = local_folder.get_augmentation().get();
     auto folder_presence = static_cast<presentation::folder_presence_t *>(augmentation);
 
+    auto mk_full_path = [&](std::string_view name) -> std::pmr::string {
+        auto folder_path = narrow(folder->get_path().generic_wstring());
+        auto full_path = std::pmr::string(folder_path, stack_ctx.allocator);
+        full_path += "/";
+        full_path += name;
+        return full_path;
+    };
     auto immediate_update = [&](fs::payload::file_info_t &change) {
         auto name = proto::get_name(change);
         auto file = files_map.by_name(name);
+        auto is_dir = proto::get_type(change) == proto::FileInfoType::DIRECTORY;
         bool update = true;
         if (file) {
             if (proto::get_deleted(change)) {
@@ -431,8 +460,22 @@ void local_keeper_t::on_changes(model::folder_info_t &local_folder, fs::payload:
             } else {
                 update = !file->identical_by_content_to(change);
             }
+        } else {
+            auto relation = folder_presence->get_link(name, is_dir);
+            if (!relation.parent) {
+                auto inside_subdir = name.find_last_of('/');
+                if (inside_subdir != std::string::npos) {
+                    auto subdir = name.substr(0, inside_subdir);
+                    auto parent_path = mk_full_path(subdir);
+                    update = just_created_dirs.count(parent_path);
+                } else {
+                    update = false;
+                }
+            } else {
+                update = true;
+            }
         }
-        if (proto::get_type(change) == proto::FileInfoType::DIRECTORY) {
+        if (is_dir) {
             auto n = std::pmr::string(name, stack_ctx.allocator);
             scheduled_dirs.emplace(n);
         }
@@ -451,6 +494,11 @@ void local_keeper_t::on_changes(model::folder_info_t &local_folder, fs::payload:
             if (renamed) {
                 handle_rename(change, local_folder, stack_ctx);
             } else {
+                if (is_dir && change.update_reason == UT::created) {
+                    auto tmp = mk_full_path(name);
+                    auto full_path = std::string(tmp.data(), tmp.size());
+                    just_created_dirs.insert(full_path);
+                }
                 stack_ctx.push_back(new advance::local_update_t(*cluster, *sequencer, std::move(change), folder_id));
             }
         } else {
