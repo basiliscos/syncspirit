@@ -642,9 +642,7 @@ void test_deleted() {
             paths.emplace_back(std::string(name));
         }
         void on_diff(const model::diff::local::file_availability_t &diff) noexcept override {
-            auto file = diff.file;
-            auto name = file->get_name()->get_full_name();
-            available.emplace_back(std::string(name));
+            available.emplace_back(std::string(diff.name));
         }
 
         void main() noexcept override {

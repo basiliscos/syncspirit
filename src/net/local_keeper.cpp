@@ -524,7 +524,10 @@ void local_keeper_t::on_changes(model::folder_info_t &local_folder, fs::payload:
             LOG_DEBUG(log, "ignoring change '{}' in folder '{}', parent dir scan is scheduled", name, folder_id);
             return;
         }
-        auto path = folder->get_path() / widen(name);
+        auto path = folder->get_path();
+        if (name.size()) {
+            path /= widen(name);
+        }
         auto child_info = CI(std::move(change), std::move(path), relation.child, relation.parent, 0);
         auto item = unexamined_t(std::move(child_info), true, recurse_children, change.requires_refinement);
         unexamined.push_back(std::move(item));

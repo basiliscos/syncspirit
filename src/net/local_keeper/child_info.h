@@ -26,7 +26,7 @@ struct child_info_t {
     virtual ~child_info_t() = default;
 
     proto::FileInfo serialize(const model::folder_info_t &local_folder, blocks_t blocks, bool ignore_permissions);
-    presentation::presence_t *fetch_self();
+    const model::file_info_t *fetch_model(const model::folder_info_t &local_folder) const;
 
     bfs::path path;
     bfs::path link_target;

@@ -9,7 +9,6 @@
 
 #include <boost/nowide/convert.hpp>
 #include <cassert>
-#include <memory_resource>
 
 using namespace syncspirit::net::local_keeper;
 using boost::nowide::narrow;
@@ -74,15 +73,8 @@ auto child_info_t::serialize(const model::folder_info_t &local_folder, blocks_t 
     return data;
 }
 
-auto child_info_t::fetch_self() -> presentation::presence_t * {
-    if (self) {
-        return self.get();
-    }
-    if (!parent) {
-        return {};
-    }
-    auto is_dir = type == proto::FileInfoType::DIRECTORY;
-    auto name = narrow(path.filename().generic_wstring());
-    self = parent->get_child(name, is_dir);
-    return self.get();
+auto child_info_t::fetch_model(const model::folder_info_t &local_folder) const -> const model::file_info_t * {
+    auto &folder_path = local_folder.get_folder()->get_path();
+    auto name = narrow(fs::relativize(path, folder_path).generic_wstring());
+    return local_folder.get_file_infos().by_name(name).get();
 }

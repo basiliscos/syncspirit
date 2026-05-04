@@ -164,11 +164,11 @@ int folder_context_t::process(unscanned_dir_t &dir, stack_context_t &ctx) noexce
 }
 
 int folder_context_t::process(unexamined_t &child_info, stack_context_t &ctx) noexcept {
-    auto self = child_info.fetch_self();
+    auto file = child_info.fetch_model(*local_folder);
     auto &type = child_info.type;
     if (type == proto::FileInfoType::DIRECTORY) {
-        auto recurse = child_info.recurse || !self;
-        auto skip_self_update = self && (self->get_features() & F::folder);
+        auto recurse = child_info.recurse || !file;
+        auto skip_self_update = child_info.path == local_folder->get_folder()->get_path();
         if (!skip_self_update) {
             stack.push_front(child_ready_t(child_info));
         }
@@ -189,31 +189,18 @@ int folder_context_t::process(unexamined_t &child_info, stack_context_t &ctx) no
                 return 1;
             }
         }
-        if (!child_info.size || self) {
+        if (!child_info.size || file) {
             stack.emplace_front(child_ready_t(std::move(child_info)));
         } else {
             auto path_str = narrow(child_info.path.generic_wstring());
-            auto already_in_model = [&]() -> presence_t * {
-                auto rel_path = fs::relativize(child_info.path, local_folder->get_folder()->get_path());
-                auto rel_path_str = narrow(rel_path.generic_wstring());
-                auto file = local_folder->get_file_infos().by_name(rel_path_str);
-                if (!file) {
-                    return {};
-                }
-                auto augmentation = file->get_augmentation().get();
-                auto presence = static_cast<cluster_file_presence_t *>(augmentation);
-                return presence;
-            };
             if (hashing_files.contains(path_str)) {
                 LOG_DEBUG(log, "file '{}' is already scheduled for hashing", path_str);
-            } else if (auto found_self = already_in_model(); found_self) {
-                child_info.self = found_self;
-                child_info.parent = found_self->get_parent();
+            } else if (file) {
                 stack.emplace_front(child_ready_t(std::move(child_info)));
             } else {
                 auto block_size = [&]() -> std::int32_t {
                     // for possible correct importing later at local-update.
-                    if (!self) {
+                    if (!file) {
                         auto folder = local_folder->get_folder();
                         auto &folder_path = folder->get_path();
                         auto rel_path = fs::relativize(child_info.path, folder_path);
@@ -271,37 +258,35 @@ int folder_context_t::process(child_ready_t &info, stack_context_t &ctx) noexcep
     using namespace model::diff;
     bool emit_update = false;
     bool emit_hashing = false;
-    auto self = info.fetch_self();
-    if (!self || (self->get_features() & F::deleted)) {
+    auto file = info.fetch_model(*local_folder);
+    if (!file || file->is_deleted()) {
         if (info.size && info.blocks.empty()) {
             emit_hashing = true;
         } else {
             emit_update = true;
         }
     } else {
-        auto presence = static_cast<presentation::cluster_file_presence_t *>(self);
-        auto &file = const_cast<model::file_info_t &>(presence->get_file_info());
         bool match = false;
         auto &type = info.type;
         auto modification_match =
-            (type == FT::SYMLINK) || (type == FT::DIRECTORY) || (info.last_write_time == file.get_modified_s());
+            (type == FT::SYMLINK) || (type == FT::DIRECTORY) || (info.last_write_time == file->get_modified_s());
         if (modification_match) {
-            if (type == model::file_info_t::as_type(file.get_type())) {
-                auto ignore_perms = ignore_permissions || file.has_no_permissions();
-                auto perms_match = ignore_perms || info.perms == file.get_permissions();
+            if (type == model::file_info_t::as_type(file->get_type())) {
+                auto ignore_perms = ignore_permissions || file->has_no_permissions();
+                auto perms_match = ignore_perms || info.perms == file->get_permissions();
                 if (perms_match) {
                     if (type == FT::SYMLINK) {
                         auto target = narrow(info.link_target.generic_wstring());
-                        match = file.get_link_target() == target;
+                        match = file->get_link_target() == target;
                     } else {
-                        match = file.get_size() == info.size;
+                        match = file->get_size() == info.size;
                     }
                 }
             }
         }
         if (match) {
-            if (!file.is_local()) {
-                ctx.push_back(new local::file_availability_t(&file, *local_folder));
+            if (!file->is_local()) {
+                ctx.push_back(new local::file_availability_t(*file, *local_folder));
             }
         } else {
             if (info.size && info.blocks.empty()) {
@@ -372,7 +357,7 @@ int folder_context_t::process(removed_dir_t &item, stack_context_t &ctx) noexcep
 int folder_context_t::process(confirmed_deleted_t &item, stack_context_t &ctx) {
     auto dir_presence = static_cast<presentation::local_file_presence_t *>(item.presence.get());
     auto &dir = const_cast<model::file_info_t &>(dir_presence->get_file_info());
-    ctx.push_back(new model::diff::local::file_availability_t(&dir, *local_folder));
+    ctx.push_back(new model::diff::local::file_availability_t(dir, *local_folder));
 
     auto dirs_stack = dirs_stack_t(stack);
     for (auto child : item.presence->get_children()) {
@@ -383,7 +368,7 @@ int folder_context_t::process(confirmed_deleted_t &item, stack_context_t &ctx) {
             } else {
                 auto file_presence = static_cast<presentation::local_file_presence_t *>(child);
                 auto &file = const_cast<model::file_info_t &>(file_presence->get_file_info());
-                ctx.push_back(new model::diff::local::file_availability_t(&file, *local_folder));
+                ctx.push_back(new model::diff::local::file_availability_t(file, *local_folder));
             }
         }
     }
