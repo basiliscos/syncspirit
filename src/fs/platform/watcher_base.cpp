@@ -136,6 +136,10 @@ bool FU::update(support::file_update_t &new_record, it_t it_prev, support::file_
         new_record.update_type |= ut::CREATED_1;
         LOG_DEBUG(log, "preserving creation flag for '{}'", new_record.path);
     }
+    if (prev.requires_refinement && !new_record.requires_refinement) {
+        new_record.requires_refinement = true;
+        LOG_DEBUG(log, "preserving refinement flag for '{}'", new_record.path);
+    }
 
     prev_source.erase(it_prev);
     updates.emplace(std::move(new_record));

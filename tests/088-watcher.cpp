@@ -825,7 +825,8 @@ void test_real_impl() {
 
                         watch_folder(folder_id);
 
-                        native::rename(path_1, path_2);
+                        SECTION("native::rename") { native::rename(path_1, path_2); }
+                        SECTION("bfs::rename") { bfs::rename(path_1, path_2); }
 
 #ifndef SYNCSPIRIT_WIN
                         await_events(poll_t::trigger_timer, 1);
@@ -871,6 +872,7 @@ void test_real_impl() {
                             CHECK(!proto::get_deleted(file_change));
                             CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
                             CHECK(file_change.update_reason == update_type_t::created);
+                            CHECK(file_change.requires_refinement);
                             CHECK(file_change.prev_path == "");
                         }
 #endif
@@ -959,6 +961,7 @@ void test_real_impl() {
                         CHECK(file_change.update_reason == update_type_t::deleted);
                     }
                 }
+
                 SECTION("into my dir => create") {
                     if (!test::wine_environment()) {
                         auto path_1 = root_path / L"my-file.1";
@@ -1242,6 +1245,7 @@ void test_hierarchies() {
                         CHECK(proto::get_type(file_change) == proto::FileInfoType::DIRECTORY);
                         CHECK(file_change.update_reason == update_type_t::created);
                         CHECK(file_change.prev_path == "");
+                        CHECK(file_change.requires_refinement);
                     }
 #endif
                 }
