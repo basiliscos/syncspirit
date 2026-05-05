@@ -151,7 +151,8 @@ int folder_context_t::process(unscanned_dir_t &dir, stack_context_t &ctx) noexce
     auto dir_str = narrow(dir.path.generic_wstring());
     if (!skip_scan) {
         auto notify_watcher = (!dir.presence && (ctx.watcher_impl == I::inotify)) ||
-                              (dir.requires_refinement && (ctx.watcher_impl == I::kqueue));
+                              (dir.requires_refinement && (ctx.watcher_impl == I::kqueue))
+                              && local_folder->get_folder()->is_watched();
         LOG_TRACE(log, "scheduling scan of '{}' (notify: {})", dir_str, notify_watcher);
         auto sub_task = scan_dir_t(std::move(dir.path), std::move(dir.presence), std::move(dir.single_child),
                                    notify_watcher, dir.recurse, dir.requires_refinement);
@@ -335,22 +336,24 @@ int folder_context_t::process(hash_incomplete_file_ptr_t &item, stack_context_t 
 
 int folder_context_t::process(removed_dir_t &item, stack_context_t &ctx) noexcept {
     auto folder_id = local_folder->get_folder()->get_id();
+    {
+        auto dirs_stack = dirs_stack_t(stack);
+        auto children = item.presence->get_children();
+        for (auto child : item.presence->get_children()) {
+            if (child->get_features() & F::directory) {
+                dirs_stack.push_front(removed_dir_t(child));
+            } else {
+                auto file = static_cast<presentation::local_file_presence_t *>(child);
+                auto file_data = file->get_file_info().as_proto(false);
+                proto::set_deleted(file_data, true);
+                ctx.push_back(new local_update_t(ctx.cluster, ctx.sequencer, std::move(file_data), folder_id));
+            }
+        }
+    }
     auto dir = static_cast<presentation::local_file_presence_t *>(item.presence.get());
     auto dir_data = dir->get_file_info().as_proto(false);
     proto::set_deleted(dir_data, true);
     ctx.push_back(new local_update_t(ctx.cluster, ctx.sequencer, std::move(dir_data), folder_id));
-    auto dirs_stack = dirs_stack_t(stack);
-    auto children = item.presence->get_children();
-    for (auto child : item.presence->get_children()) {
-        if (child->get_features() & F::directory) {
-            dirs_stack.push_front(removed_dir_t(child));
-        } else {
-            auto file = static_cast<presentation::local_file_presence_t *>(child);
-            auto file_data = file->get_file_info().as_proto(false);
-            proto::set_deleted(file_data, true);
-            ctx.push_back(new local_update_t(ctx.cluster, ctx.sequencer, std::move(file_data), folder_id));
-        }
-    }
     return 1;
 }
 
