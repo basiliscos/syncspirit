@@ -3,6 +3,7 @@
 
 #include "platform.h"
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+#include <mutex>
 #include <dbghelp.h>
 #include <array>
 #include <cstring>
@@ -36,22 +37,15 @@ struct handle_guard_t {
 };
 
 static handle_guard_t open_dump_file() {
-    return CreateFileA("crash_dump.txt", FILE_APPEND_DATA, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_ALWAYS,
+    char name[64];
+    auto thread_id = GetCurrentThreadId();
+    sprintf(name, "crash_dump-0x%x.txt", thread_id);
+    return CreateFileA(name, FILE_APPEND_DATA, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_ALWAYS,
                        FILE_ATTRIBUTE_NORMAL, nullptr);
 }
 
-static void safe_write(const char *s) {
-    HANDLE h = CreateFileA("crash_dump.txt", FILE_APPEND_DATA, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_ALWAYS,
-                           FILE_ATTRIBUTE_NORMAL, NULL);
-    if (h == INVALID_HANDLE_VALUE)
-        return;
-    DWORD written = 0;
-    WriteFile(h, s, (DWORD)strlen(s), &written, NULL);
-    CloseHandle(h);
-}
-
 static void dump_traces(EXCEPTION_POINTERS *ep) {
-    auto ctx = ep->ContextRecord;
+    auto ctx = *ep->ContextRecord;
     auto process = GetCurrentProcess();
     auto thread = GetCurrentThread();
     auto file = open_dump_file();
@@ -61,32 +55,43 @@ static void dump_traces(EXCEPTION_POINTERS *ep) {
 
     STACKFRAME64 frame;
     memset(&frame, 0, sizeof(frame));
+    frame.AddrPC.Mode = AddrModeFlat;
+    frame.AddrFrame.Mode = AddrModeFlat;
+    frame.AddrStack.Mode = AddrModeFlat;
+
 #if defined(_M_X64) || defined(__x86_64__)
     DWORD machine = IMAGE_FILE_MACHINE_AMD64;
-    frame.AddrPC.Offset = ctx->Rip;
-    frame.AddrPC.Mode = AddrModeFlat;
-    frame.AddrFrame.Offset = ctx->Rbp;
-    frame.AddrFrame.Mode = AddrModeFlat;
-    frame.AddrStack.Offset = ctx->Rsp;
-    frame.AddrStack.Mode = AddrModeFlat;
+    frame.AddrPC.Offset = ctx.Rip;
+    frame.AddrFrame.Offset = ctx.Rbp;
+    frame.AddrStack.Offset = ctx.Rsp;
 #else
     DWORD machine = IMAGE_FILE_MACHINE_I386;
-    frame.AddrPC.Offset = ctx->Eip;
-    frame.AddrPC.Mode = AddrModeFlat;
-    frame.AddrFrame.Offset = ctx->Ebp;
-    frame.AddrFrame.Mode = AddrModeFlat;
-    frame.AddrStack.Offset = ctx->Esp;
-    frame.AddrStack.Mode = AddrModeFlat;
+    frame.AddrPC.Offset = ctx.Eip;
+    frame.AddrFrame.Offset = ctx.Ebp;
+    frame.AddrStack.Offset = ctx.Esp;
 #endif
 
     int frame_idx = 0;
-    while (true) {
-        auto ok = StackWalk64(machine, process, thread, &frame, ctx, NULL, SymFunctionTableAccess64, SymGetModuleBase64,
-                              NULL);
-        if (!ok || frame.AddrPC.Offset == 0) {
-            return;
-        }
+    DWORD written = 0;
+    char buff[512];
+    auto out_bytes = snprintf(buff, sizeof(buff), "dump begin\n");
+    WriteFile(file, buff, out_bytes, &written, {});
 
+    while (true) {
+        auto ok = StackWalk64(machine, process, thread, &frame, &ctx, NULL, SymFunctionTableAccess64, SymGetModuleBase64,
+                              NULL);
+        if (!ok) {
+            DWORD e = GetLastError();
+            out_bytes = snprintf(buff, sizeof(buff), "not ok, code: 0x%08x, stopping\n", e);
+            WriteFile(file, buff, out_bytes, &written, {});
+            break;
+        }
+        if (frame.AddrPC.Offset == 0) {
+            out_bytes = snprintf(buff, sizeof(buff), "frame.AddrPC.Offset == 0, stopping\n");
+            WriteFile(file, buff, out_bytes, &written, {});
+            break;
+        }
+        fprintf(stderr, "ip = %p\n", frame.AddrPC.Offset);
         char sym_buff[sizeof(SYMBOL_INFO) + 512] = {0};
         auto sym_info = (PSYMBOL_INFO)sym_buff;
         sym_info->SizeOfStruct = sizeof(SYMBOL_INFO);
@@ -135,18 +140,20 @@ static void dump_traces(EXCEPTION_POINTERS *ep) {
             symbol_offset = 0;
         }
 
-        char buff[512];
-        auto out_bytes =
-            snprintf(buff, sizeof(buff), "(#%d) %p %s(0x%p) %s + 0x%llx\n", frame_idx++, (void *)frame.AddrPC.Offset,
+        out_bytes =
+            snprintf(buff, sizeof(buff), "(#%02d) %p %s(0x%p) %s + 0x%llx\n", frame_idx++, (void *)frame.AddrPC.Offset,
                      module_name.data(), (void *)module_base, symbol_name.data(), symbol_offset);
-
-        DWORD written = 0;
         WriteFile(file, buff, out_bytes, &written, {});
         (void)written;
     }
+    out_bytes = snprintf(buff, sizeof(buff), "dump end\n");
+    WriteFile(file, buff, out_bytes, &written, {});
 }
 
+std::mutex crash_mutex;
+
 static LONG WINAPI seh_handler(EXCEPTION_POINTERS *ep) {
+    auto guard = std::lock_guard<std::mutex>(crash_mutex);
     dump_traces(ep);
 
     return EXCEPTION_EXECUTE_HANDLER;
