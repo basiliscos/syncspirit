@@ -45,8 +45,7 @@ struct local_keeper_t::lc_context_t final : local_keeper::stack_context_t {
 
     lc_context_t(local_keeper_t *k, folder_slave_t *slave) noexcept
         : parent_t(*k->cluster, *k->sequencer, k->concurrent_hashes_left, k->concurrent_hashes_limit, k->watcher_impl),
-          actor(k), pool(buffer.data(), buffer.size()), allocator(&pool), name_2_file(allocator),
-          file_2_name(allocator) {
+          actor(k), name_2_file(allocator), file_2_name(allocator) {
         if (slave && !actor->delayed.empty()) {
             slave->push(std::move(actor->delayed));
         }
@@ -83,9 +82,6 @@ struct local_keeper_t::lc_context_t final : local_keeper::stack_context_t {
 
     local_keeper_t *actor;
     folder_contexts_t new_contexts;
-    std::array<std::byte, 1024 * 128> buffer = {};
-    std::pmr::monotonic_buffer_resource pool;
-    std::pmr::polymorphic_allocator<char> allocator;
     name_2_file_t name_2_file;
     file_2_name_t file_2_name;
 };

@@ -335,25 +335,50 @@ int folder_context_t::process(hash_incomplete_file_ptr_t &item, stack_context_t 
 }
 
 int folder_context_t::process(removed_dir_t &item, stack_context_t &ctx) noexcept {
+    using queue_t = std::pmr::list<presentation::presence_t *>;
+    using processed_t = std::pmr::unordered_set<presentation::presence_t *>;
     auto folder_id = local_folder->get_folder()->get_id();
-    {
-        auto dirs_stack = dirs_stack_t(stack);
-        auto children = item.presence->get_children();
-        for (auto child : item.presence->get_children()) {
-            if (child->get_features() & F::directory) {
-                dirs_stack.push_front(removed_dir_t(child));
+
+    auto queue = queue_t(ctx.allocator);
+    auto processed = processed_t(ctx.allocator);
+    queue.push_back(item.presence.get());
+
+    auto get_children = [&](presentation::presence_t *p) -> presentation::presence_t::children_t * {
+        auto f = p->get_features();
+        if (f & (F::local | F::directory)) {
+            auto it = processed.find(p);
+            if (it != processed.end()) {
+                processed.erase(it);
             } else {
-                auto file = static_cast<presentation::local_file_presence_t *>(child);
-                auto file_data = file->get_file_info().as_proto(false);
-                proto::set_deleted(file_data, true);
-                ctx.push_back(new local_update_t(ctx.cluster, ctx.sequencer, std::move(file_data), folder_id));
+                auto &children = p->get_children();
+                if (children.size()) {
+                    processed.insert(p);
+                    return &children;
+                }
             }
         }
+        return nullptr;
+    };
+
+    while (!queue.empty()) {
+        auto item = queue.front();
+        auto children = get_children(item);
+        if (children) {
+            for (auto it = children->rbegin(); it != children->rend(); ++it) {
+                auto c = *it;
+                if (c->get_features() & F::local) {
+                    queue.push_front(c);
+                }
+            }
+            continue;
+        } else {
+            auto local = static_cast<presentation::local_file_presence_t *>(item);
+            auto data = local->get_file_info().as_proto(false);
+            proto::set_deleted(data, true);
+            ctx.push_back(new local_update_t(ctx.cluster, ctx.sequencer, std::move(data), folder_id));
+            queue.pop_front();
+        }
     }
-    auto dir = static_cast<presentation::local_file_presence_t *>(item.presence.get());
-    auto dir_data = dir->get_file_info().as_proto(false);
-    proto::set_deleted(dir_data, true);
-    ctx.push_back(new local_update_t(ctx.cluster, ctx.sequencer, std::move(dir_data), folder_id));
     return 1;
 }
 
@@ -610,10 +635,7 @@ void folder_context_t::post_process(fs::task::scan_dir_t &task, stack_context_t 
     }
 
     auto dir_presence = task.presence.get();
-    auto buffer = std::array<std::byte, 1024 * 128>();
-    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
-    auto allocator = allocator_t(&pool);
-    auto checked_children = checked_chidren_t(allocator);
+    auto checked_children = checked_chidren_t(ctx.allocator);
 
     auto &infos = task.child_infos;
     for (auto it_disk = infos.begin(); it_disk != infos.end(); ++it_disk) {
@@ -681,7 +703,7 @@ void folder_context_t::post_process(fs::task::scan_dir_t &task, stack_context_t 
         }
 
         using queue_t = std::pmr::list<presentation::entity_t *>;
-        auto queue = queue_t(allocator);
+        auto queue = queue_t(ctx.allocator);
         for (auto child_entity : dir_presence->get_entity()->get_children()) {
             auto filename = child_entity->get_path()->get_own_name();
             if (!checked_children.count(filename)) {
@@ -831,11 +853,8 @@ void folder_context_t::handle_scan_error(fs::task::scan_dir_t &task, stack_conte
     log->warn("cannot scan '{}': {}", narrow(task.path.wstring()), ec.message());
     auto dir_presence = task.presence.get();
     if (dir_presence && dir_presence->get_features() & F::local) {
-        auto buffer = std::array<std::byte, 1024 * 128>();
-        auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
-        auto allocator = allocator_t(&pool);
         using queue_t = std::pmr::list<presentation::presence_t *>;
-        auto queue = queue_t(allocator);
+        auto queue = queue_t(ctx.allocator);
         queue.emplace_back(dir_presence);
 
         auto local_fi = local_folder.get();

@@ -8,6 +8,7 @@
 #include "fs/messages.h"
 #include "fs/utils.h"
 #include "model/cluster.h"
+#include "model/diff/advance/advance.h"
 #include "net/local_keeper.h"
 #include "net/names.h"
 #include "test-utils.h"
@@ -50,12 +51,21 @@ struct my_supervisort_t : supervisor_t {
     using parent_t = supervisor_t;
     using parent_t::parent_t;
 
+    using strings_t = std::vector<std::string>;
+
     outcome::result<void> operator()(const model::diff::local::file_availability_t &diff,
                                      void *custom) noexcept override {
         ++file_availabilities;
         return parent_t::operator()(diff, custom);
     }
 
+    outcome::result<void> operator()(const model::diff::advance::advance_t &diff, void *custom) noexcept override {
+        auto name = proto::get_name(diff.proto_local);
+        updated_names.push_back(std::string(name));
+        return parent_t::operator()(diff, custom);
+    }
+
+    strings_t updated_names;
     std::uint_fast32_t file_availabilities = 0;
     fixture_t *fixture = nullptr;
 };
@@ -1393,6 +1403,44 @@ void test_multi_folders_update() {
     F().run();
 }
 
+void test_hierarchy_removal_order() {
+    struct F : folder_fixture_t {
+        using parent_t = folder_fixture_t;
+        using parent_t::parent_t;
+
+        void main() noexcept override {
+            auto impl = GENERATE(I::inotify, I::kqueue, I::win32);
+            prepare(impl);
+            for (auto &name : {"d0", "d0/d1", "d0/f1", "d0/d1/d2", "d0/d1/f2.1", "d0/d1/f2.2", "d0/d3"}) {
+                auto is_dir = std::string_view(name).find("f") == std::string::npos;
+                auto file = proto::FileInfo();
+                proto::set_name(file, name);
+                proto::set_type(file, is_dir ? FT::DIRECTORY : FT::FILE);
+                builder->local_update(folder_id, file).apply(*sup);
+            }
+            expect_dir_scan({});
+            LOG_INFO(log, "triggering scan...");
+            sup->updated_names.clear();
+            builder->scan_start(folder_id).apply(*sup);
+
+            // clang-format off
+            auto expected_names = my_supervisort_t::strings_t {
+                "d0/d1/d2",
+                "d0/d1/f2.1",
+                "d0/d1/f2.2",
+                "d0/d1",
+                "d0/d3",
+                "d0/f1",
+                "d0",
+            };
+            // clang-format on
+
+            CHECK(sup->updated_names == expected_names);
+        }
+    };
+    F().run();
+}
+
 void test_hierarchy_update_dirs_only() {
     struct F : folder_fixture_t {
         using parent_t = folder_fixture_t;
@@ -2338,6 +2386,7 @@ int _init() {
     REGISTER_TEST_CASE(test_read_file_error_recovery, "test_read_file_error_recovery", "[fs]");
     REGISTER_TEST_CASE(test_duplicates, "test_duplicates", "[fs]");
     REGISTER_TEST_CASE(test_multi_folders_update, "test_multi_folders_update", "[fs]");
+    REGISTER_TEST_CASE(test_hierarchy_removal_order, "test_hierarchy_removal_order", "[fs]");
     REGISTER_TEST_CASE(test_hierarchy_update_dirs_only, "test_hierarchy_update_dirs_only", "[fs]");
     REGISTER_TEST_CASE(test_hierarchy_update_with_content, "test_hierarchy_update_with_content", "[fs]");
     REGISTER_TEST_CASE(test_malformed_hierarchy_update, "test_malformed_hierarchy_update", "[fs]");

@@ -8,6 +8,7 @@
 #include "model/misc/sequencer.h"
 #include "syncspirit-config.h"
 #include <cstdint>
+#include <memory_resource>
 #include <rotor/address.hpp>
 
 namespace syncspirit::net {
@@ -35,6 +36,10 @@ struct stack_context_t : model::diff::diff_assember_t {
 
     folder_slave_t *slave;
     std::int64_t now;
+
+    std::array<std::byte, 1024 * 128> buffer = {};
+    std::pmr::monotonic_buffer_resource pool;
+    std::pmr::polymorphic_allocator<char> allocator;
 };
 
 } // namespace local_keeper

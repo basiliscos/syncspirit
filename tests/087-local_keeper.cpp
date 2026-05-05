@@ -15,6 +15,7 @@
 #include "model/cluster.h"
 #include "model/diff/advance/local_update.h"
 #include "model/diff/local/file_availability.h"
+#include "model/diff/load/interrupt.h"
 #include "net/local_keeper.h"
 #include "net/names.h"
 #include "test-utils.h"
@@ -802,22 +803,29 @@ void test_deleted() {
                 builder->scan_start(folder->get_id()).apply(*sup);
 
                 // clang-format off
-                auto expected = paths_t{
-                    "a",
+                auto expected_rm = paths_t{
                     "a/1",
-                    "a/2",
                     "a/2/xx",
                     "a/2/yy",
+                    "a/2",
                     "a/3",
-                    "b", "b/1", "b/2",  "b/3",
+                    "a",
+                    "b/1",
+                    "b/2",
+                    "b/3",
+                    "b",
                 };
                 // clang-format on
-                CHECK(paths == expected);
+                auto expected_avail = paths_t{
+                    "a", "a/1", "a/2", "a/2/xx", "a/2/yy", "a/3", "b", "b/1", "b/2", "b/3",
+                };
+                // clang-format on
+                CHECK(paths == expected_rm);
 
                 available = {};
                 builder->scan_start(folder->get_id()).apply(*sup);
-                CHECK(paths == expected);
-                CHECK(available == expected);
+                CHECK(paths == expected_rm);
+                CHECK(available == expected_avail);
             }
         }
 
@@ -2203,7 +2211,23 @@ void test_concurrency() {
 
     struct F : fixture_t {
 
-        void on_model_update(model::message::model_update_t &) noexcept override { ++local_updates; }
+        void on_model_update(model::message::model_update_t &msg) noexcept override {
+            struct V final : model::diff::cluster_visitor_t {
+                using parent_t = model::diff::cluster_visitor_t;
+                V(int *ptr_) : ptr{ptr_} {}
+
+                outcome::result<void> operator()(const model::diff::load::interrupt_t &diff,
+                                                 void *custom) noexcept override {
+                    ++(*ptr);
+                    return diff.visit_next(*this, custom);
+                }
+
+                int *ptr;
+            };
+
+            auto v = V(&interrupts);
+            std::ignore = msg.payload.diff->visit(v, nullptr);
+        }
 
         void main() noexcept override {
             for (int i = 0; i < N; ++i) {
@@ -2220,15 +2244,15 @@ void test_concurrency() {
             builder->scan_start(folder->get_id()).apply(*sup);
             REQUIRE(files->size() == 1 + N * (M + 1));
 
-            local_updates = 0;
+            interrupts = 0;
             bfs::remove_all(root_path / "sub-dir");
             builder->scan_start(folder->get_id()).apply(*sup);
 
-            CHECK(local_updates >= N);
-            CHECK(local_updates <= N * 2);
+            CHECK(interrupts >= N);
+            CHECK(interrupts <= N * 2);
         }
 
-        int local_updates = 0;
+        int interrupts = 0;
     };
     F().run();
 }
