@@ -956,28 +956,32 @@ auto db_actor_t::operator()(const model::diff::advance::advance_t &diff, void *c
         if (folder_info) {
             auto name = proto::get_name(diff.proto_local);
             auto file = folder_info->get_file_infos().by_name(name);
-            auto &txn = *get_txn().assume_value();
+            if (file) {
+                auto &txn = *get_txn().assume_value();
 
-            {
-                unsigned char key[model::file_info_t::data_length + 1];
-                key[0] = db::prefix::file_info;
-                auto id = file->get_full_id();
-                std::copy(id.begin(), id.end(), key + 1);
-                auto data = file->serialize();
-                auto r = db::save({key, data}, txn);
-                if (!r) {
-                    return r.assume_error();
+                {
+                    unsigned char key[model::file_info_t::data_length + 1];
+                    key[0] = db::prefix::file_info;
+                    auto id = file->get_full_id();
+                    std::copy(id.begin(), id.end(), key + 1);
+                    auto data = file->serialize();
+                    auto r = db::save({key, data}, txn);
+                    if (!r) {
+                        return r.assume_error();
+                    }
                 }
-            }
 
-            auto folder_infos = reinterpret_cast<folder_infos_set_t *>(custom);
-            folder_infos->emplace(folder_info.get());
-
-            auto r = diff.visit_next(*this, custom);
-            if (!r) {
-                return r.assume_error();
+                auto folder_infos = reinterpret_cast<folder_infos_set_t *>(custom);
+                folder_infos->emplace(folder_info.get());
+            } else {
+                LOG_WARN(log, "file '{}' is missing in a model", name);
             }
         }
+    }
+
+    auto r = diff.visit_next(*this, custom);
+    if (!r) {
+        return r.assume_error();
     }
 
     return force_commit();
