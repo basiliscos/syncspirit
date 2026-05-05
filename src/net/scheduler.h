@@ -42,7 +42,7 @@ struct SYNCSPIRIT_API scheduler_t final : public model_actor_t<r::actor_base_t>,
     using scan_queue_t = std::list<scan_item_t>;
 
     void on_thread_ready(model::message::thread_ready_t &) noexcept;
-    void on_app_ready(model::message::app_ready_t &) noexcept;
+    void on_local_ready(model::message::local_ready_t &) noexcept;
     void on_timer(r::request_id_t, bool cancelled) noexcept;
 
     schedule_option_t scan_next() noexcept;

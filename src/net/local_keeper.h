@@ -63,6 +63,7 @@ struct SYNCSPIRIT_API local_keeper_t final : public model_actor_t<r::actor_base_
     explicit local_keeper_t(config_t &cfg);
 
     void on_start() noexcept override;
+    void shutdown_start() noexcept override;
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
     void post_configure_coordinator() noexcept override;
 
@@ -74,6 +75,7 @@ struct SYNCSPIRIT_API local_keeper_t final : public model_actor_t<r::actor_base_
     void on_watch_dir(fs::message::watch_folder_t &) noexcept;
     void on_unwatch_dir(fs::message::unwatch_folder_t &) noexcept;
     void on_change(fs::message::folder_changes_t &) noexcept;
+    void on_local_ready(model::message::local_ready_t &) noexcept;
     void on_changes(model::folder_info_t &, fs::payload::file_changes_t &, lc_context_t &) noexcept;
 
     void handle_rename(fs::payload::file_info_t &change, const model::folder_info_t &local_folder,
@@ -97,6 +99,7 @@ struct SYNCSPIRIT_API local_keeper_t final : public model_actor_t<r::actor_base_
     folder_contexts_t delayed;
     dirs_t just_created_dirs;
     bool started_watching = false;
+    bool local_ready = false;
 
     watched_folders_t watched_folders;
 };

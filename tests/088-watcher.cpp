@@ -67,9 +67,9 @@ struct supervisor_t : fs::fs_supervisor_t {
         // NOOP
     }
 
-    void on_watch(message::watch_folder_t &) noexcept;
-    void on_unwatch(message::unwatch_folder_t &) noexcept;
-    void on_changes(message::folder_changes_t &) noexcept;
+    void on_watch(fs::message::watch_folder_t &) noexcept;
+    void on_unwatch(fs::message::unwatch_folder_t &) noexcept;
+    void on_changes(fs::message::folder_changes_t &) noexcept;
 
     fixture_t *fixture;
 };
@@ -139,7 +139,7 @@ struct fixture_t {
                         auto file_changes = folder_change.file_changes;
                         std::sort(file_changes.begin(), file_changes.end(), changes_comparator);
                         for (auto &file_change : file_changes) {
-                            auto solo_changes = payload::folder_change_t{folder_change.folder_id, {file_change}};
+                            auto solo_changes = fs::payload::folder_change_t{folder_change.folder_id, {file_change}};
                             auto msg = change_message_ptr_t();
                             msg.reset(new fs::message::folder_changes_t(sup->get_address(), std::move(solo_changes)));
                             copy.emplace_back(msg);
@@ -174,19 +174,19 @@ struct fixture_t {
         REQUIRE(changes.size() >= await_changes);
     }
 
-    virtual void on_watch(message::watch_folder_t &msg) noexcept {
+    virtual void on_watch(fs::message::watch_folder_t &msg) noexcept {
         CHECK(!msg.payload.ec);
         CHECK(msg.payload.ec.message() != "");
         ++watched_replies;
     }
 
-    virtual void on_unwatch(message::unwatch_folder_t &msg) noexcept {
+    virtual void on_unwatch(fs::message::unwatch_folder_t &msg) noexcept {
         CHECK(!msg.payload.ec);
         CHECK(msg.payload.ec.message() != "");
         ++unwatched_replies;
     }
 
-    virtual void on_changes(message::folder_changes_t &msg) noexcept { changes.emplace_back(&msg); }
+    virtual void on_changes(fs::message::folder_changes_t &msg) noexcept { changes.emplace_back(&msg); }
 
     virtual void main() noexcept {}
 
@@ -207,9 +207,9 @@ struct fixture_t {
     utils::logger_t log;
 };
 
-void supervisor_t::on_watch(message::watch_folder_t &msg) noexcept { fixture->on_watch(msg); }
-void supervisor_t::on_unwatch(message::unwatch_folder_t &msg) noexcept { fixture->on_unwatch(msg); }
-void supervisor_t::on_changes(message::folder_changes_t &msg) noexcept { fixture->on_changes(msg); }
+void supervisor_t::on_watch(fs::message::watch_folder_t &msg) noexcept { fixture->on_watch(msg); }
+void supervisor_t::on_unwatch(fs::message::unwatch_folder_t &msg) noexcept { fixture->on_unwatch(msg); }
+void supervisor_t::on_changes(fs::message::folder_changes_t &msg) noexcept { fixture->on_changes(msg); }
 
 void test_watcher_base() {
     struct F : fixture_t {
@@ -645,13 +645,13 @@ void test_watch_unwatch() {
     struct F : fixture_real_t {
         using fixture_real_t::fixture_real_t;
 
-        void on_watch(message::watch_folder_t &msg) noexcept override {
+        void on_watch(fs::message::watch_folder_t &msg) noexcept override {
             auto &counter = msg.payload.ec ? watched_errors : watched_successes;
             ++counter;
             ++watched_replies;
         }
 
-        void on_unwatch(message::unwatch_folder_t &msg) noexcept override {
+        void on_unwatch(fs::message::unwatch_folder_t &msg) noexcept override {
             auto &counter = msg.payload.ec ? unwatched_errors : unwatched_successes;
             ++counter;
             ++unwatched_replies;

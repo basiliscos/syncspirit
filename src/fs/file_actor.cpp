@@ -21,7 +21,7 @@ using boost::nowide::narrow;
 
 namespace {
 namespace resource {
-r::plugin::resource_id_t controller = 0;
+r::plugin::resource_id_t service = 0;
 } // namespace resource
 } // namespace
 
@@ -59,6 +59,8 @@ void file_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
                 plugin->subscribe_actor(&file_actor_t::on_controller_up, coordinator);
                 plugin->subscribe_actor(&file_actor_t::on_controller_predown, coordinator);
+                plugin->subscribe_actor(&file_actor_t::on_service_lock, coordinator);
+                plugin->subscribe_actor(&file_actor_t::on_service_unlock, coordinator);
             }
         });
         p.discover_name(net::names::db, db, true);
@@ -160,7 +162,7 @@ void file_actor_t::on_exec(message::foreign_executor_t &request) noexcept {
 
 void file_actor_t::on_controller_up(net::message::controller_up_t &message) noexcept {
     LOG_DEBUG(log, "on_controller_up, {}", (const void *)message.payload.controller.get());
-    resources->acquire(resource::controller);
+    resources->acquire(resource::service);
 }
 
 void file_actor_t::on_controller_predown(net::message::controller_predown_t &message) noexcept {
@@ -171,7 +173,21 @@ void file_actor_t::on_controller_predown(net::message::controller_predown_t &mes
         if (auto it = context_cache.find(cache_key); it != context_cache.end()) {
             context_cache.erase(it);
         }
-        resources->release(resource::controller);
+        resources->release(resource::service);
+    }
+}
+
+void file_actor_t::on_service_lock(model::message::service_lock_t &message) noexcept {
+    if (message.payload.service == net::names::fs_actor) {
+        LOG_DEBUG(log, "on_service_lock");
+        resources->acquire(resource::service);
+    }
+}
+
+void file_actor_t::on_service_unlock(model::message::service_unlock_t &message) noexcept {
+    if (message.payload.service == net::names::fs_actor) {
+        LOG_DEBUG(log, "on_service_unlock");
+        resources->release(resource::service);
     }
 }
 

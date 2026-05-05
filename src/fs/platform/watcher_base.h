@@ -11,6 +11,7 @@
 #include <optional>
 #include "utils/log.h"
 #include "proto/proto-fwd.hpp"
+#include "model/messages.h"
 #include "config/fs.h"
 #include "fs/messages.h"
 #include "fs/update_type.hpp"
@@ -89,6 +90,9 @@ struct SYNCSPIRIT_API watcher_base_t : r::actor_base_t {
 
     virtual void on_watch(message::watch_folder_t &) noexcept;
     virtual void on_unwatch(message::unwatch_folder_t &) noexcept;
+    void on_service_lock(model::message::service_lock_t &message) noexcept;
+    void on_service_unlock(model::message::service_unlock_t &message) noexcept;
+
     virtual void notify(const fs::task::scan_dir_t &) noexcept;
     virtual bool accept_update(const support::file_update_t &, const bfs::file_status &) noexcept;
 

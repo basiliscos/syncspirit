@@ -14,6 +14,8 @@
 using namespace syncspirit::fs::platform::windows;
 using boost::nowide::narrow;
 
+using handle_t = watcher_t::handle_t;
+
 static bool _close_handle(handle_t handle) { return ::CloseHandle(handle); }
 
 auto watcher_t::folder_guard_t::make(std::uint32_t buff_sz, std::string folder_id, io_guard_t dir_guard,

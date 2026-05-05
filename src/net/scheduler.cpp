@@ -53,7 +53,7 @@ void scheduler_t::post_configure_coordinator() noexcept {
     parent_t::post_configure_coordinator();
     auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
     auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
-    plugin->subscribe_actor(&scheduler_t::on_app_ready, coordinator);
+    plugin->subscribe_actor(&scheduler_t::on_local_ready, coordinator);
     plugin->subscribe_actor(&scheduler_t::on_thread_ready, supervisor->get_address());
 }
 
@@ -65,8 +65,8 @@ void scheduler_t::on_thread_ready(model::message::thread_ready_t &message) noexc
     }
 }
 
-void scheduler_t::on_app_ready(model::message::app_ready_t &) noexcept {
-    LOG_TRACE(log, "on_app_ready");
+void scheduler_t::on_local_ready(model::message::local_ready_t &) noexcept {
+    LOG_TRACE(log, "on_local_ready");
     scan_next();
 }
 

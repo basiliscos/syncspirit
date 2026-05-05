@@ -78,6 +78,14 @@ struct app_ready_t {};
 struct local_up_t {};
 struct local_ready_t {};
 
+struct sevice_lock_t {
+    std::string_view service;
+};
+
+struct sevice_unlock_t {
+    std::string_view service;
+};
+
 } // namespace payload
 
 namespace message {
@@ -90,6 +98,8 @@ using local_up_t = r::message_t<payload::local_up_t>;
 using local_ready_t = r::message_t<payload::local_ready_t>;
 using app_ready_t = r::message_t<payload::app_ready_t>;
 using db_loaded_t = r::message_t<payload::db_loaded_t>;
+using service_lock_t = r::message_t<payload::sevice_lock_t>;
+using service_unlock_t = r::message_t<payload::sevice_unlock_t>;
 
 using model_request_t = r::request_traits_t<payload::model_request_t>::request::message_t;
 using model_response_t = r::request_traits_t<payload::model_request_t>::response::message_t;

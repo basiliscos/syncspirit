@@ -128,6 +128,7 @@ void net_supervisor_t::shutdown_finish() noexcept {
 }
 
 void net_supervisor_t::launch_early() noexcept {
+    ++local_counter;
     thread_counter = independent_threads;
     auto timeout = shutdown_timeout * 9 / 10;
     db_addr = create_actor<db_actor_t>()
@@ -341,6 +342,7 @@ void net_supervisor_t::on_app_ready(model::message::app_ready_t &) noexcept {
         create_actor<dialer_actor_t>().timeout(timeout).dialer_config(dcfg).cluster(cluster).finish();
         ++local_counter;
     }
+    --local_counter;
 }
 
 void net_supervisor_t::commit_loading() noexcept {

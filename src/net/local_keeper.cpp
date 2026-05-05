@@ -13,6 +13,7 @@
 #include "model/diff/modify/remove_folder.h"
 #include "model/diff/modify/suspend_folder.h"
 #include "model/diff/modify/upsert_folder.h"
+#include "model/messages.h"
 #include "names.h"
 #include "presentation/folder_entity.h"
 #include "presentation/folder_presence.h"
@@ -121,6 +122,7 @@ void local_keeper_t::post_configure_coordinator() noexcept {
     auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
     plugin->subscribe_actor(&local_keeper_t::on_change, coordinator);
     plugin->subscribe_actor(&local_keeper_t::on_thread_ready, coordinator);
+    plugin->subscribe_actor(&local_keeper_t::on_local_ready, coordinator);
 }
 
 void local_keeper_t::try_start_watching() noexcept {
@@ -141,7 +143,30 @@ void local_keeper_t::try_start_watching() noexcept {
 void local_keeper_t::on_start() noexcept {
     parent_t::on_start();
     send<model::payload::local_up_t>(coordinator);
+}
+
+void local_keeper_t::on_local_ready(model::message::local_ready_t &) noexcept {
+    LOG_TRACE(log, "on_local_ready");
+    local_ready = true;
+    if (fs_addr) {
+        send<model::payload::sevice_lock_t>(coordinator, names::fs_actor);
+    }
+    if (watcher_addr) {
+        send<model::payload::sevice_lock_t>(coordinator, names::watcher);
+    }
     try_start_watching();
+}
+
+void local_keeper_t::shutdown_start() noexcept {
+    if (local_ready) {
+        if (fs_addr) {
+            send<model::payload::sevice_unlock_t>(coordinator, names::fs_actor);
+        }
+        if (watcher_addr) {
+            send<model::payload::sevice_unlock_t>(coordinator, names::watcher);
+        }
+    }
+    parent_t::shutdown_start();
 }
 
 void local_keeper_t::visit(const model::diff::cluster_diff_t &diff, model::payload::apply_context_t &ctx) noexcept {
@@ -158,7 +183,6 @@ void local_keeper_t::on_thread_ready(model::message::thread_ready_t &message) no
     if (p.thread_id == std::this_thread::get_id()) {
         LOG_TRACE(log, "on_thread_ready");
         cluster = message.payload.cluster;
-        try_start_watching();
     }
 }
 

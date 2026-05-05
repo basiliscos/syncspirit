@@ -11,6 +11,7 @@
 #include "hasher/hasher_plugin.h"
 #include "utils/log.h"
 #include "model/file_info.h"
+#include "model/messages.h"
 #include <rotor.hpp>
 #include <optional>
 
@@ -106,6 +107,8 @@ struct SYNCSPIRIT_API file_actor_t : public r::actor_base_t {
 
     void on_controller_up(net::message::controller_up_t &message) noexcept;
     void on_controller_predown(net::message::controller_predown_t &message) noexcept;
+    void on_service_lock(model::message::service_lock_t &message) noexcept;
+    void on_service_unlock(model::message::service_unlock_t &message) noexcept;
 
     void on_retension_finish(r::request_id_t, bool cancelled) noexcept;
 

@@ -20,6 +20,12 @@ static auto actor_identity = net::names::watcher;
 using BU = watcher_base_t::bulk_update_t;
 using FU = watcher_base_t::folder_update_t;
 
+namespace {
+namespace resource {
+r::plugin::resource_id_t service = 0;
+} // namespace resource
+} // namespace
+
 auto BU::prepare(std::string_view folder_id) noexcept -> folder_update_t & {
     for (auto &fi : updates) {
         if (fi.folder_id == folder_id) {
@@ -293,6 +299,20 @@ void watcher_base_t::on_watch(message::watch_folder_t &) noexcept {
 
 void watcher_base_t::on_unwatch(message::unwatch_folder_t &) noexcept {
     LOG_WARN(log, "unwatching directory isn't supported by platform");
+}
+
+void watcher_base_t::on_service_lock(model::message::service_lock_t &message) noexcept {
+    if (message.payload.service == net::names::watcher) {
+        LOG_DEBUG(log, "on_service_lock");
+        resources->acquire(resource::service);
+    }
+}
+
+void watcher_base_t::on_service_unlock(model::message::service_unlock_t &message) noexcept {
+    if (message.payload.service == net::names::watcher) {
+        LOG_DEBUG(log, "on_service_unlock");
+        resources->release(resource::service);
+    }
 }
 
 void watcher_base_t::push(const timepoint_t &deadline, std::string_view folder_id, std::string_view relative_path,

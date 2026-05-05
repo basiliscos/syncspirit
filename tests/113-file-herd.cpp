@@ -222,6 +222,7 @@ struct fixture_t {
 
         sup->send<syncspirit::model::payload::thread_ready_t>(sup->get_address(), cluster, std::this_thread::get_id());
         sup->send<syncspirit::model::payload::app_ready_t>(sup->get_address());
+        sup->send<syncspirit::model::payload::local_ready_t>(sup->get_address());
         sup->do_process();
 
         REQUIRE(static_cast<r::actor_base_t *>(file_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);

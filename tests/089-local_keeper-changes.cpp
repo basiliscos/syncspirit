@@ -160,7 +160,8 @@ struct fixture_t {
                      .finish();
         sup->do_process();
 
-        sup->send<syncspirit::model::payload::thread_ready_t>(sup->get_address(), cluster, std::this_thread::get_id());
+        sup->send<model::payload::thread_ready_t>(sup->get_address(), cluster, std::this_thread::get_id());
+        sup->send<model::payload::local_ready_t>(sup->get_address());
         sup->do_process();
     }
 
