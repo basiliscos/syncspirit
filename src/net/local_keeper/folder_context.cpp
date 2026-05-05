@@ -150,9 +150,9 @@ int folder_context_t::process(unscanned_dir_t &dir, stack_context_t &ctx) noexce
 
     auto dir_str = narrow(dir.path.generic_wstring());
     if (!skip_scan) {
-        auto notify_watcher = (!dir.presence && (ctx.watcher_impl == I::inotify)) ||
-                              (dir.requires_refinement && (ctx.watcher_impl == I::kqueue))
-                              && local_folder->get_folder()->is_watched();
+        auto notify_watcher = ((!dir.presence && (ctx.watcher_impl == I::inotify)) ||
+                               (dir.requires_refinement && (ctx.watcher_impl == I::kqueue))) &&
+                              local_folder->get_folder()->is_watched();
         LOG_TRACE(log, "scheduling scan of '{}' (notify: {})", dir_str, notify_watcher);
         auto sub_task = scan_dir_t(std::move(dir.path), std::move(dir.presence), std::move(dir.single_child),
                                    notify_watcher, dir.recurse, dir.requires_refinement);

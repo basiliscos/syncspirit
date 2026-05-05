@@ -429,15 +429,17 @@ auto net_supervisor_t::apply(const model::diff::advance::advance_t &diff, void *
     auto r = parent_t::apply(diff, custom);
     if (r) {
         auto folder = cluster->get_folders().by_id(diff.folder_id);
-        auto augmentation = folder->get_augmentation().get();
-        auto folder_entity = static_cast<presentation::folder_entity_t *>(augmentation);
-        if (folder_entity) {
-            auto &folder_infos = folder->get_folder_infos();
-            auto &local_fi = *folder_infos.by_device(*cluster->get_device());
-            auto file_name = proto::get_name(diff.proto_local);
-            auto local_file = local_fi.get_file_infos().by_name(file_name);
-            if (local_file) {
-                folder_entity->on_insert(*local_file, local_fi);
+        if (folder) {
+            auto augmentation = folder->get_augmentation().get();
+            auto folder_entity = static_cast<presentation::folder_entity_t *>(augmentation);
+            if (folder_entity) {
+                auto &folder_infos = folder->get_folder_infos();
+                auto &local_fi = *folder_infos.by_device(*cluster->get_device());
+                auto file_name = proto::get_name(diff.proto_local);
+                auto local_file = local_fi.get_file_infos().by_name(file_name);
+                if (local_file) {
+                    folder_entity->on_insert(*local_file, local_fi);
+                }
             }
         }
     }

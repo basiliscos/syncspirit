@@ -78,8 +78,8 @@ static void dump_traces(EXCEPTION_POINTERS *ep) {
     WriteFile(file, buff, out_bytes, &written, {});
 
     while (true) {
-        auto ok = StackWalk64(machine, process, thread, &frame, &ctx, NULL, SymFunctionTableAccess64, SymGetModuleBase64,
-                              NULL);
+        auto ok = StackWalk64(machine, process, thread, &frame, &ctx, NULL, SymFunctionTableAccess64,
+                              SymGetModuleBase64, NULL);
         if (!ok) {
             DWORD e = GetLastError();
             out_bytes = snprintf(buff, sizeof(buff), "not ok, code: 0x%08x, stopping\n", e);
