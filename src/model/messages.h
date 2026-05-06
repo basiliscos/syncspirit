@@ -73,7 +73,6 @@ struct thread_ready_t {
     thread_id_t thread_id;
 };
 struct db_loaded_t {};
-struct app_ready_t {};
 
 struct local_up_t {};
 struct local_ready_t {};
@@ -96,7 +95,6 @@ using thread_up_t = r::message_t<payload::thread_up_t>;
 using thread_ready_t = r::message_t<payload::thread_ready_t>;
 using local_up_t = r::message_t<payload::local_up_t>;
 using local_ready_t = r::message_t<payload::local_ready_t>;
-using app_ready_t = r::message_t<payload::app_ready_t>;
 using db_loaded_t = r::message_t<payload::db_loaded_t>;
 using service_lock_t = r::message_t<payload::sevice_lock_t>;
 using service_unlock_t = r::message_t<payload::sevice_unlock_t>;

@@ -19,6 +19,17 @@ namespace net {
 
 namespace outcome = boost::outcome_v2;
 
+namespace payload {
+
+struct ready_t {};
+
+} // namespace payload
+
+namespace message {
+using ready_t = r::message_t<payload::ready_t>;
+
+}
+
 struct net_supervisor_config_t : ra::supervisor_config_asio_t {
     config::main_t app_config;
     std::uint_fast32_t independent_threads = 0;
@@ -87,7 +98,7 @@ struct SYNCSPIRIT_API net_supervisor_t : net_supervisor_base_t<ra::supervisor_as
     void on_thread_up(model::message::thread_up_t &) noexcept;
     void on_local_up(model::message::local_up_t &) noexcept;
     void on_thread_ready(model::message::thread_ready_t &) noexcept;
-    void on_app_ready(model::message::app_ready_t &) noexcept;
+    void on_ready(message::ready_t &) noexcept;
 
     void dial_peer(const model::device_id_t &peer_device_id, const utils::uri_container_t &uris) noexcept;
     void launch_early() noexcept;

@@ -157,7 +157,7 @@ void app_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
                 auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
                 plugin->subscribe_actor(&app_supervisor_t::on_model_update, coordinator);
-                plugin->subscribe_actor(&app_supervisor_t::on_app_ready, coordinator);
+                plugin->subscribe_actor(&app_supervisor_t::on_local_ready, coordinator);
                 plugin->subscribe_actor(&app_supervisor_t::on_db_loaded, coordinator);
                 send<syncspirit::model::payload::thread_up_t>(coordinator);
             }
@@ -260,8 +260,8 @@ void app_supervisor_t::process(model::diff::cluster_diff_t &diff, model::payload
     }
 }
 
-void app_supervisor_t::on_app_ready(model::message::app_ready_t &) noexcept {
-    LOG_TRACE(log, "on_app_ready");
+void app_supervisor_t::on_local_ready(model::message::local_ready_t &) noexcept {
+    LOG_TRACE(log, "on_local_ready");
     main_window->on_loading_done();
 }
 

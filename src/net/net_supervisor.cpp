@@ -103,7 +103,7 @@ void net_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
             p.subscribe_actor(&net_supervisor_t::on_model_request);
             p.subscribe_actor(&net_supervisor_t::on_thread_up);
             p.subscribe_actor(&net_supervisor_t::on_thread_ready);
-            p.subscribe_actor(&net_supervisor_t::on_app_ready);
+            p.subscribe_actor(&net_supervisor_t::on_ready);
             p.subscribe_actor(&net_supervisor_t::on_local_up);
         },
         r::plugin::config_phase_t::PREINIT);
@@ -219,13 +219,13 @@ void net_supervisor_t::on_thread_ready(model::message::thread_ready_t &) noexcep
     LOG_DEBUG(log, "on_thread_ready, left = {}", thread_counter);
     if (thread_counter == 0 && state == r::state_t::OPERATIONAL) {
         // thread_ready_t messages are routed, give let routed messages be processed 1st
-        auto message = r::make_message<model::payload::app_ready_t>(address);
+        auto message = r::make_message<payload::ready_t>(address);
         send<bouncer::payload::package_t>(bouncer, std::move(message));
     }
 }
 
-void net_supervisor_t::on_app_ready(model::message::app_ready_t &) noexcept {
-    LOG_DEBUG(log, "on_app_ready");
+void net_supervisor_t::on_ready(message::ready_t &) noexcept {
+    LOG_DEBUG(log, "on_ready");
 
     cluster_sup = create_actor<cluster_supervisor_t>()
                       .timeout(shutdown_timeout * 9 / 10)
