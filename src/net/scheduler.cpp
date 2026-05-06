@@ -44,7 +44,6 @@ void scheduler_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 }
 
 void scheduler_t::on_start() noexcept {
-    LOG_TRACE(log, "on_start");
     send<model::payload::local_up_t>(coordinator);
     parent_t::on_start();
 }

@@ -231,7 +231,6 @@ auto db_actor_t::force_commit() noexcept -> outcome::result<void> {
 void db_actor_t::on_start() noexcept {
     parent_t::on_start();
     send<net::payload::load_cluster_trigger_t>(address);
-    send<model::payload::local_up_t>(coordinator);
 }
 
 void db_actor_t::shutdown_finish() noexcept {
@@ -287,7 +286,6 @@ void db_actor_t::on_cluster_load_trigger(message::load_cluster_trigger_t &) noex
         LOG_DEBUG(log, "on_cluster_load_trigger, ignoring");
         return;
     }
-    parent_t::on_start();
     LOG_TRACE(log, "on_cluster_load_trigger");
 
     auto txn_opt = db::make_transaction(db::transaction_type_t::RO, env);
@@ -409,6 +407,7 @@ void db_actor_t::on_cluster_load_trigger(message::load_cluster_trigger_t &) noex
         std::move(txn),
     };
 
+    send<model::payload::local_up_t>(coordinator);
     auto message = r::make_message<payload::partial_load_t>(address, std::move(p));
     send<bouncer::payload::package_t>(bouncer, std::move(message));
     resources->acquire(resource::partial_load);
