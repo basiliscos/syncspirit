@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2025-2026 Ivan Baidakou
 
 #include "test-utils.h"
 #include "model/misc/path.h"
@@ -12,6 +12,14 @@ TEST_CASE("path", "[model]") {
     using pieces_t = std::vector<std::string_view>;
     SECTION("a/bb/c.txt") {
         auto p = path_t("a/bb/c.txt");
+        SECTION("cloing") {
+            auto p2 = path_t("a/bb/c.txt");
+            CHECK(p == p2);
+            auto p4 = std::move(p2);
+            CHECK(p4 == p);
+            CHECK(p2.empty());
+        }
+
         CHECK(p.get_parent_name() == "a/bb");
         CHECK(p.get_own_name() == "c.txt");
 
@@ -48,6 +56,12 @@ TEST_CASE("path", "[model]") {
         CHECK(pieces.size() == 2);
         CHECK(pieces[0] == "dir");
         CHECK(pieces[1] == "file.bin");
+    }
+    SECTION("single") {
+        auto p = path_t("file.bin");
+        CHECK(p.get_own_name() == "file.bin");
+        CHECK(p.get_full_name() == "file.bin");
+        CHECK(p.get_parent_name() == "");
     }
 }
 

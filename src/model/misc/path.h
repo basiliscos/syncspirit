@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2025-2026 Ivan Baidakou
 
 #pragma once
 
@@ -7,7 +7,6 @@
 #include "arc.hpp"
 #include <cstdint>
 #include <string_view>
-#include "utils/compact_vector.hpp"
 
 namespace syncspirit::model {
 
@@ -19,27 +18,28 @@ struct SYNCSPIRIT_API path_t : arc_base_t<path_t> {
         using reference = element_type;
 
         iterator_t() noexcept;
-        iterator_t(const path_t *path) noexcept;
+        iterator_t(const path_t *path, std::int32_t component = 0) noexcept;
         reference operator*() const noexcept;
         iterator_t &operator++() noexcept;
         bool operator==(iterator_t) noexcept;
 
-        std::int32_t position;
+        std::int32_t component;
         const path_t *path;
     };
 
-    path_t() noexcept = default;
     path_t(std::string_view full_name) noexcept;
-    path_t(path_t &) noexcept;
-    path_t(path_t &&) noexcept = default;
-    virtual ~path_t() = default;
+    path_t() noexcept = default;
+    path_t(path_t &&) noexcept;
+    path_t(path_t &) noexcept = delete;
+    virtual ~path_t();
 
     iterator_t begin() const noexcept;
     iterator_t end() const noexcept;
 
     std::size_t get_pieces_size() const noexcept;
 
-    inline bool operator==(const path_t &other) const noexcept { return name == other.name; }
+    bool empty() const noexcept;
+    bool operator==(const path_t &other) const noexcept;
 
     std::string_view get_full_name() const noexcept;
     std::string_view get_own_name() const noexcept;
@@ -47,10 +47,8 @@ struct SYNCSPIRIT_API path_t : arc_base_t<path_t> {
     bool contains(const path_t &other) const noexcept;
 
   protected:
-    using string_t = utils::compact_vector_t<char>;
-    using pieces_t = utils::compact_vector_t<std::uint32_t>;
-    string_t name;
-    pieces_t pieces;
+    const void *data = nullptr;
+    std::uint32_t components{0};
 };
 
 using path_ptr_t = intrusive_ptr_t<path_t>;
