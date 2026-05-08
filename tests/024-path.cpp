@@ -63,7 +63,23 @@ TEST_CASE("path", "[model]") {
         CHECK(p.get_full_name() == "file.bin");
         CHECK(p.get_parent_name() == "");
     }
+    SECTION("root") {
+        auto p = path_t("/");
+        CHECK(p.get_filename() == "");
+        CHECK(p.get_full_name() == "/");
+        CHECK(p.get_parent_name() == "");
+    }
+    SECTION("backslashes") {
+        auto p = path_t("c:\\my\\path.bin");
+        CHECK(p.get_filename() == "path.bin");
+        CHECK(p.get_full_name() == "c:/my/path.bin");
+        CHECK(p.get_parent_name() == "c:/my");
+    }
 }
+
+// TEST_CASE("path view", "[model]") {
+//     usp
+// }
 
 TEST_CASE("path_cache", "[model]") {
     auto cache = path_cache_ptr_t(new path_cache_t());

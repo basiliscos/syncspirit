@@ -12,6 +12,8 @@
 
 namespace syncspirit::model {
 
+template <typename Allocator> struct path_view_t;
+
 struct SYNCSPIRIT_API path_base_t {
     static constexpr auto path_alignment = std::align_val_t(sizeof(std::uint32_t));
 
@@ -47,6 +49,13 @@ struct SYNCSPIRIT_API path_base_t {
     bool contains(const path_base_t &other) const noexcept;
 
     bool are_permissions_supported() const noexcept;
+
+    template <typename Allocator> auto get_view(Allocator a) const noexcept -> path_view_t<Allocator> {
+        return path_view_t<Allocator>(*this);
+    };
+
+    inline const void *get_data() const noexcept { return data; }
+    std::uint32_t get_components() const noexcept { return components; }
 
   protected:
     const void *data = nullptr;

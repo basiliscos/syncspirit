@@ -24,15 +24,18 @@ path_t::path_t(std::string_view full_name) noexcept {
     using traits_in_t = utf_traits<char>;
     using traits_out_t = utf_traits<wchar_t>;
     using pieces_t = std::pmr::vector<unsigned char>;
+    using positions_t = std::pmr::vector<size_t>;
 
     auto buffer = std::array<std::byte, 1024 * 5>{};
     auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
     auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
     auto pieces = pieces_t(allocator);
+    auto backslashes = positions_t(allocator);
     auto pieces_number = std::uint32_t{0};
 
     if (!full_name.empty()) {
-        auto ptr = full_name.data();
+        auto begin = full_name.data();
+        auto ptr = begin;
         auto prev = ptr;
         auto end = ptr + full_name.size();
         auto idx = (unsigned char){0};
@@ -49,6 +52,9 @@ path_t::path_t(std::string_view full_name) noexcept {
                         assert(delta <= 255);
                         pieces.push_back(static_cast<unsigned char>(delta));
                         prev = ptr;
+                        if (*b == '\\') {
+                            backslashes.push_back(static_cast<std::size_t>(b - begin));
+                        }
                     }
                 }
             }
@@ -57,14 +63,18 @@ path_t::path_t(std::string_view full_name) noexcept {
         auto data_ptr = static_cast<uint8_t *>(::operator new(sz, path_alignment));
         auto raw_u32 = reinterpret_cast<std::uint32_t *>(data_ptr);
         *raw_u32++ = full_name.size();
-        auto raw_u8 = reinterpret_cast<std::uint8_t *>(raw_u32);
+        auto raw_u8_ptr = reinterpret_cast<std::uint8_t *>(raw_u32);
         for (auto p : pieces) {
-            *raw_u8++ = p;
+            *raw_u8_ptr++ = p;
         }
+        auto raw_u8 = raw_u8_ptr;
         for (auto c : full_name) {
-            *raw_u8++ = static_cast<uint8_t>(c);
+            *raw_u8_ptr++ = static_cast<uint8_t>(c);
         }
-        *raw_u8 = 0;
+        for (auto p : backslashes) {
+            raw_u8[p] = '/';
+        }
+        *raw_u8_ptr = 0;
         data = data_ptr;
         components = pieces_number;
     }
