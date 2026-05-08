@@ -21,7 +21,7 @@ TEST_CASE("path", "[model]") {
         }
 
         CHECK(p.get_parent_name() == "a/bb");
-        CHECK(p.get_own_name() == "c.txt");
+        CHECK(p.get_filename() == "c.txt");
 
         auto pieces = pieces_t();
         for (auto p : p) {
@@ -46,7 +46,7 @@ TEST_CASE("path", "[model]") {
     SECTION("dir/file.bin") {
         auto p = path_t("dir/file.bin");
         CHECK(p.get_parent_name() == "dir");
-        CHECK(p.get_own_name() == "file.bin");
+        CHECK(p.get_filename() == "file.bin");
 
         auto pieces = pieces_t();
         for (auto p : p) {
@@ -59,7 +59,7 @@ TEST_CASE("path", "[model]") {
     }
     SECTION("single") {
         auto p = path_t("file.bin");
-        CHECK(p.get_own_name() == "file.bin");
+        CHECK(p.get_filename() == "file.bin");
         CHECK(p.get_full_name() == "file.bin");
         CHECK(p.get_parent_name() == "");
     }

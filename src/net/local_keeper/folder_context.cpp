@@ -73,7 +73,7 @@ auto make_context(model::folder_info_ptr_t local_folder, std::string_view start_
             auto &file = dir_presence->get_file_info();
             path = folder_path / bfs::path(widen(file.get_name()->get_full_name()));
         }
-        auto name = bfs::path(widen(presence->get_entity()->get_path()->get_own_name()));
+        auto name = bfs::path(widen(presence->get_entity()->get_path()->get_filename()));
         presence = parent;
         return {path, std::move(name)};
     }();
@@ -422,7 +422,7 @@ int folder_context_t::process(incomplete_t &item, stack_context_t &ctx) noexcept
         auto &entities = item.parent->get_entity()->get_children();
         auto comparator = presentation::entity_t::name_comparator_t{};
         auto it = std::lower_bound(entities.begin(), entities.end(), name_view, comparator);
-        if (it != entities.end() && (*it)->get_path()->get_own_name() == name_view) {
+        if (it != entities.end() && (*it)->get_path()->get_filename() == name_view) {
             presence = const_cast<presentation::presence_t *>((*it)->get_best());
             if (presence && presence->get_device() == self_device) {
                 presence = nullptr;
@@ -490,7 +490,7 @@ int folder_context_t::process(rehashed_incomplete_t &item, stack_context_t &ctx)
             auto modified_s = peer_file.get_modified_s();
             auto name = [&]() -> bfs::path {
                 if (item.action == model::advance_action_t::remote_copy) {
-                    auto own_name = peer_file.get_name()->get_own_name();
+                    auto own_name = peer_file.get_name()->get_filename();
                     return bfs::path(widen(own_name));
                 } else {
                     assert(item.action == model::advance_action_t::resolve_remote_win);
@@ -626,7 +626,7 @@ void folder_context_t::post_process(fs::task::scan_dir_t &task, stack_context_t 
         } else {
             auto path = task.path.parent_path();
             auto p = static_cast<presentation::local_file_presence_t *>(task.presence.get());
-            auto child = bfs::path(widen(p->get_file_info().get_name()->get_own_name()));
+            auto child = bfs::path(widen(p->get_file_info().get_name()->get_filename()));
             auto sub_task = fs::task::scan_dir_t(std::move(path), std::move(p->get_parent()), std::move(child), false,
                                                  false, false);
             push(std::move(sub_task));
@@ -650,7 +650,7 @@ void folder_context_t::post_process(fs::task::scan_dir_t &task, stack_context_t 
         auto is_dir = info.status.type() == bfs::file_type::directory;
         auto presence = presentation::get_child(task.presence.get(), name, is_dir);
         if (presence) {
-            auto filename = presence->get_entity()->get_path()->get_own_name();
+            auto filename = presence->get_entity()->get_path()->get_filename();
             checked_children.emplace(filename);
         }
         if (info.ec) {
@@ -674,7 +674,7 @@ void folder_context_t::post_process(fs::task::scan_dir_t &task, stack_context_t 
         for (auto child : dir_presence->get_children()) {
             auto features = child->get_features();
             if (features & F::local) {
-                auto filename = child->get_entity()->get_path()->get_own_name();
+                auto filename = child->get_entity()->get_path()->get_filename();
                 if (!checked_children.count(filename)) {
                     checked_children.emplace(filename);
                     if (!task.single_child.empty()) {
@@ -705,7 +705,7 @@ void folder_context_t::post_process(fs::task::scan_dir_t &task, stack_context_t 
         using queue_t = std::pmr::list<presentation::entity_t *>;
         auto queue = queue_t(ctx.allocator);
         for (auto child_entity : dir_presence->get_entity()->get_children()) {
-            auto filename = child_entity->get_path()->get_own_name();
+            auto filename = child_entity->get_path()->get_filename();
             if (!checked_children.count(filename)) {
                 auto best = child_entity->get_best();
                 if (best->get_features() & F::deleted) {

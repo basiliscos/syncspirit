@@ -128,7 +128,7 @@ advance_action_t resolve(const file_info_t &remote, const file_info_t *local,
     }
     auto action = _resolve(remote, local, local_folder);
     if (action == advance_action_t::resolve_remote_win) {
-        auto name = remote.get_name()->get_own_name();
+        auto name = remote.get_name()->get_filename();
         if (name.find(".sync-conflict-") != std::string::npos) {
             action = advance_action_t::ignore;
         } else {

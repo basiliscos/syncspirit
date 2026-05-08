@@ -569,7 +569,7 @@ void local_keeper_t::on_changes(model::folder_info_t &local_folder, fs::payload:
             }
 
             auto path = folder->get_path() / widen(parent->get_entity()->get_path()->get_full_name());
-            auto child_name = bfs::path(widen(presence->get_entity()->get_path()->get_own_name()));
+            auto child_name = bfs::path(widen(presence->get_entity()->get_path()->get_filename()));
             auto item =
                 unscanned_dir_t(std::move(path), parent, std::move(child_name), 0, true, change.requires_refinement);
             unexamined.push_back(std::move(item));

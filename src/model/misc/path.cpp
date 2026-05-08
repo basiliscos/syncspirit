@@ -2,13 +2,10 @@
 // SPDX-FileCopyrightText: 2025-2026 Ivan Baidakou
 
 #include "path.h"
-#include <filesystem>
 #include <boost/nowide/convert.hpp>
 #include <cstring>
 #include <cassert>
 #include <memory_resource>
-#include <new>
-#include <limits>
 
 namespace bfs = std::filesystem;
 
@@ -17,7 +14,6 @@ using namespace boost::nowide::utf;
 using namespace syncspirit::model;
 
 using I = path_t::iterator_t;
-static constexpr auto undef = std::numeric_limits<std::uint32_t>::max();
 
 path_t::path_t(path_t &&other) noexcept {
     std::swap(data, other.data);
@@ -58,7 +54,7 @@ path_t::path_t(std::string_view full_name) noexcept {
             }
         }
         auto sz = sizeof(std::uint32_t) + pieces.size() + full_name.size() + 1;
-        auto data_ptr = static_cast<uint8_t *>(::operator new(sz, std::align_val_t(64)));
+        auto data_ptr = static_cast<uint8_t *>(::operator new(sz, path_alignment));
         auto raw_u32 = reinterpret_cast<std::uint32_t *>(data_ptr);
         *raw_u32++ = full_name.size();
         auto raw_u8 = reinterpret_cast<std::uint8_t *>(raw_u32);
@@ -76,11 +72,11 @@ path_t::path_t(std::string_view full_name) noexcept {
 
 path_t::~path_t() {
     if (data) {
-        ::operator delete(const_cast<void *>(data), std::align_val_t(64));
+        ::operator delete(const_cast<void *>(data), path_alignment);
     }
 }
 
-bool path_t::operator==(const path_t &other) const noexcept {
+bool path_base_t::operator==(const path_base_t &other) const noexcept {
     if (components == other.components) {
         auto ptr_1 = reinterpret_cast<const uint8_t *>(data);
         auto ptr_2 = reinterpret_cast<const uint8_t *>(other.data);
@@ -94,8 +90,15 @@ bool path_t::operator==(const path_t &other) const noexcept {
     return false;
 }
 
-bool path_t::empty() const noexcept { return components == 0; }
-std::size_t path_t::get_pieces_size() const noexcept {
+path_t &path_t::operator=(path_t &&other) noexcept {
+    std::swap(data, other.data);
+    std::swap(components, other.components);
+    return *this;
+}
+
+bool path_base_t::empty() const noexcept { return components == 0; }
+
+std::size_t path_base_t::get_pieces_size() const noexcept {
     if (data) {
         // return pieces.size() + (!name.empty() ? 1 : 0);
         return components + 1;
@@ -103,7 +106,7 @@ std::size_t path_t::get_pieces_size() const noexcept {
     return 0;
 }
 
-bool path_t::contains(const path_t &other) const noexcept {
+bool path_base_t::contains(const path_base_t &other) const noexcept {
     if (data) {
         if (data) {
             auto sz_1 = *reinterpret_cast<const std::uint32_t *>(data);
@@ -125,7 +128,7 @@ bool path_t::contains(const path_t &other) const noexcept {
     return false;
 }
 
-std::string_view path_t::get_full_name() const noexcept {
+std::string_view path_base_t::get_full_name() const noexcept {
     if (data) {
         auto sz = *reinterpret_cast<const std::uint32_t *>(data);
         auto ptr = reinterpret_cast<const char *>(data) + sizeof(std::uint32_t) + components;
@@ -134,7 +137,7 @@ std::string_view path_t::get_full_name() const noexcept {
     return {};
 }
 
-std::string_view path_t::get_own_name() const noexcept {
+std::string_view path_base_t::get_filename() const noexcept {
     if (data) {
         auto it = iterator_t(this, components);
         return *it;
@@ -142,7 +145,7 @@ std::string_view path_t::get_own_name() const noexcept {
     return {};
 }
 
-std::string_view path_t::get_parent_name() const noexcept {
+std::string_view path_base_t::get_parent_name() const noexcept {
     if (components >= 1) {
         auto first = (*iterator_t(this));
         auto last = (*iterator_t(this, components - 1));
@@ -151,13 +154,13 @@ std::string_view path_t::get_parent_name() const noexcept {
     return {};
 }
 
-auto path_t::begin() const noexcept -> iterator_t { return iterator_t(this); }
+auto path_base_t::begin() const noexcept -> iterator_t { return iterator_t(this); }
 
-auto path_t::end() const noexcept -> iterator_t { return iterator_t(); }
+auto path_base_t::end() const noexcept -> iterator_t { return iterator_t(); }
 
 I::iterator_t() noexcept : component{-1}, path{nullptr} {}
 
-I::iterator_t(const path_t *path_, std::int32_t component_) noexcept {
+I::iterator_t(const path_base_t *path_, std::int32_t component_) noexcept {
     if (path_->data) {
         assert(component_ >= 0);
         assert(component_ <= path_->components);
