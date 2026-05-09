@@ -203,6 +203,9 @@ auto I::operator*() const noexcept -> reference {
         auto piece_ptr = reinterpret_cast<const std::uint8_t *>(ptr);
         auto begin_ptr = reinterpret_cast<const char *>(piece_ptr) + path->components;
         auto data_ptr = begin_ptr;
+        if (!component && sz == 1 && *begin_ptr == '/') {
+            ++data_ptr;
+        }
         for (std::uint32_t i = 0; i < static_cast<std::uint32_t>(component); ++i) {
             data_ptr += *piece_ptr++;
         }

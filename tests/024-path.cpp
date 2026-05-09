@@ -3,6 +3,7 @@
 
 #include "test-utils.h"
 #include "model/misc/path.h"
+#include "model/misc/path_view.hpp"
 #include "model/misc/path_cache.h"
 
 using namespace syncspirit;
@@ -77,9 +78,75 @@ TEST_CASE("path", "[model]") {
     }
 }
 
-// TEST_CASE("path view", "[model]") {
-//     usp
-// }
+TEST_CASE("path view", "[model]") {
+    auto allocaltor = std::allocator<char>();
+    SECTION("abs path") {
+        auto path = path_t("/some/dir/file.bin");
+        auto view = path.get_view(allocaltor);
+        CHECK(path == view);
+        CHECK(view.get_filename() == "file.bin");
+        CHECK(view.get_parent_name() == "/some/dir");
+        SECTION("parent") {
+            auto p1 = view.get_parent();
+            CHECK(p1.get_full_name() == "/some/dir");
+            CHECK(p1.get_filename() == "dir");
+
+            auto p2 = p1.get_parent();
+            CHECK(p2.get_full_name() == "/some");
+            CHECK(p2.get_filename() == "some");
+
+            auto p3 = p2.get_parent();
+            CHECK(p3.get_full_name() == "/");
+            CHECK(p3.get_filename() == "");
+
+            CHECK(p3.get_parent().empty());
+        }
+    }
+    SECTION("dir path") {
+        auto path = path_t("/some/dir/");
+        auto view = path.get_view(allocaltor);
+        CHECK(path == view);
+        CHECK(view.get_filename() == "");
+        CHECK(view.get_parent_name() == "/some/dir");
+        SECTION("parent") {
+            auto p1 = view.get_parent();
+            CHECK(p1.get_full_name() == "/some/dir");
+            CHECK(p1.get_filename() == "dir");
+
+            auto p2 = p1.get_parent();
+            CHECK(p2.get_full_name() == "/some");
+            CHECK(p2.get_filename() == "some");
+
+            auto p3 = p2.get_parent();
+            CHECK(p3.get_full_name() == "/");
+            CHECK(p3.get_filename() == "");
+
+            CHECK(p3.get_parent().empty());
+        }
+    }
+    SECTION("rel path") {
+        auto path = path_t("some/dir/file.bin");
+        auto view = path.get_view(allocaltor);
+        CHECK(path == view);
+        CHECK(view.get_filename() == "file.bin");
+        CHECK(view.get_parent_name() == "some/dir");
+        SECTION("parent") {
+            auto p1 = view.get_parent();
+            CHECK(p1.get_full_name() == "some/dir");
+            CHECK(p1.get_filename() == "dir");
+
+            auto p2 = p1.get_parent();
+            CHECK(p2.get_full_name() == "some");
+            CHECK(p2.get_filename() == "some");
+
+            auto p3 = p2.get_parent();
+            CHECK(p3.empty());
+            CHECK(p3.get_full_name() == "");
+            CHECK(p3.get_filename() == "");
+            CHECK(p3.get_parent().empty());
+        }
+    }
+}
 
 TEST_CASE("path_cache", "[model]") {
     auto cache = path_cache_ptr_t(new path_cache_t());

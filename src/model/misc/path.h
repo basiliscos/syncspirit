@@ -50,9 +50,7 @@ struct SYNCSPIRIT_API path_base_t {
 
     bool are_permissions_supported() const noexcept;
 
-    template <typename Allocator> auto get_view(Allocator a) const noexcept -> path_view_t<Allocator> {
-        return path_view_t<Allocator>(*this);
-    };
+    template <typename Allocator> auto get_view(const Allocator &a) const noexcept -> path_view_t<Allocator>;
 
     inline const void *get_data() const noexcept { return data; }
     std::uint32_t get_components() const noexcept { return components; }
