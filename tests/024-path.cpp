@@ -5,9 +5,13 @@
 #include "model/misc/path.h"
 #include "model/misc/path_view.hpp"
 #include "model/misc/path_cache.h"
+#include <memory_resource>
 
 using namespace syncspirit;
 using namespace syncspirit::model;
+
+using Catch::Matchers::EndsWith;
+using Catch::Matchers::StartsWith;
 
 TEST_CASE("path", "[model]") {
     using pieces_t = std::vector<std::string_view>;
@@ -78,11 +82,11 @@ TEST_CASE("path", "[model]") {
     }
 }
 
-TEST_CASE("path view", "[model]") {
-    auto allocaltor = std::allocator<char>();
+TEST_CASE("path view (1)", "[model]") {
+    auto allocator = std::allocator<char>();
     SECTION("abs path") {
         auto path = path_t("/some/dir/file.bin");
-        auto view = path.get_view(allocaltor);
+        auto view = path.get_view(allocator);
         CHECK(path == view);
         CHECK(view.get_filename() == "file.bin");
         CHECK(view.get_parent_name() == "/some/dir");
@@ -104,7 +108,7 @@ TEST_CASE("path view", "[model]") {
     }
     SECTION("dir path") {
         auto path = path_t("/some/dir/");
-        auto view = path.get_view(allocaltor);
+        auto view = path.get_view(allocator);
         CHECK(path == view);
         CHECK(view.get_filename() == "");
         CHECK(view.get_parent_name() == "/some/dir");
@@ -126,7 +130,7 @@ TEST_CASE("path view", "[model]") {
     }
     SECTION("rel path") {
         auto path = path_t("some/dir/file.bin");
-        auto view = path.get_view(allocaltor);
+        auto view = path.get_view(allocator);
         CHECK(path == view);
         CHECK(view.get_filename() == "file.bin");
         CHECK(view.get_parent_name() == "some/dir");
@@ -150,7 +154,7 @@ TEST_CASE("path view", "[model]") {
     SECTION("temporal") {
         auto path = path_t("/some/dir/file.bin");
         CHECK(!path.is_temporal());
-        auto view = path.get_view(allocaltor).make_temporal();
+        auto view = path.get_view(allocator).make_temporal();
         CHECK(view.get_full_name() == "/some/dir/file.bin.syncspirit-tmp");
         CHECK(view.is_temporal());
         CHECK(!view.get_parent().is_temporal());
@@ -167,6 +171,55 @@ TEST_CASE("path view", "[model]") {
         CHECK(!path_t("some/dir/file.bin").is_absolute());
         CHECK(!path_t("some\\dir\\file.bin").is_absolute());
 #endif
+    }
+}
+
+TEST_CASE("path view (2)", "[model]") {
+    auto buffer = std::array<std::byte, 1024 * 128>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+
+#ifndef SYNCSPIRIT_WIN
+    auto p_abs_1 = std::string_view("/a/b");
+    auto p_abs_2 = std::string_view("/c/d");
+#else
+    auto p_abs_1 = std::string_view("c:\\a\\b");
+    auto p_abs_2 = std::string_view("c:\\c\\d");
+#endif
+
+    SECTION("concat") {
+        SECTION("2 relatives") {
+            auto p1 = path_t("a/b").get_view(allocator);
+            auto p2 = path_t("c/d").get_view(allocator);
+            auto pr = p1 / p2;
+            CHECK(pr.get_full_name() == "a/b/c/d");
+            CHECK(!pr.is_absolute());
+        }
+        SECTION("2 absolutes") {
+            auto p1 = path_t(p_abs_1).get_view(allocator);
+            auto p2 = path_t(p_abs_2).get_view(allocator);
+            auto pr = p1 / p2;
+            CHECK(pr == p2);
+            CHECK(pr.get_full_name() == p2.get_full_name());
+            CHECK(pr.is_absolute());
+        }
+        SECTION("rel + abs") {
+            auto p1 = path_t("a/b").get_view(allocator);
+            auto p2 = path_t(p_abs_2).get_view(allocator);
+            auto pr = p1 / p2;
+            CHECK(pr == p2);
+            CHECK(pr.get_full_name() == p2.get_full_name());
+            CHECK(pr.is_absolute());
+        }
+        SECTION("abs + rel") {
+            auto p1 = path_t(p_abs_1).get_view(allocator);
+            auto p2 = path_t("c/d").get_view(allocator);
+            auto pr = p1 / p2;
+            CHECK(pr.is_absolute());
+            auto full = std::string(pr.get_full_name());
+            REQUIRE_THAT(full, StartsWith(std::string(p1.get_full_name())));
+            REQUIRE_THAT(full, EndsWith(std::string(p2.get_full_name())));
+        }
     }
 }
 

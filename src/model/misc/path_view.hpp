@@ -93,13 +93,59 @@ template <typename Allocator> struct path_view_t final : path_base_t {
         return {};
     }
 
+    const Allocator &get_allocator() const noexcept { return allocator; }
+
   private:
     mutable Allocator allocator;
 };
 
 template <typename Allocator>
 auto operator/(const path_view_t<Allocator> &parent, const path_view_t<Allocator> &child) noexcept
-    -> path_view_t<Allocator> {}
+    -> path_view_t<Allocator> {
+    using Traits = std::allocator_traits<Allocator>;
+    if (parent.empty()) {
+        return child;
+    }
+    if (child.empty()) {
+        return parent;
+    }
+    if (child.is_absolute()) {
+        return child;
+    }
+    auto allocator = parent.get_allocator();
+    auto ptr_1 = reinterpret_cast<const std::uint8_t *>(parent.get_data());
+    auto ptr_2 = reinterpret_cast<const std::uint8_t *>(child.get_data());
+    auto str_sz_1 = *reinterpret_cast<const std::uint32_t *>(ptr_1);
+    auto str_sz_2 = *reinterpret_cast<const std::uint32_t *>(ptr_2);
+
+    ptr_1 += sizeof(std::uint32_t);
+    ptr_2 += sizeof(std::uint32_t);
+
+    auto new_str_sz = str_sz_1 + str_sz_2 + 1; // "/" between
+
+    auto new_components = parent.get_components() + child.get_components();
+    auto new_sz = sizeof(std::uint32_t) + new_components + new_str_sz + 1;
+    auto new_ptr = Traits::allocate(allocator, new_sz);
+    auto new_u32_ptr = reinterpret_cast<std::uint32_t *>(new_ptr);
+    *new_u32_ptr++ = new_str_sz;
+
+    auto new_u8_ptr = reinterpret_cast<std::uint8_t *>(new_u32_ptr);
+    for (std::uint32_t i = 0; i < parent.get_components(); ++i) {
+        *new_u8_ptr++ = *ptr_1++;
+    }
+    for (std::uint32_t i = 0; i < child.get_components(); ++i) {
+        *new_u8_ptr++ = *ptr_2++;
+    }
+
+    std::memcpy(new_u8_ptr, ptr_1, str_sz_1);
+    new_u8_ptr += str_sz_1;
+    *new_u8_ptr++ = '/';
+
+    std::memcpy(new_u8_ptr, ptr_2, str_sz_2);
+    new_u8_ptr += str_sz_2;
+    *new_u8_ptr++ = 0;
+    return path_view_t(new_ptr, new_components, allocator);
+}
 
 template <typename Allocator> auto path_base_t::get_view(const Allocator &a) const noexcept -> path_view_t<Allocator> {
     return path_view_t<Allocator>(*this, a);

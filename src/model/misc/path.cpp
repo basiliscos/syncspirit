@@ -165,7 +165,7 @@ bool path_base_t::is_absolute() const noexcept {
         auto ptr = reinterpret_cast<const char *>(data) + sizeof(std::uint32_t) + components;
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
         if (sz >= 3) {
-            auto first_letter = (ptr[0] >= 'a' && ptr[0] <= 'z') ||  (ptr[0] >= 'A' && ptr[0] <= 'Z');
+            auto first_letter = (ptr[0] >= 'a' && ptr[0] <= 'z') || (ptr[0] >= 'A' && ptr[0] <= 'Z');
             if (first_letter && ptr[1] == ':' && ptr[2] == '/') {
                 return true;
             }
@@ -178,11 +178,9 @@ bool path_base_t::is_absolute() const noexcept {
         }
 
 #endif
-
     }
     return false;
 }
-
 
 std::string_view path_base_t::get_full_name() const noexcept {
     if (data) {
