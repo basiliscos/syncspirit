@@ -156,6 +156,18 @@ TEST_CASE("path view", "[model]") {
         CHECK(!view.get_parent().is_temporal());
         CHECK(view.get_parent().get_full_name() == "/some/dir");
     }
+
+    SECTION("absolutness") {
+#ifndef SYNCSPIRIT_WIN
+        CHECK(path_t("/some/dir/file.bin").is_absolute());
+        CHECK(!path_t("some/dir/file.bin").is_absolute());
+#else
+        CHECK(path_t("c:/some/dir/file.bin").is_absolute());
+        CHECK(path_t("c:\\some\\dir\\file.bin").is_absolute());
+        CHECK(!path_t("some/dir/file.bin").is_absolute());
+        CHECK(!path_t("some\\dir\\file.bin").is_absolute());
+#endif
+    }
 }
 
 TEST_CASE("path_cache", "[model]") {
