@@ -64,6 +64,7 @@ struct SYNCSPIRIT_API path_base_t {
 
 struct SYNCSPIRIT_API path_t : path_base_t, arc_base_t<path_t> {
     explicit path_t(std::string_view full_name) noexcept;
+    explicit path_t(const void *data, std::uint32_t components) noexcept;
     path_t() noexcept = default;
     path_t(path_t &&) noexcept;
     path_t(path_t &) noexcept = delete;

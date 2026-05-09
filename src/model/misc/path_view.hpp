@@ -95,6 +95,17 @@ template <typename Allocator> struct path_view_t final : path_base_t {
 
     const Allocator &get_allocator() const noexcept { return allocator; }
 
+    path_t detach() const noexcept {
+        if (data) {
+            auto str_sz = *reinterpret_cast<const std::uint32_t *>(data);
+            auto sz = sizeof(std::uint32_t) + components + str_sz + 1;
+            auto new_ptr = static_cast<uint8_t *>(::operator new(sz, path_alignment));
+            std::memcpy(new_ptr, data, sz);
+            return path_t(new_ptr, components);
+        }
+        return {};
+    }
+
   private:
     mutable Allocator allocator;
 };

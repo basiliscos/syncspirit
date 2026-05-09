@@ -194,6 +194,9 @@ TEST_CASE("path view (2)", "[model]") {
             auto pr = p1 / p2;
             CHECK(pr.get_full_name() == "a/b/c/d");
             CHECK(!pr.is_absolute());
+
+            auto pr_2 = pr.detach();
+            CHECK(pr == pr_2);
         }
         SECTION("2 absolutes") {
             auto p1 = path_t(p_abs_1).get_view(allocator);

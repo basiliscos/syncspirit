@@ -81,6 +81,11 @@ path_t::path_t(std::string_view full_name) noexcept {
     }
 }
 
+path_t::path_t(const void *data_, std::uint32_t components_) noexcept {
+    data = data_;
+    components = components_;
+}
+
 path_t::~path_t() {
     if (data) {
         ::operator delete(const_cast<void *>(data), path_alignment);
