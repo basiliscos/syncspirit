@@ -146,6 +146,16 @@ TEST_CASE("path view", "[model]") {
             CHECK(p3.get_parent().empty());
         }
     }
+
+    SECTION("temporal") {
+        auto path = path_t("/some/dir/file.bin");
+        CHECK(!path.is_temporal());
+        auto view = path.get_view(allocaltor).make_temporal();
+        CHECK(view.get_full_name() == "/some/dir/file.bin.syncspirit-tmp");
+        CHECK(view.is_temporal());
+        CHECK(!view.get_parent().is_temporal());
+        CHECK(view.get_parent().get_full_name() == "/some/dir");
+    }
 }
 
 TEST_CASE("path_cache", "[model]") {

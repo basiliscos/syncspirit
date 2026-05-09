@@ -1,6 +1,7 @@
 #pragma once
 
 #include "path.h"
+#include "fs/utils.h"
 #include <memory>
 #include <cstring>
 
@@ -61,6 +62,33 @@ template <typename Allocator> struct path_view_t final : path_base_t {
             std::memcpy(raw_u8_ptr, ptr + components, new_str_sz);
             raw_u8_ptr[new_str_sz] = 0;
             return path_view_t(new_ptr, components - 1, allocator);
+        }
+        return {};
+    }
+
+    path_view_t make_temporal() const noexcept {
+        if (data) {
+            auto u32_ptr = reinterpret_cast<const std::uint32_t *>(data);
+            auto str_sz = *u32_ptr++;
+            auto tmp_sz = fs::tmp_suffix.size();
+            auto new_str_sz = str_sz + tmp_sz;
+            auto ptr = reinterpret_cast<const std::uint8_t *>(u32_ptr);
+            auto new_sz = sizeof(std::uint32_t) + components + new_str_sz + 1;
+            auto new_ptr = Traits::allocate(allocator, new_sz);
+
+            auto new_raw_u32 = reinterpret_cast<std::uint32_t *>(new_ptr);
+            *new_raw_u32++ = new_str_sz;
+
+            auto new_raw_u8_ptr = reinterpret_cast<std::uint8_t *>(new_raw_u32);
+            for (size_t i = 0; i < components; ++i) {
+                *new_raw_u8_ptr++ = *ptr++;
+            }
+            std::memcpy(new_raw_u8_ptr, ptr, str_sz);
+            new_raw_u8_ptr += str_sz;
+            std::memcpy(new_raw_u8_ptr, fs::tmp_suffix.data(), tmp_sz);
+            new_raw_u8_ptr += tmp_sz;
+            *new_raw_u8_ptr = 0;
+            return path_view_t(new_ptr, components, allocator);
         }
         return {};
     }

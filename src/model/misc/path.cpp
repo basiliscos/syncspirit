@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Ivan Baidakou
 
 #include "path.h"
+#include "fs/utils.h"
 #include <boost/nowide/convert.hpp>
 #include <cstring>
 #include <cassert>
@@ -132,6 +133,26 @@ bool path_base_t::contains(const path_base_t &other) const noexcept {
                 return true;
             }
         } else {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool path_base_t::is_temporal() const noexcept {
+    if (data) {
+        auto it = iterator_t(this, components);
+        auto filename = *it;
+        auto tmp_sz = fs::tmp_suffix.size();
+        if (filename.size() >= tmp_sz) {
+            auto ptr_2 = fs::tmp_suffix.data();
+            auto end_2 = ptr_2 + tmp_sz;
+            auto ptr_1 = filename.data() + filename.size() - tmp_sz;
+            for (; ptr_2 != end_2; ptr_1++, ptr_2++) {
+                if (*ptr_2 != *ptr_1) {
+                    return false;
+                }
+            }
             return true;
         }
     }
