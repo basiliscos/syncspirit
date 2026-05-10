@@ -23,6 +23,10 @@ TEST_CASE("update_mediator", "[fs]") {
         mediator.mask(P("/tmp/path_1"), {}, deadline_1);
         CHECK(mediator.is_masked("/tmp/path_1"));
     }
+    SECTION("tmp files are ignored") {
+        mediator.mask(P("/tmp/path_1.syncspirit-tmp"), {}, deadline_1);
+        CHECK(!mediator.is_masked("/tmp/path_1.syncspirit-tmp"));
+    }
     SECTION("1 file, successful unmask") {
         mediator.enable(false);
         mediator.mask(P("/tmp/path_1"), {}, deadline_1);

@@ -415,7 +415,7 @@ void test_append_block() {
                 REQUIRE(bfs::exists(path));
                 REQUIRE(bfs::file_size(path) == 5);
                 CHECK(updates_mediator->is_masked(path_str) >= 2);
-                CHECK(updates_mediator->is_masked(tmp_str) == 2);
+                CHECK(updates_mediator->is_masked(tmp_str) == 0);
                 CHECK(data_1 == as_bytes(read_file(path)));
                 CHECK(to_unix(bfs::last_write_time(path)) == 1641828421);
                 if (!no_perms) {
@@ -436,7 +436,7 @@ void test_append_block() {
                 CHECK(data_1 == as_bytes(read_file(path)));
                 CHECK(to_unix(bfs::last_write_time(path)) == 1641828421);
                 CHECK(updates_mediator->is_masked(path_str) >= 2);
-                CHECK(updates_mediator->is_masked(tmp_path) >= 1);
+                CHECK(updates_mediator->is_masked(tmp_path) == 0);
 #ifdef SYNCSPIRIT_WATCHER_KQUEUE
                 CHECK(updates_mediator->is_masked(path.parent_path().string()) == 2);
 #endif
@@ -467,7 +467,7 @@ void test_append_block() {
                 CHECK(bfs::file_size(conflict_path) == 6);
                 CHECK(as_bytes(read_file(conflict_path)) == as_owned_bytes("abcdef"));
                 CHECK(updates_mediator->is_masked(path_str) >= 2);
-                CHECK(updates_mediator->is_masked(tmp_path) >= 1);
+                CHECK(updates_mediator->is_masked(tmp_path) == 0);
 #ifdef SYNCSPIRIT_WATCHER_KQUEUE
                 CHECK(updates_mediator->is_masked(path.parent_path().string()) == 3);
 #endif
@@ -490,7 +490,7 @@ void test_append_block() {
                 CHECK(read_file(tmp_path).substr(0, 5) == "12345");
 #endif
                 append_block(path, as_owned_bytes("67890"), 5, 10).check_success();
-                CHECK(updates_mediator->is_masked(tmp_path_str) >= 5);
+                CHECK(updates_mediator->is_masked(tmp_path_str) == 0);
 
                 SECTION("add 2nd block") {
                     finish_file(path, 5, 1641828421, perms, no_perms).check_success();
@@ -550,7 +550,7 @@ void test_clone_block() {
                     REQUIRE(bfs::file_size(target_path) == 5);
                     CHECK(read_file(target_path) == "12345");
                     CHECK(to_unix(bfs::last_write_time(target_path)) == modified);
-                    CHECK(updates_mediator->is_masked(tmp_path_str) >= 4);
+                    CHECK(updates_mediator->is_masked(tmp_path_str) == 0);
 #ifdef SYNCSPIRIT_WATCHER_KQUEUE
                     CHECK(updates_mediator->is_masked(target_path.parent_path().string()) == 4);
 #endif
@@ -575,7 +575,7 @@ void test_clone_block() {
                     REQUIRE(bfs::file_size(target_path) == 10);
                     CHECK(read_file(target_path) == "1234567890");
                     CHECK(to_unix(bfs::last_write_time(target_path)) == modified);
-                    CHECK(updates_mediator->is_masked(tmp_path_str) >= 6);
+                    CHECK(updates_mediator->is_masked(tmp_path_str) == 0);
 #ifdef SYNCSPIRIT_WATCHER_KQUEUE
                     CHECK(updates_mediator->is_masked(target_path.parent_path().string()) == 4);
 #endif
@@ -598,7 +598,7 @@ void test_clone_block() {
                     REQUIRE(bfs::file_size(target_path) == 10);
                     CHECK(read_file(target_path) == "1234567890");
                     CHECK(to_unix(bfs::last_write_time(target_path)) == modified);
-                    CHECK(updates_mediator->is_masked(tmp_path_str) >= 4);
+                    CHECK(updates_mediator->is_masked(tmp_path_str) == 0);
                 }
             }
             SECTION("source & target are is the same file") {
@@ -616,7 +616,7 @@ void test_clone_block() {
                 CHECK(read_file(target_path) == "1234512345");
                 CHECK(to_unix(bfs::last_write_time(target_path)) == modified);
                 auto tmp_path_str = narrow(make_temporal(target_path).generic_wstring());
-                CHECK(updates_mediator->is_masked(tmp_path_str) >= 1);
+                CHECK(updates_mediator->is_masked(tmp_path_str) == 0);
             }
         }
     };

@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 Ivan Baidakou
 
 #include "updates_mediator.h"
+#include "fs/utils.h"
 
 #include <algorithm>
 #include <memory_resource>
@@ -40,6 +41,10 @@ void updates_mediator_t::mask(const bfs::path &path, const bfs::path &prev_path,
         return;
     }
 
+    if (is_temporal(path)) {
+        return;
+    }
+
     auto target = (updates_t *){};
     auto counter = update_type_internal_t{1};
     auto path_str = Stringizer<char_t>::get(path);
@@ -69,7 +74,7 @@ void updates_mediator_t::mask(const bfs::path &path, const bfs::path &prev_path,
     };
 
     insert(std::move(path_str));
-    if (!prev_path.empty()) {
+    if (!prev_path.empty() && !is_temporal(prev_path)) {
         insert(std::move(Stringizer<char_t>::get(prev_path)));
     }
 }

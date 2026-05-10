@@ -691,6 +691,51 @@ void test_watch_unwatch() {
     F().run();
 }
 
+void test_tmp_ingnoring() {
+    struct F : fixture_real_t {
+        using fixture_real_t::fixture_real_t;
+
+        void main() noexcept override {
+            auto folder_id = std::string("my-folder-id");
+            auto back_addr = sup->get_address();
+
+            bfs::create_directories(root_path / "prev-dir.syncspirit-tmp");
+            write_file(root_path / "01.syncspirit-tmp", "12345");
+            watch_folder(folder_id);
+
+            SECTION("ignoring") {
+                SECTION("create a dir") {
+                    auto path = root_path / "my.syncspirit-tmp";
+                    bfs::create_directories(path);
+                }
+                SECTION("rm file") { bfs::remove(root_path / "01.syncspirit-tmp"); }
+                SECTION("rm dir") { bfs::remove_all(root_path / "prev-dir.syncspirit-tmp"); }
+                SECTION("write file") { write_file(root_path / "my.syncspirit-tmp", "12345"); }
+                SECTION("rename file tmp -> tmp") {
+                    bfs::rename(root_path / "01.syncspirit-tmp", root_path / "02.syncspirit-tmp");
+                }
+#ifndef SYNCSPIRIT_WIN
+                SECTION("create symlink") {
+                    bfs::create_symlink(bfs::path("xxx"), root_path / "my-link.syncspirit-tmp");
+                }
+#endif
+                for (int i = 0; i < 2; ++i) {
+                    fs_context->wait_next_event();
+                    fs_context->update_time();
+                }
+                sup->do_process();
+                CHECK(changes.size() == 0);
+            }
+
+            SECTION("not ignoring") {
+                bfs::rename(root_path / "01.syncspirit-tmp", root_path / "02.file");
+                await_events(poll_t::trigger_timer, 1);
+            }
+        }
+    };
+    F().run();
+};
+
 void test_real_impl() {
     struct F : fixture_real_t {
         using fixture_real_t::fixture_real_t;
@@ -1656,6 +1701,9 @@ int _init() {
     REGISTER_TEST_CASE(test_watcher_base, "test_watcher_base", "[fs]");
     REGISTER_TEST_CASE(test_start_n_shutdown, "test_start_n_shutdown", "[fs]");
     REGISTER_TEST_CASE(test_watch_unwatch, "test_watch_unwatch", "[fs]");
+#ifdef SYNCSPIRIT_WATCHER_ANY
+    REGISTER_TEST_CASE(test_tmp_ingnoring, "test_tmp_ingnoring", "[fs]");
+#endif
 #ifndef SYNCSPIRIT_WATCHER_KQUEUE
     REGISTER_TEST_CASE(test_real_impl, "test_real_impl", "[fs]");
     REGISTER_TEST_CASE(test_hierarchies, "test_hierarchies", "[fs]");

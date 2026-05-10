@@ -5,6 +5,7 @@
 
 #if SYNCSPIRIT_WATCHER_INOTIFY
 #include "fs/fs_supervisor.h"
+#include "fs/utils.h"
 #include "utils/utf8.h"
 
 #include <sys/inotify.h>
@@ -135,55 +136,63 @@ void watcher_t::inotify_callback() noexcept {
             *name_ptr-- = 0;
 
             struct inotify_event *event = (struct inotify_event *)&buffer[i];
-            auto event_name = std::string_view(event->name, event->len);
+            auto name_begin = event->name;
+            auto name_end = name_begin;
+            if (event->len) {
+                while (*name_end)
+                    ++name_end;
+            }
+            auto event_name = std::string_view(name_begin, name_end);
             LOG_TRACE(log, "event 0x{:x}, cookie: 0x{:x}, on '{}'", event->mask, event->cookie, event_name);
             if (event->len) {
-                auto type = update_type_internal_t{0};
-                if (event->mask & IN_CREATE) {
-                    type = update_type::CREATED;
-                } else if (event->mask & IN_DELETE) {
-                    type = update_type::DELETED;
-                } else if (event->mask & IN_MOVED_FROM) {
-                    renamed_cookies.emplace(event->cookie, event);
-                } else if (event->mask & IN_MOVED_TO) {
-                    auto it = renamed_cookies.find(event->cookie);
-                    if (it == renamed_cookies.end()) {
+                if (!fs::is_temporal(event_name)) {
+                    auto type = update_type_internal_t{0};
+                    if (event->mask & IN_CREATE) {
                         type = update_type::CREATED;
-                    } else {
-                        auto prev_event = it->second;
-                        auto pn = std::string_view(prev_event->name);
-                        auto &prev_parent_guard = path_map[prev_event->wd];
-                        auto prev_parent_path = std::string_view(prev_parent_guard.path);
-                        auto folder_id = prev_parent_guard.folder_id;
-                        auto &folder_path = watched_folders->find(folder_id)->second.path_str;
-                        auto subpath_bytes = prev_parent_path.size() - folder_path.size();
-                        if (subpath_bytes) {
-                            --subpath_bytes; // skip trailing '/'
+                    } else if (event->mask & IN_DELETE) {
+                        type = update_type::DELETED;
+                    } else if (event->mask & IN_MOVED_FROM) {
+                        renamed_cookies.emplace(event->cookie, event);
+                    } else if (event->mask & IN_MOVED_TO) {
+                        auto it = renamed_cookies.find(event->cookie);
+                        if (it == renamed_cookies.end()) {
+                            type = update_type::CREATED;
+                        } else {
+                            auto prev_event = it->second;
+                            auto pn = std::string_view(prev_event->name);
+                            auto &prev_parent_guard = path_map[prev_event->wd];
+                            auto prev_parent_path = std::string_view(prev_parent_guard.path);
+                            auto folder_id = prev_parent_guard.folder_id;
+                            auto &folder_path = watched_folders->find(folder_id)->second.path_str;
+                            auto subpath_bytes = prev_parent_path.size() - folder_path.size();
+                            if (subpath_bytes) {
+                                --subpath_bytes; // skip trailing '/'
+                            }
+                            auto sub_path_sz = subpath_bytes + pn.size();
+                            if (subpath_bytes) {
+                                ++sub_path_sz;
+                            };
+                            prev_name.reserve(sub_path_sz + 1);
+                            prev_name += prev_parent_path.substr(prev_parent_path.size() - subpath_bytes);
+                            if (subpath_bytes) {
+                                prev_name += '/';
+                            };
+                            prev_name += pn;
+
+                            type = update_type::META;
+                            renamed_cookies.erase(it);
                         }
-                        auto sub_path_sz = subpath_bytes + pn.size();
-                        if (subpath_bytes) {
-                            ++sub_path_sz;
-                        };
-                        prev_name.reserve(sub_path_sz + 1);
-                        prev_name += prev_parent_path.substr(prev_parent_path.size() - subpath_bytes);
-                        if (subpath_bytes) {
-                            prev_name += '/';
-                        };
-                        prev_name += pn;
-
+                    } else if (event->mask & IN_MODIFY) {
+                        type = update_type::CONTENT;
+                    } else if (event->mask & IN_ATTRIB) {
                         type = update_type::META;
-                        renamed_cookies.erase(it);
                     }
-                } else if (event->mask & IN_MODIFY) {
-                    type = update_type::CONTENT;
-                } else if (event->mask & IN_ATTRIB) {
-                    type = update_type::META;
-                }
 
-                if (type) {
-                    forward_update(event, std::move(prev_name), type);
-                } else {
-                    LOG_DEBUG(log, "ignoring event 0x{:x} on '{}'", event->mask, event->name);
+                    if (type) {
+                        forward_update(event, std::move(prev_name), type);
+                    } else {
+                        LOG_DEBUG(log, "ignoring event 0x{:x} on '{}'", event->mask, event->name);
+                    }
                 }
             }
             if (event->mask & IN_DELETE_SELF) {
