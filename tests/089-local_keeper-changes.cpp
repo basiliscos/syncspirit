@@ -559,6 +559,13 @@ void test_trivial_changes() {
                 mk_update(file, fs::update_type_t::created, false);
                 CHECK(files_local->size() == 0);
             }
+            SECTION("ignore event with tmp-filename") {
+                proto::set_name(file, "my.syncspirit-tmp");
+                proto::set_type(file, FT::FILE);
+                proto::set_size(file, 5);
+                mk_update(file, fs::update_type_t::created, false);
+                CHECK(files_local->size() == 0);
+            }
         }
     };
     F().run();

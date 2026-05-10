@@ -581,7 +581,11 @@ void local_keeper_t::on_changes(model::folder_info_t &local_folder, fs::payload:
         auto name = proto::get_name(change);
         if (!utils::is_utf8_valid(name)) {
             auto name_hex = spdlog::to_hex(name.begin(), name.end());
-            LOG_WARN(log, "invalid filename : {} in folder '{}' ", name_hex, folder_id);
+            LOG_WARN(log, "invalid filename: '{}' in folder '{}' ", name_hex, folder_id);
+            return false;
+        }
+        if (fs::is_temporal(name)) {
+            LOG_WARN(log, "temporal file '{}' ignored in folder '{}' ", name, folder_id);
             return false;
         }
         auto link = proto::get_symlink_target(change);
