@@ -691,7 +691,7 @@ void test_watch_unwatch() {
     F().run();
 }
 
-void test_tmp_ingnoring() {
+void test_tmp_ignoring() {
     struct F : fixture_real_t {
         using fixture_real_t::fixture_real_t;
 
@@ -723,8 +723,24 @@ void test_tmp_ingnoring() {
                     fs_context->wait_next_event();
                     fs_context->update_time();
                 }
+#ifdef SYNCSPIRIT_WATCHER_KQUEUE
+                sup->do_process();
+                CHECK(changes.size() == 1);
+                {
+                    auto &payload = changes.front()->payload;
+                    REQUIRE(payload.size() == 1);
+                    auto &folder_change = payload[0];
+                    REQUIRE(folder_change.folder_id == folder_id);
+                    REQUIRE(folder_change.file_changes.size() == 1);
+                    auto &file_change = folder_change.file_changes.front();
+                    CHECK(proto::get_name(file_change) == "");
+                    CHECK(proto::get_type(file_change) == proto::FileInfoType::DIRECTORY);
+                    CHECK(file_change.requires_refinement);
+                }
+#else
                 sup->do_process();
                 CHECK(changes.size() == 0);
+#endif
             }
 
             SECTION("not ignoring") {
@@ -1702,7 +1718,7 @@ int _init() {
     REGISTER_TEST_CASE(test_start_n_shutdown, "test_start_n_shutdown", "[fs]");
     REGISTER_TEST_CASE(test_watch_unwatch, "test_watch_unwatch", "[fs]");
 #ifdef SYNCSPIRIT_WATCHER_ANY
-    REGISTER_TEST_CASE(test_tmp_ingnoring, "test_tmp_ingnoring", "[fs]");
+    REGISTER_TEST_CASE(test_tmp_ignoring, "test_tmp_ignoring", "[fs]");
 #endif
 #ifndef SYNCSPIRIT_WATCHER_KQUEUE
     REGISTER_TEST_CASE(test_real_impl, "test_real_impl", "[fs]");

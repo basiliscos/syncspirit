@@ -172,37 +172,39 @@ void watcher_t::kqueue_callback(int wd, std::uint32_t flags, const pt::ptime &no
     auto rel_path = full_path.size() > folder_path.size() ? full_path.substr(folder_path.size() + 1) : "";
     LOG_TRACE(log, "kqueue_callback ({}), fd: {} ({:#x}), {}", folder_id, wd, flags, rel_path);
 
-    auto type = update_type_internal_t{0};
+    if (!fs::is_temporal(rel_path)) {
+        auto type = update_type_internal_t{0};
 
-    if (flags & NOTE_RENAME) {
-        auto ec = unwatch_recurse(full_path);
-        if (ec) {
-            LOG_WARN(log, "cannot unwatch(1) '{}': {}", guard.path, ec.message());
+        if (flags & NOTE_RENAME) {
+            auto ec = unwatch_recurse(full_path);
+            if (ec) {
+                LOG_WARN(log, "cannot unwatch(1) '{}': {}", guard.path, ec.message());
+            }
+            return;
+        } else if (flags & NOTE_DELETE) {
+            auto ec = unwatch_wd(wd);
+            if (ec) {
+                LOG_WARN(log, "cannot unwatch(2) '{}': {}", guard.path, ec.message());
+            }
+            return;
+        } else if (flags & (NOTE_WRITE | NOTE_EXTEND)) {
+            type = update_type::CONTENT;
+        } else if (flags & NOTE_ATTRIB) {
+            type = update_type::META;
         }
-        return;
-    } else if (flags & NOTE_DELETE) {
-        auto ec = unwatch_wd(wd);
-        if (ec) {
-            LOG_WARN(log, "cannot unwatch(2) '{}': {}", guard.path, ec.message());
+
+        if (!type && is_regular) {
+            type = update_type::CONTENT;
         }
-        return;
-    } else if (flags & (NOTE_WRITE | NOTE_EXTEND)) {
-        type = update_type::CONTENT;
-    } else if (flags & NOTE_ATTRIB) {
-        type = update_type::META;
-    }
+        if (!type) {
+            LOG_TRACE(log, "unexpected kqueue_callback ({}), fd: {} ({:#x}), {}", folder_id, wd, flags, rel_path);
+            return;
+        }
 
-    if (!type && is_regular) {
-        type = update_type::CONTENT;
+        auto deadline = now + retension;
+        auto requires_refinement = !is_regular && type == update_type::CONTENT;
+        push(deadline, folder_id, rel_path, {}, static_cast<update_type_t>(type), requires_refinement);
     }
-    if (!type) {
-        LOG_TRACE(log, "unexpected kqueue_callback ({}), fd: {} ({:#x}), {}", folder_id, wd, flags, rel_path);
-        return;
-    }
-
-    auto deadline = now + retension;
-    auto requires_refinement = !is_regular && type == update_type::CONTENT;
-    push(deadline, folder_id, rel_path, {}, static_cast<update_type_t>(type), requires_refinement);
 }
 
 #endif
