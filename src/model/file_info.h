@@ -62,7 +62,7 @@ struct SYNCSPIRIT_API file_info_t {
         utils::bytes_view_t file_id;
     };
 
-    struct guard_t {
+    struct SYNCSPIRIT_API guard_t {
         using path_guard_ptr_t = std::unique_ptr<path_guard_t>;
         guard_t() noexcept = default;
         guard_t(file_info_t &file, const folder_info_t *folder_info) noexcept;

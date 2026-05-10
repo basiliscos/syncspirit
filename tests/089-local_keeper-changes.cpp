@@ -103,9 +103,14 @@ struct fixture_t {
         auto my_id = device_id_t::from_string(my_hash).value();
         local_device = device_t::create(my_id, "my-device").value();
 
+        auto peer_hash = "VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ";
+        auto peer_id = device_id_t::from_string(peer_hash).value();
+        peer_device = device_t::create(peer_id, "peer_device").value();
+
         cluster = new cluster_t(local_device, 1);
 
         cluster->get_devices().put(local_device);
+        cluster->get_devices().put(peer_device);
 
         r::system_context_t ctx;
         sup = ctx.create_supervisor<my_supervisort_t>()
@@ -179,6 +184,7 @@ struct fixture_t {
     r::intrusive_ptr_t<my_supervisort_t> sup;
     cluster_ptr_t cluster;
     device_ptr_t local_device;
+    device_ptr_t peer_device;
     utils::logger_t log;
     target_ptr_t target;
     model::sequencer_ptr_t sequencer;
@@ -575,6 +581,13 @@ void test_ignoring_tmps() {
     struct F : folder_fixture_t {
         using parent_t = folder_fixture_t;
         using parent_t::parent_t;
+
+        bool process_cmd(fs::task::remove_file_t &task) noexcept override {
+            ++file_removal_attempts;
+            return parent_t::process_cmd(task);
+            return false;
+        }
+
         void main() noexcept override {
             using namespace std::chrono;
             using UT = fs::update_type_t;
@@ -591,8 +604,8 @@ void test_ignoring_tmps() {
                 auto file = proto::FileInfo();
                 proto::set_name(file, file_name);
                 proto::set_permissions(file, default_perms);
-                proto::set_modified_s(file, seconds);
                 proto::set_type(file, FT::FILE);
+                proto::set_modified_s(file, seconds);
 
                 auto update_type = GENERATE(UT::created, UT::content, UT::deleted, UT::meta);
                 mk_update(file, update_type, false);
@@ -611,15 +624,88 @@ void test_ignoring_tmps() {
                 expect_dir_scan({});
                 mk_update(file, UT::content, true);
 
+                auto f = files_local->begin()->get();
+                auto sequence = f->get_sequence();
+
                 auto path = fmt::format("/some/path/dir/some-file-name.bin{}", fs::tmp_suffix);
                 CHECK(files_local->size() == 1);
 
                 auto dir_children = child_infos_t{make_child(path, bfs::file_type::regular, 5, default_perms, seconds)};
                 expect_dir_scan(dir_children);
-                CHECK(files_local->size() == 1);
                 mk_update(file, UT::content, true);
+                CHECK(files_local->size() == 1);
+                CHECK(f->get_sequence() == sequence);
+                CHECK(file_removal_attempts == 0);
+            }
+
+            SECTION("ignore locked file") {
+                auto impl = GENERATE(I::kqueue);
+                prepare(impl);
+
+                auto file = proto::FileInfo();
+                proto::set_name(file, "dir");
+                proto::set_permissions(file, default_perms);
+                proto::set_type(file, FT::DIRECTORY);
+
+                auto path = fmt::format("/some/path/dir/some-file-name.bin");
+                {
+                    auto dir_children = child_infos_t{make_child(path, bfs::file_type::regular, 0, default_perms)};
+                    expect_dir_scan(dir_children);
+                }
+
+                mk_update(file, UT::content, true);
+
+                proto::set_name(file, "dir/some-file-name.bin");
+                proto::set_type(file, FT::FILE);
+                builder->local_update(folder_id, file);
+
+                REQUIRE(files_local->size() == 2);
+
+                auto sha256 = peer_device->device_id().get_sha256();
+                builder->share_folder(peer_device->device_id().get_sha256(), folder_id).apply(*sup);
+                auto folder_peer = folder_local->get_folder()->get_folder_infos().by_device(*peer_device);
+                REQUIRE(folder_peer);
+                auto f = files_local->by_name("dir/some-file-name.bin");
+
+                auto version = f->get_version().as_proto();
+                auto counter = proto::Counter();
+                proto::set_id(counter, peer_device->device_id().get_uint());
+                proto::set_value(counter, 100);
+                proto::add_counters(version, counter);
+                proto::set_version(file, version);
+                proto::set_sequence(file, 10);
+                proto::set_size(file, 10);
+                auto &block = proto::add_blocks(file);
+                proto::set_hash(block, as_bytes("abc"));
+                proto::set_size(block, 10);
+
+                builder->configure_cluster(sha256)
+                    .add(sha256, folder_id, folder_peer->get_index(), 10)
+                    .finish()
+                    .apply(*sup);
+                builder->make_index(sha256, folder_id).add(file, peer_device, false).finish().apply(*sup);
+
+                auto peer_file = folder_peer->get_file_infos().begin()->get();
+                REQUIRE(peer_file);
+                auto file_guard = peer_file->guard(*folder_peer);
+
+                auto path_tmp = fmt::format("/some/path/dir/some-file-name.bin{}", fs::tmp_suffix);
+                auto dir_children = child_infos_t{make_child(path_tmp, bfs::file_type::regular, 10, default_perms),
+                                                  make_child(path, bfs::file_type::regular, 0, default_perms)};
+                expect_dir_scan(dir_children);
+
+                auto sequence = f->get_sequence();
+
+                proto::set_name(file, "dir");
+                proto::set_type(file, FT::DIRECTORY);
+                proto::set_size(file, 0);
+                mk_update(file, UT::content, true);
+                CHECK(files_local->size() == 2);
+                CHECK(f->get_sequence() == sequence);
+                CHECK(file_removal_attempts == 0);
             }
         }
+        int file_removal_attempts = 0;
     };
     F().run();
 }
