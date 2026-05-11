@@ -195,6 +195,9 @@ diff_builder_t &diff_builder_t::upsert_folder(std::string_view id, const bfs::pa
     db::set_path(db_folder, boost::nowide::narrow(path.generic_wstring()));
     db::set_folder_type(db_folder, db::FolderType::send_and_receive);
     db::set_watched(db_folder, watched);
+    if (watched) {
+        db::set_rescan_interval(db_folder, 3600);
+    }
     auto opt = diff::modify::upsert_folder_t::create(*cluster, *sequencer, std::move(db_folder), index_id);
     return assign(opt.value().get());
 }

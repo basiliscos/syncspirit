@@ -15,6 +15,7 @@
 #include "fs/watcher_actor.h"
 #include "fs/fs_context.h"
 #include "net/local_keeper.h"
+#include "net/scheduler.h"
 #include "net/names.h"
 #include "hasher/hasher_actor.h"
 #include "model/cluster.h"
@@ -218,6 +219,8 @@ struct fixture_t {
         create_watcher_actor();
         create_file_actor();
         create_local_keeper();
+        sup->create_actor<net::scheduler_t>().timeout(timeout).finish();
+
         sup->do_process();
 
         sup->send<syncspirit::model::payload::thread_ready_t>(sup->get_address(), cluster, std::this_thread::get_id());

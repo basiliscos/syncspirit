@@ -8,6 +8,7 @@
 
 #include "access.h"
 #include "test-watcher.h"
+#include "fs/fs_slave.h"
 #include "fs/fs_context.h"
 #include "fs/fs_supervisor.h"
 #include "fs/watcher_actor.h"
@@ -612,6 +613,29 @@ struct fixture_real_t : fixture_t {
         sup->do_process();
     }
 
+    virtual bool notify_upon_watch() { return true; }
+
+    void recurse_scan(const bfs::path &path) {
+#ifdef SYNCSPIRIT_WATCHER_UNIX
+        auto queue = std::list<bfs::path>{path};
+        auto dummy_slave = fs_slave_t();
+        auto ctx = execution_context_t();
+        auto watcher = static_cast<fs::platform::unix::watcher_t *>(target.get());
+        while (!queue.empty()) {
+            auto &p = queue.front();
+            auto task = fs::task::scan_dir_t(p, {}, {}, true, false, false);
+            task.process(dummy_slave, ctx);
+            watcher->notify(task);
+            for (auto &child : task.child_infos) {
+                if (child.status.type() == bfs::file_type::directory) {
+                    queue.push_back(child.path);
+                }
+            }
+            queue.pop_front();
+        }
+#endif
+    }
+
     void watch_folder(std::string_view folder_id, const bfs::path &folder_path = {}) noexcept {
         auto watched_path = folder_path.empty() ? root_path : folder_path;
         auto back_addr = sup->get_address();
@@ -620,6 +644,10 @@ struct fixture_real_t : fixture_t {
         REQUIRE(watched_replies == 1);
         LOG_TRACE(log, "folder is being watched on '{}', updating time...", narrow(watched_path.wstring()));
         fs_context->update_time();
+
+        if (notify_upon_watch()) {
+            recurse_scan(watched_path);
+        }
     }
 };
 
@@ -811,6 +839,9 @@ void test_real_impl() {
                     changes.clear();
                 }
 
+#ifndef SYNCSPIRIT_WIN
+                recurse_scan(root_path);
+#endif
                 auto path_file = path_dir / L"файл.bin";
                 write_file(path_file, "12345");
                 await_events(poll_t::trigger_timer, 1);
@@ -946,7 +977,6 @@ void test_real_impl() {
                         bfs::create_directories(path_1);
 
                         watch_folder(folder_id);
-
                         native::rename(path_1, path_2);
 
 #ifndef SYNCSPIRIT_WIN
@@ -1229,6 +1259,8 @@ void test_hierarchies() {
                     auto name_2 = proto::get_name(changes[1]->payload[0].file_changes.front());
                     CHECK(name_1 == narrow(L"a"));
                     CHECK(name_2 == narrow(L"x"));
+
+                    recurse_scan(root_path);
 #else
                     await_events(poll_t::trigger_timer, 5, true);
                     for (auto i = size_t{0}; i < names.size(); ++i) {
@@ -1337,10 +1369,17 @@ void test_create_modify_rename() {
     F().run();
 }
 
-#ifdef SYNCSPIRIT_WATCHER_INOTIFY
-void test_inotify_notification() {
+#if defined(SYNCSPIRIT_WATCHER_UNIX)
+void test_unix_notification() {
     struct F : fixture_real_t {
+#ifdef SYNCSPIRIT_WATCHER_INOTIFY
+#define IMPL_DIFF (-1)
+#else
+#define IMPL_DIFF 0
+#endif
         using fixture_real_t::fixture_real_t;
+
+        bool notify_upon_watch() override { return false; }
 
         void main() noexcept override {
             using child_info_t = fs::task::scan_dir_t::child_info_t;
@@ -1356,7 +1395,6 @@ void test_inotify_notification() {
                 child.status = bfs::file_status(type);
                 return child;
             };
-
             auto w = static_cast<fs::platform::unix::watcher_t *>(target.get());
             CHECK(w->path_map.size() == 1);
             CHECK(w->subdir_map.size() == 0);
@@ -1378,25 +1416,45 @@ void test_inotify_notification() {
                 CHECK(w->path_map.size() == 1);
                 CHECK(w->path_to_wd.size() == 1);
             }
+            SECTION("non-watched dir of watched parent") {
+                auto task = fs::task::scan_dir_t(root_path, {}, {}, true, true, false);
+                auto child_path = root_path / "a";
+                bfs::create_directories(child_path);
+                task.child_infos = {make_child(child_path)};
+                w->notify(task);
+                CHECK(w->path_map.size() == 2);
+                CHECK(w->path_to_wd.size() == 2);
+            }
+            SECTION("non-watched dir of non-watched parent") {
+                auto task = fs::task::scan_dir_t(root_path / "xx", {}, {}, true, true, false);
+                auto dir_path = root_path / "xx";
+                bfs::create_directories(dir_path);
+                task.child_infos = {make_child(root_path / "xx/yy")};
+                w->notify(task);
+                CHECK(w->path_map.size() == 2);
+                CHECK(w->path_to_wd.size() == 2);
+            }
             SECTION("watched dir") {
                 auto path_a = root_path / "a";
                 auto path_b = root_path / "b";
                 auto path_c = root_path / "c";
+                auto path_d = root_path / "d";
                 bfs::create_directories(path_a);
                 bfs::create_directories(path_c);
                 write_file(path_b, "");
+                bfs::create_symlink(bfs::path("/some/where"), path_d);
                 auto children = child_infos_t(
                     {make_child(path_a), make_child(path_b, bfs::file_type::regular), make_child(path_c)});
                 auto task = fs::task::scan_dir_t(root_path, {}, {}, true, true, false);
                 task.child_infos = children;
                 w->notify(task);
-                CHECK(w->path_map.size() == 3);
-                CHECK(w->path_to_wd.size() == 3);
+                CHECK(w->path_map.size() == 4 + IMPL_DIFF);
+                CHECK(w->path_to_wd.size() == 4 + IMPL_DIFF);
 
                 // no-harm in double watch
                 w->notify(task);
-                CHECK(w->path_map.size() == 3);
-                CHECK(w->path_to_wd.size() == 3);
+                CHECK(w->path_map.size() == 4 + IMPL_DIFF);
+                CHECK(w->path_to_wd.size() == 4 + IMPL_DIFF);
             }
             SECTION("watched sub-dir") {
                 auto sub_dir = root_path / L"папка";
@@ -1413,13 +1471,23 @@ void test_inotify_notification() {
                 auto task = fs::task::scan_dir_t(sub_dir, {}, {}, true, true, false);
                 task.child_infos = children;
                 w->notify(task);
-                CHECK(w->path_map.size() == 4);
-                CHECK(w->path_to_wd.size() == 4);
+                CHECK(w->path_map.size() == 5 + IMPL_DIFF);
+                CHECK(w->path_to_wd.size() == 5 + IMPL_DIFF);
 
                 // no-harm in double watch
                 w->notify(task);
-                CHECK(w->path_map.size() == 4);
-                CHECK(w->path_to_wd.size() == 4);
+                CHECK(w->path_map.size() == 5 + IMPL_DIFF);
+                CHECK(w->path_to_wd.size() == 5 + IMPL_DIFF);
+            }
+            SECTION("tmp-file in a dir") {
+                auto path_tmp = root_path / "my-file.syncspirit-tmp";
+                write_file(path_tmp / "my-file.syncspirit-tmp", "12345");
+                auto children = child_infos_t({make_child(path_tmp, bfs::file_type::regular)});
+                auto task = fs::task::scan_dir_t(root_path, {}, {}, true, true, false);
+                task.child_infos = children;
+                w->notify(task);
+                CHECK(w->path_map.size() == 1);
+                CHECK(w->path_to_wd.size() == 1);
             }
             SECTION("error in watching") {
                 auto path_x = root_path / "a";
@@ -1585,131 +1653,6 @@ void test_kqueue() {
     F().run();
 }
 
-void test_kqueue_notification() {
-    struct F : fixture_real_t {
-        using fixture_real_t::fixture_real_t;
-
-        void main() noexcept override {
-            using child_info_t = fs::task::scan_dir_t::child_info_t;
-            using child_infos_t = fs::task::scan_dir_t::child_infos_t;
-
-            auto folder_id = std::string("my-folder-id");
-            auto back_addr = sup->get_address();
-            watch_folder(folder_id);
-
-            auto make_child = [](bfs::path path, bfs::file_type type = bfs::file_type::directory) -> child_info_t {
-                auto child = child_info_t{};
-                child.path = path;
-                child.status = bfs::file_status(type);
-                return child;
-            };
-            auto w = static_cast<fs::platform::unix::watcher_t *>(target.get());
-            CHECK(w->path_map.size() == 1);
-            CHECK(w->subdir_map.size() == 0);
-            SECTION("non-watched dir") {
-                auto task = fs::task::scan_dir_t(bfs::path("/some/path"), {}, {}, true, true, false);
-                task.child_infos = {make_child(bfs::path("/some/path/a"))};
-                w->notify(task);
-                CHECK(w->path_map.size() == 1);
-                CHECK(w->path_to_wd.size() == 1);
-            }
-            SECTION("dir with invalid name") {
-                auto invalid = std::uint8_t{201};
-                auto ptr = reinterpret_cast<char *>(&invalid);
-                auto invalid_name = std::string_view(ptr, ptr + 1);
-
-                auto task = fs::task::scan_dir_t(root_path, {}, {}, true, true, false);
-                task.child_infos = {make_child(bfs::path(invalid_name))};
-                w->notify(task);
-                CHECK(w->path_map.size() == 1);
-                CHECK(w->path_to_wd.size() == 1);
-            }
-            SECTION("non-watched dir of watched parent") {
-                auto task = fs::task::scan_dir_t(root_path, {}, {}, true, true, false);
-                auto child_path = root_path / "a";
-                bfs::create_directories(child_path);
-                task.child_infos = {make_child(child_path)};
-                w->notify(task);
-                CHECK(w->path_map.size() == 2);
-                CHECK(w->path_to_wd.size() == 2);
-            }
-            SECTION("non-watched dir of non-watched parent") {
-                auto task = fs::task::scan_dir_t(root_path / "xx", {}, {}, true, true, false);
-                auto dir_path = root_path / "xx";
-                bfs::create_directories(dir_path);
-                task.child_infos = {make_child(root_path / "xx/yy")};
-                w->notify(task);
-                CHECK(w->path_map.size() == 2);
-                CHECK(w->path_to_wd.size() == 2);
-            }
-            SECTION("watched dir") {
-                auto path_a = root_path / "a";
-                auto path_b = root_path / "b";
-                auto path_c = root_path / "c";
-                auto path_d = root_path / "d";
-                bfs::create_directories(path_a);
-                bfs::create_directories(path_c);
-                write_file(path_b, "");
-                bfs::create_symlink(bfs::path("/some/where"), path_d);
-                auto children = child_infos_t(
-                    {make_child(path_a), make_child(path_b, bfs::file_type::regular), make_child(path_c)});
-                auto task = fs::task::scan_dir_t(root_path, {}, {}, true, true, false);
-                task.child_infos = children;
-                w->notify(task);
-                CHECK(w->path_map.size() == 4);
-                CHECK(w->path_to_wd.size() == 4);
-
-                // no-harm in double watch
-                w->notify(task);
-                CHECK(w->path_map.size() == 4);
-                CHECK(w->path_to_wd.size() == 4);
-            }
-            SECTION("watched sub-dir") {
-                auto sub_dir = root_path / L"папка";
-                bfs::create_directories(sub_dir);
-                await_events(poll_t::trigger_timer, 1);
-                auto path_a = sub_dir / "a";
-                auto path_b = sub_dir / "b";
-                auto path_c = sub_dir / "c";
-                bfs::create_directories(path_a);
-                bfs::create_directories(path_c);
-                write_file(path_b, "");
-                auto children = child_infos_t(
-                    {make_child(path_a), make_child(path_b, bfs::file_type::regular), make_child(path_c)});
-                auto task = fs::task::scan_dir_t(sub_dir, {}, {}, true, true, false);
-                task.child_infos = children;
-                w->notify(task);
-                CHECK(w->path_map.size() == 5);
-                CHECK(w->path_to_wd.size() == 5);
-
-                // no-harm in double watch
-                w->notify(task);
-                CHECK(w->path_map.size() == 5);
-                CHECK(w->path_to_wd.size() == 5);
-            }
-            SECTION("tmp-file in a dir") {
-                auto path_tmp = root_path / "my-file.syncspirit-tmp";
-                write_file(path_tmp / "my-file.syncspirit-tmp", "12345");
-                auto children = child_infos_t({make_child(path_tmp, bfs::file_type::regular)});
-                auto task = fs::task::scan_dir_t(root_path, {}, {}, true, true, false);
-                task.child_infos = children;
-                w->notify(task);
-                CHECK(w->path_map.size() == 1);
-                CHECK(w->path_to_wd.size() == 1);
-            }
-            SECTION("error in watching") {
-                auto path_x = root_path / "a";
-                auto task = fs::task::scan_dir_t(root_path, {}, {}, true, true, false);
-                task.child_infos = {make_child(path_x)};
-                w->notify(task);
-                CHECK(w->path_map.size() == 1);
-                CHECK(w->path_to_wd.size() == 1);
-            }
-        }
-    };
-    F().run();
-}
-
 #endif
 
 int _init() {
@@ -1725,12 +1668,11 @@ int _init() {
     REGISTER_TEST_CASE(test_hierarchies, "test_hierarchies", "[fs]");
     REGISTER_TEST_CASE(test_create_modify_rename, "test_create_modify_rename", "[fs]");
 #endif
-#ifdef SYNCSPIRIT_WATCHER_INOTIFY
-    REGISTER_TEST_CASE(test_inotify_notification, "test_inotify_notification", "[fs]");
+#ifdef SYNCSPIRIT_WATCHER_UNIX
+    REGISTER_TEST_CASE(test_unix_notification, "test_unix_notification", "[fs]");
 #endif
 #ifdef SYNCSPIRIT_WATCHER_KQUEUE
     REGISTER_TEST_CASE(test_kqueue, "test_kqueue", "[fs]");
-    REGISTER_TEST_CASE(test_kqueue_notification, "test_kqueue_notification", "[fs]");
 #endif
     return 1;
 }

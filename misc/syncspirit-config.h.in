@@ -13,6 +13,10 @@ enum class syncspirit_watcher_impl_t {
 #define SYNCSPIRIT_WATCHER_ANY 1
 #endif
 
+#if defined(SYNCSPIRIT_WATCHER_INOTIFY) || defined(SYNCSPIRIT_WATCHER_KQUEUE)
+#define SYNCSPIRIT_WATCHER_UNIX 1
+#endif
+
 static constexpr syncspirit_watcher_impl_t syncspirit_watcher_impl =
 #if defined(SYNCSPIRIT_WATCHER_INOTIFY)
     syncspirit_watcher_impl_t::inotify;

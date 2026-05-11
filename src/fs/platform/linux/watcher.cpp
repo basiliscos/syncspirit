@@ -121,7 +121,6 @@ void watcher_t::inotify_callback() noexcept {
             auto requires_refinement = false;
             if (is_dir) {
                 if (type & update_type::CREATED) {
-                    watch_recurse(full_path, parent->folder_id, parent_wd);
                     requires_refinement = true;
                 } else if (event->mask & IN_MOVED_TO) {
                     rename_self_descending(parent_wd, prev_path, rel_path);
