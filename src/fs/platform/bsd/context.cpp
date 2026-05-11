@@ -103,7 +103,6 @@ bool bsd_backend_t::watch(int fd, io_callback_t callback, void *data, short filt
 }
 
 bool bsd_backend_t::poll(std::uint32_t timeout) {
-    int i = 0;
     assert(io_callbacks.size() == events.size());
 
     auto seconds = timeout / 1000;
@@ -123,12 +122,10 @@ bool bsd_backend_t::poll(std::uint32_t timeout) {
         auto now = clock_t::local_time();
         for (auto it = events.begin(); left && it != events.end(); ++it) {
             auto &event = *it;
-            if (event.fflags) {
-                --left;
-                auto fd = static_cast<int>(event.ident);
-                auto &ctx = io_callbacks.at(fd);
-                ctx.cb(fd, ctx.data, static_cast<std::uint32_t>(event.fflags), now);
-            }
+            --left;
+            auto fd = static_cast<int>(event.ident);
+            auto &ctx = io_callbacks.at(fd);
+            ctx.cb(fd, ctx.data, static_cast<std::uint32_t>(event.fflags), now);
         }
     }
     return r > 0;
