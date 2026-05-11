@@ -30,7 +30,11 @@ TEST_CASE("block iterator", "[model]") {
             auto path_str = narrow(path.generic_wstring());
             auto ec = proxy.create_directories(path);
             CHECK(!ec);
+#ifdef SYNCSPIRIT_WATCHER_KQUEUE
+            CHECK(mediator.is_masked(root_path.string()) == 1);
+#else
             CHECK(mediator.is_masked(path_str) == 1);
+#endif
             CHECK(proxy.mediator_updates == 1);
         }
     }

@@ -160,7 +160,11 @@ sys::error_code fs_proxy_t::create_directories(const bfs::path &path) noexcept {
     auto ec = sys::error_code();
     bfs::create_directories(path, ec);
     if (!ec) {
+#ifndef SYNCSPIRIT_WATCHER_KQUEUE
         updates_mediator.mask(path, {}, deadline);
+#else
+        updates_mediator.mask(path.parent_path(), {}, deadline);
+#endif
         ++mediator_updates;
     }
     return ec;
