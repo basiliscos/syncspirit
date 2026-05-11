@@ -61,7 +61,7 @@ void watcher_t::on_watch(message::watch_folder_t &message) noexcept {
     auto ctx = static_cast<fs::fs_context_t *>(sup->context);
     auto &p = message.payload;
     auto &path_native = p.path.native();
-    auto path_str = narrow(path_native);
+    auto path_str = narrow(p.path.generic_wstring());
     LOG_TRACE(log, "on watch on '{}' (buffer size: {} bytes)", path_str, fs_config.win32_watcher_buff);
 
     auto dir_handle = ::CreateFileW(path_native.c_str(), FILE_LIST_DIRECTORY, SHARE_MODE, nullptr, OPEN_EXISTING,
