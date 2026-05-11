@@ -4,6 +4,7 @@
 #include "test-utils.h"
 #include "fs/file_actor.h"
 #include "fs/utils.h"
+#include "fs/platform/context_base.h"
 #include "net/names.h"
 #include "test_supervisor.h"
 #include "access.h"
@@ -32,6 +33,12 @@ struct fixture_t;
 
 using io_commands_t = fs::message::io_commands_t;
 using io_commands_t_ptr_t = r::intrusive_ptr_t<io_commands_t>;
+
+struct my_context_t final : platform::context_base_t {
+    using parent_t = platform::context_base_t;
+    my_context_t() : parent_t(pt::milliseconds{1}) {};
+    void poll_events() noexcept override {};
+};
 
 struct chain_builder_t {
     template <typename Reply>
@@ -98,7 +105,7 @@ struct fixture_t {
     }
 
     virtual void run() noexcept {
-        r::system_context_t ctx;
+        auto ctx = my_context_t();
         sup = ctx.create_supervisor<supervisor_t>()
                   .auto_finish(false)
                   .auto_ack_io(false)
