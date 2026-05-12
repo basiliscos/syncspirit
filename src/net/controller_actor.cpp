@@ -736,7 +736,7 @@ void controller_actor_t::preprocess_block(model::file_block_t &file_block, const
                 break;
             } else {
                 ++request_id;
-                if (request_id + 1 >= blocks_max_requested) {
+                if (request_id >= blocks_max_requested) {
                     request_id = 0;
                 }
             }
