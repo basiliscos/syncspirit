@@ -1302,9 +1302,12 @@ void controller_actor_t::on_digest(hasher::message::digest_t &res) noexcept {
     } else {
         if (result.has_error() || result.assume_value() != block->get_hash()) {
             if (!file->is_unreachable()) {
-                auto ec = utils::make_error_code(utils::protocol_error_code_t::digest_mismatch);
-                LOG_WARN(log, "digest mismatch for file '{}', expected = {}; marking unreachable", *file,
-                         block->get_hash());
+                if (result.has_error()) {
+                    LOG_WARN(log, "hashing error of '{}' : {},  marking unreachable", *file, result.error().message());
+                } else {
+                    LOG_WARN(log, "digest mismatch for file '{}', expected '{}', got '{}'; marking unreachable", *file,
+                             block->get_hash(), result.assume_value());
+                }
                 file->mark_unreachable(true);
                 stack_ctx.push_back(new model::diff::modify::mark_reachable_t(*file, *peer_folder, false));
             }
