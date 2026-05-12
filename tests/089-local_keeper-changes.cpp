@@ -2461,6 +2461,37 @@ void test_rm_folder_on_scan() {
     F().run();
 }
 
+void test_not_ye_scanned_parent() {
+    struct F : folder_fixture_t {
+        using parent_t = folder_fixture_t;
+        using parent_t::parent_t;
+
+        void main() noexcept override {
+            auto impl = GENERATE(I::inotify, I::kqueue, I::win32);
+            prepare(impl);
+
+            auto pr_dir = proto::FileInfo();
+            proto::set_name(pr_dir, "dir");
+            proto::set_permissions(pr_dir, default_perms);
+            proto::set_modified_s(pr_dir, 12345);
+            proto::set_type(pr_dir, proto::FileInfoType::DIRECTORY);
+            builder->local_update(folder_id, pr_dir).apply(*sup);
+            REQUIRE(files_local->size() == 1);
+
+            auto dir = files_local->by_name("dir");
+            dir->mark_local(false);
+
+            auto pr_file = proto::FileInfo();
+            proto::set_name(pr_file, "dir/file.bin");
+            proto::set_type(pr_file, FT::FILE);
+            proto::set_size(pr_file, 5);
+            mk_update(pr_file, fs::update_type_t::created, true);
+            CHECK(files_local->size() == 1);
+        }
+    };
+    F().run();
+}
+
 int _init() {
     test::init_logging();
     REGISTER_TEST_CASE(test_just_start, "test_just_start", "[fs]");
@@ -2498,6 +2529,7 @@ int _init() {
     REGISTER_TEST_CASE(test_dir_scan_and_hashing_race, "test_dir_scan_and_hashing_race", "[fs]");
     REGISTER_TEST_CASE(test_invalid_utf8_names, "test_invalid_utf8_names", "[fs]");
     REGISTER_TEST_CASE(test_rm_folder_on_scan, "test_rm_folder_on_scan", "[fs]");
+    REGISTER_TEST_CASE(test_not_ye_scanned_parent, "test_not_ye_scanned_parent", "[fs]");
     return 1;
 }
 
