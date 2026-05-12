@@ -731,7 +731,7 @@ void controller_actor_t::preprocess_block(model::file_block_t &file_block, const
                 if (request_id + 1 >= blocks_max_requested) {
                     block_requests_next = 0;
                 } else {
-                    ++block_requests_next;
+                    block_requests_next = request_id + 1;
                 }
                 break;
             } else {
@@ -741,6 +741,7 @@ void controller_actor_t::preprocess_block(model::file_block_t &file_block, const
                 }
             }
         }
+        assert(block_requests_next < blocks_max_requested);
         assert(!block_requests[request_id]);
 
         auto sz = block->get_size();
