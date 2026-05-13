@@ -5,7 +5,15 @@
 
 using namespace syncspirit::model;
 
-auto postponed_files_t::get_ready() noexcept -> files_t { return std::move(ready); }
+auto postponed_files_t::get_ready() noexcept -> model::file_info_ptr_t {
+    if (!ready.empty()) {
+        auto it = ready.begin();
+        auto f = std::move(*it);
+        ready.erase(it);
+        return f;
+    }
+    return {};
+}
 
 void postponed_files_t::postpone(model::block_info_ptr_t block, model::file_info_ptr_t file) noexcept {
     block_2_files.insert(block_2_file_t{block, file});
@@ -23,24 +31,21 @@ void postponed_files_t::forget(model::file_info_t *file) noexcept {
 
 void postponed_files_t::advance(model::block_info_ptr_t &block) noexcept {
     auto &block_proj = block_2_files.get<0>();
-    auto pre_ready = files_t();
-    for (auto it = block_proj.find(block); it != block_proj.end();) {
-        pre_ready.emplace(it->file);
-        it = block_proj.erase(it);
-    }
-
     auto &files_proj = block_2_files.get<1>();
-    for (auto it = pre_ready.begin(); it != pre_ready.end();) {
-        if (auto fit = files_proj.find(*it); fit != files_proj.end()) {
-            it = pre_ready.erase(it);
-        } else {
-            ++it;
+
+    auto b_range = block_proj.equal_range(block);
+    for (auto bit = b_range.first; bit != b_range.second; ++bit) {
+        auto &file = bit->file;
+        auto f_range = files_proj.equal_range(file);
+        if (std::distance(f_range.first, f_range.second) == 1) {
+            ready.insert(bit->file);
+            block_proj.erase(bit);
+            return;
         }
     }
 
-    for (auto &f : pre_ready) {
-        ready.emplace(std::move(f));
-    }
+    // worse case:
+    block_proj.erase(b_range.first, b_range.second);
 }
 
 void postponed_files_t::clear() noexcept {

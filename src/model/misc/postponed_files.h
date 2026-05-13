@@ -25,7 +25,7 @@ struct SYNCSPIRIT_API postponed_files_t {
 
     void postpone(model::block_info_ptr_t block, model::file_info_ptr_t file) noexcept;
     void advance(model::block_info_ptr_t &block) noexcept;
-    files_t get_ready() noexcept;
+    model::file_info_ptr_t get_ready() noexcept;
     void forget(model::file_info_t *) noexcept;
     void clear() noexcept;
 

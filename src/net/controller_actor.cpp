@@ -512,8 +512,8 @@ OUTER:
             continue;
         }
         if (!block_iterator) {
-            auto ready = postponed_files.get_ready();
-            for (auto &file : ready) {
+            auto file = postponed_files.get_ready();
+            if (file) {
                 auto folder_uuid = file->get_folder_uuid();
                 auto fi = (model::folder_info_t *)(nullptr);
                 for (auto fit : cluster->get_folders()) {
