@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2025-2026 Ivan Baidakou
 
 #include "suspend_folder.h"
 #include "model/cluster.h"
@@ -18,7 +18,9 @@ auto suspend_folder_t::apply_impl(apply_controller_t &controller, void *custom) 
     LOG_TRACE(log, "applying suspend_folder_t, value: {}", value);
     auto &cluster = controller.get_cluster();
     auto folder = cluster.get_folders().by_id(folder_id);
-    folder->mark_suspended(value, ec);
+    if (folder) {
+        folder->mark_suspended(value, ec);
+    }
     return applicator_t::apply_impl(controller, custom);
 }
 
