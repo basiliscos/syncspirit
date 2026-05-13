@@ -163,13 +163,13 @@ static main_t make_default_config(const bfs::path &config_path, const bfs::path 
         30000   /* frequency */
     };
     cfg.global_announce_config = global_announce_config_t{
-        true,                                                           /* enabled */
-        false,                                                          /* debug */
-        utils::parse("https://discovery-announce-v4.syncthing.net/v2"), /* announce_url */
-        utils::parse("https://discovery-lookup.syncthing.net/v2"),      /* lookup_url */
-        32 * 1024,                                                      /* rx_buff_size */
-        3000,                                                           /* timeout */
-        10 * 60,                                                        /* reannounce timeout */
+        true,                                                            /* enabled */
+        false,                                                           /* debug */
+        utils::parse("https://discovery-announce-v4.syncthing.net/v2/"), /* announce_url */
+        utils::parse("https://discovery-lookup.syncthing.net/v2/"),      /* lookup_url */
+        32 * 1024,                                                       /* rx_buff_size */
+        3000,                                                            /* timeout */
+        10 * 60,                                                         /* reannounce timeout */
     };
     cfg.upnp_config = upnp_config_t {
         true,       /* enabled */

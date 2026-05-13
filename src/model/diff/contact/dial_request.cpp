@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2026 Ivan Baidakou
 
 #include "dial_request.h"
 #include "../cluster_visitor.h"
@@ -8,7 +8,7 @@ using namespace syncspirit::model::diff::contact;
 
 dial_request_t::dial_request_t(model::device_t &peer) noexcept {
     peer_id = peer.device_id().get_sha256();
-    LOG_DEBUG(log, "dial_request_t, peer = ", peer.device_id().get_short());
+    LOG_DEBUG(log, "dial_request_t, peer = {}", peer.device_id().get_short());
 }
 
 auto dial_request_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {

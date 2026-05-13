@@ -274,7 +274,7 @@ void net_supervisor_t::on_ready(message::ready_t &) noexcept {
             .resolve_timeout(io_timeout)
             .registry_name(names::http11_gda)
             .ssl_verify_store(app_config.ssl_verify_store)
-            .keep_alive(true)
+            .keep_alive(false)
             .escalate_failure()
             .finish();
 
