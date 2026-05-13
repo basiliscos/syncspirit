@@ -10,15 +10,13 @@
 #include "model/diff/diff_assembler.h"
 #include "model/misc/file_iterator.h"
 #include "model/misc/block_iterator.h"
+#include "model/misc/postponed_files.h"
 #include "model/misc/updates_streamer.h"
 #include "model/misc/sequencer.h"
 #include "hasher/messages.h"
 #include "hasher/hasher_plugin.h"
 #include "fs/messages.h"
 
-#include <boost/multi_index_container.hpp>
-#include <boost/multi_index/ordered_index.hpp>
-#include <boost/multi_index/member.hpp>
 #include <unordered_map>
 #include <optional>
 #include <list>
@@ -27,7 +25,6 @@ namespace syncspirit {
 namespace net {
 
 namespace bfs = std::filesystem;
-namespace mi = boost::multi_index;
 namespace outcome = boost::outcome_v2;
 
 struct SYNCSPIRIT_API controller_actor_t final : public model_actor_t<r::actor_base_t>,
@@ -155,12 +152,6 @@ struct SYNCSPIRIT_API controller_actor_t final : public model_actor_t<r::actor_b
     using peers_map_t = std::unordered_map<r::address_ptr_t, model::device_ptr_t>;
     using io_queue_t = std::list<fs::payload::io_command_t>;
 
-    using block_2_files_t = mi::multi_index_container<
-        block_2_file_t,
-        mi::indexed_by<
-            mi::ordered_non_unique<mi::member<block_2_file_t, model::block_info_ptr_t, &block_2_file_t::block>>,
-            mi::ordered_non_unique<mi::member<block_2_file_t, model::file_info_ptr_t, &block_2_file_t::file>>>>;
-
     struct folder_synchronization_t {
         using block_set_t = std::unordered_map<utils::bytes_view_t, model::block_info_ptr_t>;
         folder_synchronization_t(controller_actor_t &controller, model::folder_t &folder) noexcept;
@@ -274,8 +265,7 @@ struct SYNCSPIRIT_API controller_actor_t final : public model_actor_t<r::actor_b
     model::block_iterator_ptr_t block_iterator;
     synchronizing_folders_t synchronizing_folders;
     synchronizing_files_t synchronizing_files;
-    postponed_files_t postponed_files;
-    block_2_files_t block_2_files;
+    model::postponed_files_t postponed_files;
     io_queue_t block_write_queue;
     io_queue_t block_read_queue;
     block_requests_t block_requests;

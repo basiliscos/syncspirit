@@ -477,14 +477,12 @@ void controller_actor_t::pull_next(stack_context_t &context) noexcept {
         return !ignore;
     };
 
-    using file_set_t = std::pmr::set<model::file_info_t *>;
     using block_2_file_set_t = std::pmr::unordered_set<block_2_file_non_owning_t>;
     using allocator_t = std::pmr::polymorphic_allocator<char>;
 
     auto buffer = std::array<std::byte, 1024 * 16>();
     auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
     auto allocator = allocator_t(&pool);
-    auto seen_files = file_set_t(allocator);
     auto seen_block_2_files = block_2_file_set_t(allocator);
 
 OUTER:
@@ -503,8 +501,7 @@ OUTER:
                         seen_block_2_files.insert(proxy);
                         auto b = model::block_info_ptr_t(const_cast<model::block_info_t *>(block));
                         auto f = model::file_info_ptr_t(file_block.file());
-                        auto b2f = block_2_file_t{std::move(b), std::move(f)};
-                        block_2_files.insert(std::move(b2f));
+                        postponed_files.postpone(b, f);
                     }
                 }
                 continue;
@@ -514,13 +511,9 @@ OUTER:
             }
             continue;
         }
-        if (!block_iterator && !postponed_files.empty()) {
-            for (auto it = postponed_files.begin(); it != postponed_files.end();) {
-                auto file = std::move(*it);
-                it = postponed_files.erase(it);
-                if (seen_files.count(file.get())) {
-                    continue;
-                }
+        if (!block_iterator) {
+            auto ready = postponed_files.get_ready();
+            for (auto &file : ready) {
                 auto folder_uuid = file->get_folder_uuid();
                 auto fi = (model::folder_info_t *)(nullptr);
                 for (auto fit : cluster->get_folders()) {
@@ -530,7 +523,6 @@ OUTER:
                     }
                 }
                 if (fi) {
-                    seen_files.emplace(file.get());
                     auto bi = model::block_iterator_ptr_t();
                     bi = new model::blocks_iterator_t(*file, *fi);
                     if (*bi) {
@@ -1386,11 +1378,7 @@ void controller_actor_t::release_block(std::string_view folder_id, utils::bytes_
                                        stack_context_t &context) noexcept {
     LOG_TRACE(log, "release block '{}'", hash);
     auto block = get_sync_info(folder_id).finish_fetching(hash, context);
-    auto &block_proj = block_2_files.get<0>();
-    for (auto it = block_proj.find(block); it != block_proj.end();) {
-        postponed_files.emplace(it->file);
-        it = block_proj.erase(it);
-    }
+    postponed_files.advance(block);
 }
 
 void controller_actor_t::cancel_sync(model::file_info_t *file) noexcept {
@@ -1398,10 +1386,7 @@ void controller_actor_t::cancel_sync(model::file_info_t *file) noexcept {
         block_iterator.reset();
     }
     auto id = file->get_full_id();
-    auto &file_proj = block_2_files.get<1>();
-    for (auto it = file_proj.find(file); it != file_proj.end();) {
-        it = file_proj.erase(it);
-    }
+    postponed_files.forget(file);
     if (auto it = synchronizing_files.find(id); it != synchronizing_files.end()) {
         synchronizing_files.erase(it);
     }
