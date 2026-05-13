@@ -127,10 +127,23 @@ struct SYNCSPIRIT_API controller_actor_t final : public model_actor_t<r::actor_b
         ~stack_context_t();
         void push(fs::payload::io_command_t command) noexcept;
         void push(fs::payload::append_block_t command) noexcept;
+        void push(fs::payload::clone_block_t command) noexcept;
         void push(utils::bytes_t data) noexcept;
 
       private:
         using commands_t = std::vector<fs::payload::io_command_t>;
+
+        template <typename T> void push_checked(T command) noexcept {
+            if (actor.state == r::state_t::OPERATIONAL) {
+                auto requests_left = actor.cluster->get_write_requests();
+                if (requests_left) {
+                    io_commands.emplace_back(std::move(command));
+                    actor.cluster->modify_write_requests(-1);
+                } else {
+                    actor.block_write_queue.emplace_back(std::move(command));
+                }
+            }
+        }
         controller_actor_t &actor;
         commands_t io_commands;
         utils::bytes_t peer_data;

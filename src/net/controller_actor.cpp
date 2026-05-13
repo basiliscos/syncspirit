@@ -145,17 +145,9 @@ void C::stack_context_t::push(fs::payload::io_command_t command) noexcept {
     io_commands.emplace_back(std::move(command));
 }
 
-void C::stack_context_t::push(fs::payload::append_block_t command) noexcept {
-    if (actor.state == r::state_t::OPERATIONAL) {
-        auto requests_left = actor.cluster->get_write_requests();
-        if (requests_left) {
-            io_commands.emplace_back(std::move(command));
-            actor.cluster->modify_write_requests(-1);
-        } else {
-            actor.block_write_queue.emplace_back(std::move(command));
-        }
-    }
-}
+void C::stack_context_t::push(fs::payload::append_block_t command) noexcept { push_checked(std::move(command)); }
+
+void C::stack_context_t::push(fs::payload::clone_block_t command) noexcept { push_checked(std::move(command)); }
 
 void C::stack_context_t::push(utils::bytes_t data) noexcept {
     peer_data.reserve(peer_data.size() + data.size());
@@ -381,16 +373,18 @@ void controller_actor_t::on_peer_down(message::peer_down_t &message) noexcept {
 }
 
 void controller_actor_t::on_postprocess_io(fs::message::io_commands_t &message) noexcept {
+    namespace p = fs::payload;
     auto stack_ctx = stack_context_t(*this);
     resources->release(resource::fs);
     for (auto &cmd : message.payload.commands) {
         std::visit(
             [&](auto &cmd) {
                 using T = std::decay_t<decltype(cmd)>;
-                if constexpr (std::is_same_v<T, fs::payload::block_request_t>) {
+                if constexpr (std::is_same_v<T, p::block_request_t>) {
                     postprocess_io(cmd, stack_ctx);
                 } else {
-                    if constexpr (std::is_same_v<T, fs::payload::append_block_t>) {
+                    constexpr auto modify = std::is_same_v<T, p::append_block_t> || std::is_same_v<T, p::clone_block_t>;
+                    if constexpr (modify) {
                         cluster->modify_write_requests(+1);
                     }
                     if (cmd.result.has_error()) {
