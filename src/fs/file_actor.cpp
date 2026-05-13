@@ -433,7 +433,6 @@ auto file_actor_t::open_file_rw(const std::filesystem::path &path, std::uint64_t
     if (it != file_cache.end()) {
         return it->second;
     }
-    LOG_TRACE(log, "open_file (rw), path = {}, size = {}", path.string(), file_size);
 
     auto parent = path.parent_path();
     sys::error_code ec;
@@ -452,6 +451,7 @@ auto file_actor_t::open_file_rw(const std::filesystem::path &path, std::uint64_t
     }
     auto ptr = file_ptr_t(new file_t(std::move(option.assume_value())));
     file_cache[path] = ptr;
+    LOG_TRACE(log, "open_file (rw), path = {}, size = {}, cache sz: {}", path.string(), file_size, file_cache.size());
     return ptr;
 }
 

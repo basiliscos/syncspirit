@@ -20,7 +20,7 @@ fs_proxy_t::fs_proxy_t(updates_mediator_t &updates_mediator_, const pt::ptime &d
     : updates_mediator{updates_mediator_}, deadline{deadline_} {}
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
-#define SS_STAT_FN(PATH, BUFF) _wstat64((PATH).wstring().data(), (BUFF))
+#define SS_STAT_FN(PATH, BUFF) _wstat64((PATH).native().data(), (BUFF))
 #define SS_STAT_BUFF struct __stat64
 #else
 #define SS_STAT_FN(PATH, BUFF) stat((PATH).native().data(), (BUFF))
