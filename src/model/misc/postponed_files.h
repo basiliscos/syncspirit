@@ -10,7 +10,9 @@
 
 #include <boost/multi_index_container.hpp>
 #include <boost/multi_index/ordered_index.hpp>
+#include <boost/multi_index/hashed_index.hpp>
 #include <boost/multi_index/member.hpp>
+#include <boost/multi_index/identity.hpp>
 
 namespace syncspirit::model {
 
@@ -34,10 +36,25 @@ struct SYNCSPIRIT_API postponed_files_t {
         model::block_info_ptr_t block;
         model::file_info_ptr_t file;
     };
+    struct block_2_file_ptr_t {
+        model::block_info_t *block;
+        model::file_info_t *file;
+    };
+    struct hasher_t {
+        std::size_t operator()(const block_2_file_t &) const noexcept;
+        std::size_t operator()(const block_2_file_ptr_t &) const noexcept;
+    };
+    struct eq_t {
+        bool operator()(const block_2_file_t &a, const block_2_file_t &b) const noexcept;
+        bool operator()(const block_2_file_ptr_t &a, const block_2_file_t &b) const noexcept;
+        bool operator()(const block_2_file_t &a, const block_2_file_ptr_t &b) const noexcept;
+        bool operator()(const block_2_file_ptr_t &a, const block_2_file_ptr_t &b) const noexcept;
+    };
 
     using block_2_files_t = mi::multi_index_container<
         block_2_file_t,
         mi::indexed_by<
+            mi::hashed_unique<mi::identity<block_2_file_t>, hasher_t, eq_t>,
             mi::ordered_non_unique<mi::member<block_2_file_t, model::block_info_ptr_t, &block_2_file_t::block>>,
             mi::ordered_non_unique<mi::member<block_2_file_t, model::file_info_ptr_t, &block_2_file_t::file>>>>;
 
