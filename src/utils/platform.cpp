@@ -16,6 +16,8 @@ using namespace syncspirit::utils;
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
 
+static DWORD thread_name_tls_index = TLS_OUT_OF_INDEXES;
+
 struct handle_guard_t {
     handle_guard_t() = default;
     handle_guard_t(HANDLE handle_) noexcept : handle{handle_} {}
@@ -146,7 +148,13 @@ static void dump_traces(EXCEPTION_POINTERS *ep) {
         WriteFile(file, buff, out_bytes, &written, {});
         (void)written;
     }
-    out_bytes = snprintf(buff, sizeof(buff), "dump end\n");
+
+    const char *thread_name = "unknown";
+    if (thread_name_tls_index != TLS_OUT_OF_INDEXES) {
+        thread_name = (const char *)TlsGetValue(thread_name_tls_index);
+    }
+
+    out_bytes = snprintf(buff, sizeof(buff), "dump end, thread: %s (%d)\n", thread_name, GetCurrentThreadId());
     WriteFile(file, buff, out_bytes, &written, {});
 }
 
@@ -181,6 +189,8 @@ bool platform_t::startup() {
     }
 
     SetUnhandledExceptionFilter(seh_handler);
+
+    thread_name_tls_index = TlsAlloc();
 #endif
     return true;
 }
@@ -326,5 +336,9 @@ bool platform_t::permissions_supported(const bfs::path &) noexcept {
 void platform_t::set_thread_name(std::string_view name) noexcept {
 #if defined(__linux__)
     pthread_setname_np(pthread_self(), name.data());
+#elif defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+    if (thread_name_tls_index != TLS_OUT_OF_INDEXES) {
+        TlsSetValue(thread_name_tls_index, (void *)name.data());
+    }
 #endif
 }
