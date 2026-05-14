@@ -23,6 +23,7 @@ struct SYNCSPIRIT_API platform_t {
     static bool symlinks_supported() noexcept;
     static bool path_supported(const bfs::path &) noexcept;
     static bool permissions_supported(const bfs::path &) noexcept;
+    static void set_thread_name(std::string_view name) noexcept;
 };
 
 } // namespace syncspirit::utils

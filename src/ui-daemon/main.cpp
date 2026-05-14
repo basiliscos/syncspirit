@@ -149,9 +149,8 @@ int main(int argc, char **argv) {
 }
 
 int app_main(app_context_t &app_ctx) {
-#if defined(__linux__)
-    pthread_setname_np(pthread_self(), "ss/main");
-#endif
+    utils::platform_t::set_thread_name("ss/main");
+
     // clang-format off
     /* parse command-line & config options */
     po::options_description cmdline_descr("Allowed options");
@@ -351,9 +350,7 @@ int app_main(app_context_t &app_ctx) {
     }
 
     auto bouncer_thread = std::thread([&]() {
-#if defined(__linux__)
-        pthread_setname_np(pthread_self(), "ss/bouncer");
-#endif
+        utils::platform_t::set_thread_name("ss/bouncer");
         logger->trace("running bouncer");
         bouncer_context.run();
         bouncer_shutdown_flag = true;
@@ -391,32 +388,23 @@ int app_main(app_context_t &app_ctx) {
     for (uint32_t i = 0; i < hasher_count; ++i) {
         auto &ctx = hasher_ctxs.at(i);
         auto thread = std::thread([ctx = ctx, i = i, logger]() {
-#if defined(__linux__)
-            std::string name = "ss/hasher-" + std::to_string(i + 1);
-            pthread_setname_np(pthread_self(), name.c_str());
-#endif
+            auto name = fmt::format("ss/hasher-{}", i + 1);
+            utils::platform_t::set_thread_name(name);
             ctx->run();
             shutdown_flag = true;
-#if defined(__linux__)
             logger->trace("{} thread has been terminated", name);
-#endif
         });
         hasher_threads.emplace_back(std::move(thread));
     }
 
     auto fs_thread = std::thread([&]() {
-#if defined(__linux__)
-        pthread_setname_np(pthread_self(), "ss/fs");
-#endif
+        utils::platform_t::set_thread_name("ss/fs");
         fs_context.run();
         shutdown_flag = true;
         logger->trace("fs thread has been terminated");
     });
 
     // main loop;
-#if defined(__linux__)
-    pthread_setname_np(pthread_self(), "ss/net");
-#endif
     sup_net->do_process();
     io_context.run();
     shutdown_flag = true;

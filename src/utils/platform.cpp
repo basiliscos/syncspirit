@@ -322,3 +322,9 @@ bool platform_t::permissions_supported(const bfs::path &) noexcept {
 #endif
     return true;
 }
+
+void platform_t::set_thread_name(std::string_view name) noexcept {
+#if defined(__linux__)
+    pthread_setname_np(pthread_self(), name.data());
+#endif
+}
