@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2026 Ivan Baidakou
 
 #include "remove_files.h"
 #include "remove_blocks.h"
@@ -43,13 +43,17 @@ auto remove_files_t::apply_impl(apply_controller_t &controller, void *custom) co
     auto &cluster = controller.get_cluster();
     auto &folders = cluster.get_folders();
     auto folder = folders.by_id(folder_id);
-    auto &folder_infos = folder->get_folder_infos();
-    auto &folder_info = *folder_infos.by_device_id(device_id);
-    auto &file_infos = folder_info.get_file_infos();
-    for (size_t i = 0; i < keys.size(); ++i) {
-        auto decomposed = file_info_t::decompose_key(keys[i]);
-        auto file = file_infos.by_uuid(decomposed.file_id);
-        file_infos.remove(file);
+    if (folder) {
+        auto &folder_infos = folder->get_folder_infos();
+        auto peer_folder = folder_infos.by_device_id(device_id);
+        if (peer_folder) {
+            auto &file_infos = peer_folder->get_file_infos();
+            for (size_t i = 0; i < keys.size(); ++i) {
+                auto decomposed = file_info_t::decompose_key(keys[i]);
+                auto file = file_infos.by_uuid(decomposed.file_id);
+                file_infos.remove(file);
+            }
+        }
     }
     return applicator_t::apply_sibling(controller, custom);
 }
