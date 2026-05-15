@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2026 Ivan Baidakou
 
 #pragma once
 
@@ -7,7 +7,8 @@
 
 namespace syncspirit::fltk::symbols {
 
-extern const std::string_view online;
+extern const std::string_view online_1;
+extern const std::string_view online_2;
 extern const std::string_view offline;
 extern const std::string_view connecting;
 extern const std::string_view discovering;

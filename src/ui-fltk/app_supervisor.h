@@ -166,7 +166,6 @@ struct app_supervisor_t : app_supervisor_base_t<app_supervisor_t> {
     std::uint32_t mask_nodes() const noexcept;
 
   private:
-    using timer_opt_t = std::optional<r::request_id_t>;
     using clock_t = std::chrono::high_resolution_clock;
     using time_point_t = typename clock_t::time_point;
     using callbacks_t = std::list<callback_ptr_t>;
@@ -178,7 +177,7 @@ struct app_supervisor_t : app_supervisor_base_t<app_supervisor_t> {
     void on_db_info_response(net::message::db_info_response_t &res) noexcept;
     void redisplay_folder_nodes(bool refresh_labels);
     void detach_main_window() noexcept;
-    void on_display_delayed_timer(r::request_id_t, bool cancelled) noexcept;
+    void on_frame_render_timer(r::request_id_t, bool cancelled) noexcept;
 
     void process(model::diff::cluster_diff_t &diff, model::payload::apply_context_t &context) noexcept override;
 
@@ -213,7 +212,6 @@ struct app_supervisor_t : app_supervisor_base_t<app_supervisor_t> {
     main_window_t *main_window;
     delayed_items_t delayed_items;
     bool soft_restart_request = false;
-    timer_opt_t display_posponed;
 
     friend struct db_info_viewer_guard_t;
 };

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2026 Ivan Baidakou
 
 #pragma once
 
@@ -20,6 +20,7 @@ struct devices_t : tree_item_t {
     bool on_select() override;
     void update_label() override;
     void remove_child(tree_item_t *child) override;
+    void on_frame_render() override;
 };
 
 } // namespace syncspirit::fltk::tree_item
