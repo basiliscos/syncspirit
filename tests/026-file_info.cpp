@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2025-2026 Ivan Baidakou
 
 #include <catch2/catch_all.hpp>
 #include "test-utils.h"
@@ -8,12 +8,13 @@
 #include "model/misc/sequencer.h"
 #include "diff-builder.h"
 
+#include <boost/nowide/convert.hpp>
+
 using namespace syncspirit;
 using namespace syncspirit::model;
 using namespace syncspirit::test;
 
 using Catch::Matchers::Matches;
-
 TEST_CASE("file-info", "[model]") {
     auto sequencer = make_sequencer(4);
     auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
@@ -61,7 +62,7 @@ TEST_CASE("file-info", "[model]") {
     CHECK(!map.by_sequence(proto::get_sequence(pr_fi)));
 
     auto conflict_name = fi->make_conflicting_name();
-    REQUIRE_THAT(conflict_name, Matches("a.b.sync-conflict-202412(\\d){2}-(\\d){6}-KHQNO2S.txt"));
+    REQUIRE_THAT(conflict_name, Matches("a/b.sync-conflict-202412(\\d){2}-(\\d){6}-KHQNO2S.txt"));
 }
 
 TEST_CASE("file_info_t::local_file", "[model]") {
@@ -332,4 +333,37 @@ TEST_CASE("file_info_t::update", "[model]") {
         CHECK(local_file_1->iterate_blocks().get_total() == 0);
         CHECK(local_file_1->is_link());
     }
+}
+
+TEST_CASE("file_info_t::make_conflicting_name for wstrings", "[model]") {
+    auto local_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
+    auto local_device = device_t::create(local_id, "my-device").value();
+
+    auto cluster = cluster_ptr_t(new cluster_t(local_device, 1));
+    auto sequencer = make_sequencer(4);
+    cluster->get_devices().put(local_device);
+
+    auto &folders = cluster->get_folders();
+    auto builder = diff_builder_t(*cluster);
+    builder.upsert_folder("1234-5678", "some/path", "my-label");
+    REQUIRE(builder.apply());
+
+    auto folder = folders.by_id("1234-5678");
+    auto &folder_infos = folder->get_folder_infos();
+    auto folder_local = folder_infos.by_device(*local_device);
+
+    auto name = boost::nowide::narrow(L"папка/файл.1ц");
+
+    auto pr_file = proto::FileInfo();
+    proto::set_name(pr_file, name);
+
+    auto v = proto::get_version(pr_file);
+    proto::add_counters(v, proto::Counter(local_device->device_id().get_uint(), 1));
+    proto::set_version(pr_file, v);
+
+    auto local_file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_local).value();
+    REQUIRE(local_file);
+
+    auto cn = local_file->make_conflicting_name();
+    REQUIRE_THAT(cn, Matches(boost::nowide::narrow(L"папка/файл.sync-conflict-(\\d){8}-(\\d){6}-KHQNO2S.1ц")));
 }
