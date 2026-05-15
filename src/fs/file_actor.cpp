@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "file_actor.h"
+#include "fs/platform/context_base.h"
 #include "fs_proxy.h"
 #include "fs_slave.h"
 #include "net/names.h"
@@ -23,7 +24,12 @@ namespace {
 namespace resource {
 r::plugin::resource_id_t service = 0;
 } // namespace resource
+namespace to {
+struct context {};
+} // namespace to
 } // namespace
+
+template <> inline auto &rotor::supervisor_t::access<to::context>() noexcept { return context; }
 
 struct file_actor_t::process_context_t : fs_proxy_t {
     process_context_t(const void *cache_key_, file_actor_t &actor)
@@ -124,6 +130,8 @@ void file_actor_t::on_io_commands(message::io_commands_t &message) noexcept {
     if (ctx.mediator_updates && !expiration_timer) {
         expiration_timer = start_timer(retension, *this, &file_actor_t::on_retension_finish);
     }
+    auto sup_ctx = static_cast<platform::context_base_t *>(supervisor->access<to::context>());
+    sup_ctx->poll_events();
 }
 
 void file_actor_t::on_retension_finish(r::request_id_t, bool cancelled) noexcept {
@@ -425,7 +433,6 @@ auto file_actor_t::open_file_rw(const std::filesystem::path &path, std::uint64_t
     if (it != file_cache.end()) {
         return it->second;
     }
-    LOG_TRACE(log, "open_file (rw), path = {}, size = {}", path.string(), file_size);
 
     auto parent = path.parent_path();
     sys::error_code ec;
@@ -444,6 +451,7 @@ auto file_actor_t::open_file_rw(const std::filesystem::path &path, std::uint64_t
     }
     auto ptr = file_ptr_t(new file_t(std::move(option.assume_value())));
     file_cache[path] = ptr;
+    LOG_TRACE(log, "open_file (rw), path = {}, size = {}, cache sz: {}", path.string(), file_size, file_cache.size());
     return ptr;
 }
 

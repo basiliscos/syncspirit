@@ -555,7 +555,7 @@ void folder_context_t::post_process(hash_base_t &hash_file, hasher::message::dig
         return;
     }
     auto path_str = narrow(hash_file.path.generic_wstring());
-    LOG_TRACE(log, "post_process of '{}', hasn_file {} blocks are hashing", path_str, hashing);
+    LOG_TRACE(log, "post_process of '{}', {} blocks are hashing", path_str, hashing);
     assert(hashing > 0);
     --hashing;
 

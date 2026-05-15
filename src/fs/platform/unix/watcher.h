@@ -48,7 +48,6 @@ struct SYNCSPIRIT_API watcher_t : watcher_base_t {
     void notify(const fs::task::scan_dir_t &) noexcept override;
 
     void rename_self_descending(int parent_wd, std::string_view prev_path, std::string_view new_path) noexcept;
-    std::optional<int> watch_recurse(std::string_view path, std::string_view folder_id, int parent_fd) noexcept;
     watch_opt_t watch_path(std::string_view path, std::string_view folder_id, file_type_t type, int parent) noexcept;
     sys::error_code unwatch_folder(std::string_view folder_id) noexcept;
     sys::error_code unwatch_recurse(std::string_view path) noexcept;

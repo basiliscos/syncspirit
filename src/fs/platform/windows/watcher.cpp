@@ -6,6 +6,7 @@
 #if SYNCSPIRIT_WATCHER_WIN32
 
 #include "fs/fs_supervisor.h"
+#include "fs/utils.h"
 #include <boost/nowide/convert.hpp>
 #include <cstring>
 #include <string>
@@ -60,7 +61,7 @@ void watcher_t::on_watch(message::watch_folder_t &message) noexcept {
     auto ctx = static_cast<fs::fs_context_t *>(sup->context);
     auto &p = message.payload;
     auto &path_native = p.path.native();
-    auto path_str = narrow(path_native);
+    auto path_str = narrow(p.path.generic_wstring());
     LOG_TRACE(log, "on watch on '{}' (buffer size: {} bytes)", path_str, fs_config.win32_watcher_buff);
 
     auto dir_handle = ::CreateFileW(path_native.c_str(), FILE_LIST_DIRECTORY, SHARE_MODE, nullptr, OPEN_EXISTING,
@@ -197,29 +198,31 @@ void watcher_t::on_notify(handle_t handle) noexcept {
             name_view = path_str;
         }
 
-        auto type = update_type_internal_t{0};
-        auto requires_refinement = false;
-        if (ptr->Action == FILE_ACTION_ADDED) {
-            type = update_type::CREATED;
-        } else if (ptr->Action == FILE_ACTION_REMOVED) {
-            type = update_type::DELETED;
-        } else if (ptr->Action == FILE_ACTION_MODIFIED) {
-            // no idea how to track metadata changes only
-            type = update_type::CONTENT;
-        } else if (ptr->Action == FILE_ACTION_RENAMED_OLD_NAME) {
-            // it is silly that win32 generates content event for the new file
-            // so it is OK to assume that previous file is always deleted
-            type = update_type::DELETED;
-            requires_refinement = true;
-        } else if (ptr->Action == FILE_ACTION_RENAMED_NEW_NAME) {
-            type = update_type::CREATED;
-            requires_refinement = true;
-        }
+        if (!fs::is_temporal(name_view)) {
+            auto type = update_type_internal_t{0};
+            auto requires_refinement = false;
+            if (ptr->Action == FILE_ACTION_ADDED) {
+                type = update_type::CREATED;
+            } else if (ptr->Action == FILE_ACTION_REMOVED) {
+                type = update_type::DELETED;
+            } else if (ptr->Action == FILE_ACTION_MODIFIED) {
+                // no idea how to track metadata changes only
+                type = update_type::CONTENT;
+            } else if (ptr->Action == FILE_ACTION_RENAMED_OLD_NAME) {
+                // it is silly that win32 generates content event for the new file
+                // so it is OK to assume that previous file is always deleted
+                type = update_type::DELETED;
+                requires_refinement = true;
+            } else if (ptr->Action == FILE_ACTION_RENAMED_NEW_NAME) {
+                type = update_type::CREATED;
+                requires_refinement = true;
+            }
 
-        if (type) {
-            push(deadline, folder_id, name_view, {}, static_cast<update_type_t>(type), requires_refinement);
-        } else {
-            LOG_DEBUG(log, "in the folder '{}' updated ({:x}): '{}'", folder_id, ptr->Action, name_view);
+            if (type) {
+                push(deadline, folder_id, name_view, {}, static_cast<update_type_t>(type), requires_refinement);
+            } else {
+                LOG_DEBUG(log, "in the folder '{}' updated ({:x}): '{}'", folder_id, ptr->Action, name_view);
+            }
         }
         ptr = ptr->NextEntryOffset ? (FILE_NOTIFY_INFORMATION *)(((char *)ptr) + ptr->NextEntryOffset) : nullptr;
     };

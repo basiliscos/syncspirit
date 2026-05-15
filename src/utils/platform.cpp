@@ -10,11 +10,14 @@
 #include <zlib.h>
 #include <spdlog/spdlog.h>
 #include <cxxabi.h>
+#include <boost/nowide/convert.hpp>
 #endif
 
 using namespace syncspirit::utils;
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+
+static DWORD thread_name_tls_index = TLS_OUT_OF_INDEXES;
 
 struct handle_guard_t {
     handle_guard_t() = default;
@@ -146,7 +149,13 @@ static void dump_traces(EXCEPTION_POINTERS *ep) {
         WriteFile(file, buff, out_bytes, &written, {});
         (void)written;
     }
-    out_bytes = snprintf(buff, sizeof(buff), "dump end\n");
+
+    const char *thread_name = "unknown";
+    if (thread_name_tls_index != TLS_OUT_OF_INDEXES) {
+        thread_name = (const char *)TlsGetValue(thread_name_tls_index);
+    }
+
+    out_bytes = snprintf(buff, sizeof(buff), "dump end, thread: %s (%d)\n", thread_name, GetCurrentThreadId());
     WriteFile(file, buff, out_bytes, &written, {});
 }
 
@@ -181,6 +190,8 @@ bool platform_t::startup() {
     }
 
     SetUnhandledExceptionFilter(seh_handler);
+
+    thread_name_tls_index = TlsAlloc();
 #endif
     return true;
 }
@@ -262,27 +273,39 @@ range_t bisect(wchar_t needle, int offset, range_t r) {
 } // namespace
 #endif
 
-bool platform_t::path_supported(const bfs::path &path) noexcept {
+bool platform_t::path_supported(std::string_view str_path) noexcept {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+    auto wname = boost::nowide::widen(str_path);
+    for (size_t i = 0; i < wname.size(); ++i) {
+        auto symbol = wname[i];
+        if (symbol < 31) {
+            return false;
+        }
+        switch (symbol) {
+            // clang-format off
+            case L'<':
+            case L'>':
+            case L':':
+            case L'"':
+            case L'\\':
+            case L'|':
+            case L'?':
+            case L'*':
+                return false;
+            // clang-format on
+        default: /* noop */;
+        }
+    }
+
+    auto path = bfs::path(wname);
     for (auto it = path.begin(); it != path.end(); ++it) {
         auto name = it->stem().wstring();
         auto range = range_t{0, static_cast<int>(reserved_names.size()) - 1};
         for (size_t i = 0; i < name.size(); ++i) {
             auto symbol = name[i];
-            if (symbol < 31) {
-                return false;
-            }
             switch (symbol) {
                 // clang-format off
-                case L'<':
-                case L'>':
-                case L':':
-                case L'"':
-                case L'\\':
                 case L'/':
-                case L'|':
-                case L'?':
-                case L'*':
                     return false;
                 case L'A': symbol = 'a'; break;
                 case L'C': symbol = 'c'; break;
@@ -297,6 +320,7 @@ bool platform_t::path_supported(const bfs::path &path) noexcept {
                 default: /* noop */ ;
                 // clang-format on
             }
+
             range = bisect(symbol, static_cast<int>(i), range);
             if (!range.is_valid()) {
                 break;
@@ -312,7 +336,7 @@ bool platform_t::path_supported(const bfs::path &path) noexcept {
     }
 #endif
 
-    (void)path;
+    (void)str_path;
     return true;
 }
 
@@ -321,4 +345,14 @@ bool platform_t::permissions_supported(const bfs::path &) noexcept {
     return false;
 #endif
     return true;
+}
+
+void platform_t::set_thread_name(std::string_view name) noexcept {
+#if defined(__linux__)
+    pthread_setname_np(pthread_self(), name.data());
+#elif defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+    if (thread_name_tls_index != TLS_OUT_OF_INDEXES) {
+        TlsSetValue(thread_name_tls_index, (void *)name.data());
+    }
+#endif
 }

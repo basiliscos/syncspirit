@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2026 Ivan Baidakou
 
 #include "test-utils.h"
 #include "diff-builder.h"
@@ -566,6 +566,22 @@ TEST_CASE("resolver, reserved names", "[model]") {
         folder_peer->add_strict(file_remote);
         auto action = resolve(*file_remote, folder_my->get_file_infos().by_name("a.txt").get(), *folder_my);
         CHECK(action == A::remote_copy);
+    }
+    SECTION(".___pycache__\two_canvases.pyc") {
+        auto name = std::string_view(".___pycache__\two_canvases.pyc");
+        proto::set_name(pr_remote, name);
+        auto file_remote = file_info_t::create(sequencer->next_uuid(), pr_remote, folder_peer).value();
+        folder_peer->add_strict(file_remote);
+        auto action = resolve(*file_remote, nullptr, *folder_my);
+        CHECK(action == A::ignore);
+    }
+    SECTION("lexers\\sas.sync") {
+        auto name = std::string_view("lexers\\sas.sync");
+        proto::set_name(pr_remote, name);
+        auto file_remote = file_info_t::create(sequencer->next_uuid(), pr_remote, folder_peer).value();
+        folder_peer->add_strict(file_remote);
+        auto action = resolve(*file_remote, nullptr, *folder_my);
+        CHECK(action == A::ignore);
     }
 #endif
 }

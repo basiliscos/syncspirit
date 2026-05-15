@@ -91,6 +91,7 @@ template <typename Backend> struct SYNCSPIRIT_API platform_context_t : context_b
     }
 
     bool wait_next_event() noexcept { return backend.poll(determine_wait_ms()); }
+    void poll_events() noexcept override { backend.poll(0); }
 
     int async_pipes[2];
     std::atomic_bool async_flag;

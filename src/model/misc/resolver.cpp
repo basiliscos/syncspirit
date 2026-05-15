@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2026 Ivan Baidakou
 
 #include "resolver.h"
 #include "model/cluster.h"
 #include "model/folder_info.h"
 #include "proto/proto-helpers-bep.h"
 #include "utils/platform.h"
-#include <boost/nowide/convert.hpp>
 
 namespace syncspirit::model {
 
@@ -123,7 +122,7 @@ advance_action_t resolve(const file_info_t &remote, const file_info_t *local,
         return advance_action_t::ignore;
     }
     auto remote_name = remote.get_name()->get_full_name();
-    if (!P::path_supported(bfs::path(boost::nowide::widen(remote_name)))) {
+    if (!P::path_supported(remote_name)) {
         return advance_action_t::ignore;
     }
     auto action = _resolve(remote, local, local_folder);

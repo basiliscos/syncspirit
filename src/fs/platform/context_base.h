@@ -19,6 +19,7 @@ struct SYNCSPIRIT_API context_base_t : rth::system_context_thread_t {
     context_base_t(const pt::time_duration &poll_timeout) noexcept;
 
     std::uint32_t determine_wait_ms() noexcept;
+    virtual void poll_events() noexcept = 0;
 
     pt::time_duration poll_timeout;
     int poll_timeout_ms;

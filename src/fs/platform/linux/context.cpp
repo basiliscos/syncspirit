@@ -82,13 +82,8 @@ bool linux_backend_t::watch(int fd, io_callback_t callback, void *data) {
 }
 
 bool linux_backend_t::poll(std::uint32_t timeout) {
-    int i = 0;
     assert(io_callbacks.size() == events.size());
-    for (auto &[fd, i_ctx] : io_callbacks) {
-        auto &event = events[i++];
-        event.data.fd = fd;
-        event.events = EPOLLIN;
-    }
+    int i = static_cast<int>(sizeof(events.size()));
 
     auto r = ::epoll_wait(monitor, events.data(), i, timeout);
     if (r == -1) {

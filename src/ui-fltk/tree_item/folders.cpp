@@ -205,6 +205,7 @@ bool folders_t::on_select() {
         db::set_rescan_interval(db_folder, 3600);
         db::set_path(db_folder, boost::nowide::narrow(path.wstring()));
         db::set_id(db_folder, id);
+        db::set_folder_type(db_folder, db::FolderType::send_and_receive);
         db::set_watched(db_folder, true);
         auto folder = model::folder_t::create(sequencer.next_uuid(), db_folder).value();
         folder->assign_cluster(cluster);

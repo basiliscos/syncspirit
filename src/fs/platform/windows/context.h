@@ -52,7 +52,10 @@ struct SYNCSPIRIT_API platform_context_t : context_base_t {
     ~platform_context_t();
 
     void notify() noexcept;
+    bool poll_events_impl(std::uint32_t timeout_ms) noexcept;
+
     bool wait_next_event() noexcept;
+    void poll_events() noexcept override;
 
     io_callbacks_map_t io_callbacks;
     handles_t handles;

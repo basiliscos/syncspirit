@@ -10,15 +10,13 @@
 #include "model/diff/diff_assembler.h"
 #include "model/misc/file_iterator.h"
 #include "model/misc/block_iterator.h"
+#include "model/misc/postponed_files.h"
 #include "model/misc/updates_streamer.h"
 #include "model/misc/sequencer.h"
 #include "hasher/messages.h"
 #include "hasher/hasher_plugin.h"
 #include "fs/messages.h"
 
-#include <boost/multi_index_container.hpp>
-#include <boost/multi_index/ordered_index.hpp>
-#include <boost/multi_index/member.hpp>
 #include <unordered_map>
 #include <optional>
 #include <list>
@@ -27,7 +25,6 @@ namespace syncspirit {
 namespace net {
 
 namespace bfs = std::filesystem;
-namespace mi = boost::multi_index;
 namespace outcome = boost::outcome_v2;
 
 struct SYNCSPIRIT_API controller_actor_t final : public model_actor_t<r::actor_base_t>,
@@ -118,74 +115,25 @@ struct SYNCSPIRIT_API controller_actor_t final : public model_actor_t<r::actor_b
     // clang-format on
 
     controller_actor_t(config_t &config);
+    ~controller_actor_t();
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
     void on_start() noexcept override;
     void shutdown_start() noexcept override;
     void shutdown_finish() noexcept override;
     void visit(const model::diff::cluster_diff_t &, model::payload::apply_context_t &) noexcept override;
 
-    struct stack_context_t : model::diff::diff_assember_t {
-        using parent_t = model::diff::diff_assember_t;
-        stack_context_t(controller_actor_t &actor_) noexcept;
-        ~stack_context_t();
-        void push(fs::payload::io_command_t command) noexcept;
-        void push(fs::payload::append_block_t command) noexcept;
-        void push(utils::bytes_t data) noexcept;
-
-      private:
-        using commands_t = std::vector<fs::payload::io_command_t>;
-        controller_actor_t &actor;
-        commands_t io_commands;
-        utils::bytes_t peer_data;
-    };
-
-    struct block_2_file_t {
-        model::block_info_ptr_t block;
-        model::file_info_ptr_t file;
-    };
-
   private:
-    struct update_context_t : stack_context_t {
-        update_context_t(controller_actor_t &actor, bool from_self_, bool cluster_config_sent_) noexcept;
-
-        bool from_self;
-        bool cluster_config_sent;
-    };
+    struct block_ack_context_t;
+    struct stack_context_t;
+    struct update_context_t;
 
     using peers_map_t = std::unordered_map<r::address_ptr_t, model::device_ptr_t>;
     using io_queue_t = std::list<fs::payload::io_command_t>;
 
-    using block_2_files_t = mi::multi_index_container<
-        block_2_file_t,
-        mi::indexed_by<
-            mi::ordered_non_unique<mi::member<block_2_file_t, model::block_info_ptr_t, &block_2_file_t::block>>,
-            mi::ordered_non_unique<mi::member<block_2_file_t, model::file_info_ptr_t, &block_2_file_t::file>>>>;
+    struct folder_synchronization_t;
+    using folder_sync_ptr_t = std::unique_ptr<folder_synchronization_t>;
 
-    struct folder_synchronization_t {
-        using block_set_t = std::unordered_map<utils::bytes_view_t, model::block_info_ptr_t>;
-        folder_synchronization_t(controller_actor_t &controller, model::folder_t &folder) noexcept;
-        folder_synchronization_t(const folder_synchronization_t &) = delete;
-        folder_synchronization_t(folder_synchronization_t &&) noexcept = default;
-        ~folder_synchronization_t();
-
-        folder_synchronization_t &operator=(folder_synchronization_t &&) noexcept = default;
-
-        void reset() noexcept;
-
-        void start_fetching(model::block_info_t *, stack_context_t &) noexcept;
-        model::block_info_ptr_t finish_fetching(utils::bytes_view_t hash, stack_context_t &) noexcept;
-
-        void start_sync(stack_context_t &) noexcept;
-        void finish_sync(stack_context_t &) noexcept;
-
-      private:
-        controller_actor_t *controller = nullptr;
-        model::folder_ptr_t folder;
-        block_set_t blocks;
-        bool synchronizing = false;
-    };
-
-    using synchronizing_folders_t = std::unordered_map<model::folder_ptr_t, folder_synchronization_t>;
+    using synchronizing_folders_t = std::unordered_map<model::folder_ptr_t, folder_sync_ptr_t>;
     using synchronizing_files_t = std::unordered_map<utils::bytes_view_t, model::file_info_t::guard_t>;
     using postponed_files_t = std::unordered_set<model::file_info_ptr_t>;
     using updates_streamer_ptr_t = std::unique_ptr<model::updates_streamer_t>;
@@ -233,7 +181,8 @@ struct SYNCSPIRIT_API controller_actor_t final : public model_actor_t<r::actor_b
 
     void acquire_block(const model::file_block_t &block, const model::folder_info_t &folder_info,
                        stack_context_t &) noexcept;
-    void release_block(std::string_view folder_id, utils::bytes_view_t hash, stack_context_t &) noexcept;
+    model::block_info_ptr_t release_block(std::string_view folder_id, utils::bytes_view_t hash,
+                                          stack_context_t &) noexcept;
     folder_synchronization_t &get_sync_info(model::folder_t *folder) noexcept;
     folder_synchronization_t &get_sync_info(std::string_view folder_id) noexcept;
     void cancel_sync(model::file_info_t *) noexcept;
@@ -274,8 +223,7 @@ struct SYNCSPIRIT_API controller_actor_t final : public model_actor_t<r::actor_b
     model::block_iterator_ptr_t block_iterator;
     synchronizing_folders_t synchronizing_folders;
     synchronizing_files_t synchronizing_files;
-    postponed_files_t postponed_files;
-    block_2_files_t block_2_files;
+    model::postponed_files_t postponed_files;
     io_queue_t block_write_queue;
     io_queue_t block_read_queue;
     block_requests_t block_requests;

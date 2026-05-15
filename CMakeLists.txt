@@ -210,6 +210,7 @@ add_library(syncspirit_core
     src/model/misc/orphaned_blocks.cpp
     src/model/misc/path.cpp
     src/model/misc/path_cache.cpp
+    src/model/misc/postponed_files.cpp
     src/model/misc/resolver.cpp
     src/model/misc/sequencer.cpp
     src/model/misc/updates_streamer.cpp
