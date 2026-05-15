@@ -567,14 +567,13 @@ TEST_CASE("resolver, reserved names", "[model]") {
         auto action = resolve(*file_remote, folder_my->get_file_infos().by_name("a.txt").get(), *folder_my);
         CHECK(action == A::remote_copy);
     }
-    SECTION("turtledemo/.___pycache__\two_canvases.cpython-314.sync-conflict-20260126-212548-BWNF2EV.pyc") {
-        auto name = std::string_view(
-            "turtledemo/.___pycache__\two_canvases.cpython-314.sync-conflict-20260126-212548-BWNF2EV.pyc");
+    SECTION(".___pycache__\two_canvases.pyc") {
+        auto name = std::string_view(".___pycache__\two_canvases.pyc");
         proto::set_name(pr_remote, name);
         auto file_remote = file_info_t::create(sequencer->next_uuid(), pr_remote, folder_peer).value();
         folder_peer->add_strict(file_remote);
         auto action = resolve(*file_remote, nullptr, *folder_my);
-        CHECK(action == A::remote_copy);
+        CHECK(action == A::ignore);
     }
 #endif
 }

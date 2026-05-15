@@ -227,6 +227,8 @@ struct range_t {
     bool is_valid() const { return a <= b; };
 };
 
+static constexpr auto invalid_range = range_t{1, -1};
+
 range_t bisect(wchar_t needle, int offset, range_t r) {
     int a = r.a;
     bool found_a = false;
@@ -307,16 +309,15 @@ bool platform_t::path_supported(const bfs::path &path) noexcept {
                 default: /* noop */ ;
                 // clang-format on
             }
-            range = bisect(symbol, static_cast<int>(i), range);
-            if (!range.is_valid()) {
-                break;
-            }
-            if (range.a == range.b && ((i + 1) == name.size())) {
-                auto &reserved = reserved_names[range.a];
-                if (reserved.size() == name.size()) {
-                    return false;
+            if (range.is_valid()) {
+                range = bisect(symbol, static_cast<int>(i), range);
+                if (range.a == range.b && ((i + 1) == name.size())) {
+                    auto &reserved = reserved_names[range.a];
+                    if (reserved.size() == name.size()) {
+                        return false;
+                    }
+                    range = invalid_range;
                 }
-                break;
             }
         }
     }
