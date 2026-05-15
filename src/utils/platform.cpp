@@ -10,6 +10,7 @@
 #include <zlib.h>
 #include <spdlog/spdlog.h>
 #include <cxxabi.h>
+#include <boost/nowide/convert.hpp>
 #endif
 
 using namespace syncspirit::utils;
@@ -227,8 +228,6 @@ struct range_t {
     bool is_valid() const { return a <= b; };
 };
 
-static constexpr auto invalid_range = range_t{1, -1};
-
 range_t bisect(wchar_t needle, int offset, range_t r) {
     int a = r.a;
     bool found_a = false;
@@ -274,27 +273,39 @@ range_t bisect(wchar_t needle, int offset, range_t r) {
 } // namespace
 #endif
 
-bool platform_t::path_supported(const bfs::path &path) noexcept {
+bool platform_t::path_supported(std::string_view str_path) noexcept {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+    auto wname = boost::nowide::widen(str_path);
+    for (size_t i = 0; i < wname.size(); ++i) {
+        auto symbol = wname[i];
+        if (symbol < 31) {
+            return false;
+        }
+        switch (symbol) {
+            // clang-format off
+            case L'<':
+            case L'>':
+            case L':':
+            case L'"':
+            case L'\\':
+            case L'|':
+            case L'?':
+            case L'*':
+                return false;
+            // clang-format on
+        default: /* noop */;
+        }
+    }
+
+    auto path = bfs::path(wname);
     for (auto it = path.begin(); it != path.end(); ++it) {
         auto name = it->stem().wstring();
         auto range = range_t{0, static_cast<int>(reserved_names.size()) - 1};
         for (size_t i = 0; i < name.size(); ++i) {
             auto symbol = name[i];
-            if (symbol < 31) {
-                return false;
-            }
             switch (symbol) {
                 // clang-format off
-                case L'<':
-                case L'>':
-                case L':':
-                case L'"':
-                case L'\\':
                 case L'/':
-                case L'|':
-                case L'?':
-                case L'*':
                     return false;
                 case L'A': symbol = 'a'; break;
                 case L'C': symbol = 'c'; break;
@@ -309,21 +320,23 @@ bool platform_t::path_supported(const bfs::path &path) noexcept {
                 default: /* noop */ ;
                 // clang-format on
             }
-            if (range.is_valid()) {
-                range = bisect(symbol, static_cast<int>(i), range);
-                if (range.a == range.b && ((i + 1) == name.size())) {
-                    auto &reserved = reserved_names[range.a];
-                    if (reserved.size() == name.size()) {
-                        return false;
-                    }
-                    range = invalid_range;
+
+            range = bisect(symbol, static_cast<int>(i), range);
+            if (!range.is_valid()) {
+                break;
+            }
+            if (range.a == range.b && ((i + 1) == name.size())) {
+                auto &reserved = reserved_names[range.a];
+                if (reserved.size() == name.size()) {
+                    return false;
                 }
+                break;
             }
         }
     }
 #endif
 
-    (void)path;
+    (void)str_path;
     return true;
 }
 
