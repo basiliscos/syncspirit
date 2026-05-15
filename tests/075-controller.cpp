@@ -1262,7 +1262,7 @@ void test_downloading_errors() {
                 peer_actor->push_response(data_1, 0);
                 peer_actor->push_response(data_2, 1);
                 expected_state = r::state_t::SHUT_DOWN;
-                expected_unreachability = false;
+                expected_unreachability = true;
             }
             SECTION("wrong request id") {
                 proto::Response res;

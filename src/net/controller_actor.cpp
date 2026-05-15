@@ -170,6 +170,21 @@ struct C::stack_context_t : model::diff::diff_assember_t {
         return locked_blocks.count(&block) || block.is_locked();
     }
 
+    void mark_unreachable(std::string_view name, std::string_view folder_id) noexcept {
+        auto folder = actor.cluster->get_folders().by_id(folder_id);
+        if (folder) {
+            auto peer_folder = folder->get_folder_infos().by_device(*actor.peer);
+            if (peer_folder) {
+                auto peer_file = peer_folder->get_file_infos().by_name(name);
+                if (peer_file && !peer_file->is_unreachable()) {
+                    LOG_DEBUG(actor.log, "marking '{}' marking unreachable", peer_file);
+                    peer_file->mark_unreachable(true);
+                    push_back(new model::diff::modify::mark_reachable_t(*peer_file, *peer_folder, false));
+                }
+            }
+        }
+    }
+
     allocator_t &get_allocator() { return allocator; }
 
   private:
@@ -423,12 +438,11 @@ void controller_actor_t::on_postprocess_io(fs::message::io_commands_t &message) 
                     if constexpr (modify) {
                         cluster->modify_write_requests(+1);
                     }
+                    postprocess_io(cmd, stack_ctx);
                     if (cmd.result.has_error()) {
                         auto &ec = cmd.result.assume_error();
                         LOG_ERROR(log, "i/o error (postprocessing): {}", ec.message());
                         do_shutdown(make_error(ec));
-                    } else {
-                        postprocess_io(cmd, stack_ctx);
                     }
                 }
             },
@@ -1181,9 +1195,8 @@ void controller_actor_t::on_message(proto::Response &message, stack_context_t &c
         if (code_int) {
             do_release_block = true;
             if (!file->is_unreachable()) {
-                LOG_WARN(log, "can't receive block from file '{}': {}; marking unreachable", *file, code_int);
-                file->mark_unreachable(true);
-                stack_ctx.push_back(new model::diff::modify::mark_reachable_t(*file, *peer_folder, false));
+                LOG_WARN(log, "can't receive block from file '{}': {}", *file, code_int);
+                stack_ctx.mark_unreachable(file_name, folder_id);
                 cancel_sync(file.get());
             }
         } else {
@@ -1226,28 +1239,51 @@ void controller_actor_t::postprocess_io(fs::payload::block_request_t &res, stack
 
 void controller_actor_t::postprocess_io(fs::payload::remote_copy_t &res, stack_context_t &ctx) noexcept {
     using namespace model::diff::advance;
-    assert(res.result);
     auto io_ctx = static_cast<remote_copy_context_t *>(res.context.get());
-    auto diff = advance_t::create(io_ctx->action, *io_ctx->peer_file, *io_ctx->peer_folder, *sequencer);
-    ctx.push_back(diff.get());
+    if (res.result) {
+        auto diff = advance_t::create(io_ctx->action, *io_ctx->peer_file, *io_ctx->peer_folder, *sequencer);
+        ctx.push_back(diff.get());
+    } else {
+        auto name = io_ctx->peer_file->get_name()->get_full_name();
+        auto folder_id = io_ctx->peer_folder->get_folder()->get_id();
+        ctx.mark_unreachable(name, folder_id);
+    }
 }
 
 void controller_actor_t::postprocess_io(fs::payload::append_block_t &res, stack_context_t &ctx) noexcept {
     auto io_ctx = static_cast<block_ack_context_t *>(res.context.get());
-    ctx.ack_block(io_ctx, true);
+    if (res.result) {
+        ctx.ack_block(io_ctx, true);
+    } else {
+        auto name = io_ctx->target_file->get_name()->get_full_name();
+        auto folder_id = io_ctx->folder->get_id();
+        ctx.mark_unreachable(name, folder_id);
+    }
 }
 
 void controller_actor_t::postprocess_io(fs::payload::clone_block_t &res, stack_context_t &ctx) noexcept {
     auto io_ctx = static_cast<block_ack_context_t *>(res.context.get());
-    ctx.ack_block(io_ctx, false);
+    if (res.result) {
+        ctx.ack_block(io_ctx, false);
+    } else {
+        auto name = io_ctx->target_file->get_name()->get_full_name();
+        auto folder_id = io_ctx->folder->get_id();
+        ctx.mark_unreachable(name, folder_id);
+    }
 }
 
 void controller_actor_t::postprocess_io(fs::payload::finish_file_t &res, stack_context_t &ctx) noexcept {
     using namespace model::diff;
     auto io_ctx = static_cast<finish_file_context_t *>(res.context.get());
 
-    auto diff = advance::advance_t::create(io_ctx->action, *io_ctx->peer_file, *io_ctx->peer_folder, *sequencer);
-    ctx.push_back(diff.get());
+    if (res.result) {
+        auto diff = advance::advance_t::create(io_ctx->action, *io_ctx->peer_file, *io_ctx->peer_folder, *sequencer);
+        ctx.push_back(diff.get());
+    } else {
+        auto name = io_ctx->peer_file->get_name()->get_full_name();
+        auto folder_id = io_ctx->peer_folder->get_folder()->get_id();
+        ctx.mark_unreachable(name, folder_id);
+    }
 }
 
 void controller_actor_t::on_digest(hasher::message::digest_t &res) noexcept {
@@ -1305,13 +1341,12 @@ void controller_actor_t::on_digest(hasher::message::digest_t &res) noexcept {
         if (result.has_error() || result.assume_value() != block->get_hash()) {
             if (!file->is_unreachable()) {
                 if (result.has_error()) {
-                    LOG_WARN(log, "hashing error of '{}' : {},  marking unreachable", *file, result.error().message());
+                    LOG_WARN(log, "hashing error of '{}' : {}", *file, result.error().message());
                 } else {
-                    LOG_WARN(log, "digest mismatch for file '{}', expected '{}', got '{}'; marking unreachable", *file,
-                             block->get_hash(), result.assume_value());
+                    LOG_WARN(log, "digest mismatch for file '{}', expected '{}', got '{}'", *file, block->get_hash(),
+                             result.assume_value());
                 }
-                file->mark_unreachable(true);
-                stack_ctx.push_back(new model::diff::modify::mark_reachable_t(*file, *peer_folder, false));
+                stack_ctx.mark_unreachable(file_name, folder_id);
             }
             do_release_block = true;
             try_next = true;
