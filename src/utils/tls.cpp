@@ -218,7 +218,7 @@ static bool write_mem_to(const char *path, BIO *mem) {
     if (size == 0) {
         return true;
     }
-    auto file = utils::io_stream_t::open_write(path, 0).stream;
+    auto file = utils::io_stream_t::open_truncate(path);
     return file.write(ptr, size);
 }
 

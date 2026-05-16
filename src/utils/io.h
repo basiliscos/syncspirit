@@ -6,7 +6,6 @@
 #include "syncspirit-export.h"
 #include <filesystem>
 #include <optional>
-#include <stdio.h>
 #include <cstdint>
 #include <string_view>
 
@@ -44,8 +43,8 @@ struct SYNCSPIRIT_API io_stream_t {
     operator bool() const noexcept;
 
   private:
-    io_stream_t(FILE *file) noexcept;
-    FILE *file = nullptr;
+    io_stream_t(int fd) noexcept;
+    int fd = -1;
 };
 
 namespace details {

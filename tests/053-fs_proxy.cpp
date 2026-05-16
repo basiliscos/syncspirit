@@ -48,13 +48,11 @@ TEST_CASE("block iterator", "[model]") {
         SECTION("empty file") {
             auto f = proxy.open_write(path, 0);
             REQUIRE(f);
-#ifndef SYNCSPIRIT_WATCHER_KQUEUE
-            CHECK(mediator.is_masked(path_str) == 2);
-#else
             CHECK(mediator.is_masked(path_str) == 1);
+#ifdef SYNCSPIRIT_WATCHER_KQUEUE
             CHECK(mediator.is_masked(path.parent_path().string()) == 1);
 #endif
-            CHECK(proxy.mediator_updates == 2);
+            CHECK(proxy.mediator_updates == 1);
             REQUIRE(bfs::exists(path));
             CHECK(bfs::file_size(path) == 0);
         }
