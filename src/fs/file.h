@@ -51,9 +51,9 @@ struct SYNCSPIRIT_API file_t : model::arc_base_t<file_t> {
     static outcome::result<file_t> open_read(const bfs::path &path) noexcept;
 
   private:
-    using backend_ptr_t = std::unique_ptr<utils::fstream_t>;
-    file_t(utils::fstream_t backend, bfs::path path, bfs::path model_path, std::uint64_t file_size) noexcept;
-    file_t(utils::fstream_t backend, bfs::path path) noexcept;
+    using backend_ptr_t = std::unique_ptr<utils::io_stream_t>;
+    file_t(utils::io_stream_t backend, bfs::path path, bfs::path model_path, std::uint64_t file_size) noexcept;
+    file_t(utils::io_stream_t backend, bfs::path path) noexcept;
 
     backend_ptr_t backend;
     bfs::path path;

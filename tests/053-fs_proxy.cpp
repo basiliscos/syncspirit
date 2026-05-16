@@ -188,7 +188,7 @@ TEST_CASE("block iterator", "[model]") {
         mediator.clean_expired();
         CHECK(mediator.is_masked(path_str) == 0);
         proxy.write(path, f, as_bytes("12345"));
-        CHECK(mediator.is_masked(path_str) == 2);
+        CHECK(mediator.is_masked(path_str) == 1);
     }
 }
 

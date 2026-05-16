@@ -176,10 +176,9 @@ std::pair<dist_sink_t, logger_t> create_root_logger() noexcept {
 SYNCSPIRIT_API logger_t get_root_logger() noexcept { return spdlog::get(""); }
 
 auto bootstrap(dist_sink_t &dist_sink, const bfs::path &dir) noexcept -> bootstrap_guard_ptr_t {
-    using F = fstream_t;
-    auto file_path = dir / bootstrap_sink;
-    auto file = fstream_t(file_path, F::trunc | F::out | F::binary);
     auto file_sink = spdlog::sink_ptr();
+    auto file_path = dir / bootstrap_sink;
+    auto file = io_stream_t::open_truncate(file_path);
     if (file) {
         file.close();
 #if defined(_WIN32) && defined(SPDLOG_WCHAR_FILENAMES)

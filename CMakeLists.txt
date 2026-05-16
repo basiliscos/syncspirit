@@ -281,6 +281,7 @@ add_library(syncspirit_core
     src/utils/dns.cpp
     src/utils/error_code.cpp
     src/utils/format.cpp
+    src/utils/io.cpp
     src/utils/location.cpp
     src/utils/log.cpp
     src/utils/log-setup.cpp

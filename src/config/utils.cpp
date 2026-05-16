@@ -9,6 +9,7 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/nowide/convert.hpp>
 #include <spdlog/spdlog.h>
+#include <sstream>
 #include "utils/log.h"
 #include "utils/location.h"
 
@@ -228,7 +229,7 @@ static main_t make_default_config(const bfs::path &config_path, const bfs::path 
     return cfg;
 }
 
-config_result_t get_config(std::istream &config, const bfs::path &config_path) {
+config_result_t get_config(std::string_view config, const bfs::path &config_path) {
     auto dir = config_path.parent_path();
     main_t cfg;
     cfg.config_path = config_path;
@@ -410,7 +411,7 @@ static std::string_view get_level(spdlog::level::level_enum level) noexcept {
     return "unknown";
 }
 
-outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
+std::string serialize(const main_t& cfg) noexcept {
     using boost::nowide::narrow;
 
     auto logs = toml::array{};
@@ -512,8 +513,9 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
                  }}},
     }};
     // clang-format on
+    auto out = std::stringstream();
     out << tbl;
-    return outcome::success();
+    return std::move(out.str());
 }
 
 outcome::result<main_t> generate_config(const bfs::path &config_path) {

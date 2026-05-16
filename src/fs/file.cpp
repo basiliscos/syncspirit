@@ -28,7 +28,7 @@ auto file_t::open_write(fs_proxy_t &fs_proxy, const bfs::path &model_path, std::
 }
 
 auto file_t::open_read(const bfs::path &path) noexcept -> outcome::result<file_t> {
-    auto file = utils::fstream_t(path, utils::fstream_t::binary | utils::fstream_t::in);
+    auto file = utils::io_stream_t::open_read(path);
     if (!file) {
         return sys::error_code{errno, sys::system_category()};
     }
@@ -37,16 +37,16 @@ auto file_t::open_read(const bfs::path &path) noexcept -> outcome::result<file_t
 
 file_t::file_t() noexcept {};
 
-file_t::file_t(utils::fstream_t backend_, bfs::path path_, bfs::path model_path_, std::uint64_t file_size_) noexcept
-    : backend{new utils::fstream_t(std::move(backend_))}, path{std::move(path_)}, file_size{file_size_} {
+file_t::file_t(utils::io_stream_t backend_, bfs::path path_, bfs::path model_path_, std::uint64_t file_size_) noexcept
+    : backend{new utils::io_stream_t(std::move(backend_))}, path{std::move(path_)}, file_size{file_size_} {
     model_path = std::move(model_path_);
     model_path.make_preferred();
     path.make_preferred();
     path_str = narrow(model_path.generic_wstring());
 }
 
-file_t::file_t(utils::fstream_t backend_, bfs::path path_) noexcept
-    : backend{new utils::fstream_t(std::move(backend_))}, path{std::move(path_)}, file_size{0} {
+file_t::file_t(utils::io_stream_t backend_, bfs::path path_) noexcept
+    : backend{new utils::io_stream_t(std::move(backend_))}, path{std::move(path_)}, file_size{0} {
     path.make_preferred();
     path_str = boost::nowide::narrow(path.generic_wstring());
 }
@@ -122,19 +122,18 @@ auto file_t::remove(fs_proxy_t &fs_proxy) noexcept -> outcome::result<void> {
 }
 
 auto file_t::read(std::uint64_t offset, std::uint64_t size) const noexcept -> outcome::result<utils::bytes_t> {
-    if (backend->tellg() != offset) {
-        if (!backend->seekp((long)offset, std::ios_base::beg)) {
-            return sys::errc::make_error_code(sys::errc::io_error);
+    if (auto pos = backend->get_position(); !pos || *pos != offset) {
+        if (!pos) {
+            return sys::error_code{errno, sys::system_category()};
+        } else if (!backend->set_position(offset)) {
+            return sys::error_code{errno, sys::system_category()};
         }
     }
 
     utils::bytes_t r;
     r.resize(size);
-    if (!backend->read(reinterpret_cast<char *>(r.data()), size)) {
-        return sys::errc::make_error_code(sys::errc::io_error);
-    }
-    if (backend->gcount() != size) {
-        return sys::errc::make_error_code(sys::errc::io_error);
+    if (!backend->read(r.data(), size)) {
+        return sys::error_code{errno, sys::system_category()};
     }
 
     return r;
@@ -142,11 +141,11 @@ auto file_t::read(std::uint64_t offset, std::uint64_t size) const noexcept -> ou
 
 auto file_t::write(fs_proxy_t &fs_proxy, uint64_t offset, utils::bytes_view_t data) noexcept -> outcome::result<void> {
     assert(offset + data.size() <= file_size);
-    if (auto pos = backend->tellp(); pos != offset) {
-        if (pos == -1) {
-            return sys::errc::make_error_code(sys::errc::io_error);
-        } else if (!backend->seekp((long)offset, std::ios_base::beg)) {
-            return sys::errc::make_error_code(sys::errc::io_error);
+    if (auto pos = backend->get_position(); !pos || *pos != offset) {
+        if (!pos) {
+            sys::error_code{errno, sys::system_category()};
+        } else if (!backend->set_position(offset)) {
+            sys::error_code{errno, sys::system_category()};
         }
     }
 

@@ -28,48 +28,26 @@ fs_proxy_t::fs_proxy_t(updates_mediator_t &updates_mediator_, const pt::ptime &d
 #endif
 
 auto fs_proxy_t::open_write(const bfs::path &path, std::uint64_t file_size) noexcept
-    -> outcome::result<utils::fstream_t> {
-    using mode_t = utils::fstream_t;
+    -> outcome::result<utils::io_stream_t> {
+    auto [file, resized, created] = utils::io_stream_t::open_write(path, file_size);
 
-    bool need_resize = true;
-
-    SS_STAT_BUFF stat_info;
-    auto r = SS_STAT_FN(path, &stat_info);
-    if (r == 0) {
-        need_resize = static_cast<uint64_t>(stat_info.st_size) == file_size;
-    }
-    auto mode = mode_t::in | mode_t::out | mode_t::binary;
-    if (need_resize) {
-        if (r == -1) {
-            auto file = utils::fstream_t(path, mode | mode_t::trunc);
-            if (!file) {
-                return sys::error_code{errno, sys::system_category()};
-            } else {
-#ifndef SYNCSPIRIT_WATCHER_KQUEUE
-                updates_mediator.mask(path, {}, deadline);
-#else
-                updates_mediator.mask(path.parent_path(), {}, deadline);
-#endif
-                ++mediator_updates;
-            }
-
-            mode = mode & ~mode_t::trunc;
-        }
-        auto ec = std::error_code();
-        bfs::resize_file(path, file_size, ec);
-        if (ec) {
-            return ec;
-        } else {
-            updates_mediator.mask(path, {}, deadline);
-            ++mediator_updates;
-        }
-    }
-
-    auto file = utils::fstream_t(path, mode);
     if (!file) {
         return sys::error_code{errno, sys::system_category()};
     }
-    return std::move(file);
+
+    if (created) {
+#ifndef SYNCSPIRIT_WATCHER_KQUEUE
+        updates_mediator.mask(path, {}, deadline);
+#else
+        updates_mediator.mask(path.parent_path(), {}, deadline);
+#endif
+        ++mediator_updates;
+    }
+    if (resized) {
+        updates_mediator.mask(path, {}, deadline);
+        ++mediator_updates;
+    }
+    return outcome::success(std::move(file));
 }
 
 sys::error_code fs_proxy_t::rename(const bfs::path &from, const bfs::path &to) noexcept {
@@ -123,13 +101,9 @@ sys::error_code fs_proxy_t::remove_file(const bfs::path &path) noexcept {
     return ec;
 }
 
-sys::error_code fs_proxy_t::write(const bfs::path &path, utils::fstream_t &stream, utils::bytes_view_t data) noexcept {
-    auto ptr = reinterpret_cast<const char *>(data.data());
-    if (!stream.write(ptr, data.size())) {
-        return sys::errc::make_error_code(sys::errc::io_error);
-    }
-    updates_mediator.mask(path, {}, deadline);
-    if (!stream.flush()) {
+sys::error_code fs_proxy_t::write(const bfs::path &path, utils::io_stream_t &stream,
+                                  utils::bytes_view_t data) noexcept {
+    if (!stream.write(data.data(), data.size())) {
         return sys::errc::make_error_code(sys::errc::io_error);
     }
     updates_mediator.mask(path, {}, deadline);

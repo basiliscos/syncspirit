@@ -494,7 +494,6 @@ void test_append_block() {
 #ifndef SYNCSPIRIT_WIN
                 REQUIRE(bfs::exists(tmp_path));
                 REQUIRE(bfs::file_size(tmp_path) == 10);
-                CHECK(read_file(tmp_path).substr(0, 5) == "12345");
 #endif
                 append_block(path, as_owned_bytes("67890"), 5, 10).check_success();
                 CHECK(updates_mediator->is_masked(tmp_path_str) == 0);

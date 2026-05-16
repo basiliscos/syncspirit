@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "log_panel.h"
 
@@ -12,6 +12,7 @@
 #include <FL/fl_draw.H>
 #include <FL/Fl_Native_File_Chooser.H>
 #include <boost/algorithm/string/replace.hpp>
+#include <boost/nowide/convert.hpp>
 
 using fmt::format_to;
 
@@ -105,9 +106,14 @@ static void export_log(Fl_Widget *, void *data) {
 
     // write
     auto filename = file_chooser.filename();
-    using file_t = syncspirit::utils::fstream_t;
-    auto out = file_t(filename, file_t::binary);
-    out << "level, date, source, message" << eol;
+    auto path = bfs::path(boost::nowide::widen(filename));
+    using file_t = syncspirit::utils::io_stream_t;
+    auto out = file_t::open_truncate(filename);
+    if (!out.write("level, date, source, message\n")) {
+        auto ec = sys::error_code{errno, sys::system_category()};
+        log->warn("cannot write logs: {}", ec.message());
+        return;
+    }
 
     auto escape_message = [](const std::string &msg) -> std::string {
         auto copy = boost::replace_all_copy<std::string>(msg, "\"", "\"\"");
@@ -115,8 +121,14 @@ static void export_log(Fl_Widget *, void *data) {
     };
 
     while (auto record = it_selected->next()) {
-        out << record->level << ", " << record->date << ", " << record->source << ", "
-            << escape_message(record->message) << eol;
+        auto msg = fmt::format("{}, {}, {}, {}\n", static_cast<int>(record->level), record->date, record->source,
+                               escape_message(record->message));
+
+        if (!out.write(msg)) {
+            auto ec = sys::error_code{errno, sys::system_category()};
+            log->warn("cannot write logs: {}", ec.message());
+            return;
+        }
     }
     log->info("logs wrote to {}", filename);
 }

@@ -179,14 +179,10 @@ void app_supervisor_t::shutdown_finish() noexcept {
     if (main_window) {
         main_window->on_shutdown();
     }
-    std::stringstream out;
-    std::stringstream out_orig;
-    auto r = config::serialize(app_config, out);
-    auto r_orig = config::serialize(app_config_original, out_orig);
-    if (r.has_value() && r_orig.has_value()) {
-        if (out.str() != out_orig.str()) {
-            write_config(app_config);
-        }
+    auto cfg = config::serialize(app_config);
+    auto cfg_orig = config::serialize(app_config_original);
+    if (cfg != cfg) {
+        write_config(app_config);
     }
 }
 
@@ -640,16 +636,21 @@ auto app_supervisor_t::apply(const model::diff::load::load_cluster_t &diff, void
 }
 
 void app_supervisor_t::write_config(const config::main_t &cfg) noexcept {
-    using F = utils::fstream_t;
     log->debug("going to write config");
     auto &path = get_config_path();
-    utils::fstream_t f_cfg(path.string(), F::binary | F::trunc | F::in | F::out);
-    auto r = config::serialize(cfg, f_cfg);
-    if (!r) {
-        log->error("cannot save default config at {}: {}", path, r.error().message());
-    } else {
-        log->info("succesfully stored config at {}. Restart to apply", path);
+    auto cfg_str = config::serialize(cfg);
+    auto file = utils::io_stream_t::open_truncate(path);
+    if (!file) {
+        auto ec = sys::error_code{errno, sys::system_category()};
+        log->error("cannot open config '{}': {}", path, ec.message());
+        return;
     }
+    if (!file.write(cfg_str)) {
+        auto ec = sys::error_code{errno, sys::system_category()};
+        log->error("cannot save default config at '{}': {}", path, ec.message());
+        return;
+    }
+    log->info("succesfully stored config at {}. Restart to apply", path);
     app_config_original = app_config = cfg;
 }
 
