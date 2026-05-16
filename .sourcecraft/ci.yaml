@@ -172,6 +172,7 @@ tasks:
           - cp .sourcecraft/conan-profile-linux-appimage /root/.conan2/profiles/default
           - mkdir build.ci
           - apt-get remove -y g++9 gcc-9
+          - apt-get -y autoremove --purge
           - cd build.ci
           - whereis gcc
           - whereis x86_64-pc-linux-gnu-gcc
