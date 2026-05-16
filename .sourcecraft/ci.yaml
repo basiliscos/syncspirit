@@ -161,7 +161,7 @@ tasks:
           - tar -xf gcc-14.3.0.tar.xz
           - cd gcc-14.3.0
           - ./contrib/download_prerequisites
-          - ./configure --prefix=/$HOME/my-gcc --enable-languages=c,c++ --disable-multilib --enable-bootstrap
+          - ./configure --prefix=/$HOME/my-gcc --enable-languages=c,c++ --disable-multilib --disable-bootstrap --disable-libstdcxx-pch --disable-libsanitizer --disable-libquadmath --disable-libgomp --disable-libvtv --disable-libssp
           - make -j`nproc` > /dev/null
           - make install
           - cd ..
