@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2026 Ivan Baidakou
 
 #pragma once
 
@@ -36,6 +36,7 @@ struct tree_item_t : Fl_Tree_Item {
     virtual void on_delete();
     virtual void on_open();
     virtual void on_close();
+    virtual void on_frame_render();
 
     void select_other();
     augmentation_ptr_t get_proxy();

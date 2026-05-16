@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2026 Ivan Baidakou
 
 #include "devices.h"
 #include "self_device.h"
@@ -262,4 +262,11 @@ peer_device_t *devices_t::get_peer(const model::device_t &peer) {
 void devices_t::remove_child(tree_item_t *child) {
     parent_t::remove_child(child);
     update_label();
+}
+
+void devices_t::on_frame_render() {
+    for (int i = 1; i < children(); ++i) {
+        auto node = static_cast<tree_item_t *>(child(i));
+        node->on_frame_render();
+    }
 }

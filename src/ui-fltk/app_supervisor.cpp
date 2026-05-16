@@ -49,7 +49,7 @@ using namespace syncspirit::fltk;
 using namespace syncspirit::presentation;
 
 static auto MAX_DEPTH = std::numeric_limits<std::int32_t>::max();
-static auto UPDATE_DELAY = r::pt::milliseconds{40};
+static auto UPDATE_DELAY = r::pt::milliseconds{100};
 
 using entities_ptrs_t = std::pmr::unordered_set<const entity_t *>;
 using entities_t = std::pmr::unordered_set<entity_ptr_t>;
@@ -241,21 +241,13 @@ void app_supervisor_t::process(model::diff::cluster_diff_t &diff, model::payload
         updated_entities.erase(entity.get());
     }
 
-    bool check_timer = false;
     for (auto entity : updated_entities) {
         for (auto p : entity->get_presences()) {
             auto augmentation = p->get_augmentation().get();
             if (augmentation) {
                 auto item = static_cast<presence_item_t *>(augmentation);
                 delayed_items.insert(item);
-                check_timer = true;
             }
-        }
-    }
-    if (check_timer) {
-        if (!display_posponed) {
-            auto method = &app_supervisor_t::on_display_delayed_timer;
-            display_posponed = start_timer(UPDATE_DELAY, *this, method);
         }
     }
 }
@@ -263,6 +255,8 @@ void app_supervisor_t::process(model::diff::cluster_diff_t &diff, model::payload
 void app_supervisor_t::on_local_ready(model::message::local_ready_t &) noexcept {
     LOG_TRACE(log, "on_local_ready");
     main_window->on_loading_done();
+    auto method = &app_supervisor_t::on_frame_render_timer;
+    start_timer(UPDATE_DELAY, *this, method);
 }
 
 void app_supervisor_t::on_db_loaded(model::message::db_loaded_t &) noexcept {
@@ -718,8 +712,7 @@ void app_supervisor_t::soft_restart() {
     main_window->hide();
 }
 
-void app_supervisor_t::on_display_delayed_timer(r::request_id_t, bool cancelled) noexcept {
-    display_posponed.reset();
+void app_supervisor_t::on_frame_render_timer(r::request_id_t, bool cancelled) noexcept {
     auto items = std::move(delayed_items);
     if (!cancelled) {
         for (auto &item : items) {
@@ -727,5 +720,10 @@ void app_supervisor_t::on_display_delayed_timer(r::request_id_t, bool cancelled)
                 item->on_update();
             }
         }
+        if (devices) {
+            devices->on_frame_render();
+        }
+        auto method = &app_supervisor_t::on_frame_render_timer;
+        start_timer(UPDATE_DELAY, *this, method);
     }
 }

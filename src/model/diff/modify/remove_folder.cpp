@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2026 Ivan Baidakou
 
 #include "remove_folder.h"
 #include "constants.h"
@@ -76,7 +76,9 @@ auto remove_folder_t::apply_impl(apply_controller_t &controller, void *custom) c
     auto &cluster = controller.get_cluster();
     auto &folders = cluster.get_folders();
     auto folder = folders.by_id(folder_id);
-    folder->mark_suspended(true); // aka deleted object marker
+    if (folder) {
+        folder->mark_suspended(true); // aka deleted object marker
+    }
     folders.remove(folder);
 
     return applicator_t::apply_sibling(controller, custom);

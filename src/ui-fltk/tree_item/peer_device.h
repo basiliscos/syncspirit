@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2026 Ivan Baidakou
 
 #pragma once
 
@@ -17,6 +17,7 @@ struct peer_device_t : tree_item_t {
     std::string_view get_state();
 
     void update_label() override;
+    void on_frame_render() override;
     bool on_select() override;
     void remove_child(tree_item_t *child) override;
 
@@ -26,6 +27,7 @@ struct peer_device_t : tree_item_t {
     model::device_t &peer;
     tree_item_t *folders;
     tree_item_t *pending_folders;
+    std::size_t traffic{0};
 };
 
 } // namespace syncspirit::fltk::tree_item
