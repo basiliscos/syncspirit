@@ -5,13 +5,15 @@
 
 #include "syncspirit-export.h"
 #include <filesystem>
-#include <optional>
 #include <cstdint>
 #include <string_view>
+#include <boost/outcome.hpp>
+#include "utils/bytes.h"
 
 namespace syncspirit::utils {
 
 namespace bfs = std::filesystem;
+namespace outcome = boost::outcome_v2;
 
 namespace details {
 struct open_write_result_t;
@@ -19,28 +21,29 @@ struct open_write_result_t;
 
 struct SYNCSPIRIT_API io_stream_t {
     using offset_t = std::uint64_t;
-    using offset_opt_t = std::optional<offset_t>;
-    using content_opt_t = std::optional<std::string>;
+    using opne_write_t = outcome::result<details::open_write_result_t>;
 
     io_stream_t() = default;
+    io_stream_t(io_stream_t &&) noexcept;
     ~io_stream_t();
 
-    io_stream_t(io_stream_t &&) noexcept;
-    static io_stream_t open_truncate(const bfs::path &path) noexcept;
-    static details::open_write_result_t open_write(const bfs::path &path, std::size_t size) noexcept;
-    static io_stream_t open_read(const bfs::path &path) noexcept;
+    static outcome::result<io_stream_t> open_truncate(const bfs::path &path) noexcept;
+    static opne_write_t open_write(const bfs::path &path, std::size_t size) noexcept;
+    static outcome::result<io_stream_t> open_read(const bfs::path &path) noexcept;
 
-    offset_opt_t get_position() const noexcept;
-    bool set_position(offset_t) noexcept;
-    offset_opt_t get_size() noexcept;
-    bool read(unsigned char *ptr, std::size_t number) noexcept;
+    outcome::result<void> close() noexcept;
 
-    content_opt_t read_whole() noexcept;
-    bool write(unsigned const char *ptr, std::size_t number) noexcept;
-    bool write(std::string_view) noexcept;
-    bool close() noexcept;
+    outcome::result<offset_t> get_position() const noexcept;
+    outcome::result<void> set_position(offset_t) noexcept;
 
-    operator bool() const noexcept;
+    outcome::result<offset_t> get_size() noexcept;
+
+    outcome::result<void> read(unsigned char *ptr, std::size_t number) noexcept;
+    outcome::result<bytes_t> read_bytes(offset_t size) noexcept;
+    outcome::result<bytes_t> read_whole() noexcept;
+
+    outcome::result<void> write(unsigned const char *ptr, std::size_t number) noexcept;
+    outcome::result<void> write(std::string_view) noexcept;
 
   private:
     io_stream_t(int fd) noexcept;

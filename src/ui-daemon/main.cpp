@@ -226,32 +226,34 @@ int app_main(app_context_t &app_ctx) {
         }
         auto &cfg = cfg_opt.value();
         auto cfg_str = config::serialize(cfg);
-        auto file = utils::io_stream_t::open_truncate(config_file_path);
-        if (!file) {
-            auto ec = sys::error_code{errno, sys::system_category()};
-            logger->error("cannot open file config at {}: {}", config_file_path_str, ec.message());
+        auto file_opt = utils::io_stream_t::open_truncate(config_file_path);
+        if (!file_opt) {
+            logger->error("cannot open file config at {}: {}", config_file_path_str, file_opt.error().message());
             return 1;
         }
-        if (!file.write(reinterpret_cast<unsigned char *>(cfg_str.data()), cfg_str.size())) {
-            auto ec = sys::error_code{errno, sys::system_category()};
-            logger->error("cannot generate default config at {}: {}", config_file_path_str, ec.message());
+        auto &file = file_opt.assume_value();
+        if (auto r = file.write(cfg_str); !r) {
+            logger->error("cannot generate default config at {}: {}", config_file_path_str, r.error().message());
             return 1;
         }
     }
-    auto config_file = utils::io_stream_t::open_read(config_file_path);
-    if (!config_file) {
-        auto ec = sys::error_code{errno, sys::system_category()};
-        logger->error("Cannot open config file '{}' : {}", config_file_path_str, ec.message());
+    auto config_file_opt = utils::io_stream_t::open_read(config_file_path);
+    if (!config_file_opt) {
+        logger->error("Cannot open config file '{}' : {}", config_file_path_str, config_file_opt.error().message());
         return 1;
     }
 
+    auto &config_file = config_file_opt.assume_value();
     auto config_file_content = config_file.read_whole();
     if (!config_file_content) {
-        auto ec = sys::error_code{errno, sys::system_category()};
+        auto &ec = config_file_content.assume_error();
         logger->error("Cannot read config file '{}' : {}", config_file_path_str, ec.message());
         return 1;
     }
-    config::config_result_t cfg_option = config::get_config(*config_file_content, config_file_path.parent_path());
+    auto &config_file_data = config_file_content.assume_value();
+    auto config_file_str =
+        std::string_view(reinterpret_cast<const char *>(config_file_data.data()), config_file_data.size());
+    auto cfg_option = config::get_config(config_file_str, config_file_path.parent_path());
     if (!cfg_option) {
         logger->error("Config file {} is incorrect :: {}", config_file_path_str, cfg_option.error());
         return 1;

@@ -108,13 +108,17 @@ static void export_log(Fl_Widget *, void *data) {
     auto filename = file_chooser.filename();
     auto path = bfs::path(boost::nowide::widen(filename));
     using file_t = syncspirit::utils::io_stream_t;
-    auto out = file_t::open_truncate(filename);
-    if (!out.write("level, date, source, message\n")) {
-        auto ec = sys::error_code{errno, sys::system_category()};
-        log->warn("cannot write logs: {}", ec.message());
+    auto out_opt = file_t::open_truncate(filename);
+    if (!out_opt) {
+        auto &ec = out_opt.assume_error();
+        log->warn("cannot open logs file: {}", ec.message());
         return;
     }
-
+    auto &out = out_opt.assume_value();
+    if (auto ok = out.write("level, date, source, message\n"); !ok) {
+        log->warn("cannot write logs: {}", ok.error().message());
+        return;
+    }
     auto escape_message = [](const std::string &msg) -> std::string {
         auto copy = boost::replace_all_copy<std::string>(msg, "\"", "\"\"");
         return fmt::format("\"{}\"", copy);
@@ -124,9 +128,8 @@ static void export_log(Fl_Widget *, void *data) {
         auto msg = fmt::format("{}, {}, {}, {}\n", static_cast<int>(record->level), record->date, record->source,
                                escape_message(record->message));
 
-        if (!out.write(msg)) {
-            auto ec = sys::error_code{errno, sys::system_category()};
-            log->warn("cannot write logs: {}", ec.message());
+        if (auto ok = out.write(msg); !ok) {
+            log->warn("cannot write logs: {}", ok.error().message());
             return;
         }
     }

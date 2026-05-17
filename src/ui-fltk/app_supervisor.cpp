@@ -639,14 +639,15 @@ void app_supervisor_t::write_config(const config::main_t &cfg) noexcept {
     log->debug("going to write config");
     auto &path = get_config_path();
     auto cfg_str = config::serialize(cfg);
-    auto file = utils::io_stream_t::open_truncate(path);
-    if (!file) {
-        auto ec = sys::error_code{errno, sys::system_category()};
+    auto file_opt = utils::io_stream_t::open_truncate(path);
+    if (!file_opt) {
+        auto &ec = file_opt.assume_error();
         log->error("cannot open config '{}': {}", path, ec.message());
         return;
     }
-    if (!file.write(cfg_str)) {
-        auto ec = sys::error_code{errno, sys::system_category()};
+    auto &file = file_opt.assume_value();
+    if (auto ok = file.write(cfg_str); !ok) {
+        auto ec = ok.assume_error();
         log->error("cannot save default config at '{}': {}", path, ec.message());
         return;
     }

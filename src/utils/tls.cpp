@@ -219,7 +219,10 @@ static bool write_mem_to(const char *path, BIO *mem) {
         return true;
     }
     auto file = utils::io_stream_t::open_truncate(path);
-    return file.write(ptr, size);
+    if (file.has_value()) {
+        return !file.assume_value().write(ptr, size).has_error();
+    }
+    return false;
 }
 
 outcome::result<void> key_pair_t::save(const char *cert_path, const char *priv_key_path) const noexcept {
@@ -254,12 +257,13 @@ static outcome::result<guard_t<BIO>> read_to_mem_bio(const char *cert_path) {
         return sys::error_code{errno, sys::system_category()};
     }
 
-    auto data_opt = file.read_whole();
-    if (!data_opt) {
-        return sys::error_code{errno, sys::system_category()};
+    auto data_opt = file.assume_value().read_whole();
+    if (!data_opt.has_value()) {
+        return data_opt.assume_error();
     }
 
-    auto cert_bio = BIO_new_mem_buf(data_opt->data(), static_cast<int>(data_opt->size()));
+    auto &data = data_opt.assume_value();
+    auto cert_bio = BIO_new_mem_buf(data.data(), static_cast<int>(data.size()));
     return make_guard(cert_bio, [data = std::move(data_opt)](auto *ptr) { BIO_free(ptr); });
 }
 

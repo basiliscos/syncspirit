@@ -179,8 +179,8 @@ auto bootstrap(dist_sink_t &dist_sink, const bfs::path &dir) noexcept -> bootstr
     auto file_sink = spdlog::sink_ptr();
     auto file_path = dir / bootstrap_sink;
     auto file = io_stream_t::open_truncate(file_path);
-    if (file) {
-        file.close();
+    if (file.has_value()) {
+        (void)file.assume_value().close();
 #if defined(_WIN32) && defined(SPDLOG_WCHAR_FILENAMES)
         file_sink.reset(new spdlog::sinks::basic_file_sink_mt(file_path.wstring(), true));
 #else

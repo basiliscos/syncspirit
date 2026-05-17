@@ -7,33 +7,18 @@
 #include "utils.h"
 #include <boost/nowide/convert.hpp>
 
-#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
-#include <io.h>
-#else
-#include <sys/stat.h>
-#include <unistd.h>
-#endif
-
 using namespace syncspirit::fs;
 
 fs_proxy_t::fs_proxy_t(updates_mediator_t &updates_mediator_, const pt::ptime &deadline_) noexcept
     : updates_mediator{updates_mediator_}, deadline{deadline_} {}
 
-#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
-#define SS_STAT_FN(PATH, BUFF) _wstat64((PATH).native().data(), (BUFF))
-#define SS_STAT_BUFF struct __stat64
-#else
-#define SS_STAT_FN(PATH, BUFF) stat((PATH).native().data(), (BUFF))
-#define SS_STAT_BUFF struct stat
-#endif
-
 auto fs_proxy_t::open_write(const bfs::path &path, std::uint64_t file_size) noexcept
     -> outcome::result<utils::io_stream_t> {
-    auto [file, resized, created] = utils::io_stream_t::open_write(path, file_size);
-
-    if (!file) {
-        return sys::error_code{errno, sys::system_category()};
+    auto r = utils::io_stream_t::open_write(path, file_size);
+    if (!r) {
+        return r.assume_error();
     }
+    auto &[file, resized, created] = r.assume_value();
 
     if (created) {
 #ifndef SYNCSPIRIT_WATCHER_KQUEUE

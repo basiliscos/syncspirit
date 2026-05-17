@@ -28,11 +28,11 @@ auto file_t::open_write(fs_proxy_t &fs_proxy, const bfs::path &model_path, std::
 }
 
 auto file_t::open_read(const bfs::path &path) noexcept -> outcome::result<file_t> {
-    auto file = utils::io_stream_t::open_read(path);
-    if (!file) {
-        return sys::error_code{errno, sys::system_category()};
+    auto r = utils::io_stream_t::open_read(path);
+    if (!r) {
+        return r.assume_error();
     }
-    return file_t(std::move(file), path);
+    return file_t(std::move(r.assume_value()), path);
 }
 
 file_t::file_t() noexcept {};
@@ -122,30 +122,31 @@ auto file_t::remove(fs_proxy_t &fs_proxy) noexcept -> outcome::result<void> {
 }
 
 auto file_t::read(std::uint64_t offset, std::uint64_t size) const noexcept -> outcome::result<utils::bytes_t> {
-    if (auto pos = backend->get_position(); !pos || *pos != offset) {
-        if (!pos) {
-            return sys::error_code{errno, sys::system_category()};
-        } else if (!backend->set_position(offset)) {
-            return sys::error_code{errno, sys::system_category()};
+    auto pos_opt = backend->get_position();
+    if (!pos_opt) {
+        return pos_opt.assume_error();
+    }
+    auto pos = pos_opt.assume_value();
+    if (pos != offset) {
+        auto r = backend->set_position(offset);
+        if (!r) {
+            return r.assume_error();
         }
     }
 
-    utils::bytes_t r;
-    r.resize(size);
-    if (!backend->read(r.data(), size)) {
-        return sys::error_code{errno, sys::system_category()};
-    }
-
-    return r;
+    return backend->read_bytes(size);
 }
 
 auto file_t::write(fs_proxy_t &fs_proxy, uint64_t offset, utils::bytes_view_t data) noexcept -> outcome::result<void> {
-    assert(offset + data.size() <= file_size);
-    if (auto pos = backend->get_position(); !pos || *pos != offset) {
-        if (!pos) {
-            sys::error_code{errno, sys::system_category()};
-        } else if (!backend->set_position(offset)) {
-            sys::error_code{errno, sys::system_category()};
+    auto pos_opt = backend->get_position();
+    if (!pos_opt) {
+        return pos_opt.assume_error();
+    }
+    auto pos = pos_opt.assume_value();
+    if (pos != offset) {
+        auto r = backend->set_position(offset);
+        if (!r) {
+            return r.assume_error();
         }
     }
 
