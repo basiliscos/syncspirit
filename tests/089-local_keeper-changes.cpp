@@ -19,6 +19,7 @@
 #include <chrono>
 #include <variant>
 #include <boost/nowide/convert.hpp>
+#include <catch2/generators/catch_generators.hpp>
 
 #ifndef SYNCSPIRIT_WIN
 #include <sys/types.h>

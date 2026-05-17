@@ -25,6 +25,7 @@
 #include "presentation/folder_entity.h"
 #include <chrono>
 #include <boost/nowide/convert.hpp>
+#include <catch2/generators/catch_generators.hpp>
 
 #ifndef SYNCSPIRIT_WIN
 #include <sys/types.h>

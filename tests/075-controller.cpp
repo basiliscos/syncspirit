@@ -17,6 +17,7 @@
 #include "utils/tls.h"
 #include <type_traits>
 #include <boost/nowide/convert.hpp>
+#include <catch2/generators/catch_generators.hpp>
 
 using namespace syncspirit;
 using namespace syncspirit::test;

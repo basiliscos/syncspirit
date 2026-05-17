@@ -19,6 +19,7 @@
 #include <deque>
 #include <boost/nowide/convert.hpp>
 #include <stdexcept>
+#include <catch2/generators/catch_generators.hpp>
 
 using namespace syncspirit;
 using namespace syncspirit::test;

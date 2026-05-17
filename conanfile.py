@@ -31,7 +31,7 @@ class SyncspiritRecipe(ConanFile):
         self.requires("tomlplusplus/3.4.0")
         self.requires("zlib/1.3.1")
 #        self.requires("c-ares/1.34.5")
-        self.requires("catch2/3.3.1")
+        self.requires("catch2/3.14.0")
 #        self.requires("uni-algo/1.2.0")
         self.requires("boost/1.86.0", headers=True, libs=True, transitive_libs=True, force=True)
 
