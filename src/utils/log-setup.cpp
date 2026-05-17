@@ -12,6 +12,7 @@
 #include <string_view>
 #include <vector>
 #include <filesystem>
+#include <boost/nowide/convert.hpp>
 
 namespace syncspirit::utils {
 

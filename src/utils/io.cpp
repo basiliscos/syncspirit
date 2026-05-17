@@ -2,7 +2,10 @@
 
 #include <cassert>
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+#include <fcntl.h>
 #include <io.h>
+#include <share.h>
+#include <sys/stat.h>
 #else
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -13,9 +16,9 @@ namespace sys = boost::system;
 using namespace syncspirit::utils;
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
-#define SS_OPEN_FILE(PATH, MODE) _wfopen(PATH.native().data(), MODE)
 #define SS_STAT_BUFF struct __stat64
 #define SS_STAT_FN(PATH, BUFF) _wstat64((PATH).native().data(), (BUFF))
+#define SS_FSTAT_FN(FD, BUFF) _fstat64(FD, (BUFF))
 #define SS_FILE_NO(FILE) _fileno(FILE)
 #define SS_RESIZE(FILE, SIZE) _chsize_s(FILE, SIZE)
 #else
@@ -37,7 +40,13 @@ io_stream_t::~io_stream_t() {
 
 auto io_stream_t::open_truncate(const bfs::path &path) noexcept -> outcome::result<io_stream_t> {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
-    TODO
+    int f;
+    auto open_mode = _O_RDWR | _O_CREAT | _O_TRUNC | _O_BINARY;
+    auto e = _wsopen_s(&f, path.native().data(), open_mode, _SH_DENYNO, _S_IREAD | _S_IWRITE);
+    if (e == 0) {
+        return io_stream_t(f);
+    }
+    return sys::error_code{e, sys::system_category()};
 #else
     auto f = open(path.native().data(), O_RDWR | O_CREAT | O_TRUNC, 0666);
     if (f >= 0) {
@@ -49,7 +58,13 @@ auto io_stream_t::open_truncate(const bfs::path &path) noexcept -> outcome::resu
 
 auto io_stream_t::open_read(const bfs::path &path) noexcept -> outcome::result<io_stream_t> {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
-    TODO
+    int f;
+    auto open_mode = _O_RDONLY | _O_BINARY;
+    auto e = _wsopen_s(&f, path.native().data(), open_mode, _SH_DENYNO, _S_IREAD | _S_IWRITE);
+    if (e == 0) {
+        return io_stream_t(f);
+    }
+    return sys::error_code{e, sys::system_category()};
 #else
     auto f = open(path.native().data(), O_RDONLY, 0666);
     if (f >= 0) {
@@ -83,11 +98,21 @@ auto io_stream_t::open_write(const bfs::path &path, std::size_t file_size) noexc
         }
         return {std::move(f), false, true};
     } else {
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+        int f;
+        auto open_mode = _O_RDWR | _O_BINARY;
+        auto e = _wsopen_s(&f, path.native().data(), open_mode, _SH_DENYNO, _S_IREAD | _S_IWRITE);
+        if (e == 0) {
+            return {io_stream_t(f), false, false};
+        }
+        return sys::error_code{e, sys::system_category()};
+#else
         auto fd = open(path.native().data(), O_RDWR, 0666);
         if (fd >= 0) {
             return {io_stream_t(fd), false, false};
         }
         return sys::error_code{errno, sys::system_category()};
+#endif
     }
 }
 
