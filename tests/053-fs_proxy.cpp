@@ -60,6 +60,7 @@ TEST_CASE("block iterator", "[model]") {
         SECTION("non-empty file") {
             auto f = proxy.open_write(path, 10);
             REQUIRE(f);
+            REQUIRE(f.assume_value().close());
 #ifndef SYNCSPIRIT_WATCHER_KQUEUE
             CHECK(mediator.is_masked(path_str) == 2);
 #else
