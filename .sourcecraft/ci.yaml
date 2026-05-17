@@ -171,9 +171,10 @@ tasks:
           - echo $PATH
           - cp .sourcecraft/conan-profile-linux-appimage /root/.conan2/profiles/default
           - mkdir build.ci
-          - apt-get remove -y g++9 gcc-9
+          - apt-get remove -y g++9 gcc-9          
           #- apt-get remove -y gir1.2-gtk-2.0 gir1.2-gtk-3.0 libgtk-3-dev libgtk2.0-0 libgtk2.0-bin libgtk2.0-common libgtk2.0-dev libgtkspell-dev libgtkspell0
           - apt-get -y autoremove --purge
+          - apt install -y build-essential binutils
           - cd build.ci
           - whereis gcc
           - whereis x86_64-pc-linux-gnu-gcc
