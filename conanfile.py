@@ -24,11 +24,11 @@ class SyncspiritRecipe(ConanFile):
             rotor_options["enable_fltk"] = True
 
         self.requires("rotor/0.41", options=rotor_options)
-        self.requires("lz4/1.10.0")
+        self.requires("lz4/1.10.0", options = {"shared": False})
         self.requires("nlohmann_json/3.12.0")
         self.requires("openssl/3.6.2")
         self.requires("protopuf/3.0.0")
-        self.requires("pugixml/1.15")
+        self.requires("pugixml/1.15", options = {"shared": False, "no_exceptions": True})
         self.requires("spdlog/1.15.3")
         self.requires("tomlplusplus/3.4.0")
         self.requires("zlib/1.3.1")

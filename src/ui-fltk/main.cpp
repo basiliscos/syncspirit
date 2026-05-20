@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
 
-#include <lz4.h>
 #include <openssl/crypto.h>
 #include <filesystem>
 #include <boost/program_options.hpp>
