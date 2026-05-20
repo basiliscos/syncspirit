@@ -392,7 +392,6 @@ void net_supervisor_t::on_start() noexcept {
         .keep_alive(false)
         .escalate_failure()
         .finish();
-
     send<syncspirit::model::payload::thread_up_t>(address);
 }
 
