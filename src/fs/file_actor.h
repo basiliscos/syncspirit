@@ -104,6 +104,7 @@ struct SYNCSPIRIT_API file_actor_t : public r::actor_base_t {
     void process(payload::append_block_t &, std::string_view, process_context_t &) noexcept;
     void process(payload::finish_file_t &, std::string_view, process_context_t &) noexcept;
     void process(payload::clone_block_t &, std::string_view, process_context_t &) noexcept;
+    void process(payload::update_meta_t &, std::string_view, process_context_t &) noexcept;
 
     void on_controller_up(net::message::controller_up_t &message) noexcept;
     void on_controller_predown(net::message::controller_predown_t &message) noexcept;

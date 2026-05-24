@@ -43,6 +43,8 @@ struct payload_generic_base_t {
 template <typename ReplyType = void> struct payload_base_t : payload_generic_base_t {
     using parent_t = payload_generic_base_t;
     payload_base_t() = default;
+    payload_base_t(const payload_base_t &) noexcept = delete;
+    payload_base_t(payload_base_t &&) noexcept = default;
     payload_base_t(extendended_context_prt_t context, std::string folder_id_)
         : parent_t{std::move(context), std::move(folder_id_)},
           result(utils::make_error_code(utils::error_code_t::no_action)) {}
@@ -60,7 +62,6 @@ struct block_request_t : payload_base_t<utils::bytes_t> {
                            std::uint64_t block_size_) noexcept
         : parent_t(std::move(context_), {}), path{std::move(path_)}, offset{offset_}, block_size{block_size_} {}
 
-    block_request_t(const block_request_t &) = delete;
     block_request_t(block_request_t &&) noexcept = default;
 };
 
@@ -85,7 +86,6 @@ struct remote_copy_t : payload_base_t<void> {
           modification_s{modification_s_}, symlink_target(std::move(symlink_target_)), deleted{deleted_},
           no_permissions{no_permissions_} {}
 
-    remote_copy_t(const remote_copy_t &) = delete;
     remote_copy_t(remote_copy_t &&) noexcept = default;
 };
 
@@ -109,6 +109,21 @@ struct finish_file_t : payload_base_t<void> {
     finish_file_t(finish_file_t &&) noexcept = default;
 };
 
+struct update_meta_t : payload_base_t<void> {
+    using parent_t = payload_base_t<void>;
+    bfs::path path;
+    std::int64_t modification_s;
+    std::uint32_t permissions;
+    bool no_permissions;
+
+    inline update_meta_t(extendended_context_prt_t context_, std::string folder_id_, bfs::path path_,
+                         std::int64_t modification_s_, std::uint32_t permissions_, bool no_permissions_) noexcept
+        : parent_t(std::move(context_), std::move(folder_id_)), path{std::move(path_)}, modification_s{modification_s_},
+          permissions{permissions_}, no_permissions{no_permissions_} {}
+
+    update_meta_t(update_meta_t &&) noexcept = default;
+};
+
 struct append_block_t : payload_base_t<void> {
     using parent_t = payload_base_t<void>;
     bfs::path path;
@@ -121,7 +136,6 @@ struct append_block_t : payload_base_t<void> {
         : parent_t(std::move(context_), std::move(folder_id_)), path{std::move(path_)}, data{std::move(data_)},
           offset{offset_}, file_size{file_size_} {}
 
-    append_block_t(const append_block_t &) = delete;
     append_block_t(append_block_t &&) noexcept = default;
 };
 
@@ -146,7 +160,8 @@ struct clone_block_t : payload_base_t<void> {
     clone_block_t(clone_block_t &&) noexcept = default;
 };
 
-using io_command_t = std::variant<block_request_t, remote_copy_t, finish_file_t, append_block_t, clone_block_t>;
+using io_command_t =
+    std::variant<block_request_t, remote_copy_t, finish_file_t, append_block_t, clone_block_t, update_meta_t>;
 struct io_commands_t {
     const void *context;
     std::vector<io_command_t> commands;

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #pragma once
 
@@ -12,7 +12,6 @@
 #include <vector>
 #include <set>
 #include <memory>
-#include <tuple>
 
 namespace syncspirit::model {
 
@@ -20,7 +19,12 @@ using compare_fn_t = bool(const file_info_t *l, const file_info_t *r);
 
 struct SYNCSPIRIT_API file_iterator_t : arc_base_t<file_iterator_t> {
     using files_list_t = std::vector<file_info_ptr_t>;
-    using result_t = std::tuple<file_info_t *, const folder_info_t *, advance_action_t>;
+    struct result_t {
+        file_info_t *peer_file;
+        folder_info_t *peer_folder;
+        file_info_t *local_file;
+        advance_action_t action;
+    };
 
     file_iterator_t(cluster_t &cluster, const device_ptr_t &peer) noexcept;
     file_iterator_t(const file_iterator_t &) = delete;

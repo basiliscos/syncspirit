@@ -557,7 +557,11 @@ void test_downloading() {
                     auto index_update = proto::IndexUpdate{};
                     proto::set_folder(index_update, proto::get_folder(index));
                     proto::set_sequence(file, 11);
-                    proto::set_value(counter, 2);
+                    SECTION("version update") { proto::set_value(counter, 2); }
+                    SECTION("version + meta update") {
+                        proto::set_modified_s(file, 0x1234);
+                        proto::set_value(counter, 2);
+                    }
                     proto::add_files(index_update, file);
 
                     peer_actor->forward(index_update);

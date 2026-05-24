@@ -205,6 +205,20 @@ struct fixture_t {
         return chain_builder_t(this, reply, std::in_place_type_t<decltype(payload)>());
     }
 
+    chain_builder_t update_meta(const bfs::path &path, std::int64_t modification_s_, std::uint32_t permissions_,
+                                bool no_permissions_) noexcept {
+        auto context = fs::payload::extendended_context_prt_t{};
+
+        auto payload = fs::payload::update_meta_t(std::move(context), folder_id, path, modification_s_, permissions_,
+                                                  no_permissions_);
+        auto cmd = fs::payload::io_command_t(std::move(payload));
+        auto cmds = fs::payload::io_commands_t{nullptr};
+        cmds.commands.emplace_back(std::move(cmd));
+        sup->route<fs::payload::io_commands_t>(file_addr, sup->get_address(), std::move(cmds));
+        sup->do_process();
+        return chain_builder_t(this, reply, std::in_place_type_t<decltype(payload)>());
+    }
+
     r::address_ptr_t file_addr;
     r::pt::time_duration timeout = r::pt::millisec{10};
     r::pt::time_duration retension = r::pt::microseconds{1};
@@ -630,6 +644,42 @@ void test_clone_block() {
     F().run();
 }
 
+void test_update_meta() {
+    struct F : fixture_t {
+        void main() noexcept override {
+            std::int64_t modified = 1641828421;
+            auto perms = std::uint32_t(0444);
+#ifndef SYNCSPIRIT_WIN
+            auto no_perms = false;
+#else
+            auto no_perms = true;
+#endif
+            auto path = root_path / L"файл.bin";
+            auto path_str = narrow(path.generic_wstring());
+
+            SECTION("file") {
+                write_file(path, "12345");
+                update_meta(path, modified, perms, no_perms).check_success();
+                CHECK(to_unix(bfs::last_write_time(path)) == modified);
+#ifndef SYNCSPIRIT_WIN
+                CHECK(bfs::status(path).permissions() == static_cast<bfs::perms>(perms));
+#endif
+            }
+            SECTION("file does not exists") { update_meta(path, modified, perms, no_perms).check_fail(); }
+
+#ifndef SYNCSPIRIT_WIN
+            SECTION("dir") {
+                bfs::create_directories(path);
+                update_meta(path, modified, perms, no_perms).check_success();
+                CHECK(to_unix(bfs::last_write_time(path)) == modified);
+                CHECK(bfs::status(path).permissions() == static_cast<bfs::perms>(perms));
+            }
+#endif
+        }
+    };
+    F().run();
+}
+
 void test_requesting_block() {
     struct F : fixture_t {
         void main() noexcept override {
@@ -710,6 +760,7 @@ int _init() {
     REGISTER_TEST_CASE(test_remote_copy, "test_remote_copy", "[fs]");
     REGISTER_TEST_CASE(test_append_block, "test_append_block", "[fs]");
     REGISTER_TEST_CASE(test_clone_block, "test_clone_block", "[fs]");
+    REGISTER_TEST_CASE(test_update_meta, "test_update_meta", "[fs]");
     REGISTER_TEST_CASE(test_requesting_block, "test_requesting_block", "[fs]");
     return 1;
 }

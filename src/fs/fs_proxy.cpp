@@ -87,6 +87,8 @@ sys::error_code fs_proxy_t::rename(const bfs::path &from, const bfs::path &to) n
 
 sys::error_code fs_proxy_t::last_write_time(const bfs::path &path, std::int64_t modification_s) noexcept {
     auto ec = sys::error_code();
+    auto opts = bfs::perm_options::nofollow | bfs::perm_options::replace;
+
     bfs::last_write_time(path, from_unix(modification_s), ec);
     if (!ec) {
         updates_mediator.mask(path, {}, deadline);
@@ -138,7 +140,8 @@ sys::error_code fs_proxy_t::write(const bfs::path &path, utils::fstream_t &strea
 
 sys::error_code fs_proxy_t::set_perms(const bfs::path &path, std::uint32_t permissions) noexcept {
     auto ec = sys::error_code();
-    bfs::permissions(path, static_cast<bfs::perms>(permissions), ec);
+    auto opts = bfs::perm_options::nofollow | bfs::perm_options::replace;
+    bfs::permissions(path, static_cast<bfs::perms>(permissions), opts, ec);
     if (!ec) {
         updates_mediator.mask(path, {}, deadline);
         ++mediator_updates;

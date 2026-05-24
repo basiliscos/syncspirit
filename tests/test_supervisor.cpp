@@ -258,6 +258,13 @@ void supervisor_t::process_io(fs::payload::clone_block_t &req) noexcept {
     }
 }
 
+void supervisor_t::process_io(fs::payload::update_meta_t &req) noexcept {
+    LOG_TRACE(log, "process_io (ack: {}), update_meta_t of {}", auto_ack_io, req.path.string());
+    if (auto_ack_io) {
+        req.result = outcome::success();
+    }
+}
+
 auto supervisor_t::apply(const model::diff::load::commit_t &message, void *) noexcept -> outcome::result<void> {
     put(message.commit_message);
     return outcome::success();
