@@ -1037,6 +1037,37 @@ void test_remove_dir_refinement() {
     F().run();
 }
 
+void test_scan_notification_unix() {
+    struct F : folder_fixture_t {
+        using parent_t = folder_fixture_t;
+        using parent_t::parent_t;
+        using child_info_t = fs::task::scan_dir_t::child_info_t;
+
+        bool process_cmd(fs::task::scan_dir_t &task) noexcept override {
+            if (task.notify) {
+                ++watcher_notifications;
+            }
+            return parent_t::process_cmd(task);
+        }
+
+        void main() noexcept override {
+            auto impl = GENERATE(I::inotify, I::kqueue);
+            prepare(impl);
+
+            expect_dir_scan({make_child("/some/path/dir-a")});
+            expect_dir_scan({make_child("/some/path/dir-a/dir-b")});
+            expect_dir_scan({});
+
+            LOG_INFO(log, "triggering scan...");
+            builder->scan_start(folder_id).apply(*sup);
+            CHECK(watcher_notifications == 3);
+        }
+
+        int watcher_notifications = 0;
+    };
+    F().run();
+}
+
 void test_kqueue_changes() {
     struct F : folder_fixture_t {
         using parent_t = folder_fixture_t;
@@ -1095,7 +1126,6 @@ void test_dir_scan_errors() {
             proto::set_modified_s(pr_dir, 12345);
             proto::set_type(pr_dir, FT::DIRECTORY);
 
-            // if (impl == I::inotify) {
             SECTION("new dir/update") {
                 mk_update(pr_dir, fs::update_type_t::created, true);
 
@@ -1117,7 +1147,6 @@ void test_dir_scan_errors() {
                 CHECK(dir_C->is_dir());
                 CHECK(dir_C->is_locally_available());
             }
-            // }
             SECTION("existing dirs") {
                 for (auto &p : {"dir-a", "dir-a/A", "dir-a/B", "dir-a/C"}) {
                     proto::set_name(pr_dir, p);
@@ -2505,6 +2534,7 @@ int _init() {
     REGISTER_TEST_CASE(test_new_dir_refinement, "test_new_dir_refinement", "[fs]");
     REGISTER_TEST_CASE(test_new_dir_without_refinement, "test_new_dir_without_refinement", "[fs]");
     REGISTER_TEST_CASE(test_remove_dir_refinement, "test_remove_dir_refinement", "[fs]");
+    REGISTER_TEST_CASE(test_scan_notification_unix, "test_scan_notification_unix", "[fs]");
     REGISTER_TEST_CASE(test_kqueue_changes, "test_kqueue_changes", "[fs]");
     REGISTER_TEST_CASE(test_dir_scan_errors, "test_dir_scan_errors", "[fs]");
     REGISTER_TEST_CASE(test_read_file_errors, "test_read_file_errors", "[fs]");
