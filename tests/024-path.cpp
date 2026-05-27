@@ -6,6 +6,7 @@
 #include "model/misc/path_view.hpp"
 #include "model/misc/path_cache.h"
 #include <memory_resource>
+#include <catch2/matchers/catch_matchers_string.hpp>
 
 using namespace syncspirit;
 using namespace syncspirit::model;
