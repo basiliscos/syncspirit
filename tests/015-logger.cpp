@@ -16,15 +16,20 @@ using namespace syncspirit;
 
 using L = spdlog::level::level_enum;
 
-static bool _init = []() {
+static auto init_root = []() {
     auto [dist_sink, _] = utils::create_root_logger();
     auto console_sink = std::make_shared<spdlog::sinks::stderr_color_sink_mt>();
     dist_sink->add_sink(console_sink);
     dist_sink->add_sink(std::make_shared<spdlog::sinks::null_sink_mt>());
+};
+
+static bool _init = []() {
+    init_root();
     return true;
 }();
 
 TEST_CASE("default logger", "[log]") {
+    init_root();
     config::log_configs_t cfg{{"default", L::trace, {"stdout"}}};
     REQUIRE(utils::init_loggers(cfg));
     auto l = utils::get_logger("default");
@@ -33,6 +38,7 @@ TEST_CASE("default logger", "[log]") {
 }
 
 TEST_CASE("hierarchy", "[log]") {
+    init_root();
     config::log_configs_t cfg{{"default", L::trace, {"stdout"}}, {"a", L::info, {}}, {"a.b.c", L::warn, {}}};
     REQUIRE(utils::init_loggers(cfg));
     SECTION("custom") {
@@ -58,6 +64,7 @@ TEST_CASE("hierarchy", "[log]") {
 }
 
 TEST_CASE("file sink", "[log]") {
+    init_root();
     auto dir = bfs::absolute(bfs::current_path() / st::unique_path());
     auto path_guard = st::path_guard_t(dir);
     bfs::create_directories(dir);

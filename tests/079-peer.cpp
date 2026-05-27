@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "test-utils.h"
 
@@ -20,6 +20,8 @@
 #include <rotor/asio.hpp>
 #include <iterator>
 #include <boost/algorithm/string/replace.hpp>
+#include <catch2/matchers/catch_matchers_string.hpp>
+#include <catch2/generators/catch_generators.hpp>
 
 using namespace syncspirit;
 using namespace syncspirit::test;

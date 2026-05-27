@@ -47,7 +47,7 @@ find_package(protopuf REQUIRED)
 find_package(pugixml REQUIRED)
 find_package(tomlplusplus REQUIRED)
 find_package(nlohmann_json REQUIRED)
-#find_package(c-ares REQUIRED)
+find_package(c-ares REQUIRED)
 
 set(SYNCSPIRIT_VERSION "v${CMAKE_PROJECT_VERSION}")
 if (LINUX)
@@ -323,17 +323,6 @@ FetchContent_Declare(MDBX
     set(MDBX_ALLOY_BUILD_DEFAULT true CACHE BOOL "MDBX_ALLOY_BUILD_DEFAULT")
     set(MDBX_ALLOY_BUILD true CACHE BOOL "MDBX_ALLOY_BUILD")
 FetchContent_MakeAvailable(MDBX)
-
-FetchContent_Declare(C_ARES
-    URL https://github.com/c-ares/c-ares/releases/download/v1.34.5/c-ares-1.34.5.tar.gz
-    URL_HASH SHA256=7d935790e9af081c25c495fd13c2cfcda4792983418e96358ef6e7320ee06346
-)
-    set(CARES_STATIC      true  CACHE BOOL "CARES_STATIC")
-    set(CARES_SHARED      false CACHE BOOL "CARES_SHARED")
-    set(CARES_STATIC_PIC  true  CACHE BOOL "CARES_STATIC_PIC")
-    set(CARES_BUILD_TOOLS false CACHE BOOL "CARES_BUILD_TOOLS")
-    set(CARES_THREADS     false CACHE BOOL "CARES_THREADS")
-FetchContent_MakeAvailable(C_ARES)
 
 FetchContent_Declare(UNI_ALGO
     URL https://github.com/uni-algo/uni-algo/archive/refs/tags/v1.2.0.tar.gz

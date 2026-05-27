@@ -125,10 +125,10 @@ auto file_iterator_t::next() noexcept -> result_t {
                 auto file = *it;
                 it = queue->erase(it);
                 if (!cluster.is_locked(file->get_name().get())) {
-                    auto local_file = local_files.by_name(file->get_name()->get_full_name());
-                    auto action = resolve(*file, local_file.get(), local_folder);
+                    auto local_file = local_files.by_name(file->get_name()->get_full_name()).get();
+                    auto action = resolve(*file, local_file, local_folder);
                     if (action != advance_action_t::ignore) {
-                        return std::make_tuple(file, &peer_folder, action);
+                        return {file, &peer_folder, local_file, action};
                     }
                 }
             }
@@ -136,7 +136,7 @@ auto file_iterator_t::next() noexcept -> result_t {
         folder_index = (folder_index + 1) % folders_count;
         ++folder_scans;
     }
-    return {nullptr, nullptr, advance_action_t::ignore};
+    return {nullptr, nullptr, nullptr, advance_action_t::ignore};
 }
 
 void file_iterator_t::on_upsert(folder_info_ptr_t peer_folder) noexcept {
