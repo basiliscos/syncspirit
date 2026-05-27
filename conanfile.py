@@ -1,5 +1,6 @@
 from conan import ConanFile
 from conan.tools.cmake import CMakeToolchain, CMake, CMakeDeps, cmake_layout
+from conan.tools.apple import is_apple_os
 
 class SyncspiritRecipe(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
@@ -16,22 +17,23 @@ class SyncspiritRecipe(ConanFile):
         rotor_options = {"enable_asio": True, "enable_thread": True}
 
         if self.options.get_safe("frontend_fltk", False):
+            fltk_version = "1.3.9" if is_apple_os(self) else "1.4.5"
             self.requires("freetype/2.12.1", headers=True, libs=True, transitive_libs=True, force=True)
-            self.requires("fltk/1.4.5", headers=True, libs=True, transitive_libs=True, force=True)
+            self.requires(f"fltk/{fltk_version}", headers=True, libs=True, transitive_libs=True, force=True)
             self.requires("libqrencode/4.1.1")
             rotor_options["enable_fltk"] = True
 
-        self.requires("rotor/0.40", options=rotor_options)
-        self.requires("lz4/1.10.0")
+        self.requires("rotor/0.41", options=rotor_options)
+        self.requires("lz4/1.10.0", options = {"shared": False})
         self.requires("nlohmann_json/3.12.0")
         self.requires("openssl/3.6.2")
         self.requires("protopuf/3.0.0")
-        self.requires("pugixml/1.15")
+        self.requires("pugixml/1.15", options = {"shared": False, "no_exceptions": True})
         self.requires("spdlog/1.15.3")
         self.requires("tomlplusplus/3.4.0")
         self.requires("zlib/1.3.1")
-#        self.requires("c-ares/1.34.5")
-        self.requires("catch2/3.3.1")
+        self.requires("c-ares/1.34.6", options = {"multithreading": False, "shared": False, "tools": False})
+        self.requires("catch2/3.14.0")
 #        self.requires("uni-algo/1.2.0")
         self.requires("boost/1.86.0", headers=True, libs=True, transitive_libs=True, force=True)
 

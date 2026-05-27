@@ -426,6 +426,25 @@ void file_actor_t::process(payload::clone_block_t &cmd, std::string_view path_st
     cmd.result = target_backend->copy(context, cmd.target_offset, source_backend, cmd.source_offset, cmd.block_size);
 }
 
+void file_actor_t::process(payload::update_meta_t &cmd, std::string_view path_str,
+                           process_context_t &context) noexcept {
+    LOG_DEBUG(log, "Updating metadata of '{}'", path_str);
+
+    auto r = sys::error_code();
+    auto &path = cmd.path;
+    if (!cmd.no_permissions && utils::platform_t::permissions_supported(path)) {
+        r = context.set_perms(path, cmd.permissions);
+    }
+    if (!r) {
+        r = context.last_write_time(path, cmd.modification_s);
+    }
+
+    if (r) {
+        LOG_ERROR(log, "cannot update metadata of '{}': {}", path_str, r.message());
+    }
+    cmd.result = r;
+}
+
 auto file_actor_t::open_file_rw(const std::filesystem::path &path, std::uint64_t file_size,
                                 process_context_t &context) noexcept -> outcome::result<file_ptr_t> {
     auto &file_cache = context_cache[context.cache_key];

@@ -123,6 +123,7 @@ struct SYNCSPIRIT_API controller_actor_t final : public model_actor_t<r::actor_b
     void visit(const model::diff::cluster_diff_t &, model::payload::apply_context_t &) noexcept override;
 
   private:
+    enum class local_difference_t { content, trivial_io, meta, unflushed, version };
     struct block_ack_context_t;
     struct stack_context_t;
     struct update_context_t;
@@ -162,6 +163,7 @@ struct SYNCSPIRIT_API controller_actor_t final : public model_actor_t<r::actor_b
     void postprocess_io(fs::payload::append_block_t &, stack_context_t &) noexcept;
     void postprocess_io(fs::payload::finish_file_t &, stack_context_t &) noexcept;
     void postprocess_io(fs::payload::clone_block_t &, stack_context_t &) noexcept;
+    void postprocess_io(fs::payload::update_meta_t &, stack_context_t &) noexcept;
 
     void request_block(const model::file_block_t &block) noexcept;
     void pull_next(stack_context_t &) noexcept;
@@ -170,12 +172,13 @@ struct SYNCSPIRIT_API controller_actor_t final : public model_actor_t<r::actor_b
     void send_new_indices() noexcept;
 
     void io_advance(model::advance_action_t action, model::file_info_t &peer_file, model::folder_info_t &peer_folder,
-                    stack_context_t &);
+                    model::file_info_t *local_file, stack_context_t &);
     void io_append_block(model::file_info_t &, model::folder_info_t &, uint32_t block_index, utils::bytes_t data,
                          stack_context_t &);
     void io_clone_block(const model::file_block_t &file_block, model::folder_info_t &target_fi, stack_context_t &);
     void io_finish_file(model::file_info_t *, model::file_info_t &, model::folder_info_t &, model::advance_action_t,
                         stack_context_t &);
+    void io_update_meta(model::file_info_t &, model::folder_info_t &, model::advance_action_t, stack_context_t &);
     auto io_make_request_block(model::file_info_t &, model::folder_info_t &, proto::Request)
         -> fs::payload::io_command_t;
 
@@ -187,6 +190,7 @@ struct SYNCSPIRIT_API controller_actor_t final : public model_actor_t<r::actor_b
     folder_synchronization_t &get_sync_info(std::string_view folder_id) noexcept;
     void cancel_sync(model::file_info_t *) noexcept;
     bool is_unflushed(model::file_info_t *peer_file, model::folder_info_t &peer_folder) noexcept;
+    local_difference_t compare_with_local(model::file_info_t &peer_file, model::file_info_t *local_file) noexcept;
 
     outcome::result<void> operator()(const model::diff::advance::advance_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::contact::peer_state_t &, void *) noexcept override;
