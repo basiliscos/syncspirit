@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2026 Ivan Baidakou
 
 #include <openssl/crypto.h>
 #include <filesystem>
@@ -55,8 +55,10 @@ namespace ra = r::asio;
 namespace rth = r::thread;
 namespace rf = rotor::fltk;
 namespace asio = boost::asio;
+namespace sys = boost::system;
 
 using namespace syncspirit;
+using boost::nowide::narrow;
 
 [[noreturn]] static void report_error_and_die(r::actor_base_t *actor, const r::extended_error_ptr_t &ec) noexcept {
     auto name = actor ? actor->get_identity() : "unknown";
@@ -231,32 +233,47 @@ int app_main(app_context_t &app_ctx) {
 
     config_file_path.append("syncspirit.toml");
     bool populate = !bfs::exists(config_file_path);
+    auto config_file_path_str = narrow(config_file_path.generic_wstring());
     if (populate) {
-        logger->info("config {} seems does not exit, creating default one...", config_file_path.string());
+        logger->info("Config {} seems does not exit, creating default one...", config_file_path.string());
         auto cfg_opt = config::generate_config(config_file_path);
         if (!cfg_opt) {
             logger->error("cannot generate default config: {}", cfg_opt.error().message());
-            return -1;
+            return 1;
         }
         auto &cfg = cfg_opt.value();
-        using F = utils::fstream_t;
-        auto f_cfg = utils::fstream_t(config_file_path, F::binary | F::trunc | F::in | F::out);
-        auto r = config::serialize(cfg, f_cfg);
-        if (!r) {
-            logger->error("cannot save default config at :: {}", r.error().message());
-            return -1;
+        auto cfg_str = config::serialize(cfg);
+        auto file_opt = utils::io_stream_t::open_truncate(config_file_path);
+        if (!file_opt) {
+            logger->error("cannot open file config at {}: {}", config_file_path_str, file_opt.error().message());
+            return 1;
+        }
+        auto &file = file_opt.assume_value();
+        if (auto r = file.write(cfg_str); !r) {
+            logger->error("cannot generate default config at {}: {}", config_file_path_str, r.error().message());
+            return 1;
         }
     }
-    auto config_file = utils::ifstream_t(config_file_path);
-    if (!config_file) {
-        logger->error("Cannot open config file {}", config_file_path.string());
-        return -1;
+    auto config_file_opt = utils::io_stream_t::open_read(config_file_path);
+    if (!config_file_opt) {
+        logger->error("Cannot open config file '{}' : {}", config_file_path_str, config_file_opt.error().message());
+        return 1;
     }
 
-    config::config_result_t cfg_option = config::get_config(config_file, config_file_path.parent_path());
+    auto &config_file = config_file_opt.assume_value();
+    auto config_file_content = config_file.read_whole();
+    if (!config_file_content) {
+        auto &ec = config_file_content.assume_error();
+        logger->error("Cannot read config file '{}' : {}", config_file_path_str, ec.message());
+        return 1;
+    }
+    auto &config_file_data = config_file_content.assume_value();
+    auto config_file_str =
+        std::string_view(reinterpret_cast<const char *>(config_file_data.data()), config_file_data.size());
+    auto cfg_option = config::get_config(config_file_str, config_file_path.parent_path());
     if (!cfg_option) {
-        logger->error("Config file {} is incorrect: {}", config_file_path.string(), cfg_option.error());
-        return -1;
+        logger->error("Config file {} is incorrect :: {}", config_file_path_str, cfg_option.error());
+        return 1;
     }
     auto &cfg = cfg_option.value();
     logger->trace("configuration seems OK, timeout = {}ms", cfg.timeout);

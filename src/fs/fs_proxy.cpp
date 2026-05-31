@@ -7,69 +7,32 @@
 #include "utils.h"
 #include <boost/nowide/convert.hpp>
 
-#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
-#include <io.h>
-#else
-#include <sys/stat.h>
-#include <unistd.h>
-#endif
-
 using namespace syncspirit::fs;
 
 fs_proxy_t::fs_proxy_t(updates_mediator_t &updates_mediator_, const pt::ptime &deadline_) noexcept
     : updates_mediator{updates_mediator_}, deadline{deadline_} {}
 
-#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
-#define SS_STAT_FN(PATH, BUFF) _wstat64((PATH).native().data(), (BUFF))
-#define SS_STAT_BUFF struct __stat64
-#else
-#define SS_STAT_FN(PATH, BUFF) stat((PATH).native().data(), (BUFF))
-#define SS_STAT_BUFF struct stat
-#endif
-
 auto fs_proxy_t::open_write(const bfs::path &path, std::uint64_t file_size) noexcept
-    -> outcome::result<utils::fstream_t> {
-    using mode_t = utils::fstream_t;
-
-    bool need_resize = true;
-
-    SS_STAT_BUFF stat_info;
-    auto r = SS_STAT_FN(path, &stat_info);
-    if (r == 0) {
-        need_resize = static_cast<uint64_t>(stat_info.st_size) == file_size;
+    -> outcome::result<utils::io_stream_t> {
+    auto r = utils::io_stream_t::open_write(path, file_size);
+    if (!r) {
+        return r.assume_error();
     }
-    auto mode = mode_t::in | mode_t::out | mode_t::binary;
-    if (need_resize) {
-        if (r == -1) {
-            auto file = utils::fstream_t(path, mode | mode_t::trunc);
-            if (!file) {
-                return sys::error_code{errno, sys::system_category()};
-            } else {
+    auto &[file, resized, created] = r.assume_value();
+
+    if (created) {
 #ifndef SYNCSPIRIT_WATCHER_KQUEUE
-                updates_mediator.mask(path, {}, deadline);
+        updates_mediator.mask(path, {}, deadline);
 #else
-                updates_mediator.mask(path.parent_path(), {}, deadline);
+        updates_mediator.mask(path.parent_path(), {}, deadline);
 #endif
-                ++mediator_updates;
-            }
-
-            mode = mode & ~mode_t::trunc;
-        }
-        auto ec = std::error_code();
-        bfs::resize_file(path, file_size, ec);
-        if (ec) {
-            return ec;
-        } else {
-            updates_mediator.mask(path, {}, deadline);
-            ++mediator_updates;
-        }
+        ++mediator_updates;
     }
-
-    auto file = utils::fstream_t(path, mode);
-    if (!file) {
-        return sys::error_code{errno, sys::system_category()};
+    if (resized) {
+        updates_mediator.mask(path, {}, deadline);
+        ++mediator_updates;
     }
-    return std::move(file);
+    return outcome::success(std::move(file));
 }
 
 sys::error_code fs_proxy_t::rename(const bfs::path &from, const bfs::path &to) noexcept {
@@ -125,13 +88,9 @@ sys::error_code fs_proxy_t::remove_file(const bfs::path &path) noexcept {
     return ec;
 }
 
-sys::error_code fs_proxy_t::write(const bfs::path &path, utils::fstream_t &stream, utils::bytes_view_t data) noexcept {
-    auto ptr = reinterpret_cast<const char *>(data.data());
-    if (!stream.write(ptr, data.size())) {
-        return sys::errc::make_error_code(sys::errc::io_error);
-    }
-    updates_mediator.mask(path, {}, deadline);
-    if (!stream.flush()) {
+sys::error_code fs_proxy_t::write(const bfs::path &path, utils::io_stream_t &stream,
+                                  utils::bytes_view_t data) noexcept {
+    if (!stream.write(data.data(), data.size())) {
         return sys::errc::make_error_code(sys::errc::io_error);
     }
     updates_mediator.mask(path, {}, deadline);

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "tls.h"
 #include "error_code.h"
@@ -210,8 +210,7 @@ outcome::result<key_pair_t> generate_pair(const char *issuer_name) noexcept {
 }
 
 static bool write_mem_to(const char *path, BIO *mem) {
-    auto file = ofstream_t(path, ifstream_t::out | ifstream_t::binary);
-    char *ptr;
+    unsigned char *ptr;
     auto size = BIO_get_mem_data(mem, &ptr);
     if (size < 0) {
         return false;
@@ -219,8 +218,11 @@ static bool write_mem_to(const char *path, BIO *mem) {
     if (size == 0) {
         return true;
     }
-    file.write(ptr, size);
-    return (bool)file;
+    auto file = utils::io_stream_t::open_truncate(path);
+    if (file.has_value()) {
+        return !file.assume_value().write(ptr, size).has_error();
+    }
+    return false;
 }
 
 outcome::result<void> key_pair_t::save(const char *cert_path, const char *priv_key_path) const noexcept {
@@ -250,29 +252,19 @@ outcome::result<void> key_pair_t::save(const char *cert_path, const char *priv_k
 }
 
 static outcome::result<guard_t<BIO>> read_to_mem_bio(const char *cert_path) {
-    auto file = ifstream_t(cert_path, ifstream_t::in | ifstream_t::binary);
+    auto file = io_stream_t::open_read(cert_path);
     if (!file) {
         return sys::error_code{errno, sys::system_category()};
     }
 
-    auto begin = file.tellg();
-    if (!file.seekg(0, ifstream_t::end)) {
-        return sys::error_code{errno, sys::generic_category()};
+    auto data_opt = file.assume_value().read_whole();
+    if (!data_opt.has_value()) {
+        return data_opt.assume_error();
     }
-    auto end = file.tellg();
-    if (end < 0) {
-        return sys::error_code{errno, sys::generic_category()};
-    }
-    auto cert_sz = end - begin;
-    if (!file.seekg(ifstream_t::beg)) {
-        return sys::error_code{errno, sys::generic_category()};
-    }
-    auto data = std::vector<char>(cert_sz);
-    auto ptr = data.data();
-    file.read(ptr, cert_sz);
 
-    auto cert_bio = BIO_new_mem_buf(ptr, static_cast<int>(cert_sz));
-    return make_guard(cert_bio, [data = std::move(data)](auto *ptr) { BIO_free(ptr); });
+    auto &data = data_opt.assume_value();
+    auto cert_bio = BIO_new_mem_buf(data.data(), static_cast<int>(data.size()));
+    return make_guard(cert_bio, [data = std::move(data_opt)](auto *ptr) { BIO_free(ptr); });
 }
 
 outcome::result<key_pair_t> load_pair(const char *cert_path, const char *priv_key_path) {

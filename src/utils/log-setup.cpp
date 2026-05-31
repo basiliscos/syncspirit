@@ -12,6 +12,7 @@
 #include <string_view>
 #include <vector>
 #include <filesystem>
+#include <boost/nowide/convert.hpp>
 
 namespace syncspirit::utils {
 
@@ -176,12 +177,11 @@ std::pair<dist_sink_t, logger_t> create_root_logger() noexcept {
 SYNCSPIRIT_API logger_t get_root_logger() noexcept { return spdlog::get(""); }
 
 auto bootstrap(dist_sink_t &dist_sink, const bfs::path &dir) noexcept -> bootstrap_guard_ptr_t {
-    using F = fstream_t;
-    auto file_path = dir / bootstrap_sink;
-    auto file = fstream_t(file_path, F::trunc | F::out | F::binary);
     auto file_sink = spdlog::sink_ptr();
-    if (file) {
-        file.close();
+    auto file_path = dir / bootstrap_sink;
+    auto file = io_stream_t::open_truncate(file_path);
+    if (file.has_value()) {
+        (void)file.assume_value().close();
 #if defined(_WIN32) && defined(SPDLOG_WCHAR_FILENAMES)
         file_sink.reset(new spdlog::sinks::basic_file_sink_mt(file_path.wstring(), true));
 #else
