@@ -96,6 +96,9 @@ after the core completion.
 
 # changes
 
+## 0.4.6 (xx-xxx-202x)
+ - [core, win32, bugfix] use utf8 for displaying error messages
+
 ## 0.4.5 (31-May-2026)
  - [core] monitor in realtime changes on filesystem (on watched folders)
  - [core] allow partial directory rescan
