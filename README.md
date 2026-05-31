@@ -96,7 +96,7 @@ after the core completion.
 
 # changes
 
-## 0.4.5 (xx-xxx-2026)
+## 0.4.5 (31-May-2026)
  - [core] monitor in realtime changes on filesystem (on watched folders)
  - [core] allow partial directory rescan
  - [core] do not accept files with non-valid utf8 filenames
