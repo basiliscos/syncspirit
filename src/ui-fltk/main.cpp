@@ -30,6 +30,7 @@
 #include <FL/Fl_Window.H>
 #include <FL/Fl_Box.H>
 #include <FL/fl_utf8.h>
+#include <FL/fl_ask.H>
 
 #include "app_supervisor.h"
 #include "main_window.h"
@@ -63,7 +64,11 @@ using boost::nowide::narrow;
 
 [[noreturn]] static void report_error_and_die(r::actor_base_t *actor, const r::extended_error_ptr_t &ee) noexcept {
     auto name = actor ? actor->get_identity() : "unknown";
-    utils::get_root_logger()->critical("actor '{}' error: {}", name, ee);
+    auto msg = fmt::format("actor '{}' error: {}", name, ee);
+    auto logger = utils::get_root_logger();
+    logger->critical(msg);
+    logger->flush();
+    fl_alert("%s", msg.c_str());
     std::terminate();
 }
 
