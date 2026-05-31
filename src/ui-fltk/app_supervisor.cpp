@@ -179,14 +179,10 @@ void app_supervisor_t::shutdown_finish() noexcept {
     if (main_window) {
         main_window->on_shutdown();
     }
-    std::stringstream out;
-    std::stringstream out_orig;
-    auto r = config::serialize(app_config, out);
-    auto r_orig = config::serialize(app_config_original, out_orig);
-    if (r.has_value() && r_orig.has_value()) {
-        if (out.str() != out_orig.str()) {
-            write_config(app_config);
-        }
+    auto cfg = config::serialize(app_config);
+    auto cfg_orig = config::serialize(app_config_original);
+    if (cfg != cfg) {
+        write_config(app_config);
     }
 }
 
@@ -196,7 +192,7 @@ void app_supervisor_t::on_model_response(model::message::model_response_t &res) 
     LOG_TRACE(log, "on_model_response");
     auto &ee = res.payload.ee;
     if (ee) {
-        LOG_ERROR(log, "cannot get model: {}", ee->message());
+        LOG_ERROR(log, "cannot get model: {}", ee);
         return do_shutdown(ee);
     }
     cluster = std::move(res.payload.res.cluster);
@@ -286,7 +282,7 @@ void app_supervisor_t::on_db_info_response(net::message::db_info_response_t &res
     if (db_info_viewer) {
         auto &ee = res.payload.ee;
         if (ee) {
-            log->warn("error requesting db info: {}", ee->message());
+            log->warn("error requesting db info: {}", ee);
         } else {
             db_info_viewer->view(res.payload.res);
         }
@@ -338,8 +334,8 @@ callback_ptr_t app_supervisor_t::call_share_folders(std::string_view folder_id, 
             using diff_t = model::diff::modify::share_folder_t;
             auto opt = diff_t::create(*cluster, *sequencer, *device, self, *folder);
             if (!opt) {
-                auto message = opt.assume_error().message();
-                log->error("cannot share folder {} with {} : {}", folder_id, device->device_id(), message);
+                auto &ec = opt.assume_error();
+                log->error("cannot share folder {} with {} : {}", folder_id, device->device_id(), ec);
                 return;
             }
             assember.push_back(opt.assume_value().get());
@@ -357,7 +353,7 @@ auto app_supervisor_t::apply(const model::diff::local::io_failure_t &diff, void 
     auto r = parent_t::apply(diff, custom);
     if (r) {
         for (auto &details : diff.errors) {
-            log->warn("I/O error on '{}': {}", details.path.string(), details.ec.message());
+            log->warn("I/O error on '{}': {}", details.path.string(), details.ec);
         }
     }
     return r;
@@ -640,16 +636,22 @@ auto app_supervisor_t::apply(const model::diff::load::load_cluster_t &diff, void
 }
 
 void app_supervisor_t::write_config(const config::main_t &cfg) noexcept {
-    using F = utils::fstream_t;
     log->debug("going to write config");
     auto &path = get_config_path();
-    utils::fstream_t f_cfg(path.string(), F::binary | F::trunc | F::in | F::out);
-    auto r = config::serialize(cfg, f_cfg);
-    if (!r) {
-        log->error("cannot save default config at {}: {}", path, r.error().message());
-    } else {
-        log->info("succesfully stored config at {}. Restart to apply", path);
+    auto cfg_str = config::serialize(cfg);
+    auto file_opt = utils::io_stream_t::open_truncate(path);
+    if (!file_opt) {
+        auto &ec = file_opt.assume_error();
+        log->error("cannot open config '{}': {}", path, ec);
+        return;
     }
+    auto &file = file_opt.assume_value();
+    if (auto ok = file.write(cfg_str); !ok) {
+        auto ec = ok.assume_error();
+        log->error("cannot save default config at '{}': {}", path, ec);
+        return;
+    }
+    log->info("succesfully stored config at {}. Restart to apply", path);
     app_config_original = app_config = cfg;
 }
 

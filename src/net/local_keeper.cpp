@@ -21,6 +21,7 @@
 #include "proto/proto-helpers-db.h"
 #include "utils/string_comparator.hpp"
 #include "utils/utf8.h"
+#include "utils/format.hpp"
 
 #include <boost/nowide/convert.hpp>
 #include <spdlog/fmt/bin_to_hex.h>
@@ -271,8 +272,7 @@ void local_keeper_t::on_create_dir(fs::message::create_dir_t &message) noexcept 
     if (folder) {
         LOG_TRACE(log, "on_create_dir, folder path: {}", narrow(p.generic_wstring()));
         if (ec) {
-            LOG_WARN(log, "on_create_dir, cannot create path '{}': {}, suspending", narrow(p.generic_wstring()),
-                     ec.message());
+            LOG_WARN(log, "on_create_dir, cannot create path '{}': {}, suspending", narrow(p.generic_wstring()), ec);
             auto diff = model::diff::cluster_diff_ptr_t();
             diff = new model::diff::modify::suspend_folder_t(*folder, true, ec);
             send<model::payload::model_update_t>(coordinator, std::move(diff));
@@ -294,7 +294,7 @@ void local_keeper_t::on_post_process(fs::message::foreign_executor_t &msg) noexc
         auto has_pending = slave.post_process(stack_ctx);
         if (has_pending && fs_tasks == 0) {
             if (slave.ec) {
-                LOG_ERROR(log, "cannot process folder any longer: {}", slave.ec.message());
+                LOG_ERROR(log, "cannot process folder any longer: {}", slave.ec);
             } else {
                 slave.prepare_task();
                 slave.ec = utils::make_error_code(utils::error_code_t::no_action);
@@ -333,7 +333,7 @@ void local_keeper_t::on_watch_dir(fs::message::watch_folder_t &message) noexcept
     auto &p = message.payload;
     auto &ec = p.ec;
     if (ec) {
-        LOG_WARN(log, "cannot watch folder '{}': {}", p.folder_id, ec.message());
+        LOG_WARN(log, "cannot watch folder '{}': {}", p.folder_id, ec);
     } else {
         LOG_DEBUG(log, "watching fodler '{}'", p.folder_id);
         watched_folders.emplace(std::string(p.folder_id));

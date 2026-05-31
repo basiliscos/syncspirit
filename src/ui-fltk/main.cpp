@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2026 Ivan Baidakou
 
 #include <openssl/crypto.h>
 #include <filesystem>
@@ -19,6 +19,7 @@
 #include "utils/location.h"
 #include "utils/log-setup.h"
 #include "utils/platform.h"
+#include "utils/format.hpp"
 #include "hasher/hasher_supervisor.h"
 #include "net/net_supervisor.h"
 #include "bouncer/bouncer_actor.h"
@@ -29,6 +30,7 @@
 #include <FL/Fl_Window.H>
 #include <FL/Fl_Box.H>
 #include <FL/fl_utf8.h>
+#include <FL/fl_ask.H>
 
 #include "app_supervisor.h"
 #include "main_window.h"
@@ -55,12 +57,18 @@ namespace ra = r::asio;
 namespace rth = r::thread;
 namespace rf = rotor::fltk;
 namespace asio = boost::asio;
+namespace sys = boost::system;
 
 using namespace syncspirit;
+using boost::nowide::narrow;
 
-[[noreturn]] static void report_error_and_die(r::actor_base_t *actor, const r::extended_error_ptr_t &ec) noexcept {
+[[noreturn]] static void report_error_and_die(r::actor_base_t *actor, const r::extended_error_ptr_t &ee) noexcept {
     auto name = actor ? actor->get_identity() : "unknown";
-    utils::get_root_logger()->critical("actor '{}' error: {}", name, ec->message());
+    auto msg = fmt::format("actor '{}' error: {}", name, ee);
+    auto logger = utils::get_root_logger();
+    logger->critical(msg);
+    logger->flush();
+    fl_alert("%s", msg.c_str());
     std::terminate();
 }
 
@@ -107,12 +115,6 @@ BOOL WINAPI consoleHandler(DWORD signal) {
 }
 #endif
 
-#ifdef _WIN32
-#define SET_THREAD_EN_LANGUAGE() SetThreadUILanguage(MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US))
-#else
-#define SET_THREAD_EN_LANGUAGE()
-#endif
-
 struct app_context_t {
     int argc;
     char **argv;
@@ -126,7 +128,6 @@ int app_main(app_context_t &ctx);
 
 int main(int argc, char **argv) {
     auto bootstrap_guard = utils::bootstrap_guard_ptr_t();
-    SET_THREAD_EN_LANGUAGE();
     if (!utils::platform_t::startup()) {
         fprintf(stderr, "cannot startup platform\n");
         return -1;
@@ -223,7 +224,7 @@ int app_main(app_context_t &app_ctx) {
         if (config_default) {
             config_file_path = config_default.value();
         } else {
-            logger->error("cannot determine default config dir: {}", config_default.error().message());
+            logger->error("cannot determine default config dir: {}", config_default.error());
             return -1;
         }
     }
@@ -231,32 +232,47 @@ int app_main(app_context_t &app_ctx) {
 
     config_file_path.append("syncspirit.toml");
     bool populate = !bfs::exists(config_file_path);
+    auto config_file_path_str = narrow(config_file_path.generic_wstring());
     if (populate) {
-        logger->info("config {} seems does not exit, creating default one...", config_file_path.string());
+        logger->info("Config {} seems does not exit, creating default one...", config_file_path.string());
         auto cfg_opt = config::generate_config(config_file_path);
         if (!cfg_opt) {
-            logger->error("cannot generate default config: {}", cfg_opt.error().message());
-            return -1;
+            logger->error("cannot generate default config: {}", cfg_opt.error());
+            return 1;
         }
         auto &cfg = cfg_opt.value();
-        using F = utils::fstream_t;
-        auto f_cfg = utils::fstream_t(config_file_path, F::binary | F::trunc | F::in | F::out);
-        auto r = config::serialize(cfg, f_cfg);
-        if (!r) {
-            logger->error("cannot save default config at :: {}", r.error().message());
-            return -1;
+        auto cfg_str = config::serialize(cfg);
+        auto file_opt = utils::io_stream_t::open_truncate(config_file_path);
+        if (!file_opt) {
+            logger->error("cannot open file config at {}: {}", config_file_path_str, file_opt.error());
+            return 1;
+        }
+        auto &file = file_opt.assume_value();
+        if (auto r = file.write(cfg_str); !r) {
+            logger->error("cannot generate default config at {}: {}", config_file_path_str, r.error());
+            return 1;
         }
     }
-    auto config_file = utils::ifstream_t(config_file_path);
-    if (!config_file) {
-        logger->error("Cannot open config file {}", config_file_path.string());
-        return -1;
+    auto config_file_opt = utils::io_stream_t::open_read(config_file_path);
+    if (!config_file_opt) {
+        logger->error("Cannot open config file '{}' : {}", config_file_path_str, config_file_opt.error());
+        return 1;
     }
 
-    config::config_result_t cfg_option = config::get_config(config_file, config_file_path.parent_path());
+    auto &config_file = config_file_opt.assume_value();
+    auto config_file_content = config_file.read_whole();
+    if (!config_file_content) {
+        auto &ec = config_file_content.assume_error();
+        logger->error("Cannot read config file '{}' : {}", config_file_path_str, ec);
+        return 1;
+    }
+    auto &config_file_data = config_file_content.assume_value();
+    auto config_file_str =
+        std::string_view(reinterpret_cast<const char *>(config_file_data.data()), config_file_data.size());
+    auto cfg_option = config::get_config(config_file_str, config_file_path.parent_path());
     if (!cfg_option) {
-        logger->error("Config file {} is incorrect: {}", config_file_path.string(), cfg_option.error());
-        return -1;
+        logger->error("Config file {} is incorrect :: {}", config_file_path_str, cfg_option.error());
+        return 1;
     }
     auto &cfg = cfg_option.value();
     logger->trace("configuration seems OK, timeout = {}ms", cfg.timeout);
@@ -275,7 +291,7 @@ int app_main(app_context_t &app_ctx) {
     }
     auto init_result = utils::init_loggers(cfg.log_configs);
     if (!init_result) {
-        logger->error("loggers initialization failed :: {}", init_result.error().message());
+        logger->error("loggers initialization failed :: {}", init_result.error());
         return -1;
     }
 
@@ -290,14 +306,14 @@ int app_main(app_context_t &app_ctx) {
             logger->info("Generating cryptographic keys...");
             auto pair = utils::generate_pair(constants::issuer_name);
             if (!pair) {
-                logger->error("cannot generate cryptographic keys :: {}", pair.error().message());
+                logger->error("cannot generate cryptographic keys :: {}", pair.error());
                 return -1;
             }
             auto &keys = pair.value();
             auto save_result = keys.save(cert_path_str.c_str(), key_path_str.c_str());
             if (!save_result) {
                 logger->error("cannot store cryptographic keys ({} & {}) :: {}", cert_path_str, key_path_str,
-                              save_result.error().message());
+                              save_result.error());
                 return -1;
             }
         }
@@ -403,7 +419,6 @@ int app_main(app_context_t &app_ctx) {
 
     // launch
     auto net_thread = std::thread([&]() {
-        SET_THREAD_EN_LANGUAGE();
         utils::platform_t::set_thread_name("ss/net");
         io_context.run();
         shutdown_flag = true;
@@ -414,7 +429,6 @@ int app_main(app_context_t &app_ctx) {
     for (uint32_t i = 0; i < hasher_count; ++i) {
         auto &ctx = hasher_ctxs.at(i);
         auto thread = std::thread([ctx = ctx, i = i, logger]() {
-            SET_THREAD_EN_LANGUAGE();
             auto name = fmt::format("ss/hasher-{}", i + 1);
             utils::platform_t::set_thread_name(name);
             ctx->run();
@@ -425,7 +439,6 @@ int app_main(app_context_t &app_ctx) {
     }
 
     auto fs_thread = std::thread([&]() {
-        SET_THREAD_EN_LANGUAGE();
         utils::platform_t::set_thread_name("ss/fs");
         fs_context.run();
         shutdown_flag = true;
@@ -465,7 +478,7 @@ int app_main(app_context_t &app_ctx) {
     bouncer_thread.join();
 
     if (auto reason = sup_net->get_shutdown_reason(); reason && reason->ec) {
-        logger->info("app shut down reason: {}", reason->message());
+        logger->info("app shut down reason: {}", reason);
     }
 
     int code = sup_fltk->is_soft_restart_requested() ? 1 : 0;

@@ -7,6 +7,7 @@
 
 #include "fs/fs_supervisor.h"
 #include "fs/utils.h"
+#include "utils/format.hpp"
 #include <boost/nowide/convert.hpp>
 #include <cstring>
 #include <string>
@@ -69,7 +70,7 @@ void watcher_t::on_watch(message::watch_folder_t &message) noexcept {
 
     if (dir_handle == INVALID_HANDLE_VALUE) {
         auto ec = sys::error_code(::GetLastError(), sys::system_category());
-        LOG_ERROR(log, "cannot open directory '{}' handle: {}", path_str, ec.message());
+        LOG_ERROR(log, "cannot open directory '{}' handle: {}", path_str, ec);
         p.ec = ec;
         return;
     }
@@ -78,7 +79,7 @@ void watcher_t::on_watch(message::watch_folder_t &message) noexcept {
     auto event_handle = ::CreateEvent(nullptr, true, false, nullptr);
     if (!event_handle) {
         auto ec = sys::error_code(::GetLastError(), sys::system_category());
-        LOG_ERROR(log, "cannot create event handle: {}", path_str, ec.message());
+        LOG_ERROR(log, "cannot create event handle: {}", path_str, ec);
         p.ec = ec;
         return;
     }
@@ -94,7 +95,7 @@ void watcher_t::on_watch(message::watch_folder_t &message) noexcept {
     }
 
     if (auto ec = folder_guard->initiate(); ec) {
-        LOG_ERROR(log, "cannot initate watching dir '{}': {}", path_str, ec.message());
+        LOG_ERROR(log, "cannot initate watching dir '{}': {}", path_str, ec);
         p.ec = ec;
         return;
     }
@@ -165,7 +166,7 @@ void watcher_t::on_notify(handle_t handle) noexcept {
     auto ok = ::GetOverlappedResult(folder_guard->dir_guard.handle, &folder_guard->overlapped, &bytes, false);
     if (!ok) {
         auto ec = sys::error_code(::GetLastError(), sys::system_category());
-        LOG_WARN(log, "cannot get overlapped result for '{}': {}", path_str, ec.message());
+        LOG_WARN(log, "cannot get overlapped result for '{}': {}", path_str, ec);
         return;
     }
     if (!bytes) {
@@ -229,12 +230,12 @@ void watcher_t::on_notify(handle_t handle) noexcept {
 
     if (auto ok = ::ResetEvent(handle); !ok) {
         auto ec = sys::error_code(::GetLastError(), sys::system_category());
-        LOG_WARN(log, "cannot reset event for handle for '{}': {}", path_str, ec.message());
+        LOG_WARN(log, "cannot reset event for handle for '{}': {}", path_str, ec);
         return;
     }
 
     if (auto ec = folder_guard->initiate(); ec) {
-        LOG_ERROR(log, "cannot initate watching dir '{}': {}", path_str, ec.message());
+        LOG_ERROR(log, "cannot initate watching dir '{}': {}", path_str, ec);
         return;
     }
 }

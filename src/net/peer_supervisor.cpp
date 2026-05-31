@@ -43,7 +43,7 @@ void peer_supervisor_t::post_configure_coordinator() noexcept {
 void peer_supervisor_t::on_child_shutdown(actor_base_t *actor) noexcept {
     using namespace model::diff;
     auto &reason = actor->get_shutdown_reason();
-    LOG_TRACE(log, "on_child_shutdown, {} due to {} ", actor->get_identity(), reason->message());
+    LOG_TRACE(log, "on_child_shutdown, {} due to {} ", actor->get_identity(), reason);
     parent_t::on_child_shutdown(actor);
 }
 
@@ -97,7 +97,7 @@ void peer_supervisor_t::on_connected(message::peer_connected_t &msg) noexcept {
     auto host = p.uri->encoded_host();
     auto ip = asio::ip::make_address(host, ec);
     if (ec) {
-        LOG_WARN(log, "cannot make ip address from '{}': {}", host, ec.message());
+        LOG_WARN(log, "cannot make ip address from '{}': {}", host, ec);
         reply_with_error(*req, make_error(ec));
         return;
     }

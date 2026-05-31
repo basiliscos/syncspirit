@@ -90,7 +90,7 @@ db_actor_t::payload::commit_t::~commit_t() {
                 spdlog::debug("successfully closed orphaned transaction");
             } else {
                 auto ec = r.assume_error();
-                spdlog::debug("cannot close orphaned transaction: {}", ec.message());
+                spdlog::debug("cannot close orphaned transaction: {}", ec);
             }
         }
     }
@@ -169,14 +169,14 @@ void db_actor_t::open() noexcept {
     }
     auto txn = db::make_transaction(db::transaction_type_t::RO, env);
     if (!txn) {
-        LOG_ERROR(log, "open, cannot create transaction {}", txn.error().message());
+        LOG_ERROR(log, "open, cannot create transaction {}", txn.error());
         resources->release(resource::db);
         return do_shutdown(make_error(db::make_error_code(r)));
     }
 
     auto db_ver = db::get_version(txn.value());
     if (!db_ver) {
-        LOG_ERROR(log, "open, cannot get db version :: {}", db_ver.error().message());
+        LOG_ERROR(log, "open, cannot get db version :: {}", db_ver.error());
         resources->release(resource::db);
         return do_shutdown(make_error(db::make_error_code(r)));
     }
@@ -184,7 +184,7 @@ void db_actor_t::open() noexcept {
     LOG_DEBUG(log, "got db version: {}, expected : {} ", version, db::version);
 
     if (!txn) {
-        LOG_ERROR(log, "open, cannot create transaction {}", txn.error().message());
+        LOG_ERROR(log, "open, cannot create transaction {}", txn.error());
         resources->release(resource::db);
         return do_shutdown(make_error(db::make_error_code(r)));
     }
@@ -192,7 +192,7 @@ void db_actor_t::open() noexcept {
         txn = db::make_transaction(db::transaction_type_t::RW, txn.value());
         auto r = db::migrate(version, my_device, txn.value());
         if (!r) {
-            LOG_ERROR(log, "open, cannot migrate db {}", r.error().message());
+            LOG_ERROR(log, "open, cannot migrate db {}", r.error());
             resources->release(resource::db);
             return do_shutdown(make_error(r.error()));
         }
@@ -240,7 +240,7 @@ void db_actor_t::shutdown_finish() noexcept {
         auto r = commit_on_demand();
         if (!r) {
             auto &err = r.assume_error();
-            LOG_ERROR(log, "cannot commit tx: {}", err.message());
+            LOG_ERROR(log, "cannot commit tx: {}", err);
         }
         txn_holder.reset();
     }
@@ -425,7 +425,7 @@ void db_actor_t::on_patrial_load(partial_load_t &message) noexcept {
         auto r = p.txn.commit();
         if (!r) {
             ee = make_error(r.assume_error());
-            LOG_ERROR(log, "committing txn error: {}", r.assume_error().message());
+            LOG_ERROR(log, "committing txn error: {}", r.assume_error());
         }
         send<net::payload::load_cluster_fail_t>(coordinator, ee);
         resources->release(resource::partial_load);
@@ -548,7 +548,7 @@ void db_actor_t::on_commit(commit_message_t &message) noexcept {
     auto r = message.payload.commit();
     if (!r) {
         auto ee = make_error(r.assume_error());
-        LOG_ERROR(log, "committing txn error: {}", r.assume_error().message());
+        LOG_ERROR(log, "committing txn error: {}", r.assume_error());
         do_shutdown(ee);
     }
 }
@@ -566,7 +566,7 @@ void db_actor_t::visit(const model::diff::cluster_diff_t &diff, model::payload::
     }
     if (!r) {
         auto ee = make_error(r.assume_error());
-        LOG_ERROR(log, "visit error: {}", r.assume_error().message());
+        LOG_ERROR(log, "visit error: {}", r.assume_error());
         do_shutdown(ee);
     }
 }

@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2026 Ivan Baidakou
 
 #include "control.h"
 
 #include "table.h"
 #include "config/utils.h"
+#include "utils/format.hpp"
 #include "../tree_item/settings.h"
 #include <FL/Fl_Button.H>
 
@@ -20,7 +21,7 @@ control_t::control_t(tree_item_t &tree_item_, int x, int y, int w, int h)
     auto defaults_opt = syncspirit::config::generate_config(config_path);
     if (!defaults_opt) {
         auto ec = defaults_opt.assume_error();
-        sup.get_logger()->error("cannot generate default config at {}: {}", config_path.string(), ec.message());
+        sup.get_logger()->error("cannot generate default config at {}: {}", config_path.string(), ec);
     } else {
         default_cfg = std::move(defaults_opt.assume_value());
         categories = reflect(sup.get_app_config(), default_cfg);

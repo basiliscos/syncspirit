@@ -163,7 +163,7 @@ cluster_update_t::cluster_update_t(const bfs::path &default_path, const cluster_
             auto ec = sys::error_code();
             bfs::create_directories(path, ec);
             LOG_TRACE(log, "cluster_update_t, trying to make a dir: '{}' for folder '{}', result: {}", path.string(),
-                      folder_id, ec.message());
+                      folder_id, ec);
             if (ec) {
                 return ec;
             }

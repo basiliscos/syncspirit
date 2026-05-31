@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "add_folder.h"
 #include "../governor_actor.h"
@@ -95,9 +95,9 @@ bool add_folder_t::execute(governor_actor_t &actor) noexcept {
 
     auto opt = modify::upsert_folder_t::create(*cluster, *actor.sequencer, folder, 0);
     if (opt.has_error()) {
-        auto message = opt.assume_error().message();
+        auto ec = opt.assume_error();
         log->warn("{}, cannot create folder '{}' on '{}': {}", actor.get_identity(), db::get_label(folder),
-                  db::get_path(folder), message);
+                  db::get_path(folder), ec);
         return false;
     }
 

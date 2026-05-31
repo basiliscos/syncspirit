@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "relay_actor.h"
 #include "names.h"
 #include "constants.h"
+#include "utils/format.hpp"
 #include "utils/error_code.h"
 #include "utils/beast_support.h"
 #include "utils/time.h"
@@ -135,7 +136,7 @@ void relay_actor_t::request_relay_list() noexcept {
     auto r = utils::serialize(req, tx_buff);
     if (!r) {
         auto &ec = r.assume_error();
-        LOG_WARN(log, "cannot serialize request: {}'", r.assume_error().message());
+        LOG_WARN(log, "cannot serialize request: {}'", r.assume_error());
         return do_shutdown(make_error(ec));
     }
     resources->acquire(resource::http);
@@ -151,7 +152,7 @@ void relay_actor_t::on_list(message::http_response_t &msg) noexcept {
 
     auto &ee = msg.payload.ee;
     if (ee) {
-        LOG_WARN(log, "get public relays failed: {}", ee->message());
+        LOG_WARN(log, "get public relays failed: {}", ee);
         auto inner = utils::make_error_code(utils::error_code_t::cannot_get_public_relays);
         return do_shutdown(make_error(inner, ee));
     }
@@ -163,7 +164,7 @@ void relay_actor_t::on_list(message::http_response_t &msg) noexcept {
     auto result = proto::relay::parse_endpoint(body);
     if (!result) {
         auto &ec = result.assume_error();
-        LOG_WARN(log, "cannot parse relays: {}", ec.message());
+        LOG_WARN(log, "cannot parse relays: {}", ec);
         return do_shutdown(make_error(ec));
     }
     auto &list = result.assume_value();
@@ -227,7 +228,7 @@ void relay_actor_t::on_connect(message::connect_response_t &res) noexcept {
     auto &ee = res.payload.ee;
     auto &r = relays[relay_index];
     if (ee) {
-        LOG_TRACE(log, "failed to connect to relay {}: {}", r->device_id.get_short(), ee->message());
+        LOG_TRACE(log, "failed to connect to relay {}: {}", r->device_id.get_short(), ee);
         relays[relay_index].reset();
         return connect_to_relay();
     }
@@ -246,10 +247,10 @@ void relay_actor_t::on_connect(message::connect_response_t &res) noexcept {
 }
 
 void relay_actor_t::on_io_error(const sys::error_code &ec, rotor::plugin::resource_id_t resource) noexcept {
-    LOG_TRACE(log, "on_io_error: {}", ec.message());
+    LOG_TRACE(log, "on_io_error: {}", ec);
     resources->release(resource);
     if (ec != asio::error::operation_aborted) {
-        LOG_WARN(log, "on_io_error: {}", ec.message());
+        LOG_WARN(log, "on_io_error: {}", ec);
         if (state < r::state_t::SHUTTING_DOWN) {
             do_shutdown(make_error(ec));
         }

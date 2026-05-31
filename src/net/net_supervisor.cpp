@@ -22,6 +22,7 @@
 #include "net/ssdp_actor.h"
 #include "net/local_keeper.h"
 #include "net/scheduler.h"
+#include "utils/format.hpp"
 #include "presentation/folder_entity.h"
 #include "presentation/folder_entity.h"
 #include "proto/proto-helpers-bep.h"
@@ -51,7 +52,7 @@ net_supervisor_t::net_supervisor_t(net_supervisor_t::config_t &cfg)
     auto key_file = narrow(app_config.key_file.wstring());
     auto result = utils::load_pair(cert_file.c_str(), key_file.c_str());
     if (!result) {
-        LOG_CRITICAL(log, "cannot load certificate/key pair :: {}", result.error().message());
+        LOG_CRITICAL(log, "cannot load certificate/key pair: {}", result.error());
         throw result.error();
     }
     ssl_pair = std::move(result.value());
@@ -112,7 +113,7 @@ void net_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 void net_supervisor_t::on_child_shutdown(actor_base_t *actor) noexcept {
     parent_t::on_child_shutdown(actor);
     auto &reason = actor->get_shutdown_reason();
-    LOG_TRACE(log, "on_child_shutdown, '{}' due to {} ", actor->get_identity(), reason->message());
+    LOG_TRACE(log, "on_child_shutdown, '{}' due to {} ", actor->get_identity(), reason);
 }
 
 void net_supervisor_t::shutdown_start() noexcept {
@@ -167,7 +168,7 @@ void net_supervisor_t::seed_model() noexcept {
 
 void net_supervisor_t::on_load_cluster_fail(message::load_cluster_fail_t &message) noexcept {
     auto &ee = message.payload.ee;
-    LOG_ERROR(log, "cannot load cluster : {}", ee->message());
+    LOG_ERROR(log, "cannot load cluster : {}", ee);
     return do_shutdown(ee);
 }
 

@@ -9,8 +9,10 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/nowide/convert.hpp>
 #include <spdlog/spdlog.h>
+#include <sstream>
 #include "utils/log.h"
 #include "utils/location.h"
+#include "utils/format.hpp"
 
 #define TOML_EXCEPTIONS 0
 #include <toml++/toml.h>
@@ -228,7 +230,7 @@ static main_t make_default_config(const bfs::path &config_path, const bfs::path 
     return cfg;
 }
 
-config_result_t get_config(std::istream &config, const bfs::path &config_path) {
+config_result_t get_config(std::string_view config, const bfs::path &config_path) {
     auto dir = config_path.parent_path();
     main_t cfg;
     cfg.config_path = config_path;
@@ -242,7 +244,7 @@ config_result_t get_config(std::istream &config, const bfs::path &config_path) {
     auto config_dir_opt = utils::get_default_config_dir();
     if (!config_dir_opt) {
         auto ec = config_dir_opt.assume_error();
-        return fmt::format("cannot get config dir: {}", ec.message());
+        return fmt::format("cannot get config dir: {}", ec);
     }
     auto &config_dir = config_dir_opt.assume_value();
     bool is_home = dir == config_dir;
@@ -410,7 +412,7 @@ static std::string_view get_level(spdlog::level::level_enum level) noexcept {
     return "unknown";
 }
 
-outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
+std::string serialize(const main_t& cfg) noexcept {
     using boost::nowide::narrow;
 
     auto logs = toml::array{};
@@ -512,8 +514,9 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
                  }}},
     }};
     // clang-format on
+    auto out = std::stringstream();
     out << tbl;
-    return outcome::success();
+    return std::move(out.str());
 }
 
 outcome::result<main_t> generate_config(const bfs::path &config_path) {
@@ -524,7 +527,7 @@ outcome::result<main_t> generate_config(const bfs::path &config_path) {
         spdlog::info("creating directory {}", dir.string());
         bfs::create_directories(dir, ec);
         if (ec) {
-            spdlog::error("cannot create dirs: {}", ec.message());
+            spdlog::error("cannot create dirs: {}", ec);
             return ec;
         }
     }
@@ -534,8 +537,7 @@ outcome::result<main_t> generate_config(const bfs::path &config_path) {
     auto config_dir_opt = utils::get_default_config_dir();
     if (!config_dir_opt) {
         auto ec = config_dir_opt.assume_error();
-        auto msg = ec.message();
-        spdlog::warn("cannot get config dir: {}", msg);
+        spdlog::warn("cannot get config dir: {}", ec);
         return ec;
     }
     auto &config_dir = config_dir_opt.assume_value();

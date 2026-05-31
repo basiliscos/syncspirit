@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include <openssl/crypto.h>
 #include <filesystem>
@@ -18,6 +18,7 @@
 #include "utils/location.h"
 #include "utils/log-setup.h"
 #include "utils/platform.h"
+#include "utils/format.hpp"
 #include "net/net_supervisor.h"
 #include "fs/fs_context.h"
 #include "fs/fs_supervisor.h"
@@ -46,13 +47,15 @@ namespace r = rotor;
 namespace ra = r::asio;
 namespace rth = r::thread;
 namespace asio = boost::asio;
+namespace sys = boost::system;
 
 using namespace syncspirit;
 using namespace syncspirit::daemon;
+using boost::nowide::narrow;
 
-[[noreturn]] static void report_error_and_die(r::actor_base_t *actor, const r::extended_error_ptr_t &ec) noexcept {
+[[noreturn]] static void report_error_and_die(r::actor_base_t *actor, const r::extended_error_ptr_t &ee) noexcept {
     auto name = actor ? actor->get_identity() : "unknown";
-    utils::get_root_logger()->critical("actor '{}' error: {}", name, ec->message());
+    utils::get_root_logger()->critical("actor '{}' error: {}", name, ee);
     std::terminate();
 }
 
@@ -205,38 +208,52 @@ int app_main(app_context_t &app_ctx) {
         if (config_default) {
             config_file_path = config_default.value();
         } else {
-            logger->error("cannot determine default config dir: {}", config_default.error().message());
+            logger->error("cannot determine default config dir: {}", config_default.error());
             return 1;
         }
     }
     app_ctx.bootstrap_guard = utils::bootstrap(app_ctx.dist_sink, config_file_path);
 
     config_file_path.append("syncspirit.toml");
-    auto config_file_path_str = config_file_path.string();
+    auto config_file_path_str = narrow(config_file_path.generic_wstring());
     bool populate = !bfs::exists(config_file_path);
     if (populate) {
         logger->info("Config {} seems does not exit, creating default one...", config_file_path.string());
         auto cfg_opt = config::generate_config(config_file_path);
         if (!cfg_opt) {
-            logger->error("cannot generate default config: {}", cfg_opt.error().message());
+            logger->error("cannot generate default config: {}", cfg_opt.error());
             return 1;
         }
         auto &cfg = cfg_opt.value();
-        using F = utils::fstream_t;
-        auto f_cfg = utils::fstream_t(config_file_path, F::binary | F::trunc | F::in | F::out);
-        auto r = config::serialize(cfg, f_cfg);
-        if (!r) {
-            logger->error("cannot save default config at {}: {}", config_file_path_str, r.error().message());
+        auto cfg_str = config::serialize(cfg);
+        auto file_opt = utils::io_stream_t::open_truncate(config_file_path);
+        if (!file_opt) {
+            logger->error("cannot open file config at {}: {}", config_file_path_str, file_opt.error());
+            return 1;
+        }
+        auto &file = file_opt.assume_value();
+        if (auto r = file.write(cfg_str); !r) {
+            logger->error("cannot generate default config at {}: {}", config_file_path_str, r.error());
             return 1;
         }
     }
-    auto config_file = utils::ifstream_t(config_file_path);
-    if (!config_file) {
-        logger->error("Cannot open config file {}", config_file_path_str);
+    auto config_file_opt = utils::io_stream_t::open_read(config_file_path);
+    if (!config_file_opt) {
+        logger->error("Cannot open config file '{}' : {}", config_file_path_str, config_file_opt.error());
         return 1;
     }
 
-    config::config_result_t cfg_option = config::get_config(config_file, config_file_path.parent_path());
+    auto &config_file = config_file_opt.assume_value();
+    auto config_file_content = config_file.read_whole();
+    if (!config_file_content) {
+        auto &ec = config_file_content.assume_error();
+        logger->error("Cannot read config file '{}' : {}", config_file_path_str, ec);
+        return 1;
+    }
+    auto &config_file_data = config_file_content.assume_value();
+    auto config_file_str =
+        std::string_view(reinterpret_cast<const char *>(config_file_data.data()), config_file_data.size());
+    auto cfg_option = config::get_config(config_file_str, config_file_path.parent_path());
     if (!cfg_option) {
         logger->error("Config file {} is incorrect :: {}", config_file_path_str, cfg_option.error());
         return 1;
@@ -253,7 +270,7 @@ int app_main(app_context_t &app_ctx) {
     }
     auto init_result = utils::init_loggers(cfg.log_configs);
     if (!init_result) {
-        logger->error("Loggers initialization failed :: {}", init_result.error().message());
+        logger->error("Loggers initialization failed :: {}", init_result.error());
         return 1;
     }
 
@@ -263,7 +280,7 @@ int app_main(app_context_t &app_ctx) {
         for (auto &cmd : cmds) {
             auto r = command_t::parse(cmd);
             if (!r) {
-                logger->error("error parsing {} : {}", cmd, r.assume_error().message());
+                logger->error("error parsing {} : {}", cmd, r.assume_error());
                 return 1;
             }
             commands.emplace_back(std::move(r.assume_value()));
@@ -275,20 +292,20 @@ int app_main(app_context_t &app_ctx) {
         auto &key_path = cfg.key_file;
         auto ec = std::error_code{};
         if (!bfs::exists(cert_path, ec) || !bfs::exists(key_path, ec)) {
-            auto cert_path_str = boost::nowide::narrow(cert_path.wstring());
-            auto key_path_str = boost::nowide::narrow(key_path.wstring());
+            auto cert_path_str = narrow(cert_path.wstring());
+            auto key_path_str = narrow(key_path.wstring());
             logger->trace("'{}' or '{}' do not exist", cert_path_str, key_path_str);
             logger->info("Generating cryptographic keys...");
             auto pair = utils::generate_pair(constants::issuer_name);
             if (!pair) {
-                logger->error("cannot generate cryptographic keys :: {}", pair.error().message());
+                logger->error("cannot generate cryptographic keys :: {}", pair.error());
                 return 1;
             }
             auto &keys = pair.value();
             auto save_result = keys.save(cert_path_str.c_str(), key_path_str.c_str());
             if (!save_result) {
                 logger->error("cannot store cryptographic keys ({} & {}) :: {}", cert_path, key_path,
-                              save_result.error().message());
+                              save_result.error());
                 return 1;
             }
         }
@@ -422,7 +439,7 @@ int app_main(app_context_t &app_ctx) {
     bouncer_thread.join();
 
     if (auto reason = sup_net->get_shutdown_reason(); reason && reason->ec) {
-        logger->info("app shut down reason: {}", reason->message());
+        logger->info("app shut down reason: {}", reason);
     }
 
     logger->trace("everything has been terminated");

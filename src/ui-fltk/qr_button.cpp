@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2026 Ivan Baidakou
 
 #include "qr_button.h"
+#include "utils/format.hpp"
 
 #include <memory>
 #include <system_error>
@@ -133,7 +134,7 @@ qr_button_t::qr_button_t(const model::device_id_t &device_, app_supervisor_t &su
     auto &logger = supervisor.get_logger();
     if (!code_raw) {
         auto ec = std::error_code{errno, std::generic_category()};
-        logger->error("cannot generate qr code ({}) : {}", ec.value(), ec.message());
+        logger->error("cannot generate qr code ({}) : {}", ec.value(), ec);
         return;
     }
     auto code = make_guard(code_raw, [](auto ptr) { QRcode_free(ptr); });

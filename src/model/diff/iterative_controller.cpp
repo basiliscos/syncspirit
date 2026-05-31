@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2025-2026 Ivan Baidakou
 
 #include "iterative_controller.h"
 #include "bouncer/messages.hpp"
 #include "model/diff/load/commit.h"
 #include "model/diff/load/interrupt.h"
+#include "utils/format.hpp"
 #include <rotor/actor_base.h>
 #include <rotor/extended_error.h>
 #include <thread>
@@ -107,7 +108,7 @@ void iterative_controller_base_t::process_impl(model::diff::cluster_diff_t &diff
 
     auto r = target_diff->apply(*this, &apply_context);
     if (!r) {
-        LOG_ERROR(log, "error applying model diff: {}", r.assume_error().message());
+        LOG_ERROR(log, "error applying model diff: {}", r.assume_error());
         auto ee = owner->access<to::make_error, T0, T1, T2>(r.assume_error(), {}, {});
         return owner->do_shutdown(ee);
     }

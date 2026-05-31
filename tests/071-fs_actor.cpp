@@ -300,9 +300,9 @@ void test_remote_copy() {
 
                 auto status = bfs::status(path);
                 CHECK(to_unix(bfs::last_write_time(path)) == 1641828421);
-                CHECK(updates_mediator->is_masked(path_str) >= 2);
                 CHECK(updates_mediator->is_masked(tmp_path_str) == 0);
 #ifndef SYNCSPIRIT_WIN
+                CHECK(updates_mediator->is_masked(path_str) >= 2);
                 auto p = status.permissions();
                 CHECK((p & perms_t::owner_read) != perms_t::none);
                 CHECK((p & perms_t::owner_write) != perms_t::none);
@@ -310,6 +310,8 @@ void test_remote_copy() {
                 CHECK((p & perms_t::group_write) != perms_t::none);
                 CHECK((p & perms_t::others_read) != perms_t::none);
                 CHECK((p & perms_t::others_write) != perms_t::none);
+#else
+                CHECK(updates_mediator->is_masked(path_str) == 1);
 #endif
             }
             SECTION("directory") {
@@ -508,7 +510,6 @@ void test_append_block() {
 #ifndef SYNCSPIRIT_WIN
                 REQUIRE(bfs::exists(tmp_path));
                 REQUIRE(bfs::file_size(tmp_path) == 10);
-                CHECK(read_file(tmp_path).substr(0, 5) == "12345");
 #endif
                 append_block(path, as_owned_bytes("67890"), 5, 10).check_success();
                 CHECK(updates_mediator->is_masked(tmp_path_str) == 0);

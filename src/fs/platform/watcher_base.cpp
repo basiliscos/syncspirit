@@ -6,6 +6,7 @@
 #include "proto/proto-helpers-bep.h"
 #include "net/names.h"
 #include "model/messages.h"
+#include "utils/format.hpp"
 #include <boost/nowide/convert.hpp>
 #include <string.h>
 
@@ -210,7 +211,7 @@ auto FU::make(const folder_info_t &folder_info, watcher_base_t &actor) noexcept 
             auto path = folder_info.path / widen(update.path);
             auto status = bfs::symlink_status(path, ec);
             if (ec) {
-                LOG_DEBUG(log, "cannot get status on '{}': {} (update ignored)", full_name, ec.message());
+                LOG_DEBUG(log, "cannot get status on '{}': {} (update ignored)", full_name, ec);
                 continue;
             }
             if (!actor.accept_update(update, status)) {
@@ -221,12 +222,12 @@ auto FU::make(const folder_info_t &folder_info, watcher_base_t &actor) noexcept 
             if (status.type() == FT::regular) {
                 auto sz = bfs::file_size(path, ec);
                 if (ec) {
-                    LOG_WARN(log, "cannot get size on '{}': {} (update ignored)", full_name, ec.message());
+                    LOG_WARN(log, "cannot get size on '{}': {} (update ignored)", full_name, ec);
                     continue;
                 }
                 auto modified = bfs::last_write_time(path, ec);
                 if (ec) {
-                    LOG_WARN(log, "cannot get last_write_time on '{}': {} (update ignored)", full_name, ec.message());
+                    LOG_WARN(log, "cannot get last_write_time on '{}': {} (update ignored)", full_name, ec);
                     continue;
                 }
                 proto::set_modified_s(r, to_unix(modified));
@@ -237,7 +238,7 @@ auto FU::make(const folder_info_t &folder_info, watcher_base_t &actor) noexcept 
             } else if (status.type() == FT::symlink) {
                 auto target = bfs::read_symlink(path, ec);
                 if (ec) {
-                    LOG_WARN(log, "cannot read_symlink on '{}': {} (update ignored)", full_name, ec.message());
+                    LOG_WARN(log, "cannot read_symlink on '{}': {} (update ignored)", full_name, ec);
                     continue;
                 }
                 proto::set_symlink_target(r, narrow(target.generic_wstring()));

@@ -6,6 +6,7 @@
 #include "base.h"
 #include "utils/platform.h"
 #include "utils/log.h"
+#include "utils/format.hpp"
 #include "stream.h"
 #include <boost/asio/ssl.hpp>
 
@@ -124,7 +125,7 @@ template <> struct base_impl_t<ssl_socket_t> {
                 ec = sys::error_code(static_cast<int>(code), asio::error::get_ssl_category());
             }
             if (ec) {
-                log->warn("cannot load_verify_store: {}", ec.message());
+                log->warn("cannot load_verify_store: {}", ec);
             } else {
                 log->trace("using ssl verify store: {}", source.ssl_verify_store);
                 use_sytem_verify_paths = false;
@@ -135,7 +136,7 @@ template <> struct base_impl_t<ssl_socket_t> {
             auto ec = sys::error_code();
             ctx.set_default_verify_paths(ec);
             if (ec) {
-                log->warn("cannot set ssl default verify paths: {}", ec.message());
+                log->warn("cannot set ssl default verify paths: {}", ec);
             }
         }
 
@@ -180,7 +181,7 @@ template <> struct base_impl_t<ssl_socket_t> {
             log->trace("will will use sni extension (value = '{}')", host);
             if (!SSL_set_tlsext_host_name(sock.native_handle(), host.c_str())) {
                 sys::error_code ec{static_cast<int>(::ERR_get_error()), asio::error::get_ssl_category()};
-                log->error("http_actor_t:: Set SNI Hostname : {}", ec.message());
+                log->error("http_actor_t:: Set SNI Hostname : {}", ec);
             }
         }
 
@@ -202,7 +203,7 @@ template <> struct base_impl_t<ssl_socket_t> {
                 }
                 auto der_option = utils::as_serialized_der(peer_cert);
                 if (!der_option) {
-                    log->warn("peer certificate cannot be serialized as der : {}", der_option.error().message());
+                    log->warn("peer certificate cannot be serialized as der : {}", der_option.error());
                     return false;
                 }
 
@@ -334,7 +335,7 @@ template <> struct impl<tcp_socket_t> {
             sys::error_code ec;
             sock.cancel(ec);
             if (ec) {
-                utils::get_logger("transport.sock")->error("impl<tcp::socket>::cancel() :: {}", ec.message());
+                utils::get_logger("transport.sock")->error("impl<tcp::socket>::cancel(): {}", ec);
             }
         }
     }

@@ -408,7 +408,7 @@ void controller_actor_t::on_peer_down(message::peer_down_t &message) noexcept {
             peer_address.reset();
         }
         auto &ee = message.payload.ee;
-        LOG_TRACE(log, "on_peer_down reason: {}", ee->message());
+        LOG_TRACE(log, "on_peer_down reason: {}", ee);
         do_shutdown(ee);
     }
 }
@@ -431,7 +431,7 @@ void controller_actor_t::on_postprocess_io(fs::message::io_commands_t &message) 
                     postprocess_io(cmd, stack_ctx);
                     if (cmd.result.has_error()) {
                         auto &ec = cmd.result.assume_error();
-                        LOG_ERROR(log, "i/o error (postprocessing): {}", ec.message());
+                        LOG_ERROR(log, "i/o error (postprocessing): {}", ec);
                         do_shutdown(make_error(ec));
                     }
                 }
@@ -1043,7 +1043,7 @@ void controller_actor_t::on_message(proto::ClusterConfig &message, stack_context
     auto diff_opt = diff_t::create(default_path, *cluster, *sequencer, *peer, message);
     if (!diff_opt) {
         auto &ec = diff_opt.assume_error();
-        LOG_ERROR(log, "error processing message from {} : {}", peer->device_id(), ec.message());
+        LOG_ERROR(log, "error processing message from {} : {}", peer->device_id(), ec);
         return do_shutdown(make_error(ec));
     }
     ctx.push_back(std::move(diff_opt).assume_value().get());
@@ -1054,7 +1054,7 @@ void controller_actor_t::on_message(proto::Index &msg, stack_context_t &ctx) noe
     auto diff_opt = model::diff::peer::update_folder_t::create(*cluster, *sequencer, *peer, msg);
     if (!diff_opt) {
         auto &ec = diff_opt.assume_error();
-        LOG_ERROR(log, "error processing message from {} : {}", peer->device_id(), ec.message());
+        LOG_ERROR(log, "error processing message from {} : {}", peer->device_id(), ec);
         return do_shutdown(make_error(ec));
     }
     auto &diff = diff_opt.assume_value();
@@ -1069,7 +1069,7 @@ void controller_actor_t::on_message(proto::IndexUpdate &msg, stack_context_t &ct
     auto diff_opt = model::diff::peer::update_folder_t::create(*cluster, *sequencer, *peer, msg);
     if (!diff_opt) {
         auto &ec = diff_opt.assume_error();
-        LOG_ERROR(log, "error processing message from {} : {}", peer->device_id(), ec.message());
+        LOG_ERROR(log, "error processing message from {} : {}", peer->device_id(), ec);
         return do_shutdown(make_error(ec));
     }
     auto &diff = diff_opt.assume_value();
@@ -1363,7 +1363,7 @@ void controller_actor_t::on_digest(hasher::message::digest_t &res) noexcept {
         if (result.has_error() || result.assume_value() != block->get_hash()) {
             if (!file->is_unreachable()) {
                 if (result.has_error()) {
-                    LOG_WARN(log, "hashing error of '{}' : {}", *file, result.error().message());
+                    LOG_WARN(log, "hashing error of '{}' : {}", *file, result.error());
                 } else {
                     LOG_WARN(log, "digest mismatch for file '{}', expected '{}', got '{}'", *file, block->get_hash(),
                              result.assume_value());

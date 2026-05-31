@@ -11,6 +11,7 @@
 #include "fs/task/scan_dir.h"
 #include "fs/utils.h"
 #include "utils/utf8.h"
+#include "utils/format.hpp"
 #include <fcntl.h>
 #include <limits.h>
 #include <memory_resource>
@@ -94,13 +95,13 @@ void watcher_t::kqueue_callback(int wd, std::uint32_t flags, const pt::ptime &no
         if (flags & NOTE_RENAME) {
             auto ec = unwatch_recurse(full_path);
             if (ec) {
-                LOG_WARN(log, "cannot unwatch(1) '{}': {}", guard.path, ec.message());
+                LOG_WARN(log, "cannot unwatch(1) '{}': {}", guard.path, ec);
             }
             return;
         } else if (flags & NOTE_DELETE) {
             auto ec = unwatch_wd(wd);
             if (ec) {
-                LOG_WARN(log, "cannot unwatch(2) '{}': {}", guard.path, ec.message());
+                LOG_WARN(log, "cannot unwatch(2) '{}': {}", guard.path, ec);
             }
             return;
         } else if (flags & (NOTE_WRITE | NOTE_EXTEND)) {
