@@ -3,7 +3,6 @@
 
 #include "properties.h"
 #include "utils/log.h"
-#include "model/device_id.h"
 #include <charconv>
 #include <boost/nowide/convert.hpp>
 #include <filesystem>
@@ -216,15 +215,6 @@ void max_blocks_per_diff_t::reflect_to(syncspirit::config::main_t &main) {
 const char *max_blocks_per_diff_t::explanation_ =
     "maximum number of blocks per single diff (to display progress in UI)";
 
-max_files_per_diff_t::max_files_per_diff_t(std::uint64_t value, std::uint64_t default_value)
-    : parent_t("max_files_per_diff", explanation_, value, default_value) {}
-
-void max_files_per_diff_t::reflect_to(syncspirit::config::main_t &main) {
-    main.db_config.max_files_per_diff = native_value;
-}
-
-const char *max_files_per_diff_t::explanation_ = "maximum number of files per single diff (to display progress in UI)";
-
 uncommitted_threshold_t::uncommitted_threshold_t(std::uint64_t value, std::uint64_t default_value)
     : parent_t("uncommitted_threshold", explanation_, value, default_value) {}
 
@@ -269,6 +259,22 @@ const char *skip_discovers_t::explanation_ = "when peer addresses are known, how
 
 namespace fs {
 
+retension_timeout_t::retension_timeout_t(std::uint64_t value, std::uint64_t default_value)
+    : parent_t("retension_timeout", explanation_, value, default_value) {}
+
+void retension_timeout_t::reflect_to(syncspirit::config::main_t &main) {
+    main.fs_config.retension_timeout = native_value;
+}
+
+const char *retension_timeout_t::explanation_ = "delay of file events propagation in milliseconds";
+
+poll_timeout_t::poll_timeout_t(std::uint64_t value, std::uint64_t default_value)
+    : parent_t("poll_timeout", explanation_, value, default_value) {}
+
+void poll_timeout_t::reflect_to(syncspirit::config::main_t &main) { main.fs_config.poll_timeout = native_value; }
+
+const char *poll_timeout_t::explanation_ = "amount of microseconds to do micro-sleeps when there is nothing to do";
+
 temporally_timeout_t::temporally_timeout_t(std::uint64_t value, std::uint64_t default_value)
     : parent_t("temporally_timeout", explanation_, value, default_value) {}
 
@@ -278,23 +284,18 @@ void temporally_timeout_t::reflect_to(syncspirit::config::main_t &main) {
 
 const char *temporally_timeout_t::explanation_ = "remove incomplete file after this amount of seconds";
 
-bytes_scan_iteration_limit_t::bytes_scan_iteration_limit_t(std::uint64_t value, std::uint64_t default_value)
-    : parent_t("bytes_scan_iteration_limit", explanation_, value, default_value) {}
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
 
-void bytes_scan_iteration_limit_t::reflect_to(syncspirit::config::main_t &main) {
-    main.fs_config.bytes_scan_iteration_limit = native_value;
+win32_watcher_buff_t::win32_watcher_buff_t(std::uint64_t value, std::uint64_t default_value)
+    : parent_t("win32_watcher_buff", explanation_, value, default_value) {}
+
+void win32_watcher_buff_t::reflect_to(syncspirit::config::main_t &main) {
+    main.fs_config.win32_watcher_buff = native_value;
 }
 
-const char *bytes_scan_iteration_limit_t::explanation_ = "max number of bytes before emitting scan events";
+const char *win32_watcher_buff_t::explanation_ = "per folder watching buffer (in bytes)";
 
-files_scan_iteration_limit_t::files_scan_iteration_limit_t(std::uint64_t value, std::uint64_t default_value)
-    : parent_t("files_scan_iteration_limit", explanation_, value, default_value) {}
-
-void files_scan_iteration_limit_t::reflect_to(syncspirit::config::main_t &main) {
-    main.fs_config.files_scan_iteration_limit = native_value;
-}
-
-const char *files_scan_iteration_limit_t::explanation_ = "max number processed files before emitting scan events";
+#endif
 
 } // namespace fs
 

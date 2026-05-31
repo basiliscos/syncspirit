@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2026 Ivan Baidakou
 
 #include "tree_item.h"
 #include "utils.hpp"
@@ -28,6 +28,8 @@ void tree_item_t::on_open() {}
 void tree_item_t::on_close() {}
 
 void tree_item_t::update_label() {}
+
+void tree_item_t::on_frame_render() {}
 
 void tree_item_t::refresh_content() {
     if (content) {

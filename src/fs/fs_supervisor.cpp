@@ -1,8 +1,21 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
+// mingw hack:
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+#include <memory_resource>
+#endif
+
 #include "fs_supervisor.h"
 #include "file_actor.h"
+#include "fs_context.h"
+#include "updates_mediator.h"
+#include "watched_folders.h"
+#include "watcher_actor.h"
+
+#if SYNCSPIRIT_WATCHER_INOTIFY
+#include <unistd.h>
+#endif
 
 using namespace syncspirit::fs;
 
@@ -17,11 +30,47 @@ void fs_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     });
 }
 
+void fs_supervisor_t::enqueue(r::message_ptr_t message) noexcept {
+    auto ctx = static_cast<fs_context_t *>(context);
+    inbound_queue.push(message.detach());
+    ctx->notify();
+}
+
 void fs_supervisor_t::on_start() noexcept {
     LOG_TRACE(log, "on_start");
     parent_t::on_start();
+    launch_children();
+}
+
+void fs_supervisor_t::launch_children() noexcept {
+    auto retension = pt::milliseconds{fs_config.retension_timeout};
+    auto retension_x2 = retension * 2;
+    updates_mediator_ptr_t updates_mediator;
+    watched_folders_ptr_t watched_folders;
+
+    updates_mediator.reset(new updates_mediator_t(retension_x2));
+    watched_folders.reset(new watched_folders_t());
+
     auto timeout = shutdown_timeout * 9 / 10;
-    create_actor<file_actor_t>().concurrent_hashes(hasher_threads).timeout(timeout).escalate_failure().finish();
+    auto watcher = create_actor<watch_actor_t>()
+                       .timeout(timeout)
+                       .change_retension(retension)
+                       .updates_mediator(updates_mediator)
+                       .watched_folders(watched_folders)
+                       .fs_config(fs_config)
+                       .finish()
+                       .get();
+
+    auto notify_watcher = [watcher](const fs::task::scan_dir_t &scan_dir) { watcher->notify(scan_dir); };
+    create_actor<file_actor_t>()
+        .concurrent_hashes(hasher_threads)
+        .change_retension(retension_x2)
+        .updates_mediator(updates_mediator)
+        .watched_folders(watched_folders)
+        .scan_dir_callback(notify_watcher)
+        .timeout(timeout)
+        .escalate_failure()
+        .finish();
 }
 
 void fs_supervisor_t::on_child_shutdown(actor_base_t *actor) noexcept {

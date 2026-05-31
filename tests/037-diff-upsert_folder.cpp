@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2025-2026 Ivan Baidakou
 
 #include "test-utils.h"
 #include "diff-builder.h"
@@ -73,7 +73,7 @@ TEST_CASE("folder upsert", "[model]") {
     auto file_iterator = peer_device->create_iterator(*cluster);
     auto names = names_t();
     auto next = [&]() {
-        auto [file, folder_info, action] = file_iterator->next();
+        auto [file, folder_info, local_file, action] = file_iterator->next();
         REQUIRE(file);
         CHECK(action == A::remote_copy);
         names.emplace_back(std::string(file->get_name()->get_full_name()));

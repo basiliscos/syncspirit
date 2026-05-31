@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2026 Ivan Baidakou
 
 #pragma once
 
@@ -15,8 +15,11 @@ struct file_table_t : static_table_t {
 
     void refresh() override;
 
-  private:
+    void on_scan();
+
     presence_item_t &container;
+
+  private:
     static_string_provider_ptr_t name_cell;
     static_string_provider_ptr_t device_cell;
     static_string_provider_ptr_t modified_cell;
@@ -31,6 +34,7 @@ struct file_table_t : static_table_t {
     static_string_provider_ptr_t entries_cell;
     static_string_provider_ptr_t entries_size_cell;
     static_string_provider_ptr_t local_entries_cell;
+    static_string_provider_ptr_t notice_cell;
     size_t displayed_versions;
 };
 

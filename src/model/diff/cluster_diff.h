@@ -30,7 +30,7 @@ struct SYNCSPIRIT_API cluster_diff_t : arc_base_t<cluster_diff_t> {
     cluster_diff_t();
     cluster_diff_t(const cluster_diff_t &) = delete;
     cluster_diff_t(cluster_diff_t &&) = delete;
-    virtual ~cluster_diff_t() = default;
+    virtual ~cluster_diff_t();
 
     outcome::result<void> apply(apply_controller_t &, void *) const noexcept;
     virtual outcome::result<void> visit(visitor_t &visitor, void *custom) const noexcept;

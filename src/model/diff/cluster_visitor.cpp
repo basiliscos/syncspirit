@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "cluster_diff.h"
 #include "cluster_visitor.h"
@@ -134,6 +134,10 @@ auto cluster_visitor_t::operator()(const load::load_cluster_t &diff, void *custo
 auto cluster_visitor_t::operator()(const load::remove_corrupted_files_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     return diff.visit_next(*this, custom);
+}
+
+auto cluster_visitor_t::operator()(const load::interrupt_t &diff, void *custom) noexcept -> outcome::result<void> {
+    return outcome::success();
 }
 
 auto cluster_visitor_t::operator()(const local::file_availability_t &diff, void *custom) noexcept

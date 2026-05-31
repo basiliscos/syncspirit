@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2026 Ivan Baidakou
 
 #include "folder_table.h"
 
-#include "model/diff/load/interrupt.h"
+#include "constants.h"
+#include "model/diff/diff_assembler.h"
 #include "model/diff/modify/remove_folder.h"
 #include "model/diff/modify/remove_blocks.h"
 #include "model/diff/modify/share_folder.h"
@@ -550,6 +551,32 @@ auto folder_table_t::make_paused(folder_table_t &container, bool disabled) -> wi
     return new widget_t(container, disabled);
 }
 
+auto folder_table_t::make_watched(folder_table_t &container, bool disabled) -> widgetable_ptr_t {
+    struct widget_t final : checkbox_widget_t {
+        using parent_t = checkbox_widget_t;
+        widget_t(Fl_Widget &container, bool disabled_) : parent_t{container}, disabled{disabled_} {}
+
+        Fl_Widget *create_widget(int x, int y, int w, int h) override {
+            auto r = parent_t::create_widget(x, y, w, h);
+            if (disabled) {
+                widget->deactivate();
+            }
+            return r;
+        }
+        void reset() override {
+            auto &container = static_cast<folder_table_t &>(this->container);
+            input->value(container.description.get_folder()->is_watched());
+        }
+        bool store(void *data) override {
+            auto ctx = reinterpret_cast<ctx_t *>(data);
+            db::set_watched(ctx->folder, input->value());
+            return true;
+        }
+        bool disabled;
+    };
+    return new widget_t(container, disabled);
+}
+
 auto folder_table_t::make_scheduled(folder_table_t &container, bool disabled) -> widgetable_ptr_t {
     struct widget_t final : checkbox_widget_t {
         using parent_t = checkbox_widget_t;
@@ -740,8 +767,8 @@ void folder_table_t::on_apply() {
         log->error("cannot create folder: {}", opt.assume_error().message());
         return;
     }
-    auto &diff = opt.value();
-    auto current = diff.get();
+    auto assember = model::diff::diff_assember_t(constants::diffs_batch);
+    assember.push_back(opt.assume_value().get());
 
     if (initially_shared_with.size()) {
         auto folder = description.get_folder();
@@ -755,16 +782,14 @@ void folder_table_t::on_apply() {
                     log->info("going to unshare folder '{}' with {}({})", folder->get_label(), device->get_name(),
                               device->device_id().get_short());
                     auto sub_diff = model::diff::cluster_diff_ptr_t{};
-                    sub_diff = new modify::unshare_folder_t(cluster, *folder_info, &orphaned_blocks);
-                    current = current->assign_sibling(sub_diff.get());
+                    assember.push_back(new modify::unshare_folder_t(cluster, *folder_info, &orphaned_blocks));
                 }
             }
         }
         if (auto orphaned_set = orphaned_blocks.deduce(); orphaned_set.size()) {
             log->info("going to remove {} orphaned blocks", orphaned_set.size());
             auto sub_diff = model::diff::cluster_diff_ptr_t{};
-            sub_diff = new modify::remove_blocks_t(std::move(orphaned_set));
-            current = current->assign_sibling(sub_diff.get());
+            assember.push_back(new modify::remove_blocks_t(std::move(orphaned_set)));
         }
     }
 
@@ -780,7 +805,7 @@ void folder_table_t::on_apply() {
     auto folder_id = db::get_id(folder_db);
     auto cb =
         devices.empty() ? sup.call_select_folder(folder_id) : sup.call_share_folders(folder_id, std::move(devices));
-    sup.send_model<model::payload::model_update_t>(diff, cb.get());
+    sup.send_model<model::payload::model_update_t>(assember.consume(), cb.get());
 }
 
 void folder_table_t::on_reset() {
@@ -833,6 +858,6 @@ void folder_table_t::on_rescan() {
     auto &sup = container.supervisor;
     auto diff = model::diff::cluster_diff_ptr_t{};
     auto folder_id = description.get_folder()->get_id();
-    diff = new model::diff::local::scan_request_t(folder_id);
+    diff = new model::diff::local::scan_request_t(folder_id, {});
     sup.send_model<model::payload::model_update_t>(std::move(diff), this);
 }

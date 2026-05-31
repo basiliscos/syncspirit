@@ -8,8 +8,8 @@ compiler.libcxx=libstdc++11
 compiler.version=10
 os=Linux
 [buildenv]
-CC=/home/c/my-gcc/bin/x86_64-pc-linux-gnu-gcc
-CXX=/home/c/my-gcc/bin/x86_64-pc-linux-gnu-g++
+CC=x86_64-pc-linux-gnu-gcc
+CXX=x86_64-pc-linux-gnu-g++
 
 [options]
 */*:shared=True

@@ -4,22 +4,28 @@
 #include "access.h"
 #include "diff-builder.h"
 #include "config/fs.h"
+#include "hasher/hasher_plugin.h"
+#include "constants.h"
+#include "fs/fs_proxy.h"
 #include "fs/fs_slave.h"
 #include "fs/messages.h"
 #include "fs/utils.h"
-#include "fs/file_cache.h"
+#include "fs/updates_mediator.h"
 #include "managed_hasher.h"
 #include "model/cluster.h"
 #include "model/diff/advance/local_update.h"
 #include "model/diff/local/file_availability.h"
+#include "model/diff/load/interrupt.h"
 #include "net/local_keeper.h"
 #include "net/names.h"
 #include "test-utils.h"
 #include "test_supervisor.h"
 #include "access.h"
 #include "utils/platform.h"
-#include <format>
+#include "presentation/folder_entity.h"
+#include <chrono>
 #include <boost/nowide/convert.hpp>
+#include <catch2/generators/catch_generators.hpp>
 
 #ifndef SYNCSPIRIT_WIN
 #include <sys/types.h>
@@ -33,6 +39,7 @@ using namespace syncspirit::net;
 using namespace syncspirit::fs;
 using namespace syncspirit::hasher;
 using boost::nowide::narrow;
+using boost::nowide::widen;
 
 using task_processor_t = std::function<void(fs::fs_slave_t *)>;
 
@@ -85,19 +92,26 @@ struct fixture_t {
 
     fixture_t(bool auto_launch_ = true) noexcept
         : root_path{unique_path()}, path_guard{root_path}, auto_launch{auto_launch_} {
-        test::init_logging();
         bfs::create_directory(root_path);
+        mediator = new fs::updates_mediator_t(pt::microseconds{1});
     }
 
     virtual std::uint32_t get_hash_limit() { return 1; }
 
-    virtual std::int64_t get_iterations_limit() { return 100; }
+    bool execute_slave(fs::payload::foreign_executor_t &slave) {
+        static constexpr auto retension = pt::milliseconds{1};
+        auto deadline = pt::microsec_clock::local_time() + retension;
+        auto fs_proxy = fs_proxy_t(*mediator, deadline);
+        auto ctx = execution_context_t();
+        ctx.fs_proxy = &fs_proxy;
+        ctx.plugin = executor->hasher;
+        return slave.exec(ctx);
+    }
 
     virtual void execute(fs::message::foreign_executor_t &req) noexcept {
-        sup->log->info("executing foreign task");
         auto slave = static_cast<fs::fs_slave_t *>(req.payload.get());
         slave->ec = {};
-        req.payload->exec(executor->hasher);
+        sup->log->info("executing foreign task: {}", execute_slave(*req.payload));
     }
 
     virtual void create_dir(fs::message::create_dir_t &req) noexcept {
@@ -171,7 +185,7 @@ struct fixture_t {
         launch_hasher();
         sup->do_process();
 
-        auto fs_config = config::fs_config_t{3600, 10, 1024 * 1024};
+        auto fs_config = config::fs_config_t{3600, 10};
 
         if (auto_launch) {
             launch_target();
@@ -191,7 +205,6 @@ struct fixture_t {
                      .timeout(timeout)
                      .sequencer(sequencer)
                      .concurrent_hashes(get_hash_limit())
-                     .files_scan_iteration_limit(get_iterations_limit())
                      .finish();
         sup->do_process();
 
@@ -212,6 +225,7 @@ struct fixture_t {
     bfs::path root_path;
     test::path_guard_t path_guard;
     target_ptr_t target;
+    updates_mediator_ptr_t mediator;
     model::folder_ptr_t folder;
     model::folder_info_ptr_t folder_info;
     model::folder_info_ptr_t folder_info_peer;
@@ -630,9 +644,7 @@ void test_deleted() {
             paths.emplace_back(std::string(name));
         }
         void on_diff(const model::diff::local::file_availability_t &diff) noexcept override {
-            auto file = diff.file;
-            auto name = file->get_name()->get_full_name();
-            available.emplace_back(std::string(name));
+            available.emplace_back(std::string(diff.name));
         }
 
         void main() noexcept override {
@@ -645,14 +657,17 @@ void test_deleted() {
             proto::set_id(counter, my_short_id);
             proto::set_value(counter, 1);
 
-            SECTION("sigle items") {
+            SECTION("single items") {
                 auto pr_file = proto::FileInfo{};
                 auto file_name = bfs::path(L"неизменное.bin");
                 proto::set_name(pr_file, file_name.string());
                 proto::set_sequence(pr_file, 4);
                 proto::set_version(pr_file, v);
 
-                SECTION("regular file") { builder->local_update(folder->get_id(), pr_file).apply(*sup); }
+                SECTION("regular file") {
+                    proto::set_type(pr_file, proto::FileInfoType::FILE);
+                    builder->local_update(folder->get_id(), pr_file).apply(*sup);
+                }
 #ifndef SYNCSPIRIT_WIN
                 SECTION("symlink") {
                     proto::set_symlink_target(pr_file, "does/not/matter");
@@ -679,6 +694,7 @@ void test_deleted() {
                 CHECK(file_1.get() == file_2.get());
                 CHECK(file_1->is_local());
                 REQUIRE(file_1->is_deleted());
+                CHECK(file_info_t::as_type(file_1->get_type()) == proto::get_type(pr_file));
             }
             SECTION("deleted hierarchy of dirs") {
                 auto pr_file = proto::FileInfo{};
@@ -698,12 +714,40 @@ void test_deleted() {
                     f->mark_local(false);
                 }
 
-                builder->scan_start(folder->get_id()).apply(*sup);
-                REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
-                CHECK(files->size() == 4);
-                for (auto f : *files) {
-                    CHECK(f->is_local());
-                    CHECK(f->is_deleted());
+                SECTION("whole hierarchy removal") {
+                    builder->scan_start(folder->get_id()).apply(*sup);
+                    REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
+                    CHECK(files->size() == 4);
+                    for (auto f : *files) {
+                        CHECK(f->is_local());
+                        CHECK(f->is_deleted());
+                    }
+                }
+                SECTION("sub hierarchy removal") {
+                    bfs::create_directories(root_path / "a" / "cc");
+                    builder->scan_start(folder->get_id()).apply(*sup);
+                    REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
+                    CHECK(files->size() == 4);
+
+                    auto dir_a = files->by_name("a");
+                    REQUIRE(dir_a);
+                    REQUIRE(dir_a->is_local());
+                    REQUIRE(!dir_a->is_deleted());
+
+                    auto dir_cc = files->by_name("a/cc");
+                    REQUIRE(dir_cc);
+                    REQUIRE(dir_cc->is_local());
+                    REQUIRE(!dir_cc->is_deleted());
+
+                    auto dir_bb = files->by_name("a/bb");
+                    REQUIRE(dir_bb);
+                    REQUIRE(dir_bb->is_local());
+                    REQUIRE(dir_bb->is_deleted());
+
+                    auto dir_dd = files->by_name("a/bb/ddd");
+                    REQUIRE(dir_dd);
+                    REQUIRE(dir_dd->is_local());
+                    REQUIRE(dir_dd->is_deleted());
                 }
             }
             SECTION("order of deletion (1)") {
@@ -760,22 +804,29 @@ void test_deleted() {
                 builder->scan_start(folder->get_id()).apply(*sup);
 
                 // clang-format off
-                auto expected = paths_t{
-                    "a",
+                auto expected_rm = paths_t{
                     "a/1",
-                    "a/2",
                     "a/2/xx",
                     "a/2/yy",
+                    "a/2",
                     "a/3",
-                    "b", "b/1", "b/2",  "b/3",
+                    "a",
+                    "b/1",
+                    "b/2",
+                    "b/3",
+                    "b",
                 };
                 // clang-format on
-                CHECK(paths == expected);
+                auto expected_avail = paths_t{
+                    "a", "a/1", "a/2", "a/2/xx", "a/2/yy", "a/3", "b", "b/1", "b/2", "b/3",
+                };
+                // clang-format on
+                CHECK(paths == expected_rm);
 
                 available = {};
                 builder->scan_start(folder->get_id()).apply(*sup);
-                CHECK(paths == expected);
-                CHECK(available == expected);
+                CHECK(paths == expected_rm);
+                CHECK(available == expected_avail);
             }
         }
 
@@ -1147,17 +1198,151 @@ void test_type_change() {
     F().run();
 }
 
+void test_resurrection() {
+    struct F : fixture_t {
+        void main() noexcept override {
+            bfs::create_directories(root_path / L"a/b/c");
+            write_file(root_path / "a/b/c/file.bin", "12345");
+
+            builder->scan_start(folder->get_id()).apply(*sup);
+            auto &files = folder_info->get_file_infos();
+            CHECK(files.size() == 4);
+
+            auto dir_a = files.by_name("a");
+            auto dir_b = files.by_name("a/b");
+            auto dir_c = files.by_name("a/b/c");
+            auto file = files.by_name("a/b/c/file.bin");
+
+            REQUIRE(dir_a);
+            REQUIRE(dir_b);
+            REQUIRE(dir_c);
+            REQUIRE(file);
+            REQUIRE(file->get_size() == 5);
+
+            CHECK(!dir_a->is_deleted());
+            CHECK(!dir_b->is_deleted());
+            CHECK(!dir_c->is_deleted());
+            CHECK(!file->is_deleted());
+
+            bfs::remove_all(root_path / L"a");
+            builder->scan_start(folder->get_id()).apply(*sup);
+
+            CHECK(dir_a->is_deleted());
+            CHECK(dir_b->is_deleted());
+            CHECK(dir_c->is_deleted());
+            CHECK(file->is_deleted());
+
+            bfs::create_directories(root_path / L"a/b/c");
+            write_file(root_path / "a/b/c/file.bin", "12345");
+
+            builder->scan_start(folder->get_id()).apply(*sup);
+
+            CHECK(!dir_a->is_deleted());
+            CHECK(!dir_b->is_deleted());
+            CHECK(!dir_c->is_deleted());
+            CHECK(!file->is_deleted());
+            REQUIRE(file->get_size() == 5);
+        }
+    };
+    F().run();
+}
+
+void test_partial_scan() {
+    struct F : fixture_t {
+        void main() noexcept override {
+            auto my_short_id = my_device->device_id().get_uint();
+            auto dir_1 = root_path / L"а/б/в";
+            auto dir_2 = root_path / L"x/y/z";
+            auto file_1 = dir_1 / L"файл-1.bin";
+            auto file_2 = dir_2 / L"файл-2.bin";
+
+            bfs::create_directories(dir_1);
+            bfs::create_directories(dir_2);
+            write_file(file_1, "12345");
+            write_file(file_2, "67890");
+            builder->scan_start(folder->get_id()).apply(*sup);
+            auto &files = folder_info->get_file_infos();
+            REQUIRE(files.size() == 6 + 2);
+
+            auto f_1 = files.by_name(narrow(L"а/б/в/файл-1.bin"));
+            auto f_2 = files.by_name(narrow(L"x/y/z/файл-2.bin"));
+
+            REQUIRE(f_1);
+            REQUIRE(f_2);
+
+            auto seq_1 = f_1->get_sequence();
+            auto seq_2 = f_2->get_sequence();
+
+            write_file(file_1, "1234567890");
+            write_file(file_2, "6789012345");
+            SECTION("existing dir") {
+                auto subdir = GENERATE(L"а", L"а/б", L"а/б/в");
+                builder->scan_start(folder->get_id(), narrow(subdir)).apply(*sup);
+                CHECK(subdir != std::wstring_view());
+                REQUIRE(files.size() == 6 + 2);
+                CHECK(f_1->get_sequence() != seq_1);
+                CHECK(f_2->get_sequence() == seq_2);
+            }
+            SECTION("non-existing dir") {
+                builder->scan_start(folder->get_id()).apply(*sup);
+                auto subdir = narrow(GENERATE(L"а", L"а/б", L"а/б/в"));
+                bfs::remove_all(root_path / subdir);
+                INFO("subdir: " << subdir);
+                CHECK(subdir != std::string_view{});
+                builder->scan_start(folder->get_id(), narrow(L"а/б/в")).apply(*sup);
+                auto dir = files.by_name(narrow(L"а/б/в"));
+                REQUIRE(dir);
+                auto aug = folder->get_augmentation().get();
+                auto folder_entity = static_cast<presentation::folder_entity_t *>(aug);
+                auto &a_entity = *folder_entity->get_children().begin();
+                auto &b_entity = *a_entity->get_children().begin();
+                auto &c_entity = *b_entity->get_children().begin();
+                auto presence = c_entity->get_presence(my_device.get());
+                auto &entity_stats = c_entity->get_stats();
+                auto &presence_stats = presence->get_stats();
+                CHECK(entity_stats.entities == 2);
+                CHECK(entity_stats.entities == presence_stats.local_entries);
+                CHECK(!folder->is_suspended());
+            }
+            SECTION("resurrection") {
+                bfs::remove_all(root_path / L"а");
+                auto dir_a = files.by_name(narrow(L"а"));
+                auto dir_x = files.by_name("x");
+                auto dir_b = files.by_name(narrow(L"а/б"));
+                auto dir_c = files.by_name(narrow(L"а/б/в"));
+                builder->scan_start(folder->get_id(), narrow(L"а/б")).apply(*sup);
+
+                REQUIRE(dir_a->is_deleted());
+                REQUIRE(dir_b->is_deleted());
+                REQUIRE(dir_c->is_deleted());
+                CHECK(!dir_x->is_deleted());
+
+                bfs::create_directories(root_path / L"а/б/в");
+                builder->scan_start(folder->get_id(), narrow(L"а/б")).apply(*sup);
+
+                CHECK(!dir_a->is_deleted());
+                CHECK(!dir_b->is_deleted());
+                CHECK(!dir_c->is_deleted());
+                CHECK(!dir_x->is_deleted());
+            }
+        }
+    };
+    F().run();
+}
+
 void test_scan_errors() {
     struct F : fixture_t {
         F() {
             processor = [&](fs::fs_slave_t *slave) {
                 slave->ec = {};
-                sup->log->info("executing foreign task");
-                slave->exec(executor->hasher);
+                sup->log->info("executing foreign task: {}", execute_slave(*slave));
             };
         }
 
+        std::uint32_t get_hash_limit() override { return 100; }
+
         void execute(fs::message::foreign_executor_t &req) noexcept override {
+            ++exec_attempts;
             if (exec_pool) {
                 sup->log->info("processing foreign task (left = {})", exec_pool);
                 auto slave = static_cast<fs::fs_slave_t *>(req.payload.get());
@@ -1185,6 +1370,13 @@ void test_scan_errors() {
                 CHECK(!folder->is_scanning());
                 CHECK(folder->get_scan_finish() >= folder->get_scan_start());
                 bfs::permissions(root_path, bfs::perms::all);
+                CHECK(exec_attempts == 1);
+            }
+            SECTION("missing start dir (in model)") {
+                builder->scan_start(folder->get_id(), "non-existing-dir").apply(*sup);
+                CHECK(!folder->is_scanning());
+                CHECK(folder->get_scan_finish() >= folder->get_scan_start());
+                CHECK(exec_attempts == 0);
             }
 #ifndef SYNCSPIRIT_WIN
             SECTION("non-root errors (non-win32)") {
@@ -1230,7 +1422,7 @@ void test_scan_errors() {
                 builder->scan_start(folder->get_id()).apply(*sup);
                 CHECK(!folder->is_scanning());
                 CHECK(folder->get_scan_finish() >= folder->get_scan_start());
-                CHECK(files->size() == 0);
+                CHECK(files->size() == 1);
             }
 
             SECTION("scan dir errors") {
@@ -1264,8 +1456,7 @@ void test_scan_errors() {
                             }
                         }
                         if (do_exec) {
-                            sup->log->info("executing foreign task");
-                            slave->exec(executor->hasher);
+                            sup->log->info("executing foreign task: {}", execute_slave(*slave));
                         }
                     };
                 };
@@ -1317,6 +1508,7 @@ void test_scan_errors() {
         }
 
         std::uint32_t exec_pool = 5;
+        std::uint32_t exec_attempts = 0;
         task_processor_t processor;
     };
     F().run();
@@ -1327,8 +1519,7 @@ void test_read_errors() {
         F() : fixture_t{false} {
             processor = [&](fs::fs_slave_t *slave) {
                 slave->ec = {};
-                sup->log->info("executing foreign task");
-                slave->exec(executor->hasher);
+                sup->log->info("executing foreign task: {}", execute_slave(*slave));
             };
         }
 
@@ -1415,8 +1606,7 @@ void test_read_errors() {
                             }
                         }
                         if (do_exec) {
-                            sup->log->info("executing foreign task");
-                            slave->exec(executor->hasher);
+                            sup->log->info("executing foreign task: {}", execute_slave(*slave));
                         }
                     };
                 };
@@ -1500,7 +1690,7 @@ void test_read_errors() {
         }
         std::uint32_t exec_pool = 10;
         task_processor_t processor;
-        std::uint32_t hash_limit = 1;
+        std::uint32_t hash_limit = 10;
     };
     F().run();
 }
@@ -1544,7 +1734,6 @@ void test_hashing_fail() {
             CHECK(!folder->get_scan_finish().is_special());
             CHECK(folder->get_scan_finish() >= folder->get_scan_start());
             CHECK(files->size() == 0);
-            CHECK(target->get_shutdown_reason());
         }
     };
     F().run();
@@ -1553,6 +1742,7 @@ void test_hashing_fail() {
 void test_incomplete() {
     struct F : fixture_t {
         void main() noexcept override {
+            using clock_t = std::chrono::system_clock;
             auto sha256 = peer_device->device_id().get_sha256();
             auto block_sz = fs::block_sizes[0];
             auto path = root_path / L"файл.syncspirit-tmp";
@@ -1578,9 +1768,11 @@ void test_incomplete() {
             proto::set_hash(b_2, hash_2);
             proto::set_offset(b_2, data_1.size());
             proto::set_size(b_2, data_2.size());
+            auto m_time = clock_t::to_time_t(clock_t::now()) - (constants::tmp_min_age * 2);
 
             SECTION("no in model => remove") {
                 write_file(path, "");
+                last_write_time(path, fs::from_unix(m_time));
                 builder->scan_start(folder->get_id()).apply(*sup);
 
                 CHECK(files->size() == 0);
@@ -1588,6 +1780,7 @@ void test_incomplete() {
             }
             SECTION("exists only in my model => remove") {
                 write_file(path, "");
+                last_write_time(path, fs::from_unix(m_time));
                 builder->local_update(folder->get_id(), pr_file)
                     .apply(*sup)
                     .then()
@@ -1607,6 +1800,8 @@ void test_incomplete() {
                     builder->scan_start(folder->get_id()).apply(*sup);
 
                     write_file(path, "");
+                    last_write_time(path, fs::from_unix(m_time));
+
                     builder->scan_start(folder->get_id()).apply(*sup);
 
                     CHECK(files->size() == 0);
@@ -1614,6 +1809,7 @@ void test_incomplete() {
 #ifndef SYNCSPIRIT_WIN
                 SECTION("cannot read tmp file") {
                     write_file(path, "12345");
+                    last_write_time(path, fs::from_unix(m_time));
                     auto status = bfs::status(path);
                     auto perms = static_cast<uint32_t>(status.permissions());
 
@@ -1636,9 +1832,11 @@ void test_incomplete() {
 #endif
                 SECTION("local version is better than remote (local file does exists)") {
                     write_file(path, "1234");
-                    auto p = root_path / file_name;
+                    last_write_time(path, fs::from_unix(m_time));
+                    auto p = root_path / widen(file_name);
 
                     write_file(p, "12345");
+                    last_write_time(path, fs::from_unix(m_time));
                     auto status = bfs::status(p);
                     auto perms = static_cast<uint32_t>(status.permissions());
 
@@ -1668,9 +1866,10 @@ void test_incomplete() {
                 proto::add_blocks(pr_file, b_2);
                 proto::set_size(pr_file, data_1.size() + data_2.size());
 
-                auto model_path = root_path / file_name;
+                auto model_path = root_path / widen(file_name);
                 SECTION("all blocks match => rename & add into model") {
                     write_file(path, "1234567890");
+                    last_write_time(path, fs::from_unix(m_time));
                     auto status = bfs::status(path);
                     auto perms = static_cast<uint32_t>(status.permissions());
 
@@ -1700,6 +1899,7 @@ void test_incomplete() {
                 }
                 SECTION("1st block match") {
                     write_file(path, "1234500000");
+                    last_write_time(path, fs::from_unix(m_time));
                     auto status = bfs::status(path);
                     auto perms = static_cast<uint32_t>(status.permissions());
 
@@ -1717,6 +1917,7 @@ void test_incomplete() {
                 }
                 SECTION("2nd block match") {
                     write_file(path, "0000067890");
+                    last_write_time(path, fs::from_unix(m_time));
                     auto status = bfs::status(path);
                     auto perms = static_cast<uint32_t>(status.permissions());
 
@@ -1734,6 +1935,7 @@ void test_incomplete() {
                 }
                 SECTION("no block match") {
                     write_file(path, "0000000000");
+                    last_write_time(path, fs::from_unix(m_time));
                     auto status = bfs::status(path);
                     auto perms = static_cast<uint32_t>(status.permissions());
 
@@ -1747,6 +1949,7 @@ void test_incomplete() {
                 }
                 SECTION("synchronization lock => ignored") {
                     write_file(path, "0000000000");
+                    last_write_time(path, fs::from_unix(m_time));
                     auto status = bfs::status(path);
                     auto perms = static_cast<uint32_t>(status.permissions());
                     proto::set_permissions(pr_file, perms);
@@ -1805,15 +2008,15 @@ void test_traversal() {
 
             // clang-format off
             auto expected = paths_t{
-                "a/c/file_2.bin",
-                "a/c",
-                "a/file.bin",
                 "a",
+                "a/c",
+                "a/c/file_2.bin",
+                "a/file.bin",
                 "b",
-                "d/d1/file_3.bin",
-                "d/d1",
-                "d/d2",
                 "d",
+                "d/d1",
+                "d/d1/file_3.bin",
+                "d/d2",
                 "x.bin",
                 "y.bin",
             };
@@ -2004,14 +2207,28 @@ void test_importing() {
 }
 
 void test_concurrency() {
-    static constexpr int N = 5;
-    static constexpr int M = 3;
+    static constexpr std::uint_fast32_t N = 5;
+    static constexpr auto M = constants::diffs_batch;
 
     struct F : fixture_t {
 
-        void on_model_update(model::message::model_update_t &) noexcept override { ++local_updates; }
+        void on_model_update(model::message::model_update_t &msg) noexcept override {
+            struct V final : model::diff::cluster_visitor_t {
+                using parent_t = model::diff::cluster_visitor_t;
+                V(int *ptr_) : ptr{ptr_} {}
 
-        std::int64_t get_iterations_limit() override { return M; }
+                outcome::result<void> operator()(const model::diff::load::interrupt_t &diff,
+                                                 void *custom) noexcept override {
+                    ++(*ptr);
+                    return diff.visit_next(*this, custom);
+                }
+
+                int *ptr;
+            };
+
+            auto v = V(&interrupts);
+            std::ignore = msg.payload.diff->visit(v, nullptr);
+        }
 
         void main() noexcept override {
             for (int i = 0; i < N; ++i) {
@@ -2019,9 +2236,8 @@ void test_concurrency() {
                 auto dir_name = std::string_view(&letter, 1);
                 auto dir_path = root_path / "sub-dir" / dir_name;
                 bfs::create_directories(dir_path);
-                for (int j = 0; j < M; ++j) {
-                    auto letter = static_cast<char>('1' + j);
-                    auto file_name = std::string_view(&letter, 1);
+                for (std::uint_fast32_t j = 0; j < M; ++j) {
+                    auto file_name = fmt::format("{:03}.bin", j);
                     auto file_path = dir_path / file_name;
                     write_file(file_path, "");
                 }
@@ -2029,15 +2245,15 @@ void test_concurrency() {
             builder->scan_start(folder->get_id()).apply(*sup);
             REQUIRE(files->size() == 1 + N * (M + 1));
 
-            local_updates = 0;
+            interrupts = 0;
             bfs::remove_all(root_path / "sub-dir");
             builder->scan_start(folder->get_id()).apply(*sup);
 
-            CHECK(local_updates >= N);
-            CHECK(local_updates <= N * 2);
+            CHECK(interrupts >= N);
+            CHECK(interrupts <= N * 2);
         }
 
-        int local_updates = 0;
+        int interrupts = 0;
     };
     F().run();
 }
@@ -2074,6 +2290,8 @@ int _init() {
     REGISTER_TEST_CASE(test_deleted, "test_deleted", "[net]");
     REGISTER_TEST_CASE(test_changed, "test_changed", "[net]");
     REGISTER_TEST_CASE(test_type_change, "test_type_change", "[net]");
+    REGISTER_TEST_CASE(test_resurrection, "test_resurrection", "[net]");
+    REGISTER_TEST_CASE(test_partial_scan, "test_partial_scan", "[net]");
     REGISTER_TEST_CASE(test_scan_errors, "test_scan_errors", "[net]");
     REGISTER_TEST_CASE(test_read_errors, "test_read_errors", "[net]");
     REGISTER_TEST_CASE(test_leaks, "test_leaks", "[net]");

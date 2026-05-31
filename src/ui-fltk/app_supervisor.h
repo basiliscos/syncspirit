@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2026 Ivan Baidakou
 
 #pragma once
 
@@ -32,6 +32,8 @@ struct app_supervisor_t;
 struct main_window_t;
 struct tree_item_t;
 struct augmentation_entry_base_t;
+struct presence_item_t;
+using presence_item_ptr_t = model::intrusive_ptr_t<presence_item_t>;
 
 struct db_info_viewer_t {
     virtual void view(const net::payload::db_info_response_t &) = 0;
@@ -167,17 +169,17 @@ struct app_supervisor_t : app_supervisor_base_t<app_supervisor_t> {
     using clock_t = std::chrono::high_resolution_clock;
     using time_point_t = typename clock_t::time_point;
     using callbacks_t = std::list<callback_ptr_t>;
-    using model_update_ptr_t = r::intrusive_ptr_t<model::message::model_update_t>;
-    using delayed_updates_t = std::list<model_update_ptr_t>;
+    using delayed_items_t = std::unordered_set<presence_item_ptr_t>;
 
     void on_model_response(model::message::model_response_t &res) noexcept;
-    void on_app_ready(model::message::app_ready_t &) noexcept;
+    void on_local_ready(model::message::local_ready_t &) noexcept;
     void on_db_loaded(model::message::db_loaded_t &) noexcept;
     void on_db_info_response(net::message::db_info_response_t &res) noexcept;
     void redisplay_folder_nodes(bool refresh_labels);
     void detach_main_window() noexcept;
+    void on_frame_render_timer(r::request_id_t, bool cancelled) noexcept;
 
-    void process(model::diff::cluster_diff_t &diff, apply_context_t &context) noexcept override;
+    void process(model::diff::cluster_diff_t &diff, model::payload::apply_context_t &context) noexcept override;
 
     outcome::result<void> apply(const model::diff::advance::advance_t &, void *) noexcept override;
     outcome::result<void> apply(const model::diff::load::blocks_t &, void *) noexcept override;
@@ -208,6 +210,7 @@ struct app_supervisor_t : app_supervisor_base_t<app_supervisor_t> {
     db_info_viewer_t *db_info_viewer;
     callbacks_t callbacks;
     main_window_t *main_window;
+    delayed_items_t delayed_items;
     bool soft_restart_request = false;
 
     friend struct db_info_viewer_guard_t;

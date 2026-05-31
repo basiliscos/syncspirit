@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2026 Ivan Baidakou
 
 #include "pending_folder.h"
 #include "pending_folders.h"
@@ -87,6 +87,7 @@ struct table_t : content::folder_table_t {
         data.push_back({"disable temp indixes", make_disable_tmp(*this)});
         data.push_back({"scheduled", make_scheduled(*this, existing)});
         data.push_back({"paused", make_paused(*this, existing)});
+        data.push_back({"watched", make_watched(*this, existing)});
         data.push_back({"shared_with", make_shared_with(*this, fi->get_device(), true)});
         data.push_back({"", notice = make_notice(*this)});
         data.push_back({"actions", make_actions(*this)});
@@ -159,6 +160,7 @@ bool pending_folder_t::on_select() {
         auto &db_folder = db::get_folder(db);
         db::set_path(db_folder, path.string());
         db::set_rescan_interval(db_folder, 3600);
+        db::set_watched(db_folder, true);
 
         auto folder = model::folder_t::create(sequencer.next_uuid(), db_folder).value();
         folder->assign_cluster(cluster);

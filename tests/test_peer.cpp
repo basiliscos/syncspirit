@@ -178,7 +178,36 @@ void test_peer_t::process_block_requests() noexcept {
         in_requests.pop_front();
         out_responses.pop_front();
     }
-    send<net::payload::forwarded_messages_t>(controller, std::move(replies));
+    if (replies.size()) {
+        send<net::payload::forwarded_messages_t>(controller, std::move(replies));
+    }
+}
+
+void test_peer_t::process_any_block_requests() noexcept {
+    auto replies = net::payload::forwarded_messages_t();
+    for (auto it = in_requests.begin(); it != in_requests.end();) {
+        auto &req = *it;
+        auto req_id = proto::get_id(req);
+        auto found = false;
+        for (auto j = out_responses.begin(); j != out_responses.end(); ++j) {
+            auto &res = *j;
+            auto res_id = proto::get_id(res);
+            if (req_id == res_id) {
+                replies.emplace_back(std::move(res));
+                found = true;
+                log->debug("request & responce match by id '{}', replying...", res_id);
+                out_responses.erase(j);
+                it = in_requests.erase(it);
+                break;
+            }
+        }
+        if (!found) {
+            ++it;
+        }
+    }
+    if (replies.size()) {
+        send<net::payload::forwarded_messages_t>(controller, std::move(replies));
+    }
 }
 
 void test_peer_t::push_response(proto::ErrorCode code, std::int32_t request_id) noexcept {

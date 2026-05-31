@@ -1,18 +1,25 @@
 on:
   push:
-    - workflows: build-package-workflow
-
-# tasks:
-#   - name: compile-san-n-test
-#   - name: make-app-image
+    - workflow_general
+    - workflow_windows
+    - workflow_linux
 
 workflows:
-  build-package-workflow:
+  workflow_general:
     settings:
-        max_cube_duration: 120m
+        max_cube_duration: 240m
     tasks:
-      #- [compile-san-n-test, make-app-image]
-      - make-app-image
+      - [compile-san-n-test]
+  workflow_windows:
+    settings:
+        max_cube_duration: 240m
+    tasks:
+      - [make-win32-build, make-win64-build]
+  workflow_linux:
+    settings:
+        max_cube_duration: 240m
+    tasks:
+      - [make-app-image]
 
 tasks:
   - name: compile-san-n-test
@@ -34,13 +41,13 @@ tasks:
           - sudo apt install -y libgl1-mesa-dev libx11-xcb-dev libfontenc-dev libice-dev libsm-dev libxaw7-dev libxcomposite-dev libxcursor-dev libxdamage-dev libxext-dev libxfixes-dev libxi-dev libxinerama-dev libxkbfile-dev libxmu-dev libxmuu-dev libxpm-dev libxrandr-dev libxrender-dev libxres-dev libxss-dev libxt-dev libxtst-dev libxv-dev libxxf86vm-dev libxcb-glx0-dev libxcb-render0-dev libxcb-render-util0-dev libxcb-xkb-dev libxcb-icccm4-dev libxcb-image0-dev libxcb-keysyms1-dev libxcb-randr0-dev libxcb-shape0-dev libxcb-sync-dev libxcb-xfixes0-dev libxcb-xinerama0-dev libxcb-dri3-dev uuid-dev libxcb-cursor-dev libxcb-dri2-0-dev libxcb-dri3-dev libxcb-present-dev libxcb-composite0-dev libxcb-ewmh-dev libxcb-res0-dev libxcb-util-dev libxcb-util0-dev libglu1-mesa-dev
           - sudo apt install -y libxft-dev
           - python3 -m venv myenv
-          - source myenv/bin/activate
+          - . myenv/bin/activate
           - pip install conan
           - conan profile detect
           - cp .sourcecraft/conan-profile-linux-native /root/.conan2/profiles/linux-native
           - mkdir build.ci && cd build.ci
           - conan install --build=missing --profile=linux-native --output-folder . -s build_type=Debug -o '&:shared=True' ..
-          - source ./conanbuild.sh
+          - . ./conanbuild.sh
           - cmake .. -G "Unix Makefiles" -DCMAKE_TOOLCHAIN_FILE=conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_FLAGS="-fuse-ld=mold -fsanitize=undefined -fsanitize=address -fno-omit-frame-pointer"  -DSYNCSPIRIT_BUILD_TESTS=on
       - name: compile
         script:
@@ -50,29 +57,135 @@ tasks:
         script:
           - cd build.ci
           - ctest --rerun-failed --output-on-failure .
+  - name: make-win32-build
+    cubes:
+      - name: make-binary
+        script:
+          - sudo apt update
+          - sudo apt install software-properties-common
+          - sudo add-apt-repository ppa:ubuntu-toolchain-r/test
+          - sudo apt update
+          - sudo apt install -y build-essential
+          - sudo apt install -y autoconf automake autopoint bash bison bzip2 flex g++ g++-multilib gettext git gperf intltool libc6-dev-i386 libclang-dev libgdk-pixbuf2.0-dev libltdl-dev libgl-dev libpcre2-dev libssl-dev libtool-bin libxml-parser-perl lzip make openssl p7zip-full patch perl python3 python3-mako python3-packaging python3-pkg-resources python3-setuptools python-is-python3 ruby sed sqlite3 unzip wget xz-utils
+          - sudo apt install -y curl p7zip-full coreutils zip
+          - g++ --version
+          - gcc --version
+          - git clone --branch build-2022-04-09  --depth 1 https://github.com/mxe/mxe
+          - cp .sourcecraft/mxe-settings-win32.mk ./mxe/settings.mk
+          - cd mxe
+          - make zip
+          - find usr/bin
+          - export PATH=`pwd`/usr/bin:$PATH
+          - cd ..
+          - python3 -m venv myenv
+          - . myenv/bin/activate
+          - pip install conan
+          - pip install pefile
+          - conan profile detect
+          - cp .sourcecraft/conan-profile-win32 /root/.conan2/profiles/win32
+          - mkdir build.ci && cd build.ci
+          - conan install --build=missing --profile=win32 --output-folder . -s build_type=Release -o "&:shared=True" ..
+          - . ./conanbuild.sh
+          - cmake .. -G "Unix Makefiles" -DCMAKE_TOOLCHAIN_FILE=conan_toolchain.cmake -DCMAKE_POLICY_DEFAULT_CMP0091=NEW  -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS="-D_WIN32_WINNT=0x0501 -DBOOST_ASIO_ENABLE_CANCELIO=1" -DCMAKE_SYSTEM_NAME=Windows -DCMAKE_CROSSCOMPILING=on -DCMAKE_CROSSCOMPILING_EMULATOR=wine
+          - make -j`nproc`
+          - make -j`nproc` deploy_deps
+          - python ../misc/post-install-win32.py --binaries ./dist/*.exe  --dirs $HOME/.conan2 ../mxe/ `pwd`
+          - cd dist
+          - zip -r9 ../syncspirit-win32.zip *
+          - md5sum ../syncspirit-win32.zip
+          - echo "going to upload binary"
+          - cd ..
+          - echo `pwd`/syncspirit-win32.zip
+          - ls -lah `pwd`/syncspirit-win32.zip
+        artifacts:
+          paths:
+            - ./build.ci/syncspirit-win32.zip
+  - name: make-win64-build
+    cubes:
+      - name: make-binary
+        script:
+          - sudo apt update
+          - sudo apt install software-properties-common
+          - sudo add-apt-repository ppa:ubuntu-toolchain-r/test
+          - sudo apt update
+          - sudo apt install -y build-essential
+          - sudo apt install -y autoconf automake autopoint bash bison bzip2 flex g++ g++-multilib gettext git gperf intltool libc6-dev-i386 libclang-dev libgdk-pixbuf2.0-dev libltdl-dev libgl-dev libpcre2-dev libssl-dev libtool-bin libxml-parser-perl lzip make openssl p7zip-full patch perl python3 python3-mako python3-packaging python3-pkg-resources python3-setuptools python-is-python3 ruby sed sqlite3 unzip wget xz-utils
+          - sudo apt install -y curl p7zip-full coreutils zip
+          - g++ --version
+          - gcc --version
+          - git clone --branch build-2022-04-09  --depth 1 https://github.com/mxe/mxe
+          - cp .sourcecraft/mxe-settings-win64.mk ./mxe/settings.mk
+          - cd mxe
+          - make zip
+          - find usr/bin
+          - export PATH=`pwd`/usr/bin:$PATH
+          - cd ..
+          - python3 -m venv myenv
+          - . myenv/bin/activate
+          - pip install conan
+          - pip install pefile
+          - conan profile detect
+          - cp .sourcecraft/conan-profile-win64 /root/.conan2/profiles/win64
+          - mkdir build.ci && cd build.ci
+          - conan install --build=missing --profile=win64 --output-folder . -s build_type=Release -o "&:shared=True" ..
+          - . ./conanbuild.sh
+          - cmake .. -G "Unix Makefiles" -DCMAKE_TOOLCHAIN_FILE=conan_toolchain.cmake -DCMAKE_POLICY_DEFAULT_CMP0091=NEW  -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS="-D_WIN32_WINNT=0x0501 -DBOOST_ASIO_ENABLE_CANCELIO=1" -DCMAKE_SYSTEM_NAME=Windows -DCMAKE_CROSSCOMPILING=on -DCMAKE_CROSSCOMPILING_EMULATOR=wine
+          - make -j`nproc`
+          - make -j`nproc` deploy_deps
+          - python ../misc/post-install-win32.py --binaries ./dist/*.exe  --dirs $HOME/.conan2 ../mxe/ `pwd`
+          - cd dist
+          - zip -r9 ../syncspirit-win64.zip *
+          - md5sum ../syncspirit-win64.zip
+          - echo "going to upload binary"
+          - cd ..
+          - echo `pwd`/syncspirit-win64.zip
+          - ls -lah `pwd`/syncspirit-win64.zip
+        artifacts:
+          paths:
+            - ./build.ci/syncspirit-win64.zip
   - name: make-app-image
     cubes:
       - name: prepare
         image: ubuntu:focal
         script:
-         - export PATH=$HOME/my-gcc/bin:$HOME/.local/bin:$PATH
-         - apt update
-         - apt install -y software-properties-common
-         - apt update
-         - apt-get install -y g++9 gcc-9 wget libxft-dev build-essential python3-pip make cmake git fuse libfuse2 libx11-dev libx11-xcb-dev libfontenc-dev libice-dev libsm-dev libxau-dev libxaw7-dev libxcomposite-dev libxcursor-dev libxdamage-dev libxfixes-dev libxi-dev libxinerama-dev libxkbfile-dev libxmuu-dev libxrandr-dev libxrender-dev libxres-dev libxss-dev libxtst-dev libxv-dev libxxf86vm-dev libxcb-glx0-dev libxcb-render0-dev libxcb-render-util0-dev libxcb-xkb-dev libxcb-icccm4-dev libxcb-image0-dev libxcb-keysyms1-dev libxcb-randr0-dev libxcb-shape0-dev libxcb-sync-dev libxcb-xfixes0-dev libxcb-xinerama0-dev libxcb-dri3-dev uuid-dev libxcb-cursor-dev libxcb-dri2-0-dev libxcb-dri3-dev libxcb-present-dev libxcb-composite0-dev libxcb-ewmh-dev libxcb-res0-dev libxcb-util0-dev libxcb-util-dev libglu1-mesa-dev pkgconf file
-         - pip3 install --user conan
-         - pip3 install conan
-         - conan profile detect
-         - cp .sourcecraft/conan-profile-linux-appimage /root/.conan2/profiles/default
-         - wget https://ftp.gnu.org/gnu/gcc/gcc-14.3.0/gcc-14.3.0.tar.xz
-         - tar -xf gcc-14.3.0.tar.xz
-         - cd gcc-14.3.0
-         - ./contrib/download_prerequisites
-         - ./configure --prefix=/$HOME/my-gcc --enable-languages=c,c++ --disable-multilib --enable-bootstrap
-         - make -j`nproc`
-         - make install
-      - name: setup
-        script:
-        - export PATH=$HOME/my-gcc/bin:$HOME/.local/bin:$PATH
-          - mkdir build.chroot
+          - export PATH=$HOME/my-gcc/bin:$HOME/.local/bin:$PATH
+          - apt update
+          - apt install -y software-properties-common
+          - apt update
+          - apt-get install -y g++9 gcc-9 wget libxft-dev build-essential python3-pip make cmake git fuse libfuse2 libx11-dev libx11-xcb-dev libfontenc-dev libice-dev libsm-dev libxau-dev libxaw7-dev libxcomposite-dev libxcursor-dev libxdamage-dev libxfixes-dev libxi-dev libxinerama-dev libxkbfile-dev libxmuu-dev libxrandr-dev libxrender-dev libxres-dev libxss-dev libxtst-dev libxv-dev libxxf86vm-dev libxcb-glx0-dev libxcb-render0-dev libxcb-render-util0-dev libxcb-xkb-dev libxcb-icccm4-dev libxcb-image0-dev libxcb-keysyms1-dev libxcb-randr0-dev libxcb-shape0-dev libxcb-sync-dev libxcb-xfixes0-dev libxcb-xinerama0-dev libxcb-dri3-dev uuid-dev libxcb-cursor-dev libxcb-dri2-0-dev libxcb-dri3-dev libxcb-present-dev libxcb-composite0-dev libxcb-ewmh-dev libxcb-res0-dev libxcb-util0-dev libxcb-util-dev libglu1-mesa-dev pkgconf file
+          - apt install -y cmake python3-venv pkgconf
+          - pip install conan
+          - conan profile detect
+          - conan install -r conancenter --tool-requires=b2/5.4.2 -o "&:use_cxx_env=True" --build="&"
+          - wget https://ftp.gnu.org/gnu/gcc/gcc-14.3.0/gcc-14.3.0.tar.xz
+          - tar -xf gcc-14.3.0.tar.xz
+          - cd gcc-14.3.0
+          - ./contrib/download_prerequisites
+          - ./configure --prefix=/$HOME/my-gcc --enable-languages=c,c++ --disable-multilib --disable-bootstrap --disable-libstdcxx-pch --disable-libsanitizer --disable-libquadmath --disable-libgomp --disable-libvtv --disable-libssp
+          - make -j`nproc` > /dev/null
+          - make install
+          - cd ..
+          - python3 -m venv ~/myenv
+          - echo $PATH
+          - . ~/myenv/bin/activate
+          - echo $PATH
+          - cp .sourcecraft/conan-profile-linux-appimage /root/.conan2/profiles/default
+          - mkdir build.ci
+          - apt-get remove -y g++9 gcc-9          
+          #- apt-get remove -y gir1.2-gtk-2.0 gir1.2-gtk-3.0 libgtk-3-dev libgtk2.0-0 libgtk2.0-bin libgtk2.0-common libgtk2.0-dev libgtkspell-dev libgtkspell0
+          - apt-get -y autoremove --purge
+          - apt install -y build-essential binutils
+          - cd build.ci
+          - whereis gcc
+          - whereis x86_64-pc-linux-gnu-gcc
           - conan install -u --build=missing --output-folder . -s build_type=Release  -o '&:shared=True' ..
+          - . ./conanbuild.sh
+          - cmake .. -G "Unix Makefiles" -DCMAKE_TOOLCHAIN_FILE=conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Release
+          - make -j`nproc`
+          - make deploy_syncspirit-daemon deploy_syncspirit-fltk
+          - cd ..
+          - ls -lah ./build.ci/AppDir/*.AppImage
+        artifacts:
+          paths:
+            - ./build.ci/AppDir/syncspirit-fltk-x86_64.AppImage
+            - ./build.ci/AppDir/syncspirit-daemon-x86_64.AppImage

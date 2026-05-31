@@ -1,0 +1,1685 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-FileCopyrightText: 2026 Ivan Baidakou
+
+#include "syncspirit-config.h"
+#include "test-utils.h"
+
+#if defined(SYNCSPIRIT_WATCHER_ANY)
+
+#include "access.h"
+#include "test-watcher.h"
+#include "fs/fs_slave.h"
+#include "fs/fs_context.h"
+#include "fs/fs_supervisor.h"
+#include "fs/watcher_actor.h"
+#include "fs/utils.h"
+#include "fs/task/scan_dir.h"
+#include "utils/error_code.h"
+#include "net/names.h"
+#include <deque>
+#include <boost/nowide/convert.hpp>
+#include <stdexcept>
+#include <catch2/generators/catch_generators.hpp>
+
+using namespace syncspirit;
+using namespace syncspirit::test;
+using namespace syncspirit::model;
+using namespace syncspirit::fs;
+namespace bfs = std::filesystem;
+using boost::nowide::narrow;
+
+struct fixture_t;
+
+namespace native {
+
+void rename(const bfs::path &from, const bfs::path &to) {
+#ifndef SYNCSPIRIT_WIN
+    bfs::rename(from, to);
+#else
+    auto from_native = from.native().data();
+    auto to_native = to.native().data();
+    if (!MoveFileExW(from_native, to_native, MOVEFILE_WRITE_THROUGH)) {
+        auto ec = sys::error_code(::GetLastError(), sys::system_category());
+        REQUIRE(ec.message() == "");
+    }
+#endif
+}
+
+} // namespace native
+
+static const auto RETENSION_TIMEOUT = r::pt::millisec{1};
+static const auto TIMEOUT = r::pt::millisec{10};
+
+struct supervisor_t : fs::fs_supervisor_t {
+    using parent_t = fs::fs_supervisor_t;
+    using parent_t::parent_t;
+
+    void configure(r::plugin::plugin_base_t &plugin) noexcept override {
+        parent_t::configure(plugin);
+        plugin.with_casted<r::plugin::registry_plugin_t>(
+            [&](auto &p) { p.register_name(net::names::coordinator, get_address()); });
+        plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
+            p.subscribe_actor(&supervisor_t::on_watch);
+            p.subscribe_actor(&supervisor_t::on_unwatch);
+            p.subscribe_actor(&supervisor_t::on_changes);
+        });
+    }
+
+    void launch_children() noexcept override {
+        // NOOP
+    }
+
+    void on_watch(fs::message::watch_folder_t &) noexcept;
+    void on_unwatch(fs::message::unwatch_folder_t &) noexcept;
+    void on_changes(fs::message::folder_changes_t &) noexcept;
+
+    fixture_t *fixture;
+};
+
+enum class poll_t { single, trigger_timer };
+
+struct fixture_t {
+    using target_ptr_t = r::intrusive_ptr_t<fs::platform::watcher_base_t>;
+    using fs_context_ptr_r = r::intrusive_ptr_t<fs::fs_context_t>;
+    using change_message_ptr_t = r::intrusive_ptr_t<fs::message::folder_changes_t>;
+    using change_messages_t = std::deque<change_message_ptr_t>;
+
+    fixture_t(bool auto_launch_ = true) noexcept
+        : auto_launch{auto_launch_}, root_path{unique_path()}, path_guard{root_path} {
+        bfs::create_directory(root_path);
+        log = utils::get_logger("fixture");
+    }
+
+    void run() noexcept {
+        fs_context.reset(new fs::fs_context_t(timeout * 2));
+        sup = fs_context->create_supervisor<supervisor_t>().timeout(timeout).create_registry().finish();
+        sup->fixture = this;
+
+        sup->start();
+        sup->do_process();
+        REQUIRE(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::OPERATIONAL);
+
+        updates_mediator = new fs::updates_mediator_t(retension() * 2);
+        watched_folders.reset(new watched_folders_t());
+
+        if (auto_launch) {
+            launch_target();
+            REQUIRE(static_cast<r::actor_base_t *>(target.get())->access<to::state>() == r::state_t::OPERATIONAL);
+        }
+
+        fs_context->update_time();
+        main();
+
+        sup->do_process();
+        sup->do_shutdown();
+        sup->do_process();
+        CHECK(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::SHUT_DOWN);
+    }
+
+    virtual void launch_target() {
+        target = sup->create_actor<target_ptr_t::element_type>()
+                     .timeout(timeout)
+                     .change_retension(retension())
+                     .updates_mediator(updates_mediator)
+                     .watched_folders(watched_folders)
+                     .finish();
+        sup->do_process();
+    }
+
+    void await_events(poll_t poll_type, size_t await_changes = 0, bool flatten = false) {
+        using clock_t = pt::microsec_clock;
+        changes.clear();
+        auto deadline = clock_t::local_time() + timeout * 10;
+        auto do_flatten_on_demand = [&]() {
+            if (flatten) {
+                auto copy = change_messages_t();
+                auto changes_comparator = [](const auto &l, const auto &r) -> bool {
+                    return proto::get_name(l) < proto::get_name(r);
+                };
+                for (auto &m : changes) {
+                    for (auto &folder_change : m->payload) {
+                        auto file_changes = folder_change.file_changes;
+                        std::sort(file_changes.begin(), file_changes.end(), changes_comparator);
+                        for (auto &file_change : file_changes) {
+                            auto solo_changes = fs::payload::folder_change_t{folder_change.folder_id, {file_change}};
+                            auto msg = change_message_ptr_t();
+                            msg.reset(new fs::message::folder_changes_t(sup->get_address(), std::move(solo_changes)));
+                            copy.emplace_back(msg);
+                        }
+                    }
+                }
+                auto comparator = [&](const auto &lm, const auto &rm) -> bool {
+                    auto l = lm->payload[0].file_changes[0];
+                    auto r = rm->payload[0].file_changes[0];
+                    return changes_comparator(l, r);
+                };
+                std::sort(copy.begin(), copy.end(), comparator);
+                changes = std::move(copy);
+            }
+        };
+        do {
+            auto prev_sz = changes.size();
+            auto has_events = fs_context->wait_next_event();
+            fs_context->update_time();
+            LOG_TRACE(log, "updating time... already has {} changes", changes.size());
+            sup->do_process();
+            auto wait_next = (changes.size() < await_changes) || (!has_events && poll_type == poll_t::trigger_timer);
+            if (wait_next) {
+                fs_context->wait_next_event();
+                fs_context->update_time();
+                sup->do_process();
+            }
+            do_flatten_on_demand();
+        } while ((changes.size() < await_changes) && clock_t::local_time() < deadline);
+
+        do_flatten_on_demand();
+        REQUIRE(changes.size() >= await_changes);
+    }
+
+    virtual void on_watch(fs::message::watch_folder_t &msg) noexcept {
+        CHECK(!msg.payload.ec);
+        CHECK(msg.payload.ec.message() != "");
+        ++watched_replies;
+    }
+
+    virtual void on_unwatch(fs::message::unwatch_folder_t &msg) noexcept {
+        CHECK(!msg.payload.ec);
+        CHECK(msg.payload.ec.message() != "");
+        ++unwatched_replies;
+    }
+
+    virtual void on_changes(fs::message::folder_changes_t &msg) noexcept { changes.emplace_back(&msg); }
+
+    virtual void main() noexcept {}
+
+    r::pt::time_duration retension() { return RETENSION_TIMEOUT; }
+
+    bool auto_launch;
+    bfs::path root_path;
+    test::path_guard_t path_guard;
+    fs_context_ptr_r fs_context;
+    r::intrusive_ptr_t<supervisor_t> sup;
+    fs::updates_mediator_ptr_t updates_mediator;
+    fs::watched_folders_ptr_t watched_folders;
+    target_ptr_t target;
+    r::pt::time_duration timeout = TIMEOUT;
+    change_messages_t changes;
+    size_t watched_replies = 0;
+    size_t unwatched_replies = 0;
+    utils::logger_t log;
+};
+
+void supervisor_t::on_watch(fs::message::watch_folder_t &msg) noexcept { fixture->on_watch(msg); }
+void supervisor_t::on_unwatch(fs::message::unwatch_folder_t &msg) noexcept { fixture->on_unwatch(msg); }
+void supervisor_t::on_changes(fs::message::folder_changes_t &msg) noexcept { fixture->on_changes(msg); }
+
+void test_watcher_base() {
+    struct F : fixture_t {
+        using fixture_t::fixture_t;
+
+        void launch_target() override {
+            target = sup->create_actor<test::test_watcher_t>()
+                         .timeout(timeout)
+                         .change_retension(retension())
+                         .updates_mediator(updates_mediator)
+                         .watched_folders(watched_folders)
+                         .finish();
+            sup->do_process();
+        }
+
+        void main() noexcept override {
+            using U = fs::update_type_t;
+            auto folder_id = std::string("my-folder-id");
+            auto back_addr = sup->get_address();
+            sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id);
+            sup->do_process();
+            REQUIRE(watched_replies == 1);
+            auto deadline = r::pt::microsec_clock::local_time() + retension();
+            SECTION("simple (creation)") {
+                SECTION("dir") {
+                    auto own_name = bfs::path(L"папка");
+                    auto sub_path = root_path / own_name;
+                    auto requires_refinement = GENERATE(true, false);
+                    bfs::create_directories(sub_path);
+                    target->push(deadline, folder_id, narrow(own_name.wstring()), {}, U::created, requires_refinement);
+                    await_events(poll_t::single, 1);
+                    auto &payload = changes.front()->payload;
+                    REQUIRE(payload.size() == 1);
+                    auto &folder_change = payload[0];
+                    REQUIRE(folder_change.folder_id == folder_id);
+                    REQUIRE(folder_change.file_changes.size() == 1);
+                    auto &file_change = folder_change.file_changes.front();
+                    CHECK(proto::get_name(file_change) == narrow(own_name.wstring()));
+                    CHECK(proto::get_size(file_change) == 0);
+                    CHECK(proto::get_type(file_change) == proto::FileInfoType::DIRECTORY);
+                    CHECK(proto::get_permissions(file_change));
+                    CHECK(file_change.requires_refinement == requires_refinement);
+                }
+                SECTION("file") {
+                    auto own_name = bfs::path(L"файл.bin");
+                    auto sub_path = root_path / own_name;
+                    write_file(sub_path, "12345");
+                    target->push(deadline, folder_id, narrow(own_name.wstring()), {}, U::created, false);
+                    await_events(poll_t::single, 1);
+                    auto &payload = changes.front()->payload;
+                    REQUIRE(payload.size() == 1);
+                    auto &folder_change = payload[0];
+                    REQUIRE(folder_change.folder_id == folder_id);
+                    REQUIRE(folder_change.file_changes.size() == 1);
+                    auto &file_change = folder_change.file_changes.front();
+                    CHECK(proto::get_name(file_change) == narrow(own_name.wstring()));
+                    CHECK(proto::get_size(file_change) == 5);
+                    CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
+                    CHECK(proto::get_permissions(file_change));
+                }
+#ifndef SYNCSPIRIT_WIN
+                SECTION("symlink") {
+                    auto own_name = bfs::path(L"ссылка");
+                    auto sub_path = root_path / own_name;
+                    auto where = bfs::path("/to/some/where");
+                    bfs::create_symlink(where, sub_path);
+                    target->push(deadline, folder_id, narrow(own_name.wstring()), {}, U::created, false);
+                    await_events(poll_t::single, 1);
+                    auto &payload = changes.front()->payload;
+                    REQUIRE(payload.size() == 1);
+                    auto &folder_change = payload[0];
+                    REQUIRE(folder_change.folder_id == folder_id);
+                    REQUIRE(folder_change.file_changes.size() == 1);
+                    auto &file_change = folder_change.file_changes.front();
+                    CHECK(proto::get_name(file_change) == narrow(own_name.wstring()));
+                    CHECK(proto::get_size(file_change) == 0);
+                    CHECK(proto::get_type(file_change) == proto::FileInfoType::SYMLINK);
+                    CHECK(proto::get_permissions(file_change));
+                    CHECK(proto::get_symlink_target(file_change) == narrow(where.wstring()));
+                }
+#endif
+            }
+            SECTION("file moving") {
+                auto name_1 = bfs::path(L"файл-1.bin");
+                auto name_2 = bfs::path(L"файл-2.bin");
+                auto sub_path_1 = root_path / name_1;
+                auto sub_path_2 = root_path / name_2;
+                auto path_2_str = narrow(sub_path_2.generic_wstring());
+                write_file(sub_path_1, "12345");
+                target->push(deadline, folder_id, narrow(name_1.wstring()), path_2_str, U::meta, false);
+                await_events(poll_t::single, 1);
+                auto &payload = changes.front()->payload;
+                REQUIRE(payload.size() == 1);
+                auto &folder_change = payload[0];
+                REQUIRE(folder_change.folder_id == folder_id);
+                REQUIRE(folder_change.file_changes.size() == 1);
+                auto &file_change = folder_change.file_changes.front();
+                CHECK(proto::get_name(file_change) == narrow(name_1.wstring()));
+                CHECK(proto::get_size(file_change) == 5);
+                CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
+                CHECK(proto::get_permissions(file_change));
+                CHECK(file_change.prev_path == path_2_str);
+                CHECK(file_change.update_reason == update_type_t::meta);
+            }
+            SECTION("changes accumulation") {
+                auto deadline_2 = deadline + retension();
+                SECTION("simple case") {
+                    auto own_name = bfs::path(L"файл.bin");
+                    auto sub_path = root_path / own_name;
+                    write_file(sub_path, "12345");
+                    target->push(deadline, folder_id, narrow(own_name.wstring()), {}, U::created, false);
+                    target->push(deadline_2, folder_id, narrow(own_name.wstring()), {}, U::content, false);
+
+                    await_events(poll_t::single);
+                    REQUIRE(changes.size() == 0);
+
+                    await_events(poll_t::trigger_timer, 1);
+
+                    auto &payload = changes.front()->payload;
+                    REQUIRE(payload.size() == 1);
+                    auto &folder_change = payload[0];
+                    REQUIRE(folder_change.folder_id == folder_id);
+                    REQUIRE(folder_change.file_changes.size() == 1);
+                    auto &file_change = folder_change.file_changes.front();
+                    CHECK(proto::get_name(file_change) == narrow(own_name.wstring()));
+                    CHECK(proto::get_size(file_change) == 5);
+                    CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
+                    CHECK(proto::get_permissions(file_change));
+                    CHECK(file_change.update_reason == update_type_t::created);
+                }
+                SECTION("create , delete -> collapse to void") {
+                    auto own_name = bfs::path(L"файл.bin");
+                    auto sub_path = root_path / own_name;
+                    write_file(sub_path, "12345");
+                    target->push(deadline, folder_id, narrow(own_name.wstring()), {}, U::created, false);
+                    target->push(deadline_2, folder_id, narrow(own_name.wstring()), {}, U::deleted, false);
+                    await_events(poll_t::trigger_timer);
+                    REQUIRE(changes.size() == 0);
+                }
+                SECTION("content , meta -> collapse to content") {
+                    auto own_name = bfs::path(L"файл.bin");
+                    auto sub_path = root_path / own_name;
+                    write_file(sub_path, "12345");
+                    target->push(deadline, folder_id, narrow(own_name.wstring()), {}, U::content, false);
+                    target->push(deadline_2, folder_id, narrow(own_name.wstring()), {}, U::meta, false);
+
+                    await_events(poll_t::trigger_timer, 1);
+
+                    auto &payload = changes.front()->payload;
+                    REQUIRE(payload.size() == 1);
+                    auto &folder_change = payload[0];
+                    REQUIRE(folder_change.folder_id == folder_id);
+                    REQUIRE(folder_change.file_changes.size() == 1);
+                    auto &file_change = folder_change.file_changes.front();
+                    CHECK(proto::get_name(file_change) == narrow(own_name.wstring()));
+                    CHECK(proto::get_size(file_change) == 5);
+                    CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
+                    CHECK(proto::get_permissions(file_change));
+                    CHECK(file_change.update_reason == update_type_t::content);
+                }
+                SECTION("mv(a, b), content(b) -> rm(a), create(b)") {
+                    auto name_1 = bfs::path(L"файл-1.bin");
+                    auto name_2 = bfs::path(L"файл-2.bin");
+                    auto name_1_str = narrow(name_1.generic_wstring());
+                    auto name_2_str = narrow(name_2.generic_wstring());
+                    write_file(root_path / name_2, "12345");
+                    target->push(deadline, folder_id, name_2_str, name_1_str, U::meta, false);
+                    target->push(deadline, folder_id, name_2_str, {}, U::content, false);
+
+                    await_events(poll_t::trigger_timer, 2, true);
+                    auto &payload_1 = changes[0]->payload;
+                    REQUIRE(payload_1.size() == 1);
+                    auto &folder_change_1 = payload_1[0];
+                    REQUIRE(folder_change_1.folder_id == folder_id);
+                    REQUIRE(folder_change_1.file_changes.size() == 1);
+
+                    auto &change_0 = folder_change_1.file_changes[0];
+                    CHECK(proto::get_name(change_0) == narrow(name_1.wstring()));
+                    CHECK(proto::get_size(change_0) == 0);
+                    CHECK(proto::get_type(change_0) == proto::FileInfoType::FILE);
+                    CHECK(change_0.update_reason == update_type_t::deleted);
+                    CHECK(change_0.prev_path == "");
+
+                    auto &payload_2 = changes[1]->payload;
+                    REQUIRE(payload_2.size() == 1);
+                    auto &folder_change_2 = payload_2[0];
+                    auto &change_1 = folder_change_2.file_changes[0];
+                    CHECK(proto::get_name(change_1) == narrow(name_2.wstring()));
+                    CHECK(proto::get_size(change_1) == 5);
+                    CHECK(proto::get_type(change_1) == proto::FileInfoType::FILE);
+                    CHECK(proto::get_permissions(change_1));
+                    CHECK(change_1.update_reason == update_type_t::created);
+                    CHECK(change_1.prev_path == "");
+                }
+                SECTION("mv(a, b), content(b), meta(b) -> rm(a), create(b)") {
+                    auto name_1 = bfs::path(L"файл-1.bin");
+                    auto name_2 = bfs::path(L"файл-2.bin");
+                    auto name_1_str = narrow(name_1.generic_wstring());
+                    auto name_2_str = narrow(name_2.generic_wstring());
+                    write_file(root_path / name_2, "12345");
+                    target->push(deadline, folder_id, name_2_str, name_1_str, U::meta, false);
+                    target->push(deadline_2, folder_id, name_2_str, {}, U::content, false);
+                    target->push(deadline_2, folder_id, name_2_str, {}, U::meta, false);
+
+                    await_events(poll_t::trigger_timer, 2, true);
+
+                    auto &payload_1 = changes[0]->payload;
+                    REQUIRE(payload_1.size() == 1);
+                    auto &folder_change_1 = payload_1[0];
+                    REQUIRE(folder_change_1.folder_id == folder_id);
+                    REQUIRE(folder_change_1.file_changes.size() == 1);
+
+                    auto &change_0 = folder_change_1.file_changes[0];
+                    CHECK(proto::get_name(change_0) == narrow(name_1.wstring()));
+                    CHECK(proto::get_size(change_0) == 0);
+                    CHECK(proto::get_type(change_0) == proto::FileInfoType::FILE);
+                    CHECK(change_0.update_reason == update_type_t::deleted);
+                    CHECK(change_0.prev_path == "");
+
+                    auto &payload_2 = changes[1]->payload;
+                    REQUIRE(payload_2.size() == 1);
+                    auto &folder_change_2 = payload_2[0];
+                    auto &change_1 = folder_change_2.file_changes[0];
+                    CHECK(proto::get_name(change_1) == narrow(name_2.wstring()));
+                    CHECK(proto::get_size(change_1) == 5);
+                    CHECK(proto::get_type(change_1) == proto::FileInfoType::FILE);
+                    CHECK(proto::get_permissions(change_1));
+                    CHECK(change_1.update_reason == update_type_t::created);
+                    CHECK(change_1.prev_path == "");
+                }
+                SECTION("content change + rename => remove + content change") {
+                    auto name_1 = bfs::path(L"файл-1.bin");
+                    auto name_2 = bfs::path(L"файл-2.bin");
+                    auto name_1_str = narrow(name_1.generic_wstring());
+                    auto name_2_str = narrow(name_2.generic_wstring());
+                    write_file(root_path / name_2, "12345");
+                    target->push(deadline, folder_id, name_2_str, {}, U::content, false);
+                    target->push(deadline, folder_id, name_2_str, name_1_str, U::meta, false);
+                    await_events(poll_t::trigger_timer, 1, true);
+
+                    auto &payload_1 = changes[0]->payload;
+                    REQUIRE(payload_1.size() == 1);
+                    auto &folder_change_1 = payload_1[0];
+                    REQUIRE(folder_change_1.folder_id == folder_id);
+                    REQUIRE(folder_change_1.file_changes.size() == 1);
+
+                    auto &change_0 = folder_change_1.file_changes[0];
+                    CHECK(proto::get_name(change_0) == narrow(name_1.wstring()));
+                    CHECK(proto::get_size(change_0) == 0);
+                    CHECK(proto::get_type(change_0) == proto::FileInfoType::FILE);
+                    CHECK(change_0.update_reason == update_type_t::deleted);
+                    CHECK(change_0.prev_path == "");
+
+                    auto &payload_2 = changes[1]->payload;
+                    REQUIRE(payload_2.size() == 1);
+                    auto &folder_change_2 = payload_2[0];
+                    auto &change_1 = folder_change_2.file_changes[0];
+                    CHECK(proto::get_name(change_1) == narrow(name_2.wstring()));
+                    CHECK(proto::get_size(change_1) == 5);
+                    CHECK(proto::get_type(change_1) == proto::FileInfoType::FILE);
+                    CHECK(proto::get_permissions(change_1));
+                    CHECK(change_1.update_reason == update_type_t::created);
+                    CHECK(change_1.prev_path == "");
+                }
+                SECTION("move, delete -> collapse to delete of original") {
+                    auto name_1 = bfs::path(L"файл-1.bin");
+                    auto name_2 = bfs::path(L"файл-2.bin");
+                    auto name_1_str = narrow(name_1.generic_wstring());
+                    auto name_2_str = narrow(name_2.generic_wstring());
+                    target->push(deadline, folder_id, name_2_str, name_1_str, U::meta, false);
+                    target->push(deadline_2, folder_id, name_2_str, {}, U::deleted, false);
+
+                    await_events(poll_t::trigger_timer, 1);
+
+                    auto &payload = changes.front()->payload;
+                    REQUIRE(payload.size() == 1);
+                    auto &folder_change = payload[0];
+                    REQUIRE(folder_change.folder_id == folder_id);
+                    REQUIRE(folder_change.file_changes.size() == 1);
+                    auto &file_change = folder_change.file_changes.front();
+                    CHECK(proto::get_name(file_change) == name_1_str);
+                    CHECK(proto::get_size(file_change) == 0);
+                    CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
+                    CHECK(proto::get_deleted(file_change));
+                    CHECK(file_change.update_reason == update_type_t::deleted);
+                    CHECK(file_change.prev_path.empty());
+                }
+                SECTION("mv(a, b), mv(b, c) -> collapse to mv(a, c") {
+                    auto name_1 = bfs::path(L"файл-1.bin");
+                    auto name_2 = bfs::path(L"файл-2.bin");
+                    auto name_3 = bfs::path(L"файл-3.bin");
+                    auto name_1_str = narrow(name_1.generic_wstring());
+                    auto name_2_str = narrow(name_2.generic_wstring());
+                    auto name_3_str = narrow(name_3.generic_wstring());
+                    write_file(root_path / name_3, "12345");
+                    target->push(deadline, folder_id, name_2_str, name_1_str, U::meta, false);
+                    target->push(deadline_2, folder_id, name_3_str, name_2_str, U::meta, false);
+
+                    await_events(poll_t::trigger_timer);
+
+                    auto &payload = changes.front()->payload;
+                    REQUIRE(payload.size() == 1);
+                    auto &folder_change = payload[0];
+                    REQUIRE(folder_change.folder_id == folder_id);
+                    REQUIRE(folder_change.file_changes.size() == 1);
+                    auto &file_change = folder_change.file_changes.front();
+                    CHECK(proto::get_name(file_change) == name_3_str);
+                    CHECK(proto::get_size(file_change) == 5);
+                    CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
+                    CHECK(proto::get_permissions(file_change));
+                    CHECK(file_change.update_reason == update_type_t::meta);
+                    CHECK(file_change.prev_path == name_1_str);
+                }
+                SECTION("mv(a, b) -> mv(b, a) -> noop") {
+                    auto name_1 = bfs::path(L"файл-1.bin");
+                    auto name_2 = bfs::path(L"файл-2.bin");
+                    auto name_1_str = narrow(name_1.generic_wstring());
+                    auto name_2_str = narrow(name_2.generic_wstring());
+                    write_file(root_path / name_1, "12345");
+                    target->push(deadline, folder_id, name_2_str, name_1_str, U::meta, false);
+                    target->push(deadline_2, folder_id, name_1_str, name_2_str, U::meta, false);
+                    await_events(poll_t::trigger_timer);
+                    REQUIRE(changes.size() == 0);
+                }
+                SECTION("change(a), mv(a, b) -> rm(a), create(b)") {
+                    auto name_1 = bfs::path(L"файл-1.bin");
+                    auto name_2 = bfs::path(L"файл-2.bin");
+                    auto name_1_str = narrow(name_1.generic_wstring());
+                    auto name_2_str = narrow(name_2.generic_wstring());
+                    write_file(root_path / name_2, "12345");
+                    target->push(deadline, folder_id, name_1_str, {}, U::content, false);
+                    target->push(deadline, folder_id, name_2_str, name_1_str, U::meta, false);
+                    await_events(poll_t::trigger_timer, 2, true);
+
+                    auto &payload_1 = changes[0]->payload;
+                    REQUIRE(payload_1.size() == 1);
+                    auto &folder_change_1 = payload_1[0];
+                    REQUIRE(folder_change_1.folder_id == folder_id);
+                    REQUIRE(folder_change_1.file_changes.size() == 1);
+                    auto &change_1 = folder_change_1.file_changes.front();
+                    CHECK(change_1.update_reason == update_type_t::deleted);
+                    CHECK(proto::get_name(change_1) == name_1_str);
+                    CHECK(proto::get_size(change_1) == 0);
+                    CHECK(proto::get_type(change_1) == proto::FileInfoType::FILE);
+                    CHECK(change_1.prev_path.empty());
+
+                    auto &payload_2 = changes[1]->payload;
+                    REQUIRE(payload_2.size() == 1);
+                    auto &folder_change_2 = payload_2[0];
+                    auto &change_2 = folder_change_2.file_changes[0];
+                    CHECK(proto::get_name(change_2) == narrow(name_2.wstring()));
+                    CHECK(proto::get_size(change_2) == 5);
+                    CHECK(proto::get_type(change_2) == proto::FileInfoType::FILE);
+                    CHECK(proto::get_permissions(change_2));
+                    CHECK(change_2.update_reason == update_type_t::created);
+                    CHECK(change_2.prev_path == "");
+                }
+            }
+            SECTION("updates mediator") {
+                auto own_name = bfs::path(L"файл.bin");
+                auto sub_path = root_path / own_name;
+                write_file(sub_path, "12345");
+                updates_mediator->enable(true);
+                updates_mediator->mask(sub_path, {}, deadline);
+
+                target->push(deadline, folder_id, narrow(own_name.wstring()), {}, U::created, false);
+                await_events(poll_t::single);
+                REQUIRE(changes.size() == 0);
+
+                target->push(deadline, folder_id, narrow(own_name.wstring()), {}, U::created, false);
+                await_events(poll_t::single);
+                REQUIRE(changes.size() == 1);
+
+                auto &payload = changes.front()->payload;
+                REQUIRE(payload.size() == 1);
+                auto &folder_change = payload[0];
+                REQUIRE(folder_change.folder_id == folder_id);
+                REQUIRE(folder_change.file_changes.size() == 1);
+                auto &file_change = folder_change.file_changes.front();
+                CHECK(proto::get_name(file_change) == narrow(own_name.wstring()));
+                CHECK(proto::get_size(file_change) == 5);
+                CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
+                CHECK(proto::get_permissions(file_change));
+            }
+        }
+    };
+    F().run();
+}
+
+struct fixture_real_t : fixture_t {
+    using fixture_t::fixture_t;
+
+    void launch_target() override {
+        target = sup->create_actor<fs::watch_actor_t>()
+                     .timeout(timeout)
+                     .change_retension(retension())
+                     .updates_mediator(updates_mediator)
+                     .watched_folders(watched_folders)
+                     .finish();
+        sup->do_process();
+    }
+
+    virtual bool notify_upon_watch() { return true; }
+
+    void recurse_scan(const bfs::path &path) {
+#ifdef SYNCSPIRIT_WATCHER_UNIX
+        auto queue = std::list<bfs::path>{path};
+        auto dummy_slave = fs_slave_t();
+        auto ctx = execution_context_t();
+        auto watcher = static_cast<fs::platform::unix::watcher_t *>(target.get());
+        while (!queue.empty()) {
+            auto &p = queue.front();
+            auto task = fs::task::scan_dir_t(p, {}, {}, true, false, false);
+            task.process(dummy_slave, ctx);
+            watcher->notify(task);
+            for (auto &child : task.child_infos) {
+                if (child.status.type() == bfs::file_type::directory) {
+                    queue.push_back(child.path);
+                }
+            }
+            queue.pop_front();
+        }
+#endif
+    }
+
+    void watch_folder(std::string_view folder_id, const bfs::path &folder_path = {}) noexcept {
+        auto watched_path = folder_path.empty() ? root_path : folder_path;
+        auto back_addr = sup->get_address();
+        sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, watched_path, folder_id);
+        sup->do_process();
+        REQUIRE(watched_replies == 1);
+        LOG_TRACE(log, "folder is being watched on '{}', updating time...", narrow(watched_path.wstring()));
+        fs_context->update_time();
+
+        if (notify_upon_watch()) {
+            recurse_scan(watched_path);
+        }
+    }
+};
+
+void test_start_n_shutdown() {
+    struct F : fixture_real_t {
+        using fixture_real_t::fixture_real_t;
+
+        void main() noexcept override {
+            launch_target();
+            CHECK(static_cast<r::actor_base_t *>(target.get())->access<to::state>() == r::state_t::OPERATIONAL);
+            REQUIRE(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::OPERATIONAL);
+
+            target->do_shutdown();
+            sup->do_process();
+            CHECK(static_cast<r::actor_base_t *>(target.get())->access<to::state>() == r::state_t::SHUT_DOWN);
+            REQUIRE(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::OPERATIONAL);
+        }
+    };
+    F(false).run();
+}
+
+void test_watch_unwatch() {
+    struct F : fixture_real_t {
+        using fixture_real_t::fixture_real_t;
+
+        void on_watch(fs::message::watch_folder_t &msg) noexcept override {
+            auto &counter = msg.payload.ec ? watched_errors : watched_successes;
+            ++counter;
+            ++watched_replies;
+        }
+
+        void on_unwatch(fs::message::unwatch_folder_t &msg) noexcept override {
+            auto &counter = msg.payload.ec ? unwatched_errors : unwatched_successes;
+            ++counter;
+            ++unwatched_replies;
+        }
+
+        void main() noexcept override {
+            auto folder_id = std::string("my-folder-id");
+            auto back_addr = sup->get_address();
+            sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id);
+            sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id);
+            sup->do_process();
+            CHECK(watched_replies == 2);
+            CHECK(watched_successes == 1);
+            CHECK(watched_errors == 1);
+            CHECK(unwatched_replies == 0);
+            CHECK(unwatched_successes == 0);
+            CHECK(unwatched_errors == 0);
+
+            sup->route<fs::payload::unwatch_folder_t>(target->get_address(), back_addr, folder_id);
+            sup->do_process();
+            CHECK(unwatched_replies == 1);
+            CHECK(unwatched_successes == 1);
+            CHECK(unwatched_errors == 0);
+
+            sup->route<fs::payload::unwatch_folder_t>(target->get_address(), back_addr, folder_id);
+            sup->do_process();
+            CHECK(unwatched_replies == 2);
+            CHECK(unwatched_successes == 1);
+            CHECK(unwatched_errors == 1);
+        }
+
+        int watched_successes = 0;
+        int watched_errors = 0;
+        int unwatched_successes = 0;
+        int unwatched_errors = 0;
+    };
+    F().run();
+}
+
+void test_tmp_ignoring() {
+    struct F : fixture_real_t {
+        using fixture_real_t::fixture_real_t;
+
+        void main() noexcept override {
+            auto folder_id = std::string("my-folder-id");
+            auto back_addr = sup->get_address();
+
+            bfs::create_directories(root_path / "prev-dir.syncspirit-tmp");
+            write_file(root_path / "01.syncspirit-tmp", "12345");
+            watch_folder(folder_id);
+
+            SECTION("ignoring") {
+                SECTION("create a dir") {
+                    auto path = root_path / "my.syncspirit-tmp";
+                    bfs::create_directories(path);
+                }
+                SECTION("rm file") { bfs::remove(root_path / "01.syncspirit-tmp"); }
+                SECTION("rm dir") { bfs::remove_all(root_path / "prev-dir.syncspirit-tmp"); }
+                SECTION("write file") { write_file(root_path / "my.syncspirit-tmp", "12345"); }
+                SECTION("rename file tmp -> tmp") {
+                    bfs::rename(root_path / "01.syncspirit-tmp", root_path / "02.syncspirit-tmp");
+                }
+#ifndef SYNCSPIRIT_WIN
+                SECTION("create symlink") {
+                    bfs::create_symlink(bfs::path("xxx"), root_path / "my-link.syncspirit-tmp");
+                }
+#endif
+                for (int i = 0; i < 2; ++i) {
+                    fs_context->wait_next_event();
+                    fs_context->update_time();
+                }
+#ifdef SYNCSPIRIT_WATCHER_KQUEUE
+                sup->do_process();
+                CHECK(changes.size() == 1);
+                {
+                    auto &payload = changes.front()->payload;
+                    REQUIRE(payload.size() == 1);
+                    auto &folder_change = payload[0];
+                    REQUIRE(folder_change.folder_id == folder_id);
+                    REQUIRE(folder_change.file_changes.size() == 1);
+                    auto &file_change = folder_change.file_changes.front();
+                    CHECK(proto::get_name(file_change) == "");
+                    CHECK(proto::get_type(file_change) == proto::FileInfoType::DIRECTORY);
+                    CHECK(file_change.requires_refinement);
+                }
+#else
+                sup->do_process();
+                CHECK(changes.size() == 0);
+#endif
+            }
+
+            SECTION("not ignoring") {
+                bfs::rename(root_path / "01.syncspirit-tmp", root_path / "02.file");
+                await_events(poll_t::trigger_timer, 1);
+            }
+        }
+    };
+    F().run();
+};
+
+void test_real_impl() {
+    struct F : fixture_real_t {
+        using fixture_real_t::fixture_real_t;
+
+        void main() noexcept override {
+            auto folder_id = std::string("my-folder-id");
+            auto back_addr = sup->get_address();
+
+            SECTION("(create) new dir") {
+#ifndef SYNCSPIRIT_WIN
+                auto expected_refinement = true;
+#else
+                auto expected_refinement = false;
+#endif
+                watch_folder(folder_id);
+
+                auto path = root_path / "my-dir";
+                bfs::create_directories(path);
+                await_events(poll_t::trigger_timer, 1);
+
+                auto &payload = changes.front()->payload;
+                REQUIRE(payload.size() == 1);
+                auto &folder_change = payload[0];
+                REQUIRE(folder_change.folder_id == folder_id);
+                REQUIRE(folder_change.file_changes.size() == 1);
+                auto &file_change = folder_change.file_changes.front();
+                CHECK(proto::get_name(file_change) == "my-dir");
+                CHECK(proto::get_size(file_change) == 0);
+                CHECK(proto::get_type(file_change) == proto::FileInfoType::DIRECTORY);
+                CHECK(proto::get_permissions(file_change));
+                CHECK(file_change.update_reason == update_type_t::created);
+                CHECK(file_change.requires_refinement == expected_refinement);
+            }
+            SECTION("(create with recursion) new dir + new file") {
+                watch_folder(folder_id);
+#ifndef SYNCSPIRIT_WIN
+                auto expected_refinement = true;
+#else
+                auto expected_refinement = false;
+#endif
+
+                auto path_dir = root_path / "my-dir";
+                bfs::create_directories(path_dir);
+                await_events(poll_t::trigger_timer, 1);
+                {
+                    auto &payload = changes.front()->payload;
+                    REQUIRE(payload.size() == 1);
+                    auto &folder_change = payload[0];
+                    REQUIRE(folder_change.folder_id == folder_id);
+                    REQUIRE(folder_change.file_changes.size() == 1);
+                    auto &file_change = folder_change.file_changes.front();
+                    CHECK(proto::get_name(file_change) == "my-dir");
+                    CHECK(proto::get_size(file_change) == 0);
+                    CHECK(proto::get_type(file_change) == proto::FileInfoType::DIRECTORY);
+                    CHECK(proto::get_permissions(file_change));
+                    CHECK(file_change.requires_refinement == expected_refinement);
+                    changes.clear();
+                }
+
+#ifndef SYNCSPIRIT_WIN
+                recurse_scan(root_path);
+#endif
+                auto path_file = path_dir / L"файл.bin";
+                write_file(path_file, "12345");
+                await_events(poll_t::trigger_timer, 1);
+                {
+                    auto &payload = changes.front()->payload;
+                    REQUIRE(payload.size() == 1);
+                    auto &folder_change = payload[0];
+                    REQUIRE(folder_change.folder_id == folder_id);
+                    REQUIRE(folder_change.file_changes.size() == 1);
+                    auto &file_change = folder_change.file_changes.front();
+                    CHECK(proto::get_name(file_change) == narrow(L"my-dir/файл.bin"));
+                    CHECK(proto::get_size(file_change) == 5);
+                    CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
+                    CHECK(proto::get_permissions(file_change));
+                    CHECK(file_change.update_reason == update_type_t::created);
+                }
+            }
+            SECTION("(content change) file") {
+                auto path = root_path / "my-file";
+                write_file(path, "12345");
+
+                watch_folder(folder_id);
+
+                write_file(path, "123456");
+
+                await_events(poll_t::trigger_timer, 1);
+                auto &payload = changes.front()->payload;
+                REQUIRE(payload.size() == 1);
+                auto &folder_change = payload[0];
+                REQUIRE(folder_change.folder_id == folder_id);
+                REQUIRE(folder_change.file_changes.size() == 1);
+                auto &file_change = folder_change.file_changes.front();
+                CHECK(proto::get_name(file_change) == "my-file");
+                CHECK(proto::get_size(file_change) == 6);
+                CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
+                CHECK(proto::get_permissions(file_change));
+                CHECK(file_change.update_reason == update_type_t::content);
+                CHECK(!file_change.requires_refinement);
+            }
+            SECTION("(delete) single file") {
+                auto path = root_path / "my-file";
+                write_file(path, "12345");
+
+                watch_folder(folder_id);
+
+                bfs::remove(path);
+
+                await_events(poll_t::trigger_timer, 1);
+                auto &payload = changes.front()->payload;
+                REQUIRE(payload.size() == 1);
+                auto &folder_change = payload[0];
+                REQUIRE(folder_change.folder_id == folder_id);
+                REQUIRE(folder_change.file_changes.size() == 1);
+                auto &file_change = folder_change.file_changes.front();
+                CHECK(proto::get_name(file_change) == "my-file");
+                CHECK(proto::get_size(file_change) == 0);
+                CHECK(proto::get_deleted(file_change));
+                CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
+                CHECK(!file_change.requires_refinement);
+                CHECK(file_change.update_reason == update_type_t::deleted);
+            }
+            SECTION("move") {
+                auto subdir_path = root_path / "my-root";
+                auto a_path = subdir_path / L"a/b/п1";
+                auto x_path = subdir_path / L"x/y/п2";
+                bfs::create_directories(a_path);
+                bfs::create_directories(x_path);
+                SECTION("file inside root => meta") {
+                    if (!test::wine_environment()) {
+                        auto path_1 = subdir_path / L"my-file.1";
+                        auto path_2 = subdir_path / L"my-file.2";
+                        write_file(path_1, "12345");
+
+                        watch_folder(folder_id);
+
+                        SECTION("native::rename") { native::rename(path_1, path_2); }
+                        SECTION("bfs::rename") { bfs::rename(path_1, path_2); }
+
+#ifndef SYNCSPIRIT_WIN
+                        await_events(poll_t::trigger_timer, 1);
+
+                        auto &payload = changes.front()->payload;
+                        REQUIRE(payload.size() == 1);
+                        auto &folder_change = payload[0];
+                        REQUIRE(folder_change.folder_id == folder_id);
+                        REQUIRE(folder_change.file_changes.size() == 1);
+                        auto &file_change = folder_change.file_changes.front();
+                        CHECK(proto::get_name(file_change) == narrow(L"my-root/my-file.2"));
+                        CHECK(proto::get_size(file_change) == 5);
+                        CHECK(!proto::get_deleted(file_change));
+                        CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
+                        CHECK(file_change.update_reason == update_type_t::meta);
+                        CHECK(file_change.prev_path == narrow(L"my-root/my-file.1"));
+#else
+                        await_events(poll_t::trigger_timer, 2, true);
+                        {
+                            auto &payload = changes.front()->payload;
+                            REQUIRE(payload.size() == 1);
+                            auto &folder_change = payload[0];
+                            REQUIRE(folder_change.folder_id == folder_id);
+                            REQUIRE(folder_change.file_changes.size() == 1);
+                            auto &file_change = folder_change.file_changes[0];
+                            CHECK(proto::get_name(file_change) == narrow(L"my-root/my-file.1"));
+                            CHECK(proto::get_size(file_change) == 0);
+                            CHECK(proto::get_deleted(file_change));
+                            CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
+                            CHECK(file_change.update_reason == update_type_t::deleted);
+                            CHECK(file_change.prev_path == "");
+                            changes.pop_front();
+                        }
+                        {
+                            auto &payload = changes.front()->payload;
+                            REQUIRE(payload.size() == 1);
+                            auto &folder_change = payload[0];
+                            REQUIRE(folder_change.folder_id == folder_id);
+                            REQUIRE(folder_change.file_changes.size() == 1);
+                            auto &file_change = folder_change.file_changes[0];
+                            CHECK(proto::get_name(file_change) == narrow(L"my-root/my-file.2"));
+                            CHECK(proto::get_size(file_change) == 5);
+                            CHECK(!proto::get_deleted(file_change));
+                            CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
+                            CHECK(file_change.update_reason == update_type_t::created);
+                            CHECK(file_change.requires_refinement);
+                            CHECK(file_change.prev_path == "");
+                        }
+#endif
+                    }
+                }
+                SECTION("dirs inside folder => meta") {
+                    if (!test::wine_environment()) {
+                        auto path_1 = subdir_path / L"папка1";
+                        auto path_2 = subdir_path / L"папка2";
+                        bfs::create_directories(path_1);
+
+                        watch_folder(folder_id);
+                        native::rename(path_1, path_2);
+
+#ifndef SYNCSPIRIT_WIN
+                        await_events(poll_t::trigger_timer, 1);
+                        auto &payload = changes.front()->payload;
+                        REQUIRE(payload.size() == 1);
+                        auto &folder_change = payload[0];
+                        REQUIRE(folder_change.folder_id == folder_id);
+                        REQUIRE(folder_change.file_changes.size() == 1);
+                        auto &file_change = folder_change.file_changes.front();
+                        CHECK(proto::get_name(file_change) == narrow(L"my-root/папка2"));
+                        CHECK(proto::get_size(file_change) == 0);
+                        CHECK(!proto::get_deleted(file_change));
+                        CHECK(proto::get_type(file_change) == proto::FileInfoType::DIRECTORY);
+                        CHECK(file_change.update_reason == update_type_t::meta);
+                        CHECK(file_change.prev_path == narrow(L"my-root/папка1"));
+#else
+                        await_events(poll_t::trigger_timer, 2, true);
+                        {
+                            auto &payload = changes.front()->payload;
+                            REQUIRE(payload.size() == 1);
+                            auto &folder_change = payload[0];
+                            REQUIRE(folder_change.folder_id == folder_id);
+                            REQUIRE(folder_change.file_changes.size() == 1);
+                            auto &file_change = folder_change.file_changes[0];
+                            CHECK(proto::get_name(file_change) == narrow(L"my-root/папка1"));
+                            CHECK(proto::get_size(file_change) == 0);
+                            CHECK(proto::get_deleted(file_change));
+                            CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
+                            CHECK(file_change.update_reason == update_type_t::deleted);
+                            CHECK(file_change.prev_path == "");
+                            changes.pop_front();
+                        }
+                        {
+                            auto &payload = changes.front()->payload;
+                            REQUIRE(payload.size() == 1);
+                            auto &folder_change = payload[0];
+                            REQUIRE(folder_change.folder_id == folder_id);
+                            REQUIRE(folder_change.file_changes.size() == 1);
+                            auto &file_change = folder_change.file_changes[0];
+                            CHECK(proto::get_name(file_change) == narrow(L"my-root/папка2"));
+                            CHECK(proto::get_size(file_change) == 0);
+                            CHECK(!proto::get_deleted(file_change));
+                            CHECK(proto::get_type(file_change) == proto::FileInfoType::DIRECTORY);
+                            CHECK(file_change.update_reason == update_type_t::created);
+                            CHECK(file_change.prev_path == "");
+                        }
+#endif
+                    }
+                }
+
+                SECTION("outside of my dir => delete") {
+                    if (!test::wine_environment()) {
+                        auto path_1 = a_path / L"my-file.1";
+                        auto path_2 = root_path / L"my-file.2";
+                        write_file(path_1, "12345");
+
+                        watch_folder(folder_id, subdir_path);
+
+                        native::rename(path_1, path_2);
+
+                        await_events(poll_t::trigger_timer, 1);
+                        auto &payload = changes.front()->payload;
+                        REQUIRE(payload.size() == 1);
+                        auto &folder_change = payload[0];
+                        REQUIRE(folder_change.folder_id == folder_id);
+                        REQUIRE(folder_change.file_changes.size() == 1);
+                        auto &file_change = folder_change.file_changes.front();
+                        CHECK(proto::get_name(file_change) == narrow(L"a/b/п1/my-file.1"));
+                        CHECK(proto::get_size(file_change) == 0);
+                        CHECK(proto::get_deleted(file_change));
+                        CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
+                        CHECK(file_change.update_reason == update_type_t::deleted);
+                    }
+                }
+
+                SECTION("into my dir => create") {
+                    if (!test::wine_environment()) {
+                        auto path_1 = root_path / L"my-file.1";
+                        auto path_2 = x_path / L"my-file.2";
+                        write_file(path_1, "12345");
+
+                        watch_folder(folder_id, subdir_path);
+
+                        native::rename(path_1, path_2);
+
+                        await_events(poll_t::trigger_timer, 1);
+                        auto &payload = changes.front()->payload;
+                        REQUIRE(payload.size() == 1);
+                        auto &folder_change = payload[0];
+                        REQUIRE(folder_change.folder_id == folder_id);
+                        REQUIRE(folder_change.file_changes.size() == 1);
+                        auto &file_change = folder_change.file_changes.front();
+                        CHECK(proto::get_name(file_change) == narrow(L"x/y/п2/my-file.2"));
+                        CHECK(proto::get_size(file_change) == 5);
+                        CHECK(!proto::get_deleted(file_change));
+                        CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
+                        CHECK(file_change.update_reason == update_type_t::created);
+                        CHECK(file_change.prev_path.empty());
+                    }
+                }
+                SECTION("inside folder, cross-dir moving => meta") {
+                    if (!test::wine_environment()) {
+                        auto path_1 = a_path / L"my-file.1";
+                        auto path_2 = x_path / L"my-file.2";
+                        write_file(path_1, "12345");
+
+                        watch_folder(folder_id, subdir_path);
+
+                        native::rename(path_1, path_2);
+
+#ifndef SYNCSPIRIT_WIN
+                        await_events(poll_t::trigger_timer, 1);
+                        auto &payload = changes.front()->payload;
+                        REQUIRE(payload.size() == 1);
+                        auto &folder_change = payload[0];
+                        REQUIRE(folder_change.folder_id == folder_id);
+                        REQUIRE(folder_change.file_changes.size() == 1);
+                        auto &file_change = folder_change.file_changes.front();
+                        CHECK(proto::get_name(file_change) == narrow(L"x/y/п2/my-file.2"));
+                        CHECK(proto::get_size(file_change) == 5);
+                        CHECK(!proto::get_deleted(file_change));
+                        CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
+                        CHECK(file_change.update_reason == update_type_t::meta);
+                        CHECK(file_change.prev_path == narrow(L"a/b/п1/my-file.1"));
+#else
+                        await_events(poll_t::trigger_timer, 2, true);
+                        {
+                            auto &payload = changes.front()->payload;
+                            REQUIRE(payload.size() == 1);
+                            auto &folder_change = payload[0];
+                            REQUIRE(folder_change.folder_id == folder_id);
+                            REQUIRE(folder_change.file_changes.size() == 1);
+                            auto &file_change = folder_change.file_changes.front();
+                            CHECK(proto::get_name(file_change) == narrow(L"a/b/п1/my-file.1"));
+                            CHECK(proto::get_size(file_change) == 0);
+                            CHECK(proto::get_deleted(file_change));
+                            CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
+                            CHECK(file_change.update_reason == update_type_t::deleted);
+                            CHECK(file_change.prev_path == "");
+                            changes.pop_front();
+                        }
+                        {
+                            auto &payload = changes.front()->payload;
+                            REQUIRE(payload.size() == 1);
+                            auto &folder_change = payload[0];
+                            REQUIRE(folder_change.folder_id == folder_id);
+                            REQUIRE(folder_change.file_changes.size() == 1);
+                            {
+                                auto &file_change = folder_change.file_changes[0];
+                                CHECK(proto::get_name(file_change) == narrow(L"x/y/п2/my-file.2"));
+                                CHECK(proto::get_size(file_change) == 5);
+                                CHECK(!proto::get_deleted(file_change));
+                                CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
+                                CHECK(file_change.update_reason == update_type_t::created);
+                                CHECK(file_change.prev_path == "");
+                            }
+                            changes.pop_front();
+                        }
+#endif
+                    }
+                }
+            }
+#ifndef SYNCSPIRIT_WIN
+            SECTION("(permissions) file") {
+                auto path = root_path / "my-file";
+                write_file(path, "12345");
+                bfs::permissions(path, bfs::perms::owner_read);
+
+                watch_folder(folder_id);
+
+                bfs::permissions(path, bfs::perms::owner_write);
+                await_events(poll_t::trigger_timer, 1);
+                auto &payload = changes.front()->payload;
+                REQUIRE(payload.size() == 1);
+                auto &folder_change = payload[0];
+                REQUIRE(folder_change.folder_id == folder_id);
+                REQUIRE(folder_change.file_changes.size() == 1);
+                auto &file_change = folder_change.file_changes.front();
+                CHECK(proto::get_name(file_change) == "my-file");
+                CHECK(proto::get_size(file_change) == 5);
+                CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
+                CHECK(proto::get_permissions(file_change));
+                CHECK(file_change.update_reason == update_type_t::meta);
+                CHECK(!file_change.requires_refinement);
+            }
+            SECTION("(delete + create) symlink target change") {
+                auto path = root_path / "my-file";
+                auto link_target_1 = std::string_view("/some/where/1");
+                auto link_target_2 = std::string_view("/some/where/2");
+                bfs::create_symlink(bfs::path(link_target_1), path);
+
+                watch_folder(folder_id);
+
+                bfs::remove(path);
+                bfs::create_symlink(bfs::path(link_target_2), path);
+
+                await_events(poll_t::trigger_timer, 1);
+                auto &payload = changes.front()->payload;
+                REQUIRE(payload.size() == 1);
+                auto &folder_change = payload[0];
+                REQUIRE(folder_change.folder_id == folder_id);
+                REQUIRE(folder_change.file_changes.size() == 1);
+                auto &file_change = folder_change.file_changes.front();
+                CHECK(proto::get_name(file_change) == "my-file");
+                CHECK(proto::get_size(file_change) == 0);
+                CHECK(proto::get_type(file_change) == proto::FileInfoType::SYMLINK);
+                CHECK(proto::get_symlink_target(file_change) == link_target_2);
+                CHECK(!file_change.requires_refinement);
+            }
+#endif
+        }
+    };
+    F().run();
+}
+
+void test_hierarchies() {
+    struct F : fixture_real_t {
+        using fixture_real_t::fixture_real_t;
+
+        void main() noexcept override {
+            using names_t = std::vector<std::wstring_view>;
+            auto folder_id = std::string("my-folder-id");
+            auto back_addr = sup->get_address();
+            SECTION("remove hierarchy") {
+                if (!test::wine_environment()) {
+                    auto path_1 = root_path / L"x" / L"y" / L"файл.bin";
+                    auto path_2 = root_path / L"a" / L"b";
+                    bfs::create_directories(path_1.parent_path());
+                    bfs::create_directories(path_2);
+                    write_file(path_1, "12345");
+
+                    watch_folder(folder_id);
+
+                    auto names = names_t({L"a", L"a/b", L"x", L"x/y", L"x/y/файл.bin"});
+                    SECTION("remove files individually") {
+                        for (auto it = names.rbegin(); it != names.rend(); ++it) {
+                            auto p = root_path / bfs::path(*it);
+                            bfs::remove_all(p);
+                        }
+                    }
+                    SECTION("remove subdirs ") {
+                        auto for_removal = names_t({L"a", L"x"});
+                        for (auto it = for_removal.rbegin(); it != for_removal.rend(); ++it) {
+                            auto p = root_path / bfs::path(*it);
+                            bfs::remove_all(p);
+                        }
+                    }
+
+                    await_events(poll_t::trigger_timer, 5, true);
+
+                    for (auto i = size_t{0}; i < names.size(); ++i) {
+                        auto &payload = changes[i]->payload;
+                        REQUIRE(payload.size() == 1);
+                        auto &file_change = payload[0].file_changes.front();
+                        auto &name = names[i];
+                        CHECK(proto::get_name(file_change) == narrow(names[i]));
+                        CHECK(file_change.update_reason == update_type_t::deleted);
+                    }
+#ifndef SYNCSPIRIT_WIN
+                    auto impl = static_cast<watch_actor_t *>(target.get());
+                    CHECK(impl->path_map.size() == 1);
+                    CHECK(impl->subdir_map.size() == 1);
+#endif
+                }
+            }
+            SECTION("create hierarchy") {
+                if (!test::wine_environment()) {
+                    watch_folder(folder_id);
+
+                    auto names = names_t({L"a", L"a/b", L"x", L"x/y", L"x/y/z"});
+                    for (auto it = names.rbegin(); it != names.rend(); ++it) {
+                        auto p = root_path / bfs::path(*it);
+                        bfs::create_directories(p);
+                    }
+
+#ifndef SYNCSPIRIT_WIN
+                    await_events(poll_t::trigger_timer, 2, true);
+                    auto name_1 = proto::get_name(changes[0]->payload[0].file_changes.front());
+                    auto name_2 = proto::get_name(changes[1]->payload[0].file_changes.front());
+                    CHECK(name_1 == narrow(L"a"));
+                    CHECK(name_2 == narrow(L"x"));
+
+                    recurse_scan(root_path);
+#else
+                    await_events(poll_t::trigger_timer, 5, true);
+                    for (auto i = size_t{0}; i < names.size(); ++i) {
+                        auto &payload = changes[i]->payload;
+                        REQUIRE(payload.size() == 1);
+                        auto &file_change = payload[0].file_changes.front();
+                        auto &name = names[i];
+                        LOG_DEBUG(log, "i = {}", i);
+                        CHECK(proto::get_name(file_change) == narrow(names[i]));
+                        CHECK(file_change.update_reason == update_type_t::created);
+                    }
+#endif
+                    auto path_f = root_path / L"x/y/z" / L"f.bin";
+                    write_file(path_f, "12345");
+                    await_events(poll_t::trigger_timer, 1, true);
+                    auto name_f = proto::get_name(changes[0]->payload[0].file_changes.front());
+                    CHECK(name_f == narrow(L"x/y/z/f.bin"));
+                }
+            }
+            SECTION("move hierarchy (inside folder)") {
+                if (!test::wine_environment()) {
+                    auto names = names_t({L"a", L"a/b", L"x", L"x/y", L"x/y/z", L"a/файл.bin"});
+                    auto dir_1 = root_path / "win32-hack" / L"директория-1";
+                    auto dir_2 = root_path / "win32-hack" / L"директория-2";
+                    for (auto it = names.rbegin(); it != names.rend(); ++it) {
+                        auto p = dir_1 / bfs::path(*it);
+                        if (p.filename().generic_wstring() == L"файл.bin") {
+                            write_file(p, "12345");
+                        } else {
+                            bfs::create_directories(p);
+                        }
+                    }
+
+                    watch_folder(folder_id);
+
+                    native::rename(dir_1, dir_2);
+
+#ifndef SYNCSPIRIT_WIN
+                    await_events(poll_t::trigger_timer, 1);
+                    auto &file_change = changes[0]->payload[0].file_changes[0];
+                    CHECK(proto::get_name(file_change) == narrow(L"win32-hack/директория-2"));
+                    CHECK(proto::get_size(file_change) == 0);
+                    CHECK(!proto::get_deleted(file_change));
+                    CHECK(proto::get_type(file_change) == proto::FileInfoType::DIRECTORY);
+                    CHECK(file_change.update_reason == update_type_t::meta);
+                    CHECK(file_change.prev_path == narrow(L"win32-hack/директория-1"));
+                    {
+                        auto file_prev = root_path / "win32-hack" / L"директория-2" / "a" / L"файл.bin";
+                        auto file_new = root_path / "win32-hack" / L"директория-2" / "a" / L"ф.bin";
+                        native::rename(file_prev, file_new);
+                        await_events(poll_t::trigger_timer, 1);
+                        auto &file_change = changes[0]->payload[0].file_changes[0];
+                        CHECK(proto::get_name(file_change) == narrow(L"win32-hack/директория-2/a/ф.bin"));
+                        CHECK(proto::get_size(file_change) == 5);
+                        CHECK(!proto::get_deleted(file_change));
+                        CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
+                        CHECK(file_change.update_reason == update_type_t::meta);
+                        CHECK(file_change.prev_path == narrow(L"win32-hack/директория-2/a/файл.bin"));
+                    }
+#else
+                    await_events(poll_t::trigger_timer, 2, true);
+                    {
+                        auto &file_change = changes[0]->payload[0].file_changes[0];
+                        CHECK(proto::get_name(file_change) == narrow(L"win32-hack/директория-1"));
+                        CHECK(proto::get_size(file_change) == 0);
+                        CHECK(proto::get_deleted(file_change));
+                        CHECK(file_change.update_reason == update_type_t::deleted);
+                        CHECK(file_change.prev_path == "");
+                    }
+                    {
+                        auto &file_change = changes[1]->payload[0].file_changes[0];
+                        CHECK(proto::get_name(file_change) == narrow(L"win32-hack/директория-2"));
+                        CHECK(proto::get_size(file_change) == 0);
+                        CHECK(!proto::get_deleted(file_change));
+                        CHECK(proto::get_type(file_change) == proto::FileInfoType::DIRECTORY);
+                        CHECK(file_change.update_reason == update_type_t::created);
+                        CHECK(file_change.prev_path == "");
+                        CHECK(file_change.requires_refinement);
+                    }
+#endif
+                }
+            }
+        }
+    };
+    F().run();
+}
+
+void test_create_modify_rename() {
+    struct F : fixture_real_t {
+        using fixture_real_t::fixture_real_t;
+        void main() noexcept override {
+            auto folder_id = std::string("my-folder-id");
+            auto back_addr = sup->get_address();
+            watch_folder(folder_id);
+#ifndef SYNCSPIRIT_WIN
+            auto path_file_tmp = root_path / L"файл.bin-tmp";
+            auto path_file_final = root_path / L"файл.bin";
+            write_file(path_file_tmp, "12345");
+            native::rename(path_file_tmp, path_file_final);
+            auto modified = fs::from_unix(123456);
+            bfs::last_write_time(path_file_final, modified);
+            await_events(poll_t::trigger_timer, 1);
+#endif
+        };
+    };
+    F().run();
+}
+
+#if defined(SYNCSPIRIT_WATCHER_UNIX)
+void test_unix_notification() {
+    struct F : fixture_real_t {
+#ifdef SYNCSPIRIT_WATCHER_INOTIFY
+#define IMPL_DIFF (-1)
+#else
+#define IMPL_DIFF 0
+#endif
+        using fixture_real_t::fixture_real_t;
+
+        bool notify_upon_watch() override { return false; }
+
+        void main() noexcept override {
+            using child_info_t = fs::task::scan_dir_t::child_info_t;
+            using child_infos_t = fs::task::scan_dir_t::child_infos_t;
+
+            auto folder_id = std::string("my-folder-id");
+            auto back_addr = sup->get_address();
+            watch_folder(folder_id);
+
+            auto make_child = [](bfs::path path, bfs::file_type type = bfs::file_type::directory) -> child_info_t {
+                auto child = child_info_t{};
+                child.path = path;
+                child.status = bfs::file_status(type);
+                return child;
+            };
+            auto w = static_cast<fs::platform::unix::watcher_t *>(target.get());
+            CHECK(w->path_map.size() == 1);
+            CHECK(w->subdir_map.size() == 0);
+            SECTION("non-watched dir") {
+                auto task = fs::task::scan_dir_t(bfs::path("/some/path"), {}, {}, true, true, false);
+                task.child_infos = {make_child(bfs::path("/some/path/a"))};
+                w->notify(task);
+                CHECK(w->path_map.size() == 1);
+                CHECK(w->path_to_wd.size() == 1);
+            }
+            SECTION("dir with invalid name") {
+                auto invalid = std::uint8_t{201};
+                auto ptr = reinterpret_cast<char *>(&invalid);
+                auto invalid_name = std::string_view(ptr, ptr + 1);
+
+                auto task = fs::task::scan_dir_t(root_path, {}, {}, true, true, false);
+                task.child_infos = {make_child(bfs::path(invalid_name))};
+                w->notify(task);
+                CHECK(w->path_map.size() == 1);
+                CHECK(w->path_to_wd.size() == 1);
+            }
+            SECTION("non-watched dir of watched parent") {
+                auto task = fs::task::scan_dir_t(root_path, {}, {}, true, true, false);
+                auto child_path = root_path / "a";
+                bfs::create_directories(child_path);
+                task.child_infos = {make_child(child_path)};
+                w->notify(task);
+                CHECK(w->path_map.size() == 2);
+                CHECK(w->path_to_wd.size() == 2);
+            }
+            SECTION("non-watched dir of non-watched parent") {
+                auto task = fs::task::scan_dir_t(root_path / "xx", {}, {}, true, true, false);
+                auto dir_path = root_path / "xx";
+                bfs::create_directories(dir_path);
+                task.child_infos = {make_child(root_path / "xx/yy")};
+                w->notify(task);
+                CHECK(w->path_map.size() == 2);
+                CHECK(w->path_to_wd.size() == 2);
+            }
+            SECTION("watched dir") {
+                auto path_a = root_path / "a";
+                auto path_b = root_path / "b";
+                auto path_c = root_path / "c";
+                auto path_d = root_path / "d";
+                bfs::create_directories(path_a);
+                bfs::create_directories(path_c);
+                write_file(path_b, "");
+                bfs::create_symlink(bfs::path("/some/where"), path_d);
+                auto children = child_infos_t(
+                    {make_child(path_a), make_child(path_b, bfs::file_type::regular), make_child(path_c)});
+                auto task = fs::task::scan_dir_t(root_path, {}, {}, true, true, false);
+                task.child_infos = children;
+                w->notify(task);
+                CHECK(w->path_map.size() == 4 + IMPL_DIFF);
+                CHECK(w->path_to_wd.size() == 4 + IMPL_DIFF);
+
+                // no-harm in double watch
+                w->notify(task);
+                CHECK(w->path_map.size() == 4 + IMPL_DIFF);
+                CHECK(w->path_to_wd.size() == 4 + IMPL_DIFF);
+            }
+            SECTION("watched sub-dir") {
+                auto sub_dir = root_path / L"папка";
+                bfs::create_directories(sub_dir);
+                await_events(poll_t::trigger_timer, 1);
+                auto path_a = sub_dir / "a";
+                auto path_b = sub_dir / "b";
+                auto path_c = sub_dir / "c";
+                bfs::create_directories(path_a);
+                bfs::create_directories(path_c);
+                write_file(path_b, "");
+                auto children = child_infos_t(
+                    {make_child(path_a), make_child(path_b, bfs::file_type::regular), make_child(path_c)});
+                auto task = fs::task::scan_dir_t(sub_dir, {}, {}, true, true, false);
+                task.child_infos = children;
+                w->notify(task);
+                CHECK(w->path_map.size() == 5 + IMPL_DIFF);
+                CHECK(w->path_to_wd.size() == 5 + IMPL_DIFF);
+
+                // no-harm in double watch
+                w->notify(task);
+                CHECK(w->path_map.size() == 5 + IMPL_DIFF);
+                CHECK(w->path_to_wd.size() == 5 + IMPL_DIFF);
+            }
+            SECTION("tmp-file in a dir") {
+                auto path_tmp = root_path / "my-file.syncspirit-tmp";
+                write_file(path_tmp / "my-file.syncspirit-tmp", "12345");
+                auto children = child_infos_t({make_child(path_tmp, bfs::file_type::regular)});
+                auto task = fs::task::scan_dir_t(root_path, {}, {}, true, true, false);
+                task.child_infos = children;
+                w->notify(task);
+                CHECK(w->path_map.size() == 1);
+                CHECK(w->path_to_wd.size() == 1);
+            }
+            SECTION("error in watching") {
+                auto path_x = root_path / "a";
+                auto task = fs::task::scan_dir_t(root_path, {}, {}, true, true, false);
+                task.child_infos = {make_child(path_x)};
+                w->notify(task);
+                CHECK(w->path_map.size() == 1);
+                CHECK(w->path_to_wd.size() == 1);
+            }
+        }
+    };
+    F().run();
+}
+#endif
+
+#ifdef SYNCSPIRIT_WATCHER_KQUEUE
+
+void test_kqueue() {
+    struct F : fixture_real_t {
+        using fixture_real_t::fixture_real_t;
+
+        void main() noexcept override {
+            using child_info_t = fs::task::scan_dir_t::child_info_t;
+            using child_infos_t = fs::task::scan_dir_t::child_infos_t;
+
+            auto folder_id = std::string("my-folder-id");
+            auto back_addr = sup->get_address();
+
+            bfs::create_directories(root_path / "ex-dir");
+            bfs::create_directories(root_path / "ex-hier" / "aaa");
+            write_file(root_path / "ex-file", "12345");
+            bfs::create_symlink(root_path / "ex-target", root_path / "ex-link");
+
+            watch_folder(folder_id);
+            auto w = static_cast<fs::platform::unix::watcher_t *>(target.get());
+
+            SECTION("metadata (vnode/dir) events") {
+                auto watched_paths = w->path_map.size();
+                REQUIRE(watched_paths == 5);
+                auto expected_watches = watched_paths;
+                SECTION("creation") {
+                    SECTION("new dir") { bfs::create_directories(root_path / "my-dir"); }
+                    SECTION("new dir hierarchy") { bfs::create_directories(root_path / "a" / "b" / "c" / "d"); }
+                    SECTION("new file") { write_file(root_path / "my-file", "12345"); }
+                    SECTION("new link") { bfs::create_symlink(root_path / "a", root_path / "b"); }
+                }
+                SECTION("removal") {
+                    SECTION("simple") {
+                        auto name_raw = GENERATE("ex-file", "ex-dir");
+                        auto name = std::string_view(name_raw);
+                        bfs::remove(root_path / name);
+                        --expected_watches;
+                    }
+                    SECTION("link") { bfs::remove(root_path / "ex-link"); }
+                    SECTION("hierarchy") {
+                        bfs::remove_all(root_path / "ex-hier");
+                        expected_watches -= 2;
+                    }
+                }
+                SECTION("renaming") {
+                    SECTION("simple") {
+                        auto name_raw = GENERATE("ex-file", "ex-dir");
+                        auto name = std::string_view(name_raw);
+                        spdlog::info("renaming {}", name);
+                        bfs::rename(root_path / name, root_path / L"новое-имя");
+                        --expected_watches;
+                    }
+                    SECTION("link") { bfs::rename(root_path / "ex-link", root_path / L"новое-имя"); }
+                    SECTION("hierarchy") {
+                        bfs::rename(root_path / "ex-hier", root_path / L"новое-имя");
+                        expected_watches -= 2;
+                    }
+                }
+
+                await_events(poll_t::trigger_timer, 1);
+                {
+                    auto &payload = changes.front()->payload;
+                    REQUIRE(payload.size() == 1);
+                    auto &folder_change = payload[0];
+                    REQUIRE(folder_change.folder_id == folder_id);
+                    REQUIRE(folder_change.file_changes.size() == 1);
+                    auto &file_change = folder_change.file_changes.front();
+                    CHECK(proto::get_name(file_change) == "");
+                    CHECK(proto::get_size(file_change) == 0);
+                    CHECK(proto::get_type(file_change) == proto::FileInfoType::DIRECTORY);
+                    CHECK(file_change.update_reason == update_type_t::content);
+                    changes.clear();
+                }
+
+                await_events(poll_t::trigger_timer);
+                REQUIRE(changes.size() == 0);
+                CHECK(w->path_map.size() == expected_watches);
+            }
+            SECTION("file content change") {
+                write_file(root_path / "ex-file", "abcdef");
+                await_events(poll_t::trigger_timer, 1);
+                {
+                    auto &payload = changes.front()->payload;
+                    REQUIRE(payload.size() == 1);
+                    auto &folder_change = payload[0];
+                    REQUIRE(folder_change.folder_id == folder_id);
+                    REQUIRE(folder_change.file_changes.size() == 1);
+                    auto &file_change = folder_change.file_changes.front();
+                    CHECK(proto::get_name(file_change) == "ex-file");
+                    CHECK(proto::get_size(file_change) == 6);
+                    CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
+                    CHECK(file_change.update_reason == update_type_t::content);
+                    changes.clear();
+                }
+
+                await_events(poll_t::trigger_timer);
+                REQUIRE(changes.size() == 0);
+            }
+            SECTION("permissions change") {
+                auto name_raw = GENERATE("ex-file", "ex-dir", "ex-hier");
+                auto name = std::string_view(name_raw);
+                auto path = root_path / name;
+                auto perms = 0777;
+                bfs::permissions(path, static_cast<bfs::perms>(perms));
+
+                await_events(poll_t::trigger_timer, 1);
+                {
+                    auto &payload = changes.front()->payload;
+                    REQUIRE(payload.size() == 1);
+                    auto &folder_change = payload[0];
+                    REQUIRE(folder_change.folder_id == folder_id);
+                    REQUIRE(folder_change.file_changes.size() == 1);
+                    auto &file_change = folder_change.file_changes.front();
+                    CHECK(proto::get_name(file_change) == name);
+                    CHECK(proto::get_permissions(file_change) == perms);
+                    CHECK(file_change.update_reason == update_type_t::meta);
+                    changes.clear();
+                }
+
+                await_events(poll_t::trigger_timer);
+                REQUIRE(changes.size() == 0);
+            }
+            SECTION("changes agggeration (2 new files + new perms => dir content change)") {
+                auto perms = 0777;
+                write_file(root_path / "ex-dir" / L"ф1.bin", "abcde");
+                write_file(root_path / "ex-dir" / L"ф2.bin", "12345");
+                bfs::permissions(root_path / "ex-dir", static_cast<bfs::perms>(perms));
+                await_events(poll_t::trigger_timer, 1);
+                {
+                    auto &payload = changes.front()->payload;
+                    REQUIRE(payload.size() == 1);
+                    auto &folder_change = payload[0];
+                    REQUIRE(folder_change.folder_id == folder_id);
+                    REQUIRE(folder_change.file_changes.size() == 1);
+                    auto &file_change = folder_change.file_changes.front();
+                    CHECK(proto::get_name(file_change) == "ex-dir");
+                    CHECK(proto::get_permissions(file_change) == perms);
+                    CHECK(proto::get_size(file_change) == 0);
+                    CHECK(proto::get_type(file_change) == proto::FileInfoType::DIRECTORY);
+                    CHECK(file_change.update_reason == update_type_t::content);
+                    changes.clear();
+                }
+                await_events(poll_t::trigger_timer);
+                REQUIRE(changes.size() == 0);
+            }
+        }
+    };
+    F().run();
+}
+
+#endif
+
+int _init() {
+    test::init_logging();
+    REGISTER_TEST_CASE(test_watcher_base, "test_watcher_base", "[fs]");
+    REGISTER_TEST_CASE(test_start_n_shutdown, "test_start_n_shutdown", "[fs]");
+    REGISTER_TEST_CASE(test_watch_unwatch, "test_watch_unwatch", "[fs]");
+#ifdef SYNCSPIRIT_WATCHER_ANY
+    REGISTER_TEST_CASE(test_tmp_ignoring, "test_tmp_ignoring", "[fs]");
+#endif
+#ifndef SYNCSPIRIT_WATCHER_KQUEUE
+    REGISTER_TEST_CASE(test_real_impl, "test_real_impl", "[fs]");
+    REGISTER_TEST_CASE(test_hierarchies, "test_hierarchies", "[fs]");
+    REGISTER_TEST_CASE(test_create_modify_rename, "test_create_modify_rename", "[fs]");
+#endif
+#ifdef SYNCSPIRIT_WATCHER_UNIX
+    REGISTER_TEST_CASE(test_unix_notification, "test_unix_notification", "[fs]");
+#endif
+#ifdef SYNCSPIRIT_WATCHER_KQUEUE
+    REGISTER_TEST_CASE(test_kqueue, "test_kqueue", "[fs]");
+#endif
+    return 1;
+}
+
+static int v = _init();
+
+#endif
+
+TEST_CASE("dummy-test", "test") { CHECK(true); }

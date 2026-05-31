@@ -10,6 +10,7 @@
 #include <cstdint>
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <boost/nowide/convert.hpp>
+#include <catch2/catch_session.hpp>
 
 int main(int argc, char *argv[]) { return Catch::Session().run(argc, argv); }
 
@@ -107,6 +108,7 @@ void write_file(const bfs::path &path_, std::string_view content) {
         assert(r);
         (void)r;
     }
+    fflush(out);
     fclose(out);
 }
 
@@ -135,9 +137,10 @@ apply_controller_ptr_t make_apply_controller(model::cluster_ptr_t cluster) {
 }
 
 void init_logging() {
-    auto [dist_sink, _] = utils::create_root_logger();
+    auto [dist_sink, logger] = utils::create_root_logger();
     auto console_sink = std::make_shared<spdlog::sinks::stderr_color_sink_mt>();
     dist_sink->add_sink(console_sink);
+    logger->set_pattern(utils::log_pattern);
 }
 
 static std::random_device rd;
@@ -179,6 +182,17 @@ utils::bytes_t make_key(model::block_info_ptr_t block) {
     std::copy(hash.begin(), hash.end(), key_storage + 1);
     auto key = utils::bytes_t(key_storage, key_storage + SZ);
     return key;
+}
+
+bool wine_environment() {
+#ifdef SYNCSPIRIT_WIN
+    if (auto handle = GetModuleHandle("ntdll.dll")) {
+        if (GetProcAddress(handle, "wine_get_version")) {
+            return true;
+        }
+    }
+#endif
+    return false;
 }
 
 } // namespace syncspirit::test

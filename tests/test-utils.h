@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #pragma once
 
-#include <catch2/catch_all.hpp>
+#include <catch2/catch_test_macros.hpp>
 #include <filesystem>
-#include <memory>
 
 #include "model/device.h"
 #include "model/cluster.h"
@@ -54,5 +53,6 @@ SYNCSPIRIT_TEST_API model::device_ptr_t make_device(std::string_view device_id, 
 SYNCSPIRIT_TEST_API std::string hash_string(const std::string_view &hash) noexcept;
 SYNCSPIRIT_TEST_API bool has_ipv6() noexcept;
 SYNCSPIRIT_TEST_API utils::bytes_t make_key(model::block_info_ptr_t block);
+SYNCSPIRIT_TEST_API bool wine_environment();
 
 } // namespace syncspirit::test

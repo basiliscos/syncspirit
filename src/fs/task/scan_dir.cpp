@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2025-2026 Ivan Baidakou
 
 #include "scan_dir.h"
 #include "fs/fs_slave.h"
@@ -22,19 +22,26 @@ struct comparator_t {
     }
 };
 
-scan_dir_t::scan_dir_t(bfs::path path_, presentation::presence_ptr_t presence_, custom_payload_ptr_t payload_) noexcept
+scan_dir_t::scan_dir_t(bfs::path path_, presentation::presence_ptr_t presence_, bfs::path single_child_, bool notify_,
+                       bool recurse_, bool requires_refinement_) noexcept
     : path{std::move(path_)}, presence{std::move(presence_)},
-      ec(utils::make_error_code(utils::error_code_t::no_action)), payload(std::move(payload_)) {}
+      ec(utils::make_error_code(utils::error_code_t::no_action)), single_child{std::move(single_child_)},
+      notify{notify_ ? 1u : 0}, recurse{recurse_ ? 1u : 0}, requires_refinement{requires_refinement_ ? 1u : 0} {}
 
-void scan_dir_t::process(fs_slave_t &slave, hasher::hasher_plugin_t *) noexcept {
+bool scan_dir_t::process(fs_slave_t &slave, execution_context_t &context) noexcept {
     ec = {};
     using FT = bfs::file_type;
     auto it = bfs::directory_iterator(path, ec);
     if (ec) {
-        return;
+        return false;
     }
     for (; it != bfs::directory_iterator(); ++it) {
         auto &child = *it;
+        if (!single_child.empty()) {
+            if (single_child.filename() != child.path().filename()) {
+                continue;
+            }
+        }
         auto child_info = task::scan_dir_t::child_info_t{};
         child_info.path = child;
         auto status = bfs::symlink_status(child_info.path, ec);
@@ -78,4 +85,10 @@ void scan_dir_t::process(fs_slave_t &slave, hasher::hasher_plugin_t *) noexcept 
     auto b = child_infos.begin();
     auto e = child_infos.end();
     std::sort(b, e, comparator_t());
+
+    if (notify && context.scan_dir_callback) {
+        context.scan_dir_callback(*this);
+    }
+
+    return false;
 }

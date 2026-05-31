@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2026 Ivan Baidakou
 
 #pragma once
 
@@ -12,12 +12,13 @@ namespace syncspirit::model::diff::local {
 namespace pt = boost::posix_time;
 
 struct SYNCSPIRIT_API scan_start_t final : cluster_diff_t {
-    scan_start_t(std::string_view folder_id, const pt::ptime &at);
+    scan_start_t(std::string_view folder_id, std::string_view sub_dir, const pt::ptime &at);
     outcome::result<void> apply_impl(apply_controller_t &, void *) const noexcept override;
     outcome::result<void> apply_forward(apply_controller_t &, void *) const noexcept override;
     outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;
 
     std::string folder_id;
+    std::string sub_dir;
     pt::ptime at;
 };
 

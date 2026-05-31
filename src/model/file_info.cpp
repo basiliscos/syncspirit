@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "cluster.h"
 #include "file_info.h"
@@ -621,11 +621,13 @@ void file_info_t::update(const file_info_t &other) noexcept {
 
 std::string file_info_t::make_conflicting_name() const noexcept {
     using adjustor_t = boost::date_time::c_local_adjustor<pt::ptime>;
+    using boost::nowide::narrow;
+    using boost::nowide::widen;
     auto own_name = boost::nowide::widen(name->get_full_name());
     auto path = bfs::path(own_name);
     auto file_name = path.filename();
-    auto stem = file_name.stem().string();
-    auto ext = file_name.extension().string();
+    auto stem = narrow(file_name.stem().generic_wstring());
+    auto ext = narrow(file_name.extension().generic_wstring());
     auto utc = pt::from_time_t(modified_s);
     auto local = adjustor_t::utc_to_local(utc);
     auto ymd = local.date().year_month_day();
@@ -635,8 +637,8 @@ std::string file_info_t::make_conflicting_name() const noexcept {
     auto conflicted_name =
         fmt::format("{}.sync-conflict-{:04}{:02}{:02}-{:02}{:02}{:02}-{}{}", stem, (int)ymd.year, ymd.month.as_number(),
                     ymd.day.as_number(), time.hours(), time.minutes(), time.seconds(), device_short, ext);
-    auto full_name = path.parent_path() / conflicted_name;
-    return full_name.string();
+    auto full_name = path.parent_path() / widen(conflicted_name);
+    return narrow(full_name.generic_wstring());
 }
 
 auto file_info_t::guard(const model::folder_info_t &folder_info) noexcept -> guard_t {
@@ -662,6 +664,39 @@ bool file_info_t::identical_to(const proto::FileInfo &file) const noexcept {
         }
     }
     return false;
+}
+
+bool file_info_t::identical_by_content_to(const proto::FileInfo &file) const noexcept {
+    assert(proto::get_name(file) == name->get_full_name());
+    auto sz = proto::get_size(file);
+    auto file_size = get_size();
+    if (sz != file_size) {
+        return false;
+    }
+    auto main_meta_eq = proto::get_type(file) == as_type(flags) && proto::get_modified_s(file) == get_modified_s() &&
+                        proto::get_modified_ns(file) == get_modified_ns() && proto::get_deleted(file) == is_deleted() &&
+                        proto::get_invalid(file) == is_invalid();
+
+    if (!main_meta_eq) {
+        return false;
+    }
+    if (is_link()) {
+        if (proto::get_symlink_target(file) != get_link_target()) {
+            return false;
+        }
+    }
+    if (!has_no_permissions()) {
+        if (proto::get_permissions(file) != get_permissions()) {
+            return false;
+        }
+    }
+
+    if (sz) {
+        if (proto::get_block_size(file) != get_block_size()) {
+            return false;
+        }
+    }
+    return true;
 }
 
 void file_info_t::set_augmentation(augmentation_t &value) noexcept { extension = &value; }

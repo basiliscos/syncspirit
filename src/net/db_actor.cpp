@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "db_actor.h"
 #include "bouncer/messages.hpp"
@@ -97,10 +97,11 @@ db_actor_t::payload::commit_t::~commit_t() {
 }
 
 db_actor_t::db_actor_t(config_t &config)
-    : r::actor_base_t{config}, env{nullptr}, db_dir{config.db_dir}, db_config{config.db_config},
-      cluster{config.cluster} {
+    : parent_t{config}, env{nullptr}, db_dir{config.db_dir}, db_config{config.db_config},
+      max_files_per_diff(config.max_files_per_diff) {
     // mdbx_module_handler({}, {}, {});
     // mdbx_setup_debug(MDBX_LOG_TRACE, MDBX_DBG_ASSERT, &_my_log);
+    assert(max_files_per_diff);
     auto r = mdbx_env_create(&env);
     if (r != MDBX_SUCCESS) {
         auto log = utils::get_logger("net.db");
@@ -117,31 +118,28 @@ db_actor_t::~db_actor_t() {
 }
 
 void db_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
-    r::actor_base_t::configure(plugin);
+    parent_t::configure(plugin);
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
         p.set_identity(names::db, false);
         log = utils::get_logger(identity);
         sink = p.create_address();
     });
-    plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
-        p.register_name(names::db, get_address());
-        p.discover_name(names::coordinator, coordinator, false).link(false).callback([&](auto phase, auto &ee) {
-            if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {
-                auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
-                auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
-                plugin->subscribe_actor(&db_actor_t::on_model_update, coordinator);
-                plugin->subscribe_actor(&db_actor_t::on_db_info, coordinator);
-                plugin->subscribe_actor(&db_actor_t::on_controller_up, coordinator);
-                plugin->subscribe_actor(&db_actor_t::on_controller_down, coordinator);
-            }
-        });
-    });
+    plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) { p.register_name(names::db, get_address()); });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         open();
         p.subscribe_actor(&db_actor_t::on_cluster_load_trigger);
         p.subscribe_actor(&db_actor_t::on_commit);
         p.subscribe_actor(&db_actor_t::on_patrial_load);
     });
+}
+
+void db_actor_t::post_configure_coordinator() noexcept {
+    parent_t::post_configure_coordinator();
+    auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
+    auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
+    plugin->subscribe_actor(&db_actor_t::on_db_info, coordinator);
+    plugin->subscribe_actor(&db_actor_t::on_controller_up, coordinator);
+    plugin->subscribe_actor(&db_actor_t::on_controller_down, coordinator);
 }
 
 void db_actor_t::open() noexcept {
@@ -231,14 +229,8 @@ auto db_actor_t::force_commit() noexcept -> outcome::result<void> {
 }
 
 void db_actor_t::on_start() noexcept {
-    r::actor_base_t::on_start();
-    LOG_TRACE(log, "on_start, triggering cluster loading");
+    parent_t::on_start();
     send<net::payload::load_cluster_trigger_t>(address);
-}
-
-void db_actor_t::shutdown_start() noexcept {
-    r::actor_base_t::shutdown_start();
-    LOG_TRACE(log, "shutdown_start");
 }
 
 void db_actor_t::shutdown_finish() noexcept {
@@ -257,7 +249,7 @@ void db_actor_t::shutdown_finish() noexcept {
         LOG_ERROR(log, "open, mdbx close error ({}): {}", r, mdbx_strerror(r));
     }
     env = nullptr;
-    r::actor_base_t::shutdown_finish();
+    parent_t::shutdown_finish();
 }
 
 void db_actor_t::on_db_info(message::db_info_request_t &request) noexcept {
@@ -294,7 +286,6 @@ void db_actor_t::on_cluster_load_trigger(message::load_cluster_trigger_t &) noex
         LOG_DEBUG(log, "on_cluster_load_trigger, ignoring");
         return;
     }
-    r::actor_base_t::on_start();
     LOG_TRACE(log, "on_cluster_load_trigger");
 
     auto txn_opt = db::make_transaction(db::transaction_type_t::RO, env);
@@ -416,6 +407,7 @@ void db_actor_t::on_cluster_load_trigger(message::load_cluster_trigger_t &) noex
         std::move(txn),
     };
 
+    send<model::payload::local_up_t>(coordinator);
     auto message = r::make_message<payload::partial_load_t>(address, std::move(p));
     send<bouncer::payload::package_t>(bouncer, std::move(message));
     resources->acquire(resource::partial_load);
@@ -478,7 +470,7 @@ void db_actor_t::on_patrial_load(partial_load_t &message) noexcept {
 
     if (p.files_next) {
         bounce_again = true;
-        auto max_files = db_config.max_files_per_diff;
+        auto max_files = max_files_per_diff;
         auto ptr = p.files_next;
         auto begin = p.files.data();
         auto end = begin + p.files.size();
@@ -561,9 +553,8 @@ void db_actor_t::on_commit(commit_message_t &message) noexcept {
     }
 }
 
-void db_actor_t::on_model_update(model::message::model_update_t &message) noexcept {
-    LOG_TRACE(log, "on_model_update", identity);
-    auto &diff = *message.payload.diff;
+void db_actor_t::visit(const model::diff::cluster_diff_t &diff, model::payload::apply_context_t &ctx) noexcept {
+    LOG_TRACE(log, "visit");
     auto set = folder_infos_set_t{};
     auto r = diff.visit(*this, &set);
     while (r && !set.empty()) {
@@ -575,7 +566,7 @@ void db_actor_t::on_model_update(model::message::model_update_t &message) noexce
     }
     if (!r) {
         auto ee = make_error(r.assume_error());
-        LOG_ERROR(log, "on_model_update error: {}", r.assume_error().message());
+        LOG_ERROR(log, "visit error: {}", r.assume_error().message());
         do_shutdown(ee);
     }
 }
@@ -964,28 +955,32 @@ auto db_actor_t::operator()(const model::diff::advance::advance_t &diff, void *c
         if (folder_info) {
             auto name = proto::get_name(diff.proto_local);
             auto file = folder_info->get_file_infos().by_name(name);
-            auto &txn = *get_txn().assume_value();
+            if (file) {
+                auto &txn = *get_txn().assume_value();
 
-            {
-                unsigned char key[model::file_info_t::data_length + 1];
-                key[0] = db::prefix::file_info;
-                auto id = file->get_full_id();
-                std::copy(id.begin(), id.end(), key + 1);
-                auto data = file->serialize();
-                auto r = db::save({key, data}, txn);
-                if (!r) {
-                    return r.assume_error();
+                {
+                    unsigned char key[model::file_info_t::data_length + 1];
+                    key[0] = db::prefix::file_info;
+                    auto id = file->get_full_id();
+                    std::copy(id.begin(), id.end(), key + 1);
+                    auto data = file->serialize();
+                    auto r = db::save({key, data}, txn);
+                    if (!r) {
+                        return r.assume_error();
+                    }
                 }
-            }
 
-            auto folder_infos = reinterpret_cast<folder_infos_set_t *>(custom);
-            folder_infos->emplace(folder_info.get());
-
-            auto r = diff.visit_next(*this, custom);
-            if (!r) {
-                return r.assume_error();
+                auto folder_infos = reinterpret_cast<folder_infos_set_t *>(custom);
+                folder_infos->emplace(folder_info.get());
+            } else {
+                LOG_WARN(log, "file '{}' is missing in a model", name);
             }
         }
+    }
+
+    auto r = diff.visit_next(*this, custom);
+    if (!r) {
+        return r.assume_error();
     }
 
     return force_commit();

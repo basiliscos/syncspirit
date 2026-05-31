@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2026 Ivan Baidakou
 
 #include "folder.h"
 #include "symbols.h"
@@ -12,12 +12,6 @@
 #include "presentation/folder_presence.h"
 #include <boost/smart_ptr/local_shared_ptr.hpp>
 #include <spdlog/fmt/fmt.h>
-
-#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
-#include <malloc.h>
-#else
-#include <alloca.h>
-#endif
 
 using namespace syncspirit;
 using namespace model::diff;
@@ -117,6 +111,7 @@ struct table_t : content::folder_table_t {
             data.push_back({"disable temp indixes", make_disable_tmp(*this)});
             data.push_back({"scheduled", make_scheduled(*this, false)});
             data.push_back({"paused", make_paused(*this, false)});
+            data.push_back({"watched", make_watched(*this, false)});
         }
 
         if (is_local) {

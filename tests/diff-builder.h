@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #pragma once
 
@@ -56,7 +56,7 @@ struct SYNCSPIRIT_TEST_API index_maker_t {
     utils::bytes_view_t peer_sha256;
 };
 
-struct SYNCSPIRIT_TEST_API diff_builder_t : private model::diff::apply_controller_t {
+struct SYNCSPIRIT_TEST_API diff_builder_t : protected model::diff::apply_controller_t {
     using blocks_t = std::vector<proto::BlockInfo>;
 
     diff_builder_t(model::cluster_t &, r::address_ptr_t receiver = {}, model::sequencer_ptr_t sequencer = {}) noexcept;
@@ -70,7 +70,7 @@ struct SYNCSPIRIT_TEST_API diff_builder_t : private model::diff::apply_controlle
     index_maker_t make_index(utils::bytes_view_t sha256, std::string_view folder_id) noexcept;
 
     diff_builder_t &upsert_folder(std::string_view id, const bfs::path &path, std::string_view label = "",
-                                  std::uint64_t index_id = 0) noexcept;
+                                  std::uint64_t index_id = 0, bool watched = false) noexcept;
     diff_builder_t &upsert_folder(const db::Folder &data, std::uint64_t index_id = 0) noexcept;
     diff_builder_t &upsert_folder_info(model::folder_info_t &prev, std::uint64_t new_index_id) noexcept;
     diff_builder_t &update_peer(const model::device_id_t &device, std::string_view name = "",
@@ -80,7 +80,7 @@ struct SYNCSPIRIT_TEST_API diff_builder_t : private model::diff::apply_controlle
     diff_builder_t &unshare_folder(model::folder_info_t &fi) noexcept;
     diff_builder_t &remote_copy(const model::file_info_t &source, const model::folder_info_t &source_fi) noexcept;
     diff_builder_t &advance(const model::file_info_t &source, const model::folder_info_t &source_fi) noexcept;
-    diff_builder_t &local_update(std::string_view folder_id, const proto::FileInfo &file_) noexcept;
+    virtual diff_builder_t &local_update(std::string_view folder_id, const proto::FileInfo &file_) noexcept;
     diff_builder_t &ack_block(const model::diff::modify::block_transaction_t &) noexcept;
     diff_builder_t &remove_folder(const model::folder_t &folder) noexcept;
     diff_builder_t &remove_peer(const model::device_t &peer) noexcept;
@@ -91,9 +91,9 @@ struct SYNCSPIRIT_TEST_API diff_builder_t : private model::diff::apply_controlle
     diff_builder_t &add_unknown_device(const model::device_id_t &device, db::SomeDevice db_device) noexcept;
     diff_builder_t &remove_ignored_device(const model::ignored_device_t &device) noexcept;
     diff_builder_t &remove_unknown_device(const model::pending_device_t &device) noexcept;
-    diff_builder_t &scan_start(std::string_view id, const r::pt::ptime & = {}) noexcept;
+    diff_builder_t &scan_start(std::string_view id, std::string_view sub_dir = {}, const r::pt::ptime & = {}) noexcept;
     diff_builder_t &scan_finish(std::string_view id, const r::pt::ptime & = {}) noexcept;
-    diff_builder_t &scan_request(std::string_view id) noexcept;
+    diff_builder_t &scan_request(std::string_view id, std::string_view sub_dir = {}) noexcept;
     diff_builder_t &synchronization_start(std::string_view id) noexcept;
     diff_builder_t &synchronization_finish(std::string_view id) noexcept;
     diff_builder_t &mark_reacheable(model::file_info_ptr_t peer_file, const model::folder_info_t &peer_fi,
@@ -105,7 +105,7 @@ struct SYNCSPIRIT_TEST_API diff_builder_t : private model::diff::apply_controlle
 
     diff_builder_t &assign(model::diff::cluster_diff_t *) noexcept;
 
-  private:
+  protected:
     model::sequencer_ptr_t sequencer;
     apply_controller_ptr_t controller;
     model::diff::cluster_diff_ptr_t cluster_diff;

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #pragma once
 
@@ -25,6 +25,7 @@ struct SYNCSPIRIT_API folder_data_t {
     inline bool are_temp_indixes_disabled() const noexcept { return disable_temp_indixes; }
     inline bool is_paused() const noexcept { return paused; }
     inline bool is_scheduled() const noexcept { return scheduled; }
+    inline bool is_watched() const noexcept { return watched; }
     inline folder_type_t get_folder_type() const noexcept { return folder_type; }
     inline pull_order_t get_pull_order() const noexcept { return pull_order; }
     inline const bfs::path &get_path() const noexcept { return path; }
@@ -51,6 +52,7 @@ struct SYNCSPIRIT_API folder_data_t {
     bool ignore_delete;
     bool disable_temp_indixes;
     bool paused;
+    bool watched;
 };
 
 } // namespace syncspirit::model

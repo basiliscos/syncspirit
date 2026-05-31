@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "test-utils.h"
 #include "diff-builder.h"
@@ -917,6 +917,90 @@ TEST_CASE("statistics, update", "[presentation]") {
     CHECK(folder_entity->get_stats() == entity_stats_t{5, 2});
 }
 
+TEST_CASE("statistics (size & locality are idenpendent)", "[presentation]") {
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
+    auto sequencer = make_sequencer(4);
+    cluster->get_devices().put(my_device);
+    cluster->get_devices().put(peer_device);
+
+    auto builder = diff_builder_t(*cluster);
+    REQUIRE(builder.upsert_folder("1234-5678", "some/path", "my-label").apply());
+    auto folder = cluster->get_folders().by_id("1234-5678");
+    REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
+
+    auto &blocks = cluster->get_blocks();
+
+    auto add_file = [&](std::string_view name, model::device_t &device, std::int32_t file_size = 0,
+                        proto::FileInfoType type = proto::FileInfoType::DIRECTORY, std::uint64_t modified_by = 0,
+                        std::uint64_t modified_v = 0) {
+        auto folder_info = folder->get_folder_infos().by_device(device);
+
+        proto::FileInfo pr_fi;
+        proto::set_name(pr_fi, name);
+        proto::set_type(pr_fi, type);
+        proto::set_sequence(pr_fi, folder_info->get_max_sequence() + 1);
+
+        auto block = model::block_info_ptr_t();
+        if (file_size) {
+            proto::set_size(pr_fi, file_size);
+            proto::set_block_size(pr_fi, file_size);
+            assert(type == proto::FileInfoType::FILE);
+            auto bytes = utils::bytes_t(file_size);
+            auto b_hash = utils::sha256_digest(bytes).value();
+            auto &b = proto::add_blocks(pr_fi);
+            proto::set_size(b, file_size);
+            block = blocks.by_hash(b_hash);
+            if (!block) {
+                block = model::block_info_t::create(b).value();
+                blocks.put(block);
+            }
+        }
+
+        auto &v = proto::get_version(pr_fi);
+        auto modified_device = modified_by == 0 ? device.device_id().get_uint() : modified_by;
+        auto modified_version = modified_v == 0 ? 1 : modified_v;
+        proto::add_counters(v, proto::Counter(modified_device, modified_version));
+        proto::set_modified_s(pr_fi, modified_version);
+
+        auto file = model::file_info_t::create(sequencer->next_uuid(), pr_fi, folder_info.get()).value();
+        if (block) {
+            file->assign_block(block.get(), 0);
+        }
+        if (&device == my_device) {
+            file->mark_local(true);
+            if (block) {
+                file->mark_local_available(0);
+            }
+        }
+        folder_info->add_strict(file);
+        return file;
+    };
+
+    auto f_peer = add_file("b.txt", *peer_device, 5, proto::FileInfoType::FILE);
+    auto f_my = add_file("b.txt", *my_device, 5, proto::FileInfoType::FILE);
+
+    auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
+    auto file_b = *folder_entity->get_children().begin();
+    auto file_b_my = file_b->get_presence(my_device.get());
+    auto file_b_peer = file_b->get_presence(peer_device.get());
+
+    CHECK(file_b_my->get_own_stats().size == 5);
+    CHECK(file_b_my->get_own_stats().local_entries == 1);
+    CHECK(file_b_peer->get_own_stats().size == 5);
+    CHECK(file_b_peer->get_own_stats().local_entries == 0);
+
+    f_my->mark_local(false);
+    f_my->notify_update();
+    CHECK(file_b_my->get_own_stats().size == 5);
+    CHECK(file_b_my->get_own_stats().local_entries == 0);
+
+    f_my->mark_local(true);
+    f_my->notify_update();
+
+    CHECK(file_b_my->get_own_stats().size == 5);
+    CHECK(file_b_my->get_own_stats().local_entries == 1);
+}
+
 TEST_CASE("statistics", "[presentation]") {
     auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
     auto sequencer = make_sequencer(4);
@@ -1796,6 +1880,48 @@ TEST_CASE("file uniqueness", "[presentation]") {
     CHECK(p_file_e1->is_unique());
     CHECK(p_file_e2->is_unique());
 #endif
+}
+
+TEST_CASE("get_child", "[presentation]") {
+    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
+    auto sequencer = make_sequencer(4);
+    cluster->get_devices().put(my_device);
+
+    auto builder = diff_builder_t(*cluster);
+    REQUIRE(builder.upsert_folder("1234-5678", "some/path", "my-label").apply());
+    auto folder = cluster->get_folders().by_id("1234-5678");
+    auto local_folder = folder->get_folder_infos().by_device(*my_device);
+
+    auto add_file = [&](std::string_view name, proto::FileInfoType type = proto::FileInfoType::DIRECTORY) {
+        proto::FileInfo pr_fi;
+        proto::set_name(pr_fi, name);
+        proto::set_sequence(pr_fi, local_folder->get_max_sequence() + 1);
+        proto::set_type(pr_fi, type);
+
+        auto &v = proto::get_version(pr_fi);
+        auto modified_device = my_device->device_id().get_uint();
+        auto modified_version = 1;
+        proto::add_counters(v, proto::Counter(modified_device, modified_version));
+        proto::set_modified_s(pr_fi, modified_version);
+
+        auto file = model::file_info_t::create(sequencer->next_uuid(), pr_fi, local_folder.get()).value();
+        local_folder->add_strict(file);
+        return file;
+    };
+
+    auto dir = add_file("dir");
+    auto file = add_file("dir/b");
+    auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
+
+    auto p_dir = static_cast<presentation::file_presence_t *>(dir->get_augmentation().get());
+    auto p_file = static_cast<presentation::file_presence_t *>(file->get_augmentation().get());
+    CHECK(p_dir->get_child("a", true) == nullptr);
+    CHECK(p_dir->get_child("b", true) == p_file);
+    CHECK(p_dir->get_child("c", true) == nullptr);
+
+    CHECK(p_dir->get_child("a", false) == nullptr);
+    CHECK(p_dir->get_child("b", false) == nullptr);
+    CHECK(p_dir->get_child("c", false) == nullptr);
 }
 
 static bool _init = []() -> bool {

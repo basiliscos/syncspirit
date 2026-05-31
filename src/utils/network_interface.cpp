@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "network_interface.h"
 
-#if defined(__linux__) || defined(__APPLE__)
+#if defined(__unix__) || defined(__APPLE__)
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <netdb.h>
@@ -14,11 +14,16 @@
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
 #include <winsock2.h>
 #include <iphlpapi.h>
+#include "utils/platform.h"
 #endif
+
+#include <boost/system.hpp>
+
+namespace sys = boost::system;
 
 namespace syncspirit::utils {
 
-#if defined(__linux__) || defined(__APPLE__)
+#if defined(__unix__) || defined(__APPLE__)
 static uri_container_t _local_interfaces(logger_t &log, std::uint16_t port) noexcept {
     uri_container_t r{};
 
@@ -59,31 +64,6 @@ static uri_container_t _local_interfaces(logger_t &log, std::uint16_t port) noex
 #endif
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
-std::string GetLastErrorAsString() {
-    // Get the error message ID, if any.
-    DWORD errorMessageID = ::GetLastError();
-    if (errorMessageID == 0) {
-        return std::string(); // No error message has been recorded
-    }
-
-    LPSTR messageBuffer = nullptr;
-
-    // Ask Win32 to give us the string version of that message ID.
-    // The parameters we pass in, tell Win32 to create the buffer that holds the message for us (because we don't yet
-    // know how long the message string will be).
-    size_t size =
-        FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
-                       NULL, errorMessageID, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPSTR)&messageBuffer, 0, NULL);
-
-    // Copy the error message into a std::string.
-    std::string message(messageBuffer, size);
-
-    // Free the Win32's string's buffer.
-    LocalFree(messageBuffer);
-
-    return message;
-}
-
 static uri_container_t _local_interfaces(logger_t &log, std::uint16_t port) noexcept {
     uri_container_t r{};
 
@@ -96,7 +76,8 @@ static uri_container_t _local_interfaces(logger_t &log, std::uint16_t port) noex
                                         NULL, adapter_addresses, &adapter_addresses_buffer_size);
 
     if (ERROR_SUCCESS != code) {
-        LOG_WARN(log, "GetAdaptersAddresses failed: ", GetLastErrorAsString());
+        auto ec = sys::error_code(::GetLastError(), sys::system_category());
+        LOG_WARN(log, "GetAdaptersAddresses failed: ", ec.message());
         return r;
     }
 

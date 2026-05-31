@@ -3,6 +3,7 @@
 
 #include "bouncer/messages.hpp"
 #include "cluster_supervisor.h"
+#include "constants.h"
 #include "db_actor.h"
 #include "local_discovery_actor.h"
 #include "model/diff/advance/advance.h"
@@ -25,7 +26,6 @@
 #include "presentation/folder_entity.h"
 #include "proto/proto-helpers-bep.h"
 #include "proto/proto-helpers-db.h"
-#include "utils/io.h"
 
 #include <boost/nowide/convert.hpp>
 #include <filesystem>
@@ -42,7 +42,8 @@ r::plugin::resource_id_t interrupt = 0;
 
 net_supervisor_t::net_supervisor_t(net_supervisor_t::config_t &cfg)
     : parent_t(this, resource::interrupt, cfg), sequencer{cfg.sequencer}, app_config{cfg.app_config},
-      independent_threads{cfg.independent_threads}, thread_counter{independent_threads} {
+      independent_threads{cfg.independent_threads}, thread_counter{independent_threads},
+      local_counter{cfg.local_counter} {
     using boost::nowide::narrow;
     bouncer = cfg.bouncer_address;
     auto log = utils::get_logger(names::coordinator);
@@ -95,12 +96,15 @@ void net_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         [&](auto &p) {
             p.subscribe_actor(&net_supervisor_t::on_model_update);
             p.subscribe_actor(&net_supervisor_t::on_model_interrupt);
+            p.subscribe_actor(&net_supervisor_t::on_model_subscribe);
+            p.subscribe_actor(&net_supervisor_t::on_model_unsubscribe);
             p.subscribe_actor(&net_supervisor_t::on_load_cluster_success);
             p.subscribe_actor(&net_supervisor_t::on_load_cluster_fail);
             p.subscribe_actor(&net_supervisor_t::on_model_request);
             p.subscribe_actor(&net_supervisor_t::on_thread_up);
             p.subscribe_actor(&net_supervisor_t::on_thread_ready);
-            p.subscribe_actor(&net_supervisor_t::on_app_ready);
+            p.subscribe_actor(&net_supervisor_t::on_ready);
+            p.subscribe_actor(&net_supervisor_t::on_local_up);
         },
         r::plugin::config_phase_t::PREINIT);
 }
@@ -124,6 +128,7 @@ void net_supervisor_t::shutdown_finish() noexcept {
 }
 
 void net_supervisor_t::launch_early() noexcept {
+    ++local_counter;
     thread_counter = independent_threads;
     auto timeout = shutdown_timeout * 9 / 10;
     db_addr = create_actor<db_actor_t>()
@@ -132,19 +137,23 @@ void net_supervisor_t::launch_early() noexcept {
                   .db_dir(app_config.config_path / "mdbx-db")
                   .db_config(app_config.db_config)
                   .cluster(cluster)
+                  .max_files_per_diff(constants::diffs_batch)
                   .escalate_failure()
                   .finish()
                   ->get_address();
+    ++local_counter;
 
     create_actor<local_keeper_t>()
         .concurrent_hashes(app_config.hasher_threads)
-        .files_scan_iteration_limit(app_config.fs_config.files_scan_iteration_limit)
+        .watcher_impl(syncspirit_watcher_impl)
         .sequencer(sequencer)
         .escalate_failure()
         .timeout(timeout)
         .finish();
+    ++local_counter;
 
     create_actor<scheduler_t>().timeout(timeout).escalate_failure().finish();
+    ++local_counter;
 
     for (auto &l : launchers) {
         l(cluster);
@@ -189,6 +198,14 @@ void net_supervisor_t::on_model_request(model::message::model_request_t &message
     try_seed_model();
 }
 
+void net_supervisor_t::on_local_up(model::message::local_up_t &) noexcept {
+    --local_counter;
+    LOG_DEBUG(log, "on_local_up, left = {}", local_counter);
+    if (local_counter == 0) {
+        send<model::payload::local_ready_t>(coordinator);
+    }
+}
+
 void net_supervisor_t::on_thread_up(model::message::thread_up_t &) noexcept {
     --thread_counter;
     LOG_DEBUG(log, "on_thread_up, left = {}", thread_counter);
@@ -202,13 +219,13 @@ void net_supervisor_t::on_thread_ready(model::message::thread_ready_t &) noexcep
     LOG_DEBUG(log, "on_thread_ready, left = {}", thread_counter);
     if (thread_counter == 0 && state == r::state_t::OPERATIONAL) {
         // thread_ready_t messages are routed, give let routed messages be processed 1st
-        auto message = r::make_message<model::payload::app_ready_t>(address);
+        auto message = r::make_message<payload::ready_t>(address);
         send<bouncer::payload::package_t>(bouncer, std::move(message));
     }
 }
 
-void net_supervisor_t::on_app_ready(model::message::app_ready_t &) noexcept {
-    LOG_DEBUG(log, "on_app_ready");
+void net_supervisor_t::on_ready(message::ready_t &) noexcept {
+    LOG_DEBUG(log, "on_ready");
 
     cluster_sup = create_actor<cluster_supervisor_t>()
                       .timeout(shutdown_timeout * 9 / 10)
@@ -218,6 +235,7 @@ void net_supervisor_t::on_app_ready(model::message::app_ready_t &) noexcept {
                       .config(app_config)
                       .escalate_failure()
                       .finish();
+    ++local_counter;
 
     if (app_config.upnp_config.enabled) {
         auto factory = [this](r::supervisor_t &, const r::address_ptr_t &spawner) -> r::actor_ptr_t {
@@ -256,7 +274,7 @@ void net_supervisor_t::on_app_ready(model::message::app_ready_t &) noexcept {
             .resolve_timeout(io_timeout)
             .registry_name(names::http11_gda)
             .ssl_verify_store(app_config.ssl_verify_store)
-            .keep_alive(true)
+            .keep_alive(false)
             .escalate_failure()
             .finish();
 
@@ -305,6 +323,8 @@ void net_supervisor_t::on_app_ready(model::message::app_ready_t &) noexcept {
 
     auto timeout = shutdown_timeout * 9 / 10;
     create_actor<acceptor_actor_t>().cluster(cluster).timeout(timeout).escalate_failure().finish();
+    ++local_counter;
+
     peer_sup = create_actor<peer_supervisor_t>()
                    .cluster(cluster)
                    .ssl_pair(&ssl_pair)
@@ -315,10 +335,14 @@ void net_supervisor_t::on_app_ready(model::message::app_ready_t &) noexcept {
                    .relay_config(app_config.relay_config)
                    .escalate_failure()
                    .finish();
+    ++local_counter;
+
     auto dcfg = app_config.dialer_config;
     if (dcfg.enabled) {
         create_actor<dialer_actor_t>().timeout(timeout).dialer_config(dcfg).cluster(cluster).finish();
+        ++local_counter;
     }
+    --local_counter;
 }
 
 void net_supervisor_t::commit_loading() noexcept {
@@ -368,7 +392,6 @@ void net_supervisor_t::on_start() noexcept {
         .keep_alive(false)
         .escalate_failure()
         .finish();
-
     send<syncspirit::model::payload::thread_up_t>(address);
 }
 
@@ -407,15 +430,17 @@ auto net_supervisor_t::apply(const model::diff::advance::advance_t &diff, void *
     auto r = parent_t::apply(diff, custom);
     if (r) {
         auto folder = cluster->get_folders().by_id(diff.folder_id);
-        auto augmentation = folder->get_augmentation().get();
-        auto folder_entity = static_cast<presentation::folder_entity_t *>(augmentation);
-        if (folder_entity) {
-            auto &folder_infos = folder->get_folder_infos();
-            auto &local_fi = *folder_infos.by_device(*cluster->get_device());
-            auto file_name = proto::get_name(diff.proto_local);
-            auto local_file = local_fi.get_file_infos().by_name(file_name);
-            if (local_file) {
-                folder_entity->on_insert(*local_file, local_fi);
+        if (folder) {
+            auto augmentation = folder->get_augmentation().get();
+            auto folder_entity = static_cast<presentation::folder_entity_t *>(augmentation);
+            if (folder_entity) {
+                auto &folder_infos = folder->get_folder_infos();
+                auto &local_fi = *folder_infos.by_device(*cluster->get_device());
+                auto file_name = proto::get_name(diff.proto_local);
+                auto local_file = local_fi.get_file_infos().by_name(file_name);
+                if (local_file) {
+                    folder_entity->on_insert(*local_file, local_fi);
+                }
             }
         }
     }

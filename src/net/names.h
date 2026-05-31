@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #pragma once
 
@@ -16,6 +16,7 @@ struct SYNCSPIRIT_API names {
     static const char *http11_relay;
     static const char *db;
     static const char *fs_actor;
+    static const char *watcher;
     static const char *scheduler;
 };
 

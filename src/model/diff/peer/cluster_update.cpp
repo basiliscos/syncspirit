@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "cluster_update.h"
+#include "constants.h"
 #include "model/diff/apply_controller.h"
 #include "model/diff/modify/add_pending_folders.h"
 #include "model/diff/modify/remove_blocks.h"
@@ -14,6 +15,7 @@
 #include "model/diff/modify/upsert_folder_info.h"
 #include "model/diff/peer/update_remote_views.h"
 #include "model/diff/cluster_visitor.h"
+#include "model/diff/diff_assembler.h"
 #include "model/cluster.h"
 #include "model/misc/orphaned_blocks.h"
 #include "proto/proto-helpers-bep.h"
@@ -444,10 +446,7 @@ cluster_update_t::cluster_update_t(const bfs::path &default_path, const cluster_
         }
     }
 
-    auto current = (cluster_diff_t *){nullptr};
-    auto update_current = [&](cluster_diff_t *diff) {
-        current = current ? current->assign_sibling(diff) : assign_child(diff);
-    };
+    auto assembler = diff::diff_assember_t(constants::diffs_batch);
 
     for (auto &db : upserted_folders) {
         auto opt = modify::upsert_folder_t::create(cluster, sequencer, db, 0);
@@ -455,56 +454,52 @@ cluster_update_t::cluster_update_t(const bfs::path &default_path, const cluster_
             ec = opt.assume_error();
             return;
         }
-        update_current(opt.assume_value().get());
+        assembler.push_back(opt.assume_value().get());
     }
 
     if (reset_folders.size()) {
-        auto ptr = new modify::reset_folder_infos_t(std::move(reset_folders), &orphaned_blocks);
-        update_current(ptr);
+        assembler.push_back(new modify::reset_folder_infos_t(std::move(reset_folders), &orphaned_blocks));
     }
     if (!removed_introduced_devices.empty()) {
         for (auto sha256 : removed_introduced_devices) {
             auto peer = devices.by_sha256(sha256);
-            update_current(new modify::remove_peer_t(cluster, *peer));
+            assembler.push_back(new modify::remove_peer_t(cluster, *peer));
             LOG_DEBUG(log, "removing introduced device '{}'", peer->device_id());
         }
     }
     if (removed_folders.size()) {
-        auto ptr = new modify::remove_folder_infos_t(std::move(removed_folders), &orphaned_blocks);
-        update_current(ptr);
+        assembler.push_back(new modify::remove_folder_infos_t(std::move(removed_folders), &orphaned_blocks));
     }
     auto removed_blocks = orphaned_blocks.deduce();
     if (!removed_blocks.empty()) {
-        auto diff = cluster_diff_ptr_t{};
-        diff = new modify::remove_blocks_t(std::move(removed_blocks));
-        current = current ? current->assign_sibling(diff.get()) : assign_child(diff);
+        assembler.push_back(new modify::remove_blocks_t(std::move(removed_blocks)));
     }
     if (!removed_pending_folders.empty()) {
-        auto ptr = new modify::remove_pending_folders_t(std::move(removed_pending_folders));
-        update_current(ptr);
+        assembler.push_back(new modify::remove_pending_folders_t(std::move(removed_pending_folders)));
     }
     if (reshared_folders.size()) {
         for (auto &f : reshared_folders) {
-            update_current(new modify::upsert_folder_info_t(*f, 0));
+            assembler.push_back(new modify::upsert_folder_info_t(*f, 0));
         }
     }
     if (!new_pending_folders.empty()) {
         auto ptr = new modify::add_pending_folders_t(std::move(new_pending_folders));
-        update_current(ptr);
+        assembler.push_back(ptr);
     }
     if (!remote_views.empty()) {
         auto ptr = new peer::update_remote_views_t(source, std::move(remote_views));
-        update_current(ptr);
+        assembler.push_back(ptr);
     }
     for (auto &id : introduced_devices) {
         auto ptr = new diff::modify::update_peer_t(std::move(id.device), id.device_id, cluster);
-        update_current(ptr);
+        assembler.push_back(ptr);
     }
     for (auto &info : upserted_folder_infos) {
         auto ptr = new diff::modify::upsert_folder_info_t(sequencer.next_uuid(), info.device_id, source.device_id(),
                                                           info.folder_id, info.new_index_id);
-        update_current(ptr);
+        assembler.push_back(ptr);
     }
+    assign_child(assembler.consume());
 }
 
 auto cluster_update_t::apply_impl(apply_controller_t &controller, void *custom) const noexcept

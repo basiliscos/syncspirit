@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "upsert_folder.h"
 #include "model/cluster.h"
@@ -19,7 +19,8 @@ auto upsert_folder_t::create(const cluster_t &cluster, sequencer_t &sequencer, d
     auto prev_folder = folders.by_id(db::get_id(db));
     auto folder_info = prev_folder ? prev_folder->get_folder_infos().by_device(device) : nullptr;
     auto uuid = bu::uuid{};
-    if (prev_folder) {
+    auto is_new = !prev_folder;
+    if (!is_new) {
         assign(uuid, prev_folder->get_uuid());
     } else {
         uuid = sequencer.next_uuid();
@@ -30,14 +31,14 @@ auto upsert_folder_t::create(const cluster_t &cluster, sequencer_t &sequencer, d
     }
 
     auto diff = cluster_diff_ptr_t{};
-    diff = new upsert_folder_t(sequencer, uuid, std::move(db), folder_info, device.device_id(), index_id);
+    diff = new upsert_folder_t(sequencer, uuid, std::move(db), folder_info, device.device_id(), index_id, is_new);
     return outcome::success(diff);
 }
 
 upsert_folder_t::upsert_folder_t(sequencer_t &sequencer, bu::uuid uuid_, db::Folder db_,
                                  model::folder_info_ptr_t folder_info, const device_id_t &device,
-                                 std::uint64_t index_id) noexcept
-    : uuid{uuid_}, db{std::move(db_)} {
+                                 std::uint64_t index_id, bool is_new_) noexcept
+    : uuid{uuid_}, db{std::move(db_)}, is_new{is_new_} {
     auto folder_id = db::get_id(db);
     db::set_disable_temp_indexes(db, true); // hard-code, ss does not support for now
     LOG_DEBUG(log, "upsert_folder_t, folder_id = {}, device = {}", folder_id, device);

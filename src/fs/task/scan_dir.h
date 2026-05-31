@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #pragma once
 
 #include "task.h"
 #include "presentation/presence.h"
-#include <memory>
 
 namespace syncspirit::fs::task {
 
@@ -18,20 +17,20 @@ struct SYNCSPIRIT_API scan_dir_t {
         std::uintmax_t size;
         sys::error_code ec;
     };
-    struct custom_payload_t {
-        virtual ~custom_payload_t() = default;
-    };
     using child_infos_t = std::vector<child_info_t>;
-    using custom_payload_ptr_t = std::unique_ptr<custom_payload_t>;
 
-    scan_dir_t(bfs::path path, presentation::presence_ptr_t presence, custom_payload_ptr_t payload) noexcept;
-    void process(fs_slave_t &fs_slave, hasher::hasher_plugin_t *) noexcept;
+    scan_dir_t(bfs::path path, presentation::presence_ptr_t presence, bfs::path single_child, bool notify, bool recurse,
+               bool requires_refinement) noexcept;
+    bool process(fs_slave_t &fs_slave, execution_context_t &context) noexcept;
 
     bfs::path path;
     presentation::presence_ptr_t presence;
     sys::error_code ec;
     child_infos_t child_infos;
-    custom_payload_ptr_t payload;
+    bfs::path single_child;
+    unsigned notify : 1;
+    unsigned recurse : 1;
+    unsigned requires_refinement : 1;
 };
 
 } // namespace syncspirit::fs::task

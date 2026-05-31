@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2026 Ivan Baidakou
 
 #include "app_supervisor.h"
 #include "augmentation.h"
+#include "constants.h"
 #include "main_window.h"
-#include "presence_item/folder.h"
 #include "tree_item/devices.h"
 #include "tree_item/folders.h"
 #include "tree_item/ignored_devices.h"
@@ -12,8 +12,10 @@
 #include "tree_item/pending_devices.h"
 #include "tree_item/pending_folders.h"
 #include "tree_item/peer_folders.h"
+#include "presence_item.h"
 #include "net/names.h"
 #include "config/utils.h"
+#include "model/diff/diff_assembler.h"
 #include "model/diff/advance/advance.h"
 #include "model/diff/local/io_failure.h"
 #include "model/diff/load/blocks.h"
@@ -47,6 +49,7 @@ using namespace syncspirit::fltk;
 using namespace syncspirit::presentation;
 
 static auto MAX_DEPTH = std::numeric_limits<std::int32_t>::max();
+static auto UPDATE_DELAY = r::pt::milliseconds{100};
 
 using entities_ptrs_t = std::pmr::unordered_set<const entity_t *>;
 using entities_t = std::pmr::unordered_set<entity_ptr_t>;
@@ -131,6 +134,7 @@ app_supervisor_t::app_supervisor_t(config_t &config)
 }
 
 app_supervisor_t::~app_supervisor_t() {
+    delayed_items.clear();
     detach_main_window();
     utils::get_root_logger()->debug("~app_supervisor_t()");
 }
@@ -153,7 +157,7 @@ void app_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
                 auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
                 plugin->subscribe_actor(&app_supervisor_t::on_model_update, coordinator);
-                plugin->subscribe_actor(&app_supervisor_t::on_app_ready, coordinator);
+                plugin->subscribe_actor(&app_supervisor_t::on_local_ready, coordinator);
                 plugin->subscribe_actor(&app_supervisor_t::on_db_loaded, coordinator);
                 send<syncspirit::model::payload::thread_up_t>(coordinator);
             }
@@ -198,7 +202,7 @@ void app_supervisor_t::on_model_response(model::message::model_response_t &res) 
     cluster = std::move(res.payload.res.cluster);
 }
 
-void app_supervisor_t::process(model::diff::cluster_diff_t &diff, apply_context_t &context) noexcept {
+void app_supervisor_t::process(model::diff::cluster_diff_t &diff, model::payload::apply_context_t &context) noexcept {
     auto buffer = std::array<std::byte, 16 * 1024>();
     auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
     auto allocator = std::pmr::polymorphic_allocator<std::string>(&pool);
@@ -236,20 +240,23 @@ void app_supervisor_t::process(model::diff::cluster_diff_t &diff, apply_context_
     for (auto &entity : deleted_entities) {
         updated_entities.erase(entity.get());
     }
+
     for (auto entity : updated_entities) {
         for (auto p : entity->get_presences()) {
             auto augmentation = p->get_augmentation().get();
             if (augmentation) {
                 auto item = static_cast<presence_item_t *>(augmentation);
-                item->on_update();
+                delayed_items.insert(item);
             }
         }
     }
 }
 
-void app_supervisor_t::on_app_ready(model::message::app_ready_t &) noexcept {
-    LOG_TRACE(log, "on_app_ready");
+void app_supervisor_t::on_local_ready(model::message::local_ready_t &) noexcept {
+    LOG_TRACE(log, "on_local_ready");
     main_window->on_loading_done();
+    auto method = &app_supervisor_t::on_frame_render_timer;
+    start_timer(UPDATE_DELAY, *this, method);
 }
 
 void app_supervisor_t::on_db_loaded(model::message::db_loaded_t &) noexcept {
@@ -315,8 +322,7 @@ callback_ptr_t app_supervisor_t::call_select_folder(std::string_view folder_id) 
 callback_ptr_t app_supervisor_t::call_share_folders(std::string_view folder_id, std::vector<utils::bytes_t> devices) {
     assert(devices.size());
     auto fn = callback_fn_t([this, folder_id = std::string(folder_id), devices = std::move(devices)]() {
-        auto diff = model::diff::cluster_diff_ptr_t{};
-        auto current = diff.get();
+        auto assember = model::diff::diff_assember_t(constants::diffs_batch);
         auto &self = cluster->get_device()->device_id();
         for (auto &sha256 : devices) {
             auto device = cluster->get_devices().by_sha256(sha256);
@@ -336,16 +342,10 @@ callback_ptr_t app_supervisor_t::call_share_folders(std::string_view folder_id, 
                 log->error("cannot share folder {} with {} : {}", folder_id, device->device_id(), message);
                 return;
             }
-            auto &sub_diff = opt.assume_value();
-            if (!current) {
-                diff = sub_diff;
-                current = diff.get();
-            } else {
-                current = current->assign_sibling(sub_diff.get());
-            }
+            assember.push_back(opt.assume_value().get());
         }
         auto cb = call_select_folder(folder_id);
-        send_model<model::payload::model_update_t>(std::move(diff), cb.get());
+        send_model<model::payload::model_update_t>(assember.consume(), cb.get());
     });
     auto cb = callback_ptr_t(new callback_impl_t(std::move(fn)));
     callbacks.push_back(cb);
@@ -436,7 +436,6 @@ auto app_supervisor_t::apply(const model::diff::advance::advance_t &diff, void *
             if (local_file) {
                 auto entity = folder_entity->on_insert(*local_file, *local_fi);
                 if (entity) {
-                    auto parent = entity->get_parent();
                     auto mask = mask_nodes();
                     for (auto presence : entity->get_presences()) {
                         using F = presence_t::features_t;
@@ -470,7 +469,7 @@ auto app_supervisor_t::apply(const model::diff::modify::upsert_folder_t &diff, v
             auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
             folders_node->add_folder(*folder_entity);
             folder->set_augmentation(folder_entity);
-            auto ctx = static_cast<apply_context_t *>(custom);
+            auto ctx = static_cast<model::payload::apply_context_t *>(custom);
             auto attachment = static_cast<app_context_attachment *>(ctx->custom_payload);
             attachment->guards.emplace_back(folder_entity->monitor(&attachment->monitor));
         }
@@ -561,7 +560,7 @@ auto app_supervisor_t::apply(const model::diff::peer::update_folder_t &diff, voi
 auto app_supervisor_t::apply(const model::diff::load::blocks_t &diff, void *custom) noexcept -> outcome::result<void> {
     auto r = apply_controller_t::apply(diff, custom);
     if (r) {
-        auto ctx = static_cast<apply_context_t *>(custom);
+        auto ctx = static_cast<model::payload::apply_context_t *>(custom);
         ctx->loaded_blocks += diff.blocks.size();
         auto blocks = ctx->loaded_blocks;
         auto total = ctx->total_blocks;
@@ -576,7 +575,7 @@ auto app_supervisor_t::apply(const model::diff::load::file_infos_t &diff, void *
     -> outcome::result<void> {
     auto r = apply_controller_t::apply(diff, custom);
     if (r) {
-        auto ctx = static_cast<apply_context_t *>(custom);
+        auto ctx = static_cast<model::payload::apply_context_t *>(custom);
         ctx->loaded_files += diff.container.size();
         auto files = ctx->loaded_files;
         auto total = ctx->total_files;
@@ -634,7 +633,7 @@ void app_supervisor_t::commit_loading() noexcept {
 auto app_supervisor_t::apply(const model::diff::load::load_cluster_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     main_window->set_splash_text("populating model (1/3)...");
-    auto ctx = static_cast<apply_context_t *>(custom);
+    auto ctx = static_cast<model::payload::apply_context_t *>(custom);
     ctx->total_blocks = diff.blocks_count;
     ctx->total_files = diff.files_count;
     return apply_controller_t::apply(diff, custom);
@@ -711,4 +710,20 @@ void app_supervisor_t::soft_restart() {
     log->debug("soft restart has been requested");
     soft_restart_request = true;
     main_window->hide();
+}
+
+void app_supervisor_t::on_frame_render_timer(r::request_id_t, bool cancelled) noexcept {
+    auto items = std::move(delayed_items);
+    if (!cancelled) {
+        for (auto &item : items) {
+            if (item->use_count() > 1) {
+                item->on_update();
+            }
+        }
+        if (devices) {
+            devices->on_frame_render();
+        }
+        auto method = &app_supervisor_t::on_frame_render_timer;
+        start_timer(UPDATE_DELAY, *this, method);
+    }
 }

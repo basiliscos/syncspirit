@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2025-2026 Ivan Baidakou
 
 #pragma once
 
@@ -9,7 +9,7 @@ namespace syncspirit::fs::task {
 
 struct SYNCSPIRIT_API remove_file_t {
     remove_file_t(bfs::path path) noexcept;
-    void process(fs_slave_t &fs_slave, hasher::hasher_plugin_t *) noexcept;
+    bool process(fs_slave_t &fs_slave, execution_context_t &context) noexcept;
 
     bfs::path path;
     sys::error_code ec;

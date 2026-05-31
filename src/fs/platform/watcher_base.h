@@ -1,0 +1,113 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-FileCopyrightText: 2026 Ivan Baidakou
+
+#pragma once
+
+#include "syncspirit-export.h"
+
+#include <rotor.hpp>
+#include <boost/system.hpp>
+#include <string>
+#include <optional>
+#include "utils/log.h"
+#include "proto/proto-fwd.hpp"
+#include "model/messages.h"
+#include "config/fs.h"
+#include "fs/messages.h"
+#include "fs/update_type.hpp"
+#include "fs/updates_mediator.h"
+#include "fs/updates_support.h"
+#include "fs/watched_folders.h"
+
+namespace syncspirit::fs::platform {
+
+namespace r = rotor;
+namespace sys = boost::system;
+
+struct SYNCSPIRIT_API watcher_config_t : r::actor_config_t {
+    r::pt::time_duration change_retension;
+    updates_mediator_ptr_t updates_mediator;
+    watched_folders_ptr_t watched_folders;
+    config::fs_config_t fs_config;
+};
+
+template <typename Actor> struct watcher_config_builder_t : r::actor_config_builder_t<Actor> {
+    using builder_t = typename Actor::template config_builder_t<Actor>;
+    using parent_t = r::actor_config_builder_t<Actor>;
+    using parent_t::parent_t;
+
+    builder_t &&change_retension(const r::pt::time_duration &value) && noexcept {
+        parent_t::config.change_retension = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+    builder_t &&updates_mediator(updates_mediator_ptr_t value) && noexcept {
+        parent_t::config.updates_mediator = std::move(value);
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+    builder_t &&watched_folders(watched_folders_ptr_t value) && noexcept {
+        parent_t::config.watched_folders = std::move(value);
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+    builder_t &&fs_config(const config::fs_config_t &value) && noexcept {
+        parent_t::config.fs_config = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+};
+
+struct SYNCSPIRIT_API watcher_base_t : r::actor_base_t {
+    using parent_t = r::actor_base_t;
+    template <typename Actor> using config_builder_t = watcher_config_builder_t<Actor>;
+    using config_t = watcher_config_t;
+
+    struct folder_update_t {
+        using it_t = typename support::file_updates_t::iterator;
+        std::string folder_id;
+        support::file_updates_t updates;
+
+        bool update(std::string_view relative_path, update_type_t type, folder_update_t *prev,
+                    std::string prev_path_rel, bool requires_refinement) noexcept;
+        bool update(support::file_update_t &record, folder_update_t *prev) noexcept;
+        bool update(support::file_update_t &new_record, it_t prev, support::file_updates_t &prev_source) noexcept;
+        auto make(const folder_info_t &folder_info, watcher_base_t &actor) noexcept -> payload::file_changes_t;
+    };
+    using folder_updates_t = std::vector<folder_update_t>;
+    using clock_t = r::pt::microsec_clock;
+    using timepoint_t = r::pt::ptime;
+    using interval_t = r::pt::time_duration;
+    using folder_changes_opt_t = std::optional<payload::folder_changes_t>;
+    struct bulk_update_t {
+        timepoint_t deadline;
+        folder_updates_t updates;
+        folder_update_t &prepare(std::string_view folder_id) noexcept;
+        folder_update_t *find(std::string_view folder_id) noexcept;
+        folder_changes_opt_t make(const watched_folders_t &watched_folders, watcher_base_t &) noexcept;
+        bool has_changes() const noexcept;
+    };
+
+    explicit watcher_base_t(config_t &cfg);
+    void configure(r::plugin::plugin_base_t &plugin) noexcept override;
+    void on_start() noexcept override;
+
+    virtual void on_watch(message::watch_folder_t &) noexcept;
+    virtual void on_unwatch(message::unwatch_folder_t &) noexcept;
+    void on_service_lock(model::message::service_lock_t &message) noexcept;
+    void on_service_unlock(model::message::service_unlock_t &message) noexcept;
+
+    virtual void notify(const fs::task::scan_dir_t &) noexcept;
+    virtual bool accept_update(const support::file_update_t &, const bfs::file_status &) noexcept;
+
+    void on_retension_finish(r::request_id_t, bool cancelled) noexcept;
+    void push(const timepoint_t &deadline, std::string_view folder_id, std::string_view relative_path,
+              std::string prev_path, update_type_t type, bool requires_refinement) noexcept;
+
+    utils::logger_t log;
+    interval_t retension;
+    updates_mediator_ptr_t updates_mediator;
+    r::address_ptr_t coordinator;
+    watched_folders_ptr_t watched_folders;
+    config::fs_config_t fs_config;
+    bulk_update_t next;
+    bulk_update_t postponed;
+};
+
+} // namespace syncspirit::fs::platform

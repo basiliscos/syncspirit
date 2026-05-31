@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "test-utils.h"
 #include "access.h"
@@ -75,7 +75,7 @@ TEST_CASE("with file", "[model]") {
         file->remove_blocks();
         file->assign_block(block.get(), 0);
         REQUIRE(!file->is_locally_available());
-        auto diff = diff::cluster_diff_ptr_t(new diff::local::file_availability_t(file, *folder_info));
+        auto diff = diff::cluster_diff_ptr_t(new diff::local::file_availability_t(*file, *folder_info));
         REQUIRE(diff->apply(*controller, {}));
         REQUIRE(file->is_locally_available());
     }

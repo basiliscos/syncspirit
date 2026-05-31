@@ -1,13 +1,173 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "platform.h"
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+#include <mutex>
+#include <dbghelp.h>
 #include <array>
+#include <cstring>
 #include <zlib.h>
+#include <spdlog/spdlog.h>
+#include <cxxabi.h>
+#include <boost/nowide/convert.hpp>
 #endif
 
 using namespace syncspirit::utils;
+
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+
+static DWORD thread_name_tls_index = TLS_OUT_OF_INDEXES;
+
+struct handle_guard_t {
+    handle_guard_t() = default;
+    handle_guard_t(HANDLE handle_) noexcept : handle{handle_} {}
+    ~handle_guard_t() {
+        if (handle != INVALID_HANDLE_VALUE) {
+            CloseHandle(handle);
+        }
+    }
+
+    handle_guard_t &operator=(handle_guard_t &&other) noexcept {
+        std::swap(handle, other.handle);
+        return *this;
+    }
+
+    operator HANDLE() const noexcept { return handle; }
+    operator bool() const noexcept { return handle != INVALID_HANDLE_VALUE; }
+
+    HANDLE handle{INVALID_HANDLE_VALUE};
+};
+
+static handle_guard_t open_dump_file() {
+    char name[64];
+    auto thread_id = GetCurrentThreadId();
+    sprintf(name, "crash_dump-0x%x.txt", thread_id);
+    return CreateFileA(name, FILE_APPEND_DATA, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_ALWAYS,
+                       FILE_ATTRIBUTE_NORMAL, nullptr);
+}
+
+static void dump_traces(EXCEPTION_POINTERS *ep) {
+    auto ctx = *ep->ContextRecord;
+    auto process = GetCurrentProcess();
+    auto thread = GetCurrentThread();
+    auto file = open_dump_file();
+    if (!file) {
+        return;
+    }
+
+    STACKFRAME64 frame;
+    memset(&frame, 0, sizeof(frame));
+    frame.AddrPC.Mode = AddrModeFlat;
+    frame.AddrFrame.Mode = AddrModeFlat;
+    frame.AddrStack.Mode = AddrModeFlat;
+
+#if defined(_M_X64) || defined(__x86_64__)
+    DWORD machine = IMAGE_FILE_MACHINE_AMD64;
+    frame.AddrPC.Offset = ctx.Rip;
+    frame.AddrFrame.Offset = ctx.Rbp;
+    frame.AddrStack.Offset = ctx.Rsp;
+#else
+    DWORD machine = IMAGE_FILE_MACHINE_I386;
+    frame.AddrPC.Offset = ctx.Eip;
+    frame.AddrFrame.Offset = ctx.Ebp;
+    frame.AddrStack.Offset = ctx.Esp;
+#endif
+
+    int frame_idx = 0;
+    DWORD written = 0;
+    char buff[512];
+    auto out_bytes = snprintf(buff, sizeof(buff), "dump begin\n");
+    WriteFile(file, buff, out_bytes, &written, {});
+
+    while (true) {
+        auto ok = StackWalk64(machine, process, thread, &frame, &ctx, NULL, SymFunctionTableAccess64,
+                              SymGetModuleBase64, NULL);
+        if (!ok) {
+            DWORD e = GetLastError();
+            out_bytes = snprintf(buff, sizeof(buff), "not ok, code: 0x%08x, stopping\n", e);
+            WriteFile(file, buff, out_bytes, &written, {});
+            break;
+        }
+        if (frame.AddrPC.Offset == 0) {
+            out_bytes = snprintf(buff, sizeof(buff), "frame.AddrPC.Offset == 0, stopping\n");
+            WriteFile(file, buff, out_bytes, &written, {});
+            break;
+        }
+        fprintf(stderr, "ip = %p\n", frame.AddrPC.Offset);
+        char sym_buff[sizeof(SYMBOL_INFO) + 512] = {0};
+        auto sym_info = (PSYMBOL_INFO)sym_buff;
+        sym_info->SizeOfStruct = sizeof(SYMBOL_INFO);
+        sym_info->MaxNameLen = 512;
+
+        auto module_base = SymGetModuleBase64(process, frame.AddrPC.Offset);
+        auto module_name = std::string_view("unknown module");
+        auto symbol_name = std::string_view("unknown symbol");
+        auto symbol_offset = DWORD64{0};
+
+        auto module_info = IMAGEHLP_MODULE64{};
+        std::memset(&module_info, 0, sizeof(module_info));
+        module_info.SizeOfStruct = sizeof(module_info);
+
+        if (module_base && SymGetModuleInfo64(process, module_base, &module_info)) {
+            module_name = module_info.ModuleName;
+        }
+
+        if (SymFromAddr(process, frame.AddrPC.Offset, &symbol_offset, sym_info)) {
+            char buff[512];
+            auto ptr = sym_info->Name;
+            if (*ptr != '_') {
+                --ptr;
+                *ptr = '_';
+            }
+
+            int status;
+            auto sz = size_t{0};
+            auto result = abi::__cxa_demangle(ptr, buff, &sz, &status);
+            if (result) {
+                std::memcpy(sym_buff, result, sz);
+                symbol_name = std::string_view(sym_buff, sz);
+            } else {
+                ptr++;
+                result = abi::__cxa_demangle(ptr, buff, &sz, &status);
+            }
+            if (result) {
+                std::memcpy(sym_buff, result, sz);
+                symbol_name = std::string_view(sym_buff, sz);
+            } else {
+                symbol_name = sym_info->Name;
+            }
+        } else if (module_base) {
+            symbol_offset = (DWORD64)(frame.AddrPC.Offset - module_base);
+        } else {
+            symbol_offset = 0;
+        }
+
+        out_bytes =
+            snprintf(buff, sizeof(buff), "(#%02d) %p %s(0x%p) %s + 0x%llx\n", frame_idx++, (void *)frame.AddrPC.Offset,
+                     module_name.data(), (void *)module_base, symbol_name.data(), symbol_offset);
+        WriteFile(file, buff, out_bytes, &written, {});
+        (void)written;
+    }
+
+    const char *thread_name = "unknown";
+    if (thread_name_tls_index != TLS_OUT_OF_INDEXES) {
+        thread_name = (const char *)TlsGetValue(thread_name_tls_index);
+    }
+
+    out_bytes = snprintf(buff, sizeof(buff), "dump end, thread: %s (%d)\n", thread_name, GetCurrentThreadId());
+    WriteFile(file, buff, out_bytes, &written, {});
+}
+
+std::mutex crash_mutex;
+
+static LONG WINAPI seh_handler(EXCEPTION_POINTERS *ep) {
+    auto guard = std::lock_guard<std::mutex>(crash_mutex);
+    dump_traces(ep);
+
+    return EXCEPTION_EXECUTE_HANDLER;
+}
+#endif
 
 bool platform_t::startup() {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
@@ -22,6 +182,16 @@ bool platform_t::startup() {
     if (err != 0) {
         return false;
     }
+
+    SymSetOptions(SYMOPT_DEFERRED_LOADS | SYMOPT_UNDNAME | SYMOPT_LOAD_LINES);
+
+    if (!SymInitialize(GetCurrentProcess(), NULL, TRUE)) {
+        return EXCEPTION_EXECUTE_HANDLER;
+    }
+
+    SetUnhandledExceptionFilter(seh_handler);
+
+    thread_name_tls_index = TlsAlloc();
 #endif
     return true;
 }
@@ -103,27 +273,39 @@ range_t bisect(wchar_t needle, int offset, range_t r) {
 } // namespace
 #endif
 
-bool platform_t::path_supported(const bfs::path &path) noexcept {
+bool platform_t::path_supported(std::string_view str_path) noexcept {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+    auto wname = boost::nowide::widen(str_path);
+    for (size_t i = 0; i < wname.size(); ++i) {
+        auto symbol = wname[i];
+        if (symbol < 31) {
+            return false;
+        }
+        switch (symbol) {
+            // clang-format off
+            case L'<':
+            case L'>':
+            case L':':
+            case L'"':
+            case L'\\':
+            case L'|':
+            case L'?':
+            case L'*':
+                return false;
+            // clang-format on
+        default: /* noop */;
+        }
+    }
+
+    auto path = bfs::path(wname);
     for (auto it = path.begin(); it != path.end(); ++it) {
         auto name = it->stem().wstring();
         auto range = range_t{0, static_cast<int>(reserved_names.size()) - 1};
         for (size_t i = 0; i < name.size(); ++i) {
             auto symbol = name[i];
-            if (symbol < 31) {
-                return false;
-            }
             switch (symbol) {
                 // clang-format off
-                case L'<':
-                case L'>':
-                case L':':
-                case L'"':
-                case L'\\':
                 case L'/':
-                case L'|':
-                case L'?':
-                case L'*':
                     return false;
                 case L'A': symbol = 'a'; break;
                 case L'C': symbol = 'c'; break;
@@ -138,6 +320,7 @@ bool platform_t::path_supported(const bfs::path &path) noexcept {
                 default: /* noop */ ;
                 // clang-format on
             }
+
             range = bisect(symbol, static_cast<int>(i), range);
             if (!range.is_valid()) {
                 break;
@@ -153,7 +336,7 @@ bool platform_t::path_supported(const bfs::path &path) noexcept {
     }
 #endif
 
-    (void)path;
+    (void)str_path;
     return true;
 }
 
@@ -162,4 +345,14 @@ bool platform_t::permissions_supported(const bfs::path &) noexcept {
     return false;
 #endif
     return true;
+}
+
+void platform_t::set_thread_name(std::string_view name) noexcept {
+#if defined(__linux__)
+    pthread_setname_np(pthread_self(), name.data());
+#elif defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+    if (thread_name_tls_index != TLS_OUT_OF_INDEXES) {
+        TlsSetValue(thread_name_tls_index, (void *)name.data());
+    }
+#endif
 }

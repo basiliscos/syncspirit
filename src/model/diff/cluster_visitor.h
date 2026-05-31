@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #pragma once
 
@@ -31,6 +31,7 @@ struct SYNCSPIRIT_API cluster_visitor_t {
     virtual outcome::result<void> operator()(const load::pending_devices_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const load::load_cluster_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const load::remove_corrupted_files_t &, void *custom) noexcept;
+    virtual outcome::result<void> operator()(const load::interrupt_t &, void *custom) noexcept;
 
     virtual outcome::result<void> operator()(const local::blocks_availability_t &, void *custom) noexcept;
     virtual outcome::result<void> operator()(const local::file_availability_t &, void *custom) noexcept;

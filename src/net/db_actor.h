@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #pragma once
 
@@ -8,11 +8,12 @@
 #include "model/messages.h"
 #include "model/cluster.h"
 #include "model/diff/cluster_visitor.h"
+#include "model_actor.hpp"
 #include "mdbx.h"
-#include "utils/log.h"
 #include "db/transaction.h"
 #include "db/utils.h"
 #include "utils/bytes_comparator.hpp"
+#include <cstdint>
 
 namespace syncspirit {
 namespace net {
@@ -20,49 +21,51 @@ namespace net {
 namespace outcome = boost::outcome_v2;
 namespace bfs = std::filesystem;
 
-struct db_actor_config_t : r::actor_config_t {
-    bfs::path db_dir;
-    config::db_config_t db_config;
-    model::cluster_ptr_t cluster;
-    size_t uncommitted_threshold = {100};
-    r::address_ptr_t bouncer_address;
-};
+struct SYNCSPIRIT_API db_actor_t final : public model_actor_t<r::actor_base_t>, private model::diff::cluster_visitor_t {
+    using parent_t = model_actor_t<r::actor_base_t>;
 
-template <typename Actor> struct db_actor_config_builder_t : r::actor_config_builder_t<Actor> {
-    using builder_t = typename Actor::template config_builder_t<Actor>;
-    using parent_t = r::actor_config_builder_t<Actor>;
-    using parent_t::parent_t;
+    struct config_t : parent_t::config_t {
+        using base_t = model_actor_t<r::actor_base_t>::config_t;
+        using base_t::base_t;
+        bfs::path db_dir;
+        config::db_config_t db_config;
+        size_t uncommitted_threshold = {100};
+        r::address_ptr_t bouncer_address;
+        std::uint_fast32_t max_files_per_diff;
+    };
 
-    builder_t &&db_dir(const bfs::path &value) && noexcept {
-        parent_t::config.db_dir = value;
-        return std::move(*static_cast<typename parent_t::builder_t *>(this));
-    }
-    builder_t &&cluster(const model::cluster_ptr_t &value) && noexcept {
-        parent_t::config.cluster = value;
-        return std::move(*static_cast<typename parent_t::builder_t *>(this));
-    }
-    builder_t &&db_config(const config::db_config_t &value) && noexcept {
-        parent_t::config.db_config = value;
-        return std::move(*static_cast<typename parent_t::builder_t *>(this));
-    }
-    builder_t &&bouncer_address(const r::address_ptr_t &value) && noexcept {
-        parent_t::config.bouncer_address = value;
-        return std::move(*static_cast<typename parent_t::builder_t *>(this));
-    }
-};
+    template <typename Actor> struct config_builder_t : parent_t::template config_builder_t<Actor> {
+        using builder_t = typename Actor::template config_builder_t<Actor>;
+        using base_t = parent_t::template config_builder_t<Actor>;
+        using base_t::base_t;
 
-struct SYNCSPIRIT_API db_actor_t : public r::actor_base_t, private model::diff::cluster_visitor_t {
-    using config_t = db_actor_config_t;
-    template <typename Actor> using config_builder_t = db_actor_config_builder_t<Actor>;
+        builder_t &&db_dir(const bfs::path &value) && noexcept {
+            base_t::config.db_dir = value;
+            return std::move(*static_cast<typename base_t::builder_t *>(this));
+        }
+        builder_t &&db_config(const config::db_config_t &value) && noexcept {
+            base_t::config.db_config = value;
+            return std::move(*static_cast<typename base_t::builder_t *>(this));
+        }
+        builder_t &&bouncer_address(const r::address_ptr_t &value) && noexcept {
+            base_t::config.bouncer_address = value;
+            return std::move(*static_cast<typename base_t::builder_t *>(this));
+        }
+        builder_t &&max_files_per_diff(std::uint_fast32_t value) && noexcept {
+            base_t::config.max_files_per_diff = value;
+            return std::move(*static_cast<typename base_t::builder_t *>(this));
+        }
+    };
 
     static void delete_tx(MDBX_txn *) noexcept;
 
     db_actor_t(config_t &config);
     ~db_actor_t();
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
+    void post_configure_coordinator() noexcept override;
     void on_start() noexcept override;
-    void shutdown_start() noexcept override;
     void shutdown_finish() noexcept override;
+    void visit(const model::diff::cluster_diff_t &, model::payload::apply_context_t &) noexcept override;
 
     template <typename T> auto &access() noexcept;
 
@@ -111,7 +114,6 @@ struct SYNCSPIRIT_API db_actor_t : public r::actor_base_t, private model::diff::
 
     void on_cluster_load_trigger(message::load_cluster_trigger_t &) noexcept;
     void on_commit(commit_message_t &) noexcept;
-    void on_model_update(model::message::model_update_t &) noexcept;
     void on_db_info(message::db_info_request_t &) noexcept;
     void on_controller_up(net::message::controller_up_t &message) noexcept;
     void on_controller_down(net::message::controller_down_t &message) noexcept;
@@ -145,16 +147,14 @@ struct SYNCSPIRIT_API db_actor_t : public r::actor_base_t, private model::diff::
     outcome::result<void> operator()(const model::diff::peer::cluster_update_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::peer::update_folder_t &, void *) noexcept override;
 
-    r::address_ptr_t coordinator;
     r::address_ptr_t bouncer;
     r::address_ptr_t sink;
-    utils::logger_t log;
     MDBX_env *env;
     bfs::path db_dir;
     config::db_config_t db_config;
-    model::cluster_ptr_t cluster;
     transaction_ptr_t txn_holder;
     std::int_fast32_t uncommitted;
+    std::uint_fast32_t max_files_per_diff;
 };
 
 } // namespace net

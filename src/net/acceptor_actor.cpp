@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "acceptor_actor.h"
 #include "names.h"
 #include "utils/format.hpp"
-#include "utils/error_code.h"
 #include "utils/network_interface.h"
 #include "utils/format.hpp"
 #include "model/messages.h"
@@ -35,7 +34,6 @@ void acceptor_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 }
 
 void acceptor_actor_t::on_start() noexcept {
-
     LOG_TRACE(log, "on_start");
     sys::error_code ec;
 
@@ -73,6 +71,7 @@ void acceptor_actor_t::on_start() noexcept {
     auto diff = model::diff::cluster_diff_ptr_t{};
     diff = new contact::update_contact_t(*cluster, cluster->get_device()->device_id(), uris);
     send<model::payload::model_update_t>(coordinator, std::move(diff), this);
+    send<model::payload::local_up_t>(coordinator);
     accept_next();
     r::actor_base_t::on_start();
 }

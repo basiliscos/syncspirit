@@ -21,6 +21,7 @@ add_library(syncspirit_test_lib
     test_supervisor.cpp
     test-db.cpp
     test-utils.cpp
+    test-watcher.cpp
     diff-builder.cpp
 )
 target_link_libraries(syncspirit_test_lib syncspirit_core
@@ -93,11 +94,15 @@ create_test(043-diffs-scan.cpp)
 create_test(045-diff-advance.cpp)
 create_test(050-file_iterator.cpp)
 create_test(051-block_iterator.cpp)
+create_test(052-updates_mediator.cpp)
+create_test(053-fs_proxy.cpp)
 create_test(054-updates_streamer.cpp)
 create_test(055-resolver.cpp)
 create_test(056-fs_slave.cpp)
-create_test(060-bep.cpp)
-create_test(061-presentation.cpp)
+create_test(060-proto-bep.cpp)
+create_test(061-proto-db.cpp)
+create_test(062-presentation.cpp)
+create_test(069-model-messaging.cpp)
 create_test(070-db.cpp)
 create_test(071-fs_actor.cpp)
 create_test(072-global_discovery.cpp)
@@ -109,7 +114,12 @@ create_test(077-initiator.cpp)
 create_test(078-relay.cpp)
 create_test(079-peer.cpp)
 create_test(080-resolver.cpp)
+create_test(081-prevent-stack-overflow.cpp)
 create_test(085-scan-scheduler.cpp)
 create_test(087-local_keeper.cpp)
+create_test(088-watcher.cpp)
+create_test(089-local_keeper-changes.cpp)
 create_test(110-file-n-controller-actors.cpp)
 create_test(111-controllers-concurrency.cpp)
+create_test(112-file-n-watcher-actors.cpp)
+create_test(113-file-herd.cpp)

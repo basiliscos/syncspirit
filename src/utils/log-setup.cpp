@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "log-setup.h"
 
@@ -24,7 +24,7 @@ namespace sys = boost::system;
 #define SECOND_FRACTION "%F"
 #endif
 
-static const char *log_pattern = "[%Y-%m-%d %H:%M:%S." SECOND_FRACTION "] [%^%L/%t%$] {%n} %v";
+const char *log_pattern = "[%Y-%m-%d %H:%M:%S." SECOND_FRACTION "] [%^%L/%t%$] {%n} %v";
 
 using sink_option_t = outcome::result<spdlog::sink_ptr>;
 

@@ -47,12 +47,12 @@ All front-ends share the same configuration and database when running on same ho
 
 - [x] send only/receive only dirs
 
+- [x] realtime file changes watching (inotify/kqueue/ReadReadDirectoryChangesW)
+
 
 # missing features
 
 This list is probably incomplete. Here are the most important changes:
-
-- [ ] inotify support (aka realtime files watching)
 
 - [ ] ignoring pattern files
 
@@ -95,6 +95,18 @@ after the core completion.
 - mac os x
 
 # changes
+
+## 0.4.5 (31-May-2026)
+ - [core] monitor in realtime changes on filesystem (on watched folders)
+ - [core] allow partial directory rescan
+ - [core] do not accept files with non-valid utf8 filenames
+ - [win32] write simple dump on crash
+ - [ci/cd] use https://sourcecraft.dev/ infrastructure for building
+ - [cmake] optionalize fltk-frontend building
+ - [core, bugfix] fix crash upon incorrect statistics calculation
+ - [core, bugfix] implement more robost startup
+ - [core, bugfix] make duplicated blocks cloning more reliable
+ - [test] add intergrational tests
 
 ## 0.4.4 (08-Jan-2026)
  - [fltk] allow to regenereate certificate/key pair and soft restart

@@ -83,7 +83,15 @@ struct fixture_t {
         sup->do_process();
         CHECK(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::OPERATIONAL);
 
-        file_actor = sup->create_actor<fs::file_actor_t>().timeout(timeout).finish();
+        auto updates_mediator = fs::updates_mediator_ptr_t(new fs::updates_mediator_t(retension));
+        auto watched_folders = fs::watched_folders_ptr_t(new watched_folders_t());
+
+        file_actor = sup->create_actor<fs::file_actor_t>()
+                         .change_retension(retension)
+                         .updates_mediator(updates_mediator)
+                         .watched_folders(watched_folders)
+                         .timeout(timeout)
+                         .finish();
         sup->do_process();
 
         sup->create_actor<hasher::hasher_actor_t>().index(1).timeout(timeout).finish();
@@ -139,6 +147,7 @@ struct fixture_t {
     virtual void main() noexcept {}
 
     r::pt::time_duration timeout = r::pt::millisec{10};
+    r::pt::time_duration retension = r::pt::millisec{1};
     cluster_ptr_t cluster;
     model::sequencer_ptr_t sequencer;
     model::device_ptr_t my_device;

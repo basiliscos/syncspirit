@@ -37,44 +37,54 @@ iterative_controller_base_t::iterative_controller_base_t(r::actor_base_t *owner_
                                                          r::plugin::resource_id_t interrupt_) noexcept
     : owner{owner_}, interrupt{interrupt_} {}
 
+iterative_controller_base_t::~iterative_controller_base_t() { assert(model_subscribers.empty()); }
+
 void iterative_controller_base_t::on_model_update(model::message::model_update_t &message) noexcept {
     LOG_TRACE(log, "on_model_update");
     if (interrupted) {
         delayed_updates.emplace_back(&message);
     } else {
         auto &p = message.payload;
-        auto context = apply_context_t{
-            {&message},
-            p.custom,
-        };
+        auto context = payload::apply_context_t(&message, p.custom);
         process(*p.diff, context);
     }
-}
-
-void iterative_controller_base_t::process(model::diff::cluster_diff_t &diff, apply_context_t &context) noexcept {
-    process_impl(diff, context);
 }
 
 void iterative_controller_base_t::on_model_interrupt(model::message::model_interrupt_t &message) noexcept {
     using namespace model::payload;
     owner->access<to::resources>()->release(interrupt);
     LOG_TRACE(log, "on_model_interrupt");
-    auto &p = message.payload;
-    auto apply_context = apply_context_t(
-        model_interrupt_t{std::move(p.original), p.total_blocks, p.total_files, p.loaded_blocks, p.loaded_files});
+    auto apply_context = payload::apply_context_t(message.payload);
     process(*message.payload.diff, apply_context);
     while (!interrupted && delayed_updates.size()) {
         LOG_TRACE(log, "applying delayed model update");
         auto &msg = delayed_updates.front();
         auto &p = msg->payload;
-        apply_context.message_payload = p.custom;
-        process(*p.diff, apply_context);
+        auto sub_ctx = payload::apply_context_t(msg.get(), p.custom);
+        process(*p.diff, sub_ctx);
         delayed_updates.pop_front();
     }
 }
 
+void iterative_controller_base_t::on_model_subscribe(message::model_subscription_t &message) noexcept {
+    model_subscribers.push_back(message.payload);
+}
+
+void iterative_controller_base_t::on_model_unsubscribe(message::model_unsubscription_t &message) noexcept {
+    auto &item = static_cast<const payload::model_subscription_t &>(message.payload);
+    auto it = std::find(model_subscribers.begin(), model_subscribers.end(), item);
+    if (it != model_subscribers.end()) {
+        model_subscribers.erase(it);
+    }
+}
+
+void iterative_controller_base_t::process(model::diff::cluster_diff_t &diff,
+                                          payload::apply_context_t &context) noexcept {
+    process_impl(diff, context);
+}
+
 void iterative_controller_base_t::process_impl(model::diff::cluster_diff_t &diff,
-                                               apply_context_t &apply_context) noexcept {
+                                               payload::apply_context_t &apply_context) noexcept {
     using T0 = const std::error_code &;
     using T1 = const r::extended_error_ptr_t &;
     using T2 = const r::message_ptr_t &;
@@ -101,6 +111,9 @@ void iterative_controller_base_t::process_impl(model::diff::cluster_diff_t &diff
         auto ee = owner->access<to::make_error, T0, T1, T2>(r.assume_error(), {}, {});
         return owner->do_shutdown(ee);
     }
+    for (auto &subscriber : model_subscribers) {
+        subscriber.fn(*target_diff, apply_context, subscriber.custom);
+    }
 
     interrupted = (bool)apply_context.diff;
     if (interrupted) {
@@ -114,7 +127,7 @@ void iterative_controller_base_t::process_impl(model::diff::cluster_diff_t &diff
 
 auto iterative_controller_base_t::apply(const model::diff::load::interrupt_t &diff, void *custom) noexcept
     -> outcome::result<void> {
-    auto ctx = static_cast<apply_context_t *>(custom);
+    auto ctx = static_cast<payload::apply_context_t *>(custom);
     ctx->diff = diff.sibling.get();
     return outcome::success();
 }

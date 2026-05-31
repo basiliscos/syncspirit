@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "controller_actor.h"
 #include "names.h"
@@ -18,6 +18,7 @@
 #include "model/diff/peer/cluster_update.h"
 #include "model/diff/peer/update_folder.h"
 #include "model/misc/resolver.h"
+#include "presentation/entity.h"
 #include "presentation/presence.h"
 #include "proto/bep_support.h"
 #include "proto/proto-helpers-bep.h"
@@ -29,10 +30,13 @@
 #include <utility>
 #include <type_traits>
 #include <memory_resource>
+#include <boost/functional/hash.hpp>
 
 using namespace syncspirit;
 using namespace syncspirit::net;
 namespace bfs = std::filesystem;
+
+using C = controller_actor_t;
 
 namespace {
 namespace resource {
@@ -41,32 +45,8 @@ r::plugin::resource_id_t hash = 1;
 r::plugin::resource_id_t fs = 2;
 } // namespace resource
 
-struct remote_copy_context_t final : fs::payload::extendended_context_t {
-    remote_copy_context_t(model::advance_action_t action_, model::file_info_t &peer_file_,
-                          model::folder_info_t &peer_folder_)
-        : peer_file(&peer_file_), peer_folder(&peer_folder_), action{action_} {}
-
-    model::file_info_ptr_t peer_file;
-    model::folder_info_ptr_t peer_folder;
-    model::advance_action_t action;
-};
-
-struct block_ack_context_t final : fs::payload::extendended_context_t {
-    block_ack_context_t(model::block_info_t *block_, model::file_info_t &target_file_,
-                        model::folder_info_t &target_folder_, std::uint32_t block_index_)
-        : block{block_}, target_file(&target_file_), target_folder(&target_folder_),
-          folder(target_folder_.get_folder()), block_index{block_index_} {}
-
-    model::block_info_ptr_t block;
-    model::file_info_ptr_t target_file;
-    model::folder_info_ptr_t target_folder;
-    model::folder_ptr_t folder;
-    std::uint32_t block_index;
-};
-
-struct finish_file_context_t final : fs::payload::extendended_context_t {
-    finish_file_context_t(model::file_info_t &peer_file_, model::folder_info_t &peer_folder_,
-                          model::advance_action_t action_)
+struct file_context_t final : fs::payload::extendended_context_t {
+    file_context_t(model::file_info_t &peer_file_, model::folder_info_t &peer_folder_, model::advance_action_t action_)
         : peer_file(&peer_file_), peer_folder(&peer_folder_), action{action_} {}
 
     model::file_info_ptr_t peer_file;
@@ -91,142 +71,210 @@ struct peer_request_context_t final : fs::payload::extendended_context_t {
 
 } // namespace
 
-using C = controller_actor_t;
+struct C::block_ack_context_t final : fs::payload::extendended_context_t {
+    block_ack_context_t(model::block_info_t *block_, model::file_info_t &target_file_,
+                        model::folder_info_t &target_folder_, std::uint32_t block_index_)
+        : block{block_}, target_file(&target_file_), target_folder(&target_folder_),
+          folder(target_folder_.get_folder()), block_index{block_index_} {}
 
-C::stack_context_t::stack_context_t(controller_actor_t &actor_) noexcept : actor{actor_} {}
+    model::block_info_ptr_t block;
+    model::file_info_ptr_t target_file;
+    model::folder_info_ptr_t target_folder;
+    model::folder_ptr_t folder;
+    std::uint32_t block_index;
+};
 
-C::stack_context_t::~stack_context_t() {
-    if (actor.state == r::state_t::OPERATIONAL) {
-        auto requests_left = actor.cluster->get_write_requests();
-        auto sent = 0;
-        while (requests_left > 0 && !actor.block_write_queue.empty()) {
-            auto &io_command = actor.block_write_queue.front();
-            io_commands.emplace_back(std::move(io_command));
-            --requests_left;
-            ++sent;
-            actor.block_write_queue.pop_front();
+struct C::stack_context_t : model::diff::diff_assember_t {
+    using parent_t = model::diff::diff_assember_t;
+    using allocator_t = std::pmr::polymorphic_allocator<char>;
+
+    stack_context_t(controller_actor_t &actor_) noexcept
+        : parent_t{constants::diffs_batch}, actor{actor_}, pool(buffer.data(), buffer.size()), allocator(&pool),
+          locked_blocks{allocator} {}
+    ~stack_context_t() {
+        if (actor.state == r::state_t::OPERATIONAL) {
+            auto requests_left = actor.cluster->get_write_requests();
+            auto sent = 0;
+            while (requests_left > 0 && !actor.block_write_queue.empty()) {
+                auto &io_command = actor.block_write_queue.front();
+                io_commands.emplace_back(std::move(io_command));
+                --requests_left;
+                ++sent;
+                actor.block_write_queue.pop_front();
+            }
+            if (sent) {
+                // LOG_TRACE(log, "{} block writes sent, requests left = {}", sent, requests_left);
+                actor.cluster->modify_write_requests(-sent);
+            }
+            auto max_block_read = actor.blocks_max_requested * constants::tx_blocks_max_factor;
+            while (!actor.block_read_queue.empty() && (actor.tx_blocks_requested <= max_block_read)) {
+                ++actor.tx_blocks_requested;
+                auto &cmd = actor.block_read_queue.front();
+                io_commands.emplace_back(std::move(cmd));
+                actor.block_read_queue.pop_front();
+            }
+            if (!io_commands.empty()) {
+                auto &self = actor.get_address();
+                auto &fs = actor.fs_addr;
+                auto cache_key = actor.get_address().get();
+                actor.route<fs::payload::io_commands_t>(fs, self, cache_key, std::move(io_commands));
+                actor.resources->acquire(resource::fs);
+            }
         }
-        if (sent) {
-            // LOG_TRACE(log, "{} block writes sent, requests left = {}", sent, requests_left);
-            actor.cluster->modify_write_requests(-sent);
+        if (has_diffs()) {
+            auto &addr = actor.coordinator;
+            actor.send<model::payload::model_update_t>(addr, consume(), &actor);
         }
-        auto max_block_read = actor.blocks_max_requested * constants::tx_blocks_max_factor;
-        while (!actor.block_read_queue.empty() && (actor.tx_blocks_requested <= max_block_read)) {
-            ++actor.tx_blocks_requested;
-            auto &cmd = actor.block_read_queue.front();
-            io_commands.emplace_back(std::move(cmd));
-            actor.block_read_queue.pop_front();
-        }
-        if (!io_commands.empty()) {
-            auto &self = actor.get_address();
-            auto &fs = actor.fs_addr;
-            auto cache_key = actor.get_address().get();
-            actor.route<fs::payload::io_commands_t>(fs, self, cache_key, std::move(io_commands));
-            actor.resources->acquire(resource::fs);
+        if (!peer_data.empty()) {
+            if (actor.peer_address) {
+                *actor.outgoing_buffer += static_cast<uint32_t>(peer_data.size());
+                actor.send<payload::transfer_data_t>(actor.peer_address, std::move(peer_data));
+            } else {
+                LOG_DEBUG(actor.log, "peer is no longer available, send has been ignored");
+            }
         }
     }
-    if (next) {
-        auto &addr = actor.coordinator;
-        actor.send<model::payload::model_update_t>(addr, std::move(diff), &actor);
+    void push(fs::payload::io_command_t command) noexcept { io_commands.emplace_back(std::move(command)); }
+    void push(fs::payload::append_block_t command) noexcept { push_checked(std::move(command)); }
+    void push(fs::payload::clone_block_t command) noexcept { push_checked(std::move(command)); }
+    void push(utils::bytes_t data) noexcept {
+        peer_data.reserve(peer_data.size() + data.size());
+        auto out = std::back_insert_iterator(peer_data);
+        std::copy(data.begin(), data.end(), out);
     }
-    if (!peer_data.empty()) {
-        if (actor.peer_address) {
-            *actor.outgoing_buffer += static_cast<uint32_t>(peer_data.size());
-            actor.send<payload::transfer_data_t>(actor.peer_address, std::move(peer_data));
+    void ack_block(block_ack_context_t *io_ctx, bool unlock_block) noexcept {
+        using namespace model::diff;
+        auto folder_id = io_ctx->folder->get_id();
+        auto name = std::string(io_ctx->target_file->get_name()->get_full_name());
+        auto device_id = utils::bytes_t(io_ctx->target_folder->get_device()->device_id().get_sha256());
+        auto hash = utils::bytes_t(io_ctx->block->get_hash());
+        auto diff = new modify::block_ack_t(std::move(name), std::string(folder_id), std::move(device_id),
+                                            std::move(hash), io_ctx->block_index, unlock_block);
+        push_back(diff);
+    }
+    void lock_block(model::block_info_t &block) noexcept {
+        block.lock();
+        locked_blocks.insert(&block);
+    }
+    bool is_locked(const model::block_info_t &block) noexcept {
+        return locked_blocks.count(&block) || block.is_locked();
+    }
+
+    void mark_unreachable(std::string_view name, std::string_view folder_id) noexcept {
+        auto folder = actor.cluster->get_folders().by_id(folder_id);
+        if (folder) {
+            auto peer_folder = folder->get_folder_infos().by_device(*actor.peer);
+            if (peer_folder) {
+                auto peer_file = peer_folder->get_file_infos().by_name(name);
+                if (peer_file && !peer_file->is_unreachable()) {
+                    LOG_DEBUG(actor.log, "marking '{}' marking unreachable", peer_file);
+                    peer_file->mark_unreachable(true);
+                    push_back(new model::diff::modify::mark_reachable_t(*peer_file, *peer_folder, false));
+                }
+            }
+        }
+    }
+
+    allocator_t &get_allocator() { return allocator; }
+
+  private:
+    using commands_t = std::vector<fs::payload::io_command_t>;
+    using locked_blocks_t = std::pmr::unordered_set<const model::block_info_t *>;
+
+    template <typename T> void push_checked(T command) noexcept {
+        if (actor.state == r::state_t::OPERATIONAL) {
+            auto requests_left = actor.cluster->get_write_requests();
+            if (requests_left) {
+                io_commands.emplace_back(std::move(command));
+                actor.cluster->modify_write_requests(-1);
+            } else {
+                actor.block_write_queue.emplace_back(std::move(command));
+            }
+        }
+    }
+    controller_actor_t &actor;
+    commands_t io_commands;
+    utils::bytes_t peer_data;
+    std::array<std::byte, 1024 * 128> buffer = {};
+    std::pmr::monotonic_buffer_resource pool;
+    allocator_t allocator;
+    locked_blocks_t locked_blocks;
+};
+
+struct C::update_context_t : stack_context_t {
+    update_context_t(controller_actor_t &actor, bool from_self_, bool cluster_config_sent_) noexcept
+        : stack_context_t(actor), from_self{from_self_}, cluster_config_sent{cluster_config_sent_} {}
+
+    bool from_self;
+    bool cluster_config_sent;
+};
+
+struct C::folder_synchronization_t {
+    using block_guard_t = model::rc_guard_t<model::block_info_t>;
+    using blocks_t = std::unordered_map<utils::bytes_view_t, block_guard_t>;
+    folder_synchronization_t(controller_actor_t &controller_, model::folder_t &folder_) noexcept
+        : controller{&controller_}, folder{&folder_}, synchronizing{false} {}
+
+    folder_synchronization_t(const folder_synchronization_t &) = delete;
+    ~folder_synchronization_t() {
+        if (blocks.size() && folder && !folder->is_suspended()) {
+            if (synchronizing) {
+                auto diff = model::diff::cluster_diff_ptr_t();
+                diff.reset(new model::diff::local::synchronization_finish_t(folder->get_id()));
+                controller->send<model::payload::model_update_t>(controller->coordinator, std::move(diff), controller);
+            }
+            for (auto &[_, guard] : blocks) {
+                if (guard.ptr->is_locked()) {
+                    guard.ptr->unlock();
+                }
+            }
+        }
+    }
+    void reset() noexcept { folder.reset(); }
+
+    void start_fetching(model::block_info_t *block, stack_context_t &context) noexcept {
+        if (blocks.empty() && !synchronizing) {
+            start_sync(context);
+        }
+        auto it = blocks.find(block->get_hash());
+        if (it == blocks.end()) {
+            blocks.emplace(block->get_hash(), block);
         } else {
-            LOG_DEBUG(actor.log, "peer is no longer available, send has been ignored");
+            it->second.inc();
         }
     }
-}
 
-void C::stack_context_t::push(fs::payload::io_command_t command) noexcept {
-    io_commands.emplace_back(std::move(command));
-}
-
-void C::stack_context_t::push(fs::payload::append_block_t command) noexcept {
-    if (actor.state == r::state_t::OPERATIONAL) {
-        auto requests_left = actor.cluster->get_write_requests();
-        if (requests_left) {
-            io_commands.emplace_back(std::move(command));
-            actor.cluster->modify_write_requests(-1);
-        } else {
-            actor.block_write_queue.emplace_back(std::move(command));
+    model::block_info_ptr_t finish_fetching(utils::bytes_view_t hash, stack_context_t &context) noexcept {
+        auto it = blocks.find(hash);
+        auto &guard = it->second;
+        auto block = model::block_info_ptr_t(guard.ptr);
+        if (guard.dec() == 0) {
+            blocks.erase(it);
         }
-    }
-}
-
-void C::stack_context_t::push(model::diff::cluster_diff_ptr_t diff_) noexcept {
-    if (next) {
-        next = next->assign_sibling(diff_.get());
-    } else {
-        diff = std::move(diff_);
-        next = diff.get();
-    }
-}
-
-void C::stack_context_t::push(utils::bytes_t data) noexcept {
-    peer_data.reserve(peer_data.size() + data.size());
-    auto out = std::back_insert_iterator(peer_data);
-    std::copy(data.begin(), data.end(), out);
-}
-
-C::update_context_t::update_context_t(controller_actor_t &actor, bool from_self_, bool cluster_config_sent_) noexcept
-    : stack_context_t(actor), from_self{from_self_}, cluster_config_sent{cluster_config_sent_} {}
-
-C::folder_synchronization_t::folder_synchronization_t(controller_actor_t &controller_,
-                                                      model::folder_t &folder_) noexcept
-    : controller{&controller_}, folder{&folder_}, synchronizing{false} {}
-
-C::folder_synchronization_t::~folder_synchronization_t() {
-    if (blocks.size() && folder && !folder->is_suspended()) {
-        if (synchronizing) {
-            auto diff = model::diff::cluster_diff_ptr_t();
-            diff.reset(new model::diff::local::synchronization_finish_t(folder->get_id()));
-            controller->send<model::payload::model_update_t>(controller->coordinator, std::move(diff), controller);
+        if (blocks.size() == 0 && synchronizing) {
+            finish_sync(context);
         }
-        for (auto &it : blocks) {
-            it.second->unlock();
-        }
+        return block;
     }
-}
 
-void C::folder_synchronization_t::reset() noexcept { folder.reset(); }
-
-void C::folder_synchronization_t::start_fetching(model::block_info_t *block, stack_context_t &context) noexcept {
-    assert(!block->is_locked());
-    assert(blocks.find(block->get_hash()) == blocks.end());
-    block->lock();
-    if (blocks.empty() && !synchronizing) {
-        start_sync(context);
+    void start_sync(stack_context_t &context) noexcept {
+        context.push_back(new model::diff::local::synchronization_start_t(folder->get_id()));
+        synchronizing = true;
     }
-    blocks[block->get_hash()] = model::block_info_ptr_t(block);
-}
-
-auto C::folder_synchronization_t::finish_fetching(utils::bytes_view_t hash, stack_context_t &context) noexcept
-    -> model::block_info_ptr_t {
-    auto it = blocks.find(hash);
-    auto block = it->second;
-    block->unlock();
-    assert(!block->is_locked());
-    blocks.erase(it);
-    if (blocks.size() == 0 && synchronizing) {
-        finish_sync(context);
+    void finish_sync(stack_context_t &context) noexcept {
+        context.push_back(new model::diff::local::synchronization_finish_t(folder->get_id()));
+        synchronizing = false;
     }
-    return block;
-}
 
-void C::folder_synchronization_t::start_sync(stack_context_t &context) noexcept {
-    context.push(new model::diff::local::synchronization_start_t(folder->get_id()));
-    synchronizing = true;
-}
-
-void C::folder_synchronization_t::finish_sync(stack_context_t &context) noexcept {
-    context.push(new model::diff::local::synchronization_finish_t(folder->get_id()));
-    synchronizing = false;
-}
+  private:
+    controller_actor_t *controller = nullptr;
+    model::folder_ptr_t folder;
+    blocks_t blocks;
+    bool synchronizing = false;
+};
 
 controller_actor_t::controller_actor_t(config_t &config)
-    : r::actor_base_t{config}, sequencer{std::move(config.sequencer)}, cluster{config.cluster}, peer{config.peer},
+    : parent_t{config}, sequencer{std::move(config.sequencer)}, peer{config.peer},
       peer_state{peer->get_state().clone()}, peer_address{config.peer_addr}, rx_blocks_requested{0},
       tx_blocks_requested{0}, outgoing_buffer_max{config.outgoing_buffer_max}, request_pool{config.request_pool},
       hasher_threads{config.hasher_threads}, advances_per_iteration{config.advances_per_iteration},
@@ -242,8 +290,10 @@ controller_actor_t::controller_actor_t(config_t &config)
     }
 }
 
+controller_actor_t::~controller_actor_t() {}
+
 void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
-    r::actor_base_t::configure(plugin);
+    parent_t::configure(plugin);
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
         std::string id = "net.controller/";
         id += peer->device_id().get_short();
@@ -256,9 +306,9 @@ void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.discover_name(names::fs_actor, fs_addr, false).link(false);
         p.discover_name(names::coordinator, coordinator, false).link(false).callback([&](auto phase, auto &ee) {
             if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {
+                parent_t::post_configure_coordinator();
                 auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
                 auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
-                plugin->subscribe_actor(&controller_actor_t::on_model_update, coordinator);
                 plugin->subscribe_actor(&controller_actor_t::on_fs_predown, coordinator);
             }
         });
@@ -274,7 +324,7 @@ void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 }
 
 void controller_actor_t::on_start() noexcept {
-    r::actor_base_t::on_start();
+    parent_t::on_start();
     LOG_TRACE(log, "on_start");
     auto my_url = peer_state.get_url();
     if (peer_state < peer->get_state()) {
@@ -298,7 +348,7 @@ void controller_actor_t::shutdown_start() noexcept {
     if (fs_requests) {
         fs_ack_timer = start_timer(shutdown_timeout * 8 / 9, *this, &controller_actor_t::on_fs_ack_timer);
     }
-    r::actor_base_t::shutdown_start();
+    parent_t::shutdown_start();
 }
 
 void controller_actor_t::shutdown_finish() noexcept {
@@ -311,7 +361,7 @@ void controller_actor_t::shutdown_finish() noexcept {
     if (announced) {
         send<payload::controller_down_t>(coordinator, address, peer_address);
     }
-    r::actor_base_t::shutdown_finish();
+    parent_t::shutdown_finish();
 }
 
 void controller_actor_t::send_cluster_config(stack_context_t &ctx) noexcept {
@@ -364,24 +414,25 @@ void controller_actor_t::on_peer_down(message::peer_down_t &message) noexcept {
 }
 
 void controller_actor_t::on_postprocess_io(fs::message::io_commands_t &message) noexcept {
+    namespace p = fs::payload;
     auto stack_ctx = stack_context_t(*this);
     resources->release(resource::fs);
     for (auto &cmd : message.payload.commands) {
         std::visit(
             [&](auto &cmd) {
                 using T = std::decay_t<decltype(cmd)>;
-                if constexpr (std::is_same_v<T, fs::payload::block_request_t>) {
+                if constexpr (std::is_same_v<T, p::block_request_t>) {
                     postprocess_io(cmd, stack_ctx);
                 } else {
-                    if constexpr (std::is_same_v<T, fs::payload::append_block_t>) {
+                    constexpr auto modify = std::is_same_v<T, p::append_block_t> || std::is_same_v<T, p::clone_block_t>;
+                    if constexpr (modify) {
                         cluster->modify_write_requests(+1);
                     }
+                    postprocess_io(cmd, stack_ctx);
                     if (cmd.result.has_error()) {
                         auto &ec = cmd.result.assume_error();
                         LOG_ERROR(log, "i/o error (postprocessing): {}", ec.message());
                         do_shutdown(make_error(ec));
-                    } else {
-                        postprocess_io(cmd, stack_ctx);
                     }
                 }
             },
@@ -447,6 +498,7 @@ void controller_actor_t::push_pending(stack_context_t &ctx) noexcept {
 }
 
 void controller_actor_t::pull_next(stack_context_t &context) noexcept {
+    using A = model::advance_action_t;
     if (!file_iterator) {
         return;
     }
@@ -460,30 +512,18 @@ void controller_actor_t::pull_next(stack_context_t &context) noexcept {
         return !ignore;
     };
 
-    using file_set_t = std::pmr::set<model::file_info_t *>;
-    using allocator_t = std::pmr::polymorphic_allocator<char>;
-
-    auto buffer = std::array<std::byte, 1024 * 16>();
-    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
-    auto allocator = allocator_t(&pool);
-    auto checked_children = file_set_t(allocator);
-
-    auto seen_files = file_set_t();
 OUTER:
     while (can_pull_more()) {
         if (block_iterator) {
             auto file = block_iterator->get_source();
-            seen_files.emplace(file);
             if (*block_iterator) {
                 auto file_block = block_iterator->next();
                 auto fi = &block_iterator->get_source_folder();
-                auto block = file_block.block();
-                if (!file_block.block()->is_locked()) {
+                auto block = const_cast<model::block_info_t *>(file_block.block());
+                if (!context.is_locked(*block)) {
                     preprocess_block(file_block, *fi, context);
                 } else {
-                    auto b = model::block_info_ptr_t(const_cast<model::block_info_t *>(block));
-                    auto f = model::file_info_ptr_t(file_block.file());
-                    block_2_files.emplace(block_2_file_t{std::move(b), std::move(f)});
+                    postponed_files.postpone(block, file_block.file());
                 }
                 continue;
             } else {
@@ -492,13 +532,9 @@ OUTER:
             }
             continue;
         }
-        if (!block_iterator && !postponed_files.empty()) {
-            for (auto it = postponed_files.begin(); it != postponed_files.end();) {
-                auto file = std::move(*it);
-                it = postponed_files.erase(it);
-                if (seen_files.count(file.get())) {
-                    continue;
-                }
+        if (!block_iterator) {
+            auto file = postponed_files.get_ready();
+            if (file) {
                 auto folder_uuid = file->get_folder_uuid();
                 auto fi = (model::folder_info_t *)(nullptr);
                 for (auto fit : cluster->get_folders()) {
@@ -510,14 +546,14 @@ OUTER:
                 if (fi) {
                     auto bi = model::block_iterator_ptr_t();
                     bi = new model::blocks_iterator_t(*file, *fi);
-                    if (bi) {
+                    if (*bi) {
                         block_iterator = bi;
                         goto OUTER;
                     }
                 }
             }
         }
-        if (auto [file, peer_folder, action] = file_iterator->next(); action != model::advance_action_t::ignore) {
+        if (auto [file, peer_folder, local_file, action] = file_iterator->next(); action != A::ignore) {
             auto in_sync = synchronizing_files.count(file->get_full_id());
             if (in_sync) {
                 continue;
@@ -529,23 +565,8 @@ OUTER:
                          peer_folder->get_folder()->get_label());
                 continue;
             }
-            if (file->is_locally_available()) {
-                auto finalize = false;
-                auto &peer_f = const_cast<model::folder_info_t &>(*peer_folder);
-                if (is_unflushed(file, peer_f)) {
-                    LOG_DEBUG(log, "finalizing unfinished file '{}'", file->get_name()->get_full_name());
-                    auto guard = file->guard(*peer_folder);
-                    synchronizing_files[file->get_full_id()] = std::move(guard);
-                    auto &folder_infos = peer_f.get_folder()->get_folder_infos();
-                    auto &local_files = folder_infos.by_device(*cluster->get_device())->get_file_infos();
-                    auto filename = file->get_name()->get_full_name();
-                    auto local_file = local_files.by_name(filename);
-                    io_finish_file(local_file.get(), *file, peer_f, action, context);
-                } else {
-                    io_advance(action, *file, peer_f, context);
-                }
-                ++advances;
-            } else if (file->get_size()) {
+            auto ld = compare_with_local(*file, local_file);
+            if (ld == local_difference_t::content) {
                 auto bi = model::block_iterator_ptr_t();
                 bi = new model::blocks_iterator_t(*file, *peer_folder);
                 if (*bi) {
@@ -553,8 +574,28 @@ OUTER:
                     auto guard = file->guard(*peer_folder);
                     synchronizing_files[file->get_full_id()] = std::move(guard);
                 }
+            } else if (ld == local_difference_t::trivial_io) {
+                io_advance(action, *file, *peer_folder, local_file, context);
+                ++advances;
+            } else if (ld == local_difference_t::unflushed) {
+                LOG_DEBUG(log, "finalizing unfinished file '{}'", file->get_name()->get_full_name());
+                synchronizing_files.emplace(file->get_full_id(), file->guard(*peer_folder));
+                io_finish_file(local_file, *file, *peer_folder, action, context);
+                ++advances;
+            } else if (ld == local_difference_t::meta) {
+                LOG_DEBUG(log, "file '{}' (folder '{}'), need metadata update", file->get_name()->get_full_name(),
+                          peer_folder->get_folder()->get_label());
+                synchronizing_files.emplace(file->get_full_id(), file->guard(*peer_folder));
+                io_update_meta(*file, *peer_folder, action, context);
+                ++advances;
+            } else if (ld == local_difference_t::version) {
+                using namespace model::diff;
+                LOG_DEBUG(log, "file '{}' (folder '{}'), need version update", file->get_name()->get_full_name(),
+                          peer_folder->get_folder()->get_label());
+                auto diff = advance::advance_t::create(action, *file, *peer_folder, *sequencer);
+                context.push_back(diff.get());
+                ++advances;
             }
-
             continue;
         }
         break;
@@ -562,15 +603,14 @@ OUTER:
 }
 
 void controller_actor_t::io_advance(model::advance_action_t action, model::file_info_t &peer_file,
-                                    model::folder_info_t &peer_folder, stack_context_t &ctx) {
+                                    model::folder_info_t &peer_folder, model::file_info_t *local_file,
+                                    stack_context_t &ctx) {
     using namespace model::diff::advance;
     LOG_TRACE(log, "going to advance (action: {}) on file '{}'", static_cast<int>(action), peer_file);
     assert((action == model::advance_action_t::remote_copy) || (action == model::advance_action_t::resolve_remote_win));
 
     auto conflict_path = bfs::path();
     if (action == model::advance_action_t::resolve_remote_win) {
-        auto local_folder = peer_folder.get_folder()->get_folder_infos().by_device(*cluster->get_device());
-        auto local_file = local_folder->get_file_infos().by_name(peer_file.get_name()->get_full_name());
         conflict_path = peer_folder.get_folder()->get_path() / bfs::path(local_file->make_conflicting_name());
     }
     auto path = peer_file.get_path(peer_folder);
@@ -584,9 +624,10 @@ void controller_actor_t::io_advance(model::advance_action_t action, model::file_
                           peer_folder.get_folder()->are_permissions_ignored() || peer_file.has_no_permissions();
 
     auto context = fs::payload::extendended_context_prt_t{};
-    context.reset(new remote_copy_context_t(action, peer_file, peer_folder));
-    auto payload = fs::payload::remote_copy_t(std::move(context), path, conflict_path, type, size, perms, modified,
-                                              target, deleted, no_permissions);
+    context.reset(new file_context_t(peer_file, peer_folder, action));
+    auto folder_id = std::string(peer_folder.get_folder()->get_id());
+    auto payload = fs::payload::remote_copy_t(std::move(context), std::move(folder_id), path, conflict_path, type, size,
+                                              perms, modified, target, deleted, no_permissions);
     ctx.push(std::move(payload));
 }
 
@@ -598,7 +639,9 @@ void controller_actor_t::io_append_block(model::file_info_t &peer_file, model::f
     auto offset = peer_file.get_block_offset(block_index);
     auto context = fs::payload::extendended_context_prt_t{};
     context.reset(new block_ack_context_t(block, peer_file, peer_folder, block_index));
-    auto payload = fs::payload::append_block_t(std::move(context), path, std::move(data), offset, file_size);
+    auto folder_id = std::string(peer_folder.get_folder()->get_id());
+    auto payload =
+        fs::payload::append_block_t(std::move(context), std::move(folder_id), path, std::move(data), offset, file_size);
     ctx.push(std::move(payload));
 }
 
@@ -606,7 +649,8 @@ void controller_actor_t::io_clone_block(const model::file_block_t &file_block, m
                                         stack_context_t &ctx) {
     auto src = (const model::file_info_t *)(nullptr);
     auto target = const_cast<model::file_info_t *>(file_block.file());
-    auto it = file_block.block()->iterate_blocks();
+    auto block = const_cast<model::block_info_t *>(file_block.block());
+    auto it = block->iterate_blocks();
     auto src_block_index = std::uint32_t(0);
     auto src_fi = (const model::folder_info_t *)(nullptr);
     auto target_block_index = file_block.block_index();
@@ -635,10 +679,13 @@ void controller_actor_t::io_clone_block(const model::file_block_t &file_block, m
     auto target_sz = target->get_size();
     auto block_sz = src->iterate_blocks(src_block_index).next()->get_size();
     auto context = fs::payload::extendended_context_prt_t{};
-    auto block = const_cast<model::block_info_t *>(file_block.block());
     context.reset(new block_ack_context_t(block, *target, target_fi, target_block_index));
-    auto payload = fs::payload::clone_block_t(std::move(context), target_path, target_offset, target_sz, source_path,
-                                              source_offset, block_sz);
+    auto folder_id = std::string(target_fi.get_folder()->get_id());
+    LOG_TRACE(log, "cloning locally available block '{}', {} (#{}) -> {}(#{})", block->get_hash(),
+              src->get_name()->get_full_name(), src_block_index, target->get_name()->get_full_name(),
+              target_block_index);
+    auto payload = fs::payload::clone_block_t(std::move(context), std::move(folder_id), target_path, target_offset,
+                                              target_sz, source_path, source_offset, block_sz);
     ctx.push(std::move(payload));
 }
 
@@ -659,9 +706,23 @@ void controller_actor_t::io_finish_file(model::file_info_t *local_file, model::f
                           peer_folder.get_folder()->are_permissions_ignored() || peer_file.has_no_permissions();
 
     auto context = fs::payload::extendended_context_prt_t{};
-    context.reset(new finish_file_context_t(peer_file, peer_folder, action));
-    auto payload = fs::payload::finish_file_t(std::move(context), std::move(path), std::move(conflict_path), file_size,
-                                              modified_s, perms, no_permissions);
+    context.reset(new file_context_t(peer_file, peer_folder, action));
+    auto folder_id = std::string(peer_folder.get_folder()->get_id());
+    auto payload = fs::payload::finish_file_t(std::move(context), std::move(folder_id), std::move(path),
+                                              std::move(conflict_path), file_size, modified_s, perms, no_permissions);
+    ctx.push(std::move(payload));
+}
+
+void controller_actor_t::io_update_meta(model::file_info_t &peer_file, model::folder_info_t &peer_folder,
+                                        model::advance_action_t action, stack_context_t &ctx) {
+    auto path = peer_file.get_path(peer_folder);
+    auto context = fs::payload::extendended_context_prt_t{};
+    context.reset(new file_context_t(peer_file, peer_folder, action));
+    auto folder_id = std::string(peer_folder.get_folder()->get_id());
+    bool no_permissions = !utils::platform_t::permissions_supported(path) ||
+                          peer_folder.get_folder()->are_permissions_ignored() || peer_file.has_no_permissions();
+    auto payload = fs::payload::update_meta_t(std::move(context), std::move(folder_id), std::move(path),
+                                              peer_file.get_modified_s(), peer_file.get_permissions(), no_permissions);
     ctx.push(std::move(payload));
 }
 
@@ -685,25 +746,24 @@ void controller_actor_t::preprocess_block(model::file_block_t &file_block, const
     }
 
     auto file = file_block.file();
-    auto block = file_block.block();
+    auto block = const_cast<model::block_info_t *>(file_block.block());
     acquire_block(file_block, source_folder, ctx);
 
     auto hash = block->get_hash();
     auto last_index = file->iterate_blocks(0).get_total() - 1;
     if (file_block.is_locally_available()) {
-        LOG_TRACE(log, "cloning locally available block '{}', file = {}, block index = {} / {}", hash, *file,
-                  file_block.block_index(), last_index);
         auto &folder_infos = source_folder.get_folder()->get_folder_infos();
         auto target_fi = folder_infos.by_uuid(file->get_folder_uuid());
         io_clone_block(file_block, *target_fi, ctx);
     } else {
+        ctx.lock_block(*block);
         auto request_id = block_requests_next;
         for (std::uint_fast32_t i = 0; i < blocks_max_requested; ++i) {
             if (!block_requests[request_id]) {
                 if (request_id + 1 >= blocks_max_requested) {
                     block_requests_next = 0;
                 } else {
-                    ++block_requests_next;
+                    block_requests_next = request_id + 1;
                 }
                 break;
             } else {
@@ -713,9 +773,11 @@ void controller_actor_t::preprocess_block(model::file_block_t &file_block, const
                 }
             }
         }
+        assert(block_requests_next < blocks_max_requested);
         assert(!block_requests[request_id]);
 
         auto sz = block->get_size();
+
         LOG_TRACE(log, "requesting block '{}', file '{}', index = {} of {} ({} bytes), pool sz = {}, req.id = {}", hash,
                   *file, file_block.block_index(), last_index, sz, request_pool, request_id);
 
@@ -747,11 +809,11 @@ void controller_actor_t::on_forward(message::forwarded_messages_t &message) noex
     }
 }
 
-void controller_actor_t::on_model_update(model::message::model_update_t &message) noexcept {
-    auto custom = const_cast<void *>(message.payload.custom);
-    auto ctx = update_context_t(*this, custom == this, false);
-    LOG_TRACE(log, "on_model_update");
-    auto &diff = *message.payload.diff;
+void controller_actor_t::visit(const model::diff::cluster_diff_t &diff,
+                               model::payload::apply_context_t &context) noexcept {
+    LOG_TRACE(log, "visit");
+    auto ctx = update_context_t(*this, context.message_payload == this, false);
+
     auto r = diff.visit(*this, &ctx);
     if (!r) {
         auto ee = make_error(r.assume_error());
@@ -955,7 +1017,10 @@ auto controller_actor_t::operator()(const model::diff::modify::block_ack_t &diff
                 }
             }
         }
-        release_block(diff.folder_id, diff.block_hash, *ctx);
+        auto block = release_block(diff.folder_id, diff.block_hash, *ctx);
+        if (diff.unlock_block) {
+            block->unlock();
+        }
     }
 
     return diff.visit_next(*this, custom);
@@ -981,7 +1046,7 @@ void controller_actor_t::on_message(proto::ClusterConfig &message, stack_context
         LOG_ERROR(log, "error processing message from {} : {}", peer->device_id(), ec.message());
         return do_shutdown(make_error(ec));
     }
-    ctx.push(std::move(diff_opt).assume_value());
+    ctx.push_back(std::move(diff_opt).assume_value().get());
 }
 
 void controller_actor_t::on_message(proto::Index &msg, stack_context_t &ctx) noexcept {
@@ -996,7 +1061,7 @@ void controller_actor_t::on_message(proto::Index &msg, stack_context_t &ctx) noe
     auto folder = cluster->get_folders().by_id(proto::get_folder(msg));
     auto file_count = proto::get_files_size(msg);
     LOG_DEBUG(log, "on_message (Index), folder = {}, files = {}", folder->get_label(), file_count);
-    ctx.push(std::move(diff_opt).assume_value());
+    ctx.push_back(std::move(diff_opt).assume_value().get());
 }
 
 void controller_actor_t::on_message(proto::IndexUpdate &msg, stack_context_t &ctx) noexcept {
@@ -1011,7 +1076,7 @@ void controller_actor_t::on_message(proto::IndexUpdate &msg, stack_context_t &ct
     auto folder = cluster->get_folders().by_id(proto::get_folder(msg));
     auto file_count = proto::get_files_size(msg);
     LOG_DEBUG(log, "on_message (IndexUpdate), folder = {}, files = {}", folder->get_label(), file_count);
-    ctx.push(std::move(diff_opt).assume_value());
+    ctx.push_back(diff_opt.assume_value().get());
 }
 
 void controller_actor_t::on_message(proto::Request &req, stack_context_t &ctx) noexcept {
@@ -1138,9 +1203,8 @@ void controller_actor_t::on_message(proto::Response &message, stack_context_t &c
         if (code_int) {
             do_release_block = true;
             if (!file->is_unreachable()) {
-                LOG_WARN(log, "can't receive block from file '{}': {}; marking unreachable", *file, code_int);
-                file->mark_unreachable(true);
-                stack_ctx.push(new model::diff::modify::mark_reachable_t(*file, *peer_folder, false));
+                LOG_WARN(log, "can't receive block from file '{}': {}", *file, code_int);
+                stack_ctx.mark_unreachable(file_name, folder_id);
                 cancel_sync(file.get());
             }
         } else {
@@ -1159,19 +1223,6 @@ void controller_actor_t::on_message(proto::Response &message, stack_context_t &c
     if (do_release_block) {
         release_block(folder_id, block_hash, ctx);
     }
-}
-
-static inline void ack_block(block_ack_context_t *io_ctx, model::cluster_t *cluster,
-                             controller_actor_t::stack_context_t &ctx) noexcept {
-    using namespace model::diff;
-    auto folder_id = io_ctx->folder->get_id();
-    auto diff = cluster_diff_ptr_t();
-    auto name = std::string(io_ctx->target_file->get_name()->get_full_name());
-    auto device_id = utils::bytes_t(io_ctx->target_folder->get_device()->device_id().get_sha256());
-    auto hash = utils::bytes_t(io_ctx->block->get_hash());
-    diff.reset(new modify::block_ack_t(std::move(name), std::string(folder_id), std::move(device_id), std::move(hash),
-                                       io_ctx->block_index));
-    ctx.push(std::move(diff));
 }
 
 void controller_actor_t::postprocess_io(fs::payload::block_request_t &res, stack_context_t &ctx) noexcept {
@@ -1196,28 +1247,65 @@ void controller_actor_t::postprocess_io(fs::payload::block_request_t &res, stack
 
 void controller_actor_t::postprocess_io(fs::payload::remote_copy_t &res, stack_context_t &ctx) noexcept {
     using namespace model::diff::advance;
-    assert(res.result);
-    auto io_ctx = static_cast<remote_copy_context_t *>(res.context.get());
-    auto diff = advance_t::create(io_ctx->action, *io_ctx->peer_file, *io_ctx->peer_folder, *sequencer);
-    ctx.push(std::move(diff));
+    auto io_ctx = static_cast<file_context_t *>(res.context.get());
+    if (res.result) {
+        auto diff = advance_t::create(io_ctx->action, *io_ctx->peer_file, *io_ctx->peer_folder, *sequencer);
+        ctx.push_back(diff.get());
+    } else {
+        auto name = io_ctx->peer_file->get_name()->get_full_name();
+        auto folder_id = io_ctx->peer_folder->get_folder()->get_id();
+        ctx.mark_unreachable(name, folder_id);
+    }
 }
 
 void controller_actor_t::postprocess_io(fs::payload::append_block_t &res, stack_context_t &ctx) noexcept {
     auto io_ctx = static_cast<block_ack_context_t *>(res.context.get());
-    ack_block(io_ctx, cluster.get(), ctx);
+    if (res.result) {
+        ctx.ack_block(io_ctx, true);
+    } else {
+        auto name = io_ctx->target_file->get_name()->get_full_name();
+        auto folder_id = io_ctx->folder->get_id();
+        ctx.mark_unreachable(name, folder_id);
+    }
 }
 
 void controller_actor_t::postprocess_io(fs::payload::clone_block_t &res, stack_context_t &ctx) noexcept {
     auto io_ctx = static_cast<block_ack_context_t *>(res.context.get());
-    ack_block(io_ctx, cluster.get(), ctx);
+    if (res.result) {
+        ctx.ack_block(io_ctx, false);
+    } else {
+        auto name = io_ctx->target_file->get_name()->get_full_name();
+        auto folder_id = io_ctx->folder->get_id();
+        ctx.mark_unreachable(name, folder_id);
+    }
 }
 
 void controller_actor_t::postprocess_io(fs::payload::finish_file_t &res, stack_context_t &ctx) noexcept {
     using namespace model::diff;
-    auto io_ctx = static_cast<finish_file_context_t *>(res.context.get());
+    auto io_ctx = static_cast<file_context_t *>(res.context.get());
 
-    auto diff = advance::advance_t::create(io_ctx->action, *io_ctx->peer_file, *io_ctx->peer_folder, *sequencer);
-    ctx.push(std::move(diff));
+    if (res.result) {
+        auto diff = advance::advance_t::create(io_ctx->action, *io_ctx->peer_file, *io_ctx->peer_folder, *sequencer);
+        ctx.push_back(diff.get());
+    } else {
+        auto name = io_ctx->peer_file->get_name()->get_full_name();
+        auto folder_id = io_ctx->peer_folder->get_folder()->get_id();
+        ctx.mark_unreachable(name, folder_id);
+    }
+}
+
+void controller_actor_t::postprocess_io(fs::payload::update_meta_t &res, stack_context_t &ctx) noexcept {
+    using namespace model::diff;
+    auto io_ctx = static_cast<file_context_t *>(res.context.get());
+
+    if (res.result) {
+        auto diff = advance::advance_t::create(io_ctx->action, *io_ctx->peer_file, *io_ctx->peer_folder, *sequencer);
+        ctx.push_back(diff.get());
+    } else {
+        auto name = io_ctx->peer_file->get_name()->get_full_name();
+        auto folder_id = io_ctx->peer_folder->get_folder()->get_id();
+        ctx.mark_unreachable(name, folder_id);
+    }
 }
 
 void controller_actor_t::on_digest(hasher::message::digest_t &res) noexcept {
@@ -1274,11 +1362,13 @@ void controller_actor_t::on_digest(hasher::message::digest_t &res) noexcept {
     } else {
         if (result.has_error() || result.assume_value() != block->get_hash()) {
             if (!file->is_unreachable()) {
-                auto ec = utils::make_error_code(utils::protocol_error_code_t::digest_mismatch);
-                LOG_WARN(log, "digest mismatch for file '{}', expected = {}; marking unreachable", *file,
-                         block->get_hash());
-                file->mark_unreachable(true);
-                stack_ctx.push(new model::diff::modify::mark_reachable_t(*file, *peer_folder, false));
+                if (result.has_error()) {
+                    LOG_WARN(log, "hashing error of '{}' : {}", *file, result.error().message());
+                } else {
+                    LOG_WARN(log, "digest mismatch for file '{}', expected '{}', got '{}'", *file, block->get_hash(),
+                             result.assume_value());
+                }
+                stack_ctx.mark_unreachable(file_name, folder_id);
             }
             do_release_block = true;
             try_next = true;
@@ -1329,37 +1419,34 @@ void controller_actor_t::on_fs_ack_timer(r::request_id_t, bool cancelled) noexce
 auto controller_actor_t::get_sync_info(model::folder_t *folder) noexcept -> folder_synchronization_t & {
     auto it = synchronizing_folders.find(folder);
     if (it == synchronizing_folders.end()) {
-        auto pair = synchronizing_folders.emplace(folder, folder_synchronization_t(*this, *folder));
-        return pair.first->second;
+        auto folder_sync = std::make_unique<folder_synchronization_t>(*this, *folder);
+        auto pair = synchronizing_folders.emplace(folder, std::move(folder_sync));
+        return *pair.first->second;
     }
-    return it->second;
+    return *it->second;
 }
 
 auto controller_actor_t::get_sync_info(std::string_view folder_id) noexcept -> folder_synchronization_t & {
     auto predicate = [folder_id](const auto &it) -> bool { return it.first->get_id() == folder_id; };
     auto it = std::find_if(synchronizing_folders.begin(), synchronizing_folders.end(), predicate);
     assert(it != synchronizing_folders.end());
-    return it->second;
+    return *it->second;
 }
 
 void controller_actor_t::acquire_block(const model::file_block_t &file_block, const model::folder_info_t &folder_info,
                                        stack_context_t &context) noexcept {
-    auto block = file_block.block();
+    auto block = const_cast<model::block_info_t *>(file_block.block());
     auto folder = folder_info.get_folder();
     LOG_TRACE(log, "acquire block '{}', {}", block->get_hash(), (const void *)block);
     get_sync_info(folder).start_fetching(const_cast<model::block_info_t *>(block), context);
 }
 
-void controller_actor_t::release_block(std::string_view folder_id, utils::bytes_view_t hash,
-                                       stack_context_t &context) noexcept {
+auto controller_actor_t::release_block(std::string_view folder_id, utils::bytes_view_t hash,
+                                       stack_context_t &context) noexcept -> model::block_info_ptr_t {
     LOG_TRACE(log, "release block '{}'", hash);
     auto block = get_sync_info(folder_id).finish_fetching(hash, context);
-    auto &block_proj = block_2_files.get<0>();
-    auto &file_proj = block_2_files.get<1>();
-    for (auto it = block_proj.find(block); it != block_proj.end();) {
-        postponed_files.emplace(it->file);
-        it = block_proj.erase(it);
-    }
+    postponed_files.advance(block);
+    return block;
 }
 
 void controller_actor_t::cancel_sync(model::file_info_t *file) noexcept {
@@ -1367,12 +1454,7 @@ void controller_actor_t::cancel_sync(model::file_info_t *file) noexcept {
         block_iterator.reset();
     }
     auto id = file->get_full_id();
-    auto &block_proj = block_2_files.get<0>();
-    auto &file_proj = block_2_files.get<1>();
-    for (auto it = file_proj.find(file); it != file_proj.end();) {
-        // block_proj.erase(it->block);
-        it = file_proj.erase(it);
-    }
+    postponed_files.forget(file);
     if (auto it = synchronizing_files.find(id); it != synchronizing_files.end()) {
         synchronizing_files.erase(it);
     }
@@ -1386,4 +1468,42 @@ bool controller_actor_t::is_unflushed(model::file_info_t *peer_file, model::fold
         }
     }
     return false;
+}
+
+auto controller_actor_t::compare_with_local(model::file_info_t &peer_file, model::file_info_t *local_file) noexcept
+    -> local_difference_t {
+    using LD = local_difference_t;
+    auto compare_meta = [](model::file_info_t &peer_file, model::file_info_t &local_file) -> local_difference_t {
+        if (local_file.get_modified_s() != peer_file.get_modified_s()) {
+            return LD::meta;
+        }
+        auto perms_differ = (!local_file.has_no_permissions() && !peer_file.has_no_permissions() &&
+                             local_file.get_permissions() != peer_file.get_permissions());
+        return perms_differ ? LD::meta : LD::version;
+    };
+
+    if (peer_file.get_block_size() == 0) {
+        if (!local_file || local_file->get_block_size() != 0) {
+            return LD::trivial_io;
+        }
+        return compare_meta(peer_file, *local_file);
+    }
+    if (local_file) {
+        auto it_peer = peer_file.iterate_blocks(0);
+        auto it_local = local_file->iterate_blocks(0);
+        auto content_match = true;
+        for (auto block_peer = it_peer.next(); block_peer && content_match; block_peer = it_peer.next()) {
+            auto block_local = it_local.next();
+            if (!block_local) {
+                content_match = false;
+            } else if (block_local->get_hash() != block_peer->get_hash()) {
+                content_match = false;
+            }
+        }
+        if (content_match && !it_local.next()) {
+            return compare_meta(peer_file, *local_file);
+        }
+    }
+
+    return peer_file.is_locally_available() ? LD::unflushed : LD::content;
 }
