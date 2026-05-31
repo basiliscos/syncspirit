@@ -18,6 +18,7 @@
 #include "utils/location.h"
 #include "utils/log-setup.h"
 #include "utils/platform.h"
+#include "utils/format.hpp"
 #include "net/net_supervisor.h"
 #include "fs/fs_context.h"
 #include "fs/fs_supervisor.h"
@@ -52,9 +53,9 @@ using namespace syncspirit;
 using namespace syncspirit::daemon;
 using boost::nowide::narrow;
 
-[[noreturn]] static void report_error_and_die(r::actor_base_t *actor, const r::extended_error_ptr_t &ec) noexcept {
+[[noreturn]] static void report_error_and_die(r::actor_base_t *actor, const r::extended_error_ptr_t &ee) noexcept {
     auto name = actor ? actor->get_identity() : "unknown";
-    utils::get_root_logger()->critical("actor '{}' error: {}", name, ec->message());
+    utils::get_root_logger()->critical("actor '{}' error: {}", name, ee);
     std::terminate();
 }
 
@@ -207,7 +208,7 @@ int app_main(app_context_t &app_ctx) {
         if (config_default) {
             config_file_path = config_default.value();
         } else {
-            logger->error("cannot determine default config dir: {}", config_default.error().message());
+            logger->error("cannot determine default config dir: {}", config_default.error());
             return 1;
         }
     }
@@ -220,25 +221,25 @@ int app_main(app_context_t &app_ctx) {
         logger->info("Config {} seems does not exit, creating default one...", config_file_path.string());
         auto cfg_opt = config::generate_config(config_file_path);
         if (!cfg_opt) {
-            logger->error("cannot generate default config: {}", cfg_opt.error().message());
+            logger->error("cannot generate default config: {}", cfg_opt.error());
             return 1;
         }
         auto &cfg = cfg_opt.value();
         auto cfg_str = config::serialize(cfg);
         auto file_opt = utils::io_stream_t::open_truncate(config_file_path);
         if (!file_opt) {
-            logger->error("cannot open file config at {}: {}", config_file_path_str, file_opt.error().message());
+            logger->error("cannot open file config at {}: {}", config_file_path_str, file_opt.error());
             return 1;
         }
         auto &file = file_opt.assume_value();
         if (auto r = file.write(cfg_str); !r) {
-            logger->error("cannot generate default config at {}: {}", config_file_path_str, r.error().message());
+            logger->error("cannot generate default config at {}: {}", config_file_path_str, r.error());
             return 1;
         }
     }
     auto config_file_opt = utils::io_stream_t::open_read(config_file_path);
     if (!config_file_opt) {
-        logger->error("Cannot open config file '{}' : {}", config_file_path_str, config_file_opt.error().message());
+        logger->error("Cannot open config file '{}' : {}", config_file_path_str, config_file_opt.error());
         return 1;
     }
 
@@ -246,7 +247,7 @@ int app_main(app_context_t &app_ctx) {
     auto config_file_content = config_file.read_whole();
     if (!config_file_content) {
         auto &ec = config_file_content.assume_error();
-        logger->error("Cannot read config file '{}' : {}", config_file_path_str, ec.message());
+        logger->error("Cannot read config file '{}' : {}", config_file_path_str, ec);
         return 1;
     }
     auto &config_file_data = config_file_content.assume_value();
@@ -269,7 +270,7 @@ int app_main(app_context_t &app_ctx) {
     }
     auto init_result = utils::init_loggers(cfg.log_configs);
     if (!init_result) {
-        logger->error("Loggers initialization failed :: {}", init_result.error().message());
+        logger->error("Loggers initialization failed :: {}", init_result.error());
         return 1;
     }
 
@@ -279,7 +280,7 @@ int app_main(app_context_t &app_ctx) {
         for (auto &cmd : cmds) {
             auto r = command_t::parse(cmd);
             if (!r) {
-                logger->error("error parsing {} : {}", cmd, r.assume_error().message());
+                logger->error("error parsing {} : {}", cmd, r.assume_error());
                 return 1;
             }
             commands.emplace_back(std::move(r.assume_value()));
@@ -297,14 +298,14 @@ int app_main(app_context_t &app_ctx) {
             logger->info("Generating cryptographic keys...");
             auto pair = utils::generate_pair(constants::issuer_name);
             if (!pair) {
-                logger->error("cannot generate cryptographic keys :: {}", pair.error().message());
+                logger->error("cannot generate cryptographic keys :: {}", pair.error());
                 return 1;
             }
             auto &keys = pair.value();
             auto save_result = keys.save(cert_path_str.c_str(), key_path_str.c_str());
             if (!save_result) {
                 logger->error("cannot store cryptographic keys ({} & {}) :: {}", cert_path, key_path,
-                              save_result.error().message());
+                              save_result.error());
                 return 1;
             }
         }
@@ -438,7 +439,7 @@ int app_main(app_context_t &app_ctx) {
     bouncer_thread.join();
 
     if (auto reason = sup_net->get_shutdown_reason(); reason && reason->ec) {
-        logger->info("app shut down reason: {}", reason->message());
+        logger->info("app shut down reason: {}", reason);
     }
 
     logger->trace("everything has been terminated");

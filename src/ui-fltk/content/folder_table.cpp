@@ -12,6 +12,7 @@
 #include "model/diff/modify/unshare_folder.h"
 #include "model/diff/modify/upsert_folder.h"
 #include "model/diff/local/scan_request.h"
+#include "utils/format.hpp"
 
 #include "../table_widget/checkbox.h"
 #include "../table_widget/choice.h"
@@ -19,8 +20,6 @@
 #include "../table_widget/int_input.h"
 #include "../table_widget/label.h"
 #include "../table_widget/path.h"
-
-#include "utils/format.hpp"
 
 #include <FL/fl_ask.H>
 #include <boost/nowide/convert.hpp>
@@ -726,7 +725,7 @@ void folder_table_t::on_share() {
         log->info("going to create folder {}({}) & share it with {}", label, folder_id, peer->get_name());
         auto opt = modify::upsert_folder_t::create(*sup.get_cluster(), sup.get_sequencer(), folder, 0);
         if (!opt) {
-            log->error("cannot create folder: {}", opt.assume_error().message());
+            log->error("cannot create folder: {}", opt.assume_error());
             return;
         }
 
@@ -739,7 +738,7 @@ void folder_table_t::on_share() {
         auto &self = *cluster->get_device();
         auto opt = diff_t::create(*cluster, sequncecer, *peer, self.device_id(), *existing_folder);
         if (!opt) {
-            auto message = opt.assume_error().message();
+            auto message = opt.assume_error();
             log->error("cannot share folder {} with {} : {}", folder_id, peer->device_id(), message);
             return;
         }
@@ -764,7 +763,7 @@ void folder_table_t::on_apply() {
 
     auto opt = modify::upsert_folder_t::create(*sup.get_cluster(), sup.get_sequencer(), folder_db, ctx.index);
     if (!opt) {
-        log->error("cannot create folder: {}", opt.assume_error().message());
+        log->error("cannot create folder: {}", opt.assume_error());
         return;
     }
     auto assember = model::diff::diff_assember_t(constants::diffs_batch);

@@ -3,6 +3,7 @@
 
 #include "governor_actor.h"
 #include "net/names.h"
+#include "utils/format.hpp"
 #include "model/diff/advance/remote_copy.h"
 #include "model/diff/local/io_failure.h"
 #include "model/diff/modify/block_ack.h"
@@ -134,7 +135,7 @@ auto governor_actor_t::operator()(const model::diff::local::io_failure_t &diff, 
     -> outcome::result<void> {
     LOG_TRACE(log, "on_io_error, count = {}", diff.errors.size());
     for (auto &err : diff.errors) {
-        LOG_WARN(log, "on_io_error (ignored) path: {}, problem: {}", err.path, err.ec.message());
+        LOG_WARN(log, "on_io_error (ignored) path: {}, problem: {}", err.path, err.ec);
     }
     return diff.visit_next(*this, custom);
 }

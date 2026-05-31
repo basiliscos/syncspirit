@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2026 Ivan Baidakou
 
 #include "self_device.h"
 
@@ -9,6 +9,7 @@
 #include "../utils.hpp"
 #include "../main_window.h"
 #include "utils/dns.h"
+#include "utils/format.hpp"
 #include "constants.h"
 
 #include <FL/fl_ask.H>
@@ -176,14 +177,14 @@ struct self_table_t final : static_table_t, db_info_viewer_t {
         auto key_path_str = boost::nowide::narrow(key_path.wstring());
         auto pair = utils::generate_pair(constants::issuer_name);
         if (!pair) {
-            logger->error("cannot generate cryptographic keys :: {}", pair.error().message());
+            logger->error("cannot generate cryptographic keys :: {}", pair.error());
             return;
         }
         auto &keys = pair.value();
         auto save_result = keys.save(cert_path_str.c_str(), key_path_str.c_str());
         if (!save_result) {
             logger->error("cannot store cryptographic keys ({} & {}) :: {}", cert_path_str, key_path_str,
-                          save_result.error().message());
+                          save_result.error());
         }
         logger->info("keys has been regenerated, please restart");
 

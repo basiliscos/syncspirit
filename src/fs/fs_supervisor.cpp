@@ -7,6 +7,7 @@
 #endif
 
 #include "fs_supervisor.h"
+#include "utils/format.hpp"
 #include "file_actor.h"
 #include "fs_context.h"
 #include "updates_mediator.h"
@@ -76,5 +77,5 @@ void fs_supervisor_t::launch_children() noexcept {
 void fs_supervisor_t::on_child_shutdown(actor_base_t *actor) noexcept {
     parent_t::on_child_shutdown(actor);
     auto &reason = actor->get_shutdown_reason();
-    LOG_TRACE(log, "on_child_shutdown, '{}' due to {} ", actor->get_identity(), reason->message());
+    LOG_TRACE(log, "on_child_shutdown, '{}' due to {} ", actor->get_identity(), reason);
 }

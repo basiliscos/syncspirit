@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "format.hpp"
 #include "model/device.h"
@@ -10,7 +10,11 @@
 #include "utils/bytes.h"
 #include "utils/uri.h"
 #include <boost/asio.hpp>
+#include <boost/nowide/convert.hpp>
 
+using ec_t = std::error_code;
+using sys_ec_t = boost::system::error_code;
+using ee_ptr_t = rotor::extended_error_ptr_t;
 using ctx_t = fmt::v11::context;
 using path_t = std::filesystem::path;
 using address_t = boost::asio::ip::address;
@@ -26,6 +30,42 @@ using uri_ptr_t = syncspirit::model::intrusive_ptr_t<uri_t>;
 using bytes_view_t = syncspirit::utils::bytes_view_t;
 using bytes_t = syncspirit::utils::bytes_t;
 
+using boost::nowide::narrow;
+
+template <typename FormatContext, typename ErrorCode>
+auto format_ec(const ErrorCode &ec, FormatContext &ctx) noexcept -> decltype(ctx.out()) {
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+    static auto gen_cat = std::string_view(std::generic_category().name());
+    static auto sys_cat = std::string_view(std::system_category().name());
+    auto cn = ec.category().name();
+    auto code = static_cast<DWORD>(ec.value());
+    if (code && (cn == gen_cat) || (cn == sys_cat)) {
+        static constexpr auto flags =
+            FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_IGNORE_INSERTS;
+        auto w_msg = (wchar_t *)(nullptr);
+        auto sz = FormatMessageW(flags, nullptr, code, 0, (LPWSTR)(&w_msg), 0, nullptr);
+        if (sz && w_msg) {
+            auto view = std::wstring_view(w_msg, sz);
+            auto begin = view.data();
+            auto p = begin + (sz - 1);
+            auto msg = std::string();
+            while (p > begin && (*p == L' ' || *p == L'\n' || *p == L'\t' || *p == L'\r')) {
+                --p;
+            }
+            if (p) {
+                auto trimmed_view = std::wstring_view(begin, p - begin);
+                msg = narrow(trimmed_view);
+            }
+            LocalFree(w_msg);
+            if (msg.size()) {
+                return fmt::format_to(ctx.out(), "{}", msg);
+            }
+        }
+    }
+#endif
+    return fmt::format_to(ctx.out(), "{}", ec.message());
+}
+
 template <typename FormatContext>
 auto fmt::formatter<path_t>::format(const path_t &path, FormatContext &ctx) const -> decltype(ctx.out()) {
     return fmt::format_to(ctx.out(), "{}", path.string());
@@ -34,6 +74,25 @@ auto fmt::formatter<path_t>::format(const path_t &path, FormatContext &ctx) cons
 template <typename FormatContext>
 auto fmt::formatter<address_t>::format(const address_t &addr, FormatContext &ctx) const -> decltype(ctx.out()) {
     return fmt::format_to(ctx.out(), "{}", addr.to_string());
+}
+
+template <typename FormatContext>
+auto fmt::formatter<ee_ptr_t>::format(const ee_ptr_t &ee, FormatContext &ctx) const -> decltype(ctx.out()) {
+    auto out = fmt::format_to(ctx.out(), "{} {}", ee->context, ee->ec);
+    if (ee->next) {
+        return fmt::format_to(out, " <- ", ee->next);
+    }
+    return out;
+}
+
+template <typename FormatContext>
+auto fmt::formatter<ec_t>::format(const ec_t &ec, FormatContext &ctx) const -> decltype(ctx.out()) {
+    return format_ec(ec, ctx);
+}
+
+template <typename FormatContext>
+auto fmt::formatter<sys_ec_t>::format(const sys_ec_t &ec, FormatContext &ctx) const -> decltype(ctx.out()) {
+    return format_ec(ec, ctx);
 }
 
 template <typename T>
@@ -142,4 +201,12 @@ template SYNCSPIRIT_API auto fmt::formatter<bytes_view_t>::format<ctx_t>(const b
     -> decltype(ctx.out());
 
 template SYNCSPIRIT_API auto fmt::formatter<bytes_t>::format<ctx_t>(const bytes_t &, ctx_t &ctx) const
+    -> decltype(ctx.out());
+
+template SYNCSPIRIT_API auto fmt::formatter<ec_t>::format<ctx_t>(const ec_t &, ctx_t &ctx) const -> decltype(ctx.out());
+
+template SYNCSPIRIT_API auto fmt::formatter<sys_ec_t>::format<ctx_t>(const sys_ec_t &, ctx_t &ctx) const
+    -> decltype(ctx.out());
+
+template SYNCSPIRIT_API auto fmt::formatter<ee_ptr_t>::format<ctx_t>(const ee_ptr_t &, ctx_t &ctx) const
     -> decltype(ctx.out());

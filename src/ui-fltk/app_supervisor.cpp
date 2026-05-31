@@ -192,7 +192,7 @@ void app_supervisor_t::on_model_response(model::message::model_response_t &res) 
     LOG_TRACE(log, "on_model_response");
     auto &ee = res.payload.ee;
     if (ee) {
-        LOG_ERROR(log, "cannot get model: {}", ee->message());
+        LOG_ERROR(log, "cannot get model: {}", ee);
         return do_shutdown(ee);
     }
     cluster = std::move(res.payload.res.cluster);
@@ -282,7 +282,7 @@ void app_supervisor_t::on_db_info_response(net::message::db_info_response_t &res
     if (db_info_viewer) {
         auto &ee = res.payload.ee;
         if (ee) {
-            log->warn("error requesting db info: {}", ee->message());
+            log->warn("error requesting db info: {}", ee);
         } else {
             db_info_viewer->view(res.payload.res);
         }
@@ -334,8 +334,8 @@ callback_ptr_t app_supervisor_t::call_share_folders(std::string_view folder_id, 
             using diff_t = model::diff::modify::share_folder_t;
             auto opt = diff_t::create(*cluster, *sequencer, *device, self, *folder);
             if (!opt) {
-                auto message = opt.assume_error().message();
-                log->error("cannot share folder {} with {} : {}", folder_id, device->device_id(), message);
+                auto &ec = opt.assume_error();
+                log->error("cannot share folder {} with {} : {}", folder_id, device->device_id(), ec);
                 return;
             }
             assember.push_back(opt.assume_value().get());
@@ -353,7 +353,7 @@ auto app_supervisor_t::apply(const model::diff::local::io_failure_t &diff, void 
     auto r = parent_t::apply(diff, custom);
     if (r) {
         for (auto &details : diff.errors) {
-            log->warn("I/O error on '{}': {}", details.path.string(), details.ec.message());
+            log->warn("I/O error on '{}': {}", details.path.string(), details.ec);
         }
     }
     return r;
@@ -642,13 +642,13 @@ void app_supervisor_t::write_config(const config::main_t &cfg) noexcept {
     auto file_opt = utils::io_stream_t::open_truncate(path);
     if (!file_opt) {
         auto &ec = file_opt.assume_error();
-        log->error("cannot open config '{}': {}", path, ec.message());
+        log->error("cannot open config '{}': {}", path, ec);
         return;
     }
     auto &file = file_opt.assume_value();
     if (auto ok = file.write(cfg_str); !ok) {
         auto ec = ok.assume_error();
-        log->error("cannot save default config at '{}': {}", path, ec.message());
+        log->error("cannot save default config at '{}': {}", path, ec);
         return;
     }
     log->info("succesfully stored config at {}. Restart to apply", path);

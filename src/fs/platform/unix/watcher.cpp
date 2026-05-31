@@ -6,6 +6,7 @@
 #if defined(SYNCSPIRIT_WATCHER_INOTIFY) || defined(SYNCSPIRIT_WATCHER_KQUEUE)
 
 #include "fs/task/scan_dir.h"
+#include "utils/format.hpp"
 
 using namespace syncspirit::fs::platform::unix;
 
@@ -16,7 +17,7 @@ void watcher_t::shutdown_finish() noexcept {
         LOG_DEBUG(log, "unwatching folder '{}' on {}", folder_id, path);
         auto ec = unwatch_folder(folder_id);
         if (ec) {
-            LOG_WARN(log, "cannot unwatch '{}' : {}", path, ec.message());
+            LOG_WARN(log, "cannot unwatch '{}' : {}", path, ec);
         }
         it = watched_folders->erase(it);
     }
@@ -105,7 +106,7 @@ auto watcher_t::unwatch_recurse(std::string_view path) noexcept -> sys::error_co
                 if (!ec) {
                     ec = ec_rm;
                 } else {
-                    LOG_ERROR(log, "cannot unwatch '{}': {}", wd, ec_rm.message());
+                    LOG_ERROR(log, "cannot unwatch '{}': {}", wd, ec_rm);
                 }
             }
 

@@ -1,16 +1,24 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #pragma once
 
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/ip/udp.hpp>
 #include <boost/asio.hpp>
+#include <rotor/extended_error.h>
+#include <system_error>
 #include "model/misc/arc.hpp"
 #include "syncspirit-export.h"
 #include <filesystem>
 
 #include <fmt/format.h>
+
+namespace boost::system {
+
+struct error_code;
+
+}
 
 namespace boost::asio::ip {
 class address;
@@ -38,6 +46,24 @@ template <> struct SYNCSPIRIT_API fmt::formatter<std::filesystem::path> {
     constexpr auto parse(format_parse_context &ctx) -> decltype(ctx.begin()) { return ctx.end(); }
 
     template <typename FormatContext> auto format(const Path &path, FormatContext &ctx) const -> decltype(ctx.out());
+};
+
+template <> struct SYNCSPIRIT_API fmt::formatter<std::error_code> {
+    constexpr auto parse(format_parse_context &ctx) -> decltype(ctx.begin()) { return ctx.end(); }
+    template <typename FormatContext>
+    auto format(const std::error_code &ec, FormatContext &ctx) const -> decltype(ctx.out());
+};
+
+template <> struct SYNCSPIRIT_API fmt::formatter<boost::system::error_code> {
+    constexpr auto parse(format_parse_context &ctx) -> decltype(ctx.begin()) { return ctx.end(); }
+    template <typename FormatContext>
+    auto format(const boost::system::error_code &ec, FormatContext &ctx) const -> decltype(ctx.out());
+};
+
+template <> struct SYNCSPIRIT_API fmt::formatter<rotor::extended_error_ptr_t> {
+    constexpr auto parse(format_parse_context &ctx) -> decltype(ctx.begin()) { return ctx.end(); }
+    template <typename FormatContext>
+    auto format(const rotor::extended_error_ptr_t &ee, FormatContext &ctx) const -> decltype(ctx.out());
 };
 
 template <> struct SYNCSPIRIT_API fmt::formatter<boost::asio::ip::address> {

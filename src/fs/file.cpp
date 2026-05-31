@@ -4,6 +4,7 @@
 #include "file.h"
 #include "utils.h"
 #include "utils/log.h"
+#include "utils/format.hpp"
 #include "fs_proxy.h"
 #include <errno.h>
 #include <cassert>
@@ -68,7 +69,7 @@ file_t::~file_t() {
         auto result = close(nullptr, 0);
         if (!result) {
             auto &ec = result.assume_error();
-            log->warn("error closing file via d-tor '{}': {}", path_str, ec.message());
+            log->warn("error closing file via d-tor '{}': {}", path_str, ec);
         }
     }
 }

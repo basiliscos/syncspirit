@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "resolver_actor.h"
-#include "model/cluster.h"
 #include "utils/error_code.h"
 #include "utils/format.hpp"
 #include "names.h"
@@ -97,14 +96,14 @@ void resolver_actor_t::do_initialize(r::system_context_t *ctx) noexcept {
     auto s = udp_socket_t{strand.context()};
     s.open(boost::asio::ip::udp::v4(), ec);
     if (ec) {
-        LOG_WARN(log, "init, can't open socket: {}", ec.message());
+        LOG_WARN(log, "init, can't open socket: {}", ec);
         return do_shutdown(make_error(ec));
     }
 
     auto endpoint = asio::ip::udp::endpoint(dns_address.ip, dns_address.port);
     s.connect(endpoint, ec);
     if (ec) {
-        LOG_WARN(log, "init, can't connect to {}: {}", endpoint, ec.message());
+        LOG_WARN(log, "init, can't connect to {}: {}", endpoint, ec);
         return do_shutdown(make_error(ec));
     }
 
@@ -217,7 +216,7 @@ bool resolver_actor_t::resolve_locally(const utils::dns_query_t &query) noexcept
             auto ec = sys::error_code{};
             auto ip = asio::ip::make_address(buff, ec);
             if (ec) {
-                LOG_WARN(log, "invalid ip address {}: ", buff, ec.message());
+                LOG_WARN(log, "invalid ip address {}: ", buff, ec);
                 continue;
             }
             results.emplace_back(std::move(ip));
@@ -318,7 +317,7 @@ void resolver_actor_t::on_timer(r::request_id_t, bool cancelled) noexcept {
             sys::error_code ec;
             sock->cancel(ec);
             if (ec) {
-                LOG_WARN(log, "cannot cancel socket: {}", ec.message());
+                LOG_WARN(log, "cannot cancel socket: {}", ec);
             }
         }
     };
@@ -357,7 +356,7 @@ void resolver_actor_t::on_write(size_t) noexcept {
 void resolver_actor_t::on_write_error(const sys::error_code &ec) noexcept {
     resources->release(resource::send);
     if (ec != asio::error::operation_aborted) {
-        LOG_WARN(log, "on_write_error, error = {}", ec.message());
+        LOG_WARN(log, "on_write_error, error: {}", ec);
     }
     if (current_query) {
         auto &payload = current_query->payload.request_payload;
@@ -369,7 +368,7 @@ void resolver_actor_t::on_write_error(const sys::error_code &ec) noexcept {
 void resolver_actor_t::on_read_error(const sys::error_code &ec) noexcept {
     resources->release(resource::recv);
     if (ec != asio::error::operation_aborted) {
-        LOG_WARN(log, "on_read_error, error = {}", ec.message());
+        LOG_WARN(log, "on_read_error, error: {}", ec);
     }
     if (current_query) {
         auto &payload = current_query->payload.request_payload;

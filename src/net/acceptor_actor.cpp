@@ -39,25 +39,25 @@ void acceptor_actor_t::on_start() noexcept {
 
     acceptor.open(endpoint.protocol(), ec);
     if (ec) {
-        LOG_ERROR(log, "cannot open endpoint ({}) : {}", endpoint, ec.message());
+        LOG_ERROR(log, "cannot open endpoint ({}) : {}", endpoint, ec);
         return do_shutdown(make_error(ec));
     }
 
     acceptor.bind(endpoint, ec);
     if (ec) {
-        LOG_ERROR(log, "cannot bind endpoint ({}) : {}", endpoint, ec.message());
+        LOG_ERROR(log, "cannot bind endpoint ({}) : {}", endpoint, ec);
         return do_shutdown(make_error(ec));
     }
 
     acceptor.listen(asio::socket_base::max_listen_connections, ec);
     if (ec) {
-        LOG_ERROR(log, "cannot listen ({}) : {}", endpoint, ec.message());
+        LOG_ERROR(log, "cannot listen ({}) : {}", endpoint, ec);
         return do_shutdown(make_error(ec));
     }
 
     endpoint = acceptor.local_endpoint(ec);
     if (ec) {
-        LOG_ERROR(log, "cannot get local endpoint {}", ec.message());
+        LOG_ERROR(log, "cannot get local endpoint {}", ec);
         return do_shutdown(make_error(ec));
     }
 
@@ -88,7 +88,7 @@ void acceptor_actor_t::shutdown_start() noexcept {
         sys::error_code ec;
         acceptor.cancel(ec);
         if (ec) {
-            LOG_ERROR(log, "cannot cancel accepting :: ", ec.message());
+            LOG_ERROR(log, "cannot cancel accepting: ", ec);
         }
     }
 }
@@ -97,7 +97,7 @@ void acceptor_actor_t::on_accept(const sys::error_code &ec) noexcept {
     resources->release(resource::accepting);
     if (ec) {
         if (ec != asio::error::operation_aborted) {
-            LOG_WARN(log, "accepting error :: ", ec.message());
+            LOG_WARN(log, "accepting error: ", ec);
             return do_shutdown(make_error(ec));
         } else {
             shutdown_continue();
@@ -107,7 +107,7 @@ void acceptor_actor_t::on_accept(const sys::error_code &ec) noexcept {
     sys::error_code err;
     auto remote = peer.remote_endpoint(err);
     if (err) {
-        LOG_WARN(log, "on_accept, cannot get remote endpoint:: {}", err.message());
+        LOG_WARN(log, "on_accept, cannot get remote endpoint: {}", err);
         return accept_next();
     }
     LOG_TRACE(log, "on_accept, peer = {}", remote);

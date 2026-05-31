@@ -7,6 +7,7 @@
 #if SYNCSPIRIT_WATCHER_WIN32
 #include <boost/system.hpp>
 #include <utility>
+#include "utils/format.hpp"
 
 using namespace syncspirit;
 using namespace syncspirit::fs::platform::windows;
@@ -29,7 +30,7 @@ guard_t::~io_guard_t() {
         LOG_TRACE(log, "removing handle {}", (void *)handle);
         if (!close_cb(handle)) {
             auto ec = sys::error_code(::GetLastError(), sys::system_category());
-            LOG_WARN(log, "cannot close handle {}: {}", (void *)handle, ec.message());
+            LOG_WARN(log, "cannot close handle {}: {}", (void *)handle, ec);
         }
         if (registered) {
             auto &handles = ctx->handles;
@@ -66,7 +67,7 @@ static void async_cb(HANDLE handle, void *data) {
     if (auto ok = ::ResetEvent(handle); !ok) {
         auto ec = sys::error_code(::GetLastError(), sys::system_category());
         auto log = utils::get_logger("fs");
-        LOG_WARN(log, "cannot reset asyn handle {} : {}", (void *)handle, ec.message());
+        LOG_WARN(log, "cannot reset asyn handle {} : {}", (void *)handle, ec);
     }
 }
 
@@ -76,7 +77,7 @@ platform_context_t::platform_context_t(const pt::time_duration &poll_timeout_) n
     auto event = ::CreateEvent(nullptr, false, false, nullptr);
     if (!event) {
         auto ec = sys::error_code(::GetLastError(), sys::system_category());
-        LOG_CRITICAL(log, "cannot CreateEvent(): {}", ec.message());
+        LOG_CRITICAL(log, "cannot CreateEvent(): {}", ec);
         return;
     }
     async_guard = register_callback(event, async_cb, this);
@@ -142,7 +143,7 @@ bool platform_context_t::poll_events_impl(std::uint32_t timeout_ms) noexcept {
             // NO-OP
         } else {
             auto ec = sys::error_code(::GetLastError(), sys::system_category());
-            LOG_WARN(log, "WaitFor*Object failed: {}", ec.message());
+            LOG_WARN(log, "WaitFor*Object failed: {}", ec);
         }
     }
     return has_events;

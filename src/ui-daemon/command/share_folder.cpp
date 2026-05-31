@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "share_folder.h"
 #include "pair_iterator.h"
 #include "../governor_actor.h"
 #include "../error_code.h"
+#include "utils/format.hpp"
 #include "model/diff/modify/share_folder.h"
 
 namespace syncspirit::daemon::command {
@@ -87,7 +88,7 @@ bool share_folder_t::execute(governor_actor_t &actor) noexcept {
     auto &self = actor.cluster->get_device()->device_id();
     auto opt = modify::share_folder_t::create(*actor.cluster, *actor.sequencer, *device, self, *folder);
     if (!opt) {
-        log->warn("{}, cannot share: ", actor.get_identity(), opt.assume_error().message());
+        log->warn("{}, cannot share: ", actor.get_identity(), opt.assume_error());
         return false;
     }
     actor.send_command(std::move(opt.value()), *this);

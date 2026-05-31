@@ -153,7 +153,7 @@ void http_actor_t::on_resolve(message::resolve_response_t &res) noexcept {
     auto &ee = res.payload.ee;
 
     if (ee) {
-        LOG_WARN(log, "on_resolve error: {}", ee->message());
+        LOG_WARN(log, "on_resolve error: {}", ee);
         reply_with_error(*queue.front(), ee);
         queue.pop_front();
         need_response = false;
@@ -208,7 +208,7 @@ void http_actor_t::on_connect(const tcp::endpoint &) noexcept {
         sys::error_code ec;
         local_address = transport->local_address(ec);
         if (ec) {
-            LOG_WARN(log, "on_connect, get local addr error :: {}", ec.message());
+            LOG_WARN(log, "on_connect, get local addr error: {}", ec);
             reply_with_error(*queue.front(), make_error(ec));
             queue.pop_front();
             need_response = false;
@@ -312,7 +312,7 @@ void http_actor_t::on_io_error(const sys::error_code &ec) noexcept {
     resources->release(resource::io);
     kept_alive = false;
     if (ec != asio::error::operation_aborted) {
-        LOG_DEBUG(log, "on_io_error :: {}", ec.message());
+        LOG_DEBUG(log, "on_io_error: {}", ec);
     }
     cancel_io();
     if (!need_response || stop_io) {
@@ -337,7 +337,7 @@ void http_actor_t::on_handshake(bool, utils::x509_t &, const tcp::endpoint &, co
 void http_actor_t::on_handshake_error(sys::error_code ec) noexcept {
     resources->release(resource::io);
     if (ec != asio::error::operation_aborted) {
-        LOG_WARN(log, "on_handshake_error :: {}", ec.message());
+        LOG_WARN(log, "on_handshake_error: {}", ec);
     }
     if (!need_response || stop_io) {
         return process();

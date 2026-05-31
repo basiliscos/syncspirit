@@ -67,6 +67,6 @@ void cluster_supervisor_t::on_child_shutdown(actor_base_t *actor) noexcept {
     parent_t::on_child_shutdown(actor);
     auto &reason = actor->get_shutdown_reason();
     if (state == r::state_t::OPERATIONAL) {
-        log->debug("on_child_shutdown, child {} termination: {}", actor->get_identity(), reason->message());
+        log->debug("on_child_shutdown, child {} termination: {}", actor->get_identity(), reason);
     }
 }

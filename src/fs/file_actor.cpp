@@ -208,7 +208,7 @@ void file_actor_t::process(payload::block_request_t &cmd, std::string_view path_
     auto data = utils::bytes_t{};
     if (!file_opt) {
         ec = file_opt.assume_error();
-        LOG_ERROR(log, "error opening file {}: {}", path_str, ec.message());
+        LOG_ERROR(log, "error opening file {}: {}", path_str, ec);
         cmd.result = ec;
         return;
     } else {
@@ -216,8 +216,7 @@ void file_actor_t::process(payload::block_request_t &cmd, std::string_view path_
         auto block_opt = file->read(cmd.offset, cmd.block_size);
         if (!block_opt) {
             ec = block_opt.assume_error();
-            LOG_WARN(log, "error requesting block; offset = {}, size = {} :: {} ", cmd.offset, cmd.block_size,
-                     ec.message());
+            LOG_WARN(log, "error requesting block; offset = {}, size = {} :: {} ", cmd.offset, cmd.block_size, ec);
             cmd.result = ec;
             return;
         } else {
@@ -236,7 +235,7 @@ void file_actor_t::process(payload::remote_copy_t &cmd, std::string_view path_st
         auto conflict_path_str = cmd.conflict_path.generic_string();
         LOG_DEBUG(log, "renaming {} -> {}", path_str, conflict_path_str);
         if (auto ec = context.rename(cmd.path, cmd.conflict_path); ec) {
-            LOG_ERROR(log, "cannot rename file: {}: {}", path_str, ec.message());
+            LOG_ERROR(log, "cannot rename file: {}: {}", path_str, ec);
             cmd.result = ec;
             return;
         }
@@ -246,7 +245,7 @@ void file_actor_t::process(payload::remote_copy_t &cmd, std::string_view path_st
         if (bfs::exists(path, ec)) {
             LOG_DEBUG(log, "removing {}", path_str);
             if (auto ec = context.remove(path); ec) {
-                LOG_ERROR(log, "error removing {} : {}", path_str, ec.message());
+                LOG_ERROR(log, "error removing {} : {}", path_str, ec);
                 cmd.result = ec;
                 return;
             }
@@ -275,7 +274,7 @@ void file_actor_t::process(payload::remote_copy_t &cmd, std::string_view path_st
             LOG_TRACE(log, "touching existing file {} ({} bytes)", path.string(), sz);
         } else {
             auto &ec = file_opt.assume_error();
-            LOG_ERROR(log, "error creating {}: {}", path.string(), ec.message());
+            LOG_ERROR(log, "error creating {}: {}", path.string(), ec);
             cmd.result = ec;
             return;
         }
@@ -299,7 +298,7 @@ void file_actor_t::process(payload::remote_copy_t &cmd, std::string_view path_st
                 !bfs::exists(path, ec) || !bfs::is_symlink(path, ec) || (bfs::read_symlink(path, ec) != target);
             if (attempt_create) {
                 if (auto ec = context.create_link(target, path); ec) {
-                    LOG_WARN(log, "error symlinking {} -> {} : {}", path.string(), target.string(), ec.message());
+                    LOG_WARN(log, "error symlinking {} -> {} : {}", path.string(), target.string(), ec);
                     cmd.result = ec;
                     return;
                 }
@@ -313,8 +312,7 @@ void file_actor_t::process(payload::remote_copy_t &cmd, std::string_view path_st
 
     if (set_perms) {
         if (auto ec = context.set_perms(path, cmd.permissions); ec) {
-            LOG_ERROR(log, "cannot set permissions {:#o} on file: '{}': {}", cmd.permissions, path.string(),
-                      ec.message());
+            LOG_ERROR(log, "cannot set permissions {:#o} on file: '{}': {}", cmd.permissions, path.string(), ec);
             cmd.result = ec;
             return;
         }
@@ -339,7 +337,7 @@ void file_actor_t::process(payload::finish_file_t &cmd, std::string_view path_st
         auto option = file_t::open_write(context, cmd.path, cmd.file_size);
         if (!option) {
             auto &err = option.assume_error();
-            LOG_ERROR(log, "cannot open file '{}': {}", path_str, err.message());
+            LOG_ERROR(log, "cannot open file '{}': {}", path_str, err);
             cmd.result = err;
             return;
         }
@@ -353,7 +351,7 @@ void file_actor_t::process(payload::finish_file_t &cmd, std::string_view path_st
         LOG_DEBUG(log, "renaming {} -> {}", path_str, new_name);
         auto ec = sys::error_code();
         if (auto ec = context.rename(cmd.path, cmd.conflict_path); ec) {
-            LOG_ERROR(log, "cannot rename file '{}': {}", path_str, ec.message());
+            LOG_ERROR(log, "cannot rename file '{}': {}", path_str, ec);
             cmd.result = ec;
             return;
         }
@@ -363,15 +361,14 @@ void file_actor_t::process(payload::finish_file_t &cmd, std::string_view path_st
     auto ok = backend->close(&context, cmd.modification_s, cmd.path);
     if (!ok) {
         auto &ec = ok.assume_error();
-        LOG_ERROR(log, "cannot close file '{}': {}", path_str, ec.message());
+        LOG_ERROR(log, "cannot close file '{}': {}", path_str, ec);
         cmd.result = ec;
         return;
     }
 
     if (!cmd.no_permissions) {
         if (auto ec = context.set_perms(cmd.path, cmd.permissions); ec) {
-            LOG_ERROR(log, "cannot set permissions {:#o} on file: '{}': {}", cmd.permissions, cmd.path.string(),
-                      ec.message());
+            LOG_ERROR(log, "cannot set permissions {:#o} on file: '{}': {}", cmd.permissions, cmd.path.string(), ec);
             cmd.result = ec;
             return;
         }
@@ -387,7 +384,7 @@ void file_actor_t::process(payload::append_block_t &cmd, std::string_view path_s
     auto file_opt = open_file_rw(path, cmd.file_size, context);
     if (!file_opt) {
         auto &err = file_opt.assume_error();
-        LOG_ERROR(log, "cannot open file: {}: {}", path_str, err.message());
+        LOG_ERROR(log, "cannot open file: {}: {}", path_str, err);
         cmd.result = err;
         return;
     }
@@ -401,7 +398,7 @@ void file_actor_t::process(payload::clone_block_t &cmd, std::string_view path_st
     auto target_opt = open_file_rw(target_path, cmd.target_size, context);
     if (!target_opt) {
         auto &err = target_opt.assume_error();
-        LOG_ERROR(log, "cannot open file: {}: {}", path_str, err.message());
+        LOG_ERROR(log, "cannot open file: {}: {}", path_str, err);
         cmd.result = err;
         return;
     }
@@ -418,7 +415,7 @@ void file_actor_t::process(payload::clone_block_t &cmd, std::string_view path_st
     if (!source_backend_opt) {
         auto path_str = cmd.source.string();
         auto ec = source_backend_opt.assume_error();
-        LOG_ERROR(log, "cannot open source file for cloning: {}: {}", path_str, ec.message());
+        LOG_ERROR(log, "cannot open source file for cloning: {}: {}", path_str, ec);
         cmd.result = ec;
         return;
     }
@@ -440,7 +437,7 @@ void file_actor_t::process(payload::update_meta_t &cmd, std::string_view path_st
     }
 
     if (r) {
-        LOG_ERROR(log, "cannot update metadata of '{}': {}", path_str, r.message());
+        LOG_ERROR(log, "cannot update metadata of '{}': {}", path_str, r);
     }
     cmd.result = r;
 }

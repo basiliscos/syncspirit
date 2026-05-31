@@ -18,6 +18,7 @@
 #include "proto/proto-helpers-bep.h"
 #include "utils/platform.h"
 #include "utils/utf8.h"
+#include "utils/format.hpp"
 
 #include <boost/nowide/convert.hpp>
 #include <spdlog/fmt/bin_to_hex.h>
@@ -236,7 +237,7 @@ int folder_context_t::process(unexamined_t &child_info, stack_context_t &ctx) no
 int folder_context_t::process(suspend_scan_t &item, stack_context_t &ctx) noexcept {
     auto folder = local_folder->get_folder();
     auto &ec = item.ec;
-    LOG_WARN(log, "suspending due to: {}", ec.message());
+    LOG_WARN(log, "suspending due to: {}", ec);
     ctx.push_back(new model::diff::modify::suspend_folder_t(*folder, true, ec));
     auto it = stack.begin();
     std::advance(it, 1);
@@ -568,7 +569,7 @@ void folder_context_t::post_process(hash_base_t &hash_file, hasher::message::dig
 
     if (result.has_error()) {
         auto &ec = result.assume_error();
-        LOG_WARN(log, "cannot hash '{}': {}", path_str, ec.message());
+        LOG_WARN(log, "cannot hash '{}': {}", path_str, ec);
         ++hash_file.errored_blocks;
     } else {
         auto index = p.block_index;
@@ -653,7 +654,7 @@ void folder_context_t::post_process(fs::task::scan_dir_t &task, stack_context_t 
             checked_children.emplace(filename);
         }
         if (info.ec) {
-            log->warn("scannig of  {} failed: {}", name, info.ec.message());
+            log->warn("scannig of  {} failed: {}", name, info.ec);
         } else {
             if (fs::is_temporal(info.path)) {
                 auto child = incomplete_t(std::move(info), presence, task.presence, io_generation);
@@ -753,7 +754,7 @@ void folder_context_t::post_process(fs::task::segment_iterator_t &task, stack_co
             hashing_files.erase(it_h);
         }
         if (hash_file.commit_error(ec, delta)) {
-            LOG_WARN(log, "I/O error during processing '{}': {}", path_str, ec.message());
+            LOG_WARN(log, "I/O error during processing '{}': {}", path_str, ec);
             auto presence = hash_file.self.get();
             if (presence && presence->get_features() & F::local) {
                 auto file_presence = static_cast<presentation::local_file_presence_t *>(presence);
@@ -771,7 +772,7 @@ void folder_context_t::post_process(fs::task::segment_iterator_t &task, stack_co
 void folder_context_t::post_process(fs::task::remove_file_t &task, stack_context_t &ctx) noexcept {
     auto &ec = task.ec;
     if (ec) {
-        LOG_WARN(log, "(ignored) cannot remove '{}': {}", narrow(task.path.generic_wstring()), ec.message());
+        LOG_WARN(log, "(ignored) cannot remove '{}': {}", narrow(task.path.generic_wstring()), ec);
     }
 }
 
@@ -781,7 +782,7 @@ void folder_context_t::post_process(fs::task::rename_file_t &task, stack_context
     if (ec) {
         auto &path = task.path;
         LOG_WARN(log, "cannot rename '{}' -> {}: {}, going to remove", narrow(path.generic_wstring()),
-                 narrow(task.new_name.generic_wstring()), ec.message());
+                 narrow(task.new_name.generic_wstring()), ec);
         auto sub_task = fs::task::remove_file_t(std::move(path));
         push(std::move(sub_task));
     } else {
@@ -805,8 +806,7 @@ bool folder_context_t::has_no_tasks() const noexcept { return pending_io.empty()
 int folder_context_t::schedule_hash(hash_base_t *item, stack_context_t &ctx) noexcept {
     if (item->errored_blocks) {
         if (item->commit_hash()) {
-            LOG_WARN(log, "I/O error during processing '{}': {}", narrow(item->path.generic_wstring()),
-                     item->ec.message());
+            LOG_WARN(log, "I/O error during processing '{}': {}", narrow(item->path.generic_wstring()), item->ec);
         }
 
         return 1;
@@ -849,7 +849,7 @@ int folder_context_t::schedule_hash(hash_base_t *item, stack_context_t &ctx) noe
 
 void folder_context_t::handle_scan_error(fs::task::scan_dir_t &task, stack_context_t &ctx) noexcept {
     auto &ec = task.ec;
-    log->warn("cannot scan '{}': {}", narrow(task.path.wstring()), ec.message());
+    log->warn("cannot scan '{}': {}", narrow(task.path.wstring()), ec);
     auto dir_presence = task.presence.get();
     if (dir_presence && dir_presence->get_features() & F::local) {
         using queue_t = std::pmr::list<presentation::presence_t *>;

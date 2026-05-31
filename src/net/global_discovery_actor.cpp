@@ -104,7 +104,7 @@ void global_discovery_actor_t::announce() noexcept {
     utils::bytes_t tx_buff;
     auto res = proto::make_announce_request(tx_buff, announce_url, uris);
     if (!res) {
-        LOG_TRACE(log, "error making announce request :: {}", res.error().message());
+        LOG_TRACE(log, "error making announce request: {}", res.error());
         return do_shutdown(make_error(res.error()));
     }
     make_request(addr_announce, res.value(), announce_device_id, std::move(tx_buff));
@@ -117,14 +117,14 @@ void global_discovery_actor_t::on_announce_response(message::http_response_t &me
 
     auto &ee = message.payload.ee;
     if (ee) {
-        LOG_ERROR(log, "announcing error = {}", ee->message());
+        LOG_ERROR(log, "announcing error: {}", ee);
         auto inner = utils::make_error_code(utils::error_code_t::announce_failed);
         return do_shutdown(make_error(inner, ee));
     }
 
     auto res = proto::parse_announce(message.payload.res->response);
     if (!res) {
-        LOG_WARN(log, "parsing announce error = {}", res.error().message());
+        LOG_WARN(log, "parsing announce error: {}", res.error());
         return do_shutdown(make_error(res.error()));
     }
 
@@ -178,12 +178,12 @@ void global_discovery_actor_t::on_discovery_response(message::http_response_t &m
     auto &ee = message.payload.ee;
     bool found = false;
     if (ee) {
-        LOG_WARN(log, "discovery failed = {}", ee->message());
+        LOG_WARN(log, "discovery failed: {}", ee);
     } else {
         auto &http_res = message.payload.res->response;
         auto res = proto::parse_contact(http_res);
         if (!res) {
-            auto reason = res.error().message();
+            auto reason = res.error();
             auto &body = http_res.body();
             LOG_WARN(log, "parsing discovery error = {}, body({}):\n {}", reason, body.size(), body);
         } else {
@@ -281,7 +281,7 @@ auto global_discovery_actor_t::operator()(const model::diff::contact::peer_state
         utils::bytes_t tx_buff;
         auto r = proto::make_discovery_request(tx_buff, lookup_url, peer->device_id());
         if (!r) {
-            LOG_ERROR(log, "error making discovery request: {}", r.error().message());
+            LOG_ERROR(log, "error making discovery request: {}", r.error());
             return r.error();
         }
 

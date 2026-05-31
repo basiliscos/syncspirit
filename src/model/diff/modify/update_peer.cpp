@@ -66,9 +66,9 @@ auto update_peer_t::apply_impl(apply_controller_t &controller, void *custom) con
     } else {
         auto ec = peer->update(item);
         if (!ec) {
-            auto &error = ec.error();
-            LOG_ERROR(log, "applying update_peer_t, device {} fail: {}", peer->device_id(), error.message());
-            return error;
+            auto &code = ec.error();
+            LOG_ERROR(log, "applying update_peer_t, device {} fail: {}", peer->device_id(), code);
+            return code;
         }
         peer->notify_update();
     }

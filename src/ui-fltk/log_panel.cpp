@@ -6,6 +6,7 @@
 #include "log_table.h"
 #include "log_colors.h"
 #include "utils/io.h"
+#include "utils/format.hpp"
 
 #include <spdlog/fmt/fmt.h>
 #include <FL/Fl_Box.H>
@@ -111,12 +112,12 @@ static void export_log(Fl_Widget *, void *data) {
     auto out_opt = file_t::open_truncate(filename);
     if (!out_opt) {
         auto &ec = out_opt.assume_error();
-        log->warn("cannot open logs file: {}", ec.message());
+        log->warn("cannot open logs file: {}", ec);
         return;
     }
     auto &out = out_opt.assume_value();
     if (auto ok = out.write("level, date, source, message\n"); !ok) {
-        log->warn("cannot write logs: {}", ok.error().message());
+        log->warn("cannot write logs: {}", ok.error());
         return;
     }
     auto escape_message = [](const std::string &msg) -> std::string {
@@ -129,7 +130,7 @@ static void export_log(Fl_Widget *, void *data) {
                                escape_message(record->message));
 
         if (auto ok = out.write(msg); !ok) {
-            log->warn("cannot write logs: {}", ok.error().message());
+            log->warn("cannot write logs: {}", ok.error());
             return;
         }
     }
