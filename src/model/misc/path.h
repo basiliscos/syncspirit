@@ -79,6 +79,9 @@ bool operator<(const path_base_t &parent, const path_base_t &child) noexcept;
 
 using path_ptr_t = intrusive_ptr_t<path_t>;
 
+using allocator_t = std::pmr::polymorphic_allocator<char>;
+using poly_path_view_t = path_view_t<allocator_t>;
+
 struct path_eq_t {
     using is_transparent = void;
 

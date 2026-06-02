@@ -227,6 +227,40 @@ TEST_CASE("path view (2)", "[model]") {
     }
 }
 
+TEST_CASE("path view (3)", "[model]") {
+    auto buffer = std::array<std::byte, 1024 * 128>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+    SECTION("simple") {
+        auto view = model::make_view("file.bin", allocator);
+        REQUIRE(!view.empty());
+        CHECK(view.get_full_name() == "file.bin");
+        CHECK(view.get_filename() == "file.bin");
+    }
+    SECTION("complex") {
+        auto view = model::make_view("dir/file.bin", allocator);
+        REQUIRE(!view.empty());
+        CHECK(view.get_full_name() == "dir/file.bin");
+        CHECK(view.get_filename() == "file.bin");
+    }
+    SECTION("absolute") {
+        auto view = model::make_view("/dir/file.bin", allocator);
+        REQUIRE(!view.empty());
+        CHECK(view.get_full_name() == "/dir/file.bin");
+        CHECK(view.get_filename() == "file.bin");
+    }
+}
+
+TEST_CASE("path view (4)", "[model]") {
+    auto buffer = std::array<std::byte, 1024 * 128>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+    SECTION("ascii -> utf8") {
+        auto view = model::make_view("abc", allocator);
+        CHECK(view.get_full_wname() == L"abc");
+    }
+}
+
 TEST_CASE("path_cache", "[model]") {
     auto cache = path_cache_ptr_t(new path_cache_t());
     auto path = cache->get_path("a/b/c");

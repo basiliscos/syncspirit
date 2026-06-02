@@ -41,6 +41,7 @@ r::plugin::resource_id_t interrupt = 0;
 } // namespace resource
 } // namespace
 
+#if 0
 net_supervisor_t::net_supervisor_t(net_supervisor_t::config_t &cfg)
     : parent_t(this, resource::interrupt, cfg), sequencer{cfg.sequencer}, app_config{cfg.app_config},
       independent_threads{cfg.independent_threads}, thread_counter{independent_threads},
@@ -82,6 +83,7 @@ net_supervisor_t::net_supervisor_t(net_supervisor_t::config_t &cfg)
     auto simultaneous_writes = app_config.bep_config.blocks_simultaneous_write;
     cluster = new model::cluster_t(device, static_cast<int32_t>(simultaneous_writes));
 }
+#endif
 
 void net_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     parent_t::configure(plugin);

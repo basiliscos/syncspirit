@@ -1,14 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "test-utils.h"
 #include "utils/base32.h"
 #include "utils/tls.h"
+#include "model/misc/path_view.hpp"
 #include <openssl/pem.h>
 #include <filesystem>
 #include <cstdio>
 
 using namespace syncspirit::utils;
+using namespace syncspirit;
 using namespace syncspirit::test;
 
 namespace bfs = std::filesystem;
@@ -26,18 +28,23 @@ TEST_CASE("generate cert/key pair, save & load", "[support][tls]") {
     PEM_write_X509(stdout, value.cert.get());
     X509_print_fp(stdout, value.cert.get());
 
+    auto buffer = std::array<std::byte, 1024 * 4>{};
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+
     auto cert_file = unique_path();
-    auto cert_file_path = cert_file.string();
     auto cert_file_guard = path_guard_t(cert_file);
+    auto cert_file_path = model::path_t(cert_file.string()).get_view(allocator);
 
     auto key_file = unique_path();
-    auto key_file_path = key_file.string();
     auto key_file_guard = path_guard_t(key_file);
-    auto save_result = value.save(cert_file_path.c_str(), key_file_path.c_str());
-    REQUIRE((bool)save_result);
-    printf("cert has been saved as %s\n", cert_file_path.c_str());
+    auto key_file_path = model::path_t(key_file.string()).get_view(allocator);
 
-    auto load_result = load_pair(cert_file_path.c_str(), key_file_path.c_str());
+    auto save_result = value.save(cert_file_path.get_view(allocator), key_file_path);
+    REQUIRE((bool)save_result);
+    printf("cert has been saved as %s\n", cert_file_path.get_full_name().data());
+
+    auto load_result = load_pair(cert_file_path, key_file_path);
     REQUIRE((bool)load_result);
     REQUIRE(load_result.value().cert_data.size() == pair.value().cert_data.size());
 

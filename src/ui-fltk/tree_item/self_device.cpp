@@ -166,7 +166,7 @@ struct self_table_t final : static_table_t, db_info_viewer_t {
         if (r != 0) {
             return;
         }
-
+#if 0
         auto sup = owner->get_supervisor();
         auto &cfg = sup->get_app_config();
         auto &cert_path = cfg.cert_file;
@@ -194,6 +194,8 @@ struct self_table_t final : static_table_t, db_info_viewer_t {
                 settings->update_label(true);
             }
         }
+#endif
+        std::abort();
     }
 
     main_window_t *owner;

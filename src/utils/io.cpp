@@ -1,5 +1,6 @@
 #include "io.h"
 
+#include "model/misc/path_view.hpp"
 #include <cassert>
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
 #include <fcntl.h>
@@ -15,8 +16,9 @@
 namespace sys = boost::system;
 using namespace syncspirit::utils;
 
+// TODO: remove
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
-#define SS_OPEN(PATH, MODE) _wsopen(PATH.native().data(), MODE, _SH_DENYNO, _S_IREAD | _S_IWRITE);
+#define SS_OPEN(PATH, MODE) _wsopen(PATH.native().data(), MODE, _SH_DENYNO, _S_IREAD | _S_IWRITE)
 #define SS_STAT_BUFF struct __stat64
 #define SS_STAT_FN(PATH, BUFF) _wstat64((PATH).native().data(), (BUFF))
 #define SS_FSTAT_FN(FD, BUFF) _fstat64(FD, (BUFF))
@@ -30,6 +32,12 @@ using namespace syncspirit::utils;
 #define SS_RESIZE(FILE, SIZE) ftruncate(FILE, SIZE)
 #endif
 
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+#define SS_OPEN_VIEW(PATH, MODE) _wsopen(PATH.get_full_wname().data(), MODE, _SH_DENYNO, _S_IREAD | _S_IWRITE)
+#else
+#define SS_OPEN_VIEW(PATH, MODE) open(PATH.get_full_name().data(), MODE, 0666);
+#endif
+
 io_stream_t::io_stream_t(int fd_) noexcept : fd{fd_} {}
 
 io_stream_t::io_stream_t(io_stream_t &&other) noexcept { std::swap(fd, other.fd); }
@@ -40,6 +48,7 @@ io_stream_t::~io_stream_t() {
     }
 }
 
+// TODO: remove
 auto io_stream_t::open_truncate(const bfs::path &path) noexcept -> outcome::result<io_stream_t> {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
     static constexpr auto open_mode = _O_RDWR | _O_CREAT | _O_TRUNC | _O_BINARY;
@@ -53,6 +62,20 @@ auto io_stream_t::open_truncate(const bfs::path &path) noexcept -> outcome::resu
     return sys::error_code{errno, sys::system_category()};
 }
 
+auto io_stream_t::open_truncate(const model::poly_path_view_t &path) noexcept -> outcome::result<io_stream_t> {
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+    static constexpr auto open_mode = _O_RDWR | _O_CREAT | _O_TRUNC | _O_BINARY;
+#else
+    static constexpr auto open_mode = O_RDWR | O_CREAT | O_TRUNC;
+#endif
+    auto f = SS_OPEN_VIEW(path, open_mode);
+    if (f >= 0) {
+        return io_stream_t(f);
+    }
+    return sys::error_code{errno, sys::system_category()};
+}
+
+// TODO: remove
 auto io_stream_t::open_read(const bfs::path &path) noexcept -> outcome::result<io_stream_t> {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
     static constexpr auto open_mode = _O_RDONLY | _O_BINARY;
@@ -60,6 +83,19 @@ auto io_stream_t::open_read(const bfs::path &path) noexcept -> outcome::result<i
     static constexpr auto open_mode = O_RDONLY;
 #endif
     auto f = SS_OPEN(path, open_mode);
+    if (f >= 0) {
+        return io_stream_t(f);
+    }
+    return sys::error_code{errno, sys::system_category()};
+}
+
+auto io_stream_t::open_read(const model::poly_path_view_t &path) noexcept -> outcome::result<io_stream_t> {
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+    static constexpr auto open_mode = _O_RDONLY | _O_BINARY;
+#else
+    static constexpr auto open_mode = O_RDONLY;
+#endif
+    auto f = SS_OPEN_VIEW(path, open_mode);
     if (f >= 0) {
         return io_stream_t(f);
     }

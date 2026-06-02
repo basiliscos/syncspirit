@@ -1,6 +1,7 @@
 #pragma once
 
 #include "path.h"
+#include "path_decomposer.hpp"
 #include "fs/utils.h"
 #include <memory>
 #include <cstring>
@@ -10,6 +11,8 @@ namespace syncspirit::model {
 template <typename Allocator> struct path_view_t final : path_base_t {
     using Traits = std::allocator_traits<Allocator>;
     using T = typename Allocator::value_type;
+    using wallocator_t = std::pmr::polymorphic_allocator<wchar_t>;
+    using wstring_t = std::basic_string<wchar_t, std::char_traits<wchar_t>, wallocator_t>;
 
     path_view_t() noexcept = default;
 
@@ -28,6 +31,12 @@ template <typename Allocator> struct path_view_t final : path_base_t {
         : allocator{allocator_} {
         data = data_;
         components = components_;
+    }
+
+    explicit path_view_t(std::string_view normalized, const Allocator &allocator_) noexcept : allocator{allocator_} {
+        auto decomposed = path_decomposer_t::decompose<false>(normalized, allocator);
+        data = decomposed.data;
+        components = decomposed.components;
     }
 
     ~path_view_t() {
@@ -106,6 +115,38 @@ template <typename Allocator> struct path_view_t final : path_base_t {
         return {};
     }
 
+    wstring_t get_full_wname() const noexcept {
+        using namespace boost::nowide;
+        using namespace boost::nowide::utf;
+
+        using traits_in_t = utf_traits<char>;
+        using traits_out_t = utf_traits<wchar_t>;
+
+        auto w_allocator = wallocator_t(allocator);
+        auto r = wstring_t(w_allocator);
+        if (data) {
+            auto sz = *reinterpret_cast<const std::uint32_t *>(data);
+            auto begin = reinterpret_cast<const char *>(data) + sizeof(std::uint32_t);
+            auto end = begin + sz;
+            auto ptr = reinterpret_cast<const char *>(data) + sizeof(std::uint32_t);
+
+            auto w_sz = std::size_t{0};
+            while (ptr != end) {
+                traits_in_t::decode(ptr, end);
+                ++w_sz;
+            }
+
+            r.resize(w_sz);
+            auto out = r.data();
+            ptr = begin;
+
+            while (ptr != end) {
+                *out++ = traits_in_t::decode(ptr, end);
+            }
+        }
+        return r;
+    }
+
   private:
     mutable Allocator allocator;
 };
@@ -161,5 +202,13 @@ auto operator/(const path_view_t<Allocator> &parent, const path_view_t<Allocator
 template <typename Allocator> auto path_base_t::get_view(const Allocator &a) const noexcept -> path_view_t<Allocator> {
     return path_view_t<Allocator>(*this, a);
 };
+
+template <typename Allocator>
+auto make_view(std::string_view normalized_path, const Allocator &a) noexcept -> path_view_t<Allocator> {
+    return path_view_t<Allocator>(normalized_path, a);
+};
+
+using allocator_t = std::pmr::polymorphic_allocator<char>;
+using poly_path_view_t = path_view_t<allocator_t>;
 
 } // namespace syncspirit::model

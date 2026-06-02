@@ -30,6 +30,7 @@ using uri_ptr_t = syncspirit::model::intrusive_ptr_t<uri_t>;
 using bytes_view_t = syncspirit::utils::bytes_view_t;
 using bytes_t = syncspirit::utils::bytes_t;
 
+using namespace syncspirit;
 using boost::nowide::narrow;
 
 template <typename FormatContext, typename ErrorCode>
@@ -66,9 +67,16 @@ auto format_ec(const ErrorCode &ec, FormatContext &ctx) noexcept -> decltype(ctx
     return fmt::format_to(ctx.out(), "{}", ec.message());
 }
 
+// TODO: remove
 template <typename FormatContext>
 auto fmt::formatter<path_t>::format(const path_t &path, FormatContext &ctx) const -> decltype(ctx.out()) {
     return fmt::format_to(ctx.out(), "{}", path.string());
+}
+
+template <typename FormatContext>
+auto fmt::formatter<model::path_base_t>::format(const model::path_base_t &path, FormatContext &ctx) const
+    -> decltype(ctx.out()) {
+    return fmt::format_to(ctx.out(), "{}", path.get_full_name());
 }
 
 template <typename FormatContext>
@@ -166,6 +174,9 @@ auto fmt::formatter<bytes_t>::format(const bytes_t &bytes, FormatContext &ctx) c
 
 template SYNCSPIRIT_API auto fmt::formatter<std::filesystem::path>::format<ctx_t>(const Path &, ctx_t &ctx) const
     -> decltype(ctx.out());
+
+template SYNCSPIRIT_API auto fmt::formatter<model::path_base_t>::format<ctx_t>(const model::path_base_t &,
+                                                                               ctx_t &ctx) const -> decltype(ctx.out());
 
 template SYNCSPIRIT_API auto fmt::formatter<address_t>::format<ctx_t>(const address_t &, ctx_t &ctx) const
     -> decltype(ctx.out());

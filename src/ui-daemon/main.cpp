@@ -212,7 +212,10 @@ int app_main(app_context_t &app_ctx) {
             return 1;
         }
     }
+    std::abort();
+#if 0
     app_ctx.bootstrap_guard = utils::bootstrap(app_ctx.dist_sink, config_file_path);
+#endif
 
     config_file_path.append("syncspirit.toml");
     auto config_file_path_str = narrow(config_file_path.generic_wstring());
@@ -288,6 +291,7 @@ int app_main(app_context_t &app_ctx) {
     }
 
     {
+#if 0
         auto &cert_path = cfg.cert_file;
         auto &key_path = cfg.key_file;
         auto ec = std::error_code{};
@@ -309,6 +313,8 @@ int app_main(app_context_t &app_ctx) {
                 return 1;
             }
         }
+#endif
+        std::abort();
     }
 
     logger->info("starting {} {}", constants::client_name, SYNCSPIRIT_VERSION);

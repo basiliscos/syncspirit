@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "test-utils.h"
 #include "model/cluster.h"
 #include "model/device_id.h"
+#include "model/misc/path_view.hpp"
 #include "utils/base32.h"
+#include "utils/format.hpp"
 #include "utils/log-setup.h"
+#include "utils/io.h"
 #include <random>
 #include <cstdint>
 #include <spdlog/sinks/stdout_color_sinks.h>
@@ -41,14 +44,14 @@ path_guard_t::~path_guard_t() {
     }
 }
 
-bfs::path locate_path(const char *test_file) {
+model::path_t locate_path(const char *test_file) {
     auto path = bfs::path(test_file);
     if (bfs::exists(path)) {
-        return path;
+        return model::path_t(path.string());
     }
     path = bfs::path("../") / path;
     if (bfs::exists(path)) {
-        return path;
+        return model::path_t(path.string());
     }
     std::string err = "path not found: ";
     err += test_file;
@@ -83,6 +86,29 @@ std::string read_file(const bfs::path &path) {
     (void)r;
     fclose(in);
     return std::string(buffer.data(), filesize);
+}
+
+std::string read_file(const model::poly_path_view_t &path) {
+    auto file_opt = utils::io_stream_t::open_read(path);
+    if (!file_opt) {
+        spdlog::debug("(test/read) can't open '{}': {}", path, file_opt.error());
+        return "";
+    }
+    auto content_opt = file_opt.value().read_whole();
+    if (!content_opt) {
+        spdlog::debug("(test/read) can't read '{}': {}", path, content_opt.error());
+        return "";
+    }
+    auto &content = content_opt.value();
+    auto view = std::string_view(reinterpret_cast<char *>(content.data()), content.size());
+    return std::string(view);
+}
+
+std::string read_file(const model::path_t &path) {
+    auto buffer = std::array<std::byte, 1024 * 4>{};
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+    return read_file(path.get_view(allocator));
 }
 
 void write_file(const bfs::path &path_, std::string_view content) {

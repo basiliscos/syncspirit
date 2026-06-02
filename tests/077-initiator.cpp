@@ -9,6 +9,7 @@
 #include "utils/format.hpp"
 #include "model/cluster.h"
 #include "model/messages.h"
+#include "model/misc/path_view.hpp"
 #include "model/diff/cluster_visitor.h"
 #include "net/names.h"
 #include "net/initiator_actor.h"
@@ -178,14 +179,22 @@ struct fixture_t : diff::cluster_visitor_t, diff::apply_controller_t {
     virtual void on_peer_handshake() noexcept { LOG_INFO(log, "peer handshake"); }
 
     void initiate_active() noexcept {
+        auto buffer = std::array<std::byte, 1024 * 5>{};
+        auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+        auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+        auto dir_path = model::path_t(narrow(tmp_path.wstring()));
+        auto dir_view = dir_path.get_view(allocator);
+
         auto ip = asio::ip::make_address(host);
         auto ep = tcp::endpoint(ip, listening_ep.port());
         auto addresses = std::vector<tcp::endpoint>{ep};
         auto addresses_ptr = std::make_shared<decltype(addresses)>(addresses);
-        auto cert_path = narrow((tmp_path / "i-cert.pem").wstring());
-        auto private_path = narrow((tmp_path / "i-priv.pem").wstring());
-        REQUIRE(my_keys.save(cert_path.c_str(), private_path.c_str()));
-        ssl_verify_store = cert_path;
+
+        auto cert_path = dir_view / model::make_view("i-cert.pem", allocator);
+        auto key_path = dir_view / model::make_view("i-priv.pem", allocator);
+
+        REQUIRE(my_keys.save(cert_path, key_path));
+        ssl_verify_store = cert_path.get_full_name();
 
         peer_trans =
             transport::initiate_tls_active(*sup, peer_keys, my_device->device_id(), peer_uri, {}, {}, ssl_verify_store);
