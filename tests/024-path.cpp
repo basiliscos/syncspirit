@@ -223,8 +223,8 @@ TEST_CASE("path view (2)", "[model]") {
             CHECK(pr == pr_2);
         }
         SECTION("2 absolutes") {
-            auto p1 = path_t::make_generic(p_abs_1).get_view(allocator);
-            auto p2 = path_t::make_generic(p_abs_2).get_view(allocator);
+            auto p1 = path_t::make_native(p_abs_1).get_view(allocator);
+            auto p2 = path_t::make_native(p_abs_2).get_view(allocator);
             auto pr = p1 / p2;
             CHECK(pr == p2);
             CHECK(pr.get_full_name() == p2.get_full_name());
@@ -232,14 +232,14 @@ TEST_CASE("path view (2)", "[model]") {
         }
         SECTION("rel + abs") {
             auto p1 = path_t::make_generic("a/b").get_view(allocator);
-            auto p2 = path_t::make_generic(p_abs_2).get_view(allocator);
+            auto p2 = path_t::make_native(p_abs_2).get_view(allocator);
             auto pr = p1 / p2;
             CHECK(pr == p2);
             CHECK(pr.get_full_name() == p2.get_full_name());
             CHECK(pr.is_absolute());
         }
         SECTION("abs + rel") {
-            auto p1 = path_t::make_generic(p_abs_1).get_view(allocator);
+            auto p1 = path_t::make_native(p_abs_1).get_view(allocator);
             auto p2 = path_t::make_generic("c/d").get_view(allocator);
             auto pr = p1 / p2;
             CHECK(pr.is_absolute());

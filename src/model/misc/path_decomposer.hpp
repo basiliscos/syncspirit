@@ -85,7 +85,6 @@ template <> struct support_t<char> {
         auto ptr = begin;
         auto prev = ptr;
         auto end = ptr + in.size();
-        auto idx = (unsigned char){0};
         while (ptr != end) {
             auto b = ptr;
             auto c = traits_in_t::decode(ptr, end);
@@ -152,10 +151,9 @@ template <> struct support_t<wchar_t> {
         auto separator_positions = positions_t(allocator);
         auto begin = in.data();
         auto ptr = begin;
-        auto prev = ptr;
-        auto end = ptr + in.size();
-        auto idx = (unsigned char){0};
+        auto prev = std::uint32_t{0};
         auto sz = std::uint32_t{0};
+        auto end = ptr + in.size();
         while (ptr != end) {
             auto b = ptr;
             auto c = traits_in_t::decode(ptr, end);
@@ -170,12 +168,12 @@ template <> struct support_t<wchar_t> {
                 if (ptr - b == 1) {
                     for (auto separator : separators) {
                         if (*b == separator) {
-                            auto delta = ptr - prev;
+                            auto delta = sz - prev;
                             if (delta > 255) {
                                 return {};
                             }
                             pieces.push_back(static_cast<unsigned char>(delta));
-                            prev = ptr;
+                            prev = sz;
                             auto position = static_cast<std::size_t>(b - begin);
                             separator_positions.push_back(position);
                             break;
