@@ -33,7 +33,9 @@ template <typename Allocator> struct path_view_t final : path_base_t {
         components = components_;
     }
 
-    explicit path_view_t(std::string_view normalized, const Allocator &allocator_) noexcept : allocator{allocator_} {
+    template <typename CharT>
+    explicit path_view_t(std::basic_string_view<CharT> normalized, const Allocator &allocator_) noexcept
+        : allocator{allocator_} {
         auto decomposed = path_decomposer_t::decompose<false>(normalized, allocator);
         data = decomposed.data;
         components = decomposed.components;
@@ -126,9 +128,9 @@ template <typename Allocator> struct path_view_t final : path_base_t {
         auto r = wstring_t(w_allocator);
         if (data) {
             auto sz = *reinterpret_cast<const std::uint32_t *>(data);
-            auto begin = reinterpret_cast<const char *>(data) + sizeof(std::uint32_t);
+            auto begin = reinterpret_cast<const char *>(data) + sizeof(std::uint32_t) + components;
             auto end = begin + sz;
-            auto ptr = reinterpret_cast<const char *>(data) + sizeof(std::uint32_t);
+            auto ptr = begin;
 
             auto w_sz = std::size_t{0};
             while (ptr != end) {
@@ -203,9 +205,19 @@ template <typename Allocator> auto path_base_t::get_view(const Allocator &a) con
     return path_view_t<Allocator>(*this, a);
 };
 
-template <typename Allocator>
-auto make_view(std::string_view normalized_path, const Allocator &a) noexcept -> path_view_t<Allocator> {
+template <typename CharT, typename Allocator>
+auto make_view(std::basic_string_view<CharT> normalized_path, const Allocator &a) noexcept -> path_view_t<Allocator> {
     return path_view_t<Allocator>(normalized_path, a);
+};
+
+template <typename Allocator>
+auto make_view(const char *normalized_path, const Allocator &a) noexcept -> path_view_t<Allocator> {
+    return make_view(std::string_view(normalized_path), a);
+};
+
+template <typename Allocator>
+auto make_view(const wchar_t *normalized_path, const Allocator &a) noexcept -> path_view_t<Allocator> {
+    return make_view(std::wstring_view(normalized_path), a);
 };
 
 using allocator_t = std::pmr::polymorphic_allocator<char>;

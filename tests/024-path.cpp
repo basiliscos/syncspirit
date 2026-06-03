@@ -258,6 +258,19 @@ TEST_CASE("path view (4)", "[model]") {
     SECTION("ascii -> utf8") {
         auto view = model::make_view("abc", allocator);
         CHECK(view.get_full_wname() == L"abc");
+        CHECK(view.get_full_name() == "abc");
+    }
+    SECTION("wchar -> utf8 (1)") {
+        auto view = model::make_view(L"ёпрст", allocator);
+        CHECK(view.get_full_wname() == L"ёпрст");
+    }
+    SECTION("wchar -> utf8 (2)") {
+        auto view = model::make_view(L"э/ю/Ё", allocator);
+        CHECK(view.get_full_wname() == L"э/ю/Ё");
+    }
+    SECTION("wchar -> utf8 (3)") {
+        auto view = model::make_view(L"э\\ю\\Ё", allocator);
+        CHECK(view.get_full_wname() == L"э/ю/Ё");
     }
 }
 
