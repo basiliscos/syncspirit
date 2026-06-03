@@ -47,11 +47,11 @@ path_guard_t::~path_guard_t() {
 model::path_t locate_path(const char *test_file) {
     auto path = bfs::path(test_file);
     if (bfs::exists(path)) {
-        return model::path_t(path.string());
+        return model::path_t::make_native(path.string());
     }
     path = bfs::path("../") / path;
     if (bfs::exists(path)) {
-        return model::path_t(path.string());
+        return model::path_t::make_native(path.string());
     }
     std::string err = "path not found: ";
     err += test_file;

@@ -34,11 +34,11 @@ TEST_CASE("generate cert/key pair, save & load", "[support][tls]") {
 
     auto cert_file = unique_path();
     auto cert_file_guard = path_guard_t(cert_file);
-    auto cert_file_path = model::path_t(cert_file.string()).get_view(allocator);
+    auto cert_file_path = model::path_t::make_native(cert_file.string()).get_view(allocator);
 
     auto key_file = unique_path();
     auto key_file_guard = path_guard_t(key_file);
-    auto key_file_path = model::path_t(key_file.string()).get_view(allocator);
+    auto key_file_path = model::path_t::make_native(key_file.string()).get_view(allocator);
 
     auto save_result = value.save(cert_file_path.get_view(allocator), key_file_path);
     REQUIRE((bool)save_result);

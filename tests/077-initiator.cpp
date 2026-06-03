@@ -182,7 +182,7 @@ struct fixture_t : diff::cluster_visitor_t, diff::apply_controller_t {
         auto buffer = std::array<std::byte, 1024 * 5>{};
         auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
         auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
-        auto dir_path = model::path_t(narrow(tmp_path.wstring()));
+        auto dir_path = model::path_t::make_native(tmp_path.wstring());
         auto dir_view = dir_path.get_view(allocator);
 
         auto ip = asio::ip::make_address(host);

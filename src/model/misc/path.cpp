@@ -13,11 +13,48 @@ using namespace syncspirit::model;
 
 using I = path_t::iterator_t;
 
+path_t path_t::make_native(std::string_view name) noexcept {
+    auto buffer = std::array<std::byte, 1024 * 5>{};
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+    auto separators = details::traits::native<char>::separators;
+    auto decomposed = path_decomposer_t::decompose<true>(name, allocator, separators);
+    return path_t(decomposed.data, decomposed.components);
+}
+
+path_t path_t::make_native(std::wstring_view name) noexcept {
+    auto buffer = std::array<std::byte, 1024 * 5>{};
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+    auto separators = details::traits::native<wchar_t>::separators;
+    auto decomposed = path_decomposer_t::decompose<true>(name, allocator, separators);
+    return path_t(decomposed.data, decomposed.components);
+}
+
+path_t path_t::make_generic(std::string_view name) noexcept {
+    auto buffer = std::array<std::byte, 1024 * 5>{};
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+    auto separators = details::traits::generic<char>::separators;
+    auto decomposed = path_decomposer_t::decompose<true>(name, allocator, separators);
+    return path_t(decomposed.data, decomposed.components);
+}
+
+path_t path_t::make_generic(std::wstring_view name) noexcept {
+    auto buffer = std::array<std::byte, 1024 * 5>{};
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<wchar_t>(&pool);
+    auto separators = details::traits::generic<wchar_t>::separators;
+    auto decomposed = path_decomposer_t::decompose<true>(name, allocator, separators);
+    return path_t(decomposed.data, decomposed.components);
+}
+
 path_t::path_t(path_t &&other) noexcept {
     std::swap(data, other.data);
     std::swap(components, other.components);
 }
 
+#if 0
 path_t::path_t(std::string_view full_name) noexcept {
     auto buffer = std::array<std::byte, 1024 * 5>{};
     auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
@@ -26,6 +63,7 @@ path_t::path_t(std::string_view full_name) noexcept {
     data = decomposed.data;
     components = decomposed.components;
 }
+#endif
 
 path_t::path_t(const void *data_, std::uint32_t components_) noexcept {
     data = data_;

@@ -36,7 +36,8 @@ template <typename Allocator> struct path_view_t final : path_base_t {
     template <typename CharT>
     explicit path_view_t(std::basic_string_view<CharT> normalized, const Allocator &allocator_) noexcept
         : allocator{allocator_} {
-        auto decomposed = path_decomposer_t::decompose<false>(normalized, allocator);
+        auto separators = details::traits::generic<CharT>::separators;
+        auto decomposed = path_decomposer_t::decompose<false>(normalized, allocator, separators);
         data = decomposed.data;
         components = decomposed.components;
     }

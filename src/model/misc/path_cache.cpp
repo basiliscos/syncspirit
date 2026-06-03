@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2025-2026 Ivan Baidakou
 
 #include "path_cache.h"
 
@@ -8,7 +8,8 @@ using namespace syncspirit::model;
 namespace {
 
 struct cached_path_t : path_t {
-    cached_path_t(std::string_view full_name, path_cache_t &cache_) noexcept : path_t(full_name), cache{cache_} {
+    cached_path_t(std::string_view full_name, path_cache_t &cache_) noexcept : path_t(path_t::make_generic(full_name)), cache{cache_} {
+
         intrusive_ptr_add_ref(&cache);
     }
 

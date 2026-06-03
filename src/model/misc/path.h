@@ -63,16 +63,24 @@ struct SYNCSPIRIT_API path_base_t {
 };
 
 struct SYNCSPIRIT_API path_t : path_base_t, arc_base_t<path_t> {
-    explicit path_t(std::string_view full_name) noexcept;
-    explicit path_t(const void *data, std::uint32_t components) noexcept;
     path_t() noexcept = default;
     path_t(path_t &&) noexcept;
     path_t(path_t &) noexcept = delete;
     ~path_t();
 
+    static path_t make_native(std::string_view) noexcept;
+    static path_t make_native(std::wstring_view) noexcept;
+    static path_t make_generic(std::string_view) noexcept;
+    static path_t make_generic(std::wstring_view) noexcept;
+
     path_base_t get_parent_view() const noexcept;
     path_t clone() const noexcept;
     path_t &operator=(path_t &&other) noexcept;
+
+    protected:
+    explicit path_t(const void *data, std::uint32_t components) noexcept;
+
+    template <typename Allocator> friend struct path_view_t;
 };
 
 bool operator<(const path_base_t &parent, const path_base_t &child) noexcept;

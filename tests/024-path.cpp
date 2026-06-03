@@ -7,6 +7,7 @@
 #include "model/misc/path_cache.h"
 #include <memory_resource>
 #include <catch2/matchers/catch_matchers_string.hpp>
+#include <boost/nowide/convert.hpp>
 
 using namespace syncspirit;
 using namespace syncspirit::model;
@@ -14,12 +15,14 @@ using namespace syncspirit::model;
 using Catch::Matchers::EndsWith;
 using Catch::Matchers::StartsWith;
 
+using boost::nowide::narrow;
+
 TEST_CASE("path", "[model]") {
     using pieces_t = std::vector<std::string_view>;
     SECTION("a/bb/c.txt") {
-        auto p = path_t("a/bb/c.txt");
+        auto p = path_t::make_generic("a/bb/c.txt");
         SECTION("cloing") {
-            auto p2 = path_t("a/bb/c.txt");
+            auto p2 = path_t::make_generic("a/bb/c.txt");
             CHECK(p == p2);
             auto p4 = std::move(p2);
             CHECK(p4 == p);
@@ -39,18 +42,18 @@ TEST_CASE("path", "[model]") {
         CHECK(pieces[1] == "bb");
         CHECK(pieces[2] == "c.txt");
         CHECK(p.contains(p));
-        CHECK(!p.contains(path_t("a/bb/c.tx")));
-        CHECK(!p.contains(path_t("a/bb/c.x")));
-        CHECK(!p.contains(path_t("a/bb/c")));
-        CHECK(!p.contains(path_t("a/bb")));
-        CHECK(!p.contains(path_t("a")));
-        CHECK(path_t("a").contains(p));
-        CHECK(path_t("a/").contains(p));
-        CHECK(path_t("a/b").contains(p));
-        CHECK(path_t("a/bb/c").contains(p));
+        CHECK(!p.contains(path_t::make_generic("a/bb/c.tx")));
+        CHECK(!p.contains(path_t::make_generic("a/bb/c.x")));
+        CHECK(!p.contains(path_t::make_generic("a/bb/c")));
+        CHECK(!p.contains(path_t::make_generic("a/bb")));
+        CHECK(!p.contains(path_t::make_generic("a")));
+        CHECK(path_t::make_generic("a").contains(p));
+        CHECK(path_t::make_generic("a/").contains(p));
+        CHECK(path_t::make_generic("a/b").contains(p));
+        CHECK(path_t::make_generic("a/bb/c").contains(p));
     }
     SECTION("dir/file.bin") {
-        auto p = path_t("dir/file.bin");
+        auto p = path_t::make_generic("dir/file.bin");
         CHECK(p.get_parent_name() == "dir");
         CHECK(p.get_filename() == "file.bin");
 
@@ -64,29 +67,31 @@ TEST_CASE("path", "[model]") {
         CHECK(pieces[1] == "file.bin");
     }
     SECTION("single") {
-        auto p = path_t("file.bin");
+        auto p = path_t::make_generic("file.bin");
         CHECK(p.get_filename() == "file.bin");
         CHECK(p.get_full_name() == "file.bin");
         CHECK(p.get_parent_name() == "");
     }
     SECTION("root") {
-        auto p = path_t("/");
+        auto p = path_t::make_generic("/");
         CHECK(p.get_filename() == "");
         CHECK(p.get_full_name() == "/");
         CHECK(p.get_parent_name() == "");
     }
+#if 0
     SECTION("backslashes") {
         auto p = path_t("c:\\my\\path.bin");
         CHECK(p.get_filename() == "path.bin");
         CHECK(p.get_full_name() == "c:/my/path.bin");
         CHECK(p.get_parent_name() == "c:/my");
     }
+#endif
 }
 
 TEST_CASE("path view (1)", "[model]") {
     auto allocator = std::allocator<char>();
     SECTION("abs path") {
-        auto path = path_t("/some/dir/file.bin");
+        auto path = path_t::make_generic("/some/dir/file.bin");
         auto view = path.get_view(allocator);
         CHECK(path == view);
         CHECK(view.get_filename() == "file.bin");
@@ -108,7 +113,7 @@ TEST_CASE("path view (1)", "[model]") {
         }
     }
     SECTION("dir path") {
-        auto path = path_t("/some/dir/");
+        auto path = path_t::make_generic("/some/dir/");
         auto view = path.get_view(allocator);
         CHECK(path == view);
         CHECK(view.get_filename() == "");
@@ -130,7 +135,7 @@ TEST_CASE("path view (1)", "[model]") {
         }
     }
     SECTION("rel path") {
-        auto path = path_t("some/dir/file.bin");
+        auto path = path_t::make_generic("some/dir/file.bin");
         auto view = path.get_view(allocator);
         CHECK(path == view);
         CHECK(view.get_filename() == "file.bin");
@@ -153,7 +158,7 @@ TEST_CASE("path view (1)", "[model]") {
     }
 
     SECTION("temporal") {
-        auto path = path_t("/some/dir/file.bin");
+        auto path = path_t::make_generic("/some/dir/file.bin");
         CHECK(!path.is_temporal());
         auto view = path.get_view(allocator).make_temporal();
         CHECK(view.get_full_name() == "/some/dir/file.bin.syncspirit-tmp");
@@ -164,13 +169,31 @@ TEST_CASE("path view (1)", "[model]") {
 
     SECTION("absolutness") {
 #ifndef SYNCSPIRIT_WIN
-        CHECK(path_t("/some/dir/file.bin").is_absolute());
-        CHECK(!path_t("some/dir/file.bin").is_absolute());
+        CHECK(path_t::make_generic("/some/dir/file.bin").is_absolute());
+        CHECK(!path_t::make_generic("some/dir/file.bin").is_absolute());
 #else
-        CHECK(path_t("c:/some/dir/file.bin").is_absolute());
-        CHECK(path_t("c:\\some\\dir\\file.bin").is_absolute());
-        CHECK(!path_t("some/dir/file.bin").is_absolute());
-        CHECK(!path_t("some\\dir\\file.bin").is_absolute());
+        CHECK(path_t::make_native("c:/some/dir/file.bin").is_absolute());
+        CHECK(path_t::make_native("c:\\some\\dir\\file.bin").is_absolute());
+        CHECK(!path_t::make_native("some/dir/file.bin").is_absolute());
+        CHECK(!path_t::make_native("some\\dir\\file.bin").is_absolute());
+#endif
+    }
+
+    SECTION("wchar/generic") {
+        auto path = path_t::make_generic(L"э/ю/Ё");
+        CHECK(path.get_filename() == narrow(L"Ё"));
+        CHECK(path.get_parent_name() == narrow(L"э/ю"));
+    }
+
+    SECTION("native/backslashes") {
+        auto path = path_t::make_native(L"э\\ю\\Ё");
+#ifndef SYNCSPIRIT_WIN
+        CHECK(path.get_full_name() == narrow(L"э\\ю\\Ё"));
+        CHECK(path.get_filename() == narrow(L"э\\ю\\Ё"));
+#else
+        CHECK(path.get_full_name() == narrow(L"э/ю/Ё"));
+        CHECK(path.get_filename() == narrow(L"Ё"));
+        CHECK(path.get_parent_name() == narrow(L"э/ю"));
 #endif
     }
 }
@@ -190,8 +213,8 @@ TEST_CASE("path view (2)", "[model]") {
 
     SECTION("concat") {
         SECTION("2 relatives") {
-            auto p1 = path_t("a/b").get_view(allocator);
-            auto p2 = path_t("c/d").get_view(allocator);
+            auto p1 = path_t::make_generic("a/b").get_view(allocator);
+            auto p2 = path_t::make_generic("c/d").get_view(allocator);
             auto pr = p1 / p2;
             CHECK(pr.get_full_name() == "a/b/c/d");
             CHECK(!pr.is_absolute());
@@ -200,24 +223,24 @@ TEST_CASE("path view (2)", "[model]") {
             CHECK(pr == pr_2);
         }
         SECTION("2 absolutes") {
-            auto p1 = path_t(p_abs_1).get_view(allocator);
-            auto p2 = path_t(p_abs_2).get_view(allocator);
+            auto p1 = path_t::make_generic(p_abs_1).get_view(allocator);
+            auto p2 = path_t::make_generic(p_abs_2).get_view(allocator);
             auto pr = p1 / p2;
             CHECK(pr == p2);
             CHECK(pr.get_full_name() == p2.get_full_name());
             CHECK(pr.is_absolute());
         }
         SECTION("rel + abs") {
-            auto p1 = path_t("a/b").get_view(allocator);
-            auto p2 = path_t(p_abs_2).get_view(allocator);
+            auto p1 = path_t::make_generic("a/b").get_view(allocator);
+            auto p2 = path_t::make_generic(p_abs_2).get_view(allocator);
             auto pr = p1 / p2;
             CHECK(pr == p2);
             CHECK(pr.get_full_name() == p2.get_full_name());
             CHECK(pr.is_absolute());
         }
         SECTION("abs + rel") {
-            auto p1 = path_t(p_abs_1).get_view(allocator);
-            auto p2 = path_t("c/d").get_view(allocator);
+            auto p1 = path_t::make_generic(p_abs_1).get_view(allocator);
+            auto p2 = path_t::make_generic("c/d").get_view(allocator);
             auto pr = p1 / p2;
             CHECK(pr.is_absolute());
             auto full = std::string(pr.get_full_name());
@@ -270,7 +293,7 @@ TEST_CASE("path view (4)", "[model]") {
     }
     SECTION("wchar -> utf8 (3)") {
         auto view = model::make_view(L"э\\ю\\Ё", allocator);
-        CHECK(view.get_full_wname() == L"э/ю/Ё");
+        CHECK(view.get_full_wname() == L"э\\ю\\Ё");
     }
 }
 
