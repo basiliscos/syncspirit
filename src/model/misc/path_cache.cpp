@@ -8,7 +8,8 @@ using namespace syncspirit::model;
 namespace {
 
 struct cached_path_t : path_t {
-    cached_path_t(std::string_view full_name, path_cache_t &cache_) noexcept : path_t(path_t::make_generic(full_name)), cache{cache_} {
+    cached_path_t(std::string_view full_name, path_cache_t &cache_) noexcept
+        : path_t(path_t::make_generic(full_name)), cache{cache_} {
 
         intrusive_ptr_add_ref(&cache);
     }

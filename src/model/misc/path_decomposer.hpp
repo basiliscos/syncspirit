@@ -14,24 +14,19 @@ namespace details {
 
 namespace traits {
 
-template <typename CharT>
-struct generic;
+template <typename CharT> struct generic;
 
-template <>
-struct generic<char> {
+template <> struct generic<char> {
     inline static const std::string_view separators{"/"};
 };
 
-template <>
-struct generic<wchar_t> {
+template <> struct generic<wchar_t> {
     inline static const std::wstring_view separators{L"/"};
 };
 
-template <typename CharT>
-struct native;
+template <typename CharT> struct native;
 
-template <>
-struct native<char> {
+template <> struct native<char> {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
     inline static const std::string_view separators{"/\\"};
 #else
@@ -39,8 +34,7 @@ struct native<char> {
 #endif
 };
 
-template <>
-struct native<wchar_t> {
+template <> struct native<wchar_t> {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
     inline static const std::wstring_view separators{L"/\\"};
 #else
@@ -48,7 +42,7 @@ struct native<wchar_t> {
 #endif
 };
 
-}
+} // namespace traits
 
 using pieces_t = std::pmr::vector<std::uint8_t>;
 using positions_t = std::pmr::vector<size_t>;
@@ -76,7 +70,8 @@ template <> struct support_t<char> {
         *dst = 0;
     }
 
-    template <typename Allocator> static result_1_t first_pass(str_t in, const Allocator &allocator_, str_t separators) noexcept {
+    template <typename Allocator>
+    static result_1_t first_pass(str_t in, const Allocator &allocator_, str_t separators) noexcept {
         using namespace boost::nowide;
         auto allocator = allocator_;
         auto pieces = pieces_t(allocator);
@@ -118,7 +113,8 @@ template <> struct support_t<wchar_t> {
     using traits_in_t = boost::nowide::utf::utf_traits<wchar_t>;
     using traits_out_t = boost::nowide::utf::utf_traits<char>;
 
-    static void copy(str_t src, std::uint8_t *dst_, const pieces_t &pieces, const positions_t &separator_positions) noexcept {
+    static void copy(str_t src, std::uint8_t *dst_, const pieces_t &pieces,
+                     const positions_t &separator_positions) noexcept {
         static constexpr auto UNDEF = std::numeric_limits<std::size_t>::max();
         auto in = src.data();
         auto in_end = src.data() + src.size();
@@ -138,13 +134,13 @@ template <> struct support_t<wchar_t> {
             } else {
                 auto c = traits_in_t::decode(in, in_end);
                 dst = traits_out_t::encode(c, dst);
-
             }
         }
         *dst = 0;
     }
 
-    template <typename Allocator> static result_1_t first_pass(str_t in, const Allocator &allocator_, str_t separators) noexcept {
+    template <typename Allocator>
+    static result_1_t first_pass(str_t in, const Allocator &allocator_, str_t separators) noexcept {
         using namespace boost::nowide;
         auto allocator = allocator_;
         auto pieces = pieces_t(allocator);
@@ -195,7 +191,8 @@ struct path_decomposer_t {
     };
 
     template <bool use_new, typename CharT, typename Allocator>
-    static content_t decompose(std::basic_string_view<CharT> in, const Allocator &allocator_, std::basic_string_view<CharT> separators) noexcept {
+    static content_t decompose(std::basic_string_view<CharT> in, const Allocator &allocator_,
+                               std::basic_string_view<CharT> separators) noexcept {
         using namespace boost::nowide;
         using namespace boost::nowide::utf;
 

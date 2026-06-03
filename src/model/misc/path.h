@@ -77,7 +77,7 @@ struct SYNCSPIRIT_API path_t : path_base_t, arc_base_t<path_t> {
     path_t clone() const noexcept;
     path_t &operator=(path_t &&other) noexcept;
 
-    protected:
+  protected:
     explicit path_t(const void *data, std::uint32_t components) noexcept;
 
     template <typename Allocator> friend struct path_view_t;
