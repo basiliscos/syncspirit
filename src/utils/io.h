@@ -4,7 +4,7 @@
 #pragma once
 
 #include "syncspirit-export.h"
-#include "model/misc/path.h"
+#include "utils/path.h"
 #include <filesystem>
 #include <cstdint>
 #include <string_view>
@@ -29,11 +29,11 @@ struct SYNCSPIRIT_API io_stream_t {
     ~io_stream_t();
 
     static outcome::result<io_stream_t> open_truncate(const bfs::path &path) noexcept;
-    static outcome::result<io_stream_t> open_truncate(const model::poly_path_view_t &path) noexcept;
+    static outcome::result<io_stream_t> open_truncate(const utils::poly_path_view_t &path) noexcept;
     static opne_write_t open_write(const bfs::path &path, std::size_t size) noexcept;
-    static opne_write_t open_write(const model::poly_path_view_t &path, std::size_t size) noexcept;
+    static opne_write_t open_write(const utils::poly_path_view_t &path, std::size_t size) noexcept;
     static outcome::result<io_stream_t> open_read(const bfs::path &path) noexcept;
-    static outcome::result<io_stream_t> open_read(const model::poly_path_view_t &path) noexcept;
+    static outcome::result<io_stream_t> open_read(const utils::poly_path_view_t &path) noexcept;
 
     outcome::result<void> close() noexcept;
 

@@ -31,11 +31,6 @@ using device_ptr_t = intrusive_ptr_t<device_t>;
 struct file_info_t;
 using file_info_ptr_t = intrusive_ptr_t<file_info_t>;
 
-struct path_base_t;
-template <typename Allocator> struct path_view_t;
-using allocator_t = std::pmr::polymorphic_allocator<char>;
-using poly_path_view_t = path_view_t<allocator_t>;
-
 } // namespace syncspirit::model
 
 namespace syncspirit::utils {
@@ -43,6 +38,12 @@ struct uri_t;
 using uri_ptr_t = model::intrusive_ptr_t<uri_t>;
 struct bytes_view_t;
 struct bytes_t;
+
+struct path_base_t;
+template <typename Allocator> struct path_view_t;
+using allocator_t = std::pmr::polymorphic_allocator<char>;
+using poly_path_view_t = path_view_t<allocator_t>;
+
 } // namespace syncspirit::utils
 
 template <> struct SYNCSPIRIT_API fmt::formatter<std::filesystem::path> {
@@ -53,8 +54,8 @@ template <> struct SYNCSPIRIT_API fmt::formatter<std::filesystem::path> {
     template <typename FormatContext> auto format(const Path &path, FormatContext &ctx) const -> decltype(ctx.out());
 };
 
-template <> struct SYNCSPIRIT_API fmt::formatter<syncspirit::model::path_base_t> {
-    using Path = syncspirit::model::path_base_t;
+template <> struct SYNCSPIRIT_API fmt::formatter<syncspirit::utils::path_base_t> {
+    using Path = syncspirit::utils::path_base_t;
 
     constexpr auto parse(format_parse_context &ctx) -> decltype(ctx.begin()) { return ctx.end(); }
 
@@ -62,8 +63,8 @@ template <> struct SYNCSPIRIT_API fmt::formatter<syncspirit::model::path_base_t>
 };
 
 template <>
-struct SYNCSPIRIT_API fmt::formatter<syncspirit::model::poly_path_view_t>
-    : fmt::formatter<syncspirit::model::path_base_t> {};
+struct SYNCSPIRIT_API fmt::formatter<syncspirit::utils::poly_path_view_t>
+    : fmt::formatter<syncspirit::utils::path_base_t> {};
 
 template <> struct SYNCSPIRIT_API fmt::formatter<std::error_code> {
     constexpr auto parse(format_parse_context &ctx) -> decltype(ctx.begin()) { return ctx.end(); }

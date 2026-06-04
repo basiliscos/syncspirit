@@ -1,6 +1,6 @@
 #include "io.h"
 
-#include "model/misc/path_view.hpp"
+#include "utils/path_view.hpp"
 #include <cassert>
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
 #include <fcntl.h>
@@ -62,7 +62,7 @@ auto io_stream_t::open_truncate(const bfs::path &path) noexcept -> outcome::resu
     return sys::error_code{errno, sys::system_category()};
 }
 
-auto io_stream_t::open_truncate(const model::poly_path_view_t &path) noexcept -> outcome::result<io_stream_t> {
+auto io_stream_t::open_truncate(const utils::poly_path_view_t &path) noexcept -> outcome::result<io_stream_t> {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
     static constexpr auto open_mode = _O_RDWR | _O_CREAT | _O_TRUNC | _O_BINARY;
 #else
@@ -89,7 +89,7 @@ auto io_stream_t::open_read(const bfs::path &path) noexcept -> outcome::result<i
     return sys::error_code{errno, sys::system_category()};
 }
 
-auto io_stream_t::open_read(const model::poly_path_view_t &path) noexcept -> outcome::result<io_stream_t> {
+auto io_stream_t::open_read(const utils::poly_path_view_t &path) noexcept -> outcome::result<io_stream_t> {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
     static constexpr auto open_mode = _O_RDONLY | _O_BINARY;
 #else

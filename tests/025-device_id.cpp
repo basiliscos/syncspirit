@@ -5,7 +5,7 @@
 #include "model/device_id.h"
 #include "proto/luhn32.h"
 #include "utils/tls.h"
-#include "model/misc/path_view.hpp"
+#include "utils/path_view.hpp"
 
 using namespace syncspirit::test;
 using namespace syncspirit::utils;

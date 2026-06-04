@@ -208,8 +208,6 @@ add_library(syncspirit_core
     src/model/misc/file_block.cpp
     src/model/misc/file_iterator.cpp
     src/model/misc/orphaned_blocks.cpp
-    src/model/misc/path.cpp
-    src/model/misc/path_cache.cpp
     src/model/misc/postponed_files.cpp
     src/model/misc/resolver.cpp
     src/model/misc/sequencer.cpp
@@ -286,6 +284,8 @@ add_library(syncspirit_core
     src/utils/log.cpp
     src/utils/log-setup.cpp
     src/utils/network_interface.cpp
+    src/utils/path.cpp
+    src/utils/path_cache.cpp
     src/utils/platform.cpp
     src/utils/time.cpp
     src/utils/tls.cpp

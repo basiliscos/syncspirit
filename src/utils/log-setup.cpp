@@ -4,7 +4,7 @@
 #include "log-setup.h"
 
 #include "error_code.h"
-#include "model/misc/path_view.hpp"
+#include "utils/path_view.hpp"
 #include "io.h"
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/sinks/basic_file_sink.h>
@@ -177,14 +177,14 @@ std::pair<dist_sink_t, logger_t> create_root_logger() noexcept {
 
 SYNCSPIRIT_API logger_t get_root_logger() noexcept { return spdlog::get(""); }
 
-auto bootstrap(dist_sink_t &dist_sink, const model::path_base_t &dir) noexcept -> bootstrap_guard_ptr_t {
+auto bootstrap(dist_sink_t &dist_sink, const path_base_t &dir) noexcept -> bootstrap_guard_ptr_t {
     auto buff = std::array<std::byte, 1024 * 4>();
     auto pool = std::pmr::monotonic_buffer_resource(buff.data(), buff.size());
     auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
     auto dir_view = dir.get_view(allocator);
 
     auto file_sink = spdlog::sink_ptr();
-    auto file_path = dir_view / model::make_view(bootstrap_sink, allocator);
+    auto file_path = dir_view / utils::make_view(bootstrap_sink, allocator);
     auto file = io_stream_t::open_truncate(file_path);
     if (file.has_value()) {
         (void)file.assume_value().close();

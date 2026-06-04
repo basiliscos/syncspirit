@@ -8,7 +8,7 @@
 #include "net/resolver_actor.h"
 #include "net/names.h"
 #include "utils/beast_support.h"
-#include "model/misc/path_view.hpp"
+#include "utils/path_view.hpp"
 #include "utils/format.hpp"
 #include <boost/asio/ssl.hpp>
 #include <boost/nowide/convert.hpp>
@@ -723,10 +723,10 @@ void test_https_200_ok() {
             auto buffer = std::array<std::byte, 1024 * 5>{};
             auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
             auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
-            auto dir_path = model::path_t::make_native(tmp_path.wstring());
+            auto dir_path = utils::path_t::make_native(tmp_path.wstring());
             auto dir_view = dir_path.get_view(allocator);
-            auto cert_path = dir_view / model::make_view("cert.pem", allocator);
-            auto key_path = dir_view / model::make_view("priv.pem", allocator);
+            auto cert_path = dir_view / utils::make_view("cert.pem", allocator);
+            auto key_path = dir_view / utils::make_view("priv.pem", allocator);
             REQUIRE(server_keys.save(cert_path, key_path));
 
             ssl_verify_store = cert_path.get_full_name();

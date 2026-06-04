@@ -3,7 +3,7 @@
 
 #include "path_cache.h"
 
-using namespace syncspirit::model;
+using namespace syncspirit::utils;
 
 namespace {
 

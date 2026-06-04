@@ -74,7 +74,7 @@ auto fmt::formatter<path_t>::format(const path_t &path, FormatContext &ctx) cons
 }
 
 template <typename FormatContext>
-auto fmt::formatter<model::path_base_t>::format(const model::path_base_t &path, FormatContext &ctx) const
+auto fmt::formatter<utils::path_base_t>::format(const utils::path_base_t &path, FormatContext &ctx) const
     -> decltype(ctx.out()) {
     return fmt::format_to(ctx.out(), "{}", path.get_full_name());
 }
@@ -175,7 +175,7 @@ auto fmt::formatter<bytes_t>::format(const bytes_t &bytes, FormatContext &ctx) c
 template SYNCSPIRIT_API auto fmt::formatter<std::filesystem::path>::format<ctx_t>(const Path &, ctx_t &ctx) const
     -> decltype(ctx.out());
 
-template SYNCSPIRIT_API auto fmt::formatter<model::path_base_t>::format<ctx_t>(const model::path_base_t &,
+template SYNCSPIRIT_API auto fmt::formatter<utils::path_base_t>::format<ctx_t>(const utils::path_base_t &,
                                                                                ctx_t &ctx) const -> decltype(ctx.out());
 
 template SYNCSPIRIT_API auto fmt::formatter<address_t>::format<ctx_t>(const address_t &, ctx_t &ctx) const

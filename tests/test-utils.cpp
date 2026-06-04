@@ -4,7 +4,7 @@
 #include "test-utils.h"
 #include "model/cluster.h"
 #include "model/device_id.h"
-#include "model/misc/path_view.hpp"
+#include "utils/path_view.hpp"
 #include "utils/base32.h"
 #include "utils/format.hpp"
 #include "utils/log-setup.h"
@@ -44,14 +44,14 @@ path_guard_t::~path_guard_t() {
     }
 }
 
-model::path_t locate_path(const char *test_file) {
+utils::path_t locate_path(const char *test_file) {
     auto path = bfs::path(test_file);
     if (bfs::exists(path)) {
-        return model::path_t::make_native(path.string());
+        return utils::path_t::make_native(path.string());
     }
     path = bfs::path("../") / path;
     if (bfs::exists(path)) {
-        return model::path_t::make_native(path.string());
+        return utils::path_t::make_native(path.string());
     }
     std::string err = "path not found: ";
     err += test_file;
@@ -88,7 +88,7 @@ std::string read_file(const bfs::path &path) {
     return std::string(buffer.data(), filesize);
 }
 
-std::string read_file(const model::poly_path_view_t &path) {
+std::string read_file(const utils::poly_path_view_t &path) {
     auto file_opt = utils::io_stream_t::open_read(path);
     if (!file_opt) {
         spdlog::debug("(test/read) can't open '{}': {}", path, file_opt.error());
@@ -104,7 +104,7 @@ std::string read_file(const model::poly_path_view_t &path) {
     return std::string(view);
 }
 
-std::string read_file(const model::path_t &path) {
+std::string read_file(const utils::path_t &path) {
     auto buffer = std::array<std::byte, 1024 * 4>{};
     auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
     auto allocator = std::pmr::polymorphic_allocator<char>(&pool);

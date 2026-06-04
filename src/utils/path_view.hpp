@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-FileCopyrightText: 2026 Ivan Baidakou
+
 #pragma once
 
 #include "path.h"
@@ -6,7 +9,7 @@
 #include <memory>
 #include <cstring>
 
-namespace syncspirit::model {
+namespace syncspirit::utils {
 
 template <typename Allocator> struct path_view_t final : path_base_t {
     using Traits = std::allocator_traits<Allocator>;
@@ -224,4 +227,4 @@ auto make_view(const wchar_t *normalized_path, const Allocator &a) noexcept -> p
 using allocator_t = std::pmr::polymorphic_allocator<char>;
 using poly_path_view_t = path_view_t<allocator_t>;
 
-} // namespace syncspirit::model
+} // namespace syncspirit::utils

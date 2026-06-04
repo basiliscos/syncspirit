@@ -9,7 +9,7 @@
 #include "utils/format.hpp"
 #include "model/cluster.h"
 #include "model/messages.h"
-#include "model/misc/path_view.hpp"
+#include "utils/path_view.hpp"
 #include "model/diff/cluster_visitor.h"
 #include "net/names.h"
 #include "net/initiator_actor.h"
@@ -182,7 +182,7 @@ struct fixture_t : diff::cluster_visitor_t, diff::apply_controller_t {
         auto buffer = std::array<std::byte, 1024 * 5>{};
         auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
         auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
-        auto dir_path = model::path_t::make_native(tmp_path.wstring());
+        auto dir_path = utils::path_t::make_native(tmp_path.wstring());
         auto dir_view = dir_path.get_view(allocator);
 
         auto ip = asio::ip::make_address(host);
@@ -190,8 +190,8 @@ struct fixture_t : diff::cluster_visitor_t, diff::apply_controller_t {
         auto addresses = std::vector<tcp::endpoint>{ep};
         auto addresses_ptr = std::make_shared<decltype(addresses)>(addresses);
 
-        auto cert_path = dir_view / model::make_view("i-cert.pem", allocator);
-        auto key_path = dir_view / model::make_view("i-priv.pem", allocator);
+        auto cert_path = dir_view / utils::make_view("i-cert.pem", allocator);
+        auto key_path = dir_view / utils::make_view("i-priv.pem", allocator);
 
         REQUIRE(my_keys.save(cert_path, key_path));
         ssl_verify_store = cert_path.get_full_name();

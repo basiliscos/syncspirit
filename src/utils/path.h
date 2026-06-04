@@ -4,13 +4,13 @@
 #pragma once
 
 #include "syncspirit-export.h"
-#include "arc.hpp"
+#include "model/misc/arc.hpp"
 #include <cstdint>
 #include <string_view>
 #include <type_traits>
 #include <new>
 
-namespace syncspirit::model {
+namespace syncspirit::utils {
 
 template <typename Allocator> struct path_view_t;
 
@@ -62,7 +62,7 @@ struct SYNCSPIRIT_API path_base_t {
     std::uint32_t components{0};
 };
 
-struct SYNCSPIRIT_API path_t : path_base_t, arc_base_t<path_t> {
+struct SYNCSPIRIT_API path_t : path_base_t, model::arc_base_t<path_t> {
     path_t() noexcept = default;
     path_t(path_t &&) noexcept;
     path_t(path_t &) noexcept = delete;
@@ -85,7 +85,7 @@ struct SYNCSPIRIT_API path_t : path_base_t, arc_base_t<path_t> {
 
 bool operator<(const path_base_t &parent, const path_base_t &child) noexcept;
 
-using path_ptr_t = intrusive_ptr_t<path_t>;
+using path_ptr_t = model::intrusive_ptr_t<path_t>;
 
 using allocator_t = std::pmr::polymorphic_allocator<char>;
 using poly_path_view_t = path_view_t<allocator_t>;
@@ -131,8 +131,8 @@ struct path_hash_t {
     }
 };
 
-} // namespace syncspirit::model
+} // namespace syncspirit::utils
 
 namespace std {
-template <> struct hash<syncspirit::model::path_t> : syncspirit::model::path_hash_t {};
+template <> struct hash<syncspirit::utils::path_t> : syncspirit::utils::path_hash_t {};
 } // namespace std

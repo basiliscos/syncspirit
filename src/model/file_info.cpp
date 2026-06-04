@@ -199,7 +199,7 @@ utils::bytes_t file_info_t::create_key(const bu::uuid &uuid, const folder_info_p
     return key;
 }
 
-auto file_info_t::get_name() const noexcept -> const path_ptr_t & { return name; }
+auto file_info_t::get_name() const noexcept -> const utils::path_ptr_t & { return name; }
 
 std::uint64_t file_info_t::get_block_offset(size_t block_index) const noexcept {
     assert(flags & f_type_file && !content.file.blocks.empty());
@@ -208,7 +208,7 @@ std::uint64_t file_info_t::get_block_offset(size_t block_index) const noexcept {
     return block->get_size() * block_index;
 }
 
-auto file_info_t::fields_update(const db::FileInfo &source, model::path_cache_t &path_cache) noexcept
+auto file_info_t::fields_update(const db::FileInfo &source, utils::path_cache_t &path_cache) noexcept
     -> outcome::result<void> {
     flags = (flags & ~0b111111) | as_flags(db::get_type(source));
     name = path_cache.get_path(db::get_name(source));
@@ -247,7 +247,7 @@ auto file_info_t::fields_update(const db::FileInfo &source, model::path_cache_t 
     return outcome::success();
 }
 
-auto file_info_t::fields_update(const proto::FileInfo &source, model::path_cache_t &path_cache) noexcept
+auto file_info_t::fields_update(const proto::FileInfo &source, utils::path_cache_t &path_cache) noexcept
     -> outcome::result<void> {
     name = path_cache.get_path(proto::get_name(source));
     sequence = proto::get_sequence(source);

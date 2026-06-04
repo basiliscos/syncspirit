@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2025-2026 Ivan Baidakou
 
 #pragma once
 
@@ -13,7 +13,7 @@ namespace syncspirit::presentation {
 struct file_presence_t;
 
 struct SYNCSPIRIT_API file_entity_t : entity_t {
-    file_entity_t(model::path_ptr_t path, const model::folder_infos_map_t &fi_map) noexcept;
+    file_entity_t(utils::path_ptr_t path, const model::folder_infos_map_t &fi_map) noexcept;
     void set_parent(entity_t *entity) noexcept;
     auto on_insert(model::file_info_t &, const model::folder_info_t &) noexcept -> file_presence_t *;
 

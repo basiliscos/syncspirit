@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-FileCopyrightText: 2026 Ivan Baidakou
+
 #pragma once
 
 #include "path.h"
@@ -8,7 +11,7 @@
 #include <limits>
 #include <cassert>
 
-namespace syncspirit::model {
+namespace syncspirit::utils {
 
 namespace details {
 
@@ -229,4 +232,4 @@ struct path_decomposer_t {
     }
 };
 
-} // namespace syncspirit::model
+} // namespace syncspirit::utils

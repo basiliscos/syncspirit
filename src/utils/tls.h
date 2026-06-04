@@ -10,7 +10,7 @@
 #include <openssl/evp.h>
 #include "syncspirit-export.h"
 #include "bytes.h"
-#include "model/misc/path.h"
+#include "utils/path.h"
 
 namespace syncspirit {
 namespace utils {
@@ -38,8 +38,8 @@ struct SYNCSPIRIT_API key_pair_t {
     cert_data_t cert_data;
     cert_data_t key_data;
 
-    outcome::result<void> save(const model::poly_path_view_t &cert,
-                               const model::poly_path_view_t &priv_key) const noexcept;
+    outcome::result<void> save(const utils::poly_path_view_t &cert,
+                               const utils::poly_path_view_t &priv_key) const noexcept;
 };
 
 struct SYNCSPIRIT_API x509_t {
@@ -54,8 +54,8 @@ struct SYNCSPIRIT_API x509_t {
 
 SYNCSPIRIT_API outcome::result<key_pair_t> generate_pair(const char *issuer_name) noexcept;
 
-SYNCSPIRIT_API outcome::result<key_pair_t> load_pair(const model::poly_path_view_t &cert,
-                                                     const model::poly_path_view_t &priv_key);
+SYNCSPIRIT_API outcome::result<key_pair_t> load_pair(const utils::poly_path_view_t &cert,
+                                                     const utils::poly_path_view_t &priv_key);
 
 SYNCSPIRIT_API outcome::result<bytes_t> sha256_digest(utils::bytes_view_t data) noexcept;
 

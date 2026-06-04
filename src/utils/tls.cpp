@@ -209,7 +209,7 @@ outcome::result<key_pair_t> generate_pair(const char *issuer_name) noexcept {
                       cert_data_t{std::move(key_container.value())}};
 }
 
-static bool write_mem_to(const model::poly_path_view_t &path, BIO *mem) {
+static bool write_mem_to(const utils::poly_path_view_t &path, BIO *mem) {
     unsigned char *ptr;
     auto size = BIO_get_mem_data(mem, &ptr);
     if (size < 0) {
@@ -225,8 +225,8 @@ static bool write_mem_to(const model::poly_path_view_t &path, BIO *mem) {
     return false;
 }
 
-outcome::result<void> key_pair_t::save(const model::poly_path_view_t &cert_path,
-                                       const model::poly_path_view_t &priv_key_path) const noexcept {
+outcome::result<void> key_pair_t::save(const utils::poly_path_view_t &cert_path,
+                                       const utils::poly_path_view_t &priv_key_path) const noexcept {
     do {
         BIO *bio = BIO_new(BIO_s_mem());
         auto bio_guard = make_guard(bio, [](auto ptr) { BIO_free(ptr); });
@@ -252,7 +252,7 @@ outcome::result<void> key_pair_t::save(const model::poly_path_view_t &cert_path,
     return outcome::success();
 }
 
-static outcome::result<guard_t<BIO>> read_to_mem_bio(const model::poly_path_view_t &cert_path) {
+static outcome::result<guard_t<BIO>> read_to_mem_bio(const utils::poly_path_view_t &cert_path) {
     auto file = io_stream_t::open_read(cert_path);
     if (!file) {
         return sys::error_code{errno, sys::system_category()};
@@ -268,8 +268,8 @@ static outcome::result<guard_t<BIO>> read_to_mem_bio(const model::poly_path_view
     return make_guard(cert_bio, [data = std::move(data_opt)](auto *ptr) { BIO_free(ptr); });
 }
 
-outcome::result<key_pair_t> load_pair(const model::poly_path_view_t &cert_path,
-                                      const model::poly_path_view_t &priv_key_path) {
+outcome::result<key_pair_t> load_pair(const utils::poly_path_view_t &cert_path,
+                                      const utils::poly_path_view_t &priv_key_path) {
     /* read certificate in memory, then load it va openssl */
     auto cert_mem_result = read_to_mem_bio(cert_path);
     if (!cert_mem_result) {

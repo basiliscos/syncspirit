@@ -2,15 +2,15 @@
 // SPDX-FileCopyrightText: 2025-2026 Ivan Baidakou
 
 #include "test-utils.h"
-#include "model/misc/path.h"
-#include "model/misc/path_view.hpp"
-#include "model/misc/path_cache.h"
+#include "utils/path.h"
+#include "utils/path_view.hpp"
+#include "utils/path_cache.h"
 #include <memory_resource>
 #include <catch2/matchers/catch_matchers_string.hpp>
 #include <boost/nowide/convert.hpp>
 
 using namespace syncspirit;
-using namespace syncspirit::model;
+using namespace syncspirit::utils;
 
 using Catch::Matchers::EndsWith;
 using Catch::Matchers::StartsWith;
@@ -255,19 +255,19 @@ TEST_CASE("path view (3)", "[model]") {
     auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
     auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
     SECTION("simple") {
-        auto view = model::make_view("file.bin", allocator);
+        auto view = make_view("file.bin", allocator);
         REQUIRE(!view.empty());
         CHECK(view.get_full_name() == "file.bin");
         CHECK(view.get_filename() == "file.bin");
     }
     SECTION("complex") {
-        auto view = model::make_view("dir/file.bin", allocator);
+        auto view = make_view("dir/file.bin", allocator);
         REQUIRE(!view.empty());
         CHECK(view.get_full_name() == "dir/file.bin");
         CHECK(view.get_filename() == "file.bin");
     }
     SECTION("absolute") {
-        auto view = model::make_view("/dir/file.bin", allocator);
+        auto view = make_view("/dir/file.bin", allocator);
         REQUIRE(!view.empty());
         CHECK(view.get_full_name() == "/dir/file.bin");
         CHECK(view.get_filename() == "file.bin");
@@ -279,20 +279,20 @@ TEST_CASE("path view (4)", "[model]") {
     auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
     auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
     SECTION("ascii -> utf8") {
-        auto view = model::make_view("abc", allocator);
+        auto view = make_view("abc", allocator);
         CHECK(view.get_full_wname() == L"abc");
         CHECK(view.get_full_name() == "abc");
     }
     SECTION("wchar -> utf8 (1)") {
-        auto view = model::make_view(L"ёпрст", allocator);
+        auto view = make_view(L"ёпрст", allocator);
         CHECK(view.get_full_wname() == L"ёпрст");
     }
     SECTION("wchar -> utf8 (2)") {
-        auto view = model::make_view(L"э/ю/Ё", allocator);
+        auto view = make_view(L"э/ю/Ё", allocator);
         CHECK(view.get_full_wname() == L"э/ю/Ё");
     }
     SECTION("wchar -> utf8 (3)") {
-        auto view = model::make_view(L"э\\ю\\Ё", allocator);
+        auto view = make_view(L"э\\ю\\Ё", allocator);
         CHECK(view.get_full_wname() == L"э\\ю\\Ё");
     }
 }
