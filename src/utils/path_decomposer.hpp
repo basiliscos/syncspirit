@@ -197,6 +197,8 @@ struct path_decomposer_t {
     static content_t decompose(std::basic_string_view<CharT> in, const Allocator &allocator_,
                                std::basic_string_view<CharT> separators) noexcept {
         using Traits = std::allocator_traits<Allocator>;
+        using AllocatorU32 = Traits::template rebind_alloc<std::uint32_t>;
+        using TraitsU32 = std::allocator_traits<AllocatorU32>;
         using namespace boost::nowide;
         using namespace boost::nowide::utf;
 
@@ -209,11 +211,11 @@ struct path_decomposer_t {
             if (!str_sz) {
                 return {};
             }
-            auto allocator = allocator_;
+            auto allocator = AllocatorU32(allocator_);
 
             auto sz = sizeof(std::uint32_t) + pieces.size() + str_sz + 1;
             auto data_ptr = (uint8_t *){};
-            data_ptr = reinterpret_cast<uint8_t *>(Traits::allocate(allocator, sz));
+            data_ptr = reinterpret_cast<uint8_t *>(TraitsU32::allocate(allocator, sz));
             auto raw_u32 = reinterpret_cast<std::uint32_t *>(data_ptr);
             *raw_u32++ = str_sz;
             auto raw_u8_ptr = reinterpret_cast<std::uint8_t *>(raw_u32);

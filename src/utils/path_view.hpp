@@ -13,6 +13,8 @@ namespace syncspirit::utils {
 
 template <typename Allocator> struct path_view_t final : path_base_t {
     using Traits = std::allocator_traits<Allocator>;
+    using AllocatorU32 = Traits::template rebind_alloc<std::uint32_t>;
+    using TraitsU32 = std::allocator_traits<AllocatorU32>;
     using T = typename Allocator::value_type;
     using wallocator_t = std::pmr::polymorphic_allocator<wchar_t>;
     using wstring_t = std::basic_string<wchar_t, std::char_traits<wchar_t>, wallocator_t>;
@@ -58,7 +60,8 @@ template <typename Allocator> struct path_view_t final : path_base_t {
             auto str_sz = *reinterpret_cast<const std::uint32_t *>(d);
             auto c = path.get_components();
             auto sz = sizeof(std::uint32_t) + c + str_sz + 1;
-            data = Traits::allocate(allocator, sz);
+            auto allocator_u32 = AllocatorU32(allocator);
+            data = TraitsU32::allocate(allocator_u32, sz);
             memcpy(const_cast<void *>(data), d, sz);
             components = c;
         }
@@ -76,7 +79,8 @@ template <typename Allocator> struct path_view_t final : path_base_t {
             if (new_str_sz > 1)
                 --new_str_sz; // skip trailing '/'
             auto new_sz = sizeof(std::uint32_t) + components - 1 + new_str_sz + 1;
-            auto new_ptr = Traits::allocate(allocator, new_sz);
+            auto allocator_u32 = AllocatorU32(allocator);
+            auto new_ptr = TraitsU32::allocate(allocator_u32, new_sz);
 
             auto raw_u32 = reinterpret_cast<std::uint32_t *>(new_ptr);
             *raw_u32++ = new_str_sz;
@@ -99,7 +103,8 @@ template <typename Allocator> struct path_view_t final : path_base_t {
             auto new_str_sz = str_sz + tmp_sz;
             auto ptr = reinterpret_cast<const std::uint8_t *>(u32_ptr);
             auto new_sz = sizeof(std::uint32_t) + components + new_str_sz + 1;
-            auto new_ptr = Traits::allocate(allocator, new_sz);
+            auto allocator_u32 = AllocatorU32(allocator);
+            auto new_ptr = TraitsU32::allocate(allocator_u32, new_sz);
 
             auto new_raw_u32 = reinterpret_cast<std::uint32_t *>(new_ptr);
             *new_raw_u32++ = new_str_sz;
@@ -180,6 +185,8 @@ template <typename Allocator>
 auto operator/(const path_view_t<Allocator> &parent, const path_view_t<Allocator> &child) noexcept
     -> path_view_t<Allocator> {
     using Traits = std::allocator_traits<Allocator>;
+    using AllocatorU32 = Traits::template rebind_alloc<std::uint32_t>;
+    using TraitsU32 = std::allocator_traits<AllocatorU32>;
     if (parent.empty()) {
         return child;
     }
@@ -189,7 +196,7 @@ auto operator/(const path_view_t<Allocator> &parent, const path_view_t<Allocator
     if (child.is_absolute()) {
         return child;
     }
-    auto allocator = parent.get_allocator();
+    auto allocator = AllocatorU32(parent.get_allocator());
     auto ptr_1 = reinterpret_cast<const std::uint8_t *>(parent.get_data());
     auto ptr_2 = reinterpret_cast<const std::uint8_t *>(child.get_data());
     auto str_sz_1 = *reinterpret_cast<const std::uint32_t *>(ptr_1);
@@ -202,7 +209,7 @@ auto operator/(const path_view_t<Allocator> &parent, const path_view_t<Allocator
 
     auto new_components = parent.get_components() + child.get_components() + 1; // "/"
     auto new_sz = sizeof(std::uint32_t) + new_components + new_str_sz + 1;
-    auto new_ptr = Traits::allocate(allocator, new_sz);
+    auto new_ptr = TraitsU32::allocate(allocator, new_sz);
     auto new_u32_ptr = reinterpret_cast<std::uint32_t *>(new_ptr);
     *new_u32_ptr++ = new_str_sz;
 
@@ -226,7 +233,7 @@ auto operator/(const path_view_t<Allocator> &parent, const path_view_t<Allocator
     std::memcpy(new_u8_ptr, ptr_2, str_sz_2);
     new_u8_ptr += str_sz_2;
     *new_u8_ptr++ = 0;
-    return path_view_t(new_ptr, new_components, allocator);
+    return path_view_t(new_ptr, new_components, parent.get_allocator());
 }
 
 template <typename Allocator> auto path_base_t::get_view(const Allocator &a) const noexcept -> path_view_t<Allocator> {
