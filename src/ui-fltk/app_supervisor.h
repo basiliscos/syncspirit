@@ -17,7 +17,6 @@
 #include <rotor/fltk.hpp>
 #include <FL/Fl_Widget.H>
 #include <FL/Fl_Group.H>
-#include <filesystem>
 #include <chrono>
 
 namespace syncspirit::fltk {

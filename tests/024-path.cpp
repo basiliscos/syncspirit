@@ -101,6 +101,16 @@ TEST_CASE("path", "[model]") {
 
         CHECK(it == p.end());
     }
+    SECTION("extension") {
+        auto p1 = path_t::make_generic(L"путь/файл.расш");
+        auto p2 = path_t::make_generic(L"путь/файл");
+        auto p3 = path_t::make_generic(L"/.путь/файл");
+        auto p4 = path_t::make_generic(L"путь/файл.р1.р2");
+        CHECK(p1.get_extension() == boost::nowide::narrow(L".расш"));
+        CHECK(p2.get_extension().empty());
+        CHECK(p3.get_extension().empty());
+        CHECK(p4.get_extension() == boost::nowide::narrow(L".р2"));
+    }
 }
 
 TEST_CASE("path view (1)", "[model]") {

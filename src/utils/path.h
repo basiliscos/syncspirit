@@ -45,6 +45,7 @@ struct SYNCSPIRIT_API path_base_t {
 
     std::string_view get_full_name() const noexcept;
     std::string_view get_filename() const noexcept;
+    std::string_view get_extension() const noexcept;
     std::string_view get_parent_name() const noexcept;
     bool contains(const path_base_t &other) const noexcept;
     bool is_temporal() const noexcept;

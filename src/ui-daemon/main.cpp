@@ -2,7 +2,6 @@
 // SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include <openssl/crypto.h>
-#include <filesystem>
 #include <boost/program_options.hpp>
 #include <boost/nowide/convert.hpp>
 #include <rotor/asio.hpp>
@@ -42,7 +41,6 @@
 #include <winnls.h>
 #endif
 
-namespace bfs = std::filesystem;
 namespace po = boost::program_options;
 namespace pt = boost::posix_time;
 namespace r = rotor;

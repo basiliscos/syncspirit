@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2026 Ivan Baidakou
 
 #include "table.h"
 
@@ -9,14 +9,14 @@
 #include <FL/Fl_Group.H>
 #include <FL/Fl_Check_Button.H>
 #include <FL/Fl_Native_File_Chooser.H>
-#include <filesystem>
 #include <spdlog/fmt/fmt.h>
 #include <boost/nowide/convert.hpp>
+#include "utils/path.h"
+#include "utils/path_view.hpp"
 
 #include <cassert>
 
 using namespace syncspirit::fltk::config;
-namespace bfs = std::filesystem;
 
 static constexpr int col_min_size = 60;
 
@@ -327,11 +327,15 @@ struct path_cell_t final : property_cell_t {
         file_chooser.title(property->get_explanation().data());
         file_chooser.type(type);
         if (k == property_kind_t::file) {
-            auto path = bfs::path(boost::nowide::widen(property->get_value()));
-            auto parent = boost::nowide::narrow(path.parent_path().wstring());
-            file_chooser.directory(parent.data());
+            auto buffer = std::array<std::byte, 1024 * 32>();
+            auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+            auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
 
-            auto ext = fmt::format("*{}", boost::nowide::narrow(path.extension().wstring()));
+            auto path = syncspirit::utils::path_t::make_native(property->get_value());
+            auto path_view = path.get_view(allocator);
+            file_chooser.directory(path_view.get_parent().get_full_name().data());
+
+            auto ext = fmt::format("*{}", path_view.get_extension());
             auto filter = fmt::format("{}\t{}", ext, ext);
             file_chooser.filter(filter.data());
         }
@@ -342,8 +346,7 @@ struct path_cell_t final : property_cell_t {
         }
 
         // commit
-        auto path = bfs::path(boost::nowide::widen(file_chooser.filename()));
-        property->set_value(boost::nowide::narrow(path.wstring()));
+        property->set_value(file_chooser.filename());
         load_value();
         done_editing();
     }

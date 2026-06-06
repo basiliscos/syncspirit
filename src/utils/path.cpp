@@ -187,6 +187,19 @@ std::string_view path_base_t::get_filename() const noexcept {
     return {};
 }
 
+std::string_view path_base_t::get_extension() const noexcept {
+    auto name = get_filename();
+    if (!name.empty()) {
+        if (name != "." && name != "..") {
+            auto pos = name.rfind('.');
+            if (pos != std::string_view::npos) {
+                return name.substr(pos);
+            }
+        }
+    }
+    return {};
+}
+
 std::string_view path_base_t::get_parent_name() const noexcept {
     if (components >= 1) {
         auto first = (*iterator_t(this));
