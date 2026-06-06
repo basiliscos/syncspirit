@@ -13,6 +13,8 @@
 #include "utils/log.h"
 #include "utils/location.h"
 #include "utils/format.hpp"
+#include "utils/path_view.hpp"
+#include "utils/path_utils.h"
 
 #define TOML_EXCEPTIONS 0
 #include <toml++/toml.h>
@@ -41,9 +43,9 @@
         auto option = t[#property].value<std::string>();                                                               \
         if (!option) {                                                                                                 \
             spdlog::warn("using default value for {}/{}", table_name, #property);                                      \
-            c.property = c_default.property;                                                                           \
+            c.property = c_default.property.clone();                                                                   \
         } else {                                                                                                       \
-            c.property = boost::nowide::widen(option.value());                                                         \
+            c.property = utils::path_t::make_native(option.value());                                                   \
         }                                                                                                              \
     }
 
@@ -60,9 +62,9 @@
         auto option = t[#property].value<std::string>();                                                               \
         if (!option) {                                                                                                 \
             spdlog::warn("using default value for {}/{}", table_name, #property);                                      \
-            c.property = c_default.property;                                                                           \
+            c.property = c_default.property.clone();                                                                   \
         } else {                                                                                                       \
-            c.property = utils::expand_home(option.value(), home_opt);                                                 \
+            c.property = utils::expand_home(option.value(), home_opt).detach();                                        \
         }                                                                                                              \
     }
 
@@ -106,7 +108,7 @@ namespace syncspirit::config {
 
 using level_t = spdlog::level::level_enum;
 
-using home_option_t = outcome::result<bfs::path>;
+using home_option_t = utils::path_t;
 
 static std::string get_device_name() noexcept {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
@@ -125,22 +127,24 @@ static std::string get_device_name() noexcept {
     }
 }
 
-static main_t make_default_config(const bfs::path &config_path, const bfs::path &config_dir, bool is_home) {
+static main_t make_default_config(const utils::poly_path_view_t &config_path, const utils::poly_path_view_t &config_dir,
+                                  bool is_home) {
     auto dir = config_path;
     std::string cert_file = home_path + "/cert.pem";
     std::string key_file = home_path + "/key.pem";
     if (!is_home) {
         using boost::algorithm::replace_all_copy;
-        cert_file = replace_all_copy(cert_file, home_path, dir.string());
-        key_file = replace_all_copy(key_file, home_path, dir.string());
+        cert_file = replace_all_copy(cert_file, home_path, dir.get_full_name());
+        key_file = replace_all_copy(key_file, home_path, dir.get_full_name());
     }
 
     auto device = get_device_name();
 
+    auto shared_path = utils::make_view("shared-data", dir.get_allocator());
     // clang-format off
     main_t cfg;
-    cfg.config_path = config_path;
-    cfg.default_location = config_dir / L"shared-data";
+    cfg.config_path = config_path.detach();
+    cfg.default_location = (config_dir / shared_path).detach();
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
     cfg.ssl_verify_store = "org.openssl.winstore://";
 #elif defined(__APPLE__)
@@ -148,8 +152,8 @@ static main_t make_default_config(const bfs::path &config_path, const bfs::path 
 #else
     cfg.ssl_verify_store = {};
 #endif
-    cfg.cert_file = cert_file;
-    cfg.key_file = key_file;
+    cfg.cert_file = utils::path_t::make_native(cert_file);
+    cfg.key_file = utils::path_t::make_native(key_file);
     cfg.timeout = 30000;
     cfg.device_name = device;
     cfg.hasher_threads = 3;
@@ -230,23 +234,21 @@ static main_t make_default_config(const bfs::path &config_path, const bfs::path 
     return cfg;
 }
 
-config_result_t get_config(std::string_view config, const bfs::path &config_path) {
-    auto dir = config_path.parent_path();
+config_result_t get_config(std::string_view config, const utils::poly_path_view_t &config_path) {
+    auto dir = config_path.get_parent();
     main_t cfg;
-    cfg.config_path = config_path;
+    cfg.config_path = config_path.detach();
 
-    auto home_opt = utils::get_home_dir();
+    auto home_opt = utils::get_home_dir(config_path.get_allocator());
     auto r = toml::parse(config);
     if (!r) {
         return std::string(r.error().description());
     }
 
-    auto config_dir_opt = utils::get_default_config_dir();
-    if (!config_dir_opt) {
-        auto ec = config_dir_opt.assume_error();
-        return fmt::format("cannot get config dir: {}", ec);
+    auto config_dir = utils::get_default_config_dir(config_path.get_allocator());
+    if (config_dir.empty()) {
+        return "cannot get config dir";
     }
-    auto &config_dir = config_dir_opt.assume_value();
     bool is_home = dir == config_dir;
     auto default_config = make_default_config(config_path, dir, is_home);
 
@@ -429,22 +431,19 @@ std::string serialize(const main_t& cfg) noexcept {
         logs.push_back(log_table);
     }
 
-    auto cert_file = cfg.cert_file;
-    cert_file.make_preferred();
-
-    auto key_file = cfg.key_file;
-    key_file.make_preferred();
+    auto cert_file = cfg.cert_file.get_full_name();
+    auto key_file = cfg.key_file.get_full_name();
 
     auto tbl = toml::table{{
         {"main", toml::table{{
                      {"hasher_threads", cfg.hasher_threads},
                      {"poll_timeout", cfg.poll_timeout},
                      {"ssl_verify_store", cfg.ssl_verify_store},
-                     {"cert_file", narrow(cert_file.wstring())},
-                     {"key_file", narrow(key_file.wstring())},
+                     {"cert_file", std::string(cert_file)},
+                     {"key_file", std::string(key_file)},
                      {"timeout", cfg.timeout},
                      {"device_name", cfg.device_name},
-                     {"default_location", narrow(cfg.default_location.wstring())},
+                     {"default_location", std::string(cfg.default_location.get_full_name())},
                  }}},
         {"log", logs},
         {"local_discovery", toml::table{{
@@ -519,13 +518,13 @@ std::string serialize(const main_t& cfg) noexcept {
     return std::move(out.str());
 }
 
-outcome::result<main_t> generate_config(const bfs::path &config_path) {
-    auto dir = config_path.parent_path();
-    sys::error_code ec;
-    bool exists = bfs::exists(dir, ec);
+outcome::result<main_t> generate_config(const utils::poly_path_view_t &config_path) {
+    auto dir = config_path.get_parent();
+    auto ec = std::error_code{};
+    auto exists = utils::exists(dir, ec);
     if (!exists) {
-        spdlog::info("creating directory {}", dir.string());
-        bfs::create_directories(dir, ec);
+        spdlog::info("creating directory {}", dir);
+        utils::create_directories(dir, ec);
         if (ec) {
             spdlog::error("cannot create dirs: {}", ec);
             return ec;
@@ -534,18 +533,17 @@ outcome::result<main_t> generate_config(const bfs::path &config_path) {
 
     std::string cert_file = home_path + "/cert.pem";
     std::string key_file = home_path + "/key.pem";
-    auto config_dir_opt = utils::get_default_config_dir();
-    if (!config_dir_opt) {
-        auto ec = config_dir_opt.assume_error();
-        spdlog::warn("cannot get config dir: {}", ec);
-        return ec;
+    auto config_dir = utils::get_default_config_dir(config_path.get_allocator());
+    if (config_dir.empty()) {
+        spdlog::warn("cannot get config dir");
+        return std::make_error_code(std::errc::io_error);
     }
-    auto &config_dir = config_dir_opt.assume_value();
     bool is_home = dir == config_dir;
     if (!is_home) {
         using boost::algorithm::replace_all_copy;
-        cert_file = replace_all_copy(cert_file, home_path, dir.string());
-        key_file = replace_all_copy(key_file, home_path, dir.string());
+        auto dir_expanded = dir.get_full_name();
+        cert_file = replace_all_copy(cert_file, home_path, dir_expanded);
+        key_file = replace_all_copy(key_file, home_path, dir_expanded);
     }
     return make_default_config(config_path, config_dir, is_home);
 }

@@ -35,8 +35,8 @@ using namespace syncspirit::test;
 using namespace syncspirit::model;
 
 cluster_configurer_t::cluster_configurer_t(diff_builder_t &builder_, utils::bytes_view_t peer_sha256_,
-                                           const bfs::path default_location_) noexcept
-    : builder{builder_}, peer_sha256{peer_sha256_}, default_location{default_location_} {}
+                                           const utils::path_t default_location_) noexcept
+    : builder{builder_}, peer_sha256{peer_sha256_}, default_location{default_location_.clone()} {}
 
 cluster_configurer_t &&cluster_configurer_t::add(utils::bytes_view_t sha256, std::string_view folder_id, uint64_t index,
                                                  int64_t max_sequence, std::string_view url) noexcept {
@@ -223,8 +223,8 @@ diff_builder_t &diff_builder_t::update_peer(const model::device_id_t &device, st
 }
 
 cluster_configurer_t diff_builder_t::configure_cluster(utils::bytes_view_t sha256,
-                                                       const bfs::path &default_location) noexcept {
-    return cluster_configurer_t(*this, sha256, default_location);
+                                                       const utils::path_t &default_location) noexcept {
+    return cluster_configurer_t(*this, sha256, default_location.clone());
 }
 
 index_maker_t diff_builder_t::make_index(utils::bytes_view_t sha256, std::string_view folder_id) noexcept {

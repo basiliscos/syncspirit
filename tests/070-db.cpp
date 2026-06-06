@@ -159,10 +159,11 @@ struct fixture_t {
     virtual std::uint32_t get_max_files_per_diff() const { return 32; }
 
     virtual void launch_db() {
+        auto path = utils::path_t::make_native(root_path.generic_wstring());
         db_actor = sup->create_actor<db_actor_t>()
                        .bouncer_address(sup->get_address())
                        .cluster(cluster)
-                       .db_dir(root_path)
+                       .db_dir(path.clone())
                        .db_config(make_config())
                        .timeout(timeout)
                        .max_files_per_diff(get_max_files_per_diff())

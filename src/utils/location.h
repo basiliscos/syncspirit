@@ -1,26 +1,18 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #pragma once
 
 #include <string>
-#include <boost/outcome.hpp>
-#include <filesystem>
 #include "syncspirit-export.h"
+#include "path_view.hpp"
 
-namespace syncspirit {
-namespace utils {
+namespace syncspirit::utils {
 
-namespace outcome = boost::outcome_v2;
-namespace bfs = std::filesystem;
+SYNCSPIRIT_API poly_path_view_t get_home_dir(const allocator_t &) noexcept;
 
-using home_option_t = outcome::result<bfs::path>;
+SYNCSPIRIT_API poly_path_view_t get_default_config_dir(const allocator_t &) noexcept;
 
-SYNCSPIRIT_API outcome::result<bfs::path> get_home_dir() noexcept;
+SYNCSPIRIT_API poly_path_view_t expand_home(const std::string &path, const poly_path_view_t &home) noexcept;
 
-SYNCSPIRIT_API outcome::result<bfs::path> get_default_config_dir() noexcept;
-
-SYNCSPIRIT_API std::wstring expand_home(const std::string &path, const home_option_t &home) noexcept;
-
-} // namespace utils
-} // namespace syncspirit
+} // namespace syncspirit::utils

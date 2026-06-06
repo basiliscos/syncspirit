@@ -78,18 +78,36 @@ TEST_CASE("path", "[model]") {
         CHECK(p.get_full_name() == "/");
         CHECK(p.get_parent_name() == "");
     }
-#if 0
-    SECTION("backslashes") {
-        auto p = path_t("c:\\my\\path.bin");
-        CHECK(p.get_filename() == "path.bin");
-        CHECK(p.get_full_name() == "c:/my/path.bin");
-        CHECK(p.get_parent_name() == "c:/my");
+    SECTION("parsing + components iterator") {
+        auto str = "/user/home/.config/syncspirit_test/some/path";
+        auto p = path_t::make_generic(str);
+        CHECK(p.get_components() == 6);
+        auto it = p.begin();
+
+        CHECK(*it == "");
+        ++it;
+        CHECK(*it == "user");
+        ++it;
+        CHECK(*it == "home");
+        ++it;
+        CHECK(*it == ".config");
+        ++it;
+        CHECK(*it == "syncspirit_test");
+        ++it;
+        CHECK(*it == "some");
+        ++it;
+        CHECK(*it == "path");
+        ++it;
+
+        CHECK(it == p.end());
     }
-#endif
 }
 
 TEST_CASE("path view (1)", "[model]") {
-    auto allocator = std::allocator<char>();
+    auto buffer = std::array<std::byte, 1024 * 32>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+
     SECTION("abs path") {
         auto path = path_t::make_generic("/some/dir/file.bin");
         auto view = path.get_view(allocator);
@@ -211,11 +229,23 @@ TEST_CASE("path view (2)", "[model]") {
     auto p_abs_2 = std::string_view("c:\\c\\d");
 #endif
 
+    SECTION("wide string") {
+        auto p = path_t::make_native(p_abs_1);
+        auto v = p.get_view(allocator);
+#ifndef SYNCSPIRIT_WIN
+        CHECK(v.get_full_wname(false) == L"/a/b");
+        CHECK(v.get_full_wname(true) == L"/a/b");
+#else
+        CHECK(v.get_full_wname(false) == L"c:/a/b");
+        CHECK(v.get_full_wname(true) == L"c:\\a\\b");
+#endif
+    }
     SECTION("concat") {
         SECTION("2 relatives") {
             auto p1 = path_t::make_generic("a/b").get_view(allocator);
             auto p2 = path_t::make_generic("c/d").get_view(allocator);
             auto pr = p1 / p2;
+            CHECK(pr.get_components() == 3);
             CHECK(pr.get_full_name() == "a/b/c/d");
             CHECK(!pr.is_absolute());
 
@@ -242,10 +272,42 @@ TEST_CASE("path view (2)", "[model]") {
             auto p1 = path_t::make_native(p_abs_1).get_view(allocator);
             auto p2 = path_t::make_generic("c/d").get_view(allocator);
             auto pr = p1 / p2;
+            CHECK(pr.get_components() == 4);
             CHECK(pr.is_absolute());
             auto full = std::string(pr.get_full_name());
             REQUIRE_THAT(full, StartsWith(std::string(p1.get_full_name())));
             REQUIRE_THAT(full, EndsWith(std::string(p2.get_full_name())));
+        }
+        SECTION("real-world example") {
+            auto p1 = path_t::make_generic("/user/home/.config/syncspirit_test").get_view(allocator);
+            auto p2 = path_t::make_generic("some/path").get_view(allocator);
+            auto pr = p1 / p2;
+            CHECK(pr.get_full_name() == "/user/home/.config/syncspirit_test/some/path");
+            CHECK(pr.get_components() == 6);
+#ifndef SYNCSPIRIT_WIN
+            CHECK(pr.is_absolute());
+#endif
+            auto pr_2 = pr.detach();
+            CHECK(pr == pr_2);
+
+            auto it = pr.begin();
+
+            CHECK(*it == "");
+            ++it;
+            CHECK(*it == "user");
+            ++it;
+            CHECK(*it == "home");
+            ++it;
+            CHECK(*it == ".config");
+            ++it;
+            CHECK(*it == "syncspirit_test");
+            ++it;
+            CHECK(*it == "some");
+            ++it;
+            CHECK(*it == "path");
+            ++it;
+
+            CHECK(it == pr.end());
         }
     }
 }

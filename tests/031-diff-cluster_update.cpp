@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "test-utils.h"
 #include "access.h"
@@ -779,6 +779,7 @@ TEST_CASE("cluster update with remote folders (1)", "[model]") {
 TEST_CASE("cluster update, inactual remote folders for non-shared folder", "[model]") {
     auto root_path = unique_path();
     auto path_guard = test::path_guard_t(root_path);
+    auto root = utils::path_t::make_native(root_path.generic_wstring());
 
     auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
     auto my_device = device_t::create(my_id, "my-device").value();
@@ -797,7 +798,7 @@ TEST_CASE("cluster update, inactual remote folders for non-shared folder", "[mod
 
     auto sha256 = peer_id.get_sha256();
 
-    auto r = builder.configure_cluster(sha256, root_path)
+    auto r = builder.configure_cluster(sha256, root)
                  .add(sha256, folder_1_id, 5, 4)
                  .add(my_id.get_sha256(), folder_1_id, 55, 44)
                  .finish()
@@ -942,8 +943,9 @@ TEST_CASE("device introduction", "[model]") {
 }
 
 TEST_CASE("auto-accept folders", "[model]") {
-    auto root_path = unique_path();
-    auto path_guard = test::path_guard_t(root_path);
+    auto root_dir = unique_path();
+    auto path_guard = test::path_guard_t(root_dir);
+    auto root_path = utils::path_t::make_native(root_dir.generic_wstring());
 
     auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
     auto my_device = device_t::create(my_id, "my-device").value();
@@ -991,7 +993,7 @@ TEST_CASE("auto-accept folders", "[model]") {
         REQUIRE(cluster->get_folders().size() == 1);
         auto folder_1 = cluster->get_folders().by_id(folder_1_id);
         REQUIRE(folder_1->is_shared_with(*peer_device_1));
-        CHECK(bfs::exists(root_path / folder_1_id));
+        CHECK(bfs::exists(root_dir / folder_1_id));
     }
     SECTION("able to create dir by folder label") {
         auto r = builder.configure_cluster(sha256_1, root_path)
@@ -1003,25 +1005,26 @@ TEST_CASE("auto-accept folders", "[model]") {
         REQUIRE(cluster->get_folders().size() == 1);
         auto folder_1 = cluster->get_folders().by_id(folder_1_id);
         REQUIRE(folder_1->is_shared_with(*peer_device_1));
-        CHECK(bfs::exists(root_path / "zzz"));
+        CHECK(bfs::exists(root_dir / "zzz"));
     }
     SECTION("not able to create dir by folder_id") {
-        auto new_root = root_path / "sub-root";
-        bfs::create_directories(new_root);
-        bfs::permissions(new_root, bfs::perms::all, bfs::perm_options::remove);
-        auto new_guard = test::path_guard_t(new_root);
+        auto new_dir = root_dir / "sub-root";
+        auto new_path = utils::path_t::make_native(new_dir.generic_wstring());
+        bfs::create_directories(new_dir);
+        bfs::permissions(new_dir, bfs::perms::all, bfs::perm_options::remove);
+        auto new_guard = test::path_guard_t(new_dir);
         auto ec = sys::error_code{};
-        bfs::create_directories(new_root / L"авось", ec);
+        bfs::create_directories(new_dir / L"авось", ec);
 
         if (ec) {
-            auto r = builder.configure_cluster(sha256_1, new_root).add(sha256_1, folder_1_id, 5, 4).fail();
-            bfs::permissions(new_root, bfs::perms::all, bfs::perm_options::add);
+            auto r = builder.configure_cluster(sha256_1, new_path).add(sha256_1, folder_1_id, 5, 4).fail();
+            bfs::permissions(new_dir, bfs::perms::all, bfs::perm_options::add);
             REQUIRE(r);
             REQUIRE(cluster->get_folders().size() == 0);
             REQUIRE(!cluster->get_folders().by_id(folder_1_id));
-            CHECK(!bfs::exists(new_root / folder_1_id));
+            CHECK(!bfs::exists(new_dir / folder_1_id));
         } else {
-            bfs::permissions(new_root, bfs::perms::all, bfs::perm_options::add);
+            bfs::permissions(new_dir, bfs::perms::all, bfs::perm_options::add);
             INFO("Skipping due to unability to prohibit directories creation");
         }
     }
@@ -1038,7 +1041,7 @@ TEST_CASE("auto-accept folders", "[model]") {
         auto folder_1 = cluster->get_folders().by_id(folder_1_id);
         REQUIRE(folder_1->is_shared_with(*peer_device_1));
         REQUIRE(folder_1->is_shared_with(*peer_device_2));
-        CHECK(bfs::exists(root_path / folder_1_id));
+        CHECK(bfs::exists(root_dir / folder_1_id));
     }
     SECTION("auto accept + introduce peer (source second)") {
         auto r = builder.configure_cluster(sha256_1, root_path)
@@ -1053,10 +1056,11 @@ TEST_CASE("auto-accept folders", "[model]") {
         auto folder_1 = cluster->get_folders().by_id(folder_1_id);
         REQUIRE(folder_1->is_shared_with(*peer_device_1));
         REQUIRE(folder_1->is_shared_with(*peer_device_2));
-        CHECK(bfs::exists(root_path / folder_1_id));
+        CHECK(bfs::exists(root_dir / folder_1_id));
     }
     SECTION("not able to create dir (source second)") {
-        auto new_root = root_path / "sub-root";
+        auto new_root = root_dir / "sub-root";
+        auto new_path = utils::path_t::make_native(new_root.generic_wstring());
         bfs::create_directories(new_root);
         auto new_guard = test::path_guard_t(new_root);
         bfs::permissions(new_root, bfs::perms::all, bfs::perm_options::remove);
@@ -1065,7 +1069,7 @@ TEST_CASE("auto-accept folders", "[model]") {
         bfs::create_directories(new_root / L"авось", ec);
 
         if (ec) {
-            auto r = builder.configure_cluster(sha256_1, new_root)
+            auto r = builder.configure_cluster(sha256_1, new_path)
                          .add(sha256_2, folder_1_id, 55, 44)
                          .add(sha256_1, folder_1_id, 5, 4)
                          .fail();

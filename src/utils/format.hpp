@@ -40,6 +40,7 @@ struct bytes_view_t;
 struct bytes_t;
 
 struct path_base_t;
+struct path_t;
 template <typename Allocator> struct path_view_t;
 using allocator_t = std::pmr::polymorphic_allocator<char>;
 using poly_path_view_t = path_view_t<allocator_t>;
@@ -65,6 +66,9 @@ template <> struct SYNCSPIRIT_API fmt::formatter<syncspirit::utils::path_base_t>
 template <>
 struct SYNCSPIRIT_API fmt::formatter<syncspirit::utils::poly_path_view_t>
     : fmt::formatter<syncspirit::utils::path_base_t> {};
+
+template <>
+struct SYNCSPIRIT_API fmt::formatter<syncspirit::utils::path_t> : fmt::formatter<syncspirit::utils::path_base_t> {};
 
 template <> struct SYNCSPIRIT_API fmt::formatter<std::error_code> {
     constexpr auto parse(format_parse_context &ctx) -> decltype(ctx.begin()) { return ctx.end(); }

@@ -5,10 +5,9 @@
 
 #include "property.h"
 #include <vector>
+#include "utils/path.h"
 
 namespace syncspirit::fltk::config {
-
-namespace bfs = std::filesystem;
 
 namespace impl {
 
@@ -48,10 +47,10 @@ struct url_t : string_t {
 };
 
 struct path_t : property_t {
-    path_t(std::string label, std::string explanation, const bfs::path &value, const bfs::path &default_value,
+    path_t(std::string label, std::string explanation, const utils::path_t &value, const utils::path_t &default_value,
            property_kind_t kind = property_kind_t::file);
 
-    bfs::path convert() noexcept;
+    utils::path_t convert() noexcept;
 };
 
 struct bool_t : property_t {
@@ -342,7 +341,7 @@ struct default_location_t final : impl::path_t {
 
     static const char *explanation_;
 
-    default_location_t(const bfs::path &value, const bfs::path &default_value);
+    default_location_t(const utils::path_t &value, const utils::path_t &default_value);
 
     void reflect_to(syncspirit::config::main_t &main) override;
 };
@@ -352,7 +351,7 @@ struct cert_file_t final : impl::path_t {
 
     static const char *explanation_;
 
-    cert_file_t(const bfs::path &, const bfs::path &default_value);
+    cert_file_t(const utils::path_t &, const utils::path_t &default_value);
 
     void reflect_to(syncspirit::config::main_t &main) override;
 };
@@ -362,7 +361,7 @@ struct key_file_t final : impl::path_t {
 
     static const char *explanation_;
 
-    key_file_t(const bfs::path &, const bfs::path &default_value);
+    key_file_t(const utils::path_t &, const utils::path_t &default_value);
 
     void reflect_to(syncspirit::config::main_t &main) override;
 };

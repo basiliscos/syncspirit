@@ -3,22 +3,20 @@
 
 #pragma once
 #include <boost/outcome.hpp>
-#include <filesystem>
 #include "main.h"
 #include "syncspirit-export.h"
 
 namespace syncspirit::config {
 
 namespace outcome = boost::outcome_v2;
-namespace bfs = std::filesystem;
 
 // comparators
 
 using config_result_t = outcome::outcome<main_t, std::string>;
 
-SYNCSPIRIT_API config_result_t get_config(std::string_view config, const bfs::path &config_path);
+SYNCSPIRIT_API config_result_t get_config(std::string_view config, const utils::poly_path_view_t &config_path);
 
-SYNCSPIRIT_API outcome::result<main_t> generate_config(const bfs::path &config_path);
+SYNCSPIRIT_API outcome::result<main_t> generate_config(const utils::poly_path_view_t &config_path);
 
 SYNCSPIRIT_API std::string serialize(const main_t &cfg) noexcept;
 

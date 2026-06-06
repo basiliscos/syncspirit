@@ -31,7 +31,7 @@ template <typename CharT> struct native;
 
 template <> struct native<char> {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
-    inline static const std::string_view separators{"/\\"};
+    inline static const std::string_view separators{"\\/"};
 #else
     inline static const auto separators = generic<char>::separators;
 #endif
@@ -39,7 +39,7 @@ template <> struct native<char> {
 
 template <> struct native<wchar_t> {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
-    inline static const std::wstring_view separators{L"/\\"};
+    inline static const std::wstring_view separators{L"\\/"};
 #else
     inline static const auto separators = generic<wchar_t>::separators;
 #endif
@@ -193,9 +193,10 @@ struct path_decomposer_t {
         std::uint32_t components{0};
     };
 
-    template <bool use_new, typename CharT, typename Allocator>
+    template <typename CharT, typename Allocator>
     static content_t decompose(std::basic_string_view<CharT> in, const Allocator &allocator_,
                                std::basic_string_view<CharT> separators) noexcept {
+        using Traits = std::allocator_traits<Allocator>;
         using namespace boost::nowide;
         using namespace boost::nowide::utf;
 
@@ -212,12 +213,7 @@ struct path_decomposer_t {
 
             auto sz = sizeof(std::uint32_t) + pieces.size() + str_sz + 1;
             auto data_ptr = (uint8_t *){};
-            if constexpr (use_new) {
-                data_ptr = static_cast<uint8_t *>(::operator new(sz, path_base_t::path_alignment));
-            } else {
-                using Traits = std::allocator_traits<Allocator>;
-                data_ptr = reinterpret_cast<uint8_t *>(Traits::allocate(allocator, sz));
-            }
+            data_ptr = reinterpret_cast<uint8_t *>(Traits::allocate(allocator, sz));
             auto raw_u32 = reinterpret_cast<std::uint32_t *>(data_ptr);
             *raw_u32++ = str_sz;
             auto raw_u8_ptr = reinterpret_cast<std::uint8_t *>(raw_u32);

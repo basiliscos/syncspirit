@@ -5,7 +5,6 @@
 #include "utils/log.h"
 #include <charconv>
 #include <boost/nowide/convert.hpp>
-#include <filesystem>
 #include <fmt/ranges.h>
 
 namespace syncspirit::fltk::config {
@@ -101,14 +100,14 @@ error_ptr_t url_t::validate_value() noexcept {
     return {};
 }
 
-static std::string _to_str(const bfs::path &p) { return boost::nowide::narrow(p.wstring()); }
+static std::string _to_str(const utils::path_t &p) { return std::string(p.get_full_name()); }
 
-path_t::path_t(std::string label, std::string explanation, const bfs::path &value, const bfs::path &default_value,
-               property_kind_t kind)
+path_t::path_t(std::string label, std::string explanation, const utils::path_t &value,
+               const utils::path_t &default_value, property_kind_t kind)
     : property_t(std::move(label), std::move(explanation), std::move(_to_str(value)), std::move(_to_str(default_value)),
                  kind) {}
 
-bfs::path path_t::convert() noexcept { return bfs::path(boost::nowide::widen(value)); }
+utils::path_t path_t::convert() noexcept { return utils::path_t::make_native(value); }
 
 bool_t::bool_t(bool value, bool default_value, std::string label)
     : property_t(std::move(label), "", value ? "true" : "", default_value ? "true" : "", property_kind_t::boolean),
@@ -365,21 +364,21 @@ const char *port_t::explanation_ = "upd port used for announcement (should be th
 
 namespace main {
 
-default_location_t::default_location_t(const bfs::path &value, const bfs::path &default_value)
+default_location_t::default_location_t(const utils::path_t &value, const utils::path_t &default_value)
     : parent_t("default_location", explanation_, value, default_value, property_kind_t::directory) {}
 
 void default_location_t::reflect_to(syncspirit::config::main_t &main) { main.default_location = convert(); }
 
 const char *default_location_t::explanation_ = "where folders are created by default";
 
-cert_file_t::cert_file_t(const bfs::path &value, const bfs::path &default_value)
+cert_file_t::cert_file_t(const utils::path_t &value, const utils::path_t &default_value)
     : parent_t("cert_file", explanation_, value, default_value) {}
 
 void cert_file_t::reflect_to(syncspirit::config::main_t &main) { main.cert_file = convert(); }
 
 const char *cert_file_t::explanation_ = "this device certificate location";
 
-key_file_t::key_file_t(const bfs::path &value, const bfs::path &default_value)
+key_file_t::key_file_t(const utils::path_t &value, const utils::path_t &default_value)
     : parent_t("key_file", explanation_, value, default_value) {}
 
 void key_file_t::reflect_to(syncspirit::config::main_t &main) { main.key_file = convert(); }

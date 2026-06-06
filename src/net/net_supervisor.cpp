@@ -23,16 +23,15 @@
 #include "net/local_keeper.h"
 #include "net/scheduler.h"
 #include "utils/format.hpp"
+#include "utils/path_view.hpp"
 #include "presentation/folder_entity.h"
 #include "presentation/folder_entity.h"
 #include "proto/proto-helpers-bep.h"
 #include "proto/proto-helpers-db.h"
 
 #include <boost/nowide/convert.hpp>
-#include <filesystem>
 #include <ctime>
 
-namespace bfs = std::filesystem;
 using namespace syncspirit::net;
 
 namespace {
@@ -41,17 +40,20 @@ r::plugin::resource_id_t interrupt = 0;
 } // namespace resource
 } // namespace
 
-#if 0
 net_supervisor_t::net_supervisor_t(net_supervisor_t::config_t &cfg)
     : parent_t(this, resource::interrupt, cfg), sequencer{cfg.sequencer}, app_config{cfg.app_config},
       independent_threads{cfg.independent_threads}, thread_counter{independent_threads},
       local_counter{cfg.local_counter} {
     using boost::nowide::narrow;
     bouncer = cfg.bouncer_address;
+    auto buffer = std::array<std::byte, 1024 * 32>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+
     auto log = utils::get_logger(names::coordinator);
-    auto cert_file = narrow(app_config.cert_file.wstring());
-    auto key_file = narrow(app_config.key_file.wstring());
-    auto result = utils::load_pair(cert_file.c_str(), key_file.c_str());
+    auto cert_file = app_config.cert_file.get_view(allocator);
+    auto key_file = app_config.key_file.get_view(allocator);
+    auto result = utils::load_pair(cert_file, key_file);
     if (!result) {
         LOG_CRITICAL(log, "cannot load certificate/key pair: {}", result.error());
         throw result.error();
@@ -83,7 +85,6 @@ net_supervisor_t::net_supervisor_t(net_supervisor_t::config_t &cfg)
     auto simultaneous_writes = app_config.bep_config.blocks_simultaneous_write;
     cluster = new model::cluster_t(device, static_cast<int32_t>(simultaneous_writes));
 }
-#endif
 
 void net_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     parent_t::configure(plugin);
@@ -134,10 +135,17 @@ void net_supervisor_t::launch_early() noexcept {
     ++local_counter;
     thread_counter = independent_threads;
     auto timeout = shutdown_timeout * 9 / 10;
+
+    auto buffer = std::array<std::byte, 1024 * 32>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+    auto config_path = app_config.config_path.get_view(allocator);
+    auto db_path = config_path / utils::make_view("mdbx-db", allocator);
+
     db_addr = create_actor<db_actor_t>()
                   .timeout(timeout)
                   .bouncer_address(bouncer)
-                  .db_dir(app_config.config_path / "mdbx-db")
+                  .db_dir(db_path.detach())
                   .db_config(app_config.db_config)
                   .cluster(cluster)
                   .max_files_per_diff(constants::diffs_batch)

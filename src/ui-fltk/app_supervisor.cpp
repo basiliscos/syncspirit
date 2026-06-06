@@ -34,6 +34,7 @@
 #include "presentation/folder_presence.h"
 #include "utils/format.hpp"
 #include "utils/io.h"
+#include "utils/path_view.hpp"
 #include "utils/log-setup.h"
 
 #include <utility>
@@ -139,7 +140,7 @@ app_supervisor_t::~app_supervisor_t() {
     utils::get_root_logger()->debug("~app_supervisor_t()");
 }
 
-auto app_supervisor_t::get_config_path() -> const bfs::path & { return config_path; }
+auto app_supervisor_t::get_config_path() -> const utils::path_t & { return config_path; }
 auto app_supervisor_t::get_app_config() -> config::main_t & { return app_config; }
 auto app_supervisor_t::get_cluster() -> model::cluster_t * { return cluster.get(); }
 auto app_supervisor_t::get_sequencer() -> model::sequencer_t & { return *sequencer; }
@@ -636,8 +637,12 @@ auto app_supervisor_t::apply(const model::diff::load::load_cluster_t &diff, void
 }
 
 void app_supervisor_t::write_config(const config::main_t &cfg) noexcept {
-    log->debug("going to write config");
-    auto &path = get_config_path();
+    auto buffer = std::array<std::byte, 1024 * 32>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+
+    auto path = get_config_path().get_view(allocator);
+    log->debug("going to write config to {}", path);
     auto cfg_str = config::serialize(cfg);
     auto file_opt = utils::io_stream_t::open_truncate(path);
     if (!file_opt) {

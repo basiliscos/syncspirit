@@ -286,6 +286,7 @@ add_library(syncspirit_core
     src/utils/network_interface.cpp
     src/utils/path.cpp
     src/utils/path_cache.cpp
+    src/utils/path_utils.cpp
     src/utils/platform.cpp
     src/utils/time.cpp
     src/utils/tls.cpp

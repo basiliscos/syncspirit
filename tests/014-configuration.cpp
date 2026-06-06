@@ -6,7 +6,6 @@
 #include "utils/uri.h"
 #include "utils/location.h"
 #include <filesystem>
-#include <sstream>
 
 namespace syncspirit::config {
 
@@ -72,39 +71,57 @@ bool operator==(const main_t &lhs, const main_t &rhs) noexcept {
 } // namespace syncspirit::config
 
 namespace sys = boost::system;
-namespace fs = std::filesystem;
 namespace st = syncspirit::test;
 
 using namespace syncspirit;
 
 TEST_CASE("expand_home", "[config]") {
+    auto buffer = std::array<std::byte, 1024 * 32>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+
     SECTION("valid home") {
-        auto home = utils::home_option_t(fs::path("/user/home/.config/syncspirit_test"));
-        REQUIRE(utils::expand_home("some/path", home) == L"some/path");
-        REQUIRE(utils::expand_home("~/some/path", home) == L"/user/home/.config/syncspirit_test/some/path");
+        auto home = utils::make_view("/user/home/.config/syncspirit_test", allocator);
+        SECTION("no expansion") {
+            auto p = utils::expand_home("some/path", home);
+            CHECK(p.get_full_name() == "some/path");
+        }
+        SECTION("with expansion") {
+            auto expected_str = "/user/home/.config/syncspirit_test/some/path";
+            auto p = utils::expand_home("~/some/path", home);
+            auto p_expected = utils::make_view(expected_str, allocator);
+            CHECK(p.get_full_name() == expected_str);
+            CHECK(p == p_expected);
+        }
     }
 
     SECTION("invalid home") {
         auto ec = sys::error_code{1, sys::system_category()};
-        auto home = utils::home_option_t(ec);
-        REQUIRE(utils::expand_home("some/path", home) == L"some/path");
-        REQUIRE(utils::expand_home("~/some/path", home) == L"~/some/path");
+        auto home = utils::make_view("", allocator);
+        REQUIRE(utils::expand_home("some/path", home) == utils::make_view("some/path", allocator));
+        REQUIRE(utils::expand_home("~/some/path", home) == utils::make_view("~/some/path", allocator));
     }
 }
 
 TEST_CASE("default config is OK", "[config]") {
+    auto buffer = std::array<std::byte, 1024 * 32>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+
     auto dir = st::unique_path();
-    fs::create_directory(dir);
+    std::filesystem::create_directory(dir);
     auto dir_guard = st::path_guard_t(dir);
     auto cfg_path = dir / "syncspirit.toml";
-    auto cfg_opt = config::generate_config(cfg_path);
+    auto cfg_path_view = utils::make_view(cfg_path.generic_wstring(), allocator);
+
+    auto cfg_opt = config::generate_config(cfg_path_view);
     REQUIRE(cfg_opt);
     auto &cfg = cfg_opt.value();
     SECTION("serialize default") {
         auto out_1 = config::serialize(cfg);
         INFO(out_1);
         CHECK(out_1.find("~") == std::string::npos);
-        auto cfg_opt = config::get_config(out_1, cfg_path);
+        auto cfg_opt = config::get_config(out_1, cfg_path_view);
         CHECK(cfg_opt);
 
         auto cfg2 = cfg_opt.value();

@@ -17,17 +17,10 @@ template <typename Allocator> struct path_view_t final : path_base_t {
     using wallocator_t = std::pmr::polymorphic_allocator<wchar_t>;
     using wstring_t = std::basic_string<wchar_t, std::char_traits<wchar_t>, wallocator_t>;
 
-    path_view_t() noexcept = default;
+    path_view_t(const Allocator &allocator_) noexcept : allocator{allocator_} {}
 
     explicit path_view_t(const path_base_t &path, const Allocator &allocator_) noexcept : allocator{allocator_} {
-        if (auto d = path.get_data(); d) {
-            auto str_sz = *reinterpret_cast<const std::uint32_t *>(d);
-            auto c = path.get_components();
-            auto sz = sizeof(std::uint32_t) + c + str_sz + 1;
-            data = Traits::allocate(allocator, sz);
-            memcpy(const_cast<void *>(data), d, sz);
-            components = c;
-        }
+        copy(path);
     }
 
     explicit path_view_t(const void *data_, std::uint32_t components_, const Allocator &allocator_) noexcept
@@ -40,17 +33,34 @@ template <typename Allocator> struct path_view_t final : path_base_t {
     explicit path_view_t(std::basic_string_view<CharT> normalized, const Allocator &allocator_) noexcept
         : allocator{allocator_} {
         auto separators = details::traits::generic<CharT>::separators;
-        auto decomposed = path_decomposer_t::decompose<false>(normalized, allocator, separators);
+        auto decomposed = path_decomposer_t::decompose(normalized, allocator, separators);
         data = decomposed.data;
         components = decomposed.components;
     }
 
     ~path_view_t() {
         if (data) {
-            auto str_sz = *reinterpret_cast<const std::uint32_t *>(data);
-            auto sz = sizeof(std::uint32_t) + components + str_sz + 1;
-            auto ptr = const_cast<T *>(reinterpret_cast<const T *>(data));
-            Traits::deallocate(allocator, ptr, sz);
+            deallocate();
+        }
+    }
+
+    void deallocate() {
+        auto str_sz = *reinterpret_cast<const std::uint32_t *>(data);
+        auto sz = sizeof(std::uint32_t) + components + str_sz + 1;
+        auto ptr = const_cast<T *>(reinterpret_cast<const T *>(data));
+        Traits::deallocate(allocator, ptr, sz);
+        data = nullptr;
+        components = 0;
+    }
+
+    void copy(const path_base_t &path) {
+        if (auto d = path.get_data(); d) {
+            auto str_sz = *reinterpret_cast<const std::uint32_t *>(d);
+            auto c = path.get_components();
+            auto sz = sizeof(std::uint32_t) + c + str_sz + 1;
+            data = Traits::allocate(allocator, sz);
+            memcpy(const_cast<void *>(data), d, sz);
+            components = c;
         }
     }
 
@@ -78,7 +88,7 @@ template <typename Allocator> struct path_view_t final : path_base_t {
             raw_u8_ptr[new_str_sz] = 0;
             return path_view_t(new_ptr, components - 1, allocator);
         }
-        return {};
+        return {allocator};
     }
 
     path_view_t make_temporal() const noexcept {
@@ -105,23 +115,27 @@ template <typename Allocator> struct path_view_t final : path_base_t {
             *new_raw_u8_ptr = 0;
             return path_view_t(new_ptr, components, allocator);
         }
-        return {};
+        return {allocator};
     }
 
     const Allocator &get_allocator() const noexcept { return allocator; }
 
     path_t detach() const noexcept {
         if (data) {
-            auto str_sz = *reinterpret_cast<const std::uint32_t *>(data);
-            auto sz = sizeof(std::uint32_t) + components + str_sz + 1;
-            auto new_ptr = static_cast<uint8_t *>(::operator new(sz, path_alignment));
-            std::memcpy(new_ptr, data, sz);
-            return path_t(new_ptr, components);
+            return path_t(data, components);
         }
         return {};
     }
 
-    wstring_t get_full_wname() const noexcept {
+    path_view_t &operator=(const path_view_t &path) noexcept {
+        if (data) {
+            deallocate();
+        }
+        copy(path);
+        return *this;
+    }
+
+    wstring_t get_full_wname(bool native_separator = false) const noexcept {
         using namespace boost::nowide;
         using namespace boost::nowide::utf;
 
@@ -147,7 +161,12 @@ template <typename Allocator> struct path_view_t final : path_base_t {
             ptr = begin;
 
             while (ptr != end) {
-                *out++ = traits_in_t::decode(ptr, end);
+                auto symbol = traits_in_t::decode(ptr, end);
+                if (native_separator && symbol == L'/') {
+                    *out++ = details::traits::native<wchar_t>::separators[0];
+                } else {
+                    *out++ = symbol;
+                }
             }
         }
         return r;
@@ -181,16 +200,21 @@ auto operator/(const path_view_t<Allocator> &parent, const path_view_t<Allocator
 
     auto new_str_sz = str_sz_1 + str_sz_2 + 1; // "/" between
 
-    auto new_components = parent.get_components() + child.get_components();
+    auto new_components = parent.get_components() + child.get_components() + 1; // "/"
     auto new_sz = sizeof(std::uint32_t) + new_components + new_str_sz + 1;
     auto new_ptr = Traits::allocate(allocator, new_sz);
     auto new_u32_ptr = reinterpret_cast<std::uint32_t *>(new_ptr);
     *new_u32_ptr++ = new_str_sz;
 
     auto new_u8_ptr = reinterpret_cast<std::uint8_t *>(new_u32_ptr);
+    auto traier_1_sz = std::uint32_t{0};
     for (std::uint32_t i = 0; i < parent.get_components(); ++i) {
-        *new_u8_ptr++ = *ptr_1++;
+        auto piece_sz = *ptr_1++;
+        traier_1_sz += piece_sz;
+        *new_u8_ptr++ = piece_sz;
     }
+    auto last_piece_1_sz = str_sz_1 - traier_1_sz;
+    *new_u8_ptr++ = last_piece_1_sz + 1;
     for (std::uint32_t i = 0; i < child.get_components(); ++i) {
         *new_u8_ptr++ = *ptr_2++;
     }
@@ -209,9 +233,17 @@ template <typename Allocator> auto path_base_t::get_view(const Allocator &a) con
     return path_view_t<Allocator>(*this, a);
 };
 
-template <typename CharT, typename Allocator>
-auto make_view(std::basic_string_view<CharT> normalized_path, const Allocator &a) noexcept -> path_view_t<Allocator> {
-    return path_view_t<Allocator>(normalized_path, a);
+// template <typename CharT, typename Allocator>
+// auto make_view(std::basic_string_view<CharT> normalized_path, const Allocator &a) noexcept -> path_view_t<Allocator>
+// {
+//     return path_view_t<Allocator>(normalized_path, a);
+// };
+template <typename T, typename Allocator, typename TP = std::remove_reference_t<std::remove_cv_t<T>>,
+          typename CharT = typename std::char_traits<typename TP::value_type>::char_type,
+          typename = std::enable_if_t<std::is_convertible_v<T &&, std::basic_string_view<CharT>>>>
+auto make_view(T &&normalized_path, const Allocator &a) noexcept -> path_view_t<Allocator> {
+    using str_t = std::basic_string_view<CharT>;
+    return path_view_t<Allocator>(str_t(normalized_path), a);
 };
 
 template <typename Allocator>

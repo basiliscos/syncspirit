@@ -20,6 +20,8 @@
 #include "utils/log-setup.h"
 #include "utils/platform.h"
 #include "utils/format.hpp"
+#include "utils/path_view.hpp"
+#include "utils/path_utils.h"
 #include "hasher/hasher_supervisor.h"
 #include "net/net_supervisor.h"
 #include "bouncer/bouncer_actor.h"
@@ -207,37 +209,39 @@ int app_main(app_context_t &app_ctx) {
     po::store(po::parse_command_line(app_ctx.argc, app_ctx.argv, cmdline_descr), vm);
     po::notify(vm);
 
+    auto buffer = std::array<std::byte, 1024 * 32>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+
     bool show_help = vm.count("help");
     if (show_help) {
         std::cout << cmdline_descr << "\n";
         return -1;
     }
 
-    auto log_level = utils::get_log_level(vm["log_level"].as<std::string>());
     auto logger = app_ctx.logger;
-    bfs::path config_file_path;
+    auto log_level = utils::get_log_level(vm["log_level"].as<std::string>());
+
+    auto config_file_path = utils::poly_path_view_t(allocator);
     if (vm.count("config_dir")) {
         auto path = vm["config_dir"].as<std::string>();
-        config_file_path = bfs::path{path.c_str()};
+        config_file_path = utils::make_view(path, allocator);
     } else {
-        auto config_default = utils::get_default_config_dir();
-        if (config_default) {
-            config_file_path = config_default.value();
+        auto config_default = utils::get_default_config_dir(allocator);
+        if (!config_default.empty()) {
+            config_file_path = config_default;
         } else {
-            logger->error("cannot determine default config dir: {}", config_default.error());
-            return -1;
+            logger->error("cannot determine default config dir", config_default);
+            return 1;
         }
     }
-#if 0
     app_ctx.bootstrap_guard = utils::bootstrap(app_ctx.dist_sink, config_file_path);
-#endif
-    std::abort();
 
-    config_file_path.append("syncspirit.toml");
-    bool populate = !bfs::exists(config_file_path);
-    auto config_file_path_str = narrow(config_file_path.generic_wstring());
+    config_file_path = config_file_path / utils::make_view("syncspirit.toml", allocator);
+    auto ec = std::error_code{};
+    bool populate = !utils::exists(config_file_path, ec);
     if (populate) {
-        logger->info("Config {} seems does not exit, creating default one...", config_file_path.string());
+        logger->info("Config {} seems does not exit, creating default one...", config_file_path);
         auto cfg_opt = config::generate_config(config_file_path);
         if (!cfg_opt) {
             logger->error("cannot generate default config: {}", cfg_opt.error());
@@ -247,18 +251,18 @@ int app_main(app_context_t &app_ctx) {
         auto cfg_str = config::serialize(cfg);
         auto file_opt = utils::io_stream_t::open_truncate(config_file_path);
         if (!file_opt) {
-            logger->error("cannot open file config at {}: {}", config_file_path_str, file_opt.error());
+            logger->error("cannot open file config at {}: {}", config_file_path, file_opt.error());
             return 1;
         }
         auto &file = file_opt.assume_value();
         if (auto r = file.write(cfg_str); !r) {
-            logger->error("cannot generate default config at {}: {}", config_file_path_str, r.error());
+            logger->error("cannot generate default config at {}: {}", config_file_path, r.error());
             return 1;
         }
     }
     auto config_file_opt = utils::io_stream_t::open_read(config_file_path);
     if (!config_file_opt) {
-        logger->error("Cannot open config file '{}' : {}", config_file_path_str, config_file_opt.error());
+        logger->error("Cannot open config file '{}' : {}", config_file_path, config_file_opt.error());
         return 1;
     }
 
@@ -266,15 +270,15 @@ int app_main(app_context_t &app_ctx) {
     auto config_file_content = config_file.read_whole();
     if (!config_file_content) {
         auto &ec = config_file_content.assume_error();
-        logger->error("Cannot read config file '{}' : {}", config_file_path_str, ec);
+        logger->error("Cannot read config file '{}' : {}", config_file_path, ec);
         return 1;
     }
     auto &config_file_data = config_file_content.assume_value();
     auto config_file_str =
         std::string_view(reinterpret_cast<const char *>(config_file_data.data()), config_file_data.size());
-    auto cfg_option = config::get_config(config_file_str, config_file_path.parent_path());
+    auto cfg_option = config::get_config(config_file_str, config_file_path.get_parent());
     if (!cfg_option) {
-        logger->error("Config file {} is incorrect :: {}", config_file_path_str, cfg_option.error());
+        logger->error("Config file {} is incorrect :: {}", config_file_path, cfg_option.error());
         return 1;
     }
     auto &cfg = cfg_option.value();
@@ -299,30 +303,25 @@ int app_main(app_context_t &app_ctx) {
     }
 
     {
-#if 0
-        auto &cert_path = cfg.cert_file;
-        auto &key_path = cfg.key_file;
+        auto cert_path = cfg.cert_file.get_view(allocator);
+        auto key_path = cfg.key_file.get_view(allocator);
         auto ec = std::error_code{};
-        if (!bfs::exists(cert_path, ec) || !bfs::exists(key_path, ec)) {
-            auto cert_path_str = boost::nowide::narrow(cert_path.wstring());
-            auto key_path_str = boost::nowide::narrow(key_path.wstring());
-            logger->trace("'{}' or '{}' do not exist", cert_path_str, key_path_str);
+        if (!utils::exists(cert_path, ec) || !utils::exists(key_path, ec)) {
+            logger->trace("'{}' or '{}' do not exist", cert_path, key_path);
             logger->info("Generating cryptographic keys...");
             auto pair = utils::generate_pair(constants::issuer_name);
             if (!pair) {
                 logger->error("cannot generate cryptographic keys :: {}", pair.error());
-                return -1;
+                return 1;
             }
             auto &keys = pair.value();
-            auto save_result = keys.save(cert_path_str.c_str(), key_path_str.c_str());
+            auto save_result = keys.save(cert_path, key_path);
             if (!save_result) {
-                logger->error("cannot store cryptographic keys ({} & {}) :: {}", cert_path_str, key_path_str,
+                logger->error("cannot store cryptographic keys ({} & {}) :: {}", cert_path, key_path,
                               save_result.error());
-                return -1;
+                return 1;
             }
         }
-#endif
-        std::abort();
     }
 
     asio::io_context io_context;
@@ -395,7 +394,7 @@ int app_main(app_context_t &app_ctx) {
     auto sup_fltk = fltk_ctx->create_supervisor<fltk::app_supervisor_t>()
                         .log_sink(app_ctx.im_memory_sink)
                         .poll_duration(poll_timeout)
-                        .config_path(config_file_path)
+                        .config_path(config_file_path.detach())
                         .app_config(cfg)
                         .timeout(timeout)
                         .registry_address(sup_net->get_registry_address())

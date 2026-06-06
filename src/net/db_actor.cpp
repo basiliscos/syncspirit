@@ -44,6 +44,7 @@
 #include "model/diff/peer/cluster_update.h"
 #include "model/misc/error_code.h"
 #include "utils/format.hpp"
+#include "utils/path_view.hpp"
 #include <string_view>
 #include <cstring>
 
@@ -97,7 +98,7 @@ db_actor_t::payload::commit_t::~commit_t() {
 }
 
 db_actor_t::db_actor_t(config_t &config)
-    : parent_t{config}, env{nullptr}, db_dir{config.db_dir}, db_config{config.db_config},
+    : parent_t{config}, env{nullptr}, db_dir{std::move(config.db_dir)}, db_config{config.db_config},
       max_files_per_diff(config.max_files_per_diff) {
     // mdbx_module_handler({}, {}, {});
     // mdbx_setup_debug(MDBX_LOG_TRACE, MDBX_DBG_ASSERT, &_my_log);
@@ -157,13 +158,16 @@ void db_actor_t::open() noexcept {
 
     auto flags = MDBX_WRITEMAP | MDBX_LIFORECLAIM | MDBX_EXCLUSIVE | MDBX_NOSTICKYTHREADS | MDBX_SAFE_NOSYNC;
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
-    auto db_dir_w = db_dir.wstring();
-    r = mdbx_env_openW(env, db_dir_w.c_str(), flags, 0664);
+    auto buffer = std::array<std::byte, 1024 * 32>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+    auto dir_view = db_dir.get_view(allocator);
+    r = mdbx_env_openW(env, dir_view.get_full_wname().data(), flags, 0664);
 #else
-    r = mdbx_env_open(env, db_dir.c_str(), flags, 0664);
+    r = mdbx_env_open(env, db_dir.get_full_name().data(), flags, 0664);
 #endif
     if (r != MDBX_SUCCESS) {
-        LOG_ERROR(log, "open, mdbx open environment error ({}): {}, path: {}", r, mdbx_strerror(r), db_dir.string());
+        LOG_ERROR(log, "open, mdbx open environment error ({}): {}, path: {}", r, mdbx_strerror(r), db_dir);
         resources->release(resource::db);
         return do_shutdown(make_error(db::make_error_code(r)));
     }

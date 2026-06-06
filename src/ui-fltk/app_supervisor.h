@@ -24,7 +24,6 @@ namespace syncspirit::fltk {
 
 namespace r = rotor;
 namespace rf = r::fltk;
-namespace bfs = std::filesystem;
 namespace sys = boost::system;
 namespace outcome = boost::outcome_v2;
 
@@ -57,7 +56,7 @@ struct app_supervisor_config_t : rf::supervisor_config_fltk_t {
     using parent_t::parent_t;
 
     in_memory_sink_t *log_sink;
-    bfs::path config_path;
+    utils::path_t config_path;
     config::main_t app_config;
     r::address_ptr_t bouncer_address;
 };
@@ -71,8 +70,8 @@ template <typename Actor> struct app_supervisor_config_builder_t : rf::superviso
         parent_t::config.log_sink = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
-    builder_t &&config_path(const bfs::path &value) && noexcept {
-        parent_t::config.config_path = value;
+    builder_t &&config_path(utils::path_t value) && noexcept {
+        parent_t::config.config_path = std::move(value);
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
     builder_t &&app_config(const config::main_t &value) && noexcept {
@@ -106,7 +105,7 @@ struct app_supervisor_t : app_supervisor_base_t<app_supervisor_t> {
     void shutdown_finish() noexcept override;
     using r::actor_base_t::state;
 
-    const bfs::path &get_config_path();
+    const utils::path_t &get_config_path();
     config::main_t &get_app_config();
     model::cluster_t *get_cluster();
     model::sequencer_t &get_sequencer();
@@ -199,7 +198,7 @@ struct app_supervisor_t : app_supervisor_base_t<app_supervisor_t> {
     model::sequencer_ptr_t sequencer;
     time_point_t started_at;
     in_memory_sink_t *log_sink;
-    bfs::path config_path;
+    utils::path_t config_path;
     config::main_t app_config;
     config::main_t app_config_original;
     content_t *content;

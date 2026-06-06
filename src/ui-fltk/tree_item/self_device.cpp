@@ -10,6 +10,7 @@
 #include "../main_window.h"
 #include "utils/dns.h"
 #include "utils/format.hpp"
+#include "utils/path_view.hpp"
 #include "constants.h"
 
 #include <FL/fl_ask.H>
@@ -166,25 +167,26 @@ struct self_table_t final : static_table_t, db_info_viewer_t {
         if (r != 0) {
             return;
         }
-#if 0
+
+        auto buffer = std::array<std::byte, 1024 * 32>();
+        auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+        auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+
         auto sup = owner->get_supervisor();
         auto &cfg = sup->get_app_config();
-        auto &cert_path = cfg.cert_file;
-        auto &key_path = cfg.key_file;
+        auto cert_path = cfg.cert_file.get_view(allocator);
+        auto key_path = cfg.key_file.get_view(allocator);
 
         auto logger = sup->get_logger();
-        auto cert_path_str = boost::nowide::narrow(cert_path.wstring());
-        auto key_path_str = boost::nowide::narrow(key_path.wstring());
         auto pair = utils::generate_pair(constants::issuer_name);
         if (!pair) {
             logger->error("cannot generate cryptographic keys :: {}", pair.error());
             return;
         }
         auto &keys = pair.value();
-        auto save_result = keys.save(cert_path_str.c_str(), key_path_str.c_str());
+        auto save_result = keys.save(cert_path, key_path);
         if (!save_result) {
-            logger->error("cannot store cryptographic keys ({} & {}) :: {}", cert_path_str, key_path_str,
-                          save_result.error());
+            logger->error("cannot store cryptographic keys ({} & {}) :: {}", cert_path, key_path, save_result.error());
         }
         logger->info("keys has been regenerated, please restart");
 
@@ -194,8 +196,6 @@ struct self_table_t final : static_table_t, db_info_viewer_t {
                 settings->update_label(true);
             }
         }
-#endif
-        std::abort();
     }
 
     main_window_t *owner;
