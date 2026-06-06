@@ -233,11 +233,6 @@ template <typename Allocator> auto path_base_t::get_view(const Allocator &a) con
     return path_view_t<Allocator>(*this, a);
 };
 
-// template <typename CharT, typename Allocator>
-// auto make_view(std::basic_string_view<CharT> normalized_path, const Allocator &a) noexcept -> path_view_t<Allocator>
-// {
-//     return path_view_t<Allocator>(normalized_path, a);
-// };
 template <typename T, typename Allocator, typename TP = std::remove_reference_t<std::remove_cv_t<T>>,
           typename CharT = typename std::char_traits<typename TP::value_type>::char_type,
           typename = std::enable_if_t<std::is_convertible_v<T &&, std::basic_string_view<CharT>>>>
