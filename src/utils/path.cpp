@@ -7,8 +7,6 @@
 #include <cstring>
 #include <cassert>
 
-namespace bfs = std::filesystem;
-
 using namespace syncspirit::utils;
 
 using I = path_t::iterator_t;

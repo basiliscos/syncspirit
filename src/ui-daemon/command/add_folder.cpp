@@ -10,8 +10,6 @@
 #include "pair_iterator.h"
 #include <random>
 
-namespace bfs = std::filesystem;
-
 namespace syncspirit::daemon::command {
 
 outcome::result<command_ptr_t> add_folder_t::construct(std::string_view in) noexcept {

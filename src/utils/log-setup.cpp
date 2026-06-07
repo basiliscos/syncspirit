@@ -17,7 +17,6 @@
 
 namespace syncspirit::utils {
 
-namespace bfs = std::filesystem;
 namespace sys = boost::system;
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
