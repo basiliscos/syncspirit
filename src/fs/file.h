@@ -38,8 +38,8 @@ struct SYNCSPIRIT_API file_t : model::arc_base_t<file_t> {
     std::string_view get_path_view() const noexcept;
     const bfs::path &get_path() const noexcept;
 
-    outcome::result<void> close(fs_proxy_t *fs_proxy, std::int64_t modification_s,
-                                const bfs::path &local_name = {}) noexcept;
+    outcome::result<void> finalize(fs_proxy_t *fs_proxy, std::int64_t modification_s,
+                                const bfs::path &local_name) noexcept;
     outcome::result<void> remove(fs_proxy_t &fs_proxy) noexcept;
     outcome::result<void> write(fs_proxy_t &fs_proxy, std::uint64_t offset, utils::bytes_view_t data) noexcept;
     outcome::result<void> copy(fs_proxy_t &fs_proxy, std::uint64_t my_offset, const file_t &from,
@@ -52,12 +52,11 @@ struct SYNCSPIRIT_API file_t : model::arc_base_t<file_t> {
 
   private:
     using backend_ptr_t = std::unique_ptr<utils::io_stream_t>;
-    file_t(utils::io_stream_t backend, bfs::path path, bfs::path model_path, std::uint64_t file_size) noexcept;
+    file_t(utils::io_stream_t backend, bfs::path path, std::uint64_t file_size) noexcept;
     file_t(utils::io_stream_t backend, bfs::path path) noexcept;
 
     backend_ptr_t backend;
     bfs::path path;
-    bfs::path model_path;
     std::string path_str;
     std::uint64_t file_size;
 };

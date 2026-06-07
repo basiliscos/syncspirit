@@ -358,7 +358,7 @@ void file_actor_t::process(payload::finish_file_t &cmd, std::string_view path_st
     }
 
     file_cache.erase(it);
-    auto ok = backend->close(&context, cmd.modification_s, cmd.path);
+    auto ok = backend->finalize(&context, cmd.modification_s, cmd.path);
     if (!ok) {
         auto &ec = ok.assume_error();
         LOG_ERROR(log, "cannot close file '{}': {}", path_str, ec);
