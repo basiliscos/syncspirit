@@ -7,19 +7,18 @@
 #include "hasher/messages.h"
 #include "utils/bytes.h"
 #include "utils/error_code.h"
+#include "utils/path.h"
 #include "update_type.hpp"
 #include "execution_context.h"
 
 #include <rotor.hpp>
 #include <boost/outcome.hpp>
 #include <variant>
-#include <filesystem>
 #include <cassert>
 
 namespace syncspirit::fs {
 
 namespace r = rotor;
-namespace bfs = std::filesystem;
 namespace outcome = boost::outcome_v2;
 namespace sys = boost::system;
 
@@ -54,11 +53,11 @@ template <typename ReplyType = void> struct payload_base_t : payload_generic_bas
 
 struct block_request_t : payload_base_t<utils::bytes_t> {
     using parent_t = payload_base_t<utils::bytes_t>;
-    bfs::path path;
+    utils::path_t path;
     std::uint64_t offset;
     std::uint64_t block_size;
 
-    inline block_request_t(extendended_context_prt_t context_, bfs::path path_, std::uint64_t offset_,
+    inline block_request_t(extendended_context_prt_t context_, utils::path_t path_, std::uint64_t offset_,
                            std::uint64_t block_size_) noexcept
         : parent_t(std::move(context_), {}), path{std::move(path_)}, offset{offset_}, block_size{block_size_} {}
 
@@ -67,8 +66,8 @@ struct block_request_t : payload_base_t<utils::bytes_t> {
 
 struct remote_copy_t : payload_base_t<void> {
     using parent_t = payload_base_t<void>;
-    bfs::path path;
-    bfs::path conflict_path;
+    utils::path_t path;
+    utils::path_t conflict_path;
     proto::FileInfoType type;
     std::uint64_t size;
     std::uint32_t permissions;
@@ -77,8 +76,8 @@ struct remote_copy_t : payload_base_t<void> {
     bool deleted;
     bool no_permissions;
 
-    inline remote_copy_t(extendended_context_prt_t context_, std::string folder_id_, bfs::path path_,
-                         bfs::path conflict_path_, proto::FileInfoType type_, std::uint64_t size_,
+    inline remote_copy_t(extendended_context_prt_t context_, std::string folder_id_, utils::path_t path_,
+                         utils::path_t conflict_path_, proto::FileInfoType type_, std::uint64_t size_,
                          std::uint32_t permissions_, std::int64_t modification_s_, std::string symlink_target_,
                          bool deleted_, bool no_permissions_) noexcept
         : parent_t(std::move(context_), std::move(folder_id_)), path{std::move(path_)},
@@ -91,15 +90,15 @@ struct remote_copy_t : payload_base_t<void> {
 
 struct finish_file_t : payload_base_t<void> {
     using parent_t = payload_base_t<void>;
-    bfs::path path;
-    bfs::path conflict_path;
+    utils::path_t path;
+    utils::path_t conflict_path;
     std::uint64_t file_size;
     std::int64_t modification_s;
     std::uint32_t permissions;
     bool no_permissions;
 
-    inline finish_file_t(extendended_context_prt_t context_, std::string folder_id_, bfs::path path_,
-                         bfs::path conflict_path_, std::uint64_t file_size_, std::int64_t modification_s_,
+    inline finish_file_t(extendended_context_prt_t context_, std::string folder_id_, utils::path_t path_,
+                         utils::path_t conflict_path_, std::uint64_t file_size_, std::int64_t modification_s_,
                          std::uint32_t permissions_, bool no_permissions_) noexcept
         : parent_t(std::move(context_), std::move(folder_id_)), path{std::move(path_)},
           conflict_path{std::move(conflict_path_)}, file_size{file_size_}, modification_s{modification_s_},
@@ -111,12 +110,12 @@ struct finish_file_t : payload_base_t<void> {
 
 struct update_meta_t : payload_base_t<void> {
     using parent_t = payload_base_t<void>;
-    bfs::path path;
+    utils::path_t path;
     std::int64_t modification_s;
     std::uint32_t permissions;
     bool no_permissions;
 
-    inline update_meta_t(extendended_context_prt_t context_, std::string folder_id_, bfs::path path_,
+    inline update_meta_t(extendended_context_prt_t context_, std::string folder_id_, utils::path_t path_,
                          std::int64_t modification_s_, std::uint32_t permissions_, bool no_permissions_) noexcept
         : parent_t(std::move(context_), std::move(folder_id_)), path{std::move(path_)}, modification_s{modification_s_},
           permissions{permissions_}, no_permissions{no_permissions_} {}
@@ -126,12 +125,12 @@ struct update_meta_t : payload_base_t<void> {
 
 struct append_block_t : payload_base_t<void> {
     using parent_t = payload_base_t<void>;
-    bfs::path path;
+    utils::path_t path;
     utils::bytes_t data;
     std::uint64_t offset;
     std::uint64_t file_size;
 
-    inline append_block_t(extendended_context_prt_t context_, std::string folder_id_, bfs::path path_,
+    inline append_block_t(extendended_context_prt_t context_, std::string folder_id_, utils::path_t path_,
                           utils::bytes_t data_, std::uint64_t offset_, std::uint64_t file_size_)
         : parent_t(std::move(context_), std::move(folder_id_)), path{std::move(path_)}, data{std::move(data_)},
           offset{offset_}, file_size{file_size_} {}
@@ -142,15 +141,15 @@ struct append_block_t : payload_base_t<void> {
 struct clone_block_t : payload_base_t<void> {
     using parent_t = payload_base_t<void>;
 
-    bfs::path path; // target, used for universally update mediator
+    utils::path_t path; // target, used for universally update mediator
     std::uint64_t target_offset;
     std::uint64_t target_size;
-    bfs::path source;
+    utils::path_t source;
     std::uint64_t source_offset;
     std::uint64_t block_size;
 
-    inline clone_block_t(extendended_context_prt_t context_, std::string folder_id, bfs::path target_,
-                         std::uint64_t target_offset_, std::uint64_t target_size_, bfs::path source_,
+    inline clone_block_t(extendended_context_prt_t context_, std::string folder_id, utils::path_t target_,
+                         std::uint64_t target_offset_, std::uint64_t target_size_, utils::path_t source_,
                          std::uint64_t source_offset_, std::uint64_t block_size_) noexcept
         : parent_t(std::move(context_), std::move(folder_id)), path{std::move(target_)}, target_offset{target_offset_},
           target_size{target_size_}, source{std::move(source_)}, source_offset{source_offset_},
@@ -167,11 +166,11 @@ struct io_commands_t {
     std::vector<io_command_t> commands;
 };
 
-struct create_dir_t : bfs::path {
-    using parent_t = bfs::path;
+struct create_dir_t : utils::path_t {
+    using parent_t = utils::path_t;
     using parent_t::parent_t;
 
-    inline create_dir_t(bfs::path path, std::string_view folder_id_) noexcept
+    inline create_dir_t(utils::path_t path, std::string_view folder_id_) noexcept
         : parent_t(std::move(path)), folder_id(folder_id_), ec{utils::make_error_code(utils::error_code_t::no_action)} {
     }
 
@@ -180,9 +179,9 @@ struct create_dir_t : bfs::path {
 };
 
 struct watch_folder_t {
-    inline watch_folder_t(bfs::path path_, std::string_view folder_id_) noexcept
+    inline watch_folder_t(utils::path_t path_, std::string_view folder_id_) noexcept
         : path(std::move(path_)), folder_id(folder_id_), ec{utils::make_error_code(utils::error_code_t::no_action)} {}
-    bfs::path path;
+    utils::path_t path;
     std::string folder_id;
     sys::error_code ec;
 };

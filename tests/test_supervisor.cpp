@@ -11,6 +11,7 @@
 #include "proto/proto-helpers-bep.h"
 #include "proto/proto-helpers-db.h"
 #include "net/names.h"
+#include "utils/format.hpp"
 
 namespace to {
 struct queue {};
@@ -225,26 +226,26 @@ auto supervisor_t::operator()(const model::diff::peer::update_folder_t &diff, vo
 }
 
 void supervisor_t::process_io(fs::payload::block_request_t &req) noexcept {
-    LOG_TRACE(log, "process_io, requesting on '{}' (offset: {}, size: {})", req.path.string(), req.offset,
+    LOG_TRACE(log, "process_io, requesting on '{}' (offset: {}, size: {})", req.path, req.offset,
               req.block_size);
 }
 
 void supervisor_t::process_io(fs::payload::remote_copy_t &req) noexcept {
-    LOG_TRACE(log, "process_io (ack: {}), remote_copy_t of '{} ({} bytes)'", auto_ack_io, req.path.string(), req.size);
+    LOG_TRACE(log, "process_io (ack: {}), remote_copy_t of '{} ({} bytes)'", auto_ack_io, req.path, req.size);
     if (auto_ack_io) {
         req.result = outcome::success();
     }
 }
 
 void supervisor_t::process_io(fs::payload::append_block_t &req) noexcept {
-    LOG_TRACE(log, "process_io (ack: {}), append_block_t of {}", auto_ack_io, req.path.string());
+    LOG_TRACE(log, "process_io (ack: {}), append_block_t of {}", auto_ack_io, req.path);
     if (auto_ack_io) {
         req.result = outcome::success();
     }
 }
 
 void supervisor_t::process_io(fs::payload::finish_file_t &req) noexcept {
-    LOG_TRACE(log, "process_io (ack: {}), finish_file_t of {}", auto_ack_io, req.path.string());
+    LOG_TRACE(log, "process_io (ack: {}), finish_file_t of {}", auto_ack_io, req.path);
     if (auto_ack_io) {
         req.result = outcome::success();
     }
@@ -252,14 +253,14 @@ void supervisor_t::process_io(fs::payload::finish_file_t &req) noexcept {
 
 void supervisor_t::process_io(fs::payload::clone_block_t &req) noexcept {
     LOG_TRACE(log, "process_io (ack: {}), clone_block_t, {} bytes,  {}(#{}) -> {}(#{})", auto_ack_io, req.block_size,
-              req.source.string(), req.source_offset, req.path.string(), req.target_offset);
+              req.source, req.source_offset, req.path, req.target_offset);
     if (auto_ack_io) {
         req.result = outcome::success();
     }
 }
 
 void supervisor_t::process_io(fs::payload::update_meta_t &req) noexcept {
-    LOG_TRACE(log, "process_io (ack: {}), update_meta_t of {}", auto_ack_io, req.path.string());
+    LOG_TRACE(log, "process_io (ack: {}), update_meta_t of {}", auto_ack_io, req.path);
     if (auto_ack_io) {
         req.result = outcome::success();
     }

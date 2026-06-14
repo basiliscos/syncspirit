@@ -179,7 +179,7 @@ struct SYNCSPIRIT_API controller_actor_t final : public model_actor_t<r::actor_b
     void io_finish_file(model::file_info_t *, model::file_info_t &, model::folder_info_t &, model::advance_action_t,
                         stack_context_t &);
     void io_update_meta(model::file_info_t &, model::folder_info_t &, model::advance_action_t, stack_context_t &);
-    auto io_make_request_block(model::file_info_t &, model::folder_info_t &, proto::Request)
+    auto io_make_request_block(model::file_info_t &, model::folder_info_t &, proto::Request, stack_context_t &)
         -> fs::payload::io_command_t;
 
     void acquire_block(const model::file_block_t &block, const model::folder_info_t &folder_info,

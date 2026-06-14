@@ -183,7 +183,7 @@ auto bootstrap(dist_sink_t &dist_sink, const path_base_t &dir) noexcept -> boots
     auto dir_view = dir.get_view(allocator);
 
     auto file_sink = spdlog::sink_ptr();
-    auto file_path = dir_view / utils::make_view(bootstrap_sink, allocator);
+    auto file_path = dir_view / utils::make_native_view(bootstrap_sink, allocator);
     auto file = io_stream_t::open_truncate(file_path);
     if (file.has_value()) {
         (void)file.assume_value().close();

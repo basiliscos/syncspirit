@@ -11,7 +11,6 @@
 
 namespace syncspirit::fs {
 
-namespace bfs = std::filesystem;
 namespace sys = boost::system;
 namespace r = rotor;
 

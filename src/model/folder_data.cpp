@@ -2,16 +2,14 @@
 // SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "folder_data.h"
-#include "proto/proto-helpers.h"
-
-#include <boost/nowide/convert.hpp>
+#include "proto/proto-helpers-db.h"
 
 using namespace syncspirit::model;
 
 void folder_data_t::assign_fields(const db::Folder &item) noexcept {
     id = db::get_id(item);
     label = db::get_label(item);
-    path = boost::nowide::widen(db::get_path(item));
+    path = utils::path_t::make_native(db::get_path(item));
     folder_type = db::get_folder_type(item);
     rescan_interval = db::get_rescan_interval(item);
     pull_order = db::get_pull_order(item);
@@ -32,7 +30,7 @@ void folder_data_t::serialize(db::Folder &r) const noexcept {
     db::set_paused(r, paused);
     db::set_watched(r, watched);
     db::set_scheduled(r, scheduled);
-    db::set_path(r, path.string());
+    db::set_path(r, path.get_full_name());
     db::set_folder_type(r, folder_type);
     db::set_pull_order(r, pull_order);
     db::set_rescan_interval(r, rescan_interval);

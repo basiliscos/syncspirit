@@ -117,7 +117,7 @@ struct table_t : content::folder_table_t {
                 auto buffer = std::array<std::byte, 1024 * 32>();
                 auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
                 auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
-                auto path = utils::make_view(db_path, allocator);
+                auto path = utils::make_native_view(db_path, allocator);
                 auto ec = sys::error_code{};
                 if (utils::exists(path, ec)) {
                     if (!utils::is_empty(path, ec)) {

@@ -13,6 +13,10 @@
 #include <boost/nowide/convert.hpp>
 #endif
 
+#if defined(__linux__)
+#include <pthread.h>
+#endif
+
 using namespace syncspirit::utils;
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
@@ -340,7 +344,7 @@ bool platform_t::path_supported(std::string_view str_path) noexcept {
     return true;
 }
 
-bool platform_t::permissions_supported(const bfs::path &) noexcept {
+bool platform_t::permissions_supported(const path_base_t &) noexcept {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
     return false;
 #endif

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include <catch2/catch_all.hpp>
 #include <rotor.hpp>
@@ -51,13 +51,13 @@ using actor_ptr_t = r::intrusive_ptr_t<resolver_actor_t>;
 
 struct fixture_t {
 
-    fixture_t() : ctx(io_ctx), root_path{unique_path()}, path_quard{root_path}, remote_resolver{io_ctx} {
+    fixture_t() : ctx(io_ctx), path_quard{unique_path()}, remote_resolver{io_ctx} {
         test::init_logging();
         log = utils::get_logger("fixture");
         rx_buff.resize(1500);
     }
 
-    virtual void main() noexcept = 0;
+    virtual void main(const utils::allocator_t&) noexcept = 0;
 
     void run() {
         auto strand = std::make_shared<asio::io_context::strand>(io_ctx);
@@ -65,8 +65,11 @@ struct fixture_t {
         sup->start();
         sup->do_process();
 
-        hosts_path = root_path / "hosts";
-        hosts_path_str = hosts_path.string();
+        auto buffer = std::array<std::byte, 1024 * 32>();
+        auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+        auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+
+        hosts_path = (path_quard.get_view(allocator) / "hosts").detach();
 
         auto ep = asio::ip::udp::endpoint(asio::ip::make_address("127.0.0.1"), 0);
         remote_resolver.open(ep.protocol());
@@ -75,7 +78,7 @@ struct fixture_t {
         auto local_ep = remote_resolver.local_endpoint();
         log->info("remote resolver: {}", local_ep);
 
-        main();
+        main(allocator);
 
         sup->do_shutdown();
         sup->do_process();
@@ -84,10 +87,8 @@ struct fixture_t {
 
     asio::io_context io_ctx{1};
     ra::system_context_asio_t ctx;
-    bfs::path root_path;
-    bfs::path hosts_path;
-    std::string hosts_path_str;
     path_guard_t path_quard;
+    utils::path_t hosts_path;
     utils::logger_t log;
     supervisor_ptr_t sup;
     actor_ptr_t resolver;
@@ -98,13 +99,13 @@ struct fixture_t {
 
 void test_local_resolver() {
     struct F : fixture_t {
-        void main() noexcept override {
+        void main(const utils::allocator_t& allocator) noexcept override {
 #ifndef SYNCSPIRIT_WIN
-            write_file(hosts_path, "127.0.0.2 lclhst.localdomain lclhst\n");
+            write_file(hosts_path.get_view(allocator), "127.0.0.2 lclhst.localdomain lclhst\n");
 
             resolver = sup->create_actor<resolver_actor_t>()
                            .resolve_timeout(timeout / 2)
-                           .hosts_path(hosts_path_str.c_str())
+                           .hosts_path(hosts_path.get_full_name())
                            .server_addresses("127.0.0.1:1234")
                            .timeout(timeout)
                            .finish();
@@ -135,7 +136,7 @@ void test_local_resolver() {
 
 void test_success_resolver() {
     struct F : fixture_t {
-        void main() noexcept override {
+        void main(const utils::allocator_t& allocator) noexcept override {
             auto local_port = remote_resolver.local_endpoint().port();
 
             auto buff = asio::buffer(rx_buff.data(), rx_buff.size());
@@ -174,7 +175,7 @@ void test_success_resolver() {
 
 void test_success_ip() {
     struct F : fixture_t {
-        void main() noexcept override {
+        void main(const utils::allocator_t& allocator) noexcept override {
             auto local_port = remote_resolver.local_endpoint().port();
 
             resolver = sup->create_actor<resolver_actor_t>()
@@ -200,7 +201,7 @@ void test_success_ip() {
 
 void test_success_ipv6() {
     struct F : fixture_t {
-        void main() noexcept override {
+        void main(const utils::allocator_t& allocator) noexcept override {
             auto local_port = remote_resolver.local_endpoint().port();
 
             resolver = sup->create_actor<resolver_actor_t>()
@@ -234,7 +235,7 @@ void test_success_ipv6() {
 
 void test_garbage() {
     struct F : fixture_t {
-        void main() noexcept override {
+        void main(const utils::allocator_t& allocator) noexcept override {
             auto local_port = remote_resolver.local_endpoint().port();
 
             auto buff = asio::buffer(rx_buff.data(), rx_buff.size());
@@ -270,7 +271,7 @@ void test_garbage() {
 
 void test_multi_replies() {
     struct F : fixture_t {
-        void main() noexcept override {
+        void main(const utils::allocator_t& allocator) noexcept override {
             auto local_port = remote_resolver.local_endpoint().port();
 
             auto buff = asio::buffer(rx_buff.data(), rx_buff.size());
@@ -313,7 +314,7 @@ void test_multi_replies() {
 
 void test_wrong() {
     struct F : fixture_t {
-        void main() noexcept override {
+        void main(const utils::allocator_t& allocator) noexcept override {
             auto local_port = remote_resolver.local_endpoint().port();
 
             auto buff = asio::buffer(rx_buff.data(), rx_buff.size());
@@ -352,7 +353,7 @@ void test_wrong() {
 
 void test_timeout() {
     struct F : fixture_t {
-        void main() noexcept override {
+        void main(const utils::allocator_t& allocator) noexcept override {
             auto local_port = remote_resolver.local_endpoint().port();
 
             resolver = sup->create_actor<resolver_actor_t>()
@@ -377,7 +378,7 @@ void test_timeout() {
 
 void test_cancellation() {
     struct F : fixture_t {
-        void main() noexcept override {
+        void main(const utils::allocator_t& allocator) noexcept override {
             auto local_port = remote_resolver.local_endpoint().port();
 
             resolver = sup->create_actor<resolver_actor_t>()

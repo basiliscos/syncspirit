@@ -32,13 +32,10 @@ TEST_CASE("generate cert/key pair, save & load", "[support][tls]") {
     auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
     auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
 
-    auto cert_file = unique_path();
-    auto cert_file_guard = path_guard_t(cert_file);
-    auto cert_file_path = path_t::make_native(cert_file.string()).get_view(allocator);
-
-    auto key_file = unique_path();
-    auto key_file_guard = path_guard_t(key_file);
-    auto key_file_path = path_t::make_native(key_file.string()).get_view(allocator);
+    auto path_guard = unique_path();
+    auto guard_view = path_guard.get_view(allocator);
+    auto cert_file_path = guard_view / "cert.pem";
+    auto key_file_path = guard_view / "key.pem";
 
     auto save_result = value.save(cert_file_path.get_view(allocator), key_file_path);
     REQUIRE((bool)save_result);
@@ -57,7 +54,11 @@ TEST_CASE("generate cert/key pair, save & load", "[support][tls]") {
 }
 
 TEST_CASE("sha256 for certificate", "[support][tls]") {
-    auto cert = read_file(locate_path("data/cert.der"));
+    auto buffer = std::array<std::byte, 1024 * 4>{};
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+
+    auto cert = read_file(locate_path("data/cert.der", allocator));
     auto cert_bytes = bytes_view_t((unsigned char *)cert.data(), cert.size());
     auto sha_result = sha256_digest(cert_bytes);
     REQUIRE((bool)sha_result);

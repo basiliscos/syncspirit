@@ -31,8 +31,8 @@ TEST_CASE("device_id", "[model]") {
     auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
     auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
 
-    auto cert_path = locate_path("data/sample-cert.pem").get_view(allocator);
-    auto key_path = locate_path("data/sample-key.pem").get_view(allocator);
+    auto cert_path = locate_path("data/sample-cert.pem", allocator);
+    auto key_path = locate_path("data/sample-key.pem", allocator);
     auto load_result = load_pair(cert_path, key_path);
     REQUIRE(load_result);
     auto &pair = load_result.value();

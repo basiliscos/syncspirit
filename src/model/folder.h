@@ -17,7 +17,6 @@
 
 namespace syncspirit::model {
 
-namespace bfs = std::filesystem;
 namespace outcome = boost::outcome_v2;
 namespace sys = boost::system;
 

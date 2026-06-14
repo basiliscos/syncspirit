@@ -5,7 +5,6 @@
 
 #include <cstdint>
 #include <unordered_set>
-#include <filesystem>
 #include <boost/outcome.hpp>
 #include <boost/multi_index/ordered_index.hpp>
 #include "utils/compact_vector.hpp"
@@ -24,7 +23,6 @@ struct path_cache_t;
 
 namespace syncspirit::model {
 
-namespace bfs = std::filesystem;
 namespace outcome = boost::outcome_v2;
 
 struct folder_info_t;
@@ -186,7 +184,7 @@ struct SYNCSPIRIT_API file_info_t {
         return {};
     }
 
-    bfs::path get_path(const folder_info_t &folder_info) const noexcept;
+    utils::poly_path_view_t get_path(const folder_info_t &, const utils::allocator_t& ) const noexcept;
 
     inline std::int64_t get_modified_s() const noexcept { return modified_s; }
     inline std::int32_t get_modified_ns() const noexcept { return modified_ns; }
@@ -213,7 +211,7 @@ struct SYNCSPIRIT_API file_info_t {
 
     guard_t guard(const model::folder_info_t &folder_info) noexcept;
 
-    std::string make_conflicting_name() const noexcept;
+    utils::poly_path_view_t make_conflicting_name(const utils::allocator_t& ) const noexcept;
 
     inline void refcouner_inc() const noexcept { ++counter; }
     inline std::uint32_t refcouner_dec() const noexcept { return --counter; }

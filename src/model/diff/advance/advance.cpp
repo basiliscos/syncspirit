@@ -27,7 +27,7 @@ static std::string_view stringify(advance_action_t action) {
 }
 
 auto advance_t::create(advance_action_t action, const model::file_info_t &source, const model::folder_info_t &source_fi,
-                       sequencer_t &sequencer) noexcept -> cluster_diff_ptr_t {
+                       sequencer_t &sequencer, const utils::allocator_t &allocator) noexcept -> cluster_diff_ptr_t {
     auto folder = source_fi.get_folder();
     auto &cluster = *folder->get_cluster();
     auto proto_file = source.as_proto(true);
@@ -38,7 +38,7 @@ auto advance_t::create(advance_action_t action, const model::file_info_t &source
         return new remote_copy_t(cluster, sequencer, std::move(proto_file), folder_id, peer_id);
     } else {
         assert(action == advance_action_t::resolve_remote_win);
-        return new remote_win_t(cluster, sequencer, std::move(proto_file), folder_id, peer_id);
+        return new remote_win_t(cluster, sequencer, std::move(proto_file), folder_id, peer_id, allocator);
     }
 }
 

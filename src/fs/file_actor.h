@@ -15,22 +15,6 @@
 #include <rotor.hpp>
 #include <optional>
 
-// buggy mingw fix:
-#if defined(WIN32) && defined(__GNUC__) && (__GNUC__ < 12)
-namespace std {
-template <> struct hash<std::filesystem::path> {
-    inline size_t operator()(const std::filesystem::path &item) const noexcept {
-        auto input = item.c_str();
-        auto h = size_t{0};
-        while (*input) {
-            h = (h << 1) | static_cast<size_t>(*input++);
-        }
-        return h;
-    }
-};
-} // namespace std
-#endif
-
 namespace syncspirit::fs {
 
 namespace r = rotor;
@@ -91,7 +75,7 @@ struct SYNCSPIRIT_API file_actor_t : public r::actor_base_t {
 
   private:
     using clock_t = pt::microsec_clock;
-    using file_cache_t = std::unordered_map<bfs::path, file_ptr_t>;
+    using file_cache_t = std::unordered_map<utils::path_t, file_ptr_t, utils::path_hash_t, utils::path_eq_t>;
     using context_cache_t = std::unordered_map<const void *, file_cache_t>;
     using timer_opt_t = std::optional<r::request_id_t>;
     using scan_dir_callback_t = execution_context_t::scan_dir_callback_t;
@@ -99,12 +83,12 @@ struct SYNCSPIRIT_API file_actor_t : public r::actor_base_t {
     void on_exec(message::foreign_executor_t &) noexcept;
     void on_io_commands(message::io_commands_t &) noexcept;
     void on_create_dir(message::create_dir_t &) noexcept;
-    void process(payload::block_request_t &, std::string_view, process_context_t &) noexcept;
-    void process(payload::remote_copy_t &, std::string_view, process_context_t &) noexcept;
-    void process(payload::append_block_t &, std::string_view, process_context_t &) noexcept;
-    void process(payload::finish_file_t &, std::string_view, process_context_t &) noexcept;
-    void process(payload::clone_block_t &, std::string_view, process_context_t &) noexcept;
-    void process(payload::update_meta_t &, std::string_view, process_context_t &) noexcept;
+    void process(payload::block_request_t &,process_context_t &) noexcept;
+    void process(payload::remote_copy_t &, process_context_t &) noexcept;
+    void process(payload::append_block_t &, process_context_t &) noexcept;
+    void process(payload::finish_file_t &, process_context_t &) noexcept;
+    void process(payload::clone_block_t &, process_context_t &) noexcept;
+    void process(payload::update_meta_t &, process_context_t &) noexcept;
 
     void on_controller_up(net::message::controller_up_t &message) noexcept;
     void on_controller_predown(net::message::controller_predown_t &message) noexcept;
@@ -117,9 +101,9 @@ struct SYNCSPIRIT_API file_actor_t : public r::actor_base_t {
                                                        const model::folder_info_t &source_fi,
                                                        const file_ptr_t &target_backend) noexcept;
 
-    outcome::result<file_ptr_t> open_file_rw(const bfs::path &path, std::uint64_t file_size,
+    outcome::result<file_ptr_t> open_file_rw(const utils::poly_path_view_t &path, std::uint64_t file_size,
                                              process_context_t &) noexcept;
-    outcome::result<file_ptr_t> open_file_ro(const bfs::path &path, const void *context = {}) noexcept;
+    outcome::result<file_ptr_t> open_file_ro(const utils::poly_path_view_t &path, const void *context = {}) noexcept;
 
     utils::logger_t log;
     uint32_t concurrent_hashes;

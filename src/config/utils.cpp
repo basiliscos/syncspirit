@@ -140,7 +140,7 @@ static main_t make_default_config(const utils::poly_path_view_t &config_path, co
 
     auto device = get_device_name();
 
-    auto shared_path = utils::make_view("shared-data", dir.get_allocator());
+    auto shared_path = utils::make_native_view("shared-data", dir.get_allocator());
     // clang-format off
     main_t cfg;
     cfg.config_path = config_path.detach();

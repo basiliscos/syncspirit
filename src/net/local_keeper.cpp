@@ -22,8 +22,8 @@
 #include "utils/string_comparator.hpp"
 #include "utils/utf8.h"
 #include "utils/format.hpp"
+#include "utils/path_view.hpp"
 
-#include <boost/nowide/convert.hpp>
 #include <spdlog/fmt/bin_to_hex.h>
 #include <iterator>
 
@@ -134,7 +134,7 @@ void local_keeper_t::try_start_watching() noexcept {
             for (auto &[folder, _] : cluster->get_folders()) {
                 auto &f = *folder;
                 if (f.is_watched()) {
-                    route<fs::payload::watch_folder_t>(watcher_addr, address, f.get_path(), f.get_id());
+                    route<fs::payload::watch_folder_t>(watcher_addr, address, f.get_path().clone(), f.get_id());
                 }
             }
         }
@@ -191,7 +191,7 @@ auto local_keeper_t::operator()(const model::diff::advance::local_update_t &diff
     -> outcome::result<void> {
     if (!just_created_dirs.empty()) {
         auto folder = cluster->get_folders().by_id(diff.folder_id);
-        auto folder_path = narrow(folder->get_path().generic_wstring());
+        auto& folder_path = folder->get_path();
         auto name = proto::get_name(diff.proto_local);
         auto full_path = fmt::format("{}/{}", folder_path, name);
         auto it = just_created_dirs.find(full_path);
@@ -234,14 +234,16 @@ auto local_keeper_t::operator()(const model::diff::modify::upsert_folder_t &diff
     auto folder_id = db::get_id(diff.db);
     auto folder = cluster->get_folders().by_id(folder_id);
     if (diff.is_new) {
-        auto create_dir = fs::payload::create_dir_t(folder->get_path(), folder_id);
+        auto p = folder->get_path().clone();
+        auto create_dir = fs::payload::create_dir_t(std::move(p), folder_id);
         route<fs::payload::create_dir_t>(fs_addr, address, std::move((create_dir)));
     } else {
         if (watcher_impl != syncspirit_watcher_impl_t::none) {
             auto count = watched_folders.count(folder_id);
             if (folder->is_watched()) {
                 if (!count) {
-                    route<fs::payload::watch_folder_t>(watcher_addr, address, folder->get_path(), folder_id);
+                    auto p = folder->get_path().clone();
+                    route<fs::payload::watch_folder_t>(watcher_addr, address, std::move(p), folder_id);
                 }
             } else {
                 if (count) {
@@ -266,19 +268,21 @@ auto local_keeper_t::operator()(const model::diff::modify::remove_folder_t &diff
 }
 
 void local_keeper_t::on_create_dir(fs::message::create_dir_t &message) noexcept {
-    auto &p = message.payload;
+    auto &p =  message.payload;
+    auto &pp = static_cast<utils::path_t&>(p);
     auto &ec = message.payload.ec;
     auto folder = cluster->get_folders().by_id(p.folder_id);
     if (folder) {
-        LOG_TRACE(log, "on_create_dir, folder path: {}", narrow(p.generic_wstring()));
+        LOG_TRACE(log, "on_create_dir, folder path: {}", pp);
         if (ec) {
-            LOG_WARN(log, "on_create_dir, cannot create path '{}': {}, suspending", narrow(p.generic_wstring()), ec);
+            LOG_WARN(log, "on_create_dir, cannot create path '{}': {}, suspending", pp, ec);
             auto diff = model::diff::cluster_diff_ptr_t();
             diff = new model::diff::modify::suspend_folder_t(*folder, true, ec);
             send<model::payload::model_update_t>(coordinator, std::move(diff));
         } else {
             if (folder->is_watched() && watcher_impl != syncspirit_watcher_impl_t::none) {
-                route<fs::payload::watch_folder_t>(watcher_addr, address, folder->get_path(), p.folder_id);
+                auto pp = folder->get_path().clone();
+                route<fs::payload::watch_folder_t>(watcher_addr, address, std::move(pp), p.folder_id);
             }
         }
     }
@@ -423,7 +427,7 @@ void local_keeper_t::handle_rename(fs::payload::file_info_t &change, const model
         stack_ctx.file_2_name.insert_or_assign(f, new_sub_name);
 
         if (f->is_dir()) {
-            auto folder_path = narrow(folder->get_path().generic_wstring());
+            auto folder_path = folder->get_path().get_view(stack_ctx.allocator);
             auto full_path = fmt::format("{}/{}", folder_path, new_sub_name);
             just_created_dirs.insert(std::move(full_path));
 
@@ -454,19 +458,13 @@ void local_keeper_t::on_changes(model::folder_info_t &local_folder, fs::payload:
     auto scheduled_dirs = strings_t(stack_ctx.allocator);
 
     auto folder = local_folder.get_folder();
+    auto &folder_path = folder->get_path();
     auto folder_id = folder->get_id();
     auto &local_files = local_folder.get_file_infos();
     auto unexamined = local_keeper::unexamined_items_t();
     auto augmentation = local_folder.get_augmentation().get();
     auto folder_presence = static_cast<presentation::folder_presence_t *>(augmentation);
 
-    auto mk_full_path = [&](std::string_view name) -> std::pmr::string {
-        auto folder_path = narrow(folder->get_path().generic_wstring());
-        auto full_path = std::pmr::string(folder_path, stack_ctx.allocator);
-        full_path += "/";
-        full_path += name;
-        return full_path;
-    };
     auto immediate_update = [&](fs::payload::file_info_t &change, presentation::presence_t *self,
                                 presentation::presence_t *parent) {
         auto name = proto::get_name(change);
@@ -495,8 +493,9 @@ void local_keeper_t::on_changes(model::folder_info_t &local_folder, fs::payload:
                 handle_rename(change, local_folder, stack_ctx);
             } else {
                 if (is_dir && change.update_reason == UT::created) {
-                    auto tmp = mk_full_path(name);
-                    auto full_path = std::string(tmp.data(), tmp.size());
+                    auto change_path = utils::make_generic_view(name, stack_ctx.allocator);
+                    auto fn = folder_path / change_path;
+                    auto full_path = std::string(fn.get_full_name());
                     just_created_dirs.insert(full_path);
                 }
                 stack_ctx.push_back(new advance::local_update_t(*cluster, *sequencer, std::move(change), folder_id));
@@ -509,15 +508,15 @@ void local_keeper_t::on_changes(model::folder_info_t &local_folder, fs::payload:
                               presentation::presence_t *parent, bool recurse_children) {
         using R = presentation::presence_link_t;
         auto name = proto::get_name(change);
-        auto path = folder->get_path();
+        auto path = folder->get_path().get_view(stack_ctx.allocator);
         if (name.size()) {
-            path /= widen(name);
+            path = path / utils::make_native_view(name, stack_ctx.allocator);
         }
         if (!parent) {
             parent = folder_presence;
         }
 
-        auto child_info = CI(std::move(change), std::move(path), self, parent, 0);
+        auto child_info = CI(std::move(change), path.detach(), self, parent, 0);
         auto item = unexamined_t(std::move(child_info), true, recurse_children, change.requires_refinement);
         unexamined.push_back(std::move(item));
     };
@@ -538,10 +537,10 @@ void local_keeper_t::on_changes(model::folder_info_t &local_folder, fs::payload:
                 return;
             }
 
-            auto path = folder->get_path() / widen(parent->get_entity()->get_path()->get_full_name());
-            auto child_name = bfs::path(widen(presence->get_entity()->get_path()->get_filename()));
-            auto item =
-                unscanned_dir_t(std::move(path), parent, std::move(child_name), 0, true, change.requires_refinement);
+            auto folder_path = folder->get_path().get_view(stack_ctx.allocator);
+            auto path = folder_path / *parent->get_entity()->get_path();
+            auto child_name = utils::path_t::make_native(presence->get_entity()->get_path()->get_filename());
+            auto item = unscanned_dir_t(path.detach(), parent, std::move(child_name), 0, true, change.requires_refinement);
             unexamined.push_back(std::move(item));
         } else {
             immediate_update(change, self, parent);
@@ -587,7 +586,9 @@ void local_keeper_t::on_changes(model::folder_info_t &local_folder, fs::payload:
                             parent = static_cast<presentation::presence_t *>(aug);
                         }
                     } else {
-                        auto full_path = mk_full_path(sub_dir);
+                        auto view = folder_path.get_view(stack_ctx.allocator);
+                        auto fp = view / utils::make_native_view(sub_dir, stack_ctx.allocator);
+                        auto full_path = fp.get_full_name();
                         if (just_created_dirs.count(full_path)) {
                             return {nullptr, nullptr, true};
                         }

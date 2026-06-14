@@ -25,6 +25,7 @@
 #include "proto/proto-helpers-db.h"
 #include "utils/error_code.h"
 #include "utils/format.hpp"
+#include "utils/path_view.hpp"
 #include "utils/platform.h"
 
 #include <utility>
@@ -592,7 +593,8 @@ OUTER:
                 using namespace model::diff;
                 LOG_DEBUG(log, "file '{}' (folder '{}'), need version update", file->get_name()->get_full_name(),
                           peer_folder->get_folder()->get_label());
-                auto diff = advance::advance_t::create(action, *file, *peer_folder, *sequencer);
+                auto& allocator = context.get_allocator();
+                auto diff = advance::advance_t::create(action, *file, *peer_folder, *sequencer, allocator);
                 context.push_back(diff.get());
                 ++advances;
             }
@@ -609,11 +611,12 @@ void controller_actor_t::io_advance(model::advance_action_t action, model::file_
     LOG_TRACE(log, "going to advance (action: {}) on file '{}'", static_cast<int>(action), peer_file);
     assert((action == model::advance_action_t::remote_copy) || (action == model::advance_action_t::resolve_remote_win));
 
-    auto conflict_path = bfs::path();
+    auto& allocator = ctx.get_allocator();
+    auto conflict_path = utils::make_empty_view(allocator);
     if (action == model::advance_action_t::resolve_remote_win) {
-        conflict_path = peer_folder.get_folder()->get_path() / bfs::path(local_file->make_conflicting_name());
+        conflict_path = peer_folder.get_folder()->get_path() / local_file->make_conflicting_name(allocator);
     }
-    auto path = peer_file.get_path(peer_folder);
+    auto path = peer_file.get_path(peer_folder, allocator);
     auto type = model::file_info_t::as_type(peer_file.get_type());
     auto size = peer_file.get_size();
     auto modified = peer_file.get_modified_s();
@@ -626,22 +629,22 @@ void controller_actor_t::io_advance(model::advance_action_t action, model::file_
     auto context = fs::payload::extendended_context_prt_t{};
     context.reset(new file_context_t(peer_file, peer_folder, action));
     auto folder_id = std::string(peer_folder.get_folder()->get_id());
-    auto payload = fs::payload::remote_copy_t(std::move(context), std::move(folder_id), path, conflict_path, type, size,
+    auto payload = fs::payload::remote_copy_t(std::move(context), std::move(folder_id), path.detach(), conflict_path.detach(), type, size,
                                               perms, modified, target, deleted, no_permissions);
     ctx.push(std::move(payload));
 }
 
 void controller_actor_t::io_append_block(model::file_info_t &peer_file, model::folder_info_t &peer_folder,
                                          uint32_t block_index, utils::bytes_t data, stack_context_t &ctx) {
-    auto path = peer_file.get_path(peer_folder);
+    auto& allocator = ctx.get_allocator();
+    auto path = peer_file.get_path(peer_folder, allocator);
     auto file_size = peer_file.get_size();
     auto block = const_cast<model::block_info_t *>(peer_file.iterate_blocks(block_index).next());
     auto offset = peer_file.get_block_offset(block_index);
     auto context = fs::payload::extendended_context_prt_t{};
     context.reset(new block_ack_context_t(block, peer_file, peer_folder, block_index));
     auto folder_id = std::string(peer_folder.get_folder()->get_id());
-    auto payload =
-        fs::payload::append_block_t(std::move(context), std::move(folder_id), path, std::move(data), offset, file_size);
+    auto payload = fs::payload::append_block_t(std::move(context), std::move(folder_id), path.detach(), std::move(data), offset, file_size);
     ctx.push(std::move(payload));
 }
 
@@ -672,9 +675,10 @@ void controller_actor_t::io_clone_block(const model::file_block_t &file_block, m
     }
     assert(src_fi);
 
-    auto source_path = src->get_path(*src_fi);
+    auto& allocator = ctx.get_allocator();
+    auto source_path = src->get_path(*src_fi, allocator);
     auto source_offset = src->get_block_offset(src_block_index);
-    auto target_path = target->get_path(target_fi);
+    auto target_path = target->get_path(target_fi, allocator);
     auto target_offset = target->get_block_offset(target_block_index);
     auto target_sz = target->get_size();
     auto block_sz = src->iterate_blocks(src_block_index).next()->get_size();
@@ -684,8 +688,8 @@ void controller_actor_t::io_clone_block(const model::file_block_t &file_block, m
     LOG_TRACE(log, "cloning locally available block '{}', {} (#{}) -> {}(#{})", block->get_hash(),
               src->get_name()->get_full_name(), src_block_index, target->get_name()->get_full_name(),
               target_block_index);
-    auto payload = fs::payload::clone_block_t(std::move(context), std::move(folder_id), target_path, target_offset,
-                                              target_sz, source_path, source_offset, block_sz);
+    auto payload = fs::payload::clone_block_t(std::move(context), std::move(folder_id), target_path.detach(), target_offset,
+                                              target_sz, source_path.detach(), source_offset, block_sz);
     ctx.push(std::move(payload));
 }
 
@@ -693,13 +697,14 @@ void controller_actor_t::io_finish_file(model::file_info_t *local_file, model::f
                                         model::folder_info_t &peer_folder, model::advance_action_t action,
                                         stack_context_t &ctx) {
     assert((action == model::advance_action_t::remote_copy) || (action == model::advance_action_t::resolve_remote_win));
-    auto path = peer_file.get_path(peer_folder);
-    auto conflict_path = bfs::path();
+    auto& allocator = ctx.get_allocator();
+    auto path = peer_file.get_path(peer_folder, allocator);
+    auto conflict_path = utils::make_empty_view(allocator);
     auto file_size = peer_file.get_size();
     auto modified_s = peer_file.get_modified_s();
     if (action == model::advance_action_t::resolve_remote_win) {
         assert(local_file);
-        conflict_path = peer_folder.get_folder()->get_path() / bfs::path(local_file->make_conflicting_name());
+        conflict_path = peer_folder.get_folder()->get_path() / local_file->make_conflicting_name(allocator);
     }
     auto perms = peer_file.get_permissions();
     bool no_permissions = !utils::platform_t::permissions_supported(path) ||
@@ -708,32 +713,33 @@ void controller_actor_t::io_finish_file(model::file_info_t *local_file, model::f
     auto context = fs::payload::extendended_context_prt_t{};
     context.reset(new file_context_t(peer_file, peer_folder, action));
     auto folder_id = std::string(peer_folder.get_folder()->get_id());
-    auto payload = fs::payload::finish_file_t(std::move(context), std::move(folder_id), std::move(path),
-                                              std::move(conflict_path), file_size, modified_s, perms, no_permissions);
+    auto payload = fs::payload::finish_file_t(std::move(context), std::move(folder_id), path.detach(),
+                                              conflict_path.detach(), file_size, modified_s, perms, no_permissions);
     ctx.push(std::move(payload));
 }
 
 void controller_actor_t::io_update_meta(model::file_info_t &peer_file, model::folder_info_t &peer_folder,
                                         model::advance_action_t action, stack_context_t &ctx) {
-    auto path = peer_file.get_path(peer_folder);
+    auto& allocator = ctx.get_allocator();
+    auto path = peer_file.get_path(peer_folder, allocator);
     auto context = fs::payload::extendended_context_prt_t{};
     context.reset(new file_context_t(peer_file, peer_folder, action));
     auto folder_id = std::string(peer_folder.get_folder()->get_id());
     bool no_permissions = !utils::platform_t::permissions_supported(path) ||
                           peer_folder.get_folder()->are_permissions_ignored() || peer_file.has_no_permissions();
-    auto payload = fs::payload::update_meta_t(std::move(context), std::move(folder_id), std::move(path),
+    auto payload = fs::payload::update_meta_t(std::move(context), std::move(folder_id), path.detach(),
                                               peer_file.get_modified_s(), peer_file.get_permissions(), no_permissions);
     ctx.push(std::move(payload));
 }
 
 auto controller_actor_t::io_make_request_block(model::file_info_t &source, model::folder_info_t &source_fi,
-                                               proto::Request req) -> fs::payload::io_command_t {
-    auto path = source.get_path(source_fi);
+                                               proto::Request req, stack_context_t & ctx) -> fs::payload::io_command_t {
+    auto path = source.get_path(source_fi, ctx.get_allocator());
     auto offset = proto::get_offset(req);
     auto block_size = proto::get_size(req);
     auto context = fs::payload::extendended_context_prt_t{};
     context.reset(new block_request_context_t(std::move(req)));
-    auto payload = fs::payload::block_request_t(std::move(context), std::move(path), offset, block_size);
+    auto payload = fs::payload::block_request_t(std::move(context), path.detach(), offset, block_size);
     return payload;
 }
 
@@ -1128,7 +1134,7 @@ void controller_actor_t::on_message(proto::Request &req, stack_context_t &ctx) n
             ctx.push(std::move(data));
         }
     } else {
-        auto io_command = io_make_request_block(*local_file, *local_folder, std::move(req));
+        auto io_command = io_make_request_block(*local_file, *local_folder, std::move(req), ctx);
         if (forward) {
             ++tx_blocks_requested;
             ctx.push(std::move(io_command));
@@ -1249,7 +1255,8 @@ void controller_actor_t::postprocess_io(fs::payload::remote_copy_t &res, stack_c
     using namespace model::diff::advance;
     auto io_ctx = static_cast<file_context_t *>(res.context.get());
     if (res.result) {
-        auto diff = advance_t::create(io_ctx->action, *io_ctx->peer_file, *io_ctx->peer_folder, *sequencer);
+        auto& allocator = ctx.get_allocator();
+        auto diff = advance_t::create(io_ctx->action, *io_ctx->peer_file, *io_ctx->peer_folder, *sequencer, allocator);
         ctx.push_back(diff.get());
     } else {
         auto name = io_ctx->peer_file->get_name()->get_full_name();
@@ -1285,7 +1292,8 @@ void controller_actor_t::postprocess_io(fs::payload::finish_file_t &res, stack_c
     auto io_ctx = static_cast<file_context_t *>(res.context.get());
 
     if (res.result) {
-        auto diff = advance::advance_t::create(io_ctx->action, *io_ctx->peer_file, *io_ctx->peer_folder, *sequencer);
+        auto& allocator = ctx.get_allocator();
+        auto diff = advance::advance_t::create(io_ctx->action, *io_ctx->peer_file, *io_ctx->peer_folder, *sequencer, allocator);
         ctx.push_back(diff.get());
     } else {
         auto name = io_ctx->peer_file->get_name()->get_full_name();
@@ -1299,7 +1307,8 @@ void controller_actor_t::postprocess_io(fs::payload::update_meta_t &res, stack_c
     auto io_ctx = static_cast<file_context_t *>(res.context.get());
 
     if (res.result) {
-        auto diff = advance::advance_t::create(io_ctx->action, *io_ctx->peer_file, *io_ctx->peer_folder, *sequencer);
+        auto& allocator = ctx.get_allocator();
+        auto diff = advance::advance_t::create(io_ctx->action, *io_ctx->peer_file, *io_ctx->peer_folder, *sequencer, allocator);
         ctx.push_back(diff.get());
     } else {
         auto name = io_ctx->peer_file->get_name()->get_full_name();

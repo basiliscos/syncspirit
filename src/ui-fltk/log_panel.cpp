@@ -114,7 +114,7 @@ static void export_log(Fl_Widget *, void *data) {
     auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
 
     auto filename = file_chooser.filename();
-    auto path = utils::make_view(filename, allocator);
+    auto path = utils::make_native_view(filename, allocator);
     using file_t = syncspirit::utils::io_stream_t;
     auto out_opt = file_t::open_truncate(path);
     if (!out_opt) {

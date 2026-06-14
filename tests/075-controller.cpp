@@ -55,13 +55,13 @@ struct mock_supervisor_t : supervisor_t {
     }
 
     void process_io(fs::payload::append_block_t &req) noexcept override {
-        auto copy = fs::payload::append_block_t({}, req.folder_id, req.path, req.data, req.offset, req.file_size);
+        auto copy = fs::payload::append_block_t({}, req.folder_id, req.path.clone(), req.data, req.offset, req.file_size);
         appended_blocks.emplace_back(std::move(copy));
         supervisor_t::process_io(req);
     }
 
     void process_io(fs::payload::finish_file_t &req) noexcept override {
-        auto copy = fs::payload::finish_file_t({}, req.folder_id, req.path, req.conflict_path, req.file_size,
+        auto copy = fs::payload::finish_file_t({}, req.folder_id, req.path.clone(), req.conflict_path.clone(), req.file_size,
                                                req.modification_s, req.permissions, req.no_permissions);
         file_finishes.emplace_back(std::move(copy));
         supervisor_t::process_io(req);
@@ -74,7 +74,7 @@ struct mock_supervisor_t : supervisor_t {
             req.result = std::move(res);
             block_responces.pop_front();
         }
-        auto copy = fs::payload::block_request_t({}, req.path, req.offset, req.block_size);
+        auto copy = fs::payload::block_request_t({}, req.path.clone(), req.offset, req.block_size);
         block_requests.emplace_back(std::move(copy));
     }
 
@@ -1873,7 +1873,7 @@ void test_uploading() {
                 REQUIRE(sup->block_responces.size() == 0);
                 REQUIRE(sup->block_requests.size() == 1);
                 auto &req = sup->block_requests.front();
-                CHECK(req.path.filename() == file_name);
+                CHECK(req.path.get_filename() == file_name);
                 CHECK(req.offset == 0);
                 CHECK(req.block_size == data_1.size());
 
@@ -1893,7 +1893,7 @@ void test_uploading() {
                 REQUIRE(sup->block_responces.size() == 0);
                 REQUIRE(sup->block_requests.size() == 1);
                 auto &req = sup->block_requests.front();
-                CHECK(req.path.filename() == file_name);
+                CHECK(req.path.get_filename() == file_name);
                 CHECK(req.offset == 0);
                 CHECK(req.block_size == data_1.size());
 
@@ -2136,6 +2136,11 @@ void test_conflicts() {
             peer_actor->bep_messages.clear();
             sup->appended_blocks.clear();
             sup->file_finishes.clear();
+
+            auto buffer = std::array<std::byte, 1024 * 32>();
+            auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+            auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+
             SECTION("local win") {
                 proto::set_modified_s(file, 1734670000);
                 proto::set_value(c_1, proto::get_value(local_file->get_version().get_best()) - 1);
@@ -2163,7 +2168,8 @@ void test_conflicts() {
                 sup->do_process();
 
                 auto local_folder = folder_infos.by_device(*my_device);
-                auto local_conflict = local_folder->get_file_infos().by_name(local_file->make_conflicting_name());
+                auto conflict_name = local_file->make_conflicting_name(allocator);
+                auto local_conflict = local_folder->get_file_infos().by_name(conflict_name.get_full_name());
                 REQUIRE(local_conflict);
                 CHECK(local_conflict->get_size() == 5);
                 REQUIRE(local_conflict->iterate_blocks().get_total() == 1);
@@ -2188,15 +2194,15 @@ void test_conflicts() {
 
                 REQUIRE(sup->appended_blocks.size() == 1);
                 auto &appended_block = sup->appended_blocks.front();
-                CHECK(appended_block.path == file->get_path(*local_folder));
+                CHECK(appended_block.path == file->get_path(*local_folder, allocator));
                 CHECK(appended_block.file_size == 5);
                 CHECK(appended_block.offset == 0);
                 CHECK(appended_block.data == data_3);
 
                 REQUIRE(sup->file_finishes.size() == 1);
                 auto &file_finish = sup->file_finishes.front();
-                CHECK(file_finish.path == file->get_path(*local_folder));
-                CHECK(file_finish.conflict_path == local_conflict->get_path(*local_folder));
+                CHECK(file_finish.path == file->get_path(*local_folder, allocator));
+                CHECK(file_finish.conflict_path == local_conflict->get_path(*local_folder, allocator));
                 CHECK(file_finish.file_size == 5);
                 CHECK(file_finish.modification_s == file->get_modified_s());
             }
@@ -2211,7 +2217,8 @@ void test_conflicts() {
                 sup->do_process();
 
                 auto local_folder = folder_infos.by_device(*my_device);
-                auto local_conflict = local_folder->get_file_infos().by_name(local_file->make_conflicting_name());
+                auto conflict_name = local_file->make_conflicting_name(allocator);
+                auto local_conflict = local_folder->get_file_infos().by_name(conflict_name.get_full_name());
                 REQUIRE(local_conflict);
                 CHECK(local_conflict->get_size() == 5);
                 REQUIRE(local_conflict->iterate_blocks().get_total() == 1);

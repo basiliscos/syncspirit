@@ -6,6 +6,8 @@
 #include "model/folder_info.h"
 #include "proto/proto-helpers-bep.h"
 #include "utils/platform.h"
+#include "utils/path_view.hpp"
+#include <memory_resource>
 
 namespace syncspirit::model {
 
@@ -131,7 +133,12 @@ advance_action_t resolve(const file_info_t &remote, const file_info_t *local,
         if (name.find(".sync-conflict-") != std::string::npos) {
             action = advance_action_t::ignore;
         } else {
-            auto resolved_name = local->make_conflicting_name();
+            auto buffer = std::array<std::byte, 1024 * 16>();
+            auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+            auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+
+            auto resolved_path = local->make_conflicting_name(allocator);
+            auto resolved_name = resolved_path.get_full_name();
             if (auto resolved = local_folder.get_file_infos().by_name(resolved_name); resolved) {
                 action = advance_action_t::ignore;
             }

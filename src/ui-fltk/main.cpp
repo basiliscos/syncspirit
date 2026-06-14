@@ -222,7 +222,7 @@ int app_main(app_context_t &app_ctx) {
     auto config_file_path = utils::poly_path_view_t(allocator);
     if (vm.count("config_dir")) {
         auto path = vm["config_dir"].as<std::string>();
-        config_file_path = utils::make_view(path, allocator);
+        config_file_path = utils::make_native_view(path, allocator);
     } else {
         auto config_default = utils::get_default_config_dir(allocator);
         if (!config_default.empty()) {
@@ -234,7 +234,7 @@ int app_main(app_context_t &app_ctx) {
     }
     app_ctx.bootstrap_guard = utils::bootstrap(app_ctx.dist_sink, config_file_path);
 
-    config_file_path = config_file_path / utils::make_view("syncspirit.toml", allocator);
+    config_file_path = config_file_path / utils::make_native_view("syncspirit.toml", allocator);
     auto ec = std::error_code{};
     bool populate = !utils::exists(config_file_path, ec);
     if (populate) {

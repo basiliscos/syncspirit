@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #pragma once
 
@@ -12,7 +12,7 @@ struct SYNCSPIRIT_API remote_win_t final : advance_t {
     using parent_t::parent_t;
 
     remote_win_t(const cluster_t &cluster, sequencer_t &sequencer, proto::FileInfo proto_file,
-                 std::string_view folder_id, utils::bytes_view_t peer_id) noexcept;
+                 std::string_view folder_id, utils::bytes_view_t peer_id, const utils::allocator_t& allocator) noexcept;
 
     outcome::result<void> apply_impl(apply_controller_t &, void *) const noexcept override;
     outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;

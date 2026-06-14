@@ -71,9 +71,7 @@ struct fixture_t : diff::cluster_visitor_t, diff::apply_controller_t {
     using diff_msgs_t = std::vector<diff_ptr_t>;
 
     fixture_t() noexcept
-        : ctx(io_ctx), acceptor(io_ctx), peer_sock(io_ctx), tmp_path{unique_path()}, tmp_guard{tmp_path} {
-        bfs::create_directories(tmp_path);
-        test::init_logging();
+        : ctx(io_ctx), acceptor(io_ctx), peer_sock(io_ctx), path_guard{unique_path()} {
         log = utils::get_logger("fixture");
     }
 
@@ -182,16 +180,15 @@ struct fixture_t : diff::cluster_visitor_t, diff::apply_controller_t {
         auto buffer = std::array<std::byte, 1024 * 5>{};
         auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
         auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
-        auto dir_path = utils::path_t::make_native(tmp_path.wstring());
-        auto dir_view = dir_path.get_view(allocator);
+        auto dir_view = path_guard.get_view(allocator);
 
         auto ip = asio::ip::make_address(host);
         auto ep = tcp::endpoint(ip, listening_ep.port());
         auto addresses = std::vector<tcp::endpoint>{ep};
         auto addresses_ptr = std::make_shared<decltype(addresses)>(addresses);
 
-        auto cert_path = dir_view / utils::make_view("i-cert.pem", allocator);
-        auto key_path = dir_view / utils::make_view("i-priv.pem", allocator);
+        auto cert_path = dir_view / "i-cert.pem";
+        auto key_path = dir_view / "i-priv.pem";
 
         REQUIRE(my_keys.save(cert_path, key_path));
         ssl_verify_store = cert_path.get_full_name();
@@ -269,8 +266,7 @@ struct fixture_t : diff::cluster_visitor_t, diff::apply_controller_t {
     ready_ptr_t connected_message;
     utils::bytes_t relay_session;
     bool use_model = true;
-    bfs::path tmp_path;
-    test::path_guard_t tmp_guard;
+    test::path_guard_t path_guard;
     std::string ssl_verify_store;
 
     bool valid_handshake = false;
@@ -990,6 +986,7 @@ void test_relay_non_invitation_reply() {
 }
 
 int _init() {
+    test::init_logging();
     REGISTER_TEST_CASE(test_connect_unsupported_proto, "test_connect_unsupported_proto", "[initiator]");
     REGISTER_TEST_CASE(test_connect_timeout, "test_connect_timeout", "[initiator]");
     REGISTER_TEST_CASE(test_handshake_timeout, "test_handshake_timeout", "[initiator]");

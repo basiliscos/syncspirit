@@ -58,7 +58,7 @@ void watcher_t::shutdown_finish() noexcept {
 }
 
 auto watcher_t::unwatch_path(int wd, file_type_t type) noexcept -> sys::error_code {
-    assert(type == file_type_t::directory);
+    assert(type == file_type_t::DIRECTORY);
     if (auto r = ::inotify_rm_watch(inotify_guard.fd, wd); r != 0) {
         return sys::error_code{errno, sys::system_category()};
     }
@@ -67,7 +67,7 @@ auto watcher_t::unwatch_path(int wd, file_type_t type) noexcept -> sys::error_co
 
 auto watcher_t::watch_path(std::string_view path, file_type_t type) noexcept -> std::optional<int> {
     static constexpr auto FLAGS = IN_MODIFY | IN_CREATE | IN_DELETE | IN_ATTRIB | IN_MOVE | IN_DELETE_SELF;
-    if (type != file_type_t::directory || !utils::is_utf8_valid(path)) {
+    if (type != file_type_t::DIRECTORY || !utils::is_utf8_valid(path)) {
         return {};
     }
     auto wd = ::inotify_add_watch(inotify_guard.fd, path.data(), FLAGS);
@@ -111,7 +111,7 @@ void watcher_t::inotify_callback() noexcept {
             *(--name_ptr) = '/';
             append_name(parent_guard->path);
 
-            auto &folder_path = watched_folders->find(folder_id)->second.path_str;
+            auto folder_path = watched_folders->find(folder_id)->second.get_full_name();
             auto sub_path_sz = parent_guard->path.size() - folder_path.size();
             tail -= sub_path_sz;
             auto rel_path = std::string_view(tail, sub_path_sz + filename.size());
@@ -162,7 +162,7 @@ void watcher_t::inotify_callback() noexcept {
                             auto &prev_parent_guard = path_map[prev_event->wd];
                             auto prev_parent_path = std::string_view(prev_parent_guard.path);
                             auto folder_id = prev_parent_guard.folder_id;
-                            auto &folder_path = watched_folders->find(folder_id)->second.path_str;
+                            auto folder_path = watched_folders->find(folder_id)->second.get_full_name();
                             auto subpath_bytes = prev_parent_path.size() - folder_path.size();
                             if (subpath_bytes) {
                                 --subpath_bytes; // skip trailing '/'

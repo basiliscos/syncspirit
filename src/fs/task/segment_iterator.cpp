@@ -5,14 +5,15 @@
 #include "hasher/messages.h"
 #include "hasher/hasher_plugin.h"
 #include "fs/utils.h"
+#include "utils/path_view.hpp"
+#include "utils/path_utils.h"
 #include <boost/system/errc.hpp>
-#include <memory_resource>
 
 using namespace syncspirit::fs;
 using namespace syncspirit::fs::task;
 
 segment_iterator_t::segment_iterator_t(const r::address_ptr_t &back_addr_,
-                                       hasher::payload::extendended_context_prt_t context_, bfs::path path_,
+                                       hasher::payload::extendended_context_prt_t context_, utils::path_t path_,
                                        std::int64_t offset_, std::int32_t block_index_, std::int32_t block_count_,
                                        std::int32_t block_size_, std::int32_t last_block_size_,
                                        std::int64_t last_write_time_) noexcept
@@ -24,13 +25,11 @@ segment_iterator_t::segment_iterator_t(const r::address_ptr_t &back_addr_,
 
 bool segment_iterator_t::process(fs_slave_t &fs_slave, execution_context_t &exec_ctx) noexcept {
     using byte_chunks_t = std::pmr::vector<utils::bytes_t>;
-    auto buffer = std::array<std::byte, 1024>();
-    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
-    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
 
     assert(!ec);
+    auto path_view = path.get_view(exec_ctx.allocator);
     if (!file.has_backend()) {
-        auto opt = file_t::open_read(path);
+        auto opt = file_t::open_read(path_view );
         if (!opt.has_value()) {
             ec = opt.assume_error();
             return false;
@@ -38,18 +37,17 @@ bool segment_iterator_t::process(fs_slave_t &fs_slave, execution_context_t &exec
         file = std::move(opt.assume_value());
     }
 
-    auto modified_native = bfs::last_write_time(path, ec);
+    auto modified = utils::last_write_time(path_view, ec);
     if (ec) {
         return false;
     }
 
-    auto modified = fs::to_unix(modified_native);
     if (modified != last_write_time) {
         ec = utils::make_error_code(utils::error_code_t::concurrent_file_modification);
         return false;
     }
 
-    auto byte_chunks = byte_chunks_t(allocator);
+    auto byte_chunks = byte_chunks_t(exec_ctx.allocator);
 
     for (std::int32_t j = 0; j < block_count && !ec; ++j) {
         auto bs = (j + 1 == block_count) ? last_block_size : block_size;

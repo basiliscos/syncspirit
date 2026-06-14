@@ -162,7 +162,7 @@ cluster_update_t::cluster_update_t(const utils::path_t &default_path, const clus
         auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
 
         auto try_make_path = [&](std::string_view label) -> outcome::result<utils::poly_path_view_t> {
-            auto label_path = utils::make_view(label, allocator);
+            auto label_path = utils::make_native_view(label, allocator);
             auto path = default_path.get_view(allocator) / label_path;
             if (label.empty()) {
                 return model::make_error_code(model::error_code_t::empty_folder_name);

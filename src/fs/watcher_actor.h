@@ -8,7 +8,6 @@
 namespace syncspirit::fs {
 
 namespace r = rotor;
-namespace bfs = std::filesystem;
 namespace sys = boost::system;
 using watch_actor_t = platform::watcher_t;
 

@@ -716,17 +716,15 @@ void test_https_200_ok() {
         using ssl_socket_t = ssl::stream<tcp::socket>;
         using ssl_socket_opt_t = std::optional<ssl_socket_t>;
 
-        F() : ctx(boost::asio::ssl::context::tls), tmp_path{unique_path()}, tmp_guard{tmp_path} {
-            bfs::create_directories(tmp_path);
-            server_keys = utils::generate_pair("test_server").value();
-
+        F() : ctx(boost::asio::ssl::context::tls), path_guard{test::unique_path()} {
             auto buffer = std::array<std::byte, 1024 * 5>{};
             auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
             auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
-            auto dir_path = utils::path_t::make_native(tmp_path.wstring());
-            auto dir_view = dir_path.get_view(allocator);
-            auto cert_path = dir_view / utils::make_view("cert.pem", allocator);
-            auto key_path = dir_view / utils::make_view("priv.pem", allocator);
+            server_keys = utils::generate_pair("test_server").value();
+
+            auto dir_view = path_guard.get_view(allocator);
+            auto cert_path = dir_view / L"сертификат.pem";
+            auto key_path = dir_view / L"ключ.pem";
             REQUIRE(server_keys.save(cert_path, key_path));
 
             ssl_verify_store = cert_path.get_full_name();
@@ -787,8 +785,7 @@ void test_https_200_ok() {
         utils::key_pair_t server_keys;
         ssl::context ctx;
         ssl_socket_opt_t peer_ssl_sock;
-        bfs::path tmp_path;
-        test::path_guard_t tmp_guard;
+        test::path_guard_t path_guard;
     };
     F().run();
 }

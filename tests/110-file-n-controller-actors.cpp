@@ -12,8 +12,6 @@
 #include "access.h"
 #include "model/cluster.h"
 #include "access.h"
-#include <filesystem>
-#include <boost/nowide/convert.hpp>
 
 using namespace syncspirit;
 using namespace syncspirit::db;
@@ -21,8 +19,6 @@ using namespace syncspirit::test;
 using namespace syncspirit::model;
 using namespace syncspirit::net;
 using namespace syncspirit::fs;
-
-namespace bfs = std::filesystem;
 
 namespace {
 
@@ -44,7 +40,7 @@ struct fixture_t {
     using controller_ptr_t = r::intrusive_ptr_t<net::controller_actor_t>;
     using peer_ptr_t = r::intrusive_ptr_t<test_peer_t>;
 
-    fixture_t() noexcept : root_path{unique_path()}, path_guard{root_path} { bfs::create_directory(root_path); }
+    fixture_t() noexcept : path_guard{unique_path()} {}
 
     virtual configure_callback_t configure() noexcept {
         return [&](r::plugin::plugin_base_t &plugin) {
@@ -123,8 +119,13 @@ struct fixture_t {
 
         CHECK(static_cast<r::actor_base_t *>(file_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
 
+        auto buffer = std::array<std::byte, 1024 * 32>();
+        auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+        auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+        auto root_path = path_guard.get_view(allocator);
+
         auto builder = diff_builder_t(*cluster);
-        builder.upsert_folder(folder_id, root_path, "my-label").apply(*sup);
+        builder.upsert_folder(folder_id, root_path.get_full_name(), "my-label").apply(*sup);
 
         folder = cluster->get_folders().by_id(folder_id);
 
@@ -132,7 +133,7 @@ struct fixture_t {
         CHECK(static_cast<r::actor_base_t *>(controller_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
         CHECK(static_cast<r::actor_base_t *>(file_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
 
-        main();
+        main(root_path, allocator);
 
         CHECK(static_cast<r::actor_base_t *>(peer_actor.get())->access<to::state>() == r::state_t::SHUT_DOWN);
         CHECK(static_cast<r::actor_base_t *>(controller_actor.get())->access<to::state>() == r::state_t::SHUT_DOWN);
@@ -144,7 +145,7 @@ struct fixture_t {
         CHECK(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::SHUT_DOWN);
     }
 
-    virtual void main() noexcept {}
+    virtual void main(const utils::poly_path_view_t& root_path, const utils::allocator_t& allocator) noexcept {}
 
     r::pt::time_duration timeout = r::pt::millisec{10};
     r::pt::time_duration retension = r::pt::millisec{1};
@@ -157,7 +158,6 @@ struct fixture_t {
     r::intrusive_ptr_t<fs::file_actor_t> file_actor;
     peer_ptr_t peer_actor;
     controller_ptr_t controller_actor;
-    bfs::path root_path;
     test::path_guard_t path_guard;
     r::system_context_t ctx;
     std::string_view folder_id = "1234-5678";
@@ -166,14 +166,14 @@ struct fixture_t {
 
 void test_shutdown_initiated_by_controller() {
     struct F : fixture_t {
-        void main() noexcept override {
+        void main(const utils::poly_path_view_t& root_path, const utils::allocator_t& allocator) noexcept override {
             auto file_path = root_path / L"файл.bin";
             write_file(file_path, "12345");
             auto &cache = file_actor->access<tmp_to::context_cache>();
             auto &file_cache = cache[controller_actor->get_address().get()];
             auto file_raw = fs::file_t::open_read(file_path).value();
             auto file = fs::file_ptr_t(new fs::file_t(std::move(file_raw)));
-            file_cache[file_path] = file;
+            file_cache.insert_or_assign(file_path.detach(), file);
             REQUIRE(cache.size() == 1);
 
             controller_actor->do_shutdown();
@@ -192,7 +192,7 @@ void test_shutdown_initiated_by_controller() {
 
 void test_shutdown_initiated_by_file_actor() {
     struct F : fixture_t {
-        void main() noexcept override {
+        void main(const utils::poly_path_view_t& root_path, const utils::allocator_t& allocator) noexcept override {
             file_actor->do_shutdown();
             sup->do_process();
             CHECK(cluster->get_write_requests() == 10);
@@ -203,7 +203,7 @@ void test_shutdown_initiated_by_file_actor() {
 
 void test_fs_actor_error() {
     struct F : fixture_t {
-        void main() noexcept override {
+        void main(const utils::poly_path_view_t& root_path, const utils::allocator_t& allocator) noexcept override {
             auto file_name = std::string_view("some-file");
             auto pr_file = proto::FileInfo();
             proto::set_name(pr_file, file_name);
@@ -226,9 +226,9 @@ void test_fs_actor_error() {
             auto folder_id = "1234-5678";
             auto builder = diff_builder_t(*cluster);
             auto sha256 = peer_device->device_id().get_sha256();
-            auto folder_path = bfs::absolute(root_path) / L"йцукен";
+            auto folder_path = root_path / L"йцукен";
 
-            builder.upsert_folder(folder_id, folder_path)
+            builder.upsert_folder(folder_id, folder_path.get_full_name())
                 .share_folder(sha256, folder_id)
                 .apply(*sup)
                 .configure_cluster(sha256)

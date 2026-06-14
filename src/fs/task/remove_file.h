@@ -8,10 +8,10 @@
 namespace syncspirit::fs::task {
 
 struct SYNCSPIRIT_API remove_file_t {
-    remove_file_t(bfs::path path) noexcept;
+    remove_file_t(utils::path_t path) noexcept;
     bool process(fs_slave_t &fs_slave, execution_context_t &context) noexcept;
 
-    bfs::path path;
+    utils::path_t path;
     sys::error_code ec;
 };
 

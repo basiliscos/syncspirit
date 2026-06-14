@@ -23,9 +23,9 @@ poly_path_view_t expand_home(const std::string &path, const poly_path_view_t &ho
     if (!home.empty() && path.size() >= 2 && path[0] == '~' && (path[1] == '/' || path[1] == '\\')) {
         auto path_view = std::string_view(path).substr(2);
         auto path_wstr = boost::nowide::widen(path_view);
-        return home / make_view(path_view, home.get_allocator());
+        return home / make_native_view(path_view, home.get_allocator());
     }
-    return make_view(path, home.get_allocator());
+    return make_native_view(path, home.get_allocator());
 }
 
 poly_path_view_t get_home_dir(const allocator_t &allocator) noexcept {
@@ -34,7 +34,7 @@ poly_path_view_t get_home_dir(const allocator_t &allocator) noexcept {
     if (SHGetFolderPathW(nullptr, CSIDL_LOCAL_APPDATA, nullptr, 0, appdata) != S_OK) {
         return {allocator};
     }
-    return make_view(appdata, allocator);
+    return make_native_view(appdata, allocator);
 #elif defined(__unix__) || (defined(__APPLE__) && defined(__MACH__))
     auto *pw = getpwuid(getuid());
     if (!pw) {
@@ -42,12 +42,12 @@ poly_path_view_t get_home_dir(const allocator_t &allocator) noexcept {
     }
 #if defined(__unix__)
     if (auto xdg_home = std::getenv("XDG_CONFIG_HOME")) {
-        return make_view(xdg_home, allocator);
+        return make_native_view(xdg_home, allocator);
     } else {
-        return make_view(pw->pw_dir, allocator);
+        return make_native_view(pw->pw_dir, allocator);
     }
 #else
-    return make_view(pw->pw_dir);
+    return make_native_view(pw->pw_dir);
 #endif
 
 #endif
@@ -60,9 +60,9 @@ poly_path_view_t get_default_config_dir(const allocator_t &allocator) noexcept {
     }
 
 #if defined(__unix__)
-    return home / make_view(".config", allocator);
+    return home / make_native_view(".config", allocator);
 #endif
-    return home / make_view("syncspirit", allocator);
+    return home / make_native_view("syncspirit", allocator);
 }
 
 } // namespace syncspirit::utils

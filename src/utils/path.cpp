@@ -75,10 +75,10 @@ path_t path_t::clone() const noexcept { return path_t(data, components); }
 
 bool path_base_t::operator==(const path_base_t &other) const noexcept {
     if (components == other.components) {
-        auto ptr_1 = reinterpret_cast<const uint8_t *>(data);
-        auto ptr_2 = reinterpret_cast<const uint8_t *>(other.data);
-        auto sz_1 = *reinterpret_cast<const uint32_t *>(ptr_1++);
-        auto sz_2 = *reinterpret_cast<const uint32_t *>(ptr_2++);
+        auto ptr_1 = reinterpret_cast<const uint32_t *>(data);
+        auto ptr_2 = reinterpret_cast<const uint32_t *>(other.data);
+        auto sz_1 = *ptr_1++;
+        auto sz_2 = *ptr_2++;
         if (sz_1 == sz_2) {
             auto sz = sz_1 + components;
             return std::memcmp(ptr_1, ptr_2, sz) == 0;
@@ -198,6 +198,19 @@ std::string_view path_base_t::get_extension() const noexcept {
     return {};
 }
 
+std::string_view path_base_t::get_stem() const noexcept {
+    auto name = get_filename();
+    if (!name.empty()) {
+        if (name != "." && name != "..") {
+            auto pos = name.rfind('.');
+            if (pos != std::string_view::npos) {
+                return name.substr(0, pos);
+            }
+        }
+    }
+    return name;
+}
+
 std::string_view path_base_t::get_parent_name() const noexcept {
     if (components >= 1) {
         auto first = (*iterator_t(this));
@@ -207,9 +220,44 @@ std::string_view path_base_t::get_parent_name() const noexcept {
     return {};
 }
 
+std::string_view path_base_t::relativize(const path_base_t& parent) const noexcept {
+    auto self = get_full_name();
+    auto p = parent.get_full_name();
+    assert(p.size() <= self.size());
+    auto tail = self.substr(p.size());
+    if (tail.size() && tail.front() == '/') {
+        tail = tail.substr(1);
+    }
+    return tail;
+}
+
 auto path_base_t::begin() const noexcept -> iterator_t { return iterator_t(this); }
 
 auto path_base_t::end() const noexcept -> iterator_t { return iterator_t(); }
+
+size_t path_hash_t::operator()(const path_base_t &item) const noexcept {
+    return std::hash<std::string_view>()(item.get_full_name());
+}
+
+size_t path_hash_t::operator()(std::string_view item) const noexcept {
+    return std::hash<std::string_view>()(item);
+}
+
+bool path_eq_t::operator()(const path_base_t &lhs, const path_base_t& rhs) const {
+    return lhs == rhs;
+}
+
+bool path_eq_t::operator()(const path_base_t &lhs, const std::string_view rhs) const {
+    return lhs.get_full_name() == rhs;
+}
+
+bool path_eq_t::operator()(const std::string_view lhs, const path_base_t& rhs) const {
+    return lhs == rhs.get_full_name();
+}
+
+bool path_eq_t::operator()(const std::string_view lhs, const std::string_view rhs) const {
+    return lhs == rhs;
+}
 
 I::iterator_t() noexcept : component{-1}, path{nullptr} {}
 

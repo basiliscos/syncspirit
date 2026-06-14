@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "test-utils.h"
 #include "utils/log.h"
+#include "utils/format.hpp"
 #include "utils/log-setup.h"
 #include <spdlog/sinks/dist_sink.h>
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
-#include <boost/nowide/convert.hpp>
+#include <utils/path_view.hpp>
 
 namespace st = syncspirit::test;
 namespace bfs = std::filesystem;
@@ -65,15 +66,15 @@ TEST_CASE("hierarchy", "[log]") {
 
 TEST_CASE("file sink", "[log]") {
     init_root();
-    auto dir = bfs::absolute(bfs::current_path() / st::unique_path());
-    auto path_guard = st::path_guard_t(dir);
-    bfs::create_directories(dir);
-    auto log_file = dir / u8"папка" / u8"журнал.txt";
-    INFO("log_file = " << log_file);
-    auto log_file_str = boost::nowide::narrow(log_file.wstring());
-    INFO("log_file(2) = " << log_file);
+    auto path_guard = st::path_guard_t();
+    auto buffer = std::array<std::byte, 1024 * 32>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
 
-    auto sink_config = fmt::format("file:{}", log_file_str);
+    auto log_file = path_guard.get_view(allocator) / L"папка"  /L"журнал.txt";
+    auto sink_config = fmt::format("file:{}", log_file);
+    INFO("log_file = " << sink_config);
+
     config::log_configs_t cfg{{"default", L::trace, {sink_config}}};
     REQUIRE(utils::init_loggers(cfg));
     auto l = utils::get_logger("default");
@@ -82,7 +83,6 @@ TEST_CASE("file sink", "[log]") {
 
     utils::finalize_loggers(); // to cleanup on win32
     auto data = st::read_file(log_file);
-    CHECK(log_file_str != "");
     CHECK(!data.empty());
     CHECK(data.find("lorem ipsum dolor") != std::string::npos);
 }

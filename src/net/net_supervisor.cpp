@@ -140,7 +140,7 @@ void net_supervisor_t::launch_early() noexcept {
     auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
     auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
     auto config_path = app_config.config_path.get_view(allocator);
-    auto db_path = config_path / utils::make_view("mdbx-db", allocator);
+    auto db_path = config_path / utils::make_native_view("mdbx-db", allocator);
 
     db_addr = create_actor<db_actor_t>()
                   .timeout(timeout)

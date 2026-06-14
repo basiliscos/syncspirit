@@ -5,7 +5,9 @@
 
 #include "syncspirit-export.h"
 #include "model/misc/arc.hpp"
+#include "proto/proto-file-type.h"
 #include <cstdint>
+#include <string>
 #include <string_view>
 #include <type_traits>
 #include <new>
@@ -45,8 +47,10 @@ struct SYNCSPIRIT_API path_base_t {
 
     std::string_view get_full_name() const noexcept;
     std::string_view get_filename() const noexcept;
+    std::string_view get_stem() const noexcept;
     std::string_view get_extension() const noexcept;
     std::string_view get_parent_name() const noexcept;
+    std::string_view relativize(const path_base_t&parent) const noexcept;
     bool contains(const path_base_t &other) const noexcept;
     bool is_temporal() const noexcept;
     bool is_absolute() const noexcept;
@@ -90,24 +94,25 @@ using path_ptr_t = model::intrusive_ptr_t<path_t>;
 
 using allocator_t = std::pmr::polymorphic_allocator<char>;
 using poly_path_view_t = path_view_t<allocator_t>;
+using poly_string_t = std::pmr::string;
 
-struct path_eq_t {
+struct SYNCSPIRIT_API path_eq_t {
     using is_transparent = void;
 
-    bool operator()(const path_t &lhs, path_t &rhs) const;
-    bool operator()(const path_t &lhs, std::string_view rhs) const;
-    bool operator()(const std::string_view lhs, path_t &rhs) const;
+    bool operator()(const path_base_t &lhs, const path_base_t &rhs) const;
+    bool operator()(const path_base_t &lhs, std::string_view rhs) const;
+    bool operator()(const std::string_view lhs, const path_base_t &rhs) const;
     bool operator()(const std::string_view lhs, const std::string_view rhs) const;
 
     template <typename T>
         requires std::is_constructible_v<std::string_view, const T &>
-    bool operator()(const T &lhs, path_t &rhs) const {
+    bool operator()(const T &lhs, const path_t &rhs) const {
         return (*this)(std::string_view(lhs), rhs);
     }
 
     template <typename T>
         requires std::is_constructible_v<std::string_view, const T &>
-    bool operator()(path_t &lhs, const T &rhs) const {
+    bool operator()(const path_base_t &lhs, const T &rhs) const {
         return (*this)(lhs, std::string_view(rhs));
     }
 
@@ -119,10 +124,10 @@ struct path_eq_t {
     }
 };
 
-struct path_hash_t {
+struct SYNCSPIRIT_API path_hash_t {
     using is_transparent = void;
 
-    size_t operator()(const path_t &item) const noexcept;
+    size_t operator()(const path_base_t &item) const noexcept;
     size_t operator()(std::string_view item) const noexcept;
 
     template <typename T>
@@ -131,6 +136,8 @@ struct path_hash_t {
         return (*this)(std::string_view(item));
     }
 };
+
+using file_type_t = proto::FileInfoType;
 
 } // namespace syncspirit::utils
 

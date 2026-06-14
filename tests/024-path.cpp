@@ -111,6 +111,11 @@ TEST_CASE("path", "[model]") {
         CHECK(p3.get_extension().empty());
         CHECK(p4.get_extension() == boost::nowide::narrow(L".р2"));
     }
+    SECTION("bug with eq") {
+        auto p1 = path_t::make_generic(L"/home/b/development/cpp/syncspirit/build.debug-shared/tmp-utfgowerwpsvk/sub-dir/d");
+        auto p2 = path_t::make_generic(L"/home/b/development/cpp/syncspirit/build.debug-shared/tmp-utfgowerwpsvk/sub-dir/e");
+        CHECK(p1 != p2);
+    }
 }
 
 TEST_CASE("path view (1)", "[model]") {
@@ -327,19 +332,19 @@ TEST_CASE("path view (3)", "[model]") {
     auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
     auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
     SECTION("simple") {
-        auto view = make_view("file.bin", allocator);
+        auto view = make_native_view("file.bin", allocator);
         REQUIRE(!view.empty());
         CHECK(view.get_full_name() == "file.bin");
         CHECK(view.get_filename() == "file.bin");
     }
     SECTION("complex") {
-        auto view = make_view("dir/file.bin", allocator);
+        auto view = make_native_view("dir/file.bin", allocator);
         REQUIRE(!view.empty());
         CHECK(view.get_full_name() == "dir/file.bin");
         CHECK(view.get_filename() == "file.bin");
     }
     SECTION("absolute") {
-        auto view = make_view("/dir/file.bin", allocator);
+        auto view = make_native_view("/dir/file.bin", allocator);
         REQUIRE(!view.empty());
         CHECK(view.get_full_name() == "/dir/file.bin");
         CHECK(view.get_filename() == "file.bin");
@@ -351,20 +356,20 @@ TEST_CASE("path view (4)", "[model]") {
     auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
     auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
     SECTION("ascii -> utf8") {
-        auto view = make_view("abc", allocator);
+        auto view = make_native_view("abc", allocator);
         CHECK(view.get_full_wname() == L"abc");
         CHECK(view.get_full_name() == "abc");
     }
     SECTION("wchar -> utf8 (1)") {
-        auto view = make_view(L"ёпрст", allocator);
+        auto view = make_native_view(L"ёпрст", allocator);
         CHECK(view.get_full_wname() == L"ёпрст");
     }
     SECTION("wchar -> utf8 (2)") {
-        auto view = make_view(L"э/ю/Ё", allocator);
+        auto view = make_native_view(L"э/ю/Ё", allocator);
         CHECK(view.get_full_wname() == L"э/ю/Ё");
     }
     SECTION("wchar -> utf8 (3)") {
-        auto view = make_view(L"э\\ю\\Ё", allocator);
+        auto view = make_native_view(L"э\\ю\\Ё", allocator);
         CHECK(view.get_full_wname() == L"э\\ю\\Ё");
     }
 }

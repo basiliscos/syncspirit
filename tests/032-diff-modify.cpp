@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "test-utils.h"
 #include "diff-builder.h"
@@ -34,7 +34,7 @@ TEST_CASE("cluster modifications from ui", "[model]") {
         REQUIRE(folder);
         CHECK(folder->get_id() == id);
         CHECK(folder->get_label() == label);
-        CHECK(folder->get_path() == path);
+        CHECK(folder->get_path().get_full_name() == path);
         CHECK(folder->get_cluster() == cluster);
 
         auto fi = folder->get_folder_infos().by_device(*my_device);

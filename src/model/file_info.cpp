@@ -10,9 +10,9 @@
 #include "misc/file_iterator.h"
 #include "proto/proto-helpers.h"
 #include "utils/bytes_comparator.hpp"
+#include "utils/path_view.hpp"
 #include <spdlog/spdlog.h>
 #include <boost/date_time/c_local_time_adjustor.hpp>
-#include <boost/nowide/convert.hpp>
 #include <boost/date_time.hpp>
 #include <algorithm>
 #include <set>
@@ -459,11 +459,8 @@ bool file_info_t::is_locally_available() const noexcept {
     return r;
 };
 
-std::filesystem::path file_info_t::get_path(const folder_info_t &folder_info) const noexcept {
-    auto own_name = boost::nowide::widen(name->get_full_name());
-    auto path = folder_info.get_folder()->get_path() / own_name;
-    path.make_preferred();
-    return path;
+auto file_info_t::get_path(const folder_info_t &folder_info, const utils::allocator_t& allocator) const noexcept -> utils::poly_path_view_t {
+    return folder_info.get_folder()->get_path().get_view(allocator) / *name;
 }
 
 void file_info_t::synchronizing_unlock() noexcept { flags = flags & ~flags_t::f_synchronizing; }
@@ -619,26 +616,25 @@ void file_info_t::update(const file_info_t &other) noexcept {
     flags = (other.flags & 0b111111) | (flags & ~0b111111); // local flags are preserved
 }
 
-std::string file_info_t::make_conflicting_name() const noexcept {
+utils::poly_path_view_t file_info_t::make_conflicting_name(const utils::allocator_t &allocator) const noexcept {
     using adjustor_t = boost::date_time::c_local_adjustor<pt::ptime>;
-    using boost::nowide::narrow;
-    using boost::nowide::widen;
     auto own_name = boost::nowide::widen(name->get_full_name());
-    auto path = bfs::path(own_name);
-    auto file_name = path.filename();
-    auto stem = narrow(file_name.stem().generic_wstring());
-    auto ext = narrow(file_name.extension().generic_wstring());
+    auto file_name = name->get_filename();
+    auto ext = name->get_extension();
+    auto stem = file_name.substr(0, file_name.size() - ext.size());
     auto utc = pt::from_time_t(modified_s);
     auto local = adjustor_t::utc_to_local(utc);
     auto ymd = local.date().year_month_day();
     auto time = local.time_of_day();
     auto counter = version.get_best();
     auto device_short = device_id_t::make_short(proto::get_id(counter));
-    auto conflicted_name =
-        fmt::format("{}.sync-conflict-{:04}{:02}{:02}-{:02}{:02}{:02}-{}{}", stem, (int)ymd.year, ymd.month.as_number(),
+    auto conflicted_name = std::pmr::string(allocator);
+    auto out = std::back_inserter(conflicted_name);
+    fmt::format_to(out, "{}.sync-conflict-{:04}{:02}{:02}-{:02}{:02}{:02}-{}{}", stem, (int)ymd.year, ymd.month.as_number(),
                     ymd.day.as_number(), time.hours(), time.minutes(), time.seconds(), device_short, ext);
-    auto full_name = path.parent_path() / widen(conflicted_name);
-    return narrow(full_name.generic_wstring());
+    auto parent = utils::make_native_view(name->get_parent_name(), allocator);
+    auto full_name = parent / utils::make_native_view(conflicted_name, allocator);
+    return full_name;
 }
 
 auto file_info_t::guard(const model::folder_info_t &folder_info) noexcept -> guard_t {

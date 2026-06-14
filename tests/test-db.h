@@ -4,16 +4,15 @@
 #pragma once
 
 #include "db/utils.h"
-#include <filesystem>
+#include "test-utils.h"
 
 namespace syncspirit::test {
 
-namespace bfs = std::filesystem;
 namespace db = syncspirit::db;
 
 struct env_t {
     MDBX_env *env;
-    bfs::path path;
+    path_guard_t path;
     ~env_t();
 };
 
