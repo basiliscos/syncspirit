@@ -370,7 +370,7 @@ TEST_CASE("path view (4)", "[model]") {
     }
     SECTION("wchar -> utf8 (3)") {
         auto view = make_native_view(L"э\\ю\\Ё", allocator);
-        CHECK(view.get_full_wname() == L"э\\ю\\Ё");
+        CHECK(view.get_full_wname(true) == L"э\\ю\\Ё");
     }
 }
 

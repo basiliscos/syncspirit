@@ -97,7 +97,7 @@ sys::error_code fs_proxy_t::write(const utils::path_base_t &path, utils::io_stre
     return {};
 }
 
-sys::error_code fs_proxy_t::set_perms(const utils::path_base_t &path, std::uint32_t permissions) noexcept {
+sys::error_code fs_proxy_t::set_perms(const utils::poly_path_view_t &path, std::uint32_t permissions) noexcept {
     auto ec = sys::error_code();
     utils::chmod(path, permissions, ec);
     if (!ec) {

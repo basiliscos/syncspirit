@@ -25,7 +25,7 @@ SYNCSPIRIT_API bool is_empty(const poly_path_view_t &path, std::error_code &ec) 
 SYNCSPIRIT_API void remove_all(const poly_path_view_t &path, std::error_code &ec) noexcept;
 SYNCSPIRIT_API void remove_file(const poly_path_view_t &path, std::error_code &ec) noexcept;
 SYNCSPIRIT_API void rename(const utils::path_base_t &from, const utils::poly_path_view_t &to, std::error_code &ec) noexcept;
-SYNCSPIRIT_API void chmod(const utils::path_base_t &path, std::uint32_t, std::error_code &ec) noexcept;
+SYNCSPIRIT_API void chmod(const utils::poly_path_view_t &path, std::uint32_t, std::error_code &ec) noexcept;
 SYNCSPIRIT_API void create_symlink(const utils::path_base_t &target, const utils::path_base_t &path, std::error_code &ec) noexcept;
 SYNCSPIRIT_API bool is_symlink(const utils::path_base_t &target, std::error_code &ec) noexcept;
 SYNCSPIRIT_API poly_string_t read_symlink(const poly_path_view_t &target, std::error_code &ec) noexcept;

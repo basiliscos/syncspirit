@@ -76,7 +76,7 @@ SYNCSPIRIT_TEST_API bool wine_environment();
 
 SYNCSPIRIT_TEST_API std::size_t create_directories(const utils::poly_path_view_t &path);
 SYNCSPIRIT_TEST_API bool exists(const utils::poly_path_view_t &path);
-SYNCSPIRIT_TEST_API void chmod(const utils::path_base_t &path, std::uint32_t);
+SYNCSPIRIT_TEST_API void chmod(const utils::poly_path_view_t &path, std::uint32_t);
 SYNCSPIRIT_TEST_API std::int64_t file_size(const utils::poly_path_view_t &path);
 SYNCSPIRIT_TEST_API std::int64_t last_write_time(const utils::poly_path_view_t &path);
 SYNCSPIRIT_TEST_API void last_write_time(const utils::poly_path_view_t &path, std::int64_t);

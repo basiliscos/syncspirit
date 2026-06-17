@@ -676,7 +676,7 @@ void folder_context_t::post_process(fs::task::scan_dir_t &task, stack_context_t 
                 if (!checked_children.count(filename)) {
                     checked_children.emplace(filename);
                     if (!task.single_child.empty()) {
-                        if (task.single_child != child_path) {
+                        if (task.single_child.get_filename() != filename) {
                             continue;
                         }
                     }

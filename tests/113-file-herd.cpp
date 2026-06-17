@@ -305,6 +305,7 @@ void test_fs() {
             await_events(4);
             auto dir_2 = local_files->by_name(fmt::format("a/{}", long_name));
             REQUIRE(dir_2);
+            CHECK(local_files->by_name("a/xx")->is_deleted());
 
             rename(root_path / "a" / long_name, root_path / "a" / "yy");
             await_events(3);
@@ -312,7 +313,7 @@ void test_fs() {
             REQUIRE(dir_3);
 
             rename(root_path / "a" / "b", root_path / "a" / "BB");
-            await_events(7);
+            await_events(10);
             {
                 auto wnames = {L"a/b", L"a/b/c", L"a/b/c/d", L"a/b/c/d/e", L"a/b/c/подпапка", L"a/b/c/файлик.bin"};
                 for (auto &wname : wnames) {

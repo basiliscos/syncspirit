@@ -125,7 +125,7 @@ template <> struct base_impl_t<ssl_socket_t> {
                 ec = sys::error_code(static_cast<int>(code), asio::error::get_ssl_category());
             }
             if (ec) {
-                log->warn("cannot load_verify_store: {}", ec);
+                log->warn("cannot load_verify_store '{}': {}", source.ssl_verify_store, ec);
             } else {
                 log->trace("using ssl verify store: {}", source.ssl_verify_store);
                 use_sytem_verify_paths = false;

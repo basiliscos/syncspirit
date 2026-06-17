@@ -57,6 +57,7 @@ TEST_CASE("fs_slave, scan_dir", "[fs]") {
             auto &t = std::get<task::scan_dir_t>(slave.tasks_out.front());
             CHECK(t.ec);
             CHECK(t.ec.message() != "");
+            CHECK(t.ec == std::errc::no_such_file_or_directory);
         }
         SECTION("not a dir") {
             slave.push(task::scan_dir_t((root_path / "file").detach(), {}, {}, false, true, false));

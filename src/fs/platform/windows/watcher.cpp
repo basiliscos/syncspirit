@@ -8,13 +8,12 @@
 #include "fs/fs_supervisor.h"
 #include "fs/utils.h"
 #include "utils/format.hpp"
-#include <boost/nowide/convert.hpp>
+#include "utils/path_view.hpp"
 #include <cstring>
 #include <string>
 #include <cstdlib>
 
 using namespace syncspirit::fs::platform::windows;
-using boost::nowide::narrow;
 
 using handle_t = watcher_t::handle_t;
 
@@ -60,17 +59,21 @@ void watcher_t::on_watch(message::watch_folder_t &message) noexcept {
     constexpr auto FILE_FLAGS = FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OVERLAPPED;
     auto sup = static_cast<fs::fs_supervisor_t *>(supervisor);
     auto ctx = static_cast<fs::fs_context_t *>(sup->context);
-    auto &p = message.payload;
-    auto &path_native = p.path.native();
-    auto path_str = narrow(p.path.generic_wstring());
-    LOG_TRACE(log, "on watch on '{}' (buffer size: {} bytes)", path_str, fs_config.win32_watcher_buff);
 
-    auto dir_handle = ::CreateFileW(path_native.c_str(), FILE_LIST_DIRECTORY, SHARE_MODE, nullptr, OPEN_EXISTING,
+    auto buffer = std::array<std::byte, 1024 * 32>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+    auto &p = message.payload;
+    auto path_view = p.path.get_view(allocator);
+    auto path_wstr = path_view.get_full_wname();
+    LOG_TRACE(log, "on watch on '{}' (buffer size: {} bytes)", path_view, fs_config.win32_watcher_buff);
+
+    auto dir_handle = ::CreateFileW(path_wstr.c_str(), FILE_LIST_DIRECTORY, SHARE_MODE, nullptr, OPEN_EXISTING,
                                     FILE_FLAGS, nullptr);
 
     if (dir_handle == INVALID_HANDLE_VALUE) {
         auto ec = sys::error_code(::GetLastError(), sys::system_category());
-        LOG_ERROR(log, "cannot open directory '{}' handle: {}", path_str, ec);
+        LOG_ERROR(log, "cannot open directory '{}' handle: {}", path_view, ec);
         p.ec = ec;
         return;
     }
@@ -79,7 +82,7 @@ void watcher_t::on_watch(message::watch_folder_t &message) noexcept {
     auto event_handle = ::CreateEvent(nullptr, true, false, nullptr);
     if (!event_handle) {
         auto ec = sys::error_code(::GetLastError(), sys::system_category());
-        LOG_ERROR(log, "cannot create event handle: {}", path_str, ec);
+        LOG_ERROR(log, "cannot create event handle: {}", path_view, ec);
         p.ec = ec;
         return;
     }
@@ -90,20 +93,19 @@ void watcher_t::on_watch(message::watch_folder_t &message) noexcept {
     auto folder_guard = folder_guard_t::make(fs_config.win32_watcher_buff, std::string(p.folder_id),
                                              std::move(dir_guard), std::move(event_guard));
     if (!folder_guard) {
-        LOG_ERROR(log, "cannot create folder guard for '{}'", path_str);
+        LOG_ERROR(log, "cannot create folder guard for '{}'", path_view);
         return;
     }
 
     if (auto ec = folder_guard->initiate(); ec) {
-        LOG_ERROR(log, "cannot initate watching dir '{}': {}", path_str, ec);
+        LOG_ERROR(log, "cannot initate watching dir '{}': {}", path_view, ec);
         p.ec = ec;
         return;
     }
 
-    auto folder_info = folder_info_t(p.path, path_str);
-    auto [it, inserted] = watched_folders->emplace(std::make_pair(std::string(p.folder_id), std::move(folder_info)));
+    auto [it, inserted] = watched_folders->emplace(std::make_pair(std::string(p.folder_id), p.path.clone()));
     if (!inserted) {
-        LOG_WARN(log, "folder '{}' on '{}' is already watched", p.folder_id, path_str);
+        LOG_WARN(log, "folder '{}' on '{}' is already watched", p.folder_id, path_view);
     } else {
         handle_map[it->first] = event_handle;
         path_map[event_handle] = std::move(folder_guard);
@@ -128,7 +130,7 @@ void watcher_t::on_unwatch(message::unwatch_folder_t &message) noexcept {
     auto &p = message.payload;
     auto it = watched_folders->find(p.folder_id);
     if (it != watched_folders->end()) {
-        LOG_DEBUG(log, "unwatching(1) {}", it->second.path_str);
+        LOG_DEBUG(log, "unwatching(1) '{}'", it->second);
         p.ec = unwatch_dir(p.folder_id);
         watched_folders->erase(it);
     } else {
@@ -138,8 +140,7 @@ void watcher_t::on_unwatch(message::unwatch_folder_t &message) noexcept {
 
 void watcher_t::shutdown_finish() noexcept {
     for (auto it = watched_folders->begin(); it != watched_folders->end();) {
-        auto &folder_id = it->first;
-        auto &path = it->second.path_str;
+        auto& [folder_id, path] = *it;
         LOG_DEBUG(log, "unwatching(2) {}", path);
         unwatch_dir(folder_id);
         it = watched_folders->erase(it);
@@ -159,14 +160,13 @@ void watcher_t::on_notify(handle_t handle) noexcept {
 
     auto &folder_guard = it->second;
     auto &folder_id = folder_guard->folder_id;
-    auto &folder_info = (*watched_folders)[folder_id];
-    auto &path_str = folder_info.path_str;
+    auto &path = (*watched_folders)[folder_id];
 
     auto bytes = DWORD{0};
     auto ok = ::GetOverlappedResult(folder_guard->dir_guard.handle, &folder_guard->overlapped, &bytes, false);
     if (!ok) {
         auto ec = sys::error_code(::GetLastError(), sys::system_category());
-        LOG_WARN(log, "cannot get overlapped result for '{}': {}", path_str, ec);
+        LOG_WARN(log, "cannot get overlapped result for '{}': {}", path, ec);
         return;
     }
     if (!bytes) {
@@ -174,32 +174,19 @@ void watcher_t::on_notify(handle_t handle) noexcept {
         return;
     }
 
-    char storage[32 * 1024 * sizeof(wchar_t) + 1];
+    auto buffer = std::array<std::byte, 1024 * 32 * sizeof(wchar_t) + 1>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
     auto deadline = clock_t::local_time() + retension;
 
     auto ptr = (FILE_NOTIFY_INFORMATION *)folder_guard->buff;
     while (ptr) {
-        auto storage_ptr = storage;
         auto sz = ptr->FileNameLength / sizeof(WCHAR);
         auto namew_ptr = ptr->FileName;
+        auto name_wstr = std::wstring_view(ptr->FileName, sz);
 
-        for (auto p = namew_ptr, e = namew_ptr + sz; p != e; ++p) {
-            if (*p == L'\\') {
-                *p = L'/';
-            }
-        }
-
-        auto name_holder = std::string();
-        auto name_view = std::string_view();
-        if (narrow(storage_ptr, sizeof(storage), namew_ptr, namew_ptr + sz)) {
-            name_view = std::string_view(storage_ptr);
-        } else {
-            auto file_wname = std::wstring_view(ptr->FileName, sz);
-            name_holder = narrow(file_wname);
-            name_view = path_str;
-        }
-
-        if (!fs::is_temporal(name_view)) {
+        auto name_view = utils::make_native_view(name_wstr, allocator);
+        if (!name_view.is_temporal()) {
             auto type = update_type_internal_t{0};
             auto requires_refinement = false;
             if (ptr->Action == FILE_ACTION_ADDED) {
@@ -220,7 +207,7 @@ void watcher_t::on_notify(handle_t handle) noexcept {
             }
 
             if (type) {
-                push(deadline, folder_id, name_view, {}, static_cast<update_type_t>(type), requires_refinement);
+                push(deadline, folder_id, name_view.get_full_name(), {}, static_cast<update_type_t>(type), requires_refinement);
             } else {
                 LOG_DEBUG(log, "in the folder '{}' updated ({:x}): '{}'", folder_id, ptr->Action, name_view);
             }
@@ -230,18 +217,18 @@ void watcher_t::on_notify(handle_t handle) noexcept {
 
     if (auto ok = ::ResetEvent(handle); !ok) {
         auto ec = sys::error_code(::GetLastError(), sys::system_category());
-        LOG_WARN(log, "cannot reset event for handle for '{}': {}", path_str, ec);
+        LOG_WARN(log, "cannot reset event for handle for '{}': {}", path, ec);
         return;
     }
 
     if (auto ec = folder_guard->initiate(); ec) {
-        LOG_ERROR(log, "cannot initate watching dir '{}': {}", path_str, ec);
+        LOG_ERROR(log, "cannot initate watching dir '{}': {}", path, ec);
         return;
     }
 }
 
-bool watcher_t::accept_update(const support::file_update_t &update, const bfs::file_status &status) noexcept {
-    if (update.update_type == update_type::CONTENT && status.type() == bfs::file_type::directory) {
+bool watcher_t::accept_update(const support::file_update_t &update, const utils::file_type_t type) noexcept {
+    if (update.update_type == update_type::CONTENT && type == utils::file_type_t::DIRECTORY) {
         return false;
     }
     return true;

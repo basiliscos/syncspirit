@@ -119,12 +119,16 @@ static advance_action_t _resolve(const file_info_t &remote, const file_info_t *l
 
 advance_action_t resolve(const file_info_t &remote, const file_info_t *local,
                          const folder_info_t &local_folder) noexcept {
+
     using P = utils::platform_t;
     if (remote.is_link() && !remote.is_deleted() && !P::symlinks_supported()) {
         return advance_action_t::ignore;
     }
-    auto remote_name = remote.get_name()->get_full_name();
-    if (!P::path_supported(remote_name)) {
+    auto buffer = std::array<std::byte, 1024 * 16>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+
+    if (!P::path_supported(remote.get_name()->get_view(allocator))) {
         return advance_action_t::ignore;
     }
     auto action = _resolve(remote, local, local_folder);
@@ -133,10 +137,6 @@ advance_action_t resolve(const file_info_t &remote, const file_info_t *local,
         if (name.find(".sync-conflict-") != std::string::npos) {
             action = advance_action_t::ignore;
         } else {
-            auto buffer = std::array<std::byte, 1024 * 16>();
-            auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
-            auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
-
             auto resolved_path = local->make_conflicting_name(allocator);
             auto resolved_name = resolved_path.get_full_name();
             if (auto resolved = local_folder.get_file_infos().by_name(resolved_name); resolved) {

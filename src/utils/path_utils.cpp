@@ -5,7 +5,13 @@
 #include "path_view.hpp"
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+#define _CRT_STDIO_ISO_WIDE_SPECIFIERS 1  /* optional on some toolchains */
 #include <windows.h>
+#include <sys/types.h>
+#include <sys/utime.h>
+#include <sys/stat.h>
+#include <time.h>
+#include <inttypes.h>
 #else
 #include <limits.h>
 #include <unistd.h>
@@ -13,19 +19,23 @@
 #include <errno.h>
 #include <ftw.h>
 #include <fcntl.h>
+#include <sys/types.h>
+#include <dirent.h>
 #endif
+
+#include <spdlog/spdlog.h>
 
 namespace syncspirit::utils {
 
 bool exists(const poly_path_view_t &path, std::error_code &ec) noexcept {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+    (void)ec;
     auto wpath = path.get_full_wname(true);
     auto attrs = GetFileAttributesW(wpath.data());
     if (attrs == INVALID_FILE_ATTRIBUTES) {
-        ec = std::error_code(::GetLastError(), std::system_category());
         return false;
     }
-    return attrs & FILE_ATTRIBUTE_DIRECTORY;
+    return true;
 #else
     struct stat data;
     if (lstat(path.get_full_name().data(), &data) == 0) {
@@ -39,39 +49,87 @@ bool exists(const poly_path_view_t &path, std::error_code &ec) noexcept {
 #endif
 }
 
-bool is_empty(const poly_path_view_t &path, std::error_code &ec) noexcept { std::abort(); }
+bool is_empty(const poly_path_view_t &path, std::error_code &ec) noexcept {
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+    auto mask = path / utils::make_native_view("*.*", path.get_allocator());
+    auto wpath = mask.get_full_wname(true);
+    WIN32_FIND_DATAW child_data;
+    auto child_handle = FindFirstFileW(wpath.data(), &child_data);
+    if (child_handle == INVALID_HANDLE_VALUE) {
+        ec = std::error_code(::GetLastError(), std::system_category());
+        return false;
+    }
+    auto r = true;
+    do {
+        auto child_name = std::wstring_view(child_data.cFileName);
+        if (child_name != L"." && child_name != L"..") {
+            r = false;
+            break;
+        }
+    } while(FindNextFileW(child_handle, &child_data) && !ec);
+    if (!FindClose(child_handle)) {
+        ec = std::error_code(::GetLastError(), std::system_category());
+    }
+    return r;
+
+#else
+    auto d = ::opendir(path.get_full_name().data());
+    if (!d) {
+        ec = std::error_code{errno, std::generic_category()};
+        return false;
+    }
+    auto r = true;
+    auto entry = readdir(d);
+    while (entry) {
+        auto name = std::string_view(entry->d_name);
+        if (!(name == "." || name == "..")) {
+            r = false;
+            break;
+        }
+        entry = readdir(d);
+    }
+    if (closedir(d) != 0) {
+        ec = std::error_code{errno, std::generic_category()};
+        r = false;
+    }
+    return r;
+#endif
+}
 
 std::size_t create_directories(const poly_path_view_t &path, std::error_code &ec) noexcept {
     auto r = std::size_t{0};
+    ec = {};
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
     auto whole_str = std::pmr::wstring(path.get_allocator());
     whole_str = path.get_full_wname(true);
     auto pos = whole_str.find(L'\\', 0);
-    while (pos != std::wstring::npos) {
-        whole_str[pos] = 0;
+    bool advance = true;
+    while (advance) {
+        if (pos != std::wstring::npos) {
+            whole_str[pos] = 0;
+        }
         auto code = _wmkdir(whole_str.data());
-        whole_str[pos] = L'\\';
+        if (pos != std::wstring::npos) {
+            whole_str[pos] = L'\\';
+        }
         if (!code) {
             ++r;
         } else {
-            if (errno == EEXIST) {
-                if (pos < whole_str.size()) {
-                    pos = whole_str.find(L'\\', pos + 1);
-                    if (pos == std::wstring::npos) {
-                        pos = whole_str.size();
-                    }
-                } else {
-                    printf("zzz1.3.2\n");
-                    pos = std::wstring::npos;
-                }
-            } else {
+            if (errno != EEXIST) {
                 ec = std::error_code(::GetLastError(), std::system_category());
-                break;
+                advance = false;
+            }
+        }
+        if (advance) {
+            if (pos < whole_str.size()) {
+                pos = whole_str.find(L'\\', pos + 1);
+                advance = true;
+            } else {
+                advance = false;
             }
         }
     }
 #else
-    ec = {};
     static constexpr auto perms = 0777;
     auto whole = path.get_full_name();
     auto whole_str = std::pmr::string(path.get_allocator());
@@ -100,10 +158,75 @@ std::size_t create_directories(const poly_path_view_t &path, std::error_code &ec
     return r;
 }
 
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+void rm_file(std::wstring_view path, std::error_code &ec) noexcept {
+    if (SetFileAttributesW(path.data(), FILE_ATTRIBUTE_NORMAL) == 0) {
+        ec = std::error_code(::GetLastError(), std::system_category());
+    } else {
+        if (DeleteFileW(path.data()) == 0) {
+            ec = std::error_code(::GetLastError(), std::system_category());
+        }
+    }
+}
+
+void rm_dir_recurse(std::wstring_view path, std::error_code &ec) noexcept {
+    auto ptr = const_cast<wchar_t*>(path.data() + path.size());
+    auto child_ptr = ptr;
+    swprintf(ptr, L"\\*.*");
+    WIN32_FIND_DATAW child_data;
+    auto child_handle = FindFirstFileW(path.data(), &child_data);
+    if (child_handle != INVALID_HANDLE_VALUE) {
+        do {
+            auto child_name = std::wstring_view(child_data.cFileName);
+            if (child_name != L"." && child_name != L"..") {
+                swprintf(ptr, L"\\%ls", child_name.data());
+                auto full_name = std::wstring_view(path.data(), path.size() + child_name.size() + 1);
+                if (child_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+                    rm_dir_recurse(full_name, ec);
+                } else {
+                    rm_file(full_name, ec);
+                }
+            }
+            swprintf(ptr, L"\\*.*");
+        } while(FindNextFileW(child_handle, &child_data) && !ec);
+
+        if (!FindClose(child_handle)) {
+            ec = std::error_code(::GetLastError(), std::system_category());
+        }
+    }
+
+    if (!ec) {
+        *ptr = 0;
+        if (RemoveDirectoryW(path.data()) == 0) {
+            ec = std::error_code(::GetLastError(), std::system_category());
+        }
+    }
+}
+
+void rm_dir_recurse_initial(std::wstring_view wpath, std::error_code &ec) noexcept {
+    wchar_t buff[MAX_PATH];
+    memcpy(buff, wpath.data(), wpath.size() * sizeof(wchar_t));
+    auto ptr = buff + wpath.size();
+    *ptr = 0;
+    rm_dir_recurse(std::wstring_view(buff, wpath.size()), ec);
+}
+
+#endif
 
 void remove_all(const poly_path_view_t &path, std::error_code &ec) noexcept {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
-#error "TODO"
+    auto wpath = path.get_full_wname(true);
+    auto attrs = GetFileAttributesW(wpath.data());
+    if (attrs == INVALID_FILE_ATTRIBUTES) {
+        ec = std::error_code(::GetLastError(), std::system_category());
+    } else {
+        auto wview = std::wstring_view(wpath.data(), wpath.size());
+        if (attrs & FILE_ATTRIBUTE_DIRECTORY) {
+            rm_dir_recurse_initial(wview, ec);
+        } else {
+            rm_file(wview, ec);
+        }
+    }
 #else
     auto cb = [](const char* path, const struct stat *sb, int type, struct FTW *ftwbuf) -> int {
         if (type == FTW_DP) {
@@ -132,7 +255,7 @@ void rename(const utils::path_base_t &from, const utils::poly_path_view_t &to, s
     auto wt = to.get_full_wname(true);
     auto code = ::MoveFileW(wf.data(), wt.data());
     if (code == 0) {
-        ec = sys::error_code(::GetLastError(), std::system_category());
+        ec = std::error_code(::GetLastError(), std::system_category());
     }
 #else
     auto code = ::rename(from.get_full_name().data(), to.get_full_name().data());
@@ -146,7 +269,7 @@ void remove_file(const poly_path_view_t &path, std::error_code &ec) noexcept {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
     auto wf = path.get_full_wname(true);
     if (!DeleteFileW(wf.data())) {
-        ec = sys::error_code(::GetLastError(), std::system_category());
+        ec = std::error_code(::GetLastError(), std::system_category());
     }
 #else
     if (unlink(path.get_full_name().data()) != 0) {
@@ -155,9 +278,12 @@ void remove_file(const poly_path_view_t &path, std::error_code &ec) noexcept {
 #endif
 }
 
-void  chmod(const path_base_t &path, std::uint32_t perms, std::error_code &ec) noexcept {
+void  chmod(const poly_path_view_t &path, std::uint32_t perms, std::error_code &ec) noexcept {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
-    ec = std::make_error_code(std::errc::function_not_supported);
+    auto wf = path.get_full_wname(true);
+    if (_wchmod(wf.data(), perms) != 0) {
+        ec = std::error_code{errno, std::system_category()};
+    }
 #else
     if (::chmod(path.get_full_name().data(), perms) !=0) {
         ec = std::error_code{errno, std::system_category()};
@@ -208,6 +334,15 @@ poly_string_t read_symlink(const poly_path_view_t &target, std::error_code &ec) 
 }
 
 void last_write_time(const poly_path_view_t &path, std::int64_t modified_at, std::error_code &ec) noexcept {
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+    auto wpath = path.get_full_wname(true);
+    struct _utimbuf times;
+    times.actime  = 0;
+    times.modtime = (time_t)modified_at;
+    if (_wutime(wpath.data(), &times) != 0) {
+        ec = std::error_code{errno, std::system_category()};
+    }
+#else
     struct timespec times[2];
     times[0].tv_nsec = UTIME_OMIT;          /* keep atime */
     times[1].tv_sec  = modified_at;
@@ -215,6 +350,7 @@ void last_write_time(const poly_path_view_t &path, std::int64_t modified_at, std
     if (::utimensat(AT_FDCWD, path.get_full_name().data(), times, AT_SYMLINK_NOFOLLOW) == -1) {
         ec = std::error_code{errno, std::system_category()};
     }
+#endif
 }
 
 std::int64_t last_write_time(const poly_path_view_t &path, std::error_code &ec) noexcept {
@@ -224,7 +360,23 @@ std::int64_t last_write_time(const poly_path_view_t &path, std::error_code &ec) 
 stats_t get_stats(const poly_path_view_t &path, std::error_code &ec) noexcept {
     stats_t r;
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
-#error TODO
+    auto wpath = path.get_full_wname(true);
+    struct __stat64 st;
+    if (_wstat64(wpath.data(), &st) != 0) {
+        ec = std::error_code{errno, std::system_category()};
+    } else {
+        r.supported = true;
+        r.modification = static_cast<std::int64_t>(st.st_mtime);
+        r.permissions = st.st_mode & 07777;
+        if (st.st_mode & _S_IFDIR) {
+            r.file_type = file_type_t::DIRECTORY;
+        } else if (st.st_mode & _S_IFREG) {
+            r.file_type = file_type_t::FILE;
+            r.file_size = st.st_size;
+        } else {
+            r.supported = false;
+        }
+    }
 #else
     struct stat st;
     if (lstat(path.get_full_name().data(), &st) != 0) {
@@ -243,7 +395,6 @@ stats_t get_stats(const poly_path_view_t &path, std::error_code &ec) noexcept {
         } else {
             r.supported = false;
         }
-
     }
 #endif
     return r;

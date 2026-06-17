@@ -17,7 +17,6 @@
 #include <catch2/catch_session.hpp>
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
-#error TODO
 #else
 #include <unistd.h>
 #include <stdio.h>
@@ -232,7 +231,7 @@ bool exists(const utils::poly_path_view_t &path) {
     return r;
 }
 
-void chmod(const utils::path_base_t &path, std::uint32_t mode) {
+void chmod(const utils::poly_path_view_t &path, std::uint32_t mode) {
     auto ec = sys::error_code{};
     utils::chmod(path, mode, ec);
     if (ec) {

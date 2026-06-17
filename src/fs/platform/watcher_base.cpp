@@ -366,6 +366,6 @@ void watcher_base_t::on_retension_finish(r::request_id_t, bool cancelled) noexce
     }
 }
 
-bool watcher_base_t::accept_update(const support::file_update_t &, const utils::file_type_t &) noexcept { return true; }
+bool watcher_base_t::accept_update(const support::file_update_t &, const utils::file_type_t) noexcept { return true; }
 
 void watcher_base_t::notify(const fs::task::scan_dir_t &) noexcept {}

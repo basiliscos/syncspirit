@@ -94,7 +94,7 @@ struct SYNCSPIRIT_API watcher_base_t : r::actor_base_t {
     void on_service_unlock(model::message::service_unlock_t &message) noexcept;
 
     virtual void notify(const fs::task::scan_dir_t &) noexcept;
-    virtual bool accept_update(const support::file_update_t &, const utils::file_type_t &) noexcept;
+    virtual bool accept_update(const support::file_update_t &, const utils::file_type_t) noexcept;
 
     void on_retension_finish(r::request_id_t, bool cancelled) noexcept;
     void push(const timepoint_t &deadline, std::string_view folder_id, std::string_view relative_path,

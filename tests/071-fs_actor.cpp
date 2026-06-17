@@ -283,7 +283,7 @@ void test_remote_copy() {
                 CHECK(updates_mediator->is_masked(path.get_full_name()) >= 2);
                 CHECK((permissions(path) & 0666));
 #else
-                CHECK(updates_mediator->is_masked(path_str) == 1);
+                CHECK(updates_mediator->is_masked(path.get_full_name()) == 1);
 #endif
             }
             SECTION("directory") {
