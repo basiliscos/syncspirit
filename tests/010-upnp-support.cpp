@@ -7,7 +7,6 @@
 #include <memory_resource>
 
 namespace sys = boost::system;
-namespace bfs = std::filesystem;
 
 using namespace syncspirit::proto;
 using namespace syncspirit::test;

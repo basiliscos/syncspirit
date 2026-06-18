@@ -12,7 +12,6 @@ using namespace syncspirit::utils;
 using namespace syncspirit::model;
 using namespace syncspirit::proto;
 
-namespace bfs = std::filesystem;
 using l32 = luhn32;
 
 TEST_CASE("luhn32", "[model]") {

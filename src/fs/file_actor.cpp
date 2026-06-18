@@ -385,7 +385,6 @@ void file_actor_t::process(payload::append_block_t &cmd,
         return;
     }
     auto &backend = file_opt.assume_value();
-    auto& z = file_opt.value();
     cmd.result = backend->write(context, cmd.offset, cmd.data);
 }
 

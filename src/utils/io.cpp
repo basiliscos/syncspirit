@@ -17,30 +17,29 @@ namespace sys = boost::system;
 using namespace syncspirit::utils;
 
 // TODO: remove
-#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
-#define SS_OPEN(PATH, MODE) _wsopen(PATH.native().data(), MODE, _SH_DENYNO, _S_IREAD | _S_IWRITE)
-#define SS_STAT_BUFF struct __stat64
-#define SS_STAT_FN(PATH, BUFF) _wstat64((PATH).native().data(), (BUFF))
-#define SS_FSTAT_FN(FD, BUFF) _fstat64(FD, (BUFF))
-#define SS_FILE_NO(FILE) _fileno(FILE)
-#define SS_RESIZE(FILE, SIZE) _chsize_s(FILE, SIZE)
-#else
-#define SS_OPEN(PATH, MODE) open(PATH.native().data(), MODE, 0666);
-#define SS_STAT_FN(PATH, BUFF) stat((PATH).native().data(), (BUFF))
-#define SS_FSTAT_FN(FD, BUFF) fstat(FD, (BUFF))
-#define SS_STAT_BUFF struct stat
-#define SS_RESIZE(FILE, SIZE) ftruncate(FILE, SIZE)
-#endif
+// #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+// #define SS_OPEN(PATH, MODE) _wsopen(PATH.native().data(), MODE, _SH_DENYNO, _S_IREAD | _S_IWRITE)
+// #define SS_STAT_FN(PATH, BUFF) _wstat64((PATH).native().data(), (BUFF))
+// #define SS_FILE_NO(FILE) _fileno(FILE)
+// #else
+// #define SS_OPEN(PATH, MODE) open(PATH.native().data(), MODE, 0666);
+// #define SS_STAT_FN(PATH, BUFF) stat((PATH).native().data(), (BUFF))
+// #endif
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+#define SS_STAT_BUFF struct __stat64
 #define SS_VIEW_MAKE(PATH) PATH.get_full_wname(true)
 #define SS_VIEW_OPEN(VIEW, MODE) _wsopen(VIEW.data(), MODE, _SH_DENYNO, _S_IREAD | _S_IWRITE)
 #define SS_VIEW_STAT_FN(VIEW, BUFF) _wstat64(VIEW.data(), (BUFF))
+#define SS_VIEW_RESIZE(FILE, SIZE) _chsize_s(FILE, SIZE)
+#define SS_STAT_FN(FD, BUFF) _fstat64(FD, (BUFF))
 #else
+#define SS_STAT_BUFF struct stat
 #define SS_VIEW_MAKE(PATH) PATH.get_full_name()
 #define SS_VIEW_OPEN(VIEW, MODE) open(VIEW.data(), MODE, 0666)
 #define SS_VIEW_STAT_FN(VIEW, BUFF) stat(VIEW.data(), (BUFF))
 #define SS_VIEW_RESIZE(FILE, SIZE) ftruncate(FILE, SIZE)
+#define SS_STAT_FN(FD, BUFF) fstat(FD, (BUFF))
 #endif
 
 io_stream_t::io_stream_t(int fd_) noexcept : fd{fd_} {}
@@ -53,20 +52,6 @@ io_stream_t::~io_stream_t() {
     }
 }
 
-// TODO: remove
-auto io_stream_t::open_truncate(const bfs::path &path) noexcept -> outcome::result<io_stream_t> {
-#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
-    static constexpr auto open_mode = _O_RDWR | _O_CREAT | _O_TRUNC | _O_BINARY;
-#else
-    static constexpr auto open_mode = O_RDWR | O_CREAT | O_TRUNC;
-#endif
-    auto f = SS_OPEN(path, open_mode);
-    if (f >= 0) {
-        return io_stream_t(f);
-    }
-    return sys::error_code{errno, sys::system_category()};
-}
-
 auto io_stream_t::open_truncate(const utils::poly_path_view_t &path) noexcept -> outcome::result<io_stream_t> {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
     static constexpr auto open_mode = _O_RDWR | _O_CREAT | _O_TRUNC | _O_BINARY;
@@ -75,20 +60,6 @@ auto io_stream_t::open_truncate(const utils::poly_path_view_t &path) noexcept ->
 #endif
     auto native_view = SS_VIEW_MAKE(path);
     auto f = SS_VIEW_OPEN(native_view, open_mode);
-    if (f >= 0) {
-        return io_stream_t(f);
-    }
-    return sys::error_code{errno, sys::system_category()};
-}
-
-// TODO: remove
-auto io_stream_t::open_read(const bfs::path &path) noexcept -> outcome::result<io_stream_t> {
-#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
-    static constexpr auto open_mode = _O_RDONLY | _O_BINARY;
-#else
-    static constexpr auto open_mode = O_RDONLY;
-#endif
-    auto f = SS_OPEN(path, open_mode);
     if (f >= 0) {
         return io_stream_t(f);
     }
@@ -124,7 +95,7 @@ auto io_stream_t::open_write(const utils::poly_path_view_t &path, std::size_t fi
         }
         auto &f = opt.assume_value();
         if (file_size) {
-            if (SS_RESIZE(f.fd, file_size) != 0) {
+            if (SS_VIEW_RESIZE(f.fd, file_size) != 0) {
                 return sys::error_code{errno, sys::system_category()};
             }
             if (lseek(f.fd, 0, SEEK_SET) != 0) {
@@ -140,44 +111,6 @@ auto io_stream_t::open_write(const utils::poly_path_view_t &path, std::size_t fi
         static constexpr auto open_mode = O_RDWR;
 #endif
         auto fd = SS_VIEW_OPEN(native_view, open_mode);
-        if (fd >= 0) {
-            return {io_stream_t(fd), false, false};
-        }
-        return sys::error_code{errno, sys::system_category()};
-    }
-}
-
-// TODO: remove
-auto io_stream_t::open_write(const bfs::path &path, std::size_t file_size) noexcept -> opne_write_t {
-    bool need_resize = true;
-    SS_STAT_BUFF stat_info;
-    auto r = SS_STAT_FN(path, &stat_info);
-    if (r == 0) {
-        need_resize = static_cast<uint64_t>(stat_info.st_size) != file_size;
-    }
-    if (need_resize) {
-        auto opt = open_truncate(path);
-        if (!opt) {
-            return opt.assume_error();
-        }
-        auto &f = opt.assume_value();
-        if (file_size) {
-            if (SS_RESIZE(f.fd, file_size) != 0) {
-                return sys::error_code{errno, sys::system_category()};
-            }
-            if (lseek(f.fd, 0, SEEK_SET) != 0) {
-                return sys::error_code{errno, sys::system_category()};
-            }
-            return {std::move(f), true, true};
-        }
-        return {std::move(f), false, true};
-    } else {
-#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
-        static constexpr auto open_mode = _O_RDWR | _O_BINARY;
-#else
-        static constexpr auto open_mode = O_RDWR;
-#endif
-        auto fd = SS_OPEN(path, open_mode);
         if (fd >= 0) {
             return {io_stream_t(fd), false, false};
         }
@@ -218,7 +151,7 @@ auto io_stream_t::set_position(offset_t value) noexcept -> outcome::result<void>
 
 auto io_stream_t::read_whole() noexcept -> outcome::result<bytes_t> {
     SS_STAT_BUFF stat_info;
-    auto r = SS_FSTAT_FN(fd, &stat_info);
+    auto r = SS_STAT_FN(fd, &stat_info);
     if (r != 0) {
         return sys::error_code{errno, sys::system_category()};
     }

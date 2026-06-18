@@ -144,15 +144,6 @@ void supervisor_t::on_io(fs::message::io_commands_t &message) noexcept {
     }
 }
 
-auto supervisor_t::consume_errors() noexcept -> io_errors_t { return std::move(io_errors); }
-
-auto supervisor_t::operator()(const model::diff::local::io_failure_t &diff, void *custom) noexcept
-    -> outcome::result<void> {
-    auto &errs = diff.errors;
-    std::copy(errs.begin(), errs.end(), std::back_inserter(io_errors));
-    return diff.visit_next(*this, custom);
-}
-
 auto supervisor_t::operator()(const model::diff::modify::upsert_folder_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     if (make_presentation) {

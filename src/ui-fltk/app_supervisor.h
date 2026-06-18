@@ -183,7 +183,6 @@ struct app_supervisor_t : app_supervisor_base_t<app_supervisor_t> {
     outcome::result<void> apply(const model::diff::load::blocks_t &, void *) noexcept override;
     outcome::result<void> apply(const model::diff::load::file_infos_t &, void *) noexcept override;
     outcome::result<void> apply(const model::diff::load::load_cluster_t &, void *) noexcept override;
-    outcome::result<void> apply(const model::diff::local::io_failure_t &, void *) noexcept override;
     outcome::result<void> apply(const model::diff::modify::add_pending_folders_t &, void *) noexcept override;
     outcome::result<void> apply(const model::diff::modify::add_pending_device_t &, void *) noexcept override;
     outcome::result<void> apply(const model::diff::modify::add_ignored_device_t &, void *) noexcept override;

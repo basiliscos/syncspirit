@@ -11,7 +11,6 @@
 #include <utils/path_view.hpp>
 
 namespace st = syncspirit::test;
-namespace bfs = std::filesystem;
 
 using namespace syncspirit;
 

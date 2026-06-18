@@ -24,27 +24,9 @@ using namespace syncspirit;
 using namespace syncspirit::test;
 using namespace syncspirit::model;
 using namespace syncspirit::fs;
-namespace bfs = std::filesystem;
 using boost::nowide::narrow;
 
 struct fixture_t;
-
-namespace native {
-
-void rename(const bfs::path &from, const bfs::path &to) {
-#ifndef SYNCSPIRIT_WIN
-    bfs::rename(from, to);
-#else
-    auto from_native = from.native().data();
-    auto to_native = to.native().data();
-    if (!MoveFileExW(from_native, to_native, MOVEFILE_WRITE_THROUGH)) {
-        auto ec = sys::error_code(::GetLastError(), sys::system_category());
-        REQUIRE(ec.message() == "");
-    }
-#endif
-}
-
-} // namespace native
 
 static const auto RETENSION_TIMEOUT = r::pt::millisec{1};
 static const auto TIMEOUT = r::pt::millisec{10};

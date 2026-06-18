@@ -8,7 +8,6 @@
 #include "bouncer/messages.hpp"
 #include "model/diff/apply_controller.h"
 #include "model/diff/cluster_visitor.h"
-#include "model/diff/local/io_failure.h"
 #include "model/misc/sequencer.h"
 #include "fs/messages.h"
 #include "utils/log.h"
@@ -68,7 +67,6 @@ struct SYNCSPIRIT_TEST_API supervisor_t : r::supervisor_t,
 
     using timers_t = std::list<r::timer_handler_base_t *>;
     using parent_t = r::supervisor_t;
-    using io_errors_t = model::diff::local::io_errors_t;
     using model_subscribers_t = std::vector<model::payload::model_subscription_t>;
 
     supervisor_t(config_t &cfg);
@@ -87,7 +85,6 @@ struct SYNCSPIRIT_TEST_API supervisor_t : r::supervisor_t,
     void do_invoke_timer(r::request_id_t timer_id) noexcept;
     void do_cancel_timer(r::request_id_t timer_id) noexcept override;
     virtual void on_io(fs::message::io_commands_t &) noexcept;
-    io_errors_t consume_errors() noexcept;
 
     virtual void process_io(fs::payload::block_request_t &) noexcept;
     virtual void process_io(fs::payload::remote_copy_t &) noexcept;
@@ -96,7 +93,6 @@ struct SYNCSPIRIT_TEST_API supervisor_t : r::supervisor_t,
     virtual void process_io(fs::payload::clone_block_t &) noexcept;
     virtual void process_io(fs::payload::update_meta_t &) noexcept;
 
-    outcome::result<void> operator()(const model::diff::local::io_failure_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::upsert_folder_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::upsert_folder_info_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::advance::advance_t &, void *) noexcept override;
@@ -115,7 +111,6 @@ struct SYNCSPIRIT_TEST_API supervisor_t : r::supervisor_t,
     bool auto_finish;
     bool auto_ack_io;
     bool make_presentation;
-    io_errors_t io_errors;
 };
 
 }; // namespace syncspirit::test

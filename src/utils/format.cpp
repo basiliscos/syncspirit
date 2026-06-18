@@ -16,7 +16,6 @@ using ec_t = std::error_code;
 using sys_ec_t = boost::system::error_code;
 using ee_ptr_t = rotor::extended_error_ptr_t;
 using ctx_t = fmt::v11::context;
-using path_t = std::filesystem::path;
 using address_t = boost::asio::ip::address;
 using tcp_endpoint_t = boost::asio::ip::tcp::endpoint;
 using udp_endpoint_t = boost::asio::ip::udp::endpoint;
@@ -65,12 +64,6 @@ auto format_ec(const ErrorCode &ec, FormatContext &ctx) noexcept -> decltype(ctx
     }
 #endif
     return fmt::format_to(ctx.out(), "{}", ec.message());
-}
-
-// TODO: remove
-template <typename FormatContext>
-auto fmt::formatter<path_t>::format(const path_t &path, FormatContext &ctx) const -> decltype(ctx.out()) {
-    return fmt::format_to(ctx.out(), "{}", path.string());
 }
 
 template <typename FormatContext>
@@ -171,9 +164,6 @@ auto fmt::formatter<bytes_t>::format(const bytes_t &bytes, FormatContext &ctx) c
     auto view = syncspirit::utils::bytes_view_t(bytes);
     return fmt::format_to(ctx.out(), "{}", view);
 }
-
-template SYNCSPIRIT_API auto fmt::formatter<std::filesystem::path>::format<ctx_t>(const Path &, ctx_t &ctx) const
-    -> decltype(ctx.out());
 
 template SYNCSPIRIT_API auto fmt::formatter<utils::path_base_t>::format<ctx_t>(const utils::path_base_t &,
                                                                                ctx_t &ctx) const -> decltype(ctx.out());

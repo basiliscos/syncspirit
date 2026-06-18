@@ -35,7 +35,6 @@
 
 using namespace syncspirit;
 using namespace syncspirit::net;
-namespace bfs = std::filesystem;
 
 using C = controller_actor_t;
 

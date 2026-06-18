@@ -28,7 +28,7 @@ int main(int argc, char *argv[]) { return Catch::Session().run(argc, argv); }
 namespace syncspirit::test {
 
 path_guard_t::path_guard_t() {}
-path_guard_t::path_guard_t(std::wstring path_) : path_t(utils::path_t::make_native(path_)) {
+path_guard_t::path_guard_t(utils::path_t path) : utils::path_t(std::move(path)) {
     auto buffer = std::array<std::byte, 1024 * 32>();
     auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
     auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
@@ -46,22 +46,17 @@ path_guard_t::~path_guard_t() {
     auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
     auto view = get_view(allocator);
     if (!view.empty()) {
-        auto wname = view.get_full_wname(true);
         if (!getenv("SYNCSPIRIT_TEST_KEEP_PATH")) {
             sys::error_code ec;
+            utils::remove_all(view, ec);
 
-            auto path = std::filesystem::path(wname);
-            if (std::filesystem::exists(path, ec)) {
-                std::filesystem::permissions(path, std::filesystem::perms::owner_all, ec);
+            if (exists(view, ec)) {
+                utils::chmod(view, 0777, ec);
                 if (ec) {
-                    printf("error setting permissions : %s: %s\n", path.string().c_str(), ec.message().c_str());
+                    printf("error setting permissions : %s: %s\n", get_full_name().data(), ec.message().c_str());
+                } else {
+                    utils::remove_all(view, ec);
                 }
-            }
-
-            ec = {};
-            std::filesystem::remove_all(path, ec);
-            if (ec) {
-                printf("error removing %s : %s\n", path.string().c_str(), ec.message().c_str());
             }
         }
     }
@@ -188,8 +183,8 @@ path_guard_t unique_path() {
     auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
     auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
     auto name = fmt::format("tmp-{}", random_name);
-    auto path = std::filesystem::current_path() / name;
-    return path_guard_t(path.wstring());
+    auto path = cwd(allocator) / name;
+    return path_guard_t(path.detach());
 }
 
 utils::bytes_view_t as_bytes(std::string_view str) {
@@ -247,6 +242,15 @@ void chmod(const utils::poly_path_view_t &path, std::uint32_t mode) {
         spdlog::error("chmod '{}': {}", path, ec);
         throw std::runtime_error(ec.message());
     }
+}
+
+bool is_empty(const utils::poly_path_view_t &path) {
+    auto ec = sys::error_code{};
+    auto r = utils::is_empty(path, ec);
+    if (ec) {
+        spdlog::trace("is_empty '{}': {}", path, ec);
+    }
+    return r;
 }
 
 std::size_t create_directories(const utils::poly_path_view_t &path) {

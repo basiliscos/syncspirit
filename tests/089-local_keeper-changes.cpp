@@ -42,7 +42,6 @@ using I = syncspirit_watcher_impl_t;
 using FT = proto::FileInfoType;
 
 static constexpr auto default_perms = std::uint32_t{0123};
-static constexpr auto default_perms_fs = static_cast<bfs::perms>(default_perms);
 
 #ifndef SYNCSPIRIT_WIN
 static constexpr auto expected_perms = std::uint32_t{0123};

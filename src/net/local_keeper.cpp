@@ -3,7 +3,6 @@
 
 #include "local_keeper.h"
 #include "constants.h"
-#include "fs/utils.h"
 #include "local_keeper/folder_context.h"
 #include "local_keeper/folder_slave.h"
 #include "local_keeper/hash_context.h"
@@ -23,6 +22,7 @@
 #include "utils/utf8.h"
 #include "utils/format.hpp"
 #include "utils/path_view.hpp"
+#include "utils/path_utils.h"
 
 #include <spdlog/fmt/bin_to_hex.h>
 #include <iterator>
@@ -31,7 +31,6 @@ using namespace syncspirit;
 using namespace syncspirit::net;
 using namespace syncspirit::net::local_keeper;
 
-namespace bfs = std::filesystem;
 namespace sys = boost::system;
 
 using boost::nowide::narrow;
@@ -553,7 +552,7 @@ void local_keeper_t::on_changes(model::folder_info_t &local_folder, fs::payload:
             LOG_WARN(log, "invalid filename: '{}' in folder '{}' ", name_hex, folder_id);
             return false;
         }
-        if (fs::is_temporal(name)) {
+        if (utils::is_temporal(name)) {
             LOG_WARN(log, "temporal file '{}' ignored in folder '{}' ", name, folder_id);
             return false;
         }

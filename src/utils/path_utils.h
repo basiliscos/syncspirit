@@ -18,6 +18,7 @@ struct stats_t {
     bool supported{false};
 };
 
+SYNCSPIRIT_API bool is_temporal(std::string_view path) noexcept;
 SYNCSPIRIT_API bool exists(const poly_path_view_t &path, std::error_code &ec) noexcept;
 SYNCSPIRIT_API std::int64_t last_write_time(const poly_path_view_t &path, std::error_code &ec) noexcept;
 SYNCSPIRIT_API void last_write_time(const poly_path_view_t &path, std::int64_t, std::error_code &ec) noexcept;

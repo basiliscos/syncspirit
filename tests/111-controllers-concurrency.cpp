@@ -12,7 +12,6 @@
 #include "access.h"
 #include "model/cluster.h"
 #include "access.h"
-#include <filesystem>
 
 using namespace syncspirit;
 using namespace syncspirit::db;
@@ -20,8 +19,6 @@ using namespace syncspirit::test;
 using namespace syncspirit::model;
 using namespace syncspirit::net;
 using namespace syncspirit::fs;
-
-namespace bfs = std::filesystem;
 
 namespace {
 

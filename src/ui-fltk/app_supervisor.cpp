@@ -17,7 +17,6 @@
 #include "config/utils.h"
 #include "model/diff/diff_assembler.h"
 #include "model/diff/advance/advance.h"
-#include "model/diff/local/io_failure.h"
 #include "model/diff/load/blocks.h"
 #include "model/diff/load/file_infos.h"
 #include "model/diff/load/load_cluster.h"
@@ -347,17 +346,6 @@ callback_ptr_t app_supervisor_t::call_share_folders(std::string_view folder_id, 
     auto cb = callback_ptr_t(new callback_impl_t(std::move(fn)));
     callbacks.push_back(cb);
     return cb;
-}
-
-auto app_supervisor_t::apply(const model::diff::local::io_failure_t &diff, void *custom) noexcept
-    -> outcome::result<void> {
-    auto r = parent_t::apply(diff, custom);
-    if (r) {
-        for (auto &details : diff.errors) {
-            log->warn("I/O error on '{}': {}", details.path.string(), details.ec);
-        }
-    }
-    return r;
 }
 
 auto app_supervisor_t::apply(const model::diff::modify::update_peer_t &diff, void *custom) noexcept

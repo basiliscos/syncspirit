@@ -23,9 +23,17 @@
 #include <dirent.h>
 #endif
 
-#include <spdlog/spdlog.h>
+#include "fs/utils.h"
 
 namespace syncspirit::utils {
+
+bool is_temporal(std::string_view path) noexcept {
+    if (path.size() > fs::tmp_suffix.size()) {
+        auto tail = path.substr(path.size() - fs::tmp_suffix.size());
+        return tail == fs::tmp_suffix;
+    }
+    return false;
+}
 
 bool exists(const poly_path_view_t &path, std::error_code &ec) noexcept {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)

@@ -6,14 +6,11 @@
 #include "utils/tls.h"
 #include "utils/path_view.hpp"
 #include <openssl/pem.h>
-#include <filesystem>
 #include <cstdio>
 
 using namespace syncspirit::utils;
 using namespace syncspirit;
 using namespace syncspirit::test;
-
-namespace bfs = std::filesystem;
 
 TEST_CASE("generate cert/key pair, save & load", "[support][tls]") {
     auto pair = generate_pair("sample");

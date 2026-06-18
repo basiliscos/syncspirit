@@ -3,7 +3,6 @@
 
 #include "test-utils.h"
 #include "fs/updates_mediator.h"
-#include <filesystem>
 
 using namespace syncspirit;
 using namespace syncspirit::utils;

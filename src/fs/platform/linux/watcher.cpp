@@ -5,7 +5,8 @@
 
 #if SYNCSPIRIT_WATCHER_INOTIFY
 #include "fs/fs_supervisor.h"
-#include "fs/utils.h"
+#include "utils/path.h"
+#include "utils/path_utils.h"
 #include "utils/utf8.h"
 
 #include <sys/inotify.h>
@@ -17,6 +18,7 @@
 #include <algorithm>
 #include <memory_resource>
 
+using namespace syncspirit;
 using namespace syncspirit::fs::platform::linux;
 
 void watcher_t::do_initialize(r::system_context_t *ctx) noexcept {
@@ -144,7 +146,7 @@ void watcher_t::inotify_callback() noexcept {
             auto event_name = std::string_view(name_begin, name_end);
             LOG_TRACE(log, "event 0x{:x}, cookie: 0x{:x}, on '{}'", event->mask, event->cookie, event_name);
             if (event->len) {
-                if (!fs::is_temporal(event_name)) {
+                if (!utils::is_temporal(event_name)) {
                     auto type = update_type_internal_t{0};
                     if (event->mask & IN_CREATE) {
                         type = update_type::CREATED;

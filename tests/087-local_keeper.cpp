@@ -2177,20 +2177,18 @@ void test_importing() {
                     proto::set_id(counter, 1);
                     proto::set_value(counter, 1);
 
-                    auto dir_path = bfs::path(L"папка");
+                    auto dir_path = utils::make_native_view(L"папка", allocator);
                     auto file_path = dir_path / L"файл.bin";
-                    auto narrow_dir = narrow(dir_path.generic_wstring());
-                    auto narrow_file = narrow(file_path.generic_wstring());
 
                     auto pr_dir = proto::FileInfo();
-                    proto::set_name(pr_dir, narrow_dir);
+                    proto::set_name(pr_dir, dir_path.get_full_name());
                     proto::set_sequence(pr_dir, 4);
                     proto::set_type(pr_dir, proto::FileInfoType::DIRECTORY);
                     proto::set_deleted(pr_dir, true);
                     proto::set_version(pr_dir, v);
 
                     auto pr_file = proto::FileInfo();
-                    proto::set_name(pr_file, narrow_file);
+                    proto::set_name(pr_file, file_path.get_full_name());
                     proto::set_sequence(pr_file, 5);
                     proto::set_type(pr_file, proto::FileInfoType::FILE);
                     proto::set_deleted(pr_file, true);
@@ -2207,14 +2205,12 @@ void test_importing() {
                     auto &files_my = folder_info->get_file_infos();
                     REQUIRE(files_my.size() == 2);
 
-                    auto file_1 = files_my.by_name(narrow_dir);
+                    auto file_1 = files_my.by_name(dir_path.get_full_name());
                     REQUIRE(file_1->get_version().as_proto() == v);
-                    auto file_2 = files_my.by_name(narrow_file);
+                    auto file_2 = files_my.by_name(file_path.get_full_name());
                     REQUIRE(file_2->get_version().as_proto() == v);
 
-                    auto it = bfs::directory_iterator(bfs::path(root_path.get_full_wname(true)));
-                    auto children_count = std::distance(it, bfs::directory_iterator());
-                    CHECK(children_count == 0);
+                    CHECK(is_empty(root_path));
                 }
             }
         }

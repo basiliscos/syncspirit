@@ -17,7 +17,6 @@
 #include "db/utils.h"
 #include "net/db_actor.h"
 #include "net/names.h"
-#include <filesystem>
 #include <thread>
 
 using namespace syncspirit;
@@ -25,8 +24,6 @@ using namespace syncspirit::db;
 using namespace syncspirit::test;
 using namespace syncspirit::model;
 using namespace syncspirit::net;
-
-namespace fs = std::filesystem;
 
 namespace {
 struct env {};

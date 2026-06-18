@@ -53,7 +53,7 @@ using apply_controller_ptr_t = model::intrusive_ptr_t<test_apply_controller_t>;
 struct SYNCSPIRIT_TEST_API path_guard_t: utils::path_t {
     using utils::path_t::path_t;
     path_guard_t();
-    path_guard_t(std::wstring path);
+    path_guard_t(utils::path_t);
     path_guard_t(path_guard_t &) = delete;
     path_guard_t(path_guard_t &&) = default;
     ~path_guard_t();
@@ -74,6 +74,7 @@ SYNCSPIRIT_TEST_API bool has_ipv6() noexcept;
 SYNCSPIRIT_TEST_API utils::bytes_t make_key(model::block_info_ptr_t block);
 SYNCSPIRIT_TEST_API bool wine_environment();
 
+SYNCSPIRIT_TEST_API bool is_empty(const utils::poly_path_view_t &path);
 SYNCSPIRIT_TEST_API std::size_t create_directories(const utils::poly_path_view_t &path);
 SYNCSPIRIT_TEST_API bool exists(const utils::poly_path_view_t &path);
 SYNCSPIRIT_TEST_API void chmod(const utils::poly_path_view_t &path, std::uint32_t);

@@ -5,7 +5,6 @@
 #include "net/names.h"
 #include "utils/format.hpp"
 #include "model/diff/advance/remote_copy.h"
-#include "model/diff/local/io_failure.h"
 #include "model/diff/modify/block_ack.h"
 #include "model/diff/peer/cluster_update.h"
 #include "model/diff/peer/update_folder.h"
@@ -128,15 +127,6 @@ void governor_actor_t::refresh_deadline() noexcept {
 auto governor_actor_t::operator()(const model::diff::advance::remote_copy_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     refresh_deadline();
-    return diff.visit_next(*this, custom);
-}
-
-auto governor_actor_t::operator()(const model::diff::local::io_failure_t &diff, void *custom) noexcept
-    -> outcome::result<void> {
-    LOG_TRACE(log, "on_io_error, count = {}", diff.errors.size());
-    for (auto &err : diff.errors) {
-        LOG_WARN(log, "on_io_error (ignored) path: {}, problem: {}", err.path, err.ec);
-    }
     return diff.visit_next(*this, custom);
 }
 

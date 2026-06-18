@@ -14,15 +14,10 @@
 #include "fs/watcher_actor.h"
 #include "fs/fs_context.h"
 #include "net/names.h"
-#include <filesystem>
-#include <boost/nowide/convert.hpp>
 
 using namespace syncspirit;
 using namespace syncspirit::fs;
 using namespace syncspirit::test;
-using boost::nowide::narrow;
-
-namespace bfs = std::filesystem;
 
 namespace {
 

@@ -13,8 +13,6 @@
 using namespace syncspirit;
 using namespace syncspirit::presentation;
 
-namespace bfs = std::filesystem;
-
 using file_entity_ptr_t = model::intrusive_ptr_t<file_entity_t>;
 using file_entities_t = std::unordered_map<utils::path_t *, file_entity_ptr_t>;
 
