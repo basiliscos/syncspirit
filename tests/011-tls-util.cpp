@@ -75,3 +75,10 @@ TEST_CASE("sha256 for certificate", "[support][tls]") {
     auto enc = base32::encode(sha);
     REQUIRE(enc == "WG2IWWALPC2HZF22COFUVKRJRD6GEF4VZFNCQ2HCJWJ3GJ7IQWGA");
 }
+
+int _init() {
+    test::init_logging();
+    return 1;
+}
+
+static int v = _init();

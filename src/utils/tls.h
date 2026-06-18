@@ -11,6 +11,7 @@
 #include "syncspirit-export.h"
 #include "bytes.h"
 #include "utils/path.h"
+#include <spdlog/logger.h>
 
 namespace syncspirit {
 namespace utils {
@@ -66,6 +67,8 @@ SYNCSPIRIT_API outcome::result<bytes_t> as_serialized_pem(X509 *cert) noexcept;
 SYNCSPIRIT_API outcome::result<std::string> get_common_name(X509 *cert) noexcept;
 
 SYNCSPIRIT_API void digest(const unsigned char *src, size_t length, unsigned char *storage) noexcept;
+
+SYNCSPIRIT_API bool set_store(spdlog::logger* log, SSL_CTX *ctx, std::string_view caStore) noexcept;
 
 } // namespace utils
 } // namespace syncspirit

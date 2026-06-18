@@ -68,12 +68,21 @@ path_guard_t::~path_guard_t() {
 }
 
 static utils::poly_path_view_t cwd(const utils::allocator_t& allocator) {
+#ifdef SYNCSPIRIT_WIN
+    wchar_t buff[MAX_PATH];
+    if (!::GetCurrentDirectoryW(sizeof(buff), buff)) {
+        auto ec = std::error_code(::GetLastError(), std::system_category());
+        throw std::runtime_error(fmt::format("getcwd: {}", ec.message()));
+    }
+    return utils::make_native_view(buff, allocator);
+#else
     char buff[PATH_MAX];
     if (!getcwd(buff, sizeof(buff))) {
         auto ec = std::error_code(errno, std::system_category());
         throw std::runtime_error(fmt::format("getcwd: {}", ec.message()));
     }
     return utils::make_native_view(buff, allocator);
+#endif
 }
 
 utils::poly_path_view_t locate_path(const char *test_file, const utils::allocator_t& allocator) {

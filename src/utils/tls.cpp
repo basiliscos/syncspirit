@@ -4,6 +4,9 @@
 #include "tls.h"
 #include "error_code.h"
 #include "io.h"
+#include "path_view.hpp"
+#include "log.h"
+#include "format.hpp"
 #include <random>
 #include <boost/system/error_code.hpp>
 #include <openssl/pem.h>
@@ -12,6 +15,9 @@
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
 #include <openssl/bio.h>
+#include <openssl/x509_vfy.h>
+#include <openssl/ssl.h>
+#include <memory_resource>
 
 #ifdef OSSL_DEPRECATEDIN_3_0
 #include <openssl/encoder.h>
@@ -342,5 +348,74 @@ outcome::result<std::string> get_common_name(X509 *cert) noexcept {
 }
 
 void digest(const unsigned char *src, size_t length, unsigned char *storage) noexcept { SHA256(src, length, storage); }
+
+bool set_store(spdlog::logger* log, SSL_CTX *ctx, std::string_view caStore) noexcept {
+    auto store = X509_STORE_new();
+    auto store_guard = make_guard(store, [](auto *ptr) { X509_STORE_free(ptr); });
+    char buff[256];
+
+    auto get_error = [&]() -> std::string_view {
+        auto err = ERR_get_error();
+        if (err) {
+            if (auto str = ERR_error_string(err, buff); str)  {
+                return str;
+            }
+        };
+        fmt::format_to(buff, "ssl error: {}", err);
+        return buff;
+    };
+
+    if (!caStore.empty()) {
+        bool attempt_load = true;
+
+        if (X509_STORE_load_store(store, caStore.data()) != 1) {
+            LOG_DEBUG(log, "cannot X509_STORE_load_store: {}", get_error());
+        } else {
+            LOG_DEBUG(log, "using ssl verify store: {}", caStore);
+            attempt_load = false;
+        }
+
+        if (attempt_load) {
+            auto buffer = std::array<std::byte, 1024 * 32>();
+            auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+            auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+            auto path = make_native_view(caStore, allocator);
+            auto result = read_to_mem_bio(path);
+            if (!result) {
+                LOG_WARN(log, "failed to load certificate via '{}: {}', ", path, result.assume_error());
+            } else {
+                LOG_TRACE(log, "loaded certificate via '{}'", path);
+                auto& bio = result.assume_value();
+                auto cert = X509_new();
+                auto cert_guard = make_guard(cert, [](auto *ptr) { X509_free(ptr); });
+                if (!PEM_read_bio_X509(bio.get(), &cert, nullptr, nullptr)) {
+                    LOG_WARN(log, "failed to parse PEM via '{}: {}', ", path, result.assume_error());
+                } else {
+                    if (X509_STORE_add_cert(store, cert) != 1) {
+                        LOG_WARN(log, "failed to parse PEM via '{}: {}', ", path, result.assume_error());
+                    }
+                }
+            }
+        }
+    }
+
+    if (store_guard) {
+        if (SSL_CTX_set0_verify_cert_store(ctx, store) != 1) {
+            LOG_WARN(log, "cannot SSL_CTX_set0_verify_cert_store: {}", get_error());
+        } else {
+            store_guard.release();
+        }
+    }
+
+    if (!store_guard) {
+        if (X509_STORE_set_default_paths(store) != 1) {
+            LOG_WARN(log, "cannot X509_STORE_set_default_paths: {}", get_error());
+        } else {
+            LOG_DEBUG(log, "ssl, using ssl default verify paths");
+            store_guard.release();
+        }
+    }
+    return (bool) store_guard;
+}
 
 } // namespace syncspirit::utils

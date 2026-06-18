@@ -723,9 +723,8 @@ void test_https_200_ok() {
             server_keys = utils::generate_pair("test_server").value();
 
             auto dir_view = path_guard.get_view(allocator);
-            LOG_WARN(log, "why utf8 names does not work on windows?");
-            auto cert_path = dir_view / L"cert.pem";
-            auto key_path = dir_view / L"key.pem";
+            auto cert_path = dir_view / L"серт.pem";
+            auto key_path = dir_view / L"ключ.pem";
             REQUIRE(server_keys.save(cert_path, key_path));
 
             ssl_verify_store = cert_path.get_full_name();

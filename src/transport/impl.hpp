@@ -7,6 +7,7 @@
 #include "utils/platform.h"
 #include "utils/log.h"
 #include "utils/format.hpp"
+#include "utils/tls.h"
 #include "stream.h"
 #include <boost/asio/ssl.hpp>
 
@@ -116,29 +117,7 @@ template <> struct base_impl_t<ssl_socket_t> {
         }
 
         auto log = utils::get_logger("transport.tls");
-        bool use_sytem_verify_paths = true;
-        if (source.ssl_verify_store.size()) {
-            auto r = SSL_CTX_load_verify_store(ctx.native_handle(), source.ssl_verify_store.data());
-            auto ec = sys::error_code();
-            if (!r) {
-                auto code = ::ERR_get_error();
-                ec = sys::error_code(static_cast<int>(code), asio::error::get_ssl_category());
-            }
-            if (ec) {
-                log->warn("cannot load_verify_store '{}': {}", source.ssl_verify_store, ec);
-            } else {
-                log->trace("using ssl verify store: {}", source.ssl_verify_store);
-                use_sytem_verify_paths = false;
-            }
-        }
-        if (use_sytem_verify_paths) {
-            log->trace("using default verify paths");
-            auto ec = sys::error_code();
-            ctx.set_default_verify_paths(ec);
-            if (ec) {
-                log->warn("cannot set ssl default verify paths: {}", ec);
-            }
-        }
+        utils::set_store(log.get(), ctx.native_handle(), source.ssl_verify_store);
 
         if (opt && opt->alpn.size()) {
             auto alpn = opt->alpn;
