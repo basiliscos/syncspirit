@@ -604,12 +604,9 @@ void test_clone_block() {
     F().run();
 }
 
-#if 0
-
-
 void test_update_meta() {
     struct F : fixture_t {
-        void main() noexcept override {
+        void main(const utils::poly_path_view_t& root_path) noexcept override {
             std::int64_t modified = 1641828421;
             auto perms = std::uint32_t(0444);
 #ifndef SYNCSPIRIT_WIN
@@ -618,24 +615,24 @@ void test_update_meta() {
             auto no_perms = true;
 #endif
             auto path = root_path / L"файл.bin";
-            auto path_str = narrow(path.generic_wstring());
+            auto path_str = path.get_full_name();
 
             SECTION("file") {
                 write_file(path, "12345");
                 update_meta(path, modified, perms, no_perms).check_success();
-                CHECK(to_unix(bfs::last_write_time(path)) == modified);
+                CHECK(last_write_time(path) == modified);
 #ifndef SYNCSPIRIT_WIN
-                CHECK(bfs::status(path).permissions() == static_cast<bfs::perms>(perms));
+                CHECK(permissions(path) == perms);
 #endif
             }
             SECTION("file does not exists") { update_meta(path, modified, perms, no_perms).check_fail(); }
 
 #ifndef SYNCSPIRIT_WIN
             SECTION("dir") {
-                bfs::create_directories(path);
+                create_directories(path);
                 update_meta(path, modified, perms, no_perms).check_success();
-                CHECK(to_unix(bfs::last_write_time(path)) == modified);
-                CHECK(bfs::status(path).permissions() == static_cast<bfs::perms>(perms));
+                CHECK(last_write_time(path) == modified);
+                CHECK(permissions(path) == perms);
             }
 #endif
         }
@@ -645,8 +642,8 @@ void test_update_meta() {
 
 void test_requesting_block() {
     struct F : fixture_t {
-        void main() noexcept override {
-            bfs::path target = root_path / "a.txt";
+        void main(const utils::poly_path_view_t& root_path) noexcept override {
+            auto target = root_path / "a.txt";
 
             std::int64_t modified = 1641828421;
 
@@ -655,7 +652,7 @@ void test_requesting_block() {
 
             auto context = fs::payload::extendended_context_prt_t{};
 
-            auto payload = fs::payload::block_request_t(std::move(context), target, 0, 5);
+            auto payload = fs::payload::block_request_t(std::move(context), target.detach(), 0, 5);
             auto cmd = fs::payload::io_command_t(std::move(payload));
             auto cmds = fs::payload::io_commands_t{nullptr};
             cmds.commands.emplace_back(std::move(cmd));
@@ -697,7 +694,7 @@ void test_requesting_block() {
                 reply.reset();
 
                 auto context = fs::payload::extendended_context_prt_t{};
-                auto payload = fs::payload::block_request_t(std::move(context), target, 5, 5);
+                auto payload = fs::payload::block_request_t(std::move(context), target.detach(), 5, 5);
                 auto cmd = fs::payload::io_command_t(std::move(payload));
                 auto command = fs::payload::io_commands_t{};
                 command.commands.emplace_back(std::move(cmd));
@@ -717,15 +714,14 @@ void test_requesting_block() {
     };
     F().run();
 }
-#endif
 
 int _init() {
     test::init_logging();
     REGISTER_TEST_CASE(test_remote_copy, "test_remote_copy", "[fs]");
     REGISTER_TEST_CASE(test_append_block, "test_append_block", "[fs]");
     REGISTER_TEST_CASE(test_clone_block, "test_clone_block", "[fs]");
-    // REGISTER_TEST_CASE(test_update_meta, "test_update_meta", "[fs]");
-    // REGISTER_TEST_CASE(test_requesting_block, "test_requesting_block", "[fs]");
+    REGISTER_TEST_CASE(test_update_meta, "test_update_meta", "[fs]");
+    REGISTER_TEST_CASE(test_requesting_block, "test_requesting_block", "[fs]");
     return 1;
 }
 
