@@ -30,7 +30,7 @@ TEST_CASE("block iterator", "[model]") {
             auto ec = proxy.create_directories(path);
             CHECK(!ec);
 #ifdef SYNCSPIRIT_WATCHER_KQUEUE
-            CHECK(mediator.is_masked(root_path.string()) == 1);
+            CHECK(mediator.is_masked(root_view.get_full_name()) == 1);
 #else
             CHECK(mediator.is_masked(path.get_full_name()) == 1);
 #endif
@@ -47,7 +47,7 @@ TEST_CASE("block iterator", "[model]") {
             auto f = proxy.open_write(path, 0);
             REQUIRE(f);
 #ifdef SYNCSPIRIT_WATCHER_KQUEUE
-            CHECK(mediator.is_masked(path.parent_path().string()) == 1);
+            CHECK(mediator.is_masked(path.get_parent().get_full_name()) == 1);
 #else
             CHECK(mediator.is_masked(path.get_full_name()) == 1);
 #endif
@@ -62,8 +62,8 @@ TEST_CASE("block iterator", "[model]") {
 #ifndef SYNCSPIRIT_WATCHER_KQUEUE
             CHECK(mediator.is_masked(path.get_full_name()) == 2);
 #else
-            CHECK(mediator.is_masked(path_str) == 1);
-            CHECK(mediator.is_masked(path.parent_path().string()) == 1);
+            CHECK(mediator.is_masked(path.get_full_name()) == 1);
+            CHECK(mediator.is_masked(path.get_parent().get_full_name()) == 1);
 #endif
             CHECK(proxy.mediator_updates == 2);
             REQUIRE(exists(path));
@@ -79,8 +79,8 @@ TEST_CASE("block iterator", "[model]") {
 #ifndef SYNCSPIRIT_WATCHER_KQUEUE
         CHECK(mediator.is_masked(path.get_full_name()) == 1);
 #else
-        CHECK(mediator.is_masked(path_str) == 0);
-        CHECK(mediator.is_masked(path.parent_path().string()) == 1);
+        CHECK(mediator.is_masked(path.get_full_name()) == 0);
+        CHECK(mediator.is_masked(path.get_parent().get_full_name()) == 1);
 #endif
         CHECK(!exists(path));
     }
@@ -94,8 +94,8 @@ TEST_CASE("block iterator", "[model]") {
 #ifndef SYNCSPIRIT_WATCHER_KQUEUE
             CHECK(mediator.is_masked(path.get_full_name()) == 1);
 #else
-            CHECK(mediator.is_masked(path_str) == 0);
-            CHECK(mediator.is_masked(path.parent_path().string()) == 1);
+            CHECK(mediator.is_masked(path.get_full_name()) == 0);
+            CHECK(mediator.is_masked(path.get_parent().get_full_name()) == 1);
 #endif
             CHECK(proxy.mediator_updates == 1);
         }
@@ -106,8 +106,8 @@ TEST_CASE("block iterator", "[model]") {
 #ifndef SYNCSPIRIT_WATCHER_KQUEUE
             CHECK(mediator.is_masked(path.get_full_name()) == 1);
 #else
-            CHECK(mediator.is_masked(path_str) == 0);
-            CHECK(mediator.is_masked(path.parent_path().string()) == 1);
+            CHECK(mediator.is_masked(path.get_full_name()) == 0);
+            CHECK(mediator.is_masked(path.get_parent().get_full_name()) == 1);
 #endif
             CHECK(proxy.mediator_updates == 1);
         }
@@ -118,8 +118,8 @@ TEST_CASE("block iterator", "[model]") {
 #ifndef SYNCSPIRIT_WATCHER_KQUEUE
             CHECK(mediator.is_masked(path.get_full_name()) == 1);
 #else
-            CHECK(mediator.is_masked(path_str) == 0);
-            CHECK(mediator.is_masked(path.parent_path().string()) == 1);
+            CHECK(mediator.is_masked(path.get_full_name()) == 0);
+            CHECK(mediator.is_masked(path.get_parent().get_full_name()) == 1);
 #endif
             CHECK(proxy.mediator_updates == 1);
         }

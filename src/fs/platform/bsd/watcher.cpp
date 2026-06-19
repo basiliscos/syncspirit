@@ -9,7 +9,7 @@
 
 #include "fs/fs_supervisor.h"
 #include "fs/task/scan_dir.h"
-#include "fs/utils.h"
+#include "utils/path_utils.h"
 #include "utils/utf8.h"
 #include "utils/format.hpp"
 #include <fcntl.h>
@@ -38,10 +38,10 @@ auto watcher_t::watch_path(std::string_view path, file_type_t type) noexcept -> 
         return {};
     }
 
-    if (type == file_type_t::directory) {
+    if (type == file_type_t::DIRECTORY) {
         r = open(path.data(), O_RDONLY);
-    } else if (type == file_type_t::regular) {
-        if (!is_temporal(path)) {
+    } else if (type == file_type_t::FILE) {
+        if (!utils::is_temporal(path)) {
             r = open(path.data(), O_RDONLY);
         }
     }
@@ -63,7 +63,7 @@ auto watcher_t::watch_path(std::string_view path, file_type_t type) noexcept -> 
 auto watcher_t::unwatch_path(int wd, file_type_t type) noexcept -> sys::error_code {
     static constexpr auto FLAGS = EV_DELETE;
 
-    if (!((type == file_type_t::directory) || (type == file_type_t::regular))) {
+    if (!((type == file_type_t::DIRECTORY) || (type == file_type_t::FILE))) {
         return {};
     }
 
@@ -83,13 +83,12 @@ void watcher_t::kqueue_callback(int wd, std::uint32_t flags, const pt::ptime &no
     auto full_path = std::string_view(guard.path);
     auto it_folder = watched_folders->find(folder_id);
     assert(it_folder != watched_folders->end());
-    auto &folder_info = it_folder->second;
-    auto folder_path = std::string_view(folder_info.path_str);
-    auto is_regular = guard.file_type == file_type_t::regular;
+    auto folder_path = it_folder->second.get_full_name();
+    auto is_regular = guard.file_type == file_type_t::FILE;
     auto rel_path = full_path.size() > folder_path.size() ? full_path.substr(folder_path.size() + 1) : "";
     LOG_TRACE(log, "kqueue_callback ({}), fd: {} ({:#x}), {}", folder_id, wd, flags, rel_path);
 
-    if (!fs::is_temporal(rel_path)) {
+    if (!utils::is_temporal(rel_path)) {
         auto type = update_type_internal_t{0};
 
         if (flags & NOTE_RENAME) {

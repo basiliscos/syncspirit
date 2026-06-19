@@ -346,7 +346,7 @@ void test_remote_copy() {
 #ifndef SYNCSPIRIT_WATCHER_KQUEUE
                 CHECK(updates_mediator->is_masked(target.get_full_name()) == 1);
 #else
-                CHECK(updates_mediator->is_masked(target.parent_path().string()) == 1);
+                CHECK(updates_mediator->is_masked(target.get_parent().get_full_name()) == 1);
 #endif
                 remote_copy(target, pr_fi, empty_path).check_success();
                 CHECK(updates_mediator->is_masked(target.get_full_name()) == 0);
@@ -425,7 +425,7 @@ void test_append_block() {
                 CHECK(updates_mediator->is_masked(path.get_full_name()) >= 2);
                 CHECK(updates_mediator->is_masked(tmp_path.get_full_name()) == 0);
 #ifdef SYNCSPIRIT_WATCHER_KQUEUE
-                CHECK(updates_mediator->is_masked(path.parent_path().string()) == 2);
+                CHECK(updates_mediator->is_masked(path.get_parent().get_full_name()) == 2);
 #endif
                 if (!no_perms) {
                     CHECK(permissions(path) == perms);
@@ -455,7 +455,7 @@ void test_append_block() {
                 CHECK(updates_mediator->is_masked(path.get_full_name()) >= 2);
                 CHECK(updates_mediator->is_masked(tmp_path.get_full_name()) == 0);
 #ifdef SYNCSPIRIT_WATCHER_KQUEUE
-                CHECK(updates_mediator->is_masked(path.parent_path().string()) == 3);
+                CHECK(updates_mediator->is_masked(path.get_parent().get_full_name()) == 3);
 #endif
             }
             SECTION("file with 2 different blocks") {
@@ -533,7 +533,7 @@ void test_clone_block() {
                     CHECK(last_write_time(target_path) == modified);
                     CHECK(updates_mediator->is_masked(tmp_path.get_full_name()) == 0);
 #ifdef SYNCSPIRIT_WATCHER_KQUEUE
-                    CHECK(updates_mediator->is_masked(target_path.parent_path().string()) == 4);
+                    CHECK(updates_mediator->is_masked(target_path.get_parent().get_full_name()) == 4);
 #endif
                 }
                 SECTION("multi block target file") {
@@ -558,7 +558,7 @@ void test_clone_block() {
                     CHECK(last_write_time(target_path) == modified);
                     CHECK(updates_mediator->is_masked(tmp_path.get_full_name()) == 0);
 #ifdef SYNCSPIRIT_WATCHER_KQUEUE
-                    CHECK(updates_mediator->is_masked(target_path.parent_path().string()) == 4);
+                    CHECK(updates_mediator->is_masked(target_path.get_parent().get_full_name()) == 4);
 #endif
                 }
                 SECTION("source/target different sizes") {

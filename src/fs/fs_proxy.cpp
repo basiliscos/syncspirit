@@ -42,7 +42,7 @@ sys::error_code fs_proxy_t::rename(const utils::path_base_t &from, const utils::
     if (!ec) {
         updates_mediator.mask(to, from, deadline);
 #ifdef SYNCSPIRIT_WATCHER_KQUEUE
-        updates_mediator.mask(to.parent_path(), {}, deadline);
+        updates_mediator.mask(to.get_parent(), {}, deadline);
 #endif
         ++mediator_updates;
     }
@@ -66,7 +66,7 @@ sys::error_code fs_proxy_t::remove(const utils::poly_path_view_t &path) noexcept
 #ifndef SYNCSPIRIT_WATCHER_KQUEUE
         updates_mediator.mask(path, {}, deadline);
 #else
-        updates_mediator.mask(path.parent_path(), {}, deadline);
+        updates_mediator.mask(path.get_parent(), {}, deadline);
 #endif
         ++mediator_updates;
     }
@@ -81,7 +81,7 @@ sys::error_code fs_proxy_t::remove_file(const utils::poly_path_view_t &path) noe
 #ifndef SYNCSPIRIT_WATCHER_KQUEUE
         updates_mediator.mask(path, {}, deadline);
 #else
-        updates_mediator.mask(path.parent_path(), {}, deadline);
+        updates_mediator.mask(path.get_parent(), {}, deadline);
 #endif
         ++mediator_updates;
     }
@@ -124,7 +124,7 @@ sys::error_code fs_proxy_t::create_directories(const utils::poly_path_view_t &pa
 #ifndef SYNCSPIRIT_WATCHER_KQUEUE
         updates_mediator.mask(path, {}, deadline);
 #else
-        updates_mediator.mask(path.parent_path(), {}, deadline);
+        updates_mediator.mask(path.get_parent(), {}, deadline);
 #endif
         ++mediator_updates;
     }

@@ -186,7 +186,7 @@ TEST_CASE("fs_slave, rm_file", "[fs]") {
 #ifndef SYNCSPIRIT_WATCHER_KQUEUE
         CHECK(mediator.is_masked(file.get_full_name()));
 #else
-        CHECK(mediator.is_masked(root_path.string()));
+        CHECK(mediator.is_masked(root_path.get_full_name()));
 #endif
     }
 
