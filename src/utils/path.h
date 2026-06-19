@@ -50,7 +50,7 @@ struct SYNCSPIRIT_API path_base_t {
     std::string_view get_stem() const noexcept;
     std::string_view get_extension() const noexcept;
     std::string_view get_parent_name() const noexcept;
-    std::string_view relativize(const path_base_t&parent) const noexcept;
+    std::string_view relativize(const path_base_t &parent) const noexcept;
     bool contains(const path_base_t &other) const noexcept;
     bool is_temporal() const noexcept;
     bool is_absolute() const noexcept;

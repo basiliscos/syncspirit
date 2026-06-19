@@ -145,7 +145,7 @@ struct fixture_t {
         CHECK(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::SHUT_DOWN);
     }
 
-    virtual void main(const utils::poly_path_view_t& root_path, const utils::allocator_t& allocator) noexcept {}
+    virtual void main(const utils::poly_path_view_t &root_path, const utils::allocator_t &allocator) noexcept {}
 
     r::pt::time_duration timeout = r::pt::millisec{10};
     r::pt::time_duration retension = r::pt::millisec{1};
@@ -166,7 +166,7 @@ struct fixture_t {
 
 void test_shutdown_initiated_by_controller() {
     struct F : fixture_t {
-        void main(const utils::poly_path_view_t& root_path, const utils::allocator_t& allocator) noexcept override {
+        void main(const utils::poly_path_view_t &root_path, const utils::allocator_t &allocator) noexcept override {
             auto file_path = root_path / L"файл.bin";
             write_file(file_path, "12345");
             auto &cache = file_actor->access<tmp_to::context_cache>();
@@ -192,7 +192,7 @@ void test_shutdown_initiated_by_controller() {
 
 void test_shutdown_initiated_by_file_actor() {
     struct F : fixture_t {
-        void main(const utils::poly_path_view_t& root_path, const utils::allocator_t& allocator) noexcept override {
+        void main(const utils::poly_path_view_t &root_path, const utils::allocator_t &allocator) noexcept override {
             file_actor->do_shutdown();
             sup->do_process();
             CHECK(cluster->get_write_requests() == 10);
@@ -203,7 +203,7 @@ void test_shutdown_initiated_by_file_actor() {
 
 void test_fs_actor_error() {
     struct F : fixture_t {
-        void main(const utils::poly_path_view_t& root_path, const utils::allocator_t& allocator) noexcept override {
+        void main(const utils::poly_path_view_t &root_path, const utils::allocator_t &allocator) noexcept override {
             auto file_name = std::string_view("some-file");
             auto pr_file = proto::FileInfo();
             proto::set_name(pr_file, file_name);

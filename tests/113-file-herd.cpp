@@ -144,9 +144,7 @@ struct fixture_t {
     using change_message_ptr_t = r::intrusive_ptr_t<fs::message::folder_changes_t>;
     using change_messages_t = std::deque<change_message_ptr_t>;
 
-    fixture_t() noexcept : path_guard{unique_path()} {
-        log = utils::get_logger("fixture");
-    }
+    fixture_t() noexcept : path_guard{unique_path()} { log = utils::get_logger("fixture"); }
 
     virtual void create_file_actor() {
         auto notify_watcher = [this](const fs::task::scan_dir_t &scan_dir) { watcher_actor->notify(scan_dir); };
@@ -232,7 +230,7 @@ struct fixture_t {
         auto root_path = path_guard.get_view(allocator);
 
         auto folder_id = "1234-5678";
-        auto builder = diff_builder_t(*cluster);        
+        auto builder = diff_builder_t(*cluster);
         builder.upsert_folder(folder_id, root_path.get_full_name(), "folder-label", 0, true).apply(*sup);
 
         auto folder = cluster->get_folders().by_id(folder_id);
@@ -251,7 +249,7 @@ struct fixture_t {
         CHECK(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::SHUT_DOWN);
     }
 
-    virtual void main(const utils::poly_path_view_t& root_path, const utils::allocator_t& allocator) noexcept {}
+    virtual void main(const utils::poly_path_view_t &root_path, const utils::allocator_t &allocator) noexcept {}
 
     r::pt::time_duration timeout = r::pt::millisec{10};
     r::pt::time_duration retension_timeout = r::pt::millisec{15};
@@ -276,7 +274,7 @@ struct fixture_t {
 
 void test_fs() {
     struct F : fixture_t {
-        void main(const utils::poly_path_view_t& root_path, const utils::allocator_t& allocator) noexcept override {
+        void main(const utils::poly_path_view_t &root_path, const utils::allocator_t &allocator) noexcept override {
             create_directories(root_path / "a/b/c/d/e");
             await_events(4);
             REQUIRE(local_files->size() == 5);

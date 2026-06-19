@@ -37,8 +37,8 @@ struct SYNCSPIRIT_API file_t : model::arc_base_t<file_t> {
     const utils::path_t &get_path() const noexcept;
 
     outcome::result<void> finalize(fs_proxy_t *fs_proxy, std::int64_t modification_s,
-                                const utils::poly_path_view_t &local_name) noexcept;
-    outcome::result<void> remove(fs_proxy_t &fs_proxy, const utils::allocator_t& ) noexcept;
+                                   const utils::poly_path_view_t &local_name) noexcept;
+    outcome::result<void> remove(fs_proxy_t &fs_proxy, const utils::allocator_t &) noexcept;
     outcome::result<void> write(fs_proxy_t &fs_proxy, std::uint64_t offset, utils::bytes_view_t data) noexcept;
     outcome::result<void> copy(fs_proxy_t &fs_proxy, std::uint64_t my_offset, const file_t &from,
                                std::uint64_t source_offset, std::uint64_t size) noexcept;

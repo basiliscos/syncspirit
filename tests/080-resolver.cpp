@@ -57,7 +57,7 @@ struct fixture_t {
         rx_buff.resize(1500);
     }
 
-    virtual void main(const utils::allocator_t&) noexcept = 0;
+    virtual void main(const utils::allocator_t &) noexcept = 0;
 
     void run() {
         auto strand = std::make_shared<asio::io_context::strand>(io_ctx);
@@ -99,7 +99,7 @@ struct fixture_t {
 
 void test_local_resolver() {
     struct F : fixture_t {
-        void main(const utils::allocator_t& allocator) noexcept override {
+        void main(const utils::allocator_t &allocator) noexcept override {
 #ifndef SYNCSPIRIT_WIN
             write_file(hosts_path.get_view(allocator), "127.0.0.2 lclhst.localdomain lclhst\n");
 
@@ -136,7 +136,7 @@ void test_local_resolver() {
 
 void test_success_resolver() {
     struct F : fixture_t {
-        void main(const utils::allocator_t& allocator) noexcept override {
+        void main(const utils::allocator_t &allocator) noexcept override {
             auto local_port = remote_resolver.local_endpoint().port();
 
             auto buff = asio::buffer(rx_buff.data(), rx_buff.size());
@@ -175,7 +175,7 @@ void test_success_resolver() {
 
 void test_success_ip() {
     struct F : fixture_t {
-        void main(const utils::allocator_t& allocator) noexcept override {
+        void main(const utils::allocator_t &allocator) noexcept override {
             auto local_port = remote_resolver.local_endpoint().port();
 
             resolver = sup->create_actor<resolver_actor_t>()
@@ -201,7 +201,7 @@ void test_success_ip() {
 
 void test_success_ipv6() {
     struct F : fixture_t {
-        void main(const utils::allocator_t& allocator) noexcept override {
+        void main(const utils::allocator_t &allocator) noexcept override {
             auto local_port = remote_resolver.local_endpoint().port();
 
             resolver = sup->create_actor<resolver_actor_t>()
@@ -235,7 +235,7 @@ void test_success_ipv6() {
 
 void test_garbage() {
     struct F : fixture_t {
-        void main(const utils::allocator_t& allocator) noexcept override {
+        void main(const utils::allocator_t &allocator) noexcept override {
             auto local_port = remote_resolver.local_endpoint().port();
 
             auto buff = asio::buffer(rx_buff.data(), rx_buff.size());
@@ -271,7 +271,7 @@ void test_garbage() {
 
 void test_multi_replies() {
     struct F : fixture_t {
-        void main(const utils::allocator_t& allocator) noexcept override {
+        void main(const utils::allocator_t &allocator) noexcept override {
             auto local_port = remote_resolver.local_endpoint().port();
 
             auto buff = asio::buffer(rx_buff.data(), rx_buff.size());
@@ -314,7 +314,7 @@ void test_multi_replies() {
 
 void test_wrong() {
     struct F : fixture_t {
-        void main(const utils::allocator_t& allocator) noexcept override {
+        void main(const utils::allocator_t &allocator) noexcept override {
             auto local_port = remote_resolver.local_endpoint().port();
 
             auto buff = asio::buffer(rx_buff.data(), rx_buff.size());
@@ -353,7 +353,7 @@ void test_wrong() {
 
 void test_timeout() {
     struct F : fixture_t {
-        void main(const utils::allocator_t& allocator) noexcept override {
+        void main(const utils::allocator_t &allocator) noexcept override {
             auto local_port = remote_resolver.local_endpoint().port();
 
             resolver = sup->create_actor<resolver_actor_t>()
@@ -378,7 +378,7 @@ void test_timeout() {
 
 void test_cancellation() {
     struct F : fixture_t {
-        void main(const utils::allocator_t& allocator) noexcept override {
+        void main(const utils::allocator_t &allocator) noexcept override {
             auto local_port = remote_resolver.local_endpoint().port();
 
             resolver = sup->create_actor<resolver_actor_t>()

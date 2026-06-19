@@ -62,7 +62,7 @@ path_guard_t::~path_guard_t() {
     }
 }
 
-static utils::poly_path_view_t cwd(const utils::allocator_t& allocator) {
+static utils::poly_path_view_t cwd(const utils::allocator_t &allocator) {
 #ifdef SYNCSPIRIT_WIN
     wchar_t buff[MAX_PATH];
     if (!::GetCurrentDirectoryW(sizeof(buff), buff)) {
@@ -80,7 +80,7 @@ static utils::poly_path_view_t cwd(const utils::allocator_t& allocator) {
 #endif
 }
 
-utils::poly_path_view_t locate_path(const char *test_file, const utils::allocator_t& allocator) {
+utils::poly_path_view_t locate_path(const char *test_file, const utils::allocator_t &allocator) {
     auto current = cwd(allocator);
     auto path = current / test_file;
     if (exists(path)) {
@@ -126,7 +126,7 @@ void write_file(const utils::poly_path_view_t &path_, std::string_view content) 
 
     auto opt = utils::io_stream_t::open_write(path_, content.size());
     if (opt.has_error()) {
-        auto& ec = opt.assume_error();
+        auto &ec = opt.assume_error();
         std::cout << fmt::format("(test/write) can't open {}: {} ", path_, ec);
         std::abort();
     }
@@ -273,17 +273,11 @@ static utils::stats_t get_stats(const utils::poly_path_view_t &path) {
     return r;
 }
 
-std::uint32_t permissions(const utils::poly_path_view_t &path) {
-    return get_stats(path).permissions;
-}
+std::uint32_t permissions(const utils::poly_path_view_t &path) { return get_stats(path).permissions; }
 
-std::int64_t file_size(const utils::poly_path_view_t &path) {
-    return get_stats(path).file_size;
-}
+std::int64_t file_size(const utils::poly_path_view_t &path) { return get_stats(path).file_size; }
 
-std::int64_t last_write_time(const utils::poly_path_view_t &path) {
-    return get_stats(path).modification;
-}
+std::int64_t last_write_time(const utils::poly_path_view_t &path) { return get_stats(path).modification; }
 
 bool is_directory(const utils::poly_path_view_t &path) {
     return get_stats(path).file_type == utils::file_type_t::DIRECTORY;

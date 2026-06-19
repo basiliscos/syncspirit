@@ -17,8 +17,8 @@ using namespace syncspirit::fs;
 
 using boost::nowide::narrow;
 
-auto file_t::open_write(fs_proxy_t &fs_proxy, const utils::poly_path_view_t &model_path, std::uint64_t file_size) noexcept
-    -> outcome::result<file_t> {
+auto file_t::open_write(fs_proxy_t &fs_proxy, const utils::poly_path_view_t &model_path,
+                        std::uint64_t file_size) noexcept -> outcome::result<file_t> {
     auto path = file_size > 0 ? model_path.make_temporal() : model_path.clone();
     auto result = fs_proxy.open_write(file_size > 0 ? model_path.make_temporal() : model_path, file_size);
     if (result.has_error()) {
@@ -40,12 +40,10 @@ auto file_t::open_read(const utils::poly_path_view_t &path) noexcept -> outcome:
 file_t::file_t() noexcept {};
 
 file_t::file_t(utils::io_stream_t backend_, utils::path_t path_, std::uint64_t file_size_) noexcept
-    : backend{new utils::io_stream_t(std::move(backend_))}, path{std::move(path_)}, file_size{file_size_} {
-}
+    : backend{new utils::io_stream_t(std::move(backend_))}, path{std::move(path_)}, file_size{file_size_} {}
 
 file_t::file_t(utils::io_stream_t backend_, utils::path_t path_) noexcept
-    : backend{new utils::io_stream_t(std::move(backend_))}, path{std::move(path_)}, file_size{0} {
-}
+    : backend{new utils::io_stream_t(std::move(backend_))}, path{std::move(path_)}, file_size{0} {}
 
 file_t::file_t(file_t &&other) noexcept : backend{nullptr} { *this = std::move(other); }
 
@@ -65,7 +63,6 @@ file_t::~file_t() {
 }
 
 const utils::path_t &file_t::get_path() const noexcept { return path; }
-
 
 auto file_t::finalize(fs_proxy_t *fs_proxy, int64_t modification_s, const utils::poly_path_view_t &local_name) noexcept
     -> outcome::result<void> {

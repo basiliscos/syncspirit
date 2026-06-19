@@ -55,9 +55,7 @@ struct fixture_t {
     using change_message_ptr_t = r::intrusive_ptr_t<fs::message::folder_changes_t>;
     using change_messages_t = std::deque<change_message_ptr_t>;
 
-    fixture_t() noexcept : path_guard{unique_path()} {
-        log = utils::get_logger("fixture");
-    }
+    fixture_t() noexcept : path_guard{unique_path()} { log = utils::get_logger("fixture"); }
 
     virtual void create_updates_mediator() { updates_mediator = new fs::updates_mediator_t(retension_timeout * 2); }
 
@@ -135,7 +133,7 @@ struct fixture_t {
         }
     }
 
-    void make_dir(const utils::poly_path_view_t& root_path) {
+    void make_dir(const utils::poly_path_view_t &root_path) {
         auto path = root_path / L"папка";
         std::int64_t modified = 1641828421;
 
@@ -154,7 +152,7 @@ struct fixture_t {
         sup->route<fs::payload::io_commands_t>(fs_addr, sup->get_address(), std::move(cmds));
     }
 
-    virtual void main(const utils::poly_path_view_t& root_path, const utils::allocator_t& allocator) noexcept {}
+    virtual void main(const utils::poly_path_view_t &root_path, const utils::allocator_t &allocator) noexcept {}
 
     r::pt::time_duration timeout = r::pt::millisec{10};
     r::pt::time_duration retension_timeout = r::pt::millisec{150};
@@ -190,13 +188,14 @@ void test_with_mediator() {
             fs_addr = file_actor->get_address();
         }
 
-        void append_block(const utils::poly_path_view_t& root_path) {
+        void append_block(const utils::poly_path_view_t &root_path) {
             auto path = root_path / L"файл";
             std::int64_t modified = 1641828421;
             auto bytes = as_owned_bytes("12345");
 
             auto context = fs::payload::extendended_context_prt_t{};
-            auto payload = fs::payload::append_block_t(std::move(context), folder_id, path.detach(), std::move(bytes), 0, 5);
+            auto payload =
+                fs::payload::append_block_t(std::move(context), folder_id, path.detach(), std::move(bytes), 0, 5);
             auto cmd = fs::payload::io_command_t(std::move(payload));
             auto cmds = fs::payload::io_commands_t{nullptr};
             cmds.commands.emplace_back(std::move(cmd));
@@ -204,12 +203,13 @@ void test_with_mediator() {
             sup->do_process();
         }
 
-        void finish_file(const utils::poly_path_view_t& root_path) {
+        void finish_file(const utils::poly_path_view_t &root_path) {
             auto context = fs::payload::extendended_context_prt_t{};
             auto path = root_path / L"файл";
             std::int64_t modified = 1641828421;
             auto perms = 0666;
-            auto payload = fs::payload::finish_file_t(std::move(context), folder_id, path.detach(), {}, 5, modified, 0666, true);
+            auto payload =
+                fs::payload::finish_file_t(std::move(context), folder_id, path.detach(), {}, 5, modified, 0666, true);
             auto cmd = fs::payload::io_command_t(std::move(payload));
             auto cmds = fs::payload::io_commands_t{nullptr};
             cmds.commands.emplace_back(std::move(cmd));
@@ -217,7 +217,7 @@ void test_with_mediator() {
             sup->do_process();
         }
 
-        void main(const utils::poly_path_view_t& root_path, const utils::allocator_t& allocator) noexcept override {
+        void main(const utils::poly_path_view_t &root_path, const utils::allocator_t &allocator) noexcept override {
             SECTION("create a dir") {
                 make_dir(root_path);
                 sup->do_process();

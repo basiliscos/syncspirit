@@ -112,8 +112,10 @@ TEST_CASE("path", "[model]") {
         CHECK(p4.get_extension() == boost::nowide::narrow(L".р2"));
     }
     SECTION("bug with eq") {
-        auto p1 = path_t::make_generic(L"/home/b/development/cpp/syncspirit/build.debug-shared/tmp-utfgowerwpsvk/sub-dir/d");
-        auto p2 = path_t::make_generic(L"/home/b/development/cpp/syncspirit/build.debug-shared/tmp-utfgowerwpsvk/sub-dir/e");
+        auto p1 =
+            path_t::make_generic(L"/home/b/development/cpp/syncspirit/build.debug-shared/tmp-utfgowerwpsvk/sub-dir/d");
+        auto p2 =
+            path_t::make_generic(L"/home/b/development/cpp/syncspirit/build.debug-shared/tmp-utfgowerwpsvk/sub-dir/e");
         CHECK(p1 != p2);
     }
 }

@@ -35,7 +35,7 @@ struct file_actor_t::process_context_t : fs_proxy_t {
 
     process_context_t(const void *cache_key_, file_actor_t &actor)
         : fs_proxy_t(*actor.updates_mediator, clock_t::local_time() + actor.retension), cache_key{cache_key_},
-    pool(buffer.data(), buffer.size()), allocator{&pool}{}
+          pool(buffer.data(), buffer.size()), allocator{&pool} {}
     const void *cache_key;
 
     buffer_t buffer;
@@ -195,8 +195,7 @@ void file_actor_t::on_service_unlock(model::message::service_unlock_t &message) 
     }
 }
 
-void file_actor_t::process(payload::block_request_t &cmd,
-                           process_context_t &context) noexcept {
+void file_actor_t::process(payload::block_request_t &cmd, process_context_t &context) noexcept {
     LOG_TRACE(log, "processing block request");
     auto path = cmd.path.get_view(context.allocator);
     auto file_opt = open_file_ro(path, context.cache_key);
@@ -222,8 +221,7 @@ void file_actor_t::process(payload::block_request_t &cmd,
     cmd.result = std::move(data);
 }
 
-void file_actor_t::process(payload::remote_copy_t &cmd,
-                           process_context_t &context) noexcept {
+void file_actor_t::process(payload::remote_copy_t &cmd, process_context_t &context) noexcept {
     auto path = cmd.path.get_view(context.allocator);
     sys::error_code ec;
 
@@ -290,7 +288,8 @@ void file_actor_t::process(payload::remote_copy_t &cmd,
         if (utils::platform_t::symlinks_supported()) {
             auto target = utils::make_native_view(cmd.symlink_target, context.allocator);
             LOG_DEBUG(log, "creating symlink {} -> {}", path, target);
-            bool attempt_create = !utils::is_symlink(path, ec) || (std::string_view(utils::read_symlink(path, ec)) != cmd.symlink_target);
+            bool attempt_create =
+                !utils::is_symlink(path, ec) || (std::string_view(utils::read_symlink(path, ec)) != cmd.symlink_target);
             if (attempt_create) {
                 if (auto ec = context.create_link(target, path); ec) {
                     LOG_WARN(log, "error symlinking {} -> {} : {}", path, target, ec);
@@ -315,8 +314,7 @@ void file_actor_t::process(payload::remote_copy_t &cmd,
     cmd.result = outcome::success();
 }
 
-void file_actor_t::process(payload::finish_file_t &cmd,
-                           process_context_t &context) noexcept {
+void file_actor_t::process(payload::finish_file_t &cmd, process_context_t &context) noexcept {
     auto &file_cache = context_cache[context.cache_key];
     auto path = cmd.path.get_view(context.allocator);
     auto it = file_cache.find(cmd.path);
@@ -374,8 +372,7 @@ void file_actor_t::process(payload::finish_file_t &cmd,
     LOG_INFO(log, "file {} ({} bytes) is now locally available", path, cmd.file_size);
 }
 
-void file_actor_t::process(payload::append_block_t &cmd,
-                           process_context_t &context) noexcept {
+void file_actor_t::process(payload::append_block_t &cmd, process_context_t &context) noexcept {
     auto path = cmd.path.get_view(context.allocator);
     auto file_opt = open_file_rw(path, cmd.file_size, context);
     if (!file_opt) {
@@ -388,8 +385,7 @@ void file_actor_t::process(payload::append_block_t &cmd,
     cmd.result = backend->write(context, cmd.offset, cmd.data);
 }
 
-void file_actor_t::process(payload::clone_block_t &cmd,
-                           process_context_t &context) noexcept {
+void file_actor_t::process(payload::clone_block_t &cmd, process_context_t &context) noexcept {
     auto target_path = cmd.path.get_view(context.allocator);
     auto source_path = cmd.source.get_view(context.allocator);
     auto target_opt = open_file_rw(target_path, cmd.target_size, context);
@@ -419,8 +415,7 @@ void file_actor_t::process(payload::clone_block_t &cmd,
     cmd.result = target_backend->copy(context, cmd.target_offset, source_backend, cmd.source_offset, cmd.block_size);
 }
 
-void file_actor_t::process(payload::update_meta_t &cmd,
-                           process_context_t &context) noexcept {
+void file_actor_t::process(payload::update_meta_t &cmd, process_context_t &context) noexcept {
 
     auto r = sys::error_code();
     auto path = cmd.path.get_view(context.allocator);
@@ -468,7 +463,8 @@ auto file_actor_t::open_file_rw(const utils::poly_path_view_t &path, std::uint64
     return ptr;
 }
 
-auto file_actor_t::open_file_ro(const utils::poly_path_view_t &path, const void *context) noexcept -> outcome::result<file_ptr_t> {
+auto file_actor_t::open_file_ro(const utils::poly_path_view_t &path, const void *context) noexcept
+    -> outcome::result<file_ptr_t> {
     if (context) {
         auto &file_cache = context_cache[context];
         auto it = file_cache.find(path);
@@ -494,7 +490,7 @@ void file_actor_t::on_create_dir(message::create_dir_t &message) noexcept {
     auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
     auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
 
-    auto& p = message.payload;
+    auto &p = message.payload;
     auto path = p.get_view(allocator);
     LOG_TRACE(log, "on_create_dir, '{}'", path);
     utils::create_directories(path, p.ec);

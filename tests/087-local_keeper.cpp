@@ -92,8 +92,7 @@ struct fixture_t {
     using target_ptr_t = r::intrusive_ptr_t<net::local_keeper_t>;
     using builder_ptr_t = std::unique_ptr<diff_builder_t>;
 
-    fixture_t(bool auto_launch_ = true) noexcept
-        : path_guard{unique_path()}, auto_launch{auto_launch_} {
+    fixture_t(bool auto_launch_ = true) noexcept : path_guard{unique_path()}, auto_launch{auto_launch_} {
         mediator = new fs::updates_mediator_t(pt::microseconds{1});
     }
 
@@ -117,7 +116,7 @@ struct fixture_t {
 
     virtual void create_dir(fs::message::create_dir_t &req) noexcept {
         auto &path = req.payload;
-        sup->log->info("on_create_dir, '{}'", static_cast<utils::path_t&>(path));
+        sup->log->info("on_create_dir, '{}'", static_cast<utils::path_t &>(path));
         auto buffer = std::array<std::byte, 1024 * 32>();
         auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
         auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
@@ -219,7 +218,7 @@ struct fixture_t {
         sup->do_process();
     }
 
-    virtual void main(const utils::allocator_t&) noexcept {}
+    virtual void main(const utils::allocator_t &) noexcept {}
 
     std::int64_t files_scan_iteration_limit = 100;
     builder_ptr_t builder;
@@ -263,7 +262,7 @@ void test_simple() {
     struct F : fixture_t {
         std::uint32_t get_hash_limit() override { return 2; }
 
-        void main(const utils::allocator_t& allocator) noexcept override {
+        void main(const utils::allocator_t &allocator) noexcept override {
             sys::error_code ec;
             auto &blocks = cluster->get_blocks();
             auto my_short_id = my_device->device_id().get_uint();
@@ -449,7 +448,7 @@ void test_simple() {
 
 void test_create_dir() {
     struct F : fixture_t {
-        void main(const utils::allocator_t& allocator) noexcept override {
+        void main(const utils::allocator_t &allocator) noexcept override {
             auto folder_id = std::string(folder->get_id());
             auto root_path = path_guard.get_view(allocator);
 
@@ -484,7 +483,7 @@ void test_no_changes() {
     struct F : fixture_t {
         std::uint32_t get_hash_limit() override { return 2; }
 
-        void main(const utils::allocator_t& allocator) noexcept override {
+        void main(const utils::allocator_t &allocator) noexcept override {
             sys::error_code ec;
             auto &blocks = cluster->get_blocks();
             auto my_short_id = my_device->device_id().get_uint();
@@ -658,7 +657,7 @@ void test_deleted() {
             available.emplace_back(std::string(diff.name));
         }
 
-        void main(const utils::allocator_t& allocator) noexcept override {
+        void main(const utils::allocator_t &allocator) noexcept override {
 
             auto root_path = path_guard.get_view(allocator);
             sys::error_code ec;
@@ -850,7 +849,7 @@ void test_deleted() {
 
 void test_changed() {
     struct F : fixture_t {
-        void main(const utils::allocator_t& allocator) noexcept override {
+        void main(const utils::allocator_t &allocator) noexcept override {
             auto root_path = path_guard.get_view(allocator);
 
             sys::error_code ec;
@@ -1111,7 +1110,7 @@ void test_changed() {
 
 void test_type_change() {
     struct F : fixture_t {
-        void main(const utils::allocator_t& allocator) noexcept override {
+        void main(const utils::allocator_t &allocator) noexcept override {
             auto root_path = path_guard.get_view(allocator);
             auto my_short_id = my_device->device_id().get_uint();
             auto pr_file = proto::FileInfo{};
@@ -1211,10 +1210,9 @@ void test_type_change() {
     F().run();
 }
 
-
 void test_resurrection() {
     struct F : fixture_t {
-        void main(const utils::allocator_t& allocator) noexcept override {
+        void main(const utils::allocator_t &allocator) noexcept override {
             auto root_path = path_guard.get_view(allocator);
             create_directories(root_path / L"a/b/c");
             write_file(root_path / "a/b/c/file.bin", "12345");
@@ -1264,7 +1262,7 @@ void test_resurrection() {
 
 void test_partial_scan() {
     struct F : fixture_t {
-        void main(const utils::allocator_t& allocator) noexcept override {
+        void main(const utils::allocator_t &allocator) noexcept override {
             auto root_path = path_guard.get_view(allocator);
             auto my_short_id = my_device->device_id().get_uint();
             auto dir_1 = root_path / L"а/б/в";
@@ -1301,7 +1299,7 @@ void test_partial_scan() {
             }
             SECTION("non-existing dir") {
                 builder->scan_start(folder->get_id()).apply(*sup);
-                //auto subdir = narrow(GENERATE(L"а", L"а/б", L"а/б/в"));
+                // auto subdir = narrow(GENERATE(L"а", L"а/б", L"а/б/в"));
                 auto subdir = narrow(GENERATE(L"а"));
                 remove_all(root_path / subdir);
                 INFO("subdir: " << subdir);
@@ -1370,12 +1368,10 @@ void test_scan_errors() {
             }
         }
 
-        void main(const utils::allocator_t& allocator) noexcept override {
+        void main(const utils::allocator_t &allocator) noexcept override {
             auto root_path = path_guard.get_view(allocator);
             SECTION("root dir errors") {
-                SECTION("missing root dir") {
-                    folder->set_path((root_path / "some-dir").detach());
-                }
+                SECTION("missing root dir") { folder->set_path((root_path / "some-dir").detach()); }
                 SECTION("no permissings to read outer dir") {
                     folder->set_path((root_path / "some-dir").detach());
                     chmod(root_path, 0);
@@ -1442,7 +1438,7 @@ void test_scan_errors() {
             SECTION("scan dir errors") {
                 int mocked = 0;
                 auto generator_type = GENERATE(0, 1);
-                auto do_mock = [&](const utils::poly_path_view_t& dir_path) {
+                auto do_mock = [&](const utils::poly_path_view_t &dir_path) {
                     processor = [&, dir_path = std::string(dir_path.get_full_name())](fs::fs_slave_t *slave) {
                         slave->ec = {};
                         bool do_exec = true;
@@ -1529,7 +1525,6 @@ void test_scan_errors() {
     F().run();
 }
 
-
 void test_read_errors() {
     struct F : fixture_t {
         F() : fixture_t{false} {
@@ -1552,7 +1547,7 @@ void test_read_errors() {
             }
         }
 
-        void main(const utils::allocator_t& allocator) noexcept override {
+        void main(const utils::allocator_t &allocator) noexcept override {
             auto root_path = path_guard.get_view(allocator);
 #ifndef SYNCSPIRIT_WIN
             SECTION("small unknown/new file") {
@@ -1717,7 +1712,7 @@ void test_leaks() {
         void launch_hasher() noexcept override {
             hasher = sup->create_actor<managed_hasher_t>().index(1).auto_reply(false).timeout(timeout).finish().get();
         }
-        void main(const utils::allocator_t& allocator) noexcept override {
+        void main(const utils::allocator_t &allocator) noexcept override {
             auto root_path = path_guard.get_view(allocator);
             write_file(root_path / "file-1.bin", "12345");
             write_file(root_path / "file-2.bin", "12345");
@@ -1741,7 +1736,7 @@ void test_hashing_fail() {
         void launch_hasher() noexcept override {
             hasher = sup->create_actor<managed_hasher_t>().index(1).subscribe(false).timeout(timeout).finish().get();
         }
-        void main(const utils::allocator_t& allocator) noexcept override {
+        void main(const utils::allocator_t &allocator) noexcept override {
             auto root_path = path_guard.get_view(allocator);
             auto block_sz = fs::block_sizes[0];
             auto b = std::string(block_sz * 5, 'x');
@@ -1760,7 +1755,7 @@ void test_hashing_fail() {
 
 void test_incomplete() {
     struct F : fixture_t {
-        void main(const utils::allocator_t& allocator) noexcept override {
+        void main(const utils::allocator_t &allocator) noexcept override {
             using clock_t = std::chrono::system_clock;
 
             auto root_path = path_guard.get_view(allocator);
@@ -2003,7 +1998,7 @@ void test_traversal() {
             paths.emplace_back(std::string(name));
         }
 
-        void main(const utils::allocator_t& allocator) noexcept override {
+        void main(const utils::allocator_t &allocator) noexcept override {
             auto root_path = path_guard.get_view(allocator);
             create_directories(root_path / "a");
             create_directories(root_path / "a" / "c");
@@ -2043,10 +2038,9 @@ void test_traversal() {
     F().run();
 }
 
-
 void test_importing() {
     struct F : fixture_t {
-        void main(const utils::allocator_t& allocator) noexcept override {
+        void main(const utils::allocator_t &allocator) noexcept override {
             auto root_path = path_guard.get_view(allocator);
             auto peer_short_id = my_device->device_id().get_uint();
             auto modified_s = std::int64_t{12345};
@@ -2242,7 +2236,7 @@ void test_concurrency() {
             std::ignore = msg.payload.diff->visit(v, nullptr);
         }
 
-        void main(const utils::allocator_t& allocator) noexcept override {
+        void main(const utils::allocator_t &allocator) noexcept override {
             auto root_path = path_guard.get_view(allocator);
             for (int i = 0; i < N; ++i) {
                 auto letter = static_cast<char>('a' + i);
@@ -2275,7 +2269,7 @@ void test_races() {
     static constexpr int N = 5;
 
     struct F : fixture_t {
-        void main(const utils::allocator_t& allocator) noexcept override {
+        void main(const utils::allocator_t &allocator) noexcept override {
             auto root_path = path_guard.get_view(allocator);
             for (int i = 0; i < N; ++i) {
                 auto path = root_path / fmt::format("file-{}", i);

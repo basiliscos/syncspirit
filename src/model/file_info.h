@@ -184,7 +184,7 @@ struct SYNCSPIRIT_API file_info_t {
         return {};
     }
 
-    utils::poly_path_view_t get_path(const folder_info_t &, const utils::allocator_t& ) const noexcept;
+    utils::poly_path_view_t get_path(const folder_info_t &, const utils::allocator_t &) const noexcept;
 
     inline std::int64_t get_modified_s() const noexcept { return modified_s; }
     inline std::int32_t get_modified_ns() const noexcept { return modified_ns; }
@@ -211,7 +211,7 @@ struct SYNCSPIRIT_API file_info_t {
 
     guard_t guard(const model::folder_info_t &folder_info) noexcept;
 
-    utils::poly_path_view_t make_conflicting_name(const utils::allocator_t& ) const noexcept;
+    utils::poly_path_view_t make_conflicting_name(const utils::allocator_t &) const noexcept;
 
     inline void refcouner_inc() const noexcept { ++counter; }
     inline std::uint32_t refcouner_dec() const noexcept { return --counter; }

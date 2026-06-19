@@ -65,8 +65,7 @@ struct fixture_t {
     using change_message_ptr_t = r::intrusive_ptr_t<fs::message::folder_changes_t>;
     using change_messages_t = std::deque<change_message_ptr_t>;
 
-    fixture_t(bool auto_launch_ = true) noexcept
-        : auto_launch{auto_launch_}, path_guard{unique_path()} {
+    fixture_t(bool auto_launch_ = true) noexcept : auto_launch{auto_launch_}, path_guard{unique_path()} {
         log = utils::get_logger("fixture");
     }
 
@@ -176,7 +175,7 @@ struct fixture_t {
 
     virtual void on_changes(fs::message::folder_changes_t &msg) noexcept { changes.emplace_back(&msg); }
 
-    virtual void main(const utils::poly_path_view_t& root_path, const utils::allocator_t& allocator) noexcept {}
+    virtual void main(const utils::poly_path_view_t &root_path, const utils::allocator_t &allocator) noexcept {}
 
     r::pt::time_duration retension() { return RETENSION_TIMEOUT; }
 
@@ -212,7 +211,7 @@ void test_watcher_base() {
             sup->do_process();
         }
 
-        void main(const utils::poly_path_view_t& root_path, const utils::allocator_t& allocator) noexcept override {
+        void main(const utils::poly_path_view_t &root_path, const utils::allocator_t &allocator) noexcept override {
             using U = fs::update_type_t;
             auto folder_id = std::string("my-folder-id");
             auto back_addr = sup->get_address();
@@ -285,7 +284,8 @@ void test_watcher_base() {
                 auto sub_path_1 = root_path / name_1;
                 auto sub_path_2 = root_path / name_2;
                 write_file(sub_path_1, "12345");
-                target->push(deadline, folder_id, name_1.get_full_name(), std::string(sub_path_2.get_full_name()), U::meta, false);
+                target->push(deadline, folder_id, name_1.get_full_name(), std::string(sub_path_2.get_full_name()),
+                             U::meta, false);
                 await_events(poll_t::single, 1);
                 auto &payload = changes.front()->payload;
                 REQUIRE(payload.size() == 1);
@@ -360,7 +360,8 @@ void test_watcher_base() {
                     auto name_1 = utils::make_native_view(L"файл-1.bin", allocator);
                     auto name_2 = utils::make_native_view(L"файл-2.bin", allocator);
                     write_file(root_path / name_2, "12345");
-                    target->push(deadline, folder_id, name_2.get_full_name(), std::string(name_1.get_full_name()), U::meta, false);
+                    target->push(deadline, folder_id, name_2.get_full_name(), std::string(name_1.get_full_name()),
+                                 U::meta, false);
                     target->push(deadline, folder_id, name_2.get_full_name(), {}, U::content, false);
 
                     await_events(poll_t::trigger_timer, 2, true);
@@ -392,7 +393,8 @@ void test_watcher_base() {
                     auto name_1 = utils::make_native_view(L"файл-1.bin", allocator);
                     auto name_2 = utils::make_native_view(L"файл-2.bin", allocator);
                     write_file(root_path / name_2, "12345");
-                    target->push(deadline, folder_id, name_2.get_full_name(), std::string(name_1.get_full_name()), U::meta, false);
+                    target->push(deadline, folder_id, name_2.get_full_name(), std::string(name_1.get_full_name()),
+                                 U::meta, false);
                     target->push(deadline_2, folder_id, name_2.get_full_name(), {}, U::content, false);
                     target->push(deadline_2, folder_id, name_2.get_full_name(), {}, U::meta, false);
 
@@ -427,7 +429,8 @@ void test_watcher_base() {
                     auto name_2 = utils::make_native_view(L"файл-2.bin", allocator);
                     write_file(root_path / name_2, "12345");
                     target->push(deadline, folder_id, name_2.get_full_name(), {}, U::content, false);
-                    target->push(deadline, folder_id, name_2.get_full_name(), std::string(name_1.get_full_name()), U::meta, false);
+                    target->push(deadline, folder_id, name_2.get_full_name(), std::string(name_1.get_full_name()),
+                                 U::meta, false);
                     await_events(poll_t::trigger_timer, 1, true);
 
                     auto &payload_1 = changes[0]->payload;
@@ -457,7 +460,8 @@ void test_watcher_base() {
                 SECTION("move, delete -> collapse to delete of original") {
                     auto name_1 = utils::make_native_view(L"файл-1.bin", allocator);
                     auto name_2 = utils::make_native_view(L"файл-2.bin", allocator);
-                    target->push(deadline, folder_id, name_2.get_full_name(), std::string(name_1.get_full_name()), U::meta, false);
+                    target->push(deadline, folder_id, name_2.get_full_name(), std::string(name_1.get_full_name()),
+                                 U::meta, false);
                     target->push(deadline_2, folder_id, name_2.get_full_name(), {}, U::deleted, false);
 
                     await_events(poll_t::trigger_timer, 1);
@@ -480,8 +484,10 @@ void test_watcher_base() {
                     auto name_2 = utils::make_native_view(L"файл-2.bin", allocator);
                     auto name_3 = utils::make_native_view(L"файл-3.bin", allocator);
                     write_file(root_path / name_3, "12345");
-                    target->push(deadline, folder_id, name_2.get_full_name(), std::string(name_1.get_full_name()), U::meta, false);
-                    target->push(deadline_2, folder_id, name_3.get_full_name(), std::string(name_2.get_full_name()), U::meta, false);
+                    target->push(deadline, folder_id, name_2.get_full_name(), std::string(name_1.get_full_name()),
+                                 U::meta, false);
+                    target->push(deadline_2, folder_id, name_3.get_full_name(), std::string(name_2.get_full_name()),
+                                 U::meta, false);
 
                     await_events(poll_t::trigger_timer);
 
@@ -502,8 +508,10 @@ void test_watcher_base() {
                     auto name_1 = utils::make_native_view(L"файл-1.bin", allocator);
                     auto name_2 = utils::make_native_view(L"файл-2.bin", allocator);
                     write_file(root_path / name_1, "12345");
-                    target->push(deadline, folder_id, name_2.get_full_name(), std::string(name_1.get_full_name()), U::meta, false);
-                    target->push(deadline_2, folder_id, name_1.get_full_name(), std::string(name_2.get_full_name()), U::meta, false);
+                    target->push(deadline, folder_id, name_2.get_full_name(), std::string(name_1.get_full_name()),
+                                 U::meta, false);
+                    target->push(deadline_2, folder_id, name_1.get_full_name(), std::string(name_2.get_full_name()),
+                                 U::meta, false);
                     await_events(poll_t::trigger_timer);
                     REQUIRE(changes.size() == 0);
                 }
@@ -512,7 +520,8 @@ void test_watcher_base() {
                     auto name_2 = utils::make_native_view(L"файл-2.bin", allocator);
                     write_file(root_path / name_2, "12345");
                     target->push(deadline, folder_id, name_1.get_full_name(), {}, U::content, false);
-                    target->push(deadline, folder_id, name_2.get_full_name(), std::string(name_1.get_full_name()), U::meta, false);
+                    target->push(deadline, folder_id, name_2.get_full_name(), std::string(name_1.get_full_name()),
+                                 U::meta, false);
                     await_events(poll_t::trigger_timer, 2, true);
 
                     auto &payload_1 = changes[0]->payload;
@@ -628,7 +637,7 @@ void test_start_n_shutdown() {
     struct F : fixture_real_t {
         using fixture_real_t::fixture_real_t;
 
-        void main(const utils::poly_path_view_t& root_path, const utils::allocator_t& allocator) noexcept override {
+        void main(const utils::poly_path_view_t &root_path, const utils::allocator_t &allocator) noexcept override {
             launch_target();
             CHECK(static_cast<r::actor_base_t *>(target.get())->access<to::state>() == r::state_t::OPERATIONAL);
             REQUIRE(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::OPERATIONAL);
@@ -658,7 +667,7 @@ void test_watch_unwatch() {
             ++unwatched_replies;
         }
 
-        void main(const utils::poly_path_view_t& root_path, const utils::allocator_t& allocator) noexcept override {
+        void main(const utils::poly_path_view_t &root_path, const utils::allocator_t &allocator) noexcept override {
             auto folder_id = std::string("my-folder-id");
             auto back_addr = sup->get_address();
             sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path.detach(), folder_id);
@@ -696,7 +705,7 @@ void test_tmp_ignoring() {
     struct F : fixture_real_t {
         using fixture_real_t::fixture_real_t;
 
-        void main(const utils::poly_path_view_t& root_path, const utils::allocator_t& allocator) noexcept override {
+        void main(const utils::poly_path_view_t &root_path, const utils::allocator_t &allocator) noexcept override {
             auto folder_id = std::string("my-folder-id");
             auto back_addr = sup->get_address();
 
@@ -757,7 +766,7 @@ void test_real_impl() {
     struct F : fixture_real_t {
         using fixture_real_t::fixture_real_t;
 
-        void main(const utils::poly_path_view_t& root_path, const utils::allocator_t& allocator) noexcept override {
+        void main(const utils::poly_path_view_t &root_path, const utils::allocator_t &allocator) noexcept override {
             auto folder_id = std::string("my-folder-id");
             auto back_addr = sup->get_address();
 
@@ -1168,7 +1177,7 @@ void test_hierarchies() {
     struct F : fixture_real_t {
         using fixture_real_t::fixture_real_t;
 
-        void main(const utils::poly_path_view_t& root_path, const utils::allocator_t& allocator) noexcept override {
+        void main(const utils::poly_path_view_t &root_path, const utils::allocator_t &allocator) noexcept override {
             using names_t = std::vector<std::wstring_view>;
             auto folder_id = std::string("my-folder-id");
             auto back_addr = sup->get_address();
@@ -1321,7 +1330,7 @@ void test_hierarchies() {
 void test_create_modify_rename() {
     struct F : fixture_real_t {
         using fixture_real_t::fixture_real_t;
-        void main(const utils::poly_path_view_t& root_path, const utils::allocator_t& allocator) noexcept override {
+        void main(const utils::poly_path_view_t &root_path, const utils::allocator_t &allocator) noexcept override {
             auto folder_id = std::string("my-folder-id");
             auto back_addr = sup->get_address();
             watch_folder(folder_id);
@@ -1351,7 +1360,7 @@ void test_unix_notification() {
 
         bool notify_upon_watch() override { return false; }
 
-        void main(const utils::poly_path_view_t& root_path, const utils::allocator_t& allocator) noexcept override {
+        void main(const utils::poly_path_view_t &root_path, const utils::allocator_t &allocator) noexcept override {
             using scan_dir_t = fs::task::scan_dir_t;
             using child_info_t = fs::task::scan_dir_t::child_info_t;
             using child_infos_t = fs::task::scan_dir_t::child_infos_t;
@@ -1360,7 +1369,8 @@ void test_unix_notification() {
             auto back_addr = sup->get_address();
             watch_folder(folder_id);
 
-            auto add_child = [](scan_dir_t& task, std::string_view path, utils::file_type_t type = utils::file_type_t::DIRECTORY) -> child_info_t {
+            auto add_child = [](scan_dir_t &task, std::string_view path,
+                                utils::file_type_t type = utils::file_type_t::DIRECTORY) -> child_info_t {
                 auto child = child_info_t{};
                 child.path = utils::path_t::make_native(path);
                 child.file_type = type;
@@ -1480,7 +1490,7 @@ void test_kqueue() {
     struct F : fixture_real_t {
         using fixture_real_t::fixture_real_t;
 
-        void main(const utils::poly_path_view_t& root_path, const utils::allocator_t& allocator) noexcept override {
+        void main(const utils::poly_path_view_t &root_path, const utils::allocator_t &allocator) noexcept override {
             using child_info_t = fs::task::scan_dir_t::child_info_t;
             using child_infos_t = fs::task::scan_dir_t::child_infos_t;
 

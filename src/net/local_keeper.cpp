@@ -190,7 +190,7 @@ auto local_keeper_t::operator()(const model::diff::advance::local_update_t &diff
     -> outcome::result<void> {
     if (!just_created_dirs.empty()) {
         auto folder = cluster->get_folders().by_id(diff.folder_id);
-        auto& folder_path = folder->get_path();
+        auto &folder_path = folder->get_path();
         auto name = proto::get_name(diff.proto_local);
         auto full_path = fmt::format("{}/{}", folder_path, name);
         auto it = just_created_dirs.find(full_path);
@@ -267,8 +267,8 @@ auto local_keeper_t::operator()(const model::diff::modify::remove_folder_t &diff
 }
 
 void local_keeper_t::on_create_dir(fs::message::create_dir_t &message) noexcept {
-    auto &p =  message.payload;
-    auto &pp = static_cast<utils::path_t&>(p);
+    auto &p = message.payload;
+    auto &pp = static_cast<utils::path_t &>(p);
     auto &ec = message.payload.ec;
     auto folder = cluster->get_folders().by_id(p.folder_id);
     if (folder) {
@@ -539,7 +539,8 @@ void local_keeper_t::on_changes(model::folder_info_t &local_folder, fs::payload:
             auto folder_path = folder->get_path().get_view(stack_ctx.allocator);
             auto path = folder_path / *parent->get_entity()->get_path();
             auto child_name = utils::path_t::make_native(presence->get_entity()->get_path()->get_filename());
-            auto item = unscanned_dir_t(path.detach(), parent, std::move(child_name), 0, true, change.requires_refinement);
+            auto item =
+                unscanned_dir_t(path.detach(), parent, std::move(child_name), 0, true, change.requires_refinement);
             unexamined.push_back(std::move(item));
         } else {
             immediate_update(change, self, parent);

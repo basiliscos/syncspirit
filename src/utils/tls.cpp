@@ -349,7 +349,7 @@ outcome::result<std::string> get_common_name(X509 *cert) noexcept {
 
 void digest(const unsigned char *src, size_t length, unsigned char *storage) noexcept { SHA256(src, length, storage); }
 
-bool set_store(spdlog::logger* log, SSL_CTX *ctx, std::string_view caStore) noexcept {
+bool set_store(spdlog::logger *log, SSL_CTX *ctx, std::string_view caStore) noexcept {
     auto store = X509_STORE_new();
     auto store_guard = make_guard(store, [](auto *ptr) { X509_STORE_free(ptr); });
     char buff[256];
@@ -357,7 +357,7 @@ bool set_store(spdlog::logger* log, SSL_CTX *ctx, std::string_view caStore) noex
     auto get_error = [&]() -> std::string_view {
         auto err = ERR_get_error();
         if (err) {
-            if (auto str = ERR_error_string(err, buff); str)  {
+            if (auto str = ERR_error_string(err, buff); str) {
                 return str;
             }
         };
@@ -385,7 +385,7 @@ bool set_store(spdlog::logger* log, SSL_CTX *ctx, std::string_view caStore) noex
                 LOG_WARN(log, "failed to load certificate via '{}: {}', ", path, result.assume_error());
             } else {
                 LOG_TRACE(log, "loaded certificate via '{}'", path);
-                auto& bio = result.assume_value();
+                auto &bio = result.assume_value();
                 auto cert = X509_new();
                 auto cert_guard = make_guard(cert, [](auto *ptr) { X509_free(ptr); });
                 if (!PEM_read_bio_X509(bio.get(), &cert, nullptr, nullptr)) {
@@ -415,7 +415,7 @@ bool set_store(spdlog::logger* log, SSL_CTX *ctx, std::string_view caStore) noex
             store_guard.release();
         }
     }
-    return (bool) store_guard;
+    return (bool)store_guard;
 }
 
 } // namespace syncspirit::utils

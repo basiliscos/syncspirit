@@ -309,7 +309,7 @@ bool platform_t::path_supported(const poly_path_view_t &str_path) noexcept {
             continue;
         }
         auto sz = pos == std::wstring::npos ? tail.size() : pos;
-        auto name =  tail.substr(0, sz);
+        auto name = tail.substr(0, sz);
         if (name.size() == tail.size()) {
             tail = {};
         } else {

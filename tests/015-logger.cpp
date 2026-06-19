@@ -70,7 +70,7 @@ TEST_CASE("file sink", "[log]") {
     auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
     auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
 
-    auto log_file = path_guard.get_view(allocator) / L"папка"  /L"журнал.txt";
+    auto log_file = path_guard.get_view(allocator) / L"папка" / L"журнал.txt";
     auto sink_config = fmt::format("file:{}", log_file);
     INFO("log_file = " << sink_config);
 

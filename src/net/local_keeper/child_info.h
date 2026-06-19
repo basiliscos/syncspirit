@@ -14,16 +14,16 @@ namespace syncspirit::net::local_keeper {
 
 namespace sys = boost::system;
 
-struct child_info_t: fs::task::scan_dir_t::child_info_t {
+struct child_info_t : fs::task::scan_dir_t::child_info_t {
     using parent_t = fs::task::scan_dir_t::child_info_t;
     using blocks_t = std::vector<proto::BlockInfo>;
     using generation_t = std::uint_fast32_t;
 
-    child_info_t(parent_t backend, presentation::presence_ptr_t self_,
-                 presentation::presence_ptr_t parent_, generation_t generation_) noexcept;
+    child_info_t(parent_t backend, presentation::presence_ptr_t self_, presentation::presence_ptr_t parent_,
+                 generation_t generation_) noexcept;
     child_info_t(proto::FileInfo file_info, utils::path_t path, presentation::presence_ptr_t self_,
                  presentation::presence_ptr_t parent_, generation_t generation_) noexcept;
-    child_info_t(child_info_t&&) noexcept = default;
+    child_info_t(child_info_t &&) noexcept = default;
     virtual ~child_info_t() = default;
 
     child_info_t clone() const noexcept;

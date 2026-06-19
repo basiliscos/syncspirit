@@ -68,8 +68,8 @@ void watcher_t::on_watch(message::watch_folder_t &message) noexcept {
     auto path_wstr = path_view.get_full_wname();
     LOG_TRACE(log, "on watch on '{}' (buffer size: {} bytes)", path_view, fs_config.win32_watcher_buff);
 
-    auto dir_handle = ::CreateFileW(path_wstr.c_str(), FILE_LIST_DIRECTORY, SHARE_MODE, nullptr, OPEN_EXISTING,
-                                    FILE_FLAGS, nullptr);
+    auto dir_handle =
+        ::CreateFileW(path_wstr.c_str(), FILE_LIST_DIRECTORY, SHARE_MODE, nullptr, OPEN_EXISTING, FILE_FLAGS, nullptr);
 
     if (dir_handle == INVALID_HANDLE_VALUE) {
         auto ec = sys::error_code(::GetLastError(), sys::system_category());
@@ -140,7 +140,7 @@ void watcher_t::on_unwatch(message::unwatch_folder_t &message) noexcept {
 
 void watcher_t::shutdown_finish() noexcept {
     for (auto it = watched_folders->begin(); it != watched_folders->end();) {
-        auto& [folder_id, path] = *it;
+        auto &[folder_id, path] = *it;
         LOG_DEBUG(log, "unwatching(2) {}", path);
         unwatch_dir(folder_id);
         it = watched_folders->erase(it);
@@ -207,7 +207,8 @@ void watcher_t::on_notify(handle_t handle) noexcept {
             }
 
             if (type) {
-                push(deadline, folder_id, name_view.get_full_name(), {}, static_cast<update_type_t>(type), requires_refinement);
+                push(deadline, folder_id, name_view.get_full_name(), {}, static_cast<update_type_t>(type),
+                     requires_refinement);
             } else {
                 LOG_DEBUG(log, "in the folder '{}' updated ({:x}): '{}'", folder_id, ptr->Action, name_view);
             }

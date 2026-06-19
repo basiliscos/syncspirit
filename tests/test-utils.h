@@ -26,19 +26,19 @@ namespace syncspirit::utils {
 template <typename T, typename TP = std::remove_reference_t<std::remove_cv_t<T>>,
           typename CharT = typename std::char_traits<typename TP::value_type>::char_type,
           typename = std::enable_if_t<std::is_convertible_v<T &&, std::basic_string_view<CharT>>>>
-inline poly_path_view_t operator/(const poly_path_view_t& path, T &&normalized_path) {
+inline poly_path_view_t operator/(const poly_path_view_t &path, T &&normalized_path) {
     return path / make_native_view(normalized_path, path.get_allocator());
 }
 
-inline poly_path_view_t operator/(const poly_path_view_t& path, const char* normalized_path) {
+inline poly_path_view_t operator/(const poly_path_view_t &path, const char *normalized_path) {
     return path / std::string_view(normalized_path);
 }
 
-inline poly_path_view_t operator/(const poly_path_view_t& path, const wchar_t* normalized_path) {
+inline poly_path_view_t operator/(const poly_path_view_t &path, const wchar_t *normalized_path) {
     return path / std::wstring_view(normalized_path);
 }
 
-}
+} // namespace syncspirit::utils
 
 namespace syncspirit::test {
 
@@ -50,7 +50,7 @@ struct test_apply_controller_t final : model::arc_base_t<test_apply_controller_t
 
 using apply_controller_ptr_t = model::intrusive_ptr_t<test_apply_controller_t>;
 
-struct SYNCSPIRIT_TEST_API path_guard_t: utils::path_t {
+struct SYNCSPIRIT_TEST_API path_guard_t : utils::path_t {
     using utils::path_t::path_t;
     path_guard_t();
     path_guard_t(utils::path_t);
@@ -64,7 +64,7 @@ SYNCSPIRIT_TEST_API utils::bytes_t as_owned_bytes(std::string_view);
 SYNCSPIRIT_TEST_API path_guard_t unique_path();
 SYNCSPIRIT_TEST_API apply_controller_ptr_t make_apply_controller(model::cluster_ptr_t cluster);
 SYNCSPIRIT_TEST_API void init_logging();
-SYNCSPIRIT_TEST_API utils::poly_path_view_t locate_path(const char *test_file, const utils::allocator_t&);
+SYNCSPIRIT_TEST_API utils::poly_path_view_t locate_path(const char *test_file, const utils::allocator_t &);
 SYNCSPIRIT_TEST_API std::string read_file(const utils::poly_path_view_t &path);
 SYNCSPIRIT_TEST_API void write_file(const utils::poly_path_view_t &path, std::string_view content);
 SYNCSPIRIT_TEST_API utils::bytes_t device_id2sha256(std::string_view device_id);

@@ -55,14 +55,15 @@ struct mock_supervisor_t : supervisor_t {
     }
 
     void process_io(fs::payload::append_block_t &req) noexcept override {
-        auto copy = fs::payload::append_block_t({}, req.folder_id, req.path.clone(), req.data, req.offset, req.file_size);
+        auto copy =
+            fs::payload::append_block_t({}, req.folder_id, req.path.clone(), req.data, req.offset, req.file_size);
         appended_blocks.emplace_back(std::move(copy));
         supervisor_t::process_io(req);
     }
 
     void process_io(fs::payload::finish_file_t &req) noexcept override {
-        auto copy = fs::payload::finish_file_t({}, req.folder_id, req.path.clone(), req.conflict_path.clone(), req.file_size,
-                                               req.modification_s, req.permissions, req.no_permissions);
+        auto copy = fs::payload::finish_file_t({}, req.folder_id, req.path.clone(), req.conflict_path.clone(),
+                                               req.file_size, req.modification_s, req.permissions, req.no_permissions);
         file_finishes.emplace_back(std::move(copy));
         supervisor_t::process_io(req);
     }

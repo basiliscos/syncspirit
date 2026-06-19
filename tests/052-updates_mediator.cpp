@@ -9,7 +9,6 @@ using namespace syncspirit::utils;
 using namespace syncspirit::test;
 using namespace syncspirit::fs;
 
-
 TEST_CASE("update_mediator", "[fs]") {
     auto interval = pt::microseconds{1};
     auto mediator = updates_mediator_t(interval, true);
@@ -17,9 +16,7 @@ TEST_CASE("update_mediator", "[fs]") {
     auto deadline_2 = pt::microsec_clock::local_time() + interval * 2;
     auto deadline_3 = pt::microsec_clock::local_time() + interval * 3;
 
-    auto P = [](std::string_view path) {
-        return utils::path_t::make_native(path);
-    };
+    auto P = [](std::string_view path) { return utils::path_t::make_native(path); };
 
     SECTION("non-masked file") { CHECK(!mediator.is_masked("/tmp/path_1")); }
     SECTION("1 file, successful unmask") {

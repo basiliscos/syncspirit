@@ -32,8 +32,8 @@ struct comparator_t {
 };
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
-inline std::int64_t to_unix(const FILETIME& ft) {
-    constexpr std::int64_t UNIX_TIME_START = 0x019DB1DED53E8000ll; //January 1, 1970 (start of Unix epoch) in "ticks"
+inline std::int64_t to_unix(const FILETIME &ft) {
+    constexpr std::int64_t UNIX_TIME_START = 0x019DB1DED53E8000ll; // January 1, 1970 (start of Unix epoch) in "ticks"
     auto v = ((std::int64_t)ft.dwHighDateTime << 32) | ft.dwLowDateTime;
     // convert to seconds since 1601
     auto u = v - UNIX_TIME_START;
@@ -41,8 +41,8 @@ inline std::int64_t to_unix(const FILETIME& ft) {
 }
 #endif
 
-scan_dir_t::scan_dir_t(utils::path_t path_, presentation::presence_ptr_t presence_, utils::path_t single_child_, bool notify_,
-                       bool recurse_, bool requires_refinement_) noexcept
+scan_dir_t::scan_dir_t(utils::path_t path_, presentation::presence_ptr_t presence_, utils::path_t single_child_,
+                       bool notify_, bool recurse_, bool requires_refinement_) noexcept
     : path{std::move(path_)}, presence{std::move(presence_)},
       ec(utils::make_error_code(utils::error_code_t::no_action)), single_child{std::move(single_child_)},
       notify{notify_ ? 1u : 0}, recurse{recurse_ ? 1u : 0}, requires_refinement{requires_refinement_ ? 1u : 0} {}
@@ -68,16 +68,17 @@ bool scan_dir_t::process(fs_slave_t &slave, execution_context_t &context) noexce
                     auto full_name = std::wstring_view(buff, wpath.size() + child_name.size() + 1);
                     auto child_info = task::scan_dir_t::child_info_t{};
                     auto is_dir = child_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY;
-                    auto sz = static_cast<std::int64_t>((child_data.nFileSizeHigh * (MAXDWORD+1)) + child_data.nFileSizeLow);
+                    auto sz = static_cast<std::int64_t>((child_data.nFileSizeHigh * (MAXDWORD + 1)) +
+                                                        child_data.nFileSizeLow);
                     child_info.path = utils::path_t::make_native(full_name);
-                    child_info.file_type = is_dir ? utils::file_type_t::DIRECTORY: utils::file_type_t::FILE;
+                    child_info.file_type = is_dir ? utils::file_type_t::DIRECTORY : utils::file_type_t::FILE;
                     child_info.permissions = 0666;
                     child_info.last_write_time = to_unix(child_data.ftLastWriteTime);
                     child_info.size = sz;
                     child_infos.push_back(std::move(child_info));
                 }
             }
-        } while(FindNextFileW(child_handle, &child_data) && !ec);
+        } while (FindNextFileW(child_handle, &child_data) && !ec);
 
         if (!FindClose(child_handle)) {
             ec = std::error_code(::GetLastError(), std::system_category());

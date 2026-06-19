@@ -70,8 +70,7 @@ struct fixture_t : diff::cluster_visitor_t, diff::apply_controller_t {
     using diff_ptr_t = r::intrusive_ptr_t<model::message::model_update_t>;
     using diff_msgs_t = std::vector<diff_ptr_t>;
 
-    fixture_t() noexcept
-        : ctx(io_ctx), acceptor(io_ctx), peer_sock(io_ctx), path_guard{unique_path()} {
+    fixture_t() noexcept : ctx(io_ctx), acceptor(io_ctx), peer_sock(io_ctx), path_guard{unique_path()} {
         log = utils::get_logger("fixture");
     }
 

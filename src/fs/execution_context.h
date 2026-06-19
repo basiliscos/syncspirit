@@ -33,9 +33,7 @@ struct execution_context_t {
     using pool_t = std::pmr::monotonic_buffer_resource;
     using allocator_t = std::pmr::polymorphic_allocator<char>;
 
-    inline execution_context_t() noexcept: pool(buffer.data(), buffer.size()), allocator{&pool} {
-
-    }
+    inline execution_context_t() noexcept : pool(buffer.data(), buffer.size()), allocator{&pool} {}
     execution_context_t(const execution_context_t &) = delete;
     execution_context_t(execution_context_t &&) = delete;
 

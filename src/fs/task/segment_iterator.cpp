@@ -29,7 +29,7 @@ bool segment_iterator_t::process(fs_slave_t &fs_slave, execution_context_t &exec
     assert(!ec);
     auto path_view = path.get_view(exec_ctx.allocator);
     if (!file.has_backend()) {
-        auto opt = file_t::open_read(path_view );
+        auto opt = file_t::open_read(path_view);
         if (!opt.has_value()) {
             ec = opt.assume_error();
             return false;

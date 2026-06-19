@@ -273,7 +273,7 @@ int folder_context_t::process(child_ready_t &info, stack_context_t &ctx) noexcep
                 auto perms_match = ignore_perms || info.permissions == file->get_permissions();
                 if (perms_match) {
                     if (type == FT::SYMLINK) {
-                        auto& target = info.target;
+                        auto &target = info.target;
                         match = file->get_link_target() == target.get_full_name();
                     } else {
                         match = file->get_size() == info.size;
@@ -504,8 +504,7 @@ int folder_context_t::process(rehashed_incomplete_t &item, stack_context_t &ctx)
         } else {
             if (matched) {
                 using namespace model::diff::local;
-                LOG_DEBUG(log, "matched {} of {} blocks of '{}'", matched, blocks.size(),
-                          item.path);
+                LOG_DEBUG(log, "matched {} of {} blocks of '{}'", matched, blocks.size(), item.path);
                 auto &peer_folder = cp->get_folder()->get_folder_info();
                 ctx.push_back(new blocks_availability_t(peer_file, peer_folder, std::move(valid_blocks)));
             } else {
@@ -548,7 +547,7 @@ void folder_context_t::post_process(hash_base_t &hash_file, hasher::message::dig
     if (!ensure_folder_existance(ctx)) {
         return;
     }
-    auto& path = hash_file.path;
+    auto &path = hash_file.path;
     LOG_TRACE(log, "post_process of '{}', {} blocks are hashing", path, hashing);
     assert(hashing > 0);
     --hashing;
@@ -624,9 +623,8 @@ void folder_context_t::post_process(fs::task::scan_dir_t &task, stack_context_t 
         } else {
             auto path = task.path.get_view(ctx.allocator).get_parent();
             auto p = static_cast<presentation::local_file_presence_t *>(task.presence.get());
-            auto& child = p->get_file_info().get_name();
-            auto sub_task = fs::task::scan_dir_t(path.detach(), p->get_parent(), child->clone(), false,
-                                                 false, false);
+            auto &child = p->get_file_info().get_name();
+            auto sub_task = fs::task::scan_dir_t(path.detach(), p->get_parent(), child->clone(), false, false, false);
             push(std::move(sub_task));
             return;
         }
@@ -671,7 +669,7 @@ void folder_context_t::post_process(fs::task::scan_dir_t &task, stack_context_t 
         for (auto child : dir_presence->get_children()) {
             auto features = child->get_features();
             if (features & F::local) {
-                auto& child_path = *child->get_entity()->get_path();
+                auto &child_path = *child->get_entity()->get_path();
                 auto filename = child_path.get_filename();
                 if (!checked_children.count(filename)) {
                     checked_children.emplace(filename);
@@ -778,8 +776,7 @@ void folder_context_t::post_process(fs::task::rename_file_t &task, stack_context
     auto &ec = task.ec;
     if (ec) {
         auto &path = task.path;
-        LOG_WARN(log, "cannot rename '{}' -> {}: {}, going to remove", path,
-                 task.new_name, ec);
+        LOG_WARN(log, "cannot rename '{}' -> {}: {}, going to remove", path, task.new_name, ec);
         auto sub_task = fs::task::remove_file_t(std::move(path));
         push(std::move(sub_task));
     } else {
@@ -789,7 +786,8 @@ void folder_context_t::post_process(fs::task::rename_file_t &task, stack_context
         auto peer = cp->get_device();
         auto &peer_folder = cp->get_folder()->get_folder_info();
         auto &sequencer = ctx.sequencer;
-        auto diff = model::diff::advance::advance_t::create(item.action, peer_file, peer_folder, sequencer, ctx.allocator);
+        auto diff =
+            model::diff::advance::advance_t::create(item.action, peer_file, peer_folder, sequencer, ctx.allocator);
         ctx.push_back(diff.get());
     }
 }

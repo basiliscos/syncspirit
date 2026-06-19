@@ -217,8 +217,7 @@ auto supervisor_t::operator()(const model::diff::peer::update_folder_t &diff, vo
 }
 
 void supervisor_t::process_io(fs::payload::block_request_t &req) noexcept {
-    LOG_TRACE(log, "process_io, requesting on '{}' (offset: {}, size: {})", req.path, req.offset,
-              req.block_size);
+    LOG_TRACE(log, "process_io, requesting on '{}' (offset: {}, size: {})", req.path, req.offset, req.block_size);
 }
 
 void supervisor_t::process_io(fs::payload::remote_copy_t &req) noexcept {

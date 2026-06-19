@@ -459,7 +459,8 @@ bool file_info_t::is_locally_available() const noexcept {
     return r;
 };
 
-auto file_info_t::get_path(const folder_info_t &folder_info, const utils::allocator_t& allocator) const noexcept -> utils::poly_path_view_t {
+auto file_info_t::get_path(const folder_info_t &folder_info, const utils::allocator_t &allocator) const noexcept
+    -> utils::poly_path_view_t {
     return folder_info.get_folder()->get_path().get_view(allocator) / *name;
 }
 
@@ -630,8 +631,9 @@ utils::poly_path_view_t file_info_t::make_conflicting_name(const utils::allocato
     auto device_short = device_id_t::make_short(proto::get_id(counter));
     auto conflicted_name = std::pmr::string(allocator);
     auto out = std::back_inserter(conflicted_name);
-    fmt::format_to(out, "{}.sync-conflict-{:04}{:02}{:02}-{:02}{:02}{:02}-{}{}", stem, (int)ymd.year, ymd.month.as_number(),
-                    ymd.day.as_number(), time.hours(), time.minutes(), time.seconds(), device_short, ext);
+    fmt::format_to(out, "{}.sync-conflict-{:04}{:02}{:02}-{:02}{:02}{:02}-{}{}", stem, (int)ymd.year,
+                   ymd.month.as_number(), ymd.day.as_number(), time.hours(), time.minutes(), time.seconds(),
+                   device_short, ext);
     auto parent = utils::make_native_view(name->get_parent_name(), allocator);
     auto full_name = parent / utils::make_native_view(conflicted_name, allocator);
     return full_name;

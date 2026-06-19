@@ -5,7 +5,7 @@
 #include "path_view.hpp"
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
-#define _CRT_STDIO_ISO_WIDE_SPECIFIERS 1  /* optional on some toolchains */
+#define _CRT_STDIO_ISO_WIDE_SPECIFIERS 1 /* optional on some toolchains */
 #include <windows.h>
 #include <sys/types.h>
 #include <sys/utime.h>
@@ -74,7 +74,7 @@ bool is_empty(const poly_path_view_t &path, std::error_code &ec) noexcept {
             r = false;
             break;
         }
-    } while(FindNextFileW(child_handle, &child_data) && !ec);
+    } while (FindNextFileW(child_handle, &child_data) && !ec);
     if (!FindClose(child_handle)) {
         ec = std::error_code(::GetLastError(), std::system_category());
     }
@@ -178,7 +178,7 @@ void rm_file(std::wstring_view path, std::error_code &ec) noexcept {
 }
 
 void rm_dir_recurse(std::wstring_view path, std::error_code &ec) noexcept {
-    auto ptr = const_cast<wchar_t*>(path.data() + path.size());
+    auto ptr = const_cast<wchar_t *>(path.data() + path.size());
     auto child_ptr = ptr;
     swprintf(ptr, L"\\*.*");
     WIN32_FIND_DATAW child_data;
@@ -196,7 +196,7 @@ void rm_dir_recurse(std::wstring_view path, std::error_code &ec) noexcept {
                 }
             }
             swprintf(ptr, L"\\*.*");
-        } while(FindNextFileW(child_handle, &child_data) && !ec);
+        } while (FindNextFileW(child_handle, &child_data) && !ec);
 
         if (!FindClose(child_handle)) {
             ec = std::error_code(::GetLastError(), std::system_category());
@@ -236,11 +236,11 @@ void remove_all(const poly_path_view_t &path, std::error_code &ec) noexcept {
         }
     }
 #else
-    auto cb = [](const char* path, const struct stat *sb, int type, struct FTW *ftwbuf) -> int {
+    auto cb = [](const char *path, const struct stat *sb, int type, struct FTW *ftwbuf) -> int {
         if (type == FTW_DP) {
-             if (rmdir(path) != 0) {
-                 return -1;
-             }
+            if (rmdir(path) != 0) {
+                return -1;
+            }
         } else {
             if (unlink(path) != 0) {
                 return -1;
@@ -286,14 +286,14 @@ void remove_file(const poly_path_view_t &path, std::error_code &ec) noexcept {
 #endif
 }
 
-void  chmod(const poly_path_view_t &path, std::uint32_t perms, std::error_code &ec) noexcept {
+void chmod(const poly_path_view_t &path, std::uint32_t perms, std::error_code &ec) noexcept {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
     auto wf = path.get_full_wname(true);
     if (_wchmod(wf.data(), perms) != 0) {
         ec = std::error_code{errno, std::system_category()};
     }
 #else
-    if (::chmod(path.get_full_name().data(), perms) !=0) {
+    if (::chmod(path.get_full_name().data(), perms) != 0) {
         ec = std::error_code{errno, std::system_category()};
     }
 #endif
@@ -303,7 +303,7 @@ void create_symlink(const utils::path_base_t &target, const utils::path_base_t &
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
     ec = std::make_error_code(std::errc::function_not_supported);
 #else
-    if (::symlink(target.get_full_name().data(), path.get_full_name().data()) !=0 ) {
+    if (::symlink(target.get_full_name().data(), path.get_full_name().data()) != 0) {
         ec = std::error_code{errno, std::system_category()};
     }
 #endif
@@ -345,15 +345,15 @@ void last_write_time(const poly_path_view_t &path, std::int64_t modified_at, std
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
     auto wpath = path.get_full_wname(true);
     struct _utimbuf times;
-    times.actime  = 0;
+    times.actime = 0;
     times.modtime = (time_t)modified_at;
     if (_wutime(wpath.data(), &times) != 0) {
         ec = std::error_code{errno, std::system_category()};
     }
 #else
     struct timespec times[2];
-    times[0].tv_nsec = UTIME_OMIT;          /* keep atime */
-    times[1].tv_sec  = modified_at;
+    times[0].tv_nsec = UTIME_OMIT; /* keep atime */
+    times[1].tv_sec = modified_at;
     times[1].tv_nsec = 0;
     if (::utimensat(AT_FDCWD, path.get_full_name().data(), times, AT_SYMLINK_NOFOLLOW) == -1) {
         ec = std::error_code{errno, std::system_category()};
@@ -407,7 +407,5 @@ stats_t get_stats(const poly_path_view_t &path, std::error_code &ec) noexcept {
 #endif
     return r;
 }
-
-
 
 } // namespace syncspirit::utils

@@ -10,8 +10,8 @@
 
 using namespace syncspirit::net::local_keeper;
 
-child_info_t::child_info_t(parent_t backend, presentation::presence_ptr_t self_,
-                           presentation::presence_ptr_t parent_, generation_t generation_) noexcept
+child_info_t::child_info_t(parent_t backend, presentation::presence_ptr_t self_, presentation::presence_ptr_t parent_,
+                           generation_t generation_) noexcept
     : parent_t(std::move(backend)), self(std::move(self_)), parent(std::move(parent_)), generation{generation_} {
     assert(!path.empty());
     ec = backend.ec;
@@ -31,15 +31,7 @@ child_info_t::child_info_t(proto::FileInfo info, utils::path_t path_, presentati
 }
 
 child_info_t child_info_t::clone() const noexcept {
-    auto new_parent = parent_t {
-        path.clone(),
-        target.clone(),
-        file_type,
-        permissions,
-        last_write_time,
-        size,
-        ec
-    };
+    auto new_parent = parent_t{path.clone(), target.clone(), file_type, permissions, last_write_time, size, ec};
     return child_info_t(std::move(new_parent), self, parent, generation);
 }
 

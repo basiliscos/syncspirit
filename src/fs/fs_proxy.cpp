@@ -73,7 +73,6 @@ sys::error_code fs_proxy_t::remove(const utils::poly_path_view_t &path) noexcept
     return ec;
 }
 
-
 sys::error_code fs_proxy_t::remove_file(const utils::poly_path_view_t &path) noexcept {
     sys::error_code ec;
     utils::remove_file(path, ec);

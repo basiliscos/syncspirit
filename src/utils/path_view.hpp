@@ -32,7 +32,8 @@ template <typename Allocator> struct path_view_t final : path_base_t {
     }
 
     template <typename CharT, typename Traits = details::traits::generic<CharT>>
-    explicit path_view_t(std::basic_string_view<CharT> normalized, const Allocator &allocator_, const Traits& t) noexcept
+    explicit path_view_t(std::basic_string_view<CharT> normalized, const Allocator &allocator_,
+                         const Traits &t) noexcept
         : allocator{allocator_} {
         auto separators = Traits::separators;
         auto decomposed = path_decomposer_t::decompose(normalized, allocator, separators);
@@ -120,9 +121,7 @@ template <typename Allocator> struct path_view_t final : path_base_t {
         return {};
     }
 
-    path_view_t clone() const noexcept {
-        return path_view_t(*this, allocator);
-    }
+    path_view_t clone() const noexcept { return path_view_t(*this, allocator); }
 
     path_view_t &operator=(const path_view_t &path) noexcept {
         if (data) {
@@ -169,7 +168,6 @@ template <typename Allocator> struct path_view_t final : path_base_t {
         return r;
     }
 
-
   private:
     void copy(const path_base_t &path) {
         if (auto d = path.get_data(); d) {
@@ -187,7 +185,7 @@ template <typename Allocator> struct path_view_t final : path_base_t {
 };
 
 template <typename Allocator>
-path_view_t<Allocator> join(const path_base_t &parent, const path_base_t &child, const Allocator& allocator_) noexcept {
+path_view_t<Allocator> join(const path_base_t &parent, const path_base_t &child, const Allocator &allocator_) noexcept {
     using Traits = std::allocator_traits<Allocator>;
     using AllocatorU32 = Traits::template rebind_alloc<std::uint32_t>;
     using TraitsU32 = std::allocator_traits<AllocatorU32>;
@@ -247,21 +245,18 @@ auto operator/(const path_view_t<Allocator> &parent, const path_view_t<Allocator
 }
 
 template <typename Allocator>
-auto operator/(const path_view_t<Allocator> &parent, const path_base_t &child) noexcept
-    -> path_view_t<Allocator> {
+auto operator/(const path_view_t<Allocator> &parent, const path_base_t &child) noexcept -> path_view_t<Allocator> {
     return join(parent, child, parent.get_allocator());
 }
 
 template <typename Allocator>
-auto operator/(const path_base_t &parent, const path_view_t<Allocator> &child) noexcept
-    -> path_view_t<Allocator> {
+auto operator/(const path_base_t &parent, const path_view_t<Allocator> &child) noexcept -> path_view_t<Allocator> {
     return join(parent, child, child.get_allocator());
 }
 
 template <typename Allocator> auto path_base_t::get_view(const Allocator &a) const noexcept -> path_view_t<Allocator> {
     return path_view_t<Allocator>(*this, a);
 };
-
 
 template <typename T, typename Allocator, typename TP = std::remove_reference_t<std::remove_cv_t<T>>,
           typename CharT = typename std::char_traits<typename TP::value_type>::char_type,
@@ -301,8 +296,7 @@ auto make_native_view(const wchar_t *normalized_path, const Allocator &a) noexce
     return make_native_view(std::wstring_view(normalized_path), a);
 };
 
-template <typename Allocator>
-auto make_empty_view(const Allocator &a) noexcept -> path_view_t<Allocator> {
+template <typename Allocator> auto make_empty_view(const Allocator &a) noexcept -> path_view_t<Allocator> {
     return make_generic_view(std::string_view(), a);
 };
 

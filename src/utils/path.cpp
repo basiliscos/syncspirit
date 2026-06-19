@@ -220,7 +220,7 @@ std::string_view path_base_t::get_parent_name() const noexcept {
     return {};
 }
 
-std::string_view path_base_t::relativize(const path_base_t& parent) const noexcept {
+std::string_view path_base_t::relativize(const path_base_t &parent) const noexcept {
     auto self = get_full_name();
     auto p = parent.get_full_name();
     assert(p.size() <= self.size());
@@ -239,25 +239,19 @@ size_t path_hash_t::operator()(const path_base_t &item) const noexcept {
     return std::hash<std::string_view>()(item.get_full_name());
 }
 
-size_t path_hash_t::operator()(std::string_view item) const noexcept {
-    return std::hash<std::string_view>()(item);
-}
+size_t path_hash_t::operator()(std::string_view item) const noexcept { return std::hash<std::string_view>()(item); }
 
-bool path_eq_t::operator()(const path_base_t &lhs, const path_base_t& rhs) const {
-    return lhs == rhs;
-}
+bool path_eq_t::operator()(const path_base_t &lhs, const path_base_t &rhs) const { return lhs == rhs; }
 
 bool path_eq_t::operator()(const path_base_t &lhs, const std::string_view rhs) const {
     return lhs.get_full_name() == rhs;
 }
 
-bool path_eq_t::operator()(const std::string_view lhs, const path_base_t& rhs) const {
+bool path_eq_t::operator()(const std::string_view lhs, const path_base_t &rhs) const {
     return lhs == rhs.get_full_name();
 }
 
-bool path_eq_t::operator()(const std::string_view lhs, const std::string_view rhs) const {
-    return lhs == rhs;
-}
+bool path_eq_t::operator()(const std::string_view lhs, const std::string_view rhs) const { return lhs == rhs; }
 
 I::iterator_t() noexcept : component{-1}, path{nullptr} {}
 

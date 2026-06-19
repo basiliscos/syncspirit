@@ -68,7 +68,7 @@ SYNCSPIRIT_API outcome::result<std::string> get_common_name(X509 *cert) noexcept
 
 SYNCSPIRIT_API void digest(const unsigned char *src, size_t length, unsigned char *storage) noexcept;
 
-SYNCSPIRIT_API bool set_store(spdlog::logger* log, SSL_CTX *ctx, std::string_view caStore) noexcept;
+SYNCSPIRIT_API bool set_store(spdlog::logger *log, SSL_CTX *ctx, std::string_view caStore) noexcept;
 
 } // namespace utils
 } // namespace syncspirit

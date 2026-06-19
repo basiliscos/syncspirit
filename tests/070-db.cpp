@@ -60,8 +60,7 @@ struct fixture_t {
     fixture_t() noexcept : path_quard(test::unique_path()) {}
     fixture_t(fixture_t &source) = delete;
 
-    fixture_t(fixture_t &&source) noexcept
-        : path_quard(std::move(source.path_quard)) {}
+    fixture_t(fixture_t &&source) noexcept : path_quard(std::move(source.path_quard)) {}
 
     virtual configure_callback_t configure() noexcept {
         return [&](r::plugin::plugin_base_t &plugin) {

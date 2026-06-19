@@ -136,15 +136,15 @@ struct fixture_t {
         CHECK(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::SHUT_DOWN);
     }
 
-    virtual void main(const utils::poly_path_view_t&) noexcept {}
+    virtual void main(const utils::poly_path_view_t &) noexcept {}
 
     chain_builder_t append_block(const utils::poly_path_view_t &path, utils::bytes_view_t data, std::uint64_t offset,
                                  std::uint64_t file_size) noexcept {
         auto bytes = utils::bytes_t(data.begin(), data.end());
 
         auto context = fs::payload::extendended_context_prt_t{};
-        auto payload =
-            fs::payload::append_block_t(std::move(context), folder_id, path.detach(), std::move(bytes), offset, file_size);
+        auto payload = fs::payload::append_block_t(std::move(context), folder_id, path.detach(), std::move(bytes),
+                                                   offset, file_size);
         auto cmd = fs::payload::io_command_t(std::move(payload));
         auto cmds = fs::payload::io_commands_t{nullptr};
         cmds.commands.emplace_back(std::move(cmd));
@@ -153,13 +153,13 @@ struct fixture_t {
         return chain_builder_t(this, reply, std::in_place_type_t<decltype(payload)>());
     }
 
-    chain_builder_t clone_block(const utils::poly_path_view_t &target, std::uint64_t target_offset, std::uint64_t target_size,
-                                const utils::poly_path_view_t &source, std::uint64_t source_offset,
-                                std::uint64_t block_size) noexcept {
+    chain_builder_t clone_block(const utils::poly_path_view_t &target, std::uint64_t target_offset,
+                                std::uint64_t target_size, const utils::poly_path_view_t &source,
+                                std::uint64_t source_offset, std::uint64_t block_size) noexcept {
         auto context = fs::payload::extendended_context_prt_t{};
 
-        auto payload = fs::payload::clone_block_t(std::move(context), folder_id, target.detach(), target_offset, target_size,
-                                                  source.detach(), source_offset, block_size);
+        auto payload = fs::payload::clone_block_t(std::move(context), folder_id, target.detach(), target_offset,
+                                                  target_size, source.detach(), source_offset, block_size);
         auto cmd = fs::payload::io_command_t(std::move(payload));
         auto cmds = fs::payload::io_commands_t{nullptr};
         cmds.commands.emplace_back(std::move(cmd));
@@ -168,12 +168,12 @@ struct fixture_t {
         return chain_builder_t(this, reply, std::in_place_type_t<decltype(payload)>());
     }
 
-    chain_builder_t finish_file(const utils::poly_path_view_t &path, std::uint64_t file_size, std::int64_t modification_s,
-                                std::uint32_t permissions, bool no_permissions,
+    chain_builder_t finish_file(const utils::poly_path_view_t &path, std::uint64_t file_size,
+                                std::int64_t modification_s, std::uint32_t permissions, bool no_permissions,
                                 const utils::poly_path_view_t &conflict_path) noexcept {
         auto context = fs::payload::extendended_context_prt_t{};
-        auto payload = fs::payload::finish_file_t(std::move(context), folder_id, path.detach(), conflict_path.detach(), file_size,
-                                                  modification_s, permissions, no_permissions);
+        auto payload = fs::payload::finish_file_t(std::move(context), folder_id, path.detach(), conflict_path.detach(),
+                                                  file_size, modification_s, permissions, no_permissions);
         auto cmd = fs::payload::io_command_t(std::move(payload));
         auto cmds = fs::payload::io_commands_t{nullptr};
         cmds.commands.emplace_back(std::move(cmd));
@@ -192,8 +192,8 @@ struct fixture_t {
         auto modificaiton = proto::get_modified_s(meta);
         auto target = std::string(proto::get_symlink_target(meta));
 
-        auto payload = fs::payload::remote_copy_t(std::move(context), folder_id, path.detach(), conflict_path.detach(), type, size, perms,
-                                                  modificaiton, target, deleted, false);
+        auto payload = fs::payload::remote_copy_t(std::move(context), folder_id, path.detach(), conflict_path.detach(),
+                                                  type, size, perms, modificaiton, target, deleted, false);
         auto cmd = fs::payload::io_command_t(std::move(payload));
         auto cmds = fs::payload::io_commands_t{nullptr};
         cmds.commands.emplace_back(std::move(cmd));
@@ -202,12 +202,12 @@ struct fixture_t {
         return chain_builder_t(this, reply, std::in_place_type_t<decltype(payload)>());
     }
 
-    chain_builder_t update_meta(const utils::poly_path_view_t &path, std::int64_t modification_s_, std::uint32_t permissions_,
-                                bool no_permissions_) noexcept {
+    chain_builder_t update_meta(const utils::poly_path_view_t &path, std::int64_t modification_s_,
+                                std::uint32_t permissions_, bool no_permissions_) noexcept {
         auto context = fs::payload::extendended_context_prt_t{};
 
-        auto payload = fs::payload::update_meta_t(std::move(context), folder_id, path.detach(), modification_s_, permissions_,
-                                                  no_permissions_);
+        auto payload = fs::payload::update_meta_t(std::move(context), folder_id, path.detach(), modification_s_,
+                                                  permissions_, no_permissions_);
         auto cmd = fs::payload::io_command_t(std::move(payload));
         auto cmds = fs::payload::io_commands_t{nullptr};
         cmds.commands.emplace_back(std::move(cmd));
@@ -233,7 +233,7 @@ struct fixture_t {
 
 void test_remote_copy() {
     struct F : fixture_t {
-        void main(const utils::poly_path_view_t& root_path) noexcept override {
+        void main(const utils::poly_path_view_t &root_path) noexcept override {
             proto::FileInfo pr_fi;
             std::int64_t modified = 1641828421;
             proto::set_modified_s(pr_fi, modified);
@@ -378,7 +378,7 @@ void test_remote_copy() {
 
 void test_append_block() {
     struct F : fixture_t {
-        void main(const utils::poly_path_view_t& root_path) noexcept override {
+        void main(const utils::poly_path_view_t &root_path) noexcept override {
             std::int64_t modified = 1641828421;
 
             auto path_rel = utils::make_native_view(L"путявка/инфо.txt", root_path.get_allocator());
@@ -499,10 +499,9 @@ void test_append_block() {
     F().run();
 }
 
-
 void test_clone_block() {
     struct F : fixture_t {
-        void main(const utils::poly_path_view_t& root_path) noexcept override {
+        void main(const utils::poly_path_view_t &root_path) noexcept override {
             std::int64_t modified = 1641828421;
             auto perms = std::uint32_t(0444);
 #ifndef SYNCSPIRIT_WIN
@@ -606,7 +605,7 @@ void test_clone_block() {
 
 void test_update_meta() {
     struct F : fixture_t {
-        void main(const utils::poly_path_view_t& root_path) noexcept override {
+        void main(const utils::poly_path_view_t &root_path) noexcept override {
             std::int64_t modified = 1641828421;
             auto perms = std::uint32_t(0444);
 #ifndef SYNCSPIRIT_WIN
@@ -642,7 +641,7 @@ void test_update_meta() {
 
 void test_requesting_block() {
     struct F : fixture_t {
-        void main(const utils::poly_path_view_t& root_path) noexcept override {
+        void main(const utils::poly_path_view_t &root_path) noexcept override {
             auto target = root_path / "a.txt";
 
             std::int64_t modified = 1641828421;

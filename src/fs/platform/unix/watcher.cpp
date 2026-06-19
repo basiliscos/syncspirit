@@ -13,7 +13,7 @@ using namespace syncspirit::fs::platform::unix;
 
 void watcher_t::shutdown_finish() noexcept {
     for (auto it = watched_folders->begin(); it != watched_folders->end();) {
-        auto& [folder_id, path] = *it;
+        auto &[folder_id, path] = *it;
         LOG_DEBUG(log, "unwatching folder '{}' on {}", folder_id, path);
         auto ec = unwatch_folder(folder_id);
         if (ec) {

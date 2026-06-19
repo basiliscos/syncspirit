@@ -17,4 +17,4 @@ enum class FileInfoType {
 
 // clang-format on
 
-}
+} // namespace syncspirit::proto
