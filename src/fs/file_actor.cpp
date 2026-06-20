@@ -79,6 +79,7 @@ void file_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         p.discover_name(net::names::db, db, true);
     });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
+        p.subscribe_actor(&file_actor_t::on_io_signal);
         p.subscribe_actor(&file_actor_t::on_exec);
         p.subscribe_actor(&file_actor_t::on_io_commands);
         p.subscribe_actor(&file_actor_t::on_create_dir);
@@ -87,6 +88,7 @@ void file_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 
 void file_actor_t::on_start() noexcept {
     LOG_TRACE(log, "on_start");
+    send<payload::io_signal_t>(address);
     send<model::payload::local_up_t>(coordinator);
     r::actor_base_t::on_start();
 }
@@ -106,6 +108,10 @@ void file_actor_t::shutdown_finish() noexcept {
 }
 
 void file_actor_t::on_io_commands(message::io_commands_t &message) noexcept {
+    if (!io_signal) {
+        io_queue.emplace_back(&message);
+        return;
+    }
     auto &p = message.payload;
     auto ctx = process_context_t(p.context, *this);
 
@@ -129,7 +135,19 @@ void file_actor_t::on_io_commands(message::io_commands_t &message) noexcept {
     }
     auto sup_ctx = static_cast<platform::context_base_t *>(supervisor->access<to::context>());
     sup_ctx->poll_events();
+    supervisor->put(std::move(io_signal));
 }
+
+void file_actor_t::on_io_signal(message::io_signal_t &msg) noexcept {
+    LOG_TRACE(log, "on_io_signal (queue size: {})", io_queue.size());
+    io_signal = &msg;
+    if (!io_queue.empty()) {
+        auto& io_message = io_queue.front();
+        supervisor->put(std::move(io_message));
+        io_queue.pop_front();
+    }
+}
+
 
 void file_actor_t::on_retension_finish(r::request_id_t, bool cancelled) noexcept {
     LOG_TRACE(log, "on_retension_finish ({} ms)", retension.total_milliseconds());
