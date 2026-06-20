@@ -77,7 +77,7 @@ auto watcher_t::watch_path(std::string_view path, file_type_t type) noexcept -> 
 
 void watcher_t::inotify_callback() noexcept {
     using U = update_type_t;
-    char buffer[2 * SYNCSPIRIT_PATH_MAX  + 1];
+    char buffer[2 * SYNCSPIRIT_PATH_MAX + 1];
     int length = ::read(inotify_guard.fd, buffer, sizeof(buffer));
     LOG_TRACE(log, "inotify callback, result = {}, length = {}", inotify_guard.fd, length);
     if (length < 0) {

@@ -261,22 +261,28 @@ TEST_CASE("path view (2)", "[model]") {
     }
     SECTION("long wide string") {
         auto v = make_empty_view(allocator);
-        for(int i = 0; i < 30; ++i) {
-            char buff[10]={0};
-            for (int j =0 ; j < 8; ++j) {
+        for (int i = 0; i < 30; ++i) {
+            char buff[10] = {0};
+            for (int j = 0; j < 8; ++j) {
                 buff[j] = 'a' + static_cast<char>(i % 15);
             };
             auto filename = std::string_view(buff);
             v = v / filename;
         }
 
-        auto unix_name = L"aaaaaaaa/bbbbbbbb/cccccccc/dddddddd/eeeeeeee/ffffffff/gggggggg/hhhhhhhh/iiiiiiii/jjjjjjjj/kkkkkkkk/llllllll/mmmmmmmm/nnnnnnnn/oooooooo/aaaaaaaa/bbbbbbbb/cccccccc/dddddddd/eeeeeeee/ffffffff/gggggggg/hhhhhhhh/iiiiiiii/jjjjjjjj/kkkkkkkk/llllllll/mmmmmmmm/nnnnnnnn/oooooooo";
+        auto unix_name = L"aaaaaaaa/bbbbbbbb/cccccccc/dddddddd/eeeeeeee/ffffffff/gggggggg/hhhhhhhh/iiiiiiii/jjjjjjjj/"
+                         L"kkkkkkkk/llllllll/mmmmmmmm/nnnnnnnn/oooooooo/aaaaaaaa/bbbbbbbb/cccccccc/dddddddd/eeeeeeee/"
+                         L"ffffffff/gggggggg/hhhhhhhh/iiiiiiii/jjjjjjjj/kkkkkkkk/llllllll/mmmmmmmm/nnnnnnnn/oooooooo";
 #ifndef SYNCSPIRIT_WIN
         CHECK(v.get_full_name() == narrow(unix_name));
         CHECK(v.get_full_wname(true) == unix_name);
         CHECK(v.get_full_wname(false) == unix_name);
 #else
-        auto win32_name = L"\\\\?\\aaaaaaaa\\bbbbbbbb\\cccccccc\\dddddddd\\eeeeeeee\\ffffffff\\gggggggg\\hhhhhhhh\\iiiiiiii\\jjjjjjjj\\kkkkkkkk\\llllllll\\mmmmmmmm\\nnnnnnnn\\oooooooo\\aaaaaaaa\\bbbbbbbb\\cccccccc\\dddddddd\\eeeeeeee\\ffffffff\\gggggggg\\hhhhhhhh\\iiiiiiii\\jjjjjjjj\\kkkkkkkk\\llllllll\\mmmmmmmm\\nnnnnnnn\\oooooooo";
+        auto win32_name =
+            L"\\\\?"
+            L"\\aaaaaaaa\\bbbbbbbb\\cccccccc\\dddddddd\\eeeeeeee\\ffffffff\\gggggggg\\hhhhhhhh\\iiiiiiii\\jjjjjjjj\\kkk"
+            L"kkkkk\\llllllll\\mmmmmmmm\\nnnnnnnn\\oooooooo\\aaaaaaaa\\bbbbbbbb\\cccccccc\\dddddddd\\eeeeeeee\\ffffffff"
+            L"\\gggggggg\\hhhhhhhh\\iiiiiiii\\jjjjjjjj\\kkkkkkkk\\llllllll\\mmmmmmmm\\nnnnnnnn\\oooooooo";
         CHECK(v.get_full_wname(false) == unix_name);
         CHECK(v.get_full_wname(true) == win32_name);
 
@@ -445,8 +451,11 @@ TEST_CASE("path_utils", "[utils]") {
     auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
 
     auto guard = test::unique_path();
-    auto unix_name = L"aaaaaaaa/bbbbbbbb/cccccccc/dddddddd/eeeeeeee/ffffffff/gggggggg/hhhhhhhh/iiiiiiii/jjjjjjjj/kkkkkkkk/llllllll/mmmmmmmm/nnnnnnnn/oooooooo/aaaaaaaa/bbbbbbbb/cccccccc/dddddddd/eeeeeeee/ffffffff/gggggggg/hhhhhhhh/iiiiiiii/jjjjjjjj/kkkkkkkk/llllllll/mmmmmmmm/nnnnnnnn/oooooooo";
-    // auto unix_name = L"aaaaaaaa/bbbbbbbb/cccccccc/dddddddd/eeeeeeee/ffffffff/gggggggg/hhhhhhhh/iiiiiiii/jjjjjjjj/kkkkkkkk/llllllll/mmmmmmmm/nnnnnnnn/oooooooo/aaaaaaaa/bbbbbbbb/cccccccc/dddddddd/eeeeeeee/ffffffff/g";
+    auto unix_name = L"aaaaaaaa/bbbbbbbb/cccccccc/dddddddd/eeeeeeee/ffffffff/gggggggg/hhhhhhhh/iiiiiiii/jjjjjjjj/"
+                     L"kkkkkkkk/llllllll/mmmmmmmm/nnnnnnnn/oooooooo/aaaaaaaa/bbbbbbbb/cccccccc/dddddddd/eeeeeeee/"
+                     L"ffffffff/gggggggg/hhhhhhhh/iiiiiiii/jjjjjjjj/kkkkkkkk/llllllll/mmmmmmmm/nnnnnnnn/oooooooo";
+    // auto unix_name =
+    // L"aaaaaaaa/bbbbbbbb/cccccccc/dddddddd/eeeeeeee/ffffffff/gggggggg/hhhhhhhh/iiiiiiii/jjjjjjjj/kkkkkkkk/llllllll/mmmmmmmm/nnnnnnnn/oooooooo/aaaaaaaa/bbbbbbbb/cccccccc/dddddddd/eeeeeeee/ffffffff/g";
     auto v = guard.get_view(allocator);
     auto dir = v / unix_name;
     auto file = dir / L"файл.bin";
