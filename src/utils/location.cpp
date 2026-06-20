@@ -61,7 +61,7 @@ poly_path_view_t get_default_config_dir(const allocator_t &allocator) noexcept {
     }
 
 #if defined(__unix__)
-    return home / make_native_view(".config", allocator);
+    return home / make_native_view(".config/syncspirit", allocator);
 #endif
     return home / make_native_view("syncspirit", allocator);
 }
