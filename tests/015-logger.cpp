@@ -65,7 +65,7 @@ TEST_CASE("hierarchy", "[log]") {
 
 TEST_CASE("file sink", "[log]") {
     init_root();
-    auto path_guard = st::path_guard_t();
+    auto path_guard = st::unique_path();
     auto buffer = std::array<std::byte, 1024 * 32>();
     auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
     auto allocator = std::pmr::polymorphic_allocator<char>(&pool);

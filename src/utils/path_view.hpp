@@ -141,6 +141,9 @@ template <typename Allocator> struct path_view_t final : path_base_t {
         auto w_allocator = wallocator_t(allocator);
         auto r = wstring_t(w_allocator);
         if (data) {
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+            static constexpr auto LONG_PREFIX = L"\\\\?\\";
+#endif
             auto sz = *reinterpret_cast<const std::uint32_t *>(data);
             auto begin = reinterpret_cast<const char *>(data) + sizeof(std::uint32_t) + components;
             auto end = begin + sz;
@@ -151,9 +154,23 @@ template <typename Allocator> struct path_view_t final : path_base_t {
                 traits_in_t::decode(ptr, end);
                 ++w_sz;
             }
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+            auto long_prefix_hack = (native_separator && sz > 260);
+            if (long_prefix_hack) {
+                w_sz += sizeof(LONG_PREFIX);
+            }
+#endif
 
             r.resize(w_sz);
             auto out = r.data();
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+            if (long_prefix_hack) {
+                *out++ = L'\\';
+                *out++ = L'\\';
+                *out++ = L'?';
+                *out++ = L'\\';
+            }
+#endif
             ptr = begin;
 
             while (ptr != end) {

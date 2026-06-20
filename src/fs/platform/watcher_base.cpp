@@ -9,7 +9,7 @@
 #include "utils/format.hpp"
 #include "utils/path_view.hpp"
 #include "utils/path_utils.h"
-#include <boost/nowide/convert.hpp>
+#include "syncspirit-config.h"
 #include <string.h>
 
 using namespace syncspirit;
@@ -166,13 +166,12 @@ auto FU::make(const utils::path_t &folder_info, watcher_base_t &actor) noexcept 
     namespace ut = update_type;
     using UT = update_type_t;
     using FT = utils::file_type_t;
-    static const size_t SS_PATH_MAX = 32 * 1024;
 
     auto files = payload::file_changes_t();
     auto &mediator = *actor.updates_mediator;
     files.reserve(updates.size());
     auto log = utils::get_logger(actor_identity);
-    char full_path[SS_PATH_MAX];
+    char full_path[SYNCSPIRIT_PATH_MAX];
 
     auto buffer = std::array<std::byte, 1024 * 32>();
     auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());

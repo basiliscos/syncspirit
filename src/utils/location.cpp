@@ -13,6 +13,7 @@
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32) && !defined(__CYGWIN__)
 #include <windows.h>
 #include <shlobj.h>
+#include "syncspirit-config.h"
 #endif
 
 namespace syncspirit::utils {
@@ -30,7 +31,7 @@ poly_path_view_t expand_home(const std::string &path, const poly_path_view_t &ho
 
 poly_path_view_t get_home_dir(const allocator_t &allocator) noexcept {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32) && !defined(__CYGWIN__)
-    wchar_t appdata[MAX_PATH] = {0};
+    wchar_t appdata[SYNCSPIRIT_PATH_MAX] = {0};
     if (SHGetFolderPathW(nullptr, CSIDL_LOCAL_APPDATA, nullptr, 0, appdata) != S_OK) {
         return {allocator};
     }

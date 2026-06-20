@@ -5,9 +5,12 @@
 #include "utils/path.h"
 #include "utils/path_view.hpp"
 #include "utils/path_cache.h"
+#include "utils/path_utils.h"
+#include "utils/io.h"
 #include <memory_resource>
 #include <catch2/matchers/catch_matchers_string.hpp>
 #include <boost/nowide/convert.hpp>
+#include <spdlog/fmt/bin_to_hex.h>
 
 using namespace syncspirit;
 using namespace syncspirit::utils;
@@ -237,7 +240,6 @@ TEST_CASE("path view (2)", "[model]") {
     auto buffer = std::array<std::byte, 1024 * 128>();
     auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
     auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
-
 #ifndef SYNCSPIRIT_WIN
     auto p_abs_1 = std::string_view("/a/b");
     auto p_abs_2 = std::string_view("/c/d");
@@ -255,6 +257,38 @@ TEST_CASE("path view (2)", "[model]") {
 #else
         CHECK(v.get_full_wname(false) == L"c:/a/b");
         CHECK(v.get_full_wname(true) == L"c:\\a\\b");
+#endif
+    }
+    SECTION("long wide string") {
+        auto v = make_empty_view(allocator);
+        for(int i = 0; i < 30; ++i) {
+            char buff[10]={0};
+            for (int j =0 ; j < 8; ++j) {
+                buff[j] = 'a' + static_cast<char>(i % 15);
+            };
+            auto filename = std::string_view(buff);
+            v = v / filename;
+        }
+
+        auto unix_name = L"aaaaaaaa/bbbbbbbb/cccccccc/dddddddd/eeeeeeee/ffffffff/gggggggg/hhhhhhhh/iiiiiiii/jjjjjjjj/kkkkkkkk/llllllll/mmmmmmmm/nnnnnnnn/oooooooo/aaaaaaaa/bbbbbbbb/cccccccc/dddddddd/eeeeeeee/ffffffff/gggggggg/hhhhhhhh/iiiiiiii/jjjjjjjj/kkkkkkkk/llllllll/mmmmmmmm/nnnnnnnn/oooooooo";
+#ifndef SYNCSPIRIT_WIN
+        CHECK(v.get_full_name() == narrow(unix_name));
+        CHECK(v.get_full_wname(true) == unix_name);
+        CHECK(v.get_full_wname(false) == unix_name);
+#else
+        auto win32_name = L"\\\\?\\aaaaaaaa\\bbbbbbbb\\cccccccc\\dddddddd\\eeeeeeee\\ffffffff\\gggggggg\\hhhhhhhh\\iiiiiiii\\jjjjjjjj\\kkkkkkkk\\llllllll\\mmmmmmmm\\nnnnnnnn\\oooooooo\\aaaaaaaa\\bbbbbbbb\\cccccccc\\dddddddd\\eeeeeeee\\ffffffff\\gggggggg\\hhhhhhhh\\iiiiiiii\\jjjjjjjj\\kkkkkkkk\\llllllll\\mmmmmmmm\\nnnnnnnn\\oooooooo";
+        CHECK(v.get_full_wname(false) == unix_name);
+        CHECK(v.get_full_wname(true) == win32_name);
+
+        auto w_1 = v.get_full_wname(true);
+        auto n_1 = narrow(w_1);
+        auto n_2 = narrow(win32_name);
+        CHECK(n_1 == n_2);
+        auto h_1 = spdlog::to_hex(n_1.begin(), n_1.end());
+        auto h_2 = spdlog::to_hex(n_2.begin(), n_2.end());
+        spdlog::info("{}\n{}", h_1, h_2);
+        spdlog::info("n1 = {}", n_1);
+        spdlog::info("n2 = {}", n_2);
 #endif
     }
     SECTION("concat") {
@@ -403,6 +437,26 @@ TEST_CASE("path_cache", "[model]") {
 
     path.reset();
     CHECK(cache->map.size() == 0);
+}
+
+TEST_CASE("path_utils", "[utils]") {
+    auto buffer = std::array<std::byte, 1024 * 32>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+
+    auto guard = test::unique_path();
+    auto unix_name = L"aaaaaaaa/bbbbbbbb/cccccccc/dddddddd/eeeeeeee/ffffffff/gggggggg/hhhhhhhh/iiiiiiii/jjjjjjjj/kkkkkkkk/llllllll/mmmmmmmm/nnnnnnnn/oooooooo/aaaaaaaa/bbbbbbbb/cccccccc/dddddddd/eeeeeeee/ffffffff/gggggggg/hhhhhhhh/iiiiiiii/jjjjjjjj/kkkkkkkk/llllllll/mmmmmmmm/nnnnnnnn/oooooooo";
+    // auto unix_name = L"aaaaaaaa/bbbbbbbb/cccccccc/dddddddd/eeeeeeee/ffffffff/gggggggg/hhhhhhhh/iiiiiiii/jjjjjjjj/kkkkkkkk/llllllll/mmmmmmmm/nnnnnnnn/oooooooo/aaaaaaaa/bbbbbbbb/cccccccc/dddddddd/eeeeeeee/ffffffff/g";
+    auto v = guard.get_view(allocator);
+    auto dir = v / unix_name;
+    auto file = dir / L"файл.bin";
+    auto ec = std::error_code{};
+
+    auto number = utils::create_directories(dir, ec);
+    CHECK(number == 30);
+    CHECK(!test::is_empty(v));
+    test::write_file(file, "12345");
+    CHECK(test::read_file(file) == "12345");
 }
 
 static bool _init = []() -> bool {

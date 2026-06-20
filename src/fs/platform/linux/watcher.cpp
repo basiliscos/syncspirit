@@ -13,7 +13,6 @@
 #include <sys/stat.h>
 #include <string.h>
 #include <unistd.h>
-#include <limits.h>
 #include <fcntl.h>
 #include <algorithm>
 #include <memory_resource>
@@ -78,7 +77,7 @@ auto watcher_t::watch_path(std::string_view path, file_type_t type) noexcept -> 
 
 void watcher_t::inotify_callback() noexcept {
     using U = update_type_t;
-    char buffer[1024 * (sizeof(struct inotify_event) + NAME_MAX + 1)];
+    char buffer[2 * SYNCSPIRIT_PATH_MAX  + 1];
     int length = ::read(inotify_guard.fd, buffer, sizeof(buffer));
     LOG_TRACE(log, "inotify callback, result = {}, length = {}", inotify_guard.fd, length);
     if (length < 0) {
@@ -89,7 +88,7 @@ void watcher_t::inotify_callback() noexcept {
     if (length) {
         using renamed_cookies_t = std::pmr::unordered_map<uint32_t, inotify_event *>;
         auto deadline = clock_t::local_time() + retension;
-        char name_buff[PATH_MAX];
+        char name_buff[SYNCSPIRIT_PATH_MAX];
         auto name_ptr = name_buff;
         auto append_name = [&](std::string_view piece) {
             auto sz = piece.size();

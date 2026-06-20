@@ -10,6 +10,7 @@
 #include "utils/format.hpp"
 #include "utils/log-setup.h"
 #include "utils/io.h"
+#include "syncspirit-config.h"
 #include <random>
 #include <cstdint>
 #include <spdlog/sinks/stdout_color_sinks.h>
@@ -20,7 +21,6 @@
 #else
 #include <unistd.h>
 #include <stdio.h>
-#include <limits.h>
 #endif
 
 int main(int argc, char *argv[]) { return Catch::Session().run(argc, argv); }
@@ -71,7 +71,7 @@ static utils::poly_path_view_t cwd(const utils::allocator_t &allocator) {
     }
     return utils::make_native_view(buff, allocator);
 #else
-    char buff[PATH_MAX];
+    char buff[SYNCSPIRIT_PATH_MAX];
     if (!getcwd(buff, sizeof(buff))) {
         auto ec = std::error_code(errno, std::system_category());
         throw std::runtime_error(fmt::format("getcwd: {}", ec.message()));

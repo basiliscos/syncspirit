@@ -8,6 +8,7 @@
 #include <algorithm>
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+#include "syncspirit-config.h"
 #else
 #include <sys/types.h>
 #include <dirent.h>
@@ -52,7 +53,7 @@ bool scan_dir_t::process(fs_slave_t &slave, execution_context_t &context) noexce
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
     auto wpath = path.get_view(context.allocator).get_full_wname(true);
-    wchar_t buff[MAX_PATH];
+    wchar_t buff[SYNCSPIRIT_PATH_MAX + 16];
     memcpy(buff, wpath.data(), wpath.size() * sizeof(wchar_t));
     auto ptr = buff + wpath.size();
     swprintf(ptr, L"\\*.*");

@@ -12,6 +12,7 @@
 #include "utils/platform.h"
 #include "utils/error_code.h"
 #include "model/messages.h"
+#include "syncspirit-config.h"
 #include <memory_resource>
 
 using namespace syncspirit::fs;
@@ -109,7 +110,7 @@ void file_actor_t::on_io_commands(message::io_commands_t &message) noexcept {
     auto ctx = process_context_t(p.context, *this);
 
     for (auto &cmd : p.commands) {
-        static const size_t SS_PATH_MAX = 32 * 1024;
+        static const size_t SS_PATH_MAX = SYNCSPIRIT_PATH_MAX;
         auto buffer = std::array<char, SS_PATH_MAX>();
         auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
         auto allocator = std::pmr::polymorphic_allocator<std::string>(&pool);

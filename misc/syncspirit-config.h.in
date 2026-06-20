@@ -27,3 +27,5 @@ static constexpr syncspirit_watcher_impl_t syncspirit_watcher_impl =
 #else
     syncspirit_watcher_impl_t::none;
 #endif
+
+#define SYNCSPIRIT_PATH_MAX 32767

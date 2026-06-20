@@ -23,6 +23,8 @@
 #include <dirent.h>
 #endif
 
+// #include <spdlog/spdlog.h>
+#include "syncspirit-config.h"
 #include "fs/utils.h"
 
 namespace syncspirit::utils {
@@ -110,12 +112,18 @@ std::size_t create_directories(const poly_path_view_t &path, std::error_code &ec
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
     auto whole_str = std::pmr::wstring(path.get_allocator());
     whole_str = path.get_full_wname(true);
-    auto pos = whole_str.find(L'\\', 0);
+    auto pos = std::size_t{0};
+    if (whole_str[0] == L'\\' && whole_str.size() > 8) {
+        pos += 8; // skip "\\?\X:\"
+    }
+    // spdlog::info("zzz pos: {}", pos);
+    pos = whole_str.find(L'\\', pos);
     bool advance = true;
     while (advance) {
         if (pos != std::wstring::npos) {
             whole_str[pos] = 0;
         }
+        // spdlog::info("zzz dir: {}", boost::nowide::narrow(whole_str.data()));
         auto code = _wmkdir(whole_str.data());
         if (pos != std::wstring::npos) {
             whole_str[pos] = L'\\';
@@ -182,6 +190,7 @@ void rm_dir_recurse(std::wstring_view path, std::error_code &ec) noexcept {
     auto child_ptr = ptr;
     swprintf(ptr, L"\\*.*");
     WIN32_FIND_DATAW child_data;
+    // spdlog::info("zzz rm ({}): {} ", sizeof(child_data), boost::nowide::narrow(path.data()));
     auto child_handle = FindFirstFileW(path.data(), &child_data);
     if (child_handle != INVALID_HANDLE_VALUE) {
         do {
@@ -212,11 +221,12 @@ void rm_dir_recurse(std::wstring_view path, std::error_code &ec) noexcept {
 }
 
 void rm_dir_recurse_initial(std::wstring_view wpath, std::error_code &ec) noexcept {
-    wchar_t buff[MAX_PATH];
+    wchar_t buff[SYNCSPIRIT_PATH_MAX + 16];
     memcpy(buff, wpath.data(), wpath.size() * sizeof(wchar_t));
     auto ptr = buff + wpath.size();
     *ptr = 0;
     rm_dir_recurse(std::wstring_view(buff, wpath.size()), ec);
+    // spdlog::error("zzz rm done");
 }
 
 #endif
@@ -329,7 +339,7 @@ poly_string_t read_symlink(const poly_path_view_t &target, std::error_code &ec) 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
     ec = std::make_error_code(std::errc::function_not_supported);
 #else
-    storage.resize(PATH_MAX);
+    storage.resize(SYNCSPIRIT_PATH_MAX);
     auto code = readlink(target.get_full_name().data(), storage.data(), storage.size());
     if (code == -1) {
         ec = std::error_code{errno, std::system_category()};
