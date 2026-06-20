@@ -23,6 +23,8 @@
 #include "utils/error_code.h"
 #include "utils/format.hpp"
 #include "utils/uri.h"
+#include "utils/path_view.hpp"
+#include "utils/path_utils.h"
 #include <spdlog/fmt/bin_to_hex.h>
 #include <spdlog/spdlog.h>
 #include <boost/nowide/convert.hpp>
@@ -34,7 +36,7 @@ using namespace syncspirit::model::diff::peer;
 using keys_t = syncspirit::model::diff::modify::generic_remove_t::unique_keys_t;
 using keys_view_t = std::set<utils::bytes_view_t, utils::bytes_comparator_t>;
 
-auto cluster_update_t::create(const bfs::path &default_path, const cluster_t &cluster, sequencer_t &sequencer,
+auto cluster_update_t::create(const utils::path_t &default_path, const cluster_t &cluster, sequencer_t &sequencer,
                               const device_t &source, const message_t &message) noexcept
     -> outcome::result<cluster_diff_ptr_t> {
     auto diff = cluster_diff_ptr_t();
@@ -46,7 +48,7 @@ auto cluster_update_t::create(const bfs::path &default_path, const cluster_t &cl
     return diff;
 };
 
-cluster_update_t::cluster_update_t(const bfs::path &default_path, const cluster_t &cluster, sequencer_t &sequencer,
+cluster_update_t::cluster_update_t(const utils::path_t &default_path, const cluster_t &cluster, sequencer_t &sequencer,
                                    const device_t &source, const message_t &message) noexcept {
     using folder_device_set_t = std::pmr::unordered_set<std::pmr::string>;
     using allocator_t = std::pmr::polymorphic_allocator<char>;
@@ -155,15 +157,20 @@ cluster_update_t::cluster_update_t(const bfs::path &default_path, const cluster_
     auto add_folder = [&](const proto::Folder &folder) -> bool {
         auto folder_id = proto::get_id(folder);
         auto label = proto::get_label(folder);
-        auto try_make_path = [&](std::string_view label) -> outcome::result<bfs::path> {
-            auto path = default_path / boost::nowide::widen(label);
+        auto buffer = std::array<std::byte, 1024 * 32>();
+        auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+        auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+
+        auto try_make_path = [&](std::string_view label) -> outcome::result<utils::poly_path_view_t> {
+            auto label_path = utils::make_native_view(label, allocator);
+            auto path = default_path.get_view(allocator) / label_path;
             if (label.empty()) {
                 return model::make_error_code(model::error_code_t::empty_folder_name);
             }
             auto ec = sys::error_code();
-            bfs::create_directories(path, ec);
-            LOG_TRACE(log, "cluster_update_t, trying to make a dir: '{}' for folder '{}', result: {}", path.string(),
-                      folder_id, ec);
+            utils::create_directories(path, ec);
+            LOG_TRACE(log, "cluster_update_t, trying to make a dir: '{}' for folder '{}', result: {}", path, folder_id,
+                      ec);
             if (ec) {
                 return ec;
             }
@@ -187,7 +194,7 @@ cluster_update_t::cluster_update_t(const bfs::path &default_path, const cluster_
         db::set_ignore_delete(db, proto::get_ignore_delete(folder));
         db::set_disable_temp_indexes(db, proto::get_disable_temp_indexes(folder));
         db::set_paused(db, proto::get_paused(folder));
-        db::set_path(db, boost::nowide::narrow(r.value().wstring()));
+        db::set_path(db, r.value().get_full_name());
         db::set_rescan_interval(db, 3600);
         db::set_folder_type(db, db::FolderType::send_and_receive);
         upserted_folders.emplace_back(std::move(db));

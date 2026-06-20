@@ -23,16 +23,12 @@
 #include "model/diff/modify/upsert_folder_info.h"
 #include "model/diff/advance/advance.h"
 #include "presentation/folder_entity.h"
-#include <filesystem>
-#include <boost/nowide/convert.hpp>
 
 using namespace syncspirit;
 using namespace syncspirit::fs;
 using namespace syncspirit::test;
 using namespace syncspirit::model;
 using boost::nowide::narrow;
-
-namespace bfs = std::filesystem;
 
 namespace {
 
@@ -148,10 +144,7 @@ struct fixture_t {
     using change_message_ptr_t = r::intrusive_ptr_t<fs::message::folder_changes_t>;
     using change_messages_t = std::deque<change_message_ptr_t>;
 
-    fixture_t() noexcept : root_path{unique_path()}, path_guard{root_path} {
-        log = utils::get_logger("fixture");
-        bfs::create_directory(root_path);
-    }
+    fixture_t() noexcept : path_guard{unique_path()} { log = utils::get_logger("fixture"); }
 
     virtual void create_file_actor() {
         auto notify_watcher = [this](const fs::task::scan_dir_t &scan_dir) { watcher_actor->notify(scan_dir); };
@@ -231,9 +224,14 @@ struct fixture_t {
         REQUIRE(static_cast<r::actor_base_t *>(watcher_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
         REQUIRE(static_cast<r::actor_base_t *>(local_keeper.get())->access<to::state>() == r::state_t::OPERATIONAL);
 
+        auto buffer = std::array<std::byte, 1024 * 32>();
+        auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+        auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+        auto root_path = path_guard.get_view(allocator);
+
         auto folder_id = "1234-5678";
         auto builder = diff_builder_t(*cluster);
-        builder.upsert_folder(folder_id, root_path, "folder-label", 0, true).apply(*sup);
+        builder.upsert_folder(folder_id, root_path.get_full_name(), "folder-label", 0, true).apply(*sup);
 
         auto folder = cluster->get_folders().by_id(folder_id);
         REQUIRE(folder);
@@ -241,7 +239,7 @@ struct fixture_t {
         REQUIRE(local_folder);
         local_files = &local_folder->get_file_infos();
 
-        main();
+        main(root_path, allocator);
 
         sup->do_shutdown();
         sup->do_process();
@@ -251,14 +249,13 @@ struct fixture_t {
         CHECK(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::SHUT_DOWN);
     }
 
-    virtual void main() noexcept {}
+    virtual void main(const utils::poly_path_view_t &root_path, const utils::allocator_t &allocator) noexcept {}
 
     r::pt::time_duration timeout = r::pt::millisec{10};
     r::pt::time_duration retension_timeout = r::pt::millisec{15};
     cluster_ptr_t cluster;
     model::sequencer_ptr_t sequencer;
     model::device_ptr_t local_device;
-    bfs::path root_path;
     test::path_guard_t path_guard;
     fs_context_ptr_r fs_context;
     fs::updates_mediator_ptr_t updates_mediator;
@@ -277,8 +274,8 @@ struct fixture_t {
 
 void test_fs() {
     struct F : fixture_t {
-        void main() noexcept override {
-            bfs::create_directories(root_path / "a/b/c/d/e");
+        void main(const utils::poly_path_view_t &root_path, const utils::allocator_t &allocator) noexcept override {
+            create_directories(root_path / "a/b/c/d/e");
             await_events(4);
             REQUIRE(local_files->size() == 5);
             REQUIRE(local_files->by_name("a"));
@@ -287,7 +284,7 @@ void test_fs() {
             REQUIRE(local_files->by_name("a/b/c/d"));
             REQUIRE(local_files->by_name("a/b/c/d/e"));
 
-            bfs::create_directories(root_path / L"a/b/c/подпапка");
+            create_directories(root_path / L"a/b/c/подпапка");
             write_file(root_path / L"a/b/c/файлик.bin", "12345");
             await_events(4);
             REQUIRE(local_files->by_name(narrow(L"a/b/c/подпапка")));
@@ -297,23 +294,24 @@ void test_fs() {
 
             auto long_name = "2026_Project_Report_Sales_Analysis_Financial_Quarter_One_Overview_Data_Insights_and_"
                              "Strategies_v1.0.pdf";
-            bfs::create_directories(root_path / "a/xx");
+            create_directories(root_path / "a/xx");
             await_events(3);
             auto dir_1 = local_files->by_name("a/xx");
             REQUIRE(dir_1);
 
-            bfs::rename(root_path / "a" / "xx", root_path / "a" / long_name);
+            rename(root_path / "a" / "xx", root_path / "a" / long_name);
             await_events(4);
             auto dir_2 = local_files->by_name(fmt::format("a/{}", long_name));
             REQUIRE(dir_2);
+            CHECK(local_files->by_name("a/xx")->is_deleted());
 
-            bfs::rename(root_path / "a" / long_name, root_path / "a" / "yy");
+            rename(root_path / "a" / long_name, root_path / "a" / "yy");
             await_events(3);
             auto dir_3 = local_files->by_name("a/yy");
             REQUIRE(dir_3);
 
-            bfs::rename(root_path / "a" / "b", root_path / "a" / "BB");
-            await_events(7);
+            rename(root_path / "a" / "b", root_path / "a" / "BB");
+            await_events(10);
             {
                 auto wnames = {L"a/b", L"a/b/c", L"a/b/c/d", L"a/b/c/d/e", L"a/b/c/подпапка", L"a/b/c/файлик.bin"};
                 for (auto &wname : wnames) {
@@ -337,13 +335,13 @@ void test_fs() {
                 }
             }
 
-            bfs::create_directories(root_path / "new-dir");
+            create_directories(root_path / "new-dir");
             await_events(2);
 
             auto dir_4 = local_files->by_name("new-dir");
             REQUIRE(dir_4);
 
-            bfs::create_directories(root_path / "new-dir" / "sub_dir");
+            create_directories(root_path / "new-dir" / "sub_dir");
             write_file(root_path / "new-dir" / "f", "12345");
 
             await_events(4);

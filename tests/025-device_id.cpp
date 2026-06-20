@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2023 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "test-utils.h"
 #include "model/device_id.h"
 #include "proto/luhn32.h"
 #include "utils/tls.h"
+#include "utils/path_view.hpp"
 
 using namespace syncspirit::test;
 using namespace syncspirit::utils;
 using namespace syncspirit::model;
 using namespace syncspirit::proto;
 
-namespace bfs = std::filesystem;
 using l32 = luhn32;
 
 TEST_CASE("luhn32", "[model]") {
@@ -26,9 +26,13 @@ TEST_CASE("luhn32", "[model]") {
 }
 
 TEST_CASE("device_id", "[model]") {
-    auto cert_path = locate_path("data/sample-cert.pem");
-    auto key_path = locate_path("data/sample-key.pem");
-    auto load_result = load_pair(cert_path.string().c_str(), key_path.string().c_str());
+    auto buffer = std::array<std::byte, 1024 * 4>{};
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+
+    auto cert_path = locate_path("data/sample-cert.pem", allocator);
+    auto key_path = locate_path("data/sample-key.pem", allocator);
+    auto load_result = load_pair(cert_path, key_path);
     REQUIRE(load_result);
     auto &pair = load_result.value();
     auto opt_device_id = device_id_t::from_cert(pair.cert_data);

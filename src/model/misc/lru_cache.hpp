@@ -54,7 +54,7 @@ template <typename Item> class mru_list_t {
         }
     }
 
-    item_t get(const std::string &key) noexcept {
+    item_t get(std::string_view key) noexcept {
         auto &projection = il.template get<1>();
         auto it = projection.find(key);
         if (it != projection.end()) {

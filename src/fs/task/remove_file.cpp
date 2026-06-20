@@ -3,14 +3,16 @@
 
 #include "remove_file.h"
 #include "fs/messages.h"
+#include "utils/path_view.hpp"
 #include "fs/fs_proxy.h"
 
 using namespace syncspirit::fs::task;
 
-remove_file_t::remove_file_t(bfs::path path_) noexcept : path{std::move(path_)} {}
+remove_file_t::remove_file_t(utils::path_t path_) noexcept : path{std::move(path_)} {}
 
 bool remove_file_t::process(fs_slave_t &fs_slave, execution_context_t &context) noexcept {
-    ec = context.fs_proxy->remove_file(path);
+    auto view = path.get_view(context.allocator);
+    ec = context.fs_proxy->remove_file(view);
     if (!ec) {
         return true;
     }

@@ -15,6 +15,7 @@
 #include "test_supervisor.h"
 #include "access.h"
 #include "utils/platform.h"
+#include "utils/format.hpp"
 #include "utils/utf8.h"
 #include <chrono>
 #include <variant>
@@ -32,6 +33,7 @@ using namespace syncspirit::model;
 using namespace syncspirit::net;
 using namespace syncspirit::fs;
 using namespace syncspirit::hasher;
+using namespace syncspirit::utils;
 using boost::nowide::narrow;
 
 struct fixture_t;
@@ -40,13 +42,33 @@ using I = syncspirit_watcher_impl_t;
 using FT = proto::FileInfoType;
 
 static constexpr auto default_perms = std::uint32_t{0123};
-static constexpr auto default_perms_fs = static_cast<bfs::perms>(default_perms);
 
 #ifndef SYNCSPIRIT_WIN
 static constexpr auto expected_perms = std::uint32_t{0123};
 #else
 static constexpr auto expected_perms = std::uint32_t{0666};
 #endif
+
+struct CB {
+    using child_info_t = fs::task::scan_dir_t::child_info_t;
+    using child_infos_t = fs::task::scan_dir_t::child_infos_t;
+
+    child_infos_t get() && { return std::move(r); }
+
+    CB &&add(std::string_view name, utils::file_type_t type = utils::file_type_t::DIRECTORY, std::int64_t size = 0,
+             std::uint32_t perms = default_perms, std::int64_t modified = 0) && {
+        auto child = child_info_t{};
+        child.path = utils::path_t::make_native(name);
+        child.permissions = perms;
+        child.size = size;
+        child.last_write_time = modified;
+        child.file_type = type;
+        r.push_back(std::move(child));
+        return std::move(*this);
+    }
+
+    child_infos_t r;
+};
 
 struct my_supervisort_t : supervisor_t {
     using parent_t = supervisor_t;
@@ -147,8 +169,11 @@ struct fixture_t {
 
         sup->do_process();
 
-        auto fs_config = config::fs_config_t{3600, 10};
-        main();
+        auto buffer = std::array<std::byte, 1024 * 32>();
+        auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+        auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+
+        main(allocator);
 
         sup->do_process();
         sup->shutdown();
@@ -177,7 +202,7 @@ struct fixture_t {
         sup->do_process();
     }
 
-    virtual void main() noexcept {}
+    virtual void main(const utils::allocator_t &allocator) noexcept {}
 
     std::int64_t files_scan_iteration_limit = 100;
     builder_ptr_t builder;
@@ -197,7 +222,7 @@ struct fixture_t {
 void test_just_start() {
     struct F : fixture_t {
         using fixture_t::fixture_t;
-        void main() noexcept override {
+        void main(const utils::allocator_t &) noexcept override {
             auto impl = GENERATE(I::none, I::inotify, I::kqueue, I::win32);
             launch_target(impl);
             CHECK(static_cast<r::actor_base_t *>(target.get())->access<to::state>() == r::state_t::OPERATIONAL);
@@ -210,7 +235,7 @@ void test_just_start() {
 void test_watch_unwatch() {
     struct F : fixture_t {
         using fixture_t::fixture_t;
-        void main() noexcept override {
+        void main(const utils::allocator_t &) noexcept override {
             auto impl = GENERATE(I::inotify, I::kqueue, I::win32);
             auto folder_id = "1234-5678";
             db::Folder db_folder;
@@ -232,7 +257,7 @@ void test_watch_unwatch() {
                 REQUIRE(!unwatch_folder_msg);
                 auto &p = watch_folder_msg->payload;
                 CHECK(p.folder_id == folder_id);
-                CHECK(p.path == "/some/path");
+                CHECK(p.path.get_full_name() == "/some/path");
                 p.ec = {};
                 submit(std::move(watch_folder_msg));
 
@@ -279,7 +304,7 @@ void test_watch_unwatch() {
                     REQUIRE(watch_folder_msg);
                     auto &p = watch_folder_msg->payload;
                     CHECK(p.folder_id == folder_id);
-                    CHECK(p.path == "/some/path");
+                    CHECK(p.path.get_full_name() == "/some/path");
                 }
             }
         }
@@ -313,22 +338,11 @@ struct folder_fixture_t : fixture_t {
     void on_create_dir(fs::message::create_dir_t &msg) override {
         auto &p = msg.payload;
         p.ec = {};
-        LOG_DEBUG(log, "creating a dir for {}", p.folder_id, narrow(p.generic_wstring()));
+        LOG_DEBUG(log, "creating a dir for {}", p.folder_id, static_cast<utils::path_base_t &>(p));
     }
 
-    static child_info_t make_child(std::string_view name, bfs::file_type type = bfs::file_type::directory,
-                                   std::uintmax_t size = 0, std::uint32_t perms = default_perms,
-                                   std::int64_t modified = 0) {
-        auto child = child_info_t{};
-        child.path = bfs::path(name);
-        child.status = bfs::file_status(type, static_cast<bfs::perms>(perms));
-        child.size = size;
-        child.last_write_time = fs::from_unix(modified);
-        return child;
-    };
-
     virtual bool process_cmd(fs::task::scan_dir_t &task) noexcept {
-        auto path = narrow(task.path.generic_wstring());
+        auto &path = task.path;
         if (!dir_children.empty()) {
             std::visit(
                 [&](auto &item) {
@@ -354,7 +368,7 @@ struct folder_fixture_t : fixture_t {
 
     virtual bool process_cmd(fs::task::segment_iterator_t &task) noexcept {
         static const constexpr size_t SZ = SHA256_DIGEST_LENGTH;
-        LOG_DEBUG(log, "process_cmd(segment_iterator_t) {}", narrow(task.path.generic_wstring()));
+        LOG_DEBUG(log, "process_cmd(segment_iterator_t) {}", task.path);
         for (std::int32_t i = task.block_index, j = 0; j < task.block_count; ++i, ++j) {
             auto bs = (j + 1 == task.block_count) ? task.last_block_size : task.block_size;
             auto off = task.offset + std::int64_t{task.block_size} * j;
@@ -375,12 +389,12 @@ struct folder_fixture_t : fixture_t {
     }
 
     virtual bool process_cmd(fs::task::remove_file_t &task) noexcept {
-        LOG_DEBUG(log, "process_cmd(remove_file_t) {}", narrow(task.path.generic_wstring()));
+        LOG_DEBUG(log, "process_cmd(remove_file_t) {}", task.path);
         return false;
     }
 
     virtual bool process_cmd(fs::task::rename_file_t &task) noexcept {
-        LOG_DEBUG(log, "process_cmd(rename_file_t) {}", narrow(task.path.generic_wstring()));
+        LOG_DEBUG(log, "process_cmd(rename_file_t) {}", task.path);
         return false;
     }
 
@@ -467,7 +481,7 @@ void test_trivial_changes() {
     struct F : folder_fixture_t {
         using parent_t = folder_fixture_t;
         using parent_t::parent_t;
-        void main() noexcept override {
+        void main(const utils::allocator_t &) noexcept override {
             auto impl = GENERATE(I::inotify, I::kqueue, I::win32);
             prepare(impl);
             LOG_INFO(log, "impl: {}", static_cast<int>(impl));
@@ -589,7 +603,7 @@ void test_ignoring_tmps() {
             return false;
         }
 
-        void main() noexcept override {
+        void main(const utils::allocator_t &) noexcept override {
             using namespace std::chrono;
             using UT = fs::update_type_t;
             using Clock = steady_clock;
@@ -631,8 +645,7 @@ void test_ignoring_tmps() {
                 auto path = fmt::format("/some/path/dir/some-file-name.bin{}", fs::tmp_suffix);
                 CHECK(files_local->size() == 1);
 
-                auto dir_children = child_infos_t{make_child(path, bfs::file_type::regular, 5, default_perms, seconds)};
-                expect_dir_scan(dir_children);
+                expect_dir_scan(CB().add(path, file_type_t::FILE, 5, default_perms, seconds).get());
                 mk_update(file, UT::content, true);
                 CHECK(files_local->size() == 1);
                 CHECK(f->get_sequence() == sequence);
@@ -649,11 +662,7 @@ void test_ignoring_tmps() {
                 proto::set_type(file, FT::DIRECTORY);
 
                 auto path = fmt::format("/some/path/dir/some-file-name.bin");
-                {
-                    auto dir_children = child_infos_t{make_child(path, bfs::file_type::regular, 0, default_perms)};
-                    expect_dir_scan(dir_children);
-                }
-
+                expect_dir_scan(CB().add(path, file_type_t::FILE, 0, default_perms).get());
                 mk_update(file, UT::content, true);
 
                 proto::set_name(file, "dir/some-file-name.bin");
@@ -691,12 +700,11 @@ void test_ignoring_tmps() {
                 auto file_guard = peer_file->guard(*folder_peer);
 
                 auto path_tmp = fmt::format("/some/path/dir/some-file-name.bin{}", fs::tmp_suffix);
-                auto dir_children = child_infos_t{make_child(path_tmp, bfs::file_type::regular, 10, default_perms),
-                                                  make_child(path, bfs::file_type::regular, 0, default_perms)};
-                expect_dir_scan(dir_children);
+                expect_dir_scan(CB().add(path_tmp, file_type_t::FILE, 10, default_perms)
+                                    .add(path, file_type_t::FILE, 0, default_perms)
+                                    .get());
 
                 auto sequence = f->get_sequence();
-
                 proto::set_name(file, "dir");
                 proto::set_type(file, FT::DIRECTORY);
                 proto::set_size(file, 0);
@@ -715,7 +723,7 @@ void test_hashing() {
     struct F : folder_fixture_t {
         using parent_t = folder_fixture_t;
         using parent_t::parent_t;
-        void main() noexcept override {
+        void main(const utils::allocator_t &) noexcept override {
             auto impl = GENERATE(I::inotify, I::kqueue, I::win32);
             prepare(impl);
 
@@ -768,7 +776,7 @@ void test_rescan() {
             return parent_t::process_cmd(task);
         }
 
-        void main() noexcept override {
+        void main(const utils::allocator_t &) noexcept override {
             auto impl = GENERATE(I::inotify, I::kqueue);
             prepare(impl);
 
@@ -785,15 +793,14 @@ void test_rescan() {
             auto sequence = folder_local->get_max_sequence();
             CHECK(sequence == 3);
 
-            auto root_children = child_infos_t{make_child("/some/path/dir-a"), make_child("/some/path/dir-b")};
-            auto a_children = child_infos_t{make_child("/some/path/dir-a/x")};
             auto no_children = child_infos_t{};
-
+            auto root_children = CB().add("/some/path/dir-a").add("/some/path/dir-b").get();
+            auto a_children = CB().add("/some/path/dir-a/x").get();
             SECTION("rescan whole dir => get updates") {
-                expect_dir_scan(root_children);
-                expect_dir_scan(no_children);
-                expect_dir_scan(a_children);
-                expect_dir_scan(no_children);
+                expect_dir_scan(std::move(root_children));
+                expect_dir_scan(std::move(no_children));
+                expect_dir_scan(std::move(a_children));
+                expect_dir_scan(std::move(no_children));
                 builder->scan_start(folder_id).apply(*sup);
                 CHECK(sup->file_availabilities == 3);
                 CHECK(folder_local->get_max_sequence() == sequence);
@@ -801,10 +808,10 @@ void test_rescan() {
                 CHECK(dir_scans == 4);
             }
             SECTION("content update with recurse on") {
-                expect_dir_scan(root_children);
-                expect_dir_scan(no_children);
-                expect_dir_scan(a_children);
-                expect_dir_scan(no_children);
+                expect_dir_scan(std::move(root_children));
+                expect_dir_scan(std::move(no_children));
+                expect_dir_scan(std::move(a_children));
+                expect_dir_scan(std::move(no_children));
                 proto::set_name(pr_dir, "");
                 mk_update(pr_dir, fs::update_type_t::content, true, true);
                 CHECK(sup->file_availabilities == 0);
@@ -830,7 +837,7 @@ void test_skip_scan_known() {
             return parent_t::process_cmd(task);
         }
 
-        void main() noexcept override {
+        void main(const utils::allocator_t &) noexcept override {
             auto impl = GENERATE(I::inotify, I::kqueue);
             prepare(impl);
 
@@ -845,9 +852,10 @@ void test_skip_scan_known() {
                 builder->local_update(folder_id, pr_dir).apply(*sup);
             }
 
-            expect_dir_scan(
-                {make_child("/some/path/dir-a/A"), make_child("/some/path/dir-a/B"), make_child("/some/path/dir-a/C")});
-            expect_dir_scan({make_child("/some/path/dir-a/B/2")});
+            auto root_dir = CB().add("/some/path/dir-a/A").add("/some/path/dir-a/B").add("/some/path/dir-a/C").get();
+
+            expect_dir_scan(std::move(root_dir));
+            expect_dir_scan(CB().add("/some/path/dir-a/B/2").get());
             expect_dir_scan({});
 
             proto::set_name(pr_dir, "dir-a");
@@ -874,7 +882,8 @@ void test_skip_scan_known() {
 
             CHECK(dir_scans == 3);
 
-            expect_dir_scan({make_child("/some/path/dir-a/A"), make_child("/some/path/dir-a/B")});
+            root_dir = CB().add("/some/path/dir-a/A").add("/some/path/dir-a/B").get();
+            expect_dir_scan(std::move(root_dir));
             mk_update(pr_dir, fs::update_type_t::content, false);
 
             auto dir_c_new = files_local->by_name("dir-a/C");
@@ -904,7 +913,7 @@ void test_new_dir_refinement() {
             return parent_t::process_cmd(task);
         }
 
-        void main() noexcept override {
+        void main(const utils::allocator_t &) noexcept override {
             auto impl = GENERATE(I::inotify, I::kqueue);
             prepare(impl);
 
@@ -917,9 +926,10 @@ void test_new_dir_refinement() {
             proto::set_modified_s(pr_dir, 12345);
             proto::set_type(pr_dir, FT::DIRECTORY);
 
-            expect_dir_scan({make_child("/some/path/dir-a/dir-b")});
-            expect_dir_scan({make_child("/some/path/dir-a/dir-b/dir-c"),
-                             make_child("/some/path/dir-a/dir-b/file.bin", bfs::file_type::regular, 5)});
+            expect_dir_scan(CB().add("/some/path/dir-a/dir-b").get());
+            expect_dir_scan(CB().add("/some/path/dir-a/dir-b/dir-c")
+                                .add("/some/path/dir-a/dir-b/file.bin", file_type_t::FILE, 5)
+                                .get());
             expect_dir_scan({});
             expect_bytes_hash(as_bytes("12345"));
 
@@ -964,7 +974,7 @@ void test_new_dir_without_refinement() {
         using parent_t::parent_t;
         using child_info_t = fs::task::scan_dir_t::child_info_t;
 
-        void main() noexcept override {
+        void main(const utils::allocator_t &) noexcept override {
             auto impl = GENERATE(I::inotify, I::kqueue);
             prepare(impl);
 
@@ -995,7 +1005,7 @@ void test_remove_dir_refinement() {
         using parent_t::parent_t;
         using child_info_t = fs::task::scan_dir_t::child_info_t;
 
-        void main() noexcept override {
+        void main(const utils::allocator_t &) noexcept override {
             auto impl = GENERATE(I::inotify, I::kqueue, I::win32);
             prepare(impl);
 
@@ -1050,12 +1060,12 @@ void test_scan_notification_unix() {
             return parent_t::process_cmd(task);
         }
 
-        void main() noexcept override {
+        void main(const utils::allocator_t &) noexcept override {
             auto impl = GENERATE(I::inotify, I::kqueue);
             prepare(impl);
 
-            expect_dir_scan({make_child("/some/path/dir-a")});
-            expect_dir_scan({make_child("/some/path/dir-a/dir-b")});
+            expect_dir_scan(CB().add("/some/path/dir-a").get());
+            expect_dir_scan(CB().add("/some/path/dir-a/dir-b").get());
             expect_dir_scan({});
 
             LOG_INFO(log, "triggering scan...");
@@ -1074,7 +1084,7 @@ void test_kqueue_changes() {
         using parent_t::parent_t;
         using child_info_t = fs::task::scan_dir_t::child_info_t;
 
-        void main() noexcept override {
+        void main(const utils::allocator_t &) noexcept override {
             auto impl = I::kqueue;
             prepare(impl);
 
@@ -1083,8 +1093,8 @@ void test_kqueue_changes() {
                 proto::set_name(pr_dir, "");
                 proto::set_type(pr_dir, FT::DIRECTORY);
 
-                expect_dir_scan({make_child("/some/path/dir-a")});
-                expect_dir_scan({make_child("/some/path/dir-a/dir-b")});
+                expect_dir_scan(CB().add("/some/path/dir-a").get());
+                expect_dir_scan(CB().add("/some/path/dir-a/dir-b").get());
                 expect_dir_scan({});
 
                 mk_update(pr_dir, fs::update_type_t::content, false);
@@ -1110,12 +1120,14 @@ void test_dir_scan_errors() {
         using parent_t::parent_t;
         using child_info_t = fs::task::scan_dir_t::child_info_t;
 
-        void main() noexcept override {
+        void main(const utils::allocator_t &) noexcept override {
             auto impl = GENERATE(I::inotify, I::kqueue, I::win32);
             prepare(impl);
 
-            expect_dir_scan(
-                {make_child("/some/path/dir-a/A"), make_child("/some/path/dir-a/B"), make_child("/some/path/dir-a/C")});
+            auto root_children =
+                CB().add("/some/path/dir-a/A").add("/some/path/dir-a/B").add("/some/path/dir-a/C").get();
+
+            expect_dir_scan(std::move(root_children));
             expect_dir_scan({});
             expect_dir_scan_error(utils::make_error_code(utils::error_code_t::no_action));
             expect_dir_scan({});
@@ -1168,7 +1180,7 @@ void test_dir_scan_errors() {
                 expect_bytes_hash(data);
                 builder->local_update(folder_id, pr_dir).apply(*sup);
 
-                expect_dir_scan({make_child("/some/path/dir-a")}, false);
+                expect_dir_scan(CB().add("/some/path/dir-a").get(), false);
                 LOG_INFO(log, "triggering scan...");
                 builder->scan_start(folder_id).apply(*sup);
 
@@ -1213,14 +1225,14 @@ void test_read_file_errors() {
         using child_info_t = fs::task::scan_dir_t::child_info_t;
 
         bool process_cmd(fs::task::segment_iterator_t &task) noexcept override {
-            LOG_DEBUG(log, "process_cmd(segment_iterator_t) {}", narrow(task.path.generic_wstring()));
+            LOG_DEBUG(log, "process_cmd(segment_iterator_t) {}", task.path);
             task.ec = std::make_error_code(std::errc::no_such_file_or_directory);
             return true;
         }
 
         std::uint32_t get_hash_limit() override { return concurrency; }
 
-        void main() noexcept override {
+        void main(const utils::allocator_t &) noexcept override {
             auto impl = GENERATE(I::inotify, I::kqueue, I::win32);
             concurrency = GENERATE(1, 5, 10, 100);
             prepare(impl);
@@ -1229,11 +1241,14 @@ void test_read_file_errors() {
 
             auto block_sz = fs::block_sizes[0];
             auto child = child_info_t{};
-            child.path = bfs::path("/some/path/file.bin");
-            child.status = bfs::file_status(bfs::file_type::regular);
+            child.path = utils::path_t::make_native("/some/path/file.bin");
+            child.file_type = file_type_t::FILE;
             child.size = block_sz * multiplier;
 
-            expect_dir_scan({child});
+            auto root_dir_children = child_infos_t();
+            root_dir_children.push_back(std::move(child));
+
+            expect_dir_scan(std::move(root_dir_children));
             LOG_INFO(log, "triggering scan...");
             builder->scan_start(folder_id).apply(*sup);
             CHECK(files_local->size() == 0);
@@ -1254,8 +1269,8 @@ void test_read_file_errors_partial() {
             static const constexpr size_t SZ = SHA256_DIGEST_LENGTH;
             auto from = task.block_index;
             auto to = from + task.block_count;
-            LOG_DEBUG(log, "process_cmd(segment_iterator_t) {}[{}..{}], error index = {}",
-                      narrow(task.path.generic_wstring()), from, to, error_index);
+            LOG_DEBUG(log, "process_cmd(segment_iterator_t) {}[{}..{}], error index = {}", task.path, from, to,
+                      error_index);
 
             if (error_index >= from && error_index < to) {
                 task.ec = std::make_error_code(std::errc::io_error);
@@ -1281,7 +1296,7 @@ void test_read_file_errors_partial() {
 
         std::uint32_t get_hash_limit() override { return concurrency; }
 
-        void main() noexcept override {
+        void main(const utils::allocator_t &) noexcept override {
             auto impl = GENERATE(I::inotify, I::kqueue, I::win32);
             concurrency = GENERATE(1, 2, 3, 4, 5);
             error_index = GENERATE(0, 1, 2, 3, 4);
@@ -1291,11 +1306,13 @@ void test_read_file_errors_partial() {
 
             auto block_sz = fs::block_sizes[0];
             auto child = child_info_t{};
-            child.path = bfs::path("/some/path/file.bin");
-            child.status = bfs::file_status(bfs::file_type::regular);
+            child.path = utils::path_t::make_native("/some/path/file.bin");
+            child.file_type = file_type_t::FILE;
             child.size = block_sz * multiplier;
 
-            expect_dir_scan({child});
+            auto root_dir_children = child_infos_t();
+            root_dir_children.push_back(std::move(child));
+
             LOG_INFO(log, "triggering scan... concurrency: {}, error_index: {}", concurrency, error_index);
             builder->scan_start(folder_id).apply(*sup);
             CHECK(files_local->size() == 0);
@@ -1317,8 +1334,8 @@ void test_read_file_error_recovery() {
             static const constexpr size_t SZ = SHA256_DIGEST_LENGTH;
             auto from = task.block_index;
             auto to = from + task.block_count;
-            LOG_DEBUG(log, "process_cmd(segment_iterator_t) {}[{}..{}], error index = {}",
-                      narrow(task.path.generic_wstring()), from, to, error_index);
+            LOG_DEBUG(log, "process_cmd(segment_iterator_t) {}[{}..{}], error index = {}", task.path, from, to,
+                      error_index);
 
             if (error_index >= from && error_index < to) {
                 task.ec = std::make_error_code(std::errc::io_error);
@@ -1345,7 +1362,7 @@ void test_read_file_error_recovery() {
 
         std::uint32_t get_hash_limit() override { return concurrency; }
 
-        void main() noexcept override {
+        void main(const utils::allocator_t &) noexcept override {
             auto impl = GENERATE(I::inotify, I::kqueue, I::win32);
             error_index = 3;
             prepare(impl);
@@ -1353,12 +1370,17 @@ void test_read_file_error_recovery() {
             auto multiplier = 5;
 
             auto block_sz = fs::block_sizes[0];
-            auto child = child_info_t{};
-            child.path = bfs::path("/some/path/file.bin");
-            child.status = bfs::file_status(bfs::file_type::regular);
-            child.size = block_sz * multiplier;
 
-            expect_dir_scan({child});
+            auto root_dir_1 = child_infos_t();
+            {
+                auto child = child_info_t{};
+                child.path = utils::path_t::make_native("/some/path/file.bin");
+                child.file_type = file_type_t::FILE;
+                child.size = block_sz * multiplier;
+                root_dir_1.push_back(std::move(child));
+            }
+
+            expect_dir_scan(std::move(root_dir_1));
             LOG_INFO(log, "triggering scan...");
             builder->scan_start(folder_id).apply(*sup);
             CHECK(files_local->size() == 0);
@@ -1366,13 +1388,23 @@ void test_read_file_error_recovery() {
 
             error_index = 99;
 
-            expect_dir_scan({child});
+            auto root_dir_2 = child_infos_t();
+            {
+                auto child = child_info_t{};
+                child.path = utils::path_t::make_native("/some/path/file.bin");
+                child.file_type = file_type_t::FILE;
+                child.size = block_sz * multiplier;
+                root_dir_2.push_back(std::move(child));
+            }
+
+            expect_dir_scan(std::move(root_dir_2));
+
             LOG_INFO(log, "triggering scan...");
             builder->scan_start(folder_id).apply(*sup);
             CHECK(files_local->size() == 1);
             auto file = files_local->begin()->get();
             REQUIRE(file);
-            REQUIRE(file->get_size() == child.size);
+            REQUIRE(file->get_size() == block_sz * multiplier);
             REQUIRE(file->iterate_blocks().get_total() == 5);
             CHECK(blocks_read == 5);
         }
@@ -1388,7 +1420,7 @@ void test_duplicates() {
     struct F : folder_fixture_t {
         using parent_t = folder_fixture_t;
         using parent_t::parent_t;
-        void main() noexcept override {
+        void main(const utils::allocator_t &) noexcept override {
             auto impl = GENERATE(I::inotify, I::kqueue, I::win32);
             prepare(impl);
 
@@ -1426,7 +1458,7 @@ void test_multi_folders_update() {
         using parent_t::parent_t;
         using child_info_t = fs::task::scan_dir_t::child_info_t;
 
-        void main() noexcept override {
+        void main(const utils::allocator_t &) noexcept override {
             for (auto folder_id : {"p1", "p2", "p3"}) {
                 db::Folder db_folder;
                 db::set_id(db_folder, folder_id);
@@ -1440,20 +1472,20 @@ void test_multi_folders_update() {
             auto impl = GENERATE(I::inotify, I::kqueue, I::win32);
             launch_target(impl);
 
-            expect_dir_scan({make_child("/some/p1/A")});
-            expect_dir_scan({make_child("/some/p1/A/a1"), make_child("/some/p1/A/a2"), make_child("/some/p1/A/a3")});
+            expect_dir_scan(CB().add("/some/p1/A").get());
+            expect_dir_scan(CB().add("/some/p1/A/a1").add("/some/p1/A/a2").add("/some/p1/A/a3").get());
             expect_dir_scan({});
             expect_dir_scan({});
             expect_dir_scan({});
 
-            expect_dir_scan({make_child("/some/p2/B")});
-            expect_dir_scan({make_child("/some/p2/B/b1"), make_child("/some/p2/B/b2"), make_child("/some/p2/B/b3")});
+            expect_dir_scan(CB().add("/some/p2/B").get());
+            expect_dir_scan(CB().add("/some/p2/B/b1").add("/some/p2/B/b2").add("/some/p2/B/b3").get());
             expect_dir_scan({});
             expect_dir_scan({});
             expect_dir_scan({});
 
-            expect_dir_scan({make_child("/some/p3/C")});
-            expect_dir_scan({make_child("/some/p3/C/c1"), make_child("/some/p3/C/c2"), make_child("/some/p3/C/c3")});
+            expect_dir_scan(CB().add("/some/p3/C").get());
+            expect_dir_scan(CB().add("/some/p3/C/c1").add("/some/p3/C/c2").add("/some/p3/C/c3").get());
             expect_dir_scan({});
             expect_dir_scan({});
             expect_dir_scan({});
@@ -1532,7 +1564,7 @@ void test_hierarchy_removal_order() {
         using parent_t = folder_fixture_t;
         using parent_t::parent_t;
 
-        void main() noexcept override {
+        void main(const utils::allocator_t &) noexcept override {
             auto impl = GENERATE(I::inotify, I::kqueue, I::win32);
             prepare(impl);
             for (auto &name : {"d0", "d0/d1", "d0/f1", "d0/d1/d2", "d0/d1/f2.1", "d0/d1/f2.2", "d0/d3"}) {
@@ -1570,11 +1602,11 @@ void test_hierarchy_update_dirs_only() {
         using parent_t = folder_fixture_t;
         using parent_t::parent_t;
 
-        void main() noexcept override {
+        void main(const utils::allocator_t &) noexcept override {
             auto impl = GENERATE(I::inotify, I::kqueue, I::win32);
             prepare(impl);
 
-            expect_dir_scan({make_child("/some/path/dir/subdir")});
+            expect_dir_scan(CB().add("/some/path/dir/subdir").get());
             expect_dir_scan({});
 
             auto folder_changes = fs::payload::folder_changes_t{};
@@ -1611,11 +1643,11 @@ void test_hierarchy_update_with_content() {
         using parent_t = folder_fixture_t;
         using parent_t::parent_t;
 
-        void main() noexcept override {
+        void main(const utils::allocator_t &) noexcept override {
             auto impl = GENERATE(I::inotify, I::kqueue, I::win32);
             prepare(impl);
 
-            expect_dir_scan({make_child("/some/path/dir/file.bin", bfs::file_type::regular, 5)});
+            expect_dir_scan(CB().add("/some/path/dir/file.bin", file_type_t::FILE, 5).get());
             expect_dir_scan({});
             expect_bytes_hash(as_bytes("12345"));
 
@@ -1666,11 +1698,11 @@ void test_malformed_hierarchy_update() {
         using parent_t = folder_fixture_t;
         using parent_t::parent_t;
 
-        void main() noexcept override {
+        void main(const utils::allocator_t &) noexcept override {
             auto impl = GENERATE(I::inotify, I::kqueue, I::win32);
             prepare(impl);
 
-            expect_dir_scan({make_child("/some/path/dir/file.bin", bfs::file_type::regular, 5)});
+            expect_dir_scan(CB().add("/some/path/dir/file.bin", file_type_t::FILE, 5).get());
             expect_dir_scan({});
             expect_bytes_hash(as_bytes("12345"));
 
@@ -1705,7 +1737,7 @@ void test_scan_dirs_race_unix() {
         using parent_t::parent_t;
 
         bool process_cmd(fs::task::scan_dir_t &task) noexcept override {
-            if (task.path == bfs::path("/some/path/a")) {
+            if (task.path.get_full_name() == "/some/path/a") {
                 LOG_INFO(log, "mix-in update");
                 auto pr_dir = proto::FileInfo();
                 proto::set_name(pr_dir, "x");
@@ -1720,19 +1752,19 @@ void test_scan_dirs_race_unix() {
             return parent_t::process_cmd(task);
         }
 
-        void main() noexcept override {
+        void main(const utils::allocator_t &) noexcept override {
             auto impl = GENERATE(I::inotify, I::kqueue);
             prepare(impl);
 
-            expect_dir_scan({make_child("/some/path/a")});
-            expect_dir_scan({make_child("/some/path/a/b")});
-            expect_dir_scan({make_child("/some/path/a/b/c")});
+            expect_dir_scan(CB().add("/some/path/a").get());
+            expect_dir_scan(CB().add("/some/path/a/b").get());
+            expect_dir_scan(CB().add("/some/path/a/b/c").get());
             expect_dir_scan({});
-            expect_dir_scan({make_child("/some/path/x/x1")});
-            expect_dir_scan({make_child("/some/path/x/x1/x2")});
+            expect_dir_scan(CB().add("/some/path/x/x1").get());
+            expect_dir_scan(CB().add("/some/path/x/x1/x2").get());
             expect_dir_scan({});
-            expect_dir_scan({make_child("/some/path/y/y1")});
-            expect_dir_scan({make_child("/some/path/y/y1/y2")});
+            expect_dir_scan(CB().add("/some/path/y/y1").get());
+            expect_dir_scan(CB().add("/some/path/y/y1/y2").get());
             expect_dir_scan({});
 
             LOG_INFO(log, "triggering scan...");
@@ -1750,11 +1782,11 @@ void test_scan_dirs_race_unix_2() {
         using parent_t = folder_fixture_t;
         using parent_t::parent_t;
 
-        void main() noexcept override {
+        void main(const utils::allocator_t &) noexcept override {
             auto impl = GENERATE(I::inotify, I::kqueue);
             prepare(impl);
 
-            expect_dir_scan({make_child("/some/path/a")});
+            expect_dir_scan(CB().add("/some/path/a").get());
             expect_dir_scan({});
             LOG_INFO(log, "triggering scan (1)...");
             builder->scan_start(folder_id).apply(*sup);
@@ -1772,11 +1804,11 @@ void test_scan_dirs_race_unix_2() {
 
             expect_dir_scan({});
             expect_dir_scan({});
-            expect_dir_scan({make_child("/some/path/a"), make_child("/some/path/x"), make_child("/some/path/y")});
+            expect_dir_scan(CB().add("/some/path/a").add("/some/path/x").add("/some/path/y").get());
             expect_dir_scan({});
             expect_dir_scan({});
-            expect_dir_scan({make_child("/some/path/a/b")});
-            expect_dir_scan({make_child("/some/path/a/b/c")});
+            expect_dir_scan(CB().add("/some/path/a/b").get());
+            expect_dir_scan(CB().add("/some/path/a/b/c").get());
             expect_dir_scan({});
 
             LOG_INFO(log, "triggering scan (2)...");
@@ -1795,7 +1827,7 @@ void test_scan_dirs_race_win32() {
         using parent_t::parent_t;
 
         bool process_cmd(fs::task::scan_dir_t &task) noexcept override {
-            if (task.path == bfs::path("/some/path/a")) {
+            if (task.path.get_full_name() == "/some/path/a") {
                 LOG_INFO(log, "mix-in update");
                 auto pr_dir = proto::FileInfo();
                 proto::set_permissions(pr_dir, default_perms);
@@ -1810,12 +1842,12 @@ void test_scan_dirs_race_win32() {
             return parent_t::process_cmd(task);
         }
 
-        void main() noexcept override {
+        void main(const utils::allocator_t &) noexcept override {
             prepare(I::win32);
 
-            expect_dir_scan({make_child("/some/path/a")});
-            expect_dir_scan({make_child("/some/path/a/b")});
-            expect_dir_scan({make_child("/some/path/a/b/c")});
+            expect_dir_scan(CB().add("/some/path/a").get());
+            expect_dir_scan(CB().add("/some/path/a/b").get());
+            expect_dir_scan(CB().add("/some/path/a/b/c").get());
             expect_dir_scan({});
 
             LOG_INFO(log, "triggering scan...");
@@ -1833,13 +1865,14 @@ void test_scan_dirs_race_win32_2() {
         using parent_t = folder_fixture_t;
         using parent_t::parent_t;
 
-        void main() noexcept override {
+        void main(const utils::allocator_t &) noexcept override {
             prepare(I::win32);
 
-            expect_dir_scan({make_child("/some/path/a")});
-            expect_dir_scan({make_child("/some/path/a/b")});
-            expect_dir_scan({make_child("/some/path/a/b/c")});
+            expect_dir_scan(CB().add("/some/path/a").get());
+            expect_dir_scan(CB().add("/some/path/a/b").get());
+            expect_dir_scan(CB().add("/some/path/a/b/c").get());
             expect_dir_scan({});
+
             LOG_INFO(log, "triggering scan (1)...");
             builder->scan_start(folder_id).apply(*sup);
             REQUIRE(files_local->size() == 3);
@@ -1854,11 +1887,11 @@ void test_scan_dirs_race_win32_2() {
             proto::set_name(pr_dir, "y");
             mk_update(pr_dir, fs::update_type_t::created, false, false);
 
-            expect_dir_scan({make_child("/some/path/a"), make_child("/some/path/x"), make_child("/some/path/y")});
+            expect_dir_scan(CB().add("/some/path/a").add("/some/path/x").add("/some/path/y").get());
             expect_dir_scan({});
             expect_dir_scan({});
-            expect_dir_scan({make_child("/some/path/a/b")});
-            expect_dir_scan({make_child("/some/path/a/b/c")});
+            expect_dir_scan(CB().add("/some/path/a/b").get());
+            expect_dir_scan(CB().add("/some/path/a/b/c").get());
             expect_dir_scan({});
 
             LOG_INFO(log, "triggering scan (2)...");
@@ -1886,13 +1919,13 @@ void test_hashing_race() {
             return r;
         }
 
-        void main() noexcept override {
+        void main(const utils::allocator_t &) noexcept override {
             auto impl = GENERATE(I::inotify, I::kqueue, I::win32);
             prepare(impl);
 
             auto number = std::uint32_t{5};
             auto sz = fs::block_sizes[0] * number;
-            expect_dir_scan({make_child("/some/path/file.bin", bfs::file_type::regular, sz, default_perms, 12345)});
+            expect_dir_scan(CB().add("/some/path/file.bin", file_type_t::FILE, sz, default_perms, 12345).get());
 
             auto block_a = as_owned_bytes(std::string(fs::block_sizes[0], 'a'));
             auto block_b = as_owned_bytes(std::string(fs::block_sizes[0], 'b'));
@@ -1960,7 +1993,7 @@ void test_renaming_simple() {
         using parent_t::parent_t;
         using trigger_t = std::function<void()>;
 
-        void main() noexcept override {
+        void main(const utils::allocator_t &) noexcept override {
             prepare(I::inotify);
 
             {
@@ -2062,7 +2095,7 @@ void test_renaming_hierarchy() {
         using parent_t::parent_t;
         using trigger_t = std::function<void()>;
 
-        void main() noexcept override {
+        void main(const utils::allocator_t &) noexcept override {
             prepare(I::inotify);
 
             auto data_1 = as_bytes("12345");
@@ -2156,7 +2189,7 @@ void test_renaming_race() {
         using trigger_t = std::function<void()>;
         using rename_pair_t = std::pair<std::string_view, std::string_view>;
 
-        void main() noexcept override {
+        void main(const utils::allocator_t &) noexcept override {
             prepare(I::inotify);
 
             {
@@ -2232,11 +2265,11 @@ void test_avoid_dir_rescan() {
             return parent_t::process_cmd(task);
         }
 
-        void main() noexcept override {
+        void main(const utils::allocator_t &) noexcept override {
             auto impl = GENERATE(I::inotify, I::kqueue);
             prepare(impl);
 
-            expect_dir_scan({make_child("/some/path/dir/a-file")});
+            expect_dir_scan(CB().add("/some/path/dir/a-file").get());
             expect_dir_scan({});
 
             auto file = proto::FileInfo();
@@ -2282,7 +2315,7 @@ void test_no_pending_io() {
 
         bool process_cmd(fs::task::scan_dir_t &task) noexcept override { return parent_t::process_cmd(task); }
 
-        void main() noexcept override {
+        void main(const utils::allocator_t &) noexcept override {
             auto impl = GENERATE(I::inotify, I::kqueue);
             prepare(impl);
 
@@ -2330,7 +2363,7 @@ void test_double_content_update() {
 
         bool process_cmd(fs::task::scan_dir_t &task) noexcept override { return parent_t::process_cmd(task); }
 
-        void main() noexcept override {
+        void main(const utils::allocator_t &) noexcept override {
             auto impl = GENERATE(I::inotify, I::kqueue);
             prepare(impl);
 
@@ -2378,7 +2411,7 @@ void test_dir_scan_and_hashing_race() {
         using parent_t::parent_t;
 
         bool process_cmd(fs::task::segment_iterator_t &task) noexcept override {
-            if (task.path == "/some/path/dir/f2.bin") {
+            if (task.path.get_full_name() == "/some/path/dir/f2.bin") {
                 auto file = proto::FileInfo();
                 auto file_name = std::string_view("dir/f1.bin");
                 proto::set_name(file, file_name);
@@ -2398,12 +2431,13 @@ void test_dir_scan_and_hashing_race() {
             return parent_t::process_cmd(task);
         }
 
-        void main() noexcept override {
+        void main(const utils::allocator_t &) noexcept override {
             auto impl = GENERATE(I::inotify, I::kqueue);
             prepare(impl);
 
-            expect_dir_scan({make_child("/some/path/dir/f1.bin", bfs::file_type::regular, 5),
-                             make_child("/some/path/dir/f2.bin", bfs::file_type::regular, 5)});
+            expect_dir_scan(CB().add("/some/path/dir/f1.bin", file_type_t::FILE, 5)
+                                .add("/some/path/dir/f2.bin", file_type_t::FILE, 5)
+                                .get());
             expect_dir_scan({});
 
             auto file = proto::FileInfo();
@@ -2430,7 +2464,7 @@ void test_invalid_utf8_names() {
         using parent_t = folder_fixture_t;
         using parent_t::parent_t;
 
-        void main() noexcept override {
+        void main(const utils::allocator_t &) noexcept override {
             auto impl = GENERATE(I::inotify, I::kqueue, I::win32);
             prepare(impl);
 
@@ -2455,8 +2489,7 @@ void test_invalid_utf8_names() {
                 CHECK(files_local->size() == 0);
             }
             SECTION("in dir content") {
-                auto children = child_infos_t{make_child(invalid_name, bfs::file_type::regular)};
-                expect_dir_scan(children);
+                expect_dir_scan(CB().add(invalid_name, file_type_t::FILE).get());
                 builder->scan_start(folder_id).apply(*sup);
                 CHECK(files_local->size() == 0);
             }
@@ -2479,12 +2512,11 @@ void test_rm_folder_on_scan() {
             parent_t::on_exec(msg);
         }
 
-        void main() noexcept override {
+        void main(const utils::allocator_t &) noexcept override {
             auto impl = GENERATE(I::inotify, I::kqueue, I::win32);
             prepare(impl);
 
-            auto children = child_infos_t{make_child("a-file", bfs::file_type::regular)};
-            expect_dir_scan(children);
+            expect_dir_scan(CB().add("a-file", file_type_t::FILE).get());
             builder->scan_start(folder_id).apply(*sup);
         }
     };
@@ -2496,7 +2528,7 @@ void test_not_ye_scanned_parent() {
         using parent_t = folder_fixture_t;
         using parent_t::parent_t;
 
-        void main() noexcept override {
+        void main(const utils::allocator_t &) noexcept override {
             auto impl = GENERATE(I::inotify, I::kqueue, I::win32);
             prepare(impl);
 

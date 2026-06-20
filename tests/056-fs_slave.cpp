@@ -3,20 +3,17 @@
 
 #include "test-utils.h"
 #include "fs/fs_slave.h"
-#include "fs/utils.h"
 #include "fs/updates_mediator.h"
 #include "fs/fs_proxy.h"
 #include "test-utils.h"
 #include "test_supervisor.h"
 #include "syncspirit-config.h"
-#include <boost/nowide/convert.hpp>
 
 using namespace syncspirit;
 using namespace syncspirit::test;
 using namespace syncspirit::utils;
 using namespace syncspirit::model;
 using namespace syncspirit::fs;
-using boost::nowide::narrow;
 
 inline static auto retension = pt::milliseconds{1};
 
@@ -35,16 +32,18 @@ struct my_supervisor_t final : test::supervisor_t {
 };
 
 TEST_CASE("fs_slave, scan_dir", "[fs]") {
-    auto root_path = unique_path();
-    bfs::create_directories(root_path);
-    test::path_guard_t path_quard{root_path};
+    auto buffer = std::array<std::byte, 1024 * 32>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+    auto path_quard = unique_path();
+    auto root_path = path_quard.get_view(allocator);
 
     auto slave = fs_slave_t();
     auto context = exec_ctx_t();
 
     SECTION("dir scan") {
         SECTION("empty dir") {
-            slave.push(task::scan_dir_t(root_path, {}, {}, false, true, false));
+            slave.push(task::scan_dir_t(root_path.detach(), {}, {}, false, true, false));
             CHECK(!slave.exec(context));
             REQUIRE(slave.tasks_out.size() == 1);
             auto &t = std::get<task::scan_dir_t>(slave.tasks_out.front());
@@ -52,15 +51,16 @@ TEST_CASE("fs_slave, scan_dir", "[fs]") {
             CHECK(t.child_infos.size() == 0);
         }
         SECTION("non-existing dir") {
-            slave.push(task::scan_dir_t(root_path / "non-existing", {}, {}, false, true, false));
+            slave.push(task::scan_dir_t((root_path / "non-existing").detach(), {}, {}, false, true, false));
             slave.exec(context);
             REQUIRE(slave.tasks_out.size() == 1);
             auto &t = std::get<task::scan_dir_t>(slave.tasks_out.front());
             CHECK(t.ec);
             CHECK(t.ec.message() != "");
+            CHECK(t.ec == std::errc::no_such_file_or_directory);
         }
         SECTION("not a dir") {
-            slave.push(task::scan_dir_t(root_path / "file", {}, {}, false, true, false));
+            slave.push(task::scan_dir_t((root_path / "file").detach(), {}, {}, false, true, false));
             write_file(root_path / "file", "");
             slave.exec(context);
             REQUIRE(slave.tasks_out.size() == 1);
@@ -73,7 +73,7 @@ TEST_CASE("fs_slave, scan_dir", "[fs]") {
             write_file(root_path / "file-2", "");
 
             SECTION("scan whole dir") {
-                slave.push(task::scan_dir_t(root_path, {}, {}, false, true, false));
+                slave.push(task::scan_dir_t(root_path.detach(), {}, {}, false, true, false));
                 slave.exec(context);
                 REQUIRE(slave.tasks_out.size() == 1);
                 auto &t = std::get<task::scan_dir_t>(slave.tasks_out.front());
@@ -83,7 +83,7 @@ TEST_CASE("fs_slave, scan_dir", "[fs]") {
             SECTION("scan whole dir with callback") {
                 bool invoked = false;
                 context.scan_dir_callback = [&](auto &) { invoked = true; };
-                slave.push(task::scan_dir_t(root_path, {}, {}, true, true, false));
+                slave.push(task::scan_dir_t(root_path.detach(), {}, {}, true, true, false));
                 slave.exec(context);
                 REQUIRE(slave.tasks_out.size() == 1);
                 auto &t = std::get<task::scan_dir_t>(slave.tasks_out.front());
@@ -92,7 +92,8 @@ TEST_CASE("fs_slave, scan_dir", "[fs]") {
                 CHECK(invoked);
             }
             SECTION("single child scan (1)") {
-                slave.push(task::scan_dir_t(root_path, {}, "file-1", false, true, false));
+                slave.push(
+                    task::scan_dir_t(root_path.detach(), {}, utils::path_t::make_native("file-1"), false, true, false));
                 slave.exec(context);
                 REQUIRE(slave.tasks_out.size() == 1);
                 auto &t = std::get<task::scan_dir_t>(slave.tasks_out.front());
@@ -100,7 +101,8 @@ TEST_CASE("fs_slave, scan_dir", "[fs]") {
                 CHECK(t.child_infos.size() == 1);
             }
             SECTION("single child scan (2)") {
-                slave.push(task::scan_dir_t(root_path, {}, "file-x", false, true, false));
+                slave.push(
+                    task::scan_dir_t(root_path.detach(), {}, utils::path_t::make_native("file-x"), false, true, false));
                 slave.exec(context);
                 REQUIRE(slave.tasks_out.size() == 1);
                 auto &t = std::get<task::scan_dir_t>(slave.tasks_out.front());
@@ -111,19 +113,19 @@ TEST_CASE("fs_slave, scan_dir", "[fs]") {
 
 #ifndef SYNCSPIRIT_WIN
         SECTION("dir with a file, dir & symlink") {
-            slave.push(task::scan_dir_t(root_path, {}, {}, false, true, false));
+            slave.push(task::scan_dir_t(root_path.detach(), {}, {}, false, true, false));
 
             auto modified = std::int64_t{1642007468};
             auto child_1 = root_path / L"a_файл";
             auto child_2 = root_path / L"b_ссылка";
             auto child_3 = root_path / L"с_папка";
-            auto link_target = bfs::path("/some/where");
+            auto link_target = utils::path_t::make_native("/some/where");
 
             write_file(child_1, "abc");
-            bfs::last_write_time(child_1, from_unix(modified));
-            bfs::create_symlink(link_target, child_2);
-            bfs::create_directories(child_3);
-            bfs::last_write_time(child_3, from_unix(modified));
+            last_write_time(child_1, modified);
+            create_symlink(link_target, child_2);
+            create_directories(child_3);
+            last_write_time(child_3, modified);
 
             slave.exec(context);
 
@@ -133,25 +135,25 @@ TEST_CASE("fs_slave, scan_dir", "[fs]") {
             CHECK(t.child_infos.size() == 3);
             {
                 auto &c = t.child_infos[0];
-                CHECK(c.path.filename() == child_2.filename());
+                CHECK(c.path.get_filename() == child_2.get_filename());
                 CHECK(!c.ec);
-                CHECK(c.status.type() == bfs::file_type::symlink);
+                CHECK(c.file_type == utils::file_type_t::SYMLINK);
                 CHECK(c.target == link_target);
             }
             {
                 auto &c = t.child_infos[1];
-                CHECK(c.path.filename() == child_1.filename());
+                CHECK(c.path.get_filename() == child_1.get_filename());
                 CHECK(!c.ec);
-                CHECK(c.status.type() == bfs::file_type::regular);
-                CHECK(to_unix(c.last_write_time) == modified);
+                CHECK(c.file_type == utils::file_type_t::FILE);
+                CHECK(c.last_write_time == modified);
                 CHECK(c.size == 3);
             }
             {
                 auto &c = t.child_infos[2];
-                CHECK(c.path.filename() == child_3.filename());
+                CHECK(c.path.get_filename() == child_3.get_filename());
                 CHECK(!c.ec);
-                CHECK(c.status.type() == bfs::file_type::directory);
-                CHECK(to_unix(c.last_write_time) == modified);
+                CHECK(c.file_type == utils::file_type_t::DIRECTORY);
+                CHECK(c.last_write_time == modified);
             }
         }
 #endif
@@ -164,9 +166,12 @@ TEST_CASE("fs_slave, scan_dir", "[fs]") {
 }
 
 TEST_CASE("fs_slave, rm_file", "[fs]") {
-    auto root_path = unique_path();
-    bfs::create_directories(root_path);
-    test::path_guard_t path_quard{root_path};
+    auto buffer = std::array<std::byte, 1024 * 32>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+    auto path_quard = unique_path();
+    auto root_path = path_quard.get_view(allocator);
+
     auto slave = fs_slave_t();
     auto context = exec_ctx_t();
     auto &mediator = context.mediator;
@@ -174,37 +179,38 @@ TEST_CASE("fs_slave, rm_file", "[fs]") {
     SECTION("successfuly remove") {
         auto file = root_path / "file";
         write_file(file, "");
-        slave.push(task::remove_file_t(file));
+        slave.push(task::remove_file_t(file.detach()));
         CHECK(slave.exec(context));
         REQUIRE(slave.tasks_out.size() == 1);
         auto &t = std::get<task::remove_file_t>(slave.tasks_out.front());
         CHECK(!t.ec);
-        CHECK(!bfs::exists(file));
-        auto path_str = narrow(file.generic_wstring());
+        CHECK(!exists(file));
 #ifndef SYNCSPIRIT_WATCHER_KQUEUE
-        CHECK(mediator.is_masked(path_str));
+        CHECK(mediator.is_masked(file.get_full_name()));
 #else
-        CHECK(mediator.is_masked(root_path.string()));
+        CHECK(mediator.is_masked(root_path.get_full_name()));
 #endif
     }
 
     SECTION("failed to remove") {
         auto file = root_path / "dir";
-        bfs::create_directories(file / "subdir");
-        slave.push(task::remove_file_t(file));
+        create_directories(file / "subdir");
+        slave.push(task::remove_file_t(file.detach()));
         CHECK(!slave.exec(context));
         REQUIRE(slave.tasks_out.size() == 1);
         auto &t = std::get<task::remove_file_t>(slave.tasks_out.front());
         CHECK(t.ec);
         CHECK(t.ec.message() != "");
-        CHECK(bfs::exists(file));
+        CHECK(exists(file));
     }
 }
 
 TEST_CASE("fs_slave, segment-iterator (errors only)", "[fs]") {
-    auto root_path = unique_path();
-    bfs::create_directories(root_path);
-    test::path_guard_t path_quard{root_path};
+    auto buffer = std::array<std::byte, 1024 * 32>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+    auto path_quard = unique_path();
+    auto root_path = path_quard.get_view(allocator);
 
     auto slave = fs_slave_t();
     auto context = exec_ctx_t();
@@ -213,7 +219,7 @@ TEST_CASE("fs_slave, segment-iterator (errors only)", "[fs]") {
     hash_context = new hasher::payload::extendended_context_t();
 
     SECTION("attempt to read a dir") {
-        auto task = fs::task::segment_iterator_t(back_addr, hash_context, root_path, 0, 0, 1, 5, 5, 0);
+        auto task = task::segment_iterator_t(back_addr, hash_context, root_path.detach(), 0, 0, 1, 5, 5, 0);
         slave.push(std::move(task));
         CHECK(!slave.exec(context));
         REQUIRE(slave.tasks_out.size() == 1);
@@ -223,7 +229,7 @@ TEST_CASE("fs_slave, segment-iterator (errors only)", "[fs]") {
     };
     SECTION("attempt to non-existing dir") {
         auto path = root_path / "not-existing-file";
-        auto task = fs::task::segment_iterator_t(back_addr, hash_context, path, 0, 0, 1, 5, 5, 0);
+        auto task = task::segment_iterator_t(back_addr, hash_context, path.detach(), 0, 0, 1, 5, 5, 0);
         slave.push(std::move(task));
         CHECK(!slave.exec(context));
         REQUIRE(slave.tasks_out.size() == 1);
@@ -235,10 +241,10 @@ TEST_CASE("fs_slave, segment-iterator (errors only)", "[fs]") {
     SECTION("concurrent file modification") {
         auto path = root_path / "file.bin";
         write_file(path, "12345");
-        auto modified = fs::to_unix(bfs::last_write_time(path));
-        last_write_time(path, fs::from_unix(modified - 100));
+        auto modified = last_write_time(path);
+        last_write_time(path, modified - 10);
 
-        auto task = fs::task::segment_iterator_t(back_addr, hash_context, path, 0, 0, 1, 5, 5, modified);
+        auto task = fs::task::segment_iterator_t(back_addr, hash_context, path.detach(), 0, 0, 1, 5, 5, modified);
         slave.push(std::move(task));
         CHECK(!slave.exec(context));
         REQUIRE(slave.tasks_out.size() == 1);

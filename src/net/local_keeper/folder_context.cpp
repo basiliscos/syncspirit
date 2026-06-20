@@ -19,16 +19,13 @@
 #include "utils/platform.h"
 #include "utils/utf8.h"
 #include "utils/format.hpp"
+#include "utils/path_view.hpp"
 
-#include <boost/nowide/convert.hpp>
 #include <spdlog/fmt/bin_to_hex.h>
 
 using namespace syncspirit::fs::task;
 
 namespace syncspirit::net::local_keeper {
-
-using boost::nowide::narrow;
-using boost::nowide::widen;
 
 using local_update_t = syncspirit::model::diff::advance::local_update_t;
 
@@ -39,52 +36,55 @@ struct rename_context_t final : hasher::payload::extendended_context_t {
 
 auto make_context(model::folder_info_ptr_t local_folder, std::string_view start_subdir, bool recurse) noexcept
     -> folder_context_ptr_t {
+    auto buffer = std::array<std::byte, 1024 * 32>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+
     auto folder = local_folder->get_folder();
     auto augmentation = folder->get_augmentation().get();
     auto folder_entity = static_cast<presentation::folder_entity_t *>(augmentation);
     auto local_device = folder->get_cluster()->get_device();
     auto folder_presence = folder_entity->get_presence(local_device.get());
     auto presence = folder_presence;
-    auto skip_path = bfs::path(widen(start_subdir));
+    auto skip_path = utils::make_native_view(start_subdir, allocator);
 
     auto comparator = presentation::presence_t::child_comparator_t{};
-    for (const auto &item : skip_path) {
-        auto name = narrow(item.filename().generic_wstring());
+    for (const auto name : skip_path) {
         if (auto p = presence->get_child(name, true); p) {
             presence = p;
         } else {
             return {};
         }
     }
-    auto [path, child] = [&]() -> std::pair<bfs::path, bfs::path> {
+    auto [path, child] = [&]() -> std::pair<utils::poly_path_view_t, utils::path_t> {
         auto &folder_path = folder->get_path();
         if (presence == folder_presence)
-            return {folder_path, ""};
+            return {folder_path.get_view(allocator), utils::path_t()};
 
         auto parent = presence->get_parent();
         while (parent && (parent->get_features() & F::deleted)) {
             presence = parent;
             parent = parent->get_parent();
         }
-        auto path = bfs::path();
+        auto path = utils::make_empty_view(allocator);
         if (parent == folder_presence) {
-            path = folder_path;
+            path = folder_path.get_view(allocator);
         } else {
             auto dir_presence = static_cast<presentation::cluster_file_presence_t *>(parent);
             auto &file = dir_presence->get_file_info();
-            path = folder_path / bfs::path(widen(file.get_name()->get_full_name()));
+            path = folder_path / file.get_name()->get_view(allocator);
         }
-        auto name = bfs::path(widen(presence->get_entity()->get_path()->get_own_name()));
+        auto child = presence->get_entity()->get_path()->clone();
         presence = parent;
-        return {path, std::move(name)};
+        return {path, std::move(child)};
     }();
 
     auto stack = local_keeper::stack_t();
     stack.push_front(complete_scan_t{!child.empty()});
-    stack.push_front(unscanned_dir_t(std::move(path), presence, std::move(child), 0, recurse, false));
+    stack.push_front(unscanned_dir_t(path.detach(), presence, std::move(child), 0, recurse, false));
 
     auto ptr = folder_context_ptr_t();
-    ptr.reset(new folder_context_t(std::move(local_folder), std::move(stack), path));
+    ptr.reset(new folder_context_t(std::move(local_folder), std::move(stack), path.detach()));
     return ptr;
 }
 
@@ -99,7 +99,7 @@ folder_context_ptr_t make_context(model::folder_info_ptr_t local_folder, unexami
 }
 
 folder_context_t::folder_context_t(model::folder_info_ptr_t local_folder_, local_keeper::stack_t stack_,
-                                   const bfs::path &initial_path) noexcept
+                                   const utils::path_base_t &initial_path) noexcept
     : local_folder{local_folder_}, stack(std::move(stack_)) {
     log = utils::get_logger(fmt::format("net.f/{}", local_folder->get_folder()->get_id()));
     auto folder = local_folder->get_folder();
@@ -143,35 +143,34 @@ int folder_context_t::process(complete_scan_t &, stack_context_t &ctx) noexcept 
 
 int folder_context_t::process(unscanned_dir_t &dir, stack_context_t &ctx) noexcept {
     using I = syncspirit_watcher_impl_t;
-    auto it = scan_generation.find(dir.path.generic_string());
+    auto it = scan_generation.find(dir.path);
     auto skip_scan = false;
     if (it != scan_generation.end()) {
         skip_scan = it->second > dir.generation;
     }
 
-    auto dir_str = narrow(dir.path.generic_wstring());
     if (!skip_scan) {
         auto notify_watcher = ((ctx.watcher_impl == I::inotify) || (ctx.watcher_impl == I::kqueue)) &&
                               local_folder->get_folder()->is_watched();
-        LOG_TRACE(log, "scheduling scan of '{}' (notify: {})", dir_str, notify_watcher);
+        LOG_TRACE(log, "scheduling scan of '{}' (notify: {})", dir.path, notify_watcher);
         auto sub_task = scan_dir_t(std::move(dir.path), std::move(dir.presence), std::move(dir.single_child),
                                    notify_watcher, dir.recurse, dir.requires_refinement);
         push(std::move(sub_task));
         return 0;
     } else {
-        LOG_DEBUG(log, "skipping scanning of '{}'", dir_str);
+        LOG_DEBUG(log, "skipping scanning of '{}'", dir.path);
         return 1;
     }
 }
 
 int folder_context_t::process(unexamined_t &child_info, stack_context_t &ctx) noexcept {
     auto file = child_info.fetch_model(*local_folder);
-    auto &type = child_info.type;
+    auto type = child_info.file_type;
     if (type == proto::FileInfoType::DIRECTORY) {
         auto recurse = child_info.recurse || !file;
         auto skip_self_update = child_info.path == local_folder->get_folder()->get_path();
         if (!skip_self_update) {
-            stack.push_front(child_ready_t(child_info));
+            stack.push_front(child_ready_t(recurse ? child_info.clone() : std::move(child_info)));
         }
         if (recurse) {
             stack.push_front(
@@ -182,20 +181,18 @@ int folder_context_t::process(unexamined_t &child_info, stack_context_t &ctx) no
     } else {
         using namespace presentation;
         assert(type == proto::FileInfoType::FILE);
-        if (fs::is_temporal(child_info.path)) {
+        if (child_info.path.is_temporal()) {
             auto seconds_ago = ctx.get_now() - child_info.last_write_time;
             if (seconds_ago < constants::tmp_min_age) {
-                auto path_str = narrow(child_info.path.generic_wstring());
-                LOG_DEBUG(log, "temporary file '{}' is recently modified, ignoring", path_str);
+                LOG_DEBUG(log, "temporary file '{}' is recently modified, ignoring", child_info.path);
                 return 1;
             }
         }
         if (!child_info.size || file) {
             stack.emplace_front(child_ready_t(std::move(child_info)));
         } else {
-            auto path_str = narrow(child_info.path.generic_wstring());
-            if (hashing_files.contains(path_str)) {
-                LOG_DEBUG(log, "file '{}' is already scheduled for hashing", path_str);
+            if (hashing_files.contains(child_info.path)) {
+                LOG_DEBUG(log, "file '{}' is already scheduled for hashing", child_info.path);
             } else if (file) {
                 stack.emplace_front(child_ready_t(std::move(child_info)));
             } else {
@@ -204,8 +201,7 @@ int folder_context_t::process(unexamined_t &child_info, stack_context_t &ctx) no
                     if (!file) {
                         auto folder = local_folder->get_folder();
                         auto &folder_path = folder->get_path();
-                        auto rel_path = fs::relativize(child_info.path, folder_path);
-                        auto name = narrow(rel_path.generic_wstring());
+                        auto name = child_info.path.relativize(folder_path);
                         auto folder_infos = folder->get_folder_infos();
                         for (auto &it : folder_infos) {
                             if (auto file = it.item->get_file_infos().by_name(name)) {
@@ -268,17 +264,17 @@ int folder_context_t::process(child_ready_t &info, stack_context_t &ctx) noexcep
         }
     } else {
         bool match = false;
-        auto &type = info.type;
+        auto type = info.file_type;
         auto modification_match =
             (type == FT::SYMLINK) || (type == FT::DIRECTORY) || (info.last_write_time == file->get_modified_s());
         if (modification_match) {
             if (type == model::file_info_t::as_type(file->get_type())) {
                 auto ignore_perms = ignore_permissions || file->has_no_permissions();
-                auto perms_match = ignore_perms || info.perms == file->get_permissions();
+                auto perms_match = ignore_perms || info.permissions == file->get_permissions();
                 if (perms_match) {
                     if (type == FT::SYMLINK) {
-                        auto target = narrow(info.link_target.generic_wstring());
-                        match = file->get_link_target() == target;
+                        auto &target = info.target;
+                        match = file->get_link_target() == target.get_full_name();
                     } else {
                         match = file->get_size() == info.size;
                     }
@@ -318,7 +314,7 @@ int folder_context_t::process(undo_child_ready_t &info, stack_context_t &ctx) no
             }
         }
     }
-    LOG_WARN(log, "cannot undo child ready for {}", narrow(info.path.generic_wstring()));
+    LOG_WARN(log, "cannot undo child ready for {}", info.path);
     return 1;
 }
 
@@ -404,8 +400,7 @@ int folder_context_t::process(confirmed_deleted_t &item, stack_context_t &ctx) {
 }
 
 int folder_context_t::process(incomplete_t &item, stack_context_t &ctx) noexcept {
-    auto name = narrow(item.path.stem().generic_wstring());
-    auto name_view = std::string_view(name);
+    auto name = item.path.get_stem();
     auto self_device = ctx.cluster.get_device().get();
     auto action = model::advance_action_t::ignore;
     auto presence = (presentation::presence_t *)(nullptr);
@@ -421,8 +416,8 @@ int folder_context_t::process(incomplete_t &item, stack_context_t &ctx) noexcept
     if (!ignore && item.parent) {
         auto &entities = item.parent->get_entity()->get_children();
         auto comparator = presentation::entity_t::name_comparator_t{};
-        auto it = std::lower_bound(entities.begin(), entities.end(), name_view, comparator);
-        if (it != entities.end() && (*it)->get_path()->get_own_name() == name_view) {
+        auto it = std::lower_bound(entities.begin(), entities.end(), name, comparator);
+        if (it != entities.end() && (*it)->get_path()->get_filename() == name) {
             presence = const_cast<presentation::presence_t *>((*it)->get_best());
             if (presence && presence->get_device() == self_device) {
                 presence = nullptr;
@@ -435,7 +430,7 @@ int folder_context_t::process(incomplete_t &item, stack_context_t &ctx) noexcept
         if (peer_file.get_size() != item.size) {
             presence = nullptr;
         } else if (peer_file.is_synchronizing()) {
-            LOG_DEBUG(log, "ignoring '{}' (synchronizing)", narrow(item.path.generic_wstring()));
+            LOG_DEBUG(log, "ignoring '{}' (synchronizing)", item.path);
             ignore = true;
         } else {
             auto local_file = (const model::file_info_t *)(nullptr);
@@ -454,10 +449,10 @@ int folder_context_t::process(incomplete_t &item, stack_context_t &ctx) noexcept
 
     if (!ignore) {
         if (!presence || action == model::advance_action_t::ignore) {
-            LOG_DEBUG(log, "scheduling(1) removal of '{}'", narrow(item.path.generic_wstring()));
+            LOG_DEBUG(log, "scheduling(1) removal of '{}'", item.path);
             push(remove_file_t(std::move(item.path)));
         } else {
-            LOG_TRACE(log, "scheduling rehashing of '{}'", narrow(item.path.generic_wstring()));
+            LOG_TRACE(log, "scheduling rehashing of '{}'", item.path);
             auto &child_info = static_cast<child_info_t &>(item);
             auto ptr = hash_incomplete_file_ptr_t(new hash_incomplete_file_t(std::move(child_info), presence, action));
             stack.emplace_front(std::move(ptr));
@@ -486,12 +481,11 @@ int folder_context_t::process(rehashed_incomplete_t &item, stack_context_t &ctx)
             }
         }
         if (matched == blocks.size()) {
-            LOG_DEBUG(log, "scheduling finalization of '{}", narrow(item.path.generic_wstring()));
+            LOG_DEBUG(log, "scheduling finalization of '{}", item.path);
             auto modified_s = peer_file.get_modified_s();
-            auto name = [&]() -> bfs::path {
+            auto name = [&]() -> utils::poly_path_view_t {
                 if (item.action == model::advance_action_t::remote_copy) {
-                    auto own_name = peer_file.get_name()->get_own_name();
-                    return bfs::path(widen(own_name));
+                    return peer_file.get_name()->get_view(ctx.allocator);
                 } else {
                     assert(item.action == model::advance_action_t::resolve_remote_win);
                     auto self_device = ctx.cluster.get_device().get();
@@ -499,19 +493,18 @@ int folder_context_t::process(rehashed_incomplete_t &item, stack_context_t &ctx)
                     assert(local_presence->get_features() & F::cluster);
                     auto lp = static_cast<const presentation::cluster_file_presence_t *>(local_presence);
                     auto &local_file = cp->get_file_info();
-                    return bfs::path(local_file.make_conflicting_name()).filename();
+                    return local_file.make_conflicting_name(ctx.allocator);
                 }
             }();
             auto rename_ctx = hasher::payload::extendended_context_prt_t();
-            auto path_copy = item.path;
+            auto path_copy = item.path.clone();
             rename_ctx = new rename_context_t(std::move(item));
-            auto sub_task = rename_file_t(std::move(path_copy), std::move(name), modified_s, std::move(rename_ctx));
+            auto sub_task = rename_file_t(std::move(path_copy), name.detach(), modified_s, std::move(rename_ctx));
             push(std::move(sub_task));
         } else {
             if (matched) {
                 using namespace model::diff::local;
-                LOG_DEBUG(log, "matched {} of {} blocks of '{}'", matched, blocks.size(),
-                          narrow(item.path.generic_wstring()));
+                LOG_DEBUG(log, "matched {} of {} blocks of '{}'", matched, blocks.size(), item.path);
                 auto &peer_folder = cp->get_folder()->get_folder_info();
                 ctx.push_back(new blocks_availability_t(peer_file, peer_folder, std::move(valid_blocks)));
             } else {
@@ -520,7 +513,7 @@ int folder_context_t::process(rehashed_incomplete_t &item, stack_context_t &ctx)
         }
     }
     if (schedule_removal) {
-        LOG_DEBUG(log, "scheduling(2) removal of '{}'", narrow(item.path.generic_wstring()));
+        LOG_DEBUG(log, "scheduling(2) removal of '{}'", item.path);
         push(remove_file_t(std::move(item.path)));
     }
     return 1;
@@ -529,7 +522,7 @@ int folder_context_t::process(rehashed_incomplete_t &item, stack_context_t &ctx)
 int folder_context_t::process(abort_hashing_t &item, stack_context_t &ctx) noexcept {
     auto it = stack.begin()++;
     if (it != stack.end()) {
-        LOG_DEBUG(log, "aborted hashing of '{}'", narrow(item.path.generic_wstring()));
+        LOG_DEBUG(log, "aborted hashing of '{}'", item.path);
         stack.erase(it);
     }
     return 1;
@@ -554,12 +547,12 @@ void folder_context_t::post_process(hash_base_t &hash_file, hasher::message::dig
     if (!ensure_folder_existance(ctx)) {
         return;
     }
-    auto path_str = narrow(hash_file.path.generic_wstring());
-    LOG_TRACE(log, "post_process of '{}', {} blocks are hashing", path_str, hashing);
+    auto &path = hash_file.path;
+    LOG_TRACE(log, "post_process of '{}', {} blocks are hashing", path, hashing);
     assert(hashing > 0);
     --hashing;
 
-    auto it_h = hashing_files.find(path_str);
+    auto it_h = hashing_files.find(path);
     if (--it_h->second == 0) {
         hashing_files.erase(it_h);
     }
@@ -569,7 +562,7 @@ void folder_context_t::post_process(hash_base_t &hash_file, hasher::message::dig
 
     if (result.has_error()) {
         auto &ec = result.assume_error();
-        LOG_WARN(log, "cannot hash '{}': {}", path_str, ec);
+        LOG_WARN(log, "cannot hash '{}': {}", path, ec);
         ++hash_file.errored_blocks;
     } else {
         auto index = p.block_index;
@@ -582,14 +575,13 @@ void folder_context_t::post_process(hash_base_t &hash_file, hasher::message::dig
     }
     if (!hash_file.unhashed_blocks) {
         auto blocks = std::move(hash_file.blocks);
-        auto copy = static_cast<child_info_t &>(hash_file);
         auto abort_hashing = hash_file.errored_blocks;
         if (abort_hashing) {
-            stack.push_front(abort_hashing_t{std::move(copy.path)});
+            stack.push_front(abort_hashing_t{hash_file.path.clone()});
         } else if (hash_file.incomplete) {
-            stack.push_front(rehashed_incomplete_t(std::move(copy), std::move(blocks), hash_file.action));
+            stack.push_front(rehashed_incomplete_t(hash_file.clone(), std::move(blocks), hash_file.action));
         } else {
-            stack.push_front(child_ready_t(std::move(copy), std::move(blocks)));
+            stack.push_front(child_ready_t(hash_file.clone(), std::move(blocks)));
         }
     }
     ++ctx.hashes_pool;
@@ -597,7 +589,12 @@ void folder_context_t::post_process(hash_base_t &hash_file, hasher::message::dig
 
 void folder_context_t::post_process(fs::task::scan_dir_t &task, stack_context_t &ctx) noexcept {
     using checked_chidren_t = std::pmr::set<std::string_view>;
-    scan_generation[task.path.generic_string()] = ++io_generation;
+    auto it = scan_generation.find(task.path);
+    if (it == scan_generation.end()) {
+        scan_generation.emplace(task.path.clone(), ++io_generation);
+    } else {
+        it->second = ++io_generation;
+    }
     auto folder = local_folder->get_folder();
     auto &ec = task.ec;
     auto folder_id = folder->get_id();
@@ -624,11 +621,10 @@ void folder_context_t::post_process(fs::task::scan_dir_t &task, stack_context_t 
         if (task.single_child.empty() || task.ec != std::errc::no_such_file_or_directory) {
             return handle_scan_error(task, ctx);
         } else {
-            auto path = task.path.parent_path();
+            auto path = task.path.get_view(ctx.allocator).get_parent();
             auto p = static_cast<presentation::local_file_presence_t *>(task.presence.get());
-            auto child = bfs::path(widen(p->get_file_info().get_name()->get_own_name()));
-            auto sub_task = fs::task::scan_dir_t(std::move(path), std::move(p->get_parent()), std::move(child), false,
-                                                 false, false);
+            auto &child = p->get_file_info().get_name();
+            auto sub_task = fs::task::scan_dir_t(path.detach(), p->get_parent(), child->clone(), false, false, false);
             push(std::move(sub_task));
             return;
         }
@@ -640,23 +636,22 @@ void folder_context_t::post_process(fs::task::scan_dir_t &task, stack_context_t 
     auto &infos = task.child_infos;
     for (auto it_disk = infos.begin(); it_disk != infos.end(); ++it_disk) {
         auto &info = *it_disk;
-        auto name_str = info.path.filename().string();
-        if (!utils::is_utf8_valid(name_str)) {
+        auto name_str = info.path.get_filename();
+        if (!utils::is_utf8_valid(name_str) || info.path.empty()) {
             auto name_hex = spdlog::to_hex(name_str.begin(), name_str.end());
-            LOG_WARN(log, "invalid filename : {}, ignored", name_hex);
+            LOG_WARN(log, "invalid/empty filename '{}', ignored", name_hex);
             continue;
         }
-        auto name = narrow(info.path.filename().wstring());
-        auto is_dir = info.status.type() == bfs::file_type::directory;
-        auto presence = presentation::get_child(task.presence.get(), name, is_dir);
+        auto is_dir = info.file_type == utils::file_type_t::DIRECTORY;
+        auto presence = presentation::get_child(task.presence.get(), name_str, is_dir);
         if (presence) {
-            auto filename = presence->get_entity()->get_path()->get_own_name();
+            auto filename = presence->get_entity()->get_path()->get_filename();
             checked_children.emplace(filename);
         }
         if (info.ec) {
-            log->warn("scannig of  {} failed: {}", name, info.ec);
+            log->warn("scannig of {} failed: {}", info.path, info.ec);
         } else {
-            if (fs::is_temporal(info.path)) {
+            if (info.path.is_temporal()) {
                 auto child = incomplete_t(std::move(info), presence, task.presence, io_generation);
                 stack.push_front(std::move(child));
             } else {
@@ -674,11 +669,12 @@ void folder_context_t::post_process(fs::task::scan_dir_t &task, stack_context_t 
         for (auto child : dir_presence->get_children()) {
             auto features = child->get_features();
             if (features & F::local) {
-                auto filename = child->get_entity()->get_path()->get_own_name();
+                auto &child_path = *child->get_entity()->get_path();
+                auto filename = child_path.get_filename();
                 if (!checked_children.count(filename)) {
                     checked_children.emplace(filename);
                     if (!task.single_child.empty()) {
-                        if (task.single_child.generic_wstring() != widen(filename)) {
+                        if (task.single_child.get_filename() != filename) {
                             continue;
                         }
                     }
@@ -705,7 +701,7 @@ void folder_context_t::post_process(fs::task::scan_dir_t &task, stack_context_t 
         using queue_t = std::pmr::list<presentation::entity_t *>;
         auto queue = queue_t(ctx.allocator);
         for (auto child_entity : dir_presence->get_entity()->get_children()) {
-            auto filename = child_entity->get_path()->get_own_name();
+            auto filename = child_entity->get_path()->get_filename();
             if (!checked_children.count(filename)) {
                 auto best = child_entity->get_best();
                 if (best->get_features() & F::deleted) {
@@ -747,14 +743,13 @@ void folder_context_t::post_process(fs::task::segment_iterator_t &task, stack_co
         auto delta = task.block_count - task.current_block;
         ctx.hashes_pool += delta;
         auto &hash_file = *hash_ctx->hash_file;
-        auto path_str = narrow(task.path.generic_wstring());
-        auto it_h = hashing_files.find(path_str);
+        auto it_h = hashing_files.find(task.path);
         it_h->second -= task.block_count;
         if (it_h->second == 0) {
             hashing_files.erase(it_h);
         }
         if (hash_file.commit_error(ec, delta)) {
-            LOG_WARN(log, "I/O error during processing '{}': {}", path_str, ec);
+            LOG_WARN(log, "I/O error during processing '{}': {}", task.path, ec);
             auto presence = hash_file.self.get();
             if (presence && presence->get_features() & F::local) {
                 auto file_presence = static_cast<presentation::local_file_presence_t *>(presence);
@@ -762,8 +757,8 @@ void folder_context_t::post_process(fs::task::segment_iterator_t &task, stack_co
                 auto local_fi = local_folder.get();
                 ctx.push_back(new model::diff::modify::mark_reachable_t(file, *local_fi, false));
             } else if (hash_file.incomplete) {
-                LOG_DEBUG(log, "scheduling(3) removal of '{}'", path_str);
-                push(fs::task::remove_file_t(task.path));
+                LOG_DEBUG(log, "scheduling(3) removal of '{}'", task.path);
+                push(fs::task::remove_file_t(task.path.clone()));
             }
         }
     }
@@ -772,7 +767,7 @@ void folder_context_t::post_process(fs::task::segment_iterator_t &task, stack_co
 void folder_context_t::post_process(fs::task::remove_file_t &task, stack_context_t &ctx) noexcept {
     auto &ec = task.ec;
     if (ec) {
-        LOG_WARN(log, "(ignored) cannot remove '{}': {}", narrow(task.path.generic_wstring()), ec);
+        LOG_WARN(log, "(ignored) cannot remove '{}': {}", task.path, ec);
     }
 }
 
@@ -781,8 +776,7 @@ void folder_context_t::post_process(fs::task::rename_file_t &task, stack_context
     auto &ec = task.ec;
     if (ec) {
         auto &path = task.path;
-        LOG_WARN(log, "cannot rename '{}' -> {}: {}, going to remove", narrow(path.generic_wstring()),
-                 narrow(task.new_name.generic_wstring()), ec);
+        LOG_WARN(log, "cannot rename '{}' -> {}: {}, going to remove", path, task.new_name, ec);
         auto sub_task = fs::task::remove_file_t(std::move(path));
         push(std::move(sub_task));
     } else {
@@ -792,7 +786,8 @@ void folder_context_t::post_process(fs::task::rename_file_t &task, stack_context
         auto peer = cp->get_device();
         auto &peer_folder = cp->get_folder()->get_folder_info();
         auto &sequencer = ctx.sequencer;
-        auto diff = model::diff::advance::advance_t::create(item.action, peer_file, peer_folder, sequencer);
+        auto diff =
+            model::diff::advance::advance_t::create(item.action, peer_file, peer_folder, sequencer, ctx.allocator);
         ctx.push_back(diff.get());
     }
 }
@@ -806,7 +801,7 @@ bool folder_context_t::has_no_tasks() const noexcept { return pending_io.empty()
 int folder_context_t::schedule_hash(hash_base_t *item, stack_context_t &ctx) noexcept {
     if (item->errored_blocks) {
         if (item->commit_hash()) {
-            LOG_WARN(log, "I/O error during processing '{}': {}", narrow(item->path.generic_wstring()), item->ec);
+            LOG_WARN(log, "I/O error during processing '{}': {}", item->path, item->ec);
         }
 
         return 1;
@@ -835,21 +830,20 @@ int folder_context_t::schedule_hash(hash_base_t *item, stack_context_t &ctx) noe
     assert(last_block_sz > 0);
     auto offset = std::int64_t{first_block} * block_size;
     auto hash_context = hash_context_ptr_t(new hash_context_t(ctx.slave, this, item));
-    auto sub_task = segment_iterator_t(ctx.get_back_address(), hash_context, item->path, offset, first_block,
+    auto sub_task = segment_iterator_t(ctx.get_back_address(), hash_context, item->path.clone(), offset, first_block,
                                        max_blocks, block_size, last_block_sz, item->last_write_time);
     push(std::move(sub_task));
     blocks_limit -= max_blocks;
     auto blocks_left = item->unprocessed_blocks -= max_blocks;
 
-    auto path = narrow(item->path.wstring());
     LOG_TRACE(log, "going to rehash {} block(s) ({}..{}) of '{}' (this = {})", max_blocks, first_block,
-              first_block + max_blocks, path, (void *)this);
+              first_block + max_blocks, item->path, (void *)this);
     return blocks_left ? -1 : 0;
 }
 
 void folder_context_t::handle_scan_error(fs::task::scan_dir_t &task, stack_context_t &ctx) noexcept {
     auto &ec = task.ec;
-    log->warn("cannot scan '{}': {}", narrow(task.path.wstring()), ec);
+    log->warn("cannot scan '{}': {}", task.path, ec);
     auto dir_presence = task.presence.get();
     if (dir_presence && dir_presence->get_features() & F::local) {
         using queue_t = std::pmr::list<presentation::presence_t *>;
@@ -874,7 +868,7 @@ void folder_context_t::handle_scan_error(fs::task::scan_dir_t &task, stack_conte
             }
         }
     }
-    stack.push_front(undo_child_ready_t(task.path));
+    stack.push_front(undo_child_ready_t(task.path.clone()));
 }
 
 bool folder_context_t::is_done() const noexcept {
@@ -887,8 +881,7 @@ fs::task_t folder_context_t::pop_task() noexcept {
     pending_io.pop_front();
     if (auto *si = std::get_if<fs::task::segment_iterator_t>(&task); si) {
         hashing += si->block_count;
-        auto path = narrow(si->path.generic_wstring());
-        hashing_files[std::move(path)] += si->block_count;
+        hashing_files[si->path.clone()] += si->block_count;
     }
     ++in_progress;
     return task;

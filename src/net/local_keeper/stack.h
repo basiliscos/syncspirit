@@ -33,7 +33,7 @@ struct confirmed_deleted_t {
 };
 
 struct abort_hashing_t {
-    bfs::path path;
+    utils::path_t path;
 };
 
 using stack_item_t =

@@ -11,7 +11,7 @@
 namespace syncspirit::model::details {
 
 template <> inline std::string_view get_lru_key<syncspirit::fs::file_ptr_t>(const fs::file_ptr_t &item) {
-    return item->get_path_view();
+    return item->get_path().get_full_name();
 }
 
 } // namespace syncspirit::model::details
@@ -28,7 +28,7 @@ struct SYNCSPIRIT_API file_cache_t : model::arc_base_t<file_cache_t>, private mo
     using parent_t::put;
     using parent_t::remove;
 
-    file_ptr_t get(const bfs::path &path) noexcept;
+    file_ptr_t get(const utils::path_base_t &path) noexcept;
 };
 
 using file_cache_ptr_t = model::intrusive_ptr_t<file_cache_t>;

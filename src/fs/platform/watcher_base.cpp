@@ -7,14 +7,14 @@
 #include "net/names.h"
 #include "model/messages.h"
 #include "utils/format.hpp"
-#include <boost/nowide/convert.hpp>
+#include "utils/path_view.hpp"
+#include "utils/path_utils.h"
+#include "syncspirit-config.h"
 #include <string.h>
 
 using namespace syncspirit;
 using namespace syncspirit::fs;
 using namespace syncspirit::fs::platform;
-using boost::nowide::narrow;
-using boost::nowide::widen;
 
 static auto actor_identity = net::names::watcher;
 
@@ -162,19 +162,24 @@ bool FU::update(std::string_view relative_path, update_type_t type, folder_updat
     return update(record, prev);
 }
 
-auto FU::make(const folder_info_t &folder_info, watcher_base_t &actor) noexcept -> payload::file_changes_t {
+auto FU::make(const utils::path_t &folder_info, watcher_base_t &actor) noexcept -> payload::file_changes_t {
     namespace ut = update_type;
     using UT = update_type_t;
-    using FT = bfs::file_type;
-    static const size_t SS_PATH_MAX = 32 * 1024;
+    using FT = utils::file_type_t;
 
     auto files = payload::file_changes_t();
     auto &mediator = *actor.updates_mediator;
     files.reserve(updates.size());
     auto log = utils::get_logger(actor_identity);
-    char full_path[SS_PATH_MAX];
-    auto folder_path_sz = folder_info.path_str.size();
-    std::memcpy(full_path, folder_info.path_str.data(), folder_path_sz);
+    char full_path[SYNCSPIRIT_PATH_MAX];
+
+    auto buffer = std::array<std::byte, 1024 * 32>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+
+    auto folder_path = folder_info.get_full_name();
+    auto folder_path_sz = folder_path.size();
+    std::memcpy(full_path, folder_path.data(), folder_path_sz);
     for (auto &update : updates) {
         auto rel_name_ptr = full_path + folder_path_sz;
         auto &sub_path = update.path;
@@ -207,41 +212,43 @@ auto FU::make(const folder_info_t &folder_info, watcher_base_t &actor) noexcept 
                 prev_name = nullptr;
             }
         } else {
+            auto folder_path_view = folder_info.get_view(allocator);
             auto ec = sys::error_code{};
-            auto path = folder_info.path / widen(update.path);
-            auto status = bfs::symlink_status(path, ec);
+            auto path = folder_path_view / utils::make_native_view(update.path, allocator);
+            auto stats = utils::get_stats(path, ec);
             if (ec) {
-                LOG_DEBUG(log, "cannot get status on '{}': {} (update ignored)", full_name, ec);
+                LOG_DEBUG(log, "cannot get stats on '{}': {} (update ignored)", full_name, ec);
                 continue;
             }
-            if (!actor.accept_update(update, status)) {
+            if (!stats.supported) {
+                continue;
+            }
+            if (!actor.accept_update(update, stats.file_type)) {
                 LOG_TRACE(log, "skipping update on {}", full_name);
                 continue;
             }
-            proto::set_permissions(r, static_cast<uint32_t>(status.permissions()));
-            if (status.type() == FT::regular) {
-                auto sz = bfs::file_size(path, ec);
+            proto::set_permissions(r, static_cast<uint32_t>(stats.permissions));
+            proto::set_type(r, stats.file_type);
+            if (stats.file_type == FT::FILE) {
                 if (ec) {
                     LOG_WARN(log, "cannot get size on '{}': {} (update ignored)", full_name, ec);
                     continue;
                 }
-                auto modified = bfs::last_write_time(path, ec);
                 if (ec) {
                     LOG_WARN(log, "cannot get last_write_time on '{}': {} (update ignored)", full_name, ec);
                     continue;
                 }
-                proto::set_modified_s(r, to_unix(modified));
-                proto::set_type(r, proto::FileInfoType::FILE);
-                proto::set_size(r, static_cast<std::int64_t>(sz));
-            } else if (status.type() == FT::directory) {
-                proto::set_type(r, proto::FileInfoType::DIRECTORY);
-            } else if (status.type() == FT::symlink) {
-                auto target = bfs::read_symlink(path, ec);
+                proto::set_modified_s(r, stats.modification);
+                proto::set_size(r, stats.file_size);
+            } else if (stats.file_type == FT::DIRECTORY) {
+                // NOOP
+            } else if (stats.file_type == FT::SYMLINK) {
+                auto target = utils::read_symlink(path, ec);
                 if (ec) {
                     LOG_WARN(log, "cannot read_symlink on '{}': {} (update ignored)", full_name, ec);
                     continue;
                 }
-                proto::set_symlink_target(r, narrow(target.generic_wstring()));
+                proto::set_symlink_target(r, std::string_view(target.data()));
                 proto::set_type(r, proto::FileInfoType::SYMLINK);
             } else {
                 LOG_DEBUG(log, "ignoring '{}'", full_name);
@@ -358,6 +365,6 @@ void watcher_base_t::on_retension_finish(r::request_id_t, bool cancelled) noexce
     }
 }
 
-bool watcher_base_t::accept_update(const support::file_update_t &, const bfs::file_status &) noexcept { return true; }
+bool watcher_base_t::accept_update(const support::file_update_t &, const utils::file_type_t) noexcept { return true; }
 
 void watcher_base_t::notify(const fs::task::scan_dir_t &) noexcept {}

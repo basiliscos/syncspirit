@@ -12,7 +12,6 @@
 
 namespace syncspirit::test {
 
-namespace bfs = std::filesystem;
 namespace payload = syncspirit::net::payload;
 
 struct Fixture {

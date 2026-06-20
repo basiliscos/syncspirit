@@ -4,6 +4,7 @@
 #pragma once
 
 #include <protopuf/message.h>
+#include "proto-file-type.h"
 
 namespace syncspirit {
 
@@ -35,14 +36,6 @@ enum class Compression {
     METADATA = 0,
     NEVER    = 1,
     ALWAYS   = 2,
-};
-
-enum class FileInfoType {
-    FILE              = 0,
-    DIRECTORY         = 1,
-    SYMLINK_FILE      = 2,
-    SYMLINK_DIRECTORY = 3,
-    SYMLINK           = 4,
 };
 
 enum class ErrorCode {

@@ -14,7 +14,7 @@ struct child_ready_t : child_info_t {
 };
 
 struct undo_child_ready_t {
-    bfs::path path;
+    utils::path_t path;
 };
 
 } // namespace syncspirit::net::local_keeper

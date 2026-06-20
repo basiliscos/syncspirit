@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2025-2026 Ivan Baidakou
 
 #include "apply_controller.h"
 #include "advance/advance.h"
@@ -8,7 +8,6 @@
 #include "load/interrupt.h"
 #include "load/commit.h"
 #include "load/load_cluster.h"
-#include "local/io_failure.h"
 #include "local/scan_start.h"
 #include "modify/add_ignored_device.h"
 #include "modify/add_pending_device.h"
@@ -47,10 +46,6 @@ auto apply_controller_t::apply(const load::interrupt_t &diff, void *custom) noex
 }
 
 auto apply_controller_t::apply(const load::load_cluster_t &diff, void *custom) noexcept -> outcome::result<void> {
-    return diff.apply_impl(*this, custom);
-}
-
-auto apply_controller_t::apply(const local::io_failure_t &diff, void *custom) noexcept -> outcome::result<void> {
     return diff.apply_impl(*this, custom);
 }
 

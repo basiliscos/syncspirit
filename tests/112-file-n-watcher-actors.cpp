@@ -14,15 +14,10 @@
 #include "fs/watcher_actor.h"
 #include "fs/fs_context.h"
 #include "net/names.h"
-#include <filesystem>
-#include <boost/nowide/convert.hpp>
 
 using namespace syncspirit;
 using namespace syncspirit::fs;
 using namespace syncspirit::test;
-using boost::nowide::narrow;
-
-namespace bfs = std::filesystem;
 
 namespace {
 
@@ -60,10 +55,7 @@ struct fixture_t {
     using change_message_ptr_t = r::intrusive_ptr_t<fs::message::folder_changes_t>;
     using change_messages_t = std::deque<change_message_ptr_t>;
 
-    fixture_t() noexcept : root_path{unique_path()}, path_guard{root_path} {
-        log = utils::get_logger("fixture");
-        bfs::create_directory(root_path);
-    }
+    fixture_t() noexcept : path_guard{unique_path()} { log = utils::get_logger("fixture"); }
 
     virtual void create_updates_mediator() { updates_mediator = new fs::updates_mediator_t(retension_timeout * 2); }
 
@@ -104,12 +96,17 @@ struct fixture_t {
         REQUIRE(static_cast<r::actor_base_t *>(file_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
         REQUIRE(static_cast<r::actor_base_t *>(watcher_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
 
+        auto buffer = std::array<std::byte, 1024 * 32>();
+        auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+        auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+        auto root_path = path_guard.get_view(allocator);
+
         auto back_addr = sup->get_address();
-        sup->route<fs::payload::watch_folder_t>(watcher_actor->get_address(), back_addr, root_path, folder_id);
+        sup->route<fs::payload::watch_folder_t>(watcher_actor->get_address(), back_addr, root_path.detach(), folder_id);
         sup->do_process();
 
         REQUIRE(watcher_replies == 1);
-        main();
+        main(root_path, allocator);
 
         sup->do_shutdown();
         sup->do_process();
@@ -136,11 +133,10 @@ struct fixture_t {
         }
     }
 
-    void make_dir() {
+    void make_dir(const utils::poly_path_view_t &root_path) {
         auto path = root_path / L"папка";
         std::int64_t modified = 1641828421;
 
-        auto conflict_path = bfs::path{};
         auto context = fs::payload::extendended_context_prt_t{};
         auto type = proto::FileInfoType::DIRECTORY;
         auto size = 0;
@@ -148,7 +144,7 @@ struct fixture_t {
         auto perms = 0666;
         auto target = std::string();
 
-        auto payload = fs::payload::remote_copy_t(std::move(context), folder_id, path, conflict_path, type, size, perms,
+        auto payload = fs::payload::remote_copy_t(std::move(context), folder_id, path.detach(), {}, type, size, perms,
                                                   modified, target, deleted, false);
         auto cmd = fs::payload::io_command_t(std::move(payload));
         auto cmds = fs::payload::io_commands_t{nullptr};
@@ -156,11 +152,10 @@ struct fixture_t {
         sup->route<fs::payload::io_commands_t>(fs_addr, sup->get_address(), std::move(cmds));
     }
 
-    virtual void main() noexcept {}
+    virtual void main(const utils::poly_path_view_t &root_path, const utils::allocator_t &allocator) noexcept {}
 
     r::pt::time_duration timeout = r::pt::millisec{10};
     r::pt::time_duration retension_timeout = r::pt::millisec{150};
-    bfs::path root_path;
     test::path_guard_t path_guard;
     fs_context_ptr_r fs_context;
     fs::updates_mediator_ptr_t updates_mediator;
@@ -193,13 +188,14 @@ void test_with_mediator() {
             fs_addr = file_actor->get_address();
         }
 
-        void append_block() {
+        void append_block(const utils::poly_path_view_t &root_path) {
             auto path = root_path / L"файл";
             std::int64_t modified = 1641828421;
             auto bytes = as_owned_bytes("12345");
 
             auto context = fs::payload::extendended_context_prt_t{};
-            auto payload = fs::payload::append_block_t(std::move(context), folder_id, path, std::move(bytes), 0, 5);
+            auto payload =
+                fs::payload::append_block_t(std::move(context), folder_id, path.detach(), std::move(bytes), 0, 5);
             auto cmd = fs::payload::io_command_t(std::move(payload));
             auto cmds = fs::payload::io_commands_t{nullptr};
             cmds.commands.emplace_back(std::move(cmd));
@@ -207,12 +203,13 @@ void test_with_mediator() {
             sup->do_process();
         }
 
-        void finish_file() {
+        void finish_file(const utils::poly_path_view_t &root_path) {
             auto context = fs::payload::extendended_context_prt_t{};
             auto path = root_path / L"файл";
             std::int64_t modified = 1641828421;
             auto perms = 0666;
-            auto payload = fs::payload::finish_file_t(std::move(context), folder_id, path, {}, 5, modified, 0666, true);
+            auto payload =
+                fs::payload::finish_file_t(std::move(context), folder_id, path.detach(), {}, 5, modified, 0666, true);
             auto cmd = fs::payload::io_command_t(std::move(payload));
             auto cmds = fs::payload::io_commands_t{nullptr};
             cmds.commands.emplace_back(std::move(cmd));
@@ -220,19 +217,19 @@ void test_with_mediator() {
             sup->do_process();
         }
 
-        void main() noexcept override {
+        void main(const utils::poly_path_view_t &root_path, const utils::allocator_t &allocator) noexcept override {
             SECTION("create a dir") {
-                make_dir();
+                make_dir(root_path);
                 sup->do_process();
                 poll();
                 REQUIRE(changes.size() == 0);
             }
             SECTION("downloading file (append block & finish)") {
-                append_block();
+                append_block(root_path);
                 poll(2);
                 CHECK(changes.size() == 0);
 
-                finish_file();
+                finish_file(root_path);
                 poll(2);
                 CHECK(changes.size() == 0);
             }

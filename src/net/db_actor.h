@@ -12,6 +12,7 @@
 #include "mdbx.h"
 #include "db/transaction.h"
 #include "db/utils.h"
+#include "utils/path.h"
 #include "utils/bytes_comparator.hpp"
 #include <cstdint>
 
@@ -19,7 +20,6 @@ namespace syncspirit {
 namespace net {
 
 namespace outcome = boost::outcome_v2;
-namespace bfs = std::filesystem;
 
 struct SYNCSPIRIT_API db_actor_t final : public model_actor_t<r::actor_base_t>, private model::diff::cluster_visitor_t {
     using parent_t = model_actor_t<r::actor_base_t>;
@@ -27,7 +27,7 @@ struct SYNCSPIRIT_API db_actor_t final : public model_actor_t<r::actor_base_t>, 
     struct config_t : parent_t::config_t {
         using base_t = model_actor_t<r::actor_base_t>::config_t;
         using base_t::base_t;
-        bfs::path db_dir;
+        utils::path_t db_dir;
         config::db_config_t db_config;
         size_t uncommitted_threshold = {100};
         r::address_ptr_t bouncer_address;
@@ -39,8 +39,8 @@ struct SYNCSPIRIT_API db_actor_t final : public model_actor_t<r::actor_base_t>, 
         using base_t = parent_t::template config_builder_t<Actor>;
         using base_t::base_t;
 
-        builder_t &&db_dir(const bfs::path &value) && noexcept {
-            base_t::config.db_dir = value;
+        builder_t &&db_dir(utils::path_t value) && noexcept {
+            base_t::config.db_dir = std::move(value);
             return std::move(*static_cast<typename base_t::builder_t *>(this));
         }
         builder_t &&db_config(const config::db_config_t &value) && noexcept {
@@ -150,7 +150,7 @@ struct SYNCSPIRIT_API db_actor_t final : public model_actor_t<r::actor_base_t>, 
     r::address_ptr_t bouncer;
     r::address_ptr_t sink;
     MDBX_env *env;
-    bfs::path db_dir;
+    utils::path_t db_dir;
     config::db_config_t db_config;
     transaction_ptr_t txn_holder;
     std::int_fast32_t uncommitted;

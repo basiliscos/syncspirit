@@ -195,8 +195,7 @@ auto folder_table_t::make_path(folder_table_t &container, bool disabled) -> widg
         void reset() override {
             auto &container = static_cast<folder_table_t &>(this->container);
             auto &path = container.description.get_folder()->get_path();
-            auto value = boost::nowide::narrow(path.wstring());
-            input->value(value.data());
+            input->value(path.get_full_name().data());
         }
 
         bool store(void *data) override {

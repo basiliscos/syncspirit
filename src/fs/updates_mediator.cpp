@@ -7,11 +7,8 @@
 #include <algorithm>
 #include <memory_resource>
 #include <fmt/ranges.h>
-#include <type_traits>
-#include <boost/nowide/convert.hpp>
 
 using namespace syncspirit::fs;
-using boost::nowide::narrow;
 
 static constexpr size_t MAX_LOG_ITEMS = 5;
 
@@ -20,34 +17,19 @@ updates_mediator_t::updates_mediator_t(const pt::time_duration &interval_, bool 
     log = utils::get_logger("fs.updates_mediator");
 }
 
-template <typename T> struct Stringizer;
-
-#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
-template <> struct Stringizer<wchar_t> {
-    static std::string get(const bfs::path &path) { return narrow(path.generic_wstring()); }
-};
-#else
-template <> struct Stringizer<char> {
-    static std::string get(const bfs::path &path) { return path.native(); }
-};
-#endif
-
-void updates_mediator_t::mask(const bfs::path &path, const bfs::path &prev_path, const timepoint_t &deadline) noexcept {
-    using result_t = decltype(path.native());
-    using native_type_t = std::remove_cv_t<std::remove_reference_t<result_t>>;
-    using char_t = typename native_type_t::value_type;
-
+void updates_mediator_t::mask(const utils::path_base_t &path, const utils::path_base_t &prev_path,
+                              const timepoint_t &deadline) noexcept {
     if (!enabled) {
         return;
     }
 
-    if (is_temporal(path)) {
+    if (path.is_temporal()) {
         return;
     }
 
     auto target = (updates_t *){};
     auto counter = update_type_internal_t{1};
-    auto path_str = Stringizer<char_t>::get(path);
+    auto path_str = path.get_full_name();
     if (next.deadline == deadline) {
         target = &next;
     } else if (next.deadline.is_not_a_date_time()) {
@@ -73,9 +55,9 @@ void updates_mediator_t::mask(const bfs::path &path, const bfs::path &prev_path,
         }
     };
 
-    insert(std::move(path_str));
-    if (!prev_path.empty() && !is_temporal(prev_path)) {
-        insert(std::move(Stringizer<char_t>::get(prev_path)));
+    insert(std::string(path_str));
+    if (!prev_path.empty() && !prev_path.is_temporal()) {
+        insert(std::string(prev_path.get_full_name()));
     }
 }
 

@@ -37,8 +37,8 @@ bool CP::operator()(const presence_t *l, const presence_t *r) const {
     } else if (!ld && rd) {
         return false;
     }
-    auto l_name = l->entity->get_path()->get_own_name();
-    auto r_name = r->entity->get_path()->get_own_name();
+    auto l_name = l->entity->get_path()->get_filename();
+    auto r_name = r->entity->get_path()->get_filename();
     return l_name < r_name;
 }
 
@@ -57,7 +57,7 @@ bool CP::operator()(const presence_t *l, const presence_like_t &r) const {
     } else if (!ld && rd) {
         return false;
     }
-    return l->entity->get_path()->get_own_name() < r.name;
+    return l->entity->get_path()->get_filename() < r.name;
 }
 
 presence_t *get_child(presentation::presence_t *parent, std::string_view name, bool is_dir) noexcept {
@@ -193,7 +193,7 @@ presence_t *presence_t::get_child(std::string_view name, bool is_dir) noexcept {
     auto it = std::lower_bound(children.begin(), children.end(), presence_like, comparator);
     if (it != children.end()) {
         auto &p = *it;
-        if (p->get_entity()->get_path()->get_own_name() == name) {
+        if (p->get_entity()->get_path()->get_filename() == name) {
             auto p_dir = (bool)(p->features & F::directory);
             if (!(p_dir xor is_dir)) {
                 if (!(p->features & F::missing)) {
@@ -212,10 +212,10 @@ bool presence_t::is_unique() const noexcept {
     using una::caseless::compare_utf8;
     if (!(features & F::deleted)) {
         if (parent && parent->entity) {
-            auto my_name = entity->get_path()->get_own_name();
+            auto my_name = entity->get_path()->get_filename();
             for (auto c : parent->get_children()) {
                 if (c != this && !(c->features & F::deleted)) {
-                    auto other_name = c->entity->get_path()->get_own_name();
+                    auto other_name = c->entity->get_path()->get_filename();
                     if (compare_utf8(my_name, other_name) == 0) {
                         return false;
                     }

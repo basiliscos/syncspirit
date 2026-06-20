@@ -4,7 +4,7 @@
 #pragma once
 
 #include "misc/arc.hpp"
-#include "misc/path_cache.h"
+#include "utils/path_cache.h"
 #include "device.h"
 #include "ignored_device.h"
 #include "ignored_folder.h"
@@ -18,7 +18,7 @@ namespace syncspirit::model {
 
 struct SYNCSPIRIT_API path_guard_t {
     path_guard_t() noexcept = default;
-    path_guard_t(cluster_t *cluster_, path_ptr_t path_) noexcept : path(path_), cluster{cluster_} {}
+    path_guard_t(cluster_t *cluster_, utils::path_ptr_t path_) noexcept : path(path_), cluster{cluster_} {}
     path_guard_t(path_guard_t &&) = default;
     path_guard_t(const path_guard_t &) = delete;
     ~path_guard_t();
@@ -27,7 +27,7 @@ struct SYNCSPIRIT_API path_guard_t {
 
     inline operator bool() const noexcept { return path.get(); }
 
-    path_ptr_t path = {};
+    utils::path_ptr_t path = {};
     cluster_t *cluster = {};
 };
 
@@ -48,7 +48,7 @@ struct SYNCSPIRIT_API cluster_t final : arc_base_t<cluster_t> {
     pending_devices_map_t &get_pending_devices() noexcept;
     const pending_devices_map_t &get_pending_devices() const noexcept;
     pending_folder_map_t &get_pending_folders() noexcept;
-    path_cache_t &get_path_cache() noexcept;
+    utils::path_cache_t &get_path_cache() noexcept;
 
     const folders_map_t &get_folders() const noexcept;
     const pending_folder_map_t &get_pending_folders() const noexcept;
@@ -56,17 +56,19 @@ struct SYNCSPIRIT_API cluster_t final : arc_base_t<cluster_t> {
     inline void mark_tainted() noexcept { tainted = true; }
     int32_t get_write_requests() const noexcept;
     void modify_write_requests(int32_t delta) noexcept;
-    path_guard_t lock(path_t *path) noexcept;
-    bool is_locked(path_t *path) noexcept;
+    path_guard_t lock(utils::path_t *path) noexcept;
+    bool is_locked(utils::path_t *path) noexcept;
 
   private:
     struct path_hasher_t {
         using is_transparent = void;
-        inline size_t operator()(const path_ptr_t &path) const noexcept { return reinterpret_cast<size_t>(path.get()); }
-        inline size_t operator()(const path_t *file) const noexcept { return reinterpret_cast<size_t>(file); }
+        inline size_t operator()(const utils::path_ptr_t &path) const noexcept {
+            return reinterpret_cast<size_t>(path.get());
+        }
+        inline size_t operator()(const utils::path_t *file) const noexcept { return reinterpret_cast<size_t>(file); }
     };
 
-    using locked_paths_t = std::unordered_set<path_ptr_t, path_hasher_t>;
+    using locked_paths_t = std::unordered_set<utils::path_ptr_t, path_hasher_t>;
     device_ptr_t device;
     folders_map_t folders;
     block_infos_map_t blocks;
@@ -75,7 +77,7 @@ struct SYNCSPIRIT_API cluster_t final : arc_base_t<cluster_t> {
     ignored_folders_map_t ignored_folders;
     pending_folder_map_t pending_folders;
     pending_devices_map_t pending_devices;
-    path_cache_ptr_t path_cache;
+    utils::path_cache_ptr_t path_cache;
     locked_paths_t locked_paths;
     bool tainted = false;
     int32_t write_requests;

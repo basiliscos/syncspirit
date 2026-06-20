@@ -16,7 +16,6 @@ namespace net {
 
 namespace r = rotor;
 namespace ra = r::asio;
-namespace bfs = std::filesystem;
 namespace outcome = boost::outcome_v2;
 
 struct SYNCSPIRIT_API cluster_supervisor_t final : public model_actor_t<ra::supervisor_asio_t>,

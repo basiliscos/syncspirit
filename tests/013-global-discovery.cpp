@@ -1,13 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "test-utils.h"
 #include "proto/discovery_support.h"
 #include "utils/error_code.h"
-#include <filesystem>
 
 namespace sys = boost::system;
-namespace fs = std::filesystem;
 
 using namespace syncspirit::proto;
 using namespace syncspirit::utils;

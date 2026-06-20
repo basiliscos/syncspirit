@@ -10,7 +10,11 @@
 #include <zlib.h>
 #include <spdlog/spdlog.h>
 #include <cxxabi.h>
-#include <boost/nowide/convert.hpp>
+#include "utils/path_view.hpp"
+#endif
+
+#if defined(__linux__)
+#include <pthread.h>
 #endif
 
 using namespace syncspirit::utils;
@@ -273,9 +277,9 @@ range_t bisect(wchar_t needle, int offset, range_t r) {
 } // namespace
 #endif
 
-bool platform_t::path_supported(std::string_view str_path) noexcept {
+bool platform_t::path_supported(const poly_path_view_t &str_path) noexcept {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
-    auto wname = boost::nowide::widen(str_path);
+    auto wname = str_path.get_full_wname(false);
     for (size_t i = 0; i < wname.size(); ++i) {
         auto symbol = wname[i];
         if (symbol < 31) {
@@ -297,16 +301,30 @@ bool platform_t::path_supported(std::string_view str_path) noexcept {
         }
     }
 
-    auto path = bfs::path(wname);
-    for (auto it = path.begin(); it != path.end(); ++it) {
-        auto name = it->stem().wstring();
+    auto tail = wname;
+    while (tail.size()) {
+        auto pos = tail.find(L'/');
+        if (pos == 0) {
+            tail = tail.substr(1);
+            continue;
+        }
+        auto sz = pos == std::wstring::npos ? tail.size() : pos;
+        auto name = tail.substr(0, sz);
+        if (name.size() == tail.size()) {
+            tail = {};
+        } else {
+            tail = tail.substr(name.size());
+        }
+        if (auto dot = name.rfind(L'.'); dot != std::wstring::npos) { // stem
+            name = name.substr(0, dot);
+        }
         auto range = range_t{0, static_cast<int>(reserved_names.size()) - 1};
         for (size_t i = 0; i < name.size(); ++i) {
             auto symbol = name[i];
             switch (symbol) {
                 // clang-format off
-                case L'/':
-                    return false;
+                // case L'/':
+                    // return false;
                 case L'A': symbol = 'a'; break;
                 case L'C': symbol = 'c'; break;
                 case L'L': symbol = 'l'; break;
@@ -340,7 +358,7 @@ bool platform_t::path_supported(std::string_view str_path) noexcept {
     return true;
 }
 
-bool platform_t::permissions_supported(const bfs::path &) noexcept {
+bool platform_t::permissions_supported(const path_base_t &) noexcept {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
     return false;
 #endif

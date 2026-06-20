@@ -12,40 +12,21 @@
 #include "fs/fs_context.h"
 #include "fs/fs_supervisor.h"
 #include "fs/watcher_actor.h"
-#include "fs/utils.h"
 #include "fs/task/scan_dir.h"
-#include "utils/error_code.h"
+#include "utils/format.hpp"
 #include "net/names.h"
+#include <list>
 #include <deque>
 #include <boost/nowide/convert.hpp>
-#include <stdexcept>
 #include <catch2/generators/catch_generators.hpp>
 
 using namespace syncspirit;
 using namespace syncspirit::test;
 using namespace syncspirit::model;
 using namespace syncspirit::fs;
-namespace bfs = std::filesystem;
 using boost::nowide::narrow;
 
 struct fixture_t;
-
-namespace native {
-
-void rename(const bfs::path &from, const bfs::path &to) {
-#ifndef SYNCSPIRIT_WIN
-    bfs::rename(from, to);
-#else
-    auto from_native = from.native().data();
-    auto to_native = to.native().data();
-    if (!MoveFileExW(from_native, to_native, MOVEFILE_WRITE_THROUGH)) {
-        auto ec = sys::error_code(::GetLastError(), sys::system_category());
-        REQUIRE(ec.message() == "");
-    }
-#endif
-}
-
-} // namespace native
 
 static const auto RETENSION_TIMEOUT = r::pt::millisec{1};
 static const auto TIMEOUT = r::pt::millisec{10};
@@ -84,9 +65,7 @@ struct fixture_t {
     using change_message_ptr_t = r::intrusive_ptr_t<fs::message::folder_changes_t>;
     using change_messages_t = std::deque<change_message_ptr_t>;
 
-    fixture_t(bool auto_launch_ = true) noexcept
-        : auto_launch{auto_launch_}, root_path{unique_path()}, path_guard{root_path} {
-        bfs::create_directory(root_path);
+    fixture_t(bool auto_launch_ = true) noexcept : auto_launch{auto_launch_}, path_guard{unique_path()} {
         log = utils::get_logger("fixture");
     }
 
@@ -108,7 +87,13 @@ struct fixture_t {
         }
 
         fs_context->update_time();
-        main();
+
+        auto buffer = std::array<std::byte, 1024 * 32>();
+        auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+        auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+        auto root_path = path_guard.get_view(allocator);
+
+        main(root_path, allocator);
 
         sup->do_process();
         sup->do_shutdown();
@@ -190,12 +175,11 @@ struct fixture_t {
 
     virtual void on_changes(fs::message::folder_changes_t &msg) noexcept { changes.emplace_back(&msg); }
 
-    virtual void main() noexcept {}
+    virtual void main(const utils::poly_path_view_t &root_path, const utils::allocator_t &allocator) noexcept {}
 
     r::pt::time_duration retension() { return RETENSION_TIMEOUT; }
 
     bool auto_launch;
-    bfs::path root_path;
     test::path_guard_t path_guard;
     fs_context_ptr_r fs_context;
     r::intrusive_ptr_t<supervisor_t> sup;
@@ -227,21 +211,21 @@ void test_watcher_base() {
             sup->do_process();
         }
 
-        void main() noexcept override {
+        void main(const utils::poly_path_view_t &root_path, const utils::allocator_t &allocator) noexcept override {
             using U = fs::update_type_t;
             auto folder_id = std::string("my-folder-id");
             auto back_addr = sup->get_address();
-            sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id);
+            sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path.detach(), folder_id);
             sup->do_process();
             REQUIRE(watched_replies == 1);
             auto deadline = r::pt::microsec_clock::local_time() + retension();
             SECTION("simple (creation)") {
                 SECTION("dir") {
-                    auto own_name = bfs::path(L"папка");
+                    auto own_name = utils::make_native_view(L"папка", allocator);
                     auto sub_path = root_path / own_name;
                     auto requires_refinement = GENERATE(true, false);
-                    bfs::create_directories(sub_path);
-                    target->push(deadline, folder_id, narrow(own_name.wstring()), {}, U::created, requires_refinement);
+                    create_directories(sub_path);
+                    target->push(deadline, folder_id, own_name.get_full_name(), {}, U::created, requires_refinement);
                     await_events(poll_t::single, 1);
                     auto &payload = changes.front()->payload;
                     REQUIRE(payload.size() == 1);
@@ -249,17 +233,17 @@ void test_watcher_base() {
                     REQUIRE(folder_change.folder_id == folder_id);
                     REQUIRE(folder_change.file_changes.size() == 1);
                     auto &file_change = folder_change.file_changes.front();
-                    CHECK(proto::get_name(file_change) == narrow(own_name.wstring()));
+                    CHECK(proto::get_name(file_change) == own_name.get_full_name());
                     CHECK(proto::get_size(file_change) == 0);
                     CHECK(proto::get_type(file_change) == proto::FileInfoType::DIRECTORY);
                     CHECK(proto::get_permissions(file_change));
                     CHECK(file_change.requires_refinement == requires_refinement);
                 }
                 SECTION("file") {
-                    auto own_name = bfs::path(L"файл.bin");
+                    auto own_name = utils::make_native_view(L"файл.bin", allocator);
                     auto sub_path = root_path / own_name;
                     write_file(sub_path, "12345");
-                    target->push(deadline, folder_id, narrow(own_name.wstring()), {}, U::created, false);
+                    target->push(deadline, folder_id, own_name.get_full_name(), {}, U::created, false);
                     await_events(poll_t::single, 1);
                     auto &payload = changes.front()->payload;
                     REQUIRE(payload.size() == 1);
@@ -267,18 +251,18 @@ void test_watcher_base() {
                     REQUIRE(folder_change.folder_id == folder_id);
                     REQUIRE(folder_change.file_changes.size() == 1);
                     auto &file_change = folder_change.file_changes.front();
-                    CHECK(proto::get_name(file_change) == narrow(own_name.wstring()));
+                    CHECK(proto::get_name(file_change) == own_name.get_full_name());
                     CHECK(proto::get_size(file_change) == 5);
                     CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
                     CHECK(proto::get_permissions(file_change));
                 }
 #ifndef SYNCSPIRIT_WIN
                 SECTION("symlink") {
-                    auto own_name = bfs::path(L"ссылка");
+                    auto own_name = utils::make_native_view(L"ссылка", allocator);
                     auto sub_path = root_path / own_name;
-                    auto where = bfs::path("/to/some/where");
-                    bfs::create_symlink(where, sub_path);
-                    target->push(deadline, folder_id, narrow(own_name.wstring()), {}, U::created, false);
+                    auto where = utils::make_native_view("/to/some/where", allocator);
+                    create_symlink(where, sub_path);
+                    target->push(deadline, folder_id, own_name.get_full_name(), {}, U::created, false);
                     await_events(poll_t::single, 1);
                     auto &payload = changes.front()->payload;
                     REQUIRE(payload.size() == 1);
@@ -286,22 +270,22 @@ void test_watcher_base() {
                     REQUIRE(folder_change.folder_id == folder_id);
                     REQUIRE(folder_change.file_changes.size() == 1);
                     auto &file_change = folder_change.file_changes.front();
-                    CHECK(proto::get_name(file_change) == narrow(own_name.wstring()));
+                    CHECK(proto::get_name(file_change) == own_name.get_full_name());
                     CHECK(proto::get_size(file_change) == 0);
                     CHECK(proto::get_type(file_change) == proto::FileInfoType::SYMLINK);
                     CHECK(proto::get_permissions(file_change));
-                    CHECK(proto::get_symlink_target(file_change) == narrow(where.wstring()));
+                    CHECK(proto::get_symlink_target(file_change) == where.get_full_name());
                 }
 #endif
             }
             SECTION("file moving") {
-                auto name_1 = bfs::path(L"файл-1.bin");
-                auto name_2 = bfs::path(L"файл-2.bin");
+                auto name_1 = utils::make_native_view(L"файл-1.bin", allocator);
+                auto name_2 = utils::make_native_view(L"файл-2.bin", allocator);
                 auto sub_path_1 = root_path / name_1;
                 auto sub_path_2 = root_path / name_2;
-                auto path_2_str = narrow(sub_path_2.generic_wstring());
                 write_file(sub_path_1, "12345");
-                target->push(deadline, folder_id, narrow(name_1.wstring()), path_2_str, U::meta, false);
+                target->push(deadline, folder_id, name_1.get_full_name(), std::string(sub_path_2.get_full_name()),
+                             U::meta, false);
                 await_events(poll_t::single, 1);
                 auto &payload = changes.front()->payload;
                 REQUIRE(payload.size() == 1);
@@ -309,21 +293,21 @@ void test_watcher_base() {
                 REQUIRE(folder_change.folder_id == folder_id);
                 REQUIRE(folder_change.file_changes.size() == 1);
                 auto &file_change = folder_change.file_changes.front();
-                CHECK(proto::get_name(file_change) == narrow(name_1.wstring()));
+                CHECK(proto::get_name(file_change) == name_1.get_full_name());
                 CHECK(proto::get_size(file_change) == 5);
                 CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
                 CHECK(proto::get_permissions(file_change));
-                CHECK(file_change.prev_path == path_2_str);
+                CHECK(file_change.prev_path == sub_path_2.get_full_name());
                 CHECK(file_change.update_reason == update_type_t::meta);
             }
             SECTION("changes accumulation") {
                 auto deadline_2 = deadline + retension();
                 SECTION("simple case") {
-                    auto own_name = bfs::path(L"файл.bin");
+                    auto own_name = utils::make_native_view(L"файл.bin", allocator);
                     auto sub_path = root_path / own_name;
                     write_file(sub_path, "12345");
-                    target->push(deadline, folder_id, narrow(own_name.wstring()), {}, U::created, false);
-                    target->push(deadline_2, folder_id, narrow(own_name.wstring()), {}, U::content, false);
+                    target->push(deadline, folder_id, own_name.get_full_name(), {}, U::created, false);
+                    target->push(deadline_2, folder_id, own_name.get_full_name(), {}, U::content, false);
 
                     await_events(poll_t::single);
                     REQUIRE(changes.size() == 0);
@@ -336,27 +320,27 @@ void test_watcher_base() {
                     REQUIRE(folder_change.folder_id == folder_id);
                     REQUIRE(folder_change.file_changes.size() == 1);
                     auto &file_change = folder_change.file_changes.front();
-                    CHECK(proto::get_name(file_change) == narrow(own_name.wstring()));
+                    CHECK(proto::get_name(file_change) == own_name.get_full_name());
                     CHECK(proto::get_size(file_change) == 5);
                     CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
                     CHECK(proto::get_permissions(file_change));
                     CHECK(file_change.update_reason == update_type_t::created);
                 }
                 SECTION("create , delete -> collapse to void") {
-                    auto own_name = bfs::path(L"файл.bin");
+                    auto own_name = utils::make_native_view(L"файл.bin", allocator);
                     auto sub_path = root_path / own_name;
                     write_file(sub_path, "12345");
-                    target->push(deadline, folder_id, narrow(own_name.wstring()), {}, U::created, false);
-                    target->push(deadline_2, folder_id, narrow(own_name.wstring()), {}, U::deleted, false);
+                    target->push(deadline, folder_id, own_name.get_full_name(), {}, U::created, false);
+                    target->push(deadline_2, folder_id, own_name.get_full_name(), {}, U::deleted, false);
                     await_events(poll_t::trigger_timer);
                     REQUIRE(changes.size() == 0);
                 }
                 SECTION("content , meta -> collapse to content") {
-                    auto own_name = bfs::path(L"файл.bin");
+                    auto own_name = utils::make_native_view(L"файл.bin", allocator);
                     auto sub_path = root_path / own_name;
                     write_file(sub_path, "12345");
-                    target->push(deadline, folder_id, narrow(own_name.wstring()), {}, U::content, false);
-                    target->push(deadline_2, folder_id, narrow(own_name.wstring()), {}, U::meta, false);
+                    target->push(deadline, folder_id, own_name.get_full_name(), {}, U::content, false);
+                    target->push(deadline_2, folder_id, own_name.get_full_name(), {}, U::meta, false);
 
                     await_events(poll_t::trigger_timer, 1);
 
@@ -366,20 +350,19 @@ void test_watcher_base() {
                     REQUIRE(folder_change.folder_id == folder_id);
                     REQUIRE(folder_change.file_changes.size() == 1);
                     auto &file_change = folder_change.file_changes.front();
-                    CHECK(proto::get_name(file_change) == narrow(own_name.wstring()));
+                    CHECK(proto::get_name(file_change) == own_name.get_full_name());
                     CHECK(proto::get_size(file_change) == 5);
                     CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
                     CHECK(proto::get_permissions(file_change));
                     CHECK(file_change.update_reason == update_type_t::content);
                 }
                 SECTION("mv(a, b), content(b) -> rm(a), create(b)") {
-                    auto name_1 = bfs::path(L"файл-1.bin");
-                    auto name_2 = bfs::path(L"файл-2.bin");
-                    auto name_1_str = narrow(name_1.generic_wstring());
-                    auto name_2_str = narrow(name_2.generic_wstring());
+                    auto name_1 = utils::make_native_view(L"файл-1.bin", allocator);
+                    auto name_2 = utils::make_native_view(L"файл-2.bin", allocator);
                     write_file(root_path / name_2, "12345");
-                    target->push(deadline, folder_id, name_2_str, name_1_str, U::meta, false);
-                    target->push(deadline, folder_id, name_2_str, {}, U::content, false);
+                    target->push(deadline, folder_id, name_2.get_full_name(), std::string(name_1.get_full_name()),
+                                 U::meta, false);
+                    target->push(deadline, folder_id, name_2.get_full_name(), {}, U::content, false);
 
                     await_events(poll_t::trigger_timer, 2, true);
                     auto &payload_1 = changes[0]->payload;
@@ -389,7 +372,7 @@ void test_watcher_base() {
                     REQUIRE(folder_change_1.file_changes.size() == 1);
 
                     auto &change_0 = folder_change_1.file_changes[0];
-                    CHECK(proto::get_name(change_0) == narrow(name_1.wstring()));
+                    CHECK(proto::get_name(change_0) == name_1.get_full_name());
                     CHECK(proto::get_size(change_0) == 0);
                     CHECK(proto::get_type(change_0) == proto::FileInfoType::FILE);
                     CHECK(change_0.update_reason == update_type_t::deleted);
@@ -399,7 +382,7 @@ void test_watcher_base() {
                     REQUIRE(payload_2.size() == 1);
                     auto &folder_change_2 = payload_2[0];
                     auto &change_1 = folder_change_2.file_changes[0];
-                    CHECK(proto::get_name(change_1) == narrow(name_2.wstring()));
+                    CHECK(proto::get_name(change_1) == name_2.get_full_name());
                     CHECK(proto::get_size(change_1) == 5);
                     CHECK(proto::get_type(change_1) == proto::FileInfoType::FILE);
                     CHECK(proto::get_permissions(change_1));
@@ -407,14 +390,13 @@ void test_watcher_base() {
                     CHECK(change_1.prev_path == "");
                 }
                 SECTION("mv(a, b), content(b), meta(b) -> rm(a), create(b)") {
-                    auto name_1 = bfs::path(L"файл-1.bin");
-                    auto name_2 = bfs::path(L"файл-2.bin");
-                    auto name_1_str = narrow(name_1.generic_wstring());
-                    auto name_2_str = narrow(name_2.generic_wstring());
+                    auto name_1 = utils::make_native_view(L"файл-1.bin", allocator);
+                    auto name_2 = utils::make_native_view(L"файл-2.bin", allocator);
                     write_file(root_path / name_2, "12345");
-                    target->push(deadline, folder_id, name_2_str, name_1_str, U::meta, false);
-                    target->push(deadline_2, folder_id, name_2_str, {}, U::content, false);
-                    target->push(deadline_2, folder_id, name_2_str, {}, U::meta, false);
+                    target->push(deadline, folder_id, name_2.get_full_name(), std::string(name_1.get_full_name()),
+                                 U::meta, false);
+                    target->push(deadline_2, folder_id, name_2.get_full_name(), {}, U::content, false);
+                    target->push(deadline_2, folder_id, name_2.get_full_name(), {}, U::meta, false);
 
                     await_events(poll_t::trigger_timer, 2, true);
 
@@ -425,7 +407,7 @@ void test_watcher_base() {
                     REQUIRE(folder_change_1.file_changes.size() == 1);
 
                     auto &change_0 = folder_change_1.file_changes[0];
-                    CHECK(proto::get_name(change_0) == narrow(name_1.wstring()));
+                    CHECK(proto::get_name(change_0) == name_1.get_full_name());
                     CHECK(proto::get_size(change_0) == 0);
                     CHECK(proto::get_type(change_0) == proto::FileInfoType::FILE);
                     CHECK(change_0.update_reason == update_type_t::deleted);
@@ -435,7 +417,7 @@ void test_watcher_base() {
                     REQUIRE(payload_2.size() == 1);
                     auto &folder_change_2 = payload_2[0];
                     auto &change_1 = folder_change_2.file_changes[0];
-                    CHECK(proto::get_name(change_1) == narrow(name_2.wstring()));
+                    CHECK(proto::get_name(change_1) == name_2.get_full_name());
                     CHECK(proto::get_size(change_1) == 5);
                     CHECK(proto::get_type(change_1) == proto::FileInfoType::FILE);
                     CHECK(proto::get_permissions(change_1));
@@ -443,13 +425,12 @@ void test_watcher_base() {
                     CHECK(change_1.prev_path == "");
                 }
                 SECTION("content change + rename => remove + content change") {
-                    auto name_1 = bfs::path(L"файл-1.bin");
-                    auto name_2 = bfs::path(L"файл-2.bin");
-                    auto name_1_str = narrow(name_1.generic_wstring());
-                    auto name_2_str = narrow(name_2.generic_wstring());
+                    auto name_1 = utils::make_native_view(L"файл-1.bin", allocator);
+                    auto name_2 = utils::make_native_view(L"файл-2.bin", allocator);
                     write_file(root_path / name_2, "12345");
-                    target->push(deadline, folder_id, name_2_str, {}, U::content, false);
-                    target->push(deadline, folder_id, name_2_str, name_1_str, U::meta, false);
+                    target->push(deadline, folder_id, name_2.get_full_name(), {}, U::content, false);
+                    target->push(deadline, folder_id, name_2.get_full_name(), std::string(name_1.get_full_name()),
+                                 U::meta, false);
                     await_events(poll_t::trigger_timer, 1, true);
 
                     auto &payload_1 = changes[0]->payload;
@@ -459,7 +440,7 @@ void test_watcher_base() {
                     REQUIRE(folder_change_1.file_changes.size() == 1);
 
                     auto &change_0 = folder_change_1.file_changes[0];
-                    CHECK(proto::get_name(change_0) == narrow(name_1.wstring()));
+                    CHECK(proto::get_name(change_0) == name_1.get_full_name());
                     CHECK(proto::get_size(change_0) == 0);
                     CHECK(proto::get_type(change_0) == proto::FileInfoType::FILE);
                     CHECK(change_0.update_reason == update_type_t::deleted);
@@ -469,7 +450,7 @@ void test_watcher_base() {
                     REQUIRE(payload_2.size() == 1);
                     auto &folder_change_2 = payload_2[0];
                     auto &change_1 = folder_change_2.file_changes[0];
-                    CHECK(proto::get_name(change_1) == narrow(name_2.wstring()));
+                    CHECK(proto::get_name(change_1) == name_2.get_full_name());
                     CHECK(proto::get_size(change_1) == 5);
                     CHECK(proto::get_type(change_1) == proto::FileInfoType::FILE);
                     CHECK(proto::get_permissions(change_1));
@@ -477,12 +458,11 @@ void test_watcher_base() {
                     CHECK(change_1.prev_path == "");
                 }
                 SECTION("move, delete -> collapse to delete of original") {
-                    auto name_1 = bfs::path(L"файл-1.bin");
-                    auto name_2 = bfs::path(L"файл-2.bin");
-                    auto name_1_str = narrow(name_1.generic_wstring());
-                    auto name_2_str = narrow(name_2.generic_wstring());
-                    target->push(deadline, folder_id, name_2_str, name_1_str, U::meta, false);
-                    target->push(deadline_2, folder_id, name_2_str, {}, U::deleted, false);
+                    auto name_1 = utils::make_native_view(L"файл-1.bin", allocator);
+                    auto name_2 = utils::make_native_view(L"файл-2.bin", allocator);
+                    target->push(deadline, folder_id, name_2.get_full_name(), std::string(name_1.get_full_name()),
+                                 U::meta, false);
+                    target->push(deadline_2, folder_id, name_2.get_full_name(), {}, U::deleted, false);
 
                     await_events(poll_t::trigger_timer, 1);
 
@@ -492,7 +472,7 @@ void test_watcher_base() {
                     REQUIRE(folder_change.folder_id == folder_id);
                     REQUIRE(folder_change.file_changes.size() == 1);
                     auto &file_change = folder_change.file_changes.front();
-                    CHECK(proto::get_name(file_change) == name_1_str);
+                    CHECK(proto::get_name(file_change) == name_1.get_full_name());
                     CHECK(proto::get_size(file_change) == 0);
                     CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
                     CHECK(proto::get_deleted(file_change));
@@ -500,15 +480,14 @@ void test_watcher_base() {
                     CHECK(file_change.prev_path.empty());
                 }
                 SECTION("mv(a, b), mv(b, c) -> collapse to mv(a, c") {
-                    auto name_1 = bfs::path(L"файл-1.bin");
-                    auto name_2 = bfs::path(L"файл-2.bin");
-                    auto name_3 = bfs::path(L"файл-3.bin");
-                    auto name_1_str = narrow(name_1.generic_wstring());
-                    auto name_2_str = narrow(name_2.generic_wstring());
-                    auto name_3_str = narrow(name_3.generic_wstring());
+                    auto name_1 = utils::make_native_view(L"файл-1.bin", allocator);
+                    auto name_2 = utils::make_native_view(L"файл-2.bin", allocator);
+                    auto name_3 = utils::make_native_view(L"файл-3.bin", allocator);
                     write_file(root_path / name_3, "12345");
-                    target->push(deadline, folder_id, name_2_str, name_1_str, U::meta, false);
-                    target->push(deadline_2, folder_id, name_3_str, name_2_str, U::meta, false);
+                    target->push(deadline, folder_id, name_2.get_full_name(), std::string(name_1.get_full_name()),
+                                 U::meta, false);
+                    target->push(deadline_2, folder_id, name_3.get_full_name(), std::string(name_2.get_full_name()),
+                                 U::meta, false);
 
                     await_events(poll_t::trigger_timer);
 
@@ -518,32 +497,31 @@ void test_watcher_base() {
                     REQUIRE(folder_change.folder_id == folder_id);
                     REQUIRE(folder_change.file_changes.size() == 1);
                     auto &file_change = folder_change.file_changes.front();
-                    CHECK(proto::get_name(file_change) == name_3_str);
+                    CHECK(proto::get_name(file_change) == name_3.get_full_name());
                     CHECK(proto::get_size(file_change) == 5);
                     CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
                     CHECK(proto::get_permissions(file_change));
                     CHECK(file_change.update_reason == update_type_t::meta);
-                    CHECK(file_change.prev_path == name_1_str);
+                    CHECK(file_change.prev_path == name_1.get_full_name());
                 }
                 SECTION("mv(a, b) -> mv(b, a) -> noop") {
-                    auto name_1 = bfs::path(L"файл-1.bin");
-                    auto name_2 = bfs::path(L"файл-2.bin");
-                    auto name_1_str = narrow(name_1.generic_wstring());
-                    auto name_2_str = narrow(name_2.generic_wstring());
+                    auto name_1 = utils::make_native_view(L"файл-1.bin", allocator);
+                    auto name_2 = utils::make_native_view(L"файл-2.bin", allocator);
                     write_file(root_path / name_1, "12345");
-                    target->push(deadline, folder_id, name_2_str, name_1_str, U::meta, false);
-                    target->push(deadline_2, folder_id, name_1_str, name_2_str, U::meta, false);
+                    target->push(deadline, folder_id, name_2.get_full_name(), std::string(name_1.get_full_name()),
+                                 U::meta, false);
+                    target->push(deadline_2, folder_id, name_1.get_full_name(), std::string(name_2.get_full_name()),
+                                 U::meta, false);
                     await_events(poll_t::trigger_timer);
                     REQUIRE(changes.size() == 0);
                 }
                 SECTION("change(a), mv(a, b) -> rm(a), create(b)") {
-                    auto name_1 = bfs::path(L"файл-1.bin");
-                    auto name_2 = bfs::path(L"файл-2.bin");
-                    auto name_1_str = narrow(name_1.generic_wstring());
-                    auto name_2_str = narrow(name_2.generic_wstring());
+                    auto name_1 = utils::make_native_view(L"файл-1.bin", allocator);
+                    auto name_2 = utils::make_native_view(L"файл-2.bin", allocator);
                     write_file(root_path / name_2, "12345");
-                    target->push(deadline, folder_id, name_1_str, {}, U::content, false);
-                    target->push(deadline, folder_id, name_2_str, name_1_str, U::meta, false);
+                    target->push(deadline, folder_id, name_1.get_full_name(), {}, U::content, false);
+                    target->push(deadline, folder_id, name_2.get_full_name(), std::string(name_1.get_full_name()),
+                                 U::meta, false);
                     await_events(poll_t::trigger_timer, 2, true);
 
                     auto &payload_1 = changes[0]->payload;
@@ -553,7 +531,7 @@ void test_watcher_base() {
                     REQUIRE(folder_change_1.file_changes.size() == 1);
                     auto &change_1 = folder_change_1.file_changes.front();
                     CHECK(change_1.update_reason == update_type_t::deleted);
-                    CHECK(proto::get_name(change_1) == name_1_str);
+                    CHECK(proto::get_name(change_1) == name_1.get_full_name());
                     CHECK(proto::get_size(change_1) == 0);
                     CHECK(proto::get_type(change_1) == proto::FileInfoType::FILE);
                     CHECK(change_1.prev_path.empty());
@@ -562,7 +540,7 @@ void test_watcher_base() {
                     REQUIRE(payload_2.size() == 1);
                     auto &folder_change_2 = payload_2[0];
                     auto &change_2 = folder_change_2.file_changes[0];
-                    CHECK(proto::get_name(change_2) == narrow(name_2.wstring()));
+                    CHECK(proto::get_name(change_2) == name_2.get_full_name());
                     CHECK(proto::get_size(change_2) == 5);
                     CHECK(proto::get_type(change_2) == proto::FileInfoType::FILE);
                     CHECK(proto::get_permissions(change_2));
@@ -571,17 +549,17 @@ void test_watcher_base() {
                 }
             }
             SECTION("updates mediator") {
-                auto own_name = bfs::path(L"файл.bin");
+                auto own_name = utils::make_native_view(L"файл.bin", allocator);
                 auto sub_path = root_path / own_name;
                 write_file(sub_path, "12345");
                 updates_mediator->enable(true);
                 updates_mediator->mask(sub_path, {}, deadline);
 
-                target->push(deadline, folder_id, narrow(own_name.wstring()), {}, U::created, false);
+                target->push(deadline, folder_id, own_name.get_full_name(), {}, U::created, false);
                 await_events(poll_t::single);
                 REQUIRE(changes.size() == 0);
 
-                target->push(deadline, folder_id, narrow(own_name.wstring()), {}, U::created, false);
+                target->push(deadline, folder_id, own_name.get_full_name(), {}, U::created, false);
                 await_events(poll_t::single);
                 REQUIRE(changes.size() == 1);
 
@@ -591,7 +569,7 @@ void test_watcher_base() {
                 REQUIRE(folder_change.folder_id == folder_id);
                 REQUIRE(folder_change.file_changes.size() == 1);
                 auto &file_change = folder_change.file_changes.front();
-                CHECK(proto::get_name(file_change) == narrow(own_name.wstring()));
+                CHECK(proto::get_name(file_change) == own_name.get_full_name());
                 CHECK(proto::get_size(file_change) == 5);
                 CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
                 CHECK(proto::get_permissions(file_change));
@@ -616,20 +594,20 @@ struct fixture_real_t : fixture_t {
 
     virtual bool notify_upon_watch() { return true; }
 
-    void recurse_scan(const bfs::path &path) {
+    void recurse_scan(const utils::poly_path_view_t &path) {
 #ifdef SYNCSPIRIT_WATCHER_UNIX
-        auto queue = std::list<bfs::path>{path};
+        auto queue = std::list<utils::poly_path_view_t>{path};
         auto dummy_slave = fs_slave_t();
         auto ctx = execution_context_t();
         auto watcher = static_cast<fs::platform::unix::watcher_t *>(target.get());
         while (!queue.empty()) {
             auto &p = queue.front();
-            auto task = fs::task::scan_dir_t(p, {}, {}, true, false, false);
+            auto task = fs::task::scan_dir_t(p.detach(), {}, {}, true, false, false);
             task.process(dummy_slave, ctx);
             watcher->notify(task);
             for (auto &child : task.child_infos) {
-                if (child.status.type() == bfs::file_type::directory) {
-                    queue.push_back(child.path);
+                if (child.file_type == utils::file_type_t::DIRECTORY) {
+                    queue.push_back(child.path.get_view(path.get_allocator()));
                 }
             }
             queue.pop_front();
@@ -637,17 +615,20 @@ struct fixture_real_t : fixture_t {
 #endif
     }
 
-    void watch_folder(std::string_view folder_id, const bfs::path &folder_path = {}) noexcept {
-        auto watched_path = folder_path.empty() ? root_path : folder_path;
+    void watch_folder(std::string_view folder_id, const utils::path_t &folder_path = {}) noexcept {
+        auto watched_path = folder_path.empty() ? path_guard.clone() : folder_path.clone();
         auto back_addr = sup->get_address();
-        sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, watched_path, folder_id);
+        sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, watched_path.clone(), folder_id);
         sup->do_process();
         REQUIRE(watched_replies == 1);
-        LOG_TRACE(log, "folder is being watched on '{}', updating time...", narrow(watched_path.wstring()));
+        LOG_TRACE(log, "folder is being watched on '{}', updating time...", watched_path);
         fs_context->update_time();
 
         if (notify_upon_watch()) {
-            recurse_scan(watched_path);
+            auto buffer = std::array<std::byte, 1024 * 32>();
+            auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+            auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+            recurse_scan(watched_path.get_view(allocator));
         }
     }
 };
@@ -656,7 +637,7 @@ void test_start_n_shutdown() {
     struct F : fixture_real_t {
         using fixture_real_t::fixture_real_t;
 
-        void main() noexcept override {
+        void main(const utils::poly_path_view_t &root_path, const utils::allocator_t &allocator) noexcept override {
             launch_target();
             CHECK(static_cast<r::actor_base_t *>(target.get())->access<to::state>() == r::state_t::OPERATIONAL);
             REQUIRE(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::OPERATIONAL);
@@ -686,11 +667,11 @@ void test_watch_unwatch() {
             ++unwatched_replies;
         }
 
-        void main() noexcept override {
+        void main(const utils::poly_path_view_t &root_path, const utils::allocator_t &allocator) noexcept override {
             auto folder_id = std::string("my-folder-id");
             auto back_addr = sup->get_address();
-            sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id);
-            sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path, folder_id);
+            sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path.detach(), folder_id);
+            sup->route<fs::payload::watch_folder_t>(target->get_address(), back_addr, root_path.detach(), folder_id);
             sup->do_process();
             CHECK(watched_replies == 2);
             CHECK(watched_successes == 1);
@@ -724,28 +705,28 @@ void test_tmp_ignoring() {
     struct F : fixture_real_t {
         using fixture_real_t::fixture_real_t;
 
-        void main() noexcept override {
+        void main(const utils::poly_path_view_t &root_path, const utils::allocator_t &allocator) noexcept override {
             auto folder_id = std::string("my-folder-id");
             auto back_addr = sup->get_address();
 
-            bfs::create_directories(root_path / "prev-dir.syncspirit-tmp");
+            create_directories(root_path / "prev-dir.syncspirit-tmp");
             write_file(root_path / "01.syncspirit-tmp", "12345");
             watch_folder(folder_id);
 
             SECTION("ignoring") {
                 SECTION("create a dir") {
                     auto path = root_path / "my.syncspirit-tmp";
-                    bfs::create_directories(path);
+                    create_directories(path);
                 }
-                SECTION("rm file") { bfs::remove(root_path / "01.syncspirit-tmp"); }
-                SECTION("rm dir") { bfs::remove_all(root_path / "prev-dir.syncspirit-tmp"); }
+                SECTION("rm file") { remove(root_path / "01.syncspirit-tmp"); }
+                SECTION("rm dir") { remove_all(root_path / "prev-dir.syncspirit-tmp"); }
                 SECTION("write file") { write_file(root_path / "my.syncspirit-tmp", "12345"); }
                 SECTION("rename file tmp -> tmp") {
-                    bfs::rename(root_path / "01.syncspirit-tmp", root_path / "02.syncspirit-tmp");
+                    rename(root_path / "01.syncspirit-tmp", root_path / "02.syncspirit-tmp");
                 }
 #ifndef SYNCSPIRIT_WIN
                 SECTION("create symlink") {
-                    bfs::create_symlink(bfs::path("xxx"), root_path / "my-link.syncspirit-tmp");
+                    create_symlink(utils::path_t::make_native("xxx"), root_path / "my-link.syncspirit-tmp");
                 }
 #endif
                 for (int i = 0; i < 2; ++i) {
@@ -773,7 +754,7 @@ void test_tmp_ignoring() {
             }
 
             SECTION("not ignoring") {
-                bfs::rename(root_path / "01.syncspirit-tmp", root_path / "02.file");
+                rename(root_path / "01.syncspirit-tmp", root_path / "02.file");
                 await_events(poll_t::trigger_timer, 1);
             }
         }
@@ -785,7 +766,7 @@ void test_real_impl() {
     struct F : fixture_real_t {
         using fixture_real_t::fixture_real_t;
 
-        void main() noexcept override {
+        void main(const utils::poly_path_view_t &root_path, const utils::allocator_t &allocator) noexcept override {
             auto folder_id = std::string("my-folder-id");
             auto back_addr = sup->get_address();
 
@@ -798,7 +779,7 @@ void test_real_impl() {
                 watch_folder(folder_id);
 
                 auto path = root_path / "my-dir";
-                bfs::create_directories(path);
+                create_directories(path);
                 await_events(poll_t::trigger_timer, 1);
 
                 auto &payload = changes.front()->payload;
@@ -823,7 +804,7 @@ void test_real_impl() {
 #endif
 
                 auto path_dir = root_path / "my-dir";
-                bfs::create_directories(path_dir);
+                create_directories(path_dir);
                 await_events(poll_t::trigger_timer, 1);
                 {
                     auto &payload = changes.front()->payload;
@@ -888,7 +869,7 @@ void test_real_impl() {
 
                 watch_folder(folder_id);
 
-                bfs::remove(path);
+                remove(path);
 
                 await_events(poll_t::trigger_timer, 1);
                 auto &payload = changes.front()->payload;
@@ -908,8 +889,8 @@ void test_real_impl() {
                 auto subdir_path = root_path / "my-root";
                 auto a_path = subdir_path / L"a/b/п1";
                 auto x_path = subdir_path / L"x/y/п2";
-                bfs::create_directories(a_path);
-                bfs::create_directories(x_path);
+                create_directories(a_path);
+                create_directories(x_path);
                 SECTION("file inside root => meta") {
                     if (!test::wine_environment()) {
                         auto path_1 = subdir_path / L"my-file.1";
@@ -918,8 +899,7 @@ void test_real_impl() {
 
                         watch_folder(folder_id);
 
-                        SECTION("native::rename") { native::rename(path_1, path_2); }
-                        SECTION("bfs::rename") { bfs::rename(path_1, path_2); }
+                        rename(path_1, path_2);
 
 #ifndef SYNCSPIRIT_WIN
                         await_events(poll_t::trigger_timer, 1);
@@ -975,10 +955,10 @@ void test_real_impl() {
                     if (!test::wine_environment()) {
                         auto path_1 = subdir_path / L"папка1";
                         auto path_2 = subdir_path / L"папка2";
-                        bfs::create_directories(path_1);
+                        create_directories(path_1);
 
                         watch_folder(folder_id);
-                        native::rename(path_1, path_2);
+                        rename(path_1, path_2);
 
 #ifndef SYNCSPIRIT_WIN
                         await_events(poll_t::trigger_timer, 1);
@@ -1035,9 +1015,9 @@ void test_real_impl() {
                         auto path_2 = root_path / L"my-file.2";
                         write_file(path_1, "12345");
 
-                        watch_folder(folder_id, subdir_path);
+                        watch_folder(folder_id, subdir_path.detach());
 
-                        native::rename(path_1, path_2);
+                        rename(path_1, path_2);
 
                         await_events(poll_t::trigger_timer, 1);
                         auto &payload = changes.front()->payload;
@@ -1060,9 +1040,8 @@ void test_real_impl() {
                         auto path_2 = x_path / L"my-file.2";
                         write_file(path_1, "12345");
 
-                        watch_folder(folder_id, subdir_path);
-
-                        native::rename(path_1, path_2);
+                        watch_folder(folder_id, subdir_path.detach());
+                        rename(path_1, path_2);
 
                         await_events(poll_t::trigger_timer, 1);
                         auto &payload = changes.front()->payload;
@@ -1085,9 +1064,9 @@ void test_real_impl() {
                         auto path_2 = x_path / L"my-file.2";
                         write_file(path_1, "12345");
 
-                        watch_folder(folder_id, subdir_path);
+                        watch_folder(folder_id, subdir_path.detach());
 
-                        native::rename(path_1, path_2);
+                        rename(path_1, path_2);
 
 #ifndef SYNCSPIRIT_WIN
                         await_events(poll_t::trigger_timer, 1);
@@ -1145,11 +1124,11 @@ void test_real_impl() {
             SECTION("(permissions) file") {
                 auto path = root_path / "my-file";
                 write_file(path, "12345");
-                bfs::permissions(path, bfs::perms::owner_read);
+                chmod(path, 0555);
 
                 watch_folder(folder_id);
 
-                bfs::permissions(path, bfs::perms::owner_write);
+                chmod(path, 0222);
                 await_events(poll_t::trigger_timer, 1);
                 auto &payload = changes.front()->payload;
                 REQUIRE(payload.size() == 1);
@@ -1166,14 +1145,14 @@ void test_real_impl() {
             }
             SECTION("(delete + create) symlink target change") {
                 auto path = root_path / "my-file";
-                auto link_target_1 = std::string_view("/some/where/1");
-                auto link_target_2 = std::string_view("/some/where/2");
-                bfs::create_symlink(bfs::path(link_target_1), path);
+                auto link_target_1 = utils::make_native_view("/some/where/1", allocator);
+                auto link_target_2 = utils::make_native_view("/some/where/2", allocator);
+                create_symlink(link_target_1, path);
 
                 watch_folder(folder_id);
 
-                bfs::remove(path);
-                bfs::create_symlink(bfs::path(link_target_2), path);
+                remove(path);
+                create_symlink(link_target_2, path);
 
                 await_events(poll_t::trigger_timer, 1);
                 auto &payload = changes.front()->payload;
@@ -1185,7 +1164,7 @@ void test_real_impl() {
                 CHECK(proto::get_name(file_change) == "my-file");
                 CHECK(proto::get_size(file_change) == 0);
                 CHECK(proto::get_type(file_change) == proto::FileInfoType::SYMLINK);
-                CHECK(proto::get_symlink_target(file_change) == link_target_2);
+                CHECK(proto::get_symlink_target(file_change) == link_target_2.get_full_name());
                 CHECK(!file_change.requires_refinement);
             }
 #endif
@@ -1198,7 +1177,7 @@ void test_hierarchies() {
     struct F : fixture_real_t {
         using fixture_real_t::fixture_real_t;
 
-        void main() noexcept override {
+        void main(const utils::poly_path_view_t &root_path, const utils::allocator_t &allocator) noexcept override {
             using names_t = std::vector<std::wstring_view>;
             auto folder_id = std::string("my-folder-id");
             auto back_addr = sup->get_address();
@@ -1206,8 +1185,8 @@ void test_hierarchies() {
                 if (!test::wine_environment()) {
                     auto path_1 = root_path / L"x" / L"y" / L"файл.bin";
                     auto path_2 = root_path / L"a" / L"b";
-                    bfs::create_directories(path_1.parent_path());
-                    bfs::create_directories(path_2);
+                    create_directories(path_1.get_parent());
+                    create_directories(path_2);
                     write_file(path_1, "12345");
 
                     watch_folder(folder_id);
@@ -1215,15 +1194,15 @@ void test_hierarchies() {
                     auto names = names_t({L"a", L"a/b", L"x", L"x/y", L"x/y/файл.bin"});
                     SECTION("remove files individually") {
                         for (auto it = names.rbegin(); it != names.rend(); ++it) {
-                            auto p = root_path / bfs::path(*it);
-                            bfs::remove_all(p);
+                            auto p = root_path / *it;
+                            remove_all(p);
                         }
                     }
                     SECTION("remove subdirs ") {
                         auto for_removal = names_t({L"a", L"x"});
                         for (auto it = for_removal.rbegin(); it != for_removal.rend(); ++it) {
-                            auto p = root_path / bfs::path(*it);
-                            bfs::remove_all(p);
+                            auto p = root_path / *it;
+                            remove_all(p);
                         }
                     }
 
@@ -1250,8 +1229,8 @@ void test_hierarchies() {
 
                     auto names = names_t({L"a", L"a/b", L"x", L"x/y", L"x/y/z"});
                     for (auto it = names.rbegin(); it != names.rend(); ++it) {
-                        auto p = root_path / bfs::path(*it);
-                        bfs::create_directories(p);
+                        auto p = root_path / *it;
+                        create_directories(p);
                     }
 
 #ifndef SYNCSPIRIT_WIN
@@ -1287,17 +1266,16 @@ void test_hierarchies() {
                     auto dir_1 = root_path / "win32-hack" / L"директория-1";
                     auto dir_2 = root_path / "win32-hack" / L"директория-2";
                     for (auto it = names.rbegin(); it != names.rend(); ++it) {
-                        auto p = dir_1 / bfs::path(*it);
-                        if (p.filename().generic_wstring() == L"файл.bin") {
+                        auto p = dir_1 / *it;
+                        if (p.get_filename() == utils::make_native_view(L"файл.bin", allocator).get_filename()) {
                             write_file(p, "12345");
                         } else {
-                            bfs::create_directories(p);
+                            create_directories(p);
                         }
                     }
 
                     watch_folder(folder_id);
-
-                    native::rename(dir_1, dir_2);
+                    rename(dir_1, dir_2);
 
 #ifndef SYNCSPIRIT_WIN
                     await_events(poll_t::trigger_timer, 1);
@@ -1311,7 +1289,7 @@ void test_hierarchies() {
                     {
                         auto file_prev = root_path / "win32-hack" / L"директория-2" / "a" / L"файл.bin";
                         auto file_new = root_path / "win32-hack" / L"директория-2" / "a" / L"ф.bin";
-                        native::rename(file_prev, file_new);
+                        rename(file_prev, file_new);
                         await_events(poll_t::trigger_timer, 1);
                         auto &file_change = changes[0]->payload[0].file_changes[0];
                         CHECK(proto::get_name(file_change) == narrow(L"win32-hack/директория-2/a/ф.bin"));
@@ -1352,7 +1330,7 @@ void test_hierarchies() {
 void test_create_modify_rename() {
     struct F : fixture_real_t {
         using fixture_real_t::fixture_real_t;
-        void main() noexcept override {
+        void main(const utils::poly_path_view_t &root_path, const utils::allocator_t &allocator) noexcept override {
             auto folder_id = std::string("my-folder-id");
             auto back_addr = sup->get_address();
             watch_folder(folder_id);
@@ -1360,9 +1338,9 @@ void test_create_modify_rename() {
             auto path_file_tmp = root_path / L"файл.bin-tmp";
             auto path_file_final = root_path / L"файл.bin";
             write_file(path_file_tmp, "12345");
-            native::rename(path_file_tmp, path_file_final);
-            auto modified = fs::from_unix(123456);
-            bfs::last_write_time(path_file_final, modified);
+            rename(path_file_tmp, path_file_final);
+            auto modified = 123456;
+            last_write_time(path_file_final, modified);
             await_events(poll_t::trigger_timer, 1);
 #endif
         };
@@ -1382,7 +1360,8 @@ void test_unix_notification() {
 
         bool notify_upon_watch() override { return false; }
 
-        void main() noexcept override {
+        void main(const utils::poly_path_view_t &root_path, const utils::allocator_t &allocator) noexcept override {
+            using scan_dir_t = fs::task::scan_dir_t;
             using child_info_t = fs::task::scan_dir_t::child_info_t;
             using child_infos_t = fs::task::scan_dir_t::child_infos_t;
 
@@ -1390,18 +1369,20 @@ void test_unix_notification() {
             auto back_addr = sup->get_address();
             watch_folder(folder_id);
 
-            auto make_child = [](bfs::path path, bfs::file_type type = bfs::file_type::directory) -> child_info_t {
+            auto add_child = [](scan_dir_t &task, std::string_view path,
+                                utils::file_type_t type = utils::file_type_t::DIRECTORY) -> child_info_t {
                 auto child = child_info_t{};
-                child.path = path;
-                child.status = bfs::file_status(type);
+                child.path = utils::path_t::make_native(path);
+                child.file_type = type;
+                task.child_infos.push_back(std::move(child));
                 return child;
             };
             auto w = static_cast<fs::platform::unix::watcher_t *>(target.get());
             CHECK(w->path_map.size() == 1);
             CHECK(w->subdir_map.size() == 0);
             SECTION("non-watched dir") {
-                auto task = fs::task::scan_dir_t(bfs::path("/some/path"), {}, {}, true, true, false);
-                task.child_infos = {make_child(bfs::path("/some/path/a"))};
+                auto task = fs::task::scan_dir_t(utils::path_t::make_native("/some/path"), {}, {}, true, true, false);
+                add_child(task, "/some/path/a");
                 w->notify(task);
                 CHECK(w->path_map.size() == 1);
                 CHECK(w->path_to_wd.size() == 1);
@@ -1411,26 +1392,26 @@ void test_unix_notification() {
                 auto ptr = reinterpret_cast<char *>(&invalid);
                 auto invalid_name = std::string_view(ptr, ptr + 1);
 
-                auto task = fs::task::scan_dir_t(root_path, {}, {}, true, true, false);
-                task.child_infos = {make_child(bfs::path(invalid_name))};
+                auto task = fs::task::scan_dir_t(root_path.detach(), {}, {}, true, true, false);
+                add_child(task, invalid_name);
                 w->notify(task);
                 CHECK(w->path_map.size() == 1);
                 CHECK(w->path_to_wd.size() == 1);
             }
             SECTION("non-watched dir of watched parent") {
-                auto task = fs::task::scan_dir_t(root_path, {}, {}, true, true, false);
+                auto task = fs::task::scan_dir_t(root_path.detach(), {}, {}, true, true, false);
                 auto child_path = root_path / "a";
-                bfs::create_directories(child_path);
-                task.child_infos = {make_child(child_path)};
+                create_directories(child_path);
+                add_child(task, child_path.get_full_name());
                 w->notify(task);
                 CHECK(w->path_map.size() == 2);
                 CHECK(w->path_to_wd.size() == 2);
             }
             SECTION("non-watched dir of non-watched parent") {
-                auto task = fs::task::scan_dir_t(root_path / "xx", {}, {}, true, true, false);
+                auto task = fs::task::scan_dir_t((root_path / "xx").detach(), {}, {}, true, true, false);
                 auto dir_path = root_path / "xx";
-                bfs::create_directories(dir_path);
-                task.child_infos = {make_child(root_path / "xx/yy")};
+                create_directories(dir_path);
+                add_child(task, (root_path / "xx/yy").get_full_name());
                 w->notify(task);
                 CHECK(w->path_map.size() == 2);
                 CHECK(w->path_to_wd.size() == 2);
@@ -1440,14 +1421,14 @@ void test_unix_notification() {
                 auto path_b = root_path / "b";
                 auto path_c = root_path / "c";
                 auto path_d = root_path / "d";
-                bfs::create_directories(path_a);
-                bfs::create_directories(path_c);
+                create_directories(path_a);
+                create_directories(path_c);
                 write_file(path_b, "");
-                bfs::create_symlink(bfs::path("/some/where"), path_d);
-                auto children = child_infos_t(
-                    {make_child(path_a), make_child(path_b, bfs::file_type::regular), make_child(path_c)});
-                auto task = fs::task::scan_dir_t(root_path, {}, {}, true, true, false);
-                task.child_infos = children;
+                create_symlink(utils::make_native_view("/some/where", allocator), path_d);
+                auto task = fs::task::scan_dir_t(root_path.detach(), {}, {}, true, true, false);
+                add_child(task, path_a.get_full_name());
+                add_child(task, path_b.get_full_name(), utils::file_type_t::FILE);
+                add_child(task, path_c.get_full_name());
                 w->notify(task);
                 CHECK(w->path_map.size() == 4 + IMPL_DIFF);
                 CHECK(w->path_to_wd.size() == 4 + IMPL_DIFF);
@@ -1459,18 +1440,18 @@ void test_unix_notification() {
             }
             SECTION("watched sub-dir") {
                 auto sub_dir = root_path / L"папка";
-                bfs::create_directories(sub_dir);
+                create_directories(sub_dir);
                 await_events(poll_t::trigger_timer, 1);
                 auto path_a = sub_dir / "a";
                 auto path_b = sub_dir / "b";
                 auto path_c = sub_dir / "c";
-                bfs::create_directories(path_a);
-                bfs::create_directories(path_c);
+                create_directories(path_a);
+                create_directories(path_c);
                 write_file(path_b, "");
-                auto children = child_infos_t(
-                    {make_child(path_a), make_child(path_b, bfs::file_type::regular), make_child(path_c)});
-                auto task = fs::task::scan_dir_t(sub_dir, {}, {}, true, true, false);
-                task.child_infos = children;
+                auto task = fs::task::scan_dir_t(sub_dir.detach(), {}, {}, true, true, false);
+                add_child(task, path_a.get_full_name());
+                add_child(task, path_b.get_full_name(), utils::file_type_t::FILE);
+                add_child(task, path_c.get_full_name());
                 w->notify(task);
                 CHECK(w->path_map.size() == 5 + IMPL_DIFF);
                 CHECK(w->path_to_wd.size() == 5 + IMPL_DIFF);
@@ -1483,17 +1464,16 @@ void test_unix_notification() {
             SECTION("tmp-file in a dir") {
                 auto path_tmp = root_path / "my-file.syncspirit-tmp";
                 write_file(path_tmp / "my-file.syncspirit-tmp", "12345");
-                auto children = child_infos_t({make_child(path_tmp, bfs::file_type::regular)});
-                auto task = fs::task::scan_dir_t(root_path, {}, {}, true, true, false);
-                task.child_infos = children;
+                auto task = fs::task::scan_dir_t(root_path.detach(), {}, {}, true, true, false);
+                add_child(task, path_tmp.get_full_name(), utils::file_type_t::FILE);
                 w->notify(task);
                 CHECK(w->path_map.size() == 1);
                 CHECK(w->path_to_wd.size() == 1);
             }
             SECTION("error in watching") {
                 auto path_x = root_path / "a";
-                auto task = fs::task::scan_dir_t(root_path, {}, {}, true, true, false);
-                task.child_infos = {make_child(path_x)};
+                auto task = fs::task::scan_dir_t(root_path.detach(), {}, {}, true, true, false);
+                add_child(task, path_x.get_full_name());
                 w->notify(task);
                 CHECK(w->path_map.size() == 1);
                 CHECK(w->path_to_wd.size() == 1);
@@ -1510,17 +1490,17 @@ void test_kqueue() {
     struct F : fixture_real_t {
         using fixture_real_t::fixture_real_t;
 
-        void main() noexcept override {
+        void main(const utils::poly_path_view_t &root_path, const utils::allocator_t &allocator) noexcept override {
             using child_info_t = fs::task::scan_dir_t::child_info_t;
             using child_infos_t = fs::task::scan_dir_t::child_infos_t;
 
             auto folder_id = std::string("my-folder-id");
             auto back_addr = sup->get_address();
 
-            bfs::create_directories(root_path / "ex-dir");
-            bfs::create_directories(root_path / "ex-hier" / "aaa");
+            create_directories(root_path / "ex-dir");
+            create_directories(root_path / "ex-hier" / "aaa");
             write_file(root_path / "ex-file", "12345");
-            bfs::create_symlink(root_path / "ex-target", root_path / "ex-link");
+            create_symlink(root_path / "ex-target", root_path / "ex-link");
 
             watch_folder(folder_id);
             auto w = static_cast<fs::platform::unix::watcher_t *>(target.get());
@@ -1530,21 +1510,23 @@ void test_kqueue() {
                 REQUIRE(watched_paths == 5);
                 auto expected_watches = watched_paths;
                 SECTION("creation") {
-                    SECTION("new dir") { bfs::create_directories(root_path / "my-dir"); }
-                    SECTION("new dir hierarchy") { bfs::create_directories(root_path / "a" / "b" / "c" / "d"); }
+                    SECTION("new dir") { create_directories(root_path / "my-dir"); }
+                    SECTION("new dir hierarchy") { create_directories(root_path / "a" / "b" / "c" / "d"); }
                     SECTION("new file") { write_file(root_path / "my-file", "12345"); }
-                    SECTION("new link") { bfs::create_symlink(root_path / "a", root_path / "b"); }
+                    SECTION("new link") { create_symlink(root_path / "a", root_path / "b"); }
                 }
                 SECTION("removal") {
-                    SECTION("simple") {
-                        auto name_raw = GENERATE("ex-file", "ex-dir");
-                        auto name = std::string_view(name_raw);
-                        bfs::remove(root_path / name);
+                    SECTION("simple file") {
+                        remove(root_path / "ex-file");
                         --expected_watches;
                     }
-                    SECTION("link") { bfs::remove(root_path / "ex-link"); }
+                    SECTION("simple dir") {
+                        remove_all(root_path / "ex-dir");
+                        --expected_watches;
+                    }
+                    SECTION("link") { remove(root_path / "ex-link"); }
                     SECTION("hierarchy") {
-                        bfs::remove_all(root_path / "ex-hier");
+                        remove_all(root_path / "ex-hier");
                         expected_watches -= 2;
                     }
                 }
@@ -1553,12 +1535,12 @@ void test_kqueue() {
                         auto name_raw = GENERATE("ex-file", "ex-dir");
                         auto name = std::string_view(name_raw);
                         spdlog::info("renaming {}", name);
-                        bfs::rename(root_path / name, root_path / L"новое-имя");
+                        rename(root_path / name, root_path / L"новое-имя");
                         --expected_watches;
                     }
-                    SECTION("link") { bfs::rename(root_path / "ex-link", root_path / L"новое-имя"); }
+                    SECTION("link") { rename(root_path / "ex-link", root_path / L"новое-имя"); }
                     SECTION("hierarchy") {
-                        bfs::rename(root_path / "ex-hier", root_path / L"новое-имя");
+                        rename(root_path / "ex-hier", root_path / L"новое-имя");
                         expected_watches -= 2;
                     }
                 }
@@ -1607,7 +1589,7 @@ void test_kqueue() {
                 auto name = std::string_view(name_raw);
                 auto path = root_path / name;
                 auto perms = 0777;
-                bfs::permissions(path, static_cast<bfs::perms>(perms));
+                chmod(path, perms);
 
                 await_events(poll_t::trigger_timer, 1);
                 {
@@ -1630,7 +1612,7 @@ void test_kqueue() {
                 auto perms = 0777;
                 write_file(root_path / "ex-dir" / L"ф1.bin", "abcde");
                 write_file(root_path / "ex-dir" / L"ф2.bin", "12345");
-                bfs::permissions(root_path / "ex-dir", static_cast<bfs::perms>(perms));
+                chmod(root_path / "ex-dir", perms);
                 await_events(poll_t::trigger_timer, 1);
                 {
                     auto &payload = changes.front()->payload;

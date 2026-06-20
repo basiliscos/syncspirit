@@ -6,6 +6,7 @@
 #include "table.h"
 #include "config/utils.h"
 #include "utils/format.hpp"
+#include "utils/path_view.hpp"
 #include "../tree_item/settings.h"
 #include <FL/Fl_Button.H>
 
@@ -16,12 +17,17 @@ static constexpr int PADDING = 5;
 control_t::control_t(tree_item_t &tree_item_, int x, int y, int w, int h)
     : parent_t(x, y, w, h, "global app settings"), tree_item{tree_item_} {
 
+    auto buffer = std::array<std::byte, 1024 * 32>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+
     auto &sup = tree_item_.supervisor;
-    auto config_path = sup.get_config_path();
+    auto config_path = sup.get_config_path().get_view(allocator);
+
     auto defaults_opt = syncspirit::config::generate_config(config_path);
     if (!defaults_opt) {
         auto ec = defaults_opt.assume_error();
-        sup.get_logger()->error("cannot generate default config at {}: {}", config_path.string(), ec);
+        sup.get_logger()->error("cannot generate default config at {}: {}", config_path, ec);
     } else {
         default_cfg = std::move(defaults_opt.assume_value());
         categories = reflect(sup.get_app_config(), default_cfg);
@@ -81,7 +87,7 @@ void control_t::on_save() {
     }
 
     auto cfg = reflect(categories, default_cfg);
-    cfg.config_path = sup.get_config_path();
+    cfg.config_path = sup.get_config_path().clone();
     cfg.fltk_config = sup.get_app_config().fltk_config;
 
     sup.write_config(cfg);

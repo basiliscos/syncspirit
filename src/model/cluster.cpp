@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "cluster.h"
 #include "proto/proto-helpers.h"
@@ -15,7 +15,7 @@ path_guard_t::~path_guard_t() {
 
 cluster_t::cluster_t(device_ptr_t device_, int32_t write_requests_) noexcept
     : device(device_), tainted{false}, write_requests{write_requests_} {
-    path_cache.reset(new path_cache_t());
+    path_cache.reset(new utils::path_cache_t());
 }
 
 proto::ClusterConfig cluster_t::generate(const device_t &target) const noexcept {
@@ -57,13 +57,13 @@ auto cluster_t::get_pending_folders() const noexcept -> const pending_folder_map
 
 const folders_map_t &cluster_t::get_folders() const noexcept { return folders; }
 
-auto cluster_t::get_path_cache() noexcept -> path_cache_t & { return *path_cache; }
+auto cluster_t::get_path_cache() noexcept -> utils::path_cache_t & { return *path_cache; }
 
 int32_t cluster_t::get_write_requests() const noexcept { return write_requests; }
 
-bool cluster_t::is_locked(path_t *path) noexcept { return locked_paths.contains(path); }
+bool cluster_t::is_locked(utils::path_t *path) noexcept { return locked_paths.contains(path); }
 
-path_guard_t cluster_t::lock(path_t *path) noexcept {
+path_guard_t cluster_t::lock(utils::path_t *path) noexcept {
     assert(locked_paths.count(path) == 0);
     auto guard = path_guard_t(this, path);
     locked_paths.emplace(path);

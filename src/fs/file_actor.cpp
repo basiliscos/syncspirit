@@ -6,19 +6,17 @@
 #include "fs_proxy.h"
 #include "fs_slave.h"
 #include "net/names.h"
-#include "utils.h"
-#include "utils/io.h"
+#include "utils/path_view.hpp"
+#include "utils/path_utils.h"
 #include "utils/format.hpp"
 #include "utils/platform.h"
 #include "utils/error_code.h"
-#include "proto/proto-helpers-bep.h"
 #include "model/messages.h"
-#include <boost/nowide/convert.hpp>
+#include "syncspirit-config.h"
 #include <memory_resource>
 
 using namespace syncspirit::fs;
 using namespace syncspirit::proto;
-using boost::nowide::narrow;
 
 namespace {
 namespace resource {
@@ -32,9 +30,18 @@ struct context {};
 template <> inline auto &rotor::supervisor_t::access<to::context>() noexcept { return context; }
 
 struct file_actor_t::process_context_t : fs_proxy_t {
+    using buffer_t = std::array<std::byte, 1024 * 32>;
+    using pool_t = std::pmr::monotonic_buffer_resource;
+    using allocator_t = std::pmr::polymorphic_allocator<char>;
+
     process_context_t(const void *cache_key_, file_actor_t &actor)
-        : fs_proxy_t(*actor.updates_mediator, clock_t::local_time() + actor.retension), cache_key{cache_key_} {}
+        : fs_proxy_t(*actor.updates_mediator, clock_t::local_time() + actor.retension), cache_key{cache_key_},
+          pool(buffer.data(), buffer.size()), allocator{&pool} {}
     const void *cache_key;
+
+    buffer_t buffer;
+    pool_t pool;
+    allocator_t allocator;
 };
 
 file_actor_t::file_actor_t(config_t &cfg)
@@ -103,7 +110,7 @@ void file_actor_t::on_io_commands(message::io_commands_t &message) noexcept {
     auto ctx = process_context_t(p.context, *this);
 
     for (auto &cmd : p.commands) {
-        static const size_t SS_PATH_MAX = 32 * 1024;
+        static const size_t SS_PATH_MAX = SYNCSPIRIT_PATH_MAX;
         auto buffer = std::array<char, SS_PATH_MAX>();
         auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
         auto allocator = std::pmr::polymorphic_allocator<std::string>(&pool);
@@ -112,17 +119,7 @@ void file_actor_t::on_io_commands(message::io_commands_t &message) noexcept {
         std::visit(
             [&](auto &cmd) {
                 ctx.updates_mediator.enable(watched_folders->contains(cmd.folder_id));
-                auto path_wstr = cmd.path.generic_wstring();
-                auto path_wstr_ptr = path_wstr.data();
-                auto path_str = std::string();
-                auto path_view = std::string_view();
-                if (narrow(ptr, buffer.size(), path_wstr_ptr, path_wstr_ptr + path_wstr.size())) {
-                    path_view = std::string_view(ptr);
-                } else {
-                    path_str = narrow(path_wstr);
-                    path_view = path_str;
-                }
-                process(cmd, path_view, ctx);
+                process(cmd, ctx);
             },
             cmd);
     }
@@ -199,16 +196,15 @@ void file_actor_t::on_service_unlock(model::message::service_unlock_t &message) 
     }
 }
 
-void file_actor_t::process(payload::block_request_t &cmd, std::string_view path_str,
-                           process_context_t &context) noexcept {
+void file_actor_t::process(payload::block_request_t &cmd, process_context_t &context) noexcept {
     LOG_TRACE(log, "processing block request");
-    auto &path = cmd.path;
+    auto path = cmd.path.get_view(context.allocator);
     auto file_opt = open_file_ro(path, context.cache_key);
     auto ec = sys::error_code{};
     auto data = utils::bytes_t{};
     if (!file_opt) {
         ec = file_opt.assume_error();
-        LOG_ERROR(log, "error opening file {}: {}", path_str, ec);
+        LOG_ERROR(log, "error opening file {}: {}", path, ec);
         cmd.result = ec;
         return;
     } else {
@@ -226,40 +222,39 @@ void file_actor_t::process(payload::block_request_t &cmd, std::string_view path_
     cmd.result = std::move(data);
 }
 
-void file_actor_t::process(payload::remote_copy_t &cmd, std::string_view path_str,
-                           process_context_t &context) noexcept {
-    auto &path = cmd.path;
+void file_actor_t::process(payload::remote_copy_t &cmd, process_context_t &context) noexcept {
+    auto path = cmd.path.get_view(context.allocator);
     sys::error_code ec;
 
     if (!cmd.conflict_path.empty()) {
-        auto conflict_path_str = cmd.conflict_path.generic_string();
-        LOG_DEBUG(log, "renaming {} -> {}", path_str, conflict_path_str);
-        if (auto ec = context.rename(cmd.path, cmd.conflict_path); ec) {
-            LOG_ERROR(log, "cannot rename file: {}: {}", path_str, ec);
+        LOG_DEBUG(log, "renaming {} -> {}", path, cmd.conflict_path);
+        auto new_name = cmd.conflict_path.get_view(context.allocator);
+        if (auto ec = context.rename(cmd.path, new_name); ec) {
+            LOG_ERROR(log, "cannot rename file: {}: {}", path, ec);
             cmd.result = ec;
             return;
         }
     }
 
     if (cmd.deleted) {
-        if (bfs::exists(path, ec)) {
-            LOG_DEBUG(log, "removing {}", path_str);
+        if (utils::exists(path, ec)) {
+            LOG_DEBUG(log, "removing '{}'", path);
             if (auto ec = context.remove(path); ec) {
-                LOG_ERROR(log, "error removing {} : {}", path_str, ec);
+                LOG_ERROR(log, "error removing {} : {}", path, ec);
                 cmd.result = ec;
                 return;
             }
         } else {
-            LOG_TRACE(log, "{} already abscent, noop", path_str);
+            LOG_TRACE(log, "{} already abscent, noop", path);
         }
         cmd.result = outcome::success();
         return;
     }
 
-    auto parent = path.parent_path();
+    auto parent = path.get_parent();
     bool set_perms = false;
 
-    bool exists = bfs::exists(parent, ec);
+    bool exists = utils::exists(parent, ec);
     if (!exists) {
         if (auto ec = context.create_directories(parent); ec) {
             cmd.result = ec;
@@ -271,10 +266,10 @@ void file_actor_t::process(payload::remote_copy_t &cmd, std::string_view path_st
         auto sz = cmd.size;
         auto file_opt = context.open_write(path, sz);
         if (file_opt.has_value()) {
-            LOG_TRACE(log, "touching existing file {} ({} bytes)", path.string(), sz);
+            LOG_TRACE(log, "touching existing file '{}' ({} bytes)", path, sz);
         } else {
             auto &ec = file_opt.assume_error();
-            LOG_ERROR(log, "error creating {}: {}", path.string(), ec);
+            LOG_ERROR(log, "error creating '{}': {}", path, ec);
             cmd.result = ec;
             return;
         }
@@ -284,7 +279,7 @@ void file_actor_t::process(payload::remote_copy_t &cmd, std::string_view path_st
         }
         set_perms = !cmd.no_permissions && utils::platform_t::permissions_supported(path);
     } else if (cmd.type == proto::FileInfoType::DIRECTORY) {
-        LOG_DEBUG(log, "creating directory {}", path.string());
+        LOG_DEBUG(log, "creating directory '{}'", path);
         if (auto ec = context.create_directories(path); ec) {
             cmd.result = ec;
             return;
@@ -292,27 +287,27 @@ void file_actor_t::process(payload::remote_copy_t &cmd, std::string_view path_st
         set_perms = !cmd.no_permissions && utils::platform_t::permissions_supported(path);
     } else if (cmd.type == proto::FileInfoType::SYMLINK) {
         if (utils::platform_t::symlinks_supported()) {
-            auto target = bfs::path(cmd.symlink_target);
-            LOG_DEBUG(log, "creating symlink {} -> {}", path.string(), target.string());
+            auto target = utils::make_native_view(cmd.symlink_target, context.allocator);
+            LOG_DEBUG(log, "creating symlink {} -> {}", path, target);
             bool attempt_create =
-                !bfs::exists(path, ec) || !bfs::is_symlink(path, ec) || (bfs::read_symlink(path, ec) != target);
+                !utils::is_symlink(path, ec) || (std::string_view(utils::read_symlink(path, ec)) != cmd.symlink_target);
             if (attempt_create) {
                 if (auto ec = context.create_link(target, path); ec) {
-                    LOG_WARN(log, "error symlinking {} -> {} : {}", path.string(), target.string(), ec);
+                    LOG_WARN(log, "error symlinking {} -> {} : {}", path, target, ec);
                     cmd.result = ec;
                     return;
                 }
             } else {
-                LOG_TRACE(log, "no need to create symlink {} -> {}", path.string(), target.string());
+                LOG_TRACE(log, "no need to create symlink {} -> {}", path, target);
             }
         } else {
-            LOG_WARN(log, "symlinks are not supported by platform, no I/O for {}", path.string());
+            LOG_WARN(log, "symlinks are not supported by platform, no I/O for {}", path);
         }
     }
 
     if (set_perms) {
         if (auto ec = context.set_perms(path, cmd.permissions); ec) {
-            LOG_ERROR(log, "cannot set permissions {:#o} on file: '{}': {}", cmd.permissions, path.string(), ec);
+            LOG_ERROR(log, "cannot set permissions {:#o} on file: '{}': {}", cmd.permissions, path, ec);
             cmd.result = ec;
             return;
         }
@@ -320,71 +315,70 @@ void file_actor_t::process(payload::remote_copy_t &cmd, std::string_view path_st
     cmd.result = outcome::success();
 }
 
-void file_actor_t::process(payload::finish_file_t &cmd, std::string_view path_str,
-                           process_context_t &context) noexcept {
+void file_actor_t::process(payload::finish_file_t &cmd, process_context_t &context) noexcept {
     auto &file_cache = context_cache[context.cache_key];
+    auto path = cmd.path.get_view(context.allocator);
     auto it = file_cache.find(cmd.path);
     if (it == file_cache.end()) {
-        LOG_DEBUG(log, "attempt to flush non-opened file {}", path_str);
+        LOG_DEBUG(log, "attempt to flush non-opened file {}", path);
         auto ec = sys::error_code{};
-        auto tmp_path = make_temporal(cmd.path);
-        if (!bfs::exists(tmp_path, ec)) {
+        auto tmp_path = path.make_temporal();
+        if (!utils::exists(tmp_path, ec)) {
             cmd.result = utils::make_error_code(utils::error_code_t::flush_non_opened);
-            LOG_WARN(log, "file '{}' does not exist", tmp_path.generic_string());
+            LOG_WARN(log, "file '{}' does not exist", tmp_path);
             return;
         }
 
-        auto option = file_t::open_write(context, cmd.path, cmd.file_size);
+        auto option = file_t::open_write(context, path, cmd.file_size);
         if (!option) {
             auto &err = option.assume_error();
-            LOG_ERROR(log, "cannot open file '{}': {}", path_str, err);
+            LOG_ERROR(log, "cannot open file '{}': {}", path, err);
             cmd.result = err;
             return;
         }
         auto ptr = file_ptr_t(new file_t(std::move(option.assume_value())));
-        it = file_cache.emplace(cmd.path, ptr).first;
+        it = file_cache.emplace(cmd.path.clone(), ptr).first;
     }
 
     auto backend = it->second;
     if (!cmd.conflict_path.empty()) {
-        auto new_name = narrow(cmd.conflict_path.generic_wstring());
-        LOG_DEBUG(log, "renaming {} -> {}", path_str, new_name);
+        auto new_name = cmd.conflict_path.get_view(context.allocator);
+        LOG_DEBUG(log, "renaming {} -> {}", path, new_name);
         auto ec = sys::error_code();
-        if (auto ec = context.rename(cmd.path, cmd.conflict_path); ec) {
-            LOG_ERROR(log, "cannot rename file '{}': {}", path_str, ec);
+        if (auto ec = context.rename(cmd.path, new_name); ec) {
+            LOG_ERROR(log, "cannot rename file '{}': {}", path, ec);
             cmd.result = ec;
             return;
         }
     }
 
     file_cache.erase(it);
-    auto ok = backend->close(&context, cmd.modification_s, cmd.path);
+    auto ok = backend->finalize(&context, cmd.modification_s, path);
     if (!ok) {
         auto &ec = ok.assume_error();
-        LOG_ERROR(log, "cannot close file '{}': {}", path_str, ec);
+        LOG_ERROR(log, "cannot close file '{}': {}", path, ec);
         cmd.result = ec;
         return;
     }
 
     if (!cmd.no_permissions) {
-        if (auto ec = context.set_perms(cmd.path, cmd.permissions); ec) {
-            LOG_ERROR(log, "cannot set permissions {:#o} on file: '{}': {}", cmd.permissions, cmd.path.string(), ec);
+        if (auto ec = context.set_perms(path, cmd.permissions); ec) {
+            LOG_ERROR(log, "cannot set permissions {:#o} on file: '{}': {}", cmd.permissions, path, ec);
             cmd.result = ec;
             return;
         }
     }
 
     cmd.result = outcome::success();
-    LOG_INFO(log, "file {} ({} bytes) is now locally available", path_str, cmd.file_size);
+    LOG_INFO(log, "file {} ({} bytes) is now locally available", path, cmd.file_size);
 }
 
-void file_actor_t::process(payload::append_block_t &cmd, std::string_view path_str,
-                           process_context_t &context) noexcept {
-    auto &path = cmd.path;
+void file_actor_t::process(payload::append_block_t &cmd, process_context_t &context) noexcept {
+    auto path = cmd.path.get_view(context.allocator);
     auto file_opt = open_file_rw(path, cmd.file_size, context);
     if (!file_opt) {
         auto &err = file_opt.assume_error();
-        LOG_ERROR(log, "cannot open file: {}: {}", path_str, err);
+        LOG_ERROR(log, "cannot open file: {}: {}", path, err);
         cmd.result = err;
         return;
     }
@@ -392,13 +386,13 @@ void file_actor_t::process(payload::append_block_t &cmd, std::string_view path_s
     cmd.result = backend->write(context, cmd.offset, cmd.data);
 }
 
-void file_actor_t::process(payload::clone_block_t &cmd, std::string_view path_str,
-                           process_context_t &context) noexcept {
-    auto &target_path = cmd.path;
+void file_actor_t::process(payload::clone_block_t &cmd, process_context_t &context) noexcept {
+    auto target_path = cmd.path.get_view(context.allocator);
+    auto source_path = cmd.source.get_view(context.allocator);
     auto target_opt = open_file_rw(target_path, cmd.target_size, context);
     if (!target_opt) {
         auto &err = target_opt.assume_error();
-        LOG_ERROR(log, "cannot open file: {}: {}", path_str, err);
+        LOG_ERROR(log, "cannot open file: {}: {}", target_path, err);
         cmd.result = err;
         return;
     }
@@ -409,13 +403,12 @@ void file_actor_t::process(payload::clone_block_t &cmd, std::string_view path_st
         if (it != file_cache.end()) {
             return it->second;
         } else {
-            return open_file_ro(cmd.source, {});
+            return open_file_ro(source_path, {});
         }
     }();
     if (!source_backend_opt) {
-        auto path_str = cmd.source.string();
         auto ec = source_backend_opt.assume_error();
-        LOG_ERROR(log, "cannot open source file for cloning: {}: {}", path_str, ec);
+        LOG_ERROR(log, "cannot open source file for cloning: {}: {}", source_path, ec);
         cmd.result = ec;
         return;
     }
@@ -423,12 +416,12 @@ void file_actor_t::process(payload::clone_block_t &cmd, std::string_view path_st
     cmd.result = target_backend->copy(context, cmd.target_offset, source_backend, cmd.source_offset, cmd.block_size);
 }
 
-void file_actor_t::process(payload::update_meta_t &cmd, std::string_view path_str,
-                           process_context_t &context) noexcept {
-    LOG_DEBUG(log, "Updating metadata of '{}'", path_str);
+void file_actor_t::process(payload::update_meta_t &cmd, process_context_t &context) noexcept {
 
     auto r = sys::error_code();
-    auto &path = cmd.path;
+    auto path = cmd.path.get_view(context.allocator);
+    LOG_DEBUG(log, "Updating metadata of '{}'", path);
+
     if (!cmd.no_permissions && utils::platform_t::permissions_supported(path)) {
         r = context.set_perms(path, cmd.permissions);
     }
@@ -437,12 +430,12 @@ void file_actor_t::process(payload::update_meta_t &cmd, std::string_view path_st
     }
 
     if (r) {
-        LOG_ERROR(log, "cannot update metadata of '{}': {}", path_str, r);
+        LOG_ERROR(log, "cannot update metadata of '{}': {}", path, r);
     }
     cmd.result = r;
 }
 
-auto file_actor_t::open_file_rw(const std::filesystem::path &path, std::uint64_t file_size,
+auto file_actor_t::open_file_rw(const utils::poly_path_view_t &path, std::uint64_t file_size,
                                 process_context_t &context) noexcept -> outcome::result<file_ptr_t> {
     auto &file_cache = context_cache[context.cache_key];
     auto it = file_cache.find(path);
@@ -450,12 +443,12 @@ auto file_actor_t::open_file_rw(const std::filesystem::path &path, std::uint64_t
         return it->second;
     }
 
-    auto parent = path.parent_path();
+    auto parent = path.get_parent();
     sys::error_code ec;
 
-    bool exists = bfs::exists(parent, ec);
+    bool exists = utils::exists(parent, ec);
     if (!exists) {
-        bfs::create_directories(parent, ec);
+        utils::create_directories(parent, ec);
         if (ec) {
             return ec;
         }
@@ -466,17 +459,18 @@ auto file_actor_t::open_file_rw(const std::filesystem::path &path, std::uint64_t
         return option.assume_error();
     }
     auto ptr = file_ptr_t(new file_t(std::move(option.assume_value())));
-    file_cache[path] = ptr;
-    LOG_TRACE(log, "open_file (rw), path = {}, size = {}, cache sz: {}", path.string(), file_size, file_cache.size());
+    file_cache.emplace(path.detach(), ptr);
+    LOG_TRACE(log, "open_file (rw), path = {}, size = {}, cache sz: {}", path, file_size, file_cache.size());
     return ptr;
 }
 
-auto file_actor_t::open_file_ro(const bfs::path &path, const void *context) noexcept -> outcome::result<file_ptr_t> {
+auto file_actor_t::open_file_ro(const utils::poly_path_view_t &path, const void *context) noexcept
+    -> outcome::result<file_ptr_t> {
     if (context) {
         auto &file_cache = context_cache[context];
         auto it = file_cache.find(path);
         if (it != file_cache.end()) {
-            LOG_TRACE(log, "open_file (r/o, by path, cache hit), path = {}", path.string());
+            LOG_TRACE(log, "open_file (r/o, by path, cache hit), path = {}", path);
             return it->second;
         }
     }
@@ -485,14 +479,20 @@ auto file_actor_t::open_file_ro(const bfs::path &path, const void *context) noex
     if (!opt) {
         return opt.assume_error();
     }
-    LOG_TRACE(log, "open_file (r/o, by path), path = {}", path.string());
+    LOG_TRACE(log, "open_file (r/o, by path), path = {}", path);
     return file_ptr_t(new file_t(std::move(opt.assume_value())));
 }
 
 void file_actor_t::on_create_dir(message::create_dir_t &message) noexcept {
     // no need to use updates mediator, as it is never watched and used only
     // for folder creation
-    auto &path = message.payload;
-    LOG_TRACE(log, "on_create_dir, '{}'", narrow(path.wstring()));
-    bfs::create_directories(path, path.ec);
+
+    auto buffer = std::array<std::byte, 1024 * 32>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+
+    auto &p = message.payload;
+    auto path = p.get_view(allocator);
+    LOG_TRACE(log, "on_create_dir, '{}'", path);
+    utils::create_directories(path, p.ec);
 }

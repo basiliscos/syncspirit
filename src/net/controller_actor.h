@@ -16,6 +16,7 @@
 #include "hasher/messages.h"
 #include "hasher/hasher_plugin.h"
 #include "fs/messages.h"
+#include "utils/path.h"
 
 #include <unordered_map>
 #include <optional>
@@ -24,7 +25,6 @@
 namespace syncspirit {
 namespace net {
 
-namespace bfs = std::filesystem;
 namespace outcome = boost::outcome_v2;
 
 struct SYNCSPIRIT_API controller_actor_t final : public model_actor_t<r::actor_base_t>,
@@ -42,7 +42,7 @@ struct SYNCSPIRIT_API controller_actor_t final : public model_actor_t<r::actor_b
         uint32_t blocks_max_requested = 0;
         uint32_t outgoing_buffer_max = 0;
         std::uint32_t advances_per_iteration = 10;
-        bfs::path default_path;
+        utils::path_t default_path;
     };
 
     template <typename Actor> struct config_builder_t : parent_t::template config_builder_t<Actor> {
@@ -95,8 +95,8 @@ struct SYNCSPIRIT_API controller_actor_t final : public model_actor_t<r::actor_b
             return std::move(*static_cast<typename base_t::builder_t *>(this));
         }
 
-        builder_t &&default_path(const bfs::path &value) && noexcept {
-            base_t::config.default_path = value;
+        builder_t &&default_path(const utils::path_t &value) && noexcept {
+            base_t::config.default_path = value.clone();
             return std::move(*static_cast<typename base_t::builder_t *>(this));
         }
     };
@@ -179,7 +179,7 @@ struct SYNCSPIRIT_API controller_actor_t final : public model_actor_t<r::actor_b
     void io_finish_file(model::file_info_t *, model::file_info_t &, model::folder_info_t &, model::advance_action_t,
                         stack_context_t &);
     void io_update_meta(model::file_info_t &, model::folder_info_t &, model::advance_action_t, stack_context_t &);
-    auto io_make_request_block(model::file_info_t &, model::folder_info_t &, proto::Request)
+    auto io_make_request_block(model::file_info_t &, model::folder_info_t &, proto::Request, stack_context_t &)
         -> fs::payload::io_command_t;
 
     void acquire_block(const model::file_block_t &block, const model::folder_info_t &folder_info,
@@ -221,7 +221,7 @@ struct SYNCSPIRIT_API controller_actor_t final : public model_actor_t<r::actor_b
     uint32_t hasher_threads;
     uint32_t blocks_max_requested;
     uint32_t advances_per_iteration;
-    bfs::path default_path;
+    utils::path_t default_path;
     updates_streamer_ptr_t updates_streamer;
     model::file_iterator_ptr_t file_iterator;
     model::block_iterator_ptr_t block_iterator;

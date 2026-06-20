@@ -10,8 +10,6 @@
 #include "pair_iterator.h"
 #include <random>
 
-namespace bfs = std::filesystem;
-
 namespace syncspirit::daemon::command {
 
 outcome::result<command_ptr_t> add_folder_t::construct(std::string_view in) noexcept {
@@ -86,7 +84,7 @@ bool add_folder_t::execute(governor_actor_t &actor) noexcept {
                       f->get_label());
             return false;
         }
-        if (f->get_path().string() == db::get_path(folder)) {
+        if (f->get_path().get_full_name() == db::get_path(folder)) {
             log->warn("{}, folder with path = {} is already present is the cluster", actor.get_identity(),
                       f->get_path());
             return false;

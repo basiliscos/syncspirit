@@ -5,59 +5,51 @@
 #include "utils.h"
 #include "utils/log.h"
 #include "utils/format.hpp"
+#include "utils/path_view.hpp"
 #include "fs_proxy.h"
-#include <errno.h>
 #include <cassert>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <boost/nowide/convert.hpp>
 
+using namespace syncspirit;
 using namespace syncspirit::fs;
 
 using boost::nowide::narrow;
 
-auto file_t::open_write(fs_proxy_t &fs_proxy, const bfs::path &model_path, std::uint64_t file_size) noexcept
-    -> outcome::result<file_t> {
-    auto path = file_size > 0 ? make_temporal(std::move(model_path)) : std::move(model_path);
-    auto result = fs_proxy.open_write(path, file_size);
+auto file_t::open_write(fs_proxy_t &fs_proxy, const utils::poly_path_view_t &model_path,
+                        std::uint64_t file_size) noexcept -> outcome::result<file_t> {
+    auto path = file_size > 0 ? model_path.make_temporal() : model_path.clone();
+    auto result = fs_proxy.open_write(file_size > 0 ? model_path.make_temporal() : model_path, file_size);
     if (result.has_error()) {
         return result.assume_error();
     }
 
     auto &file = result.assume_value();
-    return file_t(std::move(file), std::move(path), std::move(model_path), file_size);
+    return file_t(std::move(file), path.detach(), file_size);
 }
 
-auto file_t::open_read(const bfs::path &path) noexcept -> outcome::result<file_t> {
+auto file_t::open_read(const utils::poly_path_view_t &path) noexcept -> outcome::result<file_t> {
     auto r = utils::io_stream_t::open_read(path);
     if (!r) {
         return r.assume_error();
     }
-    return file_t(std::move(r.assume_value()), path);
+    return file_t(std::move(r.assume_value()), path.detach());
 }
 
 file_t::file_t() noexcept {};
 
-file_t::file_t(utils::io_stream_t backend_, bfs::path path_, bfs::path model_path_, std::uint64_t file_size_) noexcept
-    : backend{new utils::io_stream_t(std::move(backend_))}, path{std::move(path_)}, file_size{file_size_} {
-    model_path = std::move(model_path_);
-    model_path.make_preferred();
-    path.make_preferred();
-    path_str = narrow(model_path.generic_wstring());
-}
+file_t::file_t(utils::io_stream_t backend_, utils::path_t path_, std::uint64_t file_size_) noexcept
+    : backend{new utils::io_stream_t(std::move(backend_))}, path{std::move(path_)}, file_size{file_size_} {}
 
-file_t::file_t(utils::io_stream_t backend_, bfs::path path_) noexcept
-    : backend{new utils::io_stream_t(std::move(backend_))}, path{std::move(path_)}, file_size{0} {
-    path.make_preferred();
-    path_str = boost::nowide::narrow(path.generic_wstring());
-}
+file_t::file_t(utils::io_stream_t backend_, utils::path_t path_) noexcept
+    : backend{new utils::io_stream_t(std::move(backend_))}, path{std::move(path_)}, file_size{0} {}
 
 file_t::file_t(file_t &&other) noexcept : backend{nullptr} { *this = std::move(other); }
 
 file_t &file_t::operator=(file_t &&other) noexcept {
     std::swap(backend, other.backend);
     std::swap(path, other.path);
-    std::swap(path_str, other.path_str);
     std::swap(file_size, other.file_size);
     return *this;
 }
@@ -65,47 +57,23 @@ file_t &file_t::operator=(file_t &&other) noexcept {
 file_t::~file_t() {
     if (backend && file_size) {
         auto log = utils::get_logger("fs.file");
-        log->warn("closing file via d-tor '{}'", path_str);
-        auto result = close(nullptr, 0);
-        if (!result) {
-            auto &ec = result.assume_error();
-            log->warn("error closing file via d-tor '{}': {}", path_str, ec);
-        }
+        log->warn("closing file via d-tor '{}'", path);
+        backend.reset();
     }
 }
 
-std::string_view file_t::get_path_view() const noexcept { return path_str; }
+const utils::path_t &file_t::get_path() const noexcept { return path; }
 
-const bfs::path &file_t::get_path() const noexcept { return path; }
-
-auto file_t::close(fs_proxy_t *fs_proxy, int64_t modification_s, const bfs::path &local_name) noexcept
+auto file_t::finalize(fs_proxy_t *fs_proxy, int64_t modification_s, const utils::poly_path_view_t &local_name) noexcept
     -> outcome::result<void> {
     assert(backend && file_size && "close has sense for r/w mode");
     backend.reset();
 
-    auto rename = !local_name.empty();
-    sys::error_code ec;
-    auto orig_path = !rename ? &model_path : &local_name;
-    if (rename) {
-        if (fs_proxy) {
-            ec = fs_proxy->rename(path, *orig_path);
-        } else {
-            bfs::rename(path, *orig_path, ec);
-        }
-        if (ec) {
-            return ec;
-        }
-    } else if (*orig_path != path) {
-        orig_path = &path;
-    }
+    assert(!local_name.empty());
+    auto ec = fs_proxy->rename(path, local_name);
 
     if (modification_s) {
-        if (fs_proxy) {
-            ec = fs_proxy->last_write_time(*orig_path, modification_s);
-        } else {
-            auto modified = from_unix(modification_s);
-            bfs::last_write_time(*orig_path, modified, ec);
-        }
+        ec = fs_proxy->last_write_time(local_name, modification_s);
         if (ec) {
             return ec;
         }
@@ -116,10 +84,10 @@ auto file_t::close(fs_proxy_t *fs_proxy, int64_t modification_s, const bfs::path
 
 bool file_t::has_backend() const noexcept { return backend.get(); }
 
-auto file_t::remove(fs_proxy_t &fs_proxy) noexcept -> outcome::result<void> {
+auto file_t::remove(fs_proxy_t &fs_proxy, const utils::allocator_t &allocator) noexcept -> outcome::result<void> {
     backend.reset();
 
-    return fs_proxy.remove(path);
+    return fs_proxy.remove(path.get_view(allocator));
 }
 
 auto file_t::read(std::uint64_t offset, std::uint64_t size) const noexcept -> outcome::result<utils::bytes_t> {

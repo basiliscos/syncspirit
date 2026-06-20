@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2025-2026 Ivan Baidakou
 
 #pragma once
 
 #include "model/misc/proxy.h"
-#include "model/misc/path.h"
+#include "utils/path.h"
 #include "model/device.h"
 #include "statistics.h"
 #include "syncspirit-export.h"
@@ -51,9 +51,9 @@ struct SYNCSPIRIT_API entity_t : model::augmentable_t {
     using child_presences_t = std::vector<presence_t *>;
     using presences_t = std::vector<presence_t *>;
 
-    entity_t(model::path_ptr_t path, entity_t *parent = nullptr) noexcept;
+    entity_t(utils::path_ptr_t path, entity_t *parent = nullptr) noexcept;
     virtual ~entity_t();
-    const model::path_ptr_t &get_path() const noexcept;
+    const utils::path_ptr_t &get_path() const noexcept;
 
     presence_t *get_presence(const model::device_t *device) noexcept;
 
@@ -78,7 +78,7 @@ struct SYNCSPIRIT_API entity_t : model::augmentable_t {
     void detach_child(entity_t &child) noexcept;
     void clear_children() noexcept;
     void set_parent(entity_t *parent) noexcept;
-    void commit(const model::path_t &path, const model::device_t *device) noexcept;
+    void commit(const utils::path_t &path, const model::device_t *device) noexcept;
     void push_stats(const presence_stats_t &diff, const model::device_t *source, bool best) noexcept;
     const presence_t *recalc_best() noexcept;
 
@@ -92,7 +92,7 @@ struct SYNCSPIRIT_API entity_t : model::augmentable_t {
 
     entity_t *parent;
     presences_t presences;
-    model::path_ptr_t path;
+    utils::path_ptr_t path;
     children_t children;
     entity_stats_t statistics;
     const presence_t *best;

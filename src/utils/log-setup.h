@@ -8,14 +8,13 @@
 #include <boost/outcome.hpp>
 #include <spdlog/sinks/dist_sink.h>
 #include <spdlog/logger.h>
-#include <filesystem>
 #include <utility>
 #include "syncspirit-export.h"
+#include "utils/path.h"
 
 namespace syncspirit::utils {
 
 namespace outcome = boost::outcome_v2;
-namespace bfs = std::filesystem;
 
 using dist_sink_t = std::shared_ptr<spdlog::sinks::dist_sink_mt>;
 using sink_t = spdlog::sink_ptr;
@@ -37,7 +36,7 @@ SYNCSPIRIT_API void finalize_loggers() noexcept;
 
 SYNCSPIRIT_API std::pair<dist_sink_t, logger_t> create_root_logger() noexcept;
 SYNCSPIRIT_API logger_t get_root_logger() noexcept;
-SYNCSPIRIT_API bootstrap_guard_ptr_t bootstrap(dist_sink_t &, const bfs::path &dir) noexcept;
+SYNCSPIRIT_API bootstrap_guard_ptr_t bootstrap(dist_sink_t &, const utils::path_base_t &dir) noexcept;
 
 SYNCSPIRIT_API extern const char *log_pattern;
 

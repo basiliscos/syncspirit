@@ -1,12 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "location.h"
-#include "error_code.h"
 #include <cstdlib>
-#include <system_error>
-#include <boost/system/error_code.hpp>
-#include <boost/nowide/convert.hpp>
 
 #if defined(__unix__) || (defined(__APPLE__) && defined(__MACH__))
 #include <unistd.h>
@@ -17,59 +13,57 @@
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32) && !defined(__CYGWIN__)
 #include <windows.h>
 #include <shlobj.h>
+#include "syncspirit-config.h"
 #endif
 
 namespace syncspirit::utils {
 
 namespace sys = boost::system;
 
-SYNCSPIRIT_API std::wstring expand_home(const std::string &path, const home_option_t &home) noexcept {
-    if (home.has_value() && path.size() >= 2 && path[0] == '~' && (path[1] == '/' || path[1] == '\\')) {
+poly_path_view_t expand_home(const std::string &path, const poly_path_view_t &home) noexcept {
+    if (!home.empty() && path.size() >= 2 && path[0] == '~' && (path[1] == '/' || path[1] == '\\')) {
         auto path_view = std::string_view(path).substr(2);
         auto path_wstr = boost::nowide::widen(path_view);
-        auto path = home.assume_value() / path_wstr;
-        return path.generic_wstring();
+        return home / make_native_view(path_view, home.get_allocator());
     }
-    return boost::nowide::widen(path);
+    return make_native_view(path, home.get_allocator());
 }
 
-outcome::result<bfs::path> get_home_dir() noexcept {
+poly_path_view_t get_home_dir(const allocator_t &allocator) noexcept {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32) && !defined(__CYGWIN__)
-    wchar_t appdata[MAX_PATH] = {0};
+    wchar_t appdata[SYNCSPIRIT_PATH_MAX] = {0};
     if (SHGetFolderPathW(nullptr, CSIDL_LOCAL_APPDATA, nullptr, 0, appdata) != S_OK) {
-        return error_code_t::cant_determine_config_dir;
+        return {allocator};
     }
-    return bfs::path(appdata);
+    return make_native_view(appdata, allocator);
 #elif defined(__unix__) || (defined(__APPLE__) && defined(__MACH__))
     auto *pw = getpwuid(getuid());
     if (!pw) {
-        return sys::error_code{errno, sys::generic_category()};
+        return {allocator};
     }
 #if defined(__unix__)
     if (auto xdg_home = std::getenv("XDG_CONFIG_HOME")) {
-        return bfs::path(xdg_home);
+        return make_native_view(xdg_home, allocator);
     } else {
-        return bfs::path(pw->pw_dir);
+        return make_native_view(pw->pw_dir, allocator);
     }
 #else
-    return bfs::path(pw->pw_dir);
+    return make_native_view(pw->pw_dir);
 #endif
 
 #endif
 }
 
-outcome::result<bfs::path> get_default_config_dir() noexcept {
-    auto home_opt = get_home_dir();
-    if (home_opt.has_error()) {
-        return home_opt.assume_error();
+poly_path_view_t get_default_config_dir(const allocator_t &allocator) noexcept {
+    auto home = get_home_dir(allocator);
+    if (home.empty()) {
+        return home;
     }
-    auto home = home_opt.assume_value();
 
 #if defined(__unix__)
-    home /= ".config";
+    return home / make_native_view(".config", allocator);
 #endif
-    home /= "syncspirit";
-    return home;
+    return home / make_native_view("syncspirit", allocator);
 }
 
 } // namespace syncspirit::utils

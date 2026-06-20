@@ -22,7 +22,7 @@ namespace outcome = boost::outcome_v2;
 struct folder_context_t : boost::intrusive_ref_counter<folder_context_t, boost::thread_safe_counter> {
     using generation_t = child_info_t::generation_t;
     folder_context_t(model::folder_info_ptr_t local_folder, local_keeper::stack_t stack,
-                     const bfs::path &initial_path) noexcept;
+                     const utils::path_base_t &initial_path) noexcept;
 
     bool process_stack(stack_context_t &ctx) noexcept;
     bool is_done() const noexcept;
@@ -36,8 +36,8 @@ struct folder_context_t : boost::intrusive_ref_counter<folder_context_t, boost::
     void adjust_generation(generation_t generation) noexcept;
 
   private:
-    using scan_generation_t = std::unordered_map<std::string, generation_t>;
-    using hasing_files_t = std::unordered_map<std::string, int>;
+    using scan_generation_t = std::unordered_map<utils::path_t, generation_t, utils::path_hash_t, utils::path_eq_t>;
+    using hasing_files_t = std::unordered_map<utils::path_t, int, utils::path_hash_t, utils::path_eq_t>;
 
     int process(complete_scan_t &, stack_context_t &ctx) noexcept;
     int process(unscanned_dir_t &dir, stack_context_t &ctx) noexcept;

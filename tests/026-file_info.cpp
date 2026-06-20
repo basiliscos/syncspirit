@@ -15,7 +15,12 @@ using namespace syncspirit::model;
 using namespace syncspirit::test;
 
 using Catch::Matchers::Matches;
+
 TEST_CASE("file-info", "[model]") {
+    auto buffer = std::array<std::byte, 1024 * 32>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+
     auto sequencer = make_sequencer(4);
     auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
     auto my_device = device_t::create(my_id, "my-device").value();
@@ -61,8 +66,9 @@ TEST_CASE("file-info", "[model]") {
     CHECK(map.by_sequence(10) == fi);
     CHECK(!map.by_sequence(proto::get_sequence(pr_fi)));
 
-    auto conflict_name = fi->make_conflicting_name();
-    REQUIRE_THAT(conflict_name, Matches("a/b.sync-conflict-202412(\\d){2}-(\\d){6}-KHQNO2S.txt"));
+    auto conflict_name = fi->make_conflicting_name(allocator);
+    auto cn = std::string(conflict_name.get_full_name());
+    REQUIRE_THAT(cn, Matches("a/b.sync-conflict-202412(\\d){2}-(\\d){6}-KHQNO2S.txt"));
 }
 
 TEST_CASE("file_info_t::local_file", "[model]") {
@@ -336,6 +342,10 @@ TEST_CASE("file_info_t::update", "[model]") {
 }
 
 TEST_CASE("file_info_t::make_conflicting_name for wstrings", "[model]") {
+    auto buffer = std::array<std::byte, 1024 * 32>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+
     auto local_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
     auto local_device = device_t::create(local_id, "my-device").value();
 
@@ -364,6 +374,7 @@ TEST_CASE("file_info_t::make_conflicting_name for wstrings", "[model]") {
     auto local_file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_local).value();
     REQUIRE(local_file);
 
-    auto cn = local_file->make_conflicting_name();
+    auto conflict_name = local_file->make_conflicting_name(allocator);
+    auto cn = std::string(conflict_name.get_full_name());
     REQUIRE_THAT(cn, Matches(boost::nowide::narrow(L"папка/файл.sync-conflict-(\\d){8}-(\\d){6}-KHQNO2S.1ц")));
 }

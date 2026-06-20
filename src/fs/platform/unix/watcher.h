@@ -5,6 +5,7 @@
 
 #include "syncspirit-config.h"
 #include "fs/platform/watcher_base.h"
+#include "utils/path.h"
 #include <set>
 #include <optional>
 #include <unordered_map>
@@ -22,7 +23,7 @@ struct SYNCSPIRIT_API watcher_t : watcher_base_t {
     using parent_t = watcher_base_t;
     using parent_t::parent_t;
 
-    using file_type_t = bfs::file_type;
+    using file_type_t = utils::file_type_t;
     struct path_guard_t {
         std::string path;
         std::string_view folder_id;

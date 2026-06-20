@@ -201,6 +201,10 @@ TEST_CASE("resolver", "[model]") {
     }
 
     SECTION("conflicts") {
+        auto buffer = std::array<std::byte, 1024 * 32>();
+        auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+        auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+
         auto pr_local = pr_remote;
 
         SECTION("remote deleted, locally modified -> ignore") {
@@ -357,7 +361,8 @@ TEST_CASE("resolver", "[model]") {
             proto::set_id(c3_local, 3);
             proto::set_value(c3_local, 1);
 
-            proto::set_name(pr_local, file_local->make_conflicting_name());
+            auto cname = file_local->make_conflicting_name(allocator);
+            proto::set_name(pr_local, cname.get_full_name());
             proto::set_sequence(pr_local, folder_my->get_max_sequence() + 1);
             auto file_resolved = file_info_t::create(sequencer->next_uuid(), pr_local, folder_my).value();
             file_resolved->mark_local(true);
@@ -387,7 +392,8 @@ TEST_CASE("resolver", "[model]") {
             proto::set_id(c3_local, 3);
             proto::set_value(c3_local, 1);
 
-            proto::set_name(pr_local, file_remote->make_conflicting_name());
+            auto cname = file_remote->make_conflicting_name(allocator);
+            proto::set_name(pr_local, cname.get_full_name());
             proto::set_sequence(pr_local, folder_my->get_max_sequence() + 1);
             auto file_resolved = file_info_t::create(sequencer->next_uuid(), pr_local, folder_my).value();
             file_resolved->mark_local(true);

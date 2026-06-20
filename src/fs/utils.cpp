@@ -7,17 +7,6 @@
 namespace syncspirit::fs {
 
 const std::string_view tmp_suffix = ".syncspirit-tmp";
-const std::wstring_view tmp_wsuffix = L".syncspirit-tmp";
-
-template <typename T> struct tmp_suffix_t;
-
-template <> struct tmp_suffix_t<char> {
-    inline static auto value = tmp_suffix;
-};
-
-template <> struct tmp_suffix_t<wchar_t> {
-    inline static auto value = tmp_wsuffix;
-};
 
 static const std::int32_t _block_sizes[] = {
     // clang-format off
@@ -72,64 +61,6 @@ block_division_t get_block_size(int64_t sz, int32_t prev_size) noexcept {
     }
 
     return {count, (int32_t)bs};
-}
-
-bfs::path make_temporal(const bfs::path &path) noexcept {
-    auto copy = path;
-    copy += tmp_suffix.data();
-    return copy;
-}
-
-template <typename T> static bool _is_temporal(const T *ptr, const T *end) {
-    if ((end - ptr) >= tmp_suffix.size()) {
-        auto ptr_1 = end - tmp_suffix.size();
-        auto ptr_2 = tmp_suffix.data();
-        for (size_t i = 0; i < tmp_suffix.size(); ++i, ++ptr_1, ++ptr_2) {
-            if (*ptr_1 != *ptr_2) {
-                return false;
-            }
-        }
-        return true;
-    }
-    return false;
-}
-
-bool is_temporal(const bfs::path &path) noexcept {
-    auto &str = path.native();
-    return _is_temporal(str.data(), str.data() + str.size());
-}
-
-bool is_temporal(const std::string_view path) noexcept { return _is_temporal(path.data(), path.data() + path.size()); }
-
-bfs::path relativize(const bfs::path &path, const bfs::path &root) noexcept {
-    auto it_path = path.begin();
-    auto it_root = root.begin();
-
-    while (it_path != path.end() && it_root != root.end() && *it_path == *it_root) {
-        ++it_path;
-        ++it_root;
-    }
-
-    auto sub = bfs::path();
-    while (it_path != path.end()) {
-        sub /= *it_path;
-        ++it_path;
-    }
-
-    return sub;
-}
-
-using seconds_t = std::chrono::seconds;
-using sys_clock_t = std::chrono::system_clock;
-
-std::int64_t to_unix(const fs_time_t &at) {
-    auto sys_at = fs_time_t::clock::to_sys(at);
-    return std::chrono::duration_cast<seconds_t>(sys_at.time_since_epoch()).count();
-}
-
-fs_time_t from_unix(std::int64_t at) {
-    auto sys_time = sys_clock_t::from_time_t(at);
-    return fs_time_t::clock::from_sys(sys_time);
 }
 
 } // namespace syncspirit::fs

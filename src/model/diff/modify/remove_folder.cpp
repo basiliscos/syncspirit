@@ -41,7 +41,7 @@ remove_folder_t::remove_folder_t(const model::cluster_t &cluster, model::sequenc
             db::set_disable_temp_indexes(db_f, folder.are_temp_indixes_disabled());
             db::set_paused(db_f, folder.is_paused());
             db::set_scheduled(db_f, folder.is_scheduled());
-            db::set_path(db_f, folder.get_path().string());
+            db::set_path(db_f, folder.get_path().get_full_name());
             db::set_folder_type(db_f, folder.get_folder_type());
             db::set_pull_order(db_f, folder.get_pull_order());
 

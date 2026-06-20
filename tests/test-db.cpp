@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "test-db.h"
 #include "test-utils.h"
@@ -11,8 +11,6 @@ env_t::~env_t() {
     if (env) {
         mdbx_env_close(env);
     }
-    // std::cout << path.c_str() << "\n";
-    bfs::remove_all(path);
 }
 
 env_t mk_env() {
@@ -23,7 +21,16 @@ env_t mk_env() {
     (void)r;
     MDBX_env_flags_t flags =
         MDBX_EXCLUSIVE | MDBX_SAFE_NOSYNC | MDBX_WRITEMAP | MDBX_NOSTICKYTHREADS | MDBX_LIFORECLAIM;
-    r = mdbx_env_open(env, path.string().c_str(), flags, 0664);
+
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+    auto buffer = std::array<std::byte, 1024 * 32>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+    auto dir_view = path.get_view(allocator);
+    r = mdbx_env_openW(env, dir_view.get_full_wname(true).data(), flags, 0664);
+#else
+    r = mdbx_env_open(env, path.get_full_name().data(), flags, 0664);
+#endif
     assert(r == MDBX_SUCCESS);
     // std::cout << path.c_str() << "\n";
     return env_t{env, std::move(path)};

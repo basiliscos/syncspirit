@@ -3,7 +3,6 @@
 
 #pragma once
 
-#include <filesystem>
 #include <boost/outcome.hpp>
 #include <rotor/supervisor.h>
 
@@ -18,18 +17,18 @@
 #include "model/diff/block_diff.h"
 #include "model/diff/modify/block_transaction.h"
 #include "model/misc/sequencer.h"
+#include "utils/path.h"
 
 namespace syncspirit::test {
 
 namespace r = rotor;
-namespace bfs = std::filesystem;
 namespace outcome = boost::outcome_v2;
 
 struct diff_builder_t;
 
 struct SYNCSPIRIT_TEST_API cluster_configurer_t {
     cluster_configurer_t(diff_builder_t &builder, utils::bytes_view_t peer_sha256,
-                         const bfs::path default_location = {}) noexcept;
+                         const utils::path_t default_location = {}) noexcept;
     cluster_configurer_t &&add(utils::bytes_view_t sha256, std::string_view folder_id, uint64_t index,
                                int64_t max_sequence, std::string_view url = {}) noexcept;
     cluster_configurer_t &&add_named(utils::bytes_view_t sha256, std::string_view folder_id, uint64_t index,
@@ -41,7 +40,7 @@ struct SYNCSPIRIT_TEST_API cluster_configurer_t {
     proto::ClusterConfig cc;
     diff_builder_t &builder;
     utils::bytes_view_t peer_sha256;
-    bfs::path default_location;
+    utils::path_t default_location;
 };
 
 struct SYNCSPIRIT_TEST_API index_maker_t {
@@ -61,7 +60,8 @@ struct SYNCSPIRIT_TEST_API diff_builder_t : protected model::diff::apply_control
 
     diff_builder_t(model::cluster_t &, r::address_ptr_t receiver = {}, model::sequencer_ptr_t sequencer = {}) noexcept;
     ~diff_builder_t();
-    cluster_configurer_t configure_cluster(utils::bytes_view_t sha256, const bfs::path &default_location = {}) noexcept;
+    cluster_configurer_t configure_cluster(utils::bytes_view_t sha256,
+                                           const utils::path_t &default_location = {}) noexcept;
     diff_builder_t &apply(r::supervisor_t &sup, const void *custom = {}) noexcept;
     void send(r::supervisor_t &sup, const void *custom = {}) noexcept;
     outcome::result<void> apply(void *custom = {}) noexcept;
@@ -69,7 +69,7 @@ struct SYNCSPIRIT_TEST_API diff_builder_t : protected model::diff::apply_control
     diff_builder_t &then() noexcept;
     index_maker_t make_index(utils::bytes_view_t sha256, std::string_view folder_id) noexcept;
 
-    diff_builder_t &upsert_folder(std::string_view id, const bfs::path &path, std::string_view label = "",
+    diff_builder_t &upsert_folder(std::string_view id, std::string_view path, std::string_view label = "",
                                   std::uint64_t index_id = 0, bool watched = false) noexcept;
     diff_builder_t &upsert_folder(const db::Folder &data, std::uint64_t index_id = 0) noexcept;
     diff_builder_t &upsert_folder_info(model::folder_info_t &prev, std::uint64_t new_index_id) noexcept;

@@ -5,18 +5,19 @@
 
 #if SYNCSPIRIT_WATCHER_INOTIFY
 #include "fs/fs_supervisor.h"
-#include "fs/utils.h"
+#include "utils/path.h"
+#include "utils/path_utils.h"
 #include "utils/utf8.h"
 
 #include <sys/inotify.h>
 #include <sys/stat.h>
 #include <string.h>
 #include <unistd.h>
-#include <limits.h>
 #include <fcntl.h>
 #include <algorithm>
 #include <memory_resource>
 
+using namespace syncspirit;
 using namespace syncspirit::fs::platform::linux;
 
 void watcher_t::do_initialize(r::system_context_t *ctx) noexcept {
@@ -58,7 +59,7 @@ void watcher_t::shutdown_finish() noexcept {
 }
 
 auto watcher_t::unwatch_path(int wd, file_type_t type) noexcept -> sys::error_code {
-    assert(type == file_type_t::directory);
+    assert(type == file_type_t::DIRECTORY);
     if (auto r = ::inotify_rm_watch(inotify_guard.fd, wd); r != 0) {
         return sys::error_code{errno, sys::system_category()};
     }
@@ -67,7 +68,7 @@ auto watcher_t::unwatch_path(int wd, file_type_t type) noexcept -> sys::error_co
 
 auto watcher_t::watch_path(std::string_view path, file_type_t type) noexcept -> std::optional<int> {
     static constexpr auto FLAGS = IN_MODIFY | IN_CREATE | IN_DELETE | IN_ATTRIB | IN_MOVE | IN_DELETE_SELF;
-    if (type != file_type_t::directory || !utils::is_utf8_valid(path)) {
+    if (type != file_type_t::DIRECTORY || !utils::is_utf8_valid(path)) {
         return {};
     }
     auto wd = ::inotify_add_watch(inotify_guard.fd, path.data(), FLAGS);
@@ -76,7 +77,7 @@ auto watcher_t::watch_path(std::string_view path, file_type_t type) noexcept -> 
 
 void watcher_t::inotify_callback() noexcept {
     using U = update_type_t;
-    char buffer[1024 * (sizeof(struct inotify_event) + NAME_MAX + 1)];
+    char buffer[2 * SYNCSPIRIT_PATH_MAX + 1];
     int length = ::read(inotify_guard.fd, buffer, sizeof(buffer));
     LOG_TRACE(log, "inotify callback, result = {}, length = {}", inotify_guard.fd, length);
     if (length < 0) {
@@ -87,7 +88,7 @@ void watcher_t::inotify_callback() noexcept {
     if (length) {
         using renamed_cookies_t = std::pmr::unordered_map<uint32_t, inotify_event *>;
         auto deadline = clock_t::local_time() + retension;
-        char name_buff[PATH_MAX];
+        char name_buff[SYNCSPIRIT_PATH_MAX];
         auto name_ptr = name_buff;
         auto append_name = [&](std::string_view piece) {
             auto sz = piece.size();
@@ -111,7 +112,7 @@ void watcher_t::inotify_callback() noexcept {
             *(--name_ptr) = '/';
             append_name(parent_guard->path);
 
-            auto &folder_path = watched_folders->find(folder_id)->second.path_str;
+            auto folder_path = watched_folders->find(folder_id)->second.get_full_name();
             auto sub_path_sz = parent_guard->path.size() - folder_path.size();
             tail -= sub_path_sz;
             auto rel_path = std::string_view(tail, sub_path_sz + filename.size());
@@ -144,7 +145,7 @@ void watcher_t::inotify_callback() noexcept {
             auto event_name = std::string_view(name_begin, name_end);
             LOG_TRACE(log, "event 0x{:x}, cookie: 0x{:x}, on '{}'", event->mask, event->cookie, event_name);
             if (event->len) {
-                if (!fs::is_temporal(event_name)) {
+                if (!utils::is_temporal(event_name)) {
                     auto type = update_type_internal_t{0};
                     if (event->mask & IN_CREATE) {
                         type = update_type::CREATED;
@@ -162,7 +163,7 @@ void watcher_t::inotify_callback() noexcept {
                             auto &prev_parent_guard = path_map[prev_event->wd];
                             auto prev_parent_path = std::string_view(prev_parent_guard.path);
                             auto folder_id = prev_parent_guard.folder_id;
-                            auto &folder_path = watched_folders->find(folder_id)->second.path_str;
+                            auto folder_path = watched_folders->find(folder_id)->second.get_full_name();
                             auto subpath_bytes = prev_parent_path.size() - folder_path.size();
                             if (subpath_bytes) {
                                 --subpath_bytes; // skip trailing '/'

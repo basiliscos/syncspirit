@@ -4,7 +4,7 @@
 #pragma once
 
 #include "syncspirit-export.h"
-#include <filesystem>
+#include "path.h"
 #include <string_view>
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
@@ -16,14 +16,12 @@
 
 namespace syncspirit::utils {
 
-namespace bfs = std::filesystem;
-
 struct SYNCSPIRIT_API platform_t {
     static bool startup();
     static void shutdown() noexcept;
     static bool symlinks_supported() noexcept;
-    static bool path_supported(std::string_view) noexcept;
-    static bool permissions_supported(const bfs::path &) noexcept;
+    static bool path_supported(const poly_path_view_t &) noexcept;
+    static bool permissions_supported(const path_base_t &) noexcept;
     static void set_thread_name(std::string_view name) noexcept;
 };
 

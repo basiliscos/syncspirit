@@ -6,6 +6,7 @@
 #include "log_table.h"
 #include "log_colors.h"
 #include "utils/io.h"
+#include "utils/path_view.hpp"
 #include "utils/format.hpp"
 
 #include <spdlog/fmt/fmt.h>
@@ -17,6 +18,7 @@
 
 using fmt::format_to;
 
+using namespace syncspirit;
 using namespace syncspirit::fltk;
 
 static constexpr int padding = 5;
@@ -106,10 +108,15 @@ static void export_log(Fl_Widget *, void *data) {
     }
 
     // write
+
+    auto buffer = std::array<std::byte, 1024 * 32>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+
     auto filename = file_chooser.filename();
-    auto path = bfs::path(boost::nowide::widen(filename));
+    auto path = utils::make_native_view(filename, allocator);
     using file_t = syncspirit::utils::io_stream_t;
-    auto out_opt = file_t::open_truncate(filename);
+    auto out_opt = file_t::open_truncate(path);
     if (!out_opt) {
         auto &ec = out_opt.assume_error();
         log->warn("cannot open logs file: {}", ec);

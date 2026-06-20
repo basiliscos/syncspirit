@@ -7,13 +7,13 @@
 
 #include "fs/task/scan_dir.h"
 #include "utils/format.hpp"
+#include "utils/path_view.hpp"
 
 using namespace syncspirit::fs::platform::unix;
 
 void watcher_t::shutdown_finish() noexcept {
     for (auto it = watched_folders->begin(); it != watched_folders->end();) {
-        auto &folder_id = it->first;
-        auto &path = it->second.path_str;
+        auto &[folder_id, path] = *it;
         LOG_DEBUG(log, "unwatching folder '{}' on {}", folder_id, path);
         auto ec = unwatch_folder(folder_id);
         if (ec) {
@@ -150,24 +150,20 @@ sys::error_code watcher_t::unwatch_wd(int wd) noexcept {
 }
 
 auto watcher_t::unwatch_folder(std::string_view folder_id) noexcept -> sys::error_code {
-    auto &path = watched_folders->find(folder_id)->second.path_str;
+    auto path = watched_folders->find(folder_id)->second.get_full_name();
     return unwatch_recurse(path);
 }
 
 void watcher_t::on_watch(message::watch_folder_t &message) noexcept {
     auto &p = message.payload;
-    auto &path = p.path;
-    auto path_str = std::string_view(path.native());
-    LOG_TRACE(log, "on watch on '{}'", path_str);
+    LOG_TRACE(log, "on watch on '{}'", p.path);
     if (ready) {
-        auto folder_info = folder_info_t(p.path, std::string(path_str));
-        auto [it, inserted] =
-            watched_folders->emplace(std::make_pair(std::string(p.folder_id), std::move(folder_info)));
+        auto [it, inserted] = watched_folders->emplace(std::make_pair(std::string(p.folder_id), p.path.clone()));
         if (!inserted) {
-            LOG_WARN(log, "folder '{}' on '{}' is already watched", p.folder_id, path_str);
+            LOG_WARN(log, "folder '{}' on '{}' is already watched", p.folder_id, p.path);
         } else {
             auto &folder_id = it->first;
-            auto opt = watch_path(path_str, folder_id, bfs::file_type::directory, -1);
+            auto opt = watch_path(p.path.get_full_name(), folder_id, file_type_t::DIRECTORY, -1);
             if (!opt) {
                 LOG_WARN(log, "folder '{}' is not watched", p.folder_id);
                 return;
@@ -187,9 +183,9 @@ void watcher_t::on_unwatch(message::unwatch_folder_t &message) noexcept {
     auto &p = message.payload;
     auto it = watched_folders->find(p.folder_id);
     if (it != watched_folders->end()) {
-        auto &path = it->second.path_str;
+        auto &path = it->second;
         LOG_DEBUG(log, "unwatching folder '{}' on {}", p.folder_id, path);
-        auto it_wd = path_to_wd.find(path);
+        auto it_wd = path_to_wd.find(path.get_full_name());
         assert(it_wd != path_to_wd.end());
         p.ec = unwatch_folder(p.folder_id);
         watched_folders->erase(it);
@@ -211,15 +207,15 @@ void watcher_t::notify(const fs::task::scan_dir_t &scan_dir) noexcept {
     auto queue = queue_t(allocator);
 
     for (auto &child : scan_dir.child_infos) {
-        auto child_path = std::string_view(child.path.native());
+        auto child_path = child.path.get_full_name();
         auto pos = child_path.rfind('/');
         if (pos != std::string::npos) {
-            auto filename = child_path.substr(pos);
-            queue.emplace_back(filename, child.status.type());
+            auto filename = child.path.get_filename();
+            queue.emplace_back(filename, child.file_type);
         }
     }
 
-    auto dir_path = std::string_view(scan_dir.path.native());
+    auto dir_path = scan_dir.path.get_full_name();
     if (dir_path.size() && dir_path.back() == '/') {
         dir_path = dir_path.substr(0, dir_path.size() - 1);
     }
@@ -233,7 +229,7 @@ void watcher_t::notify(const fs::task::scan_dir_t &scan_dir) noexcept {
                 auto parent_wd = it_parent_wd->second;
                 auto &parent_guard = path_map[parent_wd];
                 auto &folder_id = parent_guard.folder_id;
-                auto opt = watch_path(dir_path, folder_id, file_type_t::directory, parent_wd);
+                auto opt = watch_path(dir_path, folder_id, file_type_t::DIRECTORY, parent_wd);
                 if (!opt) {
                     LOG_WARN(log, "cannot watch '{}'", dir_path);
                     return;
@@ -256,9 +252,11 @@ void watcher_t::notify(const fs::task::scan_dir_t &scan_dir) noexcept {
     auto &folder_id = parent_guard.folder_id;
 
     std::memcpy(path_buff, dir_path.data(), dir_path.size());
+    path_buff[dir_path.size()] = '/';
+    auto dir_path_sz = dir_path.size() + 1;
 
     while (!queue.empty()) {
-        auto ptr = path_buff + dir_path.size();
+        auto ptr = path_buff + dir_path_sz;
         auto [item_path, type] = queue.front();
         queue.pop_front();
         std::memcpy(ptr, item_path.data(), item_path.size());

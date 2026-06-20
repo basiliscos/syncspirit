@@ -5,6 +5,8 @@
 #include "pending_folders.h"
 #include "../table_widget/checkbox.h"
 #include "../content/folder_table.h"
+#include "utils/path_view.hpp"
+#include "utils/path_utils.h"
 
 #include <FL/Fl_Check_Button.H>
 #include <spdlog/fmt/fmt.h>
@@ -112,10 +114,13 @@ struct table_t : content::folder_table_t {
             if (db_path.empty()) {
                 error = "path should be defined";
             } else {
-                auto path = bfs::path(boost::nowide::widen(db_path));
+                auto buffer = std::array<std::byte, 1024 * 32>();
+                auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+                auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+                auto path = utils::make_native_view(db_path, allocator);
                 auto ec = sys::error_code{};
-                if (bfs::exists(path, ec)) {
-                    if (!bfs::is_empty(path, ec)) {
+                if (utils::exists(path, ec)) {
+                    if (!utils::is_empty(path, ec)) {
                         error = "referred directory should be empty";
                     }
                 }
@@ -158,7 +163,7 @@ bool pending_folder_t::on_select() {
         folder.serialize(db);
 
         auto &db_folder = db::get_folder(db);
-        db::set_path(db_folder, path.string());
+        db::set_path(db_folder, path.get_full_name());
         db::set_rescan_interval(db_folder, 3600);
         db::set_watched(db_folder, true);
 

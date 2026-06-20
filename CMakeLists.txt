@@ -169,7 +169,6 @@ add_library(syncspirit_core
     src/model/diff/load/remove_corrupted_files.cpp
     src/model/diff/local/blocks_availability.cpp
     src/model/diff/local/file_availability.cpp
-    src/model/diff/local/io_failure.cpp
     src/model/diff/local/scan_finish.cpp
     src/model/diff/local/scan_request.cpp
     src/model/diff/local/scan_start.cpp
@@ -208,8 +207,6 @@ add_library(syncspirit_core
     src/model/misc/file_block.cpp
     src/model/misc/file_iterator.cpp
     src/model/misc/orphaned_blocks.cpp
-    src/model/misc/path.cpp
-    src/model/misc/path_cache.cpp
     src/model/misc/postponed_files.cpp
     src/model/misc/resolver.cpp
     src/model/misc/sequencer.cpp
@@ -286,6 +283,9 @@ add_library(syncspirit_core
     src/utils/log.cpp
     src/utils/log-setup.cpp
     src/utils/network_interface.cpp
+    src/utils/path.cpp
+    src/utils/path_cache.cpp
+    src/utils/path_utils.cpp
     src/utils/platform.cpp
     src/utils/time.cpp
     src/utils/tls.cpp

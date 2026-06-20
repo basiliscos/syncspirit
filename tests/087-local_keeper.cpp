@@ -9,7 +9,6 @@
 #include "fs/fs_proxy.h"
 #include "fs/fs_slave.h"
 #include "fs/messages.h"
-#include "fs/utils.h"
 #include "fs/updates_mediator.h"
 #include "managed_hasher.h"
 #include "model/cluster.h"
@@ -22,6 +21,9 @@
 #include "test_supervisor.h"
 #include "access.h"
 #include "utils/platform.h"
+#include "utils/format.hpp"
+#include "utils/path_view.hpp"
+#include "utils/path_utils.h"
 #include "presentation/folder_entity.h"
 #include <chrono>
 #include <boost/nowide/convert.hpp>
@@ -39,7 +41,7 @@ using namespace syncspirit::net;
 using namespace syncspirit::fs;
 using namespace syncspirit::hasher;
 using boost::nowide::narrow;
-using boost::nowide::widen;
+// using boost::nowide::widen;
 
 using task_processor_t = std::function<void(fs::fs_slave_t *)>;
 
@@ -90,9 +92,7 @@ struct fixture_t {
     using target_ptr_t = r::intrusive_ptr_t<net::local_keeper_t>;
     using builder_ptr_t = std::unique_ptr<diff_builder_t>;
 
-    fixture_t(bool auto_launch_ = true) noexcept
-        : root_path{unique_path()}, path_guard{root_path}, auto_launch{auto_launch_} {
-        bfs::create_directory(root_path);
+    fixture_t(bool auto_launch_ = true) noexcept : path_guard{unique_path()}, auto_launch{auto_launch_} {
         mediator = new fs::updates_mediator_t(pt::microseconds{1});
     }
 
@@ -116,8 +116,11 @@ struct fixture_t {
 
     virtual void create_dir(fs::message::create_dir_t &req) noexcept {
         auto &path = req.payload;
-        sup->log->info("on_create_dir, '{}'", narrow(path.wstring()));
-        bfs::create_directory(path, path.ec);
+        sup->log->info("on_create_dir, '{}'", static_cast<utils::path_t &>(path));
+        auto buffer = std::array<std::byte, 1024 * 32>();
+        auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+        auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+        utils::create_directories(path.get_view(allocator), req.payload.ec);
     }
 
     virtual void launch_hasher() noexcept {
@@ -164,11 +167,14 @@ struct fixture_t {
         };
 
         auto folder_id = "1234-5678";
+        auto buffer = std::array<std::byte, 1024 * 32>();
+        auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+        auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
 
         sup->start();
         sup->do_process();
         builder = std::make_unique<diff_builder_t>(*cluster);
-        builder->upsert_folder(folder_id, root_path)
+        builder->upsert_folder(folder_id, path_guard.get_full_name())
             .apply(*sup)
             .share_folder(peer_id.get_sha256(), folder_id)
             .apply(*sup);
@@ -191,7 +197,7 @@ struct fixture_t {
             launch_target();
         }
 
-        main();
+        main(allocator);
 
         sup->do_process();
         sup->shutdown();
@@ -212,7 +218,7 @@ struct fixture_t {
         sup->do_process();
     }
 
-    virtual void main() noexcept {}
+    virtual void main(const utils::allocator_t &) noexcept {}
 
     std::int64_t files_scan_iteration_limit = 100;
     builder_ptr_t builder;
@@ -222,7 +228,6 @@ struct fixture_t {
     managed_hasher_t *hasher;
     cluster_ptr_t cluster;
     device_ptr_t my_device;
-    bfs::path root_path;
     test::path_guard_t path_guard;
     target_ptr_t target;
     updates_mediator_ptr_t mediator;
@@ -257,18 +262,18 @@ void test_simple() {
     struct F : fixture_t {
         std::uint32_t get_hash_limit() override { return 2; }
 
-        void main() noexcept override {
+        void main(const utils::allocator_t &allocator) noexcept override {
             sys::error_code ec;
             auto &blocks = cluster->get_blocks();
             auto my_short_id = my_device->device_id().get_uint();
             SECTION("root folder errors") {
-                auto dir_path = root_path / "some-dir";
-                folder->set_path(dir_path);
+                auto dir_path = path_guard.get_view(allocator) / "some-dir";
+                folder->set_path(dir_path.detach());
                 builder->scan_start(folder->get_id()).apply(*sup);
                 REQUIRE(folder->is_suspended());
                 REQUIRE(folder->get_suspend_reason().message() != "");
                 SECTION("scan on created again") {
-                    bfs::create_directories(dir_path);
+                    create_directories(dir_path);
                     builder->scan_start(folder->get_id()).apply(*sup);
                     REQUIRE(!folder->is_suspended());
                     REQUIRE(!folder->get_suspend_reason());
@@ -277,17 +282,17 @@ void test_simple() {
                 CHECK(folder->get_scan_finish() >= folder->get_scan_start());
             }
             SECTION("emtpy root dir") {
-                auto dir_path = root_path / "some-dir";
-                bfs::create_directories(dir_path);
-                folder->set_path(dir_path);
+                auto dir_path = path_guard.get_view(allocator) / "some-dir";
+                create_directories(dir_path);
+                folder->set_path(dir_path.detach());
                 builder->scan_start(folder->get_id()).apply(*sup);
                 CHECK(!folder->is_scanning());
                 CHECK(folder->get_scan_finish() >= folder->get_scan_start());
             }
             SECTION("new items") {
                 SECTION("new dir") {
-                    auto dir_path = root_path / "some-dir";
-                    bfs::create_directories(dir_path);
+                    auto dir_path = path_guard.get_view(allocator) / "some-dir";
+                    create_directories(dir_path);
                     builder->scan_start(folder->get_id()).apply(*sup);
 
                     auto file = files->by_name("some-dir");
@@ -301,27 +306,28 @@ void test_simple() {
                     REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
                 }
                 SECTION("new dir inside a new ir") {
-                    auto name_1 = bfs::path(L"п1");
-                    auto name_2 = name_1 / bfs::path(L"п2");
-                    auto dir_path = root_path / name_2;
-                    bfs::create_directories(dir_path);
+                    auto name_1 = utils::make_native_view(L"п1", allocator);
+                    auto name_2 = name_1 / L"п2";
+                    auto dir_path = path_guard.get_view(allocator) / name_2;
+                    create_directories(dir_path);
                     builder->scan_start(folder->get_id()).apply(*sup);
 
                     REQUIRE(cluster->get_blocks().size() == 0);
 
-                    auto f_1 = files->by_name(narrow(name_1.generic_wstring()));
+                    auto f_1 = files->by_name(name_1.get_full_name());
                     REQUIRE(f_1);
                     CHECK(f_1->is_locally_available());
                     CHECK(f_1->is_dir());
 
-                    auto f_2 = files->by_name(narrow(name_2.generic_wstring()));
+                    auto f_2 = files->by_name(name_2.get_full_name());
                     REQUIRE(f_2);
                     CHECK(f_2->is_locally_available());
                     CHECK(f_2->is_dir());
                     REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
                 }
                 SECTION("empty file") {
-                    CHECK(bfs::create_directories(root_path / "abc"));
+                    auto root_path = path_guard.get_view(allocator);
+                    CHECK(create_directories(root_path / "abc"));
                     auto file_path = root_path / "abc" / "empty.file";
                     write_file(file_path, "");
                     auto ingore_perms = GENERATE(0, 1);
@@ -345,7 +351,7 @@ void test_simple() {
                         CHECK(file->get_permissions() == 0666);
                     } else {
                         CHECK(!file->has_no_permissions());
-                        CHECK(file->get_permissions() == static_cast<uint32_t>(bfs::status(file_path).permissions()));
+                        CHECK(file->get_permissions() == permissions(file_path));
                     }
 #else
                     CHECK(file->has_no_permissions());
@@ -354,9 +360,9 @@ void test_simple() {
                 }
 #ifndef SYNCSPIRIT_WIN
                 SECTION("new symlink") {
-                    auto file_path = root_path / "symlink";
-                    auto target = std::string_view("/some/where");
-                    bfs::create_symlink(bfs::path(target), file_path, ec);
+                    auto file_path = path_guard.get_view(allocator) / "symlink";
+                    auto target = utils::make_native_view("/some/where", allocator);
+                    create_symlink(target, file_path);
                     REQUIRE(!ec);
                     builder->scan_start(folder->get_id()).apply(*sup);
 
@@ -367,20 +373,21 @@ void test_simple() {
                     CHECK(file->is_link());
                     CHECK(file->get_block_size() == 0);
                     CHECK(file->get_size() == 0);
-                    CHECK(file->get_link_target() == target);
+                    CHECK(file->get_link_target() == target.get_full_name());
                     CHECK(file->has_no_permissions());
                     CHECK(blocks.size() == 0);
                     REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
                 }
 #endif
                 SECTION("small non-emtpy file") {
-                    CHECK(bfs::create_directories(root_path / L"папка"));
-                    auto part_path = bfs::path(L"папка") / L"файл.bin";
-                    auto file_path = root_path / part_path;
+                    auto dir_path = path_guard.get_view(allocator) / L"папка";
+                    CHECK(create_directories(dir_path));
+                    auto part_path = utils::make_native_view(L"папка/файл.bin", allocator);
+                    auto file_path = dir_path.get_parent() / part_path;
                     write_file(file_path, "12345");
                     builder->scan_start(folder->get_id()).apply(*sup);
 
-                    auto file = files->by_name(narrow(part_path.generic_wstring()));
+                    auto file = files->by_name(part_path.get_full_name());
                     REQUIRE(file);
                     CHECK(file->is_locally_available());
                     CHECK(!file->is_link());
@@ -391,16 +398,17 @@ void test_simple() {
                     REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
                 }
                 SECTION("2 blocks file") {
-                    CHECK(bfs::create_directories(root_path / L"папка"));
-                    auto part_path = bfs::path(L"папка") / L"файл.bin";
-                    auto file_path = root_path / part_path;
+                    auto dir_path = path_guard.get_view(allocator) / L"папка";
+                    CHECK(create_directories(dir_path));
+                    auto part_path = utils::make_native_view(L"папка/файл.bin", allocator);
+                    auto file_path = path_guard.get_view(allocator) / part_path;
                     auto block_sz = fs::block_sizes[0];
                     auto b1 = std::string(block_sz, '0');
                     auto b2 = std::string(block_sz, '1');
                     write_file(file_path, b1 + b2);
                     builder->scan_start(folder->get_id()).apply(*sup);
 
-                    auto file = files->by_name(narrow(part_path.generic_wstring()));
+                    auto file = files->by_name(part_path.get_full_name());
                     REQUIRE(file);
                     CHECK(file->is_locally_available());
                     CHECK(!file->is_link());
@@ -411,9 +419,10 @@ void test_simple() {
                     REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
                 }
                 SECTION("2 blocks + 1 byte file") {
-                    CHECK(bfs::create_directories(root_path / L"папка"));
-                    auto part_path = bfs::path(L"папка") / L"файл.bin";
-                    auto file_path = root_path / part_path;
+                    auto dir_path = path_guard.get_view(allocator) / L"папка";
+                    CHECK(create_directories(dir_path));
+                    auto part_path = utils::make_native_view(L"папка/файл.bin", allocator);
+                    auto file_path = path_guard.get_view(allocator) / part_path;
                     auto block_sz = fs::block_sizes[0];
                     auto b1 = std::string(block_sz, '0');
                     auto b2 = std::string(block_sz, '1');
@@ -421,7 +430,7 @@ void test_simple() {
                     write_file(file_path, b1 + b2 + b3);
                     builder->scan_start(folder->get_id()).apply(*sup);
 
-                    auto file = files->by_name(narrow(part_path.generic_wstring()));
+                    auto file = files->by_name(part_path.get_full_name());
                     REQUIRE(file);
                     CHECK(file->is_locally_available());
                     CHECK(!file->is_link());
@@ -439,24 +448,26 @@ void test_simple() {
 
 void test_create_dir() {
     struct F : fixture_t {
-        void main() noexcept override {
+        void main(const utils::allocator_t &allocator) noexcept override {
             auto folder_id = std::string(folder->get_id());
+            auto root_path = path_guard.get_view(allocator);
 
             builder->remove_folder(*folder).apply(*sup);
-            bfs::remove_all(root_path);
-            REQUIRE(!bfs::exists(root_path));
+            remove_all(root_path);
+            REQUIRE(!exists(root_path));
 
             SECTION("success") {
-                builder->upsert_folder(folder_id, root_path).apply(*sup);
-                CHECK(bfs::exists(root_path));
+                builder->upsert_folder(folder_id, root_path.get_full_name()).apply(*sup);
+                CHECK(exists(root_path));
                 auto f = cluster->get_folders().by_id(folder_id);
                 REQUIRE(f);
                 REQUIRE(!f->is_suspended());
             }
             SECTION("fail & suspend") {
                 auto sub_path = root_path / "a" / "dir";
-                builder->upsert_folder(folder_id, sub_path).apply(*sup);
-                CHECK(!bfs::exists(sub_path));
+                write_file(sub_path.get_parent(), "");
+                builder->upsert_folder(folder_id, sub_path.get_full_name()).apply(*sup);
+                CHECK(!exists(sub_path));
 
                 auto f = cluster->get_folders().by_id(folder_id);
                 REQUIRE(f);
@@ -472,7 +483,7 @@ void test_no_changes() {
     struct F : fixture_t {
         std::uint32_t get_hash_limit() override { return 2; }
 
-        void main() noexcept override {
+        void main(const utils::allocator_t &allocator) noexcept override {
             sys::error_code ec;
             auto &blocks = cluster->get_blocks();
             auto my_short_id = my_device->device_id().get_uint();
@@ -483,19 +494,20 @@ void test_no_changes() {
             proto::set_id(counter, 1);
             proto::set_value(counter, 1);
 
+            auto root_path = path_guard.get_view(allocator);
+
             SECTION("single item") {
                 auto pr_file = proto::FileInfo{};
-                auto file_name = bfs::path(L"неизменное.bin");
-                proto::set_name(pr_file, file_name.string());
+                auto file_name = utils::make_native_view(L"неизменное.bin", allocator);
+                proto::set_name(pr_file, file_name.get_full_name());
                 proto::set_sequence(pr_file, 4);
                 proto::set_version(pr_file, v);
 
                 SECTION("dir") {
                     auto dir = root_path / file_name;
-                    bfs::create_directories(dir);
-                    auto modified = to_unix(bfs::last_write_time(dir));
-                    auto status = bfs::status(dir);
-                    auto perms = static_cast<uint32_t>(status.permissions());
+                    create_directories(dir);
+                    auto modified = last_write_time(dir);
+                    auto perms = permissions(dir);
 
                     proto::set_type(pr_file, proto::FileInfoType::DIRECTORY);
                     proto::set_permissions(pr_file, perms);
@@ -503,7 +515,7 @@ void test_no_changes() {
 
                     builder->local_update(folder_id, pr_file).apply(*sup);
                     REQUIRE(files->size() == 1);
-                    auto file_1 = files->by_name(narrow(file_name.wstring()));
+                    auto file_1 = files->by_name(file_name.get_full_name());
                     file_1->mark_local(false);
                     CHECK(!file_1->is_local());
 
@@ -511,7 +523,7 @@ void test_no_changes() {
                     REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
                     REQUIRE(files->size() == 1);
 
-                    auto file_2 = files->by_name(narrow(file_name.wstring()));
+                    auto file_2 = files->by_name(file_name.get_full_name());
                     CHECK(file_1.get() == file_2.get());
                     CHECK(file_1->is_local());
                 }
@@ -519,9 +531,8 @@ void test_no_changes() {
                     auto path = root_path / file_name;
                     auto data = std::string("12345");
                     write_file(path, data);
-                    auto modified = to_unix(bfs::last_write_time(path));
-                    auto status = bfs::status(path);
-                    auto perms = static_cast<uint32_t>(status.permissions());
+                    auto modified = last_write_time(path);
+                    auto perms = permissions(path);
 
                     proto::set_permissions(pr_file, perms);
                     proto::set_modified_s(pr_file, modified);
@@ -535,7 +546,7 @@ void test_no_changes() {
                     builder->local_update(folder_id, pr_file).apply(*sup);
                     REQUIRE(files->size() == 1);
                     REQUIRE(blocks.size() == 1);
-                    auto file_1 = files->by_name(narrow(file_name.wstring()));
+                    auto file_1 = files->by_name(file_name.get_full_name());
                     file_1->mark_local(false);
                     CHECK(!file_1->is_local());
 
@@ -543,7 +554,7 @@ void test_no_changes() {
                     REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
                     REQUIRE(files->size() == 1);
 
-                    auto file_2 = files->by_name(narrow(file_name.wstring()));
+                    auto file_2 = files->by_name(file_name.get_full_name());
                     CHECK(file_1.get() == file_2.get());
                     CHECK(file_1->is_local());
                     REQUIRE(blocks.size() == 1);
@@ -555,7 +566,7 @@ void test_no_changes() {
                         builder->local_update(folder_id, pr_file).apply(*sup);
                         auto seq_1 = file_1->get_sequence();
                         builder->scan_start(folder_id).apply(*sup);
-                        bfs::permissions(path, bfs::perms::none);
+                        chmod(path, 0);
                         REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
                         auto seq_2 = file_1->get_sequence();
                         CHECK(seq_1 == seq_2);
@@ -566,57 +577,56 @@ void test_no_changes() {
 #ifndef SYNCSPIRIT_WIN
                 SECTION("symlink") {
                     auto file_path = root_path / file_name;
-                    auto target = bfs::path(L"/куда-то/where");
-                    bfs::create_symlink(target, file_path);
-                    auto status = bfs::symlink_status(file_path);
-                    auto perms = static_cast<uint32_t>(status.permissions());
+                    auto target = utils::make_native_view(L"/куда-то/where", allocator);
+                    create_symlink(target, file_path);
+                    auto perms = permissions(file_path);
 
-                    proto::set_symlink_target(pr_file, narrow(target.wstring()));
+                    proto::set_symlink_target(pr_file, target.get_full_name());
                     proto::set_type(pr_file, proto::FileInfoType::SYMLINK);
                     proto::set_permissions(pr_file, perms);
 
                     builder->local_update(folder_id, pr_file).apply(*sup);
                     REQUIRE(files->size() == 1);
-                    auto file_1 = files->by_name(narrow(file_name.wstring()));
+                    auto file_1 = files->by_name(file_name.get_full_name());
                     file_1->mark_local(false);
                     REQUIRE(file_1->is_link());
-                    REQUIRE(file_1->get_link_target() == narrow(target.wstring()));
+                    REQUIRE(file_1->get_link_target() == target.get_full_name());
                     CHECK(!file_1->is_local());
 
                     builder->scan_start(folder_id).apply(*sup);
                     REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
                     REQUIRE(files->size() == 1);
 
-                    auto file_2 = files->by_name(narrow(file_name.wstring()));
+                    auto file_2 = files->by_name(file_name.get_full_name());
                     CHECK(file_1.get() == file_2.get());
                     CHECK(file_1->is_local());
                 }
 #endif
             }
             SECTION("dir & file") {
-                auto file_name_1 = bfs::path(L"b-dir");
+                auto file_name_1 = utils::make_native_view(L"b-dir", allocator);
                 auto dir = root_path / file_name_1;
-                bfs::create_directories(dir);
+                create_directories(dir);
 
-                auto modified_1 = to_unix(bfs::last_write_time(dir));
-                auto perms_1 = static_cast<uint32_t>(bfs::status(dir).permissions());
+                auto modified_1 = last_write_time(dir);
+                auto perms_1 = permissions(dir);
 
                 auto pr_file_1 = proto::FileInfo{};
-                proto::set_name(pr_file_1, file_name_1.string());
+                proto::set_name(pr_file_1, file_name_1.get_full_name());
                 proto::set_version(pr_file_1, v);
                 proto::set_type(pr_file_1, proto::FileInfoType::DIRECTORY);
                 proto::set_permissions(pr_file_1, perms_1);
                 proto::set_modified_s(pr_file_1, modified_1);
 
-                auto file_name_2 = bfs::path(L"a-file");
+                auto file_name_2 = utils::make_native_view(L"a-file", allocator);
                 auto file = root_path / file_name_2;
                 write_file(file, "");
 
-                auto modified_2 = to_unix(bfs::last_write_time(file));
-                auto perms_2 = static_cast<uint32_t>(bfs::status(file).permissions());
+                auto modified_2 = last_write_time(file);
+                auto perms_2 = permissions(file);
 
                 auto pr_file_2 = proto::FileInfo{};
-                proto::set_name(pr_file_2, file_name_2.string());
+                proto::set_name(pr_file_2, file_name_2.get_full_name());
                 proto::set_version(pr_file_2, v);
                 proto::set_type(pr_file_2, proto::FileInfoType::FILE);
                 proto::set_permissions(pr_file_2, perms_2);
@@ -647,7 +657,9 @@ void test_deleted() {
             available.emplace_back(std::string(diff.name));
         }
 
-        void main() noexcept override {
+        void main(const utils::allocator_t &allocator) noexcept override {
+
+            auto root_path = path_guard.get_view(allocator);
             sys::error_code ec;
             auto &blocks = cluster->get_blocks();
             auto my_short_id = my_device->device_id().get_uint();
@@ -659,8 +671,8 @@ void test_deleted() {
 
             SECTION("single items") {
                 auto pr_file = proto::FileInfo{};
-                auto file_name = bfs::path(L"неизменное.bin");
-                proto::set_name(pr_file, file_name.string());
+                auto file_name = utils::make_native_view(L"неизменное.bin", allocator);
+                proto::set_name(pr_file, file_name.get_full_name());
                 proto::set_sequence(pr_file, 4);
                 proto::set_version(pr_file, v);
 
@@ -682,7 +694,7 @@ void test_deleted() {
 
                 REQUIRE(files->size() == 1);
 
-                auto file_1 = files->by_name(narrow(file_name.wstring()));
+                auto file_1 = files->by_name(file_name.get_full_name());
                 file_1->mark_local(false);
                 CHECK(!file_1->is_local());
 
@@ -690,7 +702,7 @@ void test_deleted() {
                 REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
                 REQUIRE(files->size() == 1);
 
-                auto file_2 = files->by_name(narrow(file_name.wstring()));
+                auto file_2 = files->by_name(file_name.get_full_name());
                 CHECK(file_1.get() == file_2.get());
                 CHECK(file_1->is_local());
                 REQUIRE(file_1->is_deleted());
@@ -703,7 +715,6 @@ void test_deleted() {
                 proto::set_sequence(pr_file, 4);
                 proto::set_version(pr_file, v);
 
-                auto file_name = bfs::path(L"имя");
                 for (auto &name : {"a", "a/bb", "a/cc", "a/bb/ddd"}) {
                     proto::set_name(pr_file, name);
                     builder->local_update(folder->get_id(), pr_file);
@@ -724,7 +735,7 @@ void test_deleted() {
                     }
                 }
                 SECTION("sub hierarchy removal") {
-                    bfs::create_directories(root_path / "a" / "cc");
+                    create_directories(root_path / "a" / "cc");
                     builder->scan_start(folder->get_id()).apply(*sup);
                     REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
                     CHECK(files->size() == 4);
@@ -838,7 +849,9 @@ void test_deleted() {
 
 void test_changed() {
     struct F : fixture_t {
-        void main() noexcept override {
+        void main(const utils::allocator_t &allocator) noexcept override {
+            auto root_path = path_guard.get_view(allocator);
+
             sys::error_code ec;
             auto &blocks = cluster->get_blocks();
             auto my_short_id = my_device->device_id().get_uint();
@@ -858,10 +871,10 @@ void test_changed() {
                 auto hash_4 = utils::sha256_digest(data_x).value();
 
                 auto pr_file = proto::FileInfo{};
-                auto file_name = bfs::path(L"файлик.bin");
+                auto file_name = utils::make_native_view(L"файлик.bin", allocator);
                 auto file_path = root_path / file_name;
 
-                proto::set_name(pr_file, file_name.string());
+                proto::set_name(pr_file, file_name.get_full_name());
                 proto::set_sequence(pr_file, 4);
                 proto::set_version(pr_file, v);
 
@@ -884,7 +897,7 @@ void test_changed() {
 
                 write_file(file_path, "5432109876");
 
-                auto file_1 = files->by_name(narrow(file_name.wstring()));
+                auto file_1 = files->by_name(file_name.get_full_name());
                 file_1->mark_local(false);
                 auto seq_1 = file_1->get_sequence();
 
@@ -893,7 +906,7 @@ void test_changed() {
 
                 CHECK(files->size() == 1);
                 CHECK(blocks.size() == 1);
-                auto file_2 = files->by_name(narrow(file_name.wstring()));
+                auto file_2 = files->by_name(file_name.get_full_name());
                 CHECK(file_2->is_local());
                 REQUIRE(file_2->iterate_blocks().get_total() == 1);
                 CHECK(file_2->iterate_blocks().next()->get_hash() == hash_4);
@@ -906,10 +919,10 @@ void test_changed() {
                 auto hash_1 = utils::sha256_digest(data_1).value();
 
                 auto pr_file = proto::FileInfo{};
-                auto file_name = bfs::path(L"файлик.bin");
+                auto file_name = utils::make_native_view(L"файлик.bin", allocator);
                 auto file_path = root_path / file_name;
 
-                proto::set_name(pr_file, file_name.string());
+                proto::set_name(pr_file, file_name.get_full_name());
                 proto::set_sequence(pr_file, 4);
                 proto::set_version(pr_file, v);
 
@@ -922,8 +935,7 @@ void test_changed() {
 
                 write_file(file_path, data_1_str);
 
-                auto status = bfs::status(file_path);
-                auto modified = to_unix(bfs::last_write_time(file_path));
+                auto modified = last_write_time(file_path);
                 auto perms = static_cast<uint32_t>(0444);
                 bool perms_changed = false;
 
@@ -941,7 +953,7 @@ void test_changed() {
                 REQUIRE(files->size() == 1);
                 REQUIRE(blocks.size() == 1);
 
-                auto file_1 = files->by_name(narrow(file_name.wstring()));
+                auto file_1 = files->by_name(file_name.get_full_name());
                 file_1->mark_local(false);
                 auto seq_1 = file_1->get_sequence();
 
@@ -949,7 +961,7 @@ void test_changed() {
                 REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
 
                 CHECK(files->size() == 1);
-                auto file_2 = files->by_name(narrow(file_name.wstring()));
+                auto file_2 = files->by_name(file_name.get_full_name());
                 CHECK(file_2->is_local());
                 REQUIRE(file_2->iterate_blocks().get_total() == 1);
                 CHECK(file_2->iterate_blocks().next()->get_hash() == hash_1);
@@ -963,17 +975,16 @@ void test_changed() {
             }
             SECTION("dir meta changed") {
                 auto pr_file = proto::FileInfo{};
-                auto file_name = bfs::path(L"папка");
+                auto file_name = utils::make_native_view(L"папка", allocator);
                 auto file_path = root_path / file_name;
 
-                bfs::create_directories(file_path);
+                create_directories(file_path);
 
-                auto status = bfs::status(file_path);
-                auto modified = to_unix(bfs::last_write_time(file_path));
-                auto perms = static_cast<uint32_t>(status.permissions());
+                auto modified = last_write_time(file_path);
+                auto perms = permissions(file_path);
                 bool perms_changed = false;
 
-                proto::set_name(pr_file, file_name.string());
+                proto::set_name(pr_file, file_name.get_full_name());
                 proto::set_sequence(pr_file, 4);
                 proto::set_version(pr_file, v);
                 proto::set_type(pr_file, proto::FileInfoType::DIRECTORY);
@@ -991,7 +1002,7 @@ void test_changed() {
                 builder->local_update(folder->get_id(), pr_file).apply(*sup);
                 REQUIRE(files->size() == 1);
 
-                auto file_1 = files->by_name(narrow(file_name.wstring()));
+                auto file_1 = files->by_name(file_name.get_full_name());
                 file_1->mark_local(false);
                 auto seq_1 = file_1->get_sequence();
 
@@ -999,7 +1010,7 @@ void test_changed() {
                 REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
 
                 CHECK(files->size() == 1);
-                auto file_2 = files->by_name(narrow(file_name.wstring()));
+                auto file_2 = files->by_name(file_name.get_full_name());
                 CHECK(file_2->is_local());
                 auto seq_2 = file_2->get_sequence();
 
@@ -1012,23 +1023,23 @@ void test_changed() {
 #ifndef SYNCSPIRIT_WIN
             SECTION("symlink target changed") {
                 auto file_path = root_path / "symlink";
-                auto target_1 = std::string_view("/some/where");
-                bfs::create_symlink(bfs::path(target_1), file_path, ec);
+                auto target_1 = utils::make_native_view("/some/where", allocator);
+                create_symlink(target_1, file_path, ec);
                 builder->scan_start(folder->get_id()).apply(*sup);
                 REQUIRE(files->size() == 1);
-                auto file_1 = files->by_name(file_path.filename().string());
+                auto file_1 = files->by_name(file_path.get_filename());
                 REQUIRE(file_1);
                 auto seq_1 = file_1->get_sequence();
 
                 builder->scan_start(folder->get_id()).apply(*sup);
                 REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
 
-                bfs::remove_all(file_path);
-                auto target_2 = std::string_view("/some/where/2");
-                bfs::create_symlink(bfs::path(target_2), file_path, ec);
+                remove_all(file_path);
+                auto target_2 = utils::make_native_view("/some/where/2", allocator);
+                create_symlink(target_2, file_path);
                 builder->scan_start(folder->get_id()).apply(*sup);
 
-                auto file_2 = files->by_name(file_path.filename().string());
+                auto file_2 = files->by_name(file_path.get_filename());
                 REQUIRE(file_2);
                 auto seq_2 = file_2->get_sequence();
                 CHECK(seq_2 > seq_1);
@@ -1049,10 +1060,10 @@ void test_changed() {
                 auto hash_3 = utils::sha256_digest(data_3).value();
 
                 auto pr_file = proto::FileInfo{};
-                auto file_name = bfs::path(L"файлик.bin");
+                auto file_name = utils::make_native_view(L"файлик.bin", allocator);
                 auto file_path = root_path / file_name;
 
-                proto::set_name(pr_file, file_name.string());
+                proto::set_name(pr_file, file_name.get_full_name());
                 proto::set_sequence(pr_file, 4);
                 proto::set_version(pr_file, v);
 
@@ -1075,7 +1086,7 @@ void test_changed() {
 
                 write_file(file_path, b1 + b2 + b3);
 
-                auto file_1 = files->by_name(narrow(file_name.wstring()));
+                auto file_1 = files->by_name(file_name.get_full_name());
                 file_1->mark_local(false);
                 auto seq_1 = file_1->get_sequence();
 
@@ -1084,7 +1095,7 @@ void test_changed() {
 
                 CHECK(files->size() == 1);
                 CHECK(blocks.size() == 3);
-                auto file_2 = files->by_name(narrow(file_name.wstring()));
+                auto file_2 = files->by_name(file_name.get_full_name());
                 CHECK(file_2->is_local());
                 REQUIRE(file_2->iterate_blocks().get_total() == 3);
                 REQUIRE(file_2->iterate_blocks(2).next()->get_hash() == hash_3);
@@ -1099,11 +1110,12 @@ void test_changed() {
 
 void test_type_change() {
     struct F : fixture_t {
-        void main() noexcept override {
+        void main(const utils::allocator_t &allocator) noexcept override {
+            auto root_path = path_guard.get_view(allocator);
             auto my_short_id = my_device->device_id().get_uint();
             auto pr_file = proto::FileInfo{};
-            auto file_name = bfs::path(L"файлик.bin");
-            proto::set_name(pr_file, file_name.string());
+            auto file_name = utils::make_native_view(L"файлик.bin", allocator);
+            proto::set_name(pr_file, file_name.get_full_name());
             proto::set_sequence(pr_file, 4);
             auto &v = proto::get_version(pr_file);
             auto &counter = proto::add_counters(v);
@@ -1114,7 +1126,7 @@ void test_type_change() {
             SECTION("has been dir") {
                 proto::set_type(pr_file, proto::FileInfoType::DIRECTORY);
                 builder->local_update(folder->get_id(), pr_file).apply(*sup);
-                auto file_1 = files->by_name(narrow(file_name.wstring()));
+                auto file_1 = files->by_name(file_name.get_full_name());
                 REQUIRE(file_1->is_dir());
                 auto seq_1 = file_1->get_sequence();
 
@@ -1122,17 +1134,17 @@ void test_type_change() {
                     write_file(file_path, "");
                     builder->scan_start(folder->get_id()).apply(*sup);
                     REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
-                    auto file_2 = files->by_name(narrow(file_name.wstring()));
+                    auto file_2 = files->by_name(file_name.get_full_name());
                     REQUIRE(file_2->is_file());
                     auto seq_2 = file_2->get_sequence();
                     CHECK(seq_2 > seq_1);
                 }
 #ifndef SYNCSPIRIT_WIN
                 SECTION(" -> symlink") {
-                    bfs::create_symlink(bfs::path("/some/where"), file_path);
+                    create_symlink(utils::make_native_view("/some/where", allocator), file_path);
                     builder->scan_start(folder->get_id()).apply(*sup);
                     REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
-                    auto file_2 = files->by_name(narrow(file_name.wstring()));
+                    auto file_2 = files->by_name(file_name.get_full_name());
                     REQUIRE(file_2->is_link());
                     auto seq_2 = file_2->get_sequence();
                     CHECK(seq_2 > seq_1);
@@ -1142,24 +1154,24 @@ void test_type_change() {
             SECTION("has been regular file") {
                 proto::set_type(pr_file, proto::FileInfoType::FILE);
                 builder->local_update(folder->get_id(), pr_file).apply(*sup);
-                auto file_1 = files->by_name(narrow(file_name.wstring()));
+                auto file_1 = files->by_name(file_name.get_full_name());
                 REQUIRE(file_1->is_file());
                 auto seq_1 = file_1->get_sequence();
                 SECTION(" -> dir") {
-                    bfs::create_directories(file_path);
+                    create_directories(file_path);
                     builder->scan_start(folder->get_id()).apply(*sup);
                     REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
-                    auto file_2 = files->by_name(narrow(file_name.wstring()));
+                    auto file_2 = files->by_name(file_name.get_full_name());
                     REQUIRE(file_2->is_dir());
                     auto seq_2 = file_2->get_sequence();
                     CHECK(seq_2 > seq_1);
                 }
 #ifndef SYNCSPIRIT_WIN
                 SECTION(" -> symlink") {
-                    bfs::create_symlink(bfs::path("/some/where"), file_path);
+                    create_symlink(utils::make_native_view("/some/where", allocator), file_path);
                     builder->scan_start(folder->get_id()).apply(*sup);
                     REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
-                    auto file_2 = files->by_name(narrow(file_name.wstring()));
+                    auto file_2 = files->by_name(file_name.get_full_name());
                     REQUIRE(file_2->is_link());
                     auto seq_2 = file_2->get_sequence();
                     CHECK(seq_2 > seq_1);
@@ -1170,14 +1182,14 @@ void test_type_change() {
             SECTION("has been symlink") {
                 proto::set_type(pr_file, proto::FileInfoType::SYMLINK);
                 builder->local_update(folder->get_id(), pr_file).apply(*sup);
-                auto file_1 = files->by_name(narrow(file_name.wstring()));
+                auto file_1 = files->by_name(file_name.get_full_name());
                 REQUIRE(file_1->is_link());
                 auto seq_1 = file_1->get_sequence();
                 SECTION(" -> dir") {
-                    bfs::create_directories(file_path);
+                    create_directories(file_path);
                     builder->scan_start(folder->get_id()).apply(*sup);
                     REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
-                    auto file_2 = files->by_name(narrow(file_name.wstring()));
+                    auto file_2 = files->by_name(file_name.get_full_name());
                     REQUIRE(file_2->is_dir());
                     auto seq_2 = file_2->get_sequence();
                     CHECK(seq_2 > seq_1);
@@ -1186,7 +1198,7 @@ void test_type_change() {
                     write_file(file_path, "");
                     builder->scan_start(folder->get_id()).apply(*sup);
                     REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
-                    auto file_2 = files->by_name(narrow(file_name.wstring()));
+                    auto file_2 = files->by_name(file_name.get_full_name());
                     REQUIRE(file_2->is_file());
                     auto seq_2 = file_2->get_sequence();
                     CHECK(seq_2 > seq_1);
@@ -1200,8 +1212,9 @@ void test_type_change() {
 
 void test_resurrection() {
     struct F : fixture_t {
-        void main() noexcept override {
-            bfs::create_directories(root_path / L"a/b/c");
+        void main(const utils::allocator_t &allocator) noexcept override {
+            auto root_path = path_guard.get_view(allocator);
+            create_directories(root_path / L"a/b/c");
             write_file(root_path / "a/b/c/file.bin", "12345");
 
             builder->scan_start(folder->get_id()).apply(*sup);
@@ -1224,7 +1237,7 @@ void test_resurrection() {
             CHECK(!dir_c->is_deleted());
             CHECK(!file->is_deleted());
 
-            bfs::remove_all(root_path / L"a");
+            remove_all(root_path / L"a");
             builder->scan_start(folder->get_id()).apply(*sup);
 
             CHECK(dir_a->is_deleted());
@@ -1232,7 +1245,7 @@ void test_resurrection() {
             CHECK(dir_c->is_deleted());
             CHECK(file->is_deleted());
 
-            bfs::create_directories(root_path / L"a/b/c");
+            create_directories(root_path / L"a/b/c");
             write_file(root_path / "a/b/c/file.bin", "12345");
 
             builder->scan_start(folder->get_id()).apply(*sup);
@@ -1249,15 +1262,16 @@ void test_resurrection() {
 
 void test_partial_scan() {
     struct F : fixture_t {
-        void main() noexcept override {
+        void main(const utils::allocator_t &allocator) noexcept override {
+            auto root_path = path_guard.get_view(allocator);
             auto my_short_id = my_device->device_id().get_uint();
             auto dir_1 = root_path / L"а/б/в";
             auto dir_2 = root_path / L"x/y/z";
             auto file_1 = dir_1 / L"файл-1.bin";
             auto file_2 = dir_2 / L"файл-2.bin";
 
-            bfs::create_directories(dir_1);
-            bfs::create_directories(dir_2);
+            create_directories(dir_1);
+            create_directories(dir_2);
             write_file(file_1, "12345");
             write_file(file_2, "67890");
             builder->scan_start(folder->get_id()).apply(*sup);
@@ -1285,8 +1299,9 @@ void test_partial_scan() {
             }
             SECTION("non-existing dir") {
                 builder->scan_start(folder->get_id()).apply(*sup);
-                auto subdir = narrow(GENERATE(L"а", L"а/б", L"а/б/в"));
-                bfs::remove_all(root_path / subdir);
+                // auto subdir = narrow(GENERATE(L"а", L"а/б", L"а/б/в"));
+                auto subdir = narrow(GENERATE(L"а"));
+                remove_all(root_path / subdir);
                 INFO("subdir: " << subdir);
                 CHECK(subdir != std::string_view{});
                 builder->scan_start(folder->get_id(), narrow(L"а/б/в")).apply(*sup);
@@ -1305,7 +1320,7 @@ void test_partial_scan() {
                 CHECK(!folder->is_suspended());
             }
             SECTION("resurrection") {
-                bfs::remove_all(root_path / L"а");
+                remove_all(root_path / L"а");
                 auto dir_a = files.by_name(narrow(L"а"));
                 auto dir_x = files.by_name("x");
                 auto dir_b = files.by_name(narrow(L"а/б"));
@@ -1317,7 +1332,7 @@ void test_partial_scan() {
                 REQUIRE(dir_c->is_deleted());
                 CHECK(!dir_x->is_deleted());
 
-                bfs::create_directories(root_path / L"а/б/в");
+                create_directories(root_path / L"а/б/в");
                 builder->scan_start(folder->get_id(), narrow(L"а/б")).apply(*sup);
 
                 CHECK(!dir_a->is_deleted());
@@ -1353,23 +1368,20 @@ void test_scan_errors() {
             }
         }
 
-        void main() noexcept override {
+        void main(const utils::allocator_t &allocator) noexcept override {
+            auto root_path = path_guard.get_view(allocator);
             SECTION("root dir errors") {
-                SECTION("missing root dir") {
-                    auto dir_path = root_path / "some-dir";
-                    folder->set_path(dir_path);
-                }
+                SECTION("missing root dir") { folder->set_path((root_path / "some-dir").detach()); }
                 SECTION("no permissings to read outer dir") {
-                    auto dir_path = root_path / "some-dir";
-                    folder->set_path(dir_path);
-                    bfs::permissions(root_path, bfs::perms::none);
+                    folder->set_path((root_path / "some-dir").detach());
+                    chmod(root_path, 0);
                 }
                 builder->scan_start(folder->get_id()).apply(*sup);
                 REQUIRE(folder->is_suspended());
                 REQUIRE(folder->get_suspend_reason().message() != "");
                 CHECK(!folder->is_scanning());
                 CHECK(folder->get_scan_finish() >= folder->get_scan_start());
-                bfs::permissions(root_path, bfs::perms::all);
+                chmod(root_path, 0777);
                 CHECK(exec_attempts == 1);
             }
             SECTION("missing start dir (in model)") {
@@ -1381,18 +1393,17 @@ void test_scan_errors() {
 #ifndef SYNCSPIRIT_WIN
             SECTION("non-root errors (non-win32)") {
                 auto dir_path = root_path / "d1" / "d2";
-                auto d1_path = dir_path.parent_path();
-                bfs::create_directories(dir_path);
+                auto d1_path = dir_path.get_parent();
+                create_directories(dir_path);
 
-                auto status = bfs::status(d1_path);
-                auto perms = status.permissions();
-                bfs::permissions(d1_path, perms, bfs::perm_options::remove);
+                auto perms = permissions(d1_path);
+                chmod(d1_path, 0);
 
                 builder->scan_start(folder->get_id()).apply(*sup);
 
                 auto ec = sys::error_code{};
-                bfs::create_directories(d1_path / L"авось", ec);
-                bfs::permissions(d1_path, perms, bfs::perm_options::add);
+                create_directories(d1_path / L"авось", ec);
+                chmod(d1_path, 0777);
 
                 if (ec) {
                     REQUIRE(!folder->is_suspended());
@@ -1405,8 +1416,7 @@ void test_scan_errors() {
             }
             SECTION("non-sync'able entity (named fifo file)") {
                 auto fifo_path = root_path / "fifo";
-                auto fifo_str = narrow(fifo_path.wstring());
-                REQUIRE(mknod(fifo_str.c_str(), S_IFIFO | 0666, 0) == 0);
+                REQUIRE(mknod(fifo_path.get_full_name().data(), S_IFIFO | 0666, 0) == 0);
                 builder->scan_start(folder->get_id()).apply(*sup);
                 CHECK(!folder->is_scanning());
                 CHECK(folder->get_scan_finish() >= folder->get_scan_start());
@@ -1416,8 +1426,8 @@ void test_scan_errors() {
             SECTION("generic task error") {
                 exec_pool = 1;
                 auto dir_path = root_path / "d1" / "d2";
-                auto d1_path = dir_path.parent_path();
-                bfs::create_directories(dir_path);
+                auto d1_path = dir_path.get_parent();
+                create_directories(dir_path);
 
                 builder->scan_start(folder->get_id()).apply(*sup);
                 CHECK(!folder->is_scanning());
@@ -1428,15 +1438,15 @@ void test_scan_errors() {
             SECTION("scan dir errors") {
                 int mocked = 0;
                 auto generator_type = GENERATE(0, 1);
-                auto do_mock = [&](bfs::path dir_path) {
-                    processor = [&, dir_path = dir_path](fs::fs_slave_t *slave) {
+                auto do_mock = [&](const utils::poly_path_view_t &dir_path) {
+                    processor = [&, dir_path = std::string(dir_path.get_full_name())](fs::fs_slave_t *slave) {
                         slave->ec = {};
                         bool do_exec = true;
                         if (!slave->tasks_in.empty()) {
                             auto task = &slave->tasks_in.front();
                             auto scan_task = std::get_if<fs::task::scan_dir_t>(task);
                             if (scan_task) {
-                                if (scan_task->path == dir_path) {
+                                if (scan_task->path.get_full_name() == dir_path) {
                                     ++mocked;
                                     do_exec = false;
                                     auto ec = r::make_error_code(r::error_code_t::cancelled);
@@ -1444,7 +1454,8 @@ void test_scan_errors() {
                                     if (generator_type == 0) {
                                         scan_task->ec = {};
                                         auto info = fs::task::scan_dir_t::child_info_t();
-                                        info.path = dir_path / "xx";
+                                        auto view = scan_task->path.get_view(allocator);
+                                        info.path = (view / "xx").detach();
                                         info.ec = ec;
                                         scan_task->child_infos.emplace_back(std::move(info));
                                     } else {
@@ -1463,8 +1474,8 @@ void test_scan_errors() {
 
                 auto my_short_id = my_device->device_id().get_uint();
                 auto dir_path = root_path / "d1";
-                auto d1_path = dir_path.parent_path();
-                bfs::create_directories(dir_path);
+                auto d1_path = dir_path.get_parent();
+                create_directories(dir_path);
 
                 auto pr_dir = proto::FileInfo{};
                 proto::set_name(pr_dir, "d1");
@@ -1536,13 +1547,14 @@ void test_read_errors() {
             }
         }
 
-        void main() noexcept override {
+        void main(const utils::allocator_t &allocator) noexcept override {
+            auto root_path = path_guard.get_view(allocator);
 #ifndef SYNCSPIRIT_WIN
             SECTION("small unknown/new file") {
                 launch_target();
                 auto file_path = root_path / "file.bin";
                 write_file(file_path, "12345");
-                bfs::permissions(file_path, bfs::perms::all, bfs::perm_options::remove);
+                chmod(file_path, 0);
 
                 if (read_file(file_path) == "") {
                     builder->scan_start(folder->get_id()).apply(*sup);
@@ -1567,7 +1579,7 @@ void test_read_errors() {
 
                 auto max_seq = folder_info->get_max_sequence();
 
-                bfs::permissions(file_path, bfs::perms::all, bfs::perm_options::remove);
+                chmod(file_path, 0);
                 if (read_file(file_path) == "") {
                     builder->scan_start(folder->get_id()).apply(*sup);
                     CHECK(!folder->is_scanning());
@@ -1642,7 +1654,7 @@ void test_read_errors() {
                 auto dir_path = root_path / L"папка";
                 auto subdir_path = dir_path / L"подпапка";
                 auto file_path = subdir_path / "файл.bin";
-                bfs::create_directories(subdir_path);
+                create_directories(subdir_path);
                 write_file(file_path, "12345");
                 builder->scan_start(folder->get_id()).apply(*sup);
                 CHECK(!folder->is_scanning());
@@ -1658,14 +1670,14 @@ void test_read_errors() {
 
                 auto max_seq = folder_info->get_max_sequence();
 
-                auto perms = bfs::status(dir_path).permissions();
-                bfs::permissions(dir_path, bfs::perms::all, bfs::perm_options::remove);
+                auto perms = permissions(dir_path);
+                chmod(dir_path, 0);
 
                 auto ec = sys::error_code{};
-                bfs::create_directories(dir_path / L"авось", ec);
+                create_directories(dir_path / L"авось", ec);
                 if (ec) {
                     builder->scan_start(folder->get_id()).apply(*sup);
-                    bfs::permissions(dir_path, perms, bfs::perm_options::replace);
+                    chmod(dir_path, perms);
 
                     CHECK(!folder->is_scanning());
                     CHECK(folder->get_scan_finish() >= folder->get_scan_start());
@@ -1700,7 +1712,8 @@ void test_leaks() {
         void launch_hasher() noexcept override {
             hasher = sup->create_actor<managed_hasher_t>().index(1).auto_reply(false).timeout(timeout).finish().get();
         }
-        void main() noexcept override {
+        void main(const utils::allocator_t &allocator) noexcept override {
+            auto root_path = path_guard.get_view(allocator);
             write_file(root_path / "file-1.bin", "12345");
             write_file(root_path / "file-2.bin", "12345");
             builder->scan_start(folder->get_id()).apply(*sup);
@@ -1723,7 +1736,8 @@ void test_hashing_fail() {
         void launch_hasher() noexcept override {
             hasher = sup->create_actor<managed_hasher_t>().index(1).subscribe(false).timeout(timeout).finish().get();
         }
-        void main() noexcept override {
+        void main(const utils::allocator_t &allocator) noexcept override {
+            auto root_path = path_guard.get_view(allocator);
             auto block_sz = fs::block_sizes[0];
             auto b = std::string(block_sz * 5, 'x');
             write_file(root_path / "file.bin", b);
@@ -1741,8 +1755,10 @@ void test_hashing_fail() {
 
 void test_incomplete() {
     struct F : fixture_t {
-        void main() noexcept override {
+        void main(const utils::allocator_t &allocator) noexcept override {
             using clock_t = std::chrono::system_clock;
+
+            auto root_path = path_guard.get_view(allocator);
             auto sha256 = peer_device->device_id().get_sha256();
             auto block_sz = fs::block_sizes[0];
             auto path = root_path / L"файл.syncspirit-tmp";
@@ -1772,15 +1788,15 @@ void test_incomplete() {
 
             SECTION("no in model => remove") {
                 write_file(path, "");
-                last_write_time(path, fs::from_unix(m_time));
+                last_write_time(path, m_time);
                 builder->scan_start(folder->get_id()).apply(*sup);
 
                 CHECK(files->size() == 0);
-                CHECK(!bfs::exists(path));
+                CHECK(!exists(path));
             }
             SECTION("exists only in my model => remove") {
                 write_file(path, "");
-                last_write_time(path, fs::from_unix(m_time));
+                last_write_time(path, m_time);
                 builder->local_update(folder->get_id(), pr_file)
                     .apply(*sup)
                     .then()
@@ -1788,7 +1804,7 @@ void test_incomplete() {
                     .apply(*sup);
 
                 CHECK(files->size() == 1);
-                CHECK(!bfs::exists(path));
+                CHECK(!exists(path));
             }
             SECTION("found in peer model, remove") {
                 auto should_not_exist = true;
@@ -1800,7 +1816,7 @@ void test_incomplete() {
                     builder->scan_start(folder->get_id()).apply(*sup);
 
                     write_file(path, "");
-                    last_write_time(path, fs::from_unix(m_time));
+                    last_write_time(path, m_time);
 
                     builder->scan_start(folder->get_id()).apply(*sup);
 
@@ -1809,18 +1825,17 @@ void test_incomplete() {
 #ifndef SYNCSPIRIT_WIN
                 SECTION("cannot read tmp file") {
                     write_file(path, "12345");
-                    last_write_time(path, fs::from_unix(m_time));
-                    auto status = bfs::status(path);
-                    auto perms = static_cast<uint32_t>(status.permissions());
+                    last_write_time(path, m_time);
+                    auto perms = permissions(path);
 
                     proto::add_blocks(pr_file, b_1);
                     proto::set_size(pr_file, data_1.size());
                     proto::set_permissions(pr_file, perms);
-                    proto::set_modified_s(pr_file, to_unix(bfs::last_write_time(path)));
+                    proto::set_modified_s(pr_file, last_write_time(path));
 
                     builder->make_index(sha256, folder->get_id()).add(pr_file, peer_device).finish().apply(*sup);
 
-                    bfs::permissions(path, bfs::perms::all, bfs::perm_options::remove);
+                    chmod(path, 0);
                     if (read_file(path) == "") {
                         builder->scan_start(folder->get_id()).apply(*sup);
                         CHECK(files->size() == 0);
@@ -1832,18 +1847,17 @@ void test_incomplete() {
 #endif
                 SECTION("local version is better than remote (local file does exists)") {
                     write_file(path, "1234");
-                    last_write_time(path, fs::from_unix(m_time));
-                    auto p = root_path / widen(file_name);
+                    last_write_time(path, m_time);
+                    auto p = root_path / file_name;
 
                     write_file(p, "12345");
-                    last_write_time(path, fs::from_unix(m_time));
-                    auto status = bfs::status(p);
-                    auto perms = static_cast<uint32_t>(status.permissions());
+                    last_write_time(path, m_time);
+                    auto perms = permissions(path);
 
                     proto::add_blocks(pr_file, b_1);
                     proto::set_size(pr_file, data_1.size());
                     proto::set_permissions(pr_file, perms);
-                    proto::set_modified_s(pr_file, to_unix(bfs::last_write_time(p)));
+                    proto::set_modified_s(pr_file, last_write_time(p));
 
                     builder->local_update(folder->get_id(), pr_file).apply(*sup);
 
@@ -1858,7 +1872,7 @@ void test_incomplete() {
                     REQUIRE(seq_1 == seq_2);
                 }
                 if (should_not_exist) {
-                    CHECK(!bfs::exists(path));
+                    CHECK(!exists(path));
                 }
             }
             SECTION("2 blocks peer file") {
@@ -1866,12 +1880,11 @@ void test_incomplete() {
                 proto::add_blocks(pr_file, b_2);
                 proto::set_size(pr_file, data_1.size() + data_2.size());
 
-                auto model_path = root_path / widen(file_name);
+                auto model_path = root_path / file_name;
                 SECTION("all blocks match => rename & add into model") {
                     write_file(path, "1234567890");
-                    last_write_time(path, fs::from_unix(m_time));
-                    auto status = bfs::status(path);
-                    auto perms = static_cast<uint32_t>(status.permissions());
+                    last_write_time(path, m_time);
+                    auto perms = permissions(path);
 
                     proto::set_permissions(pr_file, perms);
                     builder->make_index(sha256, folder->get_id()).add(pr_file, peer_device).finish().apply(*sup);
@@ -1879,8 +1892,8 @@ void test_incomplete() {
                     auto max_seq = folder_info->get_max_sequence();
                     builder->scan_start(folder->get_id()).apply(*sup);
 
-                    CHECK(!bfs::exists(path));
-                    CHECK(bfs::exists(model_path));
+                    CHECK(!exists(path));
+                    CHECK(exists(model_path));
                     CHECK(read_file(model_path) == "1234567890");
                     CHECK(files->size() == 1);
                     auto f = files->by_name(file_name);
@@ -1899,16 +1912,15 @@ void test_incomplete() {
                 }
                 SECTION("1st block match") {
                     write_file(path, "1234500000");
-                    last_write_time(path, fs::from_unix(m_time));
-                    auto status = bfs::status(path);
-                    auto perms = static_cast<uint32_t>(status.permissions());
+                    last_write_time(path, m_time);
+                    auto perms = permissions(path);
 
                     proto::set_permissions(pr_file, perms);
                     builder->make_index(sha256, folder->get_id()).add(pr_file, peer_device).finish().apply(*sup);
 
                     builder->scan_start(folder->get_id()).apply(*sup);
-                    CHECK(bfs::exists(path));
-                    CHECK(!bfs::exists(model_path));
+                    CHECK(exists(path));
+                    CHECK(!exists(model_path));
                     CHECK(files->size() == 0);
 
                     auto peer_file = folder_info_peer->get_file_infos().by_name(file_name);
@@ -1917,16 +1929,15 @@ void test_incomplete() {
                 }
                 SECTION("2nd block match") {
                     write_file(path, "0000067890");
-                    last_write_time(path, fs::from_unix(m_time));
-                    auto status = bfs::status(path);
-                    auto perms = static_cast<uint32_t>(status.permissions());
+                    last_write_time(path, m_time);
+                    auto perms = permissions(path);
 
                     proto::set_permissions(pr_file, perms);
                     builder->make_index(sha256, folder->get_id()).add(pr_file, peer_device).finish().apply(*sup);
 
                     builder->scan_start(folder->get_id()).apply(*sup);
-                    CHECK(bfs::exists(path));
-                    CHECK(!bfs::exists(model_path));
+                    CHECK(exists(path));
+                    CHECK(!exists(model_path));
                     CHECK(files->size() == 0);
 
                     auto peer_file = folder_info_peer->get_file_infos().by_name(file_name);
@@ -1935,23 +1946,21 @@ void test_incomplete() {
                 }
                 SECTION("no block match") {
                     write_file(path, "0000000000");
-                    last_write_time(path, fs::from_unix(m_time));
-                    auto status = bfs::status(path);
-                    auto perms = static_cast<uint32_t>(status.permissions());
+                    last_write_time(path, m_time);
+                    auto perms = permissions(path);
 
                     proto::set_permissions(pr_file, perms);
                     builder->make_index(sha256, folder->get_id()).add(pr_file, peer_device).finish().apply(*sup);
 
                     builder->scan_start(folder->get_id()).apply(*sup);
-                    CHECK(!bfs::exists(path));
-                    CHECK(!bfs::exists(model_path));
+                    CHECK(!exists(path));
+                    CHECK(!exists(model_path));
                     CHECK(files->size() == 0);
                 }
                 SECTION("synchronization lock => ignored") {
                     write_file(path, "0000000000");
-                    last_write_time(path, fs::from_unix(m_time));
-                    auto status = bfs::status(path);
-                    auto perms = static_cast<uint32_t>(status.permissions());
+                    last_write_time(path, m_time);
+                    auto perms = permissions(path);
                     proto::set_permissions(pr_file, perms);
                     builder->make_index(sha256, folder->get_id()).add(pr_file, peer_device).finish().apply(*sup);
 
@@ -1960,13 +1969,13 @@ void test_incomplete() {
                     f->synchronizing_lock();
 
                     builder->scan_start(folder->get_id()).apply(*sup);
-                    CHECK(bfs::exists(path));
-                    CHECK(!bfs::exists(model_path));
+                    CHECK(exists(path));
+                    CHECK(!exists(model_path));
 
                     f->synchronizing_unlock();
                     builder->scan_start(folder->get_id()).apply(*sup);
-                    CHECK(!bfs::exists(path));
-                    CHECK(!bfs::exists(model_path));
+                    CHECK(!exists(path));
+                    CHECK(!exists(model_path));
                     CHECK(files->size() == 0);
                 }
             }
@@ -1989,13 +1998,14 @@ void test_traversal() {
             paths.emplace_back(std::string(name));
         }
 
-        void main() noexcept override {
-            bfs::create_directory(root_path / "a");
-            bfs::create_directory(root_path / "a" / "c");
-            bfs::create_directory(root_path / "b");
-            bfs::create_directory(root_path / "d");
-            bfs::create_directory(root_path / "d" / "d1");
-            bfs::create_directory(root_path / "d" / "d2");
+        void main(const utils::allocator_t &allocator) noexcept override {
+            auto root_path = path_guard.get_view(allocator);
+            create_directories(root_path / "a");
+            create_directories(root_path / "a" / "c");
+            create_directories(root_path / "b");
+            create_directories(root_path / "d");
+            create_directories(root_path / "d" / "d1");
+            create_directories(root_path / "d" / "d2");
             write_file(root_path / "x.bin", "");
             write_file(root_path / "y.bin", "");
             write_file(root_path / "a/file.bin", "");
@@ -2030,11 +2040,11 @@ void test_traversal() {
 
 void test_importing() {
     struct F : fixture_t {
-        void main() noexcept override {
+        void main(const utils::allocator_t &allocator) noexcept override {
+            auto root_path = path_guard.get_view(allocator);
             auto peer_short_id = my_device->device_id().get_uint();
             auto modified_s = std::int64_t{12345};
             auto sha256 = peer_device->device_id().get_sha256();
-
             SECTION("regular file") {
                 auto block_sz = fs::block_sizes[0];
                 auto path = root_path / L"файл";
@@ -2066,9 +2076,9 @@ void test_importing() {
                     proto::set_block_size(pr_file, 5);
 
                     write_file(path, "12345");
-                    bfs::last_write_time(path, from_unix(modified_s));
+                    last_write_time(path, modified_s);
 
-                    proto::set_permissions(pr_file, static_cast<uint32_t>(bfs::status(path).permissions()));
+                    proto::set_permissions(pr_file, permissions(path));
                     builder->make_index(sha256, folder->get_id()).add(pr_file, peer_device).finish().apply(*sup);
 
                     builder->scan_start(folder->get_id()).apply(*sup);
@@ -2086,9 +2096,9 @@ void test_importing() {
                     proto::set_block_size(pr_file, 5);
 
                     write_file(path, "1234567890");
-                    bfs::last_write_time(path, from_unix(modified_s));
+                    last_write_time(path, modified_s);
 
-                    proto::set_permissions(pr_file, static_cast<uint32_t>(bfs::status(path).permissions()));
+                    proto::set_permissions(pr_file, permissions(path));
                     builder->make_index(sha256, folder->get_id()).add(pr_file, peer_device).finish().apply(*sup);
 
                     builder->scan_start(folder->get_id()).apply(*sup);
@@ -2117,8 +2127,8 @@ void test_importing() {
                 proto::set_no_permissions(pr_file, true);
 #endif
 
-                bfs::create_directories(path);
-                proto::set_permissions(pr_file, static_cast<uint32_t>(bfs::status(path).permissions()));
+                create_directories(path);
+                proto::set_permissions(pr_file, permissions(path));
 
                 builder->make_index(sha256, folder->get_id()).add(pr_file, peer_device).finish().apply(*sup);
 
@@ -2134,7 +2144,7 @@ void test_importing() {
                 SECTION("single deleted file") {
                     auto path = root_path / L"файл.bin";
                     auto pr_file = proto::FileInfo();
-                    proto::set_name(pr_file, path.filename().string());
+                    proto::set_name(pr_file, path.get_filename());
                     proto::set_sequence(pr_file, 4);
                     proto::set_type(pr_file, proto::FileInfoType::FILE);
                     proto::set_deleted(pr_file, true);
@@ -2151,9 +2161,9 @@ void test_importing() {
                     auto fi_my = folder->get_folder_infos().by_device(*my_device);
                     auto &files_my = fi_my->get_file_infos();
                     REQUIRE(files_my.size() == 1);
-                    auto file = files_my.by_name(path.filename().string());
+                    auto file = files_my.by_name(path.get_filename());
                     REQUIRE(file->get_version().as_proto() == v);
-                    CHECK(!bfs::exists(path));
+                    CHECK(!exists(path));
                 }
                 SECTION("deleted file inside deleted dir") {
                     auto v = proto::Vector();
@@ -2161,20 +2171,18 @@ void test_importing() {
                     proto::set_id(counter, 1);
                     proto::set_value(counter, 1);
 
-                    auto dir_path = bfs::path(L"папка");
+                    auto dir_path = utils::make_native_view(L"папка", allocator);
                     auto file_path = dir_path / L"файл.bin";
-                    auto narrow_dir = narrow(dir_path.generic_wstring());
-                    auto narrow_file = narrow(file_path.generic_wstring());
 
                     auto pr_dir = proto::FileInfo();
-                    proto::set_name(pr_dir, narrow_dir);
+                    proto::set_name(pr_dir, dir_path.get_full_name());
                     proto::set_sequence(pr_dir, 4);
                     proto::set_type(pr_dir, proto::FileInfoType::DIRECTORY);
                     proto::set_deleted(pr_dir, true);
                     proto::set_version(pr_dir, v);
 
                     auto pr_file = proto::FileInfo();
-                    proto::set_name(pr_file, narrow_file);
+                    proto::set_name(pr_file, file_path.get_full_name());
                     proto::set_sequence(pr_file, 5);
                     proto::set_type(pr_file, proto::FileInfoType::FILE);
                     proto::set_deleted(pr_file, true);
@@ -2191,14 +2199,12 @@ void test_importing() {
                     auto &files_my = folder_info->get_file_infos();
                     REQUIRE(files_my.size() == 2);
 
-                    auto file_1 = files_my.by_name(narrow_dir);
+                    auto file_1 = files_my.by_name(dir_path.get_full_name());
                     REQUIRE(file_1->get_version().as_proto() == v);
-                    auto file_2 = files_my.by_name(narrow_file);
+                    auto file_2 = files_my.by_name(file_path.get_full_name());
                     REQUIRE(file_2->get_version().as_proto() == v);
 
-                    auto it = bfs::directory_iterator(root_path);
-                    auto children_count = std::distance(it, bfs::directory_iterator());
-                    CHECK(children_count == 0);
+                    CHECK(is_empty(root_path));
                 }
             }
         }
@@ -2230,12 +2236,13 @@ void test_concurrency() {
             std::ignore = msg.payload.diff->visit(v, nullptr);
         }
 
-        void main() noexcept override {
+        void main(const utils::allocator_t &allocator) noexcept override {
+            auto root_path = path_guard.get_view(allocator);
             for (int i = 0; i < N; ++i) {
                 auto letter = static_cast<char>('a' + i);
                 auto dir_name = std::string_view(&letter, 1);
                 auto dir_path = root_path / "sub-dir" / dir_name;
-                bfs::create_directories(dir_path);
+                create_directories(dir_path);
                 for (std::uint_fast32_t j = 0; j < M; ++j) {
                     auto file_name = fmt::format("{:03}.bin", j);
                     auto file_path = dir_path / file_name;
@@ -2246,7 +2253,7 @@ void test_concurrency() {
             REQUIRE(files->size() == 1 + N * (M + 1));
 
             interrupts = 0;
-            bfs::remove_all(root_path / "sub-dir");
+            remove_all(root_path / "sub-dir");
             builder->scan_start(folder->get_id()).apply(*sup);
 
             CHECK(interrupts >= N);
@@ -2262,7 +2269,8 @@ void test_races() {
     static constexpr int N = 5;
 
     struct F : fixture_t {
-        void main() noexcept override {
+        void main(const utils::allocator_t &allocator) noexcept override {
+            auto root_path = path_guard.get_view(allocator);
             for (int i = 0; i < N; ++i) {
                 auto path = root_path / fmt::format("file-{}", i);
                 write_file(path, "12345");
