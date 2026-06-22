@@ -115,6 +115,8 @@ std::size_t create_directories(const poly_path_view_t &path, std::error_code &ec
     auto pos = std::size_t{0};
     if (whole_str[0] == L'\\' && whole_str.size() > 8) {
         pos += 8; // skip "\\?\X:\"
+    } else if (path.is_absolute() && whole_str.size() > 3) {
+        pos += 3;
     }
     // spdlog::info("zzz pos: {}", pos);
     pos = whole_str.find(L'\\', pos);
