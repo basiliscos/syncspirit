@@ -12,6 +12,7 @@
 #include <windows.h>
 #include <vector>
 #include <unordered_map>
+#include <atomic>
 
 namespace syncspirit::fs::platform::windows {
 
@@ -60,6 +61,7 @@ struct SYNCSPIRIT_API platform_context_t : context_base_t {
     io_callbacks_map_t io_callbacks;
     handles_t handles;
     io_guard_t async_guard;
+    std::atomic_bool notify_flag{false};
 };
 
 } // namespace syncspirit::fs::platform::windows

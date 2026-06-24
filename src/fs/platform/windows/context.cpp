@@ -63,7 +63,7 @@ io_ctx_t::io_context_t(platform_context_t::io_callback_t callback_, void *data_)
 
 static void async_cb(HANDLE handle, void *data) {
     auto ctx = reinterpret_cast<platform_context_t *>(data);
-    ::ResetEvent(handle);
+    ctx->notify_flag.store(false);
     if (auto ok = ::ResetEvent(handle); !ok) {
         auto ec = sys::error_code(::GetLastError(), sys::system_category());
         auto log = utils::get_logger("fs");
@@ -91,7 +91,10 @@ platform_context_t::~platform_context_t() {
 
 void platform_context_t::notify() noexcept {
     if (async_guard) {
-        ::SetEvent(async_guard.handle);
+        if (!notify_flag.load()) {
+            notify_flag.store(true);
+            ::SetEvent(async_guard.handle);
+        }
     }
 }
 
