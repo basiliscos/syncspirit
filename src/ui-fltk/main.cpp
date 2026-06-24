@@ -447,7 +447,7 @@ int app_main(app_context_t &app_ctx) {
         logger->trace("fs thread has been terminated");
     });
 
-    logger->debug("utf8 local support: {}", fl_utf8locale());
+    logger->debug("utf8 locale support: {}", fl_utf8locale());
 
     while (!shutdown_flag) {
         sup_fltk->do_process();

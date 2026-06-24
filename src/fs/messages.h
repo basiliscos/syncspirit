@@ -214,6 +214,8 @@ struct folder_change_t {
 };
 using folder_changes_t = std::vector<folder_change_t>;
 
+struct io_signal_t {};
+
 } // namespace payload
 
 namespace message {
@@ -226,6 +228,7 @@ using create_dir_t = r::message_t<payload::create_dir_t>;
 using watch_folder_t = r::message_t<payload::watch_folder_t>;
 using unwatch_folder_t = r::message_t<payload::unwatch_folder_t>;
 using folder_changes_t = r::message_t<payload::folder_changes_t>;
+using io_signal_t = r::message_t<payload::io_signal_t>;
 
 } // namespace message
 

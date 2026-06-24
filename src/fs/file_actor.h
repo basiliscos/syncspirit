@@ -79,9 +79,13 @@ struct SYNCSPIRIT_API file_actor_t : public r::actor_base_t {
     using context_cache_t = std::unordered_map<const void *, file_cache_t>;
     using timer_opt_t = std::optional<r::request_id_t>;
     using scan_dir_callback_t = execution_context_t::scan_dir_callback_t;
+    using io_commands_ptr_t = r::intrusive_ptr_t<message::io_commands_t>;
+    using io_queue_t = std::list<io_commands_ptr_t>;
+    using io_signal_ptr_t = r::intrusive_ptr_t<message::io_signal_t>;
 
     void on_exec(message::foreign_executor_t &) noexcept;
     void on_io_commands(message::io_commands_t &) noexcept;
+    void on_io_signal(message::io_signal_t &) noexcept;
     void on_create_dir(message::create_dir_t &) noexcept;
     void process(payload::block_request_t &, process_context_t &) noexcept;
     void process(payload::remote_copy_t &, process_context_t &) noexcept;
@@ -116,6 +120,8 @@ struct SYNCSPIRIT_API file_actor_t : public r::actor_base_t {
     hasher::hasher_plugin_t *hasher = nullptr;
     timer_opt_t expiration_timer;
     scan_dir_callback_t scan_dir_callback;
+    io_queue_t io_queue;
+    io_signal_ptr_t io_signal;
 };
 
 } // namespace syncspirit::fs

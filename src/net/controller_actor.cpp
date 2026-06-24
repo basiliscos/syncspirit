@@ -117,8 +117,13 @@ struct C::stack_context_t : model::diff::diff_assember_t {
                 auto &self = actor.get_address();
                 auto &fs = actor.fs_addr;
                 auto cache_key = actor.get_address().get();
-                actor.route<fs::payload::io_commands_t>(fs, self, cache_key, std::move(io_commands));
-                actor.resources->acquire(resource::fs);
+                for (auto& io_command: io_commands) {
+                    auto unit = std::vector<fs::payload::io_command_t>();
+                    unit.reserve(1);
+                    unit.push_back(std::move(io_command));
+                    actor.route<fs::payload::io_commands_t>(fs, self, cache_key, std::move(unit));
+                    actor.resources->acquire(resource::fs);
+                }
             }
         }
         if (has_diffs()) {
