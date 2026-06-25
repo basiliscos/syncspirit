@@ -22,7 +22,7 @@ template <typename T> struct error_curry_t : model::arc_base_t<error_curry_t<T>>
     error_curry_t(T &owner, error_fn_t &on_error) noexcept : backend{&owner}, on_error_fn{std::move(on_error)} {}
     virtual ~error_curry_t() = default;
 
-    void error(const sys::error_code &ec) noexcept {
+    void error(const std::error_code &ec) noexcept {
         on_error_fn(ec);
         backend->supervisor.do_process();
     }
@@ -159,7 +159,7 @@ template <> struct base_impl_t<ssl_socket_t> {
             auto host = config.uri->host();
             log->trace("will will use sni extension (value = '{}')", host);
             if (!SSL_set_tlsext_host_name(sock.native_handle(), host.c_str())) {
-                sys::error_code ec{static_cast<int>(::ERR_get_error()), asio::error::get_ssl_category()};
+                std::error_code ec{static_cast<int>(::ERR_get_error()), asio::error::get_ssl_category()};
                 log->error("http_actor_t:: Set SNI Hostname : {}", ec);
             }
         }
@@ -286,7 +286,7 @@ template <> struct impl<tcp_socket_t> {
     }
 
     template <typename Owner> inline static void async_handshake(Owner owner) noexcept {
-        sys::error_code ec;
+        auto ec = boost::system::error_code();
         auto endpoint = owner->backend->sock.remote_endpoint(ec);
         auto &strand = owner->backend->strand;
         if (ec) {
@@ -311,7 +311,7 @@ template <> struct impl<tcp_socket_t> {
     template <typename Backend> inline static void cancel(Backend &backend, socket_t &sock) noexcept {
         if (!backend.cancelling) {
             backend.cancelling = true;
-            sys::error_code ec;
+            auto ec = boost::system::error_code();
             sock.cancel(ec);
             if (ec) {
                 utils::get_logger("transport.sock")->error("impl<tcp::socket>::cancel(): {}", ec);
@@ -398,7 +398,7 @@ template <typename T, typename Sock, typename P> struct interface_t : P {
 
     void cancel() noexcept override { impl<Sock>::cancel(get_self(), get_self().sock); }
 
-    asio::ip::address local_address(sys::error_code &ec) noexcept override {
+    asio::ip::address local_address(boost::system::error_code &ec) noexcept override {
         auto &sock = get_self().get_physical_layer();
         auto endpoint = sock.local_endpoint(ec);
         if (!ec) {

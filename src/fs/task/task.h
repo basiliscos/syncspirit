@@ -11,7 +11,6 @@
 
 namespace syncspirit::fs {
 
-namespace sys = boost::system;
 namespace r = rotor;
 
 struct fs_slave_t;

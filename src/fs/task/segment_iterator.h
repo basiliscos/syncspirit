@@ -23,7 +23,7 @@ struct SYNCSPIRIT_API segment_iterator_t {
     std::int32_t block_size;
     std::int32_t last_block_size;
     std::int64_t last_write_time;
-    sys::error_code ec;
+    std::error_code ec;
     file_t file;
     std::int32_t current_block = 0;
     hasher::payload::extendended_context_prt_t context;

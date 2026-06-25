@@ -167,7 +167,7 @@ cluster_update_t::cluster_update_t(const utils::path_t &default_path, const clus
             if (label.empty()) {
                 return model::make_error_code(model::error_code_t::empty_folder_name);
             }
-            auto ec = sys::error_code();
+            auto ec = std::error_code();
             utils::create_directories(path, ec);
             LOG_TRACE(log, "cluster_update_t, trying to make a dir: '{}' for folder '{}', result: {}", path, folder_id,
                       ec);

@@ -7,12 +7,10 @@
 #include "model/folder_info.h"
 #include "fs/task/scan_dir.h"
 #include "utils/path.h"
-#include <boost/system/error_code.hpp>
+#include <system_error>
 #include <cstdint>
 
 namespace syncspirit::net::local_keeper {
-
-namespace sys = boost::system;
 
 struct child_info_t : fs::task::scan_dir_t::child_info_t {
     using parent_t = fs::task::scan_dir_t::child_info_t;
@@ -31,7 +29,7 @@ struct child_info_t : fs::task::scan_dir_t::child_info_t {
     proto::FileInfo serialize(const model::folder_info_t &local_folder, blocks_t blocks, bool ignore_permissions);
     const model::file_info_t *fetch_model(const model::folder_info_t &local_folder) const;
 
-    sys::error_code ec;
+    std::error_code ec;
     presentation::presence_ptr_t self;
     presentation::presence_ptr_t parent;
     generation_t generation;

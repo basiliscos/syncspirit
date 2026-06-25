@@ -39,7 +39,6 @@ constexpr unsigned http_version = 11;
 
 namespace http = boost::beast::http;
 namespace asio = boost::asio;
-namespace sys = boost::system;
 
 outcome::result<void> make_discovery_request(utils::bytes_t &buff, std::uint32_t max_wait) noexcept {
     std::string upnp_host = fmt::format("{}:{}", upnp_addr, upnp_port);
@@ -60,7 +59,7 @@ outcome::result<void> make_discovery_request(utils::bytes_t &buff, std::uint32_t
 outcome::result<discovery_result> parse(const char *data, std::size_t bytes) noexcept {
     http::parser<false, http::empty_body> parser;
     auto buff = asio::const_buffers_1(data, bytes);
-    sys::error_code ec;
+    auto ec = boost::system::error_code();
     parser.put(buff, ec);
     if (ec) {
         return ec;

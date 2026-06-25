@@ -22,7 +22,7 @@ struct complete_scan_t {
     bool partial = false;
 };
 struct suspend_scan_t {
-    sys::error_code ec;
+    std::error_code ec;
 };
 struct unsuspend_scan_t {};
 struct removed_dir_t {

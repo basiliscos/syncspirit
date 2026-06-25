@@ -213,7 +213,7 @@ auto FU::make(const utils::path_t &folder_info, watcher_base_t &actor) noexcept 
             }
         } else {
             auto folder_path_view = folder_info.get_view(allocator);
-            auto ec = sys::error_code{};
+            auto ec = std::error_code{};
             auto path = folder_path_view / utils::make_native_view(update.path, allocator);
             auto stats = utils::get_stats(path, ec);
             if (ec) {

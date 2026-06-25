@@ -8,7 +8,6 @@
 #include "log.h"
 #include "format.hpp"
 #include <random>
-#include <boost/system/error_code.hpp>
 #include <openssl/pem.h>
 #include <openssl/sha.h>
 #include <openssl/err.h>
@@ -22,8 +21,6 @@
 #ifdef OSSL_DEPRECATEDIN_3_0
 #include <openssl/encoder.h>
 #endif
-
-namespace sys = boost::system;
 
 namespace syncspirit::utils {
 
@@ -261,7 +258,7 @@ outcome::result<void> key_pair_t::save(const utils::poly_path_view_t &cert_path,
 static outcome::result<guard_t<BIO>> read_to_mem_bio(const utils::poly_path_view_t &cert_path) {
     auto file = io_stream_t::open_read(cert_path);
     if (!file) {
-        return sys::error_code{errno, sys::system_category()};
+        return std::error_code{errno, std::system_category()};
     }
 
     auto data_opt = file.assume_value().read_whole();

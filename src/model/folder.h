@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #pragma once
 
@@ -12,13 +12,12 @@
 #include "folder_data.h"
 #include "syncspirit-export.h"
 #include "proto/proto-fwd.hpp"
-#include <boost/system/error_code.hpp>
+#include <system_error>
 #include <boost/outcome.hpp>
 
 namespace syncspirit::model {
 
 namespace outcome = boost::outcome_v2;
-namespace sys = boost::system;
 
 struct cluster_t;
 using cluster_ptr_t = intrusive_ptr_t<cluster_t>;
@@ -55,9 +54,9 @@ struct SYNCSPIRIT_API folder_t final : augmentable_t, folder_data_t {
     bool is_scanning() const noexcept;
     bool is_synchronizing() const noexcept;
     void adjust_synchronization(std::int_fast32_t delta) noexcept;
-    void mark_suspended(bool value, const sys::error_code &ec = {}) noexcept;
+    void mark_suspended(bool value, const std::error_code &ec = {}) noexcept;
     bool is_suspended() const noexcept;
-    const sys::error_code &get_suspend_reason() const noexcept;
+    const std::error_code &get_suspend_reason() const noexcept;
 
     using folder_data_t::get_path;
     using folder_data_t::set_path;
@@ -79,7 +78,7 @@ struct SYNCSPIRIT_API folder_t final : augmentable_t, folder_data_t {
     cluster_t *cluster = nullptr;
     unsigned char key[data_length];
     std::int_fast32_t synchronizing = 0;
-    sys::error_code suspend_reason;
+    std::error_code suspend_reason;
     bool suspended;
 };
 

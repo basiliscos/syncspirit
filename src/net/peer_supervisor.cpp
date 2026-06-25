@@ -92,7 +92,7 @@ void peer_supervisor_t::on_connected(message::peer_connected_t &msg) noexcept {
     LOG_TRACE(log, "on_connected");
     auto &p = msg.payload;
     auto req = static_cast<message::connect_request_t *>(p.custom.get());
-    auto ec = sys::error_code();
+    auto ec = boost::system::error_code();
     auto port = p.uri->port_number();
     auto host = p.uri->encoded_host();
     auto ip = asio::ip::make_address(host, ec);

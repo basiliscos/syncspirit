@@ -97,8 +97,6 @@ struct table_t : content::folder_table_t {
         initially_shared_with = *shared_with;
         initially_non_shared_with = *non_shared_with;
         assign_rows(std::move(data));
-
-        refresh();
     }
 
     void refresh() override {
@@ -118,7 +116,7 @@ struct table_t : content::folder_table_t {
                 auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
                 auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
                 auto path = utils::make_native_view(db_path, allocator);
-                auto ec = sys::error_code{};
+                auto ec = std::error_code{};
                 if (utils::exists(path, ec)) {
                     if (!utils::is_empty(path, ec)) {
                         error = "referred directory should be empty";
@@ -176,7 +174,9 @@ bool pending_folder_t::on_select() {
         folder->get_folder_infos().put(fi);
 
         int x = prev->x(), y = prev->y(), w = prev->w(), h = prev->h();
-        return new table_t(*this, std::move(fi), std::move(folder), x, y, w, h);
+        auto table = new table_t(*this, std::move(fi), std::move(folder), x, y, w, h);
+        table->refresh();
+        return table;
     });
     return true;
 }

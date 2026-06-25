@@ -268,7 +268,7 @@ void initiator_actor_t::on_resolve(message::resolve_response_t &res) noexcept {
     resources->acquire(resource::connect);
 }
 
-void initiator_actor_t::on_io_error(const sys::error_code &ec, r::plugin::resource_id_t resource) noexcept {
+void initiator_actor_t::on_io_error(const boost::system::error_code &ec, r::plugin::resource_id_t resource) noexcept {
     LOG_TRACE(log, "on_io_error: {}", ec);
     resources->release(resource);
     if (ec != asio::error::operation_aborted) {

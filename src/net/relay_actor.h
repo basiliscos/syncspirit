@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2022-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2022-2026 Ivan Baidakou
 
 #pragma once
 
@@ -76,7 +76,7 @@ struct SYNCSPIRIT_API relay_actor_t : public r::actor_base_t {
     void on_connect(message::connect_response_t &res) noexcept;
     void on_write(std::size_t sz) noexcept;
     void on_read(std::size_t bytes) noexcept;
-    void on_io_error(const sys::error_code &ec, r::plugin::resource_id_t resource) noexcept;
+    void on_io_error(const boost::system::error_code &ec, r::plugin::resource_id_t resource) noexcept;
     bool on(proto::relay::message_t &) noexcept;
     bool on(proto::relay::response_t &) noexcept;
     bool on(proto::relay::session_invitation_t &) noexcept;

@@ -13,7 +13,6 @@
 #include <unistd.h>
 #endif
 
-namespace sys = boost::system;
 using namespace syncspirit::utils;
 
 // TODO: remove
@@ -63,7 +62,7 @@ auto io_stream_t::open_truncate(const utils::poly_path_view_t &path) noexcept ->
     if (f >= 0) {
         return io_stream_t(f);
     }
-    return sys::error_code{errno, sys::system_category()};
+    return std::error_code{errno, std::system_category()};
 }
 
 auto io_stream_t::open_read(const utils::poly_path_view_t &path) noexcept -> outcome::result<io_stream_t> {
@@ -77,7 +76,7 @@ auto io_stream_t::open_read(const utils::poly_path_view_t &path) noexcept -> out
     if (f >= 0) {
         return io_stream_t(f);
     }
-    return sys::error_code{errno, sys::system_category()};
+    return std::error_code{errno, std::system_category()};
 }
 
 auto io_stream_t::open_write(const utils::poly_path_view_t &path, std::size_t file_size) noexcept -> opne_write_t {
@@ -96,10 +95,10 @@ auto io_stream_t::open_write(const utils::poly_path_view_t &path, std::size_t fi
         auto &f = opt.assume_value();
         if (file_size) {
             if (SS_VIEW_RESIZE(f.fd, file_size) != 0) {
-                return sys::error_code{errno, sys::system_category()};
+                return std::error_code{errno, std::system_category()};
             }
             if (lseek(f.fd, 0, SEEK_SET) != 0) {
-                return sys::error_code{errno, sys::system_category()};
+                return std::error_code{errno, std::system_category()};
             }
             return {std::move(f), true, true};
         }
@@ -114,7 +113,7 @@ auto io_stream_t::open_write(const utils::poly_path_view_t &path, std::size_t fi
         if (fd >= 0) {
             return {io_stream_t(fd), false, false};
         }
-        return sys::error_code{errno, sys::system_category()};
+        return std::error_code{errno, std::system_category()};
     }
 }
 
@@ -123,7 +122,7 @@ auto io_stream_t::close() noexcept -> outcome::result<void> {
         auto ok = ::close(fd) == 0;
         fd = -1;
         if (!ok) {
-            return sys::error_code{errno, sys::system_category()};
+            return std::error_code{errno, std::system_category()};
         }
     }
     return outcome::success();
@@ -133,7 +132,7 @@ auto io_stream_t::get_position() const noexcept -> outcome::result<offset_t> {
     assert(fd);
     auto pos = lseek(fd, 0, SEEK_CUR);
     if (pos == -1) {
-        auto ec = sys::error_code{errno, sys::system_category()};
+        auto ec = std::error_code{errno, std::system_category()};
         (void)const_cast<io_stream_t *>(this)->close();
         return ec;
     }
@@ -142,7 +141,7 @@ auto io_stream_t::get_position() const noexcept -> outcome::result<offset_t> {
 
 auto io_stream_t::set_position(offset_t value) noexcept -> outcome::result<void> {
     if (lseek(fd, value, SEEK_SET) != value) {
-        auto ec = sys::error_code{errno, sys::system_category()};
+        auto ec = std::error_code{errno, std::system_category()};
         (void)const_cast<io_stream_t *>(this)->close();
         return ec;
     }
@@ -153,20 +152,20 @@ auto io_stream_t::read_whole() noexcept -> outcome::result<bytes_t> {
     SS_STAT_BUFF stat_info;
     auto r = SS_STAT_FN(fd, &stat_info);
     if (r != 0) {
-        return sys::error_code{errno, sys::system_category()};
+        return std::error_code{errno, std::system_category()};
     }
     auto &sz = stat_info.st_size;
     auto str = utils::bytes_t();
     str.resize(sz);
     if (::read(fd, str.data(), sz) != sz) {
-        return sys::error_code{errno, sys::system_category()};
+        return std::error_code{errno, std::system_category()};
     }
     return std::move(str);
 }
 
 auto io_stream_t::read(unsigned char *ptr, std::size_t sz) noexcept -> outcome::result<void> {
     if (::read(fd, ptr, sz) != sz) {
-        return sys::error_code{errno, sys::system_category()};
+        return std::error_code{errno, std::system_category()};
     }
     return outcome::success();
 }
@@ -175,14 +174,14 @@ auto io_stream_t::read_bytes(offset_t sz) noexcept -> outcome::result<bytes_t> {
     auto str = utils::bytes_t();
     str.resize(sz);
     if (::read(fd, str.data(), sz) != sz) {
-        return sys::error_code{errno, sys::system_category()};
+        return std::error_code{errno, std::system_category()};
     }
     return std::move(str);
 }
 
 auto io_stream_t::write(unsigned const char *ptr, std::size_t sz) noexcept -> outcome::result<void> {
     if (::write(fd, ptr, sz) != sz) {
-        return sys::error_code{errno, sys::system_category()};
+        return std::error_code{errno, std::system_category()};
     }
     return outcome::success();
 }

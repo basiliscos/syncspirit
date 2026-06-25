@@ -75,13 +75,13 @@ void watcher_t::rename_self_descending(int parent_wd, std::string_view prev_path
     }
 }
 
-auto watcher_t::unwatch_recurse(std::string_view path) noexcept -> sys::error_code {
+auto watcher_t::unwatch_recurse(std::string_view path) noexcept -> std::error_code {
     using queue_t = std::pmr::list<int>;
     auto buff = std::array<std::byte, 1024 * 32>();
     auto pool = std::pmr::monotonic_buffer_resource(buff.data(), buff.size());
     auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
     auto queue = queue_t(allocator);
-    auto ec = sys::error_code{};
+    auto ec = std::error_code{};
     auto it_path = path_to_wd.find(path);
     if (it_path != path_to_wd.end()) {
         queue.emplace_back(path_to_wd[path]);
@@ -119,7 +119,7 @@ auto watcher_t::unwatch_recurse(std::string_view path) noexcept -> sys::error_co
     return ec;
 }
 
-sys::error_code watcher_t::unwatch_wd(int wd) noexcept {
+std::error_code watcher_t::unwatch_wd(int wd) noexcept {
     auto it_guard = path_map.find(wd);
     auto &guard = it_guard->second;
     auto parent_wd = guard.parent_fd;
@@ -149,7 +149,7 @@ sys::error_code watcher_t::unwatch_wd(int wd) noexcept {
     return ec;
 }
 
-auto watcher_t::unwatch_folder(std::string_view folder_id) noexcept -> sys::error_code {
+auto watcher_t::unwatch_folder(std::string_view folder_id) noexcept -> std::error_code {
     auto path = watched_folders->find(folder_id)->second.get_full_name();
     return unwatch_recurse(path);
 }
@@ -171,7 +171,7 @@ void watcher_t::on_watch(message::watch_folder_t &message) noexcept {
             auto fd = opt->wd;
             if (fd < 0) {
                 watched_folders->erase(it);
-                p.ec = sys::error_code{errno, sys::system_category()};
+                p.ec = std::error_code{errno, std::system_category()};
             } else {
                 p.ec = {};
             }

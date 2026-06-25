@@ -205,7 +205,7 @@ void http_actor_t::on_connect(const tcp::endpoint &) noexcept {
     auto request = queue.front();
     auto &payload = request->payload.request_payload;
     if (payload->local_ip) {
-        sys::error_code ec;
+        auto ec = boost::system::error_code();
         local_address = transport->local_address(ec);
         if (ec) {
             LOG_WARN(log, "on_connect, get local addr error: {}", ec);
@@ -308,7 +308,7 @@ void http_actor_t::on_request_read(std::size_t bytes) noexcept {
     process();
 }
 
-void http_actor_t::on_io_error(const sys::error_code &ec) noexcept {
+void http_actor_t::on_io_error(const boost::system::error_code &ec) noexcept {
     resources->release(resource::io);
     kept_alive = false;
     if (ec != asio::error::operation_aborted) {
@@ -334,7 +334,7 @@ void http_actor_t::on_handshake(bool, utils::x509_t &, const tcp::endpoint &, co
     }
 }
 
-void http_actor_t::on_handshake_error(sys::error_code ec) noexcept {
+void http_actor_t::on_handshake_error(boost::system::error_code ec) noexcept {
     resources->release(resource::io);
     if (ec != asio::error::operation_aborted) {
         LOG_WARN(log, "on_handshake_error: {}", ec);

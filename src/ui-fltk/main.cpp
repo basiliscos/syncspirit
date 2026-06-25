@@ -56,7 +56,6 @@ namespace ra = r::asio;
 namespace rth = r::thread;
 namespace rf = rotor::fltk;
 namespace asio = boost::asio;
-namespace sys = boost::system;
 
 using namespace syncspirit;
 using boost::nowide::narrow;

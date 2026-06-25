@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #pragma once
 
@@ -11,12 +11,12 @@
 #include "model/misc/arc.hpp"
 #include "utils/tls.h"
 #include "utils/uri.h"
+#include <system_error>
 #include "syncspirit-export.h"
 
 namespace syncspirit::transport {
 
 namespace asio = boost::asio;
-namespace sys = boost::system;
 namespace ra = rotor::asio;
 
 using tcp = asio::ip::tcp;
@@ -26,7 +26,7 @@ using addresses_t = std::vector<tcp::endpoint>;
 using resolved_hosts_t = std::shared_ptr<addresses_t>;
 
 using connect_fn_t = std::function<void(const tcp::endpoint &)>;
-using error_fn_t = std::function<void(const sys::error_code &)>;
+using error_fn_t = std::function<void(const std::error_code &)>;
 using handshake_fn_t =
     std::function<void(bool valid, utils::x509_t &peer, const tcp::endpoint &, const model::device_id_t *peer_device)>;
 using io_fn_t = std::function<void(std::size_t)>;

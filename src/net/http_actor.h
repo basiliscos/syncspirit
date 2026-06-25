@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #pragma once
 
@@ -90,10 +90,10 @@ struct SYNCSPIRIT_API http_actor_t : public r::actor_base_t {
     void on_request_read(std::size_t bytes) noexcept;
     void on_timer(r::request_id_t, bool cancelled) noexcept;
     void on_lock_timer(r::request_id_t, bool cancelled) noexcept;
-    void on_io_error(const sys::error_code &ec) noexcept;
+    void on_io_error(const boost::system::error_code &ec) noexcept;
     void on_shutdown_timer(r::request_id_t, bool cancelled) noexcept;
     void on_handshake(bool valid_peer, utils::x509_t &, const tcp::endpoint &, const model::device_id_t *) noexcept;
-    void on_handshake_error(sys::error_code ec) noexcept;
+    void on_handshake_error(boost::system::error_code ec) noexcept;
     void cancel_io() noexcept;
     void write_request() noexcept;
     void start_shutdown_timer() noexcept;

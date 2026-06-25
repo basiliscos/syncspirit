@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #pragma once
 
@@ -47,8 +47,8 @@ struct SYNCSPIRIT_API ssdp_actor_t : public r::actor_base_t {
 
   private:
     void on_discovery_sent(std::size_t bytes) noexcept;
-    void on_udp_send_error(const sys::error_code &ec) noexcept;
-    void on_udp_recv_error(const sys::error_code &ec) noexcept;
+    void on_udp_send_error(const boost::system::error_code &ec) noexcept;
+    void on_udp_recv_error(const boost::system::error_code &ec) noexcept;
     void on_discovery_received(std::size_t bytes) noexcept;
     void on_timer(r::request_id_t, bool cancelled) noexcept;
     void timer_cancel() noexcept;

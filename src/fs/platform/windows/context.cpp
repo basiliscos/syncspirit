@@ -5,13 +5,12 @@
 #include "context.h"
 
 #if SYNCSPIRIT_WATCHER_WIN32
-#include <boost/system.hpp>
+#include <system_error>
 #include <utility>
 #include "utils/format.hpp"
 
 using namespace syncspirit;
 using namespace syncspirit::fs::platform::windows;
-namespace sys = boost::system;
 using guard_t = platform_context_t::io_guard_t;
 using io_ctx_t = platform_context_t::io_context_t;
 
@@ -29,7 +28,7 @@ guard_t::~io_guard_t() {
         auto log = utils::get_logger("fs");
         LOG_TRACE(log, "removing handle {}", (void *)handle);
         if (!close_cb(handle)) {
-            auto ec = sys::error_code(::GetLastError(), sys::system_category());
+            auto ec = std::error_code(::GetLastError(), std::system_category());
             LOG_WARN(log, "cannot close handle {}: {}", (void *)handle, ec);
         }
         if (registered) {
@@ -65,7 +64,7 @@ static void async_cb(HANDLE handle, void *data) {
     auto ctx = reinterpret_cast<platform_context_t *>(data);
     ctx->notify_flag.store(false);
     if (auto ok = ::ResetEvent(handle); !ok) {
-        auto ec = sys::error_code(::GetLastError(), sys::system_category());
+        auto ec = std::error_code(::GetLastError(), std::system_category());
         auto log = utils::get_logger("fs");
         LOG_WARN(log, "cannot reset asyn handle {} : {}", (void *)handle, ec);
     }
@@ -76,7 +75,7 @@ static bool close_handle_cb(HANDLE handle) { return ::CloseHandle(handle); }
 platform_context_t::platform_context_t(const pt::time_duration &poll_timeout_) noexcept : parent_t(poll_timeout_) {
     auto event = ::CreateEvent(nullptr, false, false, nullptr);
     if (!event) {
-        auto ec = sys::error_code(::GetLastError(), sys::system_category());
+        auto ec = std::error_code(::GetLastError(), std::system_category());
         LOG_CRITICAL(log, "cannot CreateEvent(): {}", ec);
         return;
     }
@@ -145,7 +144,7 @@ bool platform_context_t::poll_events_impl(std::uint32_t timeout_ms) noexcept {
         } else if (r == WAIT_TIMEOUT) {
             // NO-OP
         } else {
-            auto ec = sys::error_code(::GetLastError(), sys::system_category());
+            auto ec = std::error_code(::GetLastError(), std::system_category());
             LOG_WARN(log, "WaitFor*Object failed: {}", ec);
         }
     }

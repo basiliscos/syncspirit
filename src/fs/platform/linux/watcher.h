@@ -20,7 +20,7 @@ struct SYNCSPIRIT_API watcher_t final : unix::watcher_t {
     void shutdown_finish() noexcept override;
 
     std::optional<int> watch_path(std::string_view path, file_type_t type) noexcept override;
-    sys::error_code unwatch_path(int wd, file_type_t type) noexcept override;
+    std::error_code unwatch_path(int wd, file_type_t type) noexcept override;
 
     void inotify_callback() noexcept;
 

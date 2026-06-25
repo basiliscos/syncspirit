@@ -36,8 +36,8 @@ auto fs_proxy_t::open_write(const utils::poly_path_view_t &path, std::uint64_t f
     return outcome::success(std::move(file));
 }
 
-sys::error_code fs_proxy_t::rename(const utils::path_base_t &from, const utils::poly_path_view_t &to) noexcept {
-    auto ec = sys::error_code();
+std::error_code fs_proxy_t::rename(const utils::path_base_t &from, const utils::poly_path_view_t &to) noexcept {
+    auto ec = std::error_code();
     utils::rename(from, to, ec);
     if (!ec) {
         updates_mediator.mask(to, from, deadline);
@@ -49,8 +49,8 @@ sys::error_code fs_proxy_t::rename(const utils::path_base_t &from, const utils::
     return ec;
 }
 
-sys::error_code fs_proxy_t::last_write_time(const utils::poly_path_view_t &path, std::int64_t modification_s) noexcept {
-    auto ec = sys::error_code();
+std::error_code fs_proxy_t::last_write_time(const utils::poly_path_view_t &path, std::int64_t modification_s) noexcept {
+    auto ec = std::error_code();
     utils::last_write_time(path, modification_s, ec);
     if (!ec) {
         updates_mediator.mask(path, {}, deadline);
@@ -59,8 +59,8 @@ sys::error_code fs_proxy_t::last_write_time(const utils::poly_path_view_t &path,
     return ec;
 }
 
-sys::error_code fs_proxy_t::remove(const utils::poly_path_view_t &path) noexcept {
-    sys::error_code ec;
+std::error_code fs_proxy_t::remove(const utils::poly_path_view_t &path) noexcept {
+    std::error_code ec;
     utils::remove_all(path, ec);
     if (!ec) {
 #ifndef SYNCSPIRIT_WATCHER_KQUEUE
@@ -73,8 +73,8 @@ sys::error_code fs_proxy_t::remove(const utils::poly_path_view_t &path) noexcept
     return ec;
 }
 
-sys::error_code fs_proxy_t::remove_file(const utils::poly_path_view_t &path) noexcept {
-    sys::error_code ec;
+std::error_code fs_proxy_t::remove_file(const utils::poly_path_view_t &path) noexcept {
+    std::error_code ec;
     utils::remove_file(path, ec);
     if (!ec) {
 #ifndef SYNCSPIRIT_WATCHER_KQUEUE
@@ -87,17 +87,17 @@ sys::error_code fs_proxy_t::remove_file(const utils::poly_path_view_t &path) noe
     return ec;
 }
 
-sys::error_code fs_proxy_t::write(const utils::path_base_t &path, utils::io_stream_t &stream,
+std::error_code fs_proxy_t::write(const utils::path_base_t &path, utils::io_stream_t &stream,
                                   utils::bytes_view_t data) noexcept {
     if (!stream.write(data.data(), data.size())) {
-        return sys::errc::make_error_code(sys::errc::io_error);
+        return std::make_error_code(std::errc::io_error);
     }
     updates_mediator.mask(path, {}, deadline);
     return {};
 }
 
-sys::error_code fs_proxy_t::set_perms(const utils::poly_path_view_t &path, std::uint32_t permissions) noexcept {
-    auto ec = sys::error_code();
+std::error_code fs_proxy_t::set_perms(const utils::poly_path_view_t &path, std::uint32_t permissions) noexcept {
+    auto ec = std::error_code();
     utils::chmod(path, permissions, ec);
     if (!ec) {
         updates_mediator.mask(path, {}, deadline);
@@ -106,8 +106,8 @@ sys::error_code fs_proxy_t::set_perms(const utils::poly_path_view_t &path, std::
     return ec;
 }
 
-sys::error_code fs_proxy_t::create_link(const utils::path_base_t &target, const utils::path_base_t &path) noexcept {
-    auto ec = sys::error_code();
+std::error_code fs_proxy_t::create_link(const utils::path_base_t &target, const utils::path_base_t &path) noexcept {
+    auto ec = std::error_code();
     utils::create_symlink(target, path, ec);
     if (!ec) {
         updates_mediator.mask(path, {}, deadline);
@@ -116,8 +116,8 @@ sys::error_code fs_proxy_t::create_link(const utils::path_base_t &target, const 
     return ec;
 }
 
-sys::error_code fs_proxy_t::create_directories(const utils::poly_path_view_t &path) noexcept {
-    auto ec = sys::error_code();
+std::error_code fs_proxy_t::create_directories(const utils::poly_path_view_t &path) noexcept {
+    auto ec = std::error_code();
     utils::create_directories(path, ec);
     if (!ec) {
 #ifndef SYNCSPIRIT_WATCHER_KQUEUE

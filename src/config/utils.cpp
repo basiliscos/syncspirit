@@ -96,8 +96,6 @@
 
 //        c.level = utils::get_log_level(level.value()).value_or(level_t::debug);
 
-namespace sys = boost::system;
-
 #if defined(__unix__)
 static const std::string home_path = "~/.config/syncspirit";
 #else
@@ -117,7 +115,7 @@ static std::string get_device_name() noexcept {
     if (GetComputerNameW(device_name, &device_name_sz)) {
         return boost::nowide::narrow(device_name, static_cast<size_t>(device_name_sz));
 #else
-    sys::error_code ec;
+    auto ec = boost::system::error_code();
     auto device_name = boost::asio::ip::host_name(ec);
     if (!ec) {
         return device_name;

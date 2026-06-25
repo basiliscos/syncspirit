@@ -142,12 +142,11 @@ void file_actor_t::on_io_signal(message::io_signal_t &msg) noexcept {
     LOG_TRACE(log, "on_io_signal (queue size: {})", io_queue.size());
     io_signal = &msg;
     if (!io_queue.empty()) {
-        auto& io_message = io_queue.front();
+        auto &io_message = io_queue.front();
         supervisor->put(std::move(io_message));
         io_queue.pop_front();
     }
 }
-
 
 void file_actor_t::on_retension_finish(r::request_id_t, bool cancelled) noexcept {
     LOG_TRACE(log, "on_retension_finish ({} ms)", retension.total_milliseconds());
@@ -218,7 +217,7 @@ void file_actor_t::process(payload::block_request_t &cmd, process_context_t &con
     LOG_TRACE(log, "processing block request");
     auto path = cmd.path.get_view(context.allocator);
     auto file_opt = open_file_ro(path, context.cache_key);
-    auto ec = sys::error_code{};
+    auto ec = std::error_code{};
     auto data = utils::bytes_t{};
     if (!file_opt) {
         ec = file_opt.assume_error();
@@ -242,7 +241,7 @@ void file_actor_t::process(payload::block_request_t &cmd, process_context_t &con
 
 void file_actor_t::process(payload::remote_copy_t &cmd, process_context_t &context) noexcept {
     auto path = cmd.path.get_view(context.allocator);
-    sys::error_code ec;
+    std::error_code ec;
 
     if (!cmd.conflict_path.empty()) {
         LOG_DEBUG(log, "renaming {} -> {}", path, cmd.conflict_path);
@@ -339,7 +338,7 @@ void file_actor_t::process(payload::finish_file_t &cmd, process_context_t &conte
     auto it = file_cache.find(cmd.path);
     if (it == file_cache.end()) {
         LOG_DEBUG(log, "attempt to flush non-opened file {}", path);
-        auto ec = sys::error_code{};
+        auto ec = std::error_code{};
         auto tmp_path = path.make_temporal();
         if (!utils::exists(tmp_path, ec)) {
             cmd.result = utils::make_error_code(utils::error_code_t::flush_non_opened);
@@ -362,7 +361,7 @@ void file_actor_t::process(payload::finish_file_t &cmd, process_context_t &conte
     if (!cmd.conflict_path.empty()) {
         auto new_name = cmd.conflict_path.get_view(context.allocator);
         LOG_DEBUG(log, "renaming {} -> {}", path, new_name);
-        auto ec = sys::error_code();
+        auto ec = std::error_code();
         if (auto ec = context.rename(cmd.path, new_name); ec) {
             LOG_ERROR(log, "cannot rename file '{}': {}", path, ec);
             cmd.result = ec;
@@ -436,7 +435,7 @@ void file_actor_t::process(payload::clone_block_t &cmd, process_context_t &conte
 
 void file_actor_t::process(payload::update_meta_t &cmd, process_context_t &context) noexcept {
 
-    auto r = sys::error_code();
+    auto r = std::error_code();
     auto path = cmd.path.get_view(context.allocator);
     LOG_DEBUG(log, "Updating metadata of '{}'", path);
 
@@ -462,7 +461,7 @@ auto file_actor_t::open_file_rw(const utils::poly_path_view_t &path, std::uint64
     }
 
     auto parent = path.get_parent();
-    sys::error_code ec;
+    std::error_code ec;
 
     bool exists = utils::exists(parent, ec);
     if (!exists) {

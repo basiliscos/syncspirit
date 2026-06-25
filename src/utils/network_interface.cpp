@@ -16,11 +16,8 @@
 #include <iphlpapi.h>
 #include "utils/platform.h"
 #include "utils/format.hpp"
+#include <system_error>
 #endif
-
-#include <boost/system.hpp>
-
-namespace sys = boost::system;
 
 namespace syncspirit::utils {
 
@@ -77,7 +74,7 @@ static uri_container_t _local_interfaces(logger_t &log, std::uint16_t port) noex
                                         NULL, adapter_addresses, &adapter_addresses_buffer_size);
 
     if (ERROR_SUCCESS != code) {
-        auto ec = sys::error_code(::GetLastError(), sys::system_category());
+        auto ec = std::error_code(::GetLastError(), std::system_category());
         LOG_WARN(log, "GetAdaptersAddresses failed: ", ec);
         return r;
     }

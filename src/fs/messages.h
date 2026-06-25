@@ -20,7 +20,6 @@ namespace syncspirit::fs {
 
 namespace r = rotor;
 namespace outcome = boost::outcome_v2;
-namespace sys = boost::system;
 
 struct fs_slave_t;
 
@@ -175,7 +174,7 @@ struct create_dir_t : utils::path_t {
     }
 
     std::string folder_id;
-    sys::error_code ec;
+    std::error_code ec;
 };
 
 struct watch_folder_t {
@@ -183,14 +182,14 @@ struct watch_folder_t {
         : path(std::move(path_)), folder_id(folder_id_), ec{utils::make_error_code(utils::error_code_t::no_action)} {}
     utils::path_t path;
     std::string folder_id;
-    sys::error_code ec;
+    std::error_code ec;
 };
 
 struct unwatch_folder_t {
     inline unwatch_folder_t(std::string folder_id_) noexcept
         : folder_id{folder_id_}, ec{utils::make_error_code(utils::error_code_t::no_action)} {}
     std::string folder_id;
-    sys::error_code ec;
+    std::error_code ec;
 };
 
 struct file_info_t : proto::FileInfo {

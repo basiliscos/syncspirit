@@ -47,7 +47,6 @@ namespace r = rotor;
 namespace ra = r::asio;
 namespace rth = r::thread;
 namespace asio = boost::asio;
-namespace sys = boost::system;
 
 using namespace syncspirit;
 using namespace syncspirit::daemon;

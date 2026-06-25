@@ -73,9 +73,9 @@ struct SYNCSPIRIT_API resolver_actor_t : public r::actor_base_t {
     bool resolve_as_ip(const utils::dns_query_t &query) noexcept;
     bool resolve_locally(const utils::dns_query_t &query) noexcept;
     void on_read(size_t bytes) noexcept;
-    void on_read_error(const sys::error_code &ec) noexcept;
+    void on_read_error(const boost::system::error_code &ec) noexcept;
     void on_write(size_t bytes) noexcept;
-    void on_write_error(const sys::error_code &ec) noexcept;
+    void on_write_error(const boost::system::error_code &ec) noexcept;
 
     template <typename ReplyFn> void reply(const utils::dns_query_t &query, ReplyFn &&fn) noexcept {
         auto it = queue.begin();

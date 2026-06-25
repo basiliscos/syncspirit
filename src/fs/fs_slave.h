@@ -9,8 +9,6 @@
 
 namespace syncspirit::fs {
 
-namespace sys = boost::system;
-
 struct SYNCSPIRIT_API fs_slave_t : payload::foreign_executor_t {
     bool exec(execution_context_t &context) noexcept override;
     void push(task_t task) noexcept;
@@ -19,7 +17,7 @@ struct SYNCSPIRIT_API fs_slave_t : payload::foreign_executor_t {
 
     tasks_t tasks_in;
     tasks_t tasks_out;
-    sys::error_code ec;
+    std::error_code ec;
 };
 
 } // namespace syncspirit::fs

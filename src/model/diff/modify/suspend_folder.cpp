@@ -8,7 +8,7 @@
 
 using namespace syncspirit::model::diff::modify;
 
-suspend_folder_t::suspend_folder_t(const model::folder_t &folder, bool value_, const sys::error_code &ec_) noexcept
+suspend_folder_t::suspend_folder_t(const model::folder_t &folder, bool value_, const std::error_code &ec_) noexcept
     : folder_id{folder.get_id()}, value{value_}, ec{ec_} {
     LOG_DEBUG(log, "suspend_folder_t ({}), folder_id = {}", value, folder_id);
 }

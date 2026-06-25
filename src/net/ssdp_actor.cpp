@@ -43,7 +43,7 @@ void ssdp_actor_t::on_start() noexcept {
     sock = std::make_unique<udp_socket_t>(strand.context());
 
     auto endpoint = udp::endpoint(udp::v4(), 1234);
-    auto ec = sys::error_code{};
+    auto ec = boost::system::error_code();
     sock->open(endpoint.protocol(), ec);
     if (ec) {
         LOG_WARN(log, "init, can't open socket: {}", ec);
@@ -90,7 +90,7 @@ void ssdp_actor_t::on_start() noexcept {
 
 void ssdp_actor_t::shutdown_start() noexcept {
     LOG_TRACE(log, "shutdown_start");
-    sys::error_code ec;
+    auto ec = boost::system::error_code();
     if (resources->has(resource::send) || resources->has(resource::recv)) {
         sock->cancel(ec);
         if (ec) {
@@ -138,7 +138,7 @@ void ssdp_actor_t::on_discovery_received(std::size_t bytes) noexcept {
     do_shutdown();
 }
 
-void ssdp_actor_t::on_udp_send_error(const sys::error_code &ec) noexcept {
+void ssdp_actor_t::on_udp_send_error(const boost::system::error_code &ec) noexcept {
     resources->release(resource::send);
     if (ec != asio::error::operation_aborted) {
         LOG_WARN(log, "on_udp_send_error: {}", ec);
@@ -147,7 +147,7 @@ void ssdp_actor_t::on_udp_send_error(const sys::error_code &ec) noexcept {
     timer_cancel();
 }
 
-void ssdp_actor_t::on_udp_recv_error(const sys::error_code &ec) noexcept {
+void ssdp_actor_t::on_udp_recv_error(const boost::system::error_code &ec) noexcept {
     resources->release(resource::recv);
     if (ec != asio::error::operation_aborted) {
         LOG_WARN(log, "on_udp_recv_error: {}", ec);

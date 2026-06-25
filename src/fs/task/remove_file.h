@@ -12,7 +12,7 @@ struct SYNCSPIRIT_API remove_file_t {
     bool process(fs_slave_t &fs_slave, execution_context_t &context) noexcept;
 
     utils::path_t path;
-    sys::error_code ec;
+    std::error_code ec;
 };
 
 } // namespace syncspirit::fs::task

@@ -246,7 +246,7 @@ void relay_actor_t::on_connect(message::connect_response_t &res) noexcept {
     push_master(tx);
 }
 
-void relay_actor_t::on_io_error(const sys::error_code &ec, rotor::plugin::resource_id_t resource) noexcept {
+void relay_actor_t::on_io_error(const boost::system::error_code &ec, rotor::plugin::resource_id_t resource) noexcept {
     LOG_TRACE(log, "on_io_error: {}", ec);
     resources->release(resource);
     if (ec != asio::error::operation_aborted) {
@@ -378,7 +378,6 @@ bool relay_actor_t::on(proto::relay::session_invitation_t &msg) noexcept {
 
     asio::ip::tcp::endpoint relay_ep;
     if (msg.address.has_value()) {
-        sys::error_code ec;
         relay_ep = asio::ip::tcp::endpoint{msg.address.value(), (uint16_t)msg.port};
     } else {
         relay_ep = asio::ip::tcp::endpoint{master_endpoint.address(), (uint16_t)msg.port};

@@ -47,8 +47,7 @@ void local_discovery_actor_t::configure(r::plugin::plugin_base_t &plugin) noexce
 
 void local_discovery_actor_t::init() noexcept {
     LOG_TRACE(log, "init, will announce to port = {}", port);
-
-    sys::error_code ec;
+    auto ec = boost::system::error_code();
 
     auto bc_endpoint = udp::endpoint(asio::ip::address_v4::any(), port);
     broadcast_sock.open(bc_endpoint.protocol(), ec);
@@ -89,7 +88,7 @@ void local_discovery_actor_t::shutdown_start() noexcept {
     if (resources->has(resource::timer)) {
         cancel_timer(*timer_request);
     }
-    sys::error_code ec;
+    auto ec = boost::system::error_code();
     if (resources->has(resource::send)) {
         broadcast_sock.cancel(ec);
         if (ec) {
@@ -183,7 +182,7 @@ void local_discovery_actor_t::on_read(size_t bytes) noexcept {
     return do_read();
 }
 
-void local_discovery_actor_t::on_read_error(const sys::error_code &ec) noexcept {
+void local_discovery_actor_t::on_read_error(const boost::system::error_code &ec) noexcept {
     resources->release(resource::read);
     if (ec != asio::error::operation_aborted) {
         LOG_ERROR(log, "on_read_error, error: {}", ec);
@@ -193,7 +192,7 @@ void local_discovery_actor_t::on_read_error(const sys::error_code &ec) noexcept 
 
 void local_discovery_actor_t::on_write(size_t) noexcept { resources->release(resource::send); }
 
-void local_discovery_actor_t::on_write_error(const sys::error_code &ec) noexcept {
+void local_discovery_actor_t::on_write_error(const boost::system::error_code &ec) noexcept {
     resources->release(resource::send);
     if (ec != asio::error::operation_aborted) {
         LOG_ERROR(log, "on_write_error, error: {}", ec);

@@ -10,8 +10,6 @@
 
 namespace syncspirit::model::diff::peer {
 
-namespace sys = boost::system;
-
 struct SYNCSPIRIT_API cluster_update_t final : cluster_diff_t {
     using message_t = proto::ClusterConfig;
     using parent_t = cluster_diff_t;
@@ -26,7 +24,7 @@ struct SYNCSPIRIT_API cluster_update_t final : cluster_diff_t {
     cluster_update_t(const utils::path_t &default_path, const cluster_t &cluster, sequencer_t &sequencer,
                      const model::device_t &source, const message_t &message) noexcept;
 
-    sys::error_code ec;
+    std::error_code ec;
     utils::bytes_t peer_id;
 };
 

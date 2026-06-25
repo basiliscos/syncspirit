@@ -171,7 +171,7 @@ void upnp_actor_t::on_external_ip(message::http_response_t &msg) noexcept {
     LOG_DEBUG(log, "external IP addr: {}", ip_addr);
     rx_buff->consume(msg.payload.res->bytes);
 
-    sys::error_code io_ec;
+    auto io_ec = boost::system::error_code();
     external_addr = asio::ip::address::from_string(ip_addr, io_ec);
     if (ee) {
         LOG_WARN(log, "can't external IP address '{}' is incorrect: {}", ip_addr, io_ec);

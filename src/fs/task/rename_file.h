@@ -16,7 +16,7 @@ struct SYNCSPIRIT_API rename_file_t {
     utils::path_t path;
     utils::path_t new_name;
     std::int64_t modification_s;
-    sys::error_code ec;
+    std::error_code ec;
     hasher::payload::extendended_context_prt_t context;
 };
 

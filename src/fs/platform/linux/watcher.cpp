@@ -58,10 +58,10 @@ void watcher_t::shutdown_finish() noexcept {
     return;
 }
 
-auto watcher_t::unwatch_path(int wd, file_type_t type) noexcept -> sys::error_code {
+auto watcher_t::unwatch_path(int wd, file_type_t type) noexcept -> std::error_code {
     assert(type == file_type_t::DIRECTORY);
     if (auto r = ::inotify_rm_watch(inotify_guard.fd, wd); r != 0) {
-        return sys::error_code{errno, sys::system_category()};
+        return std::error_code{errno, std::system_category()};
     }
     return {};
 }

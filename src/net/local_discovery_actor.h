@@ -57,9 +57,9 @@ struct SYNCSPIRIT_API local_discovery_actor_t final : public r::actor_base_t {
     void do_read() noexcept;
 
     void on_read(size_t bytes) noexcept;
-    void on_read_error(const sys::error_code &ec) noexcept;
+    void on_read_error(const boost::system::error_code &ec) noexcept;
     void on_write(size_t bytes) noexcept;
-    void on_write_error(const sys::error_code &ec) noexcept;
+    void on_write_error(const boost::system::error_code &ec) noexcept;
     void on_timer(r::request_id_t, bool cancelled) noexcept;
 
     void handle(const model::device_id_t &device_id, utils::uri_container_t &uris) noexcept;

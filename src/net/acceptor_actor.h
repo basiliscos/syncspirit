@@ -41,7 +41,7 @@ struct SYNCSPIRIT_API acceptor_actor_t : public r::actor_base_t {
     using tcp_socket_option_t = boost::optional<tcp_socket_t>;
 
     void accept_next() noexcept;
-    void on_accept(const sys::error_code &ec) noexcept;
+    void on_accept(const boost::system::error_code &ec) noexcept;
 
     utils::logger_t log;
     asio::io_context::strand &strand;

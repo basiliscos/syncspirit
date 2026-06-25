@@ -35,7 +35,7 @@ void acceptor_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 
 void acceptor_actor_t::on_start() noexcept {
     LOG_TRACE(log, "on_start");
-    sys::error_code ec;
+    auto ec = boost::system::error_code();
 
     acceptor.open(endpoint.protocol(), ec);
     if (ec) {
@@ -85,7 +85,7 @@ void acceptor_actor_t::accept_next() noexcept {
 void acceptor_actor_t::shutdown_start() noexcept {
     r::actor_base_t::shutdown_start();
     if (resources->has(resource::accepting)) {
-        sys::error_code ec;
+        auto ec = boost::system::error_code();
         acceptor.cancel(ec);
         if (ec) {
             LOG_ERROR(log, "cannot cancel accepting: ", ec);
@@ -93,7 +93,7 @@ void acceptor_actor_t::shutdown_start() noexcept {
     }
 }
 
-void acceptor_actor_t::on_accept(const sys::error_code &ec) noexcept {
+void acceptor_actor_t::on_accept(const boost::system::error_code &ec) noexcept {
     resources->release(resource::accepting);
     if (ec) {
         if (ec != asio::error::operation_aborted) {
@@ -104,7 +104,7 @@ void acceptor_actor_t::on_accept(const sys::error_code &ec) noexcept {
         }
         return;
     }
-    sys::error_code err;
+    auto err = boost::system::error_code();
     auto remote = peer.remote_endpoint(err);
     if (err) {
         LOG_WARN(log, "on_accept, cannot get remote endpoint: {}", err);

@@ -92,7 +92,7 @@ void resolver_actor_t::do_initialize(r::system_context_t *ctx) noexcept {
     }
     LOG_DEBUG(log, "selected dns server: {}:{}", dns_address.ip, dns_address.port);
 
-    sys::error_code ec;
+    auto ec = boost::system::error_code();
     auto s = udp_socket_t{strand.context()};
     s.open(boost::asio::ip::udp::v4(), ec);
     if (ec) {
@@ -213,7 +213,7 @@ bool resolver_actor_t::resolve_locally(const utils::dns_query_t &query) noexcept
             auto addr_string = std::string_view(buff);
             LOG_DEBUG(log, "{} => {}, resolved via hosts file", host, addr_string);
 
-            auto ec = sys::error_code{};
+            auto ec = boost::system::error_code();
             auto ip = asio::ip::make_address(buff, ec);
             if (ec) {
                 LOG_WARN(log, "invalid ip address {}: ", buff, ec);
@@ -232,7 +232,7 @@ bool resolver_actor_t::resolve_locally(const utils::dns_query_t &query) noexcept
 }
 
 bool resolver_actor_t::resolve_as_ip(const utils::dns_query_t &query) noexcept {
-    sys::error_code ec;
+    auto ec = boost::system::error_code();
     auto host = std::string_view(query.host);
     if (host.size() && host[0] == '[') {
         auto idx = host.find_last_of(']');
@@ -314,7 +314,7 @@ void resolver_actor_t::on_timer(r::request_id_t, bool cancelled) noexcept {
     resources->release(resource::timer);
     auto cancel_socket = [this]() {
         if (sock) {
-            sys::error_code ec;
+            auto ec = boost::system::error_code();
             sock->cancel(ec);
             if (ec) {
                 LOG_WARN(log, "cannot cancel socket: {}", ec);
@@ -353,7 +353,7 @@ void resolver_actor_t::on_write(size_t) noexcept {
     tx_buff = nullptr;
 }
 
-void resolver_actor_t::on_write_error(const sys::error_code &ec) noexcept {
+void resolver_actor_t::on_write_error(const boost::system::error_code &ec) noexcept {
     resources->release(resource::send);
     if (ec != asio::error::operation_aborted) {
         LOG_WARN(log, "on_write_error, error: {}", ec);
@@ -365,7 +365,7 @@ void resolver_actor_t::on_write_error(const sys::error_code &ec) noexcept {
     process();
 }
 
-void resolver_actor_t::on_read_error(const sys::error_code &ec) noexcept {
+void resolver_actor_t::on_read_error(const boost::system::error_code &ec) noexcept {
     resources->release(resource::recv);
     if (ec != asio::error::operation_aborted) {
         LOG_WARN(log, "on_read_error, error: {}", ec);

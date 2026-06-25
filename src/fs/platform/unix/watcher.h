@@ -9,14 +9,12 @@
 #include <set>
 #include <optional>
 #include <unordered_map>
-#include <boost/system.hpp>
 #include <boost/outcome.hpp>
 
 #if defined(SYNCSPIRIT_WATCHER_INOTIFY) || defined(SYNCSPIRIT_WATCHER_KQUEUE)
 
 namespace syncspirit::fs::platform::unix {
 
-namespace sys = boost::system;
 namespace outcome = boost::outcome_v2;
 
 struct SYNCSPIRIT_API watcher_t : watcher_base_t {
@@ -50,13 +48,13 @@ struct SYNCSPIRIT_API watcher_t : watcher_base_t {
 
     void rename_self_descending(int parent_wd, std::string_view prev_path, std::string_view new_path) noexcept;
     watch_opt_t watch_path(std::string_view path, std::string_view folder_id, file_type_t type, int parent) noexcept;
-    sys::error_code unwatch_folder(std::string_view folder_id) noexcept;
-    sys::error_code unwatch_recurse(std::string_view path) noexcept;
-    sys::error_code unwatch_wd(int wd) noexcept;
+    std::error_code unwatch_folder(std::string_view folder_id) noexcept;
+    std::error_code unwatch_recurse(std::string_view path) noexcept;
+    std::error_code unwatch_wd(int wd) noexcept;
     void forget(int wd) noexcept;
 
     virtual std::optional<int> watch_path(std::string_view path, file_type_t type) noexcept = 0;
-    virtual sys::error_code unwatch_path(int wd, file_type_t type) noexcept = 0;
+    virtual std::error_code unwatch_path(int wd, file_type_t type) noexcept = 0;
 
     path_map_t path_map;
     subdir_map_t subdir_map;

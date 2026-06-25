@@ -56,9 +56,9 @@ bool segment_iterator_t::process(fs_slave_t &fs_slave, execution_context_t &exec
         ++current_block;
         if (!block_opt) {
             if (errno) {
-                ec = sys::error_code{errno, sys::system_category()};
+                ec = std::error_code{errno, std::system_category()};
             } else {
-                ec = sys::error_code{sys::errc::io_error, sys::system_category()};
+                ec = std::make_error_code(std::errc::io_error);
             }
             return false;
         } else {

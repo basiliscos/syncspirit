@@ -79,7 +79,7 @@ void peer_actor_t::on_start() noexcept {
     read_action = &peer_actor_t::read_hello;
 }
 
-void peer_actor_t::on_io_error(const sys::error_code &ec, rotor::plugin::resource_id_t resource) noexcept {
+void peer_actor_t::on_io_error(const boost::system::error_code &ec, rotor::plugin::resource_id_t resource) noexcept {
     LOG_TRACE(log, "on_io_error: {}, resource: {}", ec, static_cast<int>(resource));
     resources->release(resource);
     if (ec != asio::error::operation_aborted) {

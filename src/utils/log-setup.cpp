@@ -17,8 +17,6 @@
 
 namespace syncspirit::utils {
 
-namespace sys = boost::system;
-
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
 #define SECOND_FRACTION "%f"
 #else

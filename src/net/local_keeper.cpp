@@ -31,8 +31,6 @@ using namespace syncspirit;
 using namespace syncspirit::net;
 using namespace syncspirit::net::local_keeper;
 
-namespace sys = boost::system;
-
 using boost::nowide::narrow;
 using boost::nowide::widen;
 using UT = fs::update_type_t;

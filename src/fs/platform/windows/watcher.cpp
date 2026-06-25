@@ -38,13 +38,13 @@ watcher_t::folder_guard_t::~folder_guard_t() {
     }
 }
 
-auto watcher_t::folder_guard_t::initiate() noexcept -> sys::error_code {
+auto watcher_t::folder_guard_t::initiate() noexcept -> std::error_code {
     constexpr auto flags = FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_DIR_NAME | FILE_NOTIFY_CHANGE_ATTRIBUTES |
                            FILE_NOTIFY_CHANGE_SIZE | FILE_NOTIFY_CHANGE_LAST_WRITE;
     overlapped.Offset = overlapped.OffsetHigh = 0;
     auto ok = ::ReadDirectoryChangesW(dir_guard.handle, buff, buff_sz, true, flags, nullptr, &overlapped, nullptr);
     if (!ok) {
-        return sys::error_code(::GetLastError(), sys::system_category());
+        return std::error_code(::GetLastError(), std::system_category());
     }
     return {};
 }
@@ -72,7 +72,7 @@ void watcher_t::on_watch(message::watch_folder_t &message) noexcept {
         ::CreateFileW(path_wstr.c_str(), FILE_LIST_DIRECTORY, SHARE_MODE, nullptr, OPEN_EXISTING, FILE_FLAGS, nullptr);
 
     if (dir_handle == INVALID_HANDLE_VALUE) {
-        auto ec = sys::error_code(::GetLastError(), sys::system_category());
+        auto ec = std::error_code(::GetLastError(), std::system_category());
         LOG_ERROR(log, "cannot open directory '{}' handle: {}", path_view, ec);
         p.ec = ec;
         return;
@@ -81,7 +81,7 @@ void watcher_t::on_watch(message::watch_folder_t &message) noexcept {
 
     auto event_handle = ::CreateEvent(nullptr, true, false, nullptr);
     if (!event_handle) {
-        auto ec = sys::error_code(::GetLastError(), sys::system_category());
+        auto ec = std::error_code(::GetLastError(), std::system_category());
         LOG_ERROR(log, "cannot create event handle: {}", path_view, ec);
         p.ec = ec;
         return;
@@ -113,8 +113,8 @@ void watcher_t::on_watch(message::watch_folder_t &message) noexcept {
     }
 }
 
-auto watcher_t::unwatch_dir(std::string_view folder_id) noexcept -> sys::error_code {
-    auto r = sys::error_code();
+auto watcher_t::unwatch_dir(std::string_view folder_id) noexcept -> std::error_code {
+    auto r = std::error_code();
     auto it_handle = handle_map.find(folder_id);
     auto handle = it_handle->second;
     auto it = path_map.find(handle);
@@ -165,7 +165,7 @@ void watcher_t::on_notify(handle_t handle) noexcept {
     auto bytes = DWORD{0};
     auto ok = ::GetOverlappedResult(folder_guard->dir_guard.handle, &folder_guard->overlapped, &bytes, false);
     if (!ok) {
-        auto ec = sys::error_code(::GetLastError(), sys::system_category());
+        auto ec = std::error_code(::GetLastError(), std::system_category());
         LOG_WARN(log, "cannot get overlapped result for '{}': {}", path, ec);
         return;
     }
@@ -217,7 +217,7 @@ void watcher_t::on_notify(handle_t handle) noexcept {
     };
 
     if (auto ok = ::ResetEvent(handle); !ok) {
-        auto ec = sys::error_code(::GetLastError(), sys::system_category());
+        auto ec = std::error_code(::GetLastError(), std::system_category());
         LOG_WARN(log, "cannot reset event for handle for '{}': {}", path, ec);
         return;
     }

@@ -23,7 +23,6 @@ namespace syncspirit::fltk {
 
 namespace r = rotor;
 namespace rf = r::fltk;
-namespace sys = boost::system;
 namespace outcome = boost::outcome_v2;
 
 struct app_supervisor_t;

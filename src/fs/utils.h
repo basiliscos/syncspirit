@@ -5,13 +5,11 @@
 
 #include <boost/outcome.hpp>
 #include <cstdint>
-#include <boost/smart_ptr/local_shared_ptr.hpp>
 #include "syncspirit-export.h"
 
 namespace syncspirit {
 namespace fs {
 
-namespace sys = boost::system;
 namespace outcome = boost::outcome_v2;
 
 struct block_division_t {

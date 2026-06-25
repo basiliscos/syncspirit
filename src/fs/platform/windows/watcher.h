@@ -25,7 +25,7 @@ struct SYNCSPIRIT_API watcher_t : watcher_base_t {
         static folder_guard_ptr_t make(std::uint32_t buff_sz, std::string folder_id, io_guard_t dir_guard,
                                        io_guard_t event_guard) noexcept;
         ~folder_guard_t();
-        sys::error_code initiate() noexcept;
+        std::error_code initiate() noexcept;
 
         char *buff = nullptr;
         std::uint32_t buff_sz;
@@ -38,7 +38,7 @@ struct SYNCSPIRIT_API watcher_t : watcher_base_t {
     using handle_map_t = std::unordered_map<std::string_view, handle_t>;
     using path_map_t = std::unordered_map<handle_t, folder_guard_ptr_t>;
 
-    sys::error_code unwatch_dir(std::string_view folder_id) noexcept;
+    std::error_code unwatch_dir(std::string_view folder_id) noexcept;
 
     void shutdown_finish() noexcept override;
     void on_watch(message::watch_folder_t &) noexcept override;

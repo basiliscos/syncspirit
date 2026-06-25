@@ -18,8 +18,6 @@
 
 namespace syncspirit::utils {
 
-namespace sys = boost::system;
-
 poly_path_view_t expand_home(const std::string &path, const poly_path_view_t &home) noexcept {
     if (!home.empty() && path.size() >= 2 && path[0] == '~' && (path[1] == '/' || path[1] == '\\')) {
         auto path_view = std::string_view(path).substr(2);

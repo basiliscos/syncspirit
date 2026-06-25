@@ -22,7 +22,6 @@
 namespace syncspirit::fs::platform {
 
 namespace r = rotor;
-namespace sys = boost::system;
 
 struct SYNCSPIRIT_API watcher_config_t : r::actor_config_t {
     r::pt::time_duration change_retension;

@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #pragma once
 
 #include <string>
 #include <system_error>
-#include <boost/system/error_code.hpp>
 #include "syncspirit-export.h"
 
 namespace syncspirit::utils {
@@ -98,17 +97,17 @@ enum class protocol_error_code_t {
 
 namespace detail {
 
-class SYNCSPIRIT_API error_code_category : public boost::system::error_category {
+class SYNCSPIRIT_API error_code_category : public std::error_category {
     virtual const char *name() const noexcept override;
     virtual std::string message(int c) const override;
 };
 
-class SYNCSPIRIT_API bep_error_code_category : public boost::system::error_category {
+class SYNCSPIRIT_API bep_error_code_category : public std::error_category {
     virtual const char *name() const noexcept override;
     virtual std::string message(int c) const override;
 };
 
-class SYNCSPIRIT_API protocol_error_code_category : public boost::system::error_category {
+class SYNCSPIRIT_API protocol_error_code_category : public std::error_category {
     virtual const char *name() const noexcept override;
     virtual std::string message(int c) const override;
 };
@@ -121,39 +120,20 @@ SYNCSPIRIT_API const detail::bep_error_code_category &bep_error_code_category();
 
 SYNCSPIRIT_API const detail::protocol_error_code_category &protocol_error_code_category();
 
-inline boost::system::error_code make_error_code(error_code_t e) {
-    return {static_cast<int>(e), error_code_category()};
-}
-inline boost::system::error_code make_error_code(bep_error_code_t e) {
-    return {static_cast<int>(e), bep_error_code_category()};
-}
+inline std::error_code make_error_code(error_code_t e) { return {static_cast<int>(e), error_code_category()}; }
+inline std::error_code make_error_code(bep_error_code_t e) { return {static_cast<int>(e), bep_error_code_category()}; }
 
-inline boost::system::error_code make_error_code(protocol_error_code_t e) {
+inline std::error_code make_error_code(protocol_error_code_t e) {
     return {static_cast<int>(e), protocol_error_code_category()};
 }
-
-SYNCSPIRIT_API boost::system::error_code adapt(const std::error_code &ec) noexcept;
 
 } // namespace syncspirit::utils
 
 namespace std {
 template <> struct is_error_code_enum<syncspirit::utils::error_code_t> : std::true_type {};
+
+template <> struct is_error_code_enum<syncspirit::utils::bep_error_code_t> : std::true_type {};
+
+template <> struct is_error_code_enum<syncspirit::utils::protocol_error_code_t> : std::true_type {};
+
 } // namespace std
-
-namespace boost {
-namespace system {
-
-template <> struct is_error_code_enum<syncspirit::utils::error_code_t> : std::true_type {
-    static const bool value = true;
-};
-
-template <> struct is_error_code_enum<syncspirit::utils::bep_error_code_t> : std::true_type {
-    static const bool value = true;
-};
-
-template <> struct is_error_code_enum<syncspirit::utils::protocol_error_code_t> : std::true_type {
-    static const bool value = true;
-};
-
-} // namespace system
-} // namespace boost
