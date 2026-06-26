@@ -4,6 +4,7 @@
 #pragma once
 
 #include "app_supervisor.h"
+#include "platform/tray.h"
 #include <FL/Fl_Double_Window.H>
 #include <string>
 
@@ -29,6 +30,7 @@ struct main_window_t : Fl_Double_Window {
     Fl_Group *content_left;
     tree_view_t *tree;
     log_panel_t *log_panel;
+    tray_t tray;
 };
 
 } // namespace syncspirit::fltk

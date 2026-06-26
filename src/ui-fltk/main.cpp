@@ -31,6 +31,7 @@
 #include <FL/Fl_Box.H>
 #include <FL/fl_utf8.h>
 #include <FL/fl_ask.H>
+#include <FL/platform.H>
 
 #include "app_supervisor.h"
 #include "main_window.h"
@@ -385,6 +386,7 @@ int app_main(app_context_t &app_ctx) {
 
     // window should outlive fltk ctx, as in ctx d-tor model augmentations
     // invoke fltk-things..
+    fl_open_display();
     auto main_window = std::unique_ptr<fltk::main_window_t>();
     auto fltk_ctx = rf::system_context_ptr_t(new fltk_context_t());
     auto sup_fltk = fltk_ctx->create_supervisor<fltk::app_supervisor_t>()

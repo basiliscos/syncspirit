@@ -1,6 +1,13 @@
 cmake_minimum_required (VERSION 3.19)
 
 find_package(libqrencode REQUIRED)
+find_package(X11 QUIET)
+
+if(X11_FOUND)
+    set(SYNCSPIRIT_FLTK_X11 true)
+endif()
+
+configure_file(syncspirit-fltk-config.h.in include/syncspirit-fltk-config.h @ONLY)
 
 if(MINGW)
     enable_language(RC)
@@ -32,6 +39,8 @@ add_executable(syncspirit-fltk WIN32 MACOSX_BUNDLE
     config/table.cpp
     content/file_table.cpp
     content/folder_table.cpp
+    platform/tray_base.cpp
+    platform/tray_impl/tray_x11.cpp
     presence_item/cluster.cpp
     presence_item/file.cpp
     presence_item/folder.cpp
@@ -67,6 +76,7 @@ target_link_libraries(syncspirit-fltk
 )
 target_include_directories(syncspirit-fltk PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/
+    ${CMAKE_CURRENT_BINARY_DIR}/include
     ${CMAKE_CURRENT_BINARY_DIR}/fltk
     ${syncspirit_SOURCE_DIR}/misc
     ${syncspirit_SOURCE_DIR}/src
@@ -100,3 +110,10 @@ set_target_properties(syncspirit-fltk PROPERTIES
     XCODE_EMBED_FRAMEWORKS_CODE_SIGN_ON_COPY TRUE
 )
 set_source_files_properties(${syncspirit_SOURCE_DIR}/misc/SyncSpiritIcon.icns PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
+
+add_executable(tray-x11 tray-x11.cpp)
+target_link_libraries(tray-x11
+    rotor::fltk
+    $<$<PLATFORM_ID:Linux>:jpeg>
+    $<$<PLATFORM_ID:Linux>:png>
+)

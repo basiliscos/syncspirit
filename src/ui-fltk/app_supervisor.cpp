@@ -173,6 +173,13 @@ void app_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         r::plugin::config_phase_t::PREINIT);
 }
 
+void app_supervisor_t::do_shutdown(const r::extended_error_ptr_t &reason) noexcept {
+    if (shutdown_flag) {
+        const_cast<std::atomic_bool *>(shutdown_flag)->store(true);
+    }
+    parent_t::do_shutdown(reason);
+}
+
 void app_supervisor_t::shutdown_finish() noexcept {
     parent_t::shutdown_finish();
     LOG_TRACE(log, "shutdown_finish");

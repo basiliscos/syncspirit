@@ -100,6 +100,7 @@ struct app_supervisor_t : app_supervisor_base_t<app_supervisor_t> {
     ~app_supervisor_t();
 
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
+    void do_shutdown(const r::extended_error_ptr_t &reason = {}) noexcept override;
     void shutdown_finish() noexcept override;
     using r::actor_base_t::state;
 

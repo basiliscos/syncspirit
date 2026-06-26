@@ -1,0 +1,3 @@
+#pragma once
+
+#cmakedefine SYNCSPIRIT_FLTK_X11
