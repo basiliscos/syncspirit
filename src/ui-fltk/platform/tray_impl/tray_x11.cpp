@@ -36,16 +36,6 @@ static void x11_event_poller(void *data) {
             XFillRectangle(dpy, tray_win, gc, 4, 4, 16, 16);
             XSetForeground(dpy, gc, WhitePixel(dpy, DefaultScreen(dpy)));
             XDrawString(dpy, tray_win, gc, 9, 16, "X", 1);
-        } else if (ev.type == ButtonPress) {
-#if 0
-            if (main_window) {
-                if (main_window->shown()) {
-                    main_window->hide();
-                } else {
-                    main_window->show();
-                }
-            }
-#endif
         }
     }
     Fl::repeat_timeout(0.05, x11_event_poller, data);
@@ -58,14 +48,25 @@ static void cb_quit(Fl_Widget *w, void *data) {
     sup.do_shutdown();
 }
 
-static void cb_rmb_click(Fl_Widget *w, void *data) {
+static void cb_mouse_click(Fl_Widget *w, void *data) {
     auto tray_widget = reinterpret_cast<tray_x11_t *>(data);
-    if (Fl::event_button() == FL_RIGHT_MOUSE) {
+    auto button = Fl::event_button();
+    if (button == FL_RIGHT_MOUSE) {
         auto xx = Fl::event_x();
         auto yy = Fl::event_x();
         auto picked = tray_widget->menu_items.data()->popup(xx, yy);
         if (picked) {
             picked->do_callback(w, data);
+        }
+    }
+    if (button == FL_LEFT_MOUSE) {
+        auto main_window = tray_widget->sup.get_main_window();
+        if (main_window) {
+            if (main_window->shown()) {
+                main_window->hide();
+            } else {
+                main_window->show();
+            }
         }
     }
 }
@@ -140,7 +141,7 @@ tray_x11_t *tray_x11_t::init(app_supervisor_t &sup) noexcept {
     auto window =
         new tray_x11_t(selection_atom, opcode_atom, xembed_atom, xembed_info_atom, tray_window, owner, w, sup);
 
-    icon_box->callback(cb_rmb_click, window);
+    icon_box->callback(cb_mouse_click, window);
     icon_box->when(FL_WHEN_RELEASE | FL_WHEN_NOT_CHANGED);
 
     Fl::add_timeout(0.05, x11_event_poller, window);

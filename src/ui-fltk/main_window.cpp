@@ -101,6 +101,15 @@ void main_window_t::on_shutdown() {
     }
 }
 
+int main_window_t::handle(int e) {
+    if (e == FL_KEYDOWN && Fl::event_key() == FL_Escape) {
+        supervisor->get_logger()->info("triggering quit");
+        supervisor->do_shutdown();
+        return 1;
+    }
+    return parent_t::handle(e);
+}
+
 void main_window_t::set_splash_text(std::string text) {
     log_panel->set_splash_text(std::move(text));
     Fl::flush();

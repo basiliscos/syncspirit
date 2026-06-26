@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2026 Ivan Baidakou
 
 #pragma once
 
@@ -24,6 +24,8 @@ struct main_window_t : Fl_Double_Window {
     void on_loading_done();
     void detach_supervisor();
     app_supervisor_t *get_supervisor();
+
+    int handle(int e) override;
 
   private:
     app_supervisor_t *supervisor;
