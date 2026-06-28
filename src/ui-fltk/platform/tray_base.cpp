@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 Ivan Baidakou
 
 #include "tray_base.h"
+#include "app_supervisor.h"
 #include "syncspirit-fltk-config.h"
 
 #if defined(SYNCSPIRIT_FLTK_X11)

@@ -34,6 +34,7 @@
 #include "utils/format.hpp"
 #include "utils/io.h"
 #include "utils/path_view.hpp"
+#include "utils/path_utils.h"
 #include "utils/log-setup.h"
 
 #include <utility>
@@ -303,6 +304,25 @@ void app_supervisor_t::set_pending_devices(tree_item_t *node) { pending_devices 
 void app_supervisor_t::set_ignored_devices(tree_item_t *node) { ignored_devices = node; }
 void app_supervisor_t::set_main_window(main_window_t *window) { main_window = window; }
 main_window_t *app_supervisor_t::get_main_window() { return main_window; }
+
+utils::poly_path_view_t app_supervisor_t::resolve_resource(const utils::allocator_t &allocator,
+                                                           std::string_view relative_path) noexcept {
+    auto res_path = utils::make_empty_view(allocator);
+    if (auto res_dir = std::getenv("SYNCSPIRIT_RES_DIR"); res_dir) {
+        auto dir_path = utils::make_native_view(res_dir, allocator);
+        res_path = dir_path / utils::make_native_view(relative_path, allocator);
+    }
+    if (res_path.empty()) {
+        LOG_WARN(log, "cannot resolve path to resource '{}'", relative_path);
+    } else {
+        auto ec = std::error_code{};
+        if (!utils::exists(res_path, ec)) {
+            LOG_WARN(log, "resources '{}' cannot be found via '{}'", relative_path, res_path);
+            res_path = utils::make_empty_view(allocator);
+        }
+    }
+    return res_path;
+}
 
 auto app_supervisor_t::request_db_info(db_info_viewer_t *viewer) -> db_info_viewer_guard_t {
     log->trace("request_db_info");
@@ -696,7 +716,7 @@ void app_supervisor_t::set_tray_display(bool value) {
 
 void app_supervisor_t::set_hide_to_tray(bool value) {
     log->debug("hide to tray = {}", value);
-    app_config.fltk_config.display_tray_icon = value;
+    app_config.fltk_config.hide_to_tray = value;
 }
 
 std::uint32_t app_supervisor_t::mask_nodes() const noexcept {

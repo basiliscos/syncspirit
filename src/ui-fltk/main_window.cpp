@@ -9,12 +9,16 @@
 #include "tree_item.h"
 #include "menu.h"
 #include "constants.h"
+#include "utils/path_view.hpp"
+#include "utils/format.hpp"
 
+#include <FL/Fl.H>
 #include <FL/Fl_Box.H>
 #include <FL/Fl_Tile.H>
 #include <FL/platform.H>
 #include <FL/Fl_Menu_Item.H>
 #include <FL/Fl_Menu_Bar.H>
+#include <FL/Fl_PNG_Image.H>
 #include <fmt/format.h>
 
 using namespace syncspirit;
@@ -25,12 +29,26 @@ static auto app_name = fmt::format("syncspirit-fltk {}", constants::client_versi
 main_window_t::main_window_t(app_supervisor_t &supervisor_, int w_, int h_)
     : parent_t(w_, h_, app_name.data()), supervisor{&supervisor_} {
 
+// TODO: remove
 #ifdef _WIN32
     auto icon = LoadIcon(fl_display, MAKEINTRESOURCE(ID_SYNCSPIRIT_ICON));
     this->icon((const void *)icon);
 #endif
     supervisor->set_main_window(this);
 
+    auto buffer = std::array<std::byte, 1024 * 32>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+    auto icon_path = supervisor->resolve_resource(allocator, "icons/syncspirit-fltk.png");
+    if (!icon_path.empty()) {
+        image_icon.reset(new Fl_PNG_Image(icon_path.get_full_name().data()));
+        if (image_icon->w() && image_icon->h()) {
+            Fl_Window::default_icon(static_cast<Fl_RGB_Image *>(image_icon.get()));
+        } else {
+            auto &log = supervisor->get_logger();
+            LOG_WARN(log, "failed to load app icon at {}", icon_path);
+        }
+    }
     auto top_contaner = new Fl_Group(0, 0, w(), h());
 
     top_contaner->begin();
@@ -89,6 +107,7 @@ main_window_t::main_window_t(app_supervisor_t &supervisor_, int w_, int h_)
 }
 
 main_window_t::~main_window_t() {
+    tray.enable(false);
     // one of the child d-tors use `main_window` object (indirectly),
     // hence it should be alive a little bit before children deletion
     clear();
@@ -116,7 +135,7 @@ void main_window_t::on_shutdown() {
 int main_window_t::handle(int e) {
     if (e == FL_KEYDOWN && Fl::event_key() == FL_Escape) {
         auto &log = supervisor->get_logger();
-        if (tray.is_enabled()) {
+        if (tray.is_enabled() && supervisor->get_app_config().fltk_config.hide_to_tray) {
             LOG_DEBUG(log, "hiding main window");
             hide();
         } else {
@@ -144,8 +163,11 @@ void main_window_t::on_loading_done() {
 }
 
 void main_window_t::detach_supervisor() {
+    tray.enable(false);
     clear();
     supervisor = nullptr;
 }
 
 app_supervisor_t *main_window_t::get_supervisor() { return supervisor; }
+
+const Fl_Image *main_window_t::get_icon() const noexcept { return image_icon.get(); }

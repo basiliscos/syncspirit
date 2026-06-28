@@ -6,7 +6,9 @@
 #include "app_supervisor.h"
 #include "platform/tray.h"
 #include <FL/Fl_Double_Window.H>
+#include <FL/Fl_Image.H>
 #include <string>
+#include <memory>
 
 namespace syncspirit::fltk {
 
@@ -23,17 +25,21 @@ struct main_window_t : Fl_Double_Window {
     void set_splash_text(std::string text);
     void on_loading_done();
     void detach_supervisor();
+    const Fl_Image *get_icon() const noexcept;
     app_supervisor_t *get_supervisor();
 
     int handle(int e) override;
     void show_tray_icon(bool value) noexcept;
 
   private:
+    using image_icon_t = std::unique_ptr<Fl_Image>;
+
     app_supervisor_t *supervisor;
     Fl_Group *content_left;
     tree_view_t *tree;
     log_panel_t *log_panel;
     tray_t tray;
+    image_icon_t image_icon;
 };
 
 } // namespace syncspirit::fltk

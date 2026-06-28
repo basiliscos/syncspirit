@@ -8,7 +8,7 @@
 #if defined(SYNCSPIRIT_FLTK_X11)
 
 #include "platform/tray_base.h"
-#include "FL/Fl_Window.H"
+#include <FL/Fl_Menu_Item.H>
 #include <X11/Xatom.h>
 #include <X11/Xlib.h>
 #include <vector>
@@ -18,11 +18,7 @@ namespace syncspirit::fltk {
 struct app_supervisor_t;
 struct tray_x11_t;
 
-struct tray_window_t : Fl_Window {
-    using Fl_Window::Fl_Window;
-
-    tray_x11_t *tray = nullptr;
-};
+struct tray_window_t;
 
 struct tray_x11_t final : tray_impl_t {
     using menu_items_t = std::vector<Fl_Menu_Item>;

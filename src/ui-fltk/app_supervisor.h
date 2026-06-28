@@ -144,6 +144,9 @@ struct app_supervisor_t : app_supervisor_base_t<app_supervisor_t> {
         }
     }
 
+    utils::poly_path_view_t resolve_resource(const utils::allocator_t &allocator,
+                                             std::string_view relative_path) noexcept;
+
     void set_main_window(main_window_t *window);
     main_window_t *get_main_window();
     void set_devices(tree_item_t *node);
