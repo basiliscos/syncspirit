@@ -71,8 +71,6 @@ static void cb_mouse_click(Fl_Widget *w, void *data) {
     }
 }
 
-static Fl_Menu_Item tray_menu_items[] = {{"Quit Application", 0, cb_quit, nullptr, 0, 0, 0, 14, 0}, {nullptr}};
-
 tray_x11_t *tray_x11_t::init(app_supervisor_t &sup) noexcept {
     Display *display = fl_display;
     if (!std::getenv("DISPLAY") || !display) {
@@ -144,15 +142,13 @@ tray_x11_t *tray_x11_t::init(app_supervisor_t &sup) noexcept {
     icon_box->callback(cb_mouse_click, window);
     icon_box->when(FL_WHEN_RELEASE | FL_WHEN_NOT_CHANGED);
 
-    Fl::add_timeout(0.05, x11_event_poller, window);
-
     return window;
 }
 
 tray_x11_t::tray_x11_t(Atom selection_atom_, Atom opcode_atom_, Atom xembed_atom_, Atom xembed_info_atom_,
                        tray_window_t *tray_window_, Window owner_, Window w_, app_supervisor_t &sup_)
     : selection_atom{selection_atom_}, opcode_atom{opcode_atom_}, xembed_atom{xembed_atom_},
-      xembed_info_atom{xembed_info_atom_}, tray_window{tray_window_}, sup{sup_}
+      xembed_info_atom{xembed_info_atom_}, owner{owner_}, window{w_}, tray_window{tray_window_}, sup{sup_}
 
 {
     tray_window->tray = this;
@@ -175,6 +171,35 @@ tray_x11_t::tray_x11_t(Atom selection_atom_, Atom opcode_atom_, Atom xembed_atom
 
     menu_items.push_back({"Quit", 0, cb_quit, nullptr, 0, 0, 0, 14, 0});
     menu_items.push_back({nullptr});
+    Fl::add_timeout(0.05, x11_event_poller, this);
 }
+
+tray_x11_t::~tray_x11_t() {
+    Fl::remove_timeout(x11_event_poller, this);
+
+    Display *display = fl_display;
+
+    XClientMessageEvent ev{};
+    ev.type = ClientMessage;
+    ev.window = owner;
+    ev.message_type = opcode_atom;
+    ev.format = 32;
+    ev.data.l[0] = CurrentTime;
+    ev.data.l[1] = 1; // _NET_SYSTEM_TRAY_REQUEST_UNDOCK
+    ev.data.l[2] = static_cast<long>(window);
+    ev.data.l[3] = 0;
+    ev.data.l[4] = 0;
+
+    XSendEvent(display, owner, False, NoEventMask, reinterpret_cast<XEvent *>(&ev));
+
+    int screen = DefaultScreen(display);
+    auto root = RootWindow(display, screen);
+    XReparentWindow(display, window, root, 0, 0);
+    XSync(display, False);
+
+    delete tray_window;
+}
+
+bool tray_x11_t::is_enabled() noexcept { return tray_window; }
 
 #endif

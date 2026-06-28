@@ -153,6 +153,8 @@ struct app_supervisor_t : app_supervisor_base_t<app_supervisor_t> {
     void set_show_deleted(bool value);
     void set_show_missing(bool value);
     void set_show_colorized(bool value);
+    void set_tray_display(bool value);
+    void set_hide_to_tray(bool value);
     void soft_restart();
     inline bool is_soft_restart_requested() { return soft_restart_request; }
 

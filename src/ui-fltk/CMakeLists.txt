@@ -24,11 +24,11 @@ add_executable(syncspirit-fltk WIN32 MACOSX_BUNDLE
     log_utils.cpp
     main.cpp
     main_window.cpp
+    menu.cpp
     presence_item.cpp
     qr_button.cpp
     static_table.cpp
     symbols.cpp
-    toolbar.cpp
     tree_item.cpp
     tree_view.cpp
     utils.cpp

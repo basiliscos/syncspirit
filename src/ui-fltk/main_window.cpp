@@ -7,12 +7,14 @@
 #include "log_panel.h"
 #include "tree_view.h"
 #include "tree_item.h"
-#include "toolbar.h"
+#include "menu.h"
 #include "constants.h"
 
 #include <FL/Fl_Box.H>
 #include <FL/Fl_Tile.H>
 #include <FL/platform.H>
+#include <FL/Fl_Menu_Item.H>
+#include <FL/Fl_Menu_Bar.H>
 #include <fmt/format.h>
 
 using namespace syncspirit;
@@ -29,25 +31,29 @@ main_window_t::main_window_t(app_supervisor_t &supervisor_, int w_, int h_)
 #endif
     supervisor->set_main_window(this);
 
-    auto container = new Fl_Tile(0, 0, w(), h());
+    auto top_contaner = new Fl_Group(0, 0, w(), h());
+
+    top_contaner->begin();
+
+    auto menu_bar = new menu_t(supervisor_, 0, 0, w(), 25);
+    auto hh = h() - menu_bar->h();
+    auto container = new Fl_Tile(0, menu_bar->h(), w(), hh);
+    container->color(FL_MAGENTA);
     auto &cfg = supervisor->get_app_config().fltk_config;
     auto left_share = std::min(std::max(0.1, cfg.left_panel_share), 0.9);
     auto bottom_share = std::min(std::max(0.1, cfg.bottom_panel_share), 0.9);
     container->begin();
 
-    auto resizable_area = new Fl_Box(w() * 0.1, h() * 0.1, w() * 0.9, h() * 0.8);
+    auto resizable_area = new Fl_Box(w() * 0.1, container->y() + hh * 0.15, w() * 0.8, hh * 0.7);
 
-    auto left_w = static_cast<int>(w() * left_share);
-    auto right_w = w() - left_w;
-    auto top_h = static_cast<int>(h() * (1 - bottom_share));
-    auto bottom_h = h() - top_h;
-    content_left = new Fl_Group(0, 0, left_w, top_h);
-    content_left->box(FL_ENGRAVED_BOX);
+    auto left_w = static_cast<int>(container->w() * left_share);
+    auto right_w = container->w() - left_w;
+    auto top_h = static_cast<int>(hh * (1 - bottom_share));
+    content_left = new Fl_Group(0, menu_bar->h(), left_w, top_h);
+    content_left->box(FL_FLAT_BOX);
     content_left->begin();
-    auto toolbar = new toolbar_t(*supervisor, 0, 0, left_w, 0);
-    toolbar->end();
-    auto toolbar_h = toolbar->h();
-    tree = new tree_view_t(*supervisor, 0, toolbar_h, left_w, top_h - toolbar_h);
+
+    tree = new tree_view_t(*supervisor, 0, container->y(), left_w, top_h);
     content_left->end();
     content_left->resizable(tree);
 
@@ -58,22 +64,28 @@ main_window_t::main_window_t(app_supervisor_t &supervisor_, int w_, int h_)
             void refresh() override {}
         };
 
-        auto box = new my_box_t(left_w, 0, right_w, top_h, "...");
-        box->box(FL_ENGRAVED_BOX);
+        auto box = new my_box_t(tree->x() + tree->w(), tree->y(), right_w, top_h, "...");
+        box->box(FL_FLAT_BOX);
         return box;
     });
 
-    log_panel = new log_panel_t(*supervisor, 0, 0, w(), bottom_h);
-    log_panel->position(0, content_left->h());
+    auto log_panel_h = h() - (content_left->h() + menu_bar->h());
+    log_panel = new log_panel_t(*supervisor, 0, 0, w(), log_panel_h);
+    log_panel->position(0, content_left->h() + content_left->y());
     log_panel->box(FL_FLAT_BOX);
 
     container->end();
     container->resizable(resizable_area);
 
+    top_contaner->end();
     end();
+
+    top_contaner->resizable(container);
 
     resizable(this);
     deactivate();
+
+    tray.init(*supervisor);
 }
 
 main_window_t::~main_window_t() {
@@ -103,8 +115,14 @@ void main_window_t::on_shutdown() {
 
 int main_window_t::handle(int e) {
     if (e == FL_KEYDOWN && Fl::event_key() == FL_Escape) {
-        supervisor->get_logger()->info("triggering quit");
-        supervisor->do_shutdown();
+        auto &log = supervisor->get_logger();
+        if (tray.is_enabled()) {
+            LOG_DEBUG(log, "hiding main window");
+            hide();
+        } else {
+            LOG_INFO(log, "triggering quit");
+            supervisor->do_shutdown();
+        }
         return 1;
     }
     return parent_t::handle(e);
@@ -115,10 +133,11 @@ void main_window_t::set_splash_text(std::string text) {
     Fl::flush();
 }
 
+void main_window_t::show_tray_icon(bool value) noexcept { tray.enable(value); }
+
 void main_window_t::on_loading_done() {
     auto &cfg = supervisor->get_app_config().fltk_config;
     if (cfg.display_tray_icon) {
-        tray.init(*supervisor);
         tray.enable(true);
     }
     activate();

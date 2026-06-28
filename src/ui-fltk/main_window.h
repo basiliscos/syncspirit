@@ -26,6 +26,7 @@ struct main_window_t : Fl_Double_Window {
     app_supervisor_t *get_supervisor();
 
     int handle(int e) override;
+    void show_tray_icon(bool value) noexcept;
 
   private:
     app_supervisor_t *supervisor;

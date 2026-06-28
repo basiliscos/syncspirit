@@ -688,6 +688,17 @@ void app_supervisor_t::set_show_colorized(bool value) {
     redisplay_folder_nodes(true);
 }
 
+void app_supervisor_t::set_tray_display(bool value) {
+    log->debug("tray display = {}", value);
+    app_config.fltk_config.display_tray_icon = value;
+    main_window->show_tray_icon(value);
+}
+
+void app_supervisor_t::set_hide_to_tray(bool value) {
+    log->debug("hide to tray = {}", value);
+    app_config.fltk_config.display_tray_icon = value;
+}
+
 std::uint32_t app_supervisor_t::mask_nodes() const noexcept {
     using F = syncspirit::presentation::presence_t::features_t;
     auto r = std::uint32_t{0};
