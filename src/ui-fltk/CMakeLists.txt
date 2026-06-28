@@ -110,10 +110,3 @@ set_target_properties(syncspirit-fltk PROPERTIES
     XCODE_EMBED_FRAMEWORKS_CODE_SIGN_ON_COPY TRUE
 )
 set_source_files_properties(${syncspirit_SOURCE_DIR}/misc/SyncSpiritIcon.icns PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
-
-add_executable(tray-x11 tray-x11.cpp)
-target_link_libraries(tray-x11
-    rotor::fltk
-    $<$<PLATFORM_ID:Linux>:jpeg>
-    $<$<PLATFORM_ID:Linux>:png>
-)
