@@ -17,6 +17,7 @@
 #include <FL/Fl_Box.H>
 #include <FL/Fl_Menu_Button.H>
 #include <FL/Fl_Button.H>
+#include <chrono>
 
 using namespace syncspirit::fltk;
 
@@ -72,6 +73,9 @@ static void cb_mouse_click(Fl_Widget *w, void *data) {
 }
 
 tray_x11_t *tray_x11_t::init(app_supervisor_t &sup) noexcept {
+    using clock_t = std::chrono::high_resolution_clock;
+    using tray_window_guard_t = std::unique_ptr<tray_window_t>;
+
     Display *display = fl_display;
     if (!std::getenv("DISPLAY") || !display) {
         return nullptr;
@@ -104,16 +108,17 @@ tray_x11_t *tray_x11_t::init(app_supervisor_t &sup) noexcept {
     }
 
     auto tray_window = new tray_window_t(24, 24);
+    auto guard = tray_window_guard_t(tray_window);
 
     const char *star_svg = "<svg height='24' width='24' viewBox='0 0 24 24'>"
                            "  <polygon points='12,2 15,9 22,9 17,14 19,21 12,17 5,21 7,14 2,9 9,9' fill='#ffcc00' "
                            "stroke='#d4af37' stroke-width='1'/>"
                            "</svg>";
 
-    Fl_SVG_Image *svg_icon = new Fl_SVG_Image(nullptr, star_svg);
+    auto svg_icon = new Fl_SVG_Image(nullptr, star_svg);
     auto icon_box = new Fl_Button(0, 0, 24, 24);
-    icon_box->image(svg_icon);
     icon_box->box(FL_FLAT_BOX);
+    icon_box->bind_image(svg_icon);
 
     tray_window->end();
     tray_window->show();
@@ -122,13 +127,19 @@ tray_x11_t *tray_x11_t::init(app_supervisor_t &sup) noexcept {
 
     auto w = fl_xid(tray_window);
     if (!w) {
-        delete tray_window;
         return {};
     }
 
-    // TODO: add timeout;
+    auto deadline = clock_t::now() + std::chrono::milliseconds{20};
     while (!tray_window->shown()) {
         Fl::check();
+        if (clock_t::now() > deadline) {
+            break;
+        }
+    }
+
+    if (!tray_window->shown()) {
+        return {};
     }
 
     XSetWindowAttributes attr;
@@ -137,7 +148,7 @@ tray_x11_t *tray_x11_t::init(app_supervisor_t &sup) noexcept {
     XSelectInput(display, w, ExposureMask | ButtonPressMask | ButtonReleaseMask);
 
     auto window =
-        new tray_x11_t(selection_atom, opcode_atom, xembed_atom, xembed_info_atom, tray_window, owner, w, sup);
+        new tray_x11_t(selection_atom, opcode_atom, xembed_atom, xembed_info_atom, guard.release(), owner, w, sup);
 
     icon_box->callback(cb_mouse_click, window);
     icon_box->when(FL_WHEN_RELEASE | FL_WHEN_NOT_CHANGED);
