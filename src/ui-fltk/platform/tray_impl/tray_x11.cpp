@@ -52,8 +52,8 @@ static void cb_mouse_click(Fl_Widget *w, void *data) {
     }
 }
 
-struct tray_window_t : Fl_Window {
-    using parent_t = Fl_Window;
+struct tray_window_t : Fl_Double_Window {
+    using parent_t = Fl_Double_Window;
     tray_window_t(const Fl_Image *original_) : parent_t(24, 24), original{original_} {
         box(FL_NO_BOX);
         border(0);
@@ -61,6 +61,8 @@ struct tray_window_t : Fl_Window {
         scaled = original->copy(w(), h());
         icon_box->box(FL_NO_BOX);
         icon_box->image(scaled);
+        // icon_box->box(FL_FLAT_BOX);
+        // icon_box->color(FL_CYAN);
 
         icon_box->when(FL_WHEN_RELEASE | FL_WHEN_NOT_CHANGED);
     }
@@ -92,38 +94,33 @@ struct tray_window_t : Fl_Window {
     tray_x11_t *tray = nullptr;
 };
 
-static void x11_event_poller(void *data) {
-    auto dpy = fl_display;
+static void x11_event_poller(int, void *data) {
     auto tray_widget = reinterpret_cast<tray_x11_t *>(data);
-    if (!dpy || !tray_widget) {
+    if (!tray_widget || !tray_widget->watching_display) {
         return;
     }
 
+    auto dpy = tray_widget->watching_display;
     XEvent ev;
     auto tray_win = fl_xid(tray_widget->tray_window);
     while (XCheckWindowEvent(dpy, tray_win, ExposureMask | ButtonPressMask | StructureNotifyMask, &ev)) {
-        if (ev.type == Expose) {
-            GC gc = DefaultGC(dpy, DefaultScreen(dpy));
-            XSetForeground(dpy, gc, WhitePixel(dpy, DefaultScreen(dpy)));
-            XFillRectangle(dpy, tray_win, gc, 4, 4, 16, 16);
-            XSetForeground(dpy, gc, WhitePixel(dpy, DefaultScreen(dpy)));
-            XDrawString(dpy, tray_win, gc, 9, 16, "X", 1);
-        } else if (ev.type == ConfigureNotify) {
+        if (ev.type == ConfigureNotify) {
             auto *c = &ev.xconfigure;
             int new_w = c->width;
             int new_h = c->height;
             tray_widget->tray_window->resize(0, 0, new_w, new_h);
         }
     }
-    Fl::repeat_timeout(0.05, x11_event_poller, data);
+
+    Fl::awake();
 }
 
 tray_x11_t *tray_x11_t::init(app_supervisor_t &sup) noexcept {
     using clock_t = std::chrono::high_resolution_clock;
     using tray_window_guard_t = std::unique_ptr<tray_window_t>;
 
-    Display *display = fl_display;
-    if (!std::getenv("DISPLAY") || !display) {
+    auto display = fl_display;
+    if (!display) {
         return nullptr;
     }
 
@@ -149,7 +146,7 @@ tray_x11_t *tray_x11_t::init(app_supervisor_t &sup) noexcept {
         return {};
     }
     auto xembed_info_atom = XInternAtom(display, "_XEMBED_INFO", False);
-    if (!xembed_atom) {
+    if (!xembed_info_atom) {
         return {};
     }
 
@@ -162,42 +159,39 @@ tray_x11_t *tray_x11_t::init(app_supervisor_t &sup) noexcept {
     auto guard = tray_window_guard_t(tray_window);
     tray_window->show();
 
-    Fl::flush();
+    // Fl::flush();
 
     auto w = fl_xid(tray_window);
     if (!w) {
         return {};
     }
-
-    auto deadline = clock_t::now() + std::chrono::milliseconds{100};
-    while (!tray_window->shown()) {
-        Fl::check();
-        if (clock_t::now() > deadline) {
-            break;
-        }
-    }
-
-    if (!tray_window->shown()) {
-        return {};
-    }
+    unsigned long buffer[2] = {0, 1}; // [0] = Protocol Version, [1] = XEMBED_MAPPED flags
+    XChangeProperty(display, w, xembed_info_atom, xembed_info_atom, 32, PropModeReplace, (unsigned char *)buffer, 2);
 
     XSetWindowAttributes attr;
     attr.override_redirect = True;
     XChangeWindowAttributes(display, w, CWOverrideRedirect, &attr);
     XSelectInput(display, w, ExposureMask | ButtonPressMask | ButtonReleaseMask | StructureNotifyMask);
 
-    auto window =
-        new tray_x11_t(selection_atom, opcode_atom, xembed_atom, xembed_info_atom, guard.release(), owner, w, sup);
+    Display *watching_display = XOpenDisplay(nullptr);
+
+    auto window = new tray_x11_t(watching_display, selection_atom, opcode_atom, xembed_atom, xembed_info_atom,
+                                 guard.release(), owner, w, sup);
 
     return window;
 }
 
-tray_x11_t::tray_x11_t(Atom selection_atom_, Atom opcode_atom_, Atom xembed_atom_, Atom xembed_info_atom_,
-                       tray_window_t *tray_window_, Window owner_, Window w_, app_supervisor_t &sup_)
-    : selection_atom{selection_atom_}, opcode_atom{opcode_atom_}, xembed_atom{xembed_atom_},
-      xembed_info_atom{xembed_info_atom_}, owner{owner_}, window{w_}, tray_window{tray_window_}, sup{sup_}
+tray_x11_t::tray_x11_t(Display *watching_display_, Atom selection_atom_, Atom opcode_atom_, Atom xembed_atom_,
+                       Atom xembed_info_atom_, tray_window_t *tray_window_, Window owner_, Window w_,
+                       app_supervisor_t &sup_)
+    : watching_display{watching_display_}, selection_atom{selection_atom_}, opcode_atom{opcode_atom_},
+      xembed_atom{xembed_atom_}, xembed_info_atom{xembed_info_atom_}, owner{owner_}, window{w_},
+      tray_window{tray_window_}, sup{sup_}
 
 {
+    int xfd = ConnectionNumber(watching_display);
+    Fl::add_fd(xfd, FL_READ, x11_event_poller, this);
+
     tray_window->bind(this);
 
     XClientMessageEvent ev{};
@@ -217,13 +211,12 @@ tray_x11_t::tray_x11_t(Atom selection_atom_, Atom opcode_atom_, Atom xembed_atom
 
     menu_items.push_back({"Quit", 0, cb_quit, nullptr, 0, 0, 0, 14, 0});
     menu_items.push_back({nullptr});
-    Fl::add_timeout(0.05, x11_event_poller, this);
 }
 
 tray_x11_t::~tray_x11_t() {
-    Fl::remove_timeout(x11_event_poller, this);
-
-    Display *display = fl_display;
+    XSync(watching_display, False);
+    int xfd = ConnectionNumber(watching_display);
+    Fl::remove_fd(xfd, FL_READ);
 
     XClientMessageEvent ev{};
     ev.type = ClientMessage;
@@ -236,12 +229,13 @@ tray_x11_t::~tray_x11_t() {
     ev.data.l[3] = 0;
     ev.data.l[4] = 0;
 
-    XSendEvent(display, owner, False, NoEventMask, reinterpret_cast<XEvent *>(&ev));
+    XSendEvent(fl_display, owner, False, NoEventMask, reinterpret_cast<XEvent *>(&ev));
 
-    int screen = DefaultScreen(display);
-    auto root = RootWindow(display, screen);
-    XReparentWindow(display, window, root, 0, 0);
-    XSync(display, False);
+    int screen = DefaultScreen(fl_display);
+    auto root = RootWindow(fl_display, screen);
+    XReparentWindow(fl_display, window, root, 0, 0);
+    XSync(fl_display, False);
+    XCloseDisplay(watching_display);
 
     delete tray_window;
 }
