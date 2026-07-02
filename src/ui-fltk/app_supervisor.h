@@ -11,6 +11,7 @@
 #include "model/diff/load/load_cluster.h"
 #include "model/diff/iterative_controller.h"
 #include "model/misc/sequencer.h"
+#include "utils/path_view.hpp"
 #include "log_sink.h"
 
 #include <spdlog/sinks/dist_sink.h>
@@ -55,6 +56,8 @@ struct app_supervisor_config_t : rf::supervisor_config_fltk_t {
 
     in_memory_sink_t *log_sink;
     utils::path_t config_path;
+    std::string_view app_path;
+    utils::allocator_t *allocator;
     config::main_t app_config;
     r::address_ptr_t bouncer_address;
 };
@@ -70,6 +73,14 @@ template <typename Actor> struct app_supervisor_config_builder_t : rf::superviso
     }
     builder_t &&config_path(utils::path_t value) && noexcept {
         parent_t::config.config_path = std::move(value);
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+    builder_t &&allocator(utils::allocator_t *value) && noexcept {
+        parent_t::config.allocator = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+    builder_t &&app_path(std::string_view value) && noexcept {
+        parent_t::config.app_path = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
     builder_t &&app_config(const config::main_t &value) && noexcept {
@@ -202,6 +213,7 @@ struct app_supervisor_t : app_supervisor_base_t<app_supervisor_t> {
     time_point_t started_at;
     in_memory_sink_t *log_sink;
     utils::path_t config_path;
+    utils::path_t resources_dir;
     config::main_t app_config;
     config::main_t app_config_original;
     content_t *content;

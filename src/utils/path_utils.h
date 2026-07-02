@@ -34,5 +34,6 @@ SYNCSPIRIT_API bool is_symlink(const utils::path_base_t &target, std::error_code
 SYNCSPIRIT_API poly_string_t read_symlink(const poly_path_view_t &target, std::error_code &ec) noexcept;
 SYNCSPIRIT_API std::size_t create_directories(const poly_path_view_t &path, std::error_code &ec) noexcept;
 SYNCSPIRIT_API stats_t get_stats(const poly_path_view_t &path, std::error_code &ec) noexcept;
+SYNCSPIRIT_API poly_path_view_t cwd(const allocator_t &allocator, std::error_code &ec) noexcept;
 
 } // namespace syncspirit::utils

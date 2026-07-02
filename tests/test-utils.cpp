@@ -62,31 +62,18 @@ path_guard_t::~path_guard_t() {
     }
 }
 
-static utils::poly_path_view_t cwd(const utils::allocator_t &allocator) {
-#ifdef SYNCSPIRIT_WIN
-    wchar_t buff[MAX_PATH];
-    if (!::GetCurrentDirectoryW(sizeof(buff), buff)) {
-        auto ec = std::error_code(::GetLastError(), std::system_category());
-        throw std::runtime_error(fmt::format("getcwd: {}", ec.message()));
-    }
-    return utils::make_native_view(buff, allocator);
-#else
-    char buff[SYNCSPIRIT_PATH_MAX];
-    if (!getcwd(buff, sizeof(buff))) {
-        auto ec = std::error_code(errno, std::system_category());
-        throw std::runtime_error(fmt::format("getcwd: {}", ec.message()));
-    }
-    return utils::make_native_view(buff, allocator);
-#endif
-}
-
 utils::poly_path_view_t locate_path(const char *test_file, const utils::allocator_t &allocator) {
-    auto current = cwd(allocator);
-    auto path = current / test_file;
+    auto ec = sys::error_code{};
+    auto dir = utils::cwd(allocator, ec);
+    if (ec) {
+        spdlog::error("cwd failed: {}", ec);
+        throw std::runtime_error(ec.message());
+    }
+    auto path = dir / test_file;
     if (exists(path)) {
         return path;
     }
-    path = current.get_parent() / test_file;
+    path = dir.get_parent() / test_file;
     if (exists(path)) {
         return path;
     }
@@ -183,7 +170,13 @@ path_guard_t unique_path() {
     auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
     auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
     auto name = fmt::format("tmp-{}", random_name);
-    auto path = cwd(allocator) / name;
+    auto ec = std::error_code{};
+    auto dir = utils::cwd(allocator, ec);
+    if (ec) {
+        spdlog::error("cwd: {}", ec);
+        throw std::runtime_error(ec.message());
+    }
+    auto path = dir / name;
     return path_guard_t(path.detach());
 }
 

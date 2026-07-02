@@ -132,6 +132,44 @@ app_supervisor_t::app_supervisor_t(config_t &config)
     started_at = clock_t::now();
     sequencer = model::make_sequencer(started_at.time_since_epoch().count());
     bouncer = config.bouncer_address;
+
+    log = utils::get_logger("fltk");
+
+    auto &allocator = *config.allocator;
+    auto app_path = utils::make_native_view(config.app_path, allocator);
+    auto res_path = utils::make_empty_view(allocator);
+    auto exe_dir = utils::make_empty_view(allocator);
+    if (auto res_dir = std::getenv("SYNCSPIRIT_RES_DIR"); res_dir) {
+        res_path = utils::make_native_view(res_dir, allocator);
+    }
+
+    if (res_path.empty()) {
+        exe_dir = app_path.get_parent();
+    }
+    if (res_path.empty()) {
+        auto ec = std::error_code{};
+        auto dir = exe_dir / utils::make_native_view("resources", allocator);
+        if (utils::exists(dir, ec)) {
+            res_path = std::move(dir);
+        }
+    }
+#if defined(__unix__)
+    if (res_path.empty()) {
+        res_path = exe_dir.get_parent() / utils::make_native_view("share/syncspirit/resources", allocator);
+    }
+#endif
+    if (!res_path.empty()) {
+        auto ec = std::error_code{};
+        if (!utils::exists(res_path, ec)) {
+            res_path = utils::make_empty_view(allocator);
+        } else {
+            resources_dir = res_path.detach();
+            LOG_DEBUG(log, "resources dir: '{}'", resources_dir);
+        }
+    }
+    if (res_path.empty()) {
+        LOG_WARN(log, "cannot find resources dir");
+    }
 }
 
 app_supervisor_t::~app_supervisor_t() {
@@ -148,10 +186,7 @@ auto app_supervisor_t::get_log_sink() -> in_memory_sink_t * { return log_sink; }
 
 void app_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     parent_t::configure(plugin);
-    plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
-        p.set_identity("fltk", false);
-        log = utils::get_logger(identity);
-    });
+    plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) { p.set_identity("fltk", false); });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
         p.discover_name(net::names::coordinator, coordinator, true).link(false).callback([&](auto phase, auto &ee) {
             if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {
@@ -307,21 +342,16 @@ main_window_t *app_supervisor_t::get_main_window() { return main_window; }
 
 utils::poly_path_view_t app_supervisor_t::resolve_resource(const utils::allocator_t &allocator,
                                                            std::string_view relative_path) noexcept {
-    auto res_path = utils::make_empty_view(allocator);
-    if (auto res_dir = std::getenv("SYNCSPIRIT_RES_DIR"); res_dir) {
-        auto dir_path = utils::make_native_view(res_dir, allocator);
-        res_path = dir_path / utils::make_native_view(relative_path, allocator);
-    }
-    if (res_path.empty()) {
-        LOG_WARN(log, "cannot resolve path to resource '{}'", relative_path);
-    } else {
+    if (!resources_dir.empty()) {
+        auto rel_path = utils::make_native_view(relative_path, allocator);
+        auto res_path = resources_dir.get_view(allocator) / rel_path;
         auto ec = std::error_code{};
-        if (!utils::exists(res_path, ec)) {
-            LOG_WARN(log, "resources '{}' cannot be found via '{}'", relative_path, res_path);
-            res_path = utils::make_empty_view(allocator);
+        if (utils::exists(res_path, ec)) {
+            return res_path;
         }
+        LOG_WARN(log, "resources '{}' cannot be found via '{}'", relative_path, res_path);
     }
-    return res_path;
+    return utils::make_empty_view(allocator);
 }
 
 auto app_supervisor_t::request_db_info(db_info_viewer_t *viewer) -> db_info_viewer_guard_t {
