@@ -28,12 +28,6 @@ static auto app_name = fmt::format("syncspirit-fltk {}", constants::client_versi
 
 main_window_t::main_window_t(app_supervisor_t &supervisor_, int w_, int h_)
     : parent_t(w_, h_, app_name.data()), supervisor{&supervisor_} {
-
-// TODO: remove
-#ifdef _WIN32
-    auto icon = LoadIcon(fl_display, MAKEINTRESOURCE(ID_SYNCSPIRIT_ICON));
-    this->icon((const void *)icon);
-#endif
     supervisor->set_main_window(this);
 
     auto buffer = std::array<std::byte, 1024 * 32>();

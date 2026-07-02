@@ -85,8 +85,12 @@ function(install_executable target)
                         copy
                             $<TARGET_FILE:${target}>
                             "${dist_dir}/$<TARGET_FILE_NAME:${target}>"
+                    COMMAND "${CMAKE_COMMAND}" -E
+                            copy_directory
+                                "${CMAKE_SOURCE_DIR}/misc/resources"
+                                "${dist_dir}/resources"
                 )
-            endif ()
+            endif()
         else()
             add_custom_command(TARGET deploy_${target} POST_BUILD
                 COMMAND
