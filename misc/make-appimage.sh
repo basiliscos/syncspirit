@@ -16,8 +16,7 @@ mkdir -p "$WORK_DIR"
 strip --strip-all $APP_PATH
 
 #cp $APP_PATH "$WORK_DIR"
-echo `pwd`
-find `pwd`
+echo "now at: ", `pwd`
 cp ../misc/$APP.sh "$WORK_DIR"
 
 cd "AppDir"
