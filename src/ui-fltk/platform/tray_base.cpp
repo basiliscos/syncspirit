@@ -7,6 +7,8 @@
 
 #if defined(SYNCSPIRIT_FLTK_X11)
 #include "tray_impl/tray_x11.h"
+#elif defined(SYNCSPIRIT_FLTK_WIN32)
+#include "tray_impl/tray_win32.h"
 #endif
 
 using namespace syncspirit::fltk;
@@ -27,6 +29,8 @@ void tray_base_t::enable(bool value) noexcept {
         }
 #if defined(SYNCSPIRIT_FLTK_X11)
         impl = tray_x11_t::init(*sup);
+#elif defined(SYNCSPIRIT_FLTK_WIN32)
+        impl = tray_win32_t::init(*sup);
 #endif
     } else {
         delete impl;
@@ -43,6 +47,8 @@ bool tray_base_t::is_enabled() noexcept {
 
 bool tray_base_t::is_available() noexcept {
 #if defined(SYNCSPIRIT_FLTK_X11)
+    return true;
+#elif defined(SYNCSPIRIT_FLTK_WIN32)
     return true;
 #endif
     return false;

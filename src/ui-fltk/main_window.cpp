@@ -37,6 +37,7 @@ main_window_t::main_window_t(app_supervisor_t &supervisor_, int w_, int h_)
     if (!icon_path.empty()) {
         image_icon.reset(new Fl_PNG_Image(icon_path.get_full_name().data()));
         if (image_icon->w() && image_icon->h()) {
+            icon(image_icon.get());
             Fl_Window::default_icon(static_cast<Fl_RGB_Image *>(image_icon.get()));
         } else {
             auto &log = supervisor->get_logger();

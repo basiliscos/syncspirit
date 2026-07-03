@@ -5,6 +5,8 @@ find_package(X11 QUIET)
 
 if(X11_FOUND)
     set(SYNCSPIRIT_FLTK_X11 true)
+elseif(WIN32)
+    set(SYNCSPIRIT_FLTK_WIN32 true)
 endif()
 
 configure_file(syncspirit-fltk-config.h.in include/syncspirit-fltk-config.h @ONLY)
@@ -41,6 +43,7 @@ add_executable(syncspirit-fltk WIN32 MACOSX_BUNDLE
     content/folder_table.cpp
     platform/tray_base.cpp
     platform/tray_impl/tray_x11.cpp
+    platform/tray_impl/tray_win32.cpp
     presence_item/cluster.cpp
     presence_item/file.cpp
     presence_item/folder.cpp
