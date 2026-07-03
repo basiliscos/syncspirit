@@ -30,7 +30,7 @@ static void cb_mouse_click(Fl_Widget *w, void *data) {
         auto yy = Fl::event_x();
         auto picked = tray_widget->menu_items.data()->popup(xx, yy);
         if (picked) {
-            picked->do_callback(w, data);
+            picked->do_callback(nullptr, data);
         }
     }
     if (button == FL_LEFT_MOUSE) {

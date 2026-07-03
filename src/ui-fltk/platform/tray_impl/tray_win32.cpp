@@ -47,8 +47,21 @@ static LRESULT CALLBACK tray_proc(HWND handle, UINT message, WPARAM wParam, LPAR
                 return 0;
             }
             case WM_RBUTTONUP: {
-                auto &log = tray->sup.get_logger();
-                HWND hwnd = (HWND)fl_xid(main_window);
+                POINT pt{};
+                auto log = tray->sup.get_logger();
+                if (GetCursorPos(&pt)) {
+                    HWND hwnd = (HWND)fl_xid(main_window);
+                    if (hwnd) {
+                        if (ScreenToClient(hwnd, &pt)) {
+                            auto &log = tray->sup.get_logger();
+                            LOG_TRACE(log, "displaying menu at ({},{})", pt.x, pt.y);
+                            auto picked = tray->menu_items.data()->popup(pt.x, pt.y);
+                            if (picked) {
+                                picked->do_callback(nullptr, tray);
+                            }
+                        }
+                    }
+                }
                 return 0;
             }
             }
@@ -150,6 +163,9 @@ tray_win32_t::tray_win32_t(app_supervisor_t &sup_) : tray_impl_t{sup_} {
 }
 
 tray_win32_t::~tray_win32_t() {
+    if (shown) {
+        Shell_NotifyIconW(NIM_DELETE, &notify_data);
+    }
     if (parent_proc) {
         SetWindowLongPtrW(handle, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(parent_proc));
     }

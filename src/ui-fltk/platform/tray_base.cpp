@@ -13,7 +13,7 @@
 
 using namespace syncspirit::fltk;
 
-static void cb_quit(Fl_Widget *w, void *data) {
+static void cb_quit(Fl_Widget *, void *data) {
     auto tray_widget = reinterpret_cast<tray_impl_t *>(data);
     auto &sup = tray_widget->sup;
     sup.get_logger()->info("exiting via menu");
