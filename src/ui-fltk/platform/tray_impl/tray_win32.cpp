@@ -16,47 +16,50 @@ using namespace syncspirit::fltk;
 
 static constexpr wchar_t tray_property_str[] = L"syncspirit.tray.prop";
 static constexpr wchar_t tray_message_str[] = L"syncspirit.tray.message";
+static constexpr wchar_t tray_window_class_str[] = L"syncspirit.tray.window";
 
 static LRESULT CALLBACK tray_proc(HWND handle, UINT message, WPARAM wParam, LPARAM lParam) {
     auto tray = reinterpret_cast<tray_win32_t *>(GetPropW(handle, tray_property_str));
     if (tray) {
-
-        return CallWindowProcW(tray->parent_proc, handle, message, wParam, lParam);
+        if (message == tray->tray_message) {
+            auto main_window = tray->sup.get_main_window();
+            switch (LOWORD(lParam)) {
+            case WM_COMMAND:
+                return 0;
+            case WM_LBUTTONUP:
+            case WM_LBUTTONDBLCLK: {
+                Fl::awake(
+                    [](void *p) {
+                        auto main_window = reinterpret_cast<main_window_t *>(p);
+                        HWND hwnd = (HWND)fl_xid(main_window);
+                        auto is_visible = IsWindowVisible(hwnd) != FALSE;
+                        if (is_visible) {
+                            ShowWindow(hwnd, SW_HIDE);
+                        } else {
+                            ShowWindow(hwnd, SW_SHOW);
+                            SetForegroundWindow(hwnd);
+                            SetActiveWindow(hwnd);
+                            main_window->redraw();
+                            main_window->flush();
+                        }
+                    },
+                    main_window);
+                return 0;
+            }
+            case WM_RBUTTONUP: {
+                auto &log = tray->sup.get_logger();
+                HWND hwnd = (HWND)fl_xid(main_window);
+                return 0;
+            }
+            }
+        }
     }
     return DefWindowProcW(handle, message, wParam, lParam);
 }
 
 tray_win32_t *tray_win32_t::init(app_supervisor_t &sup) noexcept {
-    auto main_window = sup.get_main_window();
-    auto handle = reinterpret_cast<HWND>(fl_xid(main_window));
-    if (!handle) {
-        return nullptr;
-    }
 
-    auto &log = sup.get_logger();
-    auto icon = reinterpret_cast<HICON>(SendMessageW(handle, WM_GETICON, ICON_SMALL, 0));
-    if (!icon) {
-        auto ec = std::error_code(::GetLastError(), std::system_category());
-        LOG_WARN(log, "cannot get icon via SendMessage: {}", ec);
-        icon = reinterpret_cast<HICON>(GetClassLongPtrW(handle, GCLP_HICONSM));
-    }
-    if (!icon) {
-        auto ec = std::error_code(::GetLastError(), std::system_category());
-        LOG_WARN(log, "cannot get icon via GetClassLongPtr: {}", ec);
-        icon = LoadIcon(nullptr, IDI_APPLICATION);
-    }
-    if (!icon) {
-        return nullptr;
-    }
-
-    auto tray_message = ::RegisterWindowMessageW(tray_message_str);
-    if (!tray_message) {
-        auto ec = std::error_code(::GetLastError(), std::system_category());
-        LOG_WARN(log, "cannot get icon via RegisterWindowMessage: {}", ec);
-        return nullptr;
-    }
-
-    auto ptr = new tray_win32_t(sup, icon, tray_message);
+    auto ptr = new tray_win32_t(sup);
     if (ptr->valid) {
         return ptr;
     }
@@ -65,13 +68,64 @@ tray_win32_t *tray_win32_t::init(app_supervisor_t &sup) noexcept {
     return nullptr;
 }
 
-tray_win32_t::tray_win32_t(app_supervisor_t &sup_, HICON icon_, UINT tray_message_)
-    : sup{sup_}, icon{CopyIcon(icon_)}, tray_message{tray_message_} {
+tray_win32_t::tray_win32_t(app_supervisor_t &sup_) : sup{sup_} {
     std::memset(&notify_data, 0, sizeof(notify_data));
 
-    auto main_window = sup.get_main_window();
     auto &log = sup.get_logger();
-    handle = reinterpret_cast<HWND>(fl_xid(main_window));
+
+    instance = GetModuleHandle(nullptr);
+    if (!instance) {
+        auto ec = std::error_code(::GetLastError(), std::system_category());
+        LOG_WARN(log, "cannot GetModuleHandle: {}", ec);
+        return;
+    }
+
+    WNDCLASSW window_class{};
+    window_class.lpfnWndProc = tray_proc;
+    window_class.hInstance = instance;
+    window_class.lpszClassName = tray_window_class_str;
+    if (!RegisterClassW(&window_class)) {
+        auto ec = std::error_code(::GetLastError(), std::system_category());
+        LOG_WARN(log, "cannot RegisterClass: {}", ec);
+        return;
+    }
+    has_window_class = true;
+
+    handle = CreateWindowExW(0, tray_window_class_str, L"", 0, 0, 0, 0, 0, HWND_MESSAGE, nullptr, instance, nullptr);
+    if (!handle) {
+        auto ec = std::error_code(::GetLastError(), std::system_category());
+        LOG_WARN(log, "cannot CreateWindow: {}", ec);
+        return;
+    }
+
+    auto main_window = sup.get_main_window();
+    auto main_handle = reinterpret_cast<HWND>(fl_xid(main_window));
+    if (!main_handle) {
+        return;
+    }
+
+    auto icon = reinterpret_cast<HICON>(SendMessageW(main_handle, WM_GETICON, ICON_SMALL, 0));
+    if (!icon) {
+        auto ec = std::error_code(::GetLastError(), std::system_category());
+        LOG_WARN(log, "cannot get icon via SendMessage: {}", ec);
+        icon = reinterpret_cast<HICON>(GetClassLongPtrW(main_handle, GCLP_HICONSM));
+    }
+    if (!icon) {
+        auto ec = std::error_code(::GetLastError(), std::system_category());
+        LOG_WARN(log, "cannot get icon via GetClassLongPtr: {}", ec);
+        icon = LoadIcon(nullptr, IDI_APPLICATION);
+    }
+    if (!icon) {
+        return;
+    }
+    this->icon = CopyIcon(icon);
+
+    tray_message = ::RegisterWindowMessageW(tray_message_str);
+    if (!tray_message) {
+        auto ec = std::error_code(::GetLastError(), std::system_category());
+        LOG_WARN(log, "cannot get icon via RegisterWindowMessage: {}", ec);
+        return;
+    }
 
     auto pp = SetWindowLongPtrW(handle, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(&tray_proc));
     if (!pp) {
@@ -96,14 +150,20 @@ tray_win32_t::tray_win32_t(app_supervisor_t &sup_, HICON icon_, UINT tray_messag
 }
 
 tray_win32_t::~tray_win32_t() {
-    if (icon) {
-        DestroyIcon(icon);
-    }
     if (parent_proc) {
         SetWindowLongPtrW(handle, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(parent_proc));
     }
     if (property) {
         RemovePropW(handle, tray_property_str);
+    }
+    if (icon) {
+        DestroyIcon(icon);
+    }
+    if (handle) {
+        DestroyWindow(handle);
+    }
+    if (has_window_class) {
+        UnregisterClassW(tray_window_class_str, instance);
     }
 }
 

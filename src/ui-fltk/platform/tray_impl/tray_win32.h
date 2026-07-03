@@ -17,7 +17,7 @@ namespace syncspirit::fltk {
 struct tray_win32_t final : tray_impl_t {
     static tray_win32_t *init(app_supervisor_t &) noexcept;
 
-    tray_win32_t(app_supervisor_t &sup, HICON icon, UINT tray_message);
+    tray_win32_t(app_supervisor_t &sup);
     tray_win32_t(const tray_win32_t &) = delete;
     tray_win32_t(tray_win32_t &&) = delete;
 
@@ -26,6 +26,8 @@ struct tray_win32_t final : tray_impl_t {
     bool is_enabled() noexcept override;
 
     app_supervisor_t &sup;
+    HMODULE instance{nullptr};
+    bool has_window_class{false};
     HWND handle{nullptr};
     HICON icon{nullptr};
     UINT tray_message{0};
