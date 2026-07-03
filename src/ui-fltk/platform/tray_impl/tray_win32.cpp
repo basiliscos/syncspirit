@@ -68,7 +68,7 @@ tray_win32_t *tray_win32_t::init(app_supervisor_t &sup) noexcept {
     return nullptr;
 }
 
-tray_win32_t::tray_win32_t(app_supervisor_t &sup_) : sup{sup_} {
+tray_win32_t::tray_win32_t(app_supervisor_t &sup_) : tray_impl_t{sup_} {
     std::memset(&notify_data, 0, sizeof(notify_data));
 
     auto &log = sup.get_logger();

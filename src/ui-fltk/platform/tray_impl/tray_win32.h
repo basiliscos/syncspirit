@@ -25,7 +25,6 @@ struct tray_win32_t final : tray_impl_t {
 
     bool is_enabled() noexcept override;
 
-    app_supervisor_t &sup;
     HMODULE instance{nullptr};
     bool has_window_class{false};
     HWND handle{nullptr};

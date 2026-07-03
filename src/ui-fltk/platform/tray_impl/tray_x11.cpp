@@ -22,13 +22,6 @@
 
 namespace syncspirit::fltk {
 
-static void cb_quit(Fl_Widget *w, void *data) {
-    auto tray_widget = reinterpret_cast<tray_x11_t *>(data);
-    auto &sup = tray_widget->sup;
-    sup.get_logger()->info("exiting via menu");
-    sup.do_shutdown();
-}
-
 static void cb_mouse_click(Fl_Widget *w, void *data) {
     auto tray_widget = reinterpret_cast<tray_x11_t *>(data);
     auto button = Fl::event_button();
@@ -184,11 +177,9 @@ tray_x11_t *tray_x11_t::init(app_supervisor_t &sup) noexcept {
 tray_x11_t::tray_x11_t(Display *watching_display_, Atom selection_atom_, Atom opcode_atom_, Atom xembed_atom_,
                        Atom xembed_info_atom_, tray_window_t *tray_window_, Window owner_, Window w_,
                        app_supervisor_t &sup_)
-    : watching_display{watching_display_}, selection_atom{selection_atom_}, opcode_atom{opcode_atom_},
-      xembed_atom{xembed_atom_}, xembed_info_atom{xembed_info_atom_}, owner{owner_}, window{w_},
-      tray_window{tray_window_}, sup{sup_}
-
-{
+    : tray_impl_t{sup_}, watching_display{watching_display_}, selection_atom{selection_atom_},
+      opcode_atom{opcode_atom_}, xembed_atom{xembed_atom_}, xembed_info_atom{xembed_info_atom_}, owner{owner_},
+      window{w_}, tray_window{tray_window_} {
     int xfd = ConnectionNumber(watching_display);
     Fl::add_fd(xfd, FL_READ, x11_event_poller, this);
 
@@ -208,9 +199,6 @@ tray_x11_t::tray_x11_t(Display *watching_display_, Atom selection_atom_, Atom op
     XSendEvent(fl_display, owner_, False, NoEventMask, reinterpret_cast<XEvent *>(&ev));
 
     XSync(fl_display, False);
-
-    menu_items.push_back({"Quit", 0, cb_quit, nullptr, 0, 0, 0, 14, 0});
-    menu_items.push_back({nullptr});
 }
 
 tray_x11_t::~tray_x11_t() {

@@ -13,6 +13,18 @@
 
 using namespace syncspirit::fltk;
 
+static void cb_quit(Fl_Widget *w, void *data) {
+    auto tray_widget = reinterpret_cast<tray_impl_t *>(data);
+    auto &sup = tray_widget->sup;
+    sup.get_logger()->info("exiting via menu");
+    sup.do_shutdown();
+}
+
+tray_impl_t::tray_impl_t(app_supervisor_t &sup_) noexcept : sup{sup_} {
+    menu_items.push_back({"Quit", 0, cb_quit, this, 0, 0, 0, 14, 0});
+    menu_items.push_back({nullptr});
+}
+
 tray_base_t::~tray_base_t() {
     if (impl) {
         delete impl;

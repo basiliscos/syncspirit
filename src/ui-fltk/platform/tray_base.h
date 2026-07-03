@@ -3,17 +3,23 @@
 
 #pragma once
 
+#include <vector>
+#include <FL/Fl_Menu_Item.H>
+
 namespace syncspirit::fltk {
 
 struct app_supervisor_t;
 struct main_window_t;
 
 struct tray_impl_t {
+    using menu_items_t = std::vector<Fl_Menu_Item>;
+
+    tray_impl_t(app_supervisor_t &sup) noexcept;
     virtual ~tray_impl_t() = default;
     virtual bool is_enabled() noexcept = 0;
 
-  protected:
-    app_supervisor_t *sup = nullptr;
+    app_supervisor_t &sup;
+    menu_items_t menu_items;
 };
 
 struct tray_base_t {
