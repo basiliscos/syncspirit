@@ -15,16 +15,6 @@
 
 using namespace syncspirit::utils;
 
-// TODO: remove
-// #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
-// #define SS_OPEN(PATH, MODE) _wsopen(PATH.native().data(), MODE, _SH_DENYNO, _S_IREAD | _S_IWRITE)
-// #define SS_STAT_FN(PATH, BUFF) _wstat64((PATH).native().data(), (BUFF))
-// #define SS_FILE_NO(FILE) _fileno(FILE)
-// #else
-// #define SS_OPEN(PATH, MODE) open(PATH.native().data(), MODE, 0666);
-// #define SS_STAT_FN(PATH, BUFF) stat((PATH).native().data(), (BUFF))
-// #endif
-
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
 #define SS_STAT_BUFF struct __stat64
 #define SS_VIEW_MAKE(PATH) PATH.get_full_wname(true)
