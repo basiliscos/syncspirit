@@ -163,6 +163,7 @@ void main_window_t::detach_supervisor() {
     supervisor = nullptr;
 }
 
+void main_window_t::on_frame_render() noexcept { tray.on_frame_render(); }
 app_supervisor_t *main_window_t::get_supervisor() { return supervisor; }
 
-const Fl_Image *main_window_t::get_icon() const noexcept { return image_icon.get(); }
+const Fl_RGB_Image *main_window_t::get_icon() const noexcept { return image_icon.get(); }

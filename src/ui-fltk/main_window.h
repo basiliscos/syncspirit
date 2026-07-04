@@ -6,7 +6,7 @@
 #include "app_supervisor.h"
 #include "platform/tray.h"
 #include <FL/Fl_Double_Window.H>
-#include <FL/Fl_Image.H>
+#include <FL/Fl_RGB_Image.H>
 #include <string>
 #include <memory>
 
@@ -25,14 +25,15 @@ struct main_window_t : Fl_Double_Window {
     void set_splash_text(std::string text);
     void on_loading_done();
     void detach_supervisor();
-    const Fl_Image *get_icon() const noexcept;
+    const Fl_RGB_Image *get_icon() const noexcept;
     app_supervisor_t *get_supervisor();
 
     int handle(int e) override;
     void show_tray_icon(bool value) noexcept;
+    void on_frame_render() noexcept;
 
   private:
-    using image_icon_t = std::unique_ptr<Fl_Image>;
+    using image_icon_t = std::unique_ptr<Fl_RGB_Image>;
 
     app_supervisor_t *supervisor;
     Fl_Group *content_left;

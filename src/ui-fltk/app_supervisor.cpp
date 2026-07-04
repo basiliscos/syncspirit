@@ -778,6 +778,7 @@ void app_supervisor_t::soft_restart() {
 void app_supervisor_t::on_frame_render_timer(r::request_id_t, bool cancelled) noexcept {
     auto items = std::move(delayed_items);
     if (!cancelled) {
+        main_window->on_frame_render();
         for (auto &item : items) {
             if (item->use_count() > 1) {
                 item->on_update();

@@ -24,11 +24,16 @@ struct tray_win32_t final : tray_impl_t {
     ~tray_win32_t();
 
     bool is_enabled() noexcept override;
+    void set_default_icon() noexcept override;
+    void set_traffic_icon() noexcept override;
+
+    void make_traffic_icon() noexcept;
 
     HMODULE instance{nullptr};
     bool has_window_class{false};
     HWND handle{nullptr};
-    HICON icon{nullptr};
+    HICON icon_default{nullptr};
+    HICON icon_traffic{nullptr};
     UINT tray_message{0};
     WNDPROC parent_proc;
     NOTIFYICONDATAW notify_data;

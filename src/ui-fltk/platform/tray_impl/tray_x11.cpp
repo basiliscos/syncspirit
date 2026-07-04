@@ -47,15 +47,11 @@ static void cb_mouse_click(Fl_Widget *w, void *data) {
 
 struct tray_window_t : Fl_Double_Window {
     using parent_t = Fl_Double_Window;
-    tray_window_t(const Fl_Image *original_) : parent_t(24, 24), original{original_} {
+    tray_window_t() : parent_t(24, 24) {
         box(FL_NO_BOX);
         border(0);
         icon_box = new Fl_Button(0, 0, w(), h());
-        scaled = original->copy(w(), h());
         icon_box->box(FL_NO_BOX);
-        icon_box->image(scaled);
-        // icon_box->box(FL_FLAT_BOX);
-        // icon_box->color(FL_CYAN);
 
         icon_box->when(FL_WHEN_RELEASE | FL_WHEN_NOT_CHANGED);
     }
@@ -71,20 +67,32 @@ struct tray_window_t : Fl_Double_Window {
         icon_box->callback(cb_mouse_click, tray_);
     }
 
+    void assing(const Fl_Image *image) noexcept {
+        if (scaled) {
+            delete scaled;
+        }
+        current = image;
+        scaled = current->copy(w(), h());
+        icon_box->image(scaled);
+        redraw();
+    }
+
     void resize(int X, int Y, int W, int H) override {
         if (w() != W || h() != H) {
             parent_t::resize(X, Y, W, H);
-            delete scaled;
+            if (scaled) {
+                delete scaled;
+            }
             icon_box->resize(0, 0, W, H);
-            scaled = original->copy(W, H);
+            scaled = current->copy(W, H);
             icon_box->image(scaled);
         }
     }
 
-    const Fl_Image *original;
-    Fl_Image *scaled;
+    const Fl_Image *current{nullptr};
+    Fl_Image *scaled{nullptr};
     Fl_Button *icon_box;
-    tray_x11_t *tray = nullptr;
+    tray_x11_t *tray{nullptr};
 };
 
 static void x11_event_poller(int, void *data) {
@@ -143,12 +151,11 @@ tray_x11_t *tray_x11_t::init(app_supervisor_t &sup) noexcept {
         return {};
     }
 
-    auto icon_orig = sup.get_main_window()->get_icon();
-    if (!icon_orig) {
+    if (!sup.get_main_window()->get_icon()) {
         return {};
     }
 
-    auto tray_window = new tray_window_t(icon_orig);
+    auto tray_window = new tray_window_t();
     auto guard = tray_window_guard_t(tray_window);
     tray_window->show();
 
@@ -184,6 +191,7 @@ tray_x11_t::tray_x11_t(Display *watching_display_, Atom selection_atom_, Atom op
     Fl::add_fd(xfd, FL_READ, x11_event_poller, this);
 
     tray_window->bind(this);
+    tray_window->assing(sup.get_main_window()->get_icon());
 
     XClientMessageEvent ev{};
     ev.type = ClientMessage;
@@ -200,6 +208,10 @@ tray_x11_t::tray_x11_t(Display *watching_display_, Atom selection_atom_, Atom op
 
     XSync(fl_display, False);
 }
+
+void tray_x11_t::set_default_icon() noexcept { tray_window->assing(sup.get_main_window()->get_icon()); }
+
+void tray_x11_t::set_traffic_icon() noexcept { tray_window->assing(traffic_image.get()); }
 
 tray_x11_t::~tray_x11_t() {
     XSync(watching_display, False);

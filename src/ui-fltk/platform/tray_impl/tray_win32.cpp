@@ -70,6 +70,86 @@ static LRESULT CALLBACK tray_proc(HWND handle, UINT message, WPARAM wParam, LPAR
     return DefWindowProcW(handle, message, wParam, lParam);
 }
 
+// clang-format off
+// adopted from FLTK sources,
+// https://github.com/fltk/fltk/discussions/1478
+static HICON image_to_icon(const Fl_RGB_Image *image) {
+  BITMAPV5HEADER bi;
+  HBITMAP bitmap, mask;
+  DWORD *bits;
+  HICON icon;
+
+  memset(&bi, 0, sizeof(BITMAPV5HEADER));
+
+  bi.bV5Size        = sizeof(BITMAPV5HEADER);
+  bi.bV5Width       = image->data_w();
+  bi.bV5Height      = -image->data_h(); // Negative for top-down
+  bi.bV5Planes      = 1;
+  bi.bV5BitCount    = 32;
+  bi.bV5Compression = BI_BITFIELDS;
+  bi.bV5RedMask     = 0x00FF0000;
+  bi.bV5GreenMask   = 0x0000FF00;
+  bi.bV5BlueMask    = 0x000000FF;
+  bi.bV5AlphaMask   = 0xFF000000;
+
+  HDC hdc;
+
+  hdc = GetDC(NULL);
+  bitmap = CreateDIBSection(hdc, (BITMAPINFO *)&bi, DIB_RGB_COLORS, (void **)&bits, NULL, 0);
+  ReleaseDC(NULL, hdc);
+
+  if (bits == NULL)
+    return NULL;
+
+  const uchar *i = (const uchar *)*image->data();
+  const int extra_data = image->ld() ? (image->ld() - image->data_w() * image->d()) : 0;
+
+  for (int y = 0; y < image->data_h(); y++) {
+    for (int x = 0; x < image->data_w(); x++) {
+      switch (image->d()) {
+        case 1:
+          *bits = (0xff << 24) | (i[0] << 16) | (i[0] << 8) | i[0];
+          break;
+        case 2:
+          *bits = (i[1] << 24) | (i[0] << 16) | (i[0] << 8) | i[0];
+          break;
+        case 3:
+          *bits = (0xff << 24) | (i[0] << 16) | (i[1] << 8) | i[2];
+          break;
+        case 4:
+          *bits = (i[3] << 24) | (i[0] << 16) | (i[1] << 8) | i[2];
+          break;
+      }
+      i += image->d();
+      bits++;
+    }
+    i += extra_data;
+  }
+
+  // A mask bitmap is still needed even though it isn't used
+  mask = CreateBitmap(image->data_w(), image->data_h(), 1, 1, NULL);
+  if (mask == NULL) {
+    DeleteObject(bitmap);
+    return NULL;
+  }
+
+  ICONINFO ii;
+
+  ii.fIcon    = true;
+  ii.xHotspot = 0;
+  ii.yHotspot = 0;
+  ii.hbmMask  = mask;
+  ii.hbmColor = bitmap;
+
+  icon = CreateIconIndirect(&ii);
+
+  DeleteObject(bitmap);
+  DeleteObject(mask);
+
+  return icon;
+}
+// clang-format on
+
 tray_win32_t *tray_win32_t::init(app_supervisor_t &sup) noexcept {
 
     auto ptr = new tray_win32_t(sup);
@@ -131,7 +211,7 @@ tray_win32_t::tray_win32_t(app_supervisor_t &sup_) : tray_impl_t{sup_} {
     if (!icon) {
         return;
     }
-    this->icon = CopyIcon(icon);
+    icon_default = CopyIcon(icon);
 
     tray_message = ::RegisterWindowMessageW(tray_message_str);
     if (!tray_message) {
@@ -153,13 +233,14 @@ tray_win32_t::tray_win32_t(app_supervisor_t &sup_) : tray_impl_t{sup_} {
     notify_data.uID = 1;
     notify_data.uFlags = NIF_MESSAGE | NIF_ICON;
     notify_data.uCallbackMessage = tray_message;
-    notify_data.hIcon = icon;
+    notify_data.hIcon = icon_default;
 
     property = SetPropW(handle, tray_property_str, this);
     shown = Shell_NotifyIconW(NIM_ADD, &notify_data);
     if (shown) {
         valid = true;
     }
+    make_traffic_icon();
 }
 
 tray_win32_t::~tray_win32_t() {
@@ -172,8 +253,11 @@ tray_win32_t::~tray_win32_t() {
     if (property) {
         RemovePropW(handle, tray_property_str);
     }
-    if (icon) {
-        DestroyIcon(icon);
+    if (icon_default) {
+        DestroyIcon(icon_default);
+    }
+    if (icon_traffic) {
+        DestroyIcon(icon_traffic);
     }
     if (handle) {
         DestroyWindow(handle);
@@ -183,6 +267,31 @@ tray_win32_t::~tray_win32_t() {
     }
 }
 
+void tray_win32_t::make_traffic_icon() noexcept {
+    auto info = ICONINFO{};
+    int w = GetSystemMetrics(SM_CXICON);
+    int h = GetSystemMetrics(SM_CYICON);
+    if (!w || !h) {
+        return;
+    }
+    auto copy = image_icon_t(static_cast<Fl_RGB_Image *>(traffic_image->copy(w, h)));
+    icon_traffic = image_to_icon(copy.get());
+}
+
 bool tray_win32_t::is_enabled() noexcept { return valid && shown; }
+
+void tray_win32_t::set_default_icon() noexcept {
+    if (valid && shown) {
+        notify_data.hIcon = icon_default;
+        shown = Shell_NotifyIconW(NIM_MODIFY, &notify_data);
+    }
+}
+
+void tray_win32_t::set_traffic_icon() noexcept {
+    if (valid && shown && icon_traffic) {
+        notify_data.hIcon = icon_traffic;
+        shown = Shell_NotifyIconW(NIM_MODIFY, &notify_data);
+    }
+}
 
 #endif
