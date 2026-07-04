@@ -34,6 +34,7 @@
 #include "utils/format.hpp"
 #include "utils/io.h"
 #include "utils/path_view.hpp"
+#include "utils/path_utils.h"
 #include "utils/log-setup.h"
 
 #include <utility>
@@ -131,6 +132,44 @@ app_supervisor_t::app_supervisor_t(config_t &config)
     started_at = clock_t::now();
     sequencer = model::make_sequencer(started_at.time_since_epoch().count());
     bouncer = config.bouncer_address;
+
+    log = utils::get_logger("fltk");
+
+    auto &allocator = *config.allocator;
+    auto app_path = utils::make_native_view(config.app_path, allocator);
+    auto res_path = utils::make_empty_view(allocator);
+    auto exe_dir = utils::make_empty_view(allocator);
+    if (auto res_dir = std::getenv("SYNCSPIRIT_RES_DIR"); res_dir) {
+        res_path = utils::make_native_view(res_dir, allocator);
+    }
+
+    if (res_path.empty()) {
+        exe_dir = app_path.get_parent();
+    }
+    if (res_path.empty()) {
+        auto ec = std::error_code{};
+        auto dir = exe_dir / utils::make_native_view("resources", allocator);
+        if (utils::exists(dir, ec)) {
+            res_path = std::move(dir);
+        }
+    }
+#if defined(__unix__)
+    if (res_path.empty()) {
+        res_path = exe_dir.get_parent() / utils::make_native_view("share/syncspirit/resources", allocator);
+    }
+#endif
+    if (!res_path.empty()) {
+        auto ec = std::error_code{};
+        if (!utils::exists(res_path, ec)) {
+            res_path = utils::make_empty_view(allocator);
+        } else {
+            resources_dir = res_path.detach();
+            LOG_DEBUG(log, "resources dir: '{}'", resources_dir);
+        }
+    }
+    if (res_path.empty()) {
+        LOG_WARN(log, "cannot find resources dir");
+    }
 }
 
 app_supervisor_t::~app_supervisor_t() {
@@ -147,10 +186,7 @@ auto app_supervisor_t::get_log_sink() -> in_memory_sink_t * { return log_sink; }
 
 void app_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     parent_t::configure(plugin);
-    plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
-        p.set_identity("fltk", false);
-        log = utils::get_logger(identity);
-    });
+    plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) { p.set_identity("fltk", false); });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
         p.discover_name(net::names::coordinator, coordinator, true).link(false).callback([&](auto phase, auto &ee) {
             if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {
@@ -171,6 +207,13 @@ void app_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
             p.subscribe_actor(&app_supervisor_t::on_db_info_response);
         },
         r::plugin::config_phase_t::PREINIT);
+}
+
+void app_supervisor_t::do_shutdown(const r::extended_error_ptr_t &reason) noexcept {
+    if (shutdown_flag) {
+        const_cast<std::atomic_bool *>(shutdown_flag)->store(true);
+    }
+    parent_t::do_shutdown(reason);
 }
 
 void app_supervisor_t::shutdown_finish() noexcept {
@@ -296,6 +339,20 @@ void app_supervisor_t::set_pending_devices(tree_item_t *node) { pending_devices 
 void app_supervisor_t::set_ignored_devices(tree_item_t *node) { ignored_devices = node; }
 void app_supervisor_t::set_main_window(main_window_t *window) { main_window = window; }
 main_window_t *app_supervisor_t::get_main_window() { return main_window; }
+
+utils::poly_path_view_t app_supervisor_t::resolve_resource(const utils::allocator_t &allocator,
+                                                           std::string_view relative_path) noexcept {
+    if (!resources_dir.empty()) {
+        auto rel_path = utils::make_native_view(relative_path, allocator);
+        auto res_path = resources_dir.get_view(allocator) / rel_path;
+        auto ec = std::error_code{};
+        if (utils::exists(res_path, ec)) {
+            return res_path;
+        }
+        LOG_WARN(log, "resources '{}' cannot be found via '{}'", relative_path, res_path);
+    }
+    return utils::make_empty_view(allocator);
+}
 
 auto app_supervisor_t::request_db_info(db_info_viewer_t *viewer) -> db_info_viewer_guard_t {
     log->trace("request_db_info");
@@ -681,6 +738,17 @@ void app_supervisor_t::set_show_colorized(bool value) {
     redisplay_folder_nodes(true);
 }
 
+void app_supervisor_t::set_tray_display(bool value) {
+    log->debug("tray display = {}", value);
+    app_config.fltk_config.display_tray_icon = value;
+    main_window->show_tray_icon(value);
+}
+
+void app_supervisor_t::set_hide_to_tray(bool value) {
+    log->debug("hide to tray = {}", value);
+    app_config.fltk_config.hide_to_tray = value;
+}
+
 std::uint32_t app_supervisor_t::mask_nodes() const noexcept {
     using F = syncspirit::presentation::presence_t::features_t;
     auto r = std::uint32_t{0};
@@ -710,6 +778,7 @@ void app_supervisor_t::soft_restart() {
 void app_supervisor_t::on_frame_render_timer(r::request_id_t, bool cancelled) noexcept {
     auto items = std::move(delayed_items);
     if (!cancelled) {
+        main_window->on_frame_render();
         for (auto &item : items) {
             if (item->use_count() > 1) {
                 item->on_update();

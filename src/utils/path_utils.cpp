@@ -420,4 +420,24 @@ stats_t get_stats(const poly_path_view_t &path, std::error_code &ec) noexcept {
     return r;
 }
 
+poly_path_view_t cwd(const allocator_t &allocator, std::error_code &ec) noexcept {
+    auto path = utils::make_empty_view(allocator);
+#ifdef SYNCSPIRIT_WIN
+    wchar_t buff[MAX_PATH];
+    if (!::GetCurrentDirectoryW(sizeof(buff), buff)) {
+        ec = std::error_code(::GetLastError(), std::system_category());
+    } else {
+        path = utils::make_native_view(buff, allocator);
+    }
+#else
+    char buff[SYNCSPIRIT_PATH_MAX];
+    if (!getcwd(buff, sizeof(buff))) {
+        ec = std::error_code(errno, std::system_category());
+    } else {
+        path = utils::make_native_view(buff, allocator);
+    }
+#endif
+    return path;
+}
+
 } // namespace syncspirit::utils

@@ -15,10 +15,15 @@ rm -rf "$WORK_DIR"
 mkdir -p "$WORK_DIR"
 strip --strip-all $APP_PATH
 
-cp $APP_PATH "$WORK_DIR"
+#cp $APP_PATH "$WORK_DIR"
+echo "now at: `pwd`"
 cp ../misc/$APP.sh "$WORK_DIR"
 
 cd "AppDir"
+
+mkdir -p "$APP_DIR/usr/share/syncspirit"
+cp -r ../../misc/resources "$APP_DIR/usr/share/syncspirit"
+
 if [ ! -e "./linuxdeploy-x86_64.AppImage" ]; then
     echo "going to download linux-deploy..."
     wget https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
@@ -32,12 +37,12 @@ if [ -e "$DESKTOP_FILE" ]; then
     ADD_DESKTOP_FILE="-d $DESKTOP_FILE"
 fi
 
-ICON_FILE="../../misc/$APP.png"
+ICON_FILE="../../misc/resources/icons/$APP.png"
 ADD_ICON_FILE=""
 if [ -e "$ICON_FILE" ]; then
     ADD_ICON_FILE="--icon-file $ICON_FILE"
 fi
 
 export LD_LIBRARY_PATH="$(pwd)/squashfs-root/usr/lib:${LD_LIBRARY_PATH:-}"
-./squashfs-root/AppRun -l`g++ -print-file-name=libstdc++.so.6` --custom-apprun "../../misc/$APP.sh" -v 2 --appdir "$APP_DIR" --output appimage -e "$APP_DIR/$APP" $ADD_ICON_FILE $ADD_DESKTOP_FILE
+./squashfs-root/AppRun  -l`g++ -print-file-name=libstdc++.so.6` --custom-apprun "../../misc/$APP.sh" -v 2 --appdir "$APP_DIR" --output appimage -e "$APP_PATH" $ADD_ICON_FILE $ADD_DESKTOP_FILE
 cd ..

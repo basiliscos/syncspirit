@@ -1,0 +1,4 @@
+#pragma once
+
+#cmakedefine SYNCSPIRIT_FLTK_X11
+#cmakedefine SYNCSPIRIT_FLTK_WIN32

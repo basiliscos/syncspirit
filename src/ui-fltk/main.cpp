@@ -31,6 +31,7 @@
 #include <FL/Fl_Box.H>
 #include <FL/fl_utf8.h>
 #include <FL/fl_ask.H>
+#include <FL/platform.H>
 
 #include "app_supervisor.h"
 #include "main_window.h"
@@ -207,7 +208,7 @@ int app_main(app_context_t &app_ctx) {
 
     auto buffer = std::array<std::byte, 1024 * 32>();
     auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
-    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+    auto allocator = utils::allocator_t(&pool);
 
     bool show_help = vm.count("help");
     if (show_help) {
@@ -277,6 +278,15 @@ int app_main(app_context_t &app_ctx) {
         logger->error("Config file {} is incorrect :: {}", config_file_path, cfg_option.error());
         return 1;
     }
+
+    auto app_path = utils::cwd(allocator, ec);
+    if (ec) {
+        logger->warn("cannot get working directory: {}", ec.message());
+        ec = {};
+    } else if (app_ctx.argc > 0) {
+        app_path = app_path / utils::make_native_view(app_ctx.argv[0], allocator);
+    }
+
     auto &cfg = cfg_option.value();
     logger->trace("configuration seems OK, timeout = {}ms", cfg.timeout);
     auto poll_timeout = r::pt::milliseconds{cfg.poll_timeout};
@@ -385,6 +395,7 @@ int app_main(app_context_t &app_ctx) {
 
     // window should outlive fltk ctx, as in ctx d-tor model augmentations
     // invoke fltk-things..
+    fl_open_display();
     auto main_window = std::unique_ptr<fltk::main_window_t>();
     auto fltk_ctx = rf::system_context_ptr_t(new fltk_context_t());
     auto sup_fltk = fltk_ctx->create_supervisor<fltk::app_supervisor_t>()
@@ -392,6 +403,8 @@ int app_main(app_context_t &app_ctx) {
                         .poll_duration(poll_timeout)
                         .config_path(config_file_path.detach())
                         .app_config(cfg)
+                        .app_path(app_path.get_full_name())
+                        .allocator(&allocator)
                         .timeout(timeout)
                         .registry_address(sup_net->get_registry_address())
                         .shutdown_flag(shutdown_flag, r::pt::millisec{50})

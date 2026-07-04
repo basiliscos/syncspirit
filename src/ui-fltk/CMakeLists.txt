@@ -1,6 +1,15 @@
 cmake_minimum_required (VERSION 3.19)
 
 find_package(libqrencode REQUIRED)
+find_package(X11 QUIET)
+
+if(X11_FOUND)
+    set(SYNCSPIRIT_FLTK_X11 true)
+elseif(WIN32)
+    set(SYNCSPIRIT_FLTK_WIN32 true)
+endif()
+
+configure_file(syncspirit-fltk-config.h.in include/syncspirit-fltk-config.h @ONLY)
 
 if(MINGW)
     enable_language(RC)
@@ -17,11 +26,11 @@ add_executable(syncspirit-fltk WIN32 MACOSX_BUNDLE
     log_utils.cpp
     main.cpp
     main_window.cpp
+    menu.cpp
     presence_item.cpp
     qr_button.cpp
     static_table.cpp
     symbols.cpp
-    toolbar.cpp
     tree_item.cpp
     tree_view.cpp
     utils.cpp
@@ -32,6 +41,9 @@ add_executable(syncspirit-fltk WIN32 MACOSX_BUNDLE
     config/table.cpp
     content/file_table.cpp
     content/folder_table.cpp
+    platform/tray_base.cpp
+    platform/tray_impl/tray_x11.cpp
+    platform/tray_impl/tray_win32.cpp
     presence_item/cluster.cpp
     presence_item/file.cpp
     presence_item/folder.cpp
@@ -67,6 +79,7 @@ target_link_libraries(syncspirit-fltk
 )
 target_include_directories(syncspirit-fltk PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/
+    ${CMAKE_CURRENT_BINARY_DIR}/include
     ${CMAKE_CURRENT_BINARY_DIR}/fltk
     ${syncspirit_SOURCE_DIR}/misc
     ${syncspirit_SOURCE_DIR}/src
