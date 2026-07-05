@@ -71,7 +71,6 @@ void acceptor_actor_t::on_start() noexcept {
     auto diff = model::diff::cluster_diff_ptr_t{};
     diff = new contact::update_contact_t(*cluster, cluster->get_device()->device_id(), uris);
     send<model::payload::model_update_t>(coordinator, std::move(diff), this);
-    send<model::payload::local_up_t>(coordinator);
     accept_next();
     r::actor_base_t::on_start();
 }

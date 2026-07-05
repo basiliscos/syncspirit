@@ -249,6 +249,7 @@ add_library(syncspirit_core
     src/net/resolver_actor.cpp
     src/net/names.cpp
     src/net/scheduler.cpp
+    src/net/services_supervisor.cpp
     src/net/ssdp_actor.cpp
     src/net/upnp_actor.cpp
     src/net/local_keeper/child_info.cpp

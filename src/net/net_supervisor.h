@@ -8,27 +8,17 @@
 #include "model/misc/sequencer.h"
 #include "model/diff/iterative_controller.h"
 #include "config/main.h"
-#include "messages.h"
+#include "net/messages.h"
 #include <cstdint>
 #include <boost/asio.hpp>
 #include <rotor/asio.hpp>
 #include <boost/outcome.hpp>
 
-namespace syncspirit {
-namespace net {
+namespace syncspirit::net {
 
 namespace outcome = boost::outcome_v2;
-
-namespace payload {
-
-struct ready_t {};
-
-} // namespace payload
-
-namespace message {
-using ready_t = r::message_t<payload::ready_t>;
-
-}
+namespace r = rotor;
+namespace ra = rotor::asio;
 
 struct net_supervisor_config_t : ra::supervisor_config_asio_t {
     config::main_t app_config;
@@ -121,10 +111,7 @@ struct SYNCSPIRIT_API net_supervisor_t : net_supervisor_base_t<ra::supervisor_as
     model::diff::cluster_diff_ptr_t load_diff;
     r::address_ptr_t db_addr;
     utils::key_pair_t ssl_pair;
-    r::supervisor_ptr_t cluster_sup;
-    r::supervisor_ptr_t peer_sup;
     launchers_t launchers;
 };
 
-} // namespace net
-} // namespace syncspirit
+} // namespace syncspirit::net

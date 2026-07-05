@@ -2,25 +2,16 @@
 // SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "bouncer/messages.hpp"
-#include "cluster_supervisor.h"
 #include "constants.h"
 #include "db_actor.h"
-#include "local_discovery_actor.h"
 #include "model/diff/advance/advance.h"
 #include "model/diff/modify/upsert_folder.h"
 #include "model/diff/modify/upsert_folder_info.h"
 #include "model/diff/peer/update_folder.h"
-#include "net/acceptor_actor.h"
-#include "net/dialer_actor.h"
-#include "net/global_discovery_actor.h"
-#include "net/http_actor.h"
 #include "net/names.h"
 #include "net/net_supervisor.h"
-#include "net/peer_supervisor.h"
-#include "net/relay_actor.h"
-#include "net/resolver_actor.h"
-#include "net/ssdp_actor.h"
 #include "net/local_keeper.h"
+#include "net/services_supervisor.h"
 #include "net/scheduler.h"
 #include "utils/format.hpp"
 #include "utils/path_view.hpp"
@@ -236,124 +227,21 @@ void net_supervisor_t::on_thread_ready(model::message::thread_ready_t &) noexcep
 }
 
 void net_supervisor_t::on_ready(message::ready_t &) noexcept {
-    LOG_DEBUG(log, "on_ready");
-
-    cluster_sup = create_actor<cluster_supervisor_t>()
-                      .timeout(shutdown_timeout * 9 / 10)
-                      .strand(strand)
-                      .cluster(cluster)
-                      .sequencer(sequencer)
-                      .config(app_config)
-                      .escalate_failure()
-                      .finish();
-    ++local_counter;
-
-    if (app_config.upnp_config.enabled) {
-        auto factory = [this](r::supervisor_t &, const r::address_ptr_t &spawner) -> r::actor_ptr_t {
-            auto timeout = shutdown_timeout * 8 / 10;
-            return create_actor<ssdp_actor_t>()
-                .timeout(timeout)
-                .upnp_config(app_config.upnp_config)
-                .cluster(cluster)
-                .spawner_address(spawner)
-                .finish();
-        };
-        spawn(factory).restart_period(pt::seconds{5}).restart_policy(r::restart_policy_t::fail_only).spawn();
-    }
-
-    if (app_config.local_announce_config.enabled) {
-        auto factory = [this](r::supervisor_t &, const r::address_ptr_t &spawner) -> r::actor_ptr_t {
-            auto timeout = shutdown_timeout * 9 / 10;
-            auto &cfg = app_config.local_announce_config;
-            return create_actor<local_discovery_actor_t>()
-                .port(cfg.port)
-                .frequency(cfg.frequency)
-                .cluster(cluster)
-                .timeout(timeout)
-                .spawner_address(spawner)
-                .finish();
-        };
-        spawn(factory).restart_period(pt::seconds{5}).restart_policy(r::restart_policy_t::fail_only).spawn();
-    }
-
-    if (app_config.global_announce_config.enabled) {
+    LOG_DEBUG(log, "on_ready, counter = {}", local_counter);
+    auto factory = [this](r::supervisor_t &, const r::address_ptr_t &spawner) -> r::actor_ptr_t {
         auto timeout = shutdown_timeout * 9 / 10;
-        auto io_timeout = shutdown_timeout * 8 / 10;
-        create_actor<http_actor_t>()
+        return create_actor<services_supervisor_t>()
             .timeout(timeout)
-            .request_timeout(io_timeout)
-            .resolve_timeout(io_timeout)
-            .registry_name(names::http11_gda)
-            .ssl_verify_store(app_config.ssl_verify_store)
-            .keep_alive(false)
-            .escalate_failure()
+            .cluster(cluster)
+            .app_config(app_config)
+            .strand(strand)
+            .ssl_pair(&ssl_pair)
+            .sequencer(sequencer)
+            .spawner_address(spawner)
             .finish();
-
-        auto factory = [this](r::supervisor_t &, const r::address_ptr_t &spawner) -> r::actor_ptr_t {
-            auto &gcfg = app_config.global_announce_config;
-            auto timeout = shutdown_timeout * 9 / 10;
-            return create_actor<global_discovery_actor_t>()
-                .timeout(timeout)
-                .cluster(cluster)
-                .ssl_pair(&ssl_pair)
-                .announce_url(gcfg.announce_url)
-                .lookup_url(gcfg.lookup_url)
-                .rx_buff_size(gcfg.rx_buff_size)
-                .io_timeout(gcfg.timeout)
-                .debug(gcfg.debug)
-                .spawner_address(spawner)
-                .finish();
-        };
-        spawn(factory).restart_period(pt::seconds{5}).restart_policy(r::restart_policy_t::fail_only).spawn();
-    }
-
-    if (app_config.relay_config.enabled) {
-        auto timeout = shutdown_timeout * 9 / 10;
-        auto io_timeout = shutdown_timeout * 8 / 10;
-        create_actor<http_actor_t>()
-            .timeout(timeout)
-            .request_timeout(io_timeout)
-            .resolve_timeout(io_timeout)
-            .registry_name(names::http11_relay)
-            .ssl_verify_store(app_config.ssl_verify_store)
-            .keep_alive(true)
-            .escalate_failure()
-            .finish();
-
-        auto factory = [this](r::supervisor_t &, const r::address_ptr_t &spawner) -> r::actor_ptr_t {
-            auto timeout = shutdown_timeout * 9 / 10;
-            return create_actor<relay_actor_t>()
-                .timeout(timeout)
-                .relay_config(app_config.relay_config)
-                .cluster(cluster)
-                .spawner_address(spawner)
-                .finish();
-        };
-        spawn(factory).restart_period(pt::seconds{5}).restart_policy(r::restart_policy_t::fail_only).spawn();
-    }
-
-    auto timeout = shutdown_timeout * 9 / 10;
-    create_actor<acceptor_actor_t>().cluster(cluster).timeout(timeout).escalate_failure().finish();
-    ++local_counter;
-
-    peer_sup = create_actor<peer_supervisor_t>()
-                   .cluster(cluster)
-                   .ssl_pair(&ssl_pair)
-                   .device_name(app_config.device_name)
-                   .strand(strand)
-                   .timeout(timeout)
-                   .bep_config(app_config.bep_config)
-                   .relay_config(app_config.relay_config)
-                   .escalate_failure()
-                   .finish();
-    ++local_counter;
-
-    auto dcfg = app_config.dialer_config;
-    if (dcfg.enabled) {
-        create_actor<dialer_actor_t>().timeout(timeout).dialer_config(dcfg).cluster(cluster).finish();
-        ++local_counter;
-    }
-    --local_counter;
+    };
+    spawn(factory).restart_period(pt::seconds{5}).restart_policy(r::restart_policy_t::fail_only).spawn();
+    send<model::payload::local_up_t>(coordinator);
 }
 
 void net_supervisor_t::commit_loading() noexcept {
@@ -391,18 +279,6 @@ void net_supervisor_t::commit_loading() noexcept {
 void net_supervisor_t::on_start() noexcept {
     LOG_TRACE(log, "on_start");
     parent_t::on_start();
-    auto timeout = shutdown_timeout * 9 / 10;
-    auto io_timeout = shutdown_timeout * 8 / 10;
-
-    create_actor<resolver_actor_t>().timeout(timeout).resolve_timeout(io_timeout).finish();
-    create_actor<http_actor_t>()
-        .timeout(timeout)
-        .request_timeout(io_timeout)
-        .resolve_timeout(io_timeout)
-        .registry_name(names::http10)
-        .keep_alive(false)
-        .escalate_failure()
-        .finish();
     send<syncspirit::model::payload::thread_up_t>(address);
 }
 

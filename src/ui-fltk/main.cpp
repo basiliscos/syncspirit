@@ -61,13 +61,28 @@ namespace asio = boost::asio;
 using namespace syncspirit;
 using boost::nowide::narrow;
 
+auto termination_flag = std::atomic_bool{false};
+
 [[noreturn]] static void report_error_and_die(r::actor_base_t *actor, const r::extended_error_ptr_t &ee) noexcept {
+    using clock_t = std::chrono::high_resolution_clock;
     auto name = actor ? actor->get_identity() : "unknown";
     auto msg = fmt::format("actor '{}' error: {}", name, ee);
     auto logger = utils::get_root_logger();
     logger->critical(msg);
     logger->flush();
-    fl_alert("%s", msg.c_str());
+    auto str = new std::string(msg);
+    Fl::awake(
+        [](void *p) {
+            auto str = reinterpret_cast<std::string *>(p);
+            fl_alert("%s", str->c_str());
+            delete str;
+            termination_flag = true;
+        },
+        str);
+    auto deadline = clock_t::now() + std::chrono::seconds{15};
+    while (!termination_flag && clock_t::now() < deadline) {
+        std::this_thread::sleep_for(std::chrono::milliseconds{50});
+    }
     std::terminate();
 }
 

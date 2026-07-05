@@ -180,6 +180,8 @@ struct lock_t {
     bool value;
 };
 
+struct ready_t {};
+
 } // end of namespace payload
 
 namespace message {
@@ -215,6 +217,7 @@ using db_info_response_t = r::request_traits_t<payload::db_info_request_t>::resp
 
 using fs_predown_t = r::message_t<payload::fs_predown_t>;
 using lock_t = r::message_t<payload::lock_t>;
+using ready_t = r::message_t<payload::ready_t>;
 
 } // end of namespace message
 

@@ -9,6 +9,10 @@
 
 namespace syncspirit::config {
 
+bool operator==(const acceptor_config_t &lhs, const acceptor_config_t &rhs) noexcept {
+    return lhs.enabled == rhs.enabled;
+}
+
 bool operator==(const bep_config_t &lhs, const bep_config_t &rhs) noexcept {
     return lhs.rx_buff_size == rhs.rx_buff_size && lhs.tx_buff_limit == rhs.tx_buff_limit &&
            lhs.connect_timeout == rhs.connect_timeout && lhs.ping_timeout == rhs.ping_timeout &&
@@ -60,12 +64,12 @@ bool operator==(const relay_config_t &lhs, const relay_config_t &rhs) noexcept {
 }
 
 bool operator==(const main_t &lhs, const main_t &rhs) noexcept {
-    return lhs.local_announce_config == rhs.local_announce_config && lhs.upnp_config == rhs.upnp_config &&
-           lhs.global_announce_config == rhs.global_announce_config && lhs.bep_config == rhs.bep_config &&
-           lhs.db_config == rhs.db_config && lhs.timeout == rhs.timeout && lhs.device_name == rhs.device_name &&
-           lhs.config_path == rhs.config_path && lhs.log_configs == rhs.log_configs && lhs.cert_file == rhs.cert_file &&
-           lhs.key_file == rhs.key_file && lhs.hasher_threads == rhs.hasher_threads &&
-           lhs.poll_timeout == rhs.poll_timeout;
+    return lhs.acceptor_config == rhs.acceptor_config && lhs.local_announce_config == rhs.local_announce_config &&
+           lhs.upnp_config == rhs.upnp_config && lhs.global_announce_config == rhs.global_announce_config &&
+           lhs.bep_config == rhs.bep_config && lhs.db_config == rhs.db_config && lhs.timeout == rhs.timeout &&
+           lhs.device_name == rhs.device_name && lhs.config_path == rhs.config_path &&
+           lhs.log_configs == rhs.log_configs && lhs.cert_file == rhs.cert_file && lhs.key_file == rhs.key_file &&
+           lhs.hasher_threads == rhs.hasher_threads && lhs.poll_timeout == rhs.poll_timeout;
 }
 
 } // namespace syncspirit::config
