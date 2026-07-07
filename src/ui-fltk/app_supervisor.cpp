@@ -628,6 +628,15 @@ auto app_supervisor_t::apply(const model::diff::load::file_infos_t &diff, void *
     return r;
 }
 
+auto app_supervisor_t::apply(const model::diff::local::local_state_update_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    auto r = apply_controller_t::apply(diff, custom);
+    if (r) {
+        main_window->on_local_state_update();
+    }
+    return r;
+};
+
 void app_supervisor_t::commit_loading() noexcept {
     main_window->set_splash_text("populating model (2/3)...");
 
