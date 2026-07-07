@@ -52,6 +52,7 @@ void services_supervisor_t::on_start() noexcept {
     send<model::payload::model_update_t>(coordinator, std::move(diff));
     send<model::payload::local_up_t>(address);
     launch_acceptor();
+    launch_cluster_supervisor();
     launch_dialer();
     launch_http10();
     launch_local_discovery();

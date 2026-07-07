@@ -67,13 +67,13 @@ struct SYNCSPIRIT_API services_supervisor_t final : ra::supervisor_asio_t {
     void launch_acceptor() noexcept;
     void launch_cluster_supervisor() noexcept;
     void launch_dialer() noexcept;
+    void launch_http10() noexcept;
     void launch_local_discovery() noexcept;
     void launch_global_discovery() noexcept;
     void launch_peer_supervisor() noexcept;
     void launch_relay() noexcept;
     void launch_resolver() noexcept;
     void launch_upnp() noexcept;
-    void launch_http10() noexcept;
 
     utils::logger_t log;
     config::main_t app_config;
