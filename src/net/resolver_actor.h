@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #pragma once
 
@@ -8,19 +8,19 @@
 #include "utils/dns.h"
 #include <boost/asio.hpp>
 #include <rotor.hpp>
-// #include <ares.h>
+#include <cstdint>
 
 struct ares_channeldata;
 typedef struct ares_channeldata ares_channel_t;
 
-namespace syncspirit {
-namespace net {
+namespace syncspirit::net {
 
 struct resolver_actor_config_t : public r::actor_config_t {
     using r::actor_config_t::actor_config_t;
     r::pt::time_duration resolve_timeout;
     std::string_view hosts_path;
     std::string server_addresses;
+    std::uint64_t random_number = 0;
 };
 
 template <typename Actor> struct resolver_actor_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -32,14 +32,16 @@ template <typename Actor> struct resolver_actor_config_builder_t : r::actor_conf
         parent_t::config.resolve_timeout = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
-
     builder_t &&hosts_path(std::string_view value) && noexcept {
         parent_t::config.hosts_path = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
-
     builder_t &&server_addresses(std::string value) && noexcept {
         parent_t::config.server_addresses = std::move(value);
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+    builder_t &&random_number(std::uint64_t value) && noexcept {
+        parent_t::config.random_number = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };
@@ -104,7 +106,7 @@ struct SYNCSPIRIT_API resolver_actor_t : public r::actor_base_t {
     request_ptr_t current_query;
     fmt::memory_buffer rx_buff;
     unsigned char *tx_buff;
+    std::uint64_t random_number;
 };
 
-} // namespace net
-} // namespace syncspirit
+} // namespace syncspirit::net

@@ -167,7 +167,12 @@ void services_supervisor_t::launch_upnp() noexcept {
 void services_supervisor_t::launch_resolver() noexcept {
     auto timeout = shutdown_timeout * 9 / 10;
     auto io_timeout = shutdown_timeout * 8 / 10;
-    create_actor<resolver_actor_t>().timeout(timeout).resolve_timeout(io_timeout).escalate_failure().finish();
+    create_actor<resolver_actor_t>()
+        .random_number(sequencer->next_uint64())
+        .timeout(timeout)
+        .resolve_timeout(io_timeout)
+        .escalate_failure()
+        .finish();
     ++counter;
 }
 
