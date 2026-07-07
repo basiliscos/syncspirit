@@ -99,6 +99,8 @@ after the core completion.
 ## 0.4.6 (xx-xxx-202x)
  - [fltk, win32, os x] add system tray icon
  - [fltk] use menu instead of toolbar
+ - [core] introduce services layer (allow stop/start/restart of networking)
+ - [core] dns resolver actor: randomly choose ip address of resolver server
  - [core, win32, bugfix] use utf8 for displaying error messages
  - [core, win32, bugfix] allow to use long file paths (260+ symbols)
  - [core, win32, bugfix] allow to use long and wide paths for certificates
