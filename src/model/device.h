@@ -46,6 +46,7 @@ struct SYNCSPIRIT_API device_t : augmentable_t {
     inline bool is_dynamic() const noexcept { return static_uris.empty(); }
     inline const device_state_t &get_state() const noexcept { return state; }
     void update_state(device_state_t &&) noexcept;
+    void update_state(const connection_state_t &) noexcept;
     void update_contact(std::string_view client_name, std::string_view client_version) noexcept;
     inline device_id_t &device_id() noexcept { return id; }
     inline const device_id_t &device_id() const noexcept { return id; }

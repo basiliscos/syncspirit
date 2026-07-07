@@ -4,6 +4,7 @@
 #include "resolver_actor.h"
 #include "utils/error_code.h"
 #include "utils/format.hpp"
+#include "model/messages.h"
 #include "names.h"
 #include <ares.h>
 
@@ -124,8 +125,9 @@ void resolver_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 }
 
 void resolver_actor_t::on_start() noexcept {
-    LOG_TRACE(log, "{}, on_start", identity);
+    LOG_TRACE(log, "on_start");
     r::actor_base_t::on_start();
+    send<model::payload::local_up_t>(supervisor->get_address());
 }
 
 void resolver_actor_t::shutdown_finish() noexcept {

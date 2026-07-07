@@ -49,6 +49,7 @@ void peer_supervisor_t::on_child_shutdown(actor_base_t *actor) noexcept {
 
 void peer_supervisor_t::on_start() noexcept {
     parent_t::on_start();
+    send<model::payload::local_up_t>(parent->get_address());
 }
 
 void peer_supervisor_t::visit(const model::diff::cluster_diff_t &diff, model::payload::apply_context_t &ctx) noexcept {

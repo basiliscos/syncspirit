@@ -90,6 +90,7 @@ void relay_actor_t::on_start() noexcept {
     LOG_TRACE(log, "on_start");
     r::actor_base_t::on_start();
     connect_to_relay();
+    send<model::payload::local_up_t>(supervisor->get_address());
 }
 
 void relay_actor_t::connect_to_relay() noexcept {

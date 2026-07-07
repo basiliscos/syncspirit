@@ -82,6 +82,7 @@ void local_discovery_actor_t::on_start() noexcept {
     init();
     do_read();
     announce();
+    send<model::payload::local_up_t>(supervisor->get_address());
 }
 
 void local_discovery_actor_t::shutdown_start() noexcept {

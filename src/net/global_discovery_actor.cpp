@@ -66,6 +66,7 @@ void global_discovery_actor_t::configure(r::plugin::plugin_base_t &plugin) noexc
 void global_discovery_actor_t::on_start() noexcept {
     parent_t::on_start();
     announce();
+    send<model::payload::local_up_t>(supervisor->get_address());
 }
 
 void global_discovery_actor_t::announce() noexcept {

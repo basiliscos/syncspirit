@@ -182,6 +182,10 @@ struct lock_t {
 
 struct ready_t {};
 
+struct stop_services_t {};
+struct start_services_t {};
+struct restart_services_t {};
+
 } // end of namespace payload
 
 namespace message {
@@ -218,6 +222,10 @@ using db_info_response_t = r::request_traits_t<payload::db_info_request_t>::resp
 using fs_predown_t = r::message_t<payload::fs_predown_t>;
 using lock_t = r::message_t<payload::lock_t>;
 using ready_t = r::message_t<payload::ready_t>;
+
+using stop_services_t = r::message_t<payload::stop_services_t>;
+using start_services_t = r::message_t<payload::start_services_t>;
+using restart_services_t = r::message_t<payload::restart_services_t>;
 
 } // end of namespace message
 

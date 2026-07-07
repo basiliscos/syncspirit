@@ -44,6 +44,7 @@ struct SYNCSPIRIT_API device_state_t {
     device_state_t clone() const noexcept;
 
     inline connection_state_t get_connection_state() const noexcept { return connection_state; }
+    inline connection_state_t &get_connection_state() noexcept { return connection_state; }
     inline utils::uri_ptr_t get_url() const noexcept { return online_url; }
 
   private:

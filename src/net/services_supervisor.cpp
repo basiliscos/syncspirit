@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 Ivan Baidakou
 
 #include "services_supervisor.h"
+#include "model/diff/local/local_state_update.h"
 #include "net/acceptor_actor.h"
 #include "net/cluster_supervisor.h"
 #include "net/dialer_actor.h"
@@ -19,8 +20,9 @@ using namespace syncspirit::net;
 
 services_supervisor_t::services_supervisor_t(config_t &cfg)
     : parent_t{cfg}, app_config{cfg.app_config}, cluster{cfg.cluster}, sequencer(cfg.sequencer),
-      ssl_pair{*cfg.ssl_pair} {
-    coordinator = address;
+      ssl_pair{*cfg.ssl_pair}, auto_restart{cfg.auto_restart} {
+    coordinator = parent->get_address();
+    assert(auto_restart);
 }
 
 void services_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
@@ -28,8 +30,9 @@ void services_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
         p.set_identity("net.services", false);
         log = utils::get_logger(identity);
-        coordinator = get_supervisor().get_address();
     });
+    plugin.with_casted<r::plugin::starter_plugin_t>(
+        [&](auto &p) { p.subscribe_actor(&services_supervisor_t::on_local_up); });
 }
 
 void services_supervisor_t::on_child_shutdown(actor_base_t *actor) noexcept {
@@ -41,8 +44,13 @@ void services_supervisor_t::on_child_shutdown(actor_base_t *actor) noexcept {
 }
 
 void services_supervisor_t::on_start() noexcept {
+    using namespace model::diff;
     parent_t::on_start();
-    LOG_TRACE(log, "on_start");
+    counter = 1;
+    auto diff = cluster_diff_ptr_t();
+    diff = new local::local_state_update_t(*cluster, model::connection_state_t::connecting);
+    send<model::payload::model_update_t>(coordinator, std::move(diff));
+    send<model::payload::local_up_t>(address);
     launch_acceptor();
     launch_dialer();
     launch_http10();
@@ -52,6 +60,32 @@ void services_supervisor_t::on_start() noexcept {
     launch_relay();
     launch_resolver();
     launch_upnp();
+    LOG_TRACE(log, "on_start, left = {}", counter);
+}
+
+void services_supervisor_t::shutdown_start() noexcept {
+    using namespace model::diff;
+    parent_t::shutdown_start();
+    auto diff = cluster_diff_ptr_t();
+    diff = new local::local_state_update_t(*cluster, model::connection_state_t::offline);
+    send<model::payload::model_update_t>(coordinator, std::move(diff));
+}
+
+bool services_supervisor_t::should_restart() const noexcept { return *auto_restart; }
+
+void services_supervisor_t::on_local_up(model::message::local_up_t &) noexcept {
+    if (counter) {
+        using namespace model::diff;
+        --counter;
+        LOG_DEBUG(log, "on_local_up, left = {}", counter);
+        if (counter == 0) {
+            auto diff = cluster_diff_ptr_t();
+            diff = new local::local_state_update_t(*cluster, model::connection_state_t::online);
+            send<model::payload::model_update_t>(coordinator, std::move(diff));
+        }
+    } else {
+        LOG_TRACE(log, "ignoring local_up");
+    }
 }
 
 void services_supervisor_t::launch_acceptor() noexcept {
@@ -61,6 +95,7 @@ void services_supervisor_t::launch_acceptor() noexcept {
             auto timeout = shutdown_timeout * 9 / 10;
             return create_actor<acceptor_actor_t>().timeout(timeout).cluster(cluster).spawner_address(spawner).finish();
         };
+        ++counter;
         spawn(factory).restart_period(pt::seconds{5}).restart_policy(r::restart_policy_t::fail_only).spawn();
     }
 }
@@ -78,6 +113,7 @@ void services_supervisor_t::launch_local_discovery() noexcept {
                 .spawner_address(spawner)
                 .finish();
         };
+        ++counter;
         spawn(factory).restart_period(pt::seconds{5}).restart_policy(r::restart_policy_t::fail_only).spawn();
     }
 }
@@ -95,9 +131,11 @@ void services_supervisor_t::launch_relay() noexcept {
             .keep_alive(true)
             .escalate_failure()
             .finish();
+        ++counter;
 
         auto factory = [this](r::supervisor_t &, const r::address_ptr_t &spawner) -> r::actor_ptr_t {
             auto timeout = shutdown_timeout * 9 / 10;
+            ++counter;
             return create_actor<relay_actor_t>()
                 .timeout(timeout)
                 .relay_config(app_config.relay_config)
@@ -113,6 +151,7 @@ void services_supervisor_t::launch_upnp() noexcept {
     if (app_config.upnp_config.enabled) {
         auto factory = [this](r::supervisor_t &, const r::address_ptr_t &spawner) -> r::actor_ptr_t {
             auto timeout = shutdown_timeout * 8 / 10;
+            ++counter;
             return create_actor<ssdp_actor_t>()
                 .timeout(timeout)
                 .upnp_config(app_config.upnp_config)
@@ -128,6 +167,7 @@ void services_supervisor_t::launch_resolver() noexcept {
     auto timeout = shutdown_timeout * 9 / 10;
     auto io_timeout = shutdown_timeout * 8 / 10;
     create_actor<resolver_actor_t>().timeout(timeout).resolve_timeout(io_timeout).escalate_failure().finish();
+    ++counter;
 }
 
 void services_supervisor_t::launch_http10() noexcept {
@@ -141,6 +181,7 @@ void services_supervisor_t::launch_http10() noexcept {
         .keep_alive(false)
         .escalate_failure()
         .finish();
+    ++counter;
 }
 
 void services_supervisor_t::launch_global_discovery() noexcept {
@@ -156,8 +197,10 @@ void services_supervisor_t::launch_global_discovery() noexcept {
             .keep_alive(false)
             .escalate_failure()
             .finish();
+        ++counter;
 
         auto factory = [this](r::supervisor_t &, const r::address_ptr_t &spawner) -> r::actor_ptr_t {
+            ++counter;
             auto &gcfg = app_config.global_announce_config;
             auto timeout = shutdown_timeout * 9 / 10;
             return create_actor<global_discovery_actor_t>()
@@ -179,6 +222,7 @@ void services_supervisor_t::launch_global_discovery() noexcept {
 void services_supervisor_t::launch_dialer() noexcept {
     auto dcfg = app_config.dialer_config;
     if (dcfg.enabled) {
+        ++counter;
         auto timeout = shutdown_timeout * 9 / 10;
         create_actor<dialer_actor_t>()
             .timeout(timeout)
@@ -201,6 +245,7 @@ void services_supervisor_t::launch_peer_supervisor() noexcept {
         .relay_config(app_config.relay_config)
         .escalate_failure()
         .finish();
+    ++counter;
 }
 
 void services_supervisor_t::launch_cluster_supervisor() noexcept {

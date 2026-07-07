@@ -5,6 +5,7 @@
 #include "upnp_actor.h"
 #include "proto/upnp_support.h"
 #include "utils/format.hpp"
+#include "model/messages.h"
 #include "names.h"
 
 using namespace syncspirit::net;
@@ -86,6 +87,7 @@ void ssdp_actor_t::on_start() noexcept {
     auto timeout = pt::seconds(max_wait);
     timer_request = start_timer(timeout, *this, &ssdp_actor_t::on_timer);
     resources->acquire(resource::timer);
+    send<model::payload::local_up_t>(supervisor->get_address());
 }
 
 void ssdp_actor_t::shutdown_start() noexcept {

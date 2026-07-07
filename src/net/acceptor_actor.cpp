@@ -73,6 +73,7 @@ void acceptor_actor_t::on_start() noexcept {
     send<model::payload::model_update_t>(coordinator, std::move(diff), this);
     accept_next();
     r::actor_base_t::on_start();
+    send<model::payload::local_up_t>(supervisor->get_address());
 }
 
 void acceptor_actor_t::accept_next() noexcept {

@@ -100,6 +100,9 @@ void net_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
             p.subscribe_actor(&net_supervisor_t::on_thread_ready);
             p.subscribe_actor(&net_supervisor_t::on_ready);
             p.subscribe_actor(&net_supervisor_t::on_local_up);
+            p.subscribe_actor(&net_supervisor_t::on_start_services);
+            p.subscribe_actor(&net_supervisor_t::on_stop_services);
+            p.subscribe_actor(&net_supervisor_t::on_restart_services);
         },
         r::plugin::config_phase_t::PREINIT);
 }
@@ -108,6 +111,9 @@ void net_supervisor_t::on_child_shutdown(actor_base_t *actor) noexcept {
     parent_t::on_child_shutdown(actor);
     auto &reason = actor->get_shutdown_reason();
     LOG_TRACE(log, "on_child_shutdown, '{}' due to {} ", actor->get_identity(), reason);
+    if (actor->get_address() == services_addr) {
+        services_addr.reset();
+    }
 }
 
 void net_supervisor_t::shutdown_start() noexcept {
@@ -228,20 +234,29 @@ void net_supervisor_t::on_thread_ready(model::message::thread_ready_t &) noexcep
 
 void net_supervisor_t::on_ready(message::ready_t &) noexcept {
     LOG_DEBUG(log, "on_ready, counter = {}", local_counter);
+    spawn_services();
+    send<model::payload::local_up_t>(coordinator);
+}
+
+void net_supervisor_t::spawn_services() noexcept {
+    LOG_TRACE(log, "spawnign services");
+    assert(!services_addr);
     auto factory = [this](r::supervisor_t &, const r::address_ptr_t &spawner) -> r::actor_ptr_t {
         auto timeout = shutdown_timeout * 9 / 10;
-        return create_actor<services_supervisor_t>()
-            .timeout(timeout)
-            .cluster(cluster)
-            .app_config(app_config)
-            .strand(strand)
-            .ssl_pair(&ssl_pair)
-            .sequencer(sequencer)
-            .spawner_address(spawner)
-            .finish();
+        auto actor = create_actor<services_supervisor_t>()
+                         .timeout(timeout)
+                         .cluster(cluster)
+                         .app_config(app_config)
+                         .strand(strand)
+                         .ssl_pair(&ssl_pair)
+                         .sequencer(sequencer)
+                         .spawner_address(spawner)
+                         .auto_restart(auto_restart_services)
+                         .finish();
+        services_addr = actor->get_address();
+        return actor;
     };
-    spawn(factory).restart_period(pt::seconds{5}).restart_policy(r::restart_policy_t::fail_only).spawn();
-    send<model::payload::local_up_t>(coordinator);
+    spawn(factory).restart_period(pt::seconds{5}).restart_policy(r::restart_policy_t::ask_actor).spawn();
 }
 
 void net_supervisor_t::commit_loading() noexcept {
@@ -357,4 +372,32 @@ auto net_supervisor_t::apply(const model::diff::peer::update_folder_t &diff, voi
         }
     }
     return r;
+}
+
+void net_supervisor_t::on_stop_services(message::stop_services_t &) noexcept {
+    auto_restart_services = false;
+    LOG_TRACE(log, "on_stop_services");
+    auto ee = make_error(make_error_code(r::shutdown_code_t::normal));
+    send<r::payload::shutdown_trigger_t>(address, services_addr, std::move(ee));
+}
+
+void net_supervisor_t::on_start_services(message::start_services_t &) noexcept {
+    LOG_TRACE(log, "on_start_services");
+    if (services_addr) {
+        LOG_WARN(log, "services are already running");
+        return;
+    }
+    auto_restart_services = true;
+    spawn_services();
+}
+
+void net_supervisor_t::on_restart_services(message::restart_services_t &) noexcept {
+    LOG_TRACE(log, "on_restart_services");
+    auto_restart_services = true;
+    if (!services_addr) {
+        spawn_services();
+        return;
+    }
+    auto ee = make_error(make_error_code(r::shutdown_code_t::normal));
+    send<r::payload::shutdown_trigger_t>(address, services_addr, std::move(ee));
 }

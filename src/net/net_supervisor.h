@@ -81,6 +81,7 @@ struct SYNCSPIRIT_API net_supervisor_t : net_supervisor_base_t<ra::supervisor_as
 
   private:
     using launchers_t = std::vector<launcher_t>;
+    using spawner_ptr_t = std::unique_ptr<r::spawner_t>;
 
     void on_load_cluster_success(message::load_cluster_success_t &message) noexcept;
     void on_load_cluster_fail(message::load_cluster_fail_t &message) noexcept;
@@ -89,11 +90,15 @@ struct SYNCSPIRIT_API net_supervisor_t : net_supervisor_base_t<ra::supervisor_as
     void on_local_up(model::message::local_up_t &) noexcept;
     void on_thread_ready(model::message::thread_ready_t &) noexcept;
     void on_ready(message::ready_t &) noexcept;
+    void on_stop_services(message::stop_services_t &) noexcept;
+    void on_start_services(message::start_services_t &) noexcept;
+    void on_restart_services(message::restart_services_t &) noexcept;
 
     void dial_peer(const model::device_id_t &peer_device_id, const utils::uri_container_t &uris) noexcept;
     void launch_early() noexcept;
     void seed_model() noexcept;
     void try_seed_model() noexcept;
+    void spawn_services() noexcept;
 
     outcome::result<void> apply(const model::diff::advance::advance_t &, void *) noexcept override;
     outcome::result<void> apply(const model::diff::modify::upsert_folder_t &, void *) noexcept override;
@@ -110,8 +115,11 @@ struct SYNCSPIRIT_API net_supervisor_t : net_supervisor_base_t<ra::supervisor_as
     std::uint_fast32_t local_counter;
     model::diff::cluster_diff_ptr_t load_diff;
     r::address_ptr_t db_addr;
+    r::address_ptr_t services_addr;
+    spawner_ptr_t services_spawner;
     utils::key_pair_t ssl_pair;
     launchers_t launchers;
+    bool auto_restart_services = true;
 };
 
 } // namespace syncspirit::net

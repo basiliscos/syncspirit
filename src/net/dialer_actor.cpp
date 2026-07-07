@@ -39,6 +39,7 @@ void dialer_actor_t::post_configure_coordinator() noexcept {
 }
 
 void dialer_actor_t::on_start() noexcept {
+    LOG_TRACE(log, "on_start");
     parent_t::on_start();
     auto &devices = cluster->get_devices();
     for (auto it : devices) {
@@ -47,6 +48,7 @@ void dialer_actor_t::on_start() noexcept {
             schedule_redial(d);
         }
     }
+    send<model::payload::local_up_t>(supervisor->get_address());
 }
 
 void dialer_actor_t::shutdown_finish() noexcept {
