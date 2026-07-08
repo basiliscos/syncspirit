@@ -13,6 +13,7 @@
 
 #include <FL/Fl_PNG_Image.H>
 
+using namespace syncspirit;
 using namespace syncspirit::fltk;
 
 static const char *traffic_icon_path = "icons/syncspirit-fltk-sync.png";
@@ -24,7 +25,34 @@ static void cb_quit(Fl_Widget *, void *data) {
     sup.do_shutdown();
 }
 
+static void on_net_start(Fl_Widget *widget, void *data) {
+    auto tray_widget = reinterpret_cast<tray_impl_t *>(data);
+    auto &sup = tray_widget->sup;
+    auto log = sup.get_logger();
+    LOG_INFO(log, "starting networking");
+    sup.send_model<net::payload::start_services_t>();
+}
+
+static void on_net_stop(Fl_Widget *widget, void *data) {
+    auto tray_widget = reinterpret_cast<tray_impl_t *>(data);
+    auto &sup = tray_widget->sup;
+    auto log = sup.get_logger();
+    LOG_INFO(log, "stopping networking");
+    sup.send_model<net::payload::stop_services_t>();
+}
+
+static void on_net_restart(Fl_Widget *widget, void *data) {
+    auto tray_widget = reinterpret_cast<tray_impl_t *>(data);
+    auto &sup = tray_widget->sup;
+    auto log = sup.get_logger();
+    LOG_INFO(log, "restarting networking");
+    sup.send_model<net::payload::restart_services_t>();
+}
+
 tray_impl_t::tray_impl_t(app_supervisor_t &sup_) noexcept : sup{sup_} {
+    menu_items.push_back({"Stop networking", 0, on_net_stop, this, 0, 0, 0, 14, 0});
+    menu_items.push_back({"Start networking", 0, on_net_start, this, 0, 0, 0, 14, 0});
+    menu_items.push_back({"Restart networking", 0, on_net_restart, this, 0, 0, 0, 14, 0});
     menu_items.push_back({"Quit", 0, cb_quit, this, 0, 0, 0, 14, 0});
     menu_items.push_back({nullptr});
 
@@ -59,6 +87,9 @@ void tray_base_t::enable(bool value) noexcept {
 #elif defined(SYNCSPIRIT_FLTK_WIN32)
         impl = tray_win32_t::init(*sup);
 #endif
+        if (impl) {
+            on_local_state_update();
+        }
     } else {
         delete impl;
         impl = nullptr;
@@ -94,4 +125,21 @@ bool tray_base_t::is_available() noexcept {
     return true;
 #endif
     return false;
+}
+
+void tray_base_t::on_local_state_update() noexcept {
+    using S = model::connection_state_t;
+    auto cluster = sup->get_cluster();
+    if (cluster && impl) {
+        auto new_state = cluster->get_device()->get_state().get_connection_state();
+        auto &m_stop = impl->menu_items[0];
+        auto &m_start = impl->menu_items[1];
+        if (new_state == S::offline) {
+            m_start.flags &= ~FL_MENU_INACTIVE;
+            m_stop.flags |= FL_MENU_INACTIVE;
+        } else {
+            m_start.flags |= FL_MENU_INACTIVE;
+            m_stop.flags &= ~FL_MENU_INACTIVE;
+        }
+    }
 }

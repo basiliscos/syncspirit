@@ -165,7 +165,10 @@ void main_window_t::detach_supervisor() {
 
 void main_window_t::on_frame_render() noexcept { tray.on_frame_render(); }
 
-void main_window_t::on_local_state_update() noexcept { menu->on_local_state_update(); }
+void main_window_t::on_local_state_update() noexcept {
+    menu->on_local_state_update();
+    tray.on_local_state_update();
+}
 
 app_supervisor_t *main_window_t::get_supervisor() { return supervisor; }
 

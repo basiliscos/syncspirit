@@ -36,6 +36,7 @@ struct tray_base_t {
     bool is_enabled() noexcept;
     static bool is_available() noexcept;
     void on_frame_render() noexcept;
+    void on_local_state_update() noexcept;
 
   protected:
     app_supervisor_t *sup = nullptr;
