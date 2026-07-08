@@ -7,7 +7,7 @@
 
 #if defined(SYNCSPIRIT_FLTK_WIN32)
 
-#include "platform/tray_base.h"
+#include "platform/tray.h"
 #include "app_supervisor.h" // for proper headers order
 
 #include <windows.h>

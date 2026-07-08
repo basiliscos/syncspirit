@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // SPDX-FileCopyrightText: 2026 Ivan Baidakou
 
-#include "tray_base.h"
+#include "tray.h"
 #include "app_supervisor.h"
 #include "syncspirit-fltk-config.h"
 
@@ -68,15 +68,15 @@ tray_impl_t::tray_impl_t(app_supervisor_t &sup_) noexcept : sup{sup_} {
     }
 }
 
-tray_base_t::~tray_base_t() {
+tray_t::~tray_t() {
     if (impl) {
         delete impl;
     }
 }
 
-void tray_base_t::init(app_supervisor_t &sup_) noexcept { sup = &sup_; }
+void tray_t::init(app_supervisor_t &sup_) noexcept { sup = &sup_; }
 
-void tray_base_t::enable(bool value) noexcept {
+void tray_t::enable(bool value) noexcept {
     if (value) {
         if (impl) {
             delete impl;
@@ -96,14 +96,14 @@ void tray_base_t::enable(bool value) noexcept {
     }
 }
 
-bool tray_base_t::is_enabled() noexcept {
+bool tray_t::is_enabled() noexcept {
     if (impl) {
         return impl->is_enabled();
     }
     return false;
 }
 
-void tray_base_t::on_frame_render() noexcept {
+void tray_t::on_frame_render() noexcept {
     if (impl && impl->is_enabled()) {
         auto &self = *sup->get_cluster()->get_device();
         auto new_traffic = (self.get_rx_bytes() + self.get_tx_bytes()) << 1;
@@ -118,7 +118,7 @@ void tray_base_t::on_frame_render() noexcept {
     }
 }
 
-bool tray_base_t::is_available() noexcept {
+bool tray_t::is_available() noexcept {
 #if defined(SYNCSPIRIT_FLTK_X11)
     return true;
 #elif defined(SYNCSPIRIT_FLTK_WIN32)
@@ -127,7 +127,7 @@ bool tray_base_t::is_available() noexcept {
     return false;
 }
 
-void tray_base_t::on_local_state_update() noexcept {
+void tray_t::on_local_state_update() noexcept {
     using S = model::connection_state_t;
     auto cluster = sup->get_cluster();
     if (cluster && impl) {
