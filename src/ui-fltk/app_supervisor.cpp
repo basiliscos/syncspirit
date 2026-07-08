@@ -224,7 +224,7 @@ void app_supervisor_t::shutdown_finish() noexcept {
     }
     auto cfg = config::serialize(app_config);
     auto cfg_orig = config::serialize(app_config_original);
-    if (cfg != cfg) {
+    if (cfg != cfg_orig) {
         write_config(app_config);
     }
 }
