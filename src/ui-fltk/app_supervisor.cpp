@@ -781,7 +781,7 @@ void app_supervisor_t::detach_main_window() noexcept {
 void app_supervisor_t::soft_restart() {
     log->debug("soft restart has been requested");
     soft_restart_request = true;
-    main_window->hide();
+    do_shutdown();
 }
 
 void app_supervisor_t::on_frame_render_timer(r::request_id_t, bool cancelled) noexcept {
