@@ -161,6 +161,9 @@ static main_t make_default_config(const utils::poly_path_view_t &config_path, co
         //     "default", spdlog::level::level_enum::trace, {"stdout"}
         // }
     };
+    cfg.acceptor_config = acceptor_config_t {
+        true, /* enabled */
+    };
     cfg.local_announce_config = local_announce_config_t {
         true,   /* enabled */
         21027,  /* port */
@@ -268,6 +271,15 @@ config_result_t get_config(std::string_view config, const utils::poly_path_view_
         SAFE_GET_PATH_EXPANDED(cert_file, "main");
         SAFE_GET_PATH_EXPANDED(key_file, "main");
     };
+
+    // acceptor
+    {
+        auto t = root_tbl["acceptor"];
+        auto &c = cfg.acceptor_config;
+        auto &c_default = default_config.acceptor_config;
+
+        SAFE_GET_VALUE(enabled, bool, "acceptor");
+    }
 
     // local_discovery
     {
@@ -448,6 +460,9 @@ std::string serialize(const main_t& cfg) noexcept {
                      {"default_location", std::string(cfg.default_location.get_full_name())},
                  }}},
         {"log", logs},
+        {"acceptor", toml::table{{
+                                {"enabled", cfg.acceptor_config.enabled},
+                            }}},
         {"local_discovery", toml::table{{
                                 {"enabled", cfg.local_announce_config.enabled},
                                 {"port", cfg.local_announce_config.port},

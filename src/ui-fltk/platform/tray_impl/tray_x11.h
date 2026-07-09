@@ -7,7 +7,7 @@
 
 #if defined(SYNCSPIRIT_FLTK_X11)
 
-#include "platform/tray_base.h"
+#include "platform/tray.h"
 #include <X11/Xatom.h>
 #include <X11/Xlib.h>
 

@@ -4,6 +4,7 @@
 #include "http_actor.h"
 #include "utils/error_code.h"
 #include "utils/format.hpp"
+#include "model/messages.h"
 #include "names.h"
 
 using namespace syncspirit::net;
@@ -376,6 +377,7 @@ void http_actor_t::on_timer(r::request_id_t, bool cancelled) noexcept {
 void http_actor_t::on_start() noexcept {
     LOG_TRACE(log, "on_start (ssl_verify_store: {})", ssl_verify_store);
     r::actor_base_t::on_start();
+    send<model::payload::local_up_t>(supervisor->get_address());
 }
 
 void http_actor_t::shutdown_start() noexcept {

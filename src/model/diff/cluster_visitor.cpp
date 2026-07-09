@@ -21,6 +21,7 @@
 #include "load/remove_corrupted_files.h"
 #include "local/blocks_availability.h"
 #include "local/file_availability.h"
+#include "local/local_state_update.h"
 #include "local/scan_finish.h"
 #include "local/scan_request.h"
 #include "local/scan_start.h"
@@ -140,6 +141,11 @@ auto cluster_visitor_t::operator()(const load::interrupt_t &diff, void *custom) 
 }
 
 auto cluster_visitor_t::operator()(const local::file_availability_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    return diff.visit_next(*this, custom);
+}
+
+auto cluster_visitor_t::operator()(const local::local_state_update_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     return diff.visit_next(*this, custom);
 }

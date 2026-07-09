@@ -106,6 +106,8 @@ void device_t::update_state(device_state_t &&new_state) noexcept {
     state = std::move(new_state);
 }
 
+void device_t::update_state(const connection_state_t &s) noexcept { state.get_connection_state() = s; }
+
 void device_t::update_contact(std::string_view client_name_, std::string_view client_version_) noexcept {
     client_name = client_name_;
     client_version = client_version_;

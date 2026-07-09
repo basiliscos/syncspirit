@@ -173,6 +173,7 @@ add_library(syncspirit_core
     src/model/diff/load/remove_corrupted_files.cpp
     src/model/diff/local/blocks_availability.cpp
     src/model/diff/local/file_availability.cpp
+    src/model/diff/local/local_state_update.cpp
     src/model/diff/local/scan_finish.cpp
     src/model/diff/local/scan_request.cpp
     src/model/diff/local/scan_start.cpp
@@ -249,6 +250,7 @@ add_library(syncspirit_core
     src/net/resolver_actor.cpp
     src/net/names.cpp
     src/net/scheduler.cpp
+    src/net/services_supervisor.cpp
     src/net/ssdp_actor.cpp
     src/net/upnp_actor.cpp
     src/net/local_keeper/child_info.cpp

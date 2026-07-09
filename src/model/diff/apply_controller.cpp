@@ -8,6 +8,7 @@
 #include "load/interrupt.h"
 #include "load/commit.h"
 #include "load/load_cluster.h"
+#include "local/local_state_update.h"
 #include "local/scan_start.h"
 #include "modify/add_ignored_device.h"
 #include "modify/add_pending_device.h"
@@ -46,6 +47,11 @@ auto apply_controller_t::apply(const load::interrupt_t &diff, void *custom) noex
 }
 
 auto apply_controller_t::apply(const load::load_cluster_t &diff, void *custom) noexcept -> outcome::result<void> {
+    return diff.apply_impl(*this, custom);
+}
+
+auto apply_controller_t::apply(const local::local_state_update_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
     return diff.apply_impl(*this, custom);
 }
 

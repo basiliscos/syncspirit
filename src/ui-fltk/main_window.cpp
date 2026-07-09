@@ -48,9 +48,9 @@ main_window_t::main_window_t(app_supervisor_t &supervisor_, int w_, int h_)
 
     top_contaner->begin();
 
-    auto menu_bar = new menu_t(supervisor_, 0, 0, w(), 25);
-    auto hh = h() - menu_bar->h();
-    auto container = new Fl_Tile(0, menu_bar->h(), w(), hh);
+    menu = new menu_t(supervisor_, 0, 0, w(), 25);
+    auto hh = h() - menu->h();
+    auto container = new Fl_Tile(0, menu->h(), w(), hh);
     container->color(FL_MAGENTA);
     auto &cfg = supervisor->get_app_config().fltk_config;
     auto left_share = std::min(std::max(0.1, cfg.left_panel_share), 0.9);
@@ -62,7 +62,7 @@ main_window_t::main_window_t(app_supervisor_t &supervisor_, int w_, int h_)
     auto left_w = static_cast<int>(container->w() * left_share);
     auto right_w = container->w() - left_w;
     auto top_h = static_cast<int>(hh * (1 - bottom_share));
-    content_left = new Fl_Group(0, menu_bar->h(), left_w, top_h);
+    content_left = new Fl_Group(0, menu->h(), left_w, top_h);
     content_left->box(FL_FLAT_BOX);
     content_left->begin();
 
@@ -82,7 +82,7 @@ main_window_t::main_window_t(app_supervisor_t &supervisor_, int w_, int h_)
         return box;
     });
 
-    auto log_panel_h = h() - (content_left->h() + menu_bar->h());
+    auto log_panel_h = h() - (content_left->h() + menu->h());
     log_panel = new log_panel_t(*supervisor, 0, 0, w(), log_panel_h);
     log_panel->position(0, content_left->h() + content_left->y());
     log_panel->box(FL_FLAT_BOX);
@@ -164,6 +164,12 @@ void main_window_t::detach_supervisor() {
 }
 
 void main_window_t::on_frame_render() noexcept { tray.on_frame_render(); }
+
+void main_window_t::on_local_state_update() noexcept {
+    menu->on_local_state_update();
+    tray.on_local_state_update();
+}
+
 app_supervisor_t *main_window_t::get_supervisor() { return supervisor; }
 
 const Fl_RGB_Image *main_window_t::get_icon() const noexcept { return image_icon.get(); }

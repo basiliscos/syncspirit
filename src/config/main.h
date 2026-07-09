@@ -3,6 +3,7 @@
 
 #pragma once
 #include <cstdint>
+#include "acceptor.h"
 #include "bep.h"
 #include "db.h"
 #include "dialer.h"
@@ -24,6 +25,7 @@ struct main_t {
     utils::path_t cert_file;
     utils::path_t key_file;
 
+    acceptor_config_t acceptor_config;
     local_announce_config_t local_announce_config;
     log_configs_t log_configs;
     upnp_config_t upnp_config;
@@ -51,6 +53,7 @@ struct main_t {
         cert_file = orig.cert_file.clone();
         key_file = orig.key_file.clone();
 
+        acceptor_config = orig.acceptor_config;
         local_announce_config = orig.local_announce_config;
         log_configs = orig.log_configs;
         upnp_config = orig.upnp_config;

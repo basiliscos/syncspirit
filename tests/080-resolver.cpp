@@ -173,6 +173,46 @@ void test_success_resolver() {
     F().run();
 }
 
+void test_success_2() {
+    struct F : fixture_t {
+        void main(const utils::allocator_t &allocator) noexcept override {
+            auto local_port = remote_resolver.local_endpoint().port();
+
+            auto buff = asio::buffer(rx_buff.data(), rx_buff.size());
+            remote_resolver.async_receive_from(buff, resolver_endpoint, [&](sys::error_code ec, size_t bytes) -> void {
+                log->info("received {} bytes from resolver, ec = {}", bytes, ec.value());
+                const unsigned char reply[] = {0x0e, 0x51, 0x81, 0x80, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00,
+                                               0x00, 0x06, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x03, 0x63, 0x6f,
+                                               0x6d, 0x00, 0x00, 0x01, 0x00, 0x01, 0xc0, 0x0c, 0x00, 0x01, 0x00,
+                                               0x01, 0x00, 0x00, 0x01, 0x02, 0x00, 0x04, 0x8e, 0xfa, 0xcb, 0x8e};
+                auto reply_str = std::string_view(reinterpret_cast<const char *>(reply), sizeof(reply));
+                auto buff = asio::buffer(reply_str.data(), reply_str.size());
+                remote_resolver.async_send_to(buff, resolver_endpoint, [&](sys::error_code ec, size_t bytes) {
+                    log->info("sent {} bytes to resolver, ec = {}", bytes, ec.value());
+                });
+            });
+
+            resolver = sup->create_actor<resolver_actor_t>()
+                           .resolve_timeout(timeout / 2)
+                           .server_addresses(fmt::format("0.0.0.0:0,127.0.0.1:{}", local_port))
+                           .random_number(1)
+                           .timeout(timeout)
+                           .finish();
+
+            sup->do_process();
+
+            sup->request<payload::address_request_t>(resolver->get_address(), "google.com", 80).send(timeout);
+            io_ctx.run();
+            REQUIRE(sup->responses.size() == 1);
+
+            auto &results = sup->responses.at(0)->payload.res->results;
+            REQUIRE(results.size() == 1);
+            REQUIRE_THAT(results.at(0).to_string(), StartsWith("142.250."));
+        }
+    };
+    F().run();
+}
+
 void test_success_ip() {
     struct F : fixture_t {
         void main(const utils::allocator_t &allocator) noexcept override {
@@ -407,6 +447,7 @@ void test_cancellation() {
 int _init() {
     REGISTER_TEST_CASE(test_local_resolver, "test_local_resolver", "[resolver]");
     REGISTER_TEST_CASE(test_success_resolver, "test_success_resolver", "[resolver]");
+    REGISTER_TEST_CASE(test_success_2, "test_success_2", "[resolver]");
     REGISTER_TEST_CASE(test_success_ip, "test_success_ip", "[resolver]");
     REGISTER_TEST_CASE(test_success_ipv6, "test_success_ipv6", "[resolver]");
     REGISTER_TEST_CASE(test_multi_replies, "test_multi_replies", "[resolver]");

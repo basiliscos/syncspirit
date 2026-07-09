@@ -224,7 +224,7 @@ void app_supervisor_t::shutdown_finish() noexcept {
     }
     auto cfg = config::serialize(app_config);
     auto cfg_orig = config::serialize(app_config_original);
-    if (cfg != cfg) {
+    if (cfg != cfg_orig) {
         write_config(app_config);
     }
 }
@@ -628,6 +628,15 @@ auto app_supervisor_t::apply(const model::diff::load::file_infos_t &diff, void *
     return r;
 }
 
+auto app_supervisor_t::apply(const model::diff::local::local_state_update_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    auto r = apply_controller_t::apply(diff, custom);
+    if (r) {
+        main_window->on_local_state_update();
+    }
+    return r;
+};
+
 void app_supervisor_t::commit_loading() noexcept {
     main_window->set_splash_text("populating model (2/3)...");
 
@@ -772,7 +781,7 @@ void app_supervisor_t::detach_main_window() noexcept {
 void app_supervisor_t::soft_restart() {
     log->debug("soft restart has been requested");
     soft_restart_request = true;
-    main_window->hide();
+    do_shutdown();
 }
 
 void app_supervisor_t::on_frame_render_timer(r::request_id_t, bool cancelled) noexcept {

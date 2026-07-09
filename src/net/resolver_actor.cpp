@@ -4,6 +4,7 @@
 #include "resolver_actor.h"
 #include "utils/error_code.h"
 #include "utils/format.hpp"
+#include "model/messages.h"
 #include "names.h"
 #include <ares.h>
 
@@ -28,7 +29,8 @@ r::plugin::resource_id_t recv = 2;
 resolver_actor_t::resolver_actor_t(resolver_actor_t::config_t &config)
     : r::actor_base_t{config}, io_timeout{config.resolve_timeout}, hosts_path{config.hosts_path},
       server_addresses{std::move(config.server_addresses)},
-      strand{static_cast<ra::supervisor_asio_t *>(config.supervisor)->get_strand()}, channel{nullptr} {
+      strand{static_cast<ra::supervisor_asio_t *>(config.supervisor)->get_strand()}, channel{nullptr},
+      random_number{config.random_number} {
 
     rx_buff.resize(1500);
     tx_buff = nullptr;
@@ -83,18 +85,14 @@ void resolver_actor_t::do_initialize(r::system_context_t *ctx) noexcept {
         return do_shutdown(make_error(ec));
     }
 
-    auto dns_address = dns_addresses[0];
-    for (auto &addr : dns_addresses) {
-        if (addr.ip.is_v4()) {
-            dns_address = addr;
-            break;
-        }
-    }
-    LOG_DEBUG(log, "selected dns server: {}:{}", dns_address.ip, dns_address.port);
+    auto index = random_number % dns_addresses.size();
+    auto dns_address = dns_addresses[index];
+    LOG_DEBUG(log, "selected dns server ({}): {}:{}", index, dns_address.ip, dns_address.port);
 
     auto ec = boost::system::error_code();
     auto s = udp_socket_t{strand.context()};
-    s.open(boost::asio::ip::udp::v4(), ec);
+    auto protocol = dns_address.ip.is_v4() ? boost::asio::ip::udp::v4() : boost::asio::ip::udp::v6();
+    s.open(protocol, ec);
     if (ec) {
         LOG_WARN(log, "init, can't open socket: {}", ec);
         return do_shutdown(make_error(ec));
@@ -124,8 +122,9 @@ void resolver_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 }
 
 void resolver_actor_t::on_start() noexcept {
-    LOG_TRACE(log, "{}, on_start", identity);
+    LOG_TRACE(log, "on_start");
     r::actor_base_t::on_start();
+    send<model::payload::local_up_t>(supervisor->get_address());
 }
 
 void resolver_actor_t::shutdown_finish() noexcept {

@@ -19,10 +19,7 @@ void cluster_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept 
     });
 }
 
-void cluster_supervisor_t::on_start() noexcept {
-    send<model::payload::local_up_t>(coordinator);
-    parent_t::on_start();
-}
+void cluster_supervisor_t::on_start() noexcept { parent_t::on_start(); }
 
 void cluster_supervisor_t::visit(const model::diff::cluster_diff_t &diff,
                                  model::payload::apply_context_t &ctx) noexcept {
