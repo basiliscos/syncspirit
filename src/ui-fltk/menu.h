@@ -3,15 +3,15 @@
 
 #pragma once
 
-#include <FL/Fl_Menu_Bar.H>
+#include <FL/Fl_Sys_Menu_Bar.H>
 #include <vector>
 
 namespace syncspirit::fltk {
 
 struct app_supervisor_t;
 
-struct menu_t : Fl_Menu_Bar {
-    using parent_t = Fl_Menu_Bar;
+struct menu_t : Fl_Sys_Menu_Bar {
+    using parent_t = Fl_Sys_Menu_Bar;
     menu_t(app_supervisor_t &supervisor, int x, int y, int w, int h);
 
     void on_local_state_update() noexcept;
