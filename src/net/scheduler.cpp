@@ -8,6 +8,7 @@
 #include "model/diff/local/scan_request.h"
 #include "model/diff/local/scan_start.h"
 #include "model/diff/local/synchronization_finish.h"
+#include "proto/proto-helpers-db.h"
 
 using namespace syncspirit::net;
 
@@ -80,7 +81,8 @@ void scheduler_t::visit(const model::diff::cluster_diff_t &diff, model::payload:
 
 auto scheduler_t::operator()(const model::diff::modify::upsert_folder_t &diff, void *custom) noexcept
     -> outcome::result<void> {
-    if (!scan_in_progress) {
+    if (!scan_in_progress && !diff.is_new) {
+        auto folder_id = db::get_id(diff.db);
         scan_next_or_schedule();
     }
     return diff.visit_next(*this, custom);
@@ -117,6 +119,15 @@ auto scheduler_t::operator()(const model::diff::local::scan_request_t &diff, voi
         if (!scan_in_progress) {
             scan_next_or_schedule();
         }
+    }
+    return diff.visit_next(*this, custom);
+}
+
+auto scheduler_t::operator()(const model::diff::local::scan_start_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    if (!scan_in_progress) {
+        LOG_TRACE(log, "marking scan in progress (triggered externally)");
+        scan_in_progress = true;
     }
     return diff.visit_next(*this, custom);
 }
@@ -163,7 +174,9 @@ auto scheduler_t::scan_next() noexcept -> schedule_option_t {
         auto item = std::move(scan_queue.front());
         scan_queue.pop_front();
         auto folder = cluster->get_folders().by_id(item.folder_id);
-        if (!folder || folder->is_synchronizing() || ((folder->is_suspended() && !folder->get_suspend_reason()))) {
+        auto skip =
+            !folder || folder->is_synchronizing() || ((folder->is_suspended() && !folder->get_suspend_reason()));
+        if (skip) {
             continue;
         }
         for (auto it = scan_queue.begin(); it != scan_queue.end();) {

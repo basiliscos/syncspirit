@@ -462,6 +462,7 @@ void test_create_dir() {
                 auto f = cluster->get_folders().by_id(folder_id);
                 REQUIRE(f);
                 REQUIRE(!f->is_suspended());
+                CHECK(!f->get_scan_finish().is_not_a_date_time());
             }
             SECTION("fail & suspend") {
                 auto sub_path = root_path / "a" / "dir";
@@ -473,6 +474,7 @@ void test_create_dir() {
                 REQUIRE(f);
                 REQUIRE(f->is_suspended());
                 CHECK(f->get_suspend_reason());
+                CHECK(f->get_scan_finish().is_not_a_date_time());
             }
         }
     };

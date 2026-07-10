@@ -51,6 +51,7 @@ struct SYNCSPIRIT_API scheduler_t final : public model_actor_t<r::actor_base_t>,
 
     outcome::result<void> operator()(const model::diff::modify::upsert_folder_t &, void *custom) noexcept override;
     outcome::result<void> operator()(const model::diff::local::scan_request_t &, void *custom) noexcept override;
+    outcome::result<void> operator()(const model::diff::local::scan_start_t &, void *custom) noexcept override;
     outcome::result<void> operator()(const model::diff::local::scan_finish_t &, void *custom) noexcept override;
     outcome::result<void> operator()(const model::diff::local::synchronization_finish_t &,
                                      void *custom) noexcept override;

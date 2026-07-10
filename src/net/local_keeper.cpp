@@ -281,6 +281,10 @@ void local_keeper_t::on_create_dir(fs::message::create_dir_t &message) noexcept 
                 auto pp = folder->get_path().clone();
                 route<fs::payload::watch_folder_t>(watcher_addr, address, std::move(pp), p.folder_id);
             }
+            auto diff = model::diff::cluster_diff_ptr_t{};
+            auto now = r::pt::microsec_clock::local_time();
+            diff = new model::diff::local::scan_start_t(p.folder_id, {}, now);
+            send<model::payload::model_update_t>(coordinator, std::move(diff));
         }
     }
 }

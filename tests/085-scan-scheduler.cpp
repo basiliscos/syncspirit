@@ -94,7 +94,6 @@ void test_1_folder() {
             db::set_id(db_folder, folder_id);
 
             auto builder = diff_builder_t(*cluster);
-
             SECTION("zero rescan time => no scan") {
                 builder.upsert_folder(db_folder).apply(*sup);
                 auto folder = cluster->get_folders().by_id(folder_id);
@@ -106,7 +105,9 @@ void test_1_folder() {
                 builder.upsert_folder(db_folder).apply(*sup);
 
                 auto folder = cluster->get_folders().by_id(folder_id);
-                CHECK(folder->is_scanning());
+                CHECK(!folder->is_scanning());
+                REQUIRE(sup->timers.size() == 0);
+                builder.scan_start(folder_id).apply(*sup);
 
                 SECTION("scan start/finish") {
                     builder.scan_finish(folder_id).apply(*sup);
@@ -153,13 +154,15 @@ void test_1_folder() {
                     CHECK(target->access<ns::to::scan_queue>().front().sub_dir == "");
                 }
             }
-
             SECTION("suspending") {
                 db::set_rescan_interval(db_folder, 3600);
                 builder.upsert_folder(db_folder).apply(*sup);
 
                 auto folder = cluster->get_folders().by_id(folder_id);
+                builder.scan_start(folder_id).apply(*sup);
                 CHECK(folder->is_scanning());
+                std::this_thread::sleep_for(std::chrono::milliseconds{2100});
+
                 builder.suspend(*folder).scan_finish(folder_id).apply(*sup);
                 REQUIRE(sup->timers.size() == 0);
             }
