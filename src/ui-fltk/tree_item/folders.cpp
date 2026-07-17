@@ -3,13 +3,18 @@
 
 #include "folders.h"
 #include "presence_item/folder.h"
+#include "presentation/folder_presence.h"
+#include "utils/base32.h"
+#include "proto/proto-helpers-db.h"
+#if 0
 #include "../content/folder_table.h"
 #include "../table_widget/label.h"
-#include "utils/base32.h"
-#include "presentation/folder_presence.h"
+
 #include <algorithm>
 #include <cctype>
 #include <boost/nowide/convert.hpp>
+#endif
+#include "content/folder_widget.h"
 #include <FL/Fl_Button.H>
 
 using namespace syncspirit;
@@ -20,6 +25,7 @@ using namespace syncspirit::fltk::presence_item;
 
 static constexpr int padding = 2;
 
+#if 0
 namespace {
 
 using folder_table_t = content::folder_table_t;
@@ -142,6 +148,25 @@ struct table_t : content::folder_table_t {
 };
 
 } // namespace
+#endif
+
+namespace {
+
+struct widget_t final: content::folder_widget_t {
+    using parent_t = content::folder_widget_t;
+    using parent_t::parent_t;
+
+    void make_tabs(model::folder_ptr_t folder_, model::folder_info_ptr_t folder_info_) {
+        folder = std::move(folder_);
+        folder_info = std::move(folder_info_);
+        parent_t::make_tabs(*folder_info);
+    }
+
+    model::folder_ptr_t folder;
+    model::folder_info_ptr_t folder_info;
+};
+}
+
 
 folders_t::folders_t(app_supervisor_t &supervisor, Fl_Tree *tree) : parent_t(supervisor, tree, false) {
     supervisor.set_folders(this);
@@ -188,6 +213,7 @@ void folders_t::select_folder(std::string_view folder_id) {
 
 bool folders_t::on_select() {
     content = supervisor.replace_content([&](content_t *content) -> content_t * {
+            using B = content::folder_widget_t::behavior_t;
         auto cluster = supervisor.get_cluster();
         auto &self = *cluster->get_device();
         auto &sequencer = supervisor.get_sequencer();
@@ -216,7 +242,9 @@ bool folders_t::on_select() {
 
         auto prev = content->get_widget();
         int x = prev->x(), y = prev->y(), w = prev->w(), h = prev->h();
-        return new table_t(*this, std::move(fi), std::move(folder), x, y, w, h);
+        auto widget = new widget_t(*this, B::edit_new, x, y, w, h);
+        widget->make_tabs(std::move(folder), std::move(fi));
+        return widget;
     });
     return true;
 }

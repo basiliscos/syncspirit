@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2026 Ivan Baidakou
 
 #pragma once
 
 #include <FL/Fl_Widget.H>
+#include <FL/Fl_Group.H>
 
 #include <type_traits>
 
@@ -39,5 +40,9 @@ template <typename T> struct contentable_t<T, std::enable_if_t<std::is_base_of_v
         }
     }
 };
+
+using refresheable_group_t = contentable_t<Fl_Group>;
+
+
 
 } // namespace syncspirit::fltk

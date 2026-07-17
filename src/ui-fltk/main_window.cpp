@@ -51,7 +51,7 @@ main_window_t::main_window_t(app_supervisor_t &supervisor_, int w_, int h_)
     menu = new menu_t(supervisor_, 0, 0, w(), 25);
     auto hh = h() - menu->h();
     auto container = new Fl_Tile(0, menu->h(), w(), hh);
-    container->color(FL_MAGENTA);
+    container->box(FL_FLAT_BOX);
     auto &cfg = supervisor->get_app_config().fltk_config;
     auto left_share = std::min(std::max(0.1, cfg.left_panel_share), 0.9);
     auto bottom_share = std::min(std::max(0.1, cfg.bottom_panel_share), 0.9);

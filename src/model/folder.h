@@ -49,7 +49,7 @@ struct SYNCSPIRIT_API folder_t final : augmentable_t, folder_data_t {
     inline cluster_t *&get_cluster() noexcept { return cluster; }
     const pt::ptime &get_scan_start() const noexcept;
     void set_scan_start(const pt::ptime &value) noexcept;
-    const pt::ptime &get_scan_finish() noexcept;
+    const pt::ptime &get_scan_finish() const noexcept;
     void set_scan_finish(const pt::ptime &value) noexcept;
     bool is_scanning() const noexcept;
     bool is_synchronizing() const noexcept;
