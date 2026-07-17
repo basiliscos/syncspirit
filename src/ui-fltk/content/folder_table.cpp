@@ -185,7 +185,7 @@ auto folder_table_t::make_path(folder_table_t &container, bool disabled) -> widg
         Fl_Widget *create_widget(int x, int y, int w, int h) override {
             auto r = parent_t::create_widget(x, y, w, h);
             input->when(input->when() | FL_WHEN_CHANGED);
-            input->callback([](auto, void *data) { reinterpret_cast<folder_table_t *>(data)->refresh(); }, &container);
+            input->callback([](auto, void *data) { reinterpret_cast<static_table_t *>(data)->refresh(); }, &container);
             if (disabled) {
                 widget->deactivate();
             }
@@ -510,7 +510,6 @@ auto folder_table_t::make_disable_tmp(folder_table_t &container) -> widgetable_p
         }
         void reset() override {
             auto &container = static_cast<folder_table_t &>(this->container);
-            // input->value(container.description.get_folder()->are_temp_indixes_disabled());
             input->value(true);
         }
         bool store(void *data) override {
@@ -749,7 +748,9 @@ void folder_table_t::on_share() {
 }
 
 void folder_table_t::on_apply() {
+    auto folder = description.get_folder();
     serialization_context_t ctx;
+    folder->serialize(ctx.folder);
     auto valid = store(&ctx);
     if (!valid) {
         return;
@@ -769,7 +770,6 @@ void folder_table_t::on_apply() {
     assember.push_back(opt.assume_value().get());
 
     if (initially_shared_with.size()) {
-        auto folder = description.get_folder();
         auto orphaned_blocks = model::orphaned_blocks_t{};
         auto &folder_infos = folder->get_folder_infos();
         for (auto it : initially_shared_with) {
@@ -804,6 +804,7 @@ void folder_table_t::on_apply() {
     auto cb =
         devices.empty() ? sup.call_select_folder(folder_id) : sup.call_share_folders(folder_id, std::move(devices));
     sup.send_model<model::payload::model_update_t>(assember.consume(), cb.get());
+    container.update_label();
 }
 
 void folder_table_t::on_reset() {
