@@ -22,15 +22,6 @@ namespace {
 struct widget_t final: content::folder_widget_t {
     using parent_t = content::folder_widget_t;
     using parent_t::parent_t;
-
-    void make_tabs(model::folder_ptr_t folder_, model::folder_info_ptr_t folder_info_) {
-        folder = std::move(folder_);
-        folder_info = std::move(folder_info_);
-        parent_t::make_tabs(*folder_info);
-    }
-
-    model::folder_ptr_t folder;
-    model::folder_info_ptr_t folder_info;
 };
 }
 

@@ -22,14 +22,18 @@ struct folder_widget_t : contentable_t<Fl_Tabs> {
     using parent_t = contentable_t<Fl_Tabs>;
 
     folder_widget_t(tree_item_t &container, behavior_t behavior, int x, int y, int w, int h);
-    void make_tabs(const model::folder_info_t &description);
+    void make_tabs(model::folder_ptr_t f, model::folder_info_ptr_t fi);
+    void reset_data();
 
     Fl_Widget& make_details_tab(int x, int y, int w, int h);
     Fl_Widget& make_sharing_tab(int x, int y, int w, int h);
     Fl_Widget& make_file_patterns_tab(int x, int y, int w, int h);
 
     tree_item_t &container;
-    const model::folder_info_t *description{nullptr};
+    model::folder_ptr_t folder;
+    model::folder_ptr_t folder_orig;
+    model::folder_info_ptr_t folder_info;
+    model::folder_info_ptr_t folder_info_orig;
     behavior_t behavior;
     std::string error;
 };

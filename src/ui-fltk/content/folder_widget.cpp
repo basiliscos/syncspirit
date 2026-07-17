@@ -81,11 +81,11 @@ struct base_table_t : syncspirit::fltk::static_table_t {
     }
 
     const model::folder_t& get_folder() const noexcept {
-        return *container.description->get_folder();
+        return *container.folder;
     }
 
     const model::folder_info_t& get_folder_info() const noexcept {
-        return *container.description;
+        return *container.folder_info;
     }
 
     inline void set_error(std::string_view error) {
@@ -586,15 +586,84 @@ struct base_table_t : syncspirit::fltk::static_table_t {
         }
     }
 
+    void refresh() override {
+        parent_t::refresh();
+
+
+        auto actions = buttons_mask_t{0};
+        if (is_local() || is_candidate() || is_new()) {
+            serialization_context_t ctx;
+
+            get_folder().serialize(ctx.folder);
+            auto copy_data = db::encode(ctx.folder);
+            set_error({});
+            auto valid = store(&ctx);
+            auto is_same = copy_data == db::encode(ctx.folder);
+
+            auto& folder = get_folder();
+
+            if (scan_start_cell && scan_finish_cell) {
+                auto &date_start = folder.get_scan_start();
+                auto &date_finish = folder.get_scan_finish();
+                auto scan_start = date_start.is_not_a_date_time() ? "-" : model::pt::to_simple_string(date_start);
+                auto scan_finish = date_finish.is_not_a_date_time() ? "-" : model::pt::to_simple_string(date_finish);
+                scan_start_cell->update(scan_start);
+                scan_finish_cell->update(scan_finish);
+            }
+
+            if (!is_same) {
+                 if (valid) {
+                     actions = actions | B_APPLY;
+                 }
+            } else {
+                if (valid) {
+                    actions = actions | B_RESCAN | B_REMOVE;
+                }
+            }
+            if (!is_same || !valid) {
+                actions = actions | B_RESET;
+            }
+        }
+
+        if ((is_local() || is_remote()) && entries_cell) {
+            auto max_sequence = get_folder_info().get_max_sequence();
+            auto &stats = presence().get_stats();
+            entries_cell->update(fmt::format("{}", stats.entities));
+            entries_size_cell->update(get_file_size(stats.size));
+            max_sequence_cell->update(fmt::format("{}", max_sequence));
+        }
+
+        ENABLE_ACTION(create_button, B_CREATE);
+        ENABLE_ACTION(apply_button, B_APPLY);
+        ENABLE_ACTION(share_button, B_SHARE);
+        ENABLE_ACTION(reset_button, B_RESET);
+        ENABLE_ACTION(rescan_button, B_RESCAN);
+        ENABLE_ACTION(remove_button, B_REMOVE);
+
+        notice->reset();
+    }
+
+
     virtual void on_apply() noexcept {}
     virtual void on_create() noexcept {}
     virtual void on_share() noexcept {}
-    virtual void on_reset() noexcept {}
+
+    void on_reset() noexcept {
+        container.reset_data();
+        reset();
+        refresh();
+    }
     virtual void on_rescan() noexcept {}
     virtual void on_remove() noexcept {}
 
 protected:
     widgetable_ptr_t notice;
+    static_string_provider_ptr_t entries_cell;
+    static_string_provider_ptr_t entries_size_cell;
+    static_string_provider_ptr_t max_sequence_cell;
+    static_string_provider_ptr_t scan_start_cell;
+    static_string_provider_ptr_t scan_finish_cell;
+
     Fl_Widget *create_button{nullptr};
     Fl_Widget *apply_button{nullptr};
     Fl_Widget *share_button{nullptr};
@@ -612,12 +681,8 @@ struct details_table_t final : base_table_t {
     details_table_t(folder_widget_t& container_, int x, int y, int w, int h)
         : parent_t(container_, x, y, w, h) {
         auto data = table_rows_t();
-        auto local_or_candidate = is_local() || is_candidate();
         auto local_or_candidate_or_remote = is_local() || is_candidate() || is_remote();
-        auto local_or_candidate_or_new = is_local() || is_candidate() || is_new();
         auto local_or_remote= is_local() || is_remote();
-        auto new_or_remote= is_local() || is_remote();
-        auto new_or_local = is_new() || is_local();
 
         data.push_back({"local path", make_path(local_or_remote)});
         data.push_back({"id", make_id(local_or_candidate_or_remote)});
@@ -647,66 +712,13 @@ struct details_table_t final : base_table_t {
         add_actions_and_notice(data);
         assign_rows(std::move(data));
     }
+};
 
-    void refresh() override {
-        parent_t::refresh();
-
-
-        auto actions = buttons_mask_t{0};
-        if (is_local()) {
-            serialization_context_t ctx;
-
-            get_folder().serialize(ctx.folder);
-            auto copy_data = db::encode(ctx.folder);
-            set_error({});
-            auto valid = store(&ctx);
-            auto is_same = copy_data == db::encode(ctx.folder);
-
-            auto& folder = get_folder();
-            auto &date_start = folder.get_scan_start();
-            auto &date_finish = folder.get_scan_finish();
-            auto scan_start = date_start.is_not_a_date_time() ? "-" : model::pt::to_simple_string(date_start);
-            auto scan_finish = date_finish.is_not_a_date_time() ? "-" : model::pt::to_simple_string(date_finish);
-            scan_start_cell->update(scan_start);
-            scan_finish_cell->update(scan_finish);
-
-            if (!is_same) {
-                 if (valid) {
-                     actions = actions | B_APPLY;
-                 }
-            } else {
-                if (valid) {
-                    actions = actions | B_RESCAN | B_REMOVE;
-                }
-            }
-            if (!is_same || !valid) {
-                actions = actions | B_RESET;
-            }
-        }
-
-        if (is_local() || is_remote()) {
-            auto max_sequence = get_folder_info().get_max_sequence();
-            auto &stats = presence().get_stats();
-            entries_cell->update(fmt::format("{}", stats.entities));
-            entries_size_cell->update(get_file_size(stats.size));
-            max_sequence_cell->update(fmt::format("{}", max_sequence));
-        }
-
-        ENABLE_ACTION(create_button, B_CREATE);
-        ENABLE_ACTION(apply_button, B_APPLY);
-        ENABLE_ACTION(share_button, B_SHARE);
-        ENABLE_ACTION(reset_button, B_RESET);
-        ENABLE_ACTION(rescan_button, B_RESCAN);
-        ENABLE_ACTION(remove_button, B_REMOVE);
-
-        notice->reset();
+struct tab_content_group: refresheable_group_t {
+    using parent_t = refresheable_group_t;
+    tab_content_group(int x, int y, int w, int h, const char* label): parent_t(x, y, w, h, label) {
+        box(FL_FLAT_BOX);
     }
-
-    static_string_provider_ptr_t entries_cell;
-    static_string_provider_ptr_t entries_size_cell;
-    static_string_provider_ptr_t max_sequence_cell;
-    static_string_provider_ptr_t scan_start_cell;
-    static_string_provider_ptr_t scan_finish_cell;
 };
 
 struct sharing_table_t final : base_table_t {
@@ -738,8 +750,10 @@ folder_widget_t::folder_widget_t(tree_item_t &container_,
     parent_t(x,y,w,h), container{container_}, behavior{behavior_} {
 }
 
-void folder_widget_t::make_tabs(const model::folder_info_t &description_) {
-    description = &description_;
+void folder_widget_t::make_tabs(model::folder_ptr_t f, model::folder_info_ptr_t fi) {
+    folder_info_orig = std::move(fi);
+    folder_orig = std::move(f);
+    reset_data();
     fl_open_display();
     int tx , ty, tw, th;
     client_area(tx, ty, tw, th);
@@ -753,8 +767,29 @@ void folder_widget_t::make_tabs(const model::folder_info_t &description_) {
     resizable(group);
 }
 
+void folder_widget_t::reset_data() {
+    folder = [this]() -> model::folder_ptr_t {
+        auto db = db::Folder();
+        folder_orig->serialize(db);
+        auto key = folder_orig->get_key();
+        auto f = model::folder_t::create(key, db).assume_value();
+        f->assign_cluster(folder_orig->get_cluster());
+        return f;
+    }();
+
+    folder_info = [this]() -> model::folder_info_ptr_t {
+        auto db = db::FolderInfo();
+        folder_info_orig->serialize(db);
+        auto key = folder_info_orig->get_key();
+        auto device = folder_info_orig->get_device();
+        auto r = model::folder_info_t::create(key, db, device, folder);
+        return r.assume_value();
+    }();
+}
+
+
 Fl_Widget& folder_widget_t::make_details_tab(int x, int y, int w, int h) {
-    auto *group = new refresheable_group_t(x, y, w, h, "Details");
+    auto *group = new tab_content_group(x, y, w, h, "Details");
     group->begin();
     new details_table_t(*this,x,y,w,h);
     group->end();
@@ -762,7 +797,7 @@ Fl_Widget& folder_widget_t::make_details_tab(int x, int y, int w, int h) {
 }
 
 Fl_Widget& folder_widget_t::make_sharing_tab(int x, int y, int w, int h) {
-    auto *group = new refresheable_group_t(x, y, w, h, "Sharing");
+    auto *group = new tab_content_group(x, y, w, h, "Sharing");
     group->begin();
     new sharing_table_t(*this,x,y,w,h);
     group->end();
@@ -770,7 +805,7 @@ Fl_Widget& folder_widget_t::make_sharing_tab(int x, int y, int w, int h) {
 }
 
 Fl_Widget& folder_widget_t::make_file_patterns_tab(int x, int y, int w, int h) {
-    auto *group = new refresheable_group_t(x, y, w, h, "File patterns");
+    auto *group = new tab_content_group(x, y, w, h, "File patterns");
     group->begin();
     group->color(FL_DARK_MAGENTA);
     group->end();
