@@ -61,6 +61,20 @@ struct checkbox_widget_t : table_widget::checkbox_t {
     Fl_Widget *create_widget(int x, int y, int w, int h) override;
 };
 
+struct device_share_widget_t final : widgetable_t {
+    using parent_t = widgetable_t;
+    device_share_widget_t(Fl_Widget &container, model::device_ptr_t device_);
+
+    Fl_Widget *create_widget(int x, int y, int w, int h) override;
+    void reset() override;
+    bool store(void *data) override;
+
+    model::device_ptr_t initial_device;
+    model::device_ptr_t device;
+    Fl_Choice *input;
+    bool disabled;
+};
+
 struct base_table_t : syncspirit::fltk::static_table_t {
     using parent_t = syncspirit::fltk::static_table_t;
     using B = content::folder_widget_t::behavior_t;
@@ -81,6 +95,8 @@ struct base_table_t : syncspirit::fltk::static_table_t {
     const model::folder_t &get_folder() const noexcept { return *container.folder; }
 
     const model::folder_info_t &get_folder_info() const noexcept { return *container.folder_info; }
+
+    const model::cluster_t *get_cluster() const noexcept { return container.container.supervisor.get_cluster(); }
 
     inline void set_error(std::string_view error) { container.error = error; }
 
@@ -570,8 +586,9 @@ struct base_table_t : syncspirit::fltk::static_table_t {
         return new widget_t(*this, disabled);
     }
 
+    widgetable_ptr_t make_shared_with(model::device_ptr_t device) { return new device_share_widget_t(*this, device); }
+
     void add_actions_and_notice(table_rows_t &data) noexcept {
-        notice = make_notice();
         auto actions = buttons_mask_t{0};
 
         if (is_new()) {
@@ -584,6 +601,7 @@ struct base_table_t : syncspirit::fltk::static_table_t {
             actions = B_SHARE;
         }
         if (actions) {
+            notice = make_notice();
             data.push_back({"", notice});
             actions = actions | B_RESET;
             data.push_back({"actions", make_actions(actions)});
@@ -643,7 +661,72 @@ struct base_table_t : syncspirit::fltk::static_table_t {
         ENABLE_ACTION(rescan_button, B_RESCAN);
         ENABLE_ACTION(remove_button, B_REMOVE);
 
-        notice->reset();
+        if (notice) {
+            notice->reset();
+        }
+    }
+
+    void on_add_share(widgetable_t &widget) {
+        auto [from_index, count] = scan(widget);
+        auto devices_amount = static_cast<int>(get_cluster()->get_devices().size());
+        if (count < devices_amount - 1) {
+            assert(from_index);
+            auto w = widgetable_ptr_t{};
+            w.reset(new device_share_widget_t(*this, {}));
+            insert_row("shared with", w, from_index + 1);
+            refresh();
+        }
+    }
+
+    bool on_remove_share(widgetable_t &widget, model::device_ptr_t device, model::device_ptr_t initial) {
+        bool removed = false;
+        auto [_, count] = scan(widget);
+        if (count > 1 && !initial) {
+            parent_t::remove_row(widget);
+            removed = true;
+        } else {
+            redraw();
+        }
+
+        if (device) {
+            container.shared_with.remove(device);
+            container.non_shared_with.put(device);
+        }
+
+        container.refresh();
+        return removed;
+    }
+
+    void on_select_share(model::device_ptr_t device, model::device_ptr_t previous) {
+        if (previous) {
+            container.shared_with.remove(previous);
+            container.non_shared_with.put(previous);
+        }
+        if (device) {
+            container.shared_with.put(device);
+            container.non_shared_with.remove(device);
+        }
+        container.refresh();
+    }
+
+    std::pair<int, int> scan(widgetable_t &widget) {
+        auto &rows = get_rows();
+        auto from_index = int{-1};
+        int count = 0;
+        for (int i = 0; i < static_cast<int>(rows.size()); ++i) {
+            auto item = std::get_if<widgetable_ptr_t>(&rows[i].value);
+            if (!item) {
+                continue;
+            }
+            if (!dynamic_cast<device_share_widget_t *>(item->get())) {
+                continue;
+            }
+            ++count;
+            if (item->get() == &widget) {
+                from_index = i;
+            }
+        }
+        return {from_index, count};
     }
 
     virtual void on_apply() noexcept {}
@@ -673,9 +756,112 @@ struct base_table_t : syncspirit::fltk::static_table_t {
     Fl_Widget *rescan_button{nullptr};
     Fl_Widget *remove_button{nullptr};
 
-  private:
+    // private:
     folder_widget_t &container;
 };
+
+device_share_widget_t::device_share_widget_t(Fl_Widget &container, model::device_ptr_t device_)
+    : parent_t(container), initial_device{device_}, device{device_}, input{nullptr} {
+    auto table = static_cast<base_table_t *>(&container);
+    disabled = device && table->scan(*this).first == 0;
+}
+
+Fl_Widget *device_share_widget_t::create_widget(int x, int y, int w, int h) {
+    auto group = new Fl_Group(x, y, w, h);
+    group->begin();
+    group->box(FL_FLAT_BOX);
+    auto yy = y + padding, ww = w - padding * 2, hh = h - padding * 2;
+    ww = std::min(300, ww);
+
+    input = new Fl_Choice(x + padding, yy, ww, hh);
+    auto add = new Fl_Button(input->x() + input->w() + padding * 2, yy, hh, hh, "@+");
+    auto remove = new Fl_Button(add->x() + add->w() + padding * 2, yy, hh, hh, "@undo");
+
+    add->callback(
+        [](auto, void *data) {
+            auto self = reinterpret_cast<device_share_widget_t *>(data);
+            auto table = static_cast<base_table_t *>(&self->container);
+            table->on_add_share(*self);
+        },
+        this);
+    remove->callback(
+        [](auto, void *data) {
+            auto self = reinterpret_cast<device_share_widget_t *>(data);
+            auto table = static_cast<base_table_t *>(&self->container);
+            self->device = {};
+            bool ok = table->on_remove_share(*self, self->device, self->initial_device);
+            if (!ok) {
+                self->input->value(0);
+            }
+        },
+        this);
+    input->callback(
+        [](auto, void *data) {
+            auto self = reinterpret_cast<device_share_widget_t *>(data);
+            auto table = static_cast<base_table_t *>(&self->container);
+            auto previous = self->device;
+            if (self->input->value()) {
+                auto cluster = table->get_cluster();
+                for (auto &it : cluster->get_devices()) {
+                    auto device = it.item.get();
+                    if (device == cluster->get_device().get()) {
+                        continue;
+                    }
+                    auto short_id = device->device_id().get_short();
+                    auto label = fmt::format("{}, {}", device->get_name(), short_id);
+                    if (label == self->input->text()) {
+                        self->device = it.item;
+                        break;
+                    }
+                }
+            } else {
+                self->device = {};
+            }
+            table->on_select_share(self->device, previous);
+        },
+        this);
+
+    group->end();
+    group->resizable(nullptr);
+    widget = group;
+    reset();
+    return widget;
+}
+
+void device_share_widget_t::reset() {
+    auto &table = static_cast<base_table_t &>(this->container);
+    auto cluster = table.get_cluster();
+
+    input->add("(empty)");
+    int i = 1;
+    int index = i;
+    for (auto &it : cluster->get_devices()) {
+        auto &device = it.item;
+        if (device == cluster->get_device()) {
+            continue;
+        }
+        auto short_id = device->device_id().get_short();
+        auto label = fmt::format("{}, {}", device->get_name(), short_id);
+        input->add(label.data());
+        if (device.get() == initial_device.get()) {
+            this->device = device;
+            index = i;
+        }
+        ++i;
+    }
+    input->value(this->device ? index : 0);
+    if (disabled) {
+        widget->deactivate();
+    }
+}
+
+bool device_share_widget_t::store(void *data) {
+    if (device) {
+        auto ctx = reinterpret_cast<ctx_t *>(data);
+        ctx->shared_with.put(device);
+    }
+    return true;
+}
 
 struct details_table_t final : base_table_t {
     using parent_t = base_table_t;
@@ -730,6 +916,19 @@ struct sharing_table_t final : base_table_t {
         data.push_back({"disable temp indixes", make_disable_tmp()});
         data.push_back({"scheduled", make_scheduled(false)});
         data.push_back({"paused", make_paused(false)});
+
+        int shared_count = 0;
+        for (auto it : container_.shared_with) {
+            auto &device = it.item;
+            auto widget = make_shared_with(device);
+            data.push_back({"shared_with", widget});
+            ++shared_count;
+        }
+        if (!shared_count) {
+            auto widget = make_shared_with({});
+            data.push_back({"shared_with", widget});
+        }
+
         add_actions_and_notice(data);
         assign_rows(std::move(data));
     }
@@ -757,6 +956,8 @@ void folder_widget_t::make_tabs(model::folder_ptr_t f, model::folder_info_ptr_t 
         if (&peer != self) {
             if (folder_orig->is_shared_with(peer)) {
                 shared_with_orig.put(&peer);
+            } else {
+                non_shared_with_orig.put(&peer);
             }
         }
     }
@@ -796,6 +997,7 @@ void folder_widget_t::reset_data() {
         return r.assume_value();
     }();
     shared_with = shared_with_orig;
+    non_shared_with = non_shared_with_orig;
 }
 
 Fl_Widget &folder_widget_t::make_details_tab(int x, int y, int w, int h) {
