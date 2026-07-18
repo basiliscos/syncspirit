@@ -571,9 +571,9 @@ struct base_table_t : syncspirit::fltk::static_table_t {
     }
 
     void add_actions_and_notice(table_rows_t &data) noexcept {
-        data.push_back({"", notice = make_notice()});
-
+        notice = make_notice();
         auto actions = buttons_mask_t{0};
+
         if (is_new()) {
             actions = B_CREATE;
         }
@@ -584,6 +584,7 @@ struct base_table_t : syncspirit::fltk::static_table_t {
             actions = B_SHARE;
         }
         if (actions) {
+            data.push_back({"", notice});
             actions = actions | B_RESET;
             data.push_back({"actions", make_actions(actions)});
         }
@@ -746,8 +747,22 @@ folder_widget_t::folder_widget_t(tree_item_t &container_, behavior_t behavior_, 
     : parent_t(x, y, w, h), container{container_}, behavior{behavior_} {}
 
 void folder_widget_t::make_tabs(model::folder_ptr_t f, model::folder_info_ptr_t fi) {
-    folder_info_orig = std::move(fi);
+    auto cluster = container.supervisor.get_cluster();
     folder_orig = std::move(f);
+    folder_info_orig = std::move(fi);
+
+    auto self = cluster->get_device().get();
+    for (auto it : cluster->get_devices()) {
+        auto &peer = *it.item.get();
+        if (&peer != self) {
+            if (folder_orig->is_shared_with(peer)) {
+                shared_with_orig.put(&peer);
+            }
+        }
+    }
+    if (auto peer = folder_info_orig->get_device(); peer && peer != self) {
+        shared_with_orig.put(peer);
+    }
     reset_data();
     fl_open_display();
     int tx, ty, tw, th;
@@ -780,6 +795,7 @@ void folder_widget_t::reset_data() {
         auto r = model::folder_info_t::create(key, db, device, folder);
         return r.assume_value();
     }();
+    shared_with = shared_with_orig;
 }
 
 Fl_Widget &folder_widget_t::make_details_tab(int x, int y, int w, int h) {

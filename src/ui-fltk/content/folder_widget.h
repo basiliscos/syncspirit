@@ -28,6 +28,8 @@ struct folder_widget_t : contentable_t<Fl_Tabs> {
     model::folder_ptr_t folder_orig;
     model::folder_info_ptr_t folder_info;
     model::folder_info_ptr_t folder_info_orig;
+    model::devices_map_t shared_with;
+    model::devices_map_t shared_with_orig;
     behavior_t behavior;
     std::string error;
 };
