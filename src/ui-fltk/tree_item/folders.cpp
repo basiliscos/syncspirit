@@ -6,14 +6,6 @@
 #include "presentation/folder_presence.h"
 #include "utils/base32.h"
 #include "proto/proto-helpers-db.h"
-#if 0
-#include "../content/folder_table.h"
-#include "../table_widget/label.h"
-
-#include <algorithm>
-#include <cctype>
-#include <boost/nowide/convert.hpp>
-#endif
 #include "content/folder_widget.h"
 #include <FL/Fl_Button.H>
 
@@ -27,12 +19,11 @@ static constexpr int padding = 2;
 
 namespace {
 
-struct widget_t final: content::folder_widget_t {
+struct widget_t final : content::folder_widget_t {
     using parent_t = content::folder_widget_t;
     using parent_t::parent_t;
 };
-}
-
+} // namespace
 
 folders_t::folders_t(app_supervisor_t &supervisor, Fl_Tree *tree) : parent_t(supervisor, tree, false) {
     supervisor.set_folders(this);
@@ -79,7 +70,7 @@ void folders_t::select_folder(std::string_view folder_id) {
 
 bool folders_t::on_select() {
     content = supervisor.replace_content([&](content_t *content) -> content_t * {
-            using B = content::folder_widget_t::behavior_t;
+        using B = content::folder_widget_t::behavior_t;
         auto cluster = supervisor.get_cluster();
         auto &self = *cluster->get_device();
         auto &sequencer = supervisor.get_sequencer();

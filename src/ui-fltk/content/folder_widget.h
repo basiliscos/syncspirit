@@ -9,15 +9,9 @@
 
 namespace syncspirit::fltk::content {
 
-
 struct folder_widget_t : contentable_t<Fl_Tabs> {
 
-    enum behavior_t {
-        edit_new,
-        candiate,
-        remote,
-        local
-    };
+    enum behavior_t { edit_new, candiate, remote, local };
 
     using parent_t = contentable_t<Fl_Tabs>;
 
@@ -25,9 +19,9 @@ struct folder_widget_t : contentable_t<Fl_Tabs> {
     void make_tabs(model::folder_ptr_t f, model::folder_info_ptr_t fi);
     void reset_data();
 
-    Fl_Widget& make_details_tab(int x, int y, int w, int h);
-    Fl_Widget& make_sharing_tab(int x, int y, int w, int h);
-    Fl_Widget& make_file_patterns_tab(int x, int y, int w, int h);
+    Fl_Widget &make_details_tab(int x, int y, int w, int h);
+    Fl_Widget &make_sharing_tab(int x, int y, int w, int h);
+    Fl_Widget &make_file_patterns_tab(int x, int y, int w, int h);
 
     tree_item_t &container;
     model::folder_ptr_t folder;
@@ -38,5 +32,4 @@ struct folder_widget_t : contentable_t<Fl_Tabs> {
     std::string error;
 };
 
-
-}
+} // namespace syncspirit::fltk::content

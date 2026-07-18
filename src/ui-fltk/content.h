@@ -43,6 +43,4 @@ template <typename T> struct contentable_t<T, std::enable_if_t<std::is_base_of_v
 
 using refresheable_group_t = contentable_t<Fl_Group>;
 
-
-
 } // namespace syncspirit::fltk

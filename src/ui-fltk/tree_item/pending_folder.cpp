@@ -19,11 +19,11 @@ static constexpr int padding = 2;
 
 namespace {
 
-struct widget_t final: content::folder_widget_t {
+struct widget_t final : content::folder_widget_t {
     using parent_t = content::folder_widget_t;
     using parent_t::parent_t;
 };
-}
+} // namespace
 
 pending_folder_t::pending_folder_t(model::pending_folder_t &folder_, app_supervisor_t &supervisor, Fl_Tree *tree)
     : parent_t(supervisor, tree), folder{folder_} {

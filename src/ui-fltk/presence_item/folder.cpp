@@ -53,7 +53,7 @@ bool folder_t::on_select() {
         int x = prev->x(), y = prev->y(), w = prev->w(), h = prev->h();
         auto is_local = folder_info.get_device() == folder_info.get_folder()->get_cluster()->get_device();
         auto b = is_local ? B::local : B::remote;
-        auto widget  = new content::folder_widget_t(*this, b, x, y, w, h);
+        auto widget = new content::folder_widget_t(*this, b, x, y, w, h);
         widget->make_tabs(folder_info.get_folder(), &folder_info);
         return widget;
     });

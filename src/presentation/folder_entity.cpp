@@ -158,7 +158,7 @@ auto folder_entity_t::get_folder() noexcept -> model::folder_t & { return folder
 
 void folder_entity_t::on_update() noexcept {
     notify_update();
-    for (auto p: presences) {
+    for (auto p : presences) {
         p->notify_update();
     }
 }
