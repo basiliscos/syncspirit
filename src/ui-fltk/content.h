@@ -39,6 +39,17 @@ template <typename T> struct contentable_t<T, std::enable_if_t<std::is_base_of_v
             }
         }
     }
+
+    bool store(void *ptr) override {
+        bool ok{true};
+        for (int i = 0; i < this->children(); ++i) {
+            auto child = this->child(i);
+            if (auto content = dynamic_cast<content_t *>(child)) {
+                ok = ok && content->store(ptr);
+            }
+        }
+        return ok;
+    }
 };
 
 using refresheable_group_t = contentable_t<Fl_Group>;

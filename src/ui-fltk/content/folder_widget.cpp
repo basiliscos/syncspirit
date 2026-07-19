@@ -44,13 +44,7 @@ static auto constexpr B_RESET = buttons_mask_t{1 << 3};
 static auto constexpr B_RESCAN = buttons_mask_t{1 << 4};
 static auto constexpr B_REMOVE = buttons_mask_t{1 << 5};
 
-struct serialization_context_t {
-    db::Folder folder;
-    std::uint64_t index;
-    model::devices_map_t shared_with;
-};
-
-using ctx_t = serialization_context_t;
+using ctx_t = folder_widget_t::serialization_context_t;
 
 struct base_table_t;
 
@@ -391,7 +385,7 @@ struct base_table_t : syncspirit::fltk::static_table_t {
                 if (mask & B_APPLY) {
                     auto apply = new Fl_Button(xx, yy, ww, hh, "apply");
                     apply->deactivate();
-                    apply->callback([](auto, void *data) { static_cast<base_table_t *>(data)->on_apply(); },
+                    apply->callback([](auto, void *data) { static_cast<base_table_t *>(data)->container.on_apply(); },
                                     &container);
                     container.apply_button = apply;
                     xx = apply->x() + ww + padding * 2;
@@ -400,7 +394,7 @@ struct base_table_t : syncspirit::fltk::static_table_t {
                 if (mask & B_CREATE) {
                     auto button = new Fl_Button(xx, yy, ww, hh, "create");
                     button->deactivate();
-                    button->callback([](auto, void *data) { static_cast<base_table_t *>(data)->on_create(); },
+                    button->callback([](auto, void *data) { static_cast<base_table_t *>(data)->container.on_create(); },
                                      &container);
                     container.create_button = button;
                     xx = button->x() + ww + padding * 2;
@@ -409,7 +403,7 @@ struct base_table_t : syncspirit::fltk::static_table_t {
                 if (mask & B_SHARE) {
                     auto button = new Fl_Button(xx, yy, ww, hh, "share");
                     button->deactivate();
-                    button->callback([](auto, void *data) { static_cast<base_table_t *>(data)->on_share(); },
+                    button->callback([](auto, void *data) { static_cast<base_table_t *>(data)->container.on_share(); },
                                      &container);
                     container.share_button = button;
                     xx = button->x() + ww + padding * 2;
@@ -426,7 +420,7 @@ struct base_table_t : syncspirit::fltk::static_table_t {
 
                 if (mask & B_RESCAN) {
                     auto rescan = new Fl_Button(xx, yy, ww, hh, "rescan");
-                    rescan->callback([](auto, void *data) { static_cast<base_table_t *>(data)->on_rescan(); },
+                    rescan->callback([](auto, void *data) { static_cast<base_table_t *>(data)->container.on_rescan(); },
                                      &container);
                     rescan->deactivate();
                     container.rescan_button = rescan;
@@ -435,7 +429,7 @@ struct base_table_t : syncspirit::fltk::static_table_t {
 
                 if (mask & B_REMOVE) {
                     auto remove = new Fl_Button(xx, yy, ww, hh, "remove");
-                    remove->callback([](auto, void *data) { static_cast<base_table_t *>(data)->on_remove(); },
+                    remove->callback([](auto, void *data) { static_cast<base_table_t *>(data)->container.on_remove(); },
                                      &container);
                     remove->color(FL_RED);
                     container.remove_button = remove;
@@ -613,7 +607,7 @@ struct base_table_t : syncspirit::fltk::static_table_t {
 
         auto actions = buttons_mask_t{0};
         if (is_local() || is_candidate() || is_new()) {
-            serialization_context_t ctx;
+            ctx_t ctx;
 
             get_folder().serialize(ctx.folder);
             auto copy_data = db::encode(ctx.folder);
@@ -729,17 +723,11 @@ struct base_table_t : syncspirit::fltk::static_table_t {
         return {from_index, count};
     }
 
-    virtual void on_apply() noexcept {}
-    virtual void on_create() noexcept {}
-    virtual void on_share() noexcept {}
-
     void on_reset() noexcept {
         container.reset_data();
         reset();
         refresh();
     }
-    virtual void on_rescan() noexcept {}
-    virtual void on_remove() noexcept {}
 
   protected:
     widgetable_ptr_t notice;
@@ -1023,3 +1011,9 @@ Fl_Widget &folder_widget_t::make_file_patterns_tab(int x, int y, int w, int h) {
     group->end();
     return *group;
 }
+
+void folder_widget_t::on_apply() noexcept {}
+void folder_widget_t::on_create() noexcept {}
+void folder_widget_t::on_share() noexcept {}
+void folder_widget_t::on_rescan() noexcept {}
+void folder_widget_t::on_remove() noexcept {}

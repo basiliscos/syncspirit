@@ -10,10 +10,14 @@
 namespace syncspirit::fltk::content {
 
 struct folder_widget_t : contentable_t<Fl_Tabs> {
-
+    using parent_t = contentable_t<Fl_Tabs>;
     enum behavior_t { edit_new, candiate, remote, local };
 
-    using parent_t = contentable_t<Fl_Tabs>;
+    struct serialization_context_t {
+        db::Folder folder;
+        std::uint64_t index;
+        model::devices_map_t shared_with;
+    };
 
     folder_widget_t(tree_item_t &container, behavior_t behavior, int x, int y, int w, int h);
     void make_tabs(model::folder_ptr_t f, model::folder_info_ptr_t fi);
@@ -22,6 +26,12 @@ struct folder_widget_t : contentable_t<Fl_Tabs> {
     Fl_Widget &make_details_tab(int x, int y, int w, int h);
     Fl_Widget &make_sharing_tab(int x, int y, int w, int h);
     Fl_Widget &make_file_patterns_tab(int x, int y, int w, int h);
+
+    virtual void on_apply() noexcept;
+    virtual void on_create() noexcept;
+    virtual void on_share() noexcept;
+    virtual void on_rescan() noexcept;
+    virtual void on_remove() noexcept;
 
     tree_item_t &container;
     model::folder_ptr_t folder;
