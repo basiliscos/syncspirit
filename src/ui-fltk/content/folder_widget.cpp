@@ -2,26 +2,28 @@
 // SPDX-FileCopyrightText: 2026 Ivan Baidakou
 
 #include "folder_widget.h"
-#include "proto/proto-helpers-db.h"
-#include "presentation/folder_presence.h"
 
 #include "constants.h"
-#include "static_table.h"
+#include "model/diff/diff_assembler.h"
+#include "model/diff/modify/remove_blocks.h"
+#include "model/diff/modify/remove_folder.h"
+#include "model/diff/modify/share_folder.h"
+#include "model/diff/modify/suspend_folder.h"
+#include "model/diff/modify/unshare_folder.h"
+#include "model/diff/modify/upsert_folder.h"
 #include "presence_item.h"
+#include "presentation/folder_presence.h"
+#include "proto/proto-helpers-db.h"
+#include "proto/proto-helpers-db.h"
+#include "static_table.h"
 #include "table_widget/checkbox.h"
 #include "table_widget/choice.h"
 #include "table_widget/input.h"
 #include "table_widget/int_input.h"
 #include "table_widget/label.h"
 #include "table_widget/path.h"
-#include "model/diff/diff_assembler.h"
-#include "model/diff/modify/remove_blocks.h"
-#include "model/diff/modify/remove_folder.h"
-#include "model/diff/modify/suspend_folder.h"
-#include "model/diff/modify/unshare_folder.h"
-#include "model/diff/modify/upsert_folder.h"
-#include "proto/proto-helpers-db.h"
 #include "utils.hpp"
+#include "utils/format.hpp"
 
 #include <FL/platform.H>
 #include <FL/fl_ask.H>
@@ -1037,7 +1039,62 @@ void folder_widget_t::on_apply() noexcept { create_or_update(); }
 
 void folder_widget_t::on_create() noexcept { create_or_update(); }
 
-void folder_widget_t::on_share() noexcept {}
+void folder_widget_t::on_share() noexcept {
+    serialization_context_t ctx;
+    auto valid = store(&ctx);
+    if (!valid) {
+        return;
+    }
+
+    auto &folder = ctx.folder;
+    auto &sup = container.supervisor;
+    auto cluster = sup.get_cluster();
+    auto log = sup.get_logger();
+    auto label = db::get_label(folder);
+    auto folder_id = db::get_id(folder);
+    auto cb_ui_select = sup.call_select_folder(folder_id);
+
+    auto existing_folder = sup.get_cluster()->get_folders().by_id(folder_id);
+    if (!existing_folder) {
+        auto devices = std::vector<utils::bytes_t>{};
+        for (auto it : shared_with) {
+            auto &device = it.item;
+            auto sha256 = device->device_id().get_sha256();
+            if (ctx.shared_with.by_sha256(sha256)) {
+                devices.emplace_back(utils::bytes_t(sha256.begin(), sha256.end()));
+            }
+        }
+
+        log->info("going to create folder {}({}) & share it with {} devices", label, folder_id, devices.size());
+        auto opt = modify::upsert_folder_t::create(*sup.get_cluster(), sup.get_sequencer(), folder, 0);
+        if (!opt) {
+            log->error("cannot create folder: {}", opt.assume_error().message());
+            return;
+        }
+
+        auto cb_share = sup.call_share_folders(folder_id, std::move(devices), cb_ui_select.get());
+        sup.send_model<model::payload::model_update_t>(opt.assume_value(), cb_share.get());
+    } else {
+        log->info("going to share folder {}({}) with {} devices", label, folder_id, shared_with.size());
+        auto &sequncecer = sup.get_sequencer();
+        auto assember = model::diff::diff_assember_t(constants::diffs_batch);
+        using diff_t = model::diff::modify::share_folder_t;
+        auto &self = *cluster->get_device();
+        for (auto it : shared_with) {
+            auto &peer = it.item;
+            auto opt = diff_t::create(*cluster, sequncecer, *peer, self.device_id(), *existing_folder);
+            if (!opt) {
+                auto message = opt.assume_error().message();
+                log->error("cannot share folder {} with {} : {}", folder_id, peer->device_id(), message);
+            } else {
+                assember.push_back(opt.assume_value().get());
+            }
+        }
+        if (auto diff = assember.consume(); diff) {
+            sup.send_model<model::payload::model_update_t>(diff, cb_ui_select.get());
+        }
+    }
+}
 
 void folder_widget_t::on_rescan() noexcept {}
 
