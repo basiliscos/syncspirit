@@ -18,6 +18,7 @@ endif()
 add_executable(syncspirit-fltk WIN32 MACOSX_BUNDLE
     app_supervisor.cpp
     augmentation.cpp
+    callback.cpp
     content.cpp
     log_colors.cpp
     log_panel.cpp

@@ -615,15 +615,15 @@ struct base_table_t : syncspirit::fltk::static_table_t {
 
         auto actions = buttons_mask_t{0};
         if (is_local() || is_candidate() || is_new()) {
-            ctx_t ctx;
+            auto &folder = get_folder();
 
-            get_folder().serialize(ctx.folder);
+            ctx_t ctx;
+            folder.serialize(ctx.folder);
             auto copy_data = db::encode(ctx.folder);
             set_error({});
             auto valid = store(&ctx);
             auto is_same = copy_data == db::encode(ctx.folder) && (container.shared_with_orig == ctx.shared_with);
 
-            auto &folder = get_folder();
             if (scan_start_cell && scan_finish_cell) {
                 auto &date_start = folder.get_scan_start();
                 auto &date_finish = folder.get_scan_finish();
@@ -941,10 +941,29 @@ folder_widget_t::folder_widget_t(tree_item_t &container_, behavior_t behavior_, 
     : parent_t(x, y, w, h), container{container_}, behavior{behavior_} {}
 
 void folder_widget_t::make_tabs(model::folder_ptr_t f, model::folder_info_ptr_t fi) {
-    auto cluster = container.supervisor.get_cluster();
     folder_orig = std::move(f);
     folder_info_orig = std::move(fi);
 
+    sync_shares_with_model();
+    reset_data();
+    fl_open_display();
+    int tx, ty, tw, th;
+    client_area(tx, ty, tw, th);
+    begin();
+    auto &group = make_details_tab(tx, ty, tw, th);
+    if (behavior != behavior_t::remote) {
+        make_sharing_tab(tx, ty, tw, th);
+    }
+    make_file_patterns_tab(tx, ty, tw, th);
+    end();
+    resizable(group);
+}
+
+void folder_widget_t::sync_shares_with_model() noexcept {
+    shared_with_orig = {};
+    non_shared_with_orig = {};
+
+    auto cluster = container.supervisor.get_cluster();
     auto self = cluster->get_device().get();
     for (auto it : cluster->get_devices()) {
         auto &peer = *it.item.get();
@@ -959,18 +978,6 @@ void folder_widget_t::make_tabs(model::folder_ptr_t f, model::folder_info_ptr_t 
     if (auto peer = folder_info_orig->get_device(); peer && peer != self) {
         shared_with_orig.put(peer);
     }
-    reset_data();
-    fl_open_display();
-    int tx, ty, tw, th;
-    client_area(tx, ty, tw, th);
-    begin();
-    auto &group = make_details_tab(tx, ty, tw, th);
-    if (behavior != behavior_t::remote) {
-        make_sharing_tab(tx, ty, tw, th);
-    }
-    make_file_patterns_tab(tx, ty, tw, th);
-    end();
-    resizable(group);
 }
 
 void folder_widget_t::reset_data() {
@@ -1083,14 +1090,21 @@ void folder_widget_t::create_or_update() noexcept {
 
     auto folder_id = db::get_id(folder_db);
     auto ui_next = callback_ptr_t();
-    auto cb_select_node = callback_ptr_t();
+    auto cb_ui_refresh = callback_ptr_t();
     if (behavior == behavior_t::edit_new || behavior == behavior_t::candiate) {
-        cb_select_node = sup.call_select_folder(folder_id);
+        cb_ui_refresh = sup.call_select_folder(folder_id);
+    } else if (behavior == behavior_t::local) {
+        cb_ui_refresh = new callback_t([this]() {
+            sync_shares_with_model();
+            reset_data();
+            refresh();
+        });
+        container.supervisor.add_callback(cb_ui_refresh);
     }
     if (devices.empty()) {
-        ui_next = cb_select_node;
+        ui_next = cb_ui_refresh;
     } else {
-        ui_next = sup.call_share_folders(folder_id, std::move(devices), cb_select_node.get());
+        ui_next = sup.call_share_folders(folder_id, std::move(devices), cb_ui_refresh.get());
     }
     sup.send_model<model::payload::model_update_t>(assember.consume(), ui_next.get());
 }

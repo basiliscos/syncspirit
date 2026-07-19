@@ -114,16 +114,6 @@ void db_info_viewer_guard_t::reset() {
     }
 }
 
-using callback_fn_t = std::function<void()>;
-
-struct callback_impl_t final : callback_t {
-    callback_impl_t(callback_fn_t fn_) : fn{std::move(fn_)} {}
-
-    void eval() override { fn(); }
-
-    callback_fn_t fn;
-};
-
 app_supervisor_t::app_supervisor_t(config_t &config)
     : parent_t(this, resource::interrupt, config), log_sink(config.log_sink),
       config_path{std::move(config.config_path)}, app_config(std::move(config.app_config)),
@@ -367,7 +357,7 @@ callback_ptr_t app_supervisor_t::call_select_folder(std::string_view folder_id) 
         auto folders_node = static_cast<tree_item::folders_t *>(folders);
         folders_node->select_folder(id);
     });
-    auto cb = callback_ptr_t(new callback_impl_t(std::move(fn)));
+    auto cb = callback_ptr_t(new callback_t(std::move(fn)));
     callbacks.push_back(cb);
     return cb;
 }
@@ -400,10 +390,12 @@ callback_ptr_t app_supervisor_t::call_share_folders(std::string_view folder_id, 
         }
         send_model<model::payload::model_update_t>(assember.consume(), next);
     });
-    auto cb = callback_ptr_t(new callback_impl_t(std::move(fn)));
+    auto cb = callback_ptr_t(new callback_t(std::move(fn)));
     callbacks.push_back(cb);
     return cb;
 }
+
+void app_supervisor_t::add_callback(callback_ptr_t cb) noexcept { callbacks.push_back(std::move(cb)); }
 
 auto app_supervisor_t::apply(const model::diff::modify::update_peer_t &diff, void *custom) noexcept
     -> outcome::result<void> {

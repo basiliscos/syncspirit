@@ -34,6 +34,7 @@ struct folder_widget_t : contentable_t<Fl_Tabs> {
     void on_remove() noexcept;
 
     void create_or_update() noexcept;
+    void sync_shares_with_model() noexcept;
 
     tree_item_t &container;
     model::folder_ptr_t folder;
