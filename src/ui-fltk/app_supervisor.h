@@ -173,7 +173,8 @@ struct app_supervisor_t : app_supervisor_base_t<app_supervisor_t> {
     inline bool is_soft_restart_requested() { return soft_restart_request; }
 
     callback_ptr_t call_select_folder(std::string_view folder_id);
-    callback_ptr_t call_share_folders(std::string_view folder_id, std::vector<utils::bytes_t> devices);
+    callback_ptr_t call_share_folders(std::string_view folder_id, std::vector<utils::bytes_t> devices,
+                                      callback_t *next);
     db_info_viewer_guard_t request_db_info(db_info_viewer_t *viewer);
     r::address_ptr_t &get_coordinator_address();
 

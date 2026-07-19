@@ -5,6 +5,7 @@
 #include "proto/proto-helpers-db.h"
 #include "presentation/folder_presence.h"
 
+#include "constants.h"
 #include "static_table.h"
 #include "presence_item.h"
 #include "table_widget/checkbox.h"
@@ -13,11 +14,17 @@
 #include "table_widget/int_input.h"
 #include "table_widget/label.h"
 #include "table_widget/path.h"
+#include "model/diff/diff_assembler.h"
+#include "model/diff/modify/upsert_folder.h"
+#include "model/diff/modify/unshare_folder.h"
+#include "model/diff/modify/remove_blocks.h"
+#include "proto/proto-helpers-db.h"
 #include "utils.hpp"
 
 #include <FL/platform.H>
 
 using namespace syncspirit;
+using namespace model::diff;
 using namespace syncspirit::presentation;
 using namespace syncspirit::fltk;
 using namespace syncspirit::fltk::content;
@@ -627,7 +634,7 @@ struct base_table_t : syncspirit::fltk::static_table_t {
 
             if (!is_same) {
                 if (valid) {
-                    actions = actions | B_APPLY;
+                    actions = actions | B_APPLY | B_CREATE | B_SHARE;
                 }
             } else {
                 if (valid) {
@@ -1011,8 +1018,78 @@ Fl_Widget &folder_widget_t::make_file_patterns_tab(int x, int y, int w, int h) {
     return *group;
 }
 
-void folder_widget_t::on_apply() noexcept {}
-void folder_widget_t::on_create() noexcept {}
+void folder_widget_t::on_apply() noexcept { create_or_update(); }
+
+void folder_widget_t::on_create() noexcept { create_or_update(); }
+
 void folder_widget_t::on_share() noexcept {}
+
 void folder_widget_t::on_rescan() noexcept {}
+
 void folder_widget_t::on_remove() noexcept {}
+
+void folder_widget_t::create_or_update() noexcept {
+    serialization_context_t ctx;
+    auto valid = store(&ctx);
+    if (!valid) {
+        return;
+    }
+
+    auto &sup = container.supervisor;
+    auto &folder_db = ctx.folder;
+    auto log = sup.get_logger();
+    auto &cluster = *sup.get_cluster();
+
+    auto opt = modify::upsert_folder_t::create(*sup.get_cluster(), sup.get_sequencer(), folder_db, ctx.index);
+    if (!opt) {
+        log->error("cannot create folder: {}", opt.assume_error().message());
+        return;
+    }
+    auto assember = model::diff::diff_assember_t(constants::diffs_batch);
+    assember.push_back(opt.assume_value().get());
+
+    if (shared_with_orig.size()) {
+        auto folder = cluster.get_folders().by_id(folder_orig->get_id());
+        auto orphaned_blocks = model::orphaned_blocks_t{};
+        auto &folder_infos = folder->get_folder_infos();
+        for (auto it : shared_with_orig) {
+            auto &device = it.item;
+            if (!ctx.shared_with.by_sha256(device->device_id().get_sha256())) {
+                auto folder_info = folder_infos.by_device(*device);
+                if (folder_info) {
+                    log->info("going to unshare folder '{}' with {}({})", folder->get_label(), device->get_name(),
+                              device->device_id().get_short());
+                    auto sub_diff = model::diff::cluster_diff_ptr_t{};
+                    assember.push_back(new modify::unshare_folder_t(cluster, *folder_info, &orphaned_blocks));
+                }
+            }
+        }
+        if (auto orphaned_set = orphaned_blocks.deduce(); orphaned_set.size()) {
+            log->info("going to remove {} orphaned blocks", orphaned_set.size());
+            auto sub_diff = model::diff::cluster_diff_ptr_t{};
+            assember.push_back(new modify::remove_blocks_t(std::move(orphaned_set)));
+        }
+    }
+
+    auto devices = std::vector<utils::bytes_t>{};
+    for (auto it : non_shared_with_orig) {
+        auto &device = it.item;
+        auto sha256 = device->device_id().get_sha256();
+        if (ctx.shared_with.by_sha256(sha256)) {
+            devices.emplace_back(utils::bytes_t(sha256.begin(), sha256.end()));
+        }
+    }
+
+    auto folder_id = db::get_id(folder_db);
+    auto ui_next = callback_ptr_t();
+    auto cb_select_node = callback_ptr_t();
+    if (behavior == behavior_t::edit_new || behavior == behavior_t::candiate) {
+        cb_select_node = sup.call_select_folder(folder_id);
+    }
+    if (devices.empty()) {
+        ui_next = cb_select_node;
+    } else {
+        ui_next = sup.call_share_folders(folder_id, std::move(devices), cb_select_node.get());
+    }
+    sup.send_model<model::payload::model_update_t>(assember.consume(), ui_next.get());
+}

@@ -27,11 +27,13 @@ struct folder_widget_t : contentable_t<Fl_Tabs> {
     Fl_Widget &make_sharing_tab(int x, int y, int w, int h);
     Fl_Widget &make_file_patterns_tab(int x, int y, int w, int h);
 
-    virtual void on_apply() noexcept;
-    virtual void on_create() noexcept;
-    virtual void on_share() noexcept;
-    virtual void on_rescan() noexcept;
-    virtual void on_remove() noexcept;
+    void on_apply() noexcept;
+    void on_create() noexcept;
+    void on_share() noexcept;
+    void on_rescan() noexcept;
+    void on_remove() noexcept;
+
+    void create_or_update() noexcept;
 
     tree_item_t &container;
     model::folder_ptr_t folder;

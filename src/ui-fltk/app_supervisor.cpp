@@ -372,9 +372,10 @@ callback_ptr_t app_supervisor_t::call_select_folder(std::string_view folder_id) 
     return cb;
 }
 
-callback_ptr_t app_supervisor_t::call_share_folders(std::string_view folder_id, std::vector<utils::bytes_t> devices) {
+callback_ptr_t app_supervisor_t::call_share_folders(std::string_view folder_id, std::vector<utils::bytes_t> devices,
+                                                    callback_t *next) {
     assert(devices.size());
-    auto fn = callback_fn_t([this, folder_id = std::string(folder_id), devices = std::move(devices)]() {
+    auto fn = callback_fn_t([this, folder_id = std::string(folder_id), devices = std::move(devices), next = next]() {
         auto assember = model::diff::diff_assember_t(constants::diffs_batch);
         auto &self = cluster->get_device()->device_id();
         for (auto &sha256 : devices) {
@@ -397,8 +398,7 @@ callback_ptr_t app_supervisor_t::call_share_folders(std::string_view folder_id, 
             }
             assember.push_back(opt.assume_value().get());
         }
-        auto cb = call_select_folder(folder_id);
-        send_model<model::payload::model_update_t>(assember.consume(), cb.get());
+        send_model<model::payload::model_update_t>(assember.consume(), next);
     });
     auto cb = callback_ptr_t(new callback_impl_t(std::move(fn)));
     callbacks.push_back(cb);
