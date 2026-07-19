@@ -15,13 +15,16 @@
 #include "table_widget/label.h"
 #include "table_widget/path.h"
 #include "model/diff/diff_assembler.h"
-#include "model/diff/modify/upsert_folder.h"
-#include "model/diff/modify/unshare_folder.h"
 #include "model/diff/modify/remove_blocks.h"
+#include "model/diff/modify/remove_folder.h"
+#include "model/diff/modify/suspend_folder.h"
+#include "model/diff/modify/unshare_folder.h"
+#include "model/diff/modify/upsert_folder.h"
 #include "proto/proto-helpers-db.h"
 #include "utils.hpp"
 
 #include <FL/platform.H>
+#include <FL/fl_ask.H>
 
 using namespace syncspirit;
 using namespace model::diff;
@@ -588,7 +591,10 @@ struct base_table_t : syncspirit::fltk::static_table_t {
         return new widget_t(*this, disabled);
     }
 
-    widgetable_ptr_t make_shared_with(model::device_ptr_t device) { return new device_share_widget_t(*this, device); }
+    widgetable_ptr_t make_shared_with(model::device_ptr_t device) {
+        ++share_widgets;
+        return new device_share_widget_t(*this, device);
+    }
 
     void add_actions_and_notice(table_rows_t &data) noexcept {
         auto actions = buttons_mask_t{0};
@@ -622,7 +628,8 @@ struct base_table_t : syncspirit::fltk::static_table_t {
             auto copy_data = db::encode(ctx.folder);
             set_error({});
             auto valid = store(&ctx);
-            auto is_same = copy_data == db::encode(ctx.folder) && (container.shared_with_orig == ctx.shared_with);
+            auto fields_are_same = copy_data == db::encode(ctx.folder);
+            auto is_same = fields_are_same && (!share_widgets || ctx.shared_with == container.shared_with_orig);
 
             if (scan_start_cell && scan_finish_cell) {
                 auto &date_start = folder.get_scan_start();
@@ -751,7 +758,7 @@ struct base_table_t : syncspirit::fltk::static_table_t {
     Fl_Widget *rescan_button{nullptr};
     Fl_Widget *remove_button{nullptr};
 
-    // private:
+    int share_widgets{0};
     folder_widget_t &container;
 };
 
@@ -1034,7 +1041,28 @@ void folder_widget_t::on_share() noexcept {}
 
 void folder_widget_t::on_rescan() noexcept {}
 
-void folder_widget_t::on_remove() noexcept {}
+void folder_widget_t::on_remove() noexcept {
+    auto r = fl_choice("Are you sure? (no files on disk are touched)", "Yes", "No", nullptr);
+    if (r != 0) {
+        return;
+    }
+    auto &sup = container.supervisor;
+    auto &cluster = *sup.get_cluster();
+    auto &sequencer = sup.get_sequencer();
+    auto &f = *folder_orig;
+    auto diff = cluster_diff_ptr_t{};
+    auto cb_reset = callback_ptr_t();
+    cb_reset = new callback_t([this]() {
+        folder.reset();
+        folder_orig.reset();
+        folder_info.reset();
+        folder_info_orig.reset();
+    });
+    container.supervisor.add_callback(cb_reset);
+    diff = new modify::suspend_folder_t(f, true);
+    diff->assign_sibling(new modify::remove_folder_t(cluster, sequencer, f));
+    sup.send_model<model::payload::model_update_t>(std::move(diff), cb_reset.get());
+}
 
 void folder_widget_t::create_or_update() noexcept {
     serialization_context_t ctx;
