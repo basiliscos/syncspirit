@@ -613,10 +613,9 @@ struct base_table_t : syncspirit::fltk::static_table_t {
             auto copy_data = db::encode(ctx.folder);
             set_error({});
             auto valid = store(&ctx);
-            auto is_same = copy_data == db::encode(ctx.folder);
+            auto is_same = copy_data == db::encode(ctx.folder) && (container.shared_with_orig == ctx.shared_with);
 
             auto &folder = get_folder();
-
             if (scan_start_cell && scan_finish_cell) {
                 auto &date_start = folder.get_scan_start();
                 auto &date_finish = folder.get_scan_finish();
