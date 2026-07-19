@@ -476,6 +476,7 @@ struct base_table_t : syncspirit::fltk::static_table_t {
 
             bool store(void *data) override {
                 auto ctx = reinterpret_cast<ctx_t *>(data);
+                db::set_ignore_permissions(ctx->folder, input->value());
                 return true;
             }
             bool disabled;
