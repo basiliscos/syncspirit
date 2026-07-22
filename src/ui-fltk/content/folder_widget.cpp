@@ -11,6 +11,7 @@
 #include "model/diff/modify/suspend_folder.h"
 #include "model/diff/modify/unshare_folder.h"
 #include "model/diff/modify/upsert_folder.h"
+#include "file_matching_widget.h"
 #include "presence_item.h"
 #include "presentation/folder_presence.h"
 #include "proto/proto-helpers-db.h"
@@ -1030,7 +1031,8 @@ Fl_Widget &folder_widget_t::make_sharing_tab(int x, int y, int w, int h) {
 Fl_Widget &folder_widget_t::make_file_patterns_tab(int x, int y, int w, int h) {
     auto *group = new tab_content_group(x, y, w, h, "File patterns");
     group->begin();
-    group->color(FL_DARK_MAGENTA);
+    auto widget = new file_matching_widget_t(container, x, y, w, h);
+    group->resizable(widget);
     group->end();
     return *group;
 }

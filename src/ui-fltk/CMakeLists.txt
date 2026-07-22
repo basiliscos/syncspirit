@@ -40,6 +40,7 @@ add_executable(syncspirit-fltk WIN32 MACOSX_BUNDLE
     config/properties.cpp
     config/property.cpp
     config/table.cpp
+    content/file_matching_widget.cpp
     content/file_table.cpp
     content/folder_widget.cpp
     platform/tray.cpp
