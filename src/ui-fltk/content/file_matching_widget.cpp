@@ -113,6 +113,7 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
         begin();
         forget_controls();
         items = std::move(rows_);
+        items.push_back(new item_t(match_mode_t::accept, ""));
         for (int i = 0; i < static_cast<int>(items.size()); ++i) {
             auto &item = items[i];
             auto tools = make_tools(*item, i);

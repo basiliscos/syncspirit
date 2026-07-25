@@ -33,6 +33,7 @@ find_package(
     COMPONENTS
         nowide
         program_options
+        regex
         system
         url
     REQUIRED
