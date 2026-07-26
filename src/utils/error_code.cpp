@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "error_code.h"
+#include <pcre2.h>
 #include <map>
 
 namespace syncspirit::utils::detail {
@@ -11,6 +12,8 @@ const char *error_code_category::name() const noexcept { return "syncspirit_erro
 const char *bep_error_code_category::name() const noexcept { return "syncspirit_bep_error"; }
 
 const char *protocol_error_code_category::name() const noexcept { return "syncspirit_proto_error"; }
+
+const char *pcre_error_code_category::name() const noexcept { return "pcre_error"; }
 
 std::string error_code_category::message(int c) const {
     std::string r;
@@ -180,6 +183,15 @@ std::string protocol_error_code_category::message(int c) const {
     return r;
 }
 
+std::string pcre_error_code_category ::message(int c) const {
+    PCRE2_UCHAR buff[256];
+    auto sz = pcre2_get_error_message(c, buff, sizeof(buff));
+    if (sz > 0) {
+        return std::string(reinterpret_cast<const char *>(buff), sz);
+    }
+    return {};
+}
+
 } // namespace syncspirit::utils::detail
 
 namespace syncspirit::utils {
@@ -187,9 +199,11 @@ namespace syncspirit::utils {
 const static detail::error_code_category category;
 const static detail::bep_error_code_category bep_category;
 const static detail::protocol_error_code_category protocol_category;
+const static detail::pcre_error_code_category pcre_category;
 
 const detail::error_code_category &error_code_category() { return category; }
 const detail::bep_error_code_category &bep_error_code_category() { return bep_category; }
 const detail::protocol_error_code_category &protocol_error_code_category() { return protocol_category; }
+const detail::pcre_error_code_category &pcre_error_code_category() { return pcre_category; }
 
 } // namespace syncspirit::utils

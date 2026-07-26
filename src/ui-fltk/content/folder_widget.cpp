@@ -28,6 +28,7 @@
 
 #include <FL/platform.H>
 #include <FL/fl_ask.H>
+#include <charconv>
 
 using namespace syncspirit;
 using namespace model::diff;

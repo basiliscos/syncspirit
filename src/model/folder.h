@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <optional>
 #include "misc/augmentation.h"
+#include "misc/file_matcher.h"
 #include "device.h"
 #include "folder_info.h"
 #include "misc/uuid.h"
@@ -30,12 +31,12 @@ struct SYNCSPIRIT_API folder_t final : augmentable_t, folder_data_t {
     static outcome::result<folder_ptr_t> create(utils::bytes_view_t key, const db::Folder &folder) noexcept;
     static outcome::result<folder_ptr_t> create(const bu::uuid &uuid, const db::Folder &folder) noexcept;
 
-    using folder_data_t::assign_fields;
     using folder_data_t::serialize;
 
     void assign_cluster(const cluster_ptr_t &cluster) noexcept;
     void add(const folder_info_ptr_t &folder_info) noexcept;
     utils::bytes_t serialize() noexcept;
+    void serialize(syncspirit::db::Folder &dest) const noexcept override;
 
     bool operator==(const folder_t &other) const noexcept { return get_id() == other.get_id(); }
     bool operator!=(const folder_t &other) const noexcept { return !(*this == other); }
@@ -57,6 +58,7 @@ struct SYNCSPIRIT_API folder_t final : augmentable_t, folder_data_t {
     void mark_suspended(bool value, const std::error_code &ec = {}) noexcept;
     bool is_suspended() const noexcept;
     const std::error_code &get_suspend_reason() const noexcept;
+    bool accept(const utils::path_base_t &path) const noexcept;
 
     using folder_data_t::get_path;
     using folder_data_t::set_path;
@@ -67,7 +69,11 @@ struct SYNCSPIRIT_API folder_t final : augmentable_t, folder_data_t {
 
     static const constexpr size_t data_length = uuid_length + 1;
 
+    void assign_fields(const db::Folder &item) noexcept override;
+
   private:
+    using file_matchers_t = std::vector<file_matcher_t>;
+
     folder_t(utils::bytes_view_t key) noexcept;
     folder_t(const bu::uuid &uuid) noexcept;
 
@@ -75,6 +81,7 @@ struct SYNCSPIRIT_API folder_t final : augmentable_t, folder_data_t {
     pt::ptime scan_finish;
     device_ptr_t device;
     folder_infos_map_t folder_infos;
+    file_matchers_t file_matchers;
     cluster_t *cluster = nullptr;
     unsigned char key[data_length];
     std::int_fast32_t synchronizing = 0;

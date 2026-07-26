@@ -1,0 +1,91 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-FileCopyrightText: 2026 Ivan Baidakou
+
+#include <catch2/catch_all.hpp>
+#include "model/folder.h"
+#include "test-utils.h"
+
+using namespace syncspirit;
+using namespace syncspirit::utils;
+using namespace syncspirit::model;
+using namespace syncspirit::test;
+
+using Catch::Matchers::Matches;
+
+TEST_CASE("folder file matchers", "[model]") {
+    auto uuid = bu::uuid{};
+    auto db = db::Folder();
+    db::set_path(db, "/some/path");
+
+    SECTION("default") {
+        auto folder_opt = folder_t::create(uuid, db);
+        REQUIRE(folder_opt.has_value());
+        auto &f = folder_opt.value();
+        CHECK(f->accept(path_t::make_generic("/some/path/a/b/c")));
+        CHECK(!f->accept(path_t::make_generic("/some/other_path/xxx")));
+    }
+
+    auto add_regex = [&](std::string_view pattern, file_match_t mode) {
+        auto db_fm = db::FileMatcher();
+        db::set_pattern(db_fm, std::string(pattern));
+        db::set_mode(db_fm, mode);
+        db::add_file_matcher(db, db_fm);
+    };
+
+    SECTION("ignore all") {
+        add_regex(".*", file_match_t::ignore);
+        auto f = folder_t::create(uuid, db).value();
+        CHECK(!f->accept(path_t::make_generic("/some/path/a/b/c")));
+        CHECK(!f->accept(path_t::make_generic("/some/other_path/xxx")));
+    }
+
+    SECTION("regex is off") {
+        add_regex(".*", file_match_t::off);
+        auto f = folder_t::create(uuid, db).value();
+        CHECK(!f->accept(path_t::make_generic("/some/path/a/b/c")));
+    }
+
+    SECTION("accept all") {
+        add_regex(".*", file_match_t::accept);
+        auto f = folder_t::create(uuid, db).value();
+        CHECK(f->accept(path_t::make_generic("/some/path/a/b/c")));
+    }
+
+    SECTION("error in regex") {
+        add_regex("\\", file_match_t::accept);
+        auto f = folder_t::create(uuid, db).value();
+        CHECK(!f->accept(path_t::make_generic("/some/path/a")));
+        CHECK(!f->accept(path_t::make_generic("/some/other_path/xxx")));
+    }
+
+    SECTION("accept some") {
+        add_regex(".*aaa.*", file_match_t::accept);
+        auto f = folder_t::create(uuid, db).value();
+        CHECK(f->accept(path_t::make_generic("/some/path/aaaa/b/c")));
+        CHECK(f->accept(path_t::make_generic("/some/path/x/aaa/b/c")));
+        CHECK(f->accept(path_t::make_generic("/some/path/aaa")));
+        CHECK(!f->accept(path_t::make_generic("/some/path/bbb")));
+        CHECK(!f->accept(path_t::make_generic("/some/path/ccc")));
+    }
+
+    SECTION("several rules") {
+        add_regex(".*aaa.*", file_match_t::accept);
+        add_regex(".*a.*", file_match_t::ignore);
+        add_regex(".*", file_match_t::accept);
+        auto f = folder_t::create(uuid, db).value();
+        CHECK(f->accept(path_t::make_generic("/some/path/aaaa/b/c")));
+        CHECK(f->accept(path_t::make_generic("/some/path/x/aaa/b/c")));
+        CHECK(f->accept(path_t::make_generic("/some/path/aaa")));
+        CHECK(!f->accept(path_t::make_generic("/some/path/aa")));
+        CHECK(!f->accept(path_t::make_generic("/some/path/a")));
+        CHECK(f->accept(path_t::make_generic("/some/path/bbb")));
+        CHECK(f->accept(path_t::make_generic("/some/path/ccc")));
+    }
+}
+
+int _init() {
+    test::init_logging();
+    return 1;
+}
+
+static int v = _init();

@@ -32,13 +32,13 @@ struct SYNCSPIRIT_API folder_data_t {
     inline std::uint32_t get_rescan_interval() const noexcept { return rescan_interval; };
     inline void set_rescan_interval(std::uint32_t value) noexcept { rescan_interval = value; };
 
-    void serialize(syncspirit::db::Folder &dest) const noexcept;
+    virtual void serialize(syncspirit::db::Folder &dest) const noexcept;
 
     template <typename T> auto &access() noexcept;
     template <typename T> auto &access() const noexcept;
 
   protected:
-    void assign_fields(const db::Folder &item) noexcept;
+    virtual void assign_fields(const db::Folder &item) noexcept;
 
     std::string id;
     std::string label;

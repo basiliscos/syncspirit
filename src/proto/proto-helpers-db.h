@@ -296,6 +296,31 @@ inline void set_symlink_target(FileInfo &msg, std::string value) {
     msg["symlink_target"_f] = std::move(value);
 }
 
+/*******************/
+/*** FileMatcher ***/
+/*******************/
+
+inline std::string_view get_pattern(const FileMatcher &msg) {
+    using namespace pp;
+    auto &opt = msg["pattern"_f];
+    if (opt) {
+        return opt.value();
+    }
+    return {};
+}
+inline void set_pattern(FileMatcher &msg, std::string value) {
+    using namespace pp;
+    msg["pattern"_f] = std::move(value);
+}
+inline FileMatch get_mode(const FileMatcher &msg) {
+    using namespace pp;
+    return msg["mode"_f].value_or(FileMatch{});
+}
+inline void set_mode(FileMatcher &msg, FileMatch value) {
+    using namespace pp;
+    msg["mode"_f] = value;
+}
+
 /**************/
 /*** Folder ***/
 /**************/
@@ -408,6 +433,18 @@ inline std::uint32_t get_rescan_interval(const Folder &msg) {
 inline void set_rescan_interval(Folder &msg, std::uint32_t value) {
     using namespace pp;
     msg["rescan_interval"_f] = value;
+}
+inline std::size_t get_file_matcher_size(const Folder &msg) {
+    using namespace pp;
+    return msg["file_matchers"_f].size();
+}
+inline const FileMatcher &get_file_matcher(const Folder &msg, std::size_t index) {
+    using namespace pp;
+    return msg["file_matchers"_f][index];
+}
+inline void add_file_matcher(Folder &msg, FileMatcher value) {
+    using namespace pp;
+    msg["file_matchers"_f].push_back(std::move(value));
 }
 
 /******************/

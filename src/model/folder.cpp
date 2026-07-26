@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "folder.h"
 #include "db/utils.h"
@@ -7,7 +7,7 @@
 #include "proto/proto-helpers.h"
 #include "misc/error_code.h"
 #include "utils/format.hpp"
-#include <spdlog/spdlog.h>
+#include "utils/log.h"
 
 namespace syncspirit::model {
 
@@ -43,6 +43,37 @@ folder_t::folder_t(const bu::uuid &uuid) noexcept : synchronizing{false}, suspen
     std::copy(uuid.begin(), uuid.end(), key + 1);
 }
 
+void folder_t::assign_fields(const db::Folder &item) noexcept {
+    folder_data_t::assign_fields(item);
+
+    auto matchers_sz = db::get_file_matcher_size(item);
+    file_matchers.clear();
+    file_matchers.reserve(matchers_sz);
+
+    for (std::size_t i = 0; i < matchers_sz; ++i) {
+        auto &db = db::get_file_matcher(item, i);
+        auto pattern = db::get_pattern(db);
+        auto fm = file_matcher_t(std::string(pattern), db::get_mode(db));
+        auto compile_err = fm.compile();
+        if (compile_err.code) {
+            spdlog::warn("({}) file matcher {} '{}' compilation error at {}: {}", label, i + 1, fm.get_pattern(),
+                         compile_err.error_offset, compile_err.code);
+        }
+        file_matchers.push_back(std::move(fm));
+    }
+
+    if (file_matchers.empty()) {
+        spdlog::debug("no file matchers for folder '{}', adding match-everything '.*'", label);
+        auto fm = file_matcher_t(".*", file_match_t::accept);
+        auto compile_err = fm.compile();
+        if (compile_err.code) {
+            spdlog::warn("({}) file matcher '{}' compilation error at {}: {}", label, fm.get_pattern(),
+                         compile_err.error_offset, compile_err.code);
+        }
+        file_matchers.push_back(std::move(fm));
+    }
+}
+
 utils::bytes_view_t folder_t::get_uuid() const noexcept { return utils::bytes_view_t(key + 1, uuid_length); }
 
 void folder_t::add(const folder_info_ptr_t &folder_info) noexcept { folder_infos.put(folder_info); }
@@ -53,6 +84,17 @@ utils::bytes_t folder_t::serialize() noexcept {
     auto r = db::Folder();
     folder_data_t::serialize(r);
     return db::encode(r);
+}
+
+void folder_t::serialize(syncspirit::db::Folder &dest) const noexcept {
+    folder_data_t::serialize(dest);
+    for (std::size_t i = 0; i < file_matchers.size(); ++i) {
+        auto &fm = file_matchers[i];
+        auto db = db::FileMatcher();
+        db::set_pattern(db, std::string(fm.get_pattern()));
+        db::set_mode(db, fm.get_mode());
+        db::add_file_matcher(dest, std::move(db));
+    }
 }
 
 auto folder_t::is_shared_with(const model::device_t &device) const noexcept -> folder_info_ptr_t {
@@ -130,6 +172,22 @@ void folder_t::mark_suspended(bool value, const std::error_code &ec) noexcept {
 bool folder_t::is_suspended() const noexcept { return suspended; }
 
 auto folder_t::get_suspend_reason() const noexcept -> const std::error_code & { return suspend_reason; }
+
+bool folder_t::accept(const utils::path_base_t &p) const noexcept {
+    auto folder_path = path.get_full_name();
+    for (auto &fm : file_matchers) {
+        if (path.contains(p)) {
+            auto rel_path = p.get_full_name().substr(folder_path.size());
+            auto mode = fm.match(rel_path);
+            if (mode == file_match_t::accept) {
+                return true;
+            } else if (mode == file_match_t::ignore) {
+                return false;
+            }
+        }
+    }
+    return false;
+}
 
 template <> SYNCSPIRIT_API utils::bytes_view_t get_index<0>(const folder_ptr_t &item) noexcept {
     return item->get_key();
