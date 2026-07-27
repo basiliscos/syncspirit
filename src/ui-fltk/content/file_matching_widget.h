@@ -14,7 +14,6 @@ struct file_matching_widget_t final : contentable_t<Fl_Group> {
     file_matching_widget_t(tree_item_t &container, int x, int y, int w, int h);
     void assign(model::folder_ptr_t f);
 
-  private:
     struct table_t;
 
     tree_item_t &container;

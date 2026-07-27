@@ -3,6 +3,7 @@
 
 #include "file_matching_widget.h"
 
+#include "utils/format.hpp"
 #include <FL/Fl_Box.H>
 #include <FL/Fl_Button.H>
 #include <FL/Fl_Choice.H>
@@ -14,22 +15,14 @@ using namespace syncspirit;
 using namespace syncspirit::fltk;
 using namespace syncspirit::fltk::content;
 
-enum class match_mode_t { accept, ignore, off };
-
 namespace {
 
 static constexpr int PADDING = 5;
 static constexpr int CELL_PADDING = 3;
 
-struct item_t : model::arc_base_t<item_t> {
-    using parent_t = model::arc_base_t<item_t>;
-    item_t(match_mode_t mode_, std::string value_) noexcept : mode{mode_}, value{value_} {}
-    match_mode_t mode;
-    std::string value;
-};
-using item_ptr_t = model::intrusive_ptr_t<item_t>;
+using rows_t = std::vector<model::file_matcher_t>;
 
-using rows_t = std::vector<item_ptr_t>;
+enum class hightlight_t { no, match, error };
 
 } // namespace
 
@@ -37,13 +30,14 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
     using parent_t = contentable_t<Fl_Table>;
 
     struct item_controls_t {
+        hightlight_t hightlight{hightlight_t::no};
         Fl_Group *tools{nullptr};
         Fl_Choice *match_mode{nullptr};
         Fl_Input *input{nullptr};
     };
     using controls_t = std::vector<item_controls_t>;
 
-    table_t(int x, int y, int w, int h) : parent_t(x, y, w, h) {
+    table_t(tree_item_t &container_, int x, int y, int w, int h) : parent_t(x, y, w, h), container{container_} {
         row_header(0);
         row_resize(0);
         cols(4);
@@ -73,7 +67,7 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
         controls.clear();
     }
 
-    Fl_Group *make_tools(const item_t &, int row) noexcept {
+    Fl_Group *make_tools(const model::file_matcher_t &, int row) noexcept {
         static constexpr auto P = CELL_PADDING;
         int x, y, w, h;
         find_cell(CONTEXT_TABLE, row, 1, x, y, w, h);
@@ -90,22 +84,22 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
         return group;
     }
 
-    Fl_Choice *make_type(const item_t &, int row) noexcept {
+    Fl_Choice *make_mode(const model::file_matcher_t &item, int row) noexcept {
         int x, y, w, h;
         find_cell(CONTEXT_TABLE, row, 2, x, y, w, h);
         auto input = new Fl_Choice(x, y, w, h);
+        input->add("off");
         input->add("accept");
         input->add("ignore");
-        input->add("off");
-        input->value(0);
+        input->value(static_cast<int>(item.get_mode()));
         return input;
     }
 
-    Fl_Input *make_regex(const item_t &item, int row) noexcept {
+    Fl_Input *make_regex(const model::file_matcher_t &item, int row) noexcept {
         int x, y, w, h;
         find_cell(CONTEXT_TABLE, row, 3, x, y, w, h);
         auto input = new Fl_Input(x, y, w, h);
-        input->value(item.value.data());
+        input->value(item.get_pattern().data());
         return input;
     }
 
@@ -113,13 +107,20 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
         begin();
         forget_controls();
         items = std::move(rows_);
-        items.push_back(new item_t(match_mode_t::accept, ""));
+        items.push_back(model::file_matcher_t());
         for (int i = 0; i < static_cast<int>(items.size()); ++i) {
             auto &item = items[i];
-            auto tools = make_tools(*item, i);
-            auto type = make_type(*item, i);
-            auto re = make_regex(*item, i);
-            auto item_controls = item_controls_t{tools, type, re};
+            auto highlight = hightlight_t::no;
+            auto [ec, off] = item.compile();
+            if (ec) {
+                auto log = container.supervisor.get_logger();
+                log->warn("cannot compile {} regex '{}': {}", i + 1, item.get_pattern(), ec);
+                highlight = hightlight_t::error;
+            }
+            auto tools = make_tools(item, i);
+            auto type = make_mode(item, i);
+            auto re = make_regex(item, i);
+            auto item_controls = item_controls_t{highlight, tools, type, re};
             controls.push_back(std::move(item_controls));
         }
         rows(static_cast<int>(items.size()));
@@ -196,7 +197,8 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
 
     void update_col_widths(int x, int y, int w, int h) noexcept {
         auto w0 = std::max(60, col_width(0));
-        auto w1 = std::max(80, col_width(1));
+        // auto w1 = std::max(80, col_width(1));
+        auto w1 = 80;
         auto w2 = std::max(85, col_width(2));
         auto w3 = std::max(1, tiw - (w0 + w1 + w2));
 
@@ -215,12 +217,17 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
     void draw_order(int row, int x, int y, int w, int h) {
         fl_push_clip(x, y, w, h);
         {
+            using H = hightlight_t;
             auto text = fmt::format("{}", row + 1);
             fl_font(FL_HELVETICA, 16);
             Fl_Align align = FL_ALIGN_RIGHT;
             int dx = CELL_PADDING;
 
-            fl_color(FL_WHITE);
+            auto &control = controls[row];
+            auto highlight = control.hightlight == H::error   ? fl_rgb_color(255, 220, 220)
+                             : control.hightlight == H::match ? fl_rgb_color(210, 245, 255)
+                                                              : FL_WHITE;
+            fl_color(highlight);
             fl_rectf(x, y, w, h);
             fl_color(FL_GRAY0);
             fl_draw(text.data(), x + dx, y, w - dx * 2, h, align);
@@ -232,24 +239,30 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
 
     rows_t items;
     controls_t controls;
+    tree_item_t &container;
 };
 
 file_matching_widget_t::file_matching_widget_t(tree_item_t &container_, int x, int y, int w, int h)
     : parent_t(x, y, w, h), container{container_} {
     auto bottom_row = 30;
+    using M = model::file_match_t;
 
     box(FL_FLAT_BOX);
     color(FL_DARK_GREEN);
     begin();
 
-    table = new table_t(x + PADDING, y + PADDING, w - PADDING * 2, h - (bottom_row + PADDING * 3));
+    table = new table_t(container, x + PADDING, y + PADDING, w - PADDING * 2, h - (bottom_row + PADDING * 3));
 
-    auto sample_rows = rows_t{
-        new item_t(match_mode_t::accept, "artefact"), new item_t(match_mode_t::ignore, "^\\.DS_Store"),
-        new item_t(match_mode_t::ignore, "*.tmp"),    new item_t(match_mode_t::ignore, "*.secret"),
-        new item_t(match_mode_t::ignore, "^\\.env$"), new item_t(match_mode_t::off, "something"),
-        new item_t(match_mode_t::accept, ".*"),
-    };
+    auto sample_rows = rows_t();
+    sample_rows.push_back(model::file_matcher_t("artefact", M::accept));
+    sample_rows.push_back(model::file_matcher_t("^\\.DS_Store", M::ignore));
+    sample_rows.push_back(model::file_matcher_t(".*\\.tmp", M::ignore));
+    sample_rows.push_back(model::file_matcher_t(".secret$", M::ignore));
+    sample_rows.push_back(model::file_matcher_t("^\\.env$", M::ignore));
+    sample_rows.push_back(model::file_matcher_t("something", M::off));
+    sample_rows.push_back(model::file_matcher_t("error$\\", M::ignore));
+    sample_rows.push_back(model::file_matcher_t(".*", M::accept));
+
     table->assing_rows(std::move(sample_rows));
 
     auto bottom = new Fl_Group(x + PADDING, table->y() + table->h() + PADDING, table->w(), bottom_row);
