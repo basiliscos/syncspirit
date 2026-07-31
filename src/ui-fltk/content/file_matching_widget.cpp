@@ -212,6 +212,8 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
         redraw();
     }
 
+    void assign_test(Fl_Input *test_input_) noexcept { test_input = test_input_; }
+
     void draw_cell(TableContext context, int row, int col, int x, int y, int w, int h) override {
         switch (context) {
         case CONTEXT_STARTPAGE: {
@@ -287,13 +289,26 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
         using M = model::file_match_t;
         parent_t::refresh();
 
+        auto test = test_input ? std::string_view(test_input->value()) : std::string_view();
+        bool has_match{false};
+
         for (int i = 0; i < static_cast<int>(items.size()); ++i) {
             auto &item = items[i];
             auto &c = controls[i];
             auto mode = item.get_mode();
             c.match_mode->value(static_cast<int>(item.get_mode()));
             c.input->value(item.get_pattern().data());
-            c.hightlight = (mode == M::off || item.is_valid()) ? hightlight_t::no : hightlight_t::error;
+            if (mode == M::off) {
+                c.hightlight = hightlight_t::no;
+            } else if (!item.is_valid()) {
+                c.hightlight = hightlight_t::error;
+            } else {
+                c.hightlight = hightlight_t::no;
+                if (!has_match && test.size() && item.match(test) != M::off) {
+                    c.hightlight = hightlight_t::match;
+                    has_match = true;
+                }
+            }
         }
     }
 
@@ -308,7 +323,7 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
 
             auto &control = controls[row];
             auto highlight = control.hightlight == H::error   ? fl_rgb_color(255, 220, 220)
-                             : control.hightlight == H::match ? fl_rgb_color(210, 245, 255)
+                             : control.hightlight == H::match ? fl_rgb_color(220, 255, 220)
                                                               : FL_WHITE;
             fl_color(highlight);
             fl_rectf(x, y, w, h);
@@ -323,6 +338,7 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
     rows_t items;
     controls_t controls;
     tree_item_t &container;
+    Fl_Input *test_input{nullptr};
 };
 
 file_matching_widget_t::file_matching_widget_t(tree_item_t &container_, int x, int y, int w, int h)
@@ -337,13 +353,13 @@ file_matching_widget_t::file_matching_widget_t(tree_item_t &container_, int x, i
     table = new table_t(container, x + PADDING, y + PADDING, w - PADDING * 2, h - (bottom_row + PADDING * 3));
 
     auto sample_rows = rows_t();
-    sample_rows.push_back(model::file_matcher_t("artefact", M::accept));
     sample_rows.push_back(model::file_matcher_t("^\\.DS_Store", M::ignore));
     sample_rows.push_back(model::file_matcher_t(".*\\.tmp", M::ignore));
     sample_rows.push_back(model::file_matcher_t(".secret$", M::ignore));
     sample_rows.push_back(model::file_matcher_t("^\\.env$", M::ignore));
-    sample_rows.push_back(model::file_matcher_t("something", M::off));
+    sample_rows.push_back(model::file_matcher_t("artefact", M::accept));
     sample_rows.push_back(model::file_matcher_t("error$\\", M::ignore));
+    sample_rows.push_back(model::file_matcher_t("something", M::off));
     sample_rows.push_back(model::file_matcher_t(".*", M::accept));
 
     table->assing_rows(std::move(sample_rows));
@@ -366,6 +382,16 @@ file_matching_widget_t::file_matching_widget_t(tree_item_t &container_, int x, i
     bottom->end();
     bottom->resizable(input);
     end();
+
+    table->assign_test(input);
+    input->callback(
+        [](auto, void *data) {
+            auto t = reinterpret_cast<table_t *>(data);
+            t->refresh();
+            t->redraw();
+        },
+        table);
+    input->when(input->when() | FL_WHEN_CHANGED);
 
     resizable(table);
     redraw();
