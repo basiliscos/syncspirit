@@ -27,12 +27,15 @@ struct SYNCSPIRIT_API file_matcher_t {
     file_matcher_t(std::string, file_match_t) noexcept;
     ~file_matcher_t();
 
+    file_matcher_t &operator=(file_matcher_t &&) noexcept;
+
     void set_pattern(std::string_view) noexcept;
     std::string_view get_pattern() const noexcept;
     void set_mode(file_match_t) noexcept;
     file_match_t get_mode() const noexcept;
 
     compile_error_t compile() noexcept;
+    bool is_valid() const noexcept;
 
     file_match_t match(std::string_view) const noexcept;
 

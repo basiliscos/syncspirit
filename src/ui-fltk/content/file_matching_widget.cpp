@@ -30,6 +30,41 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
     using parent_t = contentable_t<Fl_Table>;
 
     struct item_controls_t {
+        item_controls_t() noexcept = default;
+        item_controls_t(table_t *parent_, hightlight_t hightlight_, Fl_Group *tools_, Fl_Choice *match_mode_,
+                        Fl_Input *input_) noexcept
+            : parent{parent_}, hightlight{hightlight_}, tools{tools_}, match_mode{match_mode_}, input{input_} {}
+
+        item_controls_t(const item_controls_t &) = delete;
+        item_controls_t(item_controls_t &&other) noexcept { *this = std::move(other); }
+        item_controls_t &operator=(item_controls_t &&other) noexcept {
+            if (this != &other) {
+                parent = std::exchange(other.parent, nullptr);
+                hightlight = other.hightlight;
+                tools = std::exchange(other.tools, nullptr);
+                match_mode = std::exchange(other.match_mode, nullptr), input = std::exchange(other.input, nullptr);
+            }
+            return *this;
+        }
+
+        ~item_controls_t() {
+            if (parent) {
+                if (tools) {
+                    parent->remove(*tools);
+                    delete tools;
+                }
+                if (match_mode) {
+                    parent->remove(*match_mode);
+                    delete match_mode;
+                }
+                if (input) {
+                    parent->remove(*input);
+                    delete input;
+                }
+            }
+        }
+
+        table_t *parent{nullptr};
         hightlight_t hightlight{hightlight_t::no};
         Fl_Group *tools{nullptr};
         Fl_Choice *match_mode{nullptr};
@@ -53,19 +88,7 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
 
     ~table_t() { forget_controls(); }
 
-    void forget_controls() noexcept {
-        for (auto &c : controls) {
-#define SS_FLTK_RM(W)                                                                                                  \
-    if ((W)) {                                                                                                         \
-        parent_t::remove((*W));                                                                                        \
-        delete (W);                                                                                                    \
-    }
-            SS_FLTK_RM(c.tools);
-            SS_FLTK_RM(c.match_mode);
-            SS_FLTK_RM(c.input);
-        }
-        controls.clear();
-    }
+    void forget_controls() noexcept { controls.clear(); }
 
     Fl_Group *make_tools(const model::file_matcher_t &, int row) noexcept {
         static constexpr auto P = CELL_PADDING;
@@ -81,7 +104,66 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
         auto down = new Fl_Button(up->x() + up->w() + PADDING, y + P, hh, hh, "@>");
         group->end();
         group->resizable(nullptr);
+
+        rm->callback([](auto w, void *data) { reinterpret_cast<table_t *>(data)->on_rm(w); }, this);
+        up->callback([](auto w, void *data) { reinterpret_cast<table_t *>(data)->on_move_up(w); }, this);
+        down->callback([](auto w, void *data) { reinterpret_cast<table_t *>(data)->on_move_down(w); }, this);
+
         return group;
+    }
+
+    void on_rm(Fl_Widget *w) noexcept {
+        auto tools = w->parent();
+        if (items.size() > 1) {
+            for (size_t i = 0; i < items.size(); ++i) {
+                if (controls[i].tools == tools) {
+                    auto it_c = controls.begin() + i;
+                    controls.erase(it_c);
+                    auto it_i = items.begin() + i;
+                    items.erase(it_i);
+                    break;
+                }
+            }
+            rows(static_cast<int>(items.size()));
+        } else {
+            auto &c = controls[0];
+            c.input->value("");
+            c.hightlight = hightlight_t::no;
+            c.match_mode->value(1);
+        }
+        redraw();
+    }
+
+    void on_move_up(Fl_Widget *w) noexcept {
+        auto tools = w->parent();
+        auto index = items.size();
+        for (size_t i = 0; i < items.size(); ++i) {
+            if (controls[i].tools == tools) {
+                index = i;
+                break;
+            }
+        }
+        if (index > 0) {
+            std::swap(items[index], items[index - 1]);
+            refresh();
+        }
+        redraw();
+    }
+
+    void on_move_down(Fl_Widget *w) noexcept {
+        auto tools = w->parent();
+        auto index = items.size();
+        for (size_t i = 0; i < items.size(); ++i) {
+            if (controls[i].tools == tools) {
+                index = i;
+                break;
+            }
+        }
+        if (index + 1 < items.size()) {
+            std::swap(items[index], items[index + 1]);
+            refresh();
+        }
+        redraw();
     }
 
     Fl_Choice *make_mode(const model::file_matcher_t &item, int row) noexcept {
@@ -120,11 +202,12 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
             auto tools = make_tools(item, i);
             auto type = make_mode(item, i);
             auto re = make_regex(item, i);
-            auto item_controls = item_controls_t{highlight, tools, type, re};
+            auto item_controls = item_controls_t(this, highlight, tools, type, re);
             controls.push_back(std::move(item_controls));
         }
         rows(static_cast<int>(items.size()));
         end();
+        refresh();
         resize_widgets();
         redraw();
     }
@@ -149,20 +232,6 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
         case CONTEXT_RC_RESIZE: {
             update_col_widths(x, y, w, h);
             resize_widgets();
-#if 0
-            auto w0 = col_width(0);
-            auto col_widths = calc_col_widths();
-            auto col_min_size = std::min(col_widths.w1_min, col_widths.w2_min);
-            if (w0 < col_min_size) {
-                col_width(0, col_min_size);
-                w0 = col_min_size;
-            }
-            auto last_sz = this->tiw - w0;
-            if (last_sz >= col_min_size) {
-                col_width(1, last_sz);
-            }
-            resize_widgets();
-#endif
             return;
         }
         default:
@@ -212,6 +281,20 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
         parent_t::resize(x, y, w, h);
         update_col_widths(x, y, w, h);
         init_sizes();
+    }
+
+    void refresh() override {
+        using M = model::file_match_t;
+        parent_t::refresh();
+
+        for (int i = 0; i < static_cast<int>(items.size()); ++i) {
+            auto &item = items[i];
+            auto &c = controls[i];
+            auto mode = item.get_mode();
+            c.match_mode->value(static_cast<int>(item.get_mode()));
+            c.input->value(item.get_pattern().data());
+            c.hightlight = (mode == M::off || item.is_valid()) ? hightlight_t::no : hightlight_t::error;
+        }
     }
 
     void draw_order(int row, int x, int y, int w, int h) {

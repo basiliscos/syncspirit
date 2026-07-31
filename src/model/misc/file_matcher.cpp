@@ -10,9 +10,7 @@ using namespace syncspirit::model;
 file_matcher_t::file_matcher_t(std::string pattern_, file_match_t mode_) noexcept
     : pattern{std::move(pattern_)}, mode{mode_} {}
 
-file_matcher_t::file_matcher_t(file_matcher_t &&other) noexcept
-    : re{std::exchange(other.re, nullptr)}, match_data{std::exchange(other.match_data, nullptr)},
-      pattern{std::exchange(other.pattern, {})}, mode{other.mode} {}
+file_matcher_t::file_matcher_t(file_matcher_t &&other) noexcept { *this = std::move(other); }
 
 file_matcher_t::~file_matcher_t() {
     if (match_data) {
@@ -21,6 +19,16 @@ file_matcher_t::~file_matcher_t() {
     if (re) {
         pcre2_code_free(re);
     }
+}
+
+file_matcher_t &file_matcher_t::operator=(file_matcher_t &&other) noexcept {
+    if (this != &other) {
+        re = std::exchange(other.re, nullptr);
+        match_data = std::exchange(other.match_data, nullptr);
+        pattern = std::exchange(other.pattern, {});
+        mode = other.mode;
+    }
+    return *this;
 }
 
 void file_matcher_t::set_pattern(std::string_view value) noexcept { pattern = value; }
@@ -54,6 +62,8 @@ auto file_matcher_t::compile() noexcept -> compile_error_t {
     }
     return r;
 }
+
+bool file_matcher_t::is_valid() const noexcept { return re && match_data; }
 
 file_match_t file_matcher_t::match(std::string_view file_path) const noexcept {
     auto r = file_match_t::off;
