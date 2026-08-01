@@ -152,8 +152,19 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
         }
         if (index > 0) {
             std::swap(items[index], items[index - 1]);
-            refresh();
+        } else {
+            auto sz = items.size();
+            items.resize(sz + 1);
+            for (size_t i = sz; i > 0; --i) {
+                std::swap(items[i - 1], items[i]);
+            }
+            begin();
+            auto item_controls = make_item_controls(items.back(), static_cast<int>(sz));
+            end();
+            controls.push_back(std::move(item_controls));
+            rows(static_cast<int>(sz + 1));
         }
+        refresh();
         redraw();
     }
 
@@ -260,7 +271,6 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
         begin();
         forget_controls();
         items = std::move(rows_);
-        items.push_back(model::file_matcher_t());
         for (int i = 0; i < static_cast<int>(items.size()); ++i) {
             auto item_controls = make_item_controls(items[i], i);
             controls.push_back(std::move(item_controls));
