@@ -10,6 +10,7 @@
 #include <FL/Fl_Group.H>
 #include <FL/Fl_Input.H>
 #include <FL/Fl_Table_Row.H>
+#include <cstdint>
 
 using namespace syncspirit;
 using namespace syncspirit::fltk;
@@ -182,6 +183,27 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
         find_cell(CONTEXT_TABLE, row, 3, x, y, w, h);
         auto input = new Fl_Input(x, y, w, h);
         input->value(item.get_pattern().data());
+        input->callback(
+            [](Fl_Widget *self, void *data) {
+                auto t = reinterpret_cast<table_t *>(data);
+                for (std::size_t i = 0; i < t->controls.size(); ++i) {
+                    if (t->controls[i].input == self) {
+                        auto &item = t->items[i];
+                        auto data = std::string(static_cast<Fl_Input *>(self)->value());
+                        item.set_pattern(data);
+                        auto [ec, off] = item.compile();
+                        if (ec) {
+                            auto log = t->container.supervisor.get_logger();
+                            log->warn("cannot compile {} regex '{}': {}", i + 1, item.get_pattern(), ec);
+                        }
+                        break;
+                    }
+                }
+                t->refresh();
+                t->redraw();
+            },
+            this);
+        input->when(input->when() | FL_WHEN_CHANGED);
         return input;
     }
 
@@ -297,7 +319,11 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
             auto &c = controls[i];
             auto mode = item.get_mode();
             c.match_mode->value(static_cast<int>(item.get_mode()));
-            c.input->value(item.get_pattern().data());
+            auto pattern = item.get_pattern();
+            auto input_value = c.input->value();
+            if (!input_value || input_value != pattern) {
+                c.input->value(pattern.data());
+            }
             if (mode == M::off) {
                 c.hightlight = hightlight_t::no;
             } else if (!item.is_valid()) {
