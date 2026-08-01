@@ -42,10 +42,11 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
         item_controls_t(item_controls_t &&other) noexcept { *this = std::move(other); }
         item_controls_t &operator=(item_controls_t &&other) noexcept {
             if (this != &other) {
-                parent = std::exchange(other.parent, nullptr);
-                hightlight = other.hightlight;
-                tools = std::exchange(other.tools, nullptr);
-                match_mode = std::exchange(other.match_mode, nullptr), input = std::exchange(other.input, nullptr);
+                std::swap(parent, other.parent);
+                std::swap(hightlight, other.hightlight);
+                std::swap(tools, other.tools);
+                std::swap(match_mode, other.match_mode);
+                std::swap(input, other.input);
             }
             return *this;
         }
@@ -157,6 +158,7 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
     }
 
     void on_move_down(Fl_Widget *w) noexcept {
+        using M = model::file_match_t;
         auto tools = w->parent();
         auto index = items.size();
         for (size_t i = 0; i < items.size(); ++i) {
@@ -167,8 +169,15 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
         }
         if (index + 1 < items.size()) {
             std::swap(items[index], items[index + 1]);
-            refresh();
+        } else {
+            items.push_back(model::file_matcher_t(".*", M::accept));
+            begin();
+            auto item_controls = make_item_controls(items.back(), static_cast<int>(index + 1));
+            end();
+            controls.push_back(std::move(item_controls));
+            rows(static_cast<int>(items.size()));
         }
+        refresh();
         redraw();
     }
 
@@ -233,24 +242,27 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
         return input;
     }
 
+    item_controls_t make_item_controls(model::file_matcher_t &item, int row) {
+        auto highlight = hightlight_t::no;
+        auto [ec, off] = item.compile();
+        if (ec) {
+            auto &log = get_logger();
+            log->warn("cannot compile {} regex '{}': {}", row + 1, item.get_pattern(), ec);
+            highlight = hightlight_t::error;
+        }
+        auto tools = make_tools(item, row);
+        auto type = make_mode(item, row);
+        auto re = make_regex(item, row);
+        return item_controls_t(this, highlight, tools, type, re);
+    }
+
     void assing_rows(rows_t rows_) noexcept {
         begin();
         forget_controls();
         items = std::move(rows_);
         items.push_back(model::file_matcher_t());
         for (int i = 0; i < static_cast<int>(items.size()); ++i) {
-            auto &item = items[i];
-            auto highlight = hightlight_t::no;
-            auto [ec, off] = item.compile();
-            if (ec) {
-                auto &log = get_logger();
-                log->warn("cannot compile {} regex '{}': {}", i + 1, item.get_pattern(), ec);
-                highlight = hightlight_t::error;
-            }
-            auto tools = make_tools(item, i);
-            auto type = make_mode(item, i);
-            auto re = make_regex(item, i);
-            auto item_controls = item_controls_t(this, highlight, tools, type, re);
+            auto item_controls = make_item_controls(items[i], i);
             controls.push_back(std::move(item_controls));
         }
         rows(static_cast<int>(items.size()));

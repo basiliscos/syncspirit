@@ -23,10 +23,10 @@ file_matcher_t::~file_matcher_t() {
 
 file_matcher_t &file_matcher_t::operator=(file_matcher_t &&other) noexcept {
     if (this != &other) {
-        re = std::exchange(other.re, nullptr);
-        match_data = std::exchange(other.match_data, nullptr);
-        pattern = std::exchange(other.pattern, {});
-        mode = other.mode;
+        std::swap(re, other.re);
+        std::swap(match_data, other.match_data);
+        std::swap(pattern, other.pattern);
+        std::swap(mode, other.mode);
     }
     return *this;
 }
