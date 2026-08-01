@@ -20,7 +20,6 @@
 #include "proto/proto-helpers-bep.h"
 #include "proto/proto-helpers-db.h"
 
-#include <boost/nowide/convert.hpp>
 #include <ctime>
 
 using namespace syncspirit::net;
@@ -35,7 +34,6 @@ net_supervisor_t::net_supervisor_t(net_supervisor_t::config_t &cfg)
     : parent_t(this, resource::interrupt, cfg), sequencer{cfg.sequencer}, app_config{cfg.app_config},
       independent_threads{cfg.independent_threads}, thread_counter{independent_threads},
       local_counter{cfg.local_counter} {
-    using boost::nowide::narrow;
     bouncer = cfg.bouncer_address;
     auto buffer = std::array<std::byte, 1024 * 32>();
     auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());

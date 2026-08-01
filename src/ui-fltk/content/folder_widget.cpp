@@ -1032,7 +1032,7 @@ Fl_Widget &folder_widget_t::make_sharing_tab(int x, int y, int w, int h) {
 Fl_Widget &folder_widget_t::make_file_patterns_tab(int x, int y, int w, int h) {
     auto *group = new tab_content_group(x, y, w, h, "File patterns");
     group->begin();
-    auto widget = new file_matching_widget_t(container, x, y, w, h);
+    auto widget = new file_matching_widget_t(*this, x, y, w, h);
     group->resizable(widget);
     group->end();
     return *group;

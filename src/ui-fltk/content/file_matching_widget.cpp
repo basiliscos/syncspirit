@@ -3,6 +3,8 @@
 
 #include "file_matching_widget.h"
 
+#include "folder_widget.h"
+
 #include "utils/format.hpp"
 #include <FL/Fl_Box.H>
 #include <FL/Fl_Button.H>
@@ -73,7 +75,8 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
     };
     using controls_t = std::vector<item_controls_t>;
 
-    table_t(tree_item_t &container_, int x, int y, int w, int h) : parent_t(x, y, w, h), container{container_} {
+    table_t(file_matching_widget_t &container_, int x, int y, int w, int h)
+        : parent_t(x, y, w, h), container{container_} {
         row_header(0);
         row_resize(0);
         cols(4);
@@ -88,6 +91,8 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
     }
 
     ~table_t() { forget_controls(); }
+
+    utils::logger_t &get_logger() noexcept { return container.container.container.supervisor.get_logger(); }
 
     void forget_controls() noexcept { controls.clear(); }
 
@@ -193,7 +198,7 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
                         item.set_pattern(data);
                         auto [ec, off] = item.compile();
                         if (ec) {
-                            auto log = t->container.supervisor.get_logger();
+                            auto &log = t->get_logger();
                             log->warn("cannot compile {} regex '{}': {}", i + 1, item.get_pattern(), ec);
                         }
                         break;
@@ -217,7 +222,7 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
             auto highlight = hightlight_t::no;
             auto [ec, off] = item.compile();
             if (ec) {
-                auto log = container.supervisor.get_logger();
+                auto &log = get_logger();
                 log->warn("cannot compile {} regex '{}': {}", i + 1, item.get_pattern(), ec);
                 highlight = hightlight_t::error;
             }
@@ -363,11 +368,11 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
 
     rows_t items;
     controls_t controls;
-    tree_item_t &container;
+    file_matching_widget_t &container;
     Fl_Input *test_input{nullptr};
 };
 
-file_matching_widget_t::file_matching_widget_t(tree_item_t &container_, int x, int y, int w, int h)
+file_matching_widget_t::file_matching_widget_t(folder_widget_t &container_, int x, int y, int w, int h)
     : parent_t(x, y, w, h), container{container_} {
     auto bottom_row = 30;
     using M = model::file_match_t;
@@ -376,7 +381,7 @@ file_matching_widget_t::file_matching_widget_t(tree_item_t &container_, int x, i
     color(FL_DARK_GREEN);
     begin();
 
-    table = new table_t(container, x + PADDING, y + PADDING, w - PADDING * 2, h - (bottom_row + PADDING * 3));
+    table = new table_t(*this, x + PADDING, y + PADDING, w - PADDING * 2, h - (bottom_row + PADDING * 3));
 
     auto sample_rows = rows_t();
     sample_rows.push_back(model::file_matcher_t("^\\.DS_Store", M::ignore));
@@ -418,6 +423,14 @@ file_matching_widget_t::file_matching_widget_t(tree_item_t &container_, int x, i
         },
         table);
     input->when(input->when() | FL_WHEN_CHANGED);
+
+    auto buffer = std::array<std::byte, 1024 * 32>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+
+    auto sample_path = container.folder->get_path() / utils::make_generic_view("some/path/file.bin", allocator);
+    auto path_str = sample_path.get_full_name();
+    input->value(path_str.data());
 
     resizable(table);
     redraw();
