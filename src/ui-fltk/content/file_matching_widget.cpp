@@ -180,6 +180,27 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
         input->add("accept");
         input->add("ignore");
         input->value(static_cast<int>(item.get_mode()));
+        input->callback(
+            [](Fl_Widget *self, void *data) {
+                auto t = reinterpret_cast<table_t *>(data);
+                for (std::size_t i = 0; i < t->controls.size(); ++i) {
+                    if (t->controls[i].match_mode == self) {
+                        auto &item = t->items[i];
+                        auto value = static_cast<Fl_Choice *>(self)->value();
+                        auto mode = static_cast<model::file_match_t>(value);
+                        item.set_mode(mode);
+                        auto [ec, off] = item.compile();
+                        if (ec) {
+                            auto &log = t->get_logger();
+                            log->warn("cannot compile {} regex '{}': {}", i + 1, item.get_pattern(), ec);
+                        }
+                        break;
+                    }
+                }
+                t->refresh();
+                t->redraw();
+            },
+            this);
         return input;
     }
 

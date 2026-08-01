@@ -67,7 +67,7 @@ bool file_matcher_t::is_valid() const noexcept { return re && match_data; }
 
 file_match_t file_matcher_t::match(std::string_view file_path) const noexcept {
     auto r = file_match_t::off;
-    if (re && match_data && mode != file_match_t::off) {
+    if (re && match_data && mode != file_match_t::off && pattern.size()) {
         auto code = pcre2_match(re, reinterpret_cast<PCRE2_SPTR>(file_path.data()), file_path.size(), 0, 0, match_data,
                                 nullptr);
         if (code >= 0) {
