@@ -606,12 +606,6 @@ struct base_table_t : syncspirit::fltk::static_table_t {
         return {from_index, count};
     }
 
-    void on_reset() noexcept {
-        container.reset_data();
-        reset();
-        refresh();
-    }
-
   protected:
     static_string_provider_ptr_t entries_cell;
     static_string_provider_ptr_t entries_size_cell;
@@ -796,7 +790,7 @@ struct sharing_table_t final : base_table_t {
 
 Fl_Widget *checkbox_widget_t::create_widget(int x, int y, int w, int h) {
     auto r = parent_t::create_widget(x, y, w, h);
-    input->callback([](auto, void *data) { reinterpret_cast<base_table_t *>(data)->refresh(); }, &container);
+    static_cast<base_table_t &>(container).set_refresh_callback(input);
     return r;
 }
 
@@ -943,8 +937,6 @@ struct button_group_t final : refresheable_group_t {
     }
 
     void relayout() noexcept {
-        auto W = w();
-
         notice->resize(x() + padding * 2, y() + padding * 2, w() - padding * 4, notice->h());
 
         if (children() > 1) {
@@ -1028,7 +1020,6 @@ folder_widget_t::folder_widget_t(tree_item_t &container_, behavior_t behavior_, 
 
 void folder_widget_t::refresh() {
     error.clear();
-    // zzz move buttons refresh here
     parent_t::refresh();
 }
 
@@ -1172,7 +1163,11 @@ void folder_widget_t::on_remove() noexcept {
     sup.send_model<model::payload::model_update_t>(std::move(diff), cb_reset.get());
 }
 
-void folder_widget_t::on_reset() noexcept { std::abort(); }
+void folder_widget_t::on_reset() noexcept {
+    reset_data();
+    reset();
+    refresh();
+}
 
 void folder_widget_t::create_or_update() noexcept {
     serialization_context_t ctx;

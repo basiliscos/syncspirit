@@ -38,6 +38,17 @@ template <typename T> struct contentable_t<T, std::enable_if_t<std::is_base_of_v
                 content->refresh();
             }
         }
+        Fl_Widget::redraw();
+    }
+
+    void reset() override {
+        for (int i = 0; i < this->children(); ++i) {
+            auto child = this->child(i);
+            if (auto content = dynamic_cast<content_t *>(child)) {
+                content->reset();
+            }
+        }
+        Fl_Widget::redraw();
     }
 
     bool store(void *ptr) override {
