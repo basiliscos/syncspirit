@@ -11,6 +11,7 @@
 #include "model/diff/modify/suspend_folder.h"
 #include "model/diff/modify/unshare_folder.h"
 #include "model/diff/modify/upsert_folder.h"
+#include "model/diff/local/scan_request.h"
 #include "file_matching_widget.h"
 #include "presence_item.h"
 #include "presentation/folder_presence.h"
@@ -1138,7 +1139,13 @@ void folder_widget_t::on_share() noexcept {
     }
 }
 
-void folder_widget_t::on_rescan() noexcept {}
+void folder_widget_t::on_rescan() noexcept {
+    auto &sup = container.supervisor;
+    auto diff = model::diff::cluster_diff_ptr_t{};
+    auto folder_id = folder->get_id();
+    diff = new model::diff::local::scan_request_t(folder_id, {});
+    sup.send_model<model::payload::model_update_t>(std::move(diff), this);
+}
 
 void folder_widget_t::on_remove() noexcept {
     auto r = fl_choice("Are you sure? (no files on disk are touched)", "Yes", "No", nullptr);
