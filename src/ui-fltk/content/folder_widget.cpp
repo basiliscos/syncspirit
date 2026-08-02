@@ -895,6 +895,7 @@ struct button_group_t final : refresheable_group_t {
         }
         if (mask & B_REMOVE) {
             auto button = new Fl_Button(xx, yy, ww, hh, "remove");
+            button->color(FL_RED);
             button->deactivate();
             button->callback([](auto, void *data) { static_cast<folder_widget_t *>(data)->on_remove(); }, &container);
             remove_button = button;
@@ -914,7 +915,7 @@ struct button_group_t final : refresheable_group_t {
         if (mask & B_SHARE) {
             auto button = new Fl_Button(xx, yy, ww, hh, "share");
             button->deactivate();
-            button->callback([](auto, void *data) { static_cast<folder_widget_t *>(data)->on_reset(); }, &container);
+            button->callback([](auto, void *data) { static_cast<folder_widget_t *>(data)->on_share(); }, &container);
             share_button = button;
         }
 
