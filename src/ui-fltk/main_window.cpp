@@ -57,7 +57,7 @@ main_window_t::main_window_t(app_supervisor_t &supervisor_, int w_, int h_)
     auto bottom_share = std::min(std::max(0.1, cfg.bottom_panel_share), 0.9);
     container->begin();
 
-    auto resizable_area = new Fl_Box(w() * 0.1, container->y() + hh * 0.15, w() * 0.8, hh * 0.7);
+    auto resizable_area = new Fl_Box(w() * 0.1, container->y() + hh * 0.15, w() * 0.7, hh * 0.7);
 
     auto left_w = static_cast<int>(container->w() * left_share);
     auto right_w = container->w() - left_w;

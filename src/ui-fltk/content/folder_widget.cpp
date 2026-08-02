@@ -26,6 +26,7 @@
 #include "utils.hpp"
 #include "utils/format.hpp"
 
+#include <FL/Fl_Tabs.H>
 #include <FL/platform.H>
 #include <FL/fl_ask.H>
 #include <charconv>
@@ -90,10 +91,10 @@ struct base_table_t : syncspirit::fltk::static_table_t {
     base_table_t(folder_widget_t &container_, int x, int y, int w, int h)
         : parent_t(x, y, w, h), container{container_} {}
 
-    inline bool is_new() const noexcept { return container.behavior == B::edit_new; }
-    inline bool is_local() const noexcept { return container.behavior == B::local; }
-    inline bool is_remote() const noexcept { return container.behavior == B::remote; }
-    inline bool is_candidate() const noexcept { return container.behavior == B::candiate; }
+    inline bool is_new() const noexcept { return container.is_new(); }
+    inline bool is_local() const noexcept { return container.is_local(); }
+    inline bool is_remote() const noexcept { return container.is_remote(); }
+    inline bool is_candidate() const noexcept { return container.is_candidate(); }
 
     folder_presence_t &presence() const {
         auto &tree_item = static_cast<presence_item_t &>(container.container);
@@ -108,6 +109,10 @@ struct base_table_t : syncspirit::fltk::static_table_t {
 
     inline void set_error(std::string_view error) { container.error = error; }
 
+    void set_refresh_callback(Fl_Widget *w) {
+        w->callback([](auto, void *data) { reinterpret_cast<base_table_t *>(data)->container.refresh(); }, this);
+    }
+
     widgetable_ptr_t make_path(bool disabled) {
         struct widget_t final : table_widget::path_t {
             using parent_t = table_widget::path_t;
@@ -117,8 +122,7 @@ struct base_table_t : syncspirit::fltk::static_table_t {
             Fl_Widget *create_widget(int x, int y, int w, int h) override {
                 auto r = parent_t::create_widget(x, y, w, h);
                 input->when(input->when() | FL_WHEN_CHANGED);
-                input->callback([](auto, void *data) { reinterpret_cast<static_table_t *>(data)->refresh(); },
-                                &container);
+                static_cast<base_table_t &>(container).set_refresh_callback(input);
                 if (disabled) {
                     widget->deactivate();
                 }
@@ -149,8 +153,7 @@ struct base_table_t : syncspirit::fltk::static_table_t {
 
             Fl_Widget *create_widget(int x, int y, int w, int h) override {
                 auto r = parent_t::create_widget(x, y, w, h);
-                input->callback([](auto, void *data) { reinterpret_cast<base_table_t *>(data)->refresh(); },
-                                &container);
+                static_cast<base_table_t &>(container).set_refresh_callback(input);
                 input->when(input->when() | FL_WHEN_CHANGED);
                 if (disabled) {
                     widget->deactivate();
@@ -182,9 +185,8 @@ struct base_table_t : syncspirit::fltk::static_table_t {
 
             Fl_Widget *create_widget(int x, int y, int w, int h) override {
                 auto r = parent_t::create_widget(x, y, w, h);
-                input->callback([](auto, void *data) { reinterpret_cast<base_table_t *>(data)->refresh(); },
-                                &container);
                 input->when(input->when() | FL_WHEN_CHANGED);
+                static_cast<base_table_t &>(container).set_refresh_callback(input);
                 if (disabled) {
                     widget->deactivate();
                 }
@@ -223,9 +225,8 @@ struct base_table_t : syncspirit::fltk::static_table_t {
             Fl_Widget *create_widget(int x, int y, int w, int h) override {
                 auto r = parent_t::create_widget(x, y, w, h);
                 input->size(200, r->h());
-                input->callback([](auto, void *data) { reinterpret_cast<base_table_t *>(data)->refresh(); },
-                                &container);
                 input->when(input->when() | FL_WHEN_CHANGED);
+                static_cast<base_table_t &>(container).set_refresh_callback(input);
                 input->add("random");
                 input->add("alphabetic");
                 input->add("smallest first");
@@ -263,9 +264,8 @@ struct base_table_t : syncspirit::fltk::static_table_t {
 
             Fl_Widget *create_widget(int x, int y, int w, int h) override {
                 auto r = parent_t::create_widget(x, y, w, h);
-                input->callback([](auto, void *data) { reinterpret_cast<base_table_t *>(data)->refresh(); },
-                                &container);
                 input->when(input->when() | FL_WHEN_CHANGED);
+                static_cast<base_table_t &>(container).set_refresh_callback(input);
                 if (disabled) {
                     widget->deactivate();
                 }
@@ -309,9 +309,8 @@ struct base_table_t : syncspirit::fltk::static_table_t {
 
             Fl_Widget *create_widget(int x, int y, int w, int h) override {
                 auto r = parent_t::create_widget(x, y, w, h);
-                input->callback([](auto, void *data) { reinterpret_cast<base_table_t *>(data)->refresh(); },
-                                &container);
                 input->when(input->when() | FL_WHEN_CHANGED);
+                static_cast<base_table_t &>(container).set_refresh_callback(input);
                 if (disabled) {
                     widget->deactivate();
                 }
@@ -382,86 +381,6 @@ struct base_table_t : syncspirit::fltk::static_table_t {
             }
         };
         return new widget_t(*this);
-    }
-
-    auto make_actions(buttons_mask_t mask) -> widgetable_ptr_t {
-        struct widget_t final : widgetable_t {
-            using parent_t = widgetable_t;
-            widget_t(Fl_Widget &container, buttons_mask_t mask_) : parent_t{container}, mask{mask_} {}
-
-            Fl_Widget *create_widget(int x, int y, int w, int h) override {
-                auto group = new Fl_Group(x, y, w, h);
-                group->begin();
-                group->box(FL_FLAT_BOX);
-                auto &container = static_cast<base_table_t &>(this->container);
-                auto xx = x + padding, yy = y + padding, ww = 100, hh = h - padding * 2;
-
-                if (mask & B_APPLY) {
-                    auto apply = new Fl_Button(xx, yy, ww, hh, "apply");
-                    apply->deactivate();
-                    apply->callback([](auto, void *data) { static_cast<base_table_t *>(data)->container.on_apply(); },
-                                    &container);
-                    container.apply_button = apply;
-                    xx = apply->x() + ww + padding * 2;
-                }
-
-                if (mask & B_CREATE) {
-                    auto button = new Fl_Button(xx, yy, ww, hh, "create");
-                    button->deactivate();
-                    button->callback([](auto, void *data) { static_cast<base_table_t *>(data)->container.on_create(); },
-                                     &container);
-                    container.create_button = button;
-                    xx = button->x() + ww + padding * 2;
-                }
-
-                if (mask & B_SHARE) {
-                    auto button = new Fl_Button(xx, yy, ww, hh, "share");
-                    button->deactivate();
-                    button->callback([](auto, void *data) { static_cast<base_table_t *>(data)->container.on_share(); },
-                                     &container);
-                    container.share_button = button;
-                    xx = button->x() + ww + padding * 2;
-                }
-
-                if (mask & B_RESET) {
-                    auto reset = new Fl_Button(xx, yy, ww, hh, "reset");
-                    reset->deactivate();
-                    reset->callback([](auto, void *data) { static_cast<base_table_t *>(data)->on_reset(); },
-                                    &container);
-                    container.reset_button = reset;
-                    xx = reset->x() + ww + padding * 2;
-                }
-
-                if (mask & B_RESCAN) {
-                    auto rescan = new Fl_Button(xx, yy, ww, hh, "rescan");
-                    rescan->callback([](auto, void *data) { static_cast<base_table_t *>(data)->container.on_rescan(); },
-                                     &container);
-                    rescan->deactivate();
-                    container.rescan_button = rescan;
-                    xx = rescan->x() + ww + padding * 2;
-                }
-
-                if (mask & B_REMOVE) {
-                    auto remove = new Fl_Button(xx, yy, ww, hh, "remove");
-                    remove->callback([](auto, void *data) { static_cast<base_table_t *>(data)->container.on_remove(); },
-                                     &container);
-                    remove->color(FL_RED);
-                    container.remove_button = remove;
-                    xx = remove->x() + ww + padding * 2;
-                }
-
-                group->resizable(nullptr);
-                group->end();
-                widget = group;
-
-                this->reset();
-                return widget;
-            }
-
-            buttons_mask_t mask;
-        };
-
-        return new widget_t(*this, mask);
     }
 
     widgetable_ptr_t make_ignore_permissions(bool disabled) {
@@ -600,41 +519,11 @@ struct base_table_t : syncspirit::fltk::static_table_t {
         return new device_share_widget_t(*this, device);
     }
 
-    void add_actions_and_notice(table_rows_t &data) noexcept {
-        auto actions = buttons_mask_t{0};
-
-        if (is_new()) {
-            actions = B_CREATE;
-        }
-        if (is_local()) {
-            actions = B_APPLY | B_REMOVE | B_RESCAN;
-        }
-        if (is_candidate()) {
-            actions = B_SHARE;
-        }
-        if (actions) {
-            notice = make_notice();
-            data.push_back({"", notice});
-            actions = actions | B_RESET;
-            data.push_back({"actions", make_actions(actions)});
-        }
-    }
-
     void refresh() override {
         parent_t::refresh();
 
-        auto actions = buttons_mask_t{0};
         if (is_local() || is_candidate() || is_new()) {
             auto &folder = get_folder();
-
-            ctx_t ctx;
-            folder.serialize(ctx.folder);
-            auto copy_data = db::encode(ctx.folder);
-            set_error({});
-            auto valid = store(&ctx);
-            auto fields_are_same = copy_data == db::encode(ctx.folder);
-            auto is_same = fields_are_same && (!share_widgets || ctx.shared_with == container.shared_with_orig);
-
             if (scan_start_cell && scan_finish_cell) {
                 auto &date_start = folder.get_scan_start();
                 auto &date_finish = folder.get_scan_finish();
@@ -642,19 +531,6 @@ struct base_table_t : syncspirit::fltk::static_table_t {
                 auto scan_finish = date_finish.is_not_a_date_time() ? "-" : model::pt::to_simple_string(date_finish);
                 scan_start_cell->update(scan_start);
                 scan_finish_cell->update(scan_finish);
-            }
-
-            if (!is_same) {
-                if (valid) {
-                    actions = actions | B_APPLY | B_CREATE | B_SHARE;
-                }
-            } else {
-                if (valid) {
-                    actions = actions | B_RESCAN | B_REMOVE;
-                }
-            }
-            if (!is_same || !valid) {
-                actions = actions | B_RESET;
             }
         }
 
@@ -664,17 +540,6 @@ struct base_table_t : syncspirit::fltk::static_table_t {
             entries_cell->update(fmt::format("{}", stats.entities));
             entries_size_cell->update(get_file_size(stats.size));
             max_sequence_cell->update(fmt::format("{}", max_sequence));
-        }
-
-        ENABLE_ACTION(create_button, B_CREATE);
-        ENABLE_ACTION(apply_button, B_APPLY);
-        ENABLE_ACTION(share_button, B_SHARE);
-        ENABLE_ACTION(reset_button, B_RESET);
-        ENABLE_ACTION(rescan_button, B_RESCAN);
-        ENABLE_ACTION(remove_button, B_REMOVE);
-
-        if (notice) {
-            notice->reset();
         }
     }
 
@@ -748,20 +613,11 @@ struct base_table_t : syncspirit::fltk::static_table_t {
     }
 
   protected:
-    widgetable_ptr_t notice;
     static_string_provider_ptr_t entries_cell;
     static_string_provider_ptr_t entries_size_cell;
     static_string_provider_ptr_t max_sequence_cell;
     static_string_provider_ptr_t scan_start_cell;
     static_string_provider_ptr_t scan_finish_cell;
-
-    Fl_Widget *create_button{nullptr};
-    Fl_Widget *apply_button{nullptr};
-    Fl_Widget *share_button{nullptr};
-    Fl_Widget *reset_button{nullptr};
-    Fl_Widget *rescan_button{nullptr};
-    Fl_Widget *remove_button{nullptr};
-
     int share_widgets{0};
     folder_widget_t &container;
 };
@@ -902,7 +758,6 @@ struct details_table_t final : base_table_t {
             data.push_back({"scan finish", scan_finish_cell});
         }
         data.push_back({"watched", make_watched(is_remote())});
-        add_actions_and_notice(data);
         assign_rows(std::move(data));
     }
 };
@@ -935,7 +790,6 @@ struct sharing_table_t final : base_table_t {
             data.push_back({"shared_with", widget});
         }
 
-        add_actions_and_notice(data);
         assign_rows(std::move(data));
     }
 };
@@ -946,10 +800,237 @@ Fl_Widget *checkbox_widget_t::create_widget(int x, int y, int w, int h) {
     return r;
 }
 
+struct tabs_container_t final : contentable_t<Fl_Tabs> {
+    using parent_t = contentable_t<Fl_Tabs>;
+
+    tabs_container_t(folder_widget_t &container_, int x, int y, int w, int h) noexcept
+        : parent_t(x, y, w, h), container{container_} {
+        fl_open_display();
+        int tx, ty, tw, th;
+        client_area(tx, ty, tw, th);
+        begin();
+        new refresheable_group_t(tx, ty, tw, th, "");
+        end();
+    }
+
+    void make_tabs(model::folder_ptr_t f, model::folder_info_ptr_t fi) {
+        clear();
+        fl_open_display();
+        int tx, ty, tw, th;
+        client_area(tx, ty, tw, th);
+        begin();
+        auto &group = make_details_tab(tx, ty, tw, th);
+        if (container.behavior != folder_widget_t::behavior_t::remote) {
+            make_sharing_tab(tx, ty, tw, th);
+        }
+        make_file_patterns_tab(tx, ty, tw, th);
+        end();
+    }
+
+    Fl_Widget &make_details_tab(int x, int y, int w, int h) {
+        auto *group = new tab_content_group(x, y, w, h, "Details");
+        group->begin();
+        new details_table_t(container, x, y, w, h);
+        group->end();
+        return *group;
+    }
+
+    Fl_Widget &make_sharing_tab(int x, int y, int w, int h) {
+        auto *group = new tab_content_group(x, y, w, h, "Sharing");
+        group->begin();
+        new sharing_table_t(container, x, y, w, h);
+        group->end();
+        return *group;
+    }
+
+    Fl_Widget &make_file_patterns_tab(int x, int y, int w, int h) {
+        auto *group = new tab_content_group(x, y, w, h, "File patterns");
+        group->begin();
+        auto widget = new file_matching_widget_t(container, x, y, w, h);
+        group->resizable(widget);
+        group->end();
+        return *group;
+    }
+
+    folder_widget_t &container;
+};
+
+struct button_group_t final : refresheable_group_t {
+    using parent_t = refresheable_group_t;
+
+    button_group_t(folder_widget_t &container_, int x, int y, int w, int h) noexcept
+        : parent_t(x, y, w, h), container{container_} {
+        begin();
+        box(FL_FLAT_BOX);
+        auto hh = (h - padding * 6) / 2;
+
+        notice = new Fl_Box(x + padding * 2, y + padding * 2, w - padding * 4, hh, "");
+        notice->box(FL_FLAT_BOX);
+        notice->color(FL_LIGHT2);
+
+        auto xx = x;
+        auto yy = notice->y() + notice->h() + padding * 2;
+        auto ww = 80;
+
+        auto mask = buttons_mask_t(0);
+        if (container.is_new()) {
+            mask = B_CREATE;
+        }
+        if (container.is_local()) {
+            mask = B_APPLY | B_REMOVE | B_RESCAN;
+        }
+        if (container.is_candidate()) {
+            mask = B_SHARE;
+        }
+        if (mask) {
+            mask = mask | B_RESET;
+        }
+
+        if (mask & B_CREATE) {
+            auto button = new Fl_Button(xx, yy, ww, hh, "create");
+            button->deactivate();
+            button->callback([](auto, void *data) { static_cast<folder_widget_t *>(data)->on_create(); }, &container);
+            create_button = button;
+        }
+        if (mask & B_APPLY) {
+            auto button = new Fl_Button(xx, yy, ww, hh, "apply");
+            button->deactivate();
+            button->callback([](auto, void *data) { static_cast<folder_widget_t *>(data)->on_apply(); }, &container);
+            apply_button = button;
+        }
+        if (mask & B_REMOVE) {
+            auto button = new Fl_Button(xx, yy, ww, hh, "remove");
+            button->deactivate();
+            button->callback([](auto, void *data) { static_cast<folder_widget_t *>(data)->on_remove(); }, &container);
+            remove_button = button;
+        }
+        if (mask & B_RESCAN) {
+            auto button = new Fl_Button(xx, yy, ww, hh, "rescan");
+            button->deactivate();
+            button->callback([](auto, void *data) { static_cast<folder_widget_t *>(data)->on_rescan(); }, &container);
+            rescan_button = button;
+        }
+        if (mask & B_RESET) {
+            auto button = new Fl_Button(xx, yy, ww, hh, "reset");
+            button->deactivate();
+            button->callback([](auto, void *data) { static_cast<folder_widget_t *>(data)->on_reset(); }, &container);
+            reset_button = button;
+        }
+        if (mask & B_SHARE) {
+            auto button = new Fl_Button(xx, yy, ww, hh, "share");
+            button->deactivate();
+            button->callback([](auto, void *data) { static_cast<folder_widget_t *>(data)->on_reset(); }, &container);
+            share_button = button;
+        }
+
+        end();
+        resizable(nullptr);
+        relayout();
+    }
+
+    void resize(int X, int Y, int W, int H) override {
+        if (children() > 1) {
+            auto children_w = int{0};
+            for (int i = 1; i < children(); ++i) {
+                auto c = child(i);
+                children_w += c->w();
+            }
+            children_w += children() * (padding * 2);
+            W = std::max(children_w, W);
+        }
+        parent_t::resize(X, Y, W, H);
+        relayout();
+    }
+
+    void relayout() noexcept {
+        auto W = w();
+
+        notice->resize(x() + padding * 2, y() + padding * 2, w() - padding * 4, notice->h());
+
+        if (children() > 1) {
+            auto children_w = int{0};
+            for (int i = 1; i < children(); ++i) {
+                auto c = child(i);
+                children_w += c->w();
+            }
+            children_w += (children() + 1) * (padding * 2);
+
+            auto xx = x() + (w() / 2) - (children_w / 2) + (padding * 2);
+            for (int i = 1; i < children(); ++i) {
+                auto c = child(i);
+                c->resize(xx, c->y(), c->w(), c->h());
+                xx += (padding * 2) + c->w();
+            }
+        }
+    }
+
+    void refresh() override {
+        parent_t::refresh();
+
+        auto actions = buttons_mask_t{0};
+        if (container.is_local() || container.is_candidate() || container.is_new()) {
+            auto &folder = *container.folder;
+
+            ctx_t ctx;
+            folder.serialize(ctx.folder);
+            auto copy_data = db::encode(ctx.folder);
+            auto valid = container.store(&ctx);
+            auto fields_are_same = copy_data == db::encode(ctx.folder);
+            auto is_same = fields_are_same && (ctx.shared_with == container.shared_with_orig);
+
+            if (!is_same) {
+                if (valid) {
+                    actions = actions | B_APPLY | B_CREATE | B_SHARE;
+                }
+            } else {
+                if (valid) {
+                    actions = actions | B_RESCAN | B_REMOVE;
+                }
+            }
+            if (!is_same || !valid) {
+                actions = actions | B_RESET;
+            }
+        }
+
+        ENABLE_ACTION(create_button, B_CREATE);
+        ENABLE_ACTION(apply_button, B_APPLY);
+        ENABLE_ACTION(share_button, B_SHARE);
+        ENABLE_ACTION(reset_button, B_RESET);
+        ENABLE_ACTION(rescan_button, B_RESCAN);
+        ENABLE_ACTION(remove_button, B_REMOVE);
+
+        if (notice) {
+            notice->label(container.error.data());
+        }
+        redraw();
+    }
+
+    folder_widget_t &container;
+    Fl_Box *notice{nullptr};
+    Fl_Widget *create_button{nullptr};
+    Fl_Widget *apply_button{nullptr};
+    Fl_Widget *share_button{nullptr};
+    Fl_Widget *reset_button{nullptr};
+    Fl_Widget *rescan_button{nullptr};
+    Fl_Widget *remove_button{nullptr};
+};
+
 } // namespace
 
 folder_widget_t::folder_widget_t(tree_item_t &container_, behavior_t behavior_, int x, int y, int w, int h)
-    : parent_t(x, y, w, h), container{container_}, behavior{behavior_} {}
+    : parent_t(x, y, w, h), container{container_}, behavior{behavior_} {
+    begin();
+    box(FL_FLAT_BOX);
+    tabs_container = new tabs_container_t(*this, x, y, w, h - 50);
+    new button_group_t(*this, x, tabs_container->y() + tabs_container->h(), w, 50);
+    end();
+}
+
+void folder_widget_t::refresh() {
+    error.clear();
+    // zzz move buttons refresh here
+    parent_t::refresh();
+}
 
 void folder_widget_t::make_tabs(model::folder_ptr_t f, model::folder_info_ptr_t fi) {
     folder_orig = std::move(f);
@@ -957,17 +1038,9 @@ void folder_widget_t::make_tabs(model::folder_ptr_t f, model::folder_info_ptr_t 
 
     sync_shares_with_model();
     reset_data();
-    fl_open_display();
-    int tx, ty, tw, th;
-    client_area(tx, ty, tw, th);
-    begin();
-    auto &group = make_details_tab(tx, ty, tw, th);
-    if (behavior != behavior_t::remote) {
-        make_sharing_tab(tx, ty, tw, th);
-    }
-    make_file_patterns_tab(tx, ty, tw, th);
-    end();
-    resizable(group);
+
+    static_cast<tabs_container_t *>(tabs_container)->make_tabs(folder, folder_info);
+    resizable(tabs_container);
 }
 
 void folder_widget_t::sync_shares_with_model() noexcept {
@@ -1011,31 +1084,6 @@ void folder_widget_t::reset_data() {
     }();
     shared_with = shared_with_orig;
     non_shared_with = non_shared_with_orig;
-}
-
-Fl_Widget &folder_widget_t::make_details_tab(int x, int y, int w, int h) {
-    auto *group = new tab_content_group(x, y, w, h, "Details");
-    group->begin();
-    new details_table_t(*this, x, y, w, h);
-    group->end();
-    return *group;
-}
-
-Fl_Widget &folder_widget_t::make_sharing_tab(int x, int y, int w, int h) {
-    auto *group = new tab_content_group(x, y, w, h, "Sharing");
-    group->begin();
-    new sharing_table_t(*this, x, y, w, h);
-    group->end();
-    return *group;
-}
-
-Fl_Widget &folder_widget_t::make_file_patterns_tab(int x, int y, int w, int h) {
-    auto *group = new tab_content_group(x, y, w, h, "File patterns");
-    group->begin();
-    auto widget = new file_matching_widget_t(*this, x, y, w, h);
-    group->resizable(widget);
-    group->end();
-    return *group;
 }
 
 void folder_widget_t::on_apply() noexcept { create_or_update(); }
@@ -1123,6 +1171,8 @@ void folder_widget_t::on_remove() noexcept {
     diff->assign_sibling(new modify::remove_folder_t(cluster, sequencer, f));
     sup.send_model<model::payload::model_update_t>(std::move(diff), cb_reset.get());
 }
+
+void folder_widget_t::on_reset() noexcept { std::abort(); }
 
 void folder_widget_t::create_or_update() noexcept {
     serialization_context_t ctx;
