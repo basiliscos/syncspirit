@@ -417,14 +417,44 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
 
 file_matching_widget_t::file_matching_widget_t(folder_widget_t &container_, int x, int y, int w, int h)
     : parent_t(x, y, w, h), container{container_} {
-    auto bottom_row = 30;
+    auto top_row = 40;
     using M = model::file_match_t;
 
     box(FL_FLAT_BOX);
-    color(FL_DARK_GREEN);
+
     begin();
 
-    table = new table_t(*this, x + PADDING, y + PADDING, w - PADDING * 2, h - (bottom_row + PADDING * 3));
+    auto top = new Fl_Group(x + PADDING, y + PADDING, w - PADDING * 2, top_row);
+    top->box(FL_FLAT_BOX);
+
+    top->begin();
+    auto link = "https://en.wikipedia.org/wiki/Perl_Compatible_Regular_Expressions";
+    auto explanation = new Fl_Box(top->x(), top->y(), top->w(), 15, link);
+    explanation->align(FL_ALIGN_CENTER | FL_ALIGN_INSIDE);
+
+    auto label = "Test area:";
+    auto label_w = std::max(50, static_cast<int>(fl_width(label) + PADDING * 2));
+    auto label_widget = new Fl_Box(top->x(), explanation->y() + PADDING + explanation->h(), label_w,
+                                   top->h() - (PADDING + explanation->h()), label);
+    label_widget->box(FL_FLAT_BOX);
+    label_widget->align(FL_ALIGN_RIGHT | FL_ALIGN_INSIDE);
+
+    int ix = label_widget->x() + label_widget->w();
+    int iw = (top->x() + top->w()) - ix;
+    auto input = new Fl_Input(ix, label_widget->y(), iw, label_widget->h());
+    top->end();
+    top->resizable(input);
+
+    auto buffer = std::array<std::byte, 1024 * 32>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+
+    auto sample_path = container.folder->get_path() / utils::make_generic_view("some/path/file.bin", allocator);
+    auto path_str = sample_path.get_full_name();
+    input->value(path_str.data());
+
+    table =
+        new table_t(*this, x + PADDING, top->y() + top->h() + PADDING, w - PADDING * 2, h - (top_row + PADDING * 3));
 
     auto sample_rows = rows_t();
     sample_rows.push_back(model::file_matcher_t("^\\.DS_Store", M::ignore));
@@ -437,27 +467,8 @@ file_matching_widget_t::file_matching_widget_t(folder_widget_t &container_, int 
     sample_rows.push_back(model::file_matcher_t(".*", M::accept));
 
     table->assing_rows(std::move(sample_rows));
-
-    auto bottom = new Fl_Group(x + PADDING, table->y() + table->h() + PADDING, table->w(), bottom_row);
-    bottom->box(FL_FLAT_BOX);
-    bottom->color(FL_CYAN);
-
-    bottom->begin();
-    auto label = "Test area:";
-    auto label_w = std::max(50, static_cast<int>(fl_width(label) + PADDING * 2));
-    auto label_widget = new Fl_Box(bottom->x(), bottom->y(), label_w, bottom->h(), label);
-    label_widget->box(FL_FLAT_BOX);
-    label_widget->color(FL_DARK_RED);
-    label_widget->align(FL_ALIGN_RIGHT | FL_ALIGN_INSIDE);
-
-    int ix = label_widget->x() + label_widget->w();
-    int iw = (bottom->x() + bottom->w()) - ix;
-    auto input = new Fl_Input(ix, bottom->y(), iw, bottom->h());
-    bottom->end();
-    bottom->resizable(input);
-    end();
-
     table->assign_test(input);
+
     input->callback(
         [](auto, void *data) {
             auto t = reinterpret_cast<table_t *>(data);
@@ -467,14 +478,8 @@ file_matching_widget_t::file_matching_widget_t(folder_widget_t &container_, int 
         table);
     input->when(input->when() | FL_WHEN_CHANGED);
 
-    auto buffer = std::array<std::byte, 1024 * 32>();
-    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
-    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
-
-    auto sample_path = container.folder->get_path() / utils::make_generic_view("some/path/file.bin", allocator);
-    auto path_str = sample_path.get_full_name();
-    input->value(path_str.data());
-
+    end();
     resizable(table);
+
     redraw();
 }

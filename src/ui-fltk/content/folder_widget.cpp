@@ -820,6 +820,7 @@ struct tabs_container_t final : contentable_t<Fl_Tabs> {
         }
         make_file_patterns_tab(tx, ty, tw, th);
         end();
+        resizable(group);
     }
 
     Fl_Widget &make_details_tab(int x, int y, int w, int h) {
@@ -1032,7 +1033,8 @@ void folder_widget_t::make_tabs(model::folder_ptr_t f, model::folder_info_ptr_t 
     sync_shares_with_model();
     reset_data();
 
-    static_cast<tabs_container_t *>(tabs_container)->make_tabs(folder, folder_info);
+    auto tc = static_cast<tabs_container_t *>(tabs_container);
+    tc->make_tabs(folder, folder_info);
     resizable(tabs_container);
 }
 
