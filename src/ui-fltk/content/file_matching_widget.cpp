@@ -88,14 +88,7 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
         set_visible_focus();
         resize(x, y, w, h);
 
-        auto &src_items = container.container.folder->get_file_matchers();
-        items.resize(src_items.size());
-        for (std::size_t i = 0; i < src_items.size(); ++i) {
-            auto &src = src_items[i];
-            items[i] = src.clone();
-        }
-
-        assing_rows();
+        reset();
     }
 
     ~table_t() { forget_controls(); }
@@ -281,6 +274,16 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
     }
 
     auto get_items() noexcept -> model::file_matchers_t & { return items; }
+
+    void reset() noexcept override {
+        auto &src_items = container.container.folder->get_file_matchers();
+        items.resize(src_items.size());
+        for (std::size_t i = 0; i < src_items.size(); ++i) {
+            auto &src = src_items[i];
+            items[i] = src.clone();
+        }
+        assing_rows();
+    }
 
     void assing_rows() noexcept {
         begin();
