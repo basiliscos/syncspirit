@@ -82,7 +82,7 @@ void folder_t::assign_cluster(const cluster_ptr_t &cluster_) noexcept { cluster 
 
 utils::bytes_t folder_t::serialize() noexcept {
     auto r = db::Folder();
-    folder_data_t::serialize(r);
+    serialize(r);
     return db::encode(r);
 }
 
@@ -172,6 +172,8 @@ void folder_t::mark_suspended(bool value, const std::error_code &ec) noexcept {
 bool folder_t::is_suspended() const noexcept { return suspended; }
 
 auto folder_t::get_suspend_reason() const noexcept -> const std::error_code & { return suspend_reason; }
+
+file_matchers_t &folder_t::get_file_matchers() noexcept { return file_matchers; }
 
 bool folder_t::accept(const utils::path_base_t &p) const noexcept {
     auto folder_path = path.get_full_name();

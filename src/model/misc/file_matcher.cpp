@@ -21,6 +21,8 @@ file_matcher_t::~file_matcher_t() {
     }
 }
 
+file_matcher_t file_matcher_t::clone() const noexcept { return file_matcher_t{pattern, mode}; }
+
 file_matcher_t &file_matcher_t::operator=(file_matcher_t &&other) noexcept {
     if (this != &other) {
         std::swap(re, other.re);

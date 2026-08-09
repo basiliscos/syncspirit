@@ -108,7 +108,7 @@ struct base_table_t : syncspirit::fltk::static_table_t {
 
     const model::cluster_t *get_cluster() const noexcept { return container.container.supervisor.get_cluster(); }
 
-    inline void set_error(std::string_view error) { container.error = error; }
+    inline void set_error(std::string_view error) { container.set_error(error); }
 
     void set_refresh_callback(Fl_Widget *w) {
         w->callback([](auto, void *data) { reinterpret_cast<base_table_t *>(data)->container.refresh(); }, this);
@@ -970,7 +970,8 @@ struct button_group_t final : refresheable_group_t {
             folder.serialize(ctx.folder);
             auto copy_data = db::encode(ctx.folder);
             auto valid = container.store(&ctx);
-            auto fields_are_same = copy_data == db::encode(ctx.folder);
+            auto copy_data_2 = db::encode(ctx.folder);
+            auto fields_are_same = copy_data == copy_data_2;
             auto is_same = fields_are_same && (ctx.shared_with == container.shared_with_orig);
 
             if (!is_same) {
@@ -1251,3 +1252,5 @@ void folder_widget_t::create_or_update() noexcept {
     }
     sup.send_model<model::payload::model_update_t>(assember.consume(), ui_next.get());
 }
+
+void folder_widget_t::set_error(std::string_view error_) noexcept { error = error_; }

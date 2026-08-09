@@ -6,6 +6,7 @@
 #include "syncspirit-export.h"
 #include "proto/proto-fwd.hpp"
 
+#include <vector>
 #include <pcre2.h>
 #include <string>
 #include <string_view>
@@ -27,6 +28,7 @@ struct SYNCSPIRIT_API file_matcher_t {
     file_matcher_t(std::string, file_match_t) noexcept;
     ~file_matcher_t();
 
+    file_matcher_t clone() const noexcept;
     file_matcher_t &operator=(file_matcher_t &&) noexcept;
 
     void set_pattern(std::string_view) noexcept;
@@ -45,5 +47,7 @@ struct SYNCSPIRIT_API file_matcher_t {
     std::string pattern;
     file_match_t mode{file_match_t::off};
 };
+
+using file_matchers_t = std::vector<file_matcher_t>;
 
 } // namespace syncspirit::model

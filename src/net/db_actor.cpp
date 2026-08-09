@@ -666,6 +666,7 @@ auto db_actor_t::operator()(const model::diff::modify::upsert_folder_t &diff, vo
     auto &txn = *get_txn().assume_value();
 
     auto &db = diff.db;
+
     auto folder = cluster->get_folders().by_id(db::get_id(db));
     assert(folder);
     auto f_key = folder->get_key();

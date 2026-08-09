@@ -32,6 +32,20 @@ TEST_CASE("folder file matchers", "[model]") {
         db::add_file_matcher(db, db_fm);
     };
 
+    SECTION("serialize and deserialize") {
+        CHECK(db::get_file_matcher_size(db) == 0);
+
+        add_regex("a", file_match_t::ignore);
+        add_regex("b", file_match_t::ignore);
+        CHECK(db::get_file_matcher_size(db) == 2);
+
+        auto bytes = db::encode(db);
+        auto copy = db::Folder();
+        auto left = db::decode(bytes, copy);
+        CHECK(left == 0);
+        CHECK(db::get_file_matcher_size(copy) == 2);
+    }
+
     SECTION("ignore all") {
         add_regex(".*", file_match_t::ignore);
         auto f = folder_t::create(uuid, db).value();

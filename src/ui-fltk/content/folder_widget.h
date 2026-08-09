@@ -39,6 +39,7 @@ struct folder_widget_t : contentable_t<Fl_Group> {
 
     void create_or_update() noexcept;
     void sync_shares_with_model() noexcept;
+    void set_error(std::string_view error) noexcept;
 
     tree_item_t &container;
     model::folder_ptr_t folder;

@@ -59,6 +59,7 @@ struct SYNCSPIRIT_API folder_t final : augmentable_t, folder_data_t {
     bool is_suspended() const noexcept;
     const std::error_code &get_suspend_reason() const noexcept;
     bool accept(const utils::path_base_t &path) const noexcept;
+    file_matchers_t &get_file_matchers() noexcept;
 
     using folder_data_t::get_path;
     using folder_data_t::set_path;
@@ -72,8 +73,6 @@ struct SYNCSPIRIT_API folder_t final : augmentable_t, folder_data_t {
     void assign_fields(const db::Folder &item) noexcept override;
 
   private:
-    using file_matchers_t = std::vector<file_matcher_t>;
-
     folder_t(utils::bytes_view_t key) noexcept;
     folder_t(const bu::uuid &uuid) noexcept;
 

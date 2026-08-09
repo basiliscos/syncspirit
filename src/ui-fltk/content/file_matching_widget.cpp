@@ -4,6 +4,7 @@
 #include "file_matching_widget.h"
 
 #include "folder_widget.h"
+#include "proto/proto-helpers-db.h"
 
 #include "utils/format.hpp"
 #include <FL/Fl_Box.H>
@@ -12,7 +13,6 @@
 #include <FL/Fl_Group.H>
 #include <FL/Fl_Input.H>
 #include <FL/Fl_Table_Row.H>
-#include <cstdint>
 
 using namespace syncspirit;
 using namespace syncspirit::fltk;
@@ -22,8 +22,6 @@ namespace {
 
 static constexpr int PADDING = 5;
 static constexpr int CELL_PADDING = 3;
-
-using rows_t = std::vector<model::file_matcher_t>;
 
 enum class hightlight_t { no, match, error };
 
@@ -89,6 +87,15 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
 
         set_visible_focus();
         resize(x, y, w, h);
+
+        auto &src_items = container.container.folder->get_file_matchers();
+        items.resize(src_items.size());
+        for (std::size_t i = 0; i < src_items.size(); ++i) {
+            auto &src = src_items[i];
+            items[i] = src.clone();
+        }
+
+        assing_rows();
     }
 
     ~table_t() { forget_controls(); }
@@ -121,6 +128,7 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
 
     void on_rm(Fl_Widget *w) noexcept {
         auto tools = w->parent();
+        auto &items = get_items();
         if (items.size() > 1) {
             for (size_t i = 0; i < items.size(); ++i) {
                 if (controls[i].tools == tools) {
@@ -138,11 +146,13 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
             c.hightlight = hightlight_t::no;
             c.match_mode->value(1);
         }
+        container.container.refresh();
         redraw();
     }
 
     void on_move_up(Fl_Widget *w) noexcept {
         auto tools = w->parent();
+        auto &items = get_items();
         auto index = items.size();
         for (size_t i = 0; i < items.size(); ++i) {
             if (controls[i].tools == tools) {
@@ -164,13 +174,14 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
             controls.push_back(std::move(item_controls));
             rows(static_cast<int>(sz + 1));
         }
-        refresh();
+        container.container.refresh();
         redraw();
     }
 
     void on_move_down(Fl_Widget *w) noexcept {
         using M = model::file_match_t;
         auto tools = w->parent();
+        auto &items = get_items();
         auto index = items.size();
         for (size_t i = 0; i < items.size(); ++i) {
             if (controls[i].tools == tools) {
@@ -188,7 +199,7 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
             controls.push_back(std::move(item_controls));
             rows(static_cast<int>(items.size()));
         }
-        refresh();
+        container.container.refresh();
         redraw();
     }
 
@@ -203,9 +214,10 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
         input->callback(
             [](Fl_Widget *self, void *data) {
                 auto t = reinterpret_cast<table_t *>(data);
+                auto &items = t->get_items();
                 for (std::size_t i = 0; i < t->controls.size(); ++i) {
                     if (t->controls[i].match_mode == self) {
-                        auto &item = t->items[i];
+                        auto &item = items[i];
                         auto value = static_cast<Fl_Choice *>(self)->value();
                         auto mode = static_cast<model::file_match_t>(value);
                         item.set_mode(mode);
@@ -217,7 +229,7 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
                         break;
                     }
                 }
-                t->refresh();
+                t->container.container.refresh();
                 t->redraw();
             },
             this);
@@ -232,9 +244,10 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
         input->callback(
             [](Fl_Widget *self, void *data) {
                 auto t = reinterpret_cast<table_t *>(data);
+                auto &items = t->get_items();
                 for (std::size_t i = 0; i < t->controls.size(); ++i) {
                     if (t->controls[i].input == self) {
-                        auto &item = t->items[i];
+                        auto &item = items[i];
                         auto data = std::string(static_cast<Fl_Input *>(self)->value());
                         item.set_pattern(data);
                         auto [ec, off] = item.compile();
@@ -245,7 +258,7 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
                         break;
                     }
                 }
-                t->refresh();
+                t->container.container.refresh();
                 t->redraw();
             },
             this);
@@ -267,10 +280,12 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
         return item_controls_t(this, highlight, tools, type, re);
     }
 
-    void assing_rows(rows_t rows_) noexcept {
+    auto get_items() noexcept -> model::file_matchers_t & { return items; }
+
+    void assing_rows() noexcept {
         begin();
         forget_controls();
-        items = std::move(rows_);
+        auto &items = get_items();
         for (int i = 0; i < static_cast<int>(items.size()); ++i) {
             auto item_controls = make_item_controls(items[i], i);
             controls.push_back(std::move(item_controls));
@@ -362,6 +377,7 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
         auto test = test_input ? std::string_view(test_input->value()) : std::string_view();
         bool has_match{false};
 
+        auto &items = get_items();
         for (int i = 0; i < static_cast<int>(items.size()); ++i) {
             auto &item = items[i];
             auto &c = controls[i];
@@ -409,10 +425,10 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
         fl_pop_clip();
     }
 
-    rows_t items;
     controls_t controls;
     file_matching_widget_t &container;
     Fl_Input *test_input{nullptr};
+    model::file_matchers_t items;
 };
 
 file_matching_widget_t::file_matching_widget_t(folder_widget_t &container_, int x, int y, int w, int h)
@@ -453,20 +469,12 @@ file_matching_widget_t::file_matching_widget_t(folder_widget_t &container_, int 
     auto path_str = sample_path.get_full_name();
     input->value(path_str.data());
 
-    table =
-        new table_t(*this, x + PADDING, top->y() + top->h() + PADDING, w - PADDING * 2, h - (top_row + PADDING * 3));
+    auto tx = x + PADDING;
+    auto ty = top->y() + top->h() + PADDING;
+    auto tw = w - PADDING * 2;
+    auto th = h - (top_row + PADDING * 3);
+    table = new table_t(*this, tx, ty, tw, th);
 
-    auto sample_rows = rows_t();
-    sample_rows.push_back(model::file_matcher_t("^\\.DS_Store", M::ignore));
-    sample_rows.push_back(model::file_matcher_t(".*\\.tmp", M::ignore));
-    sample_rows.push_back(model::file_matcher_t(".secret$", M::ignore));
-    sample_rows.push_back(model::file_matcher_t("^\\.env$", M::ignore));
-    sample_rows.push_back(model::file_matcher_t("artefact", M::accept));
-    sample_rows.push_back(model::file_matcher_t("error$\\", M::ignore));
-    sample_rows.push_back(model::file_matcher_t("something", M::off));
-    sample_rows.push_back(model::file_matcher_t(".*", M::accept));
-
-    table->assing_rows(std::move(sample_rows));
     table->assign_test(input);
 
     input->callback(
@@ -482,4 +490,26 @@ file_matching_widget_t::file_matching_widget_t(folder_widget_t &container_, int 
     resizable(table);
 
     redraw();
+}
+
+bool file_matching_widget_t::store(void *ptr) {
+    auto ctx = reinterpret_cast<folder_widget_t::serialization_context_t *>(ptr);
+
+    auto &items = table->items;
+    db::clear_file_matcher(ctx->folder);
+    for (size_t i = 0; i < items.size(); ++i) {
+        auto &control = table->controls[i];
+        auto &item = items[i];
+        if (control.hightlight == hightlight_t::error) {
+            auto ec = item.compile().code;
+            auto msg = fmt::format("Cannot compile file pattern {}: {}", i + 1, ec);
+            container.set_error(msg);
+            return false;
+        }
+        auto matcher = db::FileMatcher();
+        db::set_pattern(matcher, std::string(item.get_pattern()));
+        db::set_mode(matcher, item.get_mode());
+        db::add_file_matcher(ctx->folder, std::move(matcher));
+    }
+    return true;
 }
