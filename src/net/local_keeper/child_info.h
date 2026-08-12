@@ -27,6 +27,7 @@ struct child_info_t : fs::task::scan_dir_t::child_info_t {
     child_info_t clone() const noexcept;
 
     proto::FileInfo serialize(const model::folder_info_t &local_folder, blocks_t blocks, bool ignore_permissions);
+    std::string_view relative_path(const model::folder_info_t &local_folder) const noexcept;
     const model::file_info_t *fetch_model(const model::folder_info_t &local_folder) const;
 
     std::error_code ec;

@@ -192,6 +192,12 @@ enum class PullOrder {
     newest      = 5,
 };
 
+enum FileMatch {
+    off = 0,
+    accept,
+    ignore,
+};
+
 using FileInfoType = proto::FileInfoType;
 using Vector = proto::Vector;
 using Compression = proto::Compression;
@@ -212,19 +218,25 @@ using Device = pp::message<
     pp::int64_field     <"last_seen",                  9              >
 >;
 
+using FileMatcher = pp::message<
+    pp::string_field    <"pattern", 1 >,
+    pp::enum_field      <"mode",    2, FileMatch>
+>;
+
 using Folder = pp::message<
-    pp::string_field    <"id",                    1             >,
-    pp::string_field    <"label",                 2             >,
-    pp::bool_field      <"ignore_permissions",    4             >,
-    pp::bool_field      <"ignore_delete",         5             >,
-    pp::bool_field      <"disable_temp_indexes",  6             >,
-    pp::bool_field      <"paused",                7             >,
-    pp::bool_field      <"scheduled",             8             >,
-    pp::string_field    <"path",                  9             >,
-    pp::enum_field      <"folder_type",          10, FolderType >,
-    pp::enum_field      <"pull_order",           11, PullOrder  >,
-    pp::uint32_field    <"rescan_interval",      12             >,
-    pp::bool_field      <"watched",              13             >
+    pp::string_field    <"id",                    1                           >,
+    pp::string_field    <"label",                 2                           >,
+    pp::bool_field      <"ignore_permissions",    4                           >,
+    pp::bool_field      <"ignore_delete",         5                           >,
+    pp::bool_field      <"disable_temp_indexes",  6                           >,
+    pp::bool_field      <"paused",                7                           >,
+    pp::bool_field      <"scheduled",             8                           >,
+    pp::string_field    <"path",                  9                           >,
+    pp::enum_field      <"folder_type",          10, FolderType               >,
+    pp::enum_field      <"pull_order",           11, PullOrder                >,
+    pp::uint32_field    <"rescan_interval",      12                           >,
+    pp::bool_field      <"watched",              13                           >,
+    pp::message_field   <"file_matchers",        14, FileMatcher, pp::repeated>
 >;
 
 using FolderInfo = pp::message<

@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2026 Ivan Baidakou
 
 #pragma once
 
 #include <FL/Fl_Widget.H>
+#include <FL/Fl_Group.H>
 
 #include <type_traits>
 
@@ -37,7 +38,31 @@ template <typename T> struct contentable_t<T, std::enable_if_t<std::is_base_of_v
                 content->refresh();
             }
         }
+        Fl_Widget::redraw();
+    }
+
+    void reset() override {
+        for (int i = 0; i < this->children(); ++i) {
+            auto child = this->child(i);
+            if (auto content = dynamic_cast<content_t *>(child)) {
+                content->reset();
+            }
+        }
+        Fl_Widget::redraw();
+    }
+
+    bool store(void *ptr) override {
+        bool ok{true};
+        for (int i = 0; i < this->children(); ++i) {
+            auto child = this->child(i);
+            if (auto content = dynamic_cast<content_t *>(child)) {
+                ok = ok && content->store(ptr);
+            }
+        }
+        return ok;
     }
 };
+
+using refresheable_group_t = contentable_t<Fl_Group>;
 
 } // namespace syncspirit::fltk

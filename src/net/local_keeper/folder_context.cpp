@@ -6,7 +6,7 @@
 #include "hash_context.h"
 #include "constants.h"
 #include "fs/utils.h"
-#include "model/diff/advance/local_update.h"
+#include "model/diff/advance/advance.h"
 #include "model/diff/local/blocks_availability.h"
 #include "model/diff/local/file_availability.h"
 #include "model/diff/local/scan_finish.h"
@@ -26,8 +26,6 @@
 using namespace syncspirit::fs::task;
 
 namespace syncspirit::net::local_keeper {
-
-using local_update_t = syncspirit::model::diff::advance::local_update_t;
 
 struct rename_context_t final : hasher::payload::extendended_context_t {
     rename_context_t(rehashed_incomplete_t item_) : item(std::move(item_)) {}
@@ -196,34 +194,38 @@ int folder_context_t::process(unexamined_t &child_info, stack_context_t &ctx) no
             } else if (file) {
                 stack.emplace_front(child_ready_t(std::move(child_info)));
             } else {
-                auto block_size = [&]() -> std::int32_t {
-                    // for possible correct importing later at local-update.
-                    if (!file) {
-                        auto folder = local_folder->get_folder();
-                        auto &folder_path = folder->get_path();
-                        auto name = child_info.path.relativize(folder_path);
-                        auto folder_infos = folder->get_folder_infos();
-                        for (auto &it : folder_infos) {
-                            if (auto file = it.item->get_file_infos().by_name(name)) {
-                                auto augmentation = file->get_augmentation().get();
-                                auto file_presence = static_cast<cluster_file_presence_t *>(augmentation);
-                                auto best = file_presence->get_entity()->get_best();
-                                if (best && best->get_features() & F::cluster) {
-                                    auto mutable_best = const_cast<presentation::presence_t *>(best);
-                                    auto cp = static_cast<cluster_file_presence_t *>(mutable_best);
-                                    auto &best_file = cp->get_file_info();
-                                    auto match = best_file.is_file() && best_file.get_size() == child_info.size;
-                                    if (match) {
-                                        return best_file.get_block_size();
+                if (!local_folder->get_folder()->accept(child_info.relative_path(*local_folder))) {
+                    LOG_DEBUG(log, "ignoring file '{}'", child_info.path);
+                } else {
+                    auto block_size = [&]() -> std::int32_t {
+                        // for possible correct importing later at local-update.
+                        if (!file) {
+                            auto folder = local_folder->get_folder();
+                            auto &folder_path = folder->get_path();
+                            auto name = child_info.path.relativize(folder_path);
+                            auto folder_infos = folder->get_folder_infos();
+                            for (auto &it : folder_infos) {
+                                if (auto file = it.item->get_file_infos().by_name(name)) {
+                                    auto augmentation = file->get_augmentation().get();
+                                    auto file_presence = static_cast<cluster_file_presence_t *>(augmentation);
+                                    auto best = file_presence->get_entity()->get_best();
+                                    if (best && best->get_features() & F::cluster) {
+                                        auto mutable_best = const_cast<presentation::presence_t *>(best);
+                                        auto cp = static_cast<cluster_file_presence_t *>(mutable_best);
+                                        auto &best_file = cp->get_file_info();
+                                        auto match = best_file.is_file() && best_file.get_size() == child_info.size;
+                                        if (match) {
+                                            return best_file.get_block_size();
+                                        }
                                     }
                                 }
                             }
                         }
-                    }
-                    return 0;
-                }();
-                auto ptr = hash_new_file_ptr_t(new hash_new_file_t(std::move(child_info), block_size));
-                stack.emplace_front(std::move(ptr));
+                        return 0;
+                    }();
+                    auto ptr = hash_new_file_ptr_t(new hash_new_file_t(std::move(child_info), block_size));
+                    stack.emplace_front(std::move(ptr));
+                }
             }
         }
     }
@@ -257,10 +259,12 @@ int folder_context_t::process(child_ready_t &info, stack_context_t &ctx) noexcep
     bool emit_hashing = false;
     auto file = info.fetch_model(*local_folder);
     if (!file || file->is_deleted()) {
-        if (info.size && info.blocks.empty()) {
-            emit_hashing = true;
-        } else {
-            emit_update = true;
+        if (local_folder->get_folder()->accept(info.relative_path(*local_folder))) {
+            if (info.size && info.blocks.empty()) {
+                emit_hashing = true;
+            } else {
+                emit_update = true;
+            }
         }
     } else {
         bool match = false;
@@ -300,7 +304,7 @@ int folder_context_t::process(child_ready_t &info, stack_context_t &ctx) noexcep
         auto folder = local_folder->get_folder();
         auto folder_id = folder->get_id();
         auto data = info.serialize(*local_folder, std::move(info.blocks), ignore_permissions);
-        ctx.push_back(new advance::local_update_t(ctx.cluster, ctx.sequencer, std::move(data), folder_id));
+        ctx.local_update(std::move(data), folder_id);
     }
     return 1;
 }
@@ -371,7 +375,7 @@ int folder_context_t::process(removed_dir_t &item, stack_context_t &ctx) noexcep
             auto local = static_cast<presentation::local_file_presence_t *>(item);
             auto data = local->get_file_info().as_proto(false);
             proto::set_deleted(data, true);
-            ctx.push_back(new local_update_t(ctx.cluster, ctx.sequencer, std::move(data), folder_id));
+            ctx.local_update(std::move(data), folder_id);
             queue.pop_front();
         }
     }
@@ -687,8 +691,7 @@ void folder_context_t::post_process(fs::task::scan_dir_t &task, stack_context_t 
                             auto file = static_cast<presentation::local_file_presence_t *>(child);
                             auto file_data = file->get_file_info().as_proto(false);
                             proto::set_deleted(file_data, true);
-                            ctx.push_back(
-                                new local_update_t(ctx.cluster, ctx.sequencer, std::move(file_data), folder_id));
+                            ctx.local_update(std::move(file_data), folder_id);
                         }
                     } else {
                         auto &target_stack = is_dir ? dirs_stack : stack;
@@ -716,7 +719,7 @@ void folder_context_t::post_process(fs::task::scan_dir_t &task, stack_context_t 
             auto presence = static_cast<const presentation::cluster_file_presence_t *>(best);
             auto &peer_file = presence->get_file_info();
             auto pr_file = peer_file.as_proto(true);
-            ctx.push_back(new local_update_t(ctx.cluster, ctx.sequencer, std::move(pr_file), folder_id));
+            ctx.local_update(std::move(pr_file), folder_id);
             if (best->get_features() & F::directory) {
                 for (auto c : child_entity->get_children()) {
                     auto best = child_entity->get_best();

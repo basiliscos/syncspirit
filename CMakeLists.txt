@@ -48,6 +48,7 @@ find_package(pugixml REQUIRED)
 find_package(tomlplusplus REQUIRED)
 find_package(nlohmann_json REQUIRED)
 find_package(c-ares REQUIRED)
+find_package(PCRE2 REQUIRED)
 
 set(SYNCSPIRIT_VERSION "v${CMAKE_PROJECT_VERSION}")
 if (LINUX)
@@ -211,6 +212,7 @@ add_library(syncspirit_core
     src/model/misc/error_code.cpp
     src/model/misc/file_block.cpp
     src/model/misc/file_iterator.cpp
+    src/model/misc/file_matcher.cpp
     src/model/misc/orphaned_blocks.cpp
     src/model/misc/postponed_files.cpp
     src/model/misc/resolver.cpp
@@ -337,13 +339,14 @@ FetchContent_Declare(UNI_ALGO
 )
 FetchContent_MakeAvailable(UNI_ALGO)
 
-
 target_include_directories(syncspirit_core PUBLIC
     ${OPENSSL_INCLUDE_DIR}
     ${CMAKE_CURRENT_BINARY_DIR}
     ${CMAKE_CURRENT_BINARY_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
+
+target_compile_definitions(syncspirit_core PUBLIC PCRE2_CODE_UNIT_WIDTH=8)
 
 target_link_libraries(syncspirit_core
     PUBLIC
@@ -361,6 +364,7 @@ target_link_libraries(syncspirit_core
         tomlplusplus::tomlplusplus
         nlohmann_json::nlohmann_json
         lz4::lz4
+        pcre2::pcre2
         $<IF:$<PLATFORM_ID:Windows>,mdbx,mdbx-static>
         $<$<PLATFORM_ID:Windows>:iphlpapi>
         $<$<PLATFORM_ID:Windows>:ws2_32>

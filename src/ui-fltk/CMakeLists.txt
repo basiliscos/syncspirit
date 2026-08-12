@@ -18,6 +18,7 @@ endif()
 add_executable(syncspirit-fltk WIN32 MACOSX_BUNDLE
     app_supervisor.cpp
     augmentation.cpp
+    callback.cpp
     content.cpp
     log_colors.cpp
     log_panel.cpp
@@ -39,8 +40,9 @@ add_executable(syncspirit-fltk WIN32 MACOSX_BUNDLE
     config/properties.cpp
     config/property.cpp
     config/table.cpp
+    content/file_matching_widget.cpp
     content/file_table.cpp
-    content/folder_table.cpp
+    content/folder_widget.cpp
     platform/tray.cpp
     platform/tray_impl/tray_x11.cpp
     platform/tray_impl/tray_win32.cpp

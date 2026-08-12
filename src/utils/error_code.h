@@ -112,6 +112,11 @@ class SYNCSPIRIT_API protocol_error_code_category : public std::error_category {
     virtual std::string message(int c) const override;
 };
 
+class SYNCSPIRIT_API pcre_error_code_category : public std::error_category {
+    virtual const char *name() const noexcept override;
+    virtual std::string message(int c) const override;
+};
+
 } // namespace detail
 
 SYNCSPIRIT_API const detail::error_code_category &error_code_category();
@@ -119,6 +124,8 @@ SYNCSPIRIT_API const detail::error_code_category &error_code_category();
 SYNCSPIRIT_API const detail::bep_error_code_category &bep_error_code_category();
 
 SYNCSPIRIT_API const detail::protocol_error_code_category &protocol_error_code_category();
+
+SYNCSPIRIT_API const detail::pcre_error_code_category &pcre_error_code_category();
 
 inline std::error_code make_error_code(error_code_t e) { return {static_cast<int>(e), error_code_category()}; }
 inline std::error_code make_error_code(bep_error_code_t e) { return {static_cast<int>(e), bep_error_code_category()}; }

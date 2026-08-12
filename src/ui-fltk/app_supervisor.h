@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "callback.h"
 #include "content.h"
 #include "config/main.h"
 #include "net/messages.h"
@@ -93,12 +94,6 @@ template <typename Actor> struct app_supervisor_config_builder_t : rf::superviso
     }
 };
 
-struct callback_t : model::arc_base_t<callback_t> {
-    virtual ~callback_t() = default;
-    virtual void eval() = 0;
-};
-using callback_ptr_t = model::intrusive_ptr_t<callback_t>;
-
 template <typename T> using app_supervisor_base_t = model::diff::iterative_controller_t<T, rf::supervisor_fltk_t>;
 
 struct app_supervisor_t : app_supervisor_base_t<app_supervisor_t> {
@@ -173,7 +168,9 @@ struct app_supervisor_t : app_supervisor_base_t<app_supervisor_t> {
     inline bool is_soft_restart_requested() { return soft_restart_request; }
 
     callback_ptr_t call_select_folder(std::string_view folder_id);
-    callback_ptr_t call_share_folders(std::string_view folder_id, std::vector<utils::bytes_t> devices);
+    callback_ptr_t call_share_folders(std::string_view folder_id, std::vector<utils::bytes_t> devices,
+                                      callback_t *next);
+    void add_callback(callback_ptr_t cb) noexcept;
     db_info_viewer_guard_t request_db_info(db_info_viewer_t *viewer);
     r::address_ptr_t &get_coordinator_address();
 

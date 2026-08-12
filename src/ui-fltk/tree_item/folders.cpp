@@ -3,13 +3,10 @@
 
 #include "folders.h"
 #include "presence_item/folder.h"
-#include "../content/folder_table.h"
-#include "../table_widget/label.h"
-#include "utils/base32.h"
 #include "presentation/folder_presence.h"
-#include <algorithm>
-#include <cctype>
-#include <boost/nowide/convert.hpp>
+#include "utils/base32.h"
+#include "proto/proto-helpers-db.h"
+#include "content/folder_widget.h"
 #include <FL/Fl_Button.H>
 
 using namespace syncspirit;
@@ -22,125 +19,10 @@ static constexpr int padding = 2;
 
 namespace {
 
-using folder_table_t = content::folder_table_t;
-
-static auto make_actions(folder_table_t &container) -> widgetable_ptr_t {
-    struct widget_t final : widgetable_t {
-        using parent_t = widgetable_t;
-        using parent_t::parent_t;
-
-        Fl_Widget *create_widget(int x, int y, int w, int h) override {
-            auto group = new Fl_Group(x, y, w, h);
-            group->begin();
-            group->box(FL_FLAT_BOX);
-            auto &container = static_cast<folder_table_t &>(this->container);
-
-            auto yy = y + padding, ww = 100, hh = h - padding * 2;
-
-            auto apply = new Fl_Button(x + padding, yy, ww, hh, "create");
-            apply->deactivate();
-            apply->callback([](auto, void *data) { static_cast<folder_table_t *>(data)->on_apply(); }, &container);
-            container.apply_button = apply;
-            int xx = apply->x() + ww + padding * 2;
-
-            auto reset = new Fl_Button(xx, yy, ww, hh, "reset");
-            reset->deactivate();
-            reset->callback([](auto, void *data) { static_cast<folder_table_t *>(data)->on_reset(); }, &container);
-            container.reset_button = reset;
-            xx = reset->x() + ww + padding * 2;
-
-            group->resizable(nullptr);
-            group->end();
-            widget = group;
-
-            this->reset();
-            return widget;
-        }
-    };
-
-    return new widget_t(container);
-}
-
-struct table_t : content::folder_table_t {
-    using parent_t = content::folder_table_t;
-
-    table_t(tree_item_t &container_, model::folder_info_ptr_t fi_, model::folder_ptr_t folder_, int x, int y, int w,
-            int h)
-        : parent_t(container_, *fi_, x, y, w, h), fi{fi_}, folder{folder_} {
-
-        scan_start_cell = new static_string_provider_t();
-        scan_finish_cell = new static_string_provider_t();
-
-        auto data = table_rows_t();
-        data.push_back({"", make_title(*this, "creating new folder")});
-        data.push_back({"path", make_path(*this, false)});
-        data.push_back({"id", make_id(*this, false)});
-        data.push_back({"label", make_label(*this, false)});
-        data.push_back({"type", make_folder_type(*this, false)});
-        data.push_back({"pull order", make_pull_order(*this, false)});
-        data.push_back({"index", make_index(*this, false)});
-        data.push_back({"rescan interval", make_rescan_interval(*this, false)});
-        data.push_back({"ignore permissions", make_ignore_permissions(*this, false)});
-        data.push_back({"ignore delete", make_ignore_delete(*this, false)});
-        data.push_back({"disable temp indixes", make_disable_tmp(*this)});
-        data.push_back({"scheduled", make_scheduled(*this, false)});
-        data.push_back({"paused", make_paused(*this, false)});
-        data.push_back({"watched", make_watched(*this, false)});
-        data.push_back({"shared_with", make_shared_with(*this, {}, false)});
-        data.push_back({"", notice = make_notice(*this)});
-        data.push_back({"actions", make_actions(*this)});
-
-        initially_shared_with = *shared_with;
-        initially_non_shared_with = *non_shared_with;
-
-        assign_rows(std::move(data));
-
-        refresh();
-    }
-
-    void refresh() override {
-        serialization_context_t ctx;
-        description.get_folder()->serialize(ctx.folder);
-
-        auto copy_data = db::encode(ctx.folder);
-        error = {};
-        auto valid = store(&ctx);
-
-        // clang-format off
-        auto is_same = (copy_data == db::encode(ctx.folder))
-                    && (initially_shared_with == ctx.shared_with);
-        // clang-format on
-        if (!is_same) {
-            if (valid) {
-                apply_button->activate();
-            }
-            reset_button->activate();
-        } else {
-            apply_button->deactivate();
-            reset_button->deactivate();
-        }
-
-        if (valid) {
-            auto db_path = db::get_path(ctx.folder);
-            if (db_path.empty()) {
-                error = "path should be defined";
-            }
-        }
-
-        if (valid && error.empty()) {
-            apply_button->activate();
-        } else {
-            apply_button->deactivate();
-        }
-
-        notice->reset();
-        redraw();
-    }
-
-    model::folder_info_ptr_t fi;
-    model::folder_ptr_t folder;
+struct widget_t final : content::folder_widget_t {
+    using parent_t = content::folder_widget_t;
+    using parent_t::parent_t;
 };
-
 } // namespace
 
 folders_t::folders_t(app_supervisor_t &supervisor, Fl_Tree *tree) : parent_t(supervisor, tree, false) {
@@ -188,6 +70,7 @@ void folders_t::select_folder(std::string_view folder_id) {
 
 bool folders_t::on_select() {
     content = supervisor.replace_content([&](content_t *content) -> content_t * {
+        using B = content::folder_widget_t::behavior_t;
         auto cluster = supervisor.get_cluster();
         auto &self = *cluster->get_device();
         auto &sequencer = supervisor.get_sequencer();
@@ -216,7 +99,9 @@ bool folders_t::on_select() {
 
         auto prev = content->get_widget();
         int x = prev->x(), y = prev->y(), w = prev->w(), h = prev->h();
-        return new table_t(*this, std::move(fi), std::move(folder), x, y, w, h);
+        auto widget = new widget_t(*this, B::edit_new, x, y, w, h);
+        widget->make_tabs(std::move(folder), std::move(fi));
+        return widget;
     });
     return true;
 }

@@ -97,6 +97,8 @@ after the core completion.
 # changes
 
 ## 0.4.6 (xx-xxx-202x)
+ - [core, fltk] intoduce patterns (using Perl-compatible regular expressions)
+   to accept or ignore local files addition into cluster
  - [fltk, win32, os x] add system tray icon
  - [fltk] use menu instead of toolbar
  - [core] introduce services layer (allow stop/start/restart of networking)

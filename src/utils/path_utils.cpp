@@ -118,14 +118,12 @@ std::size_t create_directories(const poly_path_view_t &path, std::error_code &ec
     } else if (path.is_absolute() && whole_str.size() > 3) {
         pos += 3;
     }
-    // spdlog::info("zzz pos: {}", pos);
     pos = whole_str.find(L'\\', pos);
     bool advance = true;
     while (advance) {
         if (pos != std::wstring::npos) {
             whole_str[pos] = 0;
         }
-        // spdlog::info("zzz dir: {}", boost::nowide::narrow(whole_str.data()));
         auto code = _wmkdir(whole_str.data());
         if (pos != std::wstring::npos) {
             whole_str[pos] = L'\\';
@@ -192,7 +190,6 @@ void rm_dir_recurse(std::wstring_view path, std::error_code &ec) noexcept {
     auto child_ptr = ptr;
     swprintf(ptr, L"\\*.*");
     WIN32_FIND_DATAW child_data;
-    // spdlog::info("zzz rm ({}): {} ", sizeof(child_data), boost::nowide::narrow(path.data()));
     auto child_handle = FindFirstFileW(path.data(), &child_data);
     if (child_handle != INVALID_HANDLE_VALUE) {
         do {
@@ -228,7 +225,6 @@ void rm_dir_recurse_initial(std::wstring_view wpath, std::error_code &ec) noexce
     auto ptr = buff + wpath.size();
     *ptr = 0;
     rm_dir_recurse(std::wstring_view(buff, wpath.size()), ec);
-    // spdlog::error("zzz rm done");
 }
 
 #endif

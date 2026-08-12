@@ -6,6 +6,7 @@
 #include "model/diff/cluster_diff.h"
 #include "model/diff/diff_assembler.h"
 #include "model/misc/sequencer.h"
+#include "proto/proto-fwd.hpp"
 #include "syncspirit-config.h"
 #include <cstdint>
 #include <memory_resource>
@@ -26,6 +27,8 @@ struct stack_context_t : model::diff::diff_assember_t {
     virtual rotor::address_ptr_t get_back_address() const noexcept = 0;
 
     std::int64_t get_now() noexcept;
+    void local_update(proto::FileInfo proto_file, std::string_view folder_id,
+                      bool disable_blocks_removal = false) noexcept;
 
     model::cluster_t &cluster;
     model::sequencer_t &sequencer;

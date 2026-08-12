@@ -92,7 +92,6 @@ void static_table_t::draw_cell(TableContext context, int row, int col, int x, in
                 col_width(1, col_widths.w2);
             }
         }
-        row_height_all(27);
         return;
     }
     case CONTEXT_COL_HEADER:
