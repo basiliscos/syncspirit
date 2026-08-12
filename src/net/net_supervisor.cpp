@@ -232,8 +232,10 @@ void net_supervisor_t::on_thread_ready(model::message::thread_ready_t &) noexcep
 
 void net_supervisor_t::on_ready(message::ready_t &) noexcept {
     LOG_DEBUG(log, "on_ready, counter = {}", local_counter);
-    spawn_services();
     send<model::payload::local_up_t>(coordinator);
+    if (!app_config.start_offline) {
+        spawn_services();
+    }
 }
 
 void net_supervisor_t::spawn_services() noexcept {

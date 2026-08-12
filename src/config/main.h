@@ -41,6 +41,7 @@ struct main_t {
     std::string device_name;
     std::uint32_t hasher_threads;
     std::uint32_t poll_timeout; // in microseconds
+    bool start_offline;
 
     main_t() noexcept = default;
 
@@ -69,6 +70,7 @@ struct main_t {
         device_name = orig.device_name;
         hasher_threads = orig.hasher_threads;
         poll_timeout = orig.poll_timeout;
+        start_offline = orig.start_offline;
 
         return *this;
     }

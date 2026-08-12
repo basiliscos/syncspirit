@@ -155,6 +155,7 @@ void main_window_t::on_loading_done() {
         tray.enable(true);
     }
     activate();
+    on_local_state_update();
 }
 
 void main_window_t::detach_supervisor() {

@@ -119,6 +119,7 @@ auto reflect(const main_cfg_t &config, const main_cfg_t &default_config) -> cate
             property_ptr_t(new main::hasher_threads_t(l.hasher_threads, l_def.hasher_threads)),
             property_ptr_t(new main::poll_timeout_t(l.poll_timeout, l_def.poll_timeout)),
             property_ptr_t(new main::timeout_t(l.timeout, l_def.timeout)),
+            property_ptr_t(new main::start_offline_t(l.start_offline, l_def.start_offline)),
             // clang-format on
         };
         return new category_t("main", "main application settings", std::move(props));

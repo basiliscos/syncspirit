@@ -98,6 +98,7 @@ after the core completion.
 
 ## 0.4.6 (xx-xxx-202x)
  - [core, fltk] intoduce patterns (using Perl-compatible regular expressions)
+ - [core] add start offline option
    to accept or ignore local files addition into cluster
  - [fltk, win32, os x] add system tray icon
  - [fltk] use menu instead of toolbar
