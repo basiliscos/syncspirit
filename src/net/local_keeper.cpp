@@ -415,17 +415,24 @@ void local_keeper_t::handle_rename(fs::payload::file_info_t &change, const model
 
         auto pr_new = f->as_proto(true);
         auto pr_prev = f->as_proto(false);
-        proto::set_name(pr_prev, p_name);
         auto new_sub_name = std::string_view(sub_name);
 
-        LOG_DEBUG(log, "renaming '{}' -> '{}' in folder '{}'", p_name, new_sub_name, folder_id);
         proto::set_name(pr_new, new_sub_name);
+        proto::set_name(pr_prev, p_name);
         proto::set_deleted(pr_prev, true);
-        stack_ctx.push_back(new advance::local_update_t(*cluster, *sequencer, std::move(pr_new), folder_id));
-        assembler.push_front(new advance::local_update_t(*cluster, *sequencer, std::move(pr_prev), folder_id, true));
 
         stack_ctx.name_2_file.emplace(new_sub_name, f);
         stack_ctx.file_2_name.insert_or_assign(f, new_sub_name);
+
+        if (folder->accept(new_sub_name)) {
+            LOG_DEBUG(log, "renaming '{}' -> '{}' in folder '{}'", p_name, new_sub_name, folder_id);
+            assembler.push_front(
+                new advance::local_update_t(*cluster, *sequencer, std::move(pr_prev), folder_id, true));
+            stack_ctx.push_back(new advance::local_update_t(*cluster, *sequencer, std::move(pr_new), folder_id));
+        } else {
+            LOG_DEBUG(log, "removing '{}' from folder '{}' (locally ignored)", p_name, folder_id);
+            assembler.push_front(new advance::local_update_t(*cluster, *sequencer, std::move(pr_prev), folder_id));
+        }
 
         if (f->is_dir()) {
             auto folder_path = folder->get_path().get_view(stack_ctx.allocator);
@@ -499,7 +506,7 @@ void local_keeper_t::on_changes(model::folder_info_t &local_folder, fs::payload:
                     auto full_path = std::string(fn.get_full_name());
                     just_created_dirs.insert(full_path);
                 }
-                stack_ctx.push_back(new advance::local_update_t(*cluster, *sequencer, std::move(change), folder_id));
+                stack_ctx.local_update(std::move(change), folder_id);
             }
         } else {
             LOG_DEBUG(log, "ignoring update on '{}'", name);

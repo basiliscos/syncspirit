@@ -21,8 +21,7 @@ TEST_CASE("folder file matchers", "[model]") {
         auto folder_opt = folder_t::create(uuid, db);
         REQUIRE(folder_opt.has_value());
         auto &f = folder_opt.value();
-        CHECK(f->accept(path_t::make_generic("/some/path/a/b/c")));
-        CHECK(!f->accept(path_t::make_generic("/some/other_path/xxx")));
+        CHECK(f->accept("a/b/c"));
     }
 
     auto add_regex = [&](std::string_view pattern, file_match_t mode) {
@@ -49,37 +48,36 @@ TEST_CASE("folder file matchers", "[model]") {
     SECTION("ignore all") {
         add_regex(".*", file_match_t::ignore);
         auto f = folder_t::create(uuid, db).value();
-        CHECK(!f->accept(path_t::make_generic("/some/path/a/b/c")));
-        CHECK(!f->accept(path_t::make_generic("/some/other_path/xxx")));
+        CHECK(!f->accept("a/b/c"));
     }
 
     SECTION("regex is off") {
         add_regex(".*", file_match_t::off);
         auto f = folder_t::create(uuid, db).value();
-        CHECK(!f->accept(path_t::make_generic("/some/path/a/b/c")));
+        CHECK(!f->accept("a/b/c"));
     }
 
     SECTION("accept all") {
         add_regex(".*", file_match_t::accept);
         auto f = folder_t::create(uuid, db).value();
-        CHECK(f->accept(path_t::make_generic("/some/path/a/b/c")));
+        CHECK(f->accept(("a/b/c")));
     }
 
     SECTION("error in regex") {
         add_regex("\\", file_match_t::accept);
         auto f = folder_t::create(uuid, db).value();
-        CHECK(!f->accept(path_t::make_generic("/some/path/a")));
-        CHECK(!f->accept(path_t::make_generic("/some/other_path/xxx")));
+        CHECK(!f->accept(("a")));
+        CHECK(!f->accept("xxx"));
     }
 
     SECTION("accept some") {
         add_regex(".*aaa.*", file_match_t::accept);
         auto f = folder_t::create(uuid, db).value();
-        CHECK(f->accept(path_t::make_generic("/some/path/aaaa/b/c")));
-        CHECK(f->accept(path_t::make_generic("/some/path/x/aaa/b/c")));
-        CHECK(f->accept(path_t::make_generic("/some/path/aaa")));
-        CHECK(!f->accept(path_t::make_generic("/some/path/bbb")));
-        CHECK(!f->accept(path_t::make_generic("/some/path/ccc")));
+        CHECK(f->accept("aaaa/b/c"));
+        CHECK(f->accept(("x/aaa/b/c")));
+        CHECK(f->accept("aaa"));
+        CHECK(!f->accept("bbb"));
+        CHECK(!f->accept("ccc"));
     }
 
     SECTION("several rules") {
@@ -87,13 +85,13 @@ TEST_CASE("folder file matchers", "[model]") {
         add_regex(".*a.*", file_match_t::ignore);
         add_regex(".*", file_match_t::accept);
         auto f = folder_t::create(uuid, db).value();
-        CHECK(f->accept(path_t::make_generic("/some/path/aaaa/b/c")));
-        CHECK(f->accept(path_t::make_generic("/some/path/x/aaa/b/c")));
-        CHECK(f->accept(path_t::make_generic("/some/path/aaa")));
-        CHECK(!f->accept(path_t::make_generic("/some/path/aa")));
-        CHECK(!f->accept(path_t::make_generic("/some/path/a")));
-        CHECK(f->accept(path_t::make_generic("/some/path/bbb")));
-        CHECK(f->accept(path_t::make_generic("/some/path/ccc")));
+        CHECK(f->accept("aaaa/b/c"));
+        CHECK(f->accept("x/aaa/b/c"));
+        CHECK(f->accept("aaa"));
+        CHECK(!f->accept("aa"));
+        CHECK(!f->accept("a"));
+        CHECK(f->accept("bbb"));
+        CHECK(f->accept("ccc"));
     }
 }
 

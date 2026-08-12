@@ -58,7 +58,7 @@ struct SYNCSPIRIT_API folder_t final : augmentable_t, folder_data_t {
     void mark_suspended(bool value, const std::error_code &ec = {}) noexcept;
     bool is_suspended() const noexcept;
     const std::error_code &get_suspend_reason() const noexcept;
-    bool accept(const utils::path_base_t &path) const noexcept;
+    bool accept(std::string_view relative_path) const noexcept;
     file_matchers_t &get_file_matchers() noexcept;
 
     using folder_data_t::get_path;

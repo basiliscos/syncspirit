@@ -415,12 +415,17 @@ struct folder_fixture_t : fixture_t {
         slave->tasks_out = std::move(slave->tasks_in);
     }
 
-    void prepare(syncspirit_watcher_impl_t impl, bool watch_folder = true) noexcept {
+    void prepare(syncspirit_watcher_impl_t impl, bool watch_folder = true, std::string_view accept = ".*") noexcept {
         db::Folder db_folder;
         db::set_id(db_folder, folder_id);
         db::set_label(db_folder, folder_id);
         db::set_path(db_folder, "/some/path");
         db::set_watched(db_folder, watch_folder);
+
+        db::FileMatcher matcher;
+        db::set_mode(matcher, file_match_t::accept);
+        db::set_pattern(matcher, std::string(accept));
+        db::add_file_matcher(db_folder, std::move(matcher));
         builder->upsert_folder(db_folder, 5).apply(*sup);
 
         folder = cluster->get_folders().by_id(folder_id);
@@ -428,7 +433,7 @@ struct folder_fixture_t : fixture_t {
         files_local = &folder_local->get_file_infos();
 
         launch_target(impl);
-        REQUIRE(watched_ack);
+        REQUIRE(watched_ack == watch_folder);
     }
 
     void expect_bytes_hash(utils::bytes_view_t bytes) noexcept { hashed_blocks.emplace_back(utils::bytes_t(bytes)); }
@@ -1991,7 +1996,6 @@ void test_renaming_simple() {
     struct F : folder_fixture_t {
         using parent_t = folder_fixture_t;
         using parent_t::parent_t;
-        using trigger_t = std::function<void()>;
 
         void main(const utils::allocator_t &) noexcept override {
             prepare(I::inotify);
@@ -2523,7 +2527,7 @@ void test_rm_folder_on_scan() {
     F().run();
 }
 
-void test_not_ye_scanned_parent() {
+void test_not_yet_scanned_parent() {
     struct F : folder_fixture_t {
         using parent_t = folder_fixture_t;
         using parent_t::parent_t;
@@ -2549,6 +2553,144 @@ void test_not_ye_scanned_parent() {
             proto::set_size(pr_file, 5);
             mk_update(pr_file, fs::update_type_t::created, true);
             CHECK(files_local->size() == 1);
+        }
+    };
+    F().run();
+}
+
+void test_ignore_files_upon_scan() {
+    struct F : folder_fixture_t {
+        using parent_t = folder_fixture_t;
+        using parent_t::parent_t;
+
+        void main(const utils::allocator_t &) noexcept override {
+            auto impl = GENERATE(I::inotify, I::kqueue, I::win32);
+            prepare(impl, false, ".*aaa.*");
+
+            SECTION("not in the model, not accepted") {
+                expect_dir_scan(CB().add("/some/path/my-bbb.txt", file_type_t::FILE).get());
+                builder->scan_start(folder_id).apply(*sup);
+                CHECK(files_local->size() == 0);
+
+                expect_dir_scan(CB().add("/some/path/my-bbb-2.txt", file_type_t::FILE, 10).get());
+                builder->scan_start(folder_id).apply(*sup);
+                CHECK(files_local->size() == 0);
+            }
+
+            SECTION("not in the model, accepted") {
+                expect_dir_scan(CB().add("/some/path/my-aaa.txt", file_type_t::FILE).get());
+                builder->scan_start(folder_id).apply(*sup);
+                CHECK(files_local->size() == 1);
+            }
+
+            SECTION("in the model => always updated") {
+                auto file_name = GENERATE("my-bbb.txt", "my-aaa.txt");
+                auto file = proto::FileInfo();
+                proto::set_name(file, file_name);
+                proto::set_permissions(file, default_perms);
+                proto::set_modified_s(file, 12345);
+                proto::set_type(file, FT::FILE);
+                builder->local_update(folder_id, file).apply(*sup);
+                REQUIRE(files_local->size() == 1);
+
+                auto f = (*files_local->begin());
+                auto seq = f->get_sequence();
+                auto path = fmt::format("/some/path/{}", file_name);
+                expect_dir_scan(CB().add(path, file_type_t::FILE, 0, default_perms, 123456).get());
+                builder->scan_start(folder_id).apply(*sup);
+
+                auto seq_2 = f->get_sequence();
+                CHECK(seq_2 > seq);
+            }
+        }
+    };
+    F().run();
+}
+
+void test_prevent_resurrection_of_ignored() {
+    struct F : folder_fixture_t {
+        using parent_t = folder_fixture_t;
+        using parent_t::parent_t;
+
+        void main(const utils::allocator_t &) noexcept override {
+            auto impl = GENERATE(I::inotify, I::kqueue, I::win32);
+            prepare(impl, false, "valuable.bin");
+
+            auto file = proto::FileInfo();
+            proto::set_name(file, "garbage.bin");
+            proto::set_permissions(file, default_perms);
+            proto::set_modified_s(file, 12345);
+            proto::set_type(file, FT::FILE);
+            builder->local_update(folder_id, file).apply(*sup);
+
+            REQUIRE(files_local->size() == 1);
+            auto f = (*files_local->begin());
+            auto seq_1 = f->get_sequence();
+
+            auto path = fmt::format("/some/path/{}", "garbage.bin");
+            expect_dir_scan(CB().add(path, file_type_t::FILE, 0, default_perms, 123456).get());
+            builder->scan_start(folder_id).apply(*sup);
+            auto seq_2 = f->get_sequence();
+
+            REQUIRE(seq_2 > seq_1);
+            expect_dir_scan({});
+            builder->scan_start(folder_id).apply(*sup);
+            auto seq_3 = f->get_sequence();
+            REQUIRE(seq_3 > seq_2);
+            REQUIRE(f->is_deleted());
+
+            expect_dir_scan(CB().add(path, file_type_t::FILE, 0, default_perms, 1234).get());
+            builder->scan_start(folder_id).apply(*sup);
+            auto seq_4 = f->get_sequence();
+            REQUIRE(seq_4 == seq_3);
+        }
+    };
+    F().run();
+}
+
+void test_renaming_to_ignored() {
+    struct F : folder_fixture_t {
+        using parent_t = folder_fixture_t;
+        using parent_t::parent_t;
+
+        void main(const utils::allocator_t &) noexcept override {
+            prepare(I::inotify, false, "valuable.bin");
+
+            auto file = proto::FileInfo();
+            proto::set_permissions(file, default_perms);
+            proto::set_modified_s(file, 12345);
+            proto::set_name(file, "valuable.bin");
+            proto::set_type(file, FT::FILE);
+
+            SECTION("empty file") { builder->local_update(folder_id, file).apply(*sup); }
+
+            SECTION("non-empty file") {
+                auto data = as_bytes("12345");
+                auto data_h = utils::sha256_digest(as_bytes("12345")).value();
+
+                auto b = proto::BlockInfo();
+                proto::set_hash(b, data_h);
+                proto::set_offset(b, 0);
+                proto::set_size(b, 5);
+                proto::set_size(file, 5);
+                proto::add_blocks(file, b);
+
+                builder->local_update(folder_id, file).apply(*sup);
+            }
+            REQUIRE(files_local->size() == 1);
+
+            proto::set_name(file, "ignored.bin");
+            auto seq_1 = folder_local->get_max_sequence();
+            make_update_rename(file, "valuable.bin");
+            CHECK(folder_local->get_max_sequence() > seq_1);
+            CHECK(files_local->size() == 1);
+
+            auto f = files_local->by_name("valuable.bin");
+            REQUIRE(f);
+            CHECK(f->get_permissions() == default_perms);
+            CHECK(f->get_modified_s() == 12345);
+            CHECK(f->is_deleted());
+            CHECK(cluster->get_blocks().size() == 0);
         }
     };
     F().run();
@@ -2592,7 +2734,10 @@ int _init() {
     REGISTER_TEST_CASE(test_dir_scan_and_hashing_race, "test_dir_scan_and_hashing_race", "[fs]");
     REGISTER_TEST_CASE(test_invalid_utf8_names, "test_invalid_utf8_names", "[fs]");
     REGISTER_TEST_CASE(test_rm_folder_on_scan, "test_rm_folder_on_scan", "[fs]");
-    REGISTER_TEST_CASE(test_not_ye_scanned_parent, "test_not_ye_scanned_parent", "[fs]");
+    REGISTER_TEST_CASE(test_not_yet_scanned_parent, "test_not_yet_scanned_parent", "[fs]");
+    REGISTER_TEST_CASE(test_ignore_files_upon_scan, "test_ignore_files_upon_scan", "[fs]");
+    REGISTER_TEST_CASE(test_prevent_resurrection_of_ignored, "test_prevent_resurrection_of_ignored", "[fs]");
+    REGISTER_TEST_CASE(test_renaming_to_ignored, "test_renaming_to_ignored", "[fs]");
     return 1;
 }
 

@@ -175,17 +175,13 @@ auto folder_t::get_suspend_reason() const noexcept -> const std::error_code & { 
 
 file_matchers_t &folder_t::get_file_matchers() noexcept { return file_matchers; }
 
-bool folder_t::accept(const utils::path_base_t &p) const noexcept {
-    auto folder_path = path.get_full_name();
+bool folder_t::accept(std::string_view relative_path) const noexcept {
     for (auto &fm : file_matchers) {
-        if (path.contains(p)) {
-            auto rel_path = p.get_full_name().substr(folder_path.size());
-            auto mode = fm.match(rel_path);
-            if (mode == file_match_t::accept) {
-                return true;
-            } else if (mode == file_match_t::ignore) {
-                return false;
-            }
+        auto mode = fm.match(relative_path);
+        if (mode == file_match_t::accept) {
+            return true;
+        } else if (mode == file_match_t::ignore) {
+            return false;
         }
     }
     return false;

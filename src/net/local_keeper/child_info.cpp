@@ -61,6 +61,10 @@ auto child_info_t::serialize(const model::folder_info_t &local_folder, blocks_t 
     return data;
 }
 
+std::string_view child_info_t::relative_path(const model::folder_info_t &local_folder) const noexcept {
+    return path.relativize(local_folder.get_folder()->get_path());
+}
+
 auto child_info_t::fetch_model(const model::folder_info_t &local_folder) const -> const model::file_info_t * {
     auto &folder_path = local_folder.get_folder()->get_path();
     auto name = path.relativize(local_folder.get_folder()->get_path());

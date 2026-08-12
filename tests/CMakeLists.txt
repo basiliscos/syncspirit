@@ -58,11 +58,6 @@ add_custom_command(TARGET syncspirit_test_lib PRE_BUILD
 # target_link_libraries(ssl PUBLIC OpenSSL::SSL Boost::system)
 
 create_test(009-uri.cpp)
-
-target_sources(009-uri
-  PRIVATE
-    026_2-folder.cpp
-)
 create_test(010-upnp-support.cpp)
 create_test(011-tls-util.cpp)
 create_test(012-base32.cpp)

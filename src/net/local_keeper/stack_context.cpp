@@ -3,6 +3,10 @@
 
 #include "stack_context.h"
 #include "constants.h"
+#include "model/cluster.h"
+#include "model/diff/advance/local_update.h"
+#include "proto/proto-helpers-bep.h"
+
 #include <chrono>
 
 using namespace syncspirit::net::local_keeper;
@@ -19,4 +23,12 @@ std::int64_t stack_context_t::get_now() noexcept {
         now = clock_t::to_time_t(clock_t::now());
     }
     return now;
+}
+
+void stack_context_t::local_update(proto::FileInfo data, std::string_view folder_id,
+                                   bool disable_blocks_removal) noexcept {
+    using namespace model::diff::advance;
+    auto &folder = *cluster.get_folders().by_id(folder_id);
+    auto relative_path = proto::get_name(data);
+    push_back(new local_update_t(cluster, sequencer, std::move(data), folder_id, disable_blocks_removal));
 }

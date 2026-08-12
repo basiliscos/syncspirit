@@ -468,7 +468,7 @@ file_matching_widget_t::file_matching_widget_t(folder_widget_t &container_, int 
     auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
     auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
 
-    auto sample_path = container.folder->get_path() / utils::make_generic_view("some/path/file.bin", allocator);
+    auto sample_path = utils::make_generic_view("some/relative/file/path.bin", allocator);
     auto path_str = sample_path.get_full_name();
     input->value(path_str.data());
 
