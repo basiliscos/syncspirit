@@ -98,11 +98,11 @@ after the core completion.
 
 ## 0.4.6 (xx-xxx-202x)
  - [core, fltk] intoduce patterns (using Perl-compatible regular expressions)
- - [core] add start offline option
    to accept or ignore local files addition into cluster
+ - [core] add start offline option
  - [fltk, win32, os x] add system tray icon
  - [fltk] use menu instead of toolbar
- - [fltk] add options to display `folder_id` and `device_id` in tree nodes
+ - [fltk] add options to display `folder_id` and `device_id` in tree id
  - [core] introduce services layer (allow stop/start/restart of networking)
  - [core] dns resolver actor: randomly choose ip address of resolver server
  - [core, win32, bugfix] use utf8 for displaying error messages
