@@ -63,6 +63,20 @@ static void on_show_missing(Fl_Widget *widget, void *data) {
     menu->supervisor.set_show_missing(value);
 }
 
+static void on_show_folder_id(Fl_Widget *widget, void *data) {
+    auto menu = static_cast<menu_t *>(widget);
+    auto item = menu->find_item_with_user_data(data);
+    auto value = item->value() ? true : false;
+    menu->supervisor.set_show_folder_id(value);
+}
+
+static void on_show_device_id(Fl_Widget *widget, void *data) {
+    auto menu = static_cast<menu_t *>(widget);
+    auto item = menu->find_item_with_user_data(data);
+    auto value = item->value() ? true : false;
+    menu->supervisor.set_show_device_id(value);
+}
+
 static void on_display_tray(Fl_Widget *widget, void *data) {
     auto menu = static_cast<menu_t *>(widget);
     auto item = menu->find_item_with_user_data(data);
@@ -105,6 +119,16 @@ menu_t::menu_t(app_supervisor_t &supervisor_, int x, int y, int w, int h)
         bool value = supervisor.get_app_config().fltk_config.display_missing;
         auto flags = FL_MENU_TOGGLE | (value ? FL_MENU_VALUE : 0);
         return add_item("Show Missing", 0, on_show_missing, SS_INT_TO_PTR(index), flags);
+    }();
+    index = [&]() {
+        bool value = supervisor.get_app_config().fltk_config.display_folder_id;
+        auto flags = FL_MENU_TOGGLE | (value ? FL_MENU_VALUE : 0);
+        return add_item("Show folder id", 0, on_show_folder_id, SS_INT_TO_PTR(index), flags);
+    }();
+    index = [&]() {
+        bool value = supervisor.get_app_config().fltk_config.display_device_id;
+        auto flags = FL_MENU_TOGGLE | (value ? FL_MENU_VALUE : 0);
+        return add_item("Show device id", 0, on_show_device_id, SS_INT_TO_PTR(index), flags);
     }();
     index = finish_submenu(); // Options/Tree
 

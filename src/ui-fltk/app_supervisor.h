@@ -162,6 +162,8 @@ struct app_supervisor_t : app_supervisor_base_t<app_supervisor_t> {
     void set_show_deleted(bool value);
     void set_show_missing(bool value);
     void set_show_colorized(bool value);
+    void set_show_folder_id(bool value);
+    void set_show_device_id(bool value);
     void set_tray_display(bool value);
     void set_hide_to_tray(bool value);
     void soft_restart();
@@ -186,7 +188,7 @@ struct app_supervisor_t : app_supervisor_base_t<app_supervisor_t> {
     void on_local_ready(model::message::local_ready_t &) noexcept;
     void on_db_loaded(model::message::db_loaded_t &) noexcept;
     void on_db_info_response(net::message::db_info_response_t &res) noexcept;
-    void redisplay_folder_nodes(bool refresh_labels);
+    void redisplay_nodes(bool refresh_labels);
     void detach_main_window() noexcept;
     void on_frame_render_timer(r::request_id_t, bool cancelled) noexcept;
 

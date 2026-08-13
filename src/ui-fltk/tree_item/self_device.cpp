@@ -269,10 +269,21 @@ self_device_t::self_device_t(model::device_t &, app_supervisor_t &supervisor, Fl
 }
 
 void self_device_t::update_label() {
-    auto self = supervisor.get_cluster()->get_device();
-    auto device_id = self->device_id().get_short();
-    auto label = fmt::format("(self) {}, {}", supervisor.get_app_config().device_name, device_id);
-    this->label(label.data());
+
+    auto &config = supervisor.get_app_config();
+    auto buffer = std::array<std::byte, 1024 * 32>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+    auto label_str = std::pmr::string(allocator);
+    auto label_out = std::back_inserter(label_str);
+    fmt::format_to(label_out, "(self) {}", config.device_name);
+
+    if (config.fltk_config.display_device_id) {
+        auto self = supervisor.get_cluster()->get_device();
+        fmt::format_to(label_out, ", {}", self->device_id().get_short());
+    }
+
+    this->label(label_str.data());
 }
 
 bool self_device_t::on_select() {

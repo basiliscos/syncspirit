@@ -706,9 +706,10 @@ void app_supervisor_t::write_config(const config::main_t &cfg) noexcept {
     app_config_original = app_config = cfg;
 }
 
-void app_supervisor_t::redisplay_folder_nodes(bool refresh_labels) {
+void app_supervisor_t::redisplay_nodes(bool refresh_labels) {
     auto mask = mask_nodes();
-    log->debug("redisplay_folder_nodes, mask: {:#x}", mask);
+    log->debug("redisplay_nodes, mask: {:#x}", mask);
+
     for (auto &it_f : cluster->get_folders()) {
         for (auto &it : it_f.item->get_folder_infos()) {
             auto generic_augmentation = it.item->get_augmentation();
@@ -721,22 +722,58 @@ void app_supervisor_t::redisplay_folder_nodes(bool refresh_labels) {
             }
         }
     }
+
+    for (auto &it : cluster->get_pending_folders()) {
+        auto aug = it.item->get_augmentation().get();
+        auto proxy = static_cast<augmentation_base_t *>(aug);
+        proxy->get_owner()->update_label();
+    }
+
+    for (auto &it : cluster->get_devices()) {
+        auto aug = it.item->get_augmentation().get();
+        auto proxy = static_cast<augmentation_base_t *>(aug);
+        proxy->get_owner()->update_label();
+    }
+
+    for (auto &it : cluster->get_pending_devices()) {
+        auto aug = it.item->get_augmentation().get();
+        auto proxy = static_cast<augmentation_base_t *>(aug);
+        proxy->get_owner()->update_label();
+    }
+
+    for (auto &it : cluster->get_ignored_devices()) {
+        auto aug = it.item->get_augmentation().get();
+        auto proxy = static_cast<augmentation_base_t *>(aug);
+        proxy->get_owner()->update_label();
+    }
 }
 
 void app_supervisor_t::set_show_deleted(bool value) {
     app_config.fltk_config.display_deleted = value;
-    redisplay_folder_nodes(false);
+    redisplay_nodes(false);
 }
 
 void app_supervisor_t::set_show_missing(bool value) {
     app_config.fltk_config.display_missing = value;
-    redisplay_folder_nodes(false);
+    redisplay_nodes(false);
 }
 
 void app_supervisor_t::set_show_colorized(bool value) {
     log->debug("display colorized = {}", value);
     app_config.fltk_config.display_colorized = value;
-    redisplay_folder_nodes(true);
+    redisplay_nodes(true);
+}
+
+void app_supervisor_t::set_show_folder_id(bool value) {
+    log->debug("display folder_id = {}", value);
+    app_config.fltk_config.display_folder_id = value;
+    redisplay_nodes(true);
+}
+
+void app_supervisor_t::set_show_device_id(bool value) {
+    log->debug("display device_id = {}", value);
+    app_config.fltk_config.display_device_id = value;
+    redisplay_nodes(true);
 }
 
 void app_supervisor_t::set_tray_display(bool value) {

@@ -229,6 +229,8 @@ static main_t make_default_config(const utils::poly_path_view_t &config_path, co
         true,                               /* display_colorized */
         true,                               /* display_tray_icon */
         true,                               /* hide_to_tray */
+        false,                              /* display_folder_id */
+        false,                              /* display_device_id */
         700,                                /* main_window_width */
         480,                                /* main_window_height */
         0.5,                                /* left_panel_share */
@@ -397,6 +399,8 @@ config_result_t get_config(std::string_view config, const utils::poly_path_view_
         SAFE_GET_VALUE(display_colorized, bool, "fltk");
         SAFE_GET_VALUE(display_tray_icon, bool, "fltk");
         SAFE_GET_VALUE(hide_to_tray, bool, "fltk");
+        SAFE_GET_VALUE(display_folder_id, bool, "fltk");
+        SAFE_GET_VALUE(display_device_id, bool, "fltk");
         SAFE_GET_VALUE(main_window_width, std::int64_t, "fltk");
         SAFE_GET_VALUE(main_window_height, std::int64_t, "fltk");
         SAFE_GET_VALUE(left_panel_share, double, "fltk");
@@ -527,6 +531,8 @@ std::string serialize(const main_t& cfg) noexcept {
                      {"display_colorized", cfg.fltk_config.display_colorized},
                      {"display_tray_icon", cfg.fltk_config.display_tray_icon},
                      {"hide_to_tray", cfg.fltk_config.hide_to_tray},
+                     {"display_folder_id", cfg.fltk_config.display_folder_id},
+                     {"display_device_id", cfg.fltk_config.display_device_id},
                      {"main_window_width", cfg.fltk_config.main_window_width},
                      {"main_window_height", cfg.fltk_config.main_window_height},
                      {"left_panel_share", cfg.fltk_config.left_panel_share},

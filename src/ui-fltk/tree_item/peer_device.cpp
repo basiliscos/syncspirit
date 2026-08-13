@@ -524,9 +524,20 @@ peer_device_t::peer_device_t(model::device_t &peer_, app_supervisor_t &superviso
 
 void peer_device_t::update_label() {
     auto name = peer.get_name();
-    auto id = peer.device_id().get_short();
-    auto value = fmt::format("{}, {} {}", name, id, get_state());
-    label(value.data());
+
+    auto buffer = std::array<std::byte, 1024 * 32>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+    auto label_str = std::pmr::string(allocator);
+    auto label_out = std::back_inserter(label_str);
+    fmt::format_to(label_out, "{}", name);
+
+    if (supervisor.get_app_config().fltk_config.display_device_id) {
+        fmt::format_to(label_out, ", {}", peer.device_id().get_short());
+    }
+    fmt::format_to(label_out, " {}", get_state());
+
+    label(label_str.data());
     tree()->redraw();
 }
 

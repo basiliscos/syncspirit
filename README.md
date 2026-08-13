@@ -102,6 +102,7 @@ after the core completion.
    to accept or ignore local files addition into cluster
  - [fltk, win32, os x] add system tray icon
  - [fltk] use menu instead of toolbar
+ - [fltk] add options to display `folder_id` and `device_id` in tree nodes
  - [core] introduce services layer (allow stop/start/restart of networking)
  - [core] dns resolver actor: randomly choose ip address of resolver server
  - [core, win32, bugfix] use utf8 for displaying error messages

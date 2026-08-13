@@ -13,6 +13,8 @@ struct fltk_config_t {
     bool display_colorized;
     bool display_tray_icon;
     bool hide_to_tray;
+    bool display_folder_id;
+    bool display_device_id;
     int main_window_width;
     int main_window_height;
     double left_panel_share;

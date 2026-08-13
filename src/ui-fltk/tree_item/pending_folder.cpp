@@ -28,8 +28,23 @@ struct widget_t final : content::folder_widget_t {
 pending_folder_t::pending_folder_t(model::pending_folder_t &folder_, app_supervisor_t &supervisor, Fl_Tree *tree)
     : parent_t(supervisor, tree), folder{folder_} {
 
-    auto l = fmt::format("{} ({})", folder.get_label(), folder.get_id());
-    label(l.c_str());
+    update_label();
+}
+
+void pending_folder_t::update_label() {
+    auto buffer = std::array<std::byte, 1024 * 32>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+    auto label_str = std::pmr::string(allocator);
+    auto label_out = std::back_inserter(label_str);
+    fmt::format_to(label_out, "{}", folder.get_label());
+
+    if (supervisor.get_app_config().fltk_config.display_folder_id) {
+        fmt::format_to(label_out, ", {}", folder.get_id());
+    }
+
+    label(label_str.data());
+    tree()->redraw();
 }
 
 bool pending_folder_t::on_select() {
