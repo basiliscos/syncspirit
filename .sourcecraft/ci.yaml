@@ -156,7 +156,7 @@ tasks:
           - apt install -y cmake python3-venv pkgconf
           - pip install conan
           - conan profile detect
-          - conan install -r conancenter --tool-requires=b2/5.4.2 -o "&:use_cxx_env=True" --build="&"
+          - conan install -r conancenter --tool-requires=b2/5.5.3 -o "&:use_cxx_env=True" --build="&"
           - wget https://ftp.gnu.org/gnu/gcc/gcc-14.3.0/gcc-14.3.0.tar.xz
           - tar -xf gcc-14.3.0.tar.xz
           - cd gcc-14.3.0
@@ -171,7 +171,7 @@ tasks:
           - echo $PATH
           - cp .sourcecraft/conan-profile-linux-appimage /root/.conan2/profiles/default
           - mkdir build.ci
-          - apt-get remove -y g++9 gcc-9          
+          - apt-get remove -y g++9 gcc-9
           #- apt-get remove -y gir1.2-gtk-2.0 gir1.2-gtk-3.0 libgtk-3-dev libgtk2.0-0 libgtk2.0-bin libgtk2.0-common libgtk2.0-dev libgtkspell-dev libgtkspell0
           - apt-get -y autoremove --purge
           - apt install -y build-essential binutils
