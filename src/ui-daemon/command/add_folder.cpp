@@ -65,6 +65,12 @@ outcome::result<command_ptr_t> add_folder_t::construct(std::string_view in) noex
     db::set_folder_type(f, db::FolderType::send_and_receive);
     db::set_pull_order(f, db::PullOrder::random);
     db::set_rescan_interval(f, 3600);
+
+    auto matcher = db::FileMatcher();
+    db::set_mode(matcher, db::FileMatch::accept);
+    db::set_pattern(matcher, std::string(".*"));
+    db::add_file_matcher(f, std::move(matcher));
+
     return command_ptr_t(new add_folder_t(std::move(f)));
 }
 

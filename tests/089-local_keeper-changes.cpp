@@ -1464,6 +1464,10 @@ void test_multi_folders_update() {
         using child_info_t = fs::task::scan_dir_t::child_info_t;
 
         void main(const utils::allocator_t &) noexcept override {
+            auto matcher = db::FileMatcher();
+            db::set_mode(matcher, db::FileMatch::accept);
+            db::set_pattern(matcher, std::string(".*"));
+
             for (auto folder_id : {"p1", "p2", "p3"}) {
                 db::Folder db_folder;
                 db::set_id(db_folder, folder_id);
@@ -1471,6 +1475,7 @@ void test_multi_folders_update() {
                 db::set_path(db_folder, fmt::format("/some/{}", folder_id));
                 db::set_folder_type(db_folder, db::FolderType::send_and_receive);
                 db::set_watched(db_folder, true);
+                db::add_file_matcher(db_folder, matcher);
                 builder->upsert_folder(db_folder, 5).apply(*sup);
             }
 

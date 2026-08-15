@@ -61,17 +61,6 @@ void folder_t::assign_fields(const db::Folder &item) noexcept {
         }
         file_matchers.push_back(std::move(fm));
     }
-
-    if (file_matchers.empty()) {
-        spdlog::debug("no file matchers for folder '{}', adding match-everything '.*'", label);
-        auto fm = file_matcher_t(".*", file_match_t::accept);
-        auto compile_err = fm.compile();
-        if (compile_err.code) {
-            spdlog::warn("({}) file matcher '{}' compilation error at {}: {}", label, fm.get_pattern(),
-                         compile_err.error_offset, compile_err.code);
-        }
-        file_matchers.push_back(std::move(fm));
-    }
 }
 
 utils::bytes_view_t folder_t::get_uuid() const noexcept { return utils::bytes_view_t(key + 1, uuid_length); }

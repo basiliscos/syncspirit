@@ -21,7 +21,7 @@ TEST_CASE("folder file matchers", "[model]") {
         auto folder_opt = folder_t::create(uuid, db);
         REQUIRE(folder_opt.has_value());
         auto &f = folder_opt.value();
-        CHECK(f->accept("a/b/c"));
+        CHECK(!f->accept("a/b/c"));
     }
 
     auto add_regex = [&](std::string_view pattern, file_match_t mode) {

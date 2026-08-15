@@ -446,7 +446,7 @@ inline void add_file_matcher(Folder &msg, FileMatcher value) {
     using namespace pp;
     msg["file_matchers"_f].push_back(std::move(value));
 }
-inline void clear_file_matcher(Folder &msg) {
+inline void clear_file_matchers(Folder &msg) {
     using namespace pp;
     msg["file_matchers"_f].clear();
 }

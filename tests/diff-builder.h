@@ -70,7 +70,7 @@ struct SYNCSPIRIT_TEST_API diff_builder_t : protected model::diff::apply_control
     index_maker_t make_index(utils::bytes_view_t sha256, std::string_view folder_id) noexcept;
 
     diff_builder_t &upsert_folder(std::string_view id, std::string_view path, std::string_view label = "",
-                                  std::uint64_t index_id = 0, bool watched = false) noexcept;
+                                  std::uint64_t index_id = 0, bool watched = false, bool accept_all = true) noexcept;
     diff_builder_t &upsert_folder(const db::Folder &data, std::uint64_t index_id = 0) noexcept;
     diff_builder_t &upsert_folder_info(model::folder_info_t &prev, std::uint64_t new_index_id) noexcept;
     diff_builder_t &update_peer(const model::device_id_t &device, std::string_view name = "",

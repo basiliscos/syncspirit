@@ -499,7 +499,7 @@ bool file_matching_widget_t::store(void *ptr) {
     auto ctx = reinterpret_cast<folder_widget_t::serialization_context_t *>(ptr);
 
     auto &items = table->items;
-    db::clear_file_matcher(ctx->folder);
+    db::clear_file_matchers(ctx->folder);
     for (size_t i = 0; i < items.size(); ++i) {
         auto &control = table->controls[i];
         auto &item = items[i];

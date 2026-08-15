@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "utils.h"
 #include "transaction.h"
 #include "error_code.h"
 #include "prefix.h"
+#include "model/misc/uuid.h"
 #include "model/misc/error_code.h"
 #include "proto/proto-helpers-db.h"
 #include "proto/proto-helpers-impl.hpp"
@@ -16,7 +17,7 @@ namespace syncspirit::db {
 namespace be = boost::endian;
 
 std::byte zero{0};
-std::uint32_t version{3};
+std::uint32_t version{4};
 
 namespace misc {
 static const constexpr std::string_view db_version = "db_version";
@@ -160,15 +161,46 @@ static outcome::result<void> migrate_2(model::device_ptr_t &device, transaction_
         }
     }
 
+    return outcome::success();
+}
+
+static outcome::result<void> migrate_3(model::device_ptr_t &device, transaction_t &txn) noexcept {
+    static constexpr auto KEY_SZ = std::size_t{model::uuid_length} + 1;
+    auto bis_opt = db::load(db::prefix::folder, txn);
+    if (!bis_opt) {
+        return bis_opt.error();
+    }
+
+    auto &container = bis_opt.value();
+
+    for (auto &pair : container) {
+        unsigned char key_copy[KEY_SZ];
+        std::copy(pair.key.begin(), pair.key.end(), key_copy);
+        assert(pair.key.size() == KEY_SZ);
+        auto db_folder = db::Folder();
+        if (auto left = syncspirit::details::generic_decode(pair.value, db_folder); left) {
+            continue;
+        }
+        auto matcher = db::FileMatcher();
+        db::set_mode(matcher, db::FileMatch::accept);
+        db::set_pattern(matcher, std::string(".*"));
+        db::add_file_matcher(db_folder, std::move(matcher));
+        auto new_value = db::encode(db_folder);
+        auto r = db::save({utils::bytes_view_t(key_copy, KEY_SZ), new_value}, txn);
+        if (!r) {
+            return r;
+        }
+    }
     return save_version(db::version, txn);
 }
 
 static outcome::result<void> do_migrate(uint32_t from, model::device_ptr_t &device, transaction_t &txn) noexcept {
-    static constexpr uint32_t SZ = 3;
+    static constexpr uint32_t SZ = 4;
     migration_fn_ptr_t migrations[SZ] = {
         migrate_0,
         migrate_1,
         migrate_2,
+        migrate_3,
     };
 
     if (from >= SZ) {
