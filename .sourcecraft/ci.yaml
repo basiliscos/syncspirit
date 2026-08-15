@@ -159,33 +159,33 @@ tasks:
           - echo "going to install custom b2/5.5.3"
           - conan install -r conancenter --tool-requires=b2/5.5.3 -o "&:use_cxx_env=True" --build="&"
           - echo "going to installed custom b2/5.5.3"
-          # - wget https://ftp.gnu.org/gnu/gcc/gcc-14.3.0/gcc-14.3.0.tar.xz
-          # - tar -xf gcc-14.3.0.tar.xz
-          # - cd gcc-14.3.0
-          # - ./contrib/download_prerequisites
-          # - ./configure --prefix=/$HOME/my-gcc --enable-languages=c,c++ --disable-multilib --disable-bootstrap --disable-libstdcxx-pch --disable-libsanitizer --disable-libquadmath --disable-libgomp --disable-libvtv --disable-libssp
-          # - make -j`nproc` > /dev/null
-          # - make install
-          # - cd ..
-          # - python3 -m venv ~/myenv
-          # - echo $PATH
-          # - . ~/myenv/bin/activate
-          # - echo $PATH
-          # - cp .sourcecraft/conan-profile-linux-appimage /root/.conan2/profiles/default
-          # - mkdir build.ci
-          # - apt-get remove -y g++9 gcc-9
-          # - apt-get -y autoremove --purge
-          # - apt install -y build-essential binutils
-          # - cd build.ci
-          # - whereis gcc
-          # - whereis x86_64-pc-linux-gnu-gcc
-          # - conan install -u --build=missing --output-folder . -s build_type=Release  -o '&:shared=True' ..
-          # - . ./conanbuild.sh
-          # - cmake .. -G "Unix Makefiles" -DCMAKE_TOOLCHAIN_FILE=conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Release
-          # - make -j`nproc`
-          # - make deploy_syncspirit-daemon deploy_syncspirit-fltk
-          # - cd ..
-          # - ls -lah ./build.ci/AppDir/*.AppImage
+          - wget https://ftp.gnu.org/gnu/gcc/gcc-14.3.0/gcc-14.3.0.tar.xz
+          - tar -xf gcc-14.3.0.tar.xz
+          - cd gcc-14.3.0
+          - ./contrib/download_prerequisites
+          - ./configure --prefix=/$HOME/my-gcc --enable-languages=c,c++ --disable-multilib --disable-bootstrap --disable-libstdcxx-pch --disable-libsanitizer --disable-libquadmath --disable-libgomp --disable-libvtv --disable-libssp
+          - make -j`nproc` > /dev/null
+          - make install
+          - cd ..
+          - python3 -m venv ~/myenv
+          - echo $PATH
+          - . ~/myenv/bin/activate
+          - echo $PATH
+          - cp .sourcecraft/conan-profile-linux-appimage /root/.conan2/profiles/default
+          - mkdir build.ci
+          - apt-get remove -y g++9 gcc-9
+          - apt-get -y autoremove --purge
+          - apt install -y build-essential binutils
+          - cd build.ci
+          - whereis gcc
+          - whereis x86_64-pc-linux-gnu-gcc
+          - conan install -u --build=missing --output-folder . -s build_type=Release  -o '&:shared=True' ..
+          - . ./conanbuild.sh
+          - cmake .. -G "Unix Makefiles" -DCMAKE_TOOLCHAIN_FILE=conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Release
+          - make -j`nproc`
+          - make deploy_syncspirit-daemon deploy_syncspirit-fltk
+          - cd ..
+          - ls -lah ./build.ci/AppDir/*.AppImage
         artifacts:
           paths:
             - ./build.ci/AppDir/syncspirit-fltk-x86_64.AppImage
