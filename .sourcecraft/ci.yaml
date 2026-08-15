@@ -156,7 +156,9 @@ tasks:
           - apt install -y cmake python3-venv pkgconf
           - pip install conan
           - conan profile detect
+          - echo "going to install custom b2/5.5.3"
           - conan install -r conancenter --tool-requires=b2/5.5.3 -o "&:use_cxx_env=True" --build="&"
+          - echo "going to installed custom b2/5.5.3"
           - wget https://ftp.gnu.org/gnu/gcc/gcc-14.3.0/gcc-14.3.0.tar.xz
           - tar -xf gcc-14.3.0.tar.xz
           - cd gcc-14.3.0
