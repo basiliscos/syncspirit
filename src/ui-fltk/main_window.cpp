@@ -11,6 +11,7 @@
 #include "constants.h"
 #include "utils/path_view.hpp"
 #include "utils/format.hpp"
+#include "syncspirit-fltk-config.h"
 
 #include <FL/Fl.H>
 #include <FL/Fl_Box.H>
@@ -140,6 +141,21 @@ int main_window_t::handle(int e) {
         return 1;
     }
     return parent_t::handle(e);
+}
+
+void main_window_t::hide() {
+    if (tray.is_enabled() && supervisor->get_app_config().fltk_config.hide_to_tray) {
+#if defined(SYNCSPIRIT_FLTK_WIN32)
+        // seems fltk/win32 destroys the window, do manually hide it:
+        HWND hwnd = (HWND)fl_xid(this);
+        auto is_visible = IsWindowVisible(hwnd) != FALSE;
+        if (is_visible) {
+            ShowWindow(hwnd, SW_HIDE);
+            return;
+        }
+#endif
+    }
+    parent_t::hide();
 }
 
 void main_window_t::set_splash_text(std::string text) {

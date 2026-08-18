@@ -96,7 +96,7 @@ void tray_t::enable(bool value) noexcept {
     }
 }
 
-bool tray_t::is_enabled() noexcept {
+bool tray_t::is_enabled() const noexcept {
     if (impl) {
         return impl->is_enabled();
     }

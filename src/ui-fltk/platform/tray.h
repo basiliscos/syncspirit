@@ -33,7 +33,7 @@ struct tray_t {
     ~tray_t();
     void init(app_supervisor_t &sup) noexcept;
     void enable(bool value) noexcept;
-    bool is_enabled() noexcept;
+    bool is_enabled() const noexcept;
     static bool is_available() noexcept;
     void on_frame_render() noexcept;
     void on_local_state_update() noexcept;

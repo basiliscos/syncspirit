@@ -30,6 +30,7 @@ struct main_window_t : Fl_Double_Window {
     app_supervisor_t *get_supervisor();
 
     int handle(int e) override;
+    void hide() override;
     void show_tray_icon(bool value) noexcept;
     void on_frame_render() noexcept;
     void on_local_state_update() noexcept;
