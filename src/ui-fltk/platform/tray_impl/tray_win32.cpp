@@ -45,14 +45,17 @@ static popup_menu_t make_menu(tray_win32_t &tray) {
                 if (sz) {
                     auto str = std::pmr::wstring(allocator);
                     str.resize(static_cast<std::size_t>(sz + 1));
-                    int out_sz = ::MultiByteToWideChar(CP_UTF8, 0, label, -1, str.data(), static_cast<int>(sz + 1));
+                    auto out_sz = ::MultiByteToWideChar(CP_UTF8, 0, label, -1, str.data(), static_cast<int>(sz + 1));
                     if (out_sz >= 0) {
-                        AppendMenuW(popup_menu, MF_STRING, menu_id++, str.data());
+                        auto flags = MF_STRING;
+                        if (menu_source.flags & FL_MENU_INACTIVE) {
+                            flags |= MF_GRAYED;
+                        }
+                        AppendMenuW(popup_menu, flags, menu_id++, str.data());
                     }
                 }
             }
         }
-        // AppendMenuW(popup_menu, MF_STRING, ID_ITEM_1, L"Item 1");
     }
     return popup_menu_t(popup_menu);
 }
@@ -101,12 +104,16 @@ static LRESULT CALLBACK tray_proc(HWND handle, UINT message, WPARAM wParam, LPAR
             }
             }
         } else if (message == WM_COMMAND) {
-            const UINT id = LOWORD(wParam);
-            // if (id == ID_ITEM_1) {
             auto &log = tray->sup.get_logger();
-            LOG_CRITICAL(log, "zzz/{}", id);
-            return 0;
-            // }
+            auto &menus = tray->menu_items;
+            auto idx = LOWORD(wParam);
+            if (idx < menus.size()) {
+                auto item = menus[idx];
+                if (item.text) {
+                    item.do_callback(nullptr, tray);
+                    return 0;
+                }
+            }
         }
     }
     return DefWindowProcW(handle, message, wParam, lParam);
