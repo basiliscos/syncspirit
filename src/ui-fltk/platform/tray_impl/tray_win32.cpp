@@ -11,12 +11,54 @@
 
 #include <FL/platform.H>
 #include <cstring>
+#include <type_traits>
 
 using namespace syncspirit::fltk;
 
 static constexpr wchar_t tray_property_str[] = L"syncspirit.tray.prop";
 static constexpr wchar_t tray_message_str[] = L"syncspirit.tray.message";
 static constexpr wchar_t tray_window_class_str[] = L"syncspirit.tray.window";
+
+struct popup_menu_deleter_t {
+    void operator()(HMENU handle) const noexcept {
+        if (handle) {
+            DestroyMenu(handle);
+        }
+    }
+};
+
+using popup_menu_t = std::unique_ptr<std::remove_pointer_t<HMENU>, popup_menu_deleter_t>;
+
+static popup_menu_t make_menu(tray_win32_t &tray) {
+    auto popup_menu = CreatePopupMenu();
+    if (popup_menu) {
+        auto buffer = std::array<std::byte, 1024 * 32>();
+        auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+        auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+
+        auto &menus = tray.menu_items;
+        auto menu_id = UINT(0);
+        for (auto &menu_source : menus) {
+            if (menu_source.text) {
+                auto label = menu_source.text;
+                int sz = ::MultiByteToWideChar(CP_UTF8, 0, label, -1, nullptr, 0);
+                if (sz) {
+                    auto str = std::pmr::wstring(allocator);
+                    str.resize(static_cast<std::size_t>(sz + 1));
+                    auto out_sz = ::MultiByteToWideChar(CP_UTF8, 0, label, -1, str.data(), static_cast<int>(sz + 1));
+                    if (out_sz >= 0) {
+                        auto flags = MF_STRING;
+                        if (menu_source.flags & FL_MENU_INACTIVE) {
+                            flags |= MF_GRAYED;
+                        }
+                        AppendMenuW(popup_menu, flags, menu_id++, str.data());
+                    }
+                }
+            }
+        }
+    }
+    return popup_menu_t(popup_menu);
+}
 
 static LRESULT CALLBACK tray_proc(HWND handle, UINT message, WPARAM wParam, LPARAM lParam) {
     auto tray = reinterpret_cast<tray_win32_t *>(GetPropW(handle, tray_property_str));
@@ -52,18 +94,25 @@ static LRESULT CALLBACK tray_proc(HWND handle, UINT message, WPARAM wParam, LPAR
                 if (GetCursorPos(&pt)) {
                     HWND hwnd = (HWND)fl_xid(main_window);
                     if (hwnd) {
-                        if (ScreenToClient(hwnd, &pt)) {
-                            auto &log = tray->sup.get_logger();
-                            LOG_TRACE(log, "displaying menu at ({},{})", pt.x, pt.y);
-                            auto picked = tray->menu_items.data()->popup(pt.x, pt.y);
-                            if (picked) {
-                                picked->do_callback(nullptr, tray);
-                            }
-                        }
+                        auto &log = tray->sup.get_logger();
+                        LOG_TRACE(log, "displaying menu at ({},{})", pt.x, pt.y);
+                        auto menu = make_menu(*tray);
+                        TrackPopupMenu(menu.get(), TPM_LEFTBUTTON, pt.x, pt.y, 0, tray->handle, nullptr);
                     }
                 }
                 return 0;
             }
+            }
+        } else if (message == WM_COMMAND) {
+            auto &log = tray->sup.get_logger();
+            auto &menus = tray->menu_items;
+            auto idx = LOWORD(wParam);
+            if (idx < menus.size()) {
+                auto item = menus[idx];
+                if (item.text) {
+                    item.do_callback(nullptr, tray);
+                    return 0;
+                }
             }
         }
     }
