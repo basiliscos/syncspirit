@@ -151,11 +151,31 @@ void main_window_t::hide() {
         auto is_visible = IsWindowVisible(hwnd) != FALSE;
         if (is_visible) {
             ShowWindow(hwnd, SW_HIDE);
+            native_hidden = true;
             return;
         }
 #endif
     }
     parent_t::hide();
+}
+
+void main_window_t::show() {
+#if defined(SYNCSPIRIT_FLTK_WIN32)
+    if (native_hidden) {
+        HWND hwnd = (HWND)fl_xid(this);
+        auto is_visible = IsWindowVisible(hwnd) != FALSE;
+        if (!is_visible) {
+            native_hidden = false;
+            ShowWindow(hwnd, SW_SHOW);
+            SetForegroundWindow(hwnd);
+            SetActiveWindow(hwnd);
+            redraw();
+            flush();
+            return;
+        }
+    }
+#endif
+    parent_t::show();
 }
 
 void main_window_t::set_splash_text(std::string text) {

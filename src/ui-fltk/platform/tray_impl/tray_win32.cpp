@@ -76,13 +76,9 @@ static LRESULT CALLBACK tray_proc(HWND handle, UINT message, WPARAM wParam, LPAR
                         HWND hwnd = (HWND)fl_xid(main_window);
                         auto is_visible = IsWindowVisible(hwnd) != FALSE;
                         if (is_visible) {
-                            ShowWindow(hwnd, SW_HIDE);
+                            main_window->hide();
                         } else {
-                            ShowWindow(hwnd, SW_SHOW);
-                            SetForegroundWindow(hwnd);
-                            SetActiveWindow(hwnd);
-                            main_window->redraw();
-                            main_window->flush();
+                            main_window->show();
                         }
                     },
                     main_window);

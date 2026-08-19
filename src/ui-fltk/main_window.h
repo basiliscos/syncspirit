@@ -18,6 +18,7 @@ struct menu_t;
 
 struct main_window_t : Fl_Double_Window {
     using parent_t = Fl_Double_Window;
+    using parent_t::show;
 
     main_window_t(app_supervisor_t &supervisor, int w, int h);
     ~main_window_t();
@@ -31,6 +32,7 @@ struct main_window_t : Fl_Double_Window {
 
     int handle(int e) override;
     void hide() override;
+    void show() override;
     void show_tray_icon(bool value) noexcept;
     void on_frame_render() noexcept;
     void on_local_state_update() noexcept;
@@ -45,6 +47,7 @@ struct main_window_t : Fl_Double_Window {
     menu_t *menu{nullptr};
     tray_t tray;
     image_icon_t image_icon;
+    bool native_hidden{false}; // win32-only
 };
 
 } // namespace syncspirit::fltk
