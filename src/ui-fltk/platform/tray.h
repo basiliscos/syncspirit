@@ -22,11 +22,13 @@ struct tray_impl_t {
     virtual bool is_enabled() noexcept = 0;
     virtual void set_default_icon() noexcept = 0;
     virtual void set_traffic_icon() noexcept = 0;
+    virtual void set_offline_icon() noexcept = 0;
 
     app_supervisor_t &sup;
     std::uint64_t traffic{0};
     menu_items_t menu_items;
     image_icon_t traffic_image;
+    image_icon_t offline_image;
 };
 
 struct tray_t {
