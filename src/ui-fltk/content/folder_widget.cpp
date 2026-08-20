@@ -56,8 +56,8 @@ using buttons_mask_t = std::uint32_t;
 static auto constexpr B_CREATE = buttons_mask_t{1 << 0};
 static auto constexpr B_APPLY = buttons_mask_t{1 << 1};
 static auto constexpr B_SHARE = buttons_mask_t{1 << 2};
-static auto constexpr B_RESET = buttons_mask_t{1 << 3};
-static auto constexpr B_RESCAN = buttons_mask_t{1 << 4};
+static auto constexpr B_RESCAN = buttons_mask_t{1 << 3};
+static auto constexpr B_RESET = buttons_mask_t{1 << 4};
 static auto constexpr B_REMOVE = buttons_mask_t{1 << 5};
 
 using ctx_t = folder_widget_t::serialization_context_t;
@@ -894,12 +894,11 @@ struct button_group_t final : refresheable_group_t {
             button->callback([](auto, void *data) { static_cast<folder_widget_t *>(data)->on_apply(); }, &container);
             apply_button = button;
         }
-        if (mask & B_REMOVE) {
-            auto button = new Fl_Button(xx, yy, ww, hh, "remove");
-            button->color(FL_RED);
+        if (mask & B_SHARE) {
+            auto button = new Fl_Button(xx, yy, ww, hh, "share");
             button->deactivate();
-            button->callback([](auto, void *data) { static_cast<folder_widget_t *>(data)->on_remove(); }, &container);
-            remove_button = button;
+            button->callback([](auto, void *data) { static_cast<folder_widget_t *>(data)->on_share(); }, &container);
+            share_button = button;
         }
         if (mask & B_RESCAN) {
             auto button = new Fl_Button(xx, yy, ww, hh, "rescan");
@@ -913,11 +912,12 @@ struct button_group_t final : refresheable_group_t {
             button->callback([](auto, void *data) { static_cast<folder_widget_t *>(data)->on_reset(); }, &container);
             reset_button = button;
         }
-        if (mask & B_SHARE) {
-            auto button = new Fl_Button(xx, yy, ww, hh, "share");
+        if (mask & B_REMOVE) {
+            auto button = new Fl_Button(xx, yy, ww, hh, "remove");
+            button->color(FL_RED);
             button->deactivate();
-            button->callback([](auto, void *data) { static_cast<folder_widget_t *>(data)->on_share(); }, &container);
-            share_button = button;
+            button->callback([](auto, void *data) { static_cast<folder_widget_t *>(data)->on_remove(); }, &container);
+            remove_button = button;
         }
 
         end();
