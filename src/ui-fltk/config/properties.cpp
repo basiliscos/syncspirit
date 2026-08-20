@@ -420,6 +420,8 @@ void timeout_t::reflect_to(syncspirit::config::main_t &main) { main.timeout = na
 
 const char *timeout_t::explanation_ = "main actors timeout, milliseconds";
 
+start_offline_t::start_offline_t(bool value, bool default_value) : parent_t(value, default_value, "start offline") {}
+
 void start_offline_t::reflect_to(syncspirit::config::main_t &main) { main.start_offline = native_value; }
 
 const char *start_offline_t::explanation_ = "do not connect to any network on startup";
