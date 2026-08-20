@@ -286,6 +286,7 @@ tray_win32_t::tray_win32_t(app_supervisor_t &sup_) : tray_impl_t{sup_} {
         valid = true;
     }
     make_traffic_icon();
+    make_offline_icon();
 }
 
 tray_win32_t::~tray_win32_t() {
@@ -303,6 +304,9 @@ tray_win32_t::~tray_win32_t() {
     }
     if (icon_traffic) {
         DestroyIcon(icon_traffic);
+    }
+    if (icon_offline) {
+        DestroyIcon(icon_offline);
     }
     if (handle) {
         DestroyWindow(handle);
@@ -323,6 +327,17 @@ void tray_win32_t::make_traffic_icon() noexcept {
     icon_traffic = image_to_icon(copy.get());
 }
 
+void tray_win32_t::make_offline_icon() noexcept {
+    auto info = ICONINFO{};
+    int w = GetSystemMetrics(SM_CXICON);
+    int h = GetSystemMetrics(SM_CYICON);
+    if (!w || !h) {
+        return;
+    }
+    auto copy = image_icon_t(static_cast<Fl_RGB_Image *>(offline_image->copy(w, h)));
+    icon_offline = image_to_icon(copy.get());
+}
+
 bool tray_win32_t::is_enabled() noexcept { return valid && shown; }
 
 void tray_win32_t::set_default_icon() noexcept {
@@ -335,6 +350,13 @@ void tray_win32_t::set_default_icon() noexcept {
 void tray_win32_t::set_traffic_icon() noexcept {
     if (valid && shown && icon_traffic) {
         notify_data.hIcon = icon_traffic;
+        shown = Shell_NotifyIconW(NIM_MODIFY, &notify_data);
+    }
+}
+
+void tray_win32_t::set_offline_icon() noexcept {
+    if (valid && shown && icon_offline) {
+        notify_data.hIcon = icon_offline;
         shown = Shell_NotifyIconW(NIM_MODIFY, &notify_data);
     }
 }
