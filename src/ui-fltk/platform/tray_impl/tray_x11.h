@@ -30,6 +30,7 @@ struct tray_x11_t final : tray_impl_t {
     bool is_enabled() noexcept override;
     void set_default_icon() noexcept override;
     void set_traffic_icon() noexcept override;
+    void set_offline_icon() noexcept override;
 
     Display *watching_display = nullptr;
     Atom selection_atom;

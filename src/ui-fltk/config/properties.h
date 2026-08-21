@@ -415,10 +415,10 @@ struct timeout_t final : impl::positive_integer_t {
 
 struct start_offline_t final : impl::bool_t {
     using parent_t = impl::bool_t;
-    using parent_t::parent_t;
 
     static const char *explanation_;
 
+    start_offline_t(bool value, bool default_value);
     void reflect_to(syncspirit::config::main_t &main) override;
 };
 

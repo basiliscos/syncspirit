@@ -479,6 +479,7 @@ int app_main(app_context_t &app_ctx) {
     while (!shutdown_flag) {
         sup_fltk->do_process();
         if (!Fl::wait()) {
+
             shutdown_flag = true;
             logger->debug("main window is longer show, terminating...");
         }

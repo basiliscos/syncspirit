@@ -90,6 +90,12 @@ bool folders_t::on_select() {
         db::set_id(db_folder, id);
         db::set_folder_type(db_folder, db::FolderType::send_and_receive);
         db::set_watched(db_folder, true);
+
+        auto matcher = db::FileMatcher();
+        db::set_mode(matcher, db::FileMatch::accept);
+        db::set_pattern(matcher, std::string(".*"));
+        db::add_file_matcher(db_folder, std::move(matcher));
+
         auto folder = model::folder_t::create(sequencer.next_uuid(), db_folder).value();
         folder->assign_cluster(cluster);
 

@@ -16,7 +16,8 @@
 using namespace syncspirit;
 using namespace syncspirit::fltk;
 
-static const char *traffic_icon_path = "icons/syncspirit-fltk-sync.png";
+static const char *traffic_icon_path_ = "icons/syncspirit-fltk-sync.png";
+static const char *offline_icon_path_ = "icons/syncspirit-fltk-offline.png";
 
 static void cb_quit(Fl_Widget *, void *data) {
     auto tray_widget = reinterpret_cast<tray_impl_t *>(data);
@@ -59,11 +60,18 @@ tray_impl_t::tray_impl_t(app_supervisor_t &sup_) noexcept : sup{sup_} {
     auto buffer = std::array<std::byte, 1024 * 32>();
     auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
     auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
-    auto icon_path = sup.resolve_resource(allocator, traffic_icon_path);
-    if (!icon_path.empty()) {
-        traffic_image.reset(new Fl_PNG_Image(icon_path.get_full_name().data()));
+    auto traffic_icon_path = sup.resolve_resource(allocator, traffic_icon_path_);
+    if (!traffic_icon_path.empty()) {
+        traffic_image.reset(new Fl_PNG_Image(traffic_icon_path.get_full_name().data()));
         if (!(traffic_image->w() && traffic_image->h())) {
             traffic_image.reset();
+        }
+    }
+    auto offline_icon_path = sup.resolve_resource(allocator, offline_icon_path_);
+    if (!offline_icon_path.empty()) {
+        offline_image.reset(new Fl_PNG_Image(offline_icon_path.get_full_name().data()));
+        if (!(offline_image->w() && offline_image->h())) {
+            offline_image.reset();
         }
     }
 }
@@ -96,7 +104,7 @@ void tray_t::enable(bool value) noexcept {
     }
 }
 
-bool tray_t::is_enabled() noexcept {
+bool tray_t::is_enabled() const noexcept {
     if (impl) {
         return impl->is_enabled();
     }
@@ -106,14 +114,19 @@ bool tray_t::is_enabled() noexcept {
 void tray_t::on_frame_render() noexcept {
     if (impl && impl->is_enabled()) {
         auto &self = *sup->get_cluster()->get_device();
+        auto new_state = self.get_state().get_connection_state();
         auto new_traffic = (self.get_rx_bytes() + self.get_tx_bytes()) << 1;
         if (new_traffic != traffic) {
             traffic = (traffic & 1) ? new_traffic : new_traffic | 1;
         }
-        if (traffic & 1) {
-            impl->set_traffic_icon();
+        if (new_state == model::connection_state_t::offline) {
+            impl->set_offline_icon();
         } else {
-            impl->set_default_icon();
+            if (traffic & 1) {
+                impl->set_traffic_icon();
+            } else {
+                impl->set_default_icon();
+            }
         }
     }
 }

@@ -22,18 +22,20 @@ struct tray_impl_t {
     virtual bool is_enabled() noexcept = 0;
     virtual void set_default_icon() noexcept = 0;
     virtual void set_traffic_icon() noexcept = 0;
+    virtual void set_offline_icon() noexcept = 0;
 
     app_supervisor_t &sup;
     std::uint64_t traffic{0};
     menu_items_t menu_items;
     image_icon_t traffic_image;
+    image_icon_t offline_image;
 };
 
 struct tray_t {
     ~tray_t();
     void init(app_supervisor_t &sup) noexcept;
     void enable(bool value) noexcept;
-    bool is_enabled() noexcept;
+    bool is_enabled() const noexcept;
     static bool is_available() noexcept;
     void on_frame_render() noexcept;
     void on_local_state_update() noexcept;

@@ -56,8 +56,8 @@ using buttons_mask_t = std::uint32_t;
 static auto constexpr B_CREATE = buttons_mask_t{1 << 0};
 static auto constexpr B_APPLY = buttons_mask_t{1 << 1};
 static auto constexpr B_SHARE = buttons_mask_t{1 << 2};
-static auto constexpr B_RESET = buttons_mask_t{1 << 3};
-static auto constexpr B_RESCAN = buttons_mask_t{1 << 4};
+static auto constexpr B_RESCAN = buttons_mask_t{1 << 3};
+static auto constexpr B_RESET = buttons_mask_t{1 << 4};
 static auto constexpr B_REMOVE = buttons_mask_t{1 << 5};
 
 using ctx_t = folder_widget_t::serialization_context_t;
@@ -515,6 +515,46 @@ struct base_table_t : syncspirit::fltk::static_table_t {
         return new widget_t(*this, disabled);
     }
 
+    auto make_folder_type(bool disabled) -> widgetable_ptr_t {
+        struct widget_t final : table_widget::choice_t {
+            using parent_t = table_widget::choice_t;
+            widget_t(Fl_Widget &container, bool disabled_) : parent_t{container}, disabled{disabled_} {}
+
+            Fl_Widget *create_widget(int x, int y, int w, int h) override {
+                auto r = parent_t::create_widget(x, y, w, h);
+                input->size(200, r->h());
+                static_cast<base_table_t &>(container).set_refresh_callback(input);
+                if (disabled) {
+                    widget->deactivate();
+                }
+                input->when(input->when() | FL_WHEN_CHANGED);
+                input->add("Send only");
+                input->add("Receive only");
+                input->add("Send and Receive");
+                if (disabled) {
+                    widget->deactivate();
+                }
+                return r;
+            }
+
+            void reset() override {
+                auto &container = static_cast<base_table_t &>(this->container);
+                auto value = container.get_folder().get_folder_type();
+                input->value(static_cast<int>(value));
+            }
+
+            bool store(void *data) override {
+                auto ctx = reinterpret_cast<ctx_t *>(data);
+                auto value = (db::FolderType)(input->value());
+
+                db::set_folder_type(ctx->folder, value);
+                return true;
+            }
+            bool disabled;
+        };
+        return new widget_t(*this, disabled);
+    }
+
     widgetable_ptr_t make_shared_with(model::device_ptr_t device) {
         ++share_widgets;
         return new device_share_widget_t(*this, device);
@@ -767,6 +807,7 @@ struct sharing_table_t final : base_table_t {
     sharing_table_t(folder_widget_t &container_, int x, int y, int w, int h) : parent_t(container_, x, y, w, h) {
         auto data = table_rows_t();
 
+        data.push_back({"type", make_folder_type(false)});
         data.push_back({"ignore permissions", make_ignore_permissions(false)});
         data.push_back({"ignore delete", make_ignore_delete(false)});
         data.push_back({"disable temp indixes", make_disable_tmp()});
@@ -894,12 +935,11 @@ struct button_group_t final : refresheable_group_t {
             button->callback([](auto, void *data) { static_cast<folder_widget_t *>(data)->on_apply(); }, &container);
             apply_button = button;
         }
-        if (mask & B_REMOVE) {
-            auto button = new Fl_Button(xx, yy, ww, hh, "remove");
-            button->color(FL_RED);
+        if (mask & B_SHARE) {
+            auto button = new Fl_Button(xx, yy, ww, hh, "share");
             button->deactivate();
-            button->callback([](auto, void *data) { static_cast<folder_widget_t *>(data)->on_remove(); }, &container);
-            remove_button = button;
+            button->callback([](auto, void *data) { static_cast<folder_widget_t *>(data)->on_share(); }, &container);
+            share_button = button;
         }
         if (mask & B_RESCAN) {
             auto button = new Fl_Button(xx, yy, ww, hh, "rescan");
@@ -913,11 +953,12 @@ struct button_group_t final : refresheable_group_t {
             button->callback([](auto, void *data) { static_cast<folder_widget_t *>(data)->on_reset(); }, &container);
             reset_button = button;
         }
-        if (mask & B_SHARE) {
-            auto button = new Fl_Button(xx, yy, ww, hh, "share");
+        if (mask & B_REMOVE) {
+            auto button = new Fl_Button(xx, yy, ww, hh, "remove");
+            button->color(FL_RED);
             button->deactivate();
-            button->callback([](auto, void *data) { static_cast<folder_widget_t *>(data)->on_share(); }, &container);
-            share_button = button;
+            button->callback([](auto, void *data) { static_cast<folder_widget_t *>(data)->on_remove(); }, &container);
+            remove_button = button;
         }
 
         end();
