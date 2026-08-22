@@ -165,17 +165,17 @@ template <> struct base_impl_t<ssl_socket_t> {
         }
 
         if (me || config.active) {
-            log->trace("will verify peer (self = {})", (const void *)this);
+            int depth = me ? 1 : 10;
+            log->trace("will verify peer (self = {}), depth = {}", (const void *)this, depth);
             auto mode = ssl::verify_peer | ssl::verify_fail_if_no_peer_cert | ssl::verify_client_once;
             sock.set_verify_mode(mode);
-            sock.set_verify_depth(1);
+            sock.set_verify_depth(depth);
         }
 
-        log->trace("will use verify callback: {}", (me ? "yes" : "no"));
-        if (me) {
-            sock.set_verify_callback([&](bool, ssl::verify_context &peer_ctx) -> bool {
-                auto native = peer_ctx.native_handle();
-                auto peer_cert = X509_STORE_CTX_get_current_cert(native);
+        sock.set_verify_callback([&](bool preverified, ssl::verify_context &peer_ctx) -> bool {
+            auto native = peer_ctx.native_handle();
+            auto peer_cert = X509_STORE_CTX_get_current_cert(native);
+            if (me) {
                 if (!peer_cert) {
                     log->warn("no peer certificate");
                     return false;
@@ -209,8 +209,31 @@ template <> struct base_impl_t<ssl_socket_t> {
                 }
                 validation_passed = true;
                 return true;
-            });
-        }
+            } else {
+                char subject[128] = {0};
+                char issuer[128] = {0};
+
+                if (peer_cert) {
+                    if (auto name = X509_get_subject_name(peer_cert); name) {
+                        X509_NAME_oneline(name, subject, sizeof(subject));
+                    }
+                    if (auto name = X509_get_issuer_name(peer_cert); name) {
+                        X509_NAME_oneline(name, issuer, sizeof(issuer));
+                    }
+                }
+
+                if (preverified) {
+                    log->trace("peer cert subject: '{}', issuer: '{}'", subject, issuer);
+                } else {
+                    auto depth = X509_STORE_CTX_get_error_depth(native);
+                    auto ec = X509_STORE_CTX_get_error(native);
+                    auto error = X509_verify_cert_error_string(ec);
+                    log->warn("peer (sn: {}, issuer: {}) verification failed ({}): {}", subject, issuer, ec, error);
+                }
+
+                return preverified;
+            }
+        });
     }
 
     tcp_socket_t &get_physical_layer() noexcept { return sock.next_layer(); }

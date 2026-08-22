@@ -105,6 +105,7 @@ after the core completion.
  - [fltk] add options to display `folder_id` and `device_id` in tree id
  - [core] introduce services layer (allow stop/start/restart of networking)
  - [core] dns resolver actor: randomly choose ip address of resolver server
+ - [core, fix] more reliably connect to relays.syncthing.net
  - [core, win32, bugfix] use utf8 for displaying error messages
  - [core, win32, bugfix] allow to use long file paths (260+ symbols)
  - [core, win32, bugfix] allow to use long and wide paths for certificates
