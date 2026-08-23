@@ -282,10 +282,10 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
             auto &src = src_items[i];
             items[i] = src.clone();
         }
-        assing_rows();
+        assign_rows();
     }
 
-    void assing_rows() noexcept {
+    void assign_rows() noexcept {
         begin();
         forget_controls();
         auto &items = get_items();
