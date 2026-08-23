@@ -21,6 +21,13 @@ static void on_quit(Fl_Widget *widget, void *) {
     sup.do_shutdown();
 }
 
+static void on_restart(Fl_Widget *widget, void *) {
+    auto &sup = static_cast<menu_t *>(widget)->supervisor;
+    auto log = sup.get_logger();
+    LOG_INFO(log, "restarting via menu");
+    sup.soft_restart();
+}
+
 static void on_net_start(Fl_Widget *widget, void *) {
     auto &sup = static_cast<menu_t *>(widget)->supervisor;
     auto log = sup.get_logger();
@@ -100,6 +107,7 @@ menu_t::menu_t(app_supervisor_t &supervisor_, int x, int y, int w, int h)
     index = add_item("Start", 0, on_net_start, SS_ID_NET_START);
     index = add_item("Restart", 0, on_net_restart);
     index = finish_submenu(); // Network
+    index = add_item("&Restart app", 0, on_restart);
     index = add_item("&Quit", 0, on_quit);
     index = finish_submenu(); // File
 
