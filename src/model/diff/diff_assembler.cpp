@@ -20,7 +20,8 @@ bool diff_assember_t::push_back(cluster_diff_t *diff) noexcept {
     if (next) {
         next = next->assign_sibling(diff);
     } else {
-        root = next = diff;
+        root = diff;
+        next = diff->get_last_sibling();
     }
     if (left == 0) {
         next = next->assign_sibling(new model::diff::load::interrupt_t());

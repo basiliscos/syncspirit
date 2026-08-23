@@ -46,8 +46,11 @@ auto cluster_diff_t::get_log() noexcept -> utils::logger_t { return utils::get_l
 cluster_diff_t *cluster_diff_t::assign_sibling(cluster_diff_t *sibling_) noexcept {
     assert(!sibling);
     sibling = sibling_;
+    return get_last_sibling();
+}
 
-    auto n = sibling_;
+cluster_diff_t *cluster_diff_t::get_last_sibling() noexcept {
+    auto n = this;
     while (n->sibling) {
         n = n->sibling.get();
     }
