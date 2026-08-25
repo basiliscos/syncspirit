@@ -13,6 +13,7 @@
 #include <FL/Fl_Group.H>
 #include <FL/Fl_Input.H>
 #include <FL/Fl_Table_Row.H>
+#include <FL/Fl_Check_Button.H>
 
 using namespace syncspirit;
 using namespace syncspirit::fltk;
@@ -32,9 +33,10 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
 
     struct item_controls_t {
         item_controls_t() noexcept = default;
-        item_controls_t(table_t *parent_, hightlight_t hightlight_, Fl_Group *tools_, Fl_Choice *match_mode_,
-                        Fl_Input *input_) noexcept
-            : parent{parent_}, hightlight{hightlight_}, tools{tools_}, match_mode{match_mode_}, input{input_} {}
+        item_controls_t(table_t *parent_, hightlight_t hightlight_, Fl_Check_Button *ignore_case_, Fl_Group *tools_,
+                        Fl_Choice *match_mode_, Fl_Input *input_) noexcept
+            : parent{parent_}, hightlight{hightlight_}, ignore_case{ignore_case_}, tools{tools_},
+              match_mode{match_mode_}, input{input_} {}
 
         item_controls_t(const item_controls_t &) = delete;
         item_controls_t(item_controls_t &&other) noexcept { *this = std::move(other); }
@@ -42,6 +44,7 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
             if (this != &other) {
                 std::swap(parent, other.parent);
                 std::swap(hightlight, other.hightlight);
+                std::swap(ignore_case, other.ignore_case);
                 std::swap(tools, other.tools);
                 std::swap(match_mode, other.match_mode);
                 std::swap(input, other.input);
@@ -51,6 +54,10 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
 
         ~item_controls_t() {
             if (parent) {
+                if (ignore_case) {
+                    parent->remove(*ignore_case);
+                    delete ignore_case;
+                }
                 if (tools) {
                     parent->remove(*tools);
                     delete tools;
@@ -68,6 +75,7 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
 
         table_t *parent{nullptr};
         hightlight_t hightlight{hightlight_t::no};
+        Fl_Check_Button *ignore_case{nullptr};
         Fl_Group *tools{nullptr};
         Fl_Choice *match_mode{nullptr};
         Fl_Input *input{nullptr};
@@ -78,7 +86,7 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
         : parent_t(x, y, w, h), container{container_} {
         row_header(0);
         row_resize(0);
-        cols(4);
+        cols(5);
         col_header(1);
         col_resize(1);
         end();
@@ -96,6 +104,37 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
     utils::logger_t &get_logger() noexcept { return container.container.container.supervisor.get_logger(); }
 
     void forget_controls() noexcept { controls.clear(); }
+
+    Fl_Check_Button *make_ignore_case(const model::file_matcher_t &item, int row) noexcept {
+        static constexpr auto P = CELL_PADDING;
+        int x, y, w, h;
+        find_cell(CONTEXT_TABLE, row, 1, x, y, w, h);
+        auto input = new Fl_Check_Button(x, y, w, h);
+        input->value(static_cast<int>(item.get_ignore_case()));
+        input->callback(
+            [](Fl_Widget *self, void *data) {
+                auto t = reinterpret_cast<table_t *>(data);
+                auto &items = t->get_items();
+                for (std::size_t i = 0; i < t->controls.size(); ++i) {
+                    if (t->controls[i].ignore_case == self) {
+                        auto &item = items[i];
+                        auto value = static_cast<Fl_Check_Button *>(self)->value();
+                        item.set_ignore_case(value);
+                        auto [ec, off] = item.compile();
+                        if (ec) {
+                            auto &log = t->get_logger();
+                            log->warn("cannot compile {} regex '{}': {}", i + 1, item.get_pattern(), ec);
+                        }
+                        break;
+                    }
+                }
+                t->container.container.refresh();
+                t->redraw();
+            },
+            this);
+
+        return input;
+    }
 
     Fl_Group *make_tools(const model::file_matcher_t &, int row) noexcept {
         static constexpr auto P = CELL_PADDING;
@@ -185,7 +224,7 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
         if (index + 1 < items.size()) {
             std::swap(items[index], items[index + 1]);
         } else {
-            items.push_back(model::file_matcher_t(".*", M::accept));
+            items.push_back(model::file_matcher_t(".*", M::accept, true));
             begin();
             auto item_controls = make_item_controls(items.back(), static_cast<int>(index + 1));
             end();
@@ -267,10 +306,11 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
             log->warn("cannot compile {} regex '{}': {}", row + 1, item.get_pattern(), ec);
             highlight = hightlight_t::error;
         }
+        auto ignore_case = make_ignore_case(item, row);
         auto tools = make_tools(item, row);
         auto type = make_mode(item, row);
         auto re = make_regex(item, row);
-        return item_controls_t(this, highlight, tools, type, re);
+        return item_controls_t(this, highlight, ignore_case, tools, type, re);
     }
 
     auto get_items() noexcept -> model::file_matchers_t & { return items; }
@@ -309,9 +349,7 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
             return;
         }
         case CONTEXT_COL_HEADER: {
-            fl_push_clip(x, y, w, h);
-            fl_draw_box(FL_THIN_UP_BOX, x, y, w, h, row_header_color());
-            fl_pop_clip();
+            draw_header(col, x, y, w, h);
             return;
         }
         case CONTEXT_CELL:
@@ -329,6 +367,21 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
         }
     }
 
+    void draw_header(int col, int x, int y, int w, int h) {
+        std::string_view label = col == 0   ? "order"
+                                 : col == 1 ? "control"
+                                 : col == 2 ? "I"
+                                 : col == 3 ? "type"
+                                            : "regex pattern";
+        fl_push_clip(x, y, w, h);
+        {
+            fl_draw_box(FL_THIN_UP_BOX, x, y, w, h, row_header_color());
+            fl_color(FL_BLACK);
+            fl_draw(label.data(), x, y, w, h, FL_ALIGN_CENTER);
+        }
+        fl_pop_clip();
+    }
+
     void resize_widgets() noexcept {
         for (int i = 0; i < rows(); ++i) {
             auto &control = controls.at(static_cast<size_t>(i));
@@ -341,12 +394,18 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
             {
                 int xx, yy, ww, hh;
                 find_cell(CONTEXT_TABLE, i, 2, xx, yy, ww, hh);
+                control.ignore_case->resize(xx, yy, ww, hh);
+                control.ignore_case->redraw();
+            }
+            {
+                int xx, yy, ww, hh;
+                find_cell(CONTEXT_TABLE, i, 3, xx, yy, ww, hh);
                 control.match_mode->resize(xx, yy, ww, hh);
                 control.match_mode->redraw();
             }
             {
                 int xx, yy, ww, hh;
-                find_cell(CONTEXT_TABLE, i, 3, xx, yy, ww, hh);
+                find_cell(CONTEXT_TABLE, i, 4, xx, yy, ww, hh);
                 control.input->resize(xx, yy, ww, hh);
                 control.input->redraw();
             }
@@ -356,15 +415,16 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
 
     void update_col_widths(int x, int y, int w, int h) noexcept {
         auto w0 = std::max(60, col_width(0));
-        // auto w1 = std::max(80, col_width(1));
         auto w1 = 80;
-        auto w2 = std::max(85, col_width(2));
-        auto w3 = std::max(1, tiw - (w0 + w1 + w2));
+        auto w2 = 20;
+        auto w3 = std::max(85, col_width(3));
+        auto w4 = std::max(1, tiw - (w0 + w1 + w2 + w3));
 
         col_width(0, w0);
         col_width(1, w1);
         col_width(2, w2);
         col_width(3, w3);
+        col_width(4, w4);
     }
 
     void resize(int x, int y, int w, int h) override {
@@ -386,6 +446,7 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
             auto &c = controls[i];
             auto mode = item.get_mode();
             c.match_mode->value(static_cast<int>(item.get_mode()));
+            c.ignore_case->value(item.get_ignore_case());
             auto pattern = item.get_pattern();
             auto input_value = c.input->value();
             if (!input_value || input_value != pattern) {
@@ -512,6 +573,7 @@ bool file_matching_widget_t::store(void *ptr) {
         auto matcher = db::FileMatcher();
         db::set_pattern(matcher, std::string(item.get_pattern()));
         db::set_mode(matcher, item.get_mode());
+        db::set_ignore_case(matcher, item.get_ignore_case());
         db::add_file_matcher(ctx->folder, std::move(matcher));
     }
     return true;

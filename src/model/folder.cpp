@@ -53,7 +53,7 @@ void folder_t::assign_fields(const db::Folder &item) noexcept {
     for (std::size_t i = 0; i < matchers_sz; ++i) {
         auto &db = db::get_file_matcher(item, i);
         auto pattern = db::get_pattern(db);
-        auto fm = file_matcher_t(std::string(pattern), db::get_mode(db));
+        auto fm = file_matcher_t(std::string(pattern), db::get_mode(db), db::get_ignore_case(db));
         auto compile_err = fm.compile();
         if (compile_err.code) {
             spdlog::warn("({}) file matcher {} '{}' compilation error at {}: {}", label, i + 1, fm.get_pattern(),
@@ -82,6 +82,7 @@ void folder_t::serialize(syncspirit::db::Folder &dest) const noexcept {
         auto db = db::FileMatcher();
         db::set_pattern(db, std::string(fm.get_pattern()));
         db::set_mode(db, fm.get_mode());
+        db::set_ignore_case(db, fm.get_ignore_case());
         db::add_file_matcher(dest, std::move(db));
     }
 }

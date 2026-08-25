@@ -320,6 +320,14 @@ inline void set_mode(FileMatcher &msg, FileMatch value) {
     using namespace pp;
     msg["mode"_f] = value;
 }
+inline bool get_ignore_case(const FileMatcher &msg) {
+    using namespace pp;
+    return msg["ignore_case"_f].value_or(false);
+}
+inline void set_ignore_case(FileMatcher &msg, bool value) {
+    using namespace pp;
+    msg["ignore_case"_f] = value;
+}
 
 /**************/
 /*** Folder ***/

@@ -219,8 +219,9 @@ using Device = pp::message<
 >;
 
 using FileMatcher = pp::message<
-    pp::string_field    <"pattern", 1 >,
-    pp::enum_field      <"mode",    2, FileMatch>
+    pp::string_field    <"pattern",     1>,
+    pp::enum_field      <"mode",        2, FileMatch>,
+    pp::bool_field      <"ignore_case", 3>
 >;
 
 using Folder = pp::message<

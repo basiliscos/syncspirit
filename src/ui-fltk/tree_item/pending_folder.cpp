@@ -6,7 +6,6 @@
 #include "content/folder_widget.h"
 #include "proto/proto-helpers-db.h"
 
-#include <FL/Fl_Check_Button.H>
 #include <spdlog/fmt/fmt.h>
 #include <boost/nowide/convert.hpp>
 
@@ -68,6 +67,7 @@ bool pending_folder_t::on_select() {
         auto matcher = db::FileMatcher();
         db::set_mode(matcher, db::FileMatch::accept);
         db::set_pattern(matcher, std::string(".*"));
+        db::set_ignore_case(matcher, true);
         db::add_file_matcher(db_folder, std::move(matcher));
 
         auto folder = model::folder_t::create(sequencer.next_uuid(), db_folder).value();

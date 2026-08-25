@@ -24,18 +24,19 @@ TEST_CASE("folder file matchers", "[model]") {
         CHECK(!f->accept("a/b/c"));
     }
 
-    auto add_regex = [&](std::string_view pattern, file_match_t mode) {
+    auto add_regex = [&](std::string_view pattern, file_match_t mode, bool ignore_case) {
         auto db_fm = db::FileMatcher();
         db::set_pattern(db_fm, std::string(pattern));
         db::set_mode(db_fm, mode);
+        db::set_ignore_case(db_fm, ignore_case);
         db::add_file_matcher(db, db_fm);
     };
 
     SECTION("serialize and deserialize") {
         CHECK(db::get_file_matcher_size(db) == 0);
 
-        add_regex("a", file_match_t::ignore);
-        add_regex("b", file_match_t::ignore);
+        add_regex("a", file_match_t::ignore, true);
+        add_regex("b", file_match_t::ignore, true);
         CHECK(db::get_file_matcher_size(db) == 2);
 
         auto bytes = db::encode(db);
@@ -46,44 +47,62 @@ TEST_CASE("folder file matchers", "[model]") {
     }
 
     SECTION("ignore all") {
-        add_regex(".*", file_match_t::ignore);
+        add_regex(".*", file_match_t::ignore, true);
         auto f = folder_t::create(uuid, db).value();
         CHECK(!f->accept("a/b/c"));
     }
 
     SECTION("regex is off") {
-        add_regex(".*", file_match_t::off);
+        add_regex(".*", file_match_t::off, true);
         auto f = folder_t::create(uuid, db).value();
         CHECK(!f->accept("a/b/c"));
     }
 
     SECTION("accept all") {
-        add_regex(".*", file_match_t::accept);
+        add_regex(".*", file_match_t::accept, true);
         auto f = folder_t::create(uuid, db).value();
         CHECK(f->accept(("a/b/c")));
     }
 
     SECTION("error in regex") {
-        add_regex("\\", file_match_t::accept);
+        add_regex("\\", file_match_t::accept, true);
         auto f = folder_t::create(uuid, db).value();
         CHECK(!f->accept(("a")));
         CHECK(!f->accept("xxx"));
     }
 
-    SECTION("accept some") {
-        add_regex(".*aaa.*", file_match_t::accept);
+    SECTION("accept some (ignore case: false)") {
+        add_regex(".*aaa.*", file_match_t::accept, false);
         auto f = folder_t::create(uuid, db).value();
         CHECK(f->accept("aaaa/b/c"));
         CHECK(f->accept(("x/aaa/b/c")));
         CHECK(f->accept("aaa"));
+        CHECK(!f->accept("AAA"));
+        CHECK(!f->accept("AaA"));
+        CHECK(!f->accept("aaA"));
+        CHECK(!f->accept("aAa"));
+        CHECK(!f->accept("bbb"));
+        CHECK(!f->accept("ccc"));
+    }
+
+    SECTION("accept some (ignore case: true)") {
+        add_regex(".*aaa.*", file_match_t::accept, true);
+        auto f = folder_t::create(uuid, db).value();
+        CHECK(f->accept("aaaa/b/c"));
+        CHECK(f->accept(("x/aaa/b/c")));
+        CHECK(f->accept("aaa"));
+        CHECK(f->accept("AAA"));
+        CHECK(f->accept("AaA"));
+        CHECK(f->accept("aaA"));
+        CHECK(f->accept("aAa"));
         CHECK(!f->accept("bbb"));
         CHECK(!f->accept("ccc"));
     }
 
     SECTION("several rules") {
-        add_regex(".*aaa.*", file_match_t::accept);
-        add_regex(".*a.*", file_match_t::ignore);
-        add_regex(".*", file_match_t::accept);
+        add_regex(".*aaa.*", file_match_t::accept, true);
+        add_regex(".*a.*", file_match_t::ignore, true);
+        add_regex(".*", file_match_t::accept, true);
         auto f = folder_t::create(uuid, db).value();
         CHECK(f->accept("aaaa/b/c"));
         CHECK(f->accept("x/aaa/b/c"));

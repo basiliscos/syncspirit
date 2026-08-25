@@ -25,7 +25,7 @@ struct SYNCSPIRIT_API file_matcher_t {
     file_matcher_t() noexcept = default;
     file_matcher_t(const file_matcher_t &) noexcept = delete;
     file_matcher_t(file_matcher_t &&) noexcept;
-    file_matcher_t(std::string, file_match_t) noexcept;
+    file_matcher_t(std::string, file_match_t, bool ignore_case) noexcept;
     ~file_matcher_t();
 
     file_matcher_t clone() const noexcept;
@@ -35,6 +35,8 @@ struct SYNCSPIRIT_API file_matcher_t {
     std::string_view get_pattern() const noexcept;
     void set_mode(file_match_t) noexcept;
     file_match_t get_mode() const noexcept;
+    void set_ignore_case(bool) noexcept;
+    bool get_ignore_case() const noexcept;
 
     compile_error_t compile() noexcept;
     bool is_valid() const noexcept;
@@ -46,6 +48,7 @@ struct SYNCSPIRIT_API file_matcher_t {
     pcre2_match_data *match_data{nullptr};
     std::string pattern;
     file_match_t mode{file_match_t::off};
+    bool ignore_case{true};
 };
 
 using file_matchers_t = std::vector<file_matcher_t>;
