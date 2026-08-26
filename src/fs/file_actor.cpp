@@ -89,7 +89,7 @@ void file_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 void file_actor_t::on_start() noexcept {
     LOG_TRACE(log, "on_start");
     send<payload::io_signal_t>(address);
-    send<model::payload::local_up_t>(coordinator);
+    send<model::payload::local_up_t>(coordinator, net::names::fs_actor, address);
     r::actor_base_t::on_start();
 }
 

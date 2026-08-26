@@ -204,8 +204,12 @@ void net_supervisor_t::on_model_request(model::message::model_request_t &message
     try_seed_model();
 }
 
-void net_supervisor_t::on_local_up(model::message::local_up_t &) noexcept {
+void net_supervisor_t::on_local_up(model::message::local_up_t &message) noexcept {
     --local_counter;
+    auto &p = message.payload;
+    if (p.name == names::fs_actor) {
+        fs_addr = p.address;
+    }
     LOG_DEBUG(log, "on_local_up, left = {}", local_counter);
     if (local_counter == 0) {
         send<model::payload::local_ready_t>(coordinator);
@@ -251,6 +255,7 @@ void net_supervisor_t::spawn_services() noexcept {
                          .ssl_pair(&ssl_pair)
                          .sequencer(sequencer)
                          .spawner_address(spawner)
+                         .fs_address(fs_addr)
                          .auto_restart(auto_restart_services)
                          .finish();
         services_addr = actor->get_address();

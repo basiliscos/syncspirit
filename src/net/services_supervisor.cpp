@@ -20,7 +20,7 @@ using namespace syncspirit::net;
 
 services_supervisor_t::services_supervisor_t(config_t &cfg)
     : parent_t{cfg}, app_config{cfg.app_config}, cluster{cfg.cluster}, sequencer(cfg.sequencer),
-      ssl_pair{*cfg.ssl_pair}, auto_restart{cfg.auto_restart} {
+      ssl_pair{*cfg.ssl_pair}, fs_address{cfg.fs_address}, auto_restart{cfg.auto_restart} {
     coordinator = parent->get_address();
     assert(auto_restart);
 }
@@ -261,6 +261,7 @@ void services_supervisor_t::launch_cluster_supervisor() noexcept {
         .cluster(cluster)
         .sequencer(sequencer)
         .config(app_config)
+        .fs_address(fs_address)
         .escalate_failure()
         .finish();
 }

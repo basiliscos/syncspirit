@@ -115,6 +115,7 @@ struct SYNCSPIRIT_API net_supervisor_t : net_supervisor_base_t<ra::supervisor_as
     std::uint_fast32_t local_counter;
     model::diff::cluster_diff_ptr_t load_diff;
     r::address_ptr_t db_addr;
+    r::address_ptr_t fs_addr;
     r::address_ptr_t services_addr;
     spawner_ptr_t services_spawner;
     utils::key_pair_t ssl_pair;

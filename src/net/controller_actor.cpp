@@ -115,7 +115,7 @@ struct C::stack_context_t : model::diff::diff_assember_t {
             }
             if (!io_commands.empty()) {
                 auto &self = actor.get_address();
-                auto &fs = actor.fs_addr;
+                auto &fs = actor.fs_address;
                 auto cache_key = actor.get_address().get();
                 for (auto &io_command : io_commands) {
                     auto unit = std::vector<fs::payload::io_command_t>();
@@ -280,10 +280,11 @@ struct C::folder_synchronization_t {
 
 controller_actor_t::controller_actor_t(config_t &config)
     : parent_t{config}, sequencer{std::move(config.sequencer)}, peer{config.peer},
-      peer_state{peer->get_state().clone()}, peer_address{config.peer_addr}, rx_blocks_requested{0},
-      tx_blocks_requested{0}, outgoing_buffer_max{config.outgoing_buffer_max}, request_pool{config.request_pool},
-      hasher_threads{config.hasher_threads}, advances_per_iteration{config.advances_per_iteration},
-      default_path(std::move(config.default_path)), announced{false} {
+      peer_state{peer->get_state().clone()}, peer_address{config.peer_addr}, fs_address{config.fs_address},
+      rx_blocks_requested{0}, tx_blocks_requested{0}, outgoing_buffer_max{config.outgoing_buffer_max},
+      request_pool{config.request_pool}, hasher_threads{config.hasher_threads},
+      advances_per_iteration{config.advances_per_iteration}, default_path(std::move(config.default_path)),
+      announced{false} {
     {
         assert(cluster);
         assert(sequencer);
@@ -308,7 +309,6 @@ void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     plugin.with_casted<hasher::hasher_plugin_t>([&](auto &p) {
         hasher = &p;
         p.configure_hashers(hasher_threads);
-        p.discover_name(names::fs_actor, fs_addr, false).link(false);
         p.discover_name(names::coordinator, coordinator, false).link(false).callback([&](auto phase, auto &ee) {
             if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {
                 parent_t::post_configure_coordinator();

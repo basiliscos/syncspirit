@@ -26,6 +26,7 @@ struct SYNCSPIRIT_API cluster_supervisor_t final : public model_actor_t<ra::supe
         using base_t::base_t;
         config::main_t config;
         model::sequencer_ptr_t sequencer;
+        r::address_ptr_t fs_address;
     };
 
     template <typename Actor> struct config_builder_t : parent_t::template config_builder_t<Actor> {
@@ -37,9 +38,12 @@ struct SYNCSPIRIT_API cluster_supervisor_t final : public model_actor_t<ra::supe
             base_t::config.config = value;
             return std::move(*static_cast<typename base_t::builder_t *>(this));
         }
-
         builder_t &&sequencer(model::sequencer_ptr_t value) && noexcept {
             base_t::config.sequencer = std::move(value);
+            return std::move(*static_cast<typename base_t::builder_t *>(this));
+        }
+        builder_t &&fs_address(const r::address_ptr_t &value) && noexcept {
+            base_t::config.fs_address = value;
             return std::move(*static_cast<typename base_t::builder_t *>(this));
         }
     };
@@ -55,6 +59,7 @@ struct SYNCSPIRIT_API cluster_supervisor_t final : public model_actor_t<ra::supe
 
     config::main_t config;
     model::sequencer_ptr_t sequencer;
+    r::address_ptr_t fs_address;
 };
 
 } // namespace net

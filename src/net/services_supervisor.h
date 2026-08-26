@@ -25,6 +25,7 @@ struct SYNCSPIRIT_API services_supervisor_t final : ra::supervisor_asio_t {
         model::cluster_ptr_t cluster;
         model::sequencer_ptr_t sequencer;
         const utils::key_pair_t *ssl_pair = nullptr;
+        r::address_ptr_t fs_address;
         bool *auto_restart = nullptr;
     };
 
@@ -47,6 +48,10 @@ struct SYNCSPIRIT_API services_supervisor_t final : ra::supervisor_asio_t {
         }
         builder_t &&sequencer(model::sequencer_ptr_t value) && noexcept {
             base_t::config.sequencer = std::move(value);
+            return std::move(*static_cast<typename base_t::builder_t *>(this));
+        }
+        builder_t &&fs_address(const r::address_ptr_t &value) && noexcept {
+            base_t::config.fs_address = value;
             return std::move(*static_cast<typename base_t::builder_t *>(this));
         }
         builder_t &&auto_restart(bool &value) && noexcept {
@@ -82,6 +87,7 @@ struct SYNCSPIRIT_API services_supervisor_t final : ra::supervisor_asio_t {
     model::sequencer_ptr_t sequencer;
     std::uint32_t counter{0};
     const utils::key_pair_t &ssl_pair;
+    r::address_ptr_t fs_address;
     bool *auto_restart;
 };
 } // namespace syncspirit::net

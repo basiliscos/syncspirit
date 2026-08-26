@@ -128,6 +128,7 @@ struct fixture_t {
         target = sup->create_actor<controller_actor_t>()
                      .peer(peer_device)
                      .peer_addr(peer_actor->get_address())
+                     .fs_address(sup->get_address())
                      .request_pool(1024)
                      .outgoing_buffer_max(1024'000)
                      .cluster(cluster)
@@ -165,10 +166,6 @@ struct fixture_t {
 
         sup = create_supervisor();
         sup->cluster = cluster;
-        sup->configure_callback = [&](r::plugin::plugin_base_t &plugin) {
-            plugin.template with_casted<r::plugin::registry_plugin_t>(
-                [&](auto &p) { p.register_name(net::names::fs_actor, sup->get_address()); });
-        };
         sup->do_process();
 
         auto folder_id_1 = "1234-5678";

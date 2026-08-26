@@ -9,7 +9,7 @@
 using namespace syncspirit::net;
 
 cluster_supervisor_t::cluster_supervisor_t(config_t &config)
-    : parent_t{config}, config{config.config}, sequencer{config.sequencer} {}
+    : parent_t{config}, config{config.config}, sequencer{config.sequencer}, fs_address{config.fs_address} {}
 
 void cluster_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     parent_t::configure(plugin);
@@ -47,6 +47,7 @@ auto cluster_supervisor_t::operator()(const model::diff::contact::peer_state_t &
                 .timeout(init_timeout * 7 / 9)
                 .peer(peer)
                 .peer_addr(diff.peer_addr)
+                .fs_address(fs_address)
                 .blocks_max_requested(bep.blocks_max_requested)
                 .advances_per_iteration(bep.advances_per_iteration)
                 .outgoing_buffer_max(bep.tx_buff_limit)

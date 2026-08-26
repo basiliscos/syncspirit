@@ -43,6 +43,7 @@ struct SYNCSPIRIT_API controller_actor_t final : public model_actor_t<r::actor_b
         uint32_t outgoing_buffer_max = 0;
         std::uint32_t advances_per_iteration = 10;
         utils::path_t default_path;
+        r::address_ptr_t fs_address;
     };
 
     template <typename Actor> struct config_builder_t : parent_t::template config_builder_t<Actor> {
@@ -62,6 +63,11 @@ struct SYNCSPIRIT_API controller_actor_t final : public model_actor_t<r::actor_b
 
         builder_t &&peer_addr(const r::address_ptr_t &value) && noexcept {
             base_t::config.peer_addr = value;
+            return std::move(*static_cast<typename base_t::builder_t *>(this));
+        }
+
+        builder_t &&fs_address(const r::address_ptr_t &value) && noexcept {
+            base_t::config.fs_address = value;
             return std::move(*static_cast<typename base_t::builder_t *>(this));
         }
 
@@ -208,7 +214,7 @@ struct SYNCSPIRIT_API controller_actor_t final : public model_actor_t<r::actor_b
     model::device_ptr_t peer;
     model::device_state_t peer_state;
     r::address_ptr_t peer_address;
-    r::address_ptr_t fs_addr;
+    r::address_ptr_t fs_address;
     model::ignored_folders_map_t *ignored_folders;
     // generic
     tx_size_ptr_t outgoing_buffer;

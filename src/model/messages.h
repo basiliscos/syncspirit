@@ -74,7 +74,10 @@ struct thread_ready_t {
 };
 struct db_loaded_t {};
 
-struct local_up_t {};
+struct local_up_t {
+    std::string_view name;
+    r::address_ptr_t address;
+};
 struct local_ready_t {};
 
 struct sevice_lock_t {

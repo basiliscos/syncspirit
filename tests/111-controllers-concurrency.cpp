@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2025-2026 Ivan Baidakou
 
 #include "test-utils.h"
 #include "hasher/hasher_actor.h"
@@ -28,13 +28,6 @@ struct fixture_t {
 
     fixture_t() noexcept { log = utils::get_logger("fixture"); }
 
-    virtual configure_callback_t configure() noexcept {
-        return [&](r::plugin::plugin_base_t &plugin) {
-            plugin.template with_casted<r::plugin::registry_plugin_t>(
-                [&](auto &p) { p.register_name(net::names::fs_actor, sup->get_address()); });
-        };
-    }
-
     virtual void run() noexcept {
         auto my_id_str = "KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD";
         auto my_id = device_id_t::from_string(my_id_str).value();
@@ -62,7 +55,6 @@ struct fixture_t {
                   .make_presentation(true)
                   .finish();
         sup->cluster = cluster;
-        sup->configure_callback = configure();
 
         sup->do_process();
         CHECK(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::OPERATIONAL);
@@ -94,6 +86,7 @@ struct fixture_t {
         controller_actors[0] = sup->create_actor<controller_actor_t>()
                                    .peer(peer_devices[0])
                                    .peer_addr(peer_actors[0]->get_address())
+                                   .fs_address(sup->get_address())
                                    .request_pool(1024)
                                    .outgoing_buffer_max(1024'000)
                                    .cluster(cluster)
@@ -106,6 +99,7 @@ struct fixture_t {
         controller_actors[1] = sup->create_actor<controller_actor_t>()
                                    .peer(peer_devices[1])
                                    .peer_addr(peer_actors[1]->get_address())
+                                   .fs_address(sup->get_address())
                                    .request_pool(1024)
                                    .outgoing_buffer_max(1024'000)
                                    .cluster(cluster)
