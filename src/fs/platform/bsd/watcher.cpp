@@ -60,7 +60,7 @@ auto watcher_t::watch_path(std::string_view path, file_type_t type) noexcept -> 
     return r;
 }
 
-auto watcher_t::unwatch_path(int wd, file_type_t type) noexcept -> sys::error_code {
+auto watcher_t::unwatch_path(int wd, file_type_t type) noexcept -> std::error_code {
     static constexpr auto FLAGS = EV_DELETE;
 
     if (!((type == file_type_t::DIRECTORY) || (type == file_type_t::FILE))) {
@@ -71,7 +71,7 @@ auto watcher_t::unwatch_path(int wd, file_type_t type) noexcept -> sys::error_co
     auto ctx = static_cast<platform_context_t *>(sup->context);
     ctx->backend.unwatch(wd, FILTER, FLAGS, FILTER_FLAGS);
     if (close(wd) == -1) {
-        return sys::error_code{errno, sys::system_category()};
+        return std::error_code{errno, std::system_category()};
     }
 
     return {};
