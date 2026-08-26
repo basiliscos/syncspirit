@@ -564,8 +564,8 @@ struct base_table_t : syncspirit::fltk::static_table_t {
         parent_t::refresh();
 
         if (is_local() || is_candidate() || is_new()) {
-            auto &folder = get_folder();
             if (scan_start_cell && scan_finish_cell) {
+                auto &folder = *container.folder_orig;
                 auto &date_start = folder.get_scan_start();
                 auto &date_finish = folder.get_scan_finish();
                 auto scan_start = date_start.is_not_a_date_time() ? "-" : model::pt::to_simple_string(date_start);
