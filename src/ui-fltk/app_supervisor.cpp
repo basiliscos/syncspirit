@@ -824,6 +824,34 @@ Fl_RGB_Image *app_supervisor_t::load_image(std::string_view relative_path) noexc
     return nullptr;
 }
 
+Fl_RGB_Image *app_supervisor_t::resize_image(Fl_RGB_Image *original, int w, int h) noexcept {
+    if (!original) {
+        return original;
+    }
+    if (original->w() == w && original->h() == h) {
+        return original;
+    }
+
+    auto buffer = std::array<std::byte, 1024 * 32>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+    auto key_str = std::pmr::string(allocator);
+    fmt::format_to(std::back_inserter(key_str), "{}-{}x{}", (const void *)original, w, h);
+    auto key_view = std::string_view(key_str);
+
+    auto it = resized_images.find(key_view);
+    if (it != resized_images.end()) {
+        return it->second.get();
+    }
+    auto copy = static_cast<Fl_RGB_Image *>(original->copy(w, h));
+    resized_images.emplace(std::string(key_view), copy);
+    return copy;
+}
+
+Fl_RGB_Image *app_supervisor_t::load_image(std::string_view relative_path, int w, int h) noexcept {
+    return resize_image(load_image(relative_path), w, h);
+}
+
 void app_supervisor_t::detach_main_window() noexcept {
     cluster.reset();
     if (main_window) {

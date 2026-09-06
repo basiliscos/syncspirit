@@ -106,6 +106,7 @@ struct base_table_t : syncspirit::fltk::static_table_t {
 
     const model::folder_info_t &get_folder_info() const noexcept { return *container.folder_info; }
 
+    app_supervisor_t &get_supervisor() noexcept { return container.container.supervisor; }
     const model::cluster_t *get_cluster() const noexcept { return container.container.supervisor.get_cluster(); }
 
     inline void set_error(std::string_view error) { container.set_error(error); }
@@ -670,9 +671,19 @@ Fl_Widget *device_share_widget_t::create_widget(int x, int y, int w, int h) {
     auto yy = y + padding, ww = w - padding * 2, hh = h - padding * 2;
     ww = std::min(300, ww);
 
+    auto &sup = static_cast<base_table_t *>(&container)->get_supervisor();
     input = new Fl_Choice(x + padding, yy, ww, hh);
     auto add = new Fl_Button(input->x() + input->w() + padding * 2, yy, hh, hh, "@+");
     auto remove = new Fl_Button(add->x() + add->w() + padding * 2, yy, hh, hh, "@undo");
+
+    if (auto add_icon = sup.load_image("icons/action-add.png", hh, hh); add_icon) {
+        add->image(*add_icon);
+        add->label(nullptr);
+    }
+    if (auto rm_icon = sup.load_image("icons/action-remove.png", hh, hh); rm_icon) {
+        remove->image(*rm_icon);
+        remove->label(nullptr);
+    }
 
     add->callback(
         [](auto, void *data) {

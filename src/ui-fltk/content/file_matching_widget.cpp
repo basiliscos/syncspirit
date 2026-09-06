@@ -154,18 +154,15 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
         down->tooltip("move matcher down");
 
         auto &sup = container.container.container.supervisor;
-        if (auto rm_icon = sup.load_image("icons/action-remove.png"); rm_icon) {
-            rm_icon->scale(hh, hh);
+        if (auto rm_icon = sup.load_image("icons/action-remove.png", hh, hh); rm_icon) {
             rm->image(*rm_icon);
             rm->label(nullptr);
         }
-        if (auto up_icon = sup.load_image("icons/action-up.png"); up_icon) {
-            up_icon->scale(hh, hh);
+        if (auto up_icon = sup.load_image("icons/action-up.png", hh, hh); up_icon) {
             up->image(*up_icon);
             up->label(nullptr);
         }
-        if (auto down_icon = sup.load_image("icons/action-down.png"); down_icon) {
-            down_icon->scale(hh, hh);
+        if (auto down_icon = sup.load_image("icons/action-down.png", hh, hh); down_icon) {
             down->image(*down_icon);
             down->label(nullptr);
         }

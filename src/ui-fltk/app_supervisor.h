@@ -23,6 +23,7 @@
 #include <FL/Fl_RGB_Image.H>
 #include <memory>
 #include <chrono>
+#include <cstdint>
 
 namespace syncspirit::fltk {
 
@@ -183,6 +184,8 @@ struct app_supervisor_t : app_supervisor_base_t<app_supervisor_t> {
 
     std::uint32_t mask_nodes() const noexcept;
     Fl_RGB_Image *load_image(std::string_view relative_path) noexcept;
+    Fl_RGB_Image *load_image(std::string_view relative_path, int w, int h) noexcept;
+    Fl_RGB_Image *resize_image(Fl_RGB_Image *original, int w, int h) noexcept;
 
   private:
     using clock_t = std::chrono::high_resolution_clock;
@@ -190,6 +193,7 @@ struct app_supervisor_t : app_supervisor_base_t<app_supervisor_t> {
     using callbacks_t = std::list<callback_ptr_t>;
     using delayed_items_t = std::unordered_set<presence_item_ptr_t>;
     using images_map_t = std::unordered_map<std::string, image_icon_t, utils::string_hash_t, utils::string_eq_t>;
+    using resized_images_t = std::unordered_map<std::string, image_icon_t, utils::string_hash_t, utils::string_eq_t>;
 
     void on_model_response(model::message::model_response_t &res) noexcept;
     void on_local_ready(model::message::local_ready_t &) noexcept;
@@ -233,6 +237,7 @@ struct app_supervisor_t : app_supervisor_base_t<app_supervisor_t> {
     main_window_t *main_window;
     delayed_items_t delayed_items;
     images_map_t images_map;
+    resized_images_t resized_images;
     bool soft_restart_request = false;
 
     friend struct db_info_viewer_guard_t;
