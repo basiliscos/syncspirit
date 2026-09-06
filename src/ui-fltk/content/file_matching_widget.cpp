@@ -26,6 +26,49 @@ static constexpr int CELL_PADDING = 3;
 
 enum class hightlight_t { no, match, error };
 
+struct tools_group_t : Fl_Group {
+    using parent_t = Fl_Group;
+    tools_group_t(app_supervisor_t &sup_, int x, int y, int w, int h) noexcept : parent_t(x, y, w, h), sup{sup_} {}
+
+    void refresh(int row, int total) noexcept {
+        auto hh = up->h();
+        if (!row) {
+            up->tooltip("add matcher above");
+            if (auto icon = sup.load_image("icons/action-add.png", hh, hh); icon) {
+                up->image(icon);
+            }
+        } else {
+            up->tooltip("move matcher up");
+            if (auto icon = sup.load_image("icons/action-up.png", hh, hh); icon) {
+                up->image(icon);
+            }
+        }
+
+        if (row + 1 == total) {
+            down->tooltip("add matcher below");
+            if (auto icon = sup.load_image("icons/action-add.png", hh, hh); icon) {
+                down->image(icon);
+            }
+        } else {
+            down->tooltip("move matcher down");
+            if (auto icon = sup.load_image("icons/action-down.png", hh, hh); icon) {
+                down->image(icon);
+            }
+        }
+
+        if (total == 1) {
+            rm->deactivate();
+        } else {
+            rm->activate();
+        }
+    }
+
+    app_supervisor_t &sup;
+    Fl_Button *rm{nullptr};
+    Fl_Button *up{nullptr};
+    Fl_Button *down{nullptr};
+};
+
 } // namespace
 
 struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
@@ -33,8 +76,8 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
 
     struct item_controls_t {
         item_controls_t() noexcept = default;
-        item_controls_t(table_t *parent_, hightlight_t hightlight_, Fl_Check_Button *ignore_case_, Fl_Group *tools_,
-                        Fl_Choice *match_mode_, Fl_Input *input_) noexcept
+        item_controls_t(table_t *parent_, hightlight_t hightlight_, Fl_Check_Button *ignore_case_,
+                        tools_group_t *tools_, Fl_Choice *match_mode_, Fl_Input *input_) noexcept
             : parent{parent_}, hightlight{hightlight_}, ignore_case{ignore_case_}, tools{tools_},
               match_mode{match_mode_}, input{input_} {}
 
@@ -76,7 +119,7 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
         table_t *parent{nullptr};
         hightlight_t hightlight{hightlight_t::no};
         Fl_Check_Button *ignore_case{nullptr};
-        Fl_Group *tools{nullptr};
+        tools_group_t *tools{nullptr};
         Fl_Choice *match_mode{nullptr};
         Fl_Input *input{nullptr};
     };
@@ -136,13 +179,14 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
         return input;
     }
 
-    Fl_Group *make_tools(const model::file_matcher_t &, int row) noexcept {
+    tools_group_t *make_tools(const model::file_matcher_t &, int row) noexcept {
         static constexpr auto P = CELL_PADDING;
         int x, y, w, h;
         find_cell(CONTEXT_TABLE, row, 1, x, y, w, h);
         h = std::max(26, row_height(row));
         auto hh = h - P * 2;
-        auto group = new Fl_Group(x, y, w, h);
+        auto &sup = container.container.container.supervisor;
+        auto group = new tools_group_t(sup, x, y, w, h);
         group->box(FL_FLAT_BOX);
         group->begin();
         auto rm = new Fl_Button(x + PADDING, y + P, hh, hh, "@undo");
@@ -153,7 +197,6 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
         up->tooltip("move matcher up");
         down->tooltip("move matcher down");
 
-        auto &sup = container.container.container.supervisor;
         if (auto rm_icon = sup.load_image("icons/action-remove.png", hh, hh); rm_icon) {
             rm->image(*rm_icon);
             rm->label(nullptr);
@@ -173,6 +216,10 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
         rm->callback([](auto w, void *data) { reinterpret_cast<table_t *>(data)->on_rm(w); }, this);
         up->callback([](auto w, void *data) { reinterpret_cast<table_t *>(data)->on_move_up(w); }, this);
         down->callback([](auto w, void *data) { reinterpret_cast<table_t *>(data)->on_move_down(w); }, this);
+
+        group->rm = rm;
+        group->up = up;
+        group->down = down;
 
         return group;
     }
@@ -460,7 +507,8 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
         bool has_match{false};
 
         auto &items = get_items();
-        for (int i = 0; i < static_cast<int>(items.size()); ++i) {
+        auto total_items = static_cast<int>(items.size());
+        for (int i = 0; i < total_items; ++i) {
             auto &item = items[i];
             auto &c = controls[i];
             auto mode = item.get_mode();
@@ -482,6 +530,7 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
                     has_match = true;
                 }
             }
+            c.tools->refresh(i, total_items);
         }
     }
 
