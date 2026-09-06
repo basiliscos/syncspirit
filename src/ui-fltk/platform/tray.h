@@ -6,7 +6,6 @@
 #include <vector>
 #include <cstdint>
 #include <FL/Fl_Menu_Item.H>
-#include <memory>
 
 namespace syncspirit::fltk {
 
@@ -15,7 +14,6 @@ struct main_window_t;
 
 struct tray_impl_t {
     using menu_items_t = std::vector<Fl_Menu_Item>;
-    using image_icon_t = std::unique_ptr<Fl_RGB_Image>;
 
     tray_impl_t(app_supervisor_t &sup) noexcept;
     virtual ~tray_impl_t() = default;
@@ -27,8 +25,9 @@ struct tray_impl_t {
     app_supervisor_t &sup;
     std::uint64_t traffic{0};
     menu_items_t menu_items;
-    image_icon_t traffic_image;
-    image_icon_t offline_image;
+
+    Fl_RGB_Image *traffic_image{nullptr};
+    Fl_RGB_Image *offline_image{nullptr};
 };
 
 struct tray_t {

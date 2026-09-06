@@ -12,6 +12,7 @@
 #include "model/diff/load/load_cluster.h"
 #include "model/diff/iterative_controller.h"
 #include "model/misc/sequencer.h"
+#include "utils/string_comparator.hpp"
 #include "utils/path_view.hpp"
 #include "log_sink.h"
 
@@ -19,6 +20,8 @@
 #include <rotor/fltk.hpp>
 #include <FL/Fl_Widget.H>
 #include <FL/Fl_Group.H>
+#include <FL/Fl_RGB_Image.H>
+#include <memory>
 #include <chrono>
 
 namespace syncspirit::fltk {
@@ -26,6 +29,8 @@ namespace syncspirit::fltk {
 namespace r = rotor;
 namespace rf = r::fltk;
 namespace outcome = boost::outcome_v2;
+
+using image_icon_t = std::unique_ptr<Fl_RGB_Image>;
 
 struct app_supervisor_t;
 struct main_window_t;
@@ -177,12 +182,14 @@ struct app_supervisor_t : app_supervisor_base_t<app_supervisor_t> {
     r::address_ptr_t &get_coordinator_address();
 
     std::uint32_t mask_nodes() const noexcept;
+    Fl_RGB_Image *load_image(std::string_view relative_path) noexcept;
 
   private:
     using clock_t = std::chrono::high_resolution_clock;
     using time_point_t = typename clock_t::time_point;
     using callbacks_t = std::list<callback_ptr_t>;
     using delayed_items_t = std::unordered_set<presence_item_ptr_t>;
+    using images_map_t = std::unordered_map<std::string, image_icon_t, utils::string_hash_t, utils::string_eq_t>;
 
     void on_model_response(model::message::model_response_t &res) noexcept;
     void on_local_ready(model::message::local_ready_t &) noexcept;
@@ -225,6 +232,7 @@ struct app_supervisor_t : app_supervisor_base_t<app_supervisor_t> {
     callbacks_t callbacks;
     main_window_t *main_window;
     delayed_items_t delayed_items;
+    images_map_t images_map;
     bool soft_restart_request = false;
 
     friend struct db_info_viewer_guard_t;

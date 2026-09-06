@@ -45,6 +45,8 @@
 #include <memory_resource>
 #include <unordered_set>
 
+#include <FL/Fl_PNG_Image.H>
+
 using namespace syncspirit;
 using namespace syncspirit::fltk;
 using namespace syncspirit::presentation;
@@ -797,6 +799,29 @@ std::uint32_t app_supervisor_t::mask_nodes() const noexcept {
         r |= F::missing;
     }
     return r;
+}
+
+Fl_RGB_Image *app_supervisor_t::load_image(std::string_view relative_path) noexcept {
+    auto it = images_map.find(relative_path);
+    if (it != images_map.end()) {
+        return it->second.get();
+    }
+
+    auto buffer = std::array<std::byte, 1024 * 32>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+    auto image_path = resolve_resource(allocator, relative_path);
+    if (!image_path.empty()) {
+        auto image = image_icon_t();
+        image.reset(new Fl_PNG_Image(image_path.get_full_name().data()));
+        if (image->w() && image->h()) {
+            auto [it, _] = images_map.emplace(std::string(relative_path), std::move(image));
+            return it->second.get();
+        }
+    }
+
+    LOG_WARN(log, "failed to load image at '{}'", image_path);
+    return nullptr;
 }
 
 void app_supervisor_t::detach_main_window() noexcept {

@@ -148,6 +148,28 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
         auto rm = new Fl_Button(x + PADDING, y + P, hh, hh, "@undo");
         auto up = new Fl_Button(rm->x() + rm->w() + PADDING, y + P, hh, hh, "@<");
         auto down = new Fl_Button(up->x() + up->w() + PADDING, y + P, hh, hh, "@>");
+
+        rm->tooltip("remove matcher");
+        up->tooltip("move matcher up");
+        down->tooltip("move matcher down");
+
+        auto &sup = container.container.container.supervisor;
+        if (auto rm_icon = sup.load_image("icons/action-remove.png"); rm_icon) {
+            rm_icon->scale(hh, hh);
+            rm->image(*rm_icon);
+            rm->label(nullptr);
+        }
+        if (auto up_icon = sup.load_image("icons/action-up.png"); up_icon) {
+            up_icon->scale(hh, hh);
+            up->image(*up_icon);
+            up->label(nullptr);
+        }
+        if (auto down_icon = sup.load_image("icons/action-down.png"); down_icon) {
+            down_icon->scale(hh, hh);
+            down->image(*down_icon);
+            down->label(nullptr);
+        }
+
         group->end();
         group->resizable(nullptr);
 

@@ -6,9 +6,7 @@
 #include "app_supervisor.h"
 #include "platform/tray.h"
 #include <FL/Fl_Double_Window.H>
-#include <FL/Fl_RGB_Image.H>
 #include <string>
-#include <memory>
 
 namespace syncspirit::fltk {
 
@@ -38,15 +36,13 @@ struct main_window_t : Fl_Double_Window {
     void on_local_state_update() noexcept;
 
   private:
-    using image_icon_t = std::unique_ptr<Fl_RGB_Image>;
-
     app_supervisor_t *supervisor{nullptr};
     Fl_Group *content_left{nullptr};
     tree_view_t *tree{nullptr};
     log_panel_t *log_panel{nullptr};
+    Fl_RGB_Image *image_icon{nullptr};
     menu_t *menu{nullptr};
     tray_t tray;
-    image_icon_t image_icon;
     bool native_hidden{false}; // win32-only
 };
 

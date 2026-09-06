@@ -57,23 +57,8 @@ tray_impl_t::tray_impl_t(app_supervisor_t &sup_) noexcept : sup{sup_} {
     menu_items.push_back({"Quit", 0, cb_quit, this, 0, 0, 0, 14, 0});
     menu_items.push_back({nullptr});
 
-    auto buffer = std::array<std::byte, 1024 * 32>();
-    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
-    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
-    auto traffic_icon_path = sup.resolve_resource(allocator, traffic_icon_path_);
-    if (!traffic_icon_path.empty()) {
-        traffic_image.reset(new Fl_PNG_Image(traffic_icon_path.get_full_name().data()));
-        if (!(traffic_image->w() && traffic_image->h())) {
-            traffic_image.reset();
-        }
-    }
-    auto offline_icon_path = sup.resolve_resource(allocator, offline_icon_path_);
-    if (!offline_icon_path.empty()) {
-        offline_image.reset(new Fl_PNG_Image(offline_icon_path.get_full_name().data()));
-        if (!(offline_image->w() && offline_image->h())) {
-            offline_image.reset();
-        }
-    }
+    traffic_image = sup.load_image(traffic_icon_path_);
+    offline_image = sup.load_image(offline_icon_path_);
 }
 
 tray_t::~tray_t() {

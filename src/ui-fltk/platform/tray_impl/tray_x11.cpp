@@ -211,9 +211,9 @@ tray_x11_t::tray_x11_t(Display *watching_display_, Atom selection_atom_, Atom op
 
 void tray_x11_t::set_default_icon() noexcept { tray_window->assing(sup.get_main_window()->get_icon()); }
 
-void tray_x11_t::set_traffic_icon() noexcept { tray_window->assing(traffic_image.get()); }
+void tray_x11_t::set_traffic_icon() noexcept { tray_window->assing(traffic_image); }
 
-void tray_x11_t::set_offline_icon() noexcept { tray_window->assing(offline_image.get()); }
+void tray_x11_t::set_offline_icon() noexcept { tray_window->assing(offline_image); }
 
 tray_x11_t::~tray_x11_t() {
     XSync(watching_display, False);

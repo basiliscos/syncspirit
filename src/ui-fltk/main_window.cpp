@@ -19,7 +19,6 @@
 #include <FL/platform.H>
 #include <FL/Fl_Menu_Item.H>
 #include <FL/Fl_Menu_Bar.H>
-#include <FL/Fl_PNG_Image.H>
 #include <fmt/format.h>
 
 using namespace syncspirit;
@@ -31,19 +30,9 @@ main_window_t::main_window_t(app_supervisor_t &supervisor_, int w_, int h_)
     : parent_t(w_, h_, app_name.data()), supervisor{&supervisor_} {
     supervisor->set_main_window(this);
 
-    auto buffer = std::array<std::byte, 1024 * 32>();
-    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
-    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
-    auto icon_path = supervisor->resolve_resource(allocator, "icons/syncspirit-fltk.png");
-    if (!icon_path.empty()) {
-        image_icon.reset(new Fl_PNG_Image(icon_path.get_full_name().data()));
-        if (image_icon->w() && image_icon->h()) {
-            icon(image_icon.get());
-            Fl_Window::default_icon(static_cast<Fl_RGB_Image *>(image_icon.get()));
-        } else {
-            auto &log = supervisor->get_logger();
-            LOG_WARN(log, "failed to load app icon at {}", icon_path);
-        }
+    image_icon = supervisor->load_image("icons/syncspirit-fltk.png");
+    if (image_icon) {
+        Fl_Window::default_icon(static_cast<Fl_RGB_Image *>(image_icon));
     }
     auto top_contaner = new Fl_Group(0, 0, w(), h());
 
@@ -209,4 +198,4 @@ void main_window_t::on_local_state_update() noexcept {
 
 app_supervisor_t *main_window_t::get_supervisor() { return supervisor; }
 
-const Fl_RGB_Image *main_window_t::get_icon() const noexcept { return image_icon.get(); }
+const Fl_RGB_Image *main_window_t::get_icon() const noexcept { return image_icon; }
