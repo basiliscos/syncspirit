@@ -128,38 +128,18 @@ app_supervisor_t::app_supervisor_t(config_t &config)
     log = utils::get_logger("fltk");
 
     auto &allocator = *config.allocator;
-    auto app_path = utils::make_native_view(config.app_path, allocator);
     auto res_path = utils::make_empty_view(allocator);
-    auto exe_dir = utils::make_empty_view(allocator);
-    if (auto res_dir = std::getenv("SYNCSPIRIT_RES_DIR"); res_dir) {
-        res_path = utils::make_native_view(res_dir, allocator);
+    if (!config.app_path.empty()) {
+        res_path = utils::make_native_view(config.app_path, allocator);
     }
-
-    if (res_path.empty()) {
-        exe_dir = app_path.get_parent();
-    }
-    if (res_path.empty()) {
-        auto ec = std::error_code{};
-        auto dir = exe_dir / utils::make_native_view("resources", allocator);
-        if (utils::exists(dir, ec)) {
-            res_path = std::move(dir);
-        }
-    }
-#if defined(__unix__)
-    if (res_path.empty()) {
-        res_path = exe_dir.get_parent() / utils::make_native_view("share/syncspirit/resources", allocator);
-    }
-#endif
     if (!res_path.empty()) {
         auto ec = std::error_code{};
-        if (!utils::exists(res_path, ec)) {
-            res_path = utils::make_empty_view(allocator);
-        } else {
+        if (utils::exists(res_path, ec)) {
             resources_dir = res_path.detach();
             LOG_DEBUG(log, "resources dir: '{}'", resources_dir);
         }
     }
-    if (res_path.empty()) {
+    if (resources_dir.empty()) {
         LOG_WARN(log, "cannot find resources dir");
     }
 }

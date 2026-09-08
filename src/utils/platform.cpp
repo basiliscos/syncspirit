@@ -2,6 +2,9 @@
 // SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "platform.h"
+#include "path_view.hpp"
+#include "path_utils.h"
+#include "syncspirit-config.h"
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
 #include <mutex>
 #include <dbghelp.h>
@@ -13,9 +16,12 @@
 #include "utils/path_view.hpp"
 #endif
 
-#if defined(__linux__)
-#include <pthread.h>
+#if defined(__APPLE__)
+#include <mach-o/dyld.h>
 #endif
+
+#include <spdlog/spdlog.h>
+#include "utils/format.hpp"
 
 using namespace syncspirit::utils;
 
@@ -373,4 +379,82 @@ void platform_t::set_thread_name(std::string_view name) noexcept {
         TlsSetValue(thread_name_tls_index, (void *)name.data());
     }
 #endif
+}
+
+static poly_path_view_t app_path(const allocator_t &allocator, std::error_code &ec, const char *argv0) noexcept {
+    auto path = make_empty_view(allocator);
+#if defined(__linux__)
+    char buff[SYNCSPIRIT_PATH_MAX];
+    if (::readlink("/proc/self/exe", buff, sizeof(buff)) == -1) {
+        ec = std::error_code(errno, std::system_category());
+    } else {
+        path = make_native_view(buff, allocator).get_parent();
+    }
+#elif defined(_WIN32)
+    wchar_t buff[SYNCSPIRIT_PATH_MAX] = {0};
+    auto sz = ::GetModuleFileNameW(nullptr, buff, SYNCSPIRIT_PATH_MAX);
+    if (sz > 0 && sz < SYNCSPIRIT_PATH_MAX) {
+        path = make_native_view(buff, allocator);
+    } else {
+        ec = std::error_code(::GetLastError(), std::system_category());
+    }
+#elif defined(__APPLE__)
+    char buff[SYNCSPIRIT_PATH_MAX] = {0};
+    auto sz = std::uint32_t{0};
+    if (_NSGetExecutablePath(nullptr, &sz) != 0 || sz == 0) {
+        ec = std::make_error_code(std::errc::io_error);
+    } else {
+        if (_NSGetExecutablePath(buff, &sz) != 0) {
+            ec = std::make_error_code(std::errc::io_error);
+        } else {
+            path = make_native_view(buff, allocator);
+        }
+    }
+#endif
+
+    // fallback
+#if defined(__unix__)
+    if (path.empty() && argv0) {
+        path = cwd(allocator, ec) / make_native_view(argv0, allocator);
+    }
+#endif
+    return path;
+}
+
+auto platform_t::resources_dir(const allocator_t &allocator, std::error_code &ec, const char *argv0) noexcept
+    -> poly_path_view_t {
+    auto path = make_empty_view(allocator);
+    auto exe_path = make_empty_view(allocator);
+    if (auto res_dir = std::getenv("SYNCSPIRIT_RES_DIR"); res_dir) {
+        path = make_native_view(res_dir, allocator);
+    }
+    if (auto app_dir = std::getenv("APPDIR"); app_dir) {
+        path = make_native_view(app_dir, allocator);
+    }
+
+    if (path.empty()) {
+        exe_path = app_path(allocator, ec, argv0);
+    }
+
+    if (path.empty() && !exe_path.empty()) {
+        auto exe_dir = exe_path.get_parent();
+#if defined(__linux__)
+        path = exe_dir / make_native_view("share/syncspirit/resources", allocator);
+#elif defined(_WIN32)
+        path = exe_dir / make_native_view("resources", allocator);
+#elif defined(__APPLE__)
+        auto parent = exe_dir.get_parent();
+        path = parent / make_native_view("resources", allocator);
+#endif
+    }
+
+    if (!path.empty()) {
+        auto ec = std::error_code{};
+        if (!exists(path, ec)) {
+            path = make_empty_view(allocator);
+            ec = std::make_error_code(std::errc::no_such_file_or_directory);
+        }
+    }
+
+    return path;
 }

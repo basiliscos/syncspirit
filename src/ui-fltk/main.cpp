@@ -294,12 +294,11 @@ int app_main(app_context_t &app_ctx) {
         return 1;
     }
 
-    auto app_path = utils::cwd(allocator, ec);
+    auto argv0 = app_ctx.argc > 0 ? app_ctx.argv[0] : nullptr;
+    auto res_dir = utils::platform_t::resources_dir(allocator, ec, argv0);
     if (ec) {
-        logger->warn("cannot get working directory: {}", ec.message());
+        logger->warn("cannot get resources dir: {}", ec.message());
         ec = {};
-    } else if (app_ctx.argc > 0) {
-        app_path = app_path / utils::make_native_view(app_ctx.argv[0], allocator);
     }
 
     auto &cfg = cfg_option.value();
@@ -418,7 +417,7 @@ int app_main(app_context_t &app_ctx) {
                         .poll_duration(poll_timeout)
                         .config_path(config_file_path.detach())
                         .app_config(cfg)
-                        .app_path(app_path.get_full_name())
+                        .app_path(res_dir.get_full_name())
                         .allocator(&allocator)
                         .timeout(timeout)
                         .registry_address(sup_net->get_registry_address())

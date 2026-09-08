@@ -6,6 +6,7 @@
 #include "syncspirit-export.h"
 #include "path.h"
 #include <string_view>
+#include <system_error>
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
 #define WIN32_LEAN_AND_MEAN
@@ -23,6 +24,8 @@ struct SYNCSPIRIT_API platform_t {
     static bool path_supported(const poly_path_view_t &) noexcept;
     static bool permissions_supported(const path_base_t &) noexcept;
     static void set_thread_name(std::string_view name) noexcept;
+    static poly_path_view_t resources_dir(const allocator_t &allocator, std::error_code &ec,
+                                          const char *argv0) noexcept;
 };
 
 } // namespace syncspirit::utils
