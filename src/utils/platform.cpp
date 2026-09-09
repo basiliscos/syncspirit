@@ -425,18 +425,23 @@ auto platform_t::resources_dir(const allocator_t &allocator, std::error_code &ec
     -> poly_path_view_t {
     auto path = make_empty_view(allocator);
     auto exe_path = make_empty_view(allocator);
+    bool need_res_dir{true};
     if (auto res_dir = std::getenv("SYNCSPIRIT_RES_DIR"); res_dir) {
         path = make_native_view(res_dir, allocator);
+        need_res_dir = false;
     }
+#if defined(__linux__)
     if (auto app_dir = std::getenv("APPDIR"); app_dir) {
-        path = make_native_view(app_dir, allocator);
+        auto tail = make_native_view("usr/share/syncspirit/resources", allocator);
+        path = make_native_view(app_dir, allocator) / tail;
     }
+#endif
 
     if (path.empty()) {
         exe_path = app_path(allocator, ec, argv0);
     }
 
-    if (path.empty() && !exe_path.empty()) {
+    if (need_res_dir && path.empty() && !exe_path.empty()) {
         auto exe_dir = exe_path.get_parent();
 #if defined(__linux__)
         path = exe_dir / make_native_view("share/syncspirit/resources", allocator);
