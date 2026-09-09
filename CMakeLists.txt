@@ -49,6 +49,7 @@ find_package(tomlplusplus REQUIRED)
 find_package(nlohmann_json REQUIRED)
 find_package(c-ares REQUIRED)
 find_package(PCRE2 REQUIRED)
+find_package(uni-algo REQUIRED)
 
 set(SYNCSPIRIT_VERSION "v${CMAKE_PROJECT_VERSION}")
 if (LINUX)
@@ -332,12 +333,6 @@ FetchContent_Declare(MDBX
     set(MDBX_ALLOY_BUILD_DEFAULT true CACHE BOOL "MDBX_ALLOY_BUILD_DEFAULT")
     set(MDBX_ALLOY_BUILD true CACHE BOOL "MDBX_ALLOY_BUILD")
 FetchContent_MakeAvailable(MDBX)
-
-FetchContent_Declare(UNI_ALGO
-    URL https://github.com/uni-algo/uni-algo/archive/refs/tags/v1.2.0.tar.gz
-    URL_HASH SHA256=f2a1539cd8635bc6088d05144a73ecfe7b4d74ee0361fabed6f87f9f19e74ca9
-)
-FetchContent_MakeAvailable(UNI_ALGO)
 
 target_include_directories(syncspirit_core PUBLIC
     ${OPENSSL_INCLUDE_DIR}

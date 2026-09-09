@@ -35,7 +35,7 @@ class SyncspiritRecipe(ConanFile):
         self.requires("c-ares/1.34.5", options = {"multithreading": False, "shared": False, "tools": False})
         self.requires("catch2/3.14.0")
         self.requires("pcre2/10.47")
-#        self.requires("uni-algo/1.2.0")
+        self.requires("uni-algo/1.2.0", options = {"shared": False})
         self.requires("boost/1.86.0", headers=True, libs=True, transitive_libs=True, force=True)
 
     def build_requirements(self):
