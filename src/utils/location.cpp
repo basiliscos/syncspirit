@@ -46,7 +46,7 @@ poly_path_view_t get_home_dir(const allocator_t &allocator) noexcept {
         return make_native_view(pw->pw_dir, allocator);
     }
 #else
-    return make_native_view(pw->pw_dir);
+    return make_native_view(pw->pw_dir, allocator);
 #endif
 
 #endif

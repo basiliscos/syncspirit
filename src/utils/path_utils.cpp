@@ -399,7 +399,11 @@ stats_t get_stats(const poly_path_view_t &path, std::error_code &ec) noexcept {
         ec = std::error_code{errno, std::system_category()};
     } else {
         r.supported = true;
+#if defined(__APPLE__)
+        r.modification = st.st_mtimespec.tv_sec;
+#else
         r.modification = st.st_mtim.tv_sec;
+#endif
         r.permissions = st.st_mode & 07777;
         if (S_ISDIR(st.st_mode)) {
             r.file_type = file_type_t::DIRECTORY;
