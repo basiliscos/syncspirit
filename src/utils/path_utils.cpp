@@ -260,6 +260,8 @@ void remove_all(const poly_path_view_t &path, std::error_code &ec) noexcept {
         return 0;
     };
     auto seed = path.get_full_name();
+
+    errno = 0;
     auto code = nftw(seed.data(), cb, 128, FTW_DEPTH | FTW_PHYS);
     if (code != 0) {
         ec = std::error_code(errno, std::generic_category());
