@@ -49,51 +49,51 @@ static void on_net_restart(Fl_Widget *widget, void *) {
     sup.send_model<net::payload::restart_services_t>();
 }
 
-static void on_colorize(Fl_Widget *widget, void *data) {
+static void on_colorize(Fl_Widget *widget, void *) {
     auto menu = static_cast<menu_t *>(widget);
-    auto item = menu->find_item_with_user_data(data);
+    auto item = menu->find_item(on_colorize);
     auto value = item->value() ? true : false;
     menu->supervisor.set_show_colorized(value);
 }
 
-static void on_show_deleted(Fl_Widget *widget, void *data) {
+static void on_show_deleted(Fl_Widget *widget, void *) {
     auto menu = static_cast<menu_t *>(widget);
-    auto item = menu->find_item_with_user_data(data);
+    auto item = menu->find_item(on_show_deleted);
     auto value = item->value() ? true : false;
     menu->supervisor.set_show_deleted(value);
 }
 
-static void on_show_missing(Fl_Widget *widget, void *data) {
+static void on_show_missing(Fl_Widget *widget, void *) {
     auto menu = static_cast<menu_t *>(widget);
-    auto item = menu->find_item_with_user_data(data);
+    auto item = menu->find_item(on_show_missing);
     auto value = item->value() ? true : false;
     menu->supervisor.set_show_missing(value);
 }
 
-static void on_show_folder_id(Fl_Widget *widget, void *data) {
+static void on_show_folder_id(Fl_Widget *widget, void *) {
     auto menu = static_cast<menu_t *>(widget);
-    auto item = menu->find_item_with_user_data(data);
+    auto item = menu->find_item(on_show_folder_id);
     auto value = item->value() ? true : false;
     menu->supervisor.set_show_folder_id(value);
 }
 
-static void on_show_device_id(Fl_Widget *widget, void *data) {
+static void on_show_device_id(Fl_Widget *widget, void *) {
     auto menu = static_cast<menu_t *>(widget);
-    auto item = menu->find_item_with_user_data(data);
+    auto item = menu->find_item(on_show_device_id);
     auto value = item->value() ? true : false;
     menu->supervisor.set_show_device_id(value);
 }
 
-static void on_display_tray(Fl_Widget *widget, void *data) {
+static void on_display_tray(Fl_Widget *widget, void *) {
     auto menu = static_cast<menu_t *>(widget);
-    auto item = menu->find_item_with_user_data(data);
+    auto item = menu->find_item(on_display_tray);
     auto value = item->value() ? true : false;
     menu->supervisor.set_tray_display(value);
 }
 
-static void on_hide_to_tray(Fl_Widget *widget, void *data) {
+static void on_hide_to_tray(Fl_Widget *widget, void *) {
     auto menu = static_cast<menu_t *>(widget);
-    auto item = menu->find_item_with_user_data(data);
+    auto item = menu->find_item(on_hide_to_tray);
     auto value = item->value() ? true : false;
     menu->supervisor.set_hide_to_tray(value);
 }
