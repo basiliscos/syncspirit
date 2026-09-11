@@ -249,17 +249,20 @@ void remove_all(const poly_path_view_t &path, std::error_code &ec) noexcept {
             if (rmdir(path) != 0) {
                 return -1;
             }
-        } else {
+        } else if (type == FTW_F || type == FTW_SL || type == FTW_SLN) {
             if (unlink(path) != 0) {
                 return -1;
             }
+        } else {
+            errno = EIO;
+            return -1;
         }
         return 0;
     };
     auto seed = path.get_full_name();
     auto code = nftw(seed.data(), cb, 128, FTW_DEPTH | FTW_PHYS);
     if (code != 0) {
-        ec = std::error_code(code, std::system_category());
+        ec = std::error_code(errno, std::generic_category());
     }
 #endif
 }
