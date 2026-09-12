@@ -52,7 +52,7 @@ bool exists(const poly_path_view_t &path, std::error_code &ec) noexcept {
         return true;
     } else {
         if (errno != ENOENT) {
-            ec = std::error_code{errno, std::system_category()};
+            ec = std::error_code{errno, std::generic_category()};
         }
         return false;
     }
@@ -161,7 +161,7 @@ std::size_t create_directories(const poly_path_view_t &path, std::error_code &ec
             if (!ok) {
                 auto code = errno;
                 if (code != EEXIST) {
-                    ec = std::error_code(code, std::system_category());
+                    ec = std::error_code(code, std::generic_category());
                     break;
                 }
             } else {
@@ -244,27 +244,38 @@ void remove_all(const poly_path_view_t &path, std::error_code &ec) noexcept {
         }
     }
 #else
-    auto cb = [](const char *path, const struct stat *sb, int type, struct FTW *ftwbuf) -> int {
-        if (type == FTW_DP) {
-            if (rmdir(path) != 0) {
-                return -1;
-            }
-        } else if (type == FTW_F || type == FTW_SL || type == FTW_SLN) {
-            if (unlink(path) != 0) {
-                return -1;
+    auto orig_path = path.get_full_name();
+    struct stat st;
+    if (lstat(orig_path.data(), &st) != 0) {
+        ec = std::error_code{errno, std::generic_category()};
+    } else {
+        if (S_ISDIR(st.st_mode)) {
+            auto cb = [](const char *path, const struct stat *sb, int type, struct FTW *ftwbuf) -> int {
+                if (type == FTW_DP) {
+                    if (rmdir(path) != 0) {
+                        return -1;
+                    }
+                } else if (type == FTW_F || type == FTW_SL || type == FTW_SLN) {
+                    if (unlink(path) != 0) {
+                        return -1;
+                    }
+                } else {
+                    errno = EIO;
+                    return -1;
+                }
+                return 0;
+            };
+
+            errno = 0;
+            auto code = nftw(orig_path.data(), cb, 128, FTW_DEPTH | FTW_PHYS);
+            if (code != 0) {
+                ec = std::error_code(errno, std::generic_category());
             }
         } else {
-            errno = EIO;
-            return -1;
+            if (unlink(orig_path.data()) != 0) {
+                ec = std::error_code(errno, std::generic_category());
+            }
         }
-        return 0;
-    };
-    auto seed = path.get_full_name();
-
-    errno = 0;
-    auto code = nftw(seed.data(), cb, 128, FTW_DEPTH | FTW_PHYS);
-    if (code != 0) {
-        ec = std::error_code(errno, std::generic_category());
     }
 #endif
 }
@@ -281,7 +292,7 @@ void rename(const utils::path_base_t &from, const utils::poly_path_view_t &to, s
 #else
     auto code = ::rename(from.get_full_name().data(), to.get_full_name().data());
     if (code != 0) {
-        ec = std::error_code{errno, std::system_category()};
+        ec = std::error_code{errno, std::generic_category()};
     }
 #endif
 }
@@ -294,7 +305,7 @@ void remove_file(const poly_path_view_t &path, std::error_code &ec) noexcept {
     }
 #else
     if (unlink(path.get_full_name().data()) != 0) {
-        ec = std::error_code{errno, std::system_category()};
+        ec = std::error_code{errno, std::generic_category()};
     }
 #endif
 }
@@ -307,7 +318,7 @@ void chmod(const poly_path_view_t &path, std::uint32_t perms, std::error_code &e
     }
 #else
     if (::chmod(path.get_full_name().data(), perms) != 0) {
-        ec = std::error_code{errno, std::system_category()};
+        ec = std::error_code{errno, std::generic_category()};
     }
 #endif
 }
@@ -317,7 +328,7 @@ void create_symlink(const utils::path_base_t &target, const utils::path_base_t &
     ec = std::make_error_code(std::errc::function_not_supported);
 #else
     if (::symlink(target.get_full_name().data(), path.get_full_name().data()) != 0) {
-        ec = std::error_code{errno, std::system_category()};
+        ec = std::error_code{errno, std::generic_category()};
     }
 #endif
 }
@@ -329,7 +340,7 @@ bool is_symlink(const utils::path_base_t &target, std::error_code &ec) noexcept 
 #else
     struct stat st;
     if (lstat(target.get_full_name().data(), &st) != 0) {
-        ec = std::error_code{errno, std::system_category()};
+        ec = std::error_code{errno, std::generic_category()};
         r = false;
     }
     r = S_ISLNK(st.st_mode);
@@ -345,7 +356,7 @@ poly_string_t read_symlink(const poly_path_view_t &target, std::error_code &ec) 
     storage.resize(SYNCSPIRIT_PATH_MAX);
     auto code = readlink(target.get_full_name().data(), storage.data(), storage.size());
     if (code == -1) {
-        ec = std::error_code{errno, std::system_category()};
+        ec = std::error_code{errno, std::generic_category()};
         storage = {};
     } else {
         storage.resize(static_cast<size_t>(code));
@@ -369,7 +380,7 @@ void last_write_time(const poly_path_view_t &path, std::int64_t modified_at, std
     times[1].tv_sec = modified_at;
     times[1].tv_nsec = 0;
     if (::utimensat(AT_FDCWD, path.get_full_name().data(), times, AT_SYMLINK_NOFOLLOW) == -1) {
-        ec = std::error_code{errno, std::system_category()};
+        ec = std::error_code{errno, std::generic_category()};
     }
 #endif
 }
@@ -401,14 +412,10 @@ stats_t get_stats(const poly_path_view_t &path, std::error_code &ec) noexcept {
 #else
     struct stat st;
     if (lstat(path.get_full_name().data(), &st) != 0) {
-        ec = std::error_code{errno, std::system_category()};
+        ec = std::error_code{errno, std::generic_category()};
     } else {
         r.supported = true;
-#if defined(__APPLE__)
-        r.modification = st.st_mtimespec.tv_sec;
-#else
-        r.modification = st.st_mtim.tv_sec;
-#endif
+        r.modification = st.st_mtime;
         r.permissions = st.st_mode & 07777;
         if (S_ISDIR(st.st_mode)) {
             r.file_type = file_type_t::DIRECTORY;
@@ -437,7 +444,7 @@ poly_path_view_t cwd(const allocator_t &allocator, std::error_code &ec) noexcept
 #else
     char buff[SYNCSPIRIT_PATH_MAX];
     if (!getcwd(buff, sizeof(buff))) {
-        ec = std::error_code(errno, std::system_category());
+        ec = std::error_code(errno, std::generic_category());
     } else {
         path = utils::make_native_view(buff, allocator);
     }
