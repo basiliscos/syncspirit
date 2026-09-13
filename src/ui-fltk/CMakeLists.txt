@@ -115,3 +115,11 @@ set_target_properties(syncspirit-fltk PROPERTIES
     XCODE_EMBED_FRAMEWORKS_CODE_SIGN_ON_COPY TRUE
 )
 set_source_files_properties(${syncspirit_SOURCE_DIR}/misc/SyncSpiritIcon.icns PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
+
+if(APPLE)
+    add_custom_command(TARGET syncspirit-fltk POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${syncspirit_SOURCE_DIR}/misc/resources/icons"
+            "$<TARGET_BUNDLE_DIR:syncspirit-fltk>/Contents/Resources/icons"
+    )
+endif()
