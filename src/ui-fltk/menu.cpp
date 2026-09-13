@@ -8,12 +8,6 @@
 using namespace syncspirit;
 using namespace syncspirit::fltk;
 
-#define SS_INT_TO_PTR(X) reinterpret_cast<void *>(static_cast<std::intptr_t>((X) + 1))
-#define SS_PTR_TO_INT(X) static_cast<int>(reinterpret_cast<std::intptr_t>((X)))
-
-#define SS_ID_NET_STOP SS_INT_TO_PTR(-2)
-#define SS_ID_NET_START SS_INT_TO_PTR(-3)
-
 #if !defined(__APPLE__)
 static void on_quit(Fl_Widget *widget, void *) {
     auto &sup = static_cast<menu_t *>(widget)->supervisor;
@@ -90,6 +84,7 @@ static void on_display_tray(Fl_Widget *widget, void *) {
     auto item = menu->find_item(on_display_tray);
     auto value = item->value() ? true : false;
     menu->supervisor.set_tray_display(value);
+    menu->on_local_state_update();
 }
 
 static void on_hide_to_tray(Fl_Widget *widget, void *) {
@@ -103,8 +98,8 @@ menu_t::menu_t(app_supervisor_t &supervisor_, int x, int y, int w, int h)
     : supervisor{supervisor_}, parent_t(x, y, w, h) {
     add_item("&File", 0, 0, 0, FL_SUBMENU);
     add_item("Network", 0, 0, 0, FL_SUBMENU);
-    add_item("Stop", 0, on_net_stop, SS_ID_NET_STOP);
-    add_item("Start", 0, on_net_start, SS_ID_NET_START);
+    add_item("Stop", 0, on_net_stop);
+    add_item("Start", 0, on_net_start);
     add_item("Restart", 0, on_net_restart);
     finish_submenu(); // Network
 
@@ -185,14 +180,22 @@ void menu_t::on_local_state_update() noexcept {
             flags_stop = true;
         }
         for (auto &item : items) {
-            if (item.user_data() == SS_ID_NET_STOP) {
+            auto callback = item.callback();
+            if (callback == on_net_stop) {
                 if (flags_stop) {
                     item.flags &= ~FL_MENU_INACTIVE;
                 } else {
                     item.flags |= FL_MENU_INACTIVE;
                 }
-            } else if (item.user_data() == SS_ID_NET_START) {
+            } else if (callback == on_net_start) {
                 if (flags_start) {
+                    item.flags = item.flags & ~FL_MENU_INACTIVE;
+                } else {
+                    item.flags = item.flags | FL_MENU_INACTIVE;
+                }
+            } else if (callback == on_hide_to_tray) {
+                auto enabled = supervisor.get_app_config().fltk_config.display_tray_icon;
+                if (enabled) {
                     item.flags = item.flags & ~FL_MENU_INACTIVE;
                 } else {
                     item.flags = item.flags | FL_MENU_INACTIVE;
