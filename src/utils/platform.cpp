@@ -401,7 +401,8 @@ static poly_path_view_t app_path(const allocator_t &allocator, std::error_code &
 #elif defined(__APPLE__)
     char buff[SYNCSPIRIT_PATH_MAX] = {0};
     auto sz = std::uint32_t{0};
-    if (_NSGetExecutablePath(nullptr, &sz) != 0 || sz == 0) {
+    _NSGetExecutablePath(nullptr, &sz);
+    if (sz == 0) {
         ec = std::make_error_code(std::errc::io_error);
     } else {
         if (_NSGetExecutablePath(buff, &sz) != 0) {
@@ -449,7 +450,7 @@ auto platform_t::resources_dir(const allocator_t &allocator, std::error_code &ec
         path = exe_dir / make_native_view("resources", allocator);
 #elif defined(__APPLE__)
         auto parent = exe_dir.get_parent();
-        path = parent / make_native_view("resources", allocator);
+        path = parent / make_native_view("Resources", allocator);
 #endif
     }
 
