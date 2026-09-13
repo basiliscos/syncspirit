@@ -14,13 +14,14 @@ using namespace syncspirit::fltk;
 #define SS_ID_NET_STOP SS_INT_TO_PTR(-2)
 #define SS_ID_NET_START SS_INT_TO_PTR(-3)
 
+#if !defined(__APPLE__)
 static void on_quit(Fl_Widget *widget, void *) {
     auto &sup = static_cast<menu_t *>(widget)->supervisor;
     auto log = sup.get_logger();
     LOG_INFO(log, "quit via menu");
     sup.do_shutdown();
 }
-
+#endif
 static void on_restart(Fl_Widget *widget, void *) {
     auto &sup = static_cast<menu_t *>(widget)->supervisor;
     auto log = sup.get_logger();
@@ -106,8 +107,13 @@ menu_t::menu_t(app_supervisor_t &supervisor_, int x, int y, int w, int h)
     add_item("Start", 0, on_net_start, SS_ID_NET_START);
     add_item("Restart", 0, on_net_restart);
     finish_submenu(); // Network
+
     add_item("&Restart app", 0, on_restart);
+    // there is that one on default app menu
+#if !defined(__APPLE__)
     add_item("&Quit", 0, on_quit);
+#endif
+
     finish_submenu(); // File
 
     add_item("&Options", 0, 0, 0, FL_SUBMENU);
