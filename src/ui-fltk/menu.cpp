@@ -100,59 +100,58 @@ static void on_hide_to_tray(Fl_Widget *widget, void *) {
 
 menu_t::menu_t(app_supervisor_t &supervisor_, int x, int y, int w, int h)
     : supervisor{supervisor_}, parent_t(x, y, w, h) {
-    int index = 0;
-    index = add_item("&File", 0, 0, 0, FL_SUBMENU);
-    index = add_item("Network", 0, 0, 0, FL_SUBMENU);
-    index = add_item("Stop", 0, on_net_stop, SS_ID_NET_STOP);
-    index = add_item("Start", 0, on_net_start, SS_ID_NET_START);
-    index = add_item("Restart", 0, on_net_restart);
-    index = finish_submenu(); // Network
-    index = add_item("&Restart app", 0, on_restart);
-    index = add_item("&Quit", 0, on_quit);
-    index = finish_submenu(); // File
+    add_item("&File", 0, 0, 0, FL_SUBMENU);
+    add_item("Network", 0, 0, 0, FL_SUBMENU);
+    add_item("Stop", 0, on_net_stop, SS_ID_NET_STOP);
+    add_item("Start", 0, on_net_start, SS_ID_NET_START);
+    add_item("Restart", 0, on_net_restart);
+    finish_submenu(); // Network
+    add_item("&Restart app", 0, on_restart);
+    add_item("&Quit", 0, on_quit);
+    finish_submenu(); // File
 
-    index = add_item("&Options", 0, 0, 0, FL_SUBMENU);
-    index = add_item("Tree", 0, 0, 0, FL_SUBMENU);
-    index = [&]() {
+    add_item("&Options", 0, 0, 0, FL_SUBMENU);
+    add_item("Tree", 0, 0, 0, FL_SUBMENU);
+    [&]() {
         bool value = supervisor.get_app_config().fltk_config.display_colorized;
         auto flags = FL_MENU_TOGGLE | (value ? FL_MENU_VALUE : 0);
-        return add_item("Colorize", 0, on_colorize, SS_INT_TO_PTR(index), flags);
+        return add_item("Colorize", 0, on_colorize, nullptr, flags);
     }();
-    index = [&]() {
+    [&]() {
         bool value = supervisor.get_app_config().fltk_config.display_deleted;
         auto flags = FL_MENU_TOGGLE | (value ? FL_MENU_VALUE : 0);
-        return add_item("Show Deleted", 0, on_show_deleted, SS_INT_TO_PTR(index), flags);
+        return add_item("Show Deleted", 0, on_show_deleted, nullptr, flags);
     }();
-    index = [&]() {
+    [&]() {
         bool value = supervisor.get_app_config().fltk_config.display_missing;
         auto flags = FL_MENU_TOGGLE | (value ? FL_MENU_VALUE : 0);
-        return add_item("Show Missing", 0, on_show_missing, SS_INT_TO_PTR(index), flags);
+        return add_item("Show Missing", 0, on_show_missing, nullptr, flags);
     }();
-    index = [&]() {
+    [&]() {
         bool value = supervisor.get_app_config().fltk_config.display_folder_id;
         auto flags = FL_MENU_TOGGLE | (value ? FL_MENU_VALUE : 0);
-        return add_item("Show folder id", 0, on_show_folder_id, SS_INT_TO_PTR(index), flags);
+        return add_item("Show folder id", 0, on_show_folder_id, nullptr, flags);
     }();
-    index = [&]() {
+    [&]() {
         bool value = supervisor.get_app_config().fltk_config.display_device_id;
         auto flags = FL_MENU_TOGGLE | (value ? FL_MENU_VALUE : 0);
-        return add_item("Show device id", 0, on_show_device_id, SS_INT_TO_PTR(index), flags);
+        return add_item("Show device id", 0, on_show_device_id, nullptr, flags);
     }();
-    index = finish_submenu(); // Options/Tree
+    finish_submenu(); // Options/Tree
 
-    index = add_item("Tray", 0, 0, 0, FL_SUBMENU);
-    index = [&]() {
+    add_item("Tray", 0, 0, 0, FL_SUBMENU);
+    [&]() {
         bool value = supervisor.get_app_config().fltk_config.display_tray_icon;
         auto flags = FL_MENU_TOGGLE | (value ? FL_MENU_VALUE : 0) | (tray_t::is_available() ? 0 : FL_MENU_INACTIVE);
-        return add_item("Enable", 0, on_display_tray, SS_INT_TO_PTR(index), flags);
+        return add_item("Enable", 0, on_display_tray, nullptr, flags);
     }();
-    index = [&]() {
+    [&]() {
         bool value = supervisor.get_app_config().fltk_config.hide_to_tray;
         auto flags = FL_MENU_TOGGLE | (value ? FL_MENU_VALUE : 0) | (tray_t::is_available() ? 0 : FL_MENU_INACTIVE);
-        return add_item("Hide on close", 0, on_hide_to_tray, SS_INT_TO_PTR(index), flags);
+        return add_item("Hide on close", 0, on_hide_to_tray, nullptr, flags);
     }();
-    index = finish_submenu(); // Options/Tray
-    index = finish_submenu(); // Options
+    finish_submenu(); // Options/Tray
+    finish_submenu(); // Options
 
     finish_submenu(); // whole menu
 
@@ -161,12 +160,11 @@ menu_t::menu_t(app_supervisor_t &supervisor_, int x, int y, int w, int h)
     menu(items.data());
 }
 
-int menu_t::add_item(const char *label, int shortcut, Fl_Callback *cb, void *user_data, int flags) noexcept {
+void menu_t::add_item(const char *label, int shortcut, Fl_Callback *cb, void *user_data, int flags) noexcept {
     items.emplace_back(label, shortcut, cb, user_data, flags);
-    return static_cast<int>(items.size());
 }
 
-int menu_t::finish_submenu() noexcept { return add_item(nullptr, 0, nullptr); }
+void menu_t::finish_submenu() noexcept { return add_item(nullptr, 0, nullptr); }
 
 void menu_t::on_local_state_update() noexcept {
     using S = model::connection_state_t;
