@@ -153,6 +153,7 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
         int x, y, w, h;
         find_cell(CONTEXT_TABLE, row, 1, x, y, w, h);
         auto input = new Fl_Check_Button(x, y, w, h);
+        input->tooltip("ignore case");
         input->value(static_cast<int>(item.get_ignore_case()));
         input->callback(
             [](Fl_Widget *self, void *data) {
