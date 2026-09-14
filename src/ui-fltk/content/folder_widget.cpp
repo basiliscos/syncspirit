@@ -739,6 +739,9 @@ Fl_Widget *device_share_widget_t::create_widget(int x, int y, int w, int h) {
 void device_share_widget_t::reset() {
     auto &table = static_cast<base_table_t &>(this->container);
     auto cluster = table.get_cluster();
+    auto buffer = std::array<std::byte, 1024 * 32>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
 
     input->add("(empty)");
     int i = 1;
@@ -748,9 +751,16 @@ void device_share_widget_t::reset() {
         if (device == cluster->get_device()) {
             continue;
         }
-        auto short_id = device->device_id().get_short();
-        auto label = fmt::format("{}, {}", device->get_name(), short_id);
-        input->add(label.data());
+
+        auto label_str = std::pmr::string(allocator);
+        auto label_out = std::back_inserter(label_str);
+        fmt::format_to(label_out, "{}", device->get_name());
+
+        if (table.get_supervisor().get_app_config().fltk_config.display_device_id) {
+            auto id = device->device_id().get_short();
+            fmt::format_to(label_out, ", {}", id);
+        }
+        input->add(label_str.data());
         if (device.get() == initial_device.get()) {
             this->device = device;
             index = i;
