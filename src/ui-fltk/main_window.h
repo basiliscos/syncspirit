@@ -5,6 +5,7 @@
 
 #include "app_supervisor.h"
 #include "platform/tray.h"
+#include "platform/window_controller.h"
 #include <FL/Fl_Double_Window.H>
 #include <string>
 
@@ -34,6 +35,7 @@ struct main_window_t : Fl_Double_Window {
     void show_tray_icon(bool value) noexcept;
     void on_frame_render() noexcept;
     void on_local_state_update() noexcept;
+    tray_t &get_tray() noexcept;
 
   private:
     app_supervisor_t *supervisor{nullptr};
@@ -43,7 +45,7 @@ struct main_window_t : Fl_Double_Window {
     Fl_RGB_Image *image_icon{nullptr};
     menu_t *menu{nullptr};
     tray_t tray;
-    bool native_hidden{false}; // win32-only
+    window_controller_t controller;
 };
 
 } // namespace syncspirit::fltk

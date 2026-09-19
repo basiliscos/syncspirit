@@ -13,10 +13,8 @@
 #include "utils/format.hpp"
 #include "syncspirit-fltk-config.h"
 
-#include <FL/Fl.H>
 #include <FL/Fl_Box.H>
 #include <FL/Fl_Tile.H>
-#include <FL/platform.H>
 #include <FL/Fl_Menu_Item.H>
 #include <FL/Fl_Menu_Bar.H>
 #include <fmt/format.h>
@@ -27,7 +25,7 @@ using namespace syncspirit::fltk;
 static auto app_name = fmt::format("syncspirit-fltk {}", constants::client_version);
 
 main_window_t::main_window_t(app_supervisor_t &supervisor_, int w_, int h_)
-    : parent_t(w_, h_, app_name.data()), supervisor{&supervisor_} {
+    : parent_t(w_, h_, app_name.data()), supervisor{&supervisor_}, controller(this) {
     supervisor->set_main_window(this);
 
     image_icon = supervisor->load_image("icons/syncspirit-fltk.png");
@@ -132,40 +130,9 @@ int main_window_t::handle(int e) {
     return parent_t::handle(e);
 }
 
-void main_window_t::hide() {
-    if (tray.is_enabled() && supervisor->get_app_config().fltk_config.hide_to_tray) {
-#if defined(SYNCSPIRIT_FLTK_WIN32)
-        // seems fltk/win32 destroys the window, do manually hide it:
-        HWND hwnd = (HWND)fl_xid(this);
-        auto is_visible = IsWindowVisible(hwnd) != FALSE;
-        if (is_visible) {
-            ShowWindow(hwnd, SW_HIDE);
-            native_hidden = true;
-            return;
-        }
-#endif
-    }
-    parent_t::hide();
-}
+void main_window_t::hide() { controller.hide(); }
 
-void main_window_t::show() {
-#if defined(SYNCSPIRIT_FLTK_WIN32)
-    if (native_hidden) {
-        HWND hwnd = (HWND)fl_xid(this);
-        auto is_visible = IsWindowVisible(hwnd) != FALSE;
-        if (!is_visible) {
-            native_hidden = false;
-            ShowWindow(hwnd, SW_SHOW);
-            SetForegroundWindow(hwnd);
-            SetActiveWindow(hwnd);
-            redraw();
-            flush();
-            return;
-        }
-    }
-#endif
-    parent_t::show();
-}
+void main_window_t::show() { controller.show(); }
 
 void main_window_t::set_splash_text(std::string text) {
     log_panel->set_splash_text(std::move(text));
@@ -199,3 +166,5 @@ void main_window_t::on_local_state_update() noexcept {
 app_supervisor_t *main_window_t::get_supervisor() { return supervisor; }
 
 const Fl_RGB_Image *main_window_t::get_icon() const noexcept { return image_icon; }
+
+tray_t &main_window_t::get_tray() noexcept { return tray; }

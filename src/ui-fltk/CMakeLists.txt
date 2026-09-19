@@ -46,6 +46,9 @@ add_executable(syncspirit-fltk WIN32 MACOSX_BUNDLE
     platform/tray.cpp
     platform/tray_impl/tray_x11.cpp
     platform/tray_impl/tray_win32.cpp
+    platform/tray_impl/tray_win32.cpp
+    platform/window_controller.cpp
+    platform/window_controller/window_controller_win32.cpp
     presence_item/cluster.cpp
     presence_item/file.cpp
     presence_item/folder.cpp
