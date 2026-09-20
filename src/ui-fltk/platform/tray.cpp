@@ -9,6 +9,8 @@
 #include "tray_impl/tray_x11.h"
 #elif defined(SYNCSPIRIT_FLTK_WIN32)
 #include "tray_impl/tray_win32.h"
+#elif defined(SYNCSPIRIT_FLTK_MACOS)
+#include "tray_impl/tray_macos.h"
 #endif
 
 #include <FL/Fl_PNG_Image.H>
@@ -79,6 +81,8 @@ void tray_t::enable(bool value) noexcept {
         impl = tray_x11_t::init(*sup);
 #elif defined(SYNCSPIRIT_FLTK_WIN32)
         impl = tray_win32_t::init(*sup);
+#elif defined(SYNCSPIRIT_FLTK_MACOS)
+        impl = tray_macos_t::init(*sup);
 #endif
         if (impl) {
             on_local_state_update();
@@ -120,6 +124,8 @@ bool tray_t::is_available() noexcept {
 #if defined(SYNCSPIRIT_FLTK_X11)
     return true;
 #elif defined(SYNCSPIRIT_FLTK_WIN32)
+    return true;
+#elif defined(SYNCSPIRIT_FLTK_MACOS)
     return true;
 #endif
     return false;

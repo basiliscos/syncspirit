@@ -7,6 +7,8 @@ if(X11_FOUND)
     set(SYNCSPIRIT_FLTK_X11 true)
 elseif(WIN32)
     set(SYNCSPIRIT_FLTK_WIN32 true)
+elseif(APPLE)
+    set(SYNCSPIRIT_FLTK_MACOS true)
 endif()
 
 configure_file(syncspirit-fltk-config.h.in include/syncspirit-fltk-config.h @ONLY)
@@ -44,10 +46,12 @@ add_executable(syncspirit-fltk WIN32 MACOSX_BUNDLE
     content/file_table.cpp
     content/folder_widget.cpp
     platform/tray.cpp
+    platform/tray_impl/tray_macos.cpp
     platform/tray_impl/tray_x11.cpp
     platform/tray_impl/tray_win32.cpp
     platform/tray_impl/tray_win32.cpp
     platform/window_controller.cpp
+    platform/window_controller/window_controller_macos.cpp
     platform/window_controller/window_controller_win32.cpp
     presence_item/cluster.cpp
     presence_item/file.cpp
@@ -72,14 +76,21 @@ add_executable(syncspirit-fltk WIN32 MACOSX_BUNDLE
     tree_item/self_device.cpp
     tree_item/settings.cpp
     $<$<PLATFORM_ID:Windows>:app.rc>
+    $<$<PLATFORM_ID:Darwin>:platform/tray_impl/tray_macos_native.mm>
+    $<$<PLATFORM_ID:Darwin>:platform/window_controller/app_helper_native.mm>
     $<$<PLATFORM_ID:Darwin>:${syncspirit_SOURCE_DIR}/misc/SyncSpiritIcon.icns>
 )
+
+if(APPLE)
+	find_library(COCOA_FRAMEWORK Cocoa REQUIRED)
+endif()
 
 target_link_libraries(syncspirit-fltk
     syncspirit_core
     rotor::fltk
     $<$<PLATFORM_ID:Linux>:jpeg>
     $<$<PLATFORM_ID:Linux>:png>
+    $<$<PLATFORM_ID:Darwin>:${COCOA_FRAMEWORK}>
     libqrencode::libqrencode
 )
 target_include_directories(syncspirit-fltk PUBLIC
@@ -119,7 +130,10 @@ set_target_properties(syncspirit-fltk PROPERTIES
 )
 set_source_files_properties(${syncspirit_SOURCE_DIR}/misc/SyncSpiritIcon.icns PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
 
-if(APPLE)
+if (APPLE)
+	set_source_files_properties(platform/tray_impl/tray_macos_native.mm
+		PROPERTIES COMPILE_FLAGS "-fobjc-arc"
+	)
     add_custom_command(TARGET syncspirit-fltk POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_directory
             "${syncspirit_SOURCE_DIR}/misc/resources/icons"

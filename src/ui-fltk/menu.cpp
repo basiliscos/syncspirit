@@ -4,11 +4,12 @@
 #include "menu.h"
 #include "platform/tray.h"
 #include "app_supervisor.h"
+#include "syncspirit-fltk-config.h"
 
 using namespace syncspirit;
 using namespace syncspirit::fltk;
 
-#if !defined(__APPLE__)
+#if !defined(SYNCSPIRIT_FLTK_MACOS)
 static void on_quit(Fl_Widget *widget, void *) {
     auto &sup = static_cast<menu_t *>(widget)->supervisor;
     auto log = sup.get_logger();
@@ -106,7 +107,7 @@ menu_t::menu_t(app_supervisor_t &supervisor_, int x, int y, int w, int h)
 
     add_item("&Restart app", 0, on_restart);
     // there is that one on default app menu
-#if !defined(__APPLE__)
+#if !defined(SYNCSPIRIT_FLTK_MACOS)
     add_item("&Quit", 0, on_quit);
 #endif
 

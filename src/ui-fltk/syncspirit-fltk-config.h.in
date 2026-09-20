@@ -2,3 +2,4 @@
 
 #cmakedefine SYNCSPIRIT_FLTK_X11
 #cmakedefine SYNCSPIRIT_FLTK_WIN32
+#cmakedefine SYNCSPIRIT_FLTK_MACOS

@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 Ivan Baidakou
 
 #include "window_controller.h"
+#include "window_controller/window_controller_macos.h"
 #include "window_controller/window_controller_win32.h"
 #include "main_window.h"
 #include "syncspirit-fltk-config.h"
@@ -23,6 +24,8 @@ void window_controller_impl_t::hide() noexcept {
 window_controller_t::window_controller_t(main_window_t *main_window) noexcept {
 #if defined(SYNCSPIRIT_FLTK_WIN32)
     impl.reset(new window_controller_impl_win32_t(main_window));
+#elif defined(SYNCSPIRIT_FLTK_MACOS)
+    impl.reset(new window_controller_impl_macos_t(main_window));
 #else
     impl.reset(new window_controller_impl_t(main_window));
 #endif
