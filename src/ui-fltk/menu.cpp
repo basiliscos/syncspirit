@@ -16,6 +16,7 @@ static void on_quit(Fl_Widget *widget, void *) {
     sup.do_shutdown();
 }
 #endif
+
 static void on_restart(Fl_Widget *widget, void *) {
     auto &sup = static_cast<menu_t *>(widget)->supervisor;
     auto log = sup.get_logger();
