@@ -389,6 +389,16 @@ std::int64_t last_write_time(const poly_path_view_t &path, std::error_code &ec) 
     return get_stats(path, ec).modification;
 }
 
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+inline std::int64_t to_unix(const FILETIME &ft) {
+    constexpr std::int64_t UNIX_TIME_START = 0x019DB1DED53E8000ll; // January 1, 1970 (start of Unix epoch) in "ticks"
+    auto v = ((std::int64_t)ft.dwHighDateTime << 32) | ft.dwLowDateTime;
+    // convert to seconds since 1601
+    auto u = v - UNIX_TIME_START;
+    return u / 10000000ULL;
+}
+#endif
+
 stats_t get_stats(const poly_path_view_t &path, std::error_code &ec) noexcept {
     stats_t r;
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
@@ -398,7 +408,6 @@ stats_t get_stats(const poly_path_view_t &path, std::error_code &ec) noexcept {
         ec = std::error_code{errno, std::system_category()};
     } else {
         r.supported = true;
-        r.modification = static_cast<std::int64_t>(st.st_mtime);
         r.permissions = st.st_mode & 07777;
         if (st.st_mode & _S_IFDIR) {
             r.file_type = file_type_t::DIRECTORY;
@@ -407,6 +416,15 @@ stats_t get_stats(const poly_path_view_t &path, std::error_code &ec) noexcept {
             r.file_size = st.st_size;
         } else {
             r.supported = false;
+        }
+        if (r.supported) {
+            // buggy st.st_mtime might contain daylight saving time application
+            auto data_w = WIN32_FIND_DATAW{};
+            auto h = FindFirstFileW(wpath.data(), &data_w);
+            if (h != INVALID_HANDLE_VALUE) {
+                r.modification = to_unix(data_w.ftLastWriteTime);
+                FindClose(h);
+            }
         }
     }
 #else
