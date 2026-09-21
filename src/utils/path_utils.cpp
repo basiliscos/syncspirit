@@ -368,12 +368,22 @@ poly_string_t read_symlink(const poly_path_view_t &target, std::error_code &ec) 
 void last_write_time(const poly_path_view_t &path, std::int64_t modified_at, std::error_code &ec) noexcept {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
     auto wpath = path.get_full_wname(true);
-    struct _utimbuf times;
-    times.actime = 0;
-    times.modtime = (time_t)modified_at;
-    if (_wutime(wpath.data(), &times) != 0) {
-        ec = std::error_code{errno, std::system_category()};
+
+    auto handle =
+        CreateFileW(wpath.data(), FILE_WRITE_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                    nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
+
+    if (handle == INVALID_HANDLE_VALUE) {
+        ec = std::error_code(::GetLastError(), std::system_category());
+        return;
     }
+
+    auto mt = utils::from_unix(modified_at);
+    auto ok = SetFileTime(handle, nullptr, nullptr, &mt);
+    if (!ok) {
+        ec = std::error_code(::GetLastError(), std::system_category());
+    }
+    CloseHandle(handle);
 #else
     struct timespec times[2];
     times[0].tv_nsec = UTIME_OMIT; /* keep atime */
