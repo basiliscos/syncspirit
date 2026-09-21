@@ -710,14 +710,26 @@ Fl_Widget *device_share_widget_t::create_widget(int x, int y, int w, int h) {
             auto previous = self->device;
             if (self->input->value()) {
                 auto cluster = table->get_cluster();
+                auto buffer = std::array<std::byte, 1024 * 32>();
+                auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+                auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+
                 for (auto &it : cluster->get_devices()) {
                     auto device = it.item.get();
                     if (device == cluster->get_device().get()) {
                         continue;
                     }
-                    auto short_id = device->device_id().get_short();
-                    auto label = fmt::format("{}, {}", device->get_name(), short_id);
-                    if (label == self->input->text()) {
+
+                    auto label_str = std::pmr::string(allocator);
+                    auto label_out = std::back_inserter(label_str);
+                    fmt::format_to(label_out, "{}", device->get_name());
+
+                    if (table->get_supervisor().get_app_config().fltk_config.display_device_id) {
+                        auto id = device->device_id().get_short();
+                        fmt::format_to(label_out, ", {}", id);
+                    }
+
+                    if (label_str == self->input->text()) {
                         self->device = it.item;
                         break;
                     }
