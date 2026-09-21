@@ -6,6 +6,7 @@
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
 #define _CRT_STDIO_ISO_WIDE_SPECIFIERS 1 /* optional on some toolchains */
+#include "utils/time.h"
 #include <windows.h>
 #include <sys/types.h>
 #include <sys/utime.h>
@@ -23,7 +24,6 @@
 #include <dirent.h>
 #endif
 
-// #include <spdlog/spdlog.h>
 #include "syncspirit-config.h"
 #include "fs/utils.h"
 
@@ -389,16 +389,6 @@ std::int64_t last_write_time(const poly_path_view_t &path, std::error_code &ec) 
     return get_stats(path, ec).modification;
 }
 
-#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
-inline std::int64_t to_unix(const FILETIME &ft) {
-    constexpr std::int64_t UNIX_TIME_START = 0x019DB1DED53E8000ll; // January 1, 1970 (start of Unix epoch) in "ticks"
-    auto v = ((std::int64_t)ft.dwHighDateTime << 32) | ft.dwLowDateTime;
-    // convert to seconds since 1601
-    auto u = v - UNIX_TIME_START;
-    return u / 10000000ULL;
-}
-#endif
-
 stats_t get_stats(const poly_path_view_t &path, std::error_code &ec) noexcept {
     stats_t r;
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
@@ -422,7 +412,7 @@ stats_t get_stats(const poly_path_view_t &path, std::error_code &ec) noexcept {
             auto data_w = WIN32_FIND_DATAW{};
             auto h = FindFirstFileW(wpath.data(), &data_w);
             if (h != INVALID_HANDLE_VALUE) {
-                r.modification = to_unix(data_w.ftLastWriteTime);
+                r.modification = utils::to_unix(data_w.ftLastWriteTime);
                 FindClose(h);
             }
         }
