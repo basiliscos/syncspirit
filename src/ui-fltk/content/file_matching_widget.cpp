@@ -155,6 +155,7 @@ struct file_matching_widget_t::table_t final : contentable_t<Fl_Table> {
         auto input = new Fl_Check_Button(x, y, w, h);
         input->tooltip("ignore case");
         input->value(static_cast<int>(item.get_ignore_case()));
+        input->when(FL_REASON_CHANGED | FL_REASON_RELEASED);
         input->callback(
             [](Fl_Widget *self, void *data) {
                 auto t = reinterpret_cast<table_t *>(data);
