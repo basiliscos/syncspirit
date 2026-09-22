@@ -17,7 +17,7 @@ class SyncspiritRecipe(ConanFile):
         rotor_options = {"enable_asio": True, "enable_thread": True}
 
         if self.options.get_safe("frontend_fltk", False):
-            fltk_version = "1.3.9" if is_apple_os(self) else "1.4.5"
+            fltk_version = "1.4.5"
             self.requires("freetype/2.12.1", headers=True, libs=True, transitive_libs=True, force=True)
             self.requires(f"fltk/{fltk_version}", headers=True, libs=True, transitive_libs=True, force=True)
             self.requires("libqrencode/4.1.1")
