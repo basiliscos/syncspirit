@@ -3,7 +3,6 @@
 
 #include "access.h"
 #include "diff-builder.h"
-#include "config/fs.h"
 #include "fs/fs_slave.h"
 #include "fs/messages.h"
 #include "fs/utils.h"
@@ -14,7 +13,6 @@
 #include "test-utils.h"
 #include "test_supervisor.h"
 #include "access.h"
-#include "utils/platform.h"
 #include "utils/format.hpp"
 #include "utils/utf8.h"
 #include <chrono>
@@ -1142,7 +1140,6 @@ void test_dir_scan_errors() {
             proto::set_permissions(pr_dir, default_perms);
             proto::set_modified_s(pr_dir, 12345);
             proto::set_type(pr_dir, FT::DIRECTORY);
-
             SECTION("new dir/update") {
                 mk_update(pr_dir, fs::update_type_t::created, true);
 

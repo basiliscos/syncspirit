@@ -1434,9 +1434,8 @@ void test_scan_errors() {
                 builder->scan_start(folder->get_id()).apply(*sup);
                 CHECK(!folder->is_scanning());
                 CHECK(folder->get_scan_finish() >= folder->get_scan_start());
-                CHECK(files->size() == 1);
+                CHECK(files->size() == 0);
             }
-
             SECTION("scan dir errors") {
                 int mocked = 0;
                 auto generator_type = GENERATE(0, 1);

@@ -105,7 +105,7 @@ folder_context_t::folder_context_t(model::folder_info_ptr_t local_folder_, local
 }
 
 bool folder_context_t::process_stack(stack_context_t &ctx) noexcept {
-    auto try_next = true;
+    auto try_next = blocked == 0;
     while (!stack.empty() && try_next) {
         auto it = stack.begin();
         auto &item = *it;
@@ -533,16 +533,29 @@ int folder_context_t::process(abort_hashing_t &item, stack_context_t &ctx) noexc
 }
 
 folder_context_t &folder_context_t::post_process(stack_context_t &ctx) noexcept {
-    LOG_TRACE(log, "postpocessing");
+    LOG_TRACE(log, "postpocessing, in progress: {}, blocked: {}", in_progress, blocked);
+    auto &tasks_out = ctx.slave->tasks_out;
     if (ensure_folder_existance(ctx)) {
         assert(in_progress > 0);
         --in_progress;
 
-        for (auto &t : ctx.slave->tasks_out) {
-            std::visit([&](auto &t) { post_process(t, ctx); }, t);
+        if (!tasks_out.empty()) {
+            for (auto &t : tasks_out) {
+                std::visit([&](auto &t) { post_process(t, ctx); }, t);
+            }
+        } else {
+            LOG_WARN(log, "no tasks out, forcing completion, stack size = {}", stack.size());
+            while (!stack.empty()) {
+                auto &t = stack.front();
+                if (auto scan_complete = std::get_if<complete_scan_t>(&t); scan_complete) {
+                    break;
+                }
+                stack.pop_front();
+            }
+            blocked = 0;
         }
     }
-    ctx.slave->tasks_out.clear();
+    tasks_out.clear();
     return *this;
 }
 
@@ -593,6 +606,7 @@ void folder_context_t::post_process(hash_base_t &hash_file, hasher::message::dig
 
 void folder_context_t::post_process(fs::task::scan_dir_t &task, stack_context_t &ctx) noexcept {
     using checked_chidren_t = std::pmr::set<std::string_view>;
+    --blocked;
     auto it = scan_generation.find(task.path);
     if (it == scan_generation.end()) {
         scan_generation.emplace(task.path.clone(), ++io_generation);
@@ -882,10 +896,17 @@ fs::task_t folder_context_t::pop_task() noexcept {
     assert(pending_io.size());
     auto task = std::move(pending_io.front());
     pending_io.pop_front();
-    if (auto *si = std::get_if<fs::task::segment_iterator_t>(&task); si) {
-        hashing += si->block_count;
-        hashing_files[si->path.clone()] += si->block_count;
-    }
+    std::visit(
+        [this](const auto &t) {
+            using T = std::decay_t<decltype(t)>;
+            if constexpr (std::is_same_v<T, fs::task::segment_iterator_t>) {
+                hashing += t.block_count;
+                hashing_files[t.path.clone()] += t.block_count;
+            } else if constexpr (std::is_same_v<T, fs::task::scan_dir_t>) {
+                ++blocked;
+            }
+        },
+        task);
     ++in_progress;
     return task;
 }

@@ -74,6 +74,7 @@ struct folder_context_t : boost::intrusive_ref_counter<folder_context_t, boost::
     bool ignore_permissions;
     std::int_fast32_t in_progress = 0;
     std::int_fast32_t hashing = 0;
+    std::int_fast32_t blocked = 0;
     child_info_t::generation_t io_generation = 0;
     scan_generation_t scan_generation;
     hasing_files_t hashing_files;
