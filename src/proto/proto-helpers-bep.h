@@ -312,6 +312,14 @@ inline void set_name(FileInfo &msg, std::string_view value) {
     using namespace pp;
     msg["name"_f] = std::string(value);
 }
+inline void set_name(FileInfo &msg, const char *value) {
+    using namespace pp;
+    msg["name"_f] = std::string(value);
+}
+inline void set_name(FileInfo &msg, std::string &&value) {
+    using namespace pp;
+    msg["name"_f] = std::move(value);
+}
 inline FileInfoType get_type(const FileInfo &msg) {
     using namespace pp;
     return msg["type"_f].value_or(FileInfoType{});
@@ -464,7 +472,11 @@ inline void set_symlink_target(FileInfo &msg, std::string_view value) {
     using namespace pp;
     msg["symlink_target"_f] = std::string(value);
 }
-template <typename T = void> inline void set_symlink_target(FileInfo &msg, std::string value) {
+inline void set_symlink_target(FileInfo &msg, const char *value) {
+    using namespace pp;
+    msg["symlink_target"_f] = std::string(value);
+}
+inline void set_symlink_target(FileInfo &msg, std::string &&value) {
     using namespace pp;
     msg["symlink_target"_f] = std::move(value);
 }

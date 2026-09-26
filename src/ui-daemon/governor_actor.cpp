@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "governor_actor.h"
 #include "net/names.h"
+#include "utils/format.hpp"
 #include "model/diff/advance/remote_copy.h"
-#include "model/diff/local/io_failure.h"
 #include "model/diff/modify/block_ack.h"
 #include "model/diff/peer/cluster_update.h"
 #include "model/diff/peer/update_folder.h"
@@ -27,7 +27,7 @@ void governor_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
                 auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
                 auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
                 plugin->subscribe_actor(&governor_actor_t::on_model_update, coordinator);
-                plugin->subscribe_actor(&governor_actor_t::on_app_ready, coordinator);
+                plugin->subscribe_actor(&governor_actor_t::on_local_ready, coordinator);
                 plugin->subscribe_actor(&governor_actor_t::on_command);
             }
         });
@@ -44,8 +44,8 @@ void governor_actor_t::shutdown_start() noexcept {
     r::actor_base_t::shutdown_start();
 }
 
-void governor_actor_t::on_app_ready(model::message::app_ready_t &) noexcept {
-    LOG_TRACE(log, "on_app_ready");
+void governor_actor_t::on_local_ready(model::message::local_ready_t &) noexcept {
+    LOG_INFO(log, "on_local_ready");
     process();
 }
 
@@ -127,15 +127,6 @@ void governor_actor_t::refresh_deadline() noexcept {
 auto governor_actor_t::operator()(const model::diff::advance::remote_copy_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     refresh_deadline();
-    return diff.visit_next(*this, custom);
-}
-
-auto governor_actor_t::operator()(const model::diff::local::io_failure_t &diff, void *custom) noexcept
-    -> outcome::result<void> {
-    LOG_TRACE(log, "on_io_error, count = {}", diff.errors.size());
-    for (auto &err : diff.errors) {
-        LOG_WARN(log, "on_io_error (ignored) path: {}, problem: {}", err.path, err.ec.message());
-    }
     return diff.visit_next(*this, custom);
 }
 

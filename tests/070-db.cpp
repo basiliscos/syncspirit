@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include <catch2/catch_all.hpp>
 #include "db/error_code.h"
@@ -17,7 +17,6 @@
 #include "db/utils.h"
 #include "net/db_actor.h"
 #include "net/names.h"
-#include <filesystem>
 #include <thread>
 
 using namespace syncspirit;
@@ -25,8 +24,6 @@ using namespace syncspirit::db;
 using namespace syncspirit::test;
 using namespace syncspirit::model;
 using namespace syncspirit::net;
-
-namespace fs = std::filesystem;
 
 namespace {
 struct env {};
@@ -60,14 +57,10 @@ struct fixture_t {
     using stats_msg_ptr_t = r::intrusive_ptr_t<stats_msg_t>;
     using supervisor_ptr_t = r::intrusive_ptr_t<db_supervisor_t>;
 
-    fixture_t() noexcept : root_path{unique_path()}, path_quard{root_path} {
-        test::init_logging();
-        bfs::create_directory(root_path);
-    }
+    fixture_t() noexcept : path_quard(test::unique_path()) {}
     fixture_t(fixture_t &source) = delete;
 
-    fixture_t(fixture_t &&source) noexcept
-        : root_path(std::move(source.root_path)), path_quard(std::move(source.path_quard)) {}
+    fixture_t(fixture_t &&source) noexcept : path_quard(std::move(source.path_quard)) {}
 
     virtual configure_callback_t configure() noexcept {
         return [&](r::plugin::plugin_base_t &plugin) {
@@ -104,7 +97,7 @@ struct fixture_t {
         return cluster;
     }
 
-    virtual config::db_config_t make_config() noexcept { return config::db_config_t{1024 * 1024, 0, 64, 32}; }
+    virtual config::db_config_t make_config() noexcept { return config::db_config_t{1024 * 1024, 0, 64}; }
 
     virtual supervisor_ptr_t make_supervisor(r::system_context_t &ctx) noexcept {
         return ctx.create_supervisor<db_supervisor_t>().timeout(timeout).create_registry().finish();
@@ -156,13 +149,16 @@ struct fixture_t {
         return counter;
     }
 
+    virtual std::uint32_t get_max_files_per_diff() const { return 32; }
+
     virtual void launch_db() {
         db_actor = sup->create_actor<db_actor_t>()
                        .bouncer_address(sup->get_address())
                        .cluster(cluster)
-                       .db_dir(root_path)
+                       .db_dir(path_quard.clone())
                        .db_config(make_config())
                        .timeout(timeout)
+                       .max_files_per_diff(get_max_files_per_diff())
                        .finish();
         db_addr = db_actor->get_address();
         sup->do_process();
@@ -179,7 +175,6 @@ struct fixture_t {
     device_ptr_t my_device;
     supervisor_ptr_t sup;
     r::intrusive_ptr_t<net::db_actor_t> db_actor;
-    bfs::path root_path;
     test::path_guard_t path_quard;
     r::system_context_t ctx;
     model::diff::cluster_diff_ptr_t load_diff;
@@ -303,7 +298,7 @@ void test_folder_upserting() {
                 REQUIRE(folder_clone);
                 REQUIRE(folder.get() != folder_clone.get());
                 REQUIRE(folder_clone->get_label() == "my-label");
-                REQUIRE(folder_clone->get_path().string() == "/my/path");
+                REQUIRE(folder_clone->get_path().get_full_name() == "/my/path");
                 REQUIRE(folder_clone->get_folder_infos().size() == 1);
                 REQUIRE(folder_clone->get_folder_infos().by_device(*cluster->get_device()));
             }
@@ -1362,7 +1357,7 @@ void test_corrupted_file() {
 void test_flush_on_shutdown() {
     struct F : fixture_t {
 
-        config::db_config_t make_config() noexcept override { return config::db_config_t{1024 * 1024, 100, 64, 32}; }
+        config::db_config_t make_config() noexcept override { return config::db_config_t{1024 * 1024, 100, 64}; }
 
         void main() noexcept override {
 
@@ -1406,10 +1401,17 @@ void test_flush_on_shutdown() {
     F().run();
 };
 
-void test_iterative_loading() {
-    struct F : fixture_t {
+struct min_concurrencty_fixture_t : fixture_t {
+    using parent_t = fixture_t;
+    using parent_t::parent_t;
 
-        config::db_config_t make_config() noexcept override { return config::db_config_t{1024 * 1024, 0, 1, 1}; }
+    std::uint32_t get_max_files_per_diff() const override { return 1; }
+};
+
+void test_iterative_loading() {
+    struct F : min_concurrencty_fixture_t {
+
+        config::db_config_t make_config() noexcept override { return config::db_config_t{1024 * 1024, 0, 1}; }
 
         void main() noexcept override {
 
@@ -1443,9 +1445,9 @@ void test_iterative_loading() {
 };
 
 void test_iterative_loading_interrupt() {
-    struct F : fixture_t {
+    struct F : min_concurrencty_fixture_t {
 
-        config::db_config_t make_config() noexcept override { return config::db_config_t{1024 * 1024, 0, 1, 1}; }
+        config::db_config_t make_config() noexcept override { return config::db_config_t{1024 * 1024, 0, 1}; }
 
         supervisor_ptr_t make_supervisor(r::system_context_t &ctx) noexcept override {
             struct sup_t : db_supervisor_t {
@@ -1494,9 +1496,9 @@ void test_iterative_loading_interrupt() {
 
 template <typename T> using my_controller_base_t = model::diff::iterative_controller_t<T, r::actor_base_t>;
 void test_iterative_application_interrupt() {
-    struct F : fixture_t {
+    struct F : min_concurrencty_fixture_t {
 
-        config::db_config_t make_config() noexcept override { return config::db_config_t{1024 * 1024, 0, 1, 1}; }
+        config::db_config_t make_config() noexcept override { return config::db_config_t{1024 * 1024, 0, 1}; }
 
         void main() noexcept override {
 
@@ -1529,7 +1531,8 @@ void test_iterative_application_interrupt() {
                         r::plugin::config_phase_t::PREINIT);
                 }
 
-                void process(model::diff::cluster_diff_t &diff, apply_context_t &context) noexcept override {
+                void process(model::diff::cluster_diff_t &diff,
+                             model::payload::apply_context_t &context) noexcept override {
                     parent_t::process(diff, context);
                     auto &folder = cluster->get_folders().begin()->item;
                     auto &fi = folder->get_folder_infos().begin()->item;
@@ -1584,6 +1587,7 @@ void test_iterative_application_interrupt() {
 };
 
 int _init() {
+    test::init_logging();
     REGISTER_TEST_CASE(test_db_population, "test_db_population", "[db]");
     REGISTER_TEST_CASE(test_loading_empty_db, "test_loading_empty_db", "[db]");
     REGISTER_TEST_CASE(test_forget_to_commit_other_thread, "test_forget_to_commit_other_thread", "[db]");

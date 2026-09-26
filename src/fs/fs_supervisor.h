@@ -41,10 +41,14 @@ struct SYNCSPIRIT_API fs_supervisor_t : rth::supervisor_thread_t {
 
     explicit fs_supervisor_t(config_t &cfg);
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
+    void enqueue(r::message_ptr_t message) noexcept override;
     void on_start() noexcept override;
     void on_child_shutdown(actor_base_t *actor) noexcept override;
+    using parent_t::context;
 
-  private:
+  protected:
+    virtual void launch_children() noexcept;
+
     utils::logger_t log;
     config::fs_config_t fs_config;
     uint32_t hasher_threads;

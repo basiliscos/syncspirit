@@ -87,6 +87,7 @@ struct SYNCSPIRIT_TEST_API test_peer_t : r::actor_base_t {
     void on_controller_predown(net::message::controller_predown_t &msg) noexcept;
     void on_transfer(net::message::transfer_data_t &message) noexcept;
     void process_block_requests() noexcept;
+    void process_any_block_requests() noexcept;
     void forward(net::payload::forwarded_message_t payload) noexcept;
 
     void push_response(proto::ErrorCode, std::int32_t request_id) noexcept;

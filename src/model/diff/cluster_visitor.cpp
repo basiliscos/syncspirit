@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "cluster_diff.h"
 #include "cluster_visitor.h"
@@ -20,8 +20,8 @@
 #include "load/pending_devices.h"
 #include "load/remove_corrupted_files.h"
 #include "local/blocks_availability.h"
-#include "local/io_failure.h"
 #include "local/file_availability.h"
+#include "local/local_state_update.h"
 #include "local/scan_finish.h"
 #include "local/scan_request.h"
 #include "local/scan_start.h"
@@ -136,12 +136,17 @@ auto cluster_visitor_t::operator()(const load::remove_corrupted_files_t &diff, v
     return diff.visit_next(*this, custom);
 }
 
+auto cluster_visitor_t::operator()(const load::interrupt_t &diff, void *custom) noexcept -> outcome::result<void> {
+    return outcome::success();
+}
+
 auto cluster_visitor_t::operator()(const local::file_availability_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     return diff.visit_next(*this, custom);
 }
 
-auto cluster_visitor_t::operator()(const local::io_failure_t &diff, void *custom) noexcept -> outcome::result<void> {
+auto cluster_visitor_t::operator()(const local::local_state_update_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
     return diff.visit_next(*this, custom);
 }
 

@@ -1,6 +1,15 @@
---- _deps/mdbx-src/mdbx.c	2025-03-07 09:32:49.342834537 +0300
-+++ _deps/mdbx-src/mdbx.c.orig	2025-03-07 09:32:13.593479783 +0300
-@@ -28490,7 +28490,7 @@
+--- _deps/mdbx-src/mdbx.c.orig  2026-03-26 22:12:17.007272000 +0300
++++ _deps/mdbx-src/mdbx.c       2026-03-26 22:08:11.626424000 +0300
+@@ -68,7 +68,7 @@
+ #endif /* _NO_CRT_STDIO_INLINE */
+
+ #elif !defined(_POSIX_C_SOURCE)
+-#define _POSIX_C_SOURCE 200809L
++//#define _POSIX_C_SOURCE 200809L
+ #endif /* Windows */
+
+ #ifdef __cplusplus
+@@ -28756,7 +28756,7 @@
      for (ior_item_t *item = ior->pool; item <= ior->last;) {
        if (!HasOverlappedIoCompleted(&item->ov)) {
          assert(ior->overlapped_fd);

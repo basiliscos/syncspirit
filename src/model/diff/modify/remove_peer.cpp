@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2026 Ivan Baidakou
 
 #include "remove_peer.h"
+#include "constants.h"
 #include "unshare_folder.h"
 #include "remove_blocks.h"
 #include "remove_pending_folders.h"
 #include "model/cluster.h"
 #include "model/diff/apply_controller.h"
 #include "model/diff/cluster_visitor.h"
+#include "model/diff/diff_assembler.h"
 #include "model/misc/error_code.h"
 #include "utils/format.hpp"
 
@@ -32,28 +34,26 @@ remove_peer_t::remove_peer_t(const cluster_t &cluster, const device_t &peer) noe
         }
     }
 
-    auto current = (cluster_diff_t *){nullptr};
+    auto assember = model::diff::diff_assember_t(constants::diffs_batch);
     if (removed_pending_folders.size()) {
-        auto diff = cluster_diff_ptr_t{};
-        diff = new remove_pending_folders_t(std::move(removed_pending_folders));
-        current = assign_child(diff);
+        assember.push_back(new remove_pending_folders_t(std::move(removed_pending_folders)));
     }
 
     auto &folders = cluster.get_folders();
     for (auto it : folders) {
         auto &f = it.item;
         if (auto fi = f->is_shared_with(peer); fi) {
-            auto diff = cluster_diff_ptr_t{};
-            diff = new unshare_folder_t(cluster, *fi, &orphaned_blocks);
-            current = current ? current->assign_sibling(diff.get()) : assign_child(diff);
+            assember.push_back(new unshare_folder_t(cluster, *fi, &orphaned_blocks));
         }
     }
 
     auto removed_blocks = orphaned_blocks.deduce();
     if (removed_blocks.size()) {
-        auto diff = cluster_diff_ptr_t{};
-        diff = new remove_blocks_t(std::move(removed_blocks));
-        current = current ? current->assign_sibling(diff.get()) : assign_child(diff);
+        assember.push_back(new remove_blocks_t(std::move(removed_blocks)));
+    }
+
+    if (assember.has_diffs()) {
+        assign_child(assember.consume());
     }
 }
 

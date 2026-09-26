@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #pragma once
 
@@ -114,7 +114,7 @@ struct SYNCSPIRIT_API peer_actor_t : public r::actor_base_t {
     void on_controller_predown(message::controller_predown_t &) noexcept;
     void on_transfer(message::transfer_data_t &message) noexcept;
 
-    void on_io_error(const sys::error_code &ec, r::plugin::resource_id_t resource) noexcept;
+    void on_io_error(const boost::system::error_code &ec, r::plugin::resource_id_t resource) noexcept;
     void on_write(std::size_t bytes) noexcept;
     void on_read(std::size_t bytes) noexcept;
     void on_ping_timeout(r::request_id_t, bool cancelled) noexcept;

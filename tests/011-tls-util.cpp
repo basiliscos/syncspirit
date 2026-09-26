@@ -1,17 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "test-utils.h"
 #include "utils/base32.h"
 #include "utils/tls.h"
+#include "utils/path_view.hpp"
 #include <openssl/pem.h>
-#include <filesystem>
 #include <cstdio>
 
 using namespace syncspirit::utils;
+using namespace syncspirit;
 using namespace syncspirit::test;
-
-namespace bfs = std::filesystem;
 
 TEST_CASE("generate cert/key pair, save & load", "[support][tls]") {
     auto pair = generate_pair("sample");
@@ -26,18 +25,20 @@ TEST_CASE("generate cert/key pair, save & load", "[support][tls]") {
     PEM_write_X509(stdout, value.cert.get());
     X509_print_fp(stdout, value.cert.get());
 
-    auto cert_file = unique_path();
-    auto cert_file_path = cert_file.string();
-    auto cert_file_guard = path_guard_t(cert_file);
+    auto buffer = std::array<std::byte, 1024 * 4>{};
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
 
-    auto key_file = unique_path();
-    auto key_file_path = key_file.string();
-    auto key_file_guard = path_guard_t(key_file);
-    auto save_result = value.save(cert_file_path.c_str(), key_file_path.c_str());
+    auto path_guard = unique_path();
+    auto guard_view = path_guard.get_view(allocator);
+    auto cert_file_path = guard_view / "cert.pem";
+    auto key_file_path = guard_view / "key.pem";
+
+    auto save_result = value.save(cert_file_path.get_view(allocator), key_file_path);
     REQUIRE((bool)save_result);
-    printf("cert has been saved as %s\n", cert_file_path.c_str());
+    printf("cert has been saved as %s\n", cert_file_path.get_full_name().data());
 
-    auto load_result = load_pair(cert_file_path.c_str(), key_file_path.c_str());
+    auto load_result = load_pair(cert_file_path, key_file_path);
     REQUIRE((bool)load_result);
     REQUIRE(load_result.value().cert_data.size() == pair.value().cert_data.size());
 
@@ -50,7 +51,11 @@ TEST_CASE("generate cert/key pair, save & load", "[support][tls]") {
 }
 
 TEST_CASE("sha256 for certificate", "[support][tls]") {
-    auto cert = read_file(locate_path("data/cert.der"));
+    auto buffer = std::array<std::byte, 1024 * 4>{};
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+
+    auto cert = read_file(locate_path("data/cert.der", allocator));
     auto cert_bytes = bytes_view_t((unsigned char *)cert.data(), cert.size());
     auto sha_result = sha256_digest(cert_bytes);
     REQUIRE((bool)sha_result);
@@ -67,3 +72,10 @@ TEST_CASE("sha256 for certificate", "[support][tls]") {
     auto enc = base32::encode(sha);
     REQUIRE(enc == "WG2IWWALPC2HZF22COFUVKRJRD6GEF4VZFNCQ2HCJWJ3GJ7IQWGA");
 }
+
+int _init() {
+    test::init_logging();
+    return 1;
+}
+
+static int v = _init();

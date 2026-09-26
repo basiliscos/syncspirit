@@ -1,0 +1,238 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-FileCopyrightText: 2026 Ivan Baidakou
+
+#include "watcher.h"
+
+#if SYNCSPIRIT_WATCHER_WIN32
+
+#include "fs/fs_supervisor.h"
+#include "fs/utils.h"
+#include "utils/format.hpp"
+#include "utils/path_view.hpp"
+#include <cstring>
+#include <string>
+#include <cstdlib>
+
+using namespace syncspirit::fs::platform::windows;
+
+using handle_t = watcher_t::handle_t;
+
+static bool _close_handle(handle_t handle) { return ::CloseHandle(handle); }
+
+auto watcher_t::folder_guard_t::make(std::uint32_t buff_sz, std::string folder_id, io_guard_t dir_guard,
+                                     io_guard_t event_guard) noexcept -> folder_guard_ptr_t {
+    auto buff = (char *)malloc(buff_sz);
+    if (!buff) {
+        return {};
+    }
+    auto r = folder_guard_ptr_t();
+    r = new folder_guard_t{{}, buff, buff_sz, std::move(folder_id), {}, std::move(dir_guard), std::move(event_guard)};
+    std::memset(&r->overlapped, 0, sizeof(r->overlapped));
+    r->overlapped.hEvent = r->event_guard.handle;
+    return r;
+}
+
+watcher_t::folder_guard_t::~folder_guard_t() {
+    if (buff) {
+        free(buff);
+    }
+}
+
+auto watcher_t::folder_guard_t::initiate() noexcept -> std::error_code {
+    constexpr auto flags = FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_DIR_NAME | FILE_NOTIFY_CHANGE_ATTRIBUTES |
+                           FILE_NOTIFY_CHANGE_SIZE | FILE_NOTIFY_CHANGE_LAST_WRITE;
+    overlapped.Offset = overlapped.OffsetHigh = 0;
+    auto ok = ::ReadDirectoryChangesW(dir_guard.handle, buff, buff_sz, true, flags, nullptr, &overlapped, nullptr);
+    if (!ok) {
+        return std::error_code(::GetLastError(), std::system_category());
+    }
+    return {};
+}
+
+static void notify_cb(HANDLE handle, void *data) {
+    auto actor = reinterpret_cast<watcher_t *>(data);
+    actor->on_notify(handle);
+}
+
+void watcher_t::on_watch(message::watch_folder_t &message) noexcept {
+    constexpr auto SHARE_MODE = FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE;
+    constexpr auto FILE_FLAGS = FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OVERLAPPED;
+    auto sup = static_cast<fs::fs_supervisor_t *>(supervisor);
+    auto ctx = static_cast<fs::fs_context_t *>(sup->context);
+
+    auto buffer = std::array<std::byte, 1024 * 32>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+    auto &p = message.payload;
+    auto path_view = p.path.get_view(allocator);
+    auto path_wstr = path_view.get_full_wname();
+    LOG_TRACE(log, "on watch on '{}' (buffer size: {} bytes)", path_view, fs_config.win32_watcher_buff);
+
+    auto dir_handle =
+        ::CreateFileW(path_wstr.c_str(), FILE_LIST_DIRECTORY, SHARE_MODE, nullptr, OPEN_EXISTING, FILE_FLAGS, nullptr);
+
+    if (dir_handle == INVALID_HANDLE_VALUE) {
+        auto ec = std::error_code(::GetLastError(), std::system_category());
+        LOG_ERROR(log, "cannot open directory '{}' handle: {}", path_view, ec);
+        p.ec = ec;
+        return;
+    }
+    auto dir_guard = ctx->guard_handle(dir_handle);
+
+    auto event_handle = ::CreateEvent(nullptr, true, false, nullptr);
+    if (!event_handle) {
+        auto ec = std::error_code(::GetLastError(), std::system_category());
+        LOG_ERROR(log, "cannot create event handle: {}", path_view, ec);
+        p.ec = ec;
+        return;
+    }
+    auto event_guard = ctx->register_callback(event_handle, notify_cb, this, _close_handle);
+
+    LOG_TRACE(log, "dir handle = {}, event_handle = {}", (void *)dir_handle, (void *)event_handle);
+
+    auto folder_guard = folder_guard_t::make(fs_config.win32_watcher_buff, std::string(p.folder_id),
+                                             std::move(dir_guard), std::move(event_guard));
+    if (!folder_guard) {
+        LOG_ERROR(log, "cannot create folder guard for '{}'", path_view);
+        return;
+    }
+
+    if (auto ec = folder_guard->initiate(); ec) {
+        LOG_ERROR(log, "cannot initate watching dir '{}': {}", path_view, ec);
+        p.ec = ec;
+        return;
+    }
+
+    auto [it, inserted] = watched_folders->emplace(std::make_pair(std::string(p.folder_id), p.path.clone()));
+    if (!inserted) {
+        LOG_WARN(log, "folder '{}' on '{}' is already watched", p.folder_id, path_view);
+    } else {
+        handle_map[it->first] = event_handle;
+        path_map[event_handle] = std::move(folder_guard);
+        p.ec = {};
+    }
+}
+
+auto watcher_t::unwatch_dir(std::string_view folder_id) noexcept -> std::error_code {
+    auto r = std::error_code();
+    auto it_handle = handle_map.find(folder_id);
+    auto handle = it_handle->second;
+    auto it = path_map.find(handle);
+    auto &pg = it->second;
+
+    handle_map.erase(it_handle);
+    path_map.erase(it);
+
+    return r;
+}
+
+void watcher_t::on_unwatch(message::unwatch_folder_t &message) noexcept {
+    auto &p = message.payload;
+    auto it = watched_folders->find(p.folder_id);
+    if (it != watched_folders->end()) {
+        LOG_DEBUG(log, "unwatching(1) '{}'", it->second);
+        p.ec = unwatch_dir(p.folder_id);
+        watched_folders->erase(it);
+    } else {
+        LOG_WARN(log, "cannot unwatch folder '{}' as it has been watched", p.folder_id);
+    }
+}
+
+void watcher_t::shutdown_finish() noexcept {
+    for (auto it = watched_folders->begin(); it != watched_folders->end();) {
+        auto &[folder_id, path] = *it;
+        LOG_DEBUG(log, "unwatching(2) {}", path);
+        unwatch_dir(folder_id);
+        it = watched_folders->erase(it);
+    }
+    assert(path_map.empty());
+    assert(folder_map.empty());
+    parent_t::shutdown_finish();
+}
+
+void watcher_t::on_notify(handle_t handle) noexcept {
+    LOG_TRACE(log, "on_notify, handle = {}", (void *)handle);
+    auto it = path_map.find(handle);
+    if (it == path_map.end()) {
+        LOG_CRITICAL(log, "cannot find path guard for handle {}", (void *)handle);
+        return;
+    }
+
+    auto &folder_guard = it->second;
+    auto &folder_id = folder_guard->folder_id;
+    auto &path = (*watched_folders)[folder_id];
+
+    auto bytes = DWORD{0};
+    auto ok = ::GetOverlappedResult(folder_guard->dir_guard.handle, &folder_guard->overlapped, &bytes, false);
+    if (!ok) {
+        auto ec = std::error_code(::GetLastError(), std::system_category());
+        LOG_WARN(log, "cannot get overlapped result for '{}': {}", path, ec);
+        return;
+    }
+    if (!bytes) {
+        LOG_WARN(log, "overflow occured in ReadDirectoryChangesW(), tune fs.win32_watcher_buff");
+        return;
+    }
+
+    auto buffer = std::array<std::byte, 1024 * 32 * sizeof(wchar_t) + 1>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+    auto deadline = clock_t::local_time() + retension;
+
+    auto ptr = (FILE_NOTIFY_INFORMATION *)folder_guard->buff;
+    while (ptr) {
+        auto sz = ptr->FileNameLength / sizeof(WCHAR);
+        auto namew_ptr = ptr->FileName;
+        auto name_wstr = std::wstring_view(ptr->FileName, sz);
+
+        auto name_view = utils::make_native_view(name_wstr, allocator);
+        if (!name_view.is_temporal()) {
+            auto type = update_type_internal_t{0};
+            auto requires_refinement = false;
+            if (ptr->Action == FILE_ACTION_ADDED) {
+                type = update_type::CREATED;
+            } else if (ptr->Action == FILE_ACTION_REMOVED) {
+                type = update_type::DELETED;
+            } else if (ptr->Action == FILE_ACTION_MODIFIED) {
+                // no idea how to track metadata changes only
+                type = update_type::CONTENT;
+            } else if (ptr->Action == FILE_ACTION_RENAMED_OLD_NAME) {
+                // it is silly that win32 generates content event for the new file
+                // so it is OK to assume that previous file is always deleted
+                type = update_type::DELETED;
+                requires_refinement = true;
+            } else if (ptr->Action == FILE_ACTION_RENAMED_NEW_NAME) {
+                type = update_type::CREATED;
+                requires_refinement = true;
+            }
+
+            if (type) {
+                push(deadline, folder_id, name_view.get_full_name(), {}, static_cast<update_type_t>(type),
+                     requires_refinement);
+            } else {
+                LOG_DEBUG(log, "in the folder '{}' updated ({:x}): '{}'", folder_id, ptr->Action, name_view);
+            }
+        }
+        ptr = ptr->NextEntryOffset ? (FILE_NOTIFY_INFORMATION *)(((char *)ptr) + ptr->NextEntryOffset) : nullptr;
+    };
+
+    if (auto ok = ::ResetEvent(handle); !ok) {
+        auto ec = std::error_code(::GetLastError(), std::system_category());
+        LOG_WARN(log, "cannot reset event for handle for '{}': {}", path, ec);
+        return;
+    }
+
+    if (auto ec = folder_guard->initiate(); ec) {
+        LOG_ERROR(log, "cannot initate watching dir '{}': {}", path, ec);
+        return;
+    }
+}
+
+bool watcher_t::accept_update(const support::file_update_t &update, const utils::file_type_t type) noexcept {
+    if (update.update_type == update_type::CONTENT && type == utils::file_type_t::DIRECTORY) {
+        return false;
+    }
+    return true;
+}
+
+#endif

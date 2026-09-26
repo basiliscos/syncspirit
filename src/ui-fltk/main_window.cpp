@@ -7,12 +7,16 @@
 #include "log_panel.h"
 #include "tree_view.h"
 #include "tree_item.h"
-#include "toolbar.h"
+#include "menu.h"
 #include "constants.h"
+#include "utils/path_view.hpp"
+#include "utils/format.hpp"
+#include "syncspirit-fltk-config.h"
 
 #include <FL/Fl_Box.H>
 #include <FL/Fl_Tile.H>
-#include <FL/platform.H>
+#include <FL/Fl_Menu_Item.H>
+#include <FL/Fl_Menu_Bar.H>
 #include <fmt/format.h>
 
 using namespace syncspirit;
@@ -21,33 +25,36 @@ using namespace syncspirit::fltk;
 static auto app_name = fmt::format("syncspirit-fltk {}", constants::client_version);
 
 main_window_t::main_window_t(app_supervisor_t &supervisor_, int w_, int h_)
-    : parent_t(w_, h_, app_name.data()), supervisor{&supervisor_} {
-
-#ifdef _WIN32
-    auto icon = LoadIcon(fl_display, MAKEINTRESOURCE(ID_SYNCSPIRIT_ICON));
-    this->icon((const void *)icon);
-#endif
+    : parent_t(w_, h_, app_name.data()), supervisor{&supervisor_}, controller(this) {
     supervisor->set_main_window(this);
 
-    auto container = new Fl_Tile(0, 0, w(), h());
+    image_icon = supervisor->load_image("icons/syncspirit-fltk.png");
+    if (image_icon) {
+        Fl_Window::default_icon(static_cast<Fl_RGB_Image *>(image_icon));
+    }
+    auto top_contaner = new Fl_Group(0, 0, w(), h());
+
+    top_contaner->begin();
+
+    menu = new menu_t(supervisor_, 0, 0, w(), 25);
+    auto hh = h() - menu->h();
+    auto container = new Fl_Tile(0, menu->h(), w(), hh);
+    container->box(FL_FLAT_BOX);
     auto &cfg = supervisor->get_app_config().fltk_config;
     auto left_share = std::min(std::max(0.1, cfg.left_panel_share), 0.9);
     auto bottom_share = std::min(std::max(0.1, cfg.bottom_panel_share), 0.9);
     container->begin();
 
-    auto resizable_area = new Fl_Box(w() * 0.1, h() * 0.1, w() * 0.9, h() * 0.8);
+    auto resizable_area = new Fl_Box(w() * 0.1, container->y() + hh * 0.15, w() * 0.7, hh * 0.7);
 
-    auto left_w = static_cast<int>(w() * left_share);
-    auto right_w = w() - left_w;
-    auto top_h = static_cast<int>(h() * (1 - bottom_share));
-    auto bottom_h = h() - top_h;
-    content_left = new Fl_Group(0, 0, left_w, top_h);
-    content_left->box(FL_ENGRAVED_BOX);
+    auto left_w = static_cast<int>(container->w() * left_share);
+    auto right_w = container->w() - left_w;
+    auto top_h = static_cast<int>(hh * (1 - bottom_share));
+    content_left = new Fl_Group(0, menu->h(), left_w, top_h);
+    content_left->box(FL_FLAT_BOX);
     content_left->begin();
-    auto toolbar = new toolbar_t(*supervisor, 0, 0, left_w, 0);
-    toolbar->end();
-    auto toolbar_h = toolbar->h();
-    tree = new tree_view_t(*supervisor, 0, toolbar_h, left_w, top_h - toolbar_h);
+
+    tree = new tree_view_t(*supervisor, 0, container->y(), left_w, top_h);
     content_left->end();
     content_left->resizable(tree);
 
@@ -58,25 +65,32 @@ main_window_t::main_window_t(app_supervisor_t &supervisor_, int w_, int h_)
             void refresh() override {}
         };
 
-        auto box = new my_box_t(left_w, 0, right_w, top_h, "...");
-        box->box(FL_ENGRAVED_BOX);
+        auto box = new my_box_t(tree->x() + tree->w(), tree->y(), right_w, top_h, "...");
+        box->box(FL_FLAT_BOX);
         return box;
     });
 
-    log_panel = new log_panel_t(*supervisor, 0, 0, w(), bottom_h);
-    log_panel->position(0, content_left->h());
+    auto log_panel_h = h() - (content_left->h() + menu->h());
+    log_panel = new log_panel_t(*supervisor, 0, 0, w(), log_panel_h);
+    log_panel->position(0, content_left->h() + content_left->y());
     log_panel->box(FL_FLAT_BOX);
 
     container->end();
     container->resizable(resizable_area);
 
+    top_contaner->end();
     end();
+
+    top_contaner->resizable(container);
 
     resizable(this);
     deactivate();
+
+    tray.init(*supervisor);
 }
 
 main_window_t::~main_window_t() {
+    tray.enable(false);
     // one of the child d-tors use `main_window` object (indirectly),
     // hence it should be alive a little bit before children deletion
     clear();
@@ -101,16 +115,56 @@ void main_window_t::on_shutdown() {
     }
 }
 
+int main_window_t::handle(int e) {
+    if (e == FL_KEYDOWN && Fl::event_key() == FL_Escape) {
+        auto &log = supervisor->get_logger();
+        if (tray.is_enabled() && supervisor->get_app_config().fltk_config.hide_to_tray) {
+            LOG_DEBUG(log, "hiding main window");
+            hide();
+        } else {
+            LOG_INFO(log, "triggering quit");
+            supervisor->do_shutdown();
+        }
+        return 1;
+    }
+    return parent_t::handle(e);
+}
+
+void main_window_t::hide() { controller.hide(); }
+
+void main_window_t::show() { controller.show(); }
+
 void main_window_t::set_splash_text(std::string text) {
     log_panel->set_splash_text(std::move(text));
     Fl::flush();
 }
 
-void main_window_t::on_loading_done() { activate(); }
+void main_window_t::show_tray_icon(bool value) noexcept { tray.enable(value); }
+
+void main_window_t::on_loading_done() {
+    auto &cfg = supervisor->get_app_config().fltk_config;
+    if (cfg.display_tray_icon) {
+        tray.enable(true);
+    }
+    activate();
+    on_local_state_update();
+}
 
 void main_window_t::detach_supervisor() {
+    tray.enable(false);
     clear();
     supervisor = nullptr;
 }
 
+void main_window_t::on_frame_render() noexcept { tray.on_frame_render(); }
+
+void main_window_t::on_local_state_update() noexcept {
+    menu->on_local_state_update();
+    tray.on_local_state_update();
+}
+
 app_supervisor_t *main_window_t::get_supervisor() { return supervisor; }
+
+const Fl_RGB_Image *main_window_t::get_icon() const noexcept { return image_icon; }
+
+tray_t &main_window_t::get_tray() noexcept { return tray; }

@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "http_actor.h"
 #include "utils/error_code.h"
 #include "utils/format.hpp"
+#include "model/messages.h"
 #include "names.h"
 
 using namespace syncspirit::net;
@@ -13,7 +14,7 @@ namespace resource {
 r::plugin::resource_id_t io = 0;
 r::plugin::resource_id_t request_timer = 1;
 r::plugin::resource_id_t resolver = 2;
-r::plugin::resource_id_t lock = 2;
+r::plugin::resource_id_t lock = 3;
 } // namespace resource
 } // namespace
 
@@ -153,7 +154,7 @@ void http_actor_t::on_resolve(message::resolve_response_t &res) noexcept {
     auto &ee = res.payload.ee;
 
     if (ee) {
-        LOG_WARN(log, "on_resolve error: {}", ee->message());
+        LOG_WARN(log, "on_resolve error: {}", ee);
         reply_with_error(*queue.front(), ee);
         queue.pop_front();
         need_response = false;
@@ -205,10 +206,10 @@ void http_actor_t::on_connect(const tcp::endpoint &) noexcept {
     auto request = queue.front();
     auto &payload = request->payload.request_payload;
     if (payload->local_ip) {
-        sys::error_code ec;
+        auto ec = boost::system::error_code();
         local_address = transport->local_address(ec);
         if (ec) {
-            LOG_WARN(log, "on_connect, get local addr error :: {}", ec.message());
+            LOG_WARN(log, "on_connect, get local addr error: {}", ec);
             reply_with_error(*queue.front(), make_error(ec));
             queue.pop_front();
             need_response = false;
@@ -308,11 +309,11 @@ void http_actor_t::on_request_read(std::size_t bytes) noexcept {
     process();
 }
 
-void http_actor_t::on_io_error(const sys::error_code &ec) noexcept {
+void http_actor_t::on_io_error(const boost::system::error_code &ec) noexcept {
     resources->release(resource::io);
     kept_alive = false;
     if (ec != asio::error::operation_aborted) {
-        LOG_DEBUG(log, "on_io_error :: {}", ec.message());
+        LOG_DEBUG(log, "on_io_error: {}", ec);
     }
     cancel_io();
     if (!need_response || stop_io) {
@@ -334,10 +335,10 @@ void http_actor_t::on_handshake(bool, utils::x509_t &, const tcp::endpoint &, co
     }
 }
 
-void http_actor_t::on_handshake_error(sys::error_code ec) noexcept {
+void http_actor_t::on_handshake_error(boost::system::error_code ec) noexcept {
     resources->release(resource::io);
     if (ec != asio::error::operation_aborted) {
-        LOG_WARN(log, "on_handshake_error :: {}", ec.message());
+        LOG_WARN(log, "on_handshake_error: {}", ec);
     }
     if (!need_response || stop_io) {
         return process();
@@ -376,6 +377,7 @@ void http_actor_t::on_timer(r::request_id_t, bool cancelled) noexcept {
 void http_actor_t::on_start() noexcept {
     LOG_TRACE(log, "on_start (ssl_verify_store: {})", ssl_verify_store);
     r::actor_base_t::on_start();
+    send<model::payload::local_up_t>(supervisor->get_address());
 }
 
 void http_actor_t::shutdown_start() noexcept {

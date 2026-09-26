@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2022-2026 Ivan Baidakou
 
 #pragma once
 
@@ -21,12 +21,15 @@ struct string_hash_t {
     std::size_t operator()(const char *value) const { return (*this)(std::string_view(value)); }
     std::size_t operator()(std::string_view value) const { return std::hash<std::string_view>()(value); }
     std::size_t operator()(const std::string &value) const { return std::hash<std::string>()(value); }
+    std::size_t operator()(const std::pmr::string &value) const { return std::hash<std::pmr::string>()(value); }
 };
 
 struct string_eq_t {
     using is_transparent = void;
 
-    template <typename T, typename U> auto operator()(const T &lhs, U &rhs) const { return lhs == rhs; }
+    template <typename T, typename U> auto operator()(const T &lhs, U &rhs) const {
+        return std::string_view(lhs) == std::string_view(rhs);
+    }
 };
 
 } // namespace syncspirit::utils

@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #pragma once
 
 #include "syncspirit-export.h"
-#include <filesystem>
+#include "path.h"
+#include <string_view>
+#include <system_error>
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
-
 #define WIN32_LEAN_AND_MEAN
-
 #include <winsock2.h>
 #include <windows.h>
 #include <ws2tcpip.h>
@@ -17,14 +17,15 @@
 
 namespace syncspirit::utils {
 
-namespace bfs = std::filesystem;
-
 struct SYNCSPIRIT_API platform_t {
     static bool startup();
     static void shutdown() noexcept;
     static bool symlinks_supported() noexcept;
-    static bool path_supported(const bfs::path &) noexcept;
-    static bool permissions_supported(const bfs::path &) noexcept;
+    static bool path_supported(const poly_path_view_t &) noexcept;
+    static bool permissions_supported(const path_base_t &) noexcept;
+    static void set_thread_name(std::string_view name) noexcept;
+    static poly_path_view_t resources_dir(const allocator_t &allocator, std::error_code &ec,
+                                          const char *argv0) noexcept;
 };
 
 } // namespace syncspirit::utils

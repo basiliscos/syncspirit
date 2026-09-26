@@ -2,36 +2,26 @@
 // SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "bouncer/messages.hpp"
-#include "cluster_supervisor.h"
+#include "constants.h"
 #include "db_actor.h"
-#include "local_discovery_actor.h"
 #include "model/diff/advance/advance.h"
 #include "model/diff/modify/upsert_folder.h"
 #include "model/diff/modify/upsert_folder_info.h"
 #include "model/diff/peer/update_folder.h"
-#include "net/acceptor_actor.h"
-#include "net/dialer_actor.h"
-#include "net/global_discovery_actor.h"
-#include "net/http_actor.h"
 #include "net/names.h"
 #include "net/net_supervisor.h"
-#include "net/peer_supervisor.h"
-#include "net/relay_actor.h"
-#include "net/resolver_actor.h"
-#include "net/ssdp_actor.h"
 #include "net/local_keeper.h"
+#include "net/services_supervisor.h"
 #include "net/scheduler.h"
+#include "utils/format.hpp"
+#include "utils/path_view.hpp"
 #include "presentation/folder_entity.h"
 #include "presentation/folder_entity.h"
 #include "proto/proto-helpers-bep.h"
 #include "proto/proto-helpers-db.h"
-#include "utils/io.h"
 
-#include <boost/nowide/convert.hpp>
-#include <filesystem>
 #include <ctime>
 
-namespace bfs = std::filesystem;
 using namespace syncspirit::net;
 
 namespace {
@@ -42,15 +32,19 @@ r::plugin::resource_id_t interrupt = 0;
 
 net_supervisor_t::net_supervisor_t(net_supervisor_t::config_t &cfg)
     : parent_t(this, resource::interrupt, cfg), sequencer{cfg.sequencer}, app_config{cfg.app_config},
-      independent_threads{cfg.independent_threads}, thread_counter{independent_threads} {
-    using boost::nowide::narrow;
+      independent_threads{cfg.independent_threads}, thread_counter{independent_threads},
+      local_counter{cfg.local_counter} {
     bouncer = cfg.bouncer_address;
+    auto buffer = std::array<std::byte, 1024 * 32>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+
     auto log = utils::get_logger(names::coordinator);
-    auto cert_file = narrow(app_config.cert_file.wstring());
-    auto key_file = narrow(app_config.key_file.wstring());
-    auto result = utils::load_pair(cert_file.c_str(), key_file.c_str());
+    auto cert_file = app_config.cert_file.get_view(allocator);
+    auto key_file = app_config.key_file.get_view(allocator);
+    auto result = utils::load_pair(cert_file, key_file);
     if (!result) {
-        LOG_CRITICAL(log, "cannot load certificate/key pair :: {}", result.error().message());
+        LOG_CRITICAL(log, "cannot load certificate/key pair: {}", result.error());
         throw result.error();
     }
     ssl_pair = std::move(result.value());
@@ -95,12 +89,18 @@ void net_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         [&](auto &p) {
             p.subscribe_actor(&net_supervisor_t::on_model_update);
             p.subscribe_actor(&net_supervisor_t::on_model_interrupt);
+            p.subscribe_actor(&net_supervisor_t::on_model_subscribe);
+            p.subscribe_actor(&net_supervisor_t::on_model_unsubscribe);
             p.subscribe_actor(&net_supervisor_t::on_load_cluster_success);
             p.subscribe_actor(&net_supervisor_t::on_load_cluster_fail);
             p.subscribe_actor(&net_supervisor_t::on_model_request);
             p.subscribe_actor(&net_supervisor_t::on_thread_up);
             p.subscribe_actor(&net_supervisor_t::on_thread_ready);
-            p.subscribe_actor(&net_supervisor_t::on_app_ready);
+            p.subscribe_actor(&net_supervisor_t::on_ready);
+            p.subscribe_actor(&net_supervisor_t::on_local_up);
+            p.subscribe_actor(&net_supervisor_t::on_start_services);
+            p.subscribe_actor(&net_supervisor_t::on_stop_services);
+            p.subscribe_actor(&net_supervisor_t::on_restart_services);
         },
         r::plugin::config_phase_t::PREINIT);
 }
@@ -108,7 +108,10 @@ void net_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 void net_supervisor_t::on_child_shutdown(actor_base_t *actor) noexcept {
     parent_t::on_child_shutdown(actor);
     auto &reason = actor->get_shutdown_reason();
-    LOG_TRACE(log, "on_child_shutdown, '{}' due to {} ", actor->get_identity(), reason->message());
+    LOG_TRACE(log, "on_child_shutdown, '{}' due to {} ", actor->get_identity(), reason);
+    if (actor->get_address() == services_addr) {
+        services_addr.reset();
+    }
 }
 
 void net_supervisor_t::shutdown_start() noexcept {
@@ -124,27 +127,39 @@ void net_supervisor_t::shutdown_finish() noexcept {
 }
 
 void net_supervisor_t::launch_early() noexcept {
+    ++local_counter;
     thread_counter = independent_threads;
     auto timeout = shutdown_timeout * 9 / 10;
+
+    auto buffer = std::array<std::byte, 1024 * 32>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+    auto config_path = app_config.config_path.get_view(allocator);
+    auto db_path = config_path / utils::make_native_view("mdbx-db", allocator);
+
     db_addr = create_actor<db_actor_t>()
                   .timeout(timeout)
                   .bouncer_address(bouncer)
-                  .db_dir(app_config.config_path / "mdbx-db")
+                  .db_dir(db_path.detach())
                   .db_config(app_config.db_config)
                   .cluster(cluster)
+                  .max_files_per_diff(constants::diffs_batch)
                   .escalate_failure()
                   .finish()
                   ->get_address();
+    ++local_counter;
 
     create_actor<local_keeper_t>()
         .concurrent_hashes(app_config.hasher_threads)
-        .files_scan_iteration_limit(app_config.fs_config.files_scan_iteration_limit)
+        .watcher_impl(syncspirit_watcher_impl)
         .sequencer(sequencer)
         .escalate_failure()
         .timeout(timeout)
         .finish();
+    ++local_counter;
 
     create_actor<scheduler_t>().timeout(timeout).escalate_failure().finish();
+    ++local_counter;
 
     for (auto &l : launchers) {
         l(cluster);
@@ -158,7 +173,7 @@ void net_supervisor_t::seed_model() noexcept {
 
 void net_supervisor_t::on_load_cluster_fail(message::load_cluster_fail_t &message) noexcept {
     auto &ee = message.payload.ee;
-    LOG_ERROR(log, "cannot load cluster : {}", ee->message());
+    LOG_ERROR(log, "cannot load cluster : {}", ee);
     return do_shutdown(ee);
 }
 
@@ -189,6 +204,18 @@ void net_supervisor_t::on_model_request(model::message::model_request_t &message
     try_seed_model();
 }
 
+void net_supervisor_t::on_local_up(model::message::local_up_t &message) noexcept {
+    --local_counter;
+    auto &p = message.payload;
+    if (p.name == names::fs_actor) {
+        fs_addr = p.address;
+    }
+    LOG_DEBUG(log, "on_local_up, left = {}", local_counter);
+    if (local_counter == 0) {
+        send<model::payload::local_ready_t>(coordinator);
+    }
+}
+
 void net_supervisor_t::on_thread_up(model::message::thread_up_t &) noexcept {
     --thread_counter;
     LOG_DEBUG(log, "on_thread_up, left = {}", thread_counter);
@@ -202,123 +229,39 @@ void net_supervisor_t::on_thread_ready(model::message::thread_ready_t &) noexcep
     LOG_DEBUG(log, "on_thread_ready, left = {}", thread_counter);
     if (thread_counter == 0 && state == r::state_t::OPERATIONAL) {
         // thread_ready_t messages are routed, give let routed messages be processed 1st
-        auto message = r::make_message<model::payload::app_ready_t>(address);
+        auto message = r::make_message<payload::ready_t>(address);
         send<bouncer::payload::package_t>(bouncer, std::move(message));
     }
 }
 
-void net_supervisor_t::on_app_ready(model::message::app_ready_t &) noexcept {
-    LOG_DEBUG(log, "on_app_ready");
-
-    cluster_sup = create_actor<cluster_supervisor_t>()
-                      .timeout(shutdown_timeout * 9 / 10)
-                      .strand(strand)
-                      .cluster(cluster)
-                      .sequencer(sequencer)
-                      .config(app_config)
-                      .escalate_failure()
-                      .finish();
-
-    if (app_config.upnp_config.enabled) {
-        auto factory = [this](r::supervisor_t &, const r::address_ptr_t &spawner) -> r::actor_ptr_t {
-            auto timeout = shutdown_timeout * 8 / 10;
-            return create_actor<ssdp_actor_t>()
-                .timeout(timeout)
-                .upnp_config(app_config.upnp_config)
-                .cluster(cluster)
-                .spawner_address(spawner)
-                .finish();
-        };
-        spawn(factory).restart_period(pt::seconds{5}).restart_policy(r::restart_policy_t::fail_only).spawn();
+void net_supervisor_t::on_ready(message::ready_t &) noexcept {
+    LOG_DEBUG(log, "on_ready, counter = {}", local_counter);
+    send<model::payload::local_up_t>(coordinator);
+    if (!app_config.start_offline) {
+        spawn_services();
     }
+}
 
-    if (app_config.local_announce_config.enabled) {
-        auto factory = [this](r::supervisor_t &, const r::address_ptr_t &spawner) -> r::actor_ptr_t {
-            auto timeout = shutdown_timeout * 9 / 10;
-            auto &cfg = app_config.local_announce_config;
-            return create_actor<local_discovery_actor_t>()
-                .port(cfg.port)
-                .frequency(cfg.frequency)
-                .cluster(cluster)
-                .timeout(timeout)
-                .spawner_address(spawner)
-                .finish();
-        };
-        spawn(factory).restart_period(pt::seconds{5}).restart_policy(r::restart_policy_t::fail_only).spawn();
-    }
-
-    if (app_config.global_announce_config.enabled) {
+void net_supervisor_t::spawn_services() noexcept {
+    LOG_TRACE(log, "spawnign services");
+    assert(!services_addr);
+    auto factory = [this](r::supervisor_t &, const r::address_ptr_t &spawner) -> r::actor_ptr_t {
         auto timeout = shutdown_timeout * 9 / 10;
-        auto io_timeout = shutdown_timeout * 8 / 10;
-        create_actor<http_actor_t>()
-            .timeout(timeout)
-            .request_timeout(io_timeout)
-            .resolve_timeout(io_timeout)
-            .registry_name(names::http11_gda)
-            .ssl_verify_store(app_config.ssl_verify_store)
-            .keep_alive(true)
-            .escalate_failure()
-            .finish();
-
-        auto factory = [this](r::supervisor_t &, const r::address_ptr_t &spawner) -> r::actor_ptr_t {
-            auto &gcfg = app_config.global_announce_config;
-            auto timeout = shutdown_timeout * 9 / 10;
-            return create_actor<global_discovery_actor_t>()
-                .timeout(timeout)
-                .cluster(cluster)
-                .ssl_pair(&ssl_pair)
-                .announce_url(gcfg.announce_url)
-                .lookup_url(gcfg.lookup_url)
-                .rx_buff_size(gcfg.rx_buff_size)
-                .io_timeout(gcfg.timeout)
-                .debug(gcfg.debug)
-                .spawner_address(spawner)
-                .finish();
-        };
-        spawn(factory).restart_period(pt::seconds{5}).restart_policy(r::restart_policy_t::fail_only).spawn();
-    }
-
-    if (app_config.relay_config.enabled) {
-        auto timeout = shutdown_timeout * 9 / 10;
-        auto io_timeout = shutdown_timeout * 8 / 10;
-        create_actor<http_actor_t>()
-            .timeout(timeout)
-            .request_timeout(io_timeout)
-            .resolve_timeout(io_timeout)
-            .registry_name(names::http11_relay)
-            .ssl_verify_store(app_config.ssl_verify_store)
-            .keep_alive(true)
-            .escalate_failure()
-            .finish();
-
-        auto factory = [this](r::supervisor_t &, const r::address_ptr_t &spawner) -> r::actor_ptr_t {
-            auto timeout = shutdown_timeout * 9 / 10;
-            return create_actor<relay_actor_t>()
-                .timeout(timeout)
-                .relay_config(app_config.relay_config)
-                .cluster(cluster)
-                .spawner_address(spawner)
-                .finish();
-        };
-        spawn(factory).restart_period(pt::seconds{5}).restart_policy(r::restart_policy_t::fail_only).spawn();
-    }
-
-    auto timeout = shutdown_timeout * 9 / 10;
-    create_actor<acceptor_actor_t>().cluster(cluster).timeout(timeout).escalate_failure().finish();
-    peer_sup = create_actor<peer_supervisor_t>()
-                   .cluster(cluster)
-                   .ssl_pair(&ssl_pair)
-                   .device_name(app_config.device_name)
-                   .strand(strand)
-                   .timeout(timeout)
-                   .bep_config(app_config.bep_config)
-                   .relay_config(app_config.relay_config)
-                   .escalate_failure()
-                   .finish();
-    auto dcfg = app_config.dialer_config;
-    if (dcfg.enabled) {
-        create_actor<dialer_actor_t>().timeout(timeout).dialer_config(dcfg).cluster(cluster).finish();
-    }
+        auto actor = create_actor<services_supervisor_t>()
+                         .timeout(timeout)
+                         .cluster(cluster)
+                         .app_config(app_config)
+                         .strand(strand)
+                         .ssl_pair(&ssl_pair)
+                         .sequencer(sequencer)
+                         .spawner_address(spawner)
+                         .fs_address(fs_addr)
+                         .auto_restart(auto_restart_services)
+                         .finish();
+        services_addr = actor->get_address();
+        return actor;
+    };
+    spawn(factory).restart_period(pt::seconds{5}).restart_policy(r::restart_policy_t::ask_actor).spawn();
 }
 
 void net_supervisor_t::commit_loading() noexcept {
@@ -356,19 +299,6 @@ void net_supervisor_t::commit_loading() noexcept {
 void net_supervisor_t::on_start() noexcept {
     LOG_TRACE(log, "on_start");
     parent_t::on_start();
-    auto timeout = shutdown_timeout * 9 / 10;
-    auto io_timeout = shutdown_timeout * 8 / 10;
-
-    create_actor<resolver_actor_t>().timeout(timeout).resolve_timeout(io_timeout).finish();
-    create_actor<http_actor_t>()
-        .timeout(timeout)
-        .request_timeout(io_timeout)
-        .resolve_timeout(io_timeout)
-        .registry_name(names::http10)
-        .keep_alive(false)
-        .escalate_failure()
-        .finish();
-
     send<syncspirit::model::payload::thread_up_t>(address);
 }
 
@@ -407,15 +337,17 @@ auto net_supervisor_t::apply(const model::diff::advance::advance_t &diff, void *
     auto r = parent_t::apply(diff, custom);
     if (r) {
         auto folder = cluster->get_folders().by_id(diff.folder_id);
-        auto augmentation = folder->get_augmentation().get();
-        auto folder_entity = static_cast<presentation::folder_entity_t *>(augmentation);
-        if (folder_entity) {
-            auto &folder_infos = folder->get_folder_infos();
-            auto &local_fi = *folder_infos.by_device(*cluster->get_device());
-            auto file_name = proto::get_name(diff.proto_local);
-            auto local_file = local_fi.get_file_infos().by_name(file_name);
-            if (local_file) {
-                folder_entity->on_insert(*local_file, local_fi);
+        if (folder) {
+            auto augmentation = folder->get_augmentation().get();
+            auto folder_entity = static_cast<presentation::folder_entity_t *>(augmentation);
+            if (folder_entity) {
+                auto &folder_infos = folder->get_folder_infos();
+                auto &local_fi = *folder_infos.by_device(*cluster->get_device());
+                auto file_name = proto::get_name(diff.proto_local);
+                auto local_file = local_fi.get_file_infos().by_name(file_name);
+                if (local_file) {
+                    folder_entity->on_insert(*local_file, local_fi);
+                }
             }
         }
     }
@@ -445,4 +377,32 @@ auto net_supervisor_t::apply(const model::diff::peer::update_folder_t &diff, voi
         }
     }
     return r;
+}
+
+void net_supervisor_t::on_stop_services(message::stop_services_t &) noexcept {
+    auto_restart_services = false;
+    LOG_TRACE(log, "on_stop_services");
+    auto ee = make_error(make_error_code(r::shutdown_code_t::normal));
+    send<r::payload::shutdown_trigger_t>(address, services_addr, std::move(ee));
+}
+
+void net_supervisor_t::on_start_services(message::start_services_t &) noexcept {
+    LOG_TRACE(log, "on_start_services");
+    if (services_addr) {
+        LOG_WARN(log, "services are already running");
+        return;
+    }
+    auto_restart_services = true;
+    spawn_services();
+}
+
+void net_supervisor_t::on_restart_services(message::restart_services_t &) noexcept {
+    LOG_TRACE(log, "on_restart_services");
+    auto_restart_services = true;
+    if (!services_addr) {
+        spawn_services();
+        return;
+    }
+    auto ee = make_error(make_error_code(r::shutdown_code_t::normal));
+    send<r::payload::shutdown_trigger_t>(address, services_addr, std::move(ee));
 }

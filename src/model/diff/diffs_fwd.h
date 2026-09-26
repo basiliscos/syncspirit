@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #pragma once
 
@@ -39,7 +39,7 @@ struct pending_devices_t;
 namespace local {
 struct blocks_availability_t;
 struct file_availability_t;
-struct io_failure_t;
+struct local_state_update_t;
 struct scan_finish_t;
 struct scan_request_t;
 struct scan_start_t;

@@ -18,7 +18,7 @@ outcome::result<void> serialize(http::request<http::empty_body> &req, bytes_t &b
     auto serializer = http::serializer<true, http::empty_body>(req);
     serializer.split(false);
 
-    sys::error_code ec;
+    auto ec = boost::system::error_code();
     serializer.next(ec, [&](auto ec, const auto &buff_seq) {
         if (!ec) {
             auto sz = buffer_size(buff_seq);
@@ -35,7 +35,7 @@ outcome::result<void> serialize(http::request<http::empty_body> &req, bytes_t &b
 outcome::result<void> serialize(http::request<http::string_body> &req, bytes_t &buff) {
     set_ua(req);
 
-    sys::error_code ec;
+    auto ec = boost::system::error_code();
     auto serializer = http::serializer<true, http::string_body>(req);
     serializer.next(ec, [&](auto ec, const auto &buff_seq) {
         if (!ec) {

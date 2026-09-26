@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2026 Ivan Baidakou
 
 #include "test-utils.h"
 #include "diff-builder.h"
@@ -201,6 +201,10 @@ TEST_CASE("resolver", "[model]") {
     }
 
     SECTION("conflicts") {
+        auto buffer = std::array<std::byte, 1024 * 32>();
+        auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+        auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+
         auto pr_local = pr_remote;
 
         SECTION("remote deleted, locally modified -> ignore") {
@@ -357,7 +361,8 @@ TEST_CASE("resolver", "[model]") {
             proto::set_id(c3_local, 3);
             proto::set_value(c3_local, 1);
 
-            proto::set_name(pr_local, file_local->make_conflicting_name());
+            auto cname = file_local->make_conflicting_name(allocator);
+            proto::set_name(pr_local, cname.get_full_name());
             proto::set_sequence(pr_local, folder_my->get_max_sequence() + 1);
             auto file_resolved = file_info_t::create(sequencer->next_uuid(), pr_local, folder_my).value();
             file_resolved->mark_local(true);
@@ -387,7 +392,8 @@ TEST_CASE("resolver", "[model]") {
             proto::set_id(c3_local, 3);
             proto::set_value(c3_local, 1);
 
-            proto::set_name(pr_local, file_remote->make_conflicting_name());
+            auto cname = file_remote->make_conflicting_name(allocator);
+            proto::set_name(pr_local, cname.get_full_name());
             proto::set_sequence(pr_local, folder_my->get_max_sequence() + 1);
             auto file_resolved = file_info_t::create(sequencer->next_uuid(), pr_local, folder_my).value();
             file_resolved->mark_local(true);
@@ -566,6 +572,22 @@ TEST_CASE("resolver, reserved names", "[model]") {
         folder_peer->add_strict(file_remote);
         auto action = resolve(*file_remote, folder_my->get_file_infos().by_name("a.txt").get(), *folder_my);
         CHECK(action == A::remote_copy);
+    }
+    SECTION(".___pycache__\two_canvases.pyc") {
+        auto name = std::string_view(".___pycache__\two_canvases.pyc");
+        proto::set_name(pr_remote, name);
+        auto file_remote = file_info_t::create(sequencer->next_uuid(), pr_remote, folder_peer).value();
+        folder_peer->add_strict(file_remote);
+        auto action = resolve(*file_remote, nullptr, *folder_my);
+        CHECK(action == A::ignore);
+    }
+    SECTION("lexers\\sas.sync") {
+        auto name = std::string_view("lexers\\sas.sync");
+        proto::set_name(pr_remote, name);
+        auto file_remote = file_info_t::create(sequencer->next_uuid(), pr_remote, folder_peer).value();
+        folder_peer->add_strict(file_remote);
+        auto action = resolve(*file_remote, nullptr, *folder_my);
+        CHECK(action == A::ignore);
     }
 #endif
 }

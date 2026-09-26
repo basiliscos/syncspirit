@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2025-2026 Ivan Baidakou
 
 #pragma once
 #include "model/diff/cluster_diff.h"
@@ -13,6 +13,7 @@ struct SYNCSPIRIT_API interrupt_t final : cluster_diff_t {
     using parent_t::parent_t;
 
     outcome::result<void> apply_forward(apply_controller_t &, void *) const noexcept override;
+    outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;
 };
 
 } // namespace syncspirit::model::diff::load

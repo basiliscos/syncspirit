@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #pragma once
 
-#include <boost/system/error_code.hpp>
+#include <system_error>
 #include "syncspirit-export.h"
 
 namespace syncspirit {
@@ -17,12 +17,12 @@ enum class error_code {
 
 namespace detail {
 
-class SYNCSPIRIT_API db_code_category : public boost::system::error_category {
+class SYNCSPIRIT_API db_code_category : public std::error_category {
     virtual const char *name() const noexcept override;
     virtual std::string message(int c) const override;
 };
 
-class SYNCSPIRIT_API mdbx_code_category : public boost::system::error_category {
+class SYNCSPIRIT_API mdbx_code_category : public std::error_category {
     virtual const char *name() const noexcept override;
     virtual std::string message(int c) const override;
 };
@@ -33,14 +33,13 @@ SYNCSPIRIT_API const detail::db_code_category &db_code_category();
 
 SYNCSPIRIT_API const detail::mdbx_code_category &mdbx_code_category();
 
-inline boost::system::error_code make_error_code(int e) { return {static_cast<int>(e), db_code_category()}; }
-inline boost::system::error_code make_error_code(error_code ec) { return {static_cast<int>(ec), mdbx_code_category()}; }
+inline std::error_code make_error_code(int e) { return {static_cast<int>(e), db_code_category()}; }
+inline std::error_code make_error_code(error_code ec) { return {static_cast<int>(ec), mdbx_code_category()}; }
 
 } // namespace db
 } // namespace syncspirit
 
-namespace boost {
-namespace system {
+namespace std {
 
 template <> struct is_error_code_enum<syncspirit::db::detail::db_code_category> : std::true_type {
     static const bool value = true;
@@ -50,5 +49,4 @@ template <> struct is_error_code_enum<syncspirit::db::detail::mdbx_code_category
     static const bool value = true;
 };
 
-} // namespace system
-} // namespace boost
+} // namespace std

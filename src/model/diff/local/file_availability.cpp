@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "file_availability.h"
 #include "model/diff/apply_controller.h"
@@ -8,10 +8,11 @@
 
 using namespace syncspirit::model::diff::local;
 
-file_availability_t::file_availability_t(file_info_ptr_t file_, const folder_info_t &fi) noexcept : file{file_} {
-    LOG_DEBUG(log, "file_availability_t, file: {}", *file);
+file_availability_t::file_availability_t(const model::file_info_t &file, const folder_info_t &fi) noexcept {
+    LOG_DEBUG(log, "file_availability_t, file: {}", file);
     folder_id = fi.get_folder()->get_id();
-    version = file->get_version();
+    name = file.get_name()->get_full_name();
+    version = file.get_version();
 }
 
 auto file_availability_t::apply_impl(apply_controller_t &controller, void *custom) const noexcept
@@ -20,10 +21,10 @@ auto file_availability_t::apply_impl(apply_controller_t &controller, void *custo
     auto folder = cluster.get_folders().by_id(folder_id);
     if (folder) {
         auto &folder_info = *folder->get_folder_infos().by_device(*cluster.get_device());
-        auto f = folder_info.get_file_infos().by_name(file->get_name()->get_full_name());
+        auto f = folder_info.get_file_infos().by_name(name);
         if (f->get_version().identical_to(version)) {
             auto count = f->iterate_blocks().get_total();
-            LOG_TRACE(log, "file_availability_t, mark local file '{}', blocks = {}", *file, count);
+            LOG_TRACE(log, "file_availability_t, mark local file '{}', blocks = {}", name, count);
             for (std::uint32_t i = 0; i < count; ++i) {
                 if (!f->is_locally_available(i)) {
                     f->mark_local_available(i);
@@ -38,6 +39,6 @@ auto file_availability_t::apply_impl(apply_controller_t &controller, void *custo
 }
 
 auto file_availability_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {
-    LOG_TRACE(log, "visiting file_availability_t, file: '{}'", *file);
+    LOG_TRACE(log, "visiting file_availability_t, file: '{}'", name);
     return visitor(*this, custom);
 }

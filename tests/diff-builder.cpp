@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "diff-builder.h"
 #include "model/messages.h"
@@ -29,14 +29,13 @@
 #include "model/diff/modify/upsert_folder_info.h"
 #include "model/diff/peer/cluster_update.h"
 #include "model/diff/peer/update_folder.h"
-#include <boost/nowide/convert.hpp>
 
 using namespace syncspirit::test;
 using namespace syncspirit::model;
 
 cluster_configurer_t::cluster_configurer_t(diff_builder_t &builder_, utils::bytes_view_t peer_sha256_,
-                                           const bfs::path default_location_) noexcept
-    : builder{builder_}, peer_sha256{peer_sha256_}, default_location{default_location_} {}
+                                           const utils::path_t default_location_) noexcept
+    : builder{builder_}, peer_sha256{peer_sha256_}, default_location{default_location_.clone()} {}
 
 cluster_configurer_t &&cluster_configurer_t::add(utils::bytes_view_t sha256, std::string_view folder_id, uint64_t index,
                                                  int64_t max_sequence, std::string_view url) noexcept {
@@ -187,13 +186,23 @@ diff_builder_t &diff_builder_t::then() noexcept {
     return *this;
 }
 
-diff_builder_t &diff_builder_t::upsert_folder(std::string_view id, const bfs::path &path, std::string_view label,
-                                              std::uint64_t index_id) noexcept {
+diff_builder_t &diff_builder_t::upsert_folder(std::string_view id, std::string_view path, std::string_view label,
+                                              std::uint64_t index_id, bool watched, bool accept_all) noexcept {
     db::Folder db_folder;
     db::set_id(db_folder, id);
     db::set_label(db_folder, label);
-    db::set_path(db_folder, boost::nowide::narrow(path.generic_wstring()));
+    db::set_path(db_folder, path);
     db::set_folder_type(db_folder, db::FolderType::send_and_receive);
+    db::set_watched(db_folder, watched);
+    if (watched) {
+        db::set_rescan_interval(db_folder, 3600);
+    }
+    if (accept_all) {
+        auto matcher = db::FileMatcher();
+        db::set_mode(matcher, db::FileMatch::accept);
+        db::set_pattern(matcher, std::string(".*"));
+        db::add_file_matcher(db_folder, std::move(matcher));
+    }
     auto opt = diff::modify::upsert_folder_t::create(*cluster, *sequencer, std::move(db_folder), index_id);
     return assign(opt.value().get());
 }
@@ -219,8 +228,8 @@ diff_builder_t &diff_builder_t::update_peer(const model::device_id_t &device, st
 }
 
 cluster_configurer_t diff_builder_t::configure_cluster(utils::bytes_view_t sha256,
-                                                       const bfs::path &default_location) noexcept {
-    return cluster_configurer_t(*this, sha256, default_location);
+                                                       const utils::path_t &default_location) noexcept {
+    return cluster_configurer_t(*this, sha256, default_location.clone());
 }
 
 index_maker_t diff_builder_t::make_index(utils::bytes_view_t sha256, std::string_view folder_id) noexcept {
@@ -250,18 +259,26 @@ diff_builder_t &diff_builder_t::unshare_folder(model::folder_info_t &fi) noexcep
 
 diff_builder_t &diff_builder_t::remote_copy(const model::file_info_t &source,
                                             const model::folder_info_t &source_fi) noexcept {
+    auto buffer = std::array<std::byte, 1024 * 16>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+
     auto action = model::advance_action_t::remote_copy;
-    auto diff = diff::advance::remote_copy_t::create(action, source, source_fi, *sequencer);
+    auto diff = diff::advance::remote_copy_t::create(action, source, source_fi, *sequencer, allocator);
     return assign(diff.get());
 }
 
 diff_builder_t &diff_builder_t::advance(const model::file_info_t &source,
                                         const model::folder_info_t &source_fi) noexcept {
+    auto buffer = std::array<std::byte, 1024 * 16>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+
     auto folder = source_fi.get_folder();
     auto local_fi = folder->get_folder_infos().by_device(*folder->get_cluster()->get_device());
     auto local_file = local_fi->get_file_infos().by_name(source.get_name()->get_full_name());
     auto action = model::resolve(source, local_file.get(), *local_fi);
-    auto diff = diff::advance::remote_copy_t::create(action, source, source_fi, *sequencer);
+    auto diff = diff::advance::remote_copy_t::create(action, source, source_fi, *sequencer, allocator);
     return assign(diff.get());
 }
 
@@ -314,9 +331,10 @@ diff_builder_t &diff_builder_t::remove_unknown_device(const model::pending_devic
     return assign(new diff::modify::remove_pending_device_t(device));
 }
 
-diff_builder_t &diff_builder_t::scan_start(std::string_view id, const r::pt::ptime &at) noexcept {
+diff_builder_t &diff_builder_t::scan_start(std::string_view id, std::string_view sub_dir,
+                                           const r::pt::ptime &at) noexcept {
     auto final_at = at.is_not_a_date_time() ? r::pt::microsec_clock::local_time() : at;
-    return assign(new model::diff::local::scan_start_t(std::string(id), final_at));
+    return assign(new model::diff::local::scan_start_t(id, sub_dir, final_at));
 }
 
 diff_builder_t &diff_builder_t::scan_finish(std::string_view id, const r::pt::ptime &at) noexcept {
@@ -324,8 +342,8 @@ diff_builder_t &diff_builder_t::scan_finish(std::string_view id, const r::pt::pt
     return assign(new model::diff::local::scan_finish_t(std::string(id), final_at));
 }
 
-diff_builder_t &diff_builder_t::scan_request(std::string_view id) noexcept {
-    return assign(new model::diff::local::scan_request_t(std::string(id)));
+diff_builder_t &diff_builder_t::scan_request(std::string_view id, std::string_view sub_dir) noexcept {
+    return assign(new model::diff::local::scan_request_t(id, sub_dir));
 }
 
 diff_builder_t &diff_builder_t::synchronization_start(std::string_view id) noexcept {

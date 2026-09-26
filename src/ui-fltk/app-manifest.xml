@@ -2,8 +2,14 @@
 <assembly manifestVersion="1.0" xmlns="urn:schemas-microsoft-com:asm.v1" xmlns:asmv3="urn:schemas-microsoft-com:asm.v3">
   <assemblyIdentity type="win32" name="Organization.Division.Name" version="1.0.0.0"/>
   <asmv3:application>
-     <asmv3:windowsSettings xmlns="http://schemas.microsoft.com/SMI/2019/WindowsSettings">
-       <activeCodePage>UTF-8</activeCodePage>
-     </asmv3:windowsSettings>
-   </asmv3:application>
+    <asmv3:windowsSettings
+            xmlns:ws05="http://schemas.microsoft.com/SMI/2005/WindowsSettings"
+            xmlns:ws16="http://schemas.microsoft.com/SMI/2016/WindowsSettings"
+            xmlns:ws19="http://schemas.microsoft.com/SMI/2019/WindowsSettings">
+      <ws05:dpiAware>true/PM</ws05:dpiAware>
+      <ws16:longPathAware>true</ws16:longPathAware>
+      <ws16:dpiAwareness>PerMonitorV2</ws16:dpiAwareness>
+      <ws19:activeCodePage>UTF-8</ws19:activeCodePage>
+    </asmv3:windowsSettings>
+  </asmv3:application>
 </assembly>

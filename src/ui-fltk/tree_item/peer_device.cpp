@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2026 Ivan Baidakou
 
 #include "peer_device.h"
 #include "peer_folders.h"
@@ -524,9 +524,20 @@ peer_device_t::peer_device_t(model::device_t &peer_, app_supervisor_t &superviso
 
 void peer_device_t::update_label() {
     auto name = peer.get_name();
-    auto id = peer.device_id().get_short();
-    auto value = fmt::format("{}, {} {}", name, id, get_state());
-    label(value.data());
+
+    auto buffer = std::array<std::byte, 1024 * 32>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+    auto label_str = std::pmr::string(allocator);
+    auto label_out = std::back_inserter(label_str);
+    fmt::format_to(label_out, "{}", name);
+
+    if (supervisor.get_app_config().fltk_config.display_device_id) {
+        fmt::format_to(label_out, ", {}", peer.device_id().get_short());
+    }
+    fmt::format_to(label_out, " {}", get_state());
+
+    label(label_str.data());
     tree()->redraw();
 }
 
@@ -543,7 +554,7 @@ std::string_view peer_device_t::get_state() {
     return [this]() -> std::string_view {
         auto &state = peer.get_state();
         if (state.is_online()) {
-            return symbols::online;
+            return traffic & 1 ? symbols::online_1 : symbols::online_2;
         } else if (state.is_unknown() || state.is_discovering()) {
             return symbols::discovering;
         } else if (state.is_connecting() || state.is_connected()) {
@@ -581,4 +592,14 @@ void peer_device_t::remove_child(tree_item_t *child) {
         folders = nullptr;
     }
     parent_t::remove_child(child);
+}
+
+void peer_device_t::on_frame_render() {
+    if (peer.get_state().is_online()) {
+        auto new_traffic = (peer.get_rx_bytes() + peer.get_tx_bytes()) << 1;
+        if (new_traffic != traffic) {
+            traffic = (traffic & 1) ? new_traffic : new_traffic | 1;
+        }
+        update_label();
+    }
 }

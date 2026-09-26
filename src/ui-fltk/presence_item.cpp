@@ -236,20 +236,24 @@ void presence_item_t::show_child(presentation::presence_t &child_presence, std::
 void presence_item_t::update_label() {
     using allocator_t = std::pmr::polymorphic_allocator<char>;
     using string_t = std::basic_string<char, std::char_traits<char>, allocator_t>;
-    auto buffer = std::array<std::byte, 256>();
+    auto buffer = std::array<std::byte, 1024 * 32>();
     auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
     auto allocator = allocator_t(&pool);
 
     auto color = get_color();
-    auto name = presence->get_entity()->get_path()->get_own_name();
+    auto name = presence->get_entity()->get_path()->get_filename();
     auto features = presence->get_features();
     auto node_label = string_t(allocator);
+    auto it = std::back_inserter(node_label);
     if (features & F::folder) {
         auto folder_presence = static_cast<presentation::folder_presence_t *>(presence);
         auto folder = folder_presence->get_folder_info().get_folder();
         auto folder_label = folder->get_label();
-        auto folder_id = folder->get_id();
-        fmt::format_to(std::back_inserter(node_label), "{}, {}", folder_label, folder_id);
+        node_label = folder_label;
+        if (supervisor.get_app_config().fltk_config.display_folder_id) {
+            auto folder_id = folder->get_id();
+            fmt::format_to(it, ", {}", folder_id);
+        }
     } else {
         node_label = string_t(name, allocator);
     }
@@ -260,11 +264,11 @@ void presence_item_t::update_label() {
         auto has_size = ps.size || (features & F::folder);
         if (es.entities && has_size && (ps.cluster_entries != es.entities)) {
             double share = (100.0 * ps.cluster_entries) / es.entities;
-            fmt::format_to(std::back_inserter(node_label), " ({}{:.2f}%)", symbols::synchronizing, share);
+            fmt::format_to(it, " ({}{:.2f}%)", symbols::synchronizing, share);
         }
         if (features & F::local && (ps.local_entries != ps.entities)) {
             double share = (100.0 * ps.local_entries) / es.entities;
-            fmt::format_to(std::back_inserter(node_label), " ({}{:.2f}%)", symbols::scanning, share);
+            fmt::format_to(it, " ({}{:.2f}%)", symbols::scanning, share);
         }
     }
 
@@ -329,3 +333,14 @@ void presence_item_t::insert_node(presence_item_ptr_t node, int position) {
 bool presence_item_t::is_expanded() const { return expanded; }
 
 void presence_item_t::on_delete() noexcept { presence = {}; }
+
+void presence_item_t::on_update() noexcept {
+    if (presence) {
+        if (presence->get_features() & F::directory && children() == 0 && !is_expanded()) {
+            if (presence->get_children().size() > 0) {
+                populate_dummy_child();
+            }
+        }
+    }
+    parent_t::on_update();
+}

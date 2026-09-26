@@ -5,10 +5,13 @@
 #include "config/utils.h"
 #include "utils/uri.h"
 #include "utils/location.h"
-#include <filesystem>
-#include <sstream>
+#include "utils/path_view.hpp"
 
 namespace syncspirit::config {
+
+bool operator==(const acceptor_config_t &lhs, const acceptor_config_t &rhs) noexcept {
+    return lhs.enabled == rhs.enabled;
+}
 
 bool operator==(const bep_config_t &lhs, const bep_config_t &rhs) noexcept {
     return lhs.rx_buff_size == rhs.rx_buff_size && lhs.tx_buff_limit == rhs.tx_buff_limit &&
@@ -23,14 +26,17 @@ bool operator==(const dialer_config_t &lhs, const dialer_config_t &rhs) noexcept
 }
 
 bool operator==(const fs_config_t &lhs, const fs_config_t &rhs) noexcept {
-    return lhs.temporally_timeout == rhs.temporally_timeout &&
-           lhs.bytes_scan_iteration_limit == rhs.bytes_scan_iteration_limit &&
-           lhs.files_scan_iteration_limit == rhs.files_scan_iteration_limit;
+    return lhs.temporally_timeout == rhs.temporally_timeout && lhs.poll_timeout == rhs.poll_timeout &&
+           lhs.retension_timeout == rhs.retension_timeout
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+           && lhs.win32_watcher_buff == rhs.win32_watcher_buff
+#endif
+        ;
 }
 
 bool operator==(const db_config_t &lhs, const db_config_t &rhs) noexcept {
     return lhs.upper_limit == rhs.upper_limit && lhs.uncommitted_threshold == rhs.uncommitted_threshold &&
-           lhs.max_blocks_per_diff == rhs.max_blocks_per_diff && lhs.max_files_per_diff == rhs.max_files_per_diff;
+           lhs.max_blocks_per_diff == rhs.max_blocks_per_diff;
 }
 
 bool operator==(const global_announce_config_t &lhs, const global_announce_config_t &rhs) noexcept {
@@ -58,52 +64,67 @@ bool operator==(const relay_config_t &lhs, const relay_config_t &rhs) noexcept {
 }
 
 bool operator==(const main_t &lhs, const main_t &rhs) noexcept {
-    return lhs.local_announce_config == rhs.local_announce_config && lhs.upnp_config == rhs.upnp_config &&
-           lhs.global_announce_config == rhs.global_announce_config && lhs.bep_config == rhs.bep_config &&
-           lhs.db_config == rhs.db_config && lhs.timeout == rhs.timeout && lhs.device_name == rhs.device_name &&
-           lhs.config_path == rhs.config_path && lhs.log_configs == rhs.log_configs && lhs.cert_file == rhs.cert_file &&
-           lhs.key_file == rhs.key_file && lhs.hasher_threads == rhs.hasher_threads &&
-           lhs.poll_timeout == rhs.poll_timeout;
+    return lhs.acceptor_config == rhs.acceptor_config && lhs.local_announce_config == rhs.local_announce_config &&
+           lhs.upnp_config == rhs.upnp_config && lhs.global_announce_config == rhs.global_announce_config &&
+           lhs.bep_config == rhs.bep_config && lhs.db_config == rhs.db_config && lhs.timeout == rhs.timeout &&
+           lhs.device_name == rhs.device_name && lhs.config_path == rhs.config_path &&
+           lhs.log_configs == rhs.log_configs && lhs.cert_file == rhs.cert_file && lhs.key_file == rhs.key_file &&
+           lhs.hasher_threads == rhs.hasher_threads && lhs.poll_timeout == rhs.poll_timeout &&
+           lhs.start_offline == rhs.start_offline;
 }
 
 } // namespace syncspirit::config
 
 namespace sys = boost::system;
-namespace fs = std::filesystem;
 namespace st = syncspirit::test;
 
 using namespace syncspirit;
 
 TEST_CASE("expand_home", "[config]") {
+    auto buffer = std::array<std::byte, 1024 * 32>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+
     SECTION("valid home") {
-        auto home = utils::home_option_t(fs::path("/user/home/.config/syncspirit_test"));
-        REQUIRE(utils::expand_home("some/path", home) == L"some/path");
-        REQUIRE(utils::expand_home("~/some/path", home) == L"/user/home/.config/syncspirit_test/some/path");
+        auto home = utils::make_native_view("/user/home/.config/syncspirit_test", allocator);
+        SECTION("no expansion") {
+            auto p = utils::expand_home("some/path", home);
+            CHECK(p.get_full_name() == "some/path");
+        }
+        SECTION("with expansion") {
+            auto expected_str = "/user/home/.config/syncspirit_test/some/path";
+            auto p = utils::expand_home("~/some/path", home);
+            auto p_expected = utils::make_native_view(expected_str, allocator);
+            CHECK(p.get_full_name() == expected_str);
+            CHECK(p == p_expected);
+        }
     }
 
     SECTION("invalid home") {
         auto ec = sys::error_code{1, sys::system_category()};
-        auto home = utils::home_option_t(ec);
-        REQUIRE(utils::expand_home("some/path", home) == L"some/path");
-        REQUIRE(utils::expand_home("~/some/path", home) == L"~/some/path");
+        auto home = utils::make_native_view("", allocator);
+        REQUIRE(utils::expand_home("some/path", home) == utils::make_native_view("some/path", allocator));
+        REQUIRE(utils::expand_home("~/some/path", home) == utils::make_native_view("~/some/path", allocator));
     }
 }
 
 TEST_CASE("default config is OK", "[config]") {
-    auto dir = st::unique_path();
-    fs::create_directory(dir);
-    auto dir_guard = st::path_guard_t(dir);
-    auto cfg_path = dir / "syncspirit.toml";
+    auto buffer = std::array<std::byte, 1024 * 32>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+    auto path_guard = st::unique_path();
+
+    auto dir = path_guard.get_view(allocator);
+    auto cfg_path = dir / utils::make_native_view("syncspirit.toml", allocator);
+
     auto cfg_opt = config::generate_config(cfg_path);
     REQUIRE(cfg_opt);
     auto &cfg = cfg_opt.value();
-    std::stringstream out;
     SECTION("serialize default") {
-        auto r = config::serialize(cfg, out);
-        CHECK(r);
-        INFO(out.str());
-        CHECK(out.str().find("~") == std::string::npos);
-        auto cfg_opt = config::get_config(out, cfg_path);
+        auto out_1 = config::serialize(cfg);
+        INFO(out_1);
+        CHECK(out_1.find("~") == std::string::npos);
+        auto cfg_opt = config::get_config(out_1, cfg_path);
         CHECK(cfg_opt);
 
         auto cfg2 = cfg_opt.value();

@@ -1,15 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #pragma once
 
 #include "config/dialer.h"
-#include "config/bep.h"
-#include "utils/log.h"
-#include "model/cluster.h"
 #include "model/messages.h"
 #include "model/diff/cluster_visitor.h"
 #include "messages.h"
+#include "model_actor.hpp"
 #include <optional>
 #include <unordered_map>
 #include <chrono>
@@ -19,30 +17,26 @@ namespace net {
 
 namespace outcome = boost::outcome_v2;
 
-struct dialer_actor_config_t : r::actor_config_t {
-    config::dialer_config_t dialer_config;
-    model::cluster_ptr_t cluster;
-};
+struct SYNCSPIRIT_API dialer_actor_t final : public model_actor_t<r::actor_base_t>,
+                                             private model::diff::cluster_visitor_t {
+    using parent_t = model_actor_t<r::actor_base_t>;
 
-template <typename Actor> struct dialer_actor_config_builder_t : r::actor_config_builder_t<Actor> {
-    using builder_t = typename Actor::template config_builder_t<Actor>;
-    using parent_t = r::actor_config_builder_t<Actor>;
-    using parent_t::parent_t;
+    struct config_t : parent_t::config_t {
+        using base_t = model_actor_t<r::actor_base_t>::config_t;
+        using base_t::base_t;
+        config::dialer_config_t dialer_config;
+    };
 
-    builder_t &&cluster(const model::cluster_ptr_t &value) && noexcept {
-        parent_t::config.cluster = value;
-        return std::move(*static_cast<typename parent_t::builder_t *>(this));
-    }
+    template <typename Actor> struct config_builder_t : parent_t::template config_builder_t<Actor> {
+        using builder_t = typename Actor::template config_builder_t<Actor>;
+        using base_t = parent_t::template config_builder_t<Actor>;
+        using base_t::base_t;
 
-    builder_t &&dialer_config(const config::dialer_config_t &value) && noexcept {
-        parent_t::config.dialer_config = value;
-        return std::move(*static_cast<typename parent_t::builder_t *>(this));
-    }
-};
-
-struct SYNCSPIRIT_API dialer_actor_t : public r::actor_base_t, private model::diff::cluster_visitor_t {
-    using config_t = dialer_actor_config_t;
-    template <typename Actor> using config_builder_t = dialer_actor_config_builder_t<Actor>;
+        builder_t &&dialer_config(const config::dialer_config_t &value) && noexcept {
+            base_t::config.dialer_config = value;
+            return std::move(*static_cast<typename base_t::builder_t *>(this));
+        }
+    };
 
     explicit dialer_actor_t(config_t &config);
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
@@ -61,7 +55,8 @@ struct SYNCSPIRIT_API dialer_actor_t : public r::actor_base_t, private model::di
     using redial_map_t = std::unordered_map<model::device_ptr_t, redial_info_t>;
 
     void on_announce(message::announce_notification_t &message) noexcept;
-    void on_model_update(model::message::model_update_t &) noexcept;
+    void visit(const model::diff::cluster_diff_t &, model::payload::apply_context_t &) noexcept override;
+    void post_configure_coordinator() noexcept override;
 
     void discover_or_dial(const model::device_ptr_t &device) noexcept;
     void remove(const model::device_ptr_t &device) noexcept;
@@ -72,12 +67,9 @@ struct SYNCSPIRIT_API dialer_actor_t : public r::actor_base_t, private model::di
     outcome::result<void> operator()(const model::diff::contact::update_contact_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::modify::remove_peer_t &, void *) noexcept override;
 
-    utils::logger_t log;
-    model::cluster_ptr_t cluster;
     pt::time_duration redial_timeout;
     std::uint32_t skip_discovers;
 
-    r::address_ptr_t coordinator;
     redial_map_t redial_map;
     bool announced;
 };

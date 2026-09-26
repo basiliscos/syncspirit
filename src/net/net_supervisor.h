@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #pragma once
 
@@ -7,22 +7,23 @@
 #include "model/cluster.h"
 #include "model/misc/sequencer.h"
 #include "model/diff/iterative_controller.h"
-#include "model/diff/cluster_visitor.h"
 #include "config/main.h"
-#include "utils/log.h"
-#include "messages.h"
+#include "net/messages.h"
+#include <cstdint>
 #include <boost/asio.hpp>
 #include <rotor/asio.hpp>
 #include <boost/outcome.hpp>
 
-namespace syncspirit {
-namespace net {
+namespace syncspirit::net {
 
 namespace outcome = boost::outcome_v2;
+namespace r = rotor;
+namespace ra = rotor::asio;
 
 struct net_supervisor_config_t : ra::supervisor_config_asio_t {
     config::main_t app_config;
-    size_t independent_threads = 0;
+    std::uint_fast32_t independent_threads = 0;
+    std::uint_fast32_t local_counter = 0;
     model::sequencer_ptr_t sequencer;
     r::address_ptr_t bouncer_address;
 };
@@ -38,8 +39,13 @@ struct net_supervisor_config_builder_t : ra::supervisor_config_asio_builder_t<Su
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
-    builder_t &&independent_threads(size_t value) && noexcept {
+    builder_t &&independent_threads(std::uint_fast32_t value) && noexcept {
         parent_t::config.independent_threads = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+
+    builder_t &&local_counter(std::uint_fast32_t value) && noexcept {
+        parent_t::config.local_counter = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 
@@ -75,18 +81,24 @@ struct SYNCSPIRIT_API net_supervisor_t : net_supervisor_base_t<ra::supervisor_as
 
   private:
     using launchers_t = std::vector<launcher_t>;
+    using spawner_ptr_t = std::unique_ptr<r::spawner_t>;
 
     void on_load_cluster_success(message::load_cluster_success_t &message) noexcept;
     void on_load_cluster_fail(message::load_cluster_fail_t &message) noexcept;
     void on_model_request(model::message::model_request_t &message) noexcept;
     void on_thread_up(model::message::thread_up_t &) noexcept;
+    void on_local_up(model::message::local_up_t &) noexcept;
     void on_thread_ready(model::message::thread_ready_t &) noexcept;
-    void on_app_ready(model::message::app_ready_t &) noexcept;
+    void on_ready(message::ready_t &) noexcept;
+    void on_stop_services(message::stop_services_t &) noexcept;
+    void on_start_services(message::start_services_t &) noexcept;
+    void on_restart_services(message::restart_services_t &) noexcept;
 
     void dial_peer(const model::device_id_t &peer_device_id, const utils::uri_container_t &uris) noexcept;
     void launch_early() noexcept;
     void seed_model() noexcept;
     void try_seed_model() noexcept;
+    void spawn_services() noexcept;
 
     outcome::result<void> apply(const model::diff::advance::advance_t &, void *) noexcept override;
     outcome::result<void> apply(const model::diff::modify::upsert_folder_t &, void *) noexcept override;
@@ -98,15 +110,17 @@ struct SYNCSPIRIT_API net_supervisor_t : net_supervisor_base_t<ra::supervisor_as
 
     model::sequencer_ptr_t sequencer;
     config::main_t app_config;
-    size_t independent_threads;
-    size_t thread_counter;
+    std::uint_fast32_t independent_threads;
+    std::uint_fast32_t thread_counter;
+    std::uint_fast32_t local_counter;
     model::diff::cluster_diff_ptr_t load_diff;
     r::address_ptr_t db_addr;
+    r::address_ptr_t fs_addr;
+    r::address_ptr_t services_addr;
+    spawner_ptr_t services_spawner;
     utils::key_pair_t ssl_pair;
-    r::supervisor_ptr_t cluster_sup;
-    r::supervisor_ptr_t peer_sup;
     launchers_t launchers;
+    bool auto_restart_services = true;
 };
 
-} // namespace net
-} // namespace syncspirit
+} // namespace syncspirit::net

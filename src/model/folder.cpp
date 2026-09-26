@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "folder.h"
 #include "db/utils.h"
@@ -7,7 +7,7 @@
 #include "proto/proto-helpers.h"
 #include "misc/error_code.h"
 #include "utils/format.hpp"
-#include <spdlog/spdlog.h>
+#include "utils/log.h"
 
 namespace syncspirit::model {
 
@@ -43,6 +43,26 @@ folder_t::folder_t(const bu::uuid &uuid) noexcept : synchronizing{false}, suspen
     std::copy(uuid.begin(), uuid.end(), key + 1);
 }
 
+void folder_t::assign_fields(const db::Folder &item) noexcept {
+    folder_data_t::assign_fields(item);
+
+    auto matchers_sz = db::get_file_matcher_size(item);
+    file_matchers.clear();
+    file_matchers.reserve(matchers_sz);
+
+    for (std::size_t i = 0; i < matchers_sz; ++i) {
+        auto &db = db::get_file_matcher(item, i);
+        auto pattern = db::get_pattern(db);
+        auto fm = file_matcher_t(std::string(pattern), db::get_mode(db), db::get_ignore_case(db));
+        auto compile_err = fm.compile();
+        if (compile_err.code) {
+            spdlog::warn("({}) file matcher {} '{}' compilation error at {}: {}", label, i + 1, fm.get_pattern(),
+                         compile_err.error_offset, compile_err.code);
+        }
+        file_matchers.push_back(std::move(fm));
+    }
+}
+
 utils::bytes_view_t folder_t::get_uuid() const noexcept { return utils::bytes_view_t(key + 1, uuid_length); }
 
 void folder_t::add(const folder_info_ptr_t &folder_info) noexcept { folder_infos.put(folder_info); }
@@ -51,8 +71,20 @@ void folder_t::assign_cluster(const cluster_ptr_t &cluster_) noexcept { cluster 
 
 utils::bytes_t folder_t::serialize() noexcept {
     auto r = db::Folder();
-    folder_data_t::serialize(r);
+    serialize(r);
     return db::encode(r);
+}
+
+void folder_t::serialize(syncspirit::db::Folder &dest) const noexcept {
+    folder_data_t::serialize(dest);
+    for (std::size_t i = 0; i < file_matchers.size(); ++i) {
+        auto &fm = file_matchers[i];
+        auto db = db::FileMatcher();
+        db::set_pattern(db, std::string(fm.get_pattern()));
+        db::set_mode(db, fm.get_mode());
+        db::set_ignore_case(db, fm.get_ignore_case());
+        db::add_file_matcher(dest, std::move(db));
+    }
 }
 
 auto folder_t::is_shared_with(const model::device_t &device) const noexcept -> folder_info_ptr_t {
@@ -97,7 +129,7 @@ std::optional<proto::Folder> folder_t::generate(const model::device_t &device) c
 
 const pt::ptime &folder_t::get_scan_start() const noexcept { return scan_start; }
 void folder_t::set_scan_start(const pt::ptime &value) noexcept { scan_start = value; }
-const pt::ptime &folder_t::get_scan_finish() noexcept { return scan_finish; }
+const pt::ptime &folder_t::get_scan_finish() const noexcept { return scan_finish; }
 void folder_t::set_scan_finish(const pt::ptime &value) noexcept {
     assert(!scan_start.is_not_a_date_time());
     assert(scan_start <= value);
@@ -121,7 +153,7 @@ void folder_t::adjust_synchronization(std::int_fast32_t delta) noexcept {
     assert(synchronizing >= 0);
 }
 
-void folder_t::mark_suspended(bool value, const sys::error_code &ec) noexcept {
+void folder_t::mark_suspended(bool value, const std::error_code &ec) noexcept {
     suspended = value;
     suspend_reason = ec;
     assert(!(!value && ec));
@@ -129,7 +161,21 @@ void folder_t::mark_suspended(bool value, const sys::error_code &ec) noexcept {
 
 bool folder_t::is_suspended() const noexcept { return suspended; }
 
-auto folder_t::get_suspend_reason() const noexcept -> const sys::error_code & { return suspend_reason; }
+auto folder_t::get_suspend_reason() const noexcept -> const std::error_code & { return suspend_reason; }
+
+file_matchers_t &folder_t::get_file_matchers() noexcept { return file_matchers; }
+
+bool folder_t::accept(std::string_view relative_path) const noexcept {
+    for (auto &fm : file_matchers) {
+        auto mode = fm.match(relative_path);
+        if (mode == file_match_t::accept) {
+            return true;
+        } else if (mode == file_match_t::ignore) {
+            return false;
+        }
+    }
+    return false;
+}
 
 template <> SYNCSPIRIT_API utils::bytes_view_t get_index<0>(const folder_ptr_t &item) noexcept {
     return item->get_key();

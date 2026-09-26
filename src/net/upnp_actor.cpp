@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "upnp_actor.h"
 #include "proto/upnp_support.h"
@@ -67,7 +67,7 @@ void upnp_actor_t::on_start() noexcept {
     auto res = make_description_request(tx_buff, main_url);
     if (!res) {
         auto &ec = res.error();
-        LOG_TRACE(log, "error making description request :: {}", ec.message());
+        LOG_TRACE(log, "error making description request: {}", ec);
         return do_shutdown(make_error(ec));
     }
     make_request(addr_description, main_url, std::move(tx_buff), true);
@@ -94,7 +94,7 @@ void upnp_actor_t::on_igd_description(message::http_response_t &msg) noexcept {
     auto &ee = msg.payload.ee;
     if (ee) {
         auto inner = utils::make_error_code(utils::error_code_t::igd_description_failed);
-        LOG_WARN(log, "get IGD description: {}", ee->message());
+        LOG_WARN(log, "get IGD description: {}", ee);
         return do_shutdown(make_error(inner, ee));
     }
     if (state > r::state_t::OPERATIONAL) {
@@ -109,7 +109,7 @@ void upnp_actor_t::on_igd_description(message::http_response_t &msg) noexcept {
     auto igd_result = parse_igd(body.data(), body.size());
     if (!igd_result) {
         auto &ec = igd_result.error();
-        LOG_WARN(log, "can't get IGD result: {}", ec.message());
+        LOG_WARN(log, "can't get IGD result: {}", ec);
         std::string xml(body);
         LOG_DEBUG(log, "xml:\n{0}\n", xml);
         return do_shutdown(make_error(ec));
@@ -135,7 +135,7 @@ void upnp_actor_t::on_igd_description(message::http_response_t &msg) noexcept {
     auto res = make_external_ip_request(tx_buff, igd_control_url);
     if (!res) {
         auto &ec = res.error();
-        LOG_TRACE(log, "error making external ip address request :: {}", ec.message());
+        LOG_TRACE(log, "error making external ip address request: {}", ec);
         return do_shutdown(make_error(ec));
     }
     make_request(addr_external_ip, igd_control_url, std::move(tx_buff));
@@ -147,7 +147,7 @@ void upnp_actor_t::on_external_ip(message::http_response_t &msg) noexcept {
 
     auto &ee = msg.payload.ee;
     if (ee) {
-        LOG_WARN(log, "get external IP address: {}", ee->message());
+        LOG_WARN(log, "get external IP address: {}", ee);
         auto inner = utils::make_error_code(utils::error_code_t::external_ip_failed);
         return do_shutdown(make_error(inner, ee));
     }
@@ -162,7 +162,7 @@ void upnp_actor_t::on_external_ip(message::http_response_t &msg) noexcept {
     auto ip_addr_result = parse_external_ip(body.data(), body.size());
     if (!ip_addr_result) {
         auto &ec = ip_addr_result.error();
-        LOG_WARN(log, "can't get external IP address: {}", ec.message());
+        LOG_WARN(log, "can't get external IP address: {}", ec);
         std::string xml(body);
         LOG_DEBUG(log, "xml:\n{0}\n", xml);
         return do_shutdown(make_error(ec));
@@ -171,10 +171,10 @@ void upnp_actor_t::on_external_ip(message::http_response_t &msg) noexcept {
     LOG_DEBUG(log, "external IP addr: {}", ip_addr);
     rx_buff->consume(msg.payload.res->bytes);
 
-    sys::error_code io_ec;
+    auto io_ec = boost::system::error_code();
     external_addr = asio::ip::address::from_string(ip_addr, io_ec);
     if (ee) {
-        LOG_WARN(log, "can't external IP address '{}' is incorrect: {}", ip_addr, io_ec.message());
+        LOG_WARN(log, "can't external IP address '{}' is incorrect: {}", ip_addr, io_ec);
         return do_shutdown(make_error(io_ec));
     }
 
@@ -191,7 +191,7 @@ void upnp_actor_t::on_external_ip(message::http_response_t &msg) noexcept {
     auto res = make_mapping_request(tx_buff, igd_control_url, external_port, local_address.to_string(), local_port);
     if (!res) {
         auto &ec = res.error();
-        LOG_TRACE(log, "error making port mapping request :: {}", ec.message());
+        LOG_TRACE(log, "error making port mapping request: {}", ec);
         return do_shutdown(make_error(ec));
     }
     make_request(addr_mapping, igd_control_url, std::move(tx_buff));
@@ -204,7 +204,7 @@ void upnp_actor_t::on_mapping_port(message::http_response_t &msg) noexcept {
     bool ok = false;
     auto &ee = msg.payload.ee;
     if (ee) {
-        LOG_WARN(log, "unsuccessful port mapping: {}", ee->message());
+        LOG_WARN(log, "unsuccessful port mapping: {}", ee);
         auto inner = utils::make_error_code(utils::error_code_t::portmapping_failed);
         return do_shutdown(make_error(inner, ee));
     } else if (state > r::state_t::OPERATIONAL) {
@@ -217,7 +217,7 @@ void upnp_actor_t::on_mapping_port(message::http_response_t &msg) noexcept {
     }
     auto result = parse_mapping(body.data(), body.size());
     if (!result) {
-        LOG_WARN(log, "can't parse port mapping reply : {}", result.error().message());
+        LOG_WARN(log, "can't parse port mapping reply: {}", result.error());
         std::string xml(body);
         LOG_DEBUG(log, "xml:\n{0}\n", xml);
     } else {
@@ -236,7 +236,7 @@ void upnp_actor_t::on_mapping_port(message::http_response_t &msg) noexcept {
         auto res = make_mapping_validation_request(tx_buff, igd_control_url, external_port);
         if (!res) {
             auto &ec = res.error();
-            LOG_TRACE(log, "error making port mapping validation request :: {}", ec.message());
+            LOG_TRACE(log, "error making port mapping validation request: {}", ec);
             return do_shutdown(make_error(ec));
         }
         make_request(addr_validate, igd_control_url, std::move(tx_buff));
@@ -250,7 +250,7 @@ void upnp_actor_t::on_unmapping_port(message::http_response_t &msg) noexcept {
 
     auto &ee = msg.payload.ee;
     if (ee) {
-        LOG_WARN(log, "upnp_actor:: unsuccessful port mapping: {}", ee->message());
+        LOG_WARN(log, "upnp_actor:: unsuccessful port mapping: {}", ee);
         return;
     }
     auto &body = msg.payload.res->response.body();
@@ -260,7 +260,7 @@ void upnp_actor_t::on_unmapping_port(message::http_response_t &msg) noexcept {
     }
     auto result = parse_unmapping(body.data(), body.size());
     if (!result) {
-        LOG_WARN(log, "can't parse port unmapping reply : {}", result.error().message());
+        LOG_WARN(log, "can't parse port unmapping reply: {}", result.error());
         LOG_DEBUG(log, "xml:\n{0}\n", content);
     } else if (!result.value()) {
         LOG_WARN(log, "port unmapping failed");
@@ -283,7 +283,7 @@ void upnp_actor_t::on_validate(message::http_response_t &msg) noexcept {
 
     auto &ee = msg.payload.ee;
     if (ee) {
-        LOG_WARN(log, "upnp_actor:: unsuccessful port mapping: {}", ee->message());
+        LOG_WARN(log, "upnp_actor:: unsuccessful port mapping: {}", ee);
         return;
     }
     auto &body = msg.payload.res->response.body();
@@ -294,7 +294,7 @@ void upnp_actor_t::on_validate(message::http_response_t &msg) noexcept {
     bool ok = false;
     auto result = parse_mapping_validation(body.data(), body.size());
     if (!result) {
-        LOG_WARN(log, "can't parse port mapping validation reply : {}", result.error().message());
+        LOG_WARN(log, "can't parse port mapping validation reply: {}", result.error());
         LOG_DEBUG(log, "xml:\n{0}\n", content);
     } else if (!result.value()) {
         LOG_WARN(log, "port mapping validation failed");
@@ -332,7 +332,7 @@ void upnp_actor_t::shutdown_start() noexcept {
         utils::bytes_t tx_buff;
         auto res = make_unmapping_request(tx_buff, igd_control_url, external_port);
         if (!res) {
-            LOG_WARN(log, "error making port mapping request :: {}", res.error().message());
+            LOG_WARN(log, "error making port mapping request: {}", res.error());
             resources->release(resource::external_port);
             return;
         }

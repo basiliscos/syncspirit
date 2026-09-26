@@ -11,6 +11,7 @@
 #include "proto/proto-helpers-bep.h"
 #include "proto/proto-helpers-db.h"
 #include "net/names.h"
+#include "utils/format.hpp"
 
 namespace to {
 struct queue {};
@@ -51,6 +52,8 @@ void supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         [&](auto &p) { p.register_name(names::coordinator, get_address()); });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&supervisor_t::on_model_update);
+        p.subscribe_actor(&supervisor_t::on_model_subscribe);
+        p.subscribe_actor(&supervisor_t::on_model_unsubscribe);
         p.subscribe_actor(&supervisor_t::on_package);
         p.subscribe_actor(&supervisor_t::on_io);
     });
@@ -98,6 +101,18 @@ void supervisor_t::enqueue(r::message_ptr_t message) noexcept {
     locality_leader->access<to::queue>().emplace_back(std::move(message));
 }
 
+void supervisor_t::on_model_subscribe(model::message::model_subscription_t &message) noexcept {
+    model_subscribers.push_back(message.payload);
+}
+
+void supervisor_t::on_model_unsubscribe(model::message::model_unsubscription_t &message) noexcept {
+    auto &item = static_cast<const model::payload::model_subscription_t &>(message.payload);
+    auto it = std::find(model_subscribers.begin(), model_subscribers.end(), item);
+    if (it != model_subscribers.end()) {
+        model_subscribers.erase(it);
+    }
+}
+
 void supervisor_t::on_model_update(model::message::model_update_t &msg) noexcept {
     LOG_TRACE(log, "updating model");
     auto &diff = msg.payload.diff;
@@ -112,6 +127,10 @@ void supervisor_t::on_model_update(model::message::model_update_t &msg) noexcept
         LOG_ERROR(log, "error visiting model: {}", r.assume_error().message());
         do_shutdown(make_error(r.assume_error()));
     }
+    auto context = model::payload::apply_context_t(&msg, const_cast<void *>(msg.payload.custom));
+    for (auto &subscriber : model_subscribers) {
+        subscriber.fn(*diff, context, subscriber.custom);
+    }
 }
 
 void supervisor_t::on_package(bouncer::message::package_t &msg) noexcept {
@@ -123,15 +142,6 @@ void supervisor_t::on_io(fs::message::io_commands_t &message) noexcept {
     for (auto &cmd : message.payload.commands) {
         std::visit([&](auto &cmd) { process_io(cmd); }, cmd);
     }
-}
-
-auto supervisor_t::consume_errors() noexcept -> io_errors_t { return std::move(io_errors); }
-
-auto supervisor_t::operator()(const model::diff::local::io_failure_t &diff, void *custom) noexcept
-    -> outcome::result<void> {
-    auto &errs = diff.errors;
-    std::copy(errs.begin(), errs.end(), std::back_inserter(io_errors));
-    return diff.visit_next(*this, custom);
 }
 
 auto supervisor_t::operator()(const model::diff::modify::upsert_folder_t &diff, void *custom) noexcept
@@ -207,26 +217,25 @@ auto supervisor_t::operator()(const model::diff::peer::update_folder_t &diff, vo
 }
 
 void supervisor_t::process_io(fs::payload::block_request_t &req) noexcept {
-    LOG_TRACE(log, "process_io, requesting on '{}' (offset: {}, size: {})", req.path.string(), req.offset,
-              req.block_size);
+    LOG_TRACE(log, "process_io, requesting on '{}' (offset: {}, size: {})", req.path, req.offset, req.block_size);
 }
 
 void supervisor_t::process_io(fs::payload::remote_copy_t &req) noexcept {
-    LOG_TRACE(log, "process_io (ack: {}), remote_copy_t of '{} ({} bytes)'", auto_ack_io, req.path.string(), req.size);
+    LOG_TRACE(log, "process_io (ack: {}), remote_copy_t of '{} ({} bytes)'", auto_ack_io, req.path, req.size);
     if (auto_ack_io) {
         req.result = outcome::success();
     }
 }
 
 void supervisor_t::process_io(fs::payload::append_block_t &req) noexcept {
-    LOG_TRACE(log, "process_io (ack: {}), append_block_t of {}", auto_ack_io, req.path.string());
+    LOG_TRACE(log, "process_io (ack: {}), append_block_t of {}", auto_ack_io, req.path);
     if (auto_ack_io) {
         req.result = outcome::success();
     }
 }
 
 void supervisor_t::process_io(fs::payload::finish_file_t &req) noexcept {
-    LOG_TRACE(log, "process_io (ack: {}), finish_file_t of {}", auto_ack_io, req.path.string());
+    LOG_TRACE(log, "process_io (ack: {}), finish_file_t of {}", auto_ack_io, req.path);
     if (auto_ack_io) {
         req.result = outcome::success();
     }
@@ -234,7 +243,14 @@ void supervisor_t::process_io(fs::payload::finish_file_t &req) noexcept {
 
 void supervisor_t::process_io(fs::payload::clone_block_t &req) noexcept {
     LOG_TRACE(log, "process_io (ack: {}), clone_block_t, {} bytes,  {}(#{}) -> {}(#{})", auto_ack_io, req.block_size,
-              req.source.string(), req.source_offset, req.target.string(), req.target_offset);
+              req.source, req.source_offset, req.path, req.target_offset);
+    if (auto_ack_io) {
+        req.result = outcome::success();
+    }
+}
+
+void supervisor_t::process_io(fs::payload::update_meta_t &req) noexcept {
+    LOG_TRACE(log, "process_io (ack: {}), update_meta_t of {}", auto_ack_io, req.path);
     if (auto_ack_io) {
         req.result = outcome::success();
     }

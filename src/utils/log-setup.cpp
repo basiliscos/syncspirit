@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "log-setup.h"
 
 #include "error_code.h"
+#include "utils/path_view.hpp"
 #include "io.h"
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/sinks/basic_file_sink.h>
@@ -11,12 +12,10 @@
 #include <unordered_map>
 #include <string_view>
 #include <vector>
-#include <filesystem>
+#include <boost/nowide/convert.hpp>
+#include <memory_resource>
 
 namespace syncspirit::utils {
-
-namespace bfs = std::filesystem;
-namespace sys = boost::system;
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
 #define SECOND_FRACTION "%f"
@@ -24,7 +23,7 @@ namespace sys = boost::system;
 #define SECOND_FRACTION "%F"
 #endif
 
-static const char *log_pattern = "[%Y-%m-%d %H:%M:%S." SECOND_FRACTION "] [%^%L/%t%$] {%n} %v";
+const char *log_pattern = "[%Y-%m-%d %H:%M:%S." SECOND_FRACTION "] [%^%L/%t%$] {%n} %v";
 
 using sink_option_t = outcome::result<spdlog::sink_ptr>;
 
@@ -138,7 +137,7 @@ void finalize_loggers() noexcept {
     spdlog::drop_all();
 }
 
-static const char *bootstrap_sink = "syncspirit-bootstrap.log";
+static auto bootstrap_sink = std::string_view("syncspirit-bootstrap.log");
 
 bootstrap_guard_t::bootstrap_guard_t(dist_sink_t dist_sink_, spdlog::sinks::sink *sink_)
     : dist_sink{dist_sink_}, sink{sink_} {}
@@ -175,22 +174,28 @@ std::pair<dist_sink_t, logger_t> create_root_logger() noexcept {
 
 SYNCSPIRIT_API logger_t get_root_logger() noexcept { return spdlog::get(""); }
 
-auto bootstrap(dist_sink_t &dist_sink, const bfs::path &dir) noexcept -> bootstrap_guard_ptr_t {
-    using F = fstream_t;
-    auto file_path = dir / bootstrap_sink;
-    auto file = fstream_t(file_path, F::trunc | F::out | F::binary);
+auto bootstrap(dist_sink_t &dist_sink, const path_base_t &dir) noexcept -> bootstrap_guard_ptr_t {
+    auto buff = std::array<std::byte, 1024 * 4>();
+    auto pool = std::pmr::monotonic_buffer_resource(buff.data(), buff.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+    auto dir_view = dir.get_view(allocator);
+
     auto file_sink = spdlog::sink_ptr();
-    if (file) {
-        file.close();
+    auto file_path = dir_view / utils::make_native_view(bootstrap_sink, allocator);
+    auto file = io_stream_t::open_truncate(file_path);
+    if (file.has_value()) {
+        (void)file.assume_value().close();
 #if defined(_WIN32) && defined(SPDLOG_WCHAR_FILENAMES)
-        file_sink.reset(new spdlog::sinks::basic_file_sink_mt(file_path.wstring(), true));
+        auto wpath = std::wstring(file_path.get_full_wname());
+        file_sink.reset(new spdlog::sinks::basic_file_sink_mt(std::move(wpath), true));
 #else
-        file_sink.reset(new spdlog::sinks::basic_file_sink_mt(file_path.string(), true));
+        auto path = std::string(file_path.get_full_name());
+        file_sink.reset(new spdlog::sinks::basic_file_sink_mt(std::move(path), true));
 #endif
         dist_sink->add_sink(file_sink);
         spdlog::trace("file sink has been added initialized");
     } else {
-        spdlog::trace("file sink '{}' has NOT been added", file_path.string());
+        spdlog::trace("file sink '{}' has NOT been added", file_path.get_full_name());
     }
     return std::make_unique<bootstrap_guard_t>(dist_sink, file_sink.get());
 }

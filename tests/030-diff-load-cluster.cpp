@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "test-utils.h"
 #include "model/cluster.h"
@@ -195,7 +195,7 @@ TEST_CASE("loading cluster (base)", "[model]") {
         REQUIRE(folder);
         CHECK(folder->get_id() == id);
         CHECK(folder->get_label() == "my-label");
-        CHECK(folder->get_path() == "/my/path");
+        CHECK(folder->get_path().get_full_name() == "/my/path");
     }
 
     SECTION("ignored folders") {

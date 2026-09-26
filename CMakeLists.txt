@@ -1,5 +1,5 @@
 cmake_minimum_required (VERSION 3.19)
-project (syncspirit VERSION 0.4.4)
+project (syncspirit VERSION 0.4.6)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -12,7 +12,11 @@ cmake_policy(SET CMP0091 NEW)
 cmake_policy(SET CMP0135 NEW)
 
 include(GenerateExportHeader)
-include (FetchContent)
+include(FetchContent)
+include(CheckIncludeFile)
+
+option(SYNCSPIRIT_BUILD_TESTS   "Enable building tests [default: OFF]"  OFF)
+option(SYNCSPIRIT_FRONTEND_FLTK "Enable building FLTK frontend [default: ON]"  ON)
 
 if (WIN32)
     # set(CMAKE_CROSSCOMPILING on)
@@ -43,11 +47,18 @@ find_package(protopuf REQUIRED)
 find_package(pugixml REQUIRED)
 find_package(tomlplusplus REQUIRED)
 find_package(nlohmann_json REQUIRED)
-#find_package(c-ares REQUIRED)
+find_package(c-ares REQUIRED)
+find_package(PCRE2 REQUIRED)
+find_package(uni-algo REQUIRED)
 
 set(SYNCSPIRIT_VERSION "v${CMAKE_PROJECT_VERSION}")
-
-option(SYNCSPIRIT_BUILD_TESTS "Enable building tests [default: OFF]"  OFF)
+if (LINUX)
+    check_include_file("sys/inotify.h" SYNCSPIRIT_WATCHER_INOTIFY)
+elseif (BSD OR APPLE)
+    check_include_file("sys/event.h" SYNCSPIRIT_WATCHER_KQUEUE)
+elseif (WIN32)
+    set(SYNCSPIRIT_WATCHER_WIN32 true)
+endif()
 
 set(dist_dir "${syncspirit_BINARY_DIR}/dist")
 add_custom_target("deploy")
@@ -76,8 +87,12 @@ function(install_executable target)
                         copy
                             $<TARGET_FILE:${target}>
                             "${dist_dir}/$<TARGET_FILE_NAME:${target}>"
+                    COMMAND "${CMAKE_COMMAND}" -E
+                            copy_directory
+                                "${CMAKE_SOURCE_DIR}/misc/resources"
+                                "${dist_dir}/resources"
                 )
-            endif ()
+            endif()
         else()
             add_custom_command(TARGET deploy_${target} POST_BUILD
                 COMMAND
@@ -99,11 +114,25 @@ add_library(syncspirit_core
     src/db/prefix.cpp
     src/db/transaction.cpp
     src/db/utils.cpp
+    src/fs/platform/context_base.cpp
+    src/fs/platform/watcher_base.cpp
+    src/fs/platform/bsd/context.cpp
+    src/fs/platform/bsd/watcher.cpp
+    src/fs/platform/generic/context.cpp
+    src/fs/platform/linux/context.cpp
+    src/fs/platform/linux/watcher.cpp
+    src/fs/platform/unix/watcher.cpp
+    src/fs/platform/windows/context.cpp
+    src/fs/platform/windows/watcher.cpp
     src/fs/file.cpp
     src/fs/file_actor.cpp
     src/fs/file_cache.cpp
+    src/fs/fs_context.cpp
+    src/fs/fs_proxy.cpp
     src/fs/fs_supervisor.cpp
     src/fs/fs_slave.cpp
+    src/fs/updates_mediator.cpp
+    src/fs/updates_support.cpp
     src/fs/utils.cpp
     src/fs/task/noop.cpp
     src/fs/task/remove_file.cpp
@@ -113,10 +142,12 @@ add_library(syncspirit_core
     src/hasher/hasher_actor.cpp
     src/hasher/hasher_plugin.cpp
     src/hasher/hasher_supervisor.cpp
+    src/model/messages.cpp
     src/model/diff/apply_controller.cpp
     src/model/diff/block_diff.cpp
     src/model/diff/cluster_diff.cpp
     src/model/diff/cluster_visitor.cpp
+    src/model/diff/diff_assembler.cpp
     src/model/diff/iterative_controller.cpp
     src/model/diff/advance/advance.cpp
     src/model/diff/advance/local_update.cpp
@@ -144,7 +175,7 @@ add_library(syncspirit_core
     src/model/diff/load/remove_corrupted_files.cpp
     src/model/diff/local/blocks_availability.cpp
     src/model/diff/local/file_availability.cpp
-    src/model/diff/local/io_failure.cpp
+    src/model/diff/local/local_state_update.cpp
     src/model/diff/local/scan_finish.cpp
     src/model/diff/local/scan_request.cpp
     src/model/diff/local/scan_start.cpp
@@ -182,9 +213,9 @@ add_library(syncspirit_core
     src/model/misc/error_code.cpp
     src/model/misc/file_block.cpp
     src/model/misc/file_iterator.cpp
+    src/model/misc/file_matcher.cpp
     src/model/misc/orphaned_blocks.cpp
-    src/model/misc/path.cpp
-    src/model/misc/path_cache.cpp
+    src/model/misc/postponed_files.cpp
     src/model/misc/resolver.cpp
     src/model/misc/sequencer.cpp
     src/model/misc/updates_streamer.cpp
@@ -222,10 +253,12 @@ add_library(syncspirit_core
     src/net/resolver_actor.cpp
     src/net/names.cpp
     src/net/scheduler.cpp
+    src/net/services_supervisor.cpp
     src/net/ssdp_actor.cpp
     src/net/upnp_actor.cpp
     src/net/local_keeper/child_info.cpp
     src/net/local_keeper/hash_base.cpp
+    src/net/local_keeper/folder_context.cpp
     src/net/local_keeper/folder_slave.cpp
     src/net/local_keeper/stack_context.cpp
     src/net/local_keeper/stack.cpp
@@ -254,14 +287,19 @@ add_library(syncspirit_core
     src/utils/dns.cpp
     src/utils/error_code.cpp
     src/utils/format.cpp
+    src/utils/io.cpp
     src/utils/location.cpp
     src/utils/log.cpp
     src/utils/log-setup.cpp
     src/utils/network_interface.cpp
+    src/utils/path.cpp
+    src/utils/path_cache.cpp
+    src/utils/path_utils.cpp
     src/utils/platform.cpp
     src/utils/time.cpp
     src/utils/tls.cpp
     src/utils/uri.cpp
+    src/utils/utf8.cpp
 )
 
 set_source_files_properties(
@@ -296,30 +334,14 @@ FetchContent_Declare(MDBX
     set(MDBX_ALLOY_BUILD true CACHE BOOL "MDBX_ALLOY_BUILD")
 FetchContent_MakeAvailable(MDBX)
 
-FetchContent_Declare(C_ARES
-    URL https://github.com/c-ares/c-ares/releases/download/v1.34.5/c-ares-1.34.5.tar.gz
-    URL_HASH SHA256=7d935790e9af081c25c495fd13c2cfcda4792983418e96358ef6e7320ee06346
-)
-    set(CARES_STATIC      true  CACHE BOOL "CARES_STATIC")
-    set(CARES_SHARED      false CACHE BOOL "CARES_SHARED")
-    set(CARES_STATIC_PIC  true  CACHE BOOL "CARES_STATIC_PIC")
-    set(CARES_BUILD_TOOLS false CACHE BOOL "CARES_BUILD_TOOLS")
-    set(CARES_THREADS     false CACHE BOOL "CARES_THREADS")
-FetchContent_MakeAvailable(C_ARES)
-
-FetchContent_Declare(UNI_ALGO
-    URL https://github.com/uni-algo/uni-algo/archive/refs/tags/v1.2.0.tar.gz
-    URL_HASH SHA256=f2a1539cd8635bc6088d05144a73ecfe7b4d74ee0361fabed6f87f9f19e74ca9
-)
-FetchContent_MakeAvailable(UNI_ALGO)
-
-
 target_include_directories(syncspirit_core PUBLIC
     ${OPENSSL_INCLUDE_DIR}
     ${CMAKE_CURRENT_BINARY_DIR}
     ${CMAKE_CURRENT_BINARY_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
+
+target_compile_definitions(syncspirit_core PUBLIC PCRE2_CODE_UNIT_WIDTH=8)
 
 target_link_libraries(syncspirit_core
     PUBLIC
@@ -337,10 +359,12 @@ target_link_libraries(syncspirit_core
         tomlplusplus::tomlplusplus
         nlohmann_json::nlohmann_json
         lz4::lz4
+        pcre2::pcre2
         $<IF:$<PLATFORM_ID:Windows>,mdbx,mdbx-static>
         $<$<PLATFORM_ID:Windows>:iphlpapi>
         $<$<PLATFORM_ID:Windows>:ws2_32>
         $<$<PLATFORM_ID:Windows>:wsock32>
+        $<$<PLATFORM_ID:Windows>:dbghelp.dll>
     PRIVATE
         ZLIB::ZLIB
         c-ares::cares
@@ -354,4 +378,7 @@ if (SYNCSPIRIT_BUILD_TESTS)
 endif()
 
 add_subdirectory("src/ui-daemon")
-add_subdirectory("src/ui-fltk")
+
+if (SYNCSPIRIT_FRONTEND_FLTK)
+    add_subdirectory("src/ui-fltk")
+endif()

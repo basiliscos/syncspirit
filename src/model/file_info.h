@@ -1,16 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #pragma once
 
 #include <cstdint>
 #include <unordered_set>
-#include <filesystem>
 #include <boost/outcome.hpp>
 #include <boost/multi_index/ordered_index.hpp>
 #include "utils/compact_vector.hpp"
 #include "misc/augmentation.h"
-#include "misc/path.h"
+#include "utils/path.h"
 #include "misc/map.hpp"
 #include "misc/uuid.h"
 #include "block_info.h"
@@ -18,9 +17,12 @@
 #include "proto/proto-fwd.hpp"
 #include "syncspirit-export.h"
 
+namespace syncspirit::utils {
+struct path_cache_t;
+}
+
 namespace syncspirit::model {
 
-namespace bfs = std::filesystem;
 namespace outcome = boost::outcome_v2;
 
 struct folder_info_t;
@@ -32,7 +34,6 @@ struct blocks_iterator_t;
 struct file_info_t;
 using file_info_ptr_t = intrusive_ptr_t<file_info_t>;
 
-struct path_cache_t;
 struct path_guard_t;
 
 struct SYNCSPIRIT_API file_info_t {
@@ -62,8 +63,8 @@ struct SYNCSPIRIT_API file_info_t {
         utils::bytes_view_t file_id;
     };
 
-    struct guard_t {
-        using path_guard_ptr_t = std::unique_ptr<path_guard_t>;
+    struct SYNCSPIRIT_API guard_t {
+        using path_guard_ptr_t = std::unique_ptr<model::path_guard_t>;
         guard_t() noexcept = default;
         guard_t(file_info_t &file, const folder_info_t *folder_info) noexcept;
         guard_t(const guard_t &) = delete;
@@ -132,7 +133,7 @@ struct SYNCSPIRIT_API file_info_t {
 
     void update(const file_info_t &updated) noexcept;
 
-    const path_ptr_t &get_name() const noexcept;
+    const utils::path_ptr_t &get_name() const noexcept;
     inline version_t &get_version() noexcept { return version; }
     inline const version_t &get_version() const noexcept { return version; }
 
@@ -183,7 +184,7 @@ struct SYNCSPIRIT_API file_info_t {
         return {};
     }
 
-    bfs::path get_path(const folder_info_t &folder_info) const noexcept;
+    utils::poly_path_view_t get_path(const folder_info_t &, const utils::allocator_t &) const noexcept;
 
     inline std::int64_t get_modified_s() const noexcept { return modified_s; }
     inline std::int32_t get_modified_ns() const noexcept { return modified_ns; }
@@ -195,11 +196,12 @@ struct SYNCSPIRIT_API file_info_t {
 
     proto::FileInfo get() const noexcept;
     bool identical_to(const proto::FileInfo &file) const noexcept;
+    bool identical_by_content_to(const proto::FileInfo &file) const noexcept;
 
     static const constexpr auto data_length = uuid_length * 2;
 
-    outcome::result<void> fields_update(const db::FileInfo &, model::path_cache_t &) noexcept;
-    outcome::result<void> fields_update(const proto::FileInfo &, model::path_cache_t &) noexcept;
+    outcome::result<void> fields_update(const db::FileInfo &, utils::path_cache_t &) noexcept;
+    outcome::result<void> fields_update(const proto::FileInfo &, utils::path_cache_t &) noexcept;
 
     proto::Index generate() noexcept;
     std::size_t expected_meta_size() const noexcept;
@@ -209,7 +211,7 @@ struct SYNCSPIRIT_API file_info_t {
 
     guard_t guard(const model::folder_info_t &folder_info) noexcept;
 
-    std::string make_conflicting_name() const noexcept;
+    utils::poly_path_view_t make_conflicting_name(const utils::allocator_t &) const noexcept;
 
     inline void refcouner_inc() const noexcept { ++counter; }
     inline std::uint32_t refcouner_dec() const noexcept { return --counter; }
@@ -253,7 +255,7 @@ struct SYNCSPIRIT_API file_info_t {
 
     unsigned char key[data_length];
     augmentation_ptr_t extension;
-    path_ptr_t name;
+    utils::path_ptr_t name;
     std::int64_t modified_s;
     std::uint64_t modified_by;
     std::int64_t sequence;

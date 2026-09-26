@@ -22,7 +22,7 @@ hash_base_t::hash_base_t(child_info_t &&info_, std::int32_t block_size_) : child
     blocks.resize(total_blocks);
 }
 
-bool hash_base_t::commit_error(sys::error_code ec_, std::int32_t delta) {
+bool hash_base_t::commit_error(std::error_code ec_, std::int32_t delta) {
     ec = ec_;
     errored_blocks += delta;
     return errored_blocks + unprocessed_blocks == unhashed_blocks;

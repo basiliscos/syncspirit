@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #pragma once
 
@@ -30,7 +30,7 @@ struct SYNCSPIRIT_API cluster_diff_t : arc_base_t<cluster_diff_t> {
     cluster_diff_t();
     cluster_diff_t(const cluster_diff_t &) = delete;
     cluster_diff_t(cluster_diff_t &&) = delete;
-    virtual ~cluster_diff_t() = default;
+    virtual ~cluster_diff_t();
 
     outcome::result<void> apply(apply_controller_t &, void *) const noexcept;
     virtual outcome::result<void> visit(visitor_t &visitor, void *custom) const noexcept;
@@ -38,6 +38,7 @@ struct SYNCSPIRIT_API cluster_diff_t : arc_base_t<cluster_diff_t> {
 
     cluster_diff_t *assign_sibling(cluster_diff_t *sibling) noexcept;
     cluster_diff_t *assign_child(cluster_diff_ptr_t child) noexcept;
+    cluster_diff_t *get_last_sibling() noexcept;
 
     cluster_diff_ptr_t child;
     cluster_diff_ptr_t sibling;

@@ -67,3 +67,19 @@ to get it the following steps should be done:
 You are not forced to import the whole folder. That way partial per-directory
 import is also supported. The only requirement is tha the unpacked directories
 should be located in the proper places.
+
+## Why would I want to use it instead of or alongside with Syncthing? What does it do better?
+
+- syncspirit is faster. According to my measurements it is able to sync linux
+sources tree folder for 2 mins vs 15 mins of syncing when using syncthing
+(that’s over a localhost, of course)
+- syncspirit has a different UI. That’s matter of personal taste, of course,
+but I like to see the exact picture what is synchronized and what is not.
+- syncspirit is able to run on more older software (i.e. from windows xp and up).
+Syncthing uses golang, and its software support is indirectly controlled by
+google (i.e. “artificial aging”); recent builds are running only on
+windows 10 and windows 11. Microsoft already dropped windows 10 support,
+so, I expect that in near future google will do the same.
+- the long-term goal of syncspirit is to allow “selective sync” feature,
+which unlikely to be implemented by syncthing.
+

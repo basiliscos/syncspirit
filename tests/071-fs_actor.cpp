@@ -4,12 +4,12 @@
 #include "test-utils.h"
 #include "fs/file_actor.h"
 #include "fs/utils.h"
+#include "fs/platform/context_base.h"
 #include "net/names.h"
 #include "test_supervisor.h"
 #include "access.h"
 #include "utils/error_code.h"
-#include <filesystem>
-#include <boost/nowide/convert.hpp>
+#include "syncspirit-config.h"
 #include <optional>
 #include <utility>
 #include <utils/platform.h>
@@ -21,15 +21,18 @@ using namespace syncspirit::model;
 using namespace syncspirit::net;
 using namespace syncspirit::fs;
 
-namespace bfs = std::filesystem;
-using perms_t = std::filesystem::perms;
-
 namespace {
 
 struct fixture_t;
 
 using io_commands_t = fs::message::io_commands_t;
 using io_commands_t_ptr_t = r::intrusive_ptr_t<io_commands_t>;
+
+struct my_context_t final : platform::context_base_t {
+    using parent_t = platform::context_base_t;
+    my_context_t() : parent_t(pt::milliseconds{1}) {};
+    void poll_events() noexcept override {};
+};
 
 struct chain_builder_t {
     template <typename Reply>
@@ -74,7 +77,7 @@ struct chain_builder_t {
 
 struct fixture_t {
 
-    fixture_t() noexcept : root_path{unique_path()}, path_guard{root_path} { bfs::create_directory(root_path); }
+    fixture_t() noexcept : path_guard{unique_path()} {}
 
     virtual configure_callback_t configure() noexcept {
         return [&](r::plugin::plugin_base_t &plugin) {
@@ -86,8 +89,17 @@ struct fixture_t {
         };
     }
 
+    virtual void create_file_actor() noexcept {
+        file_actor = sup->create_actor<fs::file_actor_t>()
+                         .timeout(timeout)
+                         .change_retension(retension)
+                         .updates_mediator(updates_mediator)
+                         .watched_folders(watched_folders)
+                         .finish();
+    }
+
     virtual void run() noexcept {
-        r::system_context_t ctx;
+        auto ctx = my_context_t();
         sup = ctx.create_supervisor<supervisor_t>()
                   .auto_finish(false)
                   .auto_ack_io(false)
@@ -100,14 +112,23 @@ struct fixture_t {
         sup->do_process();
         CHECK(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::OPERATIONAL);
 
-        file_actor = sup->create_actor<fs::file_actor_t>().timeout(timeout).finish();
+        updates_mediator = new fs::updates_mediator_t(retension);
+        watched_folders.reset(new watched_folders_t());
+
+        watched_folders->emplace(std::make_pair(folder_id, path_guard.clone()));
+
+        create_file_actor();
         sup->do_process();
         sequencer = sup->sequencer;
 
         CHECK(static_cast<r::actor_base_t *>(file_actor.get())->access<to::state>() == r::state_t::OPERATIONAL);
         file_addr = file_actor->get_address();
 
-        main();
+        auto buffer = std::array<std::byte, 1024 * 32>();
+        auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+        auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+
+        main(path_guard.get_view(allocator));
 
         sup->shutdown();
         sup->do_process();
@@ -115,14 +136,15 @@ struct fixture_t {
         CHECK(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::SHUT_DOWN);
     }
 
-    virtual void main() noexcept {}
+    virtual void main(const utils::poly_path_view_t &) noexcept {}
 
-    chain_builder_t append_block(const bfs::path &path, utils::bytes_view_t data, std::uint64_t offset,
+    chain_builder_t append_block(const utils::poly_path_view_t &path, utils::bytes_view_t data, std::uint64_t offset,
                                  std::uint64_t file_size) noexcept {
         auto bytes = utils::bytes_t(data.begin(), data.end());
 
         auto context = fs::payload::extendended_context_prt_t{};
-        auto payload = fs::payload::append_block_t(std::move(context), path, std::move(bytes), offset, file_size);
+        auto payload = fs::payload::append_block_t(std::move(context), folder_id, path.detach(), std::move(bytes),
+                                                   offset, file_size);
         auto cmd = fs::payload::io_command_t(std::move(payload));
         auto cmds = fs::payload::io_commands_t{nullptr};
         cmds.commands.emplace_back(std::move(cmd));
@@ -131,13 +153,13 @@ struct fixture_t {
         return chain_builder_t(this, reply, std::in_place_type_t<decltype(payload)>());
     }
 
-    chain_builder_t clone_block(const bfs::path &target, std::uint64_t target_offset, std::uint64_t target_size,
-                                const bfs::path &source, std::uint64_t source_offset,
-                                std::uint64_t block_size) noexcept {
+    chain_builder_t clone_block(const utils::poly_path_view_t &target, std::uint64_t target_offset,
+                                std::uint64_t target_size, const utils::poly_path_view_t &source,
+                                std::uint64_t source_offset, std::uint64_t block_size) noexcept {
         auto context = fs::payload::extendended_context_prt_t{};
 
-        auto payload = fs::payload::clone_block_t(std::move(context), target, target_offset, target_size, source,
-                                                  source_offset, block_size);
+        auto payload = fs::payload::clone_block_t(std::move(context), folder_id, target.detach(), target_offset,
+                                                  target_size, source.detach(), source_offset, block_size);
         auto cmd = fs::payload::io_command_t(std::move(payload));
         auto cmds = fs::payload::io_commands_t{nullptr};
         cmds.commands.emplace_back(std::move(cmd));
@@ -146,12 +168,12 @@ struct fixture_t {
         return chain_builder_t(this, reply, std::in_place_type_t<decltype(payload)>());
     }
 
-    chain_builder_t finish_file(const bfs::path &path, std::uint64_t file_size, std::int64_t modification_s,
-                                std::uint32_t permissions, bool no_permissions,
-                                const bfs::path &conflict_path = {}) noexcept {
+    chain_builder_t finish_file(const utils::poly_path_view_t &path, std::uint64_t file_size,
+                                std::int64_t modification_s, std::uint32_t permissions, bool no_permissions,
+                                const utils::poly_path_view_t &conflict_path) noexcept {
         auto context = fs::payload::extendended_context_prt_t{};
-        auto payload = fs::payload::finish_file_t(std::move(context), path, conflict_path, file_size, modification_s,
-                                                  permissions, no_permissions);
+        auto payload = fs::payload::finish_file_t(std::move(context), folder_id, path.detach(), conflict_path.detach(),
+                                                  file_size, modification_s, permissions, no_permissions);
         auto cmd = fs::payload::io_command_t(std::move(payload));
         auto cmds = fs::payload::io_commands_t{nullptr};
         cmds.commands.emplace_back(std::move(cmd));
@@ -160,8 +182,8 @@ struct fixture_t {
         return chain_builder_t(this, reply, std::in_place_type_t<decltype(payload)>());
     }
 
-    chain_builder_t remote_copy(const bfs::path &path, const proto::FileInfo &meta,
-                                const bfs::path &conflict_path = {}) noexcept {
+    chain_builder_t remote_copy(const utils::poly_path_view_t &path, const proto::FileInfo &meta,
+                                const utils::poly_path_view_t &conflict_path) noexcept {
         auto context = fs::payload::extendended_context_prt_t{};
         auto type = proto::get_type(meta);
         auto size = proto::get_size(meta);
@@ -170,8 +192,22 @@ struct fixture_t {
         auto modificaiton = proto::get_modified_s(meta);
         auto target = std::string(proto::get_symlink_target(meta));
 
-        auto payload = fs::payload::remote_copy_t(std::move(context), path, conflict_path, type, size, perms,
-                                                  modificaiton, target, deleted, false);
+        auto payload = fs::payload::remote_copy_t(std::move(context), folder_id, path.detach(), conflict_path.detach(),
+                                                  type, size, perms, modificaiton, target, deleted, false);
+        auto cmd = fs::payload::io_command_t(std::move(payload));
+        auto cmds = fs::payload::io_commands_t{nullptr};
+        cmds.commands.emplace_back(std::move(cmd));
+        sup->route<fs::payload::io_commands_t>(file_addr, sup->get_address(), std::move(cmds));
+        sup->do_process();
+        return chain_builder_t(this, reply, std::in_place_type_t<decltype(payload)>());
+    }
+
+    chain_builder_t update_meta(const utils::poly_path_view_t &path, std::int64_t modification_s_,
+                                std::uint32_t permissions_, bool no_permissions_) noexcept {
+        auto context = fs::payload::extendended_context_prt_t{};
+
+        auto payload = fs::payload::update_meta_t(std::move(context), folder_id, path.detach(), modification_s_,
+                                                  permissions_, no_permissions_);
         auto cmd = fs::payload::io_command_t(std::move(payload));
         auto cmds = fs::payload::io_commands_t{nullptr};
         cmds.commands.emplace_back(std::move(cmd));
@@ -182,158 +218,158 @@ struct fixture_t {
 
     r::address_ptr_t file_addr;
     r::pt::time_duration timeout = r::pt::millisec{10};
+    r::pt::time_duration retension = r::pt::microseconds{1};
     model::sequencer_ptr_t sequencer;
     r::intrusive_ptr_t<supervisor_t> sup;
     r::intrusive_ptr_t<fs::file_actor_t> file_actor;
-    bfs::path root_path;
+    fs::updates_mediator_ptr_t updates_mediator;
+    fs::watched_folders_ptr_t watched_folders;
     test::path_guard_t path_guard;
     r::system_context_t ctx;
     io_commands_t_ptr_t reply;
-    std::string_view folder_id = "1234-5678";
+    std::string folder_id = "1234-5678";
 };
 } // namespace
 
 void test_remote_copy() {
     struct F : fixture_t {
-        void main() noexcept override {
-
+        void main(const utils::poly_path_view_t &root_path) noexcept override {
             proto::FileInfo pr_fi;
             std::int64_t modified = 1641828421;
-            // proto::set_name(pr_fi, "q.txt");
             proto::set_modified_s(pr_fi, modified);
             proto::set_permissions(pr_fi, 0666);
+            auto empty_path = utils::make_empty_view(root_path.get_allocator());
 
             SECTION("empty regular file") {
                 auto path = root_path / L"папка" / L"файл.txt";
-                remote_copy(path, pr_fi).check_success();
+                remote_copy(path, pr_fi, empty_path).check_success();
 
-                REQUIRE(bfs::exists(path));
-                REQUIRE(bfs::file_size(path) == 0);
-                REQUIRE(to_unix(bfs::last_write_time(path)) == 1641828421);
+                REQUIRE(exists(path));
+                REQUIRE(file_size(path) == 0);
+                REQUIRE(last_write_time(path) == 1641828421);
+                CHECK(updates_mediator->is_masked(path.get_full_name()) >= 2);
 
 #ifndef SYNCSPIRIT_WIN
-                auto status = bfs::status(path);
-                auto p = status.permissions();
-                CHECK((p & perms_t::owner_read) != perms_t::none);
-                CHECK((p & perms_t::owner_write) != perms_t::none);
-                CHECK((p & perms_t::group_read) != perms_t::none);
-                CHECK((p & perms_t::group_write) != perms_t::none);
-                CHECK((p & perms_t::others_read) != perms_t::none);
-                CHECK((p & perms_t::others_write) != perms_t::none);
+                CHECK((permissions(path) & 0666));
 #endif
             }
             SECTION("empty regular file in a subdir") {
                 auto path = root_path / L"а" / L"б" / L"в" / L"г" / L"д" / L"файл.txt";
 
-                remote_copy(path, pr_fi).check_success();
+                remote_copy(path, pr_fi, empty_path).check_success();
 
-                REQUIRE(bfs::exists(path));
-                REQUIRE(bfs::file_size(path) == 0);
-                REQUIRE(to_unix(bfs::last_write_time(path)) == 1641828421);
+                REQUIRE(exists(path));
+                REQUIRE(file_size(path) == 0);
+                REQUIRE(last_write_time(path) == 1641828421);
+                CHECK(updates_mediator->is_masked(path.get_full_name()) >= 2);
 
 #ifndef SYNCSPIRIT_WIN
-                auto status = bfs::status(path);
-                auto p = status.permissions();
-                CHECK((p & perms_t::owner_read) != perms_t::none);
-                CHECK((p & perms_t::owner_write) != perms_t::none);
-                CHECK((p & perms_t::group_read) != perms_t::none);
-                CHECK((p & perms_t::group_write) != perms_t::none);
-                CHECK((p & perms_t::others_read) != perms_t::none);
-                CHECK((p & perms_t::others_write) != perms_t::none);
+                CHECK((permissions(path) & 0666));
 #endif
             }
             SECTION("non-empty regular file") {
                 proto::set_size(pr_fi, 5);
                 auto path = root_path / L"папка" / L"файл.txt";
                 write_file(path, "12345");
-                remote_copy(path, pr_fi).check_success();
+                remote_copy(path, pr_fi, empty_path).check_success();
 
-                auto tmp_path = path.parent_path() / (path.filename().wstring() + L".syncspirit-tmp");
-                REQUIRE(!bfs::exists(tmp_path));
+                auto filename = L"файл.txt.syncspirit-tmp";
+                auto tmp_path = path.get_parent() / utils::make_native_view(filename, path.get_allocator());
+                REQUIRE(!exists(tmp_path));
 
-                auto status = bfs::status(path);
-                CHECK(to_unix(bfs::last_write_time(path)) == 1641828421);
+                CHECK(last_write_time(path) == 1641828421);
+                CHECK(updates_mediator->is_masked(tmp_path.get_full_name()) == 0);
 #ifndef SYNCSPIRIT_WIN
-                auto p = status.permissions();
-                CHECK((p & perms_t::owner_read) != perms_t::none);
-                CHECK((p & perms_t::owner_write) != perms_t::none);
-                CHECK((p & perms_t::group_read) != perms_t::none);
-                CHECK((p & perms_t::group_write) != perms_t::none);
-                CHECK((p & perms_t::others_read) != perms_t::none);
-                CHECK((p & perms_t::others_write) != perms_t::none);
+                CHECK(updates_mediator->is_masked(path.get_full_name()) >= 2);
+                CHECK((permissions(path) & 0666));
+#else
+                CHECK(updates_mediator->is_masked(path.get_full_name()) == 1);
 #endif
             }
             SECTION("directory") {
                 auto path = root_path / L"папка";
                 proto::set_type(pr_fi, proto::FileInfoType::DIRECTORY);
-                remote_copy(path, pr_fi).check_success();
-                REQUIRE(bfs::exists(path));
-                REQUIRE(bfs::is_directory(path));
+                remote_copy(path, pr_fi, empty_path).check_success();
+                REQUIRE(exists(path));
+                REQUIRE(is_directory(path));
+                CHECK(updates_mediator->is_masked(path.get_full_name()) >= 1);
             }
             SECTION("symlink") {
                 SECTION("existing file") {
                     auto path = root_path / L"папка" / L"файл.txt";
-                    bfs::path target = root_path / "content";
+                    auto target = root_path / "content";
                     proto::set_type(pr_fi, proto::FileInfoType::SYMLINK);
-                    proto::set_symlink_target(pr_fi, boost::nowide::narrow(target.wstring()));
+                    proto::set_symlink_target(pr_fi, target.get_full_name());
 
-                    write_file(target, "zzz");
-                    remote_copy(path, pr_fi).check_success();
+                    write_file(target, "123");
+                    remote_copy(path, pr_fi, empty_path).check_success();
 #ifndef SYNCSPIRIT_WIN
-                    CHECK(bfs::exists(path));
-                    CHECK(bfs::is_symlink(path));
-                    CHECK(bfs::read_symlink(path) == target);
+                    CHECK(updates_mediator->is_masked(path.get_full_name()) == 1);
+                    CHECK(exists(path));
+                    CHECK(is_symlink(path));
+                    CHECK(read_symlink(path).data() == target.get_full_name());
 #endif
                 }
                 SECTION("non-existing file") {
                     auto path = root_path / L"папка" / L"файл.txt";
-                    bfs::path target = root_path / "content";
+                    auto target = root_path / "content";
                     proto::set_type(pr_fi, proto::FileInfoType::SYMLINK);
-                    proto::set_symlink_target(pr_fi, boost::nowide::narrow(target.wstring()));
+                    proto::set_symlink_target(pr_fi, target.get_full_name());
 
-                    remote_copy(path, pr_fi).check_success();
+                    remote_copy(path, pr_fi, empty_path).check_success();
 
-                    CHECK(!bfs::exists(path));
+                    CHECK(!exists(target));
 #ifndef SYNCSPIRIT_WIN
-                    CHECK(bfs::is_symlink(path));
-                    CHECK(bfs::read_symlink(path) == target);
+                    CHECK(exists(path));
+                    CHECK(updates_mediator->is_masked(path.get_full_name()) == 1);
+                    CHECK(is_symlink(path));
+                    CHECK(read_symlink(path).data() == target.get_full_name());
+#else
+                    CHECK(!exists(path));
 #endif
                 }
             }
             SECTION("deleted file") {
-                auto name = bfs::path(L"папка") / L"файл.bin";
+                auto name = utils::make_native_view(L"папка/файл.bin", root_path.get_allocator());
                 pr_fi = {};
-                proto::set_name(pr_fi, boost::nowide::narrow(name.generic_wstring()));
+                proto::set_name(pr_fi, name.get_full_name());
                 proto::set_modified_s(pr_fi, modified);
                 proto::set_deleted(pr_fi, true);
 
-                bfs::path target = root_path / name;
-                bfs::create_directories(target.parent_path());
+                auto target = root_path / name;
+                create_directories(target.get_parent());
                 write_file(target, "zzz");
-                REQUIRE(bfs::exists(target));
+                REQUIRE(exists(target));
 
-                remote_copy(target, pr_fi).check_success();
-
-                REQUIRE(!bfs::exists(target));
-
-                remote_copy(target, pr_fi).check_success();
-                REQUIRE(!bfs::exists(target));
+                remote_copy(target, pr_fi, empty_path).check_success();
+                REQUIRE(!exists(target));
+#ifndef SYNCSPIRIT_WATCHER_KQUEUE
+                CHECK(updates_mediator->is_masked(target.get_full_name()) == 1);
+#else
+                CHECK(updates_mediator->is_masked(target.get_parent().get_full_name()) == 1);
+#endif
+                remote_copy(target, pr_fi, empty_path).check_success();
+                CHECK(updates_mediator->is_masked(target.get_full_name()) == 0);
+                REQUIRE(!exists(target));
             }
             SECTION("conflict") {
-                auto name = bfs::path(L"папка") / L"файл.bin";
-                proto::set_name(pr_fi, boost::nowide::narrow(name.generic_wstring()));
+                auto name = utils::make_native_view(L"папка/файл.bin", root_path.get_allocator());
+                proto::set_name(pr_fi, name.get_full_name());
                 proto::set_modified_s(pr_fi, modified);
 
-                bfs::path target = root_path / name;
-                bfs::path conflict = target.parent_path() / L"конфликт.bin";
-                bfs::create_directories(target.parent_path());
-                write_file(target, "zzz");
-                REQUIRE(bfs::exists(target));
+                auto target = root_path / name;
+                auto conflict = target.get_parent() / L"конфликт.bin";
+                create_directories(target.get_parent());
+                write_file(target, "123");
+                REQUIRE(exists(target));
 
                 remote_copy(target, pr_fi, conflict).check_success();
-                CHECK(bfs::exists(target));
-                CHECK(bfs::exists(conflict));
-                CHECK(as_owned_bytes("zzz") == as_bytes(read_file(conflict)));
+                CHECK(exists(target));
+                CHECK(exists(conflict));
+                CHECK(as_owned_bytes("123") == as_bytes(read_file(conflict)));
+
+                CHECK(updates_mediator->is_masked(target.get_full_name()) >= 3);
+                CHECK(updates_mediator->is_masked(conflict.get_full_name()) == 1);
             }
         }
     };
@@ -342,108 +378,119 @@ void test_remote_copy() {
 
 void test_append_block() {
     struct F : fixture_t {
-        void main() noexcept override {
+        void main(const utils::poly_path_view_t &root_path) noexcept override {
             std::int64_t modified = 1641828421;
 
-            auto path_rel = bfs::path(L"путявка") / bfs::path(L"инфо.txt");
-            auto path_wstr = path_rel.generic_wstring();
-            auto path_str = boost::nowide::narrow(path_wstr);
+            auto path_rel = utils::make_native_view(L"путявка/инфо.txt", root_path.get_allocator());
 
             auto data_1 = as_owned_bytes("12345");
             auto perms = std::uint32_t(0444);
             auto no_perms = !utils::platform_t::permissions_supported(path_rel);
-
+            auto empty_path = utils::make_empty_view(root_path.get_allocator());
             SECTION("attempt finish non-existing") {
-                auto path = bfs::absolute(root_path / path_rel);
+                auto path = root_path / path_rel;
                 auto ec = utils::make_error_code(utils::error_code_t::flush_non_opened);
-                finish_file(path, 5, 1641828421, perms, no_perms).check_fail(ec);
+                finish_file(path, 5, 1641828421, perms, no_perms, empty_path).check_fail(ec);
+                CHECK(updates_mediator->is_masked(path.get_full_name()) == 0);
             }
             SECTION("finish unflushed") {
-                auto dir_path = root_path / path_rel.parent_path();
-                bfs::create_directories(dir_path);
-                auto tmp_path = bfs::absolute(dir_path / L"инфо.txt.syncspirit-tmp");
+                auto dir_path = root_path / path_rel.get_parent();
+                create_directories(dir_path);
+                auto tmp_path = dir_path / L"инфо.txt.syncspirit-tmp";
                 write_file(tmp_path, "12345");
-                auto path = bfs::absolute(root_path / path_rel);
-                finish_file(path, 5, 1641828421, perms, no_perms).check_success();
-                REQUIRE(bfs::exists(path));
-                REQUIRE(bfs::file_size(path) == 5);
+                auto path = root_path / path_rel;
+                finish_file(path, 5, 1641828421, perms, no_perms, empty_path).check_success();
+                REQUIRE(exists(path));
+                REQUIRE(file_size(path) == 5);
+                CHECK(updates_mediator->is_masked(path.get_full_name()) >= 2);
+                CHECK(updates_mediator->is_masked(tmp_path.get_full_name()) == 0);
                 CHECK(data_1 == as_bytes(read_file(path)));
-                CHECK(to_unix(bfs::last_write_time(path)) == 1641828421);
+                CHECK(last_write_time(path) == 1641828421);
                 if (!no_perms) {
-                    CHECK(static_cast<std::uint32_t>(bfs::status(path).permissions()) == perms);
+                    CHECK(permissions(path) == perms);
                 }
             }
-
             SECTION("file with 1 block") {
-                auto path = bfs::absolute(root_path / path_rel);
+                auto path = root_path / path_rel;
+                auto tmp_path = path.make_temporal();
                 append_block(path, data_1, 0, 5)
                     .check_success()
-                    .finish_file(path, 5, 1641828421, perms, no_perms)
+                    .finish_file(path, 5, 1641828421, perms, no_perms, empty_path)
                     .check_success();
 
-                REQUIRE(bfs::exists(path));
-                REQUIRE(bfs::file_size(path) == 5);
+                REQUIRE(exists(path));
+                REQUIRE(file_size(path) == 5);
                 CHECK(data_1 == as_bytes(read_file(path)));
-                CHECK(to_unix(bfs::last_write_time(path)) == 1641828421);
+                CHECK(last_write_time(path) == 1641828421);
+                CHECK(updates_mediator->is_masked(path.get_full_name()) >= 2);
+                CHECK(updates_mediator->is_masked(tmp_path.get_full_name()) == 0);
+#ifdef SYNCSPIRIT_WATCHER_KQUEUE
+                CHECK(updates_mediator->is_masked(path.get_parent().get_full_name()) == 2);
+#endif
                 if (!no_perms) {
-                    CHECK(static_cast<std::uint32_t>(bfs::status(path).permissions()) == perms);
+                    CHECK(permissions(path) == perms);
                 }
             }
             SECTION("file with 1 block & conflict rename") {
-                auto path = bfs::absolute(root_path / path_rel);
+                auto path = root_path / path_rel;
+                auto tmp_path = path.make_temporal();
                 write_file(path, "abcdef");
-                auto conflict_path = path.parent_path() / L"экс-инфо.txt";
+                auto conflict_path = path.get_parent() / L"экс-инфо.txt";
                 append_block(path, data_1, 0, 5)
                     .check_success()
                     .finish_file(path, 5, 1641828421, perms, no_perms, conflict_path)
                     .check_success();
 
-                REQUIRE(bfs::exists(path));
-                CHECK(bfs::file_size(path) == 5);
+                REQUIRE(exists(path));
+                CHECK(file_size(path) == 5);
                 CHECK(data_1 == as_bytes(read_file(path)));
-                CHECK(to_unix(bfs::last_write_time(path)) == 1641828421);
+                CHECK(last_write_time(path) == 1641828421);
                 if (!no_perms) {
-                    CHECK(static_cast<std::uint32_t>(bfs::status(path).permissions()) == perms);
+                    CHECK(permissions(path) == perms);
                 }
 
-                REQUIRE(bfs::exists(conflict_path));
-                CHECK(bfs::file_size(conflict_path) == 6);
+                REQUIRE(exists(conflict_path));
+                CHECK(file_size(conflict_path) == 6);
                 CHECK(as_bytes(read_file(conflict_path)) == as_owned_bytes("abcdef"));
+                CHECK(updates_mediator->is_masked(path.get_full_name()) >= 2);
+                CHECK(updates_mediator->is_masked(tmp_path.get_full_name()) == 0);
+#ifdef SYNCSPIRIT_WATCHER_KQUEUE
+                CHECK(updates_mediator->is_masked(path.get_parent().get_full_name()) == 3);
+#endif
             }
             SECTION("file with 2 different blocks") {
-                auto wfilename = boost::nowide::widen(path_str) + L".syncspirit-tmp";
-                auto filename = boost::nowide::narrow(wfilename);
-                auto tmp_path = root_path / filename;
-                auto path = root_path / path_wstr;
-
+                auto path = root_path / path_rel.get_filename();
+                auto tmp_path = path.make_temporal();
                 auto data = as_owned_bytes("12345");
 
                 append_block(path, data, 0, 10).check_success();
 
 #ifndef SYNCSPIRIT_WIN
-                REQUIRE(bfs::exists(tmp_path));
-                REQUIRE(bfs::file_size(tmp_path) == 10);
-                CHECK(read_file(tmp_path).substr(0, 5) == "12345");
+                REQUIRE(exists(tmp_path));
+                REQUIRE(file_size(tmp_path) == 10);
 #endif
                 append_block(path, as_owned_bytes("67890"), 5, 10).check_success();
+                CHECK(updates_mediator->is_masked(tmp_path.get_full_name()) == 0);
 
                 SECTION("add 2nd block") {
-                    finish_file(path, 5, 1641828421, perms, no_perms).check_success();
-                    REQUIRE(!bfs::exists(tmp_path));
-                    REQUIRE(bfs::exists(path));
-                    REQUIRE(bfs::file_size(path) == 10);
+                    finish_file(path, 5, 1641828421, perms, no_perms, empty_path).check_success();
+                    REQUIRE(!exists(tmp_path));
+                    REQUIRE(exists(path));
+                    REQUIRE(file_size(path) == 10);
                     auto data = read_file(path);
                     CHECK(data == "1234567890");
-                    CHECK(to_unix(bfs::last_write_time(path)) == 1641828421);
+                    CHECK(last_write_time(path) == 1641828421);
+                    CHECK(updates_mediator->is_masked(path.get_full_name()) >= 2);
                     if (!no_perms) {
-                        CHECK(static_cast<std::uint32_t>(bfs::status(path).permissions()) == perms);
+                        CHECK(permissions(path) == perms);
                     }
                 }
 
 #ifndef SYNCSPIRIT_WIN
                 SECTION("remove folder (simulate err)") {
-                    bfs::remove_all(root_path);
-                    finish_file(path, 5, 1641828421, perms, no_perms).check_fail();
+                    remove_all(root_path);
+                    finish_file(path, 5, 1641828421, perms, no_perms, empty_path).check_fail();
+                    CHECK(updates_mediator->is_masked(path.get_full_name()) == 0);
                 }
 #endif
             }
@@ -454,7 +501,7 @@ void test_append_block() {
 
 void test_clone_block() {
     struct F : fixture_t {
-        void main() noexcept override {
+        void main(const utils::poly_path_view_t &root_path) noexcept override {
             std::int64_t modified = 1641828421;
             auto perms = std::uint32_t(0444);
 #ifndef SYNCSPIRIT_WIN
@@ -462,25 +509,31 @@ void test_clone_block() {
 #else
             auto no_perms = true;
 #endif
+            auto empty_path = utils::make_empty_view(root_path.get_allocator());
             SECTION("source & target are different files") {
                 auto source_path = root_path / L"ать.txt";
                 auto target_path = root_path / L"ять.txt";
+                auto tmp_path = target_path.make_temporal();
 
                 SECTION("single block target file") {
                     auto data = as_owned_bytes("12345");
                     append_block(source_path, data, 0, 5)
                         .check_success()
-                        .finish_file(source_path, 5, modified, perms, no_perms)
+                        .finish_file(source_path, 5, modified, perms, no_perms, empty_path)
                         .check_success()
                         .clone_block(target_path, 0, 5, source_path, 0, 5)
                         .check_success()
-                        .finish_file(target_path, 5, modified, perms, no_perms)
+                        .finish_file(target_path, 5, modified, perms, no_perms, empty_path)
                         .check_success();
 
-                    REQUIRE(bfs::exists(target_path));
-                    REQUIRE(bfs::file_size(target_path) == 5);
+                    REQUIRE(exists(target_path));
+                    REQUIRE(file_size(target_path) == 5);
                     CHECK(read_file(target_path) == "12345");
-                    CHECK(to_unix(bfs::last_write_time(target_path)) == modified);
+                    CHECK(last_write_time(target_path) == modified);
+                    CHECK(updates_mediator->is_masked(tmp_path.get_full_name()) == 0);
+#ifdef SYNCSPIRIT_WATCHER_KQUEUE
+                    CHECK(updates_mediator->is_masked(target_path.get_parent().get_full_name()) == 4);
+#endif
                 }
                 SECTION("multi block target file") {
                     auto data_1 = as_owned_bytes("12345");
@@ -489,38 +542,43 @@ void test_clone_block() {
                         .check_success()
                         .append_block(source_path, data_2, 5, 10)
                         .check_success()
-                        .finish_file(source_path, 10, modified, perms, no_perms)
+                        .finish_file(source_path, 10, modified, perms, no_perms, empty_path)
                         .check_success()
                         .clone_block(target_path, 0, 10, source_path, 0, 5)
                         .check_success()
                         .clone_block(target_path, 5, 10, source_path, 5, 5)
                         .check_success()
-                        .finish_file(target_path, 10, modified, perms, no_perms)
+                        .finish_file(target_path, 10, modified, perms, no_perms, empty_path)
                         .check_success();
 
-                    REQUIRE(bfs::exists(target_path));
-                    REQUIRE(bfs::file_size(target_path) == 10);
+                    REQUIRE(exists(target_path));
+                    REQUIRE(file_size(target_path) == 10);
                     CHECK(read_file(target_path) == "1234567890");
-                    CHECK(to_unix(bfs::last_write_time(target_path)) == modified);
+                    CHECK(last_write_time(target_path) == modified);
+                    CHECK(updates_mediator->is_masked(tmp_path.get_full_name()) == 0);
+#ifdef SYNCSPIRIT_WATCHER_KQUEUE
+                    CHECK(updates_mediator->is_masked(target_path.get_parent().get_full_name()) == 4);
+#endif
                 }
                 SECTION("source/target different sizes") {
                     auto data_1 = as_owned_bytes("12345");
                     auto data_2 = as_owned_bytes("67890");
                     append_block(source_path, data_2, 0, 5)
                         .check_success()
-                        .finish_file(source_path, 5, modified, perms, no_perms)
+                        .finish_file(source_path, 5, modified, perms, no_perms, empty_path)
                         .check_success()
                         .append_block(target_path, data_1, 0, 10)
                         .check_success()
                         .clone_block(target_path, 5, 10, source_path, 0, 5)
                         .check_success()
-                        .finish_file(target_path, 10, modified, perms, no_perms)
+                        .finish_file(target_path, 10, modified, perms, no_perms, empty_path)
                         .check_success();
 
-                    REQUIRE(bfs::exists(target_path));
-                    REQUIRE(bfs::file_size(target_path) == 10);
+                    REQUIRE(exists(target_path));
+                    REQUIRE(file_size(target_path) == 10);
                     CHECK(read_file(target_path) == "1234567890");
-                    CHECK(to_unix(bfs::last_write_time(target_path)) == modified);
+                    CHECK(last_write_time(target_path) == modified);
+                    CHECK(updates_mediator->is_masked(tmp_path.get_full_name()) == 0);
                 }
             }
             SECTION("source & target are is the same file") {
@@ -530,14 +588,52 @@ void test_clone_block() {
                     .check_success()
                     .clone_block(target_path, 5, 10, target_path, 0, 5)
                     .check_success()
-                    .finish_file(target_path, 10, modified, perms, no_perms)
+                    .finish_file(target_path, 10, modified, perms, no_perms, empty_path)
                     .check_success();
 
-                REQUIRE(bfs::exists(target_path));
-                REQUIRE(bfs::file_size(target_path) == 10);
+                REQUIRE(exists(target_path));
+                REQUIRE(file_size(target_path) == 10);
                 CHECK(read_file(target_path) == "1234512345");
-                CHECK(to_unix(bfs::last_write_time(target_path)) == modified);
+                CHECK(last_write_time(target_path) == modified);
+                auto tmp_path = target_path.make_temporal();
+                CHECK(updates_mediator->is_masked(tmp_path.get_full_name()) == 0);
             }
+        }
+    };
+    F().run();
+}
+
+void test_update_meta() {
+    struct F : fixture_t {
+        void main(const utils::poly_path_view_t &root_path) noexcept override {
+            std::int64_t modified = 1641828421;
+            auto perms = std::uint32_t(0444);
+#ifndef SYNCSPIRIT_WIN
+            auto no_perms = false;
+#else
+            auto no_perms = true;
+#endif
+            auto path = root_path / L"файл.bin";
+            auto path_str = path.get_full_name();
+
+            SECTION("file") {
+                write_file(path, "12345");
+                update_meta(path, modified, perms, no_perms).check_success();
+                CHECK(last_write_time(path) == modified);
+#ifndef SYNCSPIRIT_WIN
+                CHECK(permissions(path) == perms);
+#endif
+            }
+            SECTION("file does not exists") { update_meta(path, modified, perms, no_perms).check_fail(); }
+
+#ifndef SYNCSPIRIT_WIN
+            SECTION("dir") {
+                create_directories(path);
+                update_meta(path, modified, perms, no_perms).check_success();
+                CHECK(last_write_time(path) == modified);
+                CHECK(permissions(path) == perms);
+            }
+#endif
         }
     };
     F().run();
@@ -545,8 +641,8 @@ void test_clone_block() {
 
 void test_requesting_block() {
     struct F : fixture_t {
-        void main() noexcept override {
-            bfs::path target = root_path / "a.txt";
+        void main(const utils::poly_path_view_t &root_path) noexcept override {
+            auto target = root_path / "a.txt";
 
             std::int64_t modified = 1641828421;
 
@@ -555,7 +651,7 @@ void test_requesting_block() {
 
             auto context = fs::payload::extendended_context_prt_t{};
 
-            auto payload = fs::payload::block_request_t(std::move(context), target, 0, 5);
+            auto payload = fs::payload::block_request_t(std::move(context), target.detach(), 0, 5);
             auto cmd = fs::payload::io_command_t(std::move(payload));
             auto cmds = fs::payload::io_commands_t{nullptr};
             cmds.commands.emplace_back(std::move(cmd));
@@ -597,7 +693,7 @@ void test_requesting_block() {
                 reply.reset();
 
                 auto context = fs::payload::extendended_context_prt_t{};
-                auto payload = fs::payload::block_request_t(std::move(context), target, 5, 5);
+                auto payload = fs::payload::block_request_t(std::move(context), target.detach(), 5, 5);
                 auto cmd = fs::payload::io_command_t(std::move(payload));
                 auto command = fs::payload::io_commands_t{};
                 command.commands.emplace_back(std::move(cmd));
@@ -623,6 +719,7 @@ int _init() {
     REGISTER_TEST_CASE(test_remote_copy, "test_remote_copy", "[fs]");
     REGISTER_TEST_CASE(test_append_block, "test_append_block", "[fs]");
     REGISTER_TEST_CASE(test_clone_block, "test_clone_block", "[fs]");
+    REGISTER_TEST_CASE(test_update_meta, "test_update_meta", "[fs]");
     REGISTER_TEST_CASE(test_requesting_block, "test_requesting_block", "[fs]");
     return 1;
 }

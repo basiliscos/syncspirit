@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #pragma once
 
@@ -9,7 +9,6 @@
 #include "syncspirit-export.h"
 
 namespace syncspirit::utils {
-namespace sys = boost::system;
 namespace outcome = boost::outcome_v2;
 namespace http = boost::beast::http;
 

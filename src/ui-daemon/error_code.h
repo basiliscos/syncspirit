@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2022 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #pragma once
 
-#include <boost/system/error_code.hpp>
+#include <system_error>
 
 namespace syncspirit::daemon {
 
@@ -22,7 +22,7 @@ enum class error_code_t {
 
 namespace detail {
 
-class error_code_category : public boost::system::error_category {
+class error_code_category : public std::error_category {
     virtual const char *name() const noexcept override;
     virtual std::string message(int c) const override;
 };
@@ -30,17 +30,14 @@ class error_code_category : public boost::system::error_category {
 
 const detail::error_code_category &error_code_category();
 
-inline boost::system::error_code make_error_code(error_code_t e) {
-    return {static_cast<int>(e), error_code_category()};
-}
+inline std::error_code make_error_code(error_code_t e) { return {static_cast<int>(e), error_code_category()}; }
 
 } // namespace syncspirit::daemon
 
-namespace boost {
-namespace system {
+namespace std {
 
 template <> struct is_error_code_enum<syncspirit::daemon::error_code_t> : std::true_type {
     static const bool value = true;
 };
-} // namespace system
-} // namespace boost
+
+} // namespace std

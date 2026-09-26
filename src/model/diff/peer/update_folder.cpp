@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "update_folder.h"
+#include "constants.h"
+#include "model/diff/diff_assembler.h"
 #include "model/diff/apply_controller.h"
 #include "model/misc/file_iterator.h"
 #include "model/diff/modify/add_blocks.h"
@@ -23,17 +25,17 @@ update_folder_t::update_folder_t(std::string_view folder_id_, utils::bytes_view_
     : folder_id{std::string(folder_id_)}, peer_id{peer_id_.begin(), peer_id_.end()}, files(std::move(files_)),
       uuids{std::move(uuids)} {
     LOG_DEBUG(log, "update_folder_t, folder = {}, files: {}, blocks = {}", folder_id, files.size(), blocks.size());
+    auto assember = model::diff::diff_assember_t(constants::diffs_batch);
+
     auto current = (cluster_diff_t *)(nullptr);
     if (!blocks.empty()) {
-        current = assign_child(new modify::add_blocks_t(std::move(blocks)));
+        assember.push_back(new modify::add_blocks_t(std::move(blocks)));
     }
     if (!removed_blocks.empty()) {
-        auto ptr = new modify::remove_blocks_t(std::move(removed_blocks));
-        if (current) {
-            current->assign_sibling(ptr);
-        } else {
-            assign_sibling(ptr);
-        }
+        assember.push_back(new modify::remove_blocks_t(std::move(removed_blocks)));
+    }
+    if (assember.has_diffs()) {
+        assign_child(assember.consume());
     }
 }
 

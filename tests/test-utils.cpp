@@ -1,113 +1,128 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "test-utils.h"
 #include "model/cluster.h"
 #include "model/device_id.h"
+#include "utils/path_view.hpp"
+#include "utils/path_utils.h"
 #include "utils/base32.h"
+#include "utils/format.hpp"
 #include "utils/log-setup.h"
+#include "utils/io.h"
+#include "syncspirit-config.h"
 #include <random>
 #include <cstdint>
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <boost/nowide/convert.hpp>
+#include <catch2/catch_session.hpp>
+
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+#else
+#include <unistd.h>
+#include <stdio.h>
+#endif
 
 int main(int argc, char *argv[]) { return Catch::Session().run(argc, argv); }
 
 namespace syncspirit::test {
 
 path_guard_t::path_guard_t() {}
-path_guard_t::path_guard_t(const bfs::path &path_) : path{path_} {}
-path_guard_t::path_guard_t(path_guard_t &&other) : path() { std::swap(path, other.path); }
+path_guard_t::path_guard_t(utils::path_t path) : utils::path_t(std::move(path)) {
+    auto buffer = std::array<std::byte, 1024 * 32>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+    auto view = get_view(allocator);
+    auto ec = sys::error_code{};
+    utils::create_directories(view, ec);
+    if (ec) {
+        std::cout << fmt::format("cannot create directory: {}: {}\n", view, ec.message());
+    }
+}
 
 path_guard_t::~path_guard_t() {
-    if (!path.empty()) {
+    auto buffer = std::array<std::byte, 1024 * 32>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+    auto view = get_view(allocator);
+    if (!view.empty()) {
         if (!getenv("SYNCSPIRIT_TEST_KEEP_PATH")) {
             sys::error_code ec;
+            utils::remove_all(view, ec);
 
-            if (bfs::exists(path, ec)) {
-                bfs::permissions(path, bfs::perms::owner_all, ec);
+            if (exists(view, ec)) {
+                utils::chmod(view, 0777, ec);
                 if (ec) {
-                    printf("error setting permissions : %s: %s\n", path.string().c_str(), ec.message().c_str());
+                    printf("error setting permissions : %s: %s\n", get_full_name().data(), ec.message().c_str());
+                } else {
+                    utils::remove_all(view, ec);
                 }
-            }
-
-            ec = {};
-            bfs::remove_all(path, ec);
-            if (ec) {
-                printf("error removing %s : %s\n", path.string().c_str(), ec.message().c_str());
             }
         }
     }
 }
 
-bfs::path locate_path(const char *test_file) {
-    auto path = bfs::path(test_file);
-    if (bfs::exists(path)) {
+utils::poly_path_view_t locate_path(const char *test_file, const utils::allocator_t &allocator) {
+    auto ec = sys::error_code{};
+    auto dir = utils::cwd(allocator, ec);
+    if (ec) {
+        spdlog::error("cwd failed: {}", ec);
+        throw std::runtime_error(ec.message());
+    }
+    auto path = dir / test_file;
+    if (exists(path)) {
         return path;
     }
-    path = bfs::path("../") / path;
-    if (bfs::exists(path)) {
+    path = dir.get_parent() / test_file;
+    if (exists(path)) {
         return path;
     }
-    std::string err = "path not found: ";
-    err += test_file;
+    auto err = fmt::format("path not found: '{}'", path);
     throw std::runtime_error(err);
 }
 
-std::string read_file(const bfs::path &path) {
-    sys::error_code ec;
-    auto copy = path;
-    copy.make_preferred();
-#ifndef SYNCSPIRIT_WIN
-    auto file_path = path.string();
-    auto file_path_c = file_path.c_str();
-    auto in = fopen(file_path_c, "rb");
-#else
-    auto file_path = copy.wstring();
-    auto file_path_c = file_path.c_str();
-    auto in = _wfopen(file_path_c, L"rb");
-#endif
-    if (!in) {
-        auto ec = sys::error_code{errno, sys::generic_category()};
-        spdlog::debug("(test/read) can't open '{}': {}", copy.string(), ec.message());
+std::string read_file(const utils::poly_path_view_t &path) {
+    auto file_opt = utils::io_stream_t::open_read(path);
+    if (!file_opt) {
+        spdlog::debug("(test/read) can't open '{}': {}", path, file_opt.error());
         return "";
     }
-
-    fseek(in, 0L, SEEK_END);
-    auto filesize = ftell(in);
-    fseek(in, 0L, SEEK_SET);
-    std::vector<char> buffer(filesize, 0);
-    auto r = fread(buffer.data(), filesize, 1, in);
-    assert(r == 1);
-    (void)r;
-    fclose(in);
-    return std::string(buffer.data(), filesize);
+    auto content_opt = file_opt.value().read_whole();
+    if (!content_opt) {
+        spdlog::debug("(test/read) can't read '{}': {}", path, content_opt.error());
+        return "";
+    }
+    auto &content = content_opt.value();
+    auto view = std::string_view(reinterpret_cast<char *>(content.data()), content.size());
+    return std::string(view);
 }
 
-void write_file(const bfs::path &path_, std::string_view content) {
-    bfs::create_directories(path_.parent_path());
-    auto copy = path_;
-    copy.make_preferred();
-#ifndef SYNCSPIRIT_WIN
-    auto file_path = copy.string();
-    auto file_path_c = file_path.c_str();
-    auto out = fopen(file_path_c, "wb");
-#else
-    auto file_path = copy.wstring();
-    auto file_path_c = file_path.c_str();
-    auto out = _wfopen(file_path_c, L"wb");
-#endif
-    if (!out) {
-        auto ec = sys::error_code{errno, sys::generic_category()};
-        std::cout << "(test/write) can't open " << copy.string() << " : " << ec.message() << "\n";
+std::string read_file(const utils::path_t &path) {
+    auto buffer = std::array<std::byte, 1024 * 4>{};
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+    return read_file(path.get_view(allocator));
+}
+
+void write_file(const utils::poly_path_view_t &path_, std::string_view content) {
+    auto ec = sys::error_code{};
+    utils::create_directories(path_.get_parent(), ec);
+    if (ec) {
+        throw ec.message();
+    }
+
+    auto opt = utils::io_stream_t::open_write(path_, content.size());
+    if (opt.has_error()) {
+        auto &ec = opt.assume_error();
+        std::cout << fmt::format("(test/write) can't open {}: {} ", path_, ec);
         std::abort();
     }
     if (content.size()) {
-        auto r = fwrite(content.data(), content.size(), 1, out);
-        assert(r);
-        (void)r;
+        auto ok = opt.assume_value().stream.write(content);
+        if (!ok) {
+            spdlog::error("cannot write to '{}': {}", path_, ok.assume_error());
+        }
     }
-    fclose(out);
 }
 
 utils::bytes_t device_id2sha256(std::string_view device_id_) {
@@ -135,22 +150,34 @@ apply_controller_ptr_t make_apply_controller(model::cluster_ptr_t cluster) {
 }
 
 void init_logging() {
-    auto [dist_sink, _] = utils::create_root_logger();
+    auto [dist_sink, logger] = utils::create_root_logger();
     auto console_sink = std::make_shared<spdlog::sinks::stderr_color_sink_mt>();
     dist_sink->add_sink(console_sink);
+    logger->set_pattern(utils::log_pattern);
 }
 
 static std::random_device rd;
 static std::uniform_int_distribution<std::uint64_t> dist;
 
-bfs::path unique_path() {
+path_guard_t unique_path() {
     auto n = dist(rd);
     auto view = utils::bytes_view_t(reinterpret_cast<const unsigned char *>(&n), sizeof(n));
     auto random_name = utils::base32::encode(view);
     std::transform(random_name.begin(), random_name.end(), random_name.begin(),
                    [](unsigned char c) { return std::tolower(c); });
-    auto name = std::wstring(L"tmp-") + boost::nowide::widen(random_name);
-    return bfs::absolute(bfs::current_path() / bfs::path(name));
+
+    auto buffer = std::array<std::byte, 1024 * 32>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+    auto name = fmt::format("tmp-{}", random_name);
+    auto ec = std::error_code{};
+    auto dir = utils::cwd(allocator, ec);
+    if (ec) {
+        spdlog::error("cwd: {}", ec);
+        throw std::runtime_error(ec.message());
+    }
+    auto path = dir / name;
+    return path_guard_t(path.detach());
 }
 
 utils::bytes_view_t as_bytes(std::string_view str) {
@@ -179,6 +206,133 @@ utils::bytes_t make_key(model::block_info_ptr_t block) {
     std::copy(hash.begin(), hash.end(), key_storage + 1);
     auto key = utils::bytes_t(key_storage, key_storage + SZ);
     return key;
+}
+
+bool wine_environment() {
+#ifdef SYNCSPIRIT_WIN
+    if (auto handle = GetModuleHandle("ntdll.dll")) {
+        if (GetProcAddress(handle, "wine_get_version")) {
+            return true;
+        }
+    }
+#endif
+    return false;
+}
+
+bool exists(const utils::poly_path_view_t &path) {
+    auto ec = sys::error_code{};
+    auto r = utils::exists(path, ec);
+    if (ec) {
+        spdlog::debug("existance of '{}' failed with: {}", path, ec);
+    }
+    return r;
+}
+
+void chmod(const utils::poly_path_view_t &path, std::uint32_t mode) {
+    auto ec = sys::error_code{};
+    utils::chmod(path, mode, ec);
+    if (ec) {
+        spdlog::error("chmod '{}': {}", path, ec);
+        throw std::runtime_error(ec.message());
+    }
+}
+
+bool is_empty(const utils::poly_path_view_t &path) {
+    auto ec = sys::error_code{};
+    auto r = utils::is_empty(path, ec);
+    if (ec) {
+        spdlog::trace("is_empty '{}': {}", path, ec);
+    }
+    return r;
+}
+
+std::size_t create_directories(const utils::poly_path_view_t &path) {
+    auto ec = sys::error_code{};
+    auto r = utils::create_directories(path, ec);
+    if (ec) {
+        spdlog::error("create_directories '{}': {}", path, ec);
+        throw std::runtime_error(ec.message());
+    }
+    return r;
+}
+
+static utils::stats_t get_stats(const utils::poly_path_view_t &path) {
+    auto ec = sys::error_code{};
+    auto r = utils::get_stats(path, ec);
+    if (ec) {
+        spdlog::error("get_stats '{}': {}", path, ec);
+        throw std::runtime_error(ec.message());
+    }
+    return r;
+}
+
+std::uint32_t permissions(const utils::poly_path_view_t &path) { return get_stats(path).permissions; }
+
+std::int64_t file_size(const utils::poly_path_view_t &path) { return get_stats(path).file_size; }
+
+std::int64_t last_write_time(const utils::poly_path_view_t &path) { return get_stats(path).modification; }
+
+bool is_directory(const utils::poly_path_view_t &path) {
+    return get_stats(path).file_type == utils::file_type_t::DIRECTORY;
+}
+
+bool is_symlink(const utils::poly_path_view_t &path) {
+    return get_stats(path).file_type == utils::file_type_t::SYMLINK;
+}
+
+utils::poly_string_t read_symlink(const utils::poly_path_view_t &target) {
+    auto ec = sys::error_code{};
+    auto r = utils::read_symlink(target, ec);
+    if (ec) {
+        spdlog::error("read_symlink '{}': {}", target, ec);
+        throw std::runtime_error(ec.message());
+    }
+    return r;
+}
+
+void create_symlink(const utils::path_base_t &target, const utils::path_base_t &path) {
+    auto ec = sys::error_code{};
+    utils::create_symlink(target, path, ec);
+    if (ec) {
+        spdlog::error("create_symlink '{}': {}", path, ec);
+        throw std::runtime_error(ec.message());
+    }
+}
+
+void rename(const utils::path_base_t &from, const utils::poly_path_view_t &to) {
+    auto ec = sys::error_code{};
+    utils::rename(from, to, ec);
+    if (ec) {
+        spdlog::error("rename '{}' -> '{}': {}", from, to, ec);
+        throw std::runtime_error(ec.message());
+    }
+}
+
+void last_write_time(const utils::poly_path_view_t &path, std::int64_t time) {
+    auto ec = sys::error_code{};
+    utils::last_write_time(path, time, ec);
+    if (ec) {
+        spdlog::error("last_write_time '{}': {}", path, ec);
+        throw std::runtime_error(ec.message());
+    }
+}
+
+void remove_all(const utils::poly_path_view_t &path) {
+    auto ec = sys::error_code{};
+    utils::remove_all(path, ec);
+    if (ec) {
+        spdlog::error("remove_all '{}': {}", path, ec);
+        throw std::runtime_error(ec.message());
+    }
+}
+
+void remove(const utils::poly_path_view_t &path) {
+    auto ec = sys::error_code{};
+    utils::remove_file(path, ec);
+    if (ec) {
+        spdlog::error("remove '{}': {}", path, ec);
+        throw std::runtime_error(ec.message());
+    }
 }
 
 } // namespace syncspirit::test

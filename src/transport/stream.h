@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #pragma once
 #include "base.h"
@@ -7,7 +7,7 @@
 namespace syncspirit::transport {
 
 struct stream_interface_t {
-    virtual asio::ip::address local_address(sys::error_code &ec) noexcept = 0;
+    virtual asio::ip::address local_address(boost::system::error_code &ec) noexcept = 0;
     virtual void async_connect(resolved_hosts_t hosts, connect_fn_t &on_connect, error_fn_t &on_error) noexcept = 0;
     virtual void async_handshake(handshake_fn_t &on_handshake, error_fn_t &on_error) noexcept = 0;
     virtual void async_send(asio::const_buffer buff, io_fn_t &on_write, error_fn_t &on_error) noexcept = 0;

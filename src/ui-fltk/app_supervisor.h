@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2026 Ivan Baidakou
 
 #pragma once
 
+#include "callback.h"
 #include "content.h"
 #include "config/main.h"
 #include "net/messages.h"
@@ -11,27 +12,33 @@
 #include "model/diff/load/load_cluster.h"
 #include "model/diff/iterative_controller.h"
 #include "model/misc/sequencer.h"
+#include "utils/string_comparator.hpp"
+#include "utils/path_view.hpp"
 #include "log_sink.h"
 
 #include <spdlog/sinks/dist_sink.h>
 #include <rotor/fltk.hpp>
 #include <FL/Fl_Widget.H>
 #include <FL/Fl_Group.H>
-#include <filesystem>
+#include <FL/Fl_RGB_Image.H>
+#include <memory>
 #include <chrono>
+#include <cstdint>
 
 namespace syncspirit::fltk {
 
 namespace r = rotor;
 namespace rf = r::fltk;
-namespace bfs = std::filesystem;
-namespace sys = boost::system;
 namespace outcome = boost::outcome_v2;
+
+using image_icon_t = std::unique_ptr<Fl_RGB_Image>;
 
 struct app_supervisor_t;
 struct main_window_t;
 struct tree_item_t;
 struct augmentation_entry_base_t;
+struct presence_item_t;
+using presence_item_ptr_t = model::intrusive_ptr_t<presence_item_t>;
 
 struct db_info_viewer_t {
     virtual void view(const net::payload::db_info_response_t &) = 0;
@@ -55,7 +62,9 @@ struct app_supervisor_config_t : rf::supervisor_config_fltk_t {
     using parent_t::parent_t;
 
     in_memory_sink_t *log_sink;
-    bfs::path config_path;
+    utils::path_t config_path;
+    std::string_view app_path;
+    utils::allocator_t *allocator;
     config::main_t app_config;
     r::address_ptr_t bouncer_address;
 };
@@ -69,8 +78,16 @@ template <typename Actor> struct app_supervisor_config_builder_t : rf::superviso
         parent_t::config.log_sink = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
-    builder_t &&config_path(const bfs::path &value) && noexcept {
-        parent_t::config.config_path = value;
+    builder_t &&config_path(utils::path_t value) && noexcept {
+        parent_t::config.config_path = std::move(value);
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+    builder_t &&allocator(utils::allocator_t *value) && noexcept {
+        parent_t::config.allocator = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+    builder_t &&app_path(std::string_view value) && noexcept {
+        parent_t::config.app_path = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
     builder_t &&app_config(const config::main_t &value) && noexcept {
@@ -82,12 +99,6 @@ template <typename Actor> struct app_supervisor_config_builder_t : rf::superviso
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };
-
-struct callback_t : model::arc_base_t<callback_t> {
-    virtual ~callback_t() = default;
-    virtual void eval() = 0;
-};
-using callback_ptr_t = model::intrusive_ptr_t<callback_t>;
 
 template <typename T> using app_supervisor_base_t = model::diff::iterative_controller_t<T, rf::supervisor_fltk_t>;
 
@@ -101,10 +112,11 @@ struct app_supervisor_t : app_supervisor_base_t<app_supervisor_t> {
     ~app_supervisor_t();
 
     void configure(r::plugin::plugin_base_t &plugin) noexcept override;
+    void do_shutdown(const r::extended_error_ptr_t &reason = {}) noexcept override;
     void shutdown_finish() noexcept override;
     using r::actor_base_t::state;
 
-    const bfs::path &get_config_path();
+    const utils::path_t &get_config_path();
     config::main_t &get_app_config();
     model::cluster_t *get_cluster();
     model::sequencer_t &get_sequencer();
@@ -144,6 +156,9 @@ struct app_supervisor_t : app_supervisor_base_t<app_supervisor_t> {
         }
     }
 
+    utils::poly_path_view_t resolve_resource(const utils::allocator_t &allocator,
+                                             std::string_view relative_path) noexcept;
+
     void set_main_window(main_window_t *window);
     main_window_t *get_main_window();
     void set_devices(tree_item_t *node);
@@ -153,37 +168,48 @@ struct app_supervisor_t : app_supervisor_base_t<app_supervisor_t> {
     void set_show_deleted(bool value);
     void set_show_missing(bool value);
     void set_show_colorized(bool value);
+    void set_show_folder_id(bool value);
+    void set_show_device_id(bool value);
+    void set_tray_display(bool value);
+    void set_hide_to_tray(bool value);
     void soft_restart();
     inline bool is_soft_restart_requested() { return soft_restart_request; }
 
     callback_ptr_t call_select_folder(std::string_view folder_id);
-    callback_ptr_t call_share_folders(std::string_view folder_id, std::vector<utils::bytes_t> devices);
+    callback_ptr_t call_share_folders(std::string_view folder_id, std::vector<utils::bytes_t> devices,
+                                      callback_t *next);
+    void add_callback(callback_ptr_t cb) noexcept;
     db_info_viewer_guard_t request_db_info(db_info_viewer_t *viewer);
     r::address_ptr_t &get_coordinator_address();
 
     std::uint32_t mask_nodes() const noexcept;
+    Fl_RGB_Image *load_image(std::string_view relative_path) noexcept;
+    Fl_RGB_Image *load_image(std::string_view relative_path, int w, int h) noexcept;
+    Fl_RGB_Image *resize_image(Fl_RGB_Image *original, int w, int h) noexcept;
 
   private:
     using clock_t = std::chrono::high_resolution_clock;
     using time_point_t = typename clock_t::time_point;
     using callbacks_t = std::list<callback_ptr_t>;
-    using model_update_ptr_t = r::intrusive_ptr_t<model::message::model_update_t>;
-    using delayed_updates_t = std::list<model_update_ptr_t>;
+    using delayed_items_t = std::unordered_set<presence_item_ptr_t>;
+    using images_map_t = std::unordered_map<std::string, image_icon_t, utils::string_hash_t, utils::string_eq_t>;
+    using resized_images_t = std::unordered_map<std::string, image_icon_t, utils::string_hash_t, utils::string_eq_t>;
 
     void on_model_response(model::message::model_response_t &res) noexcept;
-    void on_app_ready(model::message::app_ready_t &) noexcept;
+    void on_local_ready(model::message::local_ready_t &) noexcept;
     void on_db_loaded(model::message::db_loaded_t &) noexcept;
     void on_db_info_response(net::message::db_info_response_t &res) noexcept;
-    void redisplay_folder_nodes(bool refresh_labels);
+    void redisplay_nodes(bool refresh_labels);
     void detach_main_window() noexcept;
+    void on_frame_render_timer(r::request_id_t, bool cancelled) noexcept;
 
-    void process(model::diff::cluster_diff_t &diff, apply_context_t &context) noexcept override;
+    void process(model::diff::cluster_diff_t &diff, model::payload::apply_context_t &context) noexcept override;
 
     outcome::result<void> apply(const model::diff::advance::advance_t &, void *) noexcept override;
     outcome::result<void> apply(const model::diff::load::blocks_t &, void *) noexcept override;
     outcome::result<void> apply(const model::diff::load::file_infos_t &, void *) noexcept override;
     outcome::result<void> apply(const model::diff::load::load_cluster_t &, void *) noexcept override;
-    outcome::result<void> apply(const model::diff::local::io_failure_t &, void *) noexcept override;
+    outcome::result<void> apply(const model::diff::local::local_state_update_t &, void *) noexcept override;
     outcome::result<void> apply(const model::diff::modify::add_pending_folders_t &, void *) noexcept override;
     outcome::result<void> apply(const model::diff::modify::add_pending_device_t &, void *) noexcept override;
     outcome::result<void> apply(const model::diff::modify::add_ignored_device_t &, void *) noexcept override;
@@ -197,7 +223,8 @@ struct app_supervisor_t : app_supervisor_base_t<app_supervisor_t> {
     model::sequencer_ptr_t sequencer;
     time_point_t started_at;
     in_memory_sink_t *log_sink;
-    bfs::path config_path;
+    utils::path_t config_path;
+    utils::path_t resources_dir;
     config::main_t app_config;
     config::main_t app_config_original;
     content_t *content;
@@ -208,6 +235,9 @@ struct app_supervisor_t : app_supervisor_base_t<app_supervisor_t> {
     db_info_viewer_t *db_info_viewer;
     callbacks_t callbacks;
     main_window_t *main_window;
+    delayed_items_t delayed_items;
+    images_map_t images_map;
+    resized_images_t resized_images;
     bool soft_restart_request = false;
 
     friend struct db_info_viewer_guard_t;

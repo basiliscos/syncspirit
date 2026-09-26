@@ -9,8 +9,12 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/nowide/convert.hpp>
 #include <spdlog/spdlog.h>
+#include <sstream>
 #include "utils/log.h"
 #include "utils/location.h"
+#include "utils/format.hpp"
+#include "utils/path_view.hpp"
+#include "utils/path_utils.h"
 
 #define TOML_EXCEPTIONS 0
 #include <toml++/toml.h>
@@ -39,9 +43,9 @@
         auto option = t[#property].value<std::string>();                                                               \
         if (!option) {                                                                                                 \
             spdlog::warn("using default value for {}/{}", table_name, #property);                                      \
-            c.property = c_default.property;                                                                           \
+            c.property = c_default.property.clone();                                                                   \
         } else {                                                                                                       \
-            c.property = boost::nowide::widen(option.value());                                                         \
+            c.property = utils::path_t::make_native(option.value());                                                   \
         }                                                                                                              \
     }
 
@@ -58,9 +62,9 @@
         auto option = t[#property].value<std::string>();                                                               \
         if (!option) {                                                                                                 \
             spdlog::warn("using default value for {}/{}", table_name, #property);                                      \
-            c.property = c_default.property;                                                                           \
+            c.property = c_default.property.clone();                                                                   \
         } else {                                                                                                       \
-            c.property = utils::expand_home(option.value(), home_opt);                                                 \
+            c.property = utils::expand_home(option.value(), home_opt).detach();                                        \
         }                                                                                                              \
     }
 
@@ -92,8 +96,6 @@
 
 //        c.level = utils::get_log_level(level.value()).value_or(level_t::debug);
 
-namespace sys = boost::system;
-
 #if defined(__unix__)
 static const std::string home_path = "~/.config/syncspirit";
 #else
@@ -104,7 +106,7 @@ namespace syncspirit::config {
 
 using level_t = spdlog::level::level_enum;
 
-using home_option_t = outcome::result<bfs::path>;
+using home_option_t = utils::path_t;
 
 static std::string get_device_name() noexcept {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
@@ -113,7 +115,7 @@ static std::string get_device_name() noexcept {
     if (GetComputerNameW(device_name, &device_name_sz)) {
         return boost::nowide::narrow(device_name, static_cast<size_t>(device_name_sz));
 #else
-    sys::error_code ec;
+    auto ec = boost::system::error_code();
     auto device_name = boost::asio::ip::host_name(ec);
     if (!ec) {
         return device_name;
@@ -123,22 +125,24 @@ static std::string get_device_name() noexcept {
     }
 }
 
-static main_t make_default_config(const bfs::path &config_path, const bfs::path &config_dir, bool is_home) {
+static main_t make_default_config(const utils::poly_path_view_t &config_path, const utils::poly_path_view_t &config_dir,
+                                  bool is_home) {
     auto dir = config_path;
     std::string cert_file = home_path + "/cert.pem";
     std::string key_file = home_path + "/key.pem";
     if (!is_home) {
         using boost::algorithm::replace_all_copy;
-        cert_file = replace_all_copy(cert_file, home_path, dir.string());
-        key_file = replace_all_copy(key_file, home_path, dir.string());
+        cert_file = replace_all_copy(cert_file, home_path, dir.get_full_name());
+        key_file = replace_all_copy(key_file, home_path, dir.get_full_name());
     }
 
     auto device = get_device_name();
 
+    auto shared_path = utils::make_native_view("shared-data", dir.get_allocator());
     // clang-format off
     main_t cfg;
-    cfg.config_path = config_path;
-    cfg.default_location = config_dir / L"shared-data";
+    cfg.config_path = config_path.detach();
+    cfg.default_location = (config_dir / shared_path).detach();
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
     cfg.ssl_verify_store = "org.openssl.winstore://";
 #elif defined(__APPLE__)
@@ -146,9 +150,10 @@ static main_t make_default_config(const bfs::path &config_path, const bfs::path 
 #else
     cfg.ssl_verify_store = {};
 #endif
-    cfg.cert_file = cert_file;
-    cfg.key_file = key_file;
+    cfg.cert_file = utils::path_t::make_native(cert_file);
+    cfg.key_file = utils::path_t::make_native(key_file);
     cfg.timeout = 30000;
+    cfg.start_offline = false;
     cfg.device_name = device;
     cfg.hasher_threads = 3;
     cfg.poll_timeout = 0;
@@ -157,19 +162,22 @@ static main_t make_default_config(const bfs::path &config_path, const bfs::path 
         //     "default", spdlog::level::level_enum::trace, {"stdout"}
         // }
     };
+    cfg.acceptor_config = acceptor_config_t {
+        true, /* enabled */
+    };
     cfg.local_announce_config = local_announce_config_t {
         true,   /* enabled */
         21027,  /* port */
         30000   /* frequency */
     };
     cfg.global_announce_config = global_announce_config_t{
-        true,                                                           /* enabled */
-        false,                                                          /* debug */
-        utils::parse("https://discovery-announce-v4.syncthing.net/v2"), /* announce_url */
-        utils::parse("https://discovery-lookup.syncthing.net/v2"),      /* lookup_url */
-        32 * 1024,                                                      /* rx_buff_size */
-        3000,                                                           /* timeout */
-        10 * 60,                                                        /* reannounce timeout */
+        true,                                                            /* enabled */
+        false,                                                           /* debug */
+        utils::parse("https://discovery-announce-v4.syncthing.net/v2/"), /* announce_url */
+        utils::parse("https://discovery-lookup.syncthing.net/v2/"),      /* lookup_url */
+        32 * 1024,                                                       /* rx_buff_size */
+        3000,                                                            /* timeout */
+        10 * 60,                                                         /* reannounce timeout */
     };
     cfg.upnp_config = upnp_config_t {
         true,       /* enabled */
@@ -194,15 +202,17 @@ static main_t make_default_config(const bfs::path &config_path, const bfs::path 
         10          /* skip_discovers */
     };
     cfg.fs_config = fs_config_t {
-        86400000,   /* temporally_timeout, 24h default */
-        1024*1024,  /* bytes_scan_iteration_limit max number of bytes before emitting scan events */
-        128,        /* files_scan_iteration_limit max number processed files before emitting scan events */
+        86400000,    /* temporally_timeout, 24h default */
+        1000,        /* poll_timeout, 1s by default */
+        10'000,      /* retension_timeout, 10s by default */
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+        1024 * 1024, /* win32 watcher buffer size */
+#endif
     };
     cfg.db_config = db_config_t {
         0x0,           /* upper_limit, auto-adjust */
         150,           /* uncommitted_threshold */
         50*1024,       /* max blocks per diff */
-        5*1024,        /* max files per diff */
     };
 
     cfg.relay_config = relay_config_t {
@@ -217,6 +227,10 @@ static main_t make_default_config(const bfs::path &config_path, const bfs::path 
         false,                              /* display_deleted */
         true,                               /* display_missing */
         true,                               /* display_colorized */
+        true,                               /* display_tray_icon */
+        true,                               /* hide_to_tray */
+        false,                              /* display_folder_id */
+        false,                              /* display_device_id */
         700,                                /* main_window_width */
         480,                                /* main_window_height */
         0.5,                                /* left_panel_share */
@@ -226,23 +240,21 @@ static main_t make_default_config(const bfs::path &config_path, const bfs::path 
     return cfg;
 }
 
-config_result_t get_config(std::istream &config, const bfs::path &config_path) {
-    auto dir = config_path.parent_path();
+config_result_t get_config(std::string_view config, const utils::poly_path_view_t &config_path) {
+    auto dir = config_path.get_parent();
     main_t cfg;
-    cfg.config_path = config_path;
+    cfg.config_path = config_path.detach();
 
-    auto home_opt = utils::get_home_dir();
+    auto home_opt = utils::get_home_dir(config_path.get_allocator());
     auto r = toml::parse(config);
     if (!r) {
         return std::string(r.error().description());
     }
 
-    auto config_dir_opt = utils::get_default_config_dir();
-    if (!config_dir_opt) {
-        auto ec = config_dir_opt.assume_error();
-        return fmt::format("cannot get config dir: {}", ec.message());
+    auto config_dir = utils::get_default_config_dir(config_path.get_allocator());
+    if (config_dir.empty()) {
+        return "cannot get config dir";
     }
-    auto &config_dir = config_dir_opt.assume_value();
     bool is_home = dir == config_dir;
     auto default_config = make_default_config(config_path, dir, is_home);
 
@@ -258,10 +270,20 @@ config_result_t get_config(std::istream &config, const bfs::path &config_path) {
         SAFE_GET_PATH(default_location, "main");
         SAFE_GET_VALUE(hasher_threads, std::uint32_t, "main");
         SAFE_GET_VALUE(poll_timeout, std::uint32_t, "main");
+        SAFE_GET_VALUE(start_offline, bool, "main");
         SAFE_GET_VALUE_OPTIONAL(ssl_verify_store, std::string, "main");
         SAFE_GET_PATH_EXPANDED(cert_file, "main");
         SAFE_GET_PATH_EXPANDED(key_file, "main");
     };
+
+    // acceptor
+    {
+        auto t = root_tbl["acceptor"];
+        auto &c = cfg.acceptor_config;
+        auto &c_default = default_config.acceptor_config;
+
+        SAFE_GET_VALUE(enabled, bool, "acceptor");
+    }
 
     // local_discovery
     {
@@ -347,8 +369,11 @@ config_result_t get_config(std::istream &config, const bfs::path &config_path) {
         auto &c_default = default_config.fs_config;
 
         SAFE_GET_VALUE(temporally_timeout, std::uint32_t, "fs");
-        SAFE_GET_VALUE(bytes_scan_iteration_limit, std::int64_t, "fs");
-        SAFE_GET_VALUE(files_scan_iteration_limit, std::int64_t, "fs");
+        SAFE_GET_VALUE(poll_timeout, std::uint32_t, "fs");
+        SAFE_GET_VALUE(retension_timeout, std::uint32_t, "fs");
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+        SAFE_GET_VALUE(win32_watcher_buff, std::uint32_t, "fs");
+#endif
     }
 
     // db
@@ -360,7 +385,6 @@ config_result_t get_config(std::istream &config, const bfs::path &config_path) {
         SAFE_GET_VALUE(upper_limit, std::int64_t, "db");
         SAFE_GET_VALUE(uncommitted_threshold, std::uint32_t, "db");
         SAFE_GET_VALUE(max_blocks_per_diff, std::uint32_t, "db");
-        SAFE_GET_VALUE(max_files_per_diff, std::uint32_t, "db");
     }
 
     // fltk
@@ -373,6 +397,10 @@ config_result_t get_config(std::istream &config, const bfs::path &config_path) {
         SAFE_GET_VALUE(display_deleted, bool, "fltk");
         SAFE_GET_VALUE(display_missing, bool, "fltk");
         SAFE_GET_VALUE(display_colorized, bool, "fltk");
+        SAFE_GET_VALUE(display_tray_icon, bool, "fltk");
+        SAFE_GET_VALUE(hide_to_tray, bool, "fltk");
+        SAFE_GET_VALUE(display_folder_id, bool, "fltk");
+        SAFE_GET_VALUE(display_device_id, bool, "fltk");
         SAFE_GET_VALUE(main_window_width, std::int64_t, "fltk");
         SAFE_GET_VALUE(main_window_height, std::int64_t, "fltk");
         SAFE_GET_VALUE(left_panel_share, double, "fltk");
@@ -406,7 +434,7 @@ static std::string_view get_level(spdlog::level::level_enum level) noexcept {
     return "unknown";
 }
 
-outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
+std::string serialize(const main_t& cfg) noexcept {
     using boost::nowide::narrow;
 
     auto logs = toml::array{};
@@ -423,24 +451,25 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
         logs.push_back(log_table);
     }
 
-    auto cert_file = cfg.cert_file;
-    cert_file.make_preferred();
-
-    auto key_file = cfg.key_file;
-    key_file.make_preferred();
+    auto cert_file = cfg.cert_file.get_full_name();
+    auto key_file = cfg.key_file.get_full_name();
 
     auto tbl = toml::table{{
         {"main", toml::table{{
                      {"hasher_threads", cfg.hasher_threads},
                      {"poll_timeout", cfg.poll_timeout},
                      {"ssl_verify_store", cfg.ssl_verify_store},
-                     {"cert_file", narrow(cert_file.wstring())},
-                     {"key_file", narrow(key_file.wstring())},
+                     {"cert_file", std::string(cert_file)},
+                     {"key_file", std::string(key_file)},
                      {"timeout", cfg.timeout},
+                     {"start_offline", cfg.start_offline},
                      {"device_name", cfg.device_name},
-                     {"default_location", narrow(cfg.default_location.wstring())},
+                     {"default_location", std::string(cfg.default_location.get_full_name())},
                  }}},
         {"log", logs},
+        {"acceptor", toml::table{{
+                                {"enabled", cfg.acceptor_config.enabled},
+                            }}},
         {"local_discovery", toml::table{{
                                 {"enabled", cfg.local_announce_config.enabled},
                                 {"port", cfg.local_announce_config.port},
@@ -478,14 +507,16 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
                    }}},
         {"fs", toml::table{{
                    {"temporally_timeout", cfg.fs_config.temporally_timeout},
-                   {"bytes_scan_iteration_limit", cfg.fs_config.bytes_scan_iteration_limit},
-                   {"files_scan_iteration_limit", cfg.fs_config.files_scan_iteration_limit},
+                   {"poll_timeout", cfg.fs_config.poll_timeout},
+                   {"retension_timeout", cfg.fs_config.retension_timeout},
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+                   {"win32_watcher_buff", cfg.fs_config.win32_watcher_buff},
+#endif
                }}},
         {"db", toml::table{{
                    {"upper_limit", cfg.db_config.upper_limit},
                    {"uncommitted_threshold", cfg.db_config.uncommitted_threshold},
                    {"max_blocks_per_diff", cfg.db_config.max_blocks_per_diff},
-                   {"max_files_per_diff", cfg.db_config.max_files_per_diff},
                }}},
         {"relay", toml::table{{
                       {"enabled", cfg.relay_config.enabled},
@@ -498,6 +529,10 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
                      {"display_deleted", cfg.fltk_config.display_deleted},
                      {"display_missing", cfg.fltk_config.display_missing},
                      {"display_colorized", cfg.fltk_config.display_colorized},
+                     {"display_tray_icon", cfg.fltk_config.display_tray_icon},
+                     {"hide_to_tray", cfg.fltk_config.hide_to_tray},
+                     {"display_folder_id", cfg.fltk_config.display_folder_id},
+                     {"display_device_id", cfg.fltk_config.display_device_id},
                      {"main_window_width", cfg.fltk_config.main_window_width},
                      {"main_window_height", cfg.fltk_config.main_window_height},
                      {"left_panel_share", cfg.fltk_config.left_panel_share},
@@ -506,38 +541,37 @@ outcome::result<void> serialize(const main_t cfg, std::ostream &out) noexcept {
                  }}},
     }};
     // clang-format on
+    auto out = std::stringstream();
     out << tbl;
-    return outcome::success();
+    return std::move(out.str());
 }
 
-outcome::result<main_t> generate_config(const bfs::path &config_path) {
-    auto dir = config_path.parent_path();
-    sys::error_code ec;
-    bool exists = bfs::exists(dir, ec);
+outcome::result<main_t> generate_config(const utils::poly_path_view_t &config_path) {
+    auto dir = config_path.get_parent();
+    auto ec = std::error_code{};
+    auto exists = utils::exists(dir, ec);
     if (!exists) {
-        spdlog::info("creating directory {}", dir.string());
-        bfs::create_directories(dir, ec);
+        spdlog::info("creating directory {}", dir);
+        utils::create_directories(dir, ec);
         if (ec) {
-            spdlog::error("cannot create dirs: {}", ec.message());
+            spdlog::error("cannot create dirs: {}", ec);
             return ec;
         }
     }
 
     std::string cert_file = home_path + "/cert.pem";
     std::string key_file = home_path + "/key.pem";
-    auto config_dir_opt = utils::get_default_config_dir();
-    if (!config_dir_opt) {
-        auto ec = config_dir_opt.assume_error();
-        auto msg = ec.message();
-        spdlog::warn("cannot get config dir: {}", msg);
-        return ec;
+    auto config_dir = utils::get_default_config_dir(config_path.get_allocator());
+    if (config_dir.empty()) {
+        spdlog::warn("cannot get config dir");
+        return std::make_error_code(std::errc::io_error);
     }
-    auto &config_dir = config_dir_opt.assume_value();
     bool is_home = dir == config_dir;
     if (!is_home) {
         using boost::algorithm::replace_all_copy;
-        cert_file = replace_all_copy(cert_file, home_path, dir.string());
-        key_file = replace_all_copy(key_file, home_path, dir.string());
+        auto dir_expanded = dir.get_full_name();
+        cert_file = replace_all_copy(cert_file, home_path, dir_expanded);
+        key_file = replace_all_copy(key_file, home_path, dir_expanded);
     }
     return make_default_config(config_path, config_dir, is_home);
 }

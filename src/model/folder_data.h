@@ -1,16 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #pragma once
 
 #include <string>
-#include <filesystem>
+#include "utils/path.h"
 #include "syncspirit-export.h"
 #include "proto/proto-fwd.hpp"
 
 namespace syncspirit::model {
-
-namespace bfs = std::filesystem;
 
 struct SYNCSPIRIT_API folder_data_t {
     using folder_type_t = syncspirit::db::FolderType;
@@ -25,24 +23,26 @@ struct SYNCSPIRIT_API folder_data_t {
     inline bool are_temp_indixes_disabled() const noexcept { return disable_temp_indixes; }
     inline bool is_paused() const noexcept { return paused; }
     inline bool is_scheduled() const noexcept { return scheduled; }
+    inline bool is_watched() const noexcept { return watched; }
     inline folder_type_t get_folder_type() const noexcept { return folder_type; }
     inline pull_order_t get_pull_order() const noexcept { return pull_order; }
-    inline const bfs::path &get_path() const noexcept { return path; }
-    inline void set_path(const bfs::path &value) noexcept { path = value; }
+    inline const utils::path_t &get_path() const noexcept { return path; }
+    inline void set_path(const utils::path_t &value) noexcept { path = value.clone(); }
+    inline void set_path(utils::path_t &&value) noexcept { path = std::move(value); }
     inline std::uint32_t get_rescan_interval() const noexcept { return rescan_interval; };
     inline void set_rescan_interval(std::uint32_t value) noexcept { rescan_interval = value; };
 
-    void serialize(syncspirit::db::Folder &dest) const noexcept;
+    virtual void serialize(syncspirit::db::Folder &dest) const noexcept;
 
     template <typename T> auto &access() noexcept;
     template <typename T> auto &access() const noexcept;
 
   protected:
-    void assign_fields(const db::Folder &item) noexcept;
+    virtual void assign_fields(const db::Folder &item) noexcept;
 
     std::string id;
     std::string label;
-    bfs::path path;
+    utils::path_t path;
     folder_type_t folder_type;
     std::uint32_t rescan_interval;
     pull_order_t pull_order;
@@ -51,6 +51,7 @@ struct SYNCSPIRIT_API folder_data_t {
     bool ignore_delete;
     bool disable_temp_indixes;
     bool paused;
+    bool watched;
 };
 
 } // namespace syncspirit::model

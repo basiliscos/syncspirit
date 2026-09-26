@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2026 Ivan Baidakou
 
 #include "ignored_device.h"
 #include "model/diff/modify/remove_ignored_device.h"
@@ -124,10 +124,19 @@ ignored_device_t::ignored_device_t(model::ignored_device_t &device_, app_supervi
 }
 
 void ignored_device_t::update_label() {
-    auto name = device.get_name();
-    auto id = device.get_device_id().get_short();
-    auto value = fmt::format("{}, {}", name, id);
-    label(value.data());
+    auto buffer = std::array<std::byte, 1024 * 32>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+    auto label_str = std::pmr::string(allocator);
+    auto label_out = std::back_inserter(label_str);
+    fmt::format_to(label_out, "{}", device.get_name());
+
+    if (supervisor.get_app_config().fltk_config.display_device_id) {
+        auto id = device.get_device_id().get_short();
+        fmt::format_to(label_out, ", {}", id);
+    }
+
+    label(label_str.data());
     tree()->redraw();
 }
 

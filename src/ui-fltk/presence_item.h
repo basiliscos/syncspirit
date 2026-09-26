@@ -29,6 +29,7 @@ struct presence_item_t : dynamic_item_t, model::augmentation_t {
     void update_label() override;
     presence_item_ptr_t safe_detach(int child_index);
     void on_delete() noexcept override;
+    void on_update() noexcept override;
 
   protected:
     void insert_node(presence_item_ptr_t node, int position);

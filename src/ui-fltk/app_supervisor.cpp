@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2026 Ivan Baidakou
 
 #include "app_supervisor.h"
 #include "augmentation.h"
+#include "constants.h"
 #include "main_window.h"
-#include "presence_item/folder.h"
 #include "tree_item/devices.h"
 #include "tree_item/folders.h"
 #include "tree_item/ignored_devices.h"
@@ -12,10 +12,11 @@
 #include "tree_item/pending_devices.h"
 #include "tree_item/pending_folders.h"
 #include "tree_item/peer_folders.h"
+#include "presence_item.h"
 #include "net/names.h"
 #include "config/utils.h"
+#include "model/diff/diff_assembler.h"
 #include "model/diff/advance/advance.h"
-#include "model/diff/local/io_failure.h"
 #include "model/diff/load/blocks.h"
 #include "model/diff/load/file_infos.h"
 #include "model/diff/load/load_cluster.h"
@@ -32,6 +33,8 @@
 #include "presentation/folder_presence.h"
 #include "utils/format.hpp"
 #include "utils/io.h"
+#include "utils/path_view.hpp"
+#include "utils/path_utils.h"
 #include "utils/log-setup.h"
 
 #include <utility>
@@ -42,11 +45,14 @@
 #include <memory_resource>
 #include <unordered_set>
 
+#include <FL/Fl_PNG_Image.H>
+
 using namespace syncspirit;
 using namespace syncspirit::fltk;
 using namespace syncspirit::presentation;
 
 static auto MAX_DEPTH = std::numeric_limits<std::int32_t>::max();
+static auto UPDATE_DELAY = r::pt::milliseconds{100};
 
 using entities_ptrs_t = std::pmr::unordered_set<const entity_t *>;
 using entities_t = std::pmr::unordered_set<entity_ptr_t>;
@@ -110,16 +116,6 @@ void db_info_viewer_guard_t::reset() {
     }
 }
 
-using callback_fn_t = std::function<void()>;
-
-struct callback_impl_t final : callback_t {
-    callback_impl_t(callback_fn_t fn_) : fn{std::move(fn_)} {}
-
-    void eval() override { fn(); }
-
-    callback_fn_t fn;
-};
-
 app_supervisor_t::app_supervisor_t(config_t &config)
     : parent_t(this, resource::interrupt, config), log_sink(config.log_sink),
       config_path{std::move(config.config_path)}, app_config(std::move(config.app_config)),
@@ -128,14 +124,33 @@ app_supervisor_t::app_supervisor_t(config_t &config)
     started_at = clock_t::now();
     sequencer = model::make_sequencer(started_at.time_since_epoch().count());
     bouncer = config.bouncer_address;
+
+    log = utils::get_logger("fltk");
+
+    auto &allocator = *config.allocator;
+    auto res_path = utils::make_empty_view(allocator);
+    if (!config.app_path.empty()) {
+        res_path = utils::make_native_view(config.app_path, allocator);
+    }
+    if (!res_path.empty()) {
+        auto ec = std::error_code{};
+        if (utils::exists(res_path, ec)) {
+            resources_dir = res_path.detach();
+            LOG_DEBUG(log, "resources dir: '{}'", resources_dir);
+        }
+    }
+    if (resources_dir.empty()) {
+        LOG_WARN(log, "cannot find resources dir");
+    }
 }
 
 app_supervisor_t::~app_supervisor_t() {
+    delayed_items.clear();
     detach_main_window();
     utils::get_root_logger()->debug("~app_supervisor_t()");
 }
 
-auto app_supervisor_t::get_config_path() -> const bfs::path & { return config_path; }
+auto app_supervisor_t::get_config_path() -> const utils::path_t & { return config_path; }
 auto app_supervisor_t::get_app_config() -> config::main_t & { return app_config; }
 auto app_supervisor_t::get_cluster() -> model::cluster_t * { return cluster.get(); }
 auto app_supervisor_t::get_sequencer() -> model::sequencer_t & { return *sequencer; }
@@ -143,17 +158,14 @@ auto app_supervisor_t::get_log_sink() -> in_memory_sink_t * { return log_sink; }
 
 void app_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     parent_t::configure(plugin);
-    plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
-        p.set_identity("fltk", false);
-        log = utils::get_logger(identity);
-    });
+    plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) { p.set_identity("fltk", false); });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
         p.discover_name(net::names::coordinator, coordinator, true).link(false).callback([&](auto phase, auto &ee) {
             if (!ee && phase == r::plugin::registry_plugin_t::phase_t::linking) {
                 auto p = get_plugin(r::plugin::starter_plugin_t::class_identity);
                 auto plugin = static_cast<r::plugin::starter_plugin_t *>(p);
                 plugin->subscribe_actor(&app_supervisor_t::on_model_update, coordinator);
-                plugin->subscribe_actor(&app_supervisor_t::on_app_ready, coordinator);
+                plugin->subscribe_actor(&app_supervisor_t::on_local_ready, coordinator);
                 plugin->subscribe_actor(&app_supervisor_t::on_db_loaded, coordinator);
                 send<syncspirit::model::payload::thread_up_t>(coordinator);
             }
@@ -169,20 +181,23 @@ void app_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         r::plugin::config_phase_t::PREINIT);
 }
 
+void app_supervisor_t::do_shutdown(const r::extended_error_ptr_t &reason) noexcept {
+    if (shutdown_flag) {
+        const_cast<std::atomic_bool *>(shutdown_flag)->store(true);
+    }
+    parent_t::do_shutdown(reason);
+}
+
 void app_supervisor_t::shutdown_finish() noexcept {
     parent_t::shutdown_finish();
     LOG_TRACE(log, "shutdown_finish");
     if (main_window) {
         main_window->on_shutdown();
     }
-    std::stringstream out;
-    std::stringstream out_orig;
-    auto r = config::serialize(app_config, out);
-    auto r_orig = config::serialize(app_config_original, out_orig);
-    if (r.has_value() && r_orig.has_value()) {
-        if (out.str() != out_orig.str()) {
-            write_config(app_config);
-        }
+    auto cfg = config::serialize(app_config);
+    auto cfg_orig = config::serialize(app_config_original);
+    if (cfg != cfg_orig) {
+        write_config(app_config);
     }
 }
 
@@ -192,13 +207,13 @@ void app_supervisor_t::on_model_response(model::message::model_response_t &res) 
     LOG_TRACE(log, "on_model_response");
     auto &ee = res.payload.ee;
     if (ee) {
-        LOG_ERROR(log, "cannot get model: {}", ee->message());
+        LOG_ERROR(log, "cannot get model: {}", ee);
         return do_shutdown(ee);
     }
     cluster = std::move(res.payload.res.cluster);
 }
 
-void app_supervisor_t::process(model::diff::cluster_diff_t &diff, apply_context_t &context) noexcept {
+void app_supervisor_t::process(model::diff::cluster_diff_t &diff, model::payload::apply_context_t &context) noexcept {
     auto buffer = std::array<std::byte, 16 * 1024>();
     auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
     auto allocator = std::pmr::polymorphic_allocator<std::string>(&pool);
@@ -236,20 +251,23 @@ void app_supervisor_t::process(model::diff::cluster_diff_t &diff, apply_context_
     for (auto &entity : deleted_entities) {
         updated_entities.erase(entity.get());
     }
+
     for (auto entity : updated_entities) {
         for (auto p : entity->get_presences()) {
             auto augmentation = p->get_augmentation().get();
             if (augmentation) {
                 auto item = static_cast<presence_item_t *>(augmentation);
-                item->on_update();
+                delayed_items.insert(item);
             }
         }
     }
 }
 
-void app_supervisor_t::on_app_ready(model::message::app_ready_t &) noexcept {
-    LOG_TRACE(log, "on_app_ready");
+void app_supervisor_t::on_local_ready(model::message::local_ready_t &) noexcept {
+    LOG_TRACE(log, "on_local_ready");
     main_window->on_loading_done();
+    auto method = &app_supervisor_t::on_frame_render_timer;
+    start_timer(UPDATE_DELAY, *this, method);
 }
 
 void app_supervisor_t::on_db_loaded(model::message::db_loaded_t &) noexcept {
@@ -279,7 +297,7 @@ void app_supervisor_t::on_db_info_response(net::message::db_info_response_t &res
     if (db_info_viewer) {
         auto &ee = res.payload.ee;
         if (ee) {
-            log->warn("error requesting db info: {}", ee->message());
+            log->warn("error requesting db info: {}", ee);
         } else {
             db_info_viewer->view(res.payload.res);
         }
@@ -294,6 +312,20 @@ void app_supervisor_t::set_ignored_devices(tree_item_t *node) { ignored_devices 
 void app_supervisor_t::set_main_window(main_window_t *window) { main_window = window; }
 main_window_t *app_supervisor_t::get_main_window() { return main_window; }
 
+utils::poly_path_view_t app_supervisor_t::resolve_resource(const utils::allocator_t &allocator,
+                                                           std::string_view relative_path) noexcept {
+    if (!resources_dir.empty()) {
+        auto rel_path = utils::make_native_view(relative_path, allocator);
+        auto res_path = resources_dir.get_view(allocator) / rel_path;
+        auto ec = std::error_code{};
+        if (utils::exists(res_path, ec)) {
+            return res_path;
+        }
+        LOG_WARN(log, "resources '{}' cannot be found via '{}'", relative_path, res_path);
+    }
+    return utils::make_empty_view(allocator);
+}
+
 auto app_supervisor_t::request_db_info(db_info_viewer_t *viewer) -> db_info_viewer_guard_t {
     log->trace("request_db_info");
     request<net::payload::db_info_request_t>(coordinator).send(init_timeout * 5 / 6);
@@ -307,16 +339,16 @@ callback_ptr_t app_supervisor_t::call_select_folder(std::string_view folder_id) 
         auto folders_node = static_cast<tree_item::folders_t *>(folders);
         folders_node->select_folder(id);
     });
-    auto cb = callback_ptr_t(new callback_impl_t(std::move(fn)));
+    auto cb = callback_ptr_t(new callback_t(std::move(fn)));
     callbacks.push_back(cb);
     return cb;
 }
 
-callback_ptr_t app_supervisor_t::call_share_folders(std::string_view folder_id, std::vector<utils::bytes_t> devices) {
+callback_ptr_t app_supervisor_t::call_share_folders(std::string_view folder_id, std::vector<utils::bytes_t> devices,
+                                                    callback_t *next) {
     assert(devices.size());
-    auto fn = callback_fn_t([this, folder_id = std::string(folder_id), devices = std::move(devices)]() {
-        auto diff = model::diff::cluster_diff_ptr_t{};
-        auto current = diff.get();
+    auto fn = callback_fn_t([this, folder_id = std::string(folder_id), devices = std::move(devices), next = next]() {
+        auto assember = model::diff::diff_assember_t(constants::diffs_batch);
         auto &self = cluster->get_device()->device_id();
         for (auto &sha256 : devices) {
             auto device = cluster->get_devices().by_sha256(sha256);
@@ -332,36 +364,20 @@ callback_ptr_t app_supervisor_t::call_share_folders(std::string_view folder_id, 
             using diff_t = model::diff::modify::share_folder_t;
             auto opt = diff_t::create(*cluster, *sequencer, *device, self, *folder);
             if (!opt) {
-                auto message = opt.assume_error().message();
-                log->error("cannot share folder {} with {} : {}", folder_id, device->device_id(), message);
+                auto &ec = opt.assume_error();
+                log->error("cannot share folder {} with {} : {}", folder_id, device->device_id(), ec);
                 return;
             }
-            auto &sub_diff = opt.assume_value();
-            if (!current) {
-                diff = sub_diff;
-                current = diff.get();
-            } else {
-                current = current->assign_sibling(sub_diff.get());
-            }
+            assember.push_back(opt.assume_value().get());
         }
-        auto cb = call_select_folder(folder_id);
-        send_model<model::payload::model_update_t>(std::move(diff), cb.get());
+        send_model<model::payload::model_update_t>(assember.consume(), next);
     });
-    auto cb = callback_ptr_t(new callback_impl_t(std::move(fn)));
+    auto cb = callback_ptr_t(new callback_t(std::move(fn)));
     callbacks.push_back(cb);
     return cb;
 }
 
-auto app_supervisor_t::apply(const model::diff::local::io_failure_t &diff, void *custom) noexcept
-    -> outcome::result<void> {
-    auto r = parent_t::apply(diff, custom);
-    if (r) {
-        for (auto &details : diff.errors) {
-            log->warn("I/O error on '{}': {}", details.path.string(), details.ec.message());
-        }
-    }
-    return r;
-}
+void app_supervisor_t::add_callback(callback_ptr_t cb) noexcept { callbacks.push_back(std::move(cb)); }
 
 auto app_supervisor_t::apply(const model::diff::modify::update_peer_t &diff, void *custom) noexcept
     -> outcome::result<void> {
@@ -436,7 +452,6 @@ auto app_supervisor_t::apply(const model::diff::advance::advance_t &diff, void *
             if (local_file) {
                 auto entity = folder_entity->on_insert(*local_file, *local_fi);
                 if (entity) {
-                    auto parent = entity->get_parent();
                     auto mask = mask_nodes();
                     for (auto presence : entity->get_presences()) {
                         using F = presence_t::features_t;
@@ -470,7 +485,7 @@ auto app_supervisor_t::apply(const model::diff::modify::upsert_folder_t &diff, v
             auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
             folders_node->add_folder(*folder_entity);
             folder->set_augmentation(folder_entity);
-            auto ctx = static_cast<apply_context_t *>(custom);
+            auto ctx = static_cast<model::payload::apply_context_t *>(custom);
             auto attachment = static_cast<app_context_attachment *>(ctx->custom_payload);
             attachment->guards.emplace_back(folder_entity->monitor(&attachment->monitor));
         }
@@ -561,7 +576,7 @@ auto app_supervisor_t::apply(const model::diff::peer::update_folder_t &diff, voi
 auto app_supervisor_t::apply(const model::diff::load::blocks_t &diff, void *custom) noexcept -> outcome::result<void> {
     auto r = apply_controller_t::apply(diff, custom);
     if (r) {
-        auto ctx = static_cast<apply_context_t *>(custom);
+        auto ctx = static_cast<model::payload::apply_context_t *>(custom);
         ctx->loaded_blocks += diff.blocks.size();
         auto blocks = ctx->loaded_blocks;
         auto total = ctx->total_blocks;
@@ -576,7 +591,7 @@ auto app_supervisor_t::apply(const model::diff::load::file_infos_t &diff, void *
     -> outcome::result<void> {
     auto r = apply_controller_t::apply(diff, custom);
     if (r) {
-        auto ctx = static_cast<apply_context_t *>(custom);
+        auto ctx = static_cast<model::payload::apply_context_t *>(custom);
         ctx->loaded_files += diff.container.size();
         auto files = ctx->loaded_files;
         auto total = ctx->total_files;
@@ -586,6 +601,15 @@ auto app_supervisor_t::apply(const model::diff::load::file_infos_t &diff, void *
     }
     return r;
 }
+
+auto app_supervisor_t::apply(const model::diff::local::local_state_update_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    auto r = apply_controller_t::apply(diff, custom);
+    if (r) {
+        main_window->on_local_state_update();
+    }
+    return r;
+};
 
 void app_supervisor_t::commit_loading() noexcept {
     main_window->set_splash_text("populating model (2/3)...");
@@ -634,29 +658,40 @@ void app_supervisor_t::commit_loading() noexcept {
 auto app_supervisor_t::apply(const model::diff::load::load_cluster_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     main_window->set_splash_text("populating model (1/3)...");
-    auto ctx = static_cast<apply_context_t *>(custom);
+    auto ctx = static_cast<model::payload::apply_context_t *>(custom);
     ctx->total_blocks = diff.blocks_count;
     ctx->total_files = diff.files_count;
     return apply_controller_t::apply(diff, custom);
 }
 
 void app_supervisor_t::write_config(const config::main_t &cfg) noexcept {
-    using F = utils::fstream_t;
-    log->debug("going to write config");
-    auto &path = get_config_path();
-    utils::fstream_t f_cfg(path.string(), F::binary | F::trunc | F::in | F::out);
-    auto r = config::serialize(cfg, f_cfg);
-    if (!r) {
-        log->error("cannot save default config at {}: {}", path, r.error().message());
-    } else {
-        log->info("succesfully stored config at {}. Restart to apply", path);
+    auto buffer = std::array<std::byte, 1024 * 32>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+
+    auto path = get_config_path().get_view(allocator);
+    log->debug("going to write config to {}", path);
+    auto cfg_str = config::serialize(cfg);
+    auto file_opt = utils::io_stream_t::open_truncate(path);
+    if (!file_opt) {
+        auto &ec = file_opt.assume_error();
+        log->error("cannot open config '{}': {}", path, ec);
+        return;
     }
+    auto &file = file_opt.assume_value();
+    if (auto ok = file.write(cfg_str); !ok) {
+        auto ec = ok.assume_error();
+        log->error("cannot save default config at '{}': {}", path, ec);
+        return;
+    }
+    log->info("succesfully stored config at {}. Restart to apply", path);
     app_config_original = app_config = cfg;
 }
 
-void app_supervisor_t::redisplay_folder_nodes(bool refresh_labels) {
+void app_supervisor_t::redisplay_nodes(bool refresh_labels) {
     auto mask = mask_nodes();
-    log->debug("redisplay_folder_nodes, mask: {:#x}", mask);
+    log->debug("redisplay_nodes, mask: {:#x}", mask);
+
     for (auto &it_f : cluster->get_folders()) {
         for (auto &it : it_f.item->get_folder_infos()) {
             auto generic_augmentation = it.item->get_augmentation();
@@ -669,22 +704,69 @@ void app_supervisor_t::redisplay_folder_nodes(bool refresh_labels) {
             }
         }
     }
+
+    for (auto &it : cluster->get_pending_folders()) {
+        auto aug = it.item->get_augmentation().get();
+        auto proxy = static_cast<augmentation_base_t *>(aug);
+        proxy->get_owner()->update_label();
+    }
+
+    for (auto &it : cluster->get_devices()) {
+        auto aug = it.item->get_augmentation().get();
+        auto proxy = static_cast<augmentation_base_t *>(aug);
+        proxy->get_owner()->update_label();
+    }
+
+    for (auto &it : cluster->get_pending_devices()) {
+        auto aug = it.item->get_augmentation().get();
+        auto proxy = static_cast<augmentation_base_t *>(aug);
+        proxy->get_owner()->update_label();
+    }
+
+    for (auto &it : cluster->get_ignored_devices()) {
+        auto aug = it.item->get_augmentation().get();
+        auto proxy = static_cast<augmentation_base_t *>(aug);
+        proxy->get_owner()->update_label();
+    }
 }
 
 void app_supervisor_t::set_show_deleted(bool value) {
     app_config.fltk_config.display_deleted = value;
-    redisplay_folder_nodes(false);
+    redisplay_nodes(false);
 }
 
 void app_supervisor_t::set_show_missing(bool value) {
     app_config.fltk_config.display_missing = value;
-    redisplay_folder_nodes(false);
+    redisplay_nodes(false);
 }
 
 void app_supervisor_t::set_show_colorized(bool value) {
     log->debug("display colorized = {}", value);
     app_config.fltk_config.display_colorized = value;
-    redisplay_folder_nodes(true);
+    redisplay_nodes(true);
+}
+
+void app_supervisor_t::set_show_folder_id(bool value) {
+    log->debug("display folder_id = {}", value);
+    app_config.fltk_config.display_folder_id = value;
+    redisplay_nodes(true);
+}
+
+void app_supervisor_t::set_show_device_id(bool value) {
+    log->debug("display device_id = {}", value);
+    app_config.fltk_config.display_device_id = value;
+    redisplay_nodes(true);
+}
+
+void app_supervisor_t::set_tray_display(bool value) {
+    log->debug("tray display = {}", value);
+    app_config.fltk_config.display_tray_icon = value;
+    main_window->show_tray_icon(value);
+}
+
+void app_supervisor_t::set_hide_to_tray(bool value) {
+    log->debug("hide to tray = {}", value);
+    app_config.fltk_config.hide_to_tray = value;
 }
 
 std::uint32_t app_supervisor_t::mask_nodes() const noexcept {
@@ -699,6 +781,57 @@ std::uint32_t app_supervisor_t::mask_nodes() const noexcept {
     return r;
 }
 
+Fl_RGB_Image *app_supervisor_t::load_image(std::string_view relative_path) noexcept {
+    auto it = images_map.find(relative_path);
+    if (it != images_map.end()) {
+        return it->second.get();
+    }
+
+    auto buffer = std::array<std::byte, 1024 * 32>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+    auto image_path = resolve_resource(allocator, relative_path);
+    if (!image_path.empty()) {
+        auto image = image_icon_t();
+        image.reset(new Fl_PNG_Image(image_path.get_full_name().data()));
+        if (image->w() && image->h()) {
+            auto [it, _] = images_map.emplace(std::string(relative_path), std::move(image));
+            return it->second.get();
+        }
+    }
+
+    LOG_WARN(log, "failed to load image at '{}'", image_path);
+    return nullptr;
+}
+
+Fl_RGB_Image *app_supervisor_t::resize_image(Fl_RGB_Image *original, int w, int h) noexcept {
+    if (!original) {
+        return original;
+    }
+    if (original->w() == w && original->h() == h) {
+        return original;
+    }
+
+    auto buffer = std::array<std::byte, 1024 * 32>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+    auto key_str = std::pmr::string(allocator);
+    fmt::format_to(std::back_inserter(key_str), "{}-{}x{}", (const void *)original, w, h);
+    auto key_view = std::string_view(key_str);
+
+    auto it = resized_images.find(key_view);
+    if (it != resized_images.end()) {
+        return it->second.get();
+    }
+    auto copy = static_cast<Fl_RGB_Image *>(original->copy(w, h));
+    resized_images.emplace(std::string(key_view), copy);
+    return copy;
+}
+
+Fl_RGB_Image *app_supervisor_t::load_image(std::string_view relative_path, int w, int h) noexcept {
+    return resize_image(load_image(relative_path), w, h);
+}
+
 void app_supervisor_t::detach_main_window() noexcept {
     cluster.reset();
     if (main_window) {
@@ -710,5 +843,22 @@ void app_supervisor_t::detach_main_window() noexcept {
 void app_supervisor_t::soft_restart() {
     log->debug("soft restart has been requested");
     soft_restart_request = true;
-    main_window->hide();
+    do_shutdown();
+}
+
+void app_supervisor_t::on_frame_render_timer(r::request_id_t, bool cancelled) noexcept {
+    auto items = std::move(delayed_items);
+    if (!cancelled) {
+        main_window->on_frame_render();
+        for (auto &item : items) {
+            if (item->use_count() > 1) {
+                item->on_update();
+            }
+        }
+        if (devices) {
+            devices->on_frame_render();
+        }
+        auto method = &app_supervisor_t::on_frame_render_timer;
+        start_timer(UPDATE_DELAY, *this, method);
+    }
 }

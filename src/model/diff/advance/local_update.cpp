@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "local_update.h"
 #include "model/cluster.h"
@@ -11,8 +11,9 @@
 using namespace syncspirit::model::diff::advance;
 
 local_update_t::local_update_t(const cluster_t &cluster, sequencer_t &sequencer, proto::FileInfo proto_file_,
-                               std::string_view folder_id_) noexcept
-    : advance_t(folder_id_, cluster.get_device()->device_id().get_sha256(), advance_action_t::local_update) {
+                               std::string_view folder_id_, bool disable_blocks_removal_) noexcept
+    : advance_t(folder_id_, cluster.get_device()->device_id().get_sha256(), advance_action_t::local_update,
+                disable_blocks_removal_) {
 
     auto buffer = std::array<std::byte, 256>();
     auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
@@ -41,6 +42,9 @@ local_update_t::local_update_t(const cluster_t &cluster, sequencer_t &sequencer,
         if (local_file) {
             version = local_file->get_version();
             version.update(device);
+            if (disable_blocks_removal) {
+                assign(uuid, local_file->get_uuid());
+            }
         } else {
             version = version_t(device);
         }

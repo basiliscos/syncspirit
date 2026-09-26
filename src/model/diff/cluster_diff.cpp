@@ -1,21 +1,56 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "cluster_diff.h"
 #include "apply_controller.h"
 #include "model/cluster.h"
+#include <list>
+#include <memory_resource>
 
 using namespace syncspirit::model::diff;
 
 cluster_diff_t::cluster_diff_t() { log = get_log(); }
+
+// prevent stack overflow
+cluster_diff_t::~cluster_diff_t() {
+    using allocator_t = std::pmr::polymorphic_allocator<char>;
+    using queue_t = std::pmr::list<cluster_diff_ptr_t>;
+
+    auto buffer = std::array<std::byte, 1024 * 128>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = allocator_t(&pool);
+    auto queue = queue_t(allocator);
+
+    if (child) {
+        queue.push_back(std::move(child));
+    }
+    if (sibling) {
+        queue.push_back(std::move(sibling));
+    }
+    while (!queue.empty()) {
+        auto &item = queue.front();
+        if (item->use_count() == 1) {
+            if (item->child) {
+                queue.push_back(std::move(item->child));
+            }
+            if (item->sibling) {
+                queue.push_back(std::move(item->sibling));
+            }
+        }
+        queue.pop_front();
+    }
+}
 
 auto cluster_diff_t::get_log() noexcept -> utils::logger_t { return utils::get_logger("model.diff"); }
 
 cluster_diff_t *cluster_diff_t::assign_sibling(cluster_diff_t *sibling_) noexcept {
     assert(!sibling);
     sibling = sibling_;
+    return get_last_sibling();
+}
 
-    auto n = sibling_;
+cluster_diff_t *cluster_diff_t::get_last_sibling() noexcept {
+    auto n = this;
     while (n->sibling) {
         n = n->sibling.get();
     }

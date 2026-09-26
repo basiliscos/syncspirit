@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "unshare_folder.h"
 #include "remove_blocks.h"
 #include "remove_folder_infos.h"
+#include "constants.h"
+#include "model/diff/diff_assembler.h"
 #include "model/diff/cluster_visitor.h"
 #include "model/cluster.h"
 #include "utils/format.hpp"
@@ -22,14 +24,17 @@ unshare_folder_t::unshare_folder_t(const model::cluster_t &, model::folder_info_
 
     auto remove_folders_map = uuid_folder_infos_map_t();
     remove_folders_map.emplace(folder_info.get_uuid(), &folder_info);
-    auto current = assign_child(new remove_folder_infos_t(std::move(remove_folders_map), &orphaned_blocks));
+    auto assember = model::diff::diff_assember_t(constants::diffs_batch);
 
+    assember.push_back(new remove_folder_infos_t(std::move(remove_folders_map), &orphaned_blocks));
     if (!orphaned_blocks_) {
         auto block_keys = local_orphaned_blocks.deduce();
         if (block_keys.size()) {
-            current = current->assign_sibling(new remove_blocks_t(std::move(block_keys)));
+            assember.push_back(new remove_blocks_t(std::move(block_keys)));
         }
     }
+
+    assign_child(assember.consume());
 }
 
 auto unshare_folder_t::apply_impl(apply_controller_t &controller, void *custom) const noexcept

@@ -1,20 +1,24 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "log_panel.h"
 
 #include "log_table.h"
 #include "log_colors.h"
 #include "utils/io.h"
+#include "utils/path_view.hpp"
+#include "utils/format.hpp"
 
 #include <spdlog/fmt/fmt.h>
 #include <FL/Fl_Box.H>
 #include <FL/fl_draw.H>
 #include <FL/Fl_Native_File_Chooser.H>
 #include <boost/algorithm/string/replace.hpp>
+#include <boost/nowide/convert.hpp>
 
 using fmt::format_to;
 
+using namespace syncspirit;
 using namespace syncspirit::fltk;
 
 static constexpr int padding = 5;
@@ -104,19 +108,38 @@ static void export_log(Fl_Widget *, void *data) {
     }
 
     // write
-    auto filename = file_chooser.filename();
-    using file_t = syncspirit::utils::fstream_t;
-    auto out = file_t(filename, file_t::binary);
-    out << "level, date, source, message" << eol;
 
+    auto buffer = std::array<std::byte, 1024 * 32>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+
+    auto filename = file_chooser.filename();
+    auto path = utils::make_native_view(filename, allocator);
+    using file_t = syncspirit::utils::io_stream_t;
+    auto out_opt = file_t::open_truncate(path);
+    if (!out_opt) {
+        auto &ec = out_opt.assume_error();
+        log->warn("cannot open logs file: {}", ec);
+        return;
+    }
+    auto &out = out_opt.assume_value();
+    if (auto ok = out.write("level, date, source, message\n"); !ok) {
+        log->warn("cannot write logs: {}", ok.error());
+        return;
+    }
     auto escape_message = [](const std::string &msg) -> std::string {
         auto copy = boost::replace_all_copy<std::string>(msg, "\"", "\"\"");
         return fmt::format("\"{}\"", copy);
     };
 
     while (auto record = it_selected->next()) {
-        out << record->level << ", " << record->date << ", " << record->source << ", "
-            << escape_message(record->message) << eol;
+        auto msg = fmt::format("{}, {}, {}, {}\n", static_cast<int>(record->level), record->date, record->source,
+                               escape_message(record->message));
+
+        if (auto ok = out.write(msg); !ok) {
+            log->warn("cannot write logs: {}", ok.error());
+            return;
+        }
     }
     log->info("logs wrote to {}", filename);
 }

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2025-2026 Ivan Baidakou
 
 #include "proto-helpers-db.h"
 #include "proto-helpers-impl.hpp"
@@ -9,6 +9,14 @@
 namespace syncspirit::db {
 
 using namespace syncspirit::details;
+
+void set_path(Folder &msg, std::string_view value) {
+    using namespace pp;
+    while (value.size() && (value.back() == '/' || value.back() == '\\')) {
+        value = value.substr(0, value.size() - 1);
+    }
+    msg["path"_f] = std::string(value);
+}
 
 int decode(utils::bytes_view_t data, BlockInfo &object) { return generic_decode(data, object); }
 

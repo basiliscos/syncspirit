@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #pragma once
 
@@ -28,7 +28,6 @@ namespace ra = rotor::asio;
 namespace asio = boost::asio;
 namespace pt = boost::posix_time;
 namespace http = boost::beast::http;
-namespace sys = boost::system;
 namespace ssl = asio::ssl;
 
 using tcp = asio::ip::tcp;
@@ -181,6 +180,12 @@ struct lock_t {
     bool value;
 };
 
+struct ready_t {};
+
+struct stop_services_t {};
+struct start_services_t {};
+struct restart_services_t {};
+
 } // end of namespace payload
 
 namespace message {
@@ -216,6 +221,11 @@ using db_info_response_t = r::request_traits_t<payload::db_info_request_t>::resp
 
 using fs_predown_t = r::message_t<payload::fs_predown_t>;
 using lock_t = r::message_t<payload::lock_t>;
+using ready_t = r::message_t<payload::ready_t>;
+
+using stop_services_t = r::message_t<payload::stop_services_t>;
+using start_services_t = r::message_t<payload::start_services_t>;
+using restart_services_t = r::message_t<payload::restart_services_t>;
 
 } // end of namespace message
 

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "initiator_actor.h"
 #include "constants.h"
@@ -250,7 +250,7 @@ void initiator_actor_t::on_resolve(message::resolve_response_t &res) noexcept {
 
     auto &ee = res.payload.ee;
     if (ee) {
-        LOG_WARN(log, "on_resolve error : {}", ee->message());
+        LOG_WARN(log, "on_resolve error : {}", ee);
         if (role == role_t::active) {
             return initiate_active();
         } else {
@@ -268,11 +268,11 @@ void initiator_actor_t::on_resolve(message::resolve_response_t &res) noexcept {
     resources->acquire(resource::connect);
 }
 
-void initiator_actor_t::on_io_error(const sys::error_code &ec, r::plugin::resource_id_t resource) noexcept {
-    LOG_TRACE(log, "on_io_error: {}", ec.message());
+void initiator_actor_t::on_io_error(const boost::system::error_code &ec, r::plugin::resource_id_t resource) noexcept {
+    LOG_TRACE(log, "on_io_error: {}", ec);
     resources->release(resource);
     if (ec != asio::error::operation_aborted) {
-        LOG_WARN(log, "on_io_error: {}", ec.message());
+        LOG_WARN(log, "on_io_error: {}", ec);
     }
     if (state < r::state_t::SHUTTING_DOWN) {
         if (!connected && role == role_t::active) {
@@ -343,7 +343,7 @@ void initiator_actor_t::on_handshake(bool valid_peer, utils::x509_t &cert, const
 
     auto cert_name = utils::get_common_name(cert);
     if (!cert_name) {
-        LOG_WARN(log, "on_handshake, can't get certificate name: {}", cert_name.error().message());
+        LOG_WARN(log, "on_handshake, can't get certificate name: {}", cert_name.error());
         auto ec = utils::make_error_code(utils::error_code_t::missing_cn);
         return do_shutdown(make_error(ec));
     }

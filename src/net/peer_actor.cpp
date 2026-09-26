@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "peer_actor.h"
 #include "names.h"
@@ -79,11 +79,11 @@ void peer_actor_t::on_start() noexcept {
     read_action = &peer_actor_t::read_hello;
 }
 
-void peer_actor_t::on_io_error(const sys::error_code &ec, rotor::plugin::resource_id_t resource) noexcept {
-    LOG_TRACE(log, "on_io_error: {}, resource: {}", ec.message(), static_cast<int>(resource));
+void peer_actor_t::on_io_error(const boost::system::error_code &ec, rotor::plugin::resource_id_t resource) noexcept {
+    LOG_TRACE(log, "on_io_error: {}, resource: {}", ec, static_cast<int>(resource));
     resources->release(resource);
     if (ec != asio::error::operation_aborted) {
-        LOG_WARN(log, "on_io_error: {}", ec.message());
+        LOG_WARN(log, "on_io_error: {}", ec);
     }
     if (resources->has(resource::finalization)) {
         resources->release(resource::finalization);
@@ -218,7 +218,7 @@ void peer_actor_t::on_read(std::size_t bytes) noexcept {
         auto result = proto::parse_bep(buff);
         if (result.has_error()) {
             auto &ec = result.error();
-            LOG_WARN(log, "on_read, error parsing message: {}", ec.message());
+            LOG_WARN(log, "on_read, error parsing message: {}", ec);
             return do_shutdown(make_error(ec));
         }
         auto &value = result.value();
@@ -269,7 +269,7 @@ void peer_actor_t::shutdown_start() noexcept {
     }
 
     proto::Close close;
-    proto::set_reason(close, shutdown_reason->message());
+    proto::set_reason(close, fmt::format("{}", shutdown_reason));
     auto buff = proto::serialize(close);
     tx_queue.clear();
     push_write(std::move(buff), true);
@@ -335,10 +335,10 @@ void peer_actor_t::on_controller_predown(message::controller_predown_t &message)
     LOG_TRACE(log, "on_controller_predown, for_me = {}", (for_me ? "yes" : "no"));
     if (for_me && !shutdown_reason) {
         auto &ee = message.payload.ee;
-        auto reason = ee->message();
-        auto root = ee->root()->message();
-        auto max_size = std::min(size_t(30), root.size());
-        auto tail = std::string_view(root).substr(0, max_size);
+        auto root = ee->root();
+        auto reason = fmt::format("{}", root);
+        auto max_size = std::min(size_t(30), reason.size());
+        auto tail = std::string_view(reason).substr(0, max_size);
         LOG_DEBUG(log, "on_controller_predown, root reason: {}", tail);
         do_shutdown(ee);
     }

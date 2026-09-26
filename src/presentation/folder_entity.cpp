@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2025-2026 Ivan Baidakou
 
 #include "folder_entity.h"
 #include "folder_presence.h"
@@ -13,10 +13,8 @@
 using namespace syncspirit;
 using namespace syncspirit::presentation;
 
-namespace bfs = std::filesystem;
-
 using file_entity_ptr_t = model::intrusive_ptr_t<file_entity_t>;
-using file_entities_t = std::unordered_map<model::path_t *, file_entity_ptr_t>;
+using file_entities_t = std::unordered_map<utils::path_t *, file_entity_ptr_t>;
 
 static void process(model::folder_info_t *folder_info, entity_t::children_t &files, file_entities_t &new_files) {
     auto &files_map = folder_info->get_file_infos();
@@ -71,7 +69,7 @@ static void process_files(file_entities_t &&new_files, orphans_t &orphans, folde
 }
 
 folder_entity_t::folder_entity_t(model::folder_ptr_t folder_) noexcept
-    : entity_t(new model::path_t()), folder(*folder_.get()) {
+    : entity_t(new utils::path_t()), folder(*folder_.get()) {
     folder.set_augmentation(this);
 
     // make folder_infos as presence
@@ -158,7 +156,12 @@ entity_t *folder_entity_t::on_insert(model::file_info_t &file_info, const model:
 
 auto folder_entity_t::get_folder() noexcept -> model::folder_t & { return folder; }
 
-void folder_entity_t::on_update() noexcept { notify_update(); }
+void folder_entity_t::on_update() noexcept {
+    notify_update();
+    for (auto p : presences) {
+        p->notify_update();
+    }
+}
 
 void folder_entity_t::on_delete() noexcept {
     clear_children();

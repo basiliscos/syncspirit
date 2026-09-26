@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "local_discovery_actor.h"
 #include "names.h"
@@ -47,32 +47,31 @@ void local_discovery_actor_t::configure(r::plugin::plugin_base_t &plugin) noexce
 
 void local_discovery_actor_t::init() noexcept {
     LOG_TRACE(log, "init, will announce to port = {}", port);
-
-    sys::error_code ec;
+    auto ec = boost::system::error_code();
 
     auto bc_endpoint = udp::endpoint(asio::ip::address_v4::any(), port);
     broadcast_sock.open(bc_endpoint.protocol(), ec);
     if (ec) {
-        LOG_WARN(log, "init, can't open broadcast socket :: {}", ec.message());
+        LOG_WARN(log, "init, can't open broadcast socket: {}", ec);
         return do_shutdown(make_error(ec));
     }
 
     broadcast_sock.set_option(udp_socket_t::broadcast(true), ec);
     if (ec) {
-        LOG_WARN(log, "init, can't set broadcast option :: {}", ec.message());
+        LOG_WARN(log, "init, can't set broadcast option: {}", ec);
         return do_shutdown(make_error(ec));
     }
 
     auto listen_endpoint = udp::endpoint{asio::ip::address_v4::any(), port};
     sock.open(listen_endpoint.protocol(), ec);
     if (ec) {
-        LOG_WARN(log, "init, can't open socket :: {}", ec.message());
+        LOG_WARN(log, "init, can't open socket: {}", ec);
         return do_shutdown(make_error(ec));
     }
 
     sock.bind(listen_endpoint, ec);
     if (ec) {
-        LOG_WARN(log, "init, can't bind socket {} :: {}", listen_endpoint, ec.message());
+        LOG_WARN(log, "init, can't bind socket {}: {}", listen_endpoint, ec);
         return do_shutdown(make_error(ec));
     }
 }
@@ -83,23 +82,24 @@ void local_discovery_actor_t::on_start() noexcept {
     init();
     do_read();
     announce();
+    send<model::payload::local_up_t>(supervisor->get_address());
 }
 
 void local_discovery_actor_t::shutdown_start() noexcept {
     if (resources->has(resource::timer)) {
         cancel_timer(*timer_request);
     }
-    sys::error_code ec;
+    auto ec = boost::system::error_code();
     if (resources->has(resource::send)) {
         broadcast_sock.cancel(ec);
         if (ec) {
-            LOG_WARN(log, "shutdown_start, socket cancellation error:: {}", ec.message());
+            LOG_WARN(log, "shutdown_start, socket cancellation error: {}", ec);
         }
     }
     if (resources->has(resource::read)) {
         sock.cancel(ec);
         if (ec) {
-            LOG_WARN(log, "shutdown_start, socket cancellation error:: {}", ec.message());
+            LOG_WARN(log, "shutdown_start, socket cancellation error: {}", ec);
         }
     }
     r::actor_base_t::shutdown_start();
@@ -155,8 +155,8 @@ void local_discovery_actor_t::on_read(size_t bytes) noexcept {
     auto view = utils::bytes_view_t(rx_buff.data(), bytes);
     auto result = proto::parse_announce(view);
     if (!result) {
-        LOG_TRACE(log, "on_read, cannot parse incoming UDP packet {} bytes from {} :: {}", bytes, peer_endpoint,
-                  result.error().message());
+        LOG_TRACE(log, "on_read, cannot parse incoming UDP packet {} bytes from {}: {}", bytes, peer_endpoint,
+                  result.error());
     } else {
         auto &msg = result.value();
         auto sha = proto::get_id(msg);
@@ -183,20 +183,20 @@ void local_discovery_actor_t::on_read(size_t bytes) noexcept {
     return do_read();
 }
 
-void local_discovery_actor_t::on_read_error(const sys::error_code &ec) noexcept {
+void local_discovery_actor_t::on_read_error(const boost::system::error_code &ec) noexcept {
     resources->release(resource::read);
     if (ec != asio::error::operation_aborted) {
-        LOG_ERROR(log, "on_read_error, error = {}", ec.message());
+        LOG_ERROR(log, "on_read_error, error: {}", ec);
         do_shutdown(make_error(ec));
     }
 }
 
 void local_discovery_actor_t::on_write(size_t) noexcept { resources->release(resource::send); }
 
-void local_discovery_actor_t::on_write_error(const sys::error_code &ec) noexcept {
+void local_discovery_actor_t::on_write_error(const boost::system::error_code &ec) noexcept {
     resources->release(resource::send);
     if (ec != asio::error::operation_aborted) {
-        LOG_ERROR(log, "on_write_error, error = {}", ec.message());
+        LOG_ERROR(log, "on_write_error, error: {}", ec);
         do_shutdown(make_error(ec));
     }
 }

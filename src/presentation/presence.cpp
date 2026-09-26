@@ -4,13 +4,14 @@
 #include "entity.h"
 #include "presence.h"
 #include "cluster_file_presence.h"
+#include <spdlog/spdlog.h>
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32) || defined(__APPLE__)
 #include <uni_algo/case.h>
 #endif
 
 using namespace syncspirit;
-using namespace syncspirit::presentation;
+namespace syncspirit::presentation {
 
 using F = presence_t::features_t;
 using CP = presence_t::child_comparator_t;
@@ -36,8 +37,8 @@ bool CP::operator()(const presence_t *l, const presence_t *r) const {
     } else if (!ld && rd) {
         return false;
     }
-    auto l_name = l->entity->get_path()->get_own_name();
-    auto r_name = r->entity->get_path()->get_own_name();
+    auto l_name = l->entity->get_path()->get_filename();
+    auto r_name = r->entity->get_path()->get_filename();
     return l_name < r_name;
 }
 
@@ -56,7 +57,11 @@ bool CP::operator()(const presence_t *l, const presence_like_t &r) const {
     } else if (!ld && rd) {
         return false;
     }
-    return l->entity->get_path()->get_own_name() < r.name;
+    return l->entity->get_path()->get_filename() < r.name;
+}
+
+presence_t *get_child(presentation::presence_t *parent, std::string_view name, bool is_dir) noexcept {
+    return parent ? parent->get_child(name, is_dir) : nullptr;
 }
 
 presence_t::presence_t(entity_t *entity_, model::device_t *device_) noexcept
@@ -181,6 +186,25 @@ auto presence_t::get_children() noexcept -> children_t & {
     return children;
 }
 
+presence_t *presence_t::get_child(std::string_view name, bool is_dir) noexcept {
+    auto comparator = child_comparator_t{};
+    auto presence_like = presentation::presence_t::presence_like_t{name, is_dir};
+    auto &chilren = get_children();
+    auto it = std::lower_bound(children.begin(), children.end(), presence_like, comparator);
+    if (it != children.end()) {
+        auto &p = *it;
+        if (p->get_entity()->get_path()->get_filename() == name) {
+            auto p_dir = (bool)(p->features & F::directory);
+            if (!(p_dir xor is_dir)) {
+                if (!(p->features & F::missing)) {
+                    return p;
+                }
+            }
+        }
+    }
+    return nullptr;
+}
+
 void presence_t::clear_children() noexcept { children.clear(); }
 
 bool presence_t::is_unique() const noexcept {
@@ -188,10 +212,10 @@ bool presence_t::is_unique() const noexcept {
     using una::caseless::compare_utf8;
     if (!(features & F::deleted)) {
         if (parent && parent->entity) {
-            auto my_name = entity->get_path()->get_own_name();
+            auto my_name = entity->get_path()->get_filename();
             for (auto c : parent->get_children()) {
                 if (c != this && !(c->features & F::deleted)) {
-                    auto other_name = c->entity->get_path()->get_own_name();
+                    auto other_name = c->entity->get_path()->get_filename();
                     if (compare_utf8(my_name, other_name) == 0) {
                         return false;
                     }
@@ -202,3 +226,5 @@ bool presence_t::is_unique() const noexcept {
 #endif
     return true;
 }
+
+} // namespace syncspirit::presentation

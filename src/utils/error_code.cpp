@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "error_code.h"
+#include <pcre2.h>
 #include <map>
 
 namespace syncspirit::utils::detail {
@@ -12,6 +13,8 @@ const char *bep_error_code_category::name() const noexcept { return "syncspirit_
 
 const char *protocol_error_code_category::name() const noexcept { return "syncspirit_proto_error"; }
 
+const char *pcre_error_code_category::name() const noexcept { return "pcre_error"; }
+
 std::string error_code_category::message(int c) const {
     std::string r;
     switch (static_cast<error_code_t>(c)) {
@@ -19,7 +22,7 @@ std::string error_code_category::message(int c) const {
         r = "success";
         break;
     case error_code_t::no_action:
-        r = "no action (messages has not been processed)";
+        r = "no action (message has not been processed)";
         break;
     case error_code_t::no_location:
         r = "no location";
@@ -126,6 +129,9 @@ std::string error_code_category::message(int c) const {
     case error_code_t::peer_has_been_removed:
         r = "peer has been removed";
         break;
+    case error_code_t::concurrent_file_modification:
+        r = "concurrent file modification";
+        break;
     default:
         r = "unknown";
     }
@@ -177,6 +183,15 @@ std::string protocol_error_code_category::message(int c) const {
     return r;
 }
 
+std::string pcre_error_code_category ::message(int c) const {
+    PCRE2_UCHAR buff[256];
+    auto sz = pcre2_get_error_message(c, buff, sizeof(buff));
+    if (sz > 0) {
+        return std::string(reinterpret_cast<const char *>(buff), sz);
+    }
+    return {};
+}
+
 } // namespace syncspirit::utils::detail
 
 namespace syncspirit::utils {
@@ -184,28 +199,11 @@ namespace syncspirit::utils {
 const static detail::error_code_category category;
 const static detail::bep_error_code_category bep_category;
 const static detail::protocol_error_code_category protocol_category;
+const static detail::pcre_error_code_category pcre_category;
 
 const detail::error_code_category &error_code_category() { return category; }
 const detail::bep_error_code_category &bep_error_code_category() { return bep_category; }
 const detail::protocol_error_code_category &protocol_error_code_category() { return protocol_category; }
-
-boost::system::error_code adapt(const std::error_code &ec) noexcept {
-    struct category_adapter_t : public boost::system::error_category {
-        category_adapter_t(const std::error_category &category) : m_category(category) {}
-
-        const char *name() const noexcept { return m_category.name(); }
-
-        std::string message(int ev) const { return m_category.message(ev); }
-
-      private:
-        const std::error_category &m_category;
-    };
-
-    using map_t = std::map<std::string, category_adapter_t>;
-    static thread_local map_t name2cat;
-    auto result = name2cat.emplace(ec.category().name(), ec.category());
-    auto &category = result.first->second;
-    return boost::system::error_code(ec.value(), category);
-}
+const detail::pcre_error_code_category &pcre_error_code_category() { return pcre_category; }
 
 } // namespace syncspirit::utils

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2026 Ivan Baidakou
 
 #include "test-utils.h"
 #include "access.h"
@@ -12,8 +12,6 @@ using namespace syncspirit;
 using namespace syncspirit::model;
 using namespace syncspirit::proto;
 using namespace syncspirit::test;
-
-namespace bfs = std::filesystem;
 
 TEST_CASE("orphaned blocks, all removed for single file", "[model]") {
     test::init_logging();

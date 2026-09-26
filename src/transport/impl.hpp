@@ -1,19 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #pragma once
 
 #include "base.h"
 #include "utils/platform.h"
 #include "utils/log.h"
+#include "utils/format.hpp"
+#include "utils/tls.h"
 #include "stream.h"
 #include <boost/asio/ssl.hpp>
-
-#ifdef WIN32_LEAN_AND_MEAN
-#include <malloc.h>
-#else
-#include <alloca.h>
-#endif
 
 namespace syncspirit::transport {
 
@@ -26,7 +22,7 @@ template <typename T> struct error_curry_t : model::arc_base_t<error_curry_t<T>>
     error_curry_t(T &owner, error_fn_t &on_error) noexcept : backend{&owner}, on_error_fn{std::move(on_error)} {}
     virtual ~error_curry_t() = default;
 
-    void error(const sys::error_code &ec) noexcept {
+    void error(const std::error_code &ec) noexcept {
         on_error_fn(ec);
         backend->supervisor.do_process();
     }
@@ -121,33 +117,11 @@ template <> struct base_impl_t<ssl_socket_t> {
         }
 
         auto log = utils::get_logger("transport.tls");
-        bool use_sytem_verify_paths = true;
-        if (source.ssl_verify_store.size()) {
-            auto r = SSL_CTX_load_verify_store(ctx.native_handle(), source.ssl_verify_store.data());
-            auto ec = sys::error_code();
-            if (!r) {
-                auto code = ::ERR_get_error();
-                ec = sys::error_code(static_cast<int>(code), asio::error::get_ssl_category());
-            }
-            if (ec) {
-                log->warn("cannot load_verify_store: {}", ec.message());
-            } else {
-                log->trace("using ssl verify store: {}", source.ssl_verify_store);
-                use_sytem_verify_paths = false;
-            }
-        }
-        if (use_sytem_verify_paths) {
-            log->trace("using default verify paths");
-            auto ec = sys::error_code();
-            ctx.set_default_verify_paths(ec);
-            if (ec) {
-                log->warn("cannot set ssl default verify paths: {}", ec.message());
-            }
-        }
+        utils::set_store(log.get(), ctx.native_handle(), source.ssl_verify_store);
 
         if (opt && opt->alpn.size()) {
             auto alpn = opt->alpn;
-            std::byte *wire_alpn = (std::byte *)alloca(alpn.size() + 1);
+            std::byte wire_alpn[512];
             wire_alpn[0] = (std::byte)(alpn.size());
             auto b = reinterpret_cast<const std::byte *>(alpn.data());
             std::copy(b, b + alpn.size(), wire_alpn + 1);
@@ -185,30 +159,30 @@ template <> struct base_impl_t<ssl_socket_t> {
             auto host = config.uri->host();
             log->trace("will will use sni extension (value = '{}')", host);
             if (!SSL_set_tlsext_host_name(sock.native_handle(), host.c_str())) {
-                sys::error_code ec{static_cast<int>(::ERR_get_error()), asio::error::get_ssl_category()};
-                log->error("http_actor_t:: Set SNI Hostname : {}", ec.message());
+                std::error_code ec{static_cast<int>(::ERR_get_error()), asio::error::get_ssl_category()};
+                log->error("http_actor_t:: Set SNI Hostname : {}", ec);
             }
         }
 
         if (me || config.active) {
-            log->trace("will verify peer (self = {})", (const void *)this);
+            int depth = me ? 1 : 10;
+            log->trace("will verify peer (self = {}), depth = {}", (const void *)this, depth);
             auto mode = ssl::verify_peer | ssl::verify_fail_if_no_peer_cert | ssl::verify_client_once;
             sock.set_verify_mode(mode);
-            sock.set_verify_depth(1);
+            sock.set_verify_depth(depth);
         }
 
-        log->trace("will use verify callback: {}", (me ? "yes" : "no"));
-        if (me) {
-            sock.set_verify_callback([&](bool, ssl::verify_context &peer_ctx) -> bool {
-                auto native = peer_ctx.native_handle();
-                auto peer_cert = X509_STORE_CTX_get_current_cert(native);
+        sock.set_verify_callback([&](bool preverified, ssl::verify_context &peer_ctx) -> bool {
+            auto native = peer_ctx.native_handle();
+            auto peer_cert = X509_STORE_CTX_get_current_cert(native);
+            if (me) {
                 if (!peer_cert) {
                     log->warn("no peer certificate");
                     return false;
                 }
                 auto der_option = utils::as_serialized_der(peer_cert);
                 if (!der_option) {
-                    log->warn("peer certificate cannot be serialized as der : {}", der_option.error().message());
+                    log->warn("peer certificate cannot be serialized as der : {}", der_option.error());
                     return false;
                 }
 
@@ -235,8 +209,31 @@ template <> struct base_impl_t<ssl_socket_t> {
                 }
                 validation_passed = true;
                 return true;
-            });
-        }
+            } else {
+                char subject[128] = {0};
+                char issuer[128] = {0};
+
+                if (peer_cert) {
+                    if (auto name = X509_get_subject_name(peer_cert); name) {
+                        X509_NAME_oneline(name, subject, sizeof(subject));
+                    }
+                    if (auto name = X509_get_issuer_name(peer_cert); name) {
+                        X509_NAME_oneline(name, issuer, sizeof(issuer));
+                    }
+                }
+
+                if (preverified) {
+                    log->trace("peer cert subject: '{}', issuer: '{}'", subject, issuer);
+                } else {
+                    auto depth = X509_STORE_CTX_get_error_depth(native);
+                    auto ec = X509_STORE_CTX_get_error(native);
+                    auto error = X509_verify_cert_error_string(ec);
+                    log->warn("peer (sn: {}, issuer: {}) verification failed ({}): {}", subject, issuer, ec, error);
+                }
+
+                return preverified;
+            }
+        });
     }
 
     tcp_socket_t &get_physical_layer() noexcept { return sock.next_layer(); }
@@ -312,7 +309,7 @@ template <> struct impl<tcp_socket_t> {
     }
 
     template <typename Owner> inline static void async_handshake(Owner owner) noexcept {
-        sys::error_code ec;
+        auto ec = boost::system::error_code();
         auto endpoint = owner->backend->sock.remote_endpoint(ec);
         auto &strand = owner->backend->strand;
         if (ec) {
@@ -337,10 +334,10 @@ template <> struct impl<tcp_socket_t> {
     template <typename Backend> inline static void cancel(Backend &backend, socket_t &sock) noexcept {
         if (!backend.cancelling) {
             backend.cancelling = true;
-            sys::error_code ec;
+            auto ec = boost::system::error_code();
             sock.cancel(ec);
             if (ec) {
-                utils::get_logger("transport.sock")->error("impl<tcp::socket>::cancel() :: {}", ec.message());
+                utils::get_logger("transport.sock")->error("impl<tcp::socket>::cancel(): {}", ec);
             }
         }
     }
@@ -424,7 +421,7 @@ template <typename T, typename Sock, typename P> struct interface_t : P {
 
     void cancel() noexcept override { impl<Sock>::cancel(get_self(), get_self().sock); }
 
-    asio::ip::address local_address(sys::error_code &ec) noexcept override {
+    asio::ip::address local_address(boost::system::error_code &ec) noexcept override {
         auto &sock = get_self().get_physical_layer();
         auto endpoint = sock.local_endpoint(ec);
         if (!ec) {

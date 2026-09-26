@@ -5,10 +5,9 @@
 
 #include "property.h"
 #include <vector>
+#include "utils/path.h"
 
 namespace syncspirit::fltk::config {
-
-namespace bfs = std::filesystem;
 
 namespace impl {
 
@@ -48,10 +47,10 @@ struct url_t : string_t {
 };
 
 struct path_t : property_t {
-    path_t(std::string label, std::string explanation, const bfs::path &value, const bfs::path &default_value,
+    path_t(std::string label, std::string explanation, const utils::path_t &value, const utils::path_t &default_value,
            property_kind_t kind = property_kind_t::file);
 
-    bfs::path convert() noexcept;
+    utils::path_t convert() noexcept;
 };
 
 struct bool_t : property_t {
@@ -158,15 +157,6 @@ struct max_blocks_per_diff_t final : impl::positive_integer_t {
     void reflect_to(syncspirit::config::main_t &main) override;
 };
 
-struct max_files_per_diff_t final : impl::positive_integer_t {
-    using parent_t = impl::positive_integer_t;
-
-    static const char *explanation_;
-
-    max_files_per_diff_t(std::uint64_t value, std::uint64_t default_value);
-    void reflect_to(syncspirit::config::main_t &main) override;
-};
-
 struct uncommitted_threshold_t final : impl::positive_integer_t {
     using parent_t = impl::positive_integer_t;
 
@@ -218,21 +208,21 @@ struct skip_discovers_t final : impl::positive_integer_t {
 
 namespace fs {
 
-struct bytes_scan_iteration_limit_t final : impl::positive_integer_t {
+struct poll_timeout_t final : impl::positive_integer_t {
     using parent_t = impl::positive_integer_t;
 
     static const char *explanation_;
 
-    bytes_scan_iteration_limit_t(std::uint64_t value, std::uint64_t default_value);
+    poll_timeout_t(std::uint64_t value, std::uint64_t default_value);
     void reflect_to(syncspirit::config::main_t &main) override;
 };
 
-struct files_scan_iteration_limit_t final : impl::positive_integer_t {
+struct retension_timeout_t final : impl::positive_integer_t {
     using parent_t = impl::positive_integer_t;
 
     static const char *explanation_;
 
-    files_scan_iteration_limit_t(std::uint64_t value, std::uint64_t default_value);
+    retension_timeout_t(std::uint64_t value, std::uint64_t default_value);
     void reflect_to(syncspirit::config::main_t &main) override;
 };
 
@@ -244,6 +234,17 @@ struct temporally_timeout_t final : impl::positive_integer_t {
     temporally_timeout_t(std::uint64_t value, std::uint64_t default_value);
     void reflect_to(syncspirit::config::main_t &main) override;
 };
+
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+struct win32_watcher_buff_t final : impl::positive_integer_t {
+    using parent_t = impl::positive_integer_t;
+
+    static const char *explanation_;
+
+    win32_watcher_buff_t(std::uint64_t value, std::uint64_t default_value);
+    void reflect_to(syncspirit::config::main_t &main) override;
+};
+#endif
 
 } // namespace fs
 
@@ -340,7 +341,7 @@ struct default_location_t final : impl::path_t {
 
     static const char *explanation_;
 
-    default_location_t(const bfs::path &value, const bfs::path &default_value);
+    default_location_t(const utils::path_t &value, const utils::path_t &default_value);
 
     void reflect_to(syncspirit::config::main_t &main) override;
 };
@@ -350,7 +351,7 @@ struct cert_file_t final : impl::path_t {
 
     static const char *explanation_;
 
-    cert_file_t(const bfs::path &, const bfs::path &default_value);
+    cert_file_t(const utils::path_t &, const utils::path_t &default_value);
 
     void reflect_to(syncspirit::config::main_t &main) override;
 };
@@ -360,7 +361,7 @@ struct key_file_t final : impl::path_t {
 
     static const char *explanation_;
 
-    key_file_t(const bfs::path &, const bfs::path &default_value);
+    key_file_t(const utils::path_t &, const utils::path_t &default_value);
 
     void reflect_to(syncspirit::config::main_t &main) override;
 };
@@ -409,6 +410,15 @@ struct timeout_t final : impl::positive_integer_t {
     static const char *explanation_;
 
     timeout_t(std::uint64_t value, std::uint64_t default_value);
+    void reflect_to(syncspirit::config::main_t &main) override;
+};
+
+struct start_offline_t final : impl::bool_t {
+    using parent_t = impl::bool_t;
+
+    static const char *explanation_;
+
+    start_offline_t(bool value, bool default_value);
     void reflect_to(syncspirit::config::main_t &main) override;
 };
 

@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2026 Ivan Baidakou
 
 #include "resolver.h"
 #include "model/cluster.h"
 #include "model/folder_info.h"
 #include "proto/proto-helpers-bep.h"
 #include "utils/platform.h"
-#include <boost/nowide/convert.hpp>
+#include "utils/path_view.hpp"
+#include <memory_resource>
 
 namespace syncspirit::model {
 
@@ -118,21 +119,26 @@ static advance_action_t _resolve(const file_info_t &remote, const file_info_t *l
 
 advance_action_t resolve(const file_info_t &remote, const file_info_t *local,
                          const folder_info_t &local_folder) noexcept {
+
     using P = utils::platform_t;
     if (remote.is_link() && !remote.is_deleted() && !P::symlinks_supported()) {
         return advance_action_t::ignore;
     }
-    auto remote_name = remote.get_name()->get_full_name();
-    if (!P::path_supported(bfs::path(boost::nowide::widen(remote_name)))) {
+    auto buffer = std::array<std::byte, 1024 * 16>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+
+    if (!P::path_supported(remote.get_name()->get_view(allocator))) {
         return advance_action_t::ignore;
     }
     auto action = _resolve(remote, local, local_folder);
     if (action == advance_action_t::resolve_remote_win) {
-        auto name = remote.get_name()->get_own_name();
+        auto name = remote.get_name()->get_filename();
         if (name.find(".sync-conflict-") != std::string::npos) {
             action = advance_action_t::ignore;
         } else {
-            auto resolved_name = local->make_conflicting_name();
+            auto resolved_path = local->make_conflicting_name(allocator);
+            auto resolved_name = resolved_path.get_full_name();
             if (auto resolved = local_folder.get_file_infos().by_name(resolved_name); resolved) {
                 action = advance_action_t::ignore;
             }

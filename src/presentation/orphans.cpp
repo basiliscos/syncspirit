@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2025-2026 Ivan Baidakou
 
 #include "orphans.h"
 #include "entity.h"
@@ -10,7 +10,7 @@ namespace syncspirit::presentation {
 
 namespace details {
 
-model::path_t *get_path(const entity_ptr_t &entity) noexcept { return entity->get_path().get(); }
+utils::path_t *get_path(const entity_ptr_t &entity) noexcept { return entity->get_path().get(); }
 
 std::string_view get_parent(const entity_ptr_t &entity) noexcept { return entity->get_path()->get_parent_name(); }
 
@@ -50,7 +50,7 @@ void orphans_t::reap_children(entity_ptr_t parent) noexcept {
     }
 }
 
-entity_ptr_t orphans_t::get_by_path(model::path_t *path) noexcept {
+entity_ptr_t orphans_t::get_by_path(utils::path_t *path) noexcept {
     auto &by_name = get<0>();
     auto it = by_name.find(path);
     if (it != by_name.end()) {

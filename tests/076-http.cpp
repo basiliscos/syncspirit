@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2025-2026 Ivan Baidakou
 
 #include "test-utils.h"
 #include "access.h"
@@ -8,6 +8,7 @@
 #include "net/resolver_actor.h"
 #include "net/names.h"
 #include "utils/beast_support.h"
+#include "utils/path_view.hpp"
 #include "utils/format.hpp"
 #include <boost/asio/ssl.hpp>
 #include <boost/nowide/convert.hpp>
@@ -715,15 +716,18 @@ void test_https_200_ok() {
         using ssl_socket_t = ssl::stream<tcp::socket>;
         using ssl_socket_opt_t = std::optional<ssl_socket_t>;
 
-        F() : ctx(boost::asio::ssl::context::tls), tmp_path{unique_path()}, tmp_guard{tmp_path} {
-            bfs::create_directories(tmp_path);
+        F() : ctx(boost::asio::ssl::context::tls), path_guard{test::unique_path()} {
+            auto buffer = std::array<std::byte, 1024 * 5>{};
+            auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+            auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
             server_keys = utils::generate_pair("test_server").value();
-            auto cert_path = narrow((tmp_path / "cert.pem").wstring());
-            auto private_path = narrow((tmp_path / "priv.pem").wstring());
-            REQUIRE(server_keys.save(cert_path.data(), private_path.data()));
 
-            ssl_verify_store = cert_path;
+            auto dir_view = path_guard.get_view(allocator);
+            auto cert_path = dir_view / L"серт.pem";
+            auto key_path = dir_view / L"ключ.pem";
+            REQUIRE(server_keys.save(cert_path, key_path));
 
+            ssl_verify_store = cert_path.get_full_name();
             ctx.set_options(ssl::context::default_workarounds | ssl::context::no_sslv2);
 
             auto &cert = server_keys.cert_data;
@@ -780,8 +784,7 @@ void test_https_200_ok() {
         utils::key_pair_t server_keys;
         ssl::context ctx;
         ssl_socket_opt_t peer_ssl_sock;
-        bfs::path tmp_path;
-        test::path_guard_t tmp_guard;
+        test::path_guard_t path_guard;
     };
     F().run();
 }

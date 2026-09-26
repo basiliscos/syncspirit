@@ -1,23 +1,26 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "tls.h"
 #include "error_code.h"
 #include "io.h"
+#include "path_view.hpp"
+#include "log.h"
+#include "format.hpp"
 #include <random>
-#include <boost/system/error_code.hpp>
 #include <openssl/pem.h>
 #include <openssl/sha.h>
 #include <openssl/err.h>
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
 #include <openssl/bio.h>
+#include <openssl/x509_vfy.h>
+#include <openssl/ssl.h>
+#include <memory_resource>
 
 #ifdef OSSL_DEPRECATEDIN_3_0
 #include <openssl/encoder.h>
 #endif
-
-namespace sys = boost::system;
 
 namespace syncspirit::utils {
 
@@ -209,9 +212,8 @@ outcome::result<key_pair_t> generate_pair(const char *issuer_name) noexcept {
                       cert_data_t{std::move(key_container.value())}};
 }
 
-static bool write_mem_to(const char *path, BIO *mem) {
-    auto file = ofstream_t(path, ifstream_t::out | ifstream_t::binary);
-    char *ptr;
+static bool write_mem_to(const utils::poly_path_view_t &path, BIO *mem) {
+    unsigned char *ptr;
     auto size = BIO_get_mem_data(mem, &ptr);
     if (size < 0) {
         return false;
@@ -219,11 +221,15 @@ static bool write_mem_to(const char *path, BIO *mem) {
     if (size == 0) {
         return true;
     }
-    file.write(ptr, size);
-    return (bool)file;
+    auto file = utils::io_stream_t::open_truncate(path);
+    if (file.has_value()) {
+        return !file.assume_value().write(ptr, size).has_error();
+    }
+    return false;
 }
 
-outcome::result<void> key_pair_t::save(const char *cert_path, const char *priv_key_path) const noexcept {
+outcome::result<void> key_pair_t::save(const utils::poly_path_view_t &cert_path,
+                                       const utils::poly_path_view_t &priv_key_path) const noexcept {
     do {
         BIO *bio = BIO_new(BIO_s_mem());
         auto bio_guard = make_guard(bio, [](auto ptr) { BIO_free(ptr); });
@@ -249,33 +255,24 @@ outcome::result<void> key_pair_t::save(const char *cert_path, const char *priv_k
     return outcome::success();
 }
 
-static outcome::result<guard_t<BIO>> read_to_mem_bio(const char *cert_path) {
-    auto file = ifstream_t(cert_path, ifstream_t::in | ifstream_t::binary);
+static outcome::result<guard_t<BIO>> read_to_mem_bio(const utils::poly_path_view_t &cert_path) {
+    auto file = io_stream_t::open_read(cert_path);
     if (!file) {
-        return sys::error_code{errno, sys::system_category()};
+        return std::error_code{errno, std::system_category()};
     }
 
-    auto begin = file.tellg();
-    if (!file.seekg(0, ifstream_t::end)) {
-        return sys::error_code{errno, sys::generic_category()};
+    auto data_opt = file.assume_value().read_whole();
+    if (!data_opt.has_value()) {
+        return data_opt.assume_error();
     }
-    auto end = file.tellg();
-    if (end < 0) {
-        return sys::error_code{errno, sys::generic_category()};
-    }
-    auto cert_sz = end - begin;
-    if (!file.seekg(ifstream_t::beg)) {
-        return sys::error_code{errno, sys::generic_category()};
-    }
-    auto data = std::vector<char>(cert_sz);
-    auto ptr = data.data();
-    file.read(ptr, cert_sz);
 
-    auto cert_bio = BIO_new_mem_buf(ptr, static_cast<int>(cert_sz));
-    return make_guard(cert_bio, [data = std::move(data)](auto *ptr) { BIO_free(ptr); });
+    auto &data = data_opt.assume_value();
+    auto cert_bio = BIO_new_mem_buf(data.data(), static_cast<int>(data.size()));
+    return make_guard(cert_bio, [data = std::move(data_opt)](auto *ptr) { BIO_free(ptr); });
 }
 
-outcome::result<key_pair_t> load_pair(const char *cert_path, const char *priv_key_path) {
+outcome::result<key_pair_t> load_pair(const utils::poly_path_view_t &cert_path,
+                                      const utils::poly_path_view_t &priv_key_path) {
     /* read certificate in memory, then load it va openssl */
     auto cert_mem_result = read_to_mem_bio(cert_path);
     if (!cert_mem_result) {
@@ -348,5 +345,74 @@ outcome::result<std::string> get_common_name(X509 *cert) noexcept {
 }
 
 void digest(const unsigned char *src, size_t length, unsigned char *storage) noexcept { SHA256(src, length, storage); }
+
+bool set_store(spdlog::logger *log, SSL_CTX *ctx, std::string_view caStore) noexcept {
+    auto store = X509_STORE_new();
+    auto store_guard = make_guard(store, [](auto *ptr) { X509_STORE_free(ptr); });
+    char buff[256];
+
+    auto get_error = [&]() -> std::string_view {
+        auto err = ERR_get_error();
+        if (err) {
+            if (auto str = ERR_error_string(err, buff); str) {
+                return str;
+            }
+        };
+        fmt::format_to(buff, "ssl error: {}", err);
+        return buff;
+    };
+
+    if (!caStore.empty()) {
+        bool attempt_load = true;
+
+        if (X509_STORE_load_store(store, caStore.data()) != 1) {
+            LOG_DEBUG(log, "cannot X509_STORE_load_store: {}", get_error());
+        } else {
+            LOG_DEBUG(log, "using ssl verify store: {}", caStore);
+            attempt_load = false;
+        }
+
+        if (attempt_load) {
+            auto buffer = std::array<std::byte, 1024 * 32>();
+            auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+            auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+            auto path = make_native_view(caStore, allocator);
+            auto result = read_to_mem_bio(path);
+            if (!result) {
+                LOG_WARN(log, "failed to load certificate via '{}: {}', ", path, result.assume_error());
+            } else {
+                LOG_TRACE(log, "loaded certificate via '{}'", path);
+                auto &bio = result.assume_value();
+                auto cert = X509_new();
+                auto cert_guard = make_guard(cert, [](auto *ptr) { X509_free(ptr); });
+                if (!PEM_read_bio_X509(bio.get(), &cert, nullptr, nullptr)) {
+                    LOG_WARN(log, "failed to parse PEM via '{}: {}', ", path, result.assume_error());
+                } else {
+                    if (X509_STORE_add_cert(store, cert) != 1) {
+                        LOG_WARN(log, "failed to parse PEM via '{}: {}', ", path, result.assume_error());
+                    }
+                }
+            }
+        }
+    }
+
+    if (store_guard) {
+        if (SSL_CTX_set0_verify_cert_store(ctx, store) != 1) {
+            LOG_WARN(log, "cannot SSL_CTX_set0_verify_cert_store: {}", get_error());
+        } else {
+            store_guard.release();
+        }
+    }
+
+    if (!store_guard) {
+        if (X509_STORE_set_default_paths(store) != 1) {
+            LOG_WARN(log, "cannot X509_STORE_set_default_paths: {}", get_error());
+        } else {
+            LOG_DEBUG(log, "ssl, using ssl default verify paths");
+            store_guard.release();
+        }
+    }
+    return (bool)store_guard;
+}
 
 } // namespace syncspirit::utils

@@ -3,10 +3,8 @@
 
 #include "properties.h"
 #include "utils/log.h"
-#include "model/device_id.h"
 #include <charconv>
 #include <boost/nowide/convert.hpp>
-#include <filesystem>
 #include <fmt/ranges.h>
 
 namespace syncspirit::fltk::config {
@@ -102,14 +100,14 @@ error_ptr_t url_t::validate_value() noexcept {
     return {};
 }
 
-static std::string _to_str(const bfs::path &p) { return boost::nowide::narrow(p.wstring()); }
+static std::string _to_str(const utils::path_t &p) { return std::string(p.get_full_name()); }
 
-path_t::path_t(std::string label, std::string explanation, const bfs::path &value, const bfs::path &default_value,
-               property_kind_t kind)
+path_t::path_t(std::string label, std::string explanation, const utils::path_t &value,
+               const utils::path_t &default_value, property_kind_t kind)
     : property_t(std::move(label), std::move(explanation), std::move(_to_str(value)), std::move(_to_str(default_value)),
                  kind) {}
 
-bfs::path path_t::convert() noexcept { return bfs::path(boost::nowide::widen(value)); }
+utils::path_t path_t::convert() noexcept { return utils::path_t::make_native(value); }
 
 bool_t::bool_t(bool value, bool default_value, std::string label)
     : property_t(std::move(label), "", value ? "true" : "", default_value ? "true" : "", property_kind_t::boolean),
@@ -216,15 +214,6 @@ void max_blocks_per_diff_t::reflect_to(syncspirit::config::main_t &main) {
 const char *max_blocks_per_diff_t::explanation_ =
     "maximum number of blocks per single diff (to display progress in UI)";
 
-max_files_per_diff_t::max_files_per_diff_t(std::uint64_t value, std::uint64_t default_value)
-    : parent_t("max_files_per_diff", explanation_, value, default_value) {}
-
-void max_files_per_diff_t::reflect_to(syncspirit::config::main_t &main) {
-    main.db_config.max_files_per_diff = native_value;
-}
-
-const char *max_files_per_diff_t::explanation_ = "maximum number of files per single diff (to display progress in UI)";
-
 uncommitted_threshold_t::uncommitted_threshold_t(std::uint64_t value, std::uint64_t default_value)
     : parent_t("uncommitted_threshold", explanation_, value, default_value) {}
 
@@ -269,6 +258,22 @@ const char *skip_discovers_t::explanation_ = "when peer addresses are known, how
 
 namespace fs {
 
+retension_timeout_t::retension_timeout_t(std::uint64_t value, std::uint64_t default_value)
+    : parent_t("retension_timeout", explanation_, value, default_value) {}
+
+void retension_timeout_t::reflect_to(syncspirit::config::main_t &main) {
+    main.fs_config.retension_timeout = native_value;
+}
+
+const char *retension_timeout_t::explanation_ = "delay of file events propagation in milliseconds";
+
+poll_timeout_t::poll_timeout_t(std::uint64_t value, std::uint64_t default_value)
+    : parent_t("poll_timeout", explanation_, value, default_value) {}
+
+void poll_timeout_t::reflect_to(syncspirit::config::main_t &main) { main.fs_config.poll_timeout = native_value; }
+
+const char *poll_timeout_t::explanation_ = "amount of microseconds to do micro-sleeps when there is nothing to do";
+
 temporally_timeout_t::temporally_timeout_t(std::uint64_t value, std::uint64_t default_value)
     : parent_t("temporally_timeout", explanation_, value, default_value) {}
 
@@ -278,23 +283,18 @@ void temporally_timeout_t::reflect_to(syncspirit::config::main_t &main) {
 
 const char *temporally_timeout_t::explanation_ = "remove incomplete file after this amount of seconds";
 
-bytes_scan_iteration_limit_t::bytes_scan_iteration_limit_t(std::uint64_t value, std::uint64_t default_value)
-    : parent_t("bytes_scan_iteration_limit", explanation_, value, default_value) {}
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
 
-void bytes_scan_iteration_limit_t::reflect_to(syncspirit::config::main_t &main) {
-    main.fs_config.bytes_scan_iteration_limit = native_value;
+win32_watcher_buff_t::win32_watcher_buff_t(std::uint64_t value, std::uint64_t default_value)
+    : parent_t("win32_watcher_buff", explanation_, value, default_value) {}
+
+void win32_watcher_buff_t::reflect_to(syncspirit::config::main_t &main) {
+    main.fs_config.win32_watcher_buff = native_value;
 }
 
-const char *bytes_scan_iteration_limit_t::explanation_ = "max number of bytes before emitting scan events";
+const char *win32_watcher_buff_t::explanation_ = "per folder watching buffer (in bytes)";
 
-files_scan_iteration_limit_t::files_scan_iteration_limit_t(std::uint64_t value, std::uint64_t default_value)
-    : parent_t("files_scan_iteration_limit", explanation_, value, default_value) {}
-
-void files_scan_iteration_limit_t::reflect_to(syncspirit::config::main_t &main) {
-    main.fs_config.files_scan_iteration_limit = native_value;
-}
-
-const char *files_scan_iteration_limit_t::explanation_ = "max number processed files before emitting scan events";
+#endif
 
 } // namespace fs
 
@@ -364,21 +364,21 @@ const char *port_t::explanation_ = "upd port used for announcement (should be th
 
 namespace main {
 
-default_location_t::default_location_t(const bfs::path &value, const bfs::path &default_value)
+default_location_t::default_location_t(const utils::path_t &value, const utils::path_t &default_value)
     : parent_t("default_location", explanation_, value, default_value, property_kind_t::directory) {}
 
 void default_location_t::reflect_to(syncspirit::config::main_t &main) { main.default_location = convert(); }
 
 const char *default_location_t::explanation_ = "where folders are created by default";
 
-cert_file_t::cert_file_t(const bfs::path &value, const bfs::path &default_value)
+cert_file_t::cert_file_t(const utils::path_t &value, const utils::path_t &default_value)
     : parent_t("cert_file", explanation_, value, default_value) {}
 
 void cert_file_t::reflect_to(syncspirit::config::main_t &main) { main.cert_file = convert(); }
 
 const char *cert_file_t::explanation_ = "this device certificate location";
 
-key_file_t::key_file_t(const bfs::path &value, const bfs::path &default_value)
+key_file_t::key_file_t(const utils::path_t &value, const utils::path_t &default_value)
     : parent_t("key_file", explanation_, value, default_value) {}
 
 void key_file_t::reflect_to(syncspirit::config::main_t &main) { main.key_file = convert(); }
@@ -419,6 +419,12 @@ timeout_t::timeout_t(std::uint64_t value, std::uint64_t default_value)
 void timeout_t::reflect_to(syncspirit::config::main_t &main) { main.timeout = native_value; }
 
 const char *timeout_t::explanation_ = "main actors timeout, milliseconds";
+
+start_offline_t::start_offline_t(bool value, bool default_value) : parent_t(value, default_value, "start offline") {}
+
+void start_offline_t::reflect_to(syncspirit::config::main_t &main) { main.start_offline = native_value; }
+
+const char *start_offline_t::explanation_ = "do not connect to any network on startup";
 
 } // namespace main
 

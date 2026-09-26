@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "acceptor_actor.h"
 #include "names.h"
 #include "utils/format.hpp"
-#include "utils/error_code.h"
 #include "utils/network_interface.h"
 #include "utils/format.hpp"
 #include "model/messages.h"
@@ -35,31 +34,30 @@ void acceptor_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
 }
 
 void acceptor_actor_t::on_start() noexcept {
-
     LOG_TRACE(log, "on_start");
-    sys::error_code ec;
+    auto ec = boost::system::error_code();
 
     acceptor.open(endpoint.protocol(), ec);
     if (ec) {
-        LOG_ERROR(log, "cannot open endpoint ({}) : {}", endpoint, ec.message());
+        LOG_ERROR(log, "cannot open endpoint ({}) : {}", endpoint, ec);
         return do_shutdown(make_error(ec));
     }
 
     acceptor.bind(endpoint, ec);
     if (ec) {
-        LOG_ERROR(log, "cannot bind endpoint ({}) : {}", endpoint, ec.message());
+        LOG_ERROR(log, "cannot bind endpoint ({}) : {}", endpoint, ec);
         return do_shutdown(make_error(ec));
     }
 
     acceptor.listen(asio::socket_base::max_listen_connections, ec);
     if (ec) {
-        LOG_ERROR(log, "cannot listen ({}) : {}", endpoint, ec.message());
+        LOG_ERROR(log, "cannot listen ({}) : {}", endpoint, ec);
         return do_shutdown(make_error(ec));
     }
 
     endpoint = acceptor.local_endpoint(ec);
     if (ec) {
-        LOG_ERROR(log, "cannot get local endpoint {}", ec.message());
+        LOG_ERROR(log, "cannot get local endpoint {}", ec);
         return do_shutdown(make_error(ec));
     }
 
@@ -75,6 +73,7 @@ void acceptor_actor_t::on_start() noexcept {
     send<model::payload::model_update_t>(coordinator, std::move(diff), this);
     accept_next();
     r::actor_base_t::on_start();
+    send<model::payload::local_up_t>(supervisor->get_address());
 }
 
 void acceptor_actor_t::accept_next() noexcept {
@@ -86,29 +85,29 @@ void acceptor_actor_t::accept_next() noexcept {
 void acceptor_actor_t::shutdown_start() noexcept {
     r::actor_base_t::shutdown_start();
     if (resources->has(resource::accepting)) {
-        sys::error_code ec;
+        auto ec = boost::system::error_code();
         acceptor.cancel(ec);
         if (ec) {
-            LOG_ERROR(log, "cannot cancel accepting :: ", ec.message());
+            LOG_ERROR(log, "cannot cancel accepting: ", ec);
         }
     }
 }
 
-void acceptor_actor_t::on_accept(const sys::error_code &ec) noexcept {
+void acceptor_actor_t::on_accept(const boost::system::error_code &ec) noexcept {
     resources->release(resource::accepting);
     if (ec) {
         if (ec != asio::error::operation_aborted) {
-            LOG_WARN(log, "accepting error :: ", ec.message());
+            LOG_WARN(log, "accepting error: ", ec);
             return do_shutdown(make_error(ec));
         } else {
             shutdown_continue();
         }
         return;
     }
-    sys::error_code err;
+    auto err = boost::system::error_code();
     auto remote = peer.remote_endpoint(err);
     if (err) {
-        LOG_WARN(log, "on_accept, cannot get remote endpoint:: {}", err.message());
+        LOG_WARN(log, "on_accept, cannot get remote endpoint: {}", err);
         return accept_next();
     }
     LOG_TRACE(log, "on_accept, peer = {}", remote);

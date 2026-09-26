@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2025-2026 Ivan Baidakou
 
 #pragma once
 
@@ -7,6 +7,7 @@
 #include "model/device.h"
 #include "statistics.h"
 #include "syncspirit-export.h"
+#include <cstdint>
 
 namespace syncspirit::presentation {
 
@@ -18,6 +19,8 @@ using presence_ptr_t = model::intrusive_ptr_t<presence_t>;
 
 struct file_entity_t;
 struct cluster_file_presence_t;
+
+presence_t *get_child(presentation::presence_t *parent, std::string_view name, bool is_dir) noexcept;
 
 struct SYNCSPIRIT_API presence_t : model::proxy_t {
     using children_t = std::vector<presence_t *>;
@@ -53,6 +56,7 @@ struct SYNCSPIRIT_API presence_t : model::proxy_t {
     virtual const presence_t* determine_best(const presence_t*) const;
 
     children_t& get_children() noexcept;
+    presence_t *get_child(std::string_view name, bool is_dir) noexcept;
     void clear_children() noexcept;
 
     struct SYNCSPIRIT_API presence_like_t {
@@ -88,7 +92,6 @@ struct SYNCSPIRIT_API presence_t : model::proxy_t {
     mutable std::uint32_t entity_generation = 0;
     mutable presence_stats_t statistics;
     mutable presence_stats_t own_statistics;
-
 };
 
 } // namespace syncspirit::presentation

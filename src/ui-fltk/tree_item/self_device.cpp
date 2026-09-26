@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2026 Ivan Baidakou
 
 #include "self_device.h"
 
@@ -9,6 +9,8 @@
 #include "../utils.hpp"
 #include "../main_window.h"
 #include "utils/dns.h"
+#include "utils/format.hpp"
+#include "utils/path_view.hpp"
 #include "constants.h"
 
 #include <FL/fl_ask.H>
@@ -166,24 +168,25 @@ struct self_table_t final : static_table_t, db_info_viewer_t {
             return;
         }
 
+        auto buffer = std::array<std::byte, 1024 * 32>();
+        auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+        auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+
         auto sup = owner->get_supervisor();
         auto &cfg = sup->get_app_config();
-        auto &cert_path = cfg.cert_file;
-        auto &key_path = cfg.key_file;
+        auto cert_path = cfg.cert_file.get_view(allocator);
+        auto key_path = cfg.key_file.get_view(allocator);
 
         auto logger = sup->get_logger();
-        auto cert_path_str = boost::nowide::narrow(cert_path.wstring());
-        auto key_path_str = boost::nowide::narrow(key_path.wstring());
         auto pair = utils::generate_pair(constants::issuer_name);
         if (!pair) {
-            logger->error("cannot generate cryptographic keys :: {}", pair.error().message());
+            logger->error("cannot generate cryptographic keys :: {}", pair.error());
             return;
         }
         auto &keys = pair.value();
-        auto save_result = keys.save(cert_path_str.c_str(), key_path_str.c_str());
+        auto save_result = keys.save(cert_path, key_path);
         if (!save_result) {
-            logger->error("cannot store cryptographic keys ({} & {}) :: {}", cert_path_str, key_path_str,
-                          save_result.error().message());
+            logger->error("cannot store cryptographic keys ({} & {}) :: {}", cert_path, key_path, save_result.error());
         }
         logger->info("keys has been regenerated, please restart");
 
@@ -266,10 +269,21 @@ self_device_t::self_device_t(model::device_t &, app_supervisor_t &supervisor, Fl
 }
 
 void self_device_t::update_label() {
-    auto self = supervisor.get_cluster()->get_device();
-    auto device_id = self->device_id().get_short();
-    auto label = fmt::format("(self) {}, {}", supervisor.get_app_config().device_name, device_id);
-    this->label(label.data());
+
+    auto &config = supervisor.get_app_config();
+    auto buffer = std::array<std::byte, 1024 * 32>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+    auto label_str = std::pmr::string(allocator);
+    auto label_out = std::back_inserter(label_str);
+    fmt::format_to(label_out, "(self) {}", config.device_name);
+
+    if (config.fltk_config.display_device_id) {
+        auto self = supervisor.get_cluster()->get_device();
+        fmt::format_to(label_out, ", {}", self->device_id().get_short());
+    }
+
+    this->label(label_str.data());
 }
 
 bool self_device_t::on_select() {

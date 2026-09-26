@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "ssdp_actor.h"
 #include "upnp_actor.h"
 #include "proto/upnp_support.h"
 #include "utils/format.hpp"
+#include "model/messages.h"
 #include "names.h"
 
 using namespace syncspirit::net;
@@ -43,22 +44,22 @@ void ssdp_actor_t::on_start() noexcept {
     sock = std::make_unique<udp_socket_t>(strand.context());
 
     auto endpoint = udp::endpoint(udp::v4(), 1234);
-    auto ec = sys::error_code{};
+    auto ec = boost::system::error_code();
     sock->open(endpoint.protocol(), ec);
     if (ec) {
-        LOG_WARN(log, "init, can't open socket :: {}", ec.message());
+        LOG_WARN(log, "init, can't open socket: {}", ec);
         return do_shutdown(make_error(ec));
     }
 
     sock->set_option(udp_socket_t::broadcast(true), ec);
     if (ec) {
-        LOG_WARN(log, "init, can't set broadcast option :: {}", ec.message());
+        LOG_WARN(log, "init, can't set broadcast option: {}", ec);
         return do_shutdown(make_error(ec));
     }
 
     sock->bind(endpoint, ec);
     if (ec) {
-        LOG_WARN(log, "init, can't bind socket {}: {}", endpoint, ec.message());
+        LOG_WARN(log, "init, can't bind socket {}: {}", endpoint, ec);
         return do_shutdown(make_error(ec));
     }
 
@@ -67,7 +68,7 @@ void ssdp_actor_t::on_start() noexcept {
     auto request_result = make_discovery_request(tx_buff, max_wait);
     if (!request_result) {
         auto &ec = request_result.error();
-        LOG_ERROR(log, "cannot serialize discovery request: {}", ec.message());
+        LOG_ERROR(log, "cannot serialize discovery request: {}", ec);
         return do_shutdown(make_error(ec));
     }
 
@@ -86,15 +87,16 @@ void ssdp_actor_t::on_start() noexcept {
     auto timeout = pt::seconds(max_wait);
     timer_request = start_timer(timeout, *this, &ssdp_actor_t::on_timer);
     resources->acquire(resource::timer);
+    send<model::payload::local_up_t>(supervisor->get_address());
 }
 
 void ssdp_actor_t::shutdown_start() noexcept {
     LOG_TRACE(log, "shutdown_start");
-    sys::error_code ec;
+    auto ec = boost::system::error_code();
     if (resources->has(resource::send) || resources->has(resource::recv)) {
         sock->cancel(ec);
         if (ec) {
-            LOG_ERROR(log, "udp socket cancellation : {}", ec.message());
+            LOG_ERROR(log, "udp socket cancellation : {}", ec);
         }
     }
     timer_cancel();
@@ -126,7 +128,7 @@ void ssdp_actor_t::on_discovery_received(std::size_t bytes) noexcept {
             LOG_DEBUG(log, "{}", view);
         }
         auto &ec = discovery_result.error();
-        LOG_WARN(log, "can't get discovery result: {}", ec.message());
+        LOG_WARN(log, "can't get discovery result: {}", ec);
         return do_shutdown(make_error(ec));
     }
 
@@ -138,19 +140,19 @@ void ssdp_actor_t::on_discovery_received(std::size_t bytes) noexcept {
     do_shutdown();
 }
 
-void ssdp_actor_t::on_udp_send_error(const sys::error_code &ec) noexcept {
+void ssdp_actor_t::on_udp_send_error(const boost::system::error_code &ec) noexcept {
     resources->release(resource::send);
     if (ec != asio::error::operation_aborted) {
-        LOG_WARN(log, "on_udp_send_error :: {}", ec.message());
+        LOG_WARN(log, "on_udp_send_error: {}", ec);
         do_shutdown(make_error(ec));
     }
     timer_cancel();
 }
 
-void ssdp_actor_t::on_udp_recv_error(const sys::error_code &ec) noexcept {
+void ssdp_actor_t::on_udp_recv_error(const boost::system::error_code &ec) noexcept {
     resources->release(resource::recv);
     if (ec != asio::error::operation_aborted) {
-        LOG_WARN(log, "on_udp_recv_error :: {}", ec.message());
+        LOG_WARN(log, "on_udp_recv_error: {}", ec);
         do_shutdown(make_error(ec));
     }
     timer_cancel();

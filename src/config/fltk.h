@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2026 Ivan Baidakou
 
 #pragma once
 #include <spdlog/spdlog.h>
@@ -11,6 +11,10 @@ struct fltk_config_t {
     bool display_deleted;
     bool display_missing;
     bool display_colorized;
+    bool display_tray_icon;
+    bool hide_to_tray;
+    bool display_folder_id;
+    bool display_device_id;
     int main_window_width;
     int main_window_height;
     double left_panel_share;

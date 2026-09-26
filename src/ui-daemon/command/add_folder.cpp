@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "add_folder.h"
 #include "../governor_actor.h"
@@ -9,8 +9,6 @@
 #include "model/diff/modify/upsert_folder.h"
 #include "pair_iterator.h"
 #include <random>
-
-namespace bfs = std::filesystem;
 
 namespace syncspirit::daemon::command {
 
@@ -67,6 +65,13 @@ outcome::result<command_ptr_t> add_folder_t::construct(std::string_view in) noex
     db::set_folder_type(f, db::FolderType::send_and_receive);
     db::set_pull_order(f, db::PullOrder::random);
     db::set_rescan_interval(f, 3600);
+
+    auto matcher = db::FileMatcher();
+    db::set_mode(matcher, db::FileMatch::accept);
+    db::set_pattern(matcher, std::string(".*"));
+    db::set_ignore_case(matcher, true);
+    db::add_file_matcher(f, std::move(matcher));
+
     return command_ptr_t(new add_folder_t(std::move(f)));
 }
 
@@ -86,7 +91,7 @@ bool add_folder_t::execute(governor_actor_t &actor) noexcept {
                       f->get_label());
             return false;
         }
-        if (f->get_path().string() == db::get_path(folder)) {
+        if (f->get_path().get_full_name() == db::get_path(folder)) {
             log->warn("{}, folder with path = {} is already present is the cluster", actor.get_identity(),
                       f->get_path());
             return false;
@@ -95,9 +100,9 @@ bool add_folder_t::execute(governor_actor_t &actor) noexcept {
 
     auto opt = modify::upsert_folder_t::create(*cluster, *actor.sequencer, folder, 0);
     if (opt.has_error()) {
-        auto message = opt.assume_error().message();
+        auto ec = opt.assume_error();
         log->warn("{}, cannot create folder '{}' on '{}': {}", actor.get_identity(), db::get_label(folder),
-                  db::get_path(folder), message);
+                  db::get_path(folder), ec);
         return false;
     }
 
