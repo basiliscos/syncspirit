@@ -96,7 +96,7 @@ after the core completion.
 
 # changes
 
-## 0.4.6 (xx-xxx-202x)
+## 0.4.6 (26-Sep-2026)
  - [core, fltk] intoduce patterns (using Perl-compatible regular expressions)
    to accept or ignore local files addition into cluster
  - [core] add start offline option
