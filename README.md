@@ -96,8 +96,10 @@ after the core completion.
 
 # changes
 
-## 0.4.7 (xx-xxx-2026)
+## 0.4.7 (27-Sep-2026)
+- [core, bugfix] allow to specify custom dns servers
 - [core, fix] do not crash upon dns server unavailability
+- [fltk, bugfix] dynamically update max sequence number
 
 ## 0.4.6 (26-Sep-2026)
  - [core, fltk] intoduce patterns (using Perl-compatible regular expressions)
