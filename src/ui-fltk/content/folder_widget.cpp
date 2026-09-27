@@ -97,7 +97,7 @@ struct base_table_t : syncspirit::fltk::static_table_t {
     inline bool is_remote() const noexcept { return container.is_remote(); }
     inline bool is_candidate() const noexcept { return container.is_candidate(); }
 
-    folder_presence_t &presence() const {
+    folder_presence_t &get_presence() const {
         auto &tree_item = static_cast<presence_item_t &>(container.container);
         return static_cast<folder_presence_t &>(tree_item.get_presence());
     }
@@ -577,8 +577,9 @@ struct base_table_t : syncspirit::fltk::static_table_t {
         }
 
         if ((is_local() || is_remote()) && entries_cell) {
-            auto max_sequence = get_folder_info().get_max_sequence();
-            auto &stats = presence().get_stats();
+            auto &p = get_presence();
+            auto &stats = p.get_stats();
+            auto max_sequence = p.get_folder_info().get_max_sequence();
             entries_cell->update(fmt::format("{}", stats.entities));
             entries_size_cell->update(get_file_size(stats.size));
             max_sequence_cell->update(fmt::format("{}", max_sequence));
