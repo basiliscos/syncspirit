@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #pragma once
-#include <cstdint>
+
 #include "acceptor.h"
 #include "bep.h"
 #include "db.h"
@@ -16,9 +16,14 @@
 #include "fltk.h"
 #include "utils/path.h"
 
+#include <cstdint>
+#include <vector>
+
 namespace syncspirit::config {
 
 struct main_t {
+    using strings_t = std::vector<std::string>;
+
     utils::path_t config_path;
     utils::path_t default_location;
     std::string ssl_verify_store;
@@ -41,6 +46,7 @@ struct main_t {
     std::string device_name;
     std::uint32_t hasher_threads;
     std::uint32_t poll_timeout; // in microseconds
+    strings_t dns_servers;
     bool start_offline;
 
     main_t() noexcept = default;
@@ -71,6 +77,7 @@ struct main_t {
         hasher_threads = orig.hasher_threads;
         poll_timeout = orig.poll_timeout;
         start_offline = orig.start_offline;
+        dns_servers = orig.dns_servers;
 
         return *this;
     }
