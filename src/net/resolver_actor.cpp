@@ -74,13 +74,13 @@ void resolver_actor_t::do_initialize(r::system_context_t *ctx) noexcept {
         }
 
         auto servers_guard = make_guard(servers, [](auto str) { ares_free_string(str); });
-        LOG_TRACE(log, "got dns servers: {}", servers);
+        LOG_DEBUG(log, "got system dns servers: {}", servers);
         dns_servers = servers;
     }
 
     auto dns_addresses = utils::parse_dns_servers(dns_servers);
     if (dns_addresses.empty()) {
-        LOG_ERROR(log, "no valid dns servers found");
+        LOG_ERROR(log, "no valid dns servers found among '{}'", dns_servers);
         auto ec = utils::make_error_code(utils::error_code_t::cares_failure);
         return do_shutdown(make_error(ec));
     }
@@ -94,7 +94,7 @@ void resolver_actor_t::do_initialize(r::system_context_t *ctx) noexcept {
     auto protocol = dns_address.ip.is_v4() ? boost::asio::ip::udp::v4() : boost::asio::ip::udp::v6();
     s.open(protocol, ec);
     if (ec) {
-        LOG_WARN(log, "init, can't open socket: {}", ec);
+        LOG_WARN(log, "init, can't open socket: {} (ipv4: {})", ec, dns_address.ip.is_v4());
         return do_shutdown(make_error(ec));
     }
 

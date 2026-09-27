@@ -243,7 +243,9 @@ void global_discovery_actor_t::shutdown_start() noexcept {
     if (resources->has(resource::http)) {
         send<message::http_cancel_t::payload_t>(http_client, *http_request, get_address());
     }
-    send<payload::http_close_connection_t>(http_client);
+    if (http_client) {
+        send<payload::http_close_connection_t>(http_client);
+    }
 
     if (resources->has(resource::timer)) {
         cancel_timer(*timer_request);

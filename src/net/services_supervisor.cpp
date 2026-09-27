@@ -167,7 +167,18 @@ void services_supervisor_t::launch_upnp() noexcept {
 void services_supervisor_t::launch_resolver() noexcept {
     auto timeout = shutdown_timeout * 9 / 10;
     auto io_timeout = shutdown_timeout * 8 / 10;
+    auto server_addresses = std::string();
+    if (auto sz = app_config.dns_servers.size(); sz) {
+        for (std::size_t i = 0; i < sz; ++i) {
+            auto &dns_server = app_config.dns_servers[i];
+            server_addresses += dns_server;
+            if (i + 1 < sz) {
+                server_addresses += ",";
+            }
+        }
+    }
     create_actor<resolver_actor_t>()
+        .server_addresses(std::move(server_addresses))
         .random_number(sequencer->next_uint64())
         .timeout(timeout)
         .resolve_timeout(io_timeout)

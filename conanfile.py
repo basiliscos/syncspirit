@@ -32,7 +32,7 @@ class SyncspiritRecipe(ConanFile):
         self.requires("spdlog/1.15.3")
         self.requires("tomlplusplus/3.4.0")
         self.requires("zlib/1.3.1")
-        self.requires("c-ares/1.34.5", options = {"multithreading": False, "shared": False, "tools": False})
+        self.requires("c-ares/1.34.8", options = {"multithreading": False, "shared": False, "tools": False})
         self.requires("catch2/3.14.0")
         self.requires("pcre2/10.47")
         self.requires("uni-algo/1.2.0", options = {"shared": False})

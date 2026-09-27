@@ -59,7 +59,10 @@ template <typename Parent> struct model_actor_t : public Parent {
 
     void shutdown_start() noexcept override {
         LOG_DEBUG(log, "shutdown_start");
-        parent_t::template send<model::payload::model_unsubscription_t>(coordinator, model_visit_callback, this);
+        if (coordinator) {
+            using msg_t = model::payload::model_unsubscription_t;
+            parent_t::template send<msg_t>(coordinator, model_visit_callback, this);
+        }
         parent_t::shutdown_start();
     }
 

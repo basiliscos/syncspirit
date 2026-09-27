@@ -70,7 +70,7 @@ bool operator==(const main_t &lhs, const main_t &rhs) noexcept {
            lhs.device_name == rhs.device_name && lhs.config_path == rhs.config_path &&
            lhs.log_configs == rhs.log_configs && lhs.cert_file == rhs.cert_file && lhs.key_file == rhs.key_file &&
            lhs.hasher_threads == rhs.hasher_threads && lhs.poll_timeout == rhs.poll_timeout &&
-           lhs.start_offline == rhs.start_offline;
+           lhs.start_offline == rhs.start_offline && lhs.dns_servers == rhs.dns_servers;
 }
 
 } // namespace syncspirit::config
