@@ -651,8 +651,7 @@ void test_deleted() {
         using paths_t = std::vector<std::string>;
 
         void on_diff(const model::diff::advance::local_update_t &diff) noexcept override {
-            auto file = folder_info->get_file_infos().by_uuid(diff.uuid);
-            auto name = file->get_name()->get_full_name();
+            auto name = proto::get_name(diff.proto_local);
             paths.emplace_back(std::string(name));
         }
         void on_diff(const model::diff::local::file_availability_t &diff) noexcept override {
@@ -1994,9 +1993,8 @@ void test_traversal() {
         using paths_t = std::vector<std::string>;
 
         void on_diff(const model::diff::advance::local_update_t &diff) noexcept override {
-            auto file = folder_info->get_file_infos().by_uuid(diff.uuid);
-            auto name = file->get_name()->get_full_name();
-            paths.emplace_back(std::string(name));
+            auto name = proto::get_name(diff.proto_source);
+            paths.push_back(std::string(name));
         }
 
         void main(const utils::allocator_t &allocator) noexcept override {

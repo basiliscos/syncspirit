@@ -362,7 +362,7 @@ TEST_CASE("loading cluster (file info + block)", "[model]") {
         REQUIRE(diff->apply(*controller, {}));
         auto &map = folder_info->get_file_infos();
         REQUIRE(map.size() == 1);
-        target = map.by_uuid(fi->get_uuid());
+        target = map.by_name(fi->get_name()->get_full_name());
         REQUIRE(target);
         REQUIRE(map.by_name(fi->get_name()->get_full_name()));
         REQUIRE(target->iterate_blocks().get_total() == 11);

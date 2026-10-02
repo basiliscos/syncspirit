@@ -316,7 +316,6 @@ inline std::int64_t get_sequence(const model::file_info_ptr_t &file) noexcept { 
 using file_map_base_t = mi::multi_index_container<
     model::file_info_ptr_t,
     mi::indexed_by<
-        mi::hashed_unique<mi::global_fun<const model::file_info_ptr_t &, utils::bytes_view_t, &get_uuid>>,
         mi::hashed_unique<mi::global_fun<const model::file_info_ptr_t &, std::string_view, &get_name>>,
         mi::ordered_unique<mi::global_fun<const model::file_info_ptr_t &, std::int64_t, &get_sequence>>
     >
@@ -341,7 +340,7 @@ struct files_map_t : file_details::file_map_base_t {
 
 struct SYNCSPIRIT_API file_infos_map_t : private file_details::file_map_base_t {
     using parent_t = file_details::file_map_base_t;
-    using seq_projection_t = std::remove_cv_t<decltype(std::declval<parent_t>().template get<2>())>;
+    using seq_projection_t = std::remove_cv_t<decltype(std::declval<parent_t>().template get<1>())>;
     using seq_iterator_t = decltype(std::declval<seq_projection_t>().begin());
     using range_t = std::pair<seq_iterator_t, seq_iterator_t>;
 
@@ -352,7 +351,6 @@ struct SYNCSPIRIT_API file_infos_map_t : private file_details::file_map_base_t {
 
     bool put(const model::file_info_ptr_t &item, bool replace = true) noexcept;
     void remove(const model::file_info_ptr_t &item) noexcept;
-    file_info_ptr_t by_uuid(utils::bytes_view_t) const noexcept;
     file_info_ptr_t by_name(std::string_view name) const noexcept;
     file_info_ptr_t by_sequence(std::int64_t sequence) const noexcept;
     seq_projection_t &sequence_projection() noexcept;
