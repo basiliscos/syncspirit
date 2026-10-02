@@ -732,7 +732,7 @@ bool file_infos_map_t::put(const model::file_info_ptr_t &item, bool replace) noe
         result = inserted;
     }
     {
-        auto &proj = parent_t::template get<2>();
+        auto &proj = parent_t::template get<1>();
         auto [it, inserted] = proj.emplace(item);
         if (!inserted && replace) {
             proj.replace(it, item);
@@ -744,30 +744,23 @@ bool file_infos_map_t::put(const model::file_info_ptr_t &item, bool replace) noe
 }
 
 void file_infos_map_t::remove(const model::file_info_ptr_t &item) noexcept {
-    parent_t::template get<0>().erase(item->get_uuid());
-    parent_t::template get<1>().erase(file_details::get_name(item));
-    parent_t::template get<2>().erase(item->get_sequence());
-}
-
-file_info_ptr_t file_infos_map_t::by_uuid(utils::bytes_view_t uuid) const noexcept {
-    auto &proj = parent_t::template get<0>();
-    auto it = proj.find(uuid);
-    return it != proj.end() ? *it : file_info_ptr_t();
+    parent_t::template get<0>().erase(file_details::get_name(item));
+    parent_t::template get<1>().erase(item->get_sequence());
 }
 
 file_info_ptr_t file_infos_map_t::by_name(std::string_view name) const noexcept {
-    auto &proj = parent_t::template get<1>();
+    auto &proj = parent_t::template get<0>();
     auto it = proj.find(name);
     return it != proj.end() ? *it : file_info_ptr_t();
 }
 
 file_info_ptr_t file_infos_map_t::by_sequence(std::int64_t sequence) const noexcept {
-    auto &proj = parent_t::template get<2>();
+    auto &proj = parent_t::template get<1>();
     auto it = proj.find(sequence);
     return it != proj.end() ? *it : file_info_ptr_t();
 }
 
-auto file_infos_map_t::sequence_projection() noexcept -> seq_projection_t & { return parent_t::template get<2>(); }
+auto file_infos_map_t::sequence_projection() noexcept -> seq_projection_t & { return parent_t::template get<1>(); }
 
 auto file_infos_map_t::range(std::int64_t lower, std::int64_t upper) noexcept -> range_t {
     auto &proj = sequence_projection();

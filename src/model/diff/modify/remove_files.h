@@ -11,6 +11,7 @@ namespace syncspirit::model::diff::modify {
 
 struct SYNCSPIRIT_API remove_files_t final : generic_remove_t {
     using generic_remove_t::generic_remove_t;
+    using names_t = std::vector<std::string>;
 
     remove_files_t(const folder_info_t &fi, const file_infos_map_t &files,
                    orphaned_blocks_t *orphaned_blocks = nullptr) noexcept;
@@ -18,6 +19,7 @@ struct SYNCSPIRIT_API remove_files_t final : generic_remove_t {
     outcome::result<void> apply_impl(apply_controller_t &, void *) const noexcept override;
     outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;
 
+    names_t names;
     utils::bytes_t device_id;
     std::string folder_id;
 };

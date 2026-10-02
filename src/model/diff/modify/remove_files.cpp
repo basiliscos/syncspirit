@@ -16,6 +16,7 @@ remove_files_t::remove_files_t(const folder_info_t &fi, const file_infos_map_t &
     folder_id = fi.get_folder()->get_id();
     device_id = device.device_id().get_sha256();
     keys.reserve(files.size());
+    names.reserve(files.size());
     auto local_orphaned_blocks = orphaned_blocks_t();
     auto &orphaned_blocks = orphaned_blocks_ ? *orphaned_blocks_ : local_orphaned_blocks;
     for (auto &file : files) {
@@ -25,6 +26,7 @@ remove_files_t::remove_files_t(const folder_info_t &fi, const file_infos_map_t &
         key[0] = db::prefix::file_info;
         std::copy(id.begin(), id.end(), key.data() + 1);
         keys.push_back(std::move(key));
+        names.push_back(std::string(file->get_name()->get_full_name()));
     }
     if (!orphaned_blocks_) {
         auto block_keys = local_orphaned_blocks.deduce();
@@ -48,9 +50,8 @@ auto remove_files_t::apply_impl(apply_controller_t &controller, void *custom) co
         auto peer_folder = folder_infos.by_device_id(device_id);
         if (peer_folder) {
             auto &file_infos = peer_folder->get_file_infos();
-            for (size_t i = 0; i < keys.size(); ++i) {
-                auto decomposed = file_info_t::decompose_key(keys[i]);
-                auto file = file_infos.by_uuid(decomposed.file_id);
+            for (size_t i = 0; i < names.size(); ++i) {
+                auto file = file_infos.by_name(names[i]);
                 file_infos.remove(file);
             }
         }
