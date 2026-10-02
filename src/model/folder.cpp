@@ -34,11 +34,11 @@ outcome::result<folder_ptr_t> folder_t::create(const bu::uuid &uuid, const db::F
     return outcome::success(std::move(ptr));
 }
 
-folder_t::folder_t(utils::bytes_view_t key_) noexcept : synchronizing{false}, suspended{false} {
+folder_t::folder_t(utils::bytes_view_t key_) noexcept : entity_t(new utils::path_t()),  synchronizing{false}, suspended{false} {
     std::copy(key_.begin(), key_.end(), key);
 }
 
-folder_t::folder_t(const bu::uuid &uuid) noexcept : synchronizing{false}, suspended{false} {
+folder_t::folder_t(const bu::uuid &uuid) noexcept : entity_t(new utils::path_t()), synchronizing{false}, suspended{false} {
     key[0] = prefix;
     std::copy(uuid.begin(), uuid.end(), key + 1);
 }

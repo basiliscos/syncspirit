@@ -225,6 +225,7 @@ add_library(syncspirit_core
     src/model/device.cpp
     src/model/device_id.cpp
     src/model/device_state.cpp
+    src/model/entity.cpp
     src/model/file_info.cpp
     src/model/folder.cpp
     src/model/folder_data.cpp
@@ -300,6 +301,7 @@ add_library(syncspirit_core
     src/utils/tls.cpp
     src/utils/uri.cpp
     src/utils/utf8.cpp
+    src/model/presence.h
 )
 
 set_source_files_properties(
