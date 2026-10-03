@@ -63,7 +63,7 @@ struct SYNCSPIRIT_API folder_t final : augmentable_t, folder_data_t {
 
     using folder_data_t::get_path;
     using folder_data_t::set_path;
-    std::optional<proto::Folder> generate(const model::device_t &device) const noexcept;
+    std::optional<proto::Folder> generate(const device_t &device) const noexcept;
 
     template <typename T> auto &access() noexcept;
     template <typename T> auto &access() const noexcept;
@@ -78,7 +78,6 @@ struct SYNCSPIRIT_API folder_t final : augmentable_t, folder_data_t {
 
     pt::ptime scan_start;
     pt::ptime scan_finish;
-    device_ptr_t device;
     folder_infos_map_t folder_infos;
     file_matchers_t file_matchers;
     cluster_t *cluster = nullptr;
