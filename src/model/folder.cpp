@@ -88,7 +88,7 @@ void folder_t::serialize(syncspirit::db::Folder &dest) const noexcept {
 auto folder_t::is_shared_with(const model::device_t &device) const noexcept -> folder_info_t* {
     for (auto p : presences) {
         if (p->get_device()->device_id() == device.device_id()) {
-            return static_cast<folder_info_t*>(p);
+            return static_cast<folder_info_t*>(p.get());
         }
     }
 
@@ -110,7 +110,7 @@ std::optional<proto::Folder> folder_t::generate(const model::device_t &device) c
     proto::set_paused(r, paused);
 
     for (auto p: presences) {
-        auto &fi = *static_cast<folder_info_t*>(p);
+        auto &fi = *static_cast<folder_info_t*>(p.get());
         auto &d = *fi.get_device();
         auto introducer = d.is_introducer();
         auto &pd = proto::add_devices(r);
@@ -191,7 +191,7 @@ folder_info_t* folder_t::get_folder_info(utils::bytes_view_t device_sha256) noex
     for (auto p: presences) {
         if (auto d = p->get_device(); d) {
             if (d->device_id().get_sha256() == device_sha256) {
-                return static_cast<folder_info_t*>(p);
+                return static_cast<folder_info_t*>(p.get());
             }
         }
     }
@@ -200,7 +200,7 @@ folder_info_t* folder_t::get_folder_info(utils::bytes_view_t device_sha256) noex
 
 folder_info_t* folder_t::get_folder_info_by_uuid(utils::bytes_view_t uuid) noexcept {
     for (auto p: presences) {
-        auto fi = static_cast<folder_info_t*>(p);
+        auto fi = static_cast<folder_info_t*>(p.get());
         if (fi->get_uuid() == uuid) {
             return fi;
         }

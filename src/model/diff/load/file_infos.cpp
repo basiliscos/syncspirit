@@ -20,7 +20,7 @@ auto file_infos_t::apply_impl(apply_controller_t &controller, void *custom) cons
     auto &folders = cluster.get_folders();
     for (auto &f : folders) {
         for (auto p : f.item->get_presences()) {
-            auto f = static_cast<model::folder_info_t*>(p);
+            auto f = static_cast<model::folder_info_t*>(p.get());
             all_fi[f->get_uuid()] = f;
         }
     }

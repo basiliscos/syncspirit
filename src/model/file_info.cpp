@@ -410,7 +410,7 @@ void file_info_t::recheck(const folder_info_t &folder_info) noexcept {
         if (peer != self) {
             auto fit = peer->get_iterator();
             if (fit) {
-                auto fi = static_cast<model::folder_info_t*>(p);
+                auto fi = static_cast<model::folder_info_t*>(p.get());
                 auto peer_file = fi->get_file_infos().by_name(name->get_full_name());
                 if (peer_file) {
                     fit->recheck(*fi, *peer_file);

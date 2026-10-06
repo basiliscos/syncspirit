@@ -1543,7 +1543,7 @@ void test_iterative_application_interrupt() {
                              model::payload::apply_context_t &context) noexcept override {
                     parent_t::process(diff, context);
                     auto &folder = cluster->get_folders().begin()->item;
-                    auto fi = static_cast<model::folder_info_t*>(folder->get_presences().front());
+                    auto fi = static_cast<model::folder_info_t*>(folder->get_presences().front().get());
                     if (fi->get_file_infos().size() == 10) {
                         do_shutdown();
                         resources->acquire(0);

@@ -204,7 +204,7 @@ int folder_context_t::process(unexamined_t &child_info, stack_context_t &ctx) no
                             auto &folder_path = folder->get_path();
                             auto name = child_info.path.relativize(folder_path);
                             for (auto p : folder->get_presences()) {
-                                auto fi = static_cast<model::folder_info_t*>(p);
+                                auto fi = static_cast<model::folder_info_t*>(p.get());
                                 if (auto file = fi->get_file_infos().by_name(name)) {
                                     auto augmentation = file->get_augmentation().get();
                                     auto file_presence = static_cast<cluster_file_presence_t *>(augmentation);

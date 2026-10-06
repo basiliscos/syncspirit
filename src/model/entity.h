@@ -55,8 +55,7 @@ struct SYNCSPIRIT_API entity_t : model::augmentable_t {
     };
 
     using children_t = std::set<entity_t *, name_comparator_t>;
-    using child_presences_t = std::vector<presence_t *>;
-    using presences_t = std::vector<presence_t *>;
+    using presences_t = std::vector<presence_ptr_t>;
 
     entity_t(utils::path_ptr_t path, entity_t *parent = nullptr) noexcept;
     virtual ~entity_t();

@@ -433,7 +433,7 @@ cluster_update_t::cluster_update_t(const utils::path_t &default_path, const clus
     if (!source.get_skip_introduction_removals()) {
         for (auto fit : cluster.get_folders()) {
             for (auto p : fit.item->get_presences()) {
-                auto &fi = *static_cast<model::folder_info_t*>(p);
+                auto &fi = *static_cast<model::folder_info_t*>(p.get());
                 auto &i_device = fi.get_device()->device_id();
                 if (fi.is_introduced_by(source.device_id())) {
                     auto remove_fi = !confirmed_folders.count(fi.get_key()) && !removed_folders.count(fi.get_uuid());

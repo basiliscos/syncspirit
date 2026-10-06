@@ -53,7 +53,7 @@ void entity_t::push_stats(const presence_stats_t &diff, const model::device_t *s
             if (!p) {
                 for (auto pp : e->presences) {
                     if (pp->device == source) {
-                        p = pp;
+                        p = pp.get();
                         break;
                     }
                 }
@@ -145,7 +145,7 @@ auto entity_t::recalc_best() noexcept -> const presence_t * {
                 continue;
             }
             if (!best) {
-                best = p;
+                best = p.get();
             } else {
                 best = p->determine_best(best);
             }
@@ -159,9 +159,9 @@ presence_t *entity_t::get_presence(const model::device_t *device) noexcept {
     presence_t *r = nullptr;
     for (auto p : presences) {
         if (p->device == device) {
-            return p;
+            return p.get();
         } else if (!p->device) {
-            r = p;
+            r = p.get();
         }
     }
     return r;
@@ -274,8 +274,6 @@ mg_t::~monitor_guard_t() {
 using bl_t = entity_t::bulk_loader_t;
 
 bl_t& bl_t::add(presence_t* presence) noexcept {
-    // model::intrusive_ptr_add_ref(presence);
-    // entity.presences.push_back(presence);
     return *this;
 }
 
