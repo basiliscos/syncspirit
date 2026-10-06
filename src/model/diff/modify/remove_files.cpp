@@ -46,8 +46,7 @@ auto remove_files_t::apply_impl(apply_controller_t &controller, void *custom) co
     auto &folders = cluster.get_folders();
     auto folder = folders.by_id(folder_id);
     if (folder) {
-        auto &folder_infos = folder->get_folder_infos();
-        auto peer_folder = folder_infos.by_device_id(device_id);
+        auto peer_folder = folder->get_folder_info(device_id);
         if (peer_folder) {
             auto &file_infos = peer_folder->get_file_infos();
             for (size_t i = 0; i < names.size(); ++i) {

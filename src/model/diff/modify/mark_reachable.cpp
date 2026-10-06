@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "mark_reachable.h"
 #include "model/cluster.h"
@@ -21,7 +21,7 @@ auto mark_reachable_t::apply_impl(apply_controller_t &controller, void *custom) 
     auto &cluster = controller.get_cluster();
     auto folder = cluster.get_folders().by_id(folder_id);
     auto device = cluster.get_devices().by_sha256(device_id);
-    auto folder_info = folder->get_folder_infos().by_device(*device);
+    auto folder_info = folder->get_folder_info(*device);
     auto file = folder_info->get_file_infos().by_name(file_name);
 
     LOG_TRACE(log, "applying reachable ({}) for '{}'", reachable, *file);

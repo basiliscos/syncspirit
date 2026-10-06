@@ -37,6 +37,7 @@ TEST_CASE("file-info", "[model]") {
     db::set_index_id(db_folder_info, 2);
     db::set_max_sequence(db_folder_info, 3);
     auto folder_info = folder_info_t::create(sequencer->next_uuid(), db_folder_info, my_device, folder).value();
+    folder->get_loader().add(folder_info.get());
 
     proto::FileInfo pr_fi;
     auto name = "a/b.txt";
@@ -88,9 +89,8 @@ TEST_CASE("file_info_t::local_file", "[model]") {
     REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
 
     auto folder = folders.by_id("1234-5678");
-    auto &folder_infos = folder->get_folder_infos();
-    auto folder_my = folder_infos.by_device(*my_device);
-    auto folder_peer = folder_infos.by_device(*peer_device);
+    auto folder_my = folder->get_folder_info(*my_device);
+    auto folder_peer = folder->get_folder_info(*peer_device);
 
     auto pr_file = proto::FileInfo();
     proto::set_name(pr_file, "a.txt");
@@ -133,8 +133,7 @@ TEST_CASE("file_info_t::check_consistency", "[model]") {
     REQUIRE(builder.apply());
 
     auto folder = folders.by_id("1234-5678");
-    auto &folder_infos = folder->get_folder_infos();
-    auto folder_my = folder_infos.by_device(*my_device);
+    auto folder_my = folder->get_folder_info(*my_device);
 
     auto pr_file = proto::FileInfo();
     proto::set_name(pr_file, "a.txt");
@@ -171,8 +170,7 @@ TEST_CASE("file_info_t::create, inconsistent source", "[model]") {
     REQUIRE(builder.apply());
 
     auto folder = folders.by_id("1234-5678");
-    auto &folder_infos = folder->get_folder_infos();
-    auto folder_my = folder_infos.by_device(*my_device);
+    auto folder_my = folder->get_folder_info(*my_device);
 
     auto pr_block = proto::BlockInfo();
     proto::set_size(pr_block, 131072);
@@ -205,8 +203,7 @@ TEST_CASE("file_info_t::get_size", "[model]") {
     REQUIRE(builder.apply());
 
     auto folder = folders.by_id("1234-5678");
-    auto &folder_infos = folder->get_folder_infos();
-    auto folder_local = folder_infos.by_device(*local_device);
+    auto folder_local = folder->get_folder_info(*local_device);
 
     auto b_hash = utils::sha256_digest(as_bytes("12345")).value();
     auto pr_block = proto::BlockInfo();
@@ -270,8 +267,7 @@ TEST_CASE("file_info_t::update", "[model]") {
     REQUIRE(builder.apply());
 
     auto folder = folders.by_id("1234-5678");
-    auto &folder_infos = folder->get_folder_infos();
-    auto folder_local = folder_infos.by_device(*local_device);
+    auto folder_local = folder->get_folder_info(*local_device);
 
     auto pr_block = proto::BlockInfo();
     proto::set_size(pr_block, 5);
@@ -359,8 +355,7 @@ TEST_CASE("file_info_t::make_conflicting_name for wstrings", "[model]") {
     REQUIRE(builder.apply());
 
     auto folder = folders.by_id("1234-5678");
-    auto &folder_infos = folder->get_folder_infos();
-    auto folder_local = folder_infos.by_device(*local_device);
+    auto folder_local = folder->get_folder_info(*local_device);
 
     auto name = boost::nowide::narrow(L"папка/файл.1ц");
 

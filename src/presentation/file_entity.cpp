@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2025-2026 Ivan Baidakou
 
 #include "file_entity.h"
 #include "local_file_presence.h"
@@ -17,7 +17,7 @@ using namespace syncspirit::presentation;
 
 using F = presence_t::features_t;
 
-file_entity_t::file_entity_t(utils::path_ptr_t path_, const model::folder_infos_map_t &fi_map) noexcept
+file_entity_t::file_entity_t(utils::path_ptr_t path_, const model::folder_t &folder) noexcept
     : entity_t(std::move(path_)) {
     using pair_t = std::pair<model::file_info_t *, model::folder_info_t *>;
     using presence_files_t = std::pmr::vector<pair_t>;
@@ -26,8 +26,9 @@ file_entity_t::file_entity_t(utils::path_ptr_t path_, const model::folder_infos_
     auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
     auto presence_files = presence_files_t(&pool);
 
-    for (auto &it_fi : fi_map) {
-        auto &folder_info = *it_fi.item;
+    auto& fps = folder.get_presences();
+    for (auto &fp : fps) {
+        auto &folder_info = *static_cast<model::folder_info_t*>(fp);
         auto &files_map = folder_info.get_file_infos();
         auto file = files_map.by_name(path->get_full_name());
         if (file) {

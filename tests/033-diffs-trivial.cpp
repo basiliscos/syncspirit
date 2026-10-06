@@ -2,7 +2,6 @@
 // SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "test-utils.h"
-#include "access.h"
 #include "diff-builder.h"
 #include "model/cluster.h"
 #include "model/diff/local/file_availability.h"
@@ -47,7 +46,7 @@ TEST_CASE("with file", "[model]") {
     REQUIRE(builder.apply());
 
     auto folder = cluster->get_folders().by_id("1234-5678");
-    auto folder_info = folder->get_folder_infos().by_device(*my_device);
+    auto folder_info = folder->get_folder_info(*my_device);
 
     auto pr_file = []() -> proto::FileInfo {
         auto f = proto::FileInfo();

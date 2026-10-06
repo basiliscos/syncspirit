@@ -234,6 +234,7 @@ add_library(syncspirit_core
     src/model/ignored_folder.cpp
     src/model/pending_device.cpp
     src/model/pending_folder.cpp
+    src/model/presence.cpp
     src/model/remote_view.cpp
     src/model/some_device.cpp
     src/model/version.cpp
@@ -379,8 +380,8 @@ if (SYNCSPIRIT_BUILD_TESTS)
     add_subdirectory("tests")
 endif()
 
-add_subdirectory("src/ui-daemon")
+# add_subdirectory("src/ui-daemon")
 
-if (SYNCSPIRIT_FRONTEND_FLTK)
-    add_subdirectory("src/ui-fltk")
-endif()
+# if (SYNCSPIRIT_FRONTEND_FLTK)
+#     add_subdirectory("src/ui-fltk")
+# endif()

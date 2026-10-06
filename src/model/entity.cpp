@@ -19,6 +19,10 @@ entity_t::~entity_t() {
     }
 }
 
+auto entity_t::get_loader() noexcept -> bulk_loader_t  {
+    return bulk_loader_t(*this);
+}
+
 void entity_t::clear_children() noexcept {
     for (auto it = children.begin(); it != children.end();) {
         detach_child(**it);
@@ -69,6 +73,13 @@ void entity_t::push_stats(const presence_stats_t &diff, const model::device_t *s
         }
         e = e->parent;
     }
+}
+
+
+void entity_t::add_presense(presence_t &item) noexcept {
+    assert(std::find(presences.begin(), presences.end(), &item) == presences.end());
+    model::intrusive_ptr_add_ref(&item);
+    presences.push_back(&item);
 }
 
 void entity_t::remove_presense(presence_t &item) noexcept {
@@ -213,6 +224,14 @@ void entity_t::commit(const utils::path_t &path, const model::device_t *device) 
     }
 }
 
+void entity_t::commit_presences() noexcept {
+    ++generation;
+    if (auto monitor = get_monitor(); monitor) {
+        monitor->on_update(*this);
+    }
+}
+
+
 auto entity_t::monitor(entities_monitor_t *monitor_) noexcept -> monitor_guard_t {
     this->entities_monitor = monitor_;
     return monitor_guard_t(this);
@@ -250,4 +269,16 @@ mg_t::~monitor_guard_t() {
     if (entity) {
         entity->entities_monitor = {};
     }
+}
+
+using bl_t = entity_t::bulk_loader_t;
+
+bl_t& bl_t::add(presence_t* presence) noexcept {
+    // model::intrusive_ptr_add_ref(presence);
+    // entity.presences.push_back(presence);
+    return *this;
+}
+
+bl_t::~bulk_loader_t() {
+    entity.commit_presences();
 }

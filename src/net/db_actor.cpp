@@ -933,19 +933,16 @@ auto db_actor_t::operator()(const model::diff::modify::upsert_folder_info_t &dif
 
     auto device = cluster->get_devices().by_sha256(diff.device_id);
     auto folder = cluster->get_folders().by_id(diff.folder_id);
-    auto folder_info = folder->get_folder_infos().by_device(*device);
+    auto folder_info = folder->get_folder_info(*device);
 
-    auto r = save_folder_info(*folder_info, custom);
-    if (!r) {
-        return r.assume_error();
+    if (folder_info) {
+        auto r = save_folder_info(*folder_info, custom);
+        if (!r) {
+            return r.assume_error();
+        }
     }
 
-    r = diff.visit_next(*this, custom);
-    if (!r) {
-        return r.assume_error();
-    }
-
-    return r;
+    return diff.visit_next(*this, custom);
 }
 
 auto db_actor_t::operator()(const model::diff::advance::advance_t &diff, void *custom) noexcept
@@ -956,7 +953,7 @@ auto db_actor_t::operator()(const model::diff::advance::advance_t &diff, void *c
 
     auto folder = cluster->get_folders().by_id(diff.folder_id);
     if (folder && !folder->is_suspended()) {
-        auto folder_info = folder->get_folder_infos().by_device(*cluster->get_device());
+        auto folder_info = folder->get_folder_info(*cluster->get_device());
         if (folder_info) {
             auto name = proto::get_name(diff.proto_local);
             auto file = folder_info->get_file_infos().by_name(name);
@@ -976,7 +973,7 @@ auto db_actor_t::operator()(const model::diff::advance::advance_t &diff, void *c
                 }
 
                 auto folder_infos = reinterpret_cast<folder_infos_set_t *>(custom);
-                folder_infos->emplace(folder_info.get());
+                folder_infos->emplace(folder_info);
             } else {
                 LOG_WARN(log, "file '{}' is missing in a model", name);
             }
@@ -1004,32 +1001,37 @@ auto db_actor_t::operator()(const model::diff::peer::update_folder_t &diff, void
     auto &txn = *txn_opt.assume_value();
 
     auto folder = cluster->get_folders().by_id(diff.folder_id);
-    auto folder_info = folder->get_folder_infos().by_device_id(diff.peer_id);
+    auto device = cluster->get_devices().by_sha256(diff.peer_id);
+    if (device) {
+        auto folder_info = folder->get_folder_info(*device);
+        if (folder_info) {
 
-    auto fi_key = folder_info->get_key();
-    auto fi_data = folder_info->serialize();
-    auto r = db::save({fi_key, fi_data}, txn);
-    if (!r) {
-        return r.assume_error();
-    }
+            auto fi_key = folder_info->get_key();
+            auto fi_data = folder_info->serialize();
+            auto r = db::save({fi_key, fi_data}, txn);
+            if (!r) {
+                return r.assume_error();
+            }
 
-    auto &files_map = folder_info->get_file_infos();
-    for (const auto &f : diff.files) {
-        auto name = proto::get_name(f);
-        auto file = files_map.by_name(name);
-        LOG_TRACE(log, "saving '{}', seq. = {}", *file, file->get_sequence());
-        unsigned char key[model::file_info_t::data_length + 1];
-        key[0] = db::prefix::file_info;
-        auto id = file->get_full_id();
-        std::copy(id.begin(), id.end(), key + 1);
-        auto data = file->serialize();
-        auto r = db::save({key, data}, txn);
-        if (!r) {
-            return r.assume_error();
+            auto &files_map = folder_info->get_file_infos();
+            for (const auto &f : diff.files) {
+                auto name = proto::get_name(f);
+                auto file = files_map.by_name(name);
+                LOG_TRACE(log, "saving '{}', seq. = {}", *file, file->get_sequence());
+                unsigned char key[model::file_info_t::data_length + 1];
+                key[0] = db::prefix::file_info;
+                auto id = file->get_full_id();
+                std::copy(id.begin(), id.end(), key + 1);
+                auto data = file->serialize();
+                auto r = db::save({key, data}, txn);
+                if (!r) {
+                    return r.assume_error();
+                }
+            }
         }
     }
 
-    r = diff.visit_next(*this, custom);
+    auto r = diff.visit_next(*this, custom);
     if (!r) {
         return r.assume_error();
     }

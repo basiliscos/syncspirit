@@ -24,8 +24,7 @@ local_update_t::local_update_t(const cluster_t &cluster, sequencer_t &sequencer,
     auto &self = *cluster.get_device();
     auto self_id = self.device_id().get_sha256();
 
-    auto &folder_infos = folder->get_folder_infos();
-    auto local_folder_info = folder_infos.by_device_id(self_id);
+    auto local_folder_info = folder->get_folder_info(self);
     auto &local_files = local_folder_info->get_file_infos();
     auto proto_name = proto::get_name(proto_file_);
     assert(proto_name.size());
@@ -33,7 +32,7 @@ local_update_t::local_update_t(const cluster_t &cluster, sequencer_t &sequencer,
     auto name = std::pmr::string(proto_name, allocator);
     auto local_file = local_files.by_name(name);
 
-    if (auto original_file = get_original(folder_infos, device, proto_file_); original_file) {
+    if (auto original_file = get_original(*folder, device, proto_file_); original_file) {
         initialize(cluster, sequencer, original_file->as_proto(true), name);
     } else {
         proto::set_modified_by(proto_file_, self.device_id().get_uint());
@@ -53,7 +52,7 @@ local_update_t::local_update_t(const cluster_t &cluster, sequencer_t &sequencer,
     }
 }
 
-auto local_update_t::get_original(const model::folder_infos_map_t &fis, const model::device_t &self,
+auto local_update_t::get_original(const model::folder_t &folder, const model::device_t &self,
                                   const proto::FileInfo &local_file) const noexcept -> model::file_info_ptr_t {
     auto r = model::file_info_ptr_t();
     auto name = proto::get_name(local_file);
@@ -64,8 +63,8 @@ auto local_update_t::get_original(const model::folder_infos_map_t &fis, const mo
     auto local_size = proto::get_size(local_file);
     auto local_type = model::file_info_t::as_flags(proto::get_type(local_file));
 
-    for (auto &it_fi : fis) {
-        auto fi = it_fi.item.get();
+    for (auto p: folder.get_presences()) {
+        auto fi = static_cast<model::folder_info_t*>(p);
         auto peer_file = model::file_info_ptr_t();
         if (fi->get_device() != &self) {
             auto &peer_files = fi->get_file_infos();

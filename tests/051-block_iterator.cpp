@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "test-utils.h"
 #include "model/cluster.h"
@@ -38,8 +38,7 @@ TEST_CASE("block iterator", "[model]") {
     REQUIRE(builder.apply());
 
     auto folder = folders.by_id("1234-5678");
-    auto &folder_infos = folder->get_folder_infos();
-    auto my_folder = folder_infos.by_device(*my_device);
+    auto my_folder = folder->get_folder_info(*my_device);
 
     auto p_file = proto::FileInfo();
     proto::set_name(p_file, "a.txt");

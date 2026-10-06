@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "remote_copy.h"
 #include "../cluster_visitor.h"
@@ -25,7 +25,7 @@ auto remote_copy_t::apply_impl(apply_controller_t &controller, void *custom) con
     } else if (folder->is_suspended()) {
         LOG_DEBUG(log, "remote_copy_t, folder = {}, name = {}, folder is suspended, ignoring", folder_id,
                   proto::get_name(proto_source));
-    } else if (auto peer_folder = folder->get_folder_infos().by_device_id(peer_id); !peer_folder) {
+    } else if (auto peer_folder = folder->get_folder_info(peer_id); !peer_folder) {
         LOG_DEBUG(log, "remote_copy_t, folder = {}, name = {}, peer folder is not available, ignoring", folder_id,
                   proto::get_name(proto_source));
     } else {

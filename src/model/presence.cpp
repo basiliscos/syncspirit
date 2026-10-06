@@ -1,0 +1,234 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-FileCopyrightText: 2025 Ivan Baidakou
+
+#include "entity.h"
+#include "presence.h"
+#if 0
+#include "cluster_file_presence.h"
+#endif
+#include <spdlog/spdlog.h>
+
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32) || defined(__APPLE__)
+#include <uni_algo/case.h>
+#endif
+
+namespace syncspirit::model {
+
+using F = presence_t::features_t;
+using CP = presence_t::child_comparator_t;
+
+bool CP::operator()(const presence_t *l, const presence_t *r) const {
+    auto lf = l->get_features();
+    if (lf & F::missing) {
+        assert(l->entity->best);
+        l = l->entity->best;
+        lf = l->get_features();
+    }
+    auto rf = r->get_features();
+    if (rf & F::missing) {
+        assert(r->entity->best);
+        r = r->entity->best;
+        rf = r->get_features();
+    }
+
+    auto ld = lf & F::directory;
+    auto rd = rf & F::directory;
+    if (ld && !rd) {
+        return true;
+    } else if (!ld && rd) {
+        return false;
+    }
+    auto l_name = l->entity->get_path()->get_filename();
+    auto r_name = r->entity->get_path()->get_filename();
+    return l_name < r_name;
+}
+
+bool CP::operator()(const presence_t *l, const presence_like_t &r) const {
+    auto lf = l->get_features();
+    if (lf & F::missing) {
+        assert(l->entity->best);
+        l = l->entity->best;
+        lf = l->get_features();
+    }
+    auto ld = lf & F::directory;
+    auto rd = r.is_dir;
+
+    if (ld && !rd) {
+        return true;
+    } else if (!ld && rd) {
+        return false;
+    }
+    return l->entity->get_path()->get_filename() < r.name;
+}
+
+presence_t *get_child(presence_t *parent, std::string_view name, bool is_dir) noexcept {
+    return parent ? parent->get_child(name, is_dir) : nullptr;
+}
+
+presence_t::presence_t(entity_t *entity_, model::device_t *device_) noexcept
+    : entity{entity_}, device{device_}, parent{nullptr} {
+    if (entity) {
+        entity->add_presense(*this);
+    }
+}
+
+presence_t::~presence_t() { clear_presense(); }
+
+presence_t *presence_t::get_parent() noexcept { return parent; }
+entity_t *presence_t::get_entity() noexcept { return entity; }
+auto presence_t::get_features() const noexcept -> std::uint32_t { return features; }
+const presence_stats_t &presence_t::get_own_stats() const noexcept { return own_statistics; }
+
+const presence_stats_t &presence_t::get_stats(bool sync) const noexcept {
+    if (sync) {
+        sync_with_entity();
+    }
+    return statistics;
+}
+
+presence_t *presence_t::set_parent(entity_t *parent_entity, presence_t *parent_) noexcept {
+    if (parent_entity && device) {
+        if (!parent_) {
+            parent_ = parent_entity->get_presence(device);
+        }
+        if (parent_ && parent_->device == device) {
+            parent = parent_;
+            parent_entity->push_stats(get_stats(), device, false);
+            for (auto child_entity : entity->children) {
+                for (auto child_presence : child_entity->presences) {
+                    if (child_presence->device == device) {
+                        if (!child_presence->parent) {
+                            child_presence->set_parent(entity, this);
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    return parent;
+}
+
+void presence_t::clear_presense() noexcept {
+    if (extension) {
+        extension->on_delete();
+        extension = {};
+    }
+    if (entity) {
+        entity->remove_presense(*this);
+        if (!(features & F::missing)) {
+            auto ex_entity = entity;
+            model::intrusive_ptr_release(ex_entity);
+        }
+        assert(statistics.size == 0);
+        assert(statistics.entities == 0);
+        entity = nullptr;
+    }
+}
+
+void presence_t::on_delete() noexcept { clear_presense(); }
+void presence_t::on_update() noexcept {
+    if (auto monitor = entity->get_monitor(); monitor) {
+        monitor->on_update(*entity);
+    }
+}
+
+const presence_t *presence_t::determine_best(const presence_t *other) const { return other; }
+
+void presence_t::sync_with_entity() const noexcept {
+    static constexpr auto mask = F::cluster | F::folder;
+    if (entity_generation != entity->generation && (features & mask)) {
+        entity_generation = entity->generation;
+        statistics.cluster_entries = 0;
+
+#if 0
+        for (auto &child_entity : entity->get_children()) {
+            auto child_presence = const_cast<presence_t *>(child_entity->get_presence(device));
+            if (child_presence->features & F::cluster) {
+                auto child = static_cast<cluster_file_presence_t *>(child_presence);
+                child->sync_with_entity();
+                statistics.cluster_entries += child->statistics.cluster_entries;
+            }
+        }
+
+        if (features & (F::file | F::directory)) {
+            auto best_version = proto::Counter();
+            for (auto p : entity->presences) {
+                if ((p == entity->best) && (p->get_features() & F::cluster)) {
+                    auto best = static_cast<cluster_file_presence_t *>(p);
+                    best_version = best->get_file_info().get_version().get_best();
+                    break;
+                }
+            }
+            assert(features & F::cluster);
+            auto const_self = static_cast<const cluster_file_presence_t *>(this);
+            auto self = const_cast<cluster_file_presence_t *>(const_self);
+            if (self->get_file_info().get_version().get_best() == best_version) {
+                ++statistics.cluster_entries;
+            }
+        } else if (features & F::directory) {
+            ++statistics.cluster_entries;
+        }
+#endif
+        std::abort();
+    }
+}
+
+auto presence_t::get_children() noexcept -> children_t & {
+    auto &e_children = entity->children;
+    if (children.size() != e_children.size()) {
+        children.clear();
+        children.reserve(e_children.size());
+        for (auto &c : e_children) {
+            auto p = const_cast<presence_t *>(c->get_presence(device));
+            if (p->entity->best) {
+                children.emplace_back(p);
+            }
+        }
+        std::sort(children.begin(), children.end(), child_comparator_t{});
+    }
+    return children;
+}
+
+presence_t *presence_t::get_child(std::string_view name, bool is_dir) noexcept {
+    auto comparator = child_comparator_t{};
+    auto presence_like = presence_t::presence_like_t{name, is_dir};
+    auto &chilren = get_children();
+    auto it = std::lower_bound(children.begin(), children.end(), presence_like, comparator);
+    if (it != children.end()) {
+        auto &p = *it;
+        if (p->get_entity()->get_path()->get_filename() == name) {
+            auto p_dir = (bool)(p->features & F::directory);
+            if (!(p_dir xor is_dir)) {
+                if (!(p->features & F::missing)) {
+                    return p;
+                }
+            }
+        }
+    }
+    return nullptr;
+}
+
+void presence_t::clear_children() noexcept { children.clear(); }
+
+bool presence_t::is_unique() const noexcept {
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32) || defined(__APPLE__)
+    using una::caseless::compare_utf8;
+    if (!(features & F::deleted)) {
+        if (parent && parent->entity) {
+            auto my_name = entity->get_path()->get_filename();
+            for (auto c : parent->get_children()) {
+                if (c != this && !(c->features & F::deleted)) {
+                    auto other_name = c->entity->get_path()->get_filename();
+                    if (compare_utf8(my_name, other_name) == 0) {
+                        return false;
+                    }
+                }
+            }
+        }
+    }
+#endif
+    return true;
+}
+
+}

@@ -4,7 +4,6 @@
 #include "test-utils.h"
 #include "diff-builder.h"
 #include "model/cluster.h"
-#include "model/misc/error_code.h"
 #include "model/misc/file_iterator.h"
 
 using namespace syncspirit;
@@ -41,8 +40,7 @@ TEST_CASE("folder upsert", "[model]") {
     REQUIRE(builder.upsert_folder("1234-5678", "/my/path").apply());
     REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
     auto folder = folders.by_id("1234-5678");
-    auto folder_infos = &folder->get_folder_infos();
-    REQUIRE(folder_infos->size() == 2u);
+    REQUIRE(folder->get_presences().size() == 2u);
 
     auto index = builder.make_index(peer_id.get_sha256(), folder->get_id());
     std::int64_t sequence = 10;
@@ -64,7 +62,7 @@ TEST_CASE("folder upsert", "[model]") {
         proto::set_sequence(pr, sequence++);
         index.add(pr, peer_device);
     }
-    auto peer_folder = folder_infos->by_device(*peer_device);
+    auto peer_folder = folder->get_folder_info(*peer_device);
     REQUIRE(index.finish().apply());
 
     peer_device->get_remote_view_map().push(peer_id.get_sha256(), folder->get_id(), peer_folder->get_index(),

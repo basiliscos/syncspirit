@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "advance.h"
 #include "remote_copy.h"
@@ -58,10 +58,8 @@ void advance_t::initialize(const cluster_t &cluster, sequencer_t &sequencer, pro
     auto folder = cluster.get_folders().by_id(folder_id);
     auto folder_id = folder->get_id();
     auto &self = *cluster.get_device();
-    auto self_id = self.device_id().get_sha256();
 
-    auto &local_folder_infos = folder->get_folder_infos();
-    auto local_folder_info = local_folder_infos.by_device_id(self_id);
+    auto local_folder_info = folder->get_folder_info(self);
     auto &local_files = local_folder_info->get_file_infos();
     auto local_file = local_files.by_name(local_file_name_);
 
@@ -146,8 +144,8 @@ auto advance_t::apply_impl(apply_controller_t &controller, void *custom) const n
     auto &cluster = controller.get_cluster();
     auto my_device = cluster.get_device();
     auto folder = cluster.get_folders().by_id(folder_id);
-    auto local_folder = folder->get_folder_infos().by_device(*my_device);
-    auto peer_folder = folder->get_folder_infos().by_device_id(peer_id);
+    auto local_folder = folder->get_folder_info(*my_device);
+    auto peer_folder = folder->get_folder_info(peer_id);
     auto name = proto::get_name(proto_local);
 
     auto prev_file = local_folder->get_file_infos().by_name(name);

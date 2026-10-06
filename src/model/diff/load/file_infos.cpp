@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "file_infos.h"
 #include "model/cluster.h"
@@ -14,13 +14,13 @@ auto file_infos_t::apply_forward(apply_controller_t &controller, void *custom) c
 }
 
 auto file_infos_t::apply_impl(apply_controller_t &controller, void *custom) const noexcept -> outcome::result<void> {
-    using folder_info_by_id_t = std::unordered_map<utils::bytes_view_t, folder_info_ptr_t>;
+    using folder_info_by_id_t = std::unordered_map<utils::bytes_view_t, folder_info_t*>;
     auto all_fi = folder_info_by_id_t{};
     auto &cluster = controller.get_cluster();
     auto &folders = cluster.get_folders();
     for (auto &f : folders) {
-        for (auto &it : f.item->get_folder_infos()) {
-            auto &f = it.item;
+        for (auto p : f.item->get_presences()) {
+            auto f = static_cast<model::folder_info_t*>(p);
             all_fi[f->get_uuid()] = f;
         }
     }

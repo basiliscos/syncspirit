@@ -20,8 +20,8 @@ auto file_availability_t::apply_impl(apply_controller_t &controller, void *custo
     auto &cluster = controller.get_cluster();
     auto folder = cluster.get_folders().by_id(folder_id);
     if (folder) {
-        auto &folder_info = *folder->get_folder_infos().by_device(*cluster.get_device());
-        auto f = folder_info.get_file_infos().by_name(name);
+        auto folder_info = folder->get_folder_info(*cluster.get_device());
+        auto f = folder_info->get_file_infos().by_name(name);
         if (f->get_version().identical_to(version)) {
             auto count = f->iterate_blocks().get_total();
             LOG_TRACE(log, "file_availability_t, mark local file '{}', blocks = {}", name, count);
@@ -31,7 +31,7 @@ auto file_availability_t::apply_impl(apply_controller_t &controller, void *custo
                 }
             }
             f->mark_local(true);
-            f->recheck(folder_info);
+            f->recheck(*folder_info);
             f->notify_update();
         }
     }

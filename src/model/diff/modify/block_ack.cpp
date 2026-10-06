@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "block_ack.h"
 #include "model/file_info.h"
@@ -30,7 +30,7 @@ auto block_ack_t::apply_impl(apply_controller_t &controller, void *custom) const
     auto folder = cluster.get_folders().by_id(folder_id);
     bool success = false;
     if (folder) {
-        auto folder_info = folder->get_folder_infos().by_device_id(device_id);
+        auto folder_info = folder->get_folder_info(device_id);
         if (folder_info) {
             auto file = folder_info->get_file_infos().by_name(file_name);
             if (file) {

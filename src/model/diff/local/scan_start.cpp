@@ -20,7 +20,7 @@ auto scan_start_t::apply_impl(apply_controller_t &controller, void *custom) cons
     auto r = applicator_t::apply_sibling(controller, custom);
 
     auto local_device = cluster.get_device();
-    auto &local_folder = *folder->get_folder_infos().by_device(*local_device);
+    auto &local_folder = *folder->get_folder_info(*local_device);
     auto &local_files = local_folder.get_file_infos();
     auto updated = false;
     for (auto &f : local_files) {

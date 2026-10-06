@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "test-utils.h"
 #include "model/cluster.h"
@@ -25,7 +25,7 @@ TEST_CASE("various block diffs", "[model]") {
     REQUIRE(builder.apply());
 
     auto folder = cluster->get_folders().by_id("1234-5678");
-    auto folder_info = folder->get_folder_infos().by_device(*my_device);
+    auto folder_info = folder->get_folder_info(*my_device);
 
     auto b1_hash = utils::sha256_digest(as_bytes("12345")).value();
     auto b2_hash = utils::sha256_digest(as_bytes("567890")).value();

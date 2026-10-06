@@ -405,12 +405,12 @@ void file_info_t::mark_local(bool available) noexcept {
 void file_info_t::recheck(const folder_info_t &folder_info) noexcept {
     auto self = folder_info.get_device();
     auto folder = folder_info.get_folder();
-    for (auto it : folder->get_folder_infos()) {
-        auto fi = it.item.get();
-        auto peer = fi->get_device();
+    for (auto p : folder->get_presences()) {
+        auto peer = const_cast<model::device_t*>(p->get_device());
         if (peer != self) {
             auto fit = peer->get_iterator();
             if (fit) {
+                auto fi = static_cast<model::folder_info_t*>(p);
                 auto peer_file = fi->get_file_infos().by_name(name->get_full_name());
                 if (peer_file) {
                     fit->recheck(*fi, *peer_file);

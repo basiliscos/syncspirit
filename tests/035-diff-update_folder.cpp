@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2025-2026 Ivan Baidakou
 
 #include "test-utils.h"
 #include "model/cluster.h"
@@ -88,7 +88,7 @@ TEST_CASE("folder update (Index), ignore blocks on non-files", "[model]") {
 
     auto &folders = cluster->get_folders();
     auto folder = folders.by_id("1234-5678");
-    auto folder_peer = folder->get_folder_infos().by_device(*peer_device);
+    auto folder_peer = folder->get_folder_info(*peer_device);
     CHECK(folder_peer->get_file_infos().size() == 1);
 };
 
@@ -114,7 +114,7 @@ TEST_CASE("update folder-2 (via Index)", "[model]") {
 
     auto sha256 = peer_id.get_sha256();
     SECTION("successful case") {
-        auto peer_folder_info = folder->get_folder_infos().by_device(*peer_device);
+        auto peer_folder_info = folder->get_folder_info(*peer_device);
 
         auto pr_file = proto::FileInfo();
         proto::set_name(pr_file, "a.txt");
@@ -252,7 +252,7 @@ TEST_CASE("update folder-2 (via Index)", "[model]") {
 
         REQUIRE(builder.make_index(sha256, "1234-5678").add(pr_file, peer_device).finish().apply());
 
-        auto peer_folder = folder->get_folder_infos().by_device(*peer_device);
+        auto peer_folder = folder->get_folder_info(*peer_device);
         auto &peer_files = peer_folder->get_file_infos();
         REQUIRE(peer_files.size() == 1);
 
@@ -392,7 +392,7 @@ TEST_CASE("update folder-3: duplicate files", "[model]") {
 
     auto sha256 = peer_id.get_sha256();
 
-    auto folder_peer = folder->get_folder_infos().by_device(*peer_device);
+    auto folder_peer = folder->get_folder_info(*peer_device);
 
     auto pr_file = proto::FileInfo();
     proto::set_name(pr_file, "a.txt");
@@ -451,7 +451,7 @@ TEST_CASE("update folder-3: duplicate files", "[model]") {
             .apply());
         // clang-format on
 
-        folder_peer = folder->get_folder_infos().by_device(*peer_device);
+        folder_peer = folder->get_folder_info(*peer_device);
 
         CHECK(blocks_map.size() == 1);
         CHECK(folder_peer->get_max_sequence() == 10ul);

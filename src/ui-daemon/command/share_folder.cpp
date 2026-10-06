@@ -79,7 +79,7 @@ bool share_folder_t::execute(governor_actor_t &actor) noexcept {
                   this->peer);
         return false;
     }
-    auto fi = folder->get_folder_infos().by_device(*device);
+    auto fi = folder->get_folder_info(*device);
     if (fi) {
         log->warn("{}, folder {} is already shared with {}", actor.get_identity(), this->folder, this->peer);
         return false;

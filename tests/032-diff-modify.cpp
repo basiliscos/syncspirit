@@ -37,7 +37,7 @@ TEST_CASE("cluster modifications from ui", "[model]") {
         CHECK(folder->get_path().get_full_name() == path);
         CHECK(folder->get_cluster() == cluster);
 
-        auto fi = folder->get_folder_infos().by_device(*my_device);
+        auto fi = folder->get_folder_info(*my_device);
         REQUIRE(fi);
         CHECK(fi->get_max_sequence() == 0);
         CHECK(fi->get_index() != 0);
@@ -53,7 +53,7 @@ TEST_CASE("cluster modifications from ui", "[model]") {
             REQUIRE(builder.share_folder(peer_id.get_sha256(), id).apply());
             auto folder = folders.by_id(id);
             REQUIRE(folder);
-            auto fi_peer = folder->get_folder_infos().by_device(*peer_device);
+            auto fi_peer = folder->get_folder_info(*peer_device);
             REQUIRE(fi_peer);
             CHECK(fi_peer->get_device() == peer_device);
             CHECK(fi_peer->get_max_sequence() == 0);
@@ -78,8 +78,8 @@ TEST_CASE("cluster modifications from ui", "[model]") {
             auto folder = folders.by_id(id);
             REQUIRE(folder);
             REQUIRE(folder->is_shared_with(*peer_device));
-            auto fi_peer = folder->get_folder_infos().by_device(*peer_device);
-            auto fi_my = folder->get_folder_infos().by_device(*my_device);
+            auto fi_peer = folder->get_folder_info(*peer_device);
+            auto fi_my = folder->get_folder_info(*my_device);
             REQUIRE(fi_my);
             REQUIRE(fi_peer);
 
@@ -119,7 +119,7 @@ TEST_CASE("cluster modifications from ui", "[model]") {
             file_my->assign_block(bi_2.get(), 1);
 
             REQUIRE(builder.unshare_folder(*fi_peer).apply());
-            REQUIRE(!folder->get_folder_infos().by_device(*peer_device));
+            REQUIRE(!folder->get_folder_info(*peer_device));
             REQUIRE(cluster->get_blocks().size() == 1);
             REQUIRE(!folder->is_shared_with(*peer_device));
         }

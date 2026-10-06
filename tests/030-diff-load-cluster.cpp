@@ -260,10 +260,11 @@ TEST_CASE("loading cluster (folder info)", "[model]") {
         folders.emplace_back(fi->get_key(), db_fi);
         auto diff = diff::cluster_diff_ptr_t(new diff::load::folder_infos_t(std::move(folders)));
         REQUIRE(diff->apply(*controller, {}));
-        auto &map = folder->get_folder_infos();
-        REQUIRE(map.size() == 1);
-        target = map.by_uuid(fi->get_uuid());
-        REQUIRE(map.by_device(*my_device));
+        auto &presences = folder->get_presences();
+        REQUIRE(presences.size() == 2);
+        target = static_cast<model::folder_info_t*>(presences.front());
+        CHECK(target->get_uuid() == fi->get_uuid());
+        CHECK(folder->get_folder_info(*my_device));
     }
 
     REQUIRE(target);
@@ -310,7 +311,7 @@ TEST_CASE("loading cluster (file info + block)", "[model]") {
     CHECK(folder_info);
     CHECK(folder_info->get_index() == 2ul);
     CHECK(folder_info->get_max_sequence() == 3ul);
-    folder->get_folder_infos().put(folder_info);
+    folder->get_loader().add(folder_info.get());
 
     proto::FileInfo pr_fi;
     proto::set_name(pr_fi, "a/b.txt");

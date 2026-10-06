@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2026 Ivan Baidakou
 
 #include "test-utils.h"
 #include "diff-builder.h"
@@ -61,9 +61,9 @@ TEST_CASE("remove folder", "[model]") {
 
     auto f1 = cluster->get_folders().by_id("f1");
     auto f2 = cluster->get_folders().by_id("f2");
-    auto fi_1_peer = f1->get_folder_infos().by_device(*peer_device);
-    auto fi_1_mine = f1->get_folder_infos().by_device(*my_device);
-    auto fi_2_mine = f2->get_folder_infos().by_device(*my_device);
+    auto fi_1_peer = f1->get_folder_info(*peer_device);
+    auto fi_1_mine = f1->get_folder_info(*my_device);
+    auto fi_2_mine = f2->get_folder_info(*my_device);
 
     auto file_1 = [&]() {
         proto::FileInfo pr_fi;

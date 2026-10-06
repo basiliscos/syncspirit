@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2026 Ivan Baidakou
 
 #include "scan_finish.h"
 #include "model/cluster.h"
@@ -19,7 +19,7 @@ auto scan_finish_t::apply_impl(apply_controller_t &controller, void *custom) con
     folder->set_scan_finish(at);
     auto r = applicator_t::apply_sibling(controller, custom);
     auto local_device = cluster.get_device();
-    auto &local_folder = *folder->get_folder_infos().by_device(*local_device);
+    auto &local_folder = *folder->get_folder_info(*local_device);
     local_folder.notify_update();
     folder->notify_update();
     return r;

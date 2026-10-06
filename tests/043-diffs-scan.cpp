@@ -27,7 +27,7 @@ TEST_CASE("scan_start, full", "[model]") {
     REQUIRE(builder.upsert_folder("f1", "some/path-1", "my-label-1").apply());
 
     auto folder = cluster->get_folders().by_id("f1");
-    auto folder_my = folder->get_folder_infos().by_device(*my_device);
+    auto folder_my = folder->get_folder_info(*my_device);
 
     proto::FileInfo pr_fi_1;
     proto::set_name(pr_fi_1, "a.bin");
@@ -65,7 +65,7 @@ TEST_CASE("scan_start, partial", "[model]") {
     REQUIRE(builder.upsert_folder("f1", "some/path-1", "my-label-1").apply());
 
     auto folder = cluster->get_folders().by_id("f1");
-    auto folder_my = folder->get_folder_infos().by_device(*my_device);
+    auto folder_my = folder->get_folder_info(*my_device);
     auto &file_infos = folder_my->get_file_infos();
 
     auto names = {"dir", "dir_x", "dir/sub_dir"};

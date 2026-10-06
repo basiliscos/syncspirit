@@ -2,7 +2,6 @@
 // SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "test-utils.h"
-#include "access.h"
 #include "model/cluster.h"
 #include "model/misc/sequencer.h"
 #include "diff-builder.h"
@@ -184,14 +183,14 @@ TEST_CASE("cluster update, new folder", "[model]") {
             db::set_index_id(db_fi, 5ul);
             db::set_max_sequence(db_fi, 10l);
             folder_info_my = folder_info_t::create(sequencer->next_uuid(), db_fi, my_device, folder).value();
-            folder->get_folder_infos().put(folder_info_my);
+            folder->get_loader().add(folder_info_my.get());
         }
         {
             db::FolderInfo db_fi;
             db::set_index_id(db_fi, 6ul);
             db::set_max_sequence(db_fi, 10l);
             folder_info_peer = folder_info_t::create(sequencer->next_uuid(), db_fi, peer_device, folder).value();
-            folder->get_folder_infos().put(folder_info_peer);
+            folder->get_loader().add(folder_info_peer.get());
         }
 
         auto cc = std::make_unique<proto::ClusterConfig>();
@@ -238,7 +237,6 @@ TEST_CASE("cluster update, new folder", "[model]") {
         folder->assign_cluster(cluster);
 
         cluster->get_folders().put(folder);
-        auto &folder_infos = folder->get_folder_infos();
 
         auto folder_info_my = folder_info_ptr_t();
         auto folder_info_peer = folder_info_ptr_t();
@@ -247,14 +245,14 @@ TEST_CASE("cluster update, new folder", "[model]") {
             db::set_index_id(db_fi, 5ul);
             db::set_max_sequence(db_fi, 10l);
             folder_info_my = folder_info_t::create(sequencer->next_uuid(), db_fi, my_device, folder).value();
-            folder_infos.put(folder_info_my);
+            folder->get_loader().add(folder_info_my.get());
         }
         {
             db::FolderInfo db_fi;
             db::set_index_id(db_fi, 6ul);
             db::set_max_sequence(db_fi, 10l);
             folder_info_peer = folder_info_t::create(sequencer->next_uuid(), db_fi, peer_device, folder).value();
-            folder_infos.put(folder_info_peer);
+            folder->get_loader().add(folder_info_peer.get());
 
             auto pr_file = proto::FileInfo();
             proto::set_name(pr_file, "a.txt");
@@ -284,10 +282,10 @@ TEST_CASE("cluster update, new folder", "[model]") {
                 auto &diff = diff_opt.value();
                 auto r_a = diff->apply(*controller, {});
                 REQUIRE(r_a);
-                auto fi = folder_infos.by_device(*peer_device);
+                auto fi = folder->get_folder_info(*peer_device);
                 CHECK(fi->get_index() == 1234ul);
                 CHECK(fi->get_max_sequence() == 0);
-                CHECK(fi.get() == folder_info_peer.get());
+                CHECK(fi == folder_info_peer.get());
 
                 bool visited = false;
                 auto visitor = my_cluster_update_visitor_t([&](auto &) { visited = true; });
@@ -308,10 +306,10 @@ TEST_CASE("cluster update, new folder", "[model]") {
                 auto &diff = diff_opt.value();
                 auto r_a = diff->apply(*controller, {});
                 REQUIRE(r_a);
-                auto fi = folder_infos.by_device(*peer_device);
+                auto fi = folder->get_folder_info(*peer_device);
                 CHECK(fi->get_index() == 0);
                 CHECK(fi->get_max_sequence() == 0);
-                CHECK(fi.get() == folder_info_peer.get());
+                CHECK(fi == folder_info_peer.get());
 
                 bool visited = false;
                 auto visitor = my_cluster_update_visitor_t([&](auto &) { visited = true; });
@@ -371,8 +369,7 @@ TEST_CASE("cluster update, reset folder", "[model]") {
         db::set_max_sequence(db_fi, 0l);
         folder_info_peer = folder_info_t::create(sequencer->next_uuid(), db_fi, peer_device, folder).value();
     }
-    folder->get_folder_infos().put(folder_info_my);
-    folder->get_folder_infos().put(folder_info_peer);
+    folder->get_loader().add(folder_info_my.get()).add(folder_info_peer.get());
 
     auto bi1 = proto::BlockInfo();
     proto::set_size(bi1, 5);
@@ -460,7 +457,7 @@ TEST_CASE("cluster update, reset folder", "[model]") {
     auto &diff = diff_opt.value();
     REQUIRE(diff->apply(*controller, {}));
 
-    auto folder_info_peer_new = folder->get_folder_infos().by_device(*peer_device);
+    auto folder_info_peer_new = folder->get_folder_info(*peer_device);
     REQUIRE(folder_info_peer_new);
     REQUIRE(folder_info_peer_new == folder_info_peer);
     REQUIRE(folder_info_peer_new->get_file_infos().size() == 0);
@@ -514,7 +511,7 @@ TEST_CASE("cluster update for a folder, which was not shared", "[model]") {
         db::set_index_id(db_fi, 5ul);
         db::set_max_sequence(db_fi, 10l);
         folder_info_my = folder_info_t::create(sequencer->next_uuid(), db_fi, my_device, folder).value();
-        folder->get_folder_infos().put(folder_info_my);
+        folder->get_loader().add(folder_info_my.get());
     }
 
     auto cc = std::make_unique<proto::ClusterConfig>();
@@ -563,17 +560,15 @@ TEST_CASE("cluster update with unknown devices", "[model]") {
         db::set_index_id(db_fi, 5ul);
         db::set_max_sequence(db_fi, 10l);
         folder_info_my = folder_info_t::create(sequencer->next_uuid(), db_fi, my_device, folder).value();
-        folder->get_folder_infos().put(folder_info_my);
+        folder->get_loader().add(folder_info_my.get());
     }
     {
         db::FolderInfo db_fi;
         db::set_index_id(db_fi, 6ul);
         db::set_max_sequence(db_fi, 0l);
         folder_info_peer = folder_info_t::create(sequencer->next_uuid(), db_fi, peer_device, folder).value();
-        folder->get_folder_infos().put(folder_info_my);
+        folder->get_loader().add(folder_info_peer.get());
     }
-    folder->get_folder_infos().put(folder_info_my);
-    folder->get_folder_infos().put(folder_info_peer);
 
     auto cc = std::make_unique<proto::ClusterConfig>();
 
@@ -640,8 +635,8 @@ TEST_CASE("cluster update nothing shared", "[model]") {
     REQUIRE(blocks_map.size() == 1);
     auto folder_1 = cluster->get_folders().by_id(folder_1_id);
     auto folder_2 = cluster->get_folders().by_id(folder_2_id);
-    auto folder_1_peer = folder_1->get_folder_infos().by_device(*peer_device);
-    auto folder_2_peer = folder_2->get_folder_infos().by_device(*peer_device);
+    auto folder_1_peer = folder_1->get_folder_info(*peer_device);
+    auto folder_2_peer = folder_2->get_folder_info(*peer_device);
     REQUIRE(folder_1_peer->get_file_infos().size() == 1);
     REQUIRE(folder_2_peer->get_file_infos().size() == 1);
 
@@ -714,17 +709,14 @@ TEST_CASE("cluster update with remote folders (1)", "[model]") {
         db::set_index_id(db_fi, 5ul);
         db::set_max_sequence(db_fi, 10l);
         folder_info_my = folder_info_t::create(sequencer->next_uuid(), db_fi, my_device, folder).value();
-        folder->get_folder_infos().put(folder_info_my);
     }
     {
         db::FolderInfo db_fi;
         db::set_index_id(db_fi, 6ul);
         db::set_max_sequence(db_fi, 0l);
         folder_info_peer = folder_info_t::create(sequencer->next_uuid(), db_fi, peer_device, folder).value();
-        folder->get_folder_infos().put(folder_info_my);
     }
-    folder->get_folder_infos().put(folder_info_my);
-    folder->get_folder_infos().put(folder_info_peer);
+    folder->get_loader().add(folder_info_my.get()).add(folder_info_peer.get());
 
     auto cc = std::make_unique<proto::ClusterConfig>();
 
@@ -771,7 +763,7 @@ TEST_CASE("cluster update with remote folders (1)", "[model]") {
         REQUIRE(diff->apply(*controller, {}));
 
         CHECK(peer_device->get_remote_view_map().size() == 0);
-        auto fi = folder->get_folder_infos().by_device(*peer_device);
+        auto fi = folder->get_folder_info(*peer_device);
         // we are still sharing the folder with peer
         CHECK(fi);
     }
@@ -1028,6 +1020,7 @@ TEST_CASE("auto-accept folders", "[model]") {
             INFO("Skipping due to unability to prohibit directories creation");
         }
     }
+
     SECTION("auto accept + introduce peer (source first)") {
         auto r = builder.configure_cluster(sha256_1, path_guard)
                      .add(sha256_1, folder_1_id, 5, 4)
@@ -1115,7 +1108,7 @@ TEST_CASE("redundant shares", "[model]") {
     REQUIRE(r);
 
     auto folder = cluster->get_folders().by_id(folder_id);
-    auto folder_peer = folder->get_folder_infos().by_device(*peer_device);
+    auto folder_peer = folder->get_folder_info(*peer_device);
     CHECK(folder_peer->get_index() == 5);
 }
 
@@ -1145,7 +1138,7 @@ TEST_CASE("folder is shared peer (seq=0), but peer does not accepts the share =>
     REQUIRE(r);
 
     auto folder = cluster->get_folders().by_id(folder_id);
-    auto folder_peer = folder->get_folder_infos().by_device(*peer_device);
+    auto folder_peer = folder->get_folder_info(*peer_device);
 
     CHECK(folder_peer->get_index() == 0);
     CHECK(folder_peer->get_max_sequence() == 0);
@@ -1153,7 +1146,7 @@ TEST_CASE("folder is shared peer (seq=0), but peer does not accepts the share =>
     r = builder.configure_cluster(sha256).finish().apply();
     REQUIRE(r);
 
-    CHECK(folder_peer.get() == folder->get_folder_infos().by_device(*peer_device).get());
+    CHECK(folder_peer == folder->get_folder_info(*peer_device));
 }
 
 TEST_CASE("peer2 sharing unknown folder with us and peer1 => NOOP", "[model]") {

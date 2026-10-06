@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2023-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2023-2026 Ivan Baidakou
 
 #include "test-utils.h"
 #include "access.h"
@@ -51,7 +51,7 @@ TEST_CASE("updates_streamer", "[model]") {
         }
     }
 
-    auto my_folder = folder->get_folder_infos().by_device(*my_device);
+    auto my_folder = folder->get_folder_info(*my_device);
 
     int seq = 1;
     auto add_file = [&](const char *name) {
@@ -75,8 +75,8 @@ TEST_CASE("updates_streamer", "[model]") {
         auto f2 = add_file("b.txt");
 
         auto streamer = model::updates_streamer_t(*cluster, *peer_device);
-        CHECK(streamer.next() == update_t(f1, my_folder.get(), true));
-        CHECK(streamer.next() == update_t(f2, my_folder.get(), false));
+        CHECK(streamer.next() == update_t(f1, my_folder, true));
+        CHECK(streamer.next() == update_t(f2, my_folder, false));
         CHECK(streamer.next() == update_t({}, {}, false));
     }
 
@@ -97,7 +97,7 @@ TEST_CASE("updates_streamer", "[model]") {
         add_remote(my_folder->get_index(), f1->get_sequence());
 
         auto streamer = model::updates_streamer_t(*cluster, *peer_device);
-        CHECK(streamer.next() == update_t(f2, my_folder.get(), false));
+        CHECK(streamer.next() == update_t(f2, my_folder, false));
         CHECK(streamer.next() == update_t({}, {}, false));
     }
 
@@ -109,13 +109,13 @@ TEST_CASE("updates_streamer", "[model]") {
 
         auto f1 = add_file("a.txt");
         streamer.on_update(*f1, *my_folder);
-        CHECK(streamer.next() == update_t(f1, my_folder.get(), true));
+        CHECK(streamer.next() == update_t(f1, my_folder, true));
         CHECK(streamer.next() == update_t({}, {}, false));
     }
 
     SECTION("empty streamer ignores updates") {
         add_remote(0, seq);
-        auto peer_folder = folder->get_folder_infos().by_device(*peer_device);
+        auto peer_folder = folder->get_folder_info(*peer_device);
         REQUIRE(builder.unshare_folder(*peer_folder).apply());
 
         auto streamer = model::updates_streamer_t(*cluster, *peer_device);
@@ -139,8 +139,8 @@ TEST_CASE("updates_streamer", "[model]") {
 
         streamer.on_update(*f1, *my_folder);
 
-        CHECK(streamer.next() == update_t(f2, my_folder.get(), true));
-        CHECK(streamer.next() == update_t(f1, my_folder.get(), false));
+        CHECK(streamer.next() == update_t(f2, my_folder, true));
+        CHECK(streamer.next() == update_t(f1, my_folder, false));
         REQUIRE(streamer.next() == update_t({}, {}, false));
     }
 

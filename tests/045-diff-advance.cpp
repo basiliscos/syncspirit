@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2025-2026 Ivan Baidakou
 
 #include "test-utils.h"
-#include "access.h"
 #include "diff-builder.h"
 
 #include "model/cluster.h"
@@ -53,8 +52,8 @@ TEST_CASE("remove folder", "[model]") {
     REQUIRE(builder.share_folder(peer_id.get_sha256(), "f1").apply());
 
     auto folder = cluster->get_folders().by_id("f1");
-    auto folder_peer = folder->get_folder_infos().by_device(*peer_device);
-    auto folder_my = folder->get_folder_infos().by_device(*my_device);
+    auto folder_peer = folder->get_folder_info(*peer_device);
+    auto folder_my = folder->get_folder_info(*my_device);
     auto &files_my = folder_my->get_file_infos();
     auto file_peer = file_info_t::create(sequencer->next_uuid(), pr_fi, folder_peer).value();
     file_peer->assign_block(bi_1.get(), 0);

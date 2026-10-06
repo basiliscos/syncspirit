@@ -180,9 +180,9 @@ struct fixture_t {
             .apply(*sup);
 
         folder = cluster->get_folders().by_id(folder_id);
-        folder_info = folder->get_folder_infos().by_device(*my_device);
+        folder_info = folder->get_folder_info(*my_device);
         files = &folder_info->get_file_infos();
-        folder_info_peer = folder->get_folder_infos().by_device(*peer_device);
+        folder_info_peer = folder->get_folder_info(*peer_device);
         files_peer = &folder_info_peer->get_file_infos();
 
         CHECK(static_cast<r::actor_base_t *>(sup.get())->access<to::state>() == r::state_t::OPERATIONAL);
@@ -2157,7 +2157,7 @@ void test_importing() {
 
                     builder->scan_start(folder->get_id()).apply(*sup);
 
-                    auto fi_my = folder->get_folder_infos().by_device(*my_device);
+                    auto fi_my = folder->get_folder_info(*my_device);
                     auto &files_my = fi_my->get_file_infos();
                     REQUIRE(files_my.size() == 1);
                     auto file = files_my.by_name(path.get_filename());

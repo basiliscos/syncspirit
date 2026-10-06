@@ -209,7 +209,7 @@ auto local_keeper_t::operator()(const model::diff::local::scan_start_t &diff, vo
     }
     if (do_scan) {
         LOG_DEBUG(log, "initiating scan of {} from '{}'", diff.folder_id, diff.sub_dir);
-        auto local_folder = folder->get_folder_infos().by_device(*cluster->get_device());
+        auto local_folder = folder->get_folder_info(*cluster->get_device());
         auto folder_ctx = local_keeper::make_context(local_folder, diff.sub_dir, true);
         if (!folder_ctx) {
             LOG_ERROR(log, "cannot initialize scan of '{}'({})", diff.folder_id, diff.sub_dir);
@@ -365,7 +365,7 @@ void local_keeper_t::on_change(fs::message::folder_changes_t &message) noexcept 
         if (!folder) {
             LOG_DEBUG(log, "there is no folder '{}' in the model", folder_id);
         } else {
-            auto local_folder = folder->get_folder_infos().by_device(*cluster->get_device());
+            auto local_folder = folder->get_folder_info(*cluster->get_device());
             on_changes(*local_folder, folder_change.file_changes, stack_ctx);
         }
     }

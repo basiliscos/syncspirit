@@ -76,7 +76,7 @@ bool pending_folder_t::on_select() {
         auto db_folder_info = db::FolderInfo();
         db::set_index_id(db_folder_info, sequencer.next_uint64());
         auto fi = model::folder_info_t::create(sequencer.next_uuid(), db_folder_info, &peer, folder).value();
-        folder->get_folder_infos().put(fi);
+        folder->get_loader().add(fi.get());
 
         int x = prev->x(), y = prev->y(), w = prev->w(), h = prev->h();
         auto widget = new widget_t(*this, B::candiate, x, y, w, h);

@@ -235,7 +235,7 @@ cluster_update_t::cluster_update_t(const utils::path_t &default_path, const clus
     auto is_shared_with_source = [&](std::string_view folder_id) {
         auto folder = cluster.get_folders().by_id(folder_id);
         if (folder) {
-            if (folder->get_folder_infos().by_device(source)) {
+            if (folder->get_folder_info(source)) {
                 return true;
             }
         }
@@ -292,7 +292,7 @@ cluster_update_t::cluster_update_t(const utils::path_t &default_path, const clus
 
             auto folder_info = model::folder_info_ptr_t();
             if (folder && device) {
-                folder_info = folder->get_folder_infos().by_device_id(device_sha);
+                folder_info = folder->get_folder_info(device_sha);
             }
 
             if (device_sha != sha256 && device.get() != cluster.get_device()) {
@@ -390,7 +390,7 @@ cluster_update_t::cluster_update_t(const utils::path_t &default_path, const clus
 
             auto folder_info = model::folder_info_ptr_t();
             if (folder && device) {
-                folder_info = folder->get_folder_infos().by_device_id(device_sha);
+                folder_info = folder->get_folder_info(device_sha);
             }
 
             if (!folder_info && source.is_introducer()) {
@@ -418,11 +418,11 @@ cluster_update_t::cluster_update_t(const utils::path_t &default_path, const clus
 
     for (auto it_f : folders) {
         auto &folder = it_f.item;
-        auto folder_info = folder->get_folder_infos().by_device(source);
+        auto folder_info = folder->get_folder_info(source);
         if (folder_info) {
             if (!confirmed_folders.contains(folder_info->get_key())) {
                 if (folder_info->get_max_sequence()) {
-                    removed_folders.emplace(folder_info->get_uuid(), folder_info.get());
+                    removed_folders.emplace(folder_info->get_uuid(), folder_info);
                     reshared_folders.emplace(folder_info);
                 }
             }
@@ -432,9 +432,8 @@ cluster_update_t::cluster_update_t(const utils::path_t &default_path, const clus
     keys_view_t removed_introduced_devices;
     if (!source.get_skip_introduction_removals()) {
         for (auto fit : cluster.get_folders()) {
-            auto &folder_infos = fit.item->get_folder_infos();
-            for (auto it : folder_infos) {
-                auto &fi = *it.item;
+            for (auto p : fit.item->get_presences()) {
+                auto &fi = *static_cast<model::folder_info_t*>(p);
                 auto &i_device = fi.get_device()->device_id();
                 if (fi.is_introduced_by(source.device_id())) {
                     auto remove_fi = !confirmed_folders.count(fi.get_key()) && !removed_folders.count(fi.get_uuid());

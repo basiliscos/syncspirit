@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2026 Ivan Baidakou
 
 #include "upsert_folder_info.h"
 
@@ -46,8 +46,7 @@ auto upsert_folder_info_t::apply_impl(apply_controller_t &controller, void *cust
     if (!folder) {
         return make_error_code(error_code_t::no_such_folder);
     }
-    auto &folder_infos = folder->get_folder_infos();
-    auto fi = folder_infos.by_device(*device);
+    auto fi = folder->get_folder_info(*device);
     if (fi) {
         fi->set_index(index_id);
         LOG_TRACE(log, "applying upsert_folder_info_t (update), folder = {} ({}), device = {}, index = {:x}",
@@ -64,8 +63,8 @@ auto upsert_folder_info_t::apply_impl(apply_controller_t &controller, void *cust
         if (!opt) {
             return opt.assume_error();
         }
-        fi = std::move(opt.value());
-        folder_infos.put(fi);
+        fi = opt.value().get();
+        folder->get_loader().add(fi);
     }
 
     if (auto iterator = fi->get_device()->get_iterator(); iterator) {

@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #pragma once
 
 #include <cstdint>
 #include "misc/augmentation.h"
+#include "presence.h"
 #include "device.h"
 #include "file_info.h"
 #include "proto/proto-fwd.hpp"
@@ -22,7 +23,7 @@ using folder_ptr_t = intrusive_ptr_t<folder_t>;
 struct folder_info_t;
 using folder_info_ptr_t = intrusive_ptr_t<folder_info_t>;
 
-struct SYNCSPIRIT_API folder_info_t final : augmentable_t {
+struct SYNCSPIRIT_API folder_info_t final : presence_t {
 
     struct decomposed_key_t {
         static constexpr size_t folder_data_length = uuid_length + 1;
@@ -65,7 +66,7 @@ struct SYNCSPIRIT_API folder_info_t final : augmentable_t {
     void set_index(std::uint64_t value) noexcept;
 
     inline device_t *get_device() const noexcept { return device; }
-    inline folder_t *get_folder() const noexcept { return folder; }
+    folder_t *get_folder() const noexcept;
     inline std::int64_t get_max_sequence() const noexcept { return max_sequence; }
     inline file_infos_map_t &get_file_infos() noexcept { return file_infos; }
     inline const file_infos_map_t &get_file_infos() const noexcept { return file_infos; }
@@ -85,19 +86,19 @@ struct SYNCSPIRIT_API folder_info_t final : augmentable_t {
     std::uint64_t index;
     std::int64_t max_sequence;
     utils::bytes_t introducer_device_key;
-    device_t *device;
-    folder_t *folder;
     file_infos_map_t file_infos;
 };
 
 using folder_info_ptr_t = intrusive_ptr_t<folder_info_t>;
 
+#if 0
 struct SYNCSPIRIT_API folder_infos_map_t : public generic_map_t<folder_info_ptr_t, 3> {
     folder_info_ptr_t by_uuid(utils::bytes_view_t uuid) const noexcept;
     folder_info_ptr_t by_device(const device_t &device) const noexcept;
     folder_info_ptr_t by_device_id(utils::bytes_view_t device_id) const noexcept;
     folder_info_ptr_t by_device_key(utils::bytes_view_t device_id) const noexcept;
 };
+#endif
 
 using uuid_folder_infos_map_t = std::unordered_map<utils::bytes_view_t, folder_info_t *>;
 

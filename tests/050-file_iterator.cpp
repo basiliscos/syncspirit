@@ -42,13 +42,12 @@ TEST_CASE("file iterator, single folder", "[model]") {
     REQUIRE(builder.upsert_folder("1234-5678", "/my/path").apply());
     REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
     auto folder = folders.by_id("1234-5678");
-    auto &folder_infos = cluster->get_folders().by_id(folder->get_id())->get_folder_infos();
-    REQUIRE(folder_infos.size() == 2u);
+    REQUIRE(folder->get_presences().size() == 2u);
 
-    auto peer_folder = folder_infos.by_device(*peer_device);
+    auto peer_folder = folder->get_folder_info(*peer_device);
     auto &peer_files = peer_folder->get_file_infos();
 
-    auto my_folder = folder_infos.by_device(*my_device);
+    auto my_folder = folder->get_folder_info(*my_device);
     auto &my_files = my_folder->get_file_infos();
 
     auto file_iterator = peer_device->create_iterator(*cluster);
@@ -432,11 +431,10 @@ TEST_CASE("file iterator for 2 folders", "[model]") {
     REQUIRE(builder.upsert_folder("1234-5678", "/my/path").apply());
     REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
     auto folder_1 = folders.by_id("1234-5678");
-    auto &folder_infos = cluster->get_folders().by_id(folder_1->get_id())->get_folder_infos();
-    REQUIRE(folder_infos.size() == 2u);
+    REQUIRE(folder_1->get_presences().size() == 2u);
 
-    auto peer_folder = folder_infos.by_device(*peer_device);
-    auto my_folder = folder_infos.by_device(*my_device);
+    auto peer_folder = folder_1->get_folder_info(*peer_device);
+    auto my_folder = folder_1->get_folder_info(*my_device);
     auto file_iterator = peer_device->create_iterator(*cluster);
     auto sha256 = peer_id.get_sha256();
 
@@ -445,8 +443,8 @@ TEST_CASE("file iterator for 2 folders", "[model]") {
     auto folder1 = folders.by_id("1234");
     auto folder2 = folders.by_id("5678");
 
-    auto local_fi_1 = folder1->get_folder_infos().by_device(*my_device);
-    auto local_fi_2 = folder2->get_folder_infos().by_device(*my_device);
+    auto local_fi_1 = folder1->get_folder_info(*my_device);
+    auto local_fi_2 = folder2->get_folder_info(*my_device);
 
     REQUIRE(builder.configure_cluster(sha256)
                 .add(sha256, "1234", 123, 10u)
@@ -547,9 +545,8 @@ TEST_CASE("file iterator, create, share, iterae, unshare, share, iterate", "[mod
     REQUIRE(builder.upsert_folder("1234-5678", "/my/path").apply());
     REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
     auto folder = folders.by_id("1234-5678");
-    auto folder_infos = &folder->get_folder_infos();
-    REQUIRE(folder_infos->size() == 2u);
-    auto local_fi = folder_infos->by_device(*my_device);
+    REQUIRE(folder->get_presences().size() == 2u);
+    auto local_fi = folder->get_folder_info(*my_device);
 
     auto peer_sha = peer_id.get_sha256();
     auto local_sha = my_id.get_sha256();
@@ -577,8 +574,7 @@ TEST_CASE("file iterator, create, share, iterae, unshare, share, iterate", "[mod
     REQUIRE(builder.upsert_folder("1234-5678", "/my/path").apply());
     REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
     folder = folders.by_id("1234-5678");
-    folder_infos = &folder->get_folder_infos();
-    REQUIRE(folder_infos->size() == 2u);
+    REQUIRE(folder->get_presences().size() == 2u);
     REQUIRE(builder.make_index(peer_id.get_sha256(), folder->get_id()).add(pr_fi, peer_device).finish().apply());
 
     {
@@ -600,12 +596,12 @@ TEST_CASE("file iterator, create, share, iterae, unshare, share, iterate", "[mod
         CHECK(f->get_name()->get_full_name() == "a.txt");
     }
 
-    auto folder_peer = folder->get_folder_infos().by_device(*peer_device);
+    auto folder_peer = folder->get_folder_info(*peer_device);
     peer_device->release_iterator(file_iterator);
     file_iterator = peer_device->create_iterator(*cluster);
     REQUIRE(builder.upsert_folder_info(*folder_peer, folder_peer->get_index() + 1).apply());
 
-    folder_peer = folder->get_folder_infos().by_device(*peer_device);
+    folder_peer = folder->get_folder_info(*peer_device);
     file_iterator->on_upsert(folder_peer);
     CHECK(file_iterator->next().action == A::ignore);
 }
@@ -637,9 +633,8 @@ TEST_CASE("file pull order", "[model]") {
     REQUIRE(builder.upsert_folder("1234-5678", "/my/path").apply());
     REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
     auto folder = folders.by_id("1234-5678");
-    auto folder_infos = &folder->get_folder_infos();
-    REQUIRE(folder_infos->size() == 2u);
-    auto local_fi = folder_infos->by_device(*my_device);
+    REQUIRE(folder->get_presences().size() == 2u);
+    auto local_fi = folder->get_folder_info(*my_device);
 
     auto peer_sha = peer_id.get_sha256();
     auto local_sha = my_id.get_sha256();
@@ -775,9 +770,8 @@ TEST_CASE("no file iteration for send-only folder", "[model]") {
     REQUIRE(builder.upsert_folder(db_folder).apply());
     REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
     auto folder = folders.by_id("1234-5678");
-    auto folder_infos = &folder->get_folder_infos();
-    REQUIRE(folder_infos->size() == 2u);
-    auto local_fi = folder_infos->by_device(*my_device);
+    REQUIRE(folder->get_presences().size() == 2u);
+    auto local_fi = folder->get_folder_info(*my_device);
 
     auto peer_sha = peer_id.get_sha256();
     auto local_sha = my_id.get_sha256();

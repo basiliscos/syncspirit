@@ -37,10 +37,9 @@ TEST_CASE("resolver", "[model]") {
     REQUIRE(builder.share_folder(peer_2_id.get_sha256(), "1234-5678").apply());
 
     auto folder = folders.by_id("1234-5678");
-    auto &folder_infos = folder->get_folder_infos();
-    auto folder_my = folder_infos.by_device(*my_device);
-    auto folder_peer = folder_infos.by_device(*peer_device);
-    auto folder_peer_2 = folder_infos.by_device(*peer_2_device);
+    auto folder_my = folder->get_folder_info(*my_device);
+    auto folder_peer = folder->get_folder_info(*peer_device);
+    auto folder_peer_2 = folder->get_folder_info(*peer_2_device);
 
     auto pr_remote = proto::FileInfo();
     proto::set_name(pr_remote, "a.txt");
@@ -422,9 +421,8 @@ TEST_CASE("resolver, reserved names", "[model]") {
     REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
 
     auto folder = folders.by_id("1234-5678");
-    auto &folder_infos = folder->get_folder_infos();
-    auto folder_my = folder_infos.by_device(*my_device);
-    auto folder_peer = folder_infos.by_device(*peer_device);
+    auto folder_my = folder->get_folder_info(*my_device);
+    auto folder_peer = folder->get_folder_info(*peer_device);
 
     auto pr_remote = proto::FileInfo();
     auto &peer_v = proto::get_version(pr_remote);

@@ -49,11 +49,11 @@ file_iterator_t::file_iterator_t(cluster_t &cluster_, const device_ptr_t &peer_)
     auto &folders = cluster.get_folders();
 
     for (auto &[folder, _] : folders) {
-        auto peer_folder = folder->get_folder_infos().by_device(*peer);
+        auto peer_folder = folder->is_shared_with(*peer);
         if (!peer_folder) {
             continue;
         }
-        auto my_folder = folder->get_folder_infos().by_device(*cluster.get_device());
+        auto my_folder = folder->is_shared_with(*cluster.get_device());
         if (!my_folder) {
             continue;
         }
@@ -70,7 +70,7 @@ auto file_iterator_t::find_folder(folder_t *folder) noexcept -> folder_iterator_
 auto file_iterator_t::prepare_folder(folder_info_ptr_t peer_folder) noexcept -> folder_iterator_t & {
     auto &files = peer_folder->get_file_infos();
     auto folder = peer_folder->get_folder();
-    auto &local_folder = *folder->get_folder_infos().by_device(*folder->get_cluster()->get_device());
+    auto &local_folder = *folder->get_folder_info(*folder->get_cluster()->get_device());
     auto &local_files = local_folder.get_file_infos();
     auto order = folder->get_pull_order();
     auto set = std::make_unique<queue_t>(file_comparator_t{order});
@@ -104,8 +104,7 @@ auto file_iterator_t::next() noexcept -> result_t {
         auto &fi = folders_list[folder_index];
         auto &peer_folder = *fi.peer_folder;
         auto folder = peer_folder.get_folder();
-        auto &folders = folder->get_folder_infos();
-        auto &local_folder = *folders.by_device(*cluster.get_device());
+        auto &local_folder = *folder->get_folder_info(*cluster.get_device());
         auto &local_files = local_folder.get_file_infos();
 
         auto &queue = fi.files_queue;
@@ -158,7 +157,7 @@ void file_iterator_t::populate(folder_iterator_t &it) noexcept {
     }
     auto &files_map = peer_folder->get_file_infos();
     auto folder = peer_folder->get_folder();
-    auto &local_folder = *folder->get_folder_infos().by_device(*folder->get_cluster()->get_device());
+    auto &local_folder = *folder->get_folder_info(*folder->get_cluster()->get_device());
     auto &local_files = local_folder.get_file_infos();
     auto max_sequence = peer_folder->get_max_sequence();
     auto [from, to] = files_map.range(seen_sequence + 1, max_sequence);
@@ -218,7 +217,7 @@ void file_iterator_t::recheck(const folder_info_t &remote_fi, file_info_t &remot
         if (fi.peer_folder.get() == &remote_fi) {
             if (fi.can_receive) {
                 auto folder = fi.peer_folder->get_folder();
-                auto &local_folder = *folder->get_folder_infos().by_device(*folder->get_cluster()->get_device());
+                auto &local_folder = *folder->get_folder_info(*folder->get_cluster()->get_device());
                 auto &local_files = local_folder.get_file_infos();
                 auto local_file = local_files.by_name(remote.get_name()->get_full_name());
                 if (resolve(remote, local_file.get(), local_folder) != advance_action_t::ignore) {

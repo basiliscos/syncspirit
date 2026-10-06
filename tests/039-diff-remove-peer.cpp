@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2026 Ivan Baidakou
 
 #include "test-utils.h"
-#include "access.h"
 #include "diff-builder.h"
 #include "model/misc/sequencer.h"
 #include "model/cluster.h"
@@ -40,7 +39,7 @@ TEST_CASE("remove peer", "[model]") {
         blocks_map.put(block);
 
         auto folder = cluster->get_folders().by_id("1234-5678");
-        auto folder_info = folder->get_folder_infos().by_device(*peer_device);
+        auto folder_info = folder->get_folder_info(*peer_device);
         REQUIRE(folder_info);
 
         proto::FileInfo pr_fi;
@@ -99,11 +98,11 @@ TEST_CASE("remove peer", "[model]") {
         }();
 
         auto f1 = cluster->get_folders().by_id("1234-5678");
-        auto fi_1 = f1->get_folder_infos().by_device(*peer_device);
+        auto fi_1 = f1->get_folder_info(*peer_device);
         REQUIRE(fi_1);
 
         auto f2 = cluster->get_folders().by_id("1234");
-        auto fi_2 = f2->get_folder_infos().by_device(*peer_device);
+        auto fi_2 = f2->get_folder_info(*peer_device);
         REQUIRE(fi_2);
 
         auto file_1 = [&]() {

@@ -84,14 +84,13 @@ static advance_action_t _resolve(const file_info_t &remote, const file_info_t *l
 
     auto folder = local_folder.get_folder();
     auto &self = *folder->get_cluster()->get_device();
-    auto &folder_infos = folder->get_folder_infos();
     auto &r_v = remote.get_version();
 
-    for (auto it : folder_infos) {
-        auto fi = it.item.get();
-        if (fi == &local_folder) {
+    for (auto p : folder->get_presences()) {
+        if (p == &local_folder) {
             continue;
         }
+        auto fi = static_cast<model::folder_info_t*>(p);
         auto other_party_file = fi->get_file_infos().by_name(remote.get_name()->get_full_name());
         if (other_party_file && other_party_file.get() != &remote) {
             auto o_v = other_party_file->get_version();

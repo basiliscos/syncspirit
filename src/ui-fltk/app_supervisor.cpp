@@ -445,8 +445,7 @@ auto app_supervisor_t::apply(const model::diff::advance::advance_t &diff, void *
         auto augmentation = folder->get_augmentation().get();
         auto folder_entity = static_cast<presentation::folder_entity_t *>(augmentation);
         if (folder_entity) {
-            auto &folder_infos = folder->get_folder_infos();
-            auto local_fi = folder_infos.by_device(*cluster->get_device());
+            auto local_fi = folder->get_folder_info(*cluster->get_device());
             auto file_name = proto::get_name(diff.proto_local);
             auto local_file = local_fi->get_file_infos().by_name(file_name);
             if (local_file) {
@@ -537,7 +536,7 @@ auto app_supervisor_t::apply(const model::diff::peer::update_folder_t &diff, voi
         }
 
         auto peer = devices_map.by_sha256(diff.peer_id);
-        auto &peer_fi = *folder->get_folder_infos().by_device(*peer);
+        auto &peer_fi = *folder->get_folder_info(*peer);
         auto &files_map = peer_fi.get_file_infos();
         auto folder_aug = folder->get_augmentation().get();
         auto folder_entity = static_cast<presentation::folder_entity_t *>(folder_aug);
@@ -693,8 +692,8 @@ void app_supervisor_t::redisplay_nodes(bool refresh_labels) {
     log->debug("redisplay_nodes, mask: {:#x}", mask);
 
     for (auto &it_f : cluster->get_folders()) {
-        for (auto &it : it_f.item->get_folder_infos()) {
-            auto generic_augmentation = it.item->get_augmentation();
+        for (auto p : it_f.item->get_presences()) {
+            auto generic_augmentation = p->get_augmentation();
             if (generic_augmentation) {
                 auto presence = static_cast<presentation::presence_t *>(generic_augmentation.get());
                 auto item = dynamic_cast<presence_item_t *>(presence->get_augmentation().get());

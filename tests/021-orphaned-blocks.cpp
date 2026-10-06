@@ -2,7 +2,6 @@
 // SPDX-FileCopyrightText: 2024-2026 Ivan Baidakou
 
 #include "test-utils.h"
-#include "access.h"
 #include "model/device.h"
 #include "model/cluster.h"
 #include "model/misc/orphaned_blocks.h"
@@ -51,8 +50,8 @@ TEST_CASE("orphaned blocks, all removed for single file", "[model]") {
         auto bi2 = model::block_info_t::create(b2).value();
 
         REQUIRE(builder.local_update("fid", pr_file).apply());
-        auto &folder_infos = cluster->get_folders().by_id("fid")->get_folder_infos();
-        auto &file_infos = folder_infos.by_device(*my_device)->get_file_infos();
+        auto folder = cluster->get_folders().by_id("fid");
+        auto &file_infos = folder->get_folder_info(*my_device)->get_file_infos();
         auto file = file_infos.by_name("a.txt");
         REQUIRE(file);
 
@@ -87,8 +86,8 @@ TEST_CASE("orphaned blocks, all removed for single file", "[model]") {
         auto bi = model::block_info_t::create(b1).value();
 
         REQUIRE(builder.local_update("fid", pr_file).apply());
-        auto &folder_infos = cluster->get_folders().by_id("fid")->get_folder_infos();
-        auto &file_infos = folder_infos.by_device(*my_device)->get_file_infos();
+        auto folder = cluster->get_folders().by_id("fid");
+        auto &file_infos = folder->get_folder_info(*my_device)->get_file_infos();
         auto file = file_infos.by_name("a.txt");
         REQUIRE(file);
 
@@ -154,8 +153,8 @@ TEST_CASE("orphaned blocks, all removed for single file", "[model]") {
         REQUIRE(builder.local_update("fid", pr_file_1).apply());
         REQUIRE(builder.local_update("fid", pr_file_2).apply());
 
-        auto &folder_infos = cluster->get_folders().by_id("fid")->get_folder_infos();
-        auto &file_infos = folder_infos.by_device(*my_device)->get_file_infos();
+        auto folder = cluster->get_folders().by_id("fid");
+        auto &file_infos = folder->get_folder_info(*my_device)->get_file_infos();
         auto file_1 = file_infos.by_name("a.txt");
         auto file_2 = file_infos.by_name("b.txt");
         REQUIRE(file_1);

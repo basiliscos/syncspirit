@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "blocks_availability.h"
 #include "model/diff/apply_controller.h"
@@ -21,7 +21,7 @@ auto blocks_availability_t::apply_impl(apply_controller_t &controller, void *cus
     -> outcome::result<void> {
     auto &cluster = controller.get_cluster();
     auto folder = cluster.get_folders().by_id(folder_id);
-    auto folder_info = folder->get_folder_infos().by_device_id(device_id);
+    auto folder_info = folder->get_folder_info(device_id);
     auto file = folder_info->get_file_infos().by_name(file_name);
     for (size_t i = 0; i < valid_blocks_map.size(); ++i) {
         if (valid_blocks_map[i]) {

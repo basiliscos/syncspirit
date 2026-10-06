@@ -7,7 +7,7 @@
 #include "model/diff/apply_controller.h"
 #include "utils/path_view.hpp"
 #include "../cluster_visitor.h"
-#include "proto/proto-helpers.h"
+#include "proto/proto-helpers-bep.h"
 
 using namespace syncspirit::model::diff::advance;
 
@@ -17,7 +17,7 @@ remote_win_t::remote_win_t(const cluster_t &cluster, sequencer_t &sequencer, pro
     : advance_t(folder_id_, peer_id_, advance_action_t::resolve_remote_win) {
     auto &self = *cluster.get_device();
     auto folder = cluster.get_folders().by_id(folder_id);
-    auto &local_files = folder->get_folder_infos().by_device(self)->get_file_infos();
+    auto &local_files = folder->get_folder_info(self)->get_file_infos();
     auto local_file = local_files.by_name(proto::get_name(proto_file_));
     auto local_source = local_file->as_proto(true);
     auto name = local_file->make_conflicting_name(allocator);
@@ -35,11 +35,11 @@ auto remote_win_t::apply_impl(apply_controller_t &controller, void *custom) cons
     } else if (folder->is_suspended()) {
         LOG_DEBUG(log, "remote_win_t, folder = {}, name = {}, folder is suspended, ignoring", folder_id,
                   proto::get_name(proto_source));
-    } else if (auto peer_folder = folder->get_folder_infos().by_device_id(peer_id); !peer_folder) {
+    } else if (auto peer_folder = folder->get_folder_info(peer_id); !peer_folder) {
         LOG_DEBUG(log, "remote_win_t, folder = {}, name = {}, peer folder is not available, ignoring", folder_id,
                   proto::get_name(proto_source));
     } else {
-        auto &local_files = folder->get_folder_infos().by_device(self)->get_file_infos();
+        auto &local_files = folder->get_folder_info(self)->get_file_infos();
         auto prev_file = local_files.by_name(proto::get_name(proto_source));
         assert(prev_file);
         local_files.remove(prev_file);

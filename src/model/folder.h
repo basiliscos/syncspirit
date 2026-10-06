@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
+// S/PDX-License-Identifier: GPL-3.0-or-later
 // SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #pragma once
@@ -35,19 +35,21 @@ struct SYNCSPIRIT_API folder_t final : entity_t, folder_data_t {
     using folder_data_t::serialize;
 
     void assign_cluster(const cluster_ptr_t &cluster) noexcept;
-    void add(const folder_info_ptr_t &folder_info) noexcept;
     utils::bytes_t serialize() noexcept;
     void serialize(syncspirit::db::Folder &dest) const noexcept override;
 
     bool operator==(const folder_t &other) const noexcept { return get_id() == other.get_id(); }
     bool operator!=(const folder_t &other) const noexcept { return !(*this == other); }
 
-    folder_info_ptr_t is_shared_with(const device_t &device) const noexcept;
+    folder_info_t* is_shared_with(const device_t &device) const noexcept;
 
     utils::bytes_view_t get_key() const noexcept { return utils::bytes_view_t(key, data_length); }
     utils::bytes_view_t get_uuid() const noexcept;
-    inline auto &get_folder_infos() noexcept { return folder_infos; }
-    inline auto &get_folder_infos() const noexcept { return folder_infos; }
+
+    folder_info_t* get_folder_info(const device_t& device) noexcept;
+    folder_info_t* get_folder_info(utils::bytes_view_t device_sha256) noexcept;
+    folder_info_t* get_folder_info_by_uuid(utils::bytes_view_t uuid) noexcept;
+
     inline cluster_t *&get_cluster() noexcept { return cluster; }
     const pt::ptime &get_scan_start() const noexcept;
     void set_scan_start(const pt::ptime &value) noexcept;
@@ -79,7 +81,9 @@ struct SYNCSPIRIT_API folder_t final : entity_t, folder_data_t {
 
     pt::ptime scan_start;
     pt::ptime scan_finish;
+#if 0
     folder_infos_map_t folder_infos;
+#endif
     file_matchers_t file_matchers;
     cluster_t *cluster = nullptr;
     unsigned char key[data_length];

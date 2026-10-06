@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "test-utils.h"
 #include "access.h"
@@ -35,7 +35,7 @@ TEST_CASE("new file diff", "[model]") {
         proto::set_symlink_target(pr_file, "/some/where");
         REQUIRE(builder.local_update(folder->get_id(), pr_file).apply());
 
-        auto folder_info = folder->get_folder_infos().by_device(*my_device);
+        auto folder_info = folder->get_folder_info(*my_device);
         auto &files = folder_info->get_file_infos();
         auto file = files.by_name(proto::get_name(pr_file));
         REQUIRE(file);
@@ -91,7 +91,7 @@ TEST_CASE("new file diff", "[model]") {
 
         REQUIRE(builder.local_update(folder->get_id(), pr_file).apply());
 
-        auto folder_info = folder->get_folder_infos().by_device(*my_device);
+        auto folder_info = folder->get_folder_info(*my_device);
         auto file = folder_info->get_file_infos().by_name(proto::get_name(pr_file));
         REQUIRE(file);
         REQUIRE(file->get_size() == 5);
@@ -117,7 +117,7 @@ TEST_CASE("new file diff", "[model]") {
         proto::set_hash(pr_block, hash);
         REQUIRE(builder.local_update(folder->get_id(), pr_file).apply());
 
-        auto folder_info = folder->get_folder_infos().by_device(*my_device);
+        auto folder_info = folder->get_folder_info(*my_device);
         auto file = folder_info->get_file_infos().by_name(proto::get_name(pr_file));
         REQUIRE(file->get_sequence() == 1);
         CHECK(file->is_locally_available());
@@ -140,7 +140,7 @@ TEST_CASE("new file diff", "[model]") {
         proto::set_size(pr_block, 5);
         proto::set_hash(pr_block, hash);
 
-        auto folder_info = folder->get_folder_infos().by_device(*my_device);
+        auto folder_info = folder->get_folder_info(*my_device);
         auto &files = folder_info->get_file_infos();
         auto &blocks = cluster->get_blocks();
         REQUIRE(builder.local_update(folder->get_id(), pr_file).apply());

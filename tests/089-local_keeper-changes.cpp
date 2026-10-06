@@ -427,7 +427,7 @@ struct folder_fixture_t : fixture_t {
         builder->upsert_folder(db_folder, 5).apply(*sup);
 
         folder = cluster->get_folders().by_id(folder_id);
-        folder_local = folder->get_folder_infos().by_device(*local_device);
+        folder_local = folder->get_folder_info(*local_device);
         files_local = &folder_local->get_file_infos();
 
         launch_target(impl);
@@ -676,7 +676,7 @@ void test_ignoring_tmps() {
 
                 auto sha256 = peer_device->device_id().get_sha256();
                 builder->share_folder(peer_device->device_id().get_sha256(), folder_id).apply(*sup);
-                auto folder_peer = folder_local->get_folder()->get_folder_infos().by_device(*peer_device);
+                auto folder_peer = folder_local->get_folder()->get_folder_info(*peer_device);
                 REQUIRE(folder_peer);
                 auto f = files_local->by_name("dir/some-file-name.bin");
 
@@ -1532,7 +1532,7 @@ void test_multi_folders_update() {
             auto f2 = folders_map.by_id("p2");
             auto f3 = folders_map.by_id("p3");
 
-            auto &f1_files = f1->get_folder_infos().by_device(*local_device)->get_file_infos();
+            auto &f1_files = f1->get_folder_info(*local_device)->get_file_infos();
             auto f_A = f1_files.by_name("A");
             auto f_a1 = f1_files.by_name("A/a1");
             auto f_a2 = f1_files.by_name("A/a2");
@@ -1542,7 +1542,7 @@ void test_multi_folders_update() {
             CHECK(f_a2);
             CHECK(f_a3);
 
-            auto &f2_files = f2->get_folder_infos().by_device(*local_device)->get_file_infos();
+            auto &f2_files = f2->get_folder_info(*local_device)->get_file_infos();
             auto f_B = f2_files.by_name("B");
             auto f_b1 = f2_files.by_name("B/b1");
             auto f_b2 = f2_files.by_name("B/b2");
@@ -1552,7 +1552,7 @@ void test_multi_folders_update() {
             CHECK(f_b2);
             CHECK(f_b3);
 
-            auto &f3_files = f3->get_folder_infos().by_device(*local_device)->get_file_infos();
+            auto &f3_files = f3->get_folder_info(*local_device)->get_file_infos();
             auto f_C = f3_files.by_name("C");
             auto f_c1 = f3_files.by_name("C/c1");
             auto f_c2 = f3_files.by_name("C/c2");

@@ -115,7 +115,7 @@ TEST_CASE("presentation", "[presentation]") {
                 CHECK(!self_presense->get_parent());
                 CHECK(self_presense->get_features() & (F::folder));
 
-                auto my_fi = folder->get_folder_infos().by_device(*my_device);
+                auto my_fi = folder->get_folder_info(*my_device);
                 CHECK(&self_presense->get_folder_info() == my_fi);
             }
         }
@@ -132,8 +132,8 @@ TEST_CASE("presentation", "[presentation]") {
             REQUIRE(peer_presense);
 
             CHECK(!folder_entity->get_presence(&*peer_2_device));
-            auto my_fi = folder->get_folder_infos().by_device(*my_device);
-            auto peer_fi = folder->get_folder_infos().by_device(*peer_device);
+            auto my_fi = folder->get_folder_info(*my_device);
+            auto peer_fi = folder->get_folder_info(*peer_device);
             CHECK(&my_presense->get_folder_info() == my_fi);
             CHECK(&peer_presense->get_folder_info() == peer_fi);
             CHECK(my_presense->get_features() & (F::folder));
@@ -151,7 +151,7 @@ TEST_CASE("presentation", "[presentation]") {
         auto folder = cluster->get_folders().by_id("1234-5678");
 
         auto add_file = [&](std::string_view name, model::device_t &device) {
-            auto folder_info = folder->get_folder_infos().by_device(device);
+            auto folder_info = folder->get_folder_info(device);
 
             proto::FileInfo pr_fi;
             proto::set_name(pr_fi, name);
@@ -160,7 +160,7 @@ TEST_CASE("presentation", "[presentation]") {
             auto &v = proto::get_version(pr_fi);
             proto::add_counters(v, proto::Counter(peer_device->device_id().get_uint(), 1));
 
-            auto file = model::file_info_t::create(sequencer->next_uuid(), pr_fi, folder_info.get()).value();
+            auto file = model::file_info_t::create(sequencer->next_uuid(), pr_fi, folder_info).value();
             folder_info->add_strict(file);
         };
 
@@ -334,11 +334,11 @@ TEST_CASE("presentation", "[presentation]") {
         REQUIRE(builder.upsert_folder("1234-5678", "some/path", "my-label").apply());
 
         auto folder = cluster->get_folders().by_id("1234-5678");
-        auto fi_my = folder->get_folder_infos().by_device(*my_device);
+        auto fi_my = folder->get_folder_info(*my_device);
 
         auto add_file = [&](std::string_view name, model::device_t &device,
                             proto::FileInfoType type = proto::FileInfoType::DIRECTORY) {
-            auto folder_info = folder->get_folder_infos().by_device(device);
+            auto folder_info = folder->get_folder_info(device);
 
             proto::FileInfo pr_fi;
             proto::set_name(pr_fi, name);
@@ -348,7 +348,7 @@ TEST_CASE("presentation", "[presentation]") {
             auto &v = proto::get_version(pr_fi);
             proto::add_counters(v, proto::Counter(peer_device->device_id().get_uint(), 1));
 
-            auto file = model::file_info_t::create(sequencer->next_uuid(), pr_fi, folder_info.get()).value();
+            auto file = model::file_info_t::create(sequencer->next_uuid(), pr_fi, folder_info).value();
             if (&device == my_device) {
                 file->mark_local(true);
             }
@@ -442,7 +442,7 @@ TEST_CASE("presentation", "[presentation]") {
             add_file("a", *peer_device);
             add_file("a/b", *peer_device);
 
-            auto fi_peer = folder->get_folder_infos().by_device(*peer_device);
+            auto fi_peer = folder->get_folder_info(*peer_device);
             folder_entity->on_insert(*fi_peer);
 
             auto p_folder_my = folder_entity->get_presence(&*my_device);
@@ -599,7 +599,7 @@ TEST_CASE("presentation", "[presentation]") {
             }
             SECTION("lazy, with peer") {
                 REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
-                auto fi_peer = folder->get_folder_infos().by_device(*peer_device);
+                auto fi_peer = folder->get_folder_info(*peer_device);
                 auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
                 auto f_b_my = add_file("a/b.bin", *my_device);
                 auto f_b_peer = add_file("a/b.bin", *peer_device);
@@ -640,7 +640,7 @@ TEST_CASE("presentation", "[presentation]") {
             }
             SECTION("lazy, with peer-2") {
                 REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
-                auto fi_peer = folder->get_folder_infos().by_device(*peer_device);
+                auto fi_peer = folder->get_folder_info(*peer_device);
                 auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
                 auto f_b_peer = add_file("a/b.bin", *peer_device);
                 auto f_c_my = add_file("a/c.bin", *my_device);
@@ -694,7 +694,7 @@ TEST_CASE("presentation", "[presentation]") {
         SECTION("removal") {
             REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
             SECTION("empty folder info removal") {
-                auto fi_peer = folder->get_folder_infos().by_device(*peer_device).get();
+                auto fi_peer = folder->get_folder_info(*peer_device);
 
                 auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
                 CHECK(!folder_entity->get_parent());
@@ -708,7 +708,7 @@ TEST_CASE("presentation", "[presentation]") {
                 CHECK(!folder_entity->get_presence(&*peer_device));
             }
             SECTION("folder info with a file removal") {
-                auto fi_peer = folder->get_folder_infos().by_device(*peer_device).get();
+                auto fi_peer = folder->get_folder_info(*peer_device);
                 add_file("a", *peer_device);
 
                 auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
@@ -723,7 +723,7 @@ TEST_CASE("presentation", "[presentation]") {
                 CHECK(!folder_entity->get_presence(&*peer_device));
             }
             SECTION("folder info with a file hierarchy removal") {
-                auto fi_peer = folder->get_folder_infos().by_device(*peer_device).get();
+                auto fi_peer = folder->get_folder_info(*peer_device);
                 add_file("a", *peer_device);
                 add_file("a/b", *peer_device);
                 add_file("a/b/c", *peer_device);
@@ -740,7 +740,7 @@ TEST_CASE("presentation", "[presentation]") {
                 CHECK(!folder_entity->get_presence(&*peer_device));
             }
             SECTION("folder info with a file hierarchy removal (2)") {
-                auto fi_peer = folder->get_folder_infos().by_device(*peer_device).get();
+                auto fi_peer = folder->get_folder_info(*peer_device);
                 add_file("a", *my_device);
                 add_file("a", *peer_device);
                 add_file("a/b", *peer_device);
@@ -781,7 +781,7 @@ TEST_CASE("presentation", "[presentation]") {
                     presense->set_augmentation(aug);
                 };
                 {
-                    auto fi_peer = folder->get_folder_infos().by_device(*peer_device).get();
+                    auto fi_peer = folder->get_folder_info(*peer_device);
                     add_file("a", *peer_device);
                     add_file("a/b", *peer_device);
                     add_file("a/b/c", *peer_device);
@@ -822,7 +822,7 @@ TEST_CASE("presentation", "[presentation]") {
                 CHECK(strings[2] == "a");
             }
             SECTION("folder info with an orphan removal") {
-                auto fi_peer = folder->get_folder_infos().by_device(*peer_device).get();
+                auto fi_peer = folder->get_folder_info(*peer_device);
                 add_file("a/b", *peer_device);
 
                 auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
@@ -856,7 +856,7 @@ TEST_CASE("statistics, update", "[presentation]") {
     auto add_file = [&](std::string_view name, model::device_t &device, std::int32_t file_size = 0,
                         proto::FileInfoType type = proto::FileInfoType::DIRECTORY, std::uint64_t modified_by = 0,
                         std::uint64_t modified_v = 0) {
-        auto folder_info = folder->get_folder_infos().by_device(device);
+        auto folder_info = folder->get_folder_info(device);
 
         proto::FileInfo pr_fi;
         proto::set_name(pr_fi, name);
@@ -885,7 +885,7 @@ TEST_CASE("statistics, update", "[presentation]") {
         proto::add_counters(v, proto::Counter(modified_device, modified_version));
         proto::set_modified_s(pr_fi, modified_version);
 
-        auto file = model::file_info_t::create(sequencer->next_uuid(), pr_fi, folder_info.get()).value();
+        auto file = model::file_info_t::create(sequencer->next_uuid(), pr_fi, folder_info).value();
         if (block) {
             file->assign_block(block.get(), 0);
         }
@@ -933,7 +933,7 @@ TEST_CASE("statistics (size & locality are idenpendent)", "[presentation]") {
     auto add_file = [&](std::string_view name, model::device_t &device, std::int32_t file_size = 0,
                         proto::FileInfoType type = proto::FileInfoType::DIRECTORY, std::uint64_t modified_by = 0,
                         std::uint64_t modified_v = 0) {
-        auto folder_info = folder->get_folder_infos().by_device(device);
+        auto folder_info = folder->get_folder_info(device);
 
         proto::FileInfo pr_fi;
         proto::set_name(pr_fi, name);
@@ -962,7 +962,7 @@ TEST_CASE("statistics (size & locality are idenpendent)", "[presentation]") {
         proto::add_counters(v, proto::Counter(modified_device, modified_version));
         proto::set_modified_s(pr_fi, modified_version);
 
-        auto file = model::file_info_t::create(sequencer->next_uuid(), pr_fi, folder_info.get()).value();
+        auto file = model::file_info_t::create(sequencer->next_uuid(), pr_fi, folder_info).value();
         if (block) {
             file->assign_block(block.get(), 0);
         }
@@ -1011,13 +1011,13 @@ TEST_CASE("statistics", "[presentation]") {
     auto builder = diff_builder_t(*cluster);
     REQUIRE(builder.upsert_folder("1234-5678", "some/path", "my-label").apply());
     auto folder = cluster->get_folders().by_id("1234-5678");
-    auto fi_my = folder->get_folder_infos().by_device(*my_device);
+    auto fi_my = folder->get_folder_info(*my_device);
     auto &blocks = cluster->get_blocks();
 
     auto add_file = [&](std::string_view name, model::device_t &device, std::int32_t file_size = 0,
                         proto::FileInfoType type = proto::FileInfoType::DIRECTORY, std::uint64_t modified_by = 0,
                         std::uint64_t modified_v = 0) {
-        auto folder_info = folder->get_folder_infos().by_device(device);
+        auto folder_info = folder->get_folder_info(device);
 
         proto::FileInfo pr_fi;
         proto::set_name(pr_fi, name);
@@ -1046,7 +1046,7 @@ TEST_CASE("statistics", "[presentation]") {
         proto::add_counters(v, proto::Counter(modified_device, modified_version));
         proto::set_modified_s(pr_fi, modified_version);
 
-        auto file = model::file_info_t::create(sequencer->next_uuid(), pr_fi, folder_info.get()).value();
+        auto file = model::file_info_t::create(sequencer->next_uuid(), pr_fi, folder_info).value();
         if (block) {
             file->assign_block(block.get(), 0);
         }
@@ -1116,7 +1116,7 @@ TEST_CASE("statistics", "[presentation]") {
 
     SECTION("shared with a peer") {
         REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
-        auto fi_peer = folder->get_folder_infos().by_device(*peer_device).get();
+        auto fi_peer = folder->get_folder_info(*peer_device);
         SECTION("single file") {
             SECTION("same file") {
                 add_file("a.txt", *my_device, 5, proto::FileInfoType::FILE, my_device_id, 1);
@@ -1249,7 +1249,7 @@ TEST_CASE("statistics", "[presentation]") {
         }
         SECTION("for local & peer device") {
             REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
-            auto fi_peer = folder->get_folder_infos().by_device(*peer_device);
+            auto fi_peer = folder->get_folder_info(*peer_device);
             SECTION("no orphans") {
                 auto f_a_my = add_file("a", *my_device, 0, proto::FileInfoType::DIRECTORY);
                 folder_entity->on_insert(*f_a_my, *fi_my);
@@ -1318,7 +1318,7 @@ TEST_CASE("statistics", "[presentation]") {
                 CHECK(p_x_peer->get_stats() == presence_stats_t{0, 0});
 
                 auto pr_x = f_x_my->as_proto(true);
-                auto file_x_peer = model::file_info_t::create(sequencer->next_uuid(), pr_x, fi_peer.get()).value();
+                auto file_x_peer = model::file_info_t::create(sequencer->next_uuid(), pr_x, fi_peer).value();
                 auto block = *blocks.begin();
                 file_x_peer->assign_block(block.get(), 0);
                 fi_peer->add_strict(file_x_peer);
@@ -1441,10 +1441,10 @@ TEST_CASE("statistics", "[presentation]") {
         CHECK(p_a_peer->get_stats() == presence_stats_t{0, 2, 2, 0});
 
         // peer copies
-        auto fi_peer = folder->get_folder_infos().by_device(*peer_device);
+        auto fi_peer = folder->get_folder_info(*peer_device);
         f_c_my = fi_my->get_file_infos().by_name(f_c_my->get_name()->get_full_name());
         proto::get_version(pr_fi) = f_c_my->get_version().as_proto();
-        auto file_c_peer = model::file_info_t::create(sequencer->next_uuid(), pr_fi, fi_peer.get()).value();
+        auto file_c_peer = model::file_info_t::create(sequencer->next_uuid(), pr_fi, fi_peer).value();
         {
             auto block = *blocks.begin();
             file_c_peer->assign_block(block.get(), 0);
@@ -1478,10 +1478,10 @@ TEST_CASE("statistics", "[presentation]") {
                 blocks.put(block);
                 return {pr_fi, block};
             }();
-            auto fi_peer_2 = folder->get_folder_infos().by_device(*peer_device);
+            auto fi_peer_2 = folder->get_folder_info(*peer_device);
             model::bu::uuid file_uuid;
             model::assign(file_uuid, file_c_peer->get_uuid());
-            auto file_c_peer_2 = model::file_info_t::create(file_uuid, pr_fi, fi_peer.get()).value();
+            auto file_c_peer_2 = model::file_info_t::create(file_uuid, pr_fi, fi_peer).value();
             auto block = *blocks.begin();
             file_c_peer_2->assign_block(b_15.get(), 0);
             fi_peer_2->add_strict(file_c_peer);
@@ -1552,7 +1552,7 @@ TEST_CASE("statistics", "[presentation]") {
 
     SECTION("folder updates & cluster entities") {
         REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
-        auto fi_peer = folder->get_folder_infos().by_device(*peer_device);
+        auto fi_peer = folder->get_folder_info(*peer_device);
         auto f_a_peer = add_file("a", *peer_device, 0, proto::FileInfoType::DIRECTORY);
         REQUIRE(builder.remote_copy(*f_a_peer, *fi_peer).apply());
 
@@ -1582,7 +1582,7 @@ TEST_CASE("statistics", "[presentation]") {
 
     SECTION("yet not resolved conficts") {
         REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
-        auto fi_peer = folder->get_folder_infos().by_device(*peer_device);
+        auto fi_peer = folder->get_folder_info(*peer_device);
         SECTION("static") {
             SECTION("local win") {
                 auto f_a_my = add_file("content.txt", *my_device, 5, proto::FileInfoType::FILE, my_device_id, 10);
@@ -1732,7 +1732,7 @@ TEST_CASE("statistics", "[presentation]") {
         REQUIRE(folder_entity->get_stats() == entity_stats_t{13, 4});
 
         REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
-        auto fi_peer = folder->get_folder_infos().by_device(*peer_device);
+        auto fi_peer = folder->get_folder_info(*peer_device);
         folder_entity->on_insert(*fi_peer);
         REQUIRE(folder_entity->get_stats() == entity_stats_t{13, 4});
         REQUIRE(deleted_entities.size() == 0);
@@ -1823,7 +1823,7 @@ TEST_CASE("file uniqueness", "[presentation]") {
     auto &blocks = cluster->get_blocks();
 
     auto add_file = [&](std::string_view name, bool deleted = false) {
-        auto folder_info = folder->get_folder_infos().by_device(*my_device);
+        auto folder_info = folder->get_folder_info(*my_device);
 
         proto::FileInfo pr_fi;
         proto::set_name(pr_fi, name);
@@ -1836,7 +1836,7 @@ TEST_CASE("file uniqueness", "[presentation]") {
         proto::add_counters(v, proto::Counter(modified_device, modified_version));
         proto::set_modified_s(pr_fi, modified_version);
 
-        auto file = model::file_info_t::create(sequencer->next_uuid(), pr_fi, folder_info.get()).value();
+        auto file = model::file_info_t::create(sequencer->next_uuid(), pr_fi, folder_info).value();
         folder_info->add_strict(file);
         return file;
     };
@@ -1890,7 +1890,7 @@ TEST_CASE("get_child", "[presentation]") {
     auto builder = diff_builder_t(*cluster);
     REQUIRE(builder.upsert_folder("1234-5678", "some/path", "my-label").apply());
     auto folder = cluster->get_folders().by_id("1234-5678");
-    auto local_folder = folder->get_folder_infos().by_device(*my_device);
+    auto local_folder = folder->get_folder_info(*my_device);
 
     auto add_file = [&](std::string_view name, proto::FileInfoType type = proto::FileInfoType::DIRECTORY) {
         proto::FileInfo pr_fi;
@@ -1904,7 +1904,7 @@ TEST_CASE("get_child", "[presentation]") {
         proto::add_counters(v, proto::Counter(modified_device, modified_version));
         proto::set_modified_s(pr_fi, modified_version);
 
-        auto file = model::file_info_t::create(sequencer->next_uuid(), pr_fi, local_folder.get()).value();
+        auto file = model::file_info_t::create(sequencer->next_uuid(), pr_fi, local_folder).value();
         local_folder->add_strict(file);
         return file;
     };

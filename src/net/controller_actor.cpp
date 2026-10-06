@@ -168,7 +168,7 @@ struct C::stack_context_t : model::diff::diff_assember_t {
     void mark_unreachable(std::string_view name, std::string_view folder_id) noexcept {
         auto folder = actor.cluster->get_folders().by_id(folder_id);
         if (folder) {
-            auto peer_folder = folder->get_folder_infos().by_device(*actor.peer);
+            auto peer_folder = folder->get_folder_info(*actor.peer);
             if (peer_folder) {
                 auto peer_file = peer_folder->get_file_infos().by_name(name);
                 if (peer_file && !peer_file->is_unreachable()) {
@@ -385,7 +385,7 @@ void controller_actor_t::send_new_indices() noexcept {
             auto peer_folder = folder.is_shared_with(*peer);
             if (peer_folder) {
                 auto &local_device = *cluster->get_device();
-                auto local_folder = folder.get_folder_infos().by_device(local_device);
+                auto local_folder = folder.get_folder_info(local_device);
                 auto local_sha256 = local_device.device_id().get_sha256();
                 auto remote_view = remote_views.get(local_sha256, folder.get_id());
                 if (remote_view) {
@@ -543,7 +543,7 @@ OUTER:
                 auto folder_uuid = file->get_folder_uuid();
                 auto fi = (model::folder_info_t *)(nullptr);
                 for (auto fit : cluster->get_folders()) {
-                    fi = fit.item->get_folder_infos().by_uuid(folder_uuid).get();
+                    fi = fit.item->get_folder_info_by_uuid(folder_uuid);
                     if (fi) {
                         break;
                     }
@@ -669,8 +669,8 @@ void controller_actor_t::io_clone_block(const model::file_block_t &file_block, m
             src = b->file();
             auto folder_uuid = src->get_folder_uuid();
             for (auto &folder_it : cluster->get_folders()) {
-                if (auto fi = folder_it.item->get_folder_infos().by_uuid(folder_uuid)) {
-                    src_fi = fi.get();
+                if (auto fi = folder_it.item->get_folder_info_by_uuid(folder_uuid)) {
+                    src_fi = fi;
                     break;
                 }
             }
@@ -764,8 +764,8 @@ void controller_actor_t::preprocess_block(model::file_block_t &file_block, const
     auto hash = block->get_hash();
     auto last_index = file->iterate_blocks(0).get_total() - 1;
     if (file_block.is_locally_available()) {
-        auto &folder_infos = source_folder.get_folder()->get_folder_infos();
-        auto target_fi = folder_infos.by_uuid(file->get_folder_uuid());
+        auto folder = source_folder.get_folder();
+        auto target_fi = folder->get_folder_info_by_uuid(file->get_folder_uuid());
         io_clone_block(file_block, *target_fi, ctx);
     } else {
         ctx.lock_block(*block);
@@ -854,7 +854,7 @@ auto controller_actor_t::operator()(const model::diff::peer::update_folder_t &di
     auto ctx = reinterpret_cast<update_context_t *>(custom);
     if (ctx->from_self) {
         auto folder = cluster->get_folders().by_id(diff.folder_id);
-        auto &files_map = folder->get_folder_infos().by_device(*peer)->get_file_infos();
+        auto &files_map = folder->get_folder_info(*peer)->get_file_infos();
         for (auto &f : diff.files) {
             auto file = files_map.by_name(proto::get_name(f));
             cancel_sync(file.get());
@@ -868,10 +868,9 @@ auto controller_actor_t::operator()(const model::diff::advance::advance_t &diff,
     auto folder = cluster->get_folders().by_id(diff.folder_id);
     auto ctx = reinterpret_cast<update_context_t *>(custom);
     if (folder && !folder->is_suspended()) {
-        auto &folder_infos = folder->get_folder_infos();
         auto &self = *cluster->get_device();
-        auto local_folder = folder_infos.by_device(self);
-        auto peer_folder = folder_infos.by_device_id(diff.peer_id);
+        auto local_folder =  folder->get_folder_info(self);
+        auto peer_folder = folder->get_folder_info(diff.peer_id);
         auto local_file = model::file_info_ptr_t();
         if (peer_folder) {
             auto name = proto::get_name(diff.proto_source);
@@ -982,9 +981,8 @@ auto controller_actor_t::operator()(const model::diff::modify::mark_reachable_t 
     auto &folder_id = diff.folder_id;
     auto &file_name = diff.file_name;
     auto folder = cluster->get_folders().by_id(folder_id);
-    auto &folder_infos = folder->get_folder_infos();
     auto device = cluster->get_devices().by_sha256(diff.device_id);
-    auto folder_info = folder_infos.by_device(*device);
+    auto folder_info = folder->get_folder_info(*device);
     auto file = folder_info->get_file_infos().by_name(file_name);
     if (ctx->from_self) {
         cancel_sync(file.get());
@@ -1001,13 +999,12 @@ auto controller_actor_t::operator()(const model::diff::modify::block_ack_t &diff
         auto ctx = reinterpret_cast<update_context_t *>(custom);
         auto folder = cluster->get_folders().by_id(diff.folder_id);
         if (folder) {
-            auto &folder_infos = folder->get_folder_infos();
-            auto folder_info = folder_infos.by_device_id(diff.device_id);
+            auto folder_info = folder->get_folder_info(diff.device_id);
             if (folder_info) {
                 auto file = folder_info->get_file_infos().by_name(diff.file_name);
                 if (file) {
                     if (file->is_locally_available()) {
-                        auto local_fi = folder_infos.by_device(*cluster->get_device());
+                        auto local_fi = folder->get_folder_info(*cluster->get_device());
                         if (local_fi) {
                             auto it = synchronizing_files.find(file->get_full_id());
                             if (it != synchronizing_files.end()) {
@@ -1103,16 +1100,15 @@ void controller_actor_t::on_message(proto::Request &req, stack_context_t &ctx) n
     if (!folder) {
         code = proto::ErrorCode::NO_SUCH_FILE;
     } else {
-        auto &folder_infos = folder->get_folder_infos();
         if (folder->is_suspended()) {
             LOG_WARN(log, "folder '{}' is suspended for requests", folder->get_label());
             code = proto::ErrorCode::GENERIC;
         } else {
-            auto peer_folder = folder_infos.by_device(*peer);
+            auto peer_folder = folder->get_folder_info(*peer);
             if (!peer_folder) {
                 code = proto::ErrorCode::NO_SUCH_FILE;
             } else {
-                local_folder = folder_infos.by_device(*cluster->get_device());
+                local_folder = folder->get_folder_info(*cluster->get_device());
                 auto name = proto::get_name(req);
                 local_file = local_folder->get_file_infos().by_name(name);
                 if (!local_file) {
@@ -1176,7 +1172,7 @@ void controller_actor_t::on_message(proto::Response &message, stack_context_t &c
     auto file_block = (const model::file_block_t *)(nullptr);
 
     if (folder && !folder->is_suspended()) {
-        peer_folder = folder->get_folder_infos().by_device(*peer);
+        peer_folder = folder->get_folder_info(*peer);
     }
     if (peer_folder) {
         auto f = peer_folder->get_file_infos().by_name(file_name);
@@ -1341,7 +1337,7 @@ void controller_actor_t::on_digest(hasher::message::digest_t &res) noexcept {
     auto file_block = (const model::file_block_t *)(nullptr);
 
     if (folder && !folder->is_suspended()) {
-        peer_folder = folder->get_folder_infos().by_device(*peer);
+        peer_folder = folder->get_folder_info(*peer);
     }
     if (peer_folder) {
         auto f = peer_folder->get_file_infos().by_name(file_name);

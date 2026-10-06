@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2026 Ivan Baidakou
 
 #include "remove_folder_infos.h"
 #include "reset_folder_infos.h"
@@ -30,19 +30,20 @@ auto remove_folder_infos_t::apply_impl(apply_controller_t &controller, void *cus
         return r;
     }
     auto &cluster = controller.get_cluster();
+    auto& devices = cluster.get_devices();
     for (auto &key : keys) {
         auto decomposed = folder_info_t::decompose_key(key);
         auto folder = cluster.get_folders().by_key(decomposed.folder_key());
-        auto &folder_infos = folder->get_folder_infos();
         auto device_key = decomposed.device_key();
-        auto folder_info = folder_infos.by_device_key(device_key);
+        auto device = devices.by_key(device_key);
+        auto folder_info = folder->get_folder_info(*device);
         if (auto iterator = folder_info->get_device()->get_iterator(); iterator) {
             if (folder_info->get_device() != cluster.get_device()) {
                 iterator->on_remove(folder_info);
             }
         }
 
-        folder_infos.remove(folder_info);
+        folder->remove_presense(*folder_info);
     }
     return applicator_t::apply_sibling(controller, custom);
 }

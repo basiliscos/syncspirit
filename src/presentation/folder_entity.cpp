@@ -25,8 +25,8 @@ static void process(model::folder_info_t *folder_info, entity_t::children_t &fil
         if (new_files.count(name.get())) {
             continue;
         }
-        auto &folders_map = folder_info->get_folder()->get_folder_infos();
-        auto child = file_entity_ptr_t(new file_entity_t(name, folders_map));
+        auto folder = folder_info->get_folder();
+        auto child = file_entity_ptr_t(new file_entity_t(name, *folder));
         new_files.emplace(name.get(), std::move(child));
     }
 }
@@ -73,18 +73,19 @@ folder_entity_t::folder_entity_t(model::folder_ptr_t folder_) noexcept
     folder.set_augmentation(this);
 
     // make folder_infos as presence
-    auto &folders_map = folder.get_folder_infos();
-    presences.reserve(folders_map.size());
-    for (auto &it : folders_map) {
-        auto &folder_info = *it.item;
+    auto& fps = folder.get_presences();
+    presences.reserve(fps.size());
+    for (auto &fp : fps) {
+        auto &folder_info = *static_cast<model::folder_info_t*>(fp);
         auto p = new folder_presence_t(*this, folder_info);
         presences.emplace_back(p);
     }
 
     // make all-files as chilren, make hierarchy
     auto new_files = file_entities_t();
-    for (auto &it : folders_map) {
-        process(it.item.get(), children, new_files);
+    for (auto &fp : fps) {
+        auto folder_info = static_cast<model::folder_info_t*>(fp);
+        process(folder_info, children, new_files);
     }
     process_files(std::move(new_files), orphans, this);
     commit(*path, nullptr);
@@ -128,7 +129,7 @@ entity_t *folder_entity_t::on_insert(model::file_info_t &file_info, const model:
     bool has_parent = i + 1 == path->get_pieces_size();
     auto diff = entity_stats_t{};
     if (has_parent) {
-        child.reset(new file_entity_t(path, folder_info.get_folder()->get_folder_infos()));
+        child.reset(new file_entity_t(path, *folder_info.get_folder()));
         entity->add_child(*child);
         orphans.reap_children(child);
         child->commit(*child->get_path(), device);
@@ -147,7 +148,7 @@ entity_t *folder_entity_t::on_insert(model::file_info_t &file_info, const model:
         if (orphan) {
             static_cast<file_entity_t *>(orphan.get())->on_insert(file_info, folder_info);
         } else {
-            child.reset(new file_entity_t(path, folder_info.get_folder()->get_folder_infos()));
+            child.reset(new file_entity_t(path, *folder_info.get_folder()));
             orphans.push(child);
         }
     }

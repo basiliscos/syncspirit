@@ -65,8 +65,6 @@ void folder_t::assign_fields(const db::Folder &item) noexcept {
 
 utils::bytes_view_t folder_t::get_uuid() const noexcept { return utils::bytes_view_t(key + 1, uuid_length); }
 
-void folder_t::add(const folder_info_ptr_t &folder_info) noexcept { folder_infos.put(folder_info); }
-
 void folder_t::assign_cluster(const cluster_ptr_t &cluster_) noexcept { cluster = cluster_.get(); }
 
 utils::bytes_t folder_t::serialize() noexcept {
@@ -87,8 +85,14 @@ void folder_t::serialize(syncspirit::db::Folder &dest) const noexcept {
     }
 }
 
-auto folder_t::is_shared_with(const model::device_t &device) const noexcept -> folder_info_ptr_t {
-    return folder_infos.by_device_id(device.device_id().get_sha256());
+auto folder_t::is_shared_with(const model::device_t &device) const noexcept -> folder_info_t* {
+    for (auto p : presences) {
+        if (p->get_device()->device_id() == device.device_id()) {
+            return static_cast<folder_info_t*>(p);
+        }
+    }
+
+    return {};
 }
 
 std::optional<proto::Folder> folder_t::generate(const model::device_t &device) const noexcept {
@@ -104,8 +108,9 @@ std::optional<proto::Folder> folder_t::generate(const model::device_t &device) c
     proto::set_ignore_delete(r, ignore_delete);
     proto::set_disable_temp_indexes(r, true);
     proto::set_paused(r, paused);
-    for (auto &it : folder_infos) {
-        auto &fi = *it.item;
+
+    for (auto p: presences) {
+        auto &fi = *static_cast<folder_info_t*>(p);
         auto &d = *fi.get_device();
         auto introducer = d.is_introducer();
         auto &pd = proto::add_devices(r);
@@ -175,6 +180,32 @@ bool folder_t::accept(std::string_view relative_path) const noexcept {
         }
     }
     return false;
+}
+
+folder_info_t* folder_t::get_folder_info(const device_t& device) noexcept {
+    auto p = get_presence(&device);
+    return static_cast<folder_info_t*>(p);
+}
+
+folder_info_t* folder_t::get_folder_info(utils::bytes_view_t device_sha256) noexcept {
+    for (auto p: presences) {
+        if (auto d = p->get_device(); d) {
+            if (d->device_id().get_sha256() == device_sha256) {
+                return static_cast<folder_info_t*>(p);
+            }
+        }
+    }
+    return nullptr;
+}
+
+folder_info_t* folder_t::get_folder_info_by_uuid(utils::bytes_view_t uuid) noexcept {
+    for (auto p: presences) {
+        auto fi = static_cast<folder_info_t*>(p);
+        if (fi->get_uuid() == uuid) {
+            return fi;
+        }
+    }
+    return nullptr;
 }
 
 template <> SYNCSPIRIT_API utils::bytes_view_t get_index<0>(const folder_ptr_t &item) noexcept {

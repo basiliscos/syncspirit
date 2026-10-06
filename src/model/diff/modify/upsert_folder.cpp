@@ -17,7 +17,7 @@ auto upsert_folder_t::create(const cluster_t &cluster, sequencer_t &sequencer, d
     auto &folders = cluster.get_folders();
     auto &device = *cluster.get_device();
     auto prev_folder = folders.by_id(db::get_id(db));
-    auto folder_info = prev_folder ? prev_folder->get_folder_infos().by_device(device) : nullptr;
+    auto folder_info = prev_folder ? prev_folder->get_folder_info(device) : nullptr;
     auto uuid = bu::uuid{};
     auto is_new = !prev_folder;
     if (!is_new) {

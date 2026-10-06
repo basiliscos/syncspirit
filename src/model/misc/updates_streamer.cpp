@@ -24,9 +24,9 @@ void updates_streamer_t::refresh_remote() noexcept {
         if (folder.get_folder_type() != db::FolderType::receive) {
             auto peer_folder = folder.is_shared_with(*peer);
             if (peer_folder) {
-                auto local_folder = folder.get_folder_infos().by_device(*self);
+                auto local_folder = folder.get_folder_info(*self);
                 if (streaming && streaming->folder_info == local_folder) {
-                    streaming_folder = local_folder.get();
+                    streaming_folder = local_folder;
                 }
                 auto remote_view = remote_views.get(self_sha256, folder.get_id());
                 if (remote_view) {

@@ -109,7 +109,7 @@ struct fixture_t {
 
         builder.upsert_folder(folder_id, "").apply(*sup);
         auto &local_folder = *cluster->get_folders().by_id(folder_id);
-        local_files = &local_folder.get_folder_infos().by_device(*local_device)->get_file_infos();
+        local_files = &local_folder.get_folder_info(*local_device)->get_file_infos();
 
         main(builder);
 

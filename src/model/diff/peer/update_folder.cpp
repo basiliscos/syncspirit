@@ -52,7 +52,7 @@ auto update_folder_t::apply_impl(apply_controller_t &controller, void *custom) c
 
     auto &cluster = controller.get_cluster();
     auto folder = cluster.get_folders().by_id(folder_id);
-    auto folder_info = folder->get_folder_infos().by_device_id(peer_id);
+    auto folder_info = folder->get_folder_info(peer_id);
     auto &bm = cluster.get_blocks();
 
     auto max_seq = folder_info->get_max_sequence();
@@ -120,7 +120,7 @@ auto update_folder_t::visit(cluster_visitor_t &visitor, void *custom) const noex
 
 using diff_t = diff::cluster_diff_ptr_t;
 
-static auto construct(sequencer_t &sequencer, folder_info_ptr_t &folder_info, syncspirit::utils::bytes_view_t peer_id,
+static auto construct(sequencer_t &sequencer, folder_info_t* folder_info, syncspirit::utils::bytes_view_t peer_id,
                       update_folder_t::files_t files, update_folder_t::blocks_t new_blocks) -> outcome::result<diff_t> {
     auto folder = folder_info->get_folder();
 
@@ -183,7 +183,7 @@ static auto instantiate(const cluster_t &cluster, sequencer_t &sequencer, const 
     }
 
     auto device_id = source.device_id().get_sha256();
-    auto fi = folder->get_folder_infos().by_device_id(device_id);
+    auto fi = folder->get_folder_info(device_id);
     if (!fi) {
         return make_error_code(error_code_t::folder_is_not_shared);
     }

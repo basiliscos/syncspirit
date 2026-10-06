@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "test-utils.h"
 #include "diff-builder.h"
@@ -28,8 +28,8 @@ TEST_CASE("new file diff", "[model]") {
 
     auto &blocks_map = cluster->get_blocks();
     auto folder = cluster->get_folders().by_id("1234-5678");
-    auto folder_my = folder->get_folder_infos().by_device(*my_device);
-    auto folder_peer = folder->get_folder_infos().by_device(*peer_device);
+    auto folder_my = folder->get_folder_info(*my_device);
+    auto folder_peer = folder->get_folder_info(*peer_device);
 
     auto pr_file = proto::FileInfo();
     proto::set_name(pr_file, "a.txt");

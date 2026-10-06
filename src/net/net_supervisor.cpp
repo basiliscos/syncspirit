@@ -284,7 +284,7 @@ void net_supervisor_t::commit_loading() noexcept {
             if (!folder_info) {
                 continue;
             }
-            auto fi = folder_info->get_folder_infos().by_device(*cluster->get_device());
+            auto fi = folder_info->get_folder_info(*cluster->get_device());
             files += fi->get_file_infos().size();
         }
         auto pending_folders_sz = std::distance(pending_folders.begin(), pending_folders.end());
@@ -341,8 +341,7 @@ auto net_supervisor_t::apply(const model::diff::advance::advance_t &diff, void *
             auto augmentation = folder->get_augmentation().get();
             auto folder_entity = static_cast<presentation::folder_entity_t *>(augmentation);
             if (folder_entity) {
-                auto &folder_infos = folder->get_folder_infos();
-                auto &local_fi = *folder_infos.by_device(*cluster->get_device());
+                auto &local_fi = *folder->get_folder_info(*cluster->get_device());
                 auto file_name = proto::get_name(diff.proto_local);
                 auto local_file = local_fi.get_file_infos().by_name(file_name);
                 if (local_file) {
@@ -364,7 +363,7 @@ auto net_supervisor_t::apply(const model::diff::peer::update_folder_t &diff, voi
 
         auto &devices_map = cluster->get_devices();
         auto peer = devices_map.by_sha256(diff.peer_id);
-        auto &folder_info = *folder->get_folder_infos().by_device(*peer);
+        auto &folder_info = *folder->get_folder_info(*peer);
         auto &files_map = folder_info.get_file_infos();
 
         for (auto &file : diff.files) {

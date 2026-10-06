@@ -120,8 +120,7 @@ struct supervisor_t : fs::fs_supervisor_t, model::diff::apply_controller_t, prot
         auto augmentation = folder->get_augmentation().get();
         auto folder_entity = static_cast<presentation::folder_entity_t *>(augmentation);
         if (folder_entity) {
-            auto &folder_infos = folder->get_folder_infos();
-            auto local_fi = folder_infos.by_device(*cluster->get_device());
+            auto local_fi = folder->get_folder_info(*cluster->get_device());
             auto file_name = proto::get_name(diff.proto_local);
             auto local_file = local_fi->get_file_infos().by_name(file_name);
             if (local_file) {
@@ -235,7 +234,7 @@ struct fixture_t {
 
         auto folder = cluster->get_folders().by_id(folder_id);
         REQUIRE(folder);
-        local_folder = folder->get_folder_infos().by_device(*local_device);
+        local_folder = folder->get_folder_info(*local_device);
         REQUIRE(local_folder);
         local_files = &local_folder->get_file_infos();
 

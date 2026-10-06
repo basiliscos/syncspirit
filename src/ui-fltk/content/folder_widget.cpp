@@ -1278,11 +1278,10 @@ void folder_widget_t::create_or_update() noexcept {
     if (shared_with_orig.size()) {
         auto folder = cluster.get_folders().by_id(folder_orig->get_id());
         auto orphaned_blocks = model::orphaned_blocks_t{};
-        auto &folder_infos = folder->get_folder_infos();
         for (auto it : shared_with_orig) {
             auto &device = it.item;
             if (!ctx.shared_with.by_sha256(device->device_id().get_sha256())) {
-                auto folder_info = folder_infos.by_device(*device);
+                auto folder_info = folder->get_folder_info(*device);
                 if (folder_info) {
                     log->info("going to unshare folder '{}' with {}({})", folder->get_label(), device->get_name(),
                               device->device_id().get_short());

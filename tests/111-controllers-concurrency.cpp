@@ -180,7 +180,7 @@ void test_concurrent_downloading() {
 
             auto index_1 = uint64_t{101};
             auto index_2 = uint64_t{102};
-            auto local_folder = folder->get_folder_infos().by_device(*my_device);
+            auto local_folder = folder->get_folder_info(*my_device);
 
             builder.configure_cluster(sha256_1)
                 .add(sha256_1, folder_id, index_1, 10)

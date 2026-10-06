@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "folder_info.h"
 #include "folder.h"
-#include "cluster.h"
-#include "proto/proto-helpers.h"
-#include "../db/prefix.h"
+#include "proto/proto-helpers-db.h"
+#include "db/prefix.h"
 #include "misc/error_code.h"
 #include <spdlog/spdlog.h>
 #include <algorithm>
@@ -64,21 +63,26 @@ outcome::result<folder_info_ptr_t> folder_info_t::create(const bu::uuid &uuid, c
 
 folder_info_t::folder_info_t(utils::bytes_view_t key_, const device_ptr_t &device_,
                              const folder_ptr_t &folder_) noexcept
-    : device{device_.get()}, folder{folder_.get()} {
+    : presence_t(folder_.get(), device_.get())  {
     assert(key_.subspan(1, device_id_t::digest_length) == device->get_key().subspan(1));
-    assert(key_.subspan(device_id_t::digest_length + 1, uuid_length) == folder->get_key().subspan(1));
+    assert(key_.subspan(device_id_t::digest_length + 1, uuid_length) == get_folder()->get_key().subspan(1));
     std::copy(key_.begin(), key_.end(), key);
 }
 
 folder_info_t::folder_info_t(const bu::uuid &uuid, const device_ptr_t &device_, const folder_ptr_t &folder_) noexcept
-    : device{device_.get()}, folder{folder_.get()} {
+    : presence_t(folder_.get(), device_.get()) {
     auto device_key = device->get_key().subspan(1);
-    auto folder_key = folder->get_key().subspan(1);
+    auto folder_key = get_folder()->get_key().subspan(1);
     key[0] = prefix;
     std::copy(device_key.begin(), device_key.end(), key + 1);
     std::copy(folder_key.begin(), folder_key.end(), key + 1 + device_key.size());
     std::copy(uuid.begin(), uuid.end(), key + 1 + device_key.size() + folder_key.size());
 }
+
+folder_t *folder_info_t::get_folder() const noexcept {
+    return static_cast<folder_t*>(entity);
+}
+
 
 void folder_info_t::assign_fields(const db::FolderInfo &fi) noexcept {
     index = db::get_index_id(fi);
@@ -138,20 +142,6 @@ bool folder_info_t::is_introduced_by(const model::device_id_t &device) const noe
 }
 
 utils::bytes_view_t folder_info_t::get_introducer_device_key() const noexcept { return introducer_device_key; }
-
-folder_info_ptr_t folder_infos_map_t::by_uuid(utils::bytes_view_t uuid) const noexcept { return get<0>(uuid); }
-
-folder_info_ptr_t folder_infos_map_t::by_device(const device_t &device) const noexcept {
-    return get<1>(device.device_id().get_sha256());
-}
-
-folder_info_ptr_t folder_infos_map_t::by_device_id(utils::bytes_view_t device_id) const noexcept {
-    return get<1>(device_id);
-}
-
-folder_info_ptr_t folder_infos_map_t::by_device_key(utils::bytes_view_t device_key) const noexcept {
-    return get<2>(device_key);
-}
 
 template <> SYNCSPIRIT_API utils::bytes_view_t get_index<0>(const folder_info_ptr_t &item) noexcept {
     return item->get_uuid();

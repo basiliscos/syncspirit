@@ -275,7 +275,7 @@ diff_builder_t &diff_builder_t::advance(const model::file_info_t &source,
     auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
 
     auto folder = source_fi.get_folder();
-    auto local_fi = folder->get_folder_infos().by_device(*folder->get_cluster()->get_device());
+    auto local_fi = folder->get_folder_info(*folder->get_cluster()->get_device());
     auto local_file = local_fi->get_file_infos().by_name(source.get_name()->get_full_name());
     auto action = model::resolve(source, local_file.get(), *local_fi);
     auto diff = diff::advance::remote_copy_t::create(action, source, source_fi, *sequencer, allocator);

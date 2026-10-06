@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "model/diff/load/interrupt.h"
 #include "test-utils.h"
@@ -59,7 +59,7 @@ TEST_CASE("diff interrupt", "[model]") {
     builder.local_update("1234-5678", pr_file).interrupt();
 
     auto folder = cluster->get_folders().by_id("1234-5678");
-    auto folder_my = folder->get_folder_infos().by_device(*my_device);
+    auto folder_my = folder->get_folder_info(*my_device);
     auto &files = folder_my->get_file_infos();
 
     auto ctx = apply_context_t(builder.extract());
