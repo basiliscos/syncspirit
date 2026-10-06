@@ -168,7 +168,6 @@ presence_t *entity_t::get_presence(const model::device_t *device) noexcept {
 }
 
 void entity_t::add_child(entity_t &child) noexcept {
-    model::intrusive_ptr_add_ref(&child);
     children.emplace(&child);
     child.set_parent(this);
 }
@@ -247,15 +246,15 @@ auto entity_t::get_children() noexcept -> children_t & { return children; }
 
 using nc_t = entity_t::name_comparator_t;
 
-bool nc_t::operator()(const entity_t *lhs, const entity_t *rhs) const noexcept {
+bool nc_t::operator()(const entity_ptr_t& lhs, const entity_ptr_t& rhs) const noexcept {
     return lhs->get_path()->get_filename() < rhs->get_path()->get_filename();
 }
 
-bool nc_t::operator()(const entity_t *lhs, const std::string_view rhs) const noexcept {
+bool nc_t::operator()(const entity_ptr_t& lhs, const std::string_view rhs) const noexcept {
     return lhs->get_path()->get_filename() < rhs;
 }
 
-bool nc_t::operator()(const std::string_view lhs, const entity_t *rhs) const noexcept {
+bool nc_t::operator()(const std::string_view lhs, const entity_ptr_t& rhs) const noexcept {
     return lhs < rhs->get_path()->get_filename();
 }
 

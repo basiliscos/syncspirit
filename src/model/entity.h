@@ -42,9 +42,9 @@ struct SYNCSPIRIT_API entity_t : model::augmentable_t {
     };
     struct SYNCSPIRIT_API name_comparator_t {
         using is_transparent = std::true_type;
-        bool operator()(const entity_t *lhs, const entity_t *rhs) const noexcept;
-        bool operator()(const entity_t *lhs, const std::string_view rhs) const noexcept;
-        bool operator()(const std::string_view lhs, const entity_t *rhs) const noexcept;
+        bool operator()(const entity_ptr_t& lhs, const entity_ptr_t& rhs) const noexcept;
+        bool operator()(const entity_ptr_t& lhs, const std::string_view rhs) const noexcept;
+        bool operator()(const std::string_view lhs, const entity_ptr_t& rhs) const noexcept;
     };
     struct SYNCSPIRIT_API bulk_loader_t {
         inline bulk_loader_t(entity_t& entity_) noexcept: entity{entity_} {}
@@ -54,7 +54,7 @@ struct SYNCSPIRIT_API entity_t : model::augmentable_t {
         entity_t& entity;
     };
 
-    using children_t = std::set<entity_t *, name_comparator_t>;
+    using children_t = std::set<entity_ptr_t, name_comparator_t>;
     using presences_t = std::vector<presence_ptr_t>;
 
     entity_t(utils::path_ptr_t path, entity_t *parent = nullptr) noexcept;
