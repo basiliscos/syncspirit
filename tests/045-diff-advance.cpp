@@ -83,8 +83,9 @@ TEST_CASE("remove folder", "[model]") {
                 REQUIRE(files_my.size() == 0);
             }
             SECTION("after removing") {
+                auto folder_local = model::folder_info_ptr_t(folder_my);
                 REQUIRE(builder.remove_folder(*folder).local_update(folder->get_id(), pr_local).apply());
-                REQUIRE(files_my.size() == 0);
+                REQUIRE(folder_local->get_file_infos().size() == 0);
             }
         }
     }
@@ -103,8 +104,9 @@ TEST_CASE("remove folder", "[model]") {
             REQUIRE(files_my.size() == 0);
         }
         SECTION("after removing") {
+            auto folder_local = model::folder_info_ptr_t(folder_my);
             REQUIRE(builder.remove_folder(*folder).remote_copy(*file_peer, *folder_peer).apply());
-            REQUIRE(files_my.size() == 0);
+            REQUIRE(folder_local->get_file_infos().size() == 0);
         }
     }
 
@@ -127,8 +129,9 @@ TEST_CASE("remove folder", "[model]") {
             REQUIRE(files_my.size() == 0);
         }
         SECTION("after removing") {
+            auto folder_local = model::folder_info_ptr_t(folder_my);
             REQUIRE(builder.remove_folder(*folder).advance(*file_peer, *folder_peer).apply());
-            REQUIRE(files_my.size() == 0);
+            REQUIRE(folder_local->get_file_infos().size() == 0);
         }
     }
 }

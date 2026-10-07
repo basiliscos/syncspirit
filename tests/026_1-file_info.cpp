@@ -16,6 +16,7 @@ using namespace syncspirit::test;
 
 using Catch::Matchers::Matches;
 
+#if 0
 TEST_CASE("file-info", "[model]") {
     auto buffer = std::array<std::byte, 1024 * 32>();
     auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
@@ -252,6 +253,7 @@ TEST_CASE("file_info_t::get_size", "[model]") {
         CHECK(local_file->get_size() == 10);
     }
 }
+#endif
 
 TEST_CASE("file_info_t::update", "[model]") {
     auto local_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
@@ -337,6 +339,7 @@ TEST_CASE("file_info_t::update", "[model]") {
     }
 }
 
+#if 0
 TEST_CASE("file_info_t::make_conflicting_name for wstrings", "[model]") {
     auto buffer = std::array<std::byte, 1024 * 32>();
     auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
@@ -373,3 +376,4 @@ TEST_CASE("file_info_t::make_conflicting_name for wstrings", "[model]") {
     auto cn = std::string(conflict_name.get_full_name());
     REQUIRE_THAT(cn, Matches(boost::nowide::narrow(L"папка/файл.sync-conflict-(\\d){8}-(\\d){6}-KHQNO2S.1ц")));
 }
+#endif

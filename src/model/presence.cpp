@@ -72,12 +72,13 @@ presence_t::presence_t(entity_t *entity_, model::device_t *device_) noexcept
     }
 }
 
-presence_t::~presence_t() { clear_presense(); }
+presence_t::~presence_t() {}
 
 presence_t *presence_t::get_parent() noexcept { return parent; }
+
 entity_t *presence_t::get_entity() noexcept { return entity; }
+
 auto presence_t::get_features() const noexcept -> std::uint32_t { return features; }
-const presence_stats_t &presence_t::get_own_stats() const noexcept { return own_statistics; }
 
 const presence_stats_t &presence_t::get_stats(bool sync) const noexcept {
     if (sync) {
@@ -86,92 +87,8 @@ const presence_stats_t &presence_t::get_stats(bool sync) const noexcept {
     return statistics;
 }
 
-presence_t *presence_t::set_parent(entity_t *parent_entity, presence_t *parent_) noexcept {
-    if (parent_entity && device) {
-        if (!parent_) {
-            parent_ = parent_entity->get_presence(device);
-        }
-        if (parent_ && parent_->device == device) {
-            parent = parent_;
-            parent_entity->push_stats(get_stats(), device, false);
-            for (auto child_entity : entity->children) {
-                for (auto child_presence : child_entity->presences) {
-                    if (child_presence->device == device) {
-                        if (!child_presence->parent) {
-                            child_presence->set_parent(entity, this);
-                        }
-                        break;
-                    }
-                }
-            }
-        }
-    }
-    return parent;
-}
-
-void presence_t::clear_presense() noexcept {
-    if (extension) {
-        extension->on_delete();
-        extension = {};
-    }
-    if (entity) {
-        entity->remove_presense(*this);
-        if (!(features & F::missing)) {
-            auto ex_entity = entity;
-            model::intrusive_ptr_release(ex_entity);
-        }
-        assert(statistics.size == 0);
-        assert(statistics.entities == 0);
-        entity = nullptr;
-    }
-}
-
-void presence_t::on_delete() noexcept { clear_presense(); }
-void presence_t::on_update() noexcept {
-    if (auto monitor = entity->get_monitor(); monitor) {
-        monitor->on_update(*entity);
-    }
-}
-
-const presence_t *presence_t::determine_best(const presence_t *other) const { return other; }
-
 void presence_t::sync_with_entity() const noexcept {
-    static constexpr auto mask = F::cluster | F::folder;
-    if (entity_generation != entity->generation && (features & mask)) {
-        entity_generation = entity->generation;
-        statistics.cluster_entries = 0;
-
-#if 0
-        for (auto &child_entity : entity->get_children()) {
-            auto child_presence = const_cast<presence_t *>(child_entity->get_presence(device));
-            if (child_presence->features & F::cluster) {
-                auto child = static_cast<cluster_file_presence_t *>(child_presence);
-                child->sync_with_entity();
-                statistics.cluster_entries += child->statistics.cluster_entries;
-            }
-        }
-
-        if (features & (F::file | F::directory)) {
-            auto best_version = proto::Counter();
-            for (auto p : entity->presences) {
-                if ((p == entity->best) && (p->get_features() & F::cluster)) {
-                    auto best = static_cast<cluster_file_presence_t *>(p);
-                    best_version = best->get_file_info().get_version().get_best();
-                    break;
-                }
-            }
-            assert(features & F::cluster);
-            auto const_self = static_cast<const cluster_file_presence_t *>(this);
-            auto self = const_cast<cluster_file_presence_t *>(const_self);
-            if (self->get_file_info().get_version().get_best() == best_version) {
-                ++statistics.cluster_entries;
-            }
-        } else if (features & F::directory) {
-            ++statistics.cluster_entries;
-        }
-#endif
-        std::abort();
-    }
+    // TODO
 }
 
 auto presence_t::get_children() noexcept -> children_t & {
@@ -209,7 +126,7 @@ presence_t *presence_t::get_child(std::string_view name, bool is_dir) noexcept {
     return nullptr;
 }
 
-void presence_t::clear_children() noexcept { children.clear(); }
+void presence_t::forget_entity() noexcept { entity = nullptr; }
 
 bool presence_t::is_unique() const noexcept {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32) || defined(__APPLE__)
@@ -231,4 +148,4 @@ bool presence_t::is_unique() const noexcept {
     return true;
 }
 
-}
+} // namespace syncspirit::model

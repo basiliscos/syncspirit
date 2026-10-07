@@ -262,7 +262,7 @@ TEST_CASE("loading cluster (folder info)", "[model]") {
         REQUIRE(diff->apply(*controller, {}));
         auto &presences = folder->get_presences();
         REQUIRE(presences.size() == 2);
-        target = static_cast<model::folder_info_t*>(presences.front().get());
+        target = static_cast<model::folder_info_t *>(presences.front().get());
         CHECK(target->get_uuid() == fi->get_uuid());
         CHECK(folder->get_folder_info(*my_device));
     }

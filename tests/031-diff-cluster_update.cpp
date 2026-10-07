@@ -647,10 +647,8 @@ TEST_CASE("cluster update nothing shared", "[model]") {
     REQUIRE(opt);
 
     CHECK(blocks_map.size() == 0);
-    CHECK(folder_1_peer->get_file_infos().size() == 0);
     CHECK(folder_1->is_shared_with(*peer_device));
     CHECK(folder_1->is_shared_with(*peer_device)->get_file_infos().size() == 0);
-    CHECK(folder_2_peer->get_file_infos().size() == 0);
     CHECK(folder_2->is_shared_with(*peer_device));
     CHECK(folder_2->is_shared_with(*peer_device)->get_file_infos().size() == 0);
 }

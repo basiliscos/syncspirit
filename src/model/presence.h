@@ -53,11 +53,8 @@ struct SYNCSPIRIT_API presence_t : model::proxy_t {
     const presence_stats_t& get_own_stats() const noexcept;
     inline const model::device_t* get_device() const noexcept { return device; }
 
-    virtual const presence_t* determine_best(const presence_t*) const;
-
     children_t& get_children() noexcept;
     presence_t *get_child(std::string_view name, bool is_dir) noexcept;
-    void clear_children() noexcept;
 
     struct SYNCSPIRIT_API presence_like_t {
         std::string_view name;
@@ -76,9 +73,7 @@ struct SYNCSPIRIT_API presence_t : model::proxy_t {
     friend struct cluster_file_presence_t;
     friend struct file_entity_t;
 
-    void on_update() noexcept override;
-    void on_delete() noexcept override;
-    void clear_presense() noexcept;
+    void forget_entity() noexcept;
 
     template<typename Augmentable>
     void link(Augmentable *augmentable) noexcept { augmentable->set_augmentation(this); }

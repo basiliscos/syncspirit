@@ -68,4 +68,4 @@ struct presence_stats_t : entity_stats_t {
     }
 };
 
-}; // namespace syncspirit::presentation
+}; // namespace syncspirit::model

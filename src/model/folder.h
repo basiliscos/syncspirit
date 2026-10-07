@@ -41,14 +41,14 @@ struct SYNCSPIRIT_API folder_t final : entity_t, folder_data_t {
     bool operator==(const folder_t &other) const noexcept { return get_id() == other.get_id(); }
     bool operator!=(const folder_t &other) const noexcept { return !(*this == other); }
 
-    folder_info_t* is_shared_with(const device_t &device) const noexcept;
+    folder_info_t *is_shared_with(const device_t &device) const noexcept;
 
     utils::bytes_view_t get_key() const noexcept { return utils::bytes_view_t(key, data_length); }
     utils::bytes_view_t get_uuid() const noexcept;
 
-    folder_info_t* get_folder_info(const device_t& device) noexcept;
-    folder_info_t* get_folder_info(utils::bytes_view_t device_sha256) noexcept;
-    folder_info_t* get_folder_info_by_uuid(utils::bytes_view_t uuid) noexcept;
+    folder_info_t *get_folder_info(const device_t &device) noexcept;
+    folder_info_t *get_folder_info(utils::bytes_view_t device_sha256) noexcept;
+    folder_info_t *get_folder_info_by_uuid(utils::bytes_view_t uuid) noexcept;
 
     inline cluster_t *&get_cluster() noexcept { return cluster; }
     const pt::ptime &get_scan_start() const noexcept;

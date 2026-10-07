@@ -31,27 +31,19 @@ struct SYNCSPIRIT_API entities_monitor_t {
 };
 
 struct SYNCSPIRIT_API entity_t : model::augmentable_t {
-    struct SYNCSPIRIT_API monitor_guard_t {
-        monitor_guard_t(entity_t *entity = nullptr) noexcept;
-        monitor_guard_t(const monitor_guard_t &) = delete;
-        monitor_guard_t(monitor_guard_t &&) noexcept;
-        ~monitor_guard_t();
-
-      private:
-        entity_t *entity;
-    };
     struct SYNCSPIRIT_API name_comparator_t {
         using is_transparent = std::true_type;
-        bool operator()(const entity_ptr_t& lhs, const entity_ptr_t& rhs) const noexcept;
-        bool operator()(const entity_ptr_t& lhs, const std::string_view rhs) const noexcept;
-        bool operator()(const std::string_view lhs, const entity_ptr_t& rhs) const noexcept;
+        bool operator()(const entity_ptr_t &lhs, const entity_ptr_t &rhs) const noexcept;
+        bool operator()(const entity_ptr_t &lhs, const std::string_view rhs) const noexcept;
+        bool operator()(const std::string_view lhs, const entity_ptr_t &rhs) const noexcept;
     };
     struct SYNCSPIRIT_API bulk_loader_t {
-        inline bulk_loader_t(entity_t& entity_) noexcept: entity{entity_} {}
-        bulk_loader_t& add(presence_t* presence) noexcept;
+        inline bulk_loader_t(entity_t &entity_) noexcept : entity{entity_} {}
+        bulk_loader_t &add(presence_t *presence) noexcept;
         ~bulk_loader_t();
-    private:
-        entity_t& entity;
+
+      private:
+        entity_t &entity;
     };
 
     using children_t = std::set<entity_ptr_t, name_comparator_t>;
@@ -77,7 +69,6 @@ struct SYNCSPIRIT_API entity_t : model::augmentable_t {
     void remove_presense(presence_t &) noexcept;
     const entity_stats_t &get_stats() noexcept;
     const presences_t &get_presences() const noexcept;
-    [[nodiscard]] monitor_guard_t monitor(entities_monitor_t *) noexcept;
 
   protected:
     friend struct bulk_loader_t;
@@ -86,13 +77,10 @@ struct SYNCSPIRIT_API entity_t : model::augmentable_t {
     friend struct folder_entity_t;
     friend struct cluster_file_presence_t;
 
-    void detach_child(entity_t &child) noexcept;
+    void forget_parent() noexcept;
     void clear_children() noexcept;
     void set_parent(entity_t *parent) noexcept;
     void commit(const utils::path_t &path, const model::device_t *device) noexcept;
-    void commit_presences() noexcept;
-    void push_stats(const presence_stats_t &diff, const model::device_t *source, bool best) noexcept;
-    const presence_t *recalc_best() noexcept;
 
     inline entities_monitor_t *get_monitor() noexcept {
         auto e = this;
@@ -109,7 +97,6 @@ struct SYNCSPIRIT_API entity_t : model::augmentable_t {
     entity_stats_t statistics;
     const presence_t *best;
     entities_monitor_t *entities_monitor;
-    std::uint32_t generation = 0;
 };
 
-} // namespace syncspirit::presentation
+} // namespace syncspirit::model

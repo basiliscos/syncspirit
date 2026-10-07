@@ -63,7 +63,7 @@ outcome::result<folder_info_ptr_t> folder_info_t::create(const bu::uuid &uuid, c
 
 folder_info_t::folder_info_t(utils::bytes_view_t key_, const device_ptr_t &device_,
                              const folder_ptr_t &folder_) noexcept
-    : presence_t(folder_.get(), device_.get())  {
+    : presence_t(folder_.get(), device_.get()) {
     assert(key_.subspan(1, device_id_t::digest_length) == device->get_key().subspan(1));
     assert(key_.subspan(device_id_t::digest_length + 1, uuid_length) == get_folder()->get_key().subspan(1));
     std::copy(key_.begin(), key_.end(), key);
@@ -79,10 +79,7 @@ folder_info_t::folder_info_t(const bu::uuid &uuid, const device_ptr_t &device_, 
     std::copy(uuid.begin(), uuid.end(), key + 1 + device_key.size() + folder_key.size());
 }
 
-folder_t *folder_info_t::get_folder() const noexcept {
-    return static_cast<folder_t*>(entity);
-}
-
+folder_t *folder_info_t::get_folder() const noexcept { return static_cast<folder_t *>(entity); }
 
 void folder_info_t::assign_fields(const db::FolderInfo &fi) noexcept {
     index = db::get_index_id(fi);

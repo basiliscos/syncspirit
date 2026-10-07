@@ -26,9 +26,9 @@ file_entity_t::file_entity_t(utils::path_ptr_t path_, const model::folder_t &fol
     auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
     auto presence_files = presence_files_t(&pool);
 
-    auto& fps = folder.get_presences();
+    auto &fps = folder.get_presences();
     for (auto &fp : fps) {
-        auto &folder_info = *static_cast<model::folder_info_t*>(fp.get());
+        auto &folder_info = *static_cast<model::folder_info_t *>(fp.get());
         auto &files_map = folder_info.get_file_infos();
         auto file = files_map.by_name(path->get_full_name());
         if (file) {

@@ -13,9 +13,9 @@ using namespace syncspirit::model::diff::load;
 
 auto folder_infos_t::apply_impl(apply_controller_t &controller, void *custom) const noexcept -> outcome::result<void> {
     using loader_t = model::entity_t::bulk_loader_t;
-    using item_t = std::tuple<model::folder_t*, model::device_t*, loader_t*, std::size_t>;
+    using item_t = std::tuple<model::folder_t *, model::device_t *, loader_t *, std::size_t>;
     using loaders_t = std::pmr::list<loader_t>;
-    using loaders_map_t = std::pmr::unordered_map<model::folder_t*, loader_t*>;
+    using loaders_map_t = std::pmr::unordered_map<model::folder_t *, loader_t *>;
     auto &cluster = controller.get_cluster();
     auto &folders = cluster.get_folders();
     auto &devices = cluster.get_devices();
@@ -29,7 +29,7 @@ auto folder_infos_t::apply_impl(apply_controller_t &controller, void *custom) co
     folders_queue.reserve(container.size());
 
     for (std::size_t i = 0; i < container.size(); ++i) {
-        auto& item = container[i];
+        auto &item = container[i];
         auto decomposed = folder_info_t::decompose_key(item.key);
         auto device = devices.by_key(decomposed.device_key());
         if (!device) {
@@ -40,7 +40,7 @@ auto folder_infos_t::apply_impl(apply_controller_t &controller, void *custom) co
         if (!folder) {
             return make_error_code(error_code_t::no_such_folder);
         }
-        auto& loader = loaders_map[folder.get()];
+        auto &loader = loaders_map[folder.get()];
         if (!loader) {
             loader = &loaders.emplace_back(folder->get_loader());
         }
@@ -49,7 +49,7 @@ auto folder_infos_t::apply_impl(apply_controller_t &controller, void *custom) co
 
     for (std::size_t i = 0; i < folders_queue.size(); ++i) {
         auto [folder, device, loader, index] = folders_queue[i];
-        auto& item = container[index];
+        auto &item = container[index];
         auto option = folder_info_t::create(item.key, item.db_fi, device, folder);
         if (!option) {
             return option.assume_error();

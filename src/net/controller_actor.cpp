@@ -869,7 +869,7 @@ auto controller_actor_t::operator()(const model::diff::advance::advance_t &diff,
     auto ctx = reinterpret_cast<update_context_t *>(custom);
     if (folder && !folder->is_suspended()) {
         auto &self = *cluster->get_device();
-        auto local_folder =  folder->get_folder_info(self);
+        auto local_folder = folder->get_folder_info(self);
         auto peer_folder = folder->get_folder_info(diff.peer_id);
         auto local_file = model::file_info_ptr_t();
         if (peer_folder) {

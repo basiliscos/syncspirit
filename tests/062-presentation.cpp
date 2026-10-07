@@ -45,7 +45,8 @@ struct aug_sample_t : model::augmentation_t {
 };
 
 auto my_id = model::device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
-auto peer_id = model::device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
+auto peer_id =
+    model::device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
 auto peer_2_id =
     model::device_id_t::from_string("LYXKCHX-VI3NYZR-ALCJBHF-WMZYSPK-QG6QJA3-MPFYMSO-U56GTUK-NA2MIAW").value();
 auto my_device = model::device_t::create(my_id, "my-device").value();
@@ -841,7 +842,8 @@ TEST_CASE("presentation", "[presentation]") {
 }
 
 TEST_CASE("statistics, update", "[presentation]") {
-    auto my_id = model::device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
+    auto my_id =
+        model::device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
     auto my_device = model::device_t::create(my_id, "my-device").value();
 
     auto cluster = model::cluster_ptr_t(new model::cluster_t(my_device, 1));

@@ -23,8 +23,8 @@ remove_folder_t::remove_folder_t(const model::cluster_t &cluster, model::sequenc
     auto assember = model::diff::diff_assember_t(constants::diffs_batch);
     auto self = cluster.get_device();
     auto pending_folders = add_pending_folders_t::container_t();
-    for (auto p: folder.get_presences()) {
-        auto &fi = *static_cast<model::folder_info_t*>(p.get());
+    for (auto& p : folder.get_presences()) {
+        auto &fi = *static_cast<model::folder_info_t *>(p.get());
         auto d = fi.get_device();
         assember.push_back(new unshare_folder_t(cluster, fi, &orphaned_blocks));
         if (d != self && fi.get_index()) {

@@ -803,7 +803,7 @@ void test_remote_copy() {
                     auto controller = make_apply_controller(cluster_clone);
                     REQUIRE(load_diff->apply(*controller, {}));
                     REQUIRE(cluster_clone->get_blocks().size() == 1);
-                    auto folder= cluster_clone->get_folders().by_id(folder_id);
+                    auto folder = cluster_clone->get_folders().by_id(folder_id);
                     REQUIRE(folder->get_presences().size() == 2);
                     auto folder_info_clone = folder->get_folder_info(*cluster_clone->get_device());
                     auto file_clone = folder_info_clone->get_file_infos().by_name(proto::get_name(file));
@@ -830,7 +830,7 @@ void test_remote_copy() {
                     auto controller = make_apply_controller(cluster_clone);
                     REQUIRE(load_diff->apply(*controller, {}));
                     REQUIRE(cluster_clone->get_blocks().size() == 1);
-                    auto folder= cluster_clone->get_folders().by_id(folder_id);
+                    auto folder = cluster_clone->get_folders().by_id(folder_id);
                     REQUIRE(folder->get_presences().size() == 2);
                     auto folder_info_clone = folder->get_folder_info(*cluster_clone->get_device());
                     auto file_clone = folder_info_clone->get_file_infos().by_name(proto::get_name(file));
@@ -1543,7 +1543,7 @@ void test_iterative_application_interrupt() {
                              model::payload::apply_context_t &context) noexcept override {
                     parent_t::process(diff, context);
                     auto &folder = cluster->get_folders().begin()->item;
-                    auto fi = static_cast<model::folder_info_t*>(folder->get_presences().front().get());
+                    auto fi = static_cast<model::folder_info_t *>(folder->get_presences().front().get());
                     if (fi->get_file_infos().size() == 10) {
                         do_shutdown();
                         resources->acquire(0);

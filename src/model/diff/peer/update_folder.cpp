@@ -120,7 +120,7 @@ auto update_folder_t::visit(cluster_visitor_t &visitor, void *custom) const noex
 
 using diff_t = diff::cluster_diff_ptr_t;
 
-static auto construct(sequencer_t &sequencer, folder_info_t* folder_info, syncspirit::utils::bytes_view_t peer_id,
+static auto construct(sequencer_t &sequencer, folder_info_t *folder_info, syncspirit::utils::bytes_view_t peer_id,
                       update_folder_t::files_t files, update_folder_t::blocks_t new_blocks) -> outcome::result<diff_t> {
     auto folder = folder_info->get_folder();
 

@@ -73,10 +73,10 @@ folder_entity_t::folder_entity_t(model::folder_ptr_t folder_) noexcept
     folder.set_augmentation(this);
 
     // make folder_infos as presence
-    auto& fps = folder.get_presences();
+    auto &fps = folder.get_presences();
     presences.reserve(fps.size());
     for (auto &fp : fps) {
-        auto &folder_info = *static_cast<model::folder_info_t*>(fp.get());
+        auto &folder_info = *static_cast<model::folder_info_t *>(fp.get());
         auto p = new folder_presence_t(*this, folder_info);
         presences.emplace_back(p);
     }
@@ -84,7 +84,7 @@ folder_entity_t::folder_entity_t(model::folder_ptr_t folder_) noexcept
     // make all-files as chilren, make hierarchy
     auto new_files = file_entities_t();
     for (auto &fp : fps) {
-        auto folder_info = static_cast<model::folder_info_t*>(fp.get());
+        auto folder_info = static_cast<model::folder_info_t *>(fp.get());
         process(folder_info, children, new_files);
     }
     process_files(std::move(new_files), orphans, this);

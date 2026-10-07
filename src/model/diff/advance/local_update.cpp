@@ -63,8 +63,8 @@ auto local_update_t::get_original(const model::folder_t &folder, const model::de
     auto local_size = proto::get_size(local_file);
     auto local_type = model::file_info_t::as_flags(proto::get_type(local_file));
 
-    for (auto p: folder.get_presences()) {
-        auto fi = static_cast<model::folder_info_t*>(p.get());
+    for (auto& p : folder.get_presences()) {
+        auto fi = static_cast<model::folder_info_t *>(p.get());
         auto peer_file = model::file_info_ptr_t();
         if (fi->get_device() != &self) {
             auto &peer_files = fi->get_file_infos();

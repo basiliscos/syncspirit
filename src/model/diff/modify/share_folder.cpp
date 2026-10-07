@@ -16,7 +16,7 @@ using namespace syncspirit::model::diff::modify;
 auto share_folder_t::create(cluster_t &cluster, sequencer_t &sequencer, const model::device_t &peer,
                             const device_id_t &introducer, const model::folder_t &folder) noexcept
     -> outcome::result<cluster_diff_ptr_t> {
-    auto folder_info = const_cast<model::folder_t&>(folder).get_folder_info(peer);
+    auto folder_info = const_cast<model::folder_t &>(folder).get_folder_info(peer);
     if (folder_info) {
         return make_error_code(error_code_t::folder_is_already_shared);
     }
