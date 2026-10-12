@@ -44,6 +44,7 @@ struct SYNCSPIRIT_API folder_info_t final : presence_t {
         unsigned char device_key_raw[device_id_t::data_length];
         unsigned char folder_key_raw[folder_data_length];
     };
+    using location_t = std::pair<file_info_t *, presence_t *>;
 
     static decomposed_key_t decompose_key(utils::bytes_view_t key);
 
@@ -57,8 +58,9 @@ struct SYNCSPIRIT_API folder_info_t final : presence_t {
     bool operator==(const folder_info_t &other) const noexcept;
     bool operator!=(const folder_info_t &other) const noexcept { return !(*this == other); }
 
-    void add_relaxed(const file_info_ptr_t &file_info) noexcept;
-    bool add_strict(const file_info_ptr_t &file_info) noexcept;
+    void add_relaxed(file_info_t* file_info) noexcept;
+    bool add_strict(file_info_t* file_info, bool already_added) noexcept;
+
     void serialize(db::FolderInfo &storage) const noexcept;
     utils::bytes_t serialize() const noexcept;
 
@@ -68,8 +70,14 @@ struct SYNCSPIRIT_API folder_info_t final : presence_t {
     inline device_t *get_device() const noexcept { return device; }
     folder_t *get_folder() const noexcept;
     inline std::int64_t get_max_sequence() const noexcept { return max_sequence; }
+
+    location_t get_by_path(const utils::path_base_t& path) const noexcept;
+    void clear() noexcept;
+
+#if 0
     inline file_infos_map_t &get_file_infos() noexcept { return file_infos; }
     inline const file_infos_map_t &get_file_infos() const noexcept { return file_infos; }
+#endif
 
     bool is_introduced_by(const model::device_id_t &device) const noexcept;
     utils::bytes_view_t get_introducer_device_key() const noexcept;
@@ -78,6 +86,7 @@ struct SYNCSPIRIT_API folder_info_t final : presence_t {
     folder_info_t(utils::bytes_view_t key, const device_ptr_t &device_, const folder_ptr_t &folder_) noexcept;
     folder_info_t(const bu::uuid &uuid, const device_ptr_t &device_, const folder_ptr_t &folder_) noexcept;
     void assign_fields(const db::FolderInfo &data) noexcept;
+    void add(file_info_t* file_info) noexcept;
 
     static const constexpr auto data_length = uuid_length * 2 + device_id_t::digest_length + 1;
 
@@ -86,19 +95,12 @@ struct SYNCSPIRIT_API folder_info_t final : presence_t {
     std::uint64_t index;
     std::int64_t max_sequence;
     utils::bytes_t introducer_device_key;
+#if 0
     file_infos_map_t file_infos;
+#endif
 };
 
 using folder_info_ptr_t = intrusive_ptr_t<folder_info_t>;
-
-#if 0
-struct SYNCSPIRIT_API folder_infos_map_t : public generic_map_t<folder_info_ptr_t, 3> {
-    folder_info_ptr_t by_uuid(utils::bytes_view_t uuid) const noexcept;
-    folder_info_ptr_t by_device(const device_t &device) const noexcept;
-    folder_info_ptr_t by_device_id(utils::bytes_view_t device_id) const noexcept;
-    folder_info_ptr_t by_device_key(utils::bytes_view_t device_id) const noexcept;
-};
-#endif
 
 using uuid_folder_infos_map_t = std::unordered_map<utils::bytes_view_t, folder_info_t *>;
 

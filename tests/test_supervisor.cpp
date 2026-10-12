@@ -175,6 +175,7 @@ auto supervisor_t::operator()(const model::diff::modify::upsert_folder_info_t &d
 
 auto supervisor_t::operator()(const model::diff::advance::advance_t &diff, void *custom) noexcept
     -> outcome::result<void> {
+#if 0
     if (make_presentation) {
         auto folder = cluster->get_folders().by_id(diff.folder_id);
         auto augmentation = folder->get_augmentation().get();
@@ -188,11 +189,13 @@ auto supervisor_t::operator()(const model::diff::advance::advance_t &diff, void 
             }
         }
     }
+#endif
     return diff.visit_next(*this, custom);
 }
 
 auto supervisor_t::operator()(const model::diff::peer::update_folder_t &diff, void *custom) noexcept
     -> outcome::result<void> {
+#if 0
     if (make_presentation) {
         auto folder = cluster->get_folders().by_id(diff.folder_id);
         auto folder_aug = folder->get_augmentation().get();
@@ -212,6 +215,7 @@ auto supervisor_t::operator()(const model::diff::peer::update_folder_t &diff, vo
             }
         }
     }
+#endif
     return diff.visit_next(*this, custom);
 }
 

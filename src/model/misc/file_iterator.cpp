@@ -1,3 +1,4 @@
+#if 0
 // SPDX-License-Identifier: GPL-3.0-or-later
 // SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
@@ -228,3 +229,4 @@ void file_iterator_t::recheck(const folder_info_t &remote_fi, file_info_t &remot
         }
     }
 }
+#endif

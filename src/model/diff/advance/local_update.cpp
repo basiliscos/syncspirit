@@ -6,6 +6,7 @@
 #include "../cluster_visitor.h"
 #include "model/diff/apply_controller.h"
 #include "proto/proto-helpers-bep.h"
+#include "utils/path_view.hpp"
 #include <memory_resource>
 
 using namespace syncspirit::model::diff::advance;
@@ -14,8 +15,7 @@ local_update_t::local_update_t(const cluster_t &cluster, sequencer_t &sequencer,
                                std::string_view folder_id_, bool disable_blocks_removal_) noexcept
     : advance_t(folder_id_, cluster.get_device()->device_id().get_sha256(), advance_action_t::local_update,
                 disable_blocks_removal_) {
-
-    auto buffer = std::array<std::byte, 256>();
+    auto buffer = std::array<std::byte, 1024 * 32>();
     auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
     auto allocator = std::pmr::polymorphic_allocator<std::string>(&pool);
 
@@ -24,13 +24,12 @@ local_update_t::local_update_t(const cluster_t &cluster, sequencer_t &sequencer,
     auto &self = *cluster.get_device();
     auto self_id = self.device_id().get_sha256();
 
-    auto local_folder_info = folder->get_folder_info(self);
-    auto &local_files = local_folder_info->get_file_infos();
     auto proto_name = proto::get_name(proto_file_);
     assert(proto_name.size());
-
     auto name = std::pmr::string(proto_name, allocator);
-    auto local_file = local_files.by_name(name);
+    auto path = utils::make_generic_view(name, allocator);
+    auto local_folder_info = folder->get_folder_info(self);
+    auto [local_file, parent_presence] = local_folder_info->get_by_path(path);
 
     if (auto original_file = get_original(*folder, device, proto_file_); original_file) {
         initialize(cluster, sequencer, original_file->as_proto(true), name);
@@ -54,8 +53,12 @@ local_update_t::local_update_t(const cluster_t &cluster, sequencer_t &sequencer,
 
 auto local_update_t::get_original(const model::folder_t &folder, const model::device_t &self,
                                   const proto::FileInfo &local_file) const noexcept -> model::file_info_ptr_t {
+    auto buffer = std::array<std::byte, 1024 * 32>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<std::string>(&pool);
     auto r = model::file_info_ptr_t();
     auto name = proto::get_name(local_file);
+    auto path = utils::make_generic_view(name, allocator);
     auto local_deleted = proto::get_deleted(local_file);
     auto local_invalid = proto::get_invalid(local_file);
     auto local_perms = proto::get_permissions(local_file);
@@ -67,8 +70,7 @@ auto local_update_t::get_original(const model::folder_t &folder, const model::de
         auto fi = static_cast<model::folder_info_t *>(p.get());
         auto peer_file = model::file_info_ptr_t();
         if (fi->get_device() != &self) {
-            auto &peer_files = fi->get_file_infos();
-            auto candidate = peer_files.by_name(name);
+            auto [candidate, parent_presence] = fi->get_by_path(path);
             if (candidate) {
                 if (candidate->get_size() == local_size) {
                     bool matches = local_type == candidate->get_type() && local_deleted == candidate->is_deleted() &&

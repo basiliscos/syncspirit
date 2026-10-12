@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #pragma once
 
@@ -11,7 +11,7 @@ namespace syncspirit::model::diff::load {
 struct SYNCSPIRIT_API file_infos_t final : cluster_diff_t {
     using item_t = std::pair<utils::bytes_view_t, db::FileInfo>;
     using container_t = std::vector<item_t>;
-    inline file_infos_t(container_t &&container_) noexcept : container{std::move(container_)} {}
+    file_infos_t(container_t container_) noexcept;
 
     outcome::result<void> apply_impl(apply_controller_t &, void *) const noexcept override;
     outcome::result<void> apply_forward(apply_controller_t &, void *) const noexcept override;

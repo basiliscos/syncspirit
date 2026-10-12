@@ -6,6 +6,7 @@
 #include "proto/proto-helpers-db.h"
 #include "db/prefix.h"
 #include "misc/error_code.h"
+#include "utils/format.hpp"
 #include <spdlog/spdlog.h>
 #include <algorithm>
 
@@ -98,17 +99,35 @@ bool folder_info_t::operator==(const folder_info_t &other) const noexcept {
     return r.first == key + data_length;
 }
 
-void folder_info_t::add_relaxed(const file_info_ptr_t &file_info) noexcept {
-    file_infos.put(file_info);
+void folder_info_t::add(file_info_t* file_info) noexcept {
+    auto host_entity = entity;
+    auto& path = *file_info->get_name();
+    for (auto name: path) {
+        host_entity = host_entity->get_or_create_child(name);
+    }
+
+    auto host_presence = host_entity->get_parent()->get_presence(file_info->get_device());
+    if (!host_presence) {
+        spdlog::critical("missing parent presence for '{}' in folder '{}' for device {}", path,
+                         get_folder()->get_id(), device->device_id().get_short());
+        assert(host_presence);
+    }
+    host_presence->add_child(file_info, path.get_filename());
+}
+
+void folder_info_t::add_relaxed(file_info_t* file_info) noexcept {
+    add(file_info);
     auto seq = file_info->get_sequence();
     max_sequence = std::max(max_sequence, seq);
 }
 
-bool folder_info_t::add_strict(const file_info_ptr_t &file_info) noexcept {
+bool folder_info_t::add_strict(file_info_t* file_info, bool already_added) noexcept {
     auto seq = file_info->get_sequence();
     if (seq > max_sequence) {
         max_sequence = seq;
-        file_infos.put(file_info);
+        if (!already_added) {
+            add(file_info);
+        }
         return true;
     }
     return false;
@@ -130,7 +149,7 @@ void folder_info_t::set_index(std::uint64_t value) noexcept {
     if (value != this->index) {
         index = value;
         max_sequence = 0;
-        file_infos.clear();
+        clear();
     }
 }
 
@@ -140,16 +159,35 @@ bool folder_info_t::is_introduced_by(const model::device_id_t &device) const noe
 
 utils::bytes_view_t folder_info_t::get_introducer_device_key() const noexcept { return introducer_device_key; }
 
-template <> SYNCSPIRIT_API utils::bytes_view_t get_index<0>(const folder_info_ptr_t &item) noexcept {
-    return item->get_uuid();
+auto folder_info_t::get_by_path(const utils::path_base_t& path) const noexcept  -> location_t {
+    auto parent = const_cast<presence_t*>(static_cast<const presence_t*>(this));
+    auto it = path.begin();
+    for (std::size_t i = 0; i + 1 < path.get_pieces_size(); ++i) {
+        auto piece = *it;
+        ++it;
+        parent = parent->get_child(piece, true);
+        if (!parent) {
+            break;
+        }
+    }
+
+    auto child = (presence_t*)(nullptr);
+    if (parent) {
+        auto child_name = path.get_filename();
+        auto child_dir = parent->get_child(child_name, true);
+        if (child_dir) {
+            child = child_dir;
+        } else {
+            child = parent->get_child(child_name, false);
+        }
+    }
+    return {static_cast<file_info_t*>(child), parent};
 }
 
-template <> SYNCSPIRIT_API utils::bytes_view_t get_index<1>(const folder_info_ptr_t &item) noexcept {
-    return item->get_device()->device_id().get_sha256();
-}
-
-template <> SYNCSPIRIT_API utils::bytes_view_t get_index<2>(const folder_info_ptr_t &item) noexcept {
-    return item->get_device()->get_key();
+void folder_info_t::clear() noexcept {
+    while(children.size()) {
+        children.back()->forget_presence();
+    }
 }
 
 } // namespace syncspirit::model

@@ -28,6 +28,7 @@ struct SYNCSPIRIT_API updates_streamer_t {
     void on_upsert(const folder_info_t &) noexcept;
 
   private:
+#if 0
     struct streaming_info_t {
         folder_info_ptr_t folder_info;
         file_infos_map_t unseen_files;
@@ -41,6 +42,7 @@ struct SYNCSPIRIT_API updates_streamer_t {
     device_ptr_t self;
     seen_info_t seen_info;
     streaming_option_t streaming;
+#endif
 };
 
 } // namespace syncspirit::model

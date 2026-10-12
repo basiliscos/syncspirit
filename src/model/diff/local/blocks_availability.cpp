@@ -22,7 +22,7 @@ auto blocks_availability_t::apply_impl(apply_controller_t &controller, void *cus
     auto &cluster = controller.get_cluster();
     auto folder = cluster.get_folders().by_id(folder_id);
     auto folder_info = folder->get_folder_info(device_id);
-    auto file = folder_info->get_file_infos().by_name(file_name);
+    auto [file, _] = folder_info->get_by_path(path);
     for (size_t i = 0; i < valid_blocks_map.size(); ++i) {
         if (valid_blocks_map[i]) {
             file->mark_local_available(i);

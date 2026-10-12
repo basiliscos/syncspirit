@@ -18,9 +18,9 @@ reset_folder_infos_t::reset_folder_infos_t(const uuid_folder_infos_map_t &map, o
     auto assember = model::diff::diff_assember_t(constants::diffs_batch);
     for (auto &it : map) {
         auto &folder_info = *it.second;
-        auto &files_info = folder_info.get_file_infos();
-        if (files_info.size()) {
-            assember.push_back(new remove_files_t(folder_info, files_info, &orphaned_blocks));
+        auto has_files = folder_info.get_children().size() > 0;
+        if (has_files) {
+            assember.push_back(new remove_files_t(folder_info, &orphaned_blocks));
         }
     }
     if (!orphaned_blocks_) {

@@ -313,63 +313,117 @@ TEST_CASE("loading cluster (file info + block)", "[model]") {
     CHECK(folder_info->get_max_sequence() == 3ul);
     folder->get_loader().add(folder_info.get());
 
-    proto::FileInfo pr_fi;
-    proto::set_name(pr_fi, "a/b.txt");
-    proto::set_size(pr_fi, 55ul);
-    proto::set_block_size(pr_fi, 5ul);
-    auto &version = proto::get_version(pr_fi);
-    proto::add_counters(version, proto::Counter(my_device->device_id().get_uint(), 0));
-    for (size_t i = 0; i < 11; ++i) {
-        proto::add_blocks(pr_fi, bi);
-    }
-
-    auto fi = file_info_t::create(sequencer->next_uuid(), pr_fi, folder_info).value();
-    CHECK(fi);
-    for (size_t i = 0; i < 11; ++i) {
-        fi->assign_block(block.get(), i);
-    }
-
-    auto target = file_info_ptr_t();
-
-    SECTION("directly") {
-        auto data = fi->serialize(true);
-        auto file_info_db = db::FileInfo();
-        REQUIRE(db::decode(data, file_info_db) == 0);
-        auto v = db::get_version(file_info_db);
-        auto id = fi->get_full_id();
-        auto key = utils::bytes_t(id.size() + 1);
-        key[0] = db::prefix::file_info;
-        std::copy(id.begin(), id.end(), key.data() + 1);
-        target = file_info_t::create(key, file_info_db, std::move(folder_info)).value();
-        REQUIRE(target);
+    SECTION("single file") {
+        proto::FileInfo pr_fi;
+        proto::set_name(pr_fi, "a.txt");
+        proto::set_size(pr_fi, 55ul);
+        proto::set_block_size(pr_fi, 5ul);
+        auto &version = proto::get_version(pr_fi);
+        proto::add_counters(version, proto::Counter(my_device->device_id().get_uint(), 0));
         for (size_t i = 0; i < 11; ++i) {
-            target->assign_block(block.get(), i);
+            proto::add_blocks(pr_fi, bi);
         }
-        CHECK(target->get_block_size() == 5ul);
-        CHECK(target->iterate_blocks().get_total() == 11ul);
-        CHECK(target->get_size() == 55ul);
-    }
 
-    SECTION("via diff") {
+        auto fi = file_info_t::create(sequencer->next_uuid(), pr_fi, folder_info).value();
+        CHECK(fi);
+        for (size_t i = 0; i < 11; ++i) {
+            fi->assign_block(block.get(), i);
+        }
+
+        auto target = file_info_ptr_t();
+
+        SECTION("directly") {
+            auto data = fi->serialize(true);
+            auto file_info_db = db::FileInfo();
+            REQUIRE(db::decode(data, file_info_db) == 0);
+            auto v = db::get_version(file_info_db);
+            auto id = fi->get_full_id();
+            auto key = utils::bytes_t(id.size() + 1);
+            key[0] = db::prefix::file_info;
+            std::copy(id.begin(), id.end(), key.data() + 1);
+            target = file_info_t::create(key, file_info_db, std::move(folder_info)).value();
+            REQUIRE(target);
+            for (size_t i = 0; i < 11; ++i) {
+                target->assign_block(block.get(), i);
+            }
+            CHECK(target->get_block_size() == 5ul);
+            CHECK(target->iterate_blocks().get_total() == 11ul);
+            CHECK(target->get_size() == 55ul);
+        }
+
+        SECTION("via diff") {
+            diff::load::file_infos_t::container_t container;
+            using item_t = decltype(container)::value_type;
+            auto db = fi->as_db(true);
+            auto id = fi->get_full_id();
+            auto key = utils::bytes_t(id.size() + 1);
+            key[0] = db::prefix::file_info;
+            std::copy(id.begin(), id.end(), key.data() + 1);
+            container.emplace_back(item_t{key, std::move(db)});
+            auto diff = diff::cluster_diff_ptr_t(new diff::load::file_infos_t(std::move(container)));
+            REQUIRE(diff->apply(*controller, {}));
+            auto &presences = folder_info->get_children();
+            REQUIRE(presences.size() == 1);
+            target = static_cast<model::file_info_t*>(presences.front());
+            REQUIRE(target);
+            REQUIRE(target->iterate_blocks().get_total() == 11);
+            REQUIRE(target->iterate_blocks().next()->get_hash() == block->get_hash());
+        }
+
+        CHECK(target->get_uuid() == fi->get_uuid());
+        CHECK(target->get_name() == fi->get_name());
+    }
+    SECTION("file + dir") {
+        proto::FileInfo pr_dir;
+        proto::set_name(pr_dir, "dir");
+        proto::set_type(pr_dir, proto::FileInfoType::DIRECTORY);
+        proto::add_counters(proto::get_version(pr_dir), proto::Counter(my_device->device_id().get_uint(), 0));
+        auto fi_dir = file_info_t::create(sequencer->next_uuid(), pr_dir, folder_info).value();
+
+        proto::FileInfo pr_file;
+        proto::set_name(pr_file, "dir/file");
+        proto::set_type(pr_file, proto::FileInfoType::FILE);
+        proto::add_counters(proto::get_version(pr_file), proto::Counter(my_device->device_id().get_uint(), 1));
+        auto fi_file = file_info_t::create(sequencer->next_uuid(), pr_file, folder_info).value();
+
         diff::load::file_infos_t::container_t container;
         using item_t = decltype(container)::value_type;
-        auto db = fi->as_db(true);
-        auto id = fi->get_full_id();
-        auto key = utils::bytes_t(id.size() + 1);
-        key[0] = db::prefix::file_info;
-        std::copy(id.begin(), id.end(), key.data() + 1);
-        container.emplace_back(item_t{key, std::move(db)});
+
+        auto db_d = fi_dir->as_db(true);
+        auto id_dir = fi_dir->get_full_id();
+        auto key_dir = utils::bytes_t(id_dir.size() + 1);
+        key_dir[0] = db::prefix::file_info;
+        std::copy(id_dir.begin(), id_dir.end(), key_dir.data() + 1);
+
+        auto db_file = fi_file->as_db(true);
+        auto id_file = fi_file->get_full_id();
+        auto key_file = utils::bytes_t(id_file.size() + 1);
+        key_file[0] = db::prefix::file_info;
+        std::copy(id_file.begin(), id_file.end(), key_file.data() + 1);
+
+        SECTION("dir first"){
+            container.emplace_back(item_t{key_dir, std::move(db_d)});
+            container.emplace_back(item_t{key_file, std::move(db_file)});
+        }
+        SECTION("file first"){
+            container.emplace_back(item_t{key_file, std::move(db_file)});
+            container.emplace_back(item_t{key_dir, std::move(db_d)});
+        }
+
         auto diff = diff::cluster_diff_ptr_t(new diff::load::file_infos_t(std::move(container)));
         REQUIRE(diff->apply(*controller, {}));
-        auto &map = folder_info->get_file_infos();
-        REQUIRE(map.size() == 1);
-        target = map.by_name(fi->get_name()->get_full_name());
-        REQUIRE(target);
-        REQUIRE(map.by_name(fi->get_name()->get_full_name()));
-        REQUIRE(target->iterate_blocks().get_total() == 11);
-        REQUIRE(target->iterate_blocks().next()->get_hash() == block->get_hash());
-    }
 
-    CHECK(target->get_uuid() == fi->get_uuid());
-    CHECK(target->get_name() == fi->get_name());
+        auto path_dir = utils::path_t::make_generic("dir");
+        auto path_file = utils::path_t::make_generic("dir/file");
+        auto [p_dir, p_dir_parent] = folder_info->get_by_path(path_dir);
+        auto [p_file, p_file_parent] = folder_info->get_by_path(path_file);
+        REQUIRE(p_dir);
+        REQUIRE(p_file);
+        CHECK(*p_dir->get_name() == path_dir);
+        CHECK(*p_file->get_name() == path_file);
+        CHECK(p_file_parent == p_dir);
+        CHECK(p_file->get_parent() == p_dir);
+        CHECK(p_dir_parent == folder_info);
+        CHECK(p_dir->get_parent() == folder_info);
+    }
 }

@@ -92,18 +92,22 @@ void presence_t::sync_with_entity() const noexcept {
 }
 
 auto presence_t::get_children() noexcept -> children_t & {
+#if 0
     auto &e_children = entity->children;
     if (children.size() != e_children.size()) {
         children.clear();
         children.reserve(e_children.size());
         for (auto &c : e_children) {
             auto p = const_cast<presence_t *>(c->get_presence(device));
-            if (p->entity->best) {
-                children.emplace_back(p);
+            if (p) {
+                if (p->entity->best) {
+                    children.emplace_back(p);
+                }
             }
         }
         std::sort(children.begin(), children.end(), child_comparator_t{});
     }
+#endif
     return children;
 }
 
@@ -128,6 +132,18 @@ presence_t *presence_t::get_child(std::string_view name, bool is_dir) noexcept {
 
 void presence_t::forget_entity() noexcept { entity = nullptr; }
 
+void presence_t::forget_presence() noexcept {
+    for (auto& c: children) {
+        c->forget_presence();
+    }
+    if (parent) {
+        parent->remove_child(*this);
+    }
+    if (entity) {
+        entity->remove_presense(*this);
+    }
+}
+
 bool presence_t::is_unique() const noexcept {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32) || defined(__APPLE__)
     using una::caseless::compare_utf8;
@@ -147,5 +163,32 @@ bool presence_t::is_unique() const noexcept {
 #endif
     return true;
 }
+
+presence_t* presence_t::set_parent(entity_t *entity_, presence_t *parent_) noexcept {
+    if (entity_) {
+        entity = entity_;
+        entity->add_presense(*this);
+    }
+    parent = parent_;
+    return this;
+}
+
+void presence_t::add_child(presence_t* child, std::string_view name) noexcept {
+    auto child_entity = entity->get_or_create_child(name);
+    child->set_parent(child_entity, this);
+    children.push_back(std::move(child));
+    // TODO: sort children
+}
+
+void presence_t::remove_child(const presence_t & child) noexcept {
+    // TODO: sort children
+    for (auto it = children.rbegin(); it != children.rend(); ++it) {
+        if (*it == &child) {
+            children.erase(std::next(it).base());
+        }
+    }
+}
+
+
 
 } // namespace syncspirit::model

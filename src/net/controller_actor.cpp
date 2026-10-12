@@ -1,3 +1,4 @@
+#if 0
 // SPDX-License-Identifier: GPL-3.0-or-later
 // SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
@@ -1520,3 +1521,4 @@ auto controller_actor_t::compare_with_local(model::file_info_t &peer_file, model
 
     return peer_file.is_locally_available() ? LD::unflushed : LD::content;
 }
+#endif

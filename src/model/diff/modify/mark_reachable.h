@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #pragma once
 
@@ -17,7 +17,7 @@ struct SYNCSPIRIT_API mark_reachable_t final : cluster_diff_t {
 
     std::string folder_id;
     utils::bytes_t device_id;
-    std::string file_name;
+    utils::path_t path;
     bool reachable;
 };
 

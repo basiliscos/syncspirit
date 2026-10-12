@@ -207,6 +207,7 @@ auto local_keeper_t::operator()(const model::diff::local::scan_start_t &diff, vo
     if ((folder->is_suspended() && !folder->get_suspend_reason()) || state != r::state_t::OPERATIONAL) {
         do_scan = false;
     }
+#if 0
     if (do_scan) {
         LOG_DEBUG(log, "initiating scan of {} from '{}'", diff.folder_id, diff.sub_dir);
         auto local_folder = folder->get_folder_info(*cluster->get_device());
@@ -223,6 +224,8 @@ auto local_keeper_t::operator()(const model::diff::local::scan_start_t &diff, vo
     } else {
         LOG_DEBUG(log, "skipping scan of {}", diff.folder_id);
     }
+#endif
+    std::abort();
     return diff.visit_next(*this, custom);
 }
 
@@ -382,6 +385,7 @@ void local_keeper_t::handle_rename(fs::payload::file_info_t &change, const model
     auto new_name = proto::get_name(change);
     auto &prev_name = change.prev_path;
     LOG_DEBUG(log, "(input) handle rename '{}' -> '{}' in folder '{}'", prev_name, new_name, folder_id);
+#if 0
     auto &local_files = local_folder.get_file_infos();
 
     auto f_root = local_files.by_name(prev_name);
@@ -454,10 +458,13 @@ void local_keeper_t::handle_rename(fs::payload::file_info_t &change, const model
         auto diff = assembler.consume();
         stack_ctx.push_back(diff.get());
     }
+#endif
+    std::abort();
 }
 
 void local_keeper_t::on_changes(model::folder_info_t &local_folder, fs::payload::file_changes_t &changes,
                                 lc_context_t &stack_ctx) noexcept {
+#if 0
     using namespace model::diff;
     using strings_t = std::pmr::unordered_set<std::pmr::string, utils::string_hash_t, utils::string_eq_t>;
     using relation_t = std::tuple<presentation::presence_t *, presentation::presence_t *, bool>;
@@ -649,4 +656,6 @@ void local_keeper_t::on_changes(model::folder_info_t &local_folder, fs::payload:
         auto folder_ctx = local_keeper::make_context(&local_folder, std::move(unexamined));
         stack_ctx.new_contexts.emplace_back(std::move(folder_ctx));
     }
+#endif
+    std::abort();
 }

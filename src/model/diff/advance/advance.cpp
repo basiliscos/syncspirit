@@ -11,6 +11,9 @@
 #include "model/diff/modify/remove_blocks.h"
 #include "model/misc/orphaned_blocks.h"
 #include "utils/format.hpp"
+#include "utils/path_view.hpp"
+
+#include <memory_resource>
 
 using namespace syncspirit::model;
 using namespace syncspirit::model::diff::advance;
@@ -59,9 +62,13 @@ void advance_t::initialize(const cluster_t &cluster, sequencer_t &sequencer, pro
     auto folder_id = folder->get_id();
     auto &self = *cluster.get_device();
 
+    auto buffer = std::array<std::byte, 1024 * 32>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+
+    auto path = utils::make_generic_view(local_file_name_, allocator);
     auto local_folder_info = folder->get_folder_info(self);
-    auto &local_files = local_folder_info->get_file_infos();
-    auto local_file = local_files.by_name(local_file_name_);
+    auto [local_file, parent_presence] = local_folder_info->get_by_path(path);
 
     auto orphans = orphaned_blocks_t::set_t();
     proto_local = proto_source;
@@ -141,21 +148,26 @@ auto advance_t::apply_impl(apply_controller_t &controller, void *custom) const n
     if (!r) {
         return r;
     }
+
+    auto buffer = std::array<std::byte, 1024 * 32>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+
     auto &cluster = controller.get_cluster();
     auto my_device = cluster.get_device();
     auto folder = cluster.get_folders().by_id(folder_id);
     auto local_folder = folder->get_folder_info(*my_device);
     auto peer_folder = folder->get_folder_info(peer_id);
     auto name = proto::get_name(proto_local);
+    auto path = utils::make_generic_view(name, allocator);
 
-    auto prev_file = local_folder->get_file_infos().by_name(name);
+    auto [prev_file,  parent] = local_folder->get_by_path(path);
     auto local_file_opt = file_info_t::create(uuid, proto_local, local_folder);
     if (!local_file_opt) {
         return local_file_opt.assume_error();
     }
     auto local_file = std::move(local_file_opt.assume_value());
     if (prev_file) {
-        local_folder->get_file_infos().remove(prev_file);
         prev_file->update(*local_file);
         local_file = std::move(prev_file);
     }
@@ -175,15 +187,17 @@ auto advance_t::apply_impl(apply_controller_t &controller, void *custom) const n
         }
     }
 
+    auto local_file_ptr = local_file.get();
     auto sequence = local_folder->get_max_sequence() + 1;
-    local_file->mark_local(true);
-    local_file->set_sequence(sequence);
-    local_folder->add_strict(local_file);
+    local_file_ptr->mark_local(true);
+    local_file_ptr->set_sequence(sequence);
+    parent->add_child(local_file_ptr, path.get_filename());
+    local_folder->add_strict(local_file_ptr, true);
 
-    LOG_TRACE(log, "advance_t ({}), file: '{}', size: {}, blocks: {}, seq.: {}", stringify(action), *local_file, size,
+    LOG_TRACE(log, "advance_t ({}), file: '{}', size: {}, blocks: {}, seq.: {}", stringify(action), *local_file_ptr, size,
               proto::get_blocks_size(proto_local), sequence);
 
-    local_file->notify_update();
+    local_file_ptr->notify_update();
 
     return applicator_t::apply_sibling(controller, custom);
 }

@@ -252,9 +252,12 @@ void scheduler_t::on_timer(r::request_id_t, bool cancelled) noexcept {
 
 void scheduler_t::initiate_scan(std::string_view folder_id, std::string_view sub_dir) noexcept {
     LOG_DEBUG(log, "initiating folder '{}' scan (sub_dir: {})", folder_id, sub_dir);
+#if 0
     auto diff = model::diff::cluster_diff_ptr_t{};
     auto now = r::pt::microsec_clock::local_time();
     diff = new model::diff::local::scan_start_t(folder_id, sub_dir, now);
     send<model::payload::model_update_t>(coordinator, std::move(diff));
     scan_in_progress = true;
+#endif
+    std::abort();
 }

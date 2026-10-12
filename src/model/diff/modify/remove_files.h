@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2026 Ivan Baidakou
 
 #pragma once
 
@@ -11,15 +11,15 @@ namespace syncspirit::model::diff::modify {
 
 struct SYNCSPIRIT_API remove_files_t final : generic_remove_t {
     using generic_remove_t::generic_remove_t;
-    using names_t = std::vector<std::string>;
+    using paths_t = std::vector<utils::path_t>;
 
-    remove_files_t(const folder_info_t &fi, const file_infos_map_t &files,
+    remove_files_t(const folder_info_t &fi,
                    orphaned_blocks_t *orphaned_blocks = nullptr) noexcept;
 
     outcome::result<void> apply_impl(apply_controller_t &, void *) const noexcept override;
     outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;
 
-    names_t names;
+    paths_t paths;
     utils::bytes_t device_id;
     std::string folder_id;
 };

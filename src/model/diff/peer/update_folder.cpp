@@ -12,6 +12,7 @@
 #include "model/misc/error_code.h"
 #include "proto/proto-helpers-bep.h"
 #include "utils/format.hpp"
+#include "utils/path_view.hpp"
 
 #include <memory_resource>
 #include <set>
@@ -56,7 +57,6 @@ auto update_folder_t::apply_impl(apply_controller_t &controller, void *custom) c
     auto &bm = cluster.get_blocks();
 
     auto max_seq = folder_info->get_max_sequence();
-    auto &fm = folder_info->get_file_infos();
 
     for (std::size_t i = 0; i < files.size(); ++i) {
         auto &f = files[i];
@@ -81,24 +81,20 @@ auto update_folder_t::apply_impl(apply_controller_t &controller, void *custom) c
                 file->assign_block(block.get(), (size_t)i);
             }
         }
-        bool add_file = true;
-        if (auto prev_file = fm.by_name(file->get_name()->get_full_name()); prev_file) {
+        auto [prev_file, _] = folder_info->get_by_path(*file->get_name());
+        if (prev_file) {
             auto prev_seq = prev_file->get_sequence();
             auto new_seq = file->get_sequence();
             if (prev_seq < new_seq) {
-                fm.remove(prev_file);
                 prev_file->update(*file);
                 file = std::move(prev_file);
                 file->notify_update();
             } else if (prev_seq == new_seq) {
-                add_file = false;
                 LOG_TRACE(log, "update_folder_t, apply(); skipping update for '{}', seq. {}", new_seq, *file);
             }
         }
 
-        if (add_file) {
-            folder_info->add_strict(file);
-        }
+        folder_info->add_strict(file.get(), prev_file);
     }
 
     LOG_TRACE(log, "update_folder_t, apply(); max seq: {} -> {}", max_seq, folder_info->get_max_sequence());
@@ -123,10 +119,12 @@ using diff_t = diff::cluster_diff_ptr_t;
 static auto construct(sequencer_t &sequencer, folder_info_t *folder_info, syncspirit::utils::bytes_view_t peer_id,
                       update_folder_t::files_t files, update_folder_t::blocks_t new_blocks) -> outcome::result<diff_t> {
     auto folder = folder_info->get_folder();
+    auto buffer = std::array<std::byte, 1024 * 32>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
 
     auto uuids = update_folder_t::uuids_t{};
     uuids.reserve(files.size());
-    auto &fm = folder_info->get_file_infos();
     auto orphaned_candidates = orphaned_blocks_t{};
     auto white_listed_blocks = orphaned_blocks_t::set_t{};
     for (const auto &f : files) {
@@ -138,9 +136,9 @@ static auto construct(sequencer_t &sequencer, folder_info_t *folder_info, syncsp
             auto owned_hash = utils::bytes_t(strict_hash.get_hash());
             white_listed_blocks.emplace(owned_hash);
         }
-        auto file = file_info_ptr_t{};
-        bu::uuid file_uuid;
-        auto prev_file = fm.by_name(proto::get_name(f));
+        auto file_uuid = bu::uuid{};
+        auto path = utils::make_generic_view(proto::get_name(f), allocator);
+        auto [prev_file, _] = folder_info->get_by_path(path);
         if (prev_file) {
             assign(file_uuid, prev_file->get_uuid());
             orphaned_candidates.record(*prev_file);
@@ -188,7 +186,6 @@ static auto instantiate(const cluster_t &cluster, sequencer_t &sequencer, const 
         return make_error_code(error_code_t::folder_is_not_shared);
     }
 
-    auto &prev_files = fi->get_file_infos();
     auto log = update_folder_t::get_log();
     auto &blocks = cluster.get_blocks();
     auto files = update_folder_t::files_t();
@@ -216,6 +213,7 @@ static auto instantiate(const cluster_t &cluster, sequencer_t &sequencer, const 
     for (int i = 0; i < files_count; ++i) {
         auto &f = proto::get_files(message, i);
         auto name = proto::get_name(f);
+        auto path = utils::make_generic_view(name, allocator);
 
         if (skipp_file_indices.count(i)) {
             LOG_DEBUG(log, "skipping outdated {}-th file '{}'", i, name);
@@ -234,7 +232,7 @@ static auto instantiate(const cluster_t &cluster, sequencer_t &sequencer, const 
         if (sequence <= prev_sequence) {
             LOG_DEBUG(log, "file '{}' has sequence {}, it is already known {}, try to ignore", name, sequence,
                       prev_sequence);
-            auto prev_file = prev_files.by_name(name);
+            auto [prev_file, _] = fi->get_by_path(path);
             if (!prev_file) {
                 LOG_WARN(log, "no file '{}' has been previously seen, corrupted sequence?", name);
                 return make_error_code(error_code_t::invalid_sequence);

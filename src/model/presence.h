@@ -22,7 +22,7 @@ struct cluster_file_presence_t;
 
 presence_t *get_child(presence_t *parent, std::string_view name, bool is_dir) noexcept;
 
-struct SYNCSPIRIT_API presence_t : model::proxy_t {
+struct SYNCSPIRIT_API presence_t : model::augmentable_t {
     using children_t = std::vector<presence_t *>;
 
     // clang-format off
@@ -54,7 +54,10 @@ struct SYNCSPIRIT_API presence_t : model::proxy_t {
     inline const model::device_t* get_device() const noexcept { return device; }
 
     children_t& get_children() noexcept;
-    presence_t *get_child(std::string_view name, bool is_dir) noexcept;
+    presence_t *get_child(std::string_view name, bool is_dir) noexcept ;
+    void remove_child(const presence_t &) noexcept;
+    void add_child(presence_t*, std::string_view name) noexcept;
+    void forget_presence() noexcept;
 
     struct SYNCSPIRIT_API presence_like_t {
         std::string_view name;

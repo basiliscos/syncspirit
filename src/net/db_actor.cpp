@@ -951,12 +951,16 @@ auto db_actor_t::operator()(const model::diff::advance::advance_t &diff, void *c
         return outcome::success();
     }
 
+    auto buffer = std::array<std::byte, 1024 * 32>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
     auto folder = cluster->get_folders().by_id(diff.folder_id);
     if (folder && !folder->is_suspended()) {
         auto folder_info = folder->get_folder_info(*cluster->get_device());
         if (folder_info) {
             auto name = proto::get_name(diff.proto_local);
-            auto file = folder_info->get_file_infos().by_name(name);
+            auto path = utils::make_generic_view(name, allocator);
+            auto [file, _] = folder_info->get_by_path(path);
             if (file) {
                 auto &txn = *get_txn().assume_value();
 
@@ -1000,6 +1004,9 @@ auto db_actor_t::operator()(const model::diff::peer::update_folder_t &diff, void
     }
     auto &txn = *txn_opt.assume_value();
 
+    auto buffer = std::array<std::byte, 1024 * 32>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
     auto folder = cluster->get_folders().by_id(diff.folder_id);
     auto device = cluster->get_devices().by_sha256(diff.peer_id);
     if (device) {
@@ -1013,10 +1020,10 @@ auto db_actor_t::operator()(const model::diff::peer::update_folder_t &diff, void
                 return r.assume_error();
             }
 
-            auto &files_map = folder_info->get_file_infos();
             for (const auto &f : diff.files) {
                 auto name = proto::get_name(f);
-                auto file = files_map.by_name(name);
+                auto path = utils::make_generic_view(name, allocator);
+                auto [file, _] = folder_info->get_by_path(path);
                 LOG_TRACE(log, "saving '{}', seq. = {}", *file, file->get_sequence());
                 unsigned char key[model::file_info_t::data_length + 1];
                 key[0] = db::prefix::file_info;

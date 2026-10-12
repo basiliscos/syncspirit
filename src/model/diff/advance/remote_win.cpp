@@ -17,8 +17,9 @@ remote_win_t::remote_win_t(const cluster_t &cluster, sequencer_t &sequencer, pro
     : advance_t(folder_id_, peer_id_, advance_action_t::resolve_remote_win) {
     auto &self = *cluster.get_device();
     auto folder = cluster.get_folders().by_id(folder_id);
-    auto &local_files = folder->get_folder_info(self)->get_file_infos();
-    auto local_file = local_files.by_name(proto::get_name(proto_file_));
+    auto path = utils::make_generic_view(proto::get_name(proto_file_), allocator);
+
+    auto [local_file, _] = folder->get_folder_info(self)->get_by_path(path);
     auto local_source = local_file->as_proto(true);
     auto name = local_file->make_conflicting_name(allocator);
     initialize(cluster, sequencer, std::move(local_source), name.get_full_name());
@@ -39,10 +40,14 @@ auto remote_win_t::apply_impl(apply_controller_t &controller, void *custom) cons
         LOG_DEBUG(log, "remote_win_t, folder = {}, name = {}, peer folder is not available, ignoring", folder_id,
                   proto::get_name(proto_source));
     } else {
-        auto &local_files = folder->get_folder_info(self)->get_file_infos();
-        auto prev_file = local_files.by_name(proto::get_name(proto_source));
-        assert(prev_file);
-        local_files.remove(prev_file);
+        auto buffer = std::array<std::byte, 1024 * 32>();
+        auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+        auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+        auto name = proto::get_name(proto_source);
+        auto path = utils::make_generic_view(name, allocator);
+        auto local_fi = folder->get_folder_info(self);
+        auto [prev_file, parent_presence] = local_fi->get_by_path(path);
+        parent_presence->remove_child(*prev_file);
         return parent_t::apply_impl(controller, custom);
     }
     return applicator_t::apply_sibling(controller, custom);

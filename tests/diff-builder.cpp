@@ -276,8 +276,8 @@ diff_builder_t &diff_builder_t::advance(const model::file_info_t &source,
 
     auto folder = source_fi.get_folder();
     auto local_fi = folder->get_folder_info(*folder->get_cluster()->get_device());
-    auto local_file = local_fi->get_file_infos().by_name(source.get_name()->get_full_name());
-    auto action = model::resolve(source, local_file.get(), *local_fi);
+    auto [local_file, _] = local_fi->get_by_path(*source.get_name());
+    auto action = model::resolve(source, local_file, *local_fi);
     auto diff = diff::advance::remote_copy_t::create(action, source, source_fi, *sequencer, allocator);
     return assign(diff.get());
 }
@@ -331,10 +331,10 @@ diff_builder_t &diff_builder_t::remove_unknown_device(const model::pending_devic
     return assign(new diff::modify::remove_pending_device_t(device));
 }
 
-diff_builder_t &diff_builder_t::scan_start(std::string_view id, std::string_view sub_dir,
+diff_builder_t &diff_builder_t::scan_start(std::string_view id, utils::path_t sub_dir,
                                            const r::pt::ptime &at) noexcept {
-    auto final_at = at.is_not_a_date_time() ? r::pt::microsec_clock::local_time() : at;
-    return assign(new model::diff::local::scan_start_t(id, sub_dir, final_at));
+    auto final_at = at.is_not_a_date_time() ? r::pt::microsec_clock::local_time() : at;    
+    return assign(new model::diff::local::scan_start_t(id, std::move(sub_dir), final_at));
 }
 
 diff_builder_t &diff_builder_t::scan_finish(std::string_view id, const r::pt::ptime &at) noexcept {

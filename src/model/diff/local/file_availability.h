@@ -17,7 +17,7 @@ struct SYNCSPIRIT_API file_availability_t final : cluster_diff_t {
     outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;
 
     std::string folder_id;
-    std::string name;
+    utils::path_t path;
     model::version_t version;
 };
 

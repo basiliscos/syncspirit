@@ -5,6 +5,8 @@
 #include <algorithm>
 #include <spdlog/spdlog.h>
 
+#if 0
+
 using namespace syncspirit::model;
 
 updates_streamer_t::updates_streamer_t(cluster_t &cluster_, device_t &device) noexcept
@@ -120,4 +122,6 @@ auto updates_streamer_t::next() noexcept -> update_t {
         }
     }
     return {{}, {}, false};
+    std::abort();
 }
+#endif

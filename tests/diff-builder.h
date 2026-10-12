@@ -91,7 +91,7 @@ struct SYNCSPIRIT_TEST_API diff_builder_t : protected model::diff::apply_control
     diff_builder_t &add_unknown_device(const model::device_id_t &device, db::SomeDevice db_device) noexcept;
     diff_builder_t &remove_ignored_device(const model::ignored_device_t &device) noexcept;
     diff_builder_t &remove_unknown_device(const model::pending_device_t &device) noexcept;
-    diff_builder_t &scan_start(std::string_view id, std::string_view sub_dir = {}, const r::pt::ptime & = {}) noexcept;
+    diff_builder_t &scan_start(std::string_view id, utils::path_t = {}, const r::pt::ptime & = {}) noexcept;
     diff_builder_t &scan_finish(std::string_view id, const r::pt::ptime & = {}) noexcept;
     diff_builder_t &scan_request(std::string_view id, std::string_view sub_dir = {}) noexcept;
     diff_builder_t &synchronization_start(std::string_view id) noexcept;

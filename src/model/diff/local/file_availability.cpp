@@ -11,7 +11,7 @@ using namespace syncspirit::model::diff::local;
 file_availability_t::file_availability_t(const model::file_info_t &file, const folder_info_t &fi) noexcept {
     LOG_DEBUG(log, "file_availability_t, file: {}", file);
     folder_id = fi.get_folder()->get_id();
-    name = file.get_name()->get_full_name();
+    path = file.get_name()->clone();
     version = file.get_version();
 }
 
@@ -21,10 +21,10 @@ auto file_availability_t::apply_impl(apply_controller_t &controller, void *custo
     auto folder = cluster.get_folders().by_id(folder_id);
     if (folder) {
         auto folder_info = folder->get_folder_info(*cluster.get_device());
-        auto f = folder_info->get_file_infos().by_name(name);
+        auto [f, parent]= folder_info->get_by_path(path);
         if (f->get_version().identical_to(version)) {
             auto count = f->iterate_blocks().get_total();
-            LOG_TRACE(log, "file_availability_t, mark local file '{}', blocks = {}", name, count);
+            LOG_TRACE(log, "file_availability_t, mark local file '{}', blocks = {}", path, count);
             for (std::uint32_t i = 0; i < count; ++i) {
                 if (!f->is_locally_available(i)) {
                     f->mark_local_available(i);
@@ -39,6 +39,6 @@ auto file_availability_t::apply_impl(apply_controller_t &controller, void *custo
 }
 
 auto file_availability_t::visit(cluster_visitor_t &visitor, void *custom) const noexcept -> outcome::result<void> {
-    LOG_TRACE(log, "visiting file_availability_t, file: '{}'", name);
+    LOG_TRACE(log, "visiting file_availability_t, file: '{}'", path);
     return visitor(*this, custom);
 }

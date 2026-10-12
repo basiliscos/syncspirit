@@ -12,6 +12,7 @@
 #include "utils/path.h"
 #include "misc/map.hpp"
 #include "misc/uuid.h"
+#include "presence.h"
 #include "block_info.h"
 #include "version.h"
 #include "proto/proto-fwd.hpp"
@@ -36,7 +37,7 @@ using file_info_ptr_t = intrusive_ptr_t<file_info_t>;
 
 struct path_guard_t;
 
-struct SYNCSPIRIT_API file_info_t {
+struct SYNCSPIRIT_API file_info_t: presence_t {
 
     // clang-format off
     enum flags_t: std::uint16_t {
@@ -52,7 +53,6 @@ struct SYNCSPIRIT_API file_info_t {
         f_available        = 1 << 9,
     };
     // clang-format on
-
     static constexpr std::uintptr_t LOCAL_MASK = 1 << 0;
     static constexpr std::uintptr_t PTR_MASK = ~LOCAL_MASK;
 
@@ -213,6 +213,7 @@ struct SYNCSPIRIT_API file_info_t {
 
     utils::poly_path_view_t make_conflicting_name(const utils::allocator_t &) const noexcept;
 
+#if 0
     inline void refcouner_inc() const noexcept { ++counter; }
     inline std::uint32_t refcouner_dec() const noexcept { return --counter; }
     inline std::uint32_t use_count() const noexcept { return counter; }
@@ -221,6 +222,7 @@ struct SYNCSPIRIT_API file_info_t {
     void set_augmentation(augmentation_ptr_t value) noexcept;
     augmentation_ptr_t &get_augmentation() noexcept;
     void notify_update() noexcept;
+#endif
 
     template <typename T> auto &access() noexcept;
     template <typename T> auto &access() const noexcept;
@@ -265,12 +267,13 @@ struct SYNCSPIRIT_API file_info_t {
     content_t content;
     version_t version;
     std::uint16_t flags = 0;
-    mutable std::uint16_t counter = 0;
+    // mutable std::uint16_t counter = 0;
 
     friend struct blocks_iterator_t;
     friend struct model::blocks_iterator_t;
 };
 
+#if 0
 inline void intrusive_ptr_add_ref(const file_info_t *ptr) noexcept { ptr->refcouner_inc(); }
 
 inline void intrusive_ptr_release(const file_info_t *ptr) noexcept {
@@ -278,6 +281,7 @@ inline void intrusive_ptr_release(const file_info_t *ptr) noexcept {
         delete ptr;
     }
 }
+#endif
 
 namespace details {
 
@@ -324,6 +328,7 @@ using file_map_base_t = mi::multi_index_container<
 
 } // namespace file_details
 
+#if 0
 struct files_map_t : file_details::file_map_base_t {
     using parent_t = file_details::file_map_base_t;
     files_map_t() = default;
@@ -356,6 +361,7 @@ struct SYNCSPIRIT_API file_infos_map_t : private file_details::file_map_base_t {
     seq_projection_t &sequence_projection() noexcept;
     range_t range(std::int64_t lower, std::int64_t upper) noexcept;
 };
+#endif
 
 using file_infos_set_t = std::unordered_set<file_info_ptr_t>;
 

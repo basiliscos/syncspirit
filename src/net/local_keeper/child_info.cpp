@@ -66,7 +66,10 @@ std::string_view child_info_t::relative_path(const model::folder_info_t &local_f
 }
 
 auto child_info_t::fetch_model(const model::folder_info_t &local_folder) const -> const model::file_info_t * {
+#if 0
     auto &folder_path = local_folder.get_folder()->get_path();
     auto name = path.relativize(local_folder.get_folder()->get_path());
     return local_folder.get_file_infos().by_name(name).get();
+#endif
+    std::abort();
 }

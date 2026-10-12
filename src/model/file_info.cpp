@@ -158,13 +158,17 @@ file_info_t::size_full_t::~size_full_t() {}
 
 file_info_t::size_less_t::~size_less_t() {}
 
-file_info_t::file_info_t(utils::bytes_view_t key_, const folder_info_ptr_t &folder_info) noexcept {
+file_info_t::file_info_t(utils::bytes_view_t key_, const folder_info_ptr_t &folder_info) noexcept:
+    presence_t{nullptr, folder_info->get_device()}
+    {
     auto uuid_from_key = key_.subspan(1);
     assert(uuid_from_key.subspan(0, uuid_length) == folder_info->get_uuid());
     std::copy(uuid_from_key.begin(), uuid_from_key.end(), key);
 }
 
-file_info_t::file_info_t(const bu::uuid &uuid, const folder_info_ptr_t &folder_info_) noexcept {
+file_info_t::file_info_t(const bu::uuid &uuid, const folder_info_ptr_t &folder_info_) noexcept
+    :    presence_t{nullptr, folder_info_->get_device()}
+{
     fill(key, uuid, folder_info_);
 }
 
@@ -211,6 +215,7 @@ std::uint64_t file_info_t::get_block_offset(size_t block_index) const noexcept {
 auto file_info_t::fields_update(const db::FileInfo &source, utils::path_cache_t &path_cache) noexcept
     -> outcome::result<void> {
     flags = (flags & ~0b111111) | as_flags(db::get_type(source));
+    features = 0;
     name = path_cache.get_path(db::get_name(source));
     sequence = db::get_sequence(source);
     permissions = db::get_permissions(source);
@@ -219,6 +224,7 @@ auto file_info_t::fields_update(const db::FileInfo &source, utils::path_cache_t 
     modified_by = db::get_modified_by(source);
     if (db::get_deleted(source)) {
         flags |= flags_t::f_deleted;
+        features |= features_t::deleted;
     }
     if (db::get_invalid(source)) {
         flags |= flags_t::f_invalid;
@@ -226,6 +232,16 @@ auto file_info_t::fields_update(const db::FileInfo &source, utils::path_cache_t 
     if (db::get_no_permissions(source)) {
         flags |= flags_t::f_no_permissions;
     }
+    if (flags & flags_t::f_type_file) {
+        features |= features_t::file;
+    }
+    if (flags & flags_t::f_type_dir) {
+        features |= features_t::directory;
+    }
+    if (flags & flags_t::f_type_link) {
+        features |= features_t::symblink;
+    }
+    features |= features_t::cluster;
 
     version = version_t(db::get_version(source));
 
@@ -411,7 +427,8 @@ void file_info_t::recheck(const folder_info_t &folder_info) noexcept {
             auto fit = peer->get_iterator();
             if (fit) {
                 auto fi = static_cast<model::folder_info_t *>(p.get());
-                auto peer_file = fi->get_file_infos().by_name(name->get_full_name());
+                auto [peer_file, _] = fi->get_by_path(*name);
+                std::abort(); // GET SIBLING
                 if (peer_file) {
                     fit->recheck(*fi, *peer_file);
                 }
@@ -697,18 +714,7 @@ bool file_info_t::identical_by_content_to(const proto::FileInfo &file) const noe
     return true;
 }
 
-void file_info_t::set_augmentation(augmentation_t &value) noexcept { extension = &value; }
-
-void file_info_t::set_augmentation(augmentation_ptr_t value) noexcept { extension = std::move(value); }
-
-augmentation_ptr_t &file_info_t::get_augmentation() noexcept { return extension; }
-
-void file_info_t::notify_update() noexcept {
-    if (extension) {
-        extension->on_update();
-    }
-}
-
+#if 0
 bool file_infos_map_t::put(const model::file_info_ptr_t &item, bool replace) noexcept {
     bool result = false;
     auto prev = file_info_ptr_t();
@@ -768,5 +774,6 @@ auto file_infos_map_t::range(std::int64_t lower, std::int64_t upper) noexcept ->
     auto end = proj.upper_bound(upper);
     return std::make_pair(begin, end);
 }
+#endif
 
 } // namespace syncspirit::model

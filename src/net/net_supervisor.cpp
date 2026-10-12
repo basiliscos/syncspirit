@@ -265,6 +265,7 @@ void net_supervisor_t::spawn_services() noexcept {
 }
 
 void net_supervisor_t::commit_loading() noexcept {
+#if 0
     if (!cluster->is_tainted()) {
         for (auto &it : cluster->get_folders()) {
             auto &folder = it.item;
@@ -294,6 +295,8 @@ void net_supervisor_t::commit_loading() noexcept {
                   devices.size(), folders.size(), files, cluster->get_blocks().size(), ignored_devices.size(),
                   ignored_folders.size(), pending_folders_sz, pending_devices.size());
     }
+#endif
+    std::abort();
 }
 
 void net_supervisor_t::on_start() noexcept {
@@ -334,6 +337,7 @@ auto net_supervisor_t::apply(const model::diff::modify::upsert_folder_info_t &di
 
 auto net_supervisor_t::apply(const model::diff::advance::advance_t &diff, void *custom) noexcept
     -> outcome::result<void> {
+#if 0
     auto r = parent_t::apply(diff, custom);
     if (r) {
         auto folder = cluster->get_folders().by_id(diff.folder_id);
@@ -351,10 +355,13 @@ auto net_supervisor_t::apply(const model::diff::advance::advance_t &diff, void *
         }
     }
     return r;
+#endif
+    std::abort();
 }
 
 auto net_supervisor_t::apply(const model::diff::peer::update_folder_t &diff, void *custom) noexcept
     -> outcome::result<void> {
+#if 0
     auto r = parent_t::apply(diff, custom);
     if (r) {
         auto folder = cluster->get_folders().by_id(diff.folder_id);
@@ -376,6 +383,8 @@ auto net_supervisor_t::apply(const model::diff::peer::update_folder_t &diff, voi
         }
     }
     return r;
+#endif
+    std::abort();
 }
 
 void net_supervisor_t::on_stop_services(message::stop_services_t &) noexcept {
