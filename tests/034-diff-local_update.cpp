@@ -2,7 +2,6 @@
 // SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "test-utils.h"
-#include "access.h"
 #include "model/cluster.h"
 #include "diff-builder.h"
 
@@ -36,8 +35,8 @@ TEST_CASE("new file diff", "[model]") {
         REQUIRE(builder.local_update(folder->get_id(), pr_file).apply());
 
         auto folder_info = folder->get_folder_info(*my_device);
-        auto &files = folder_info->get_file_infos();
-        auto file = files.by_name(proto::get_name(pr_file));
+        auto path = utils::path_t::make_generic(proto::get_name(pr_file));
+        auto [file, _] = folder_info->get_by_path(path);
         REQUIRE(file);
         REQUIRE(file->get_name()->get_full_name() == "a.txt");
         REQUIRE(file->get_link_target() == "/some/where");
@@ -67,11 +66,11 @@ TEST_CASE("new file diff", "[model]") {
         SECTION("update it") {
             proto::set_symlink_target(pr_file, "/new/location");
             REQUIRE(builder.local_update(folder->get_id(), pr_file).apply());
-            REQUIRE(files.size() == 1);
+            REQUIRE(folder->get_children().size() == 1);
 
-            auto new_file = files.by_name(file->get_name()->get_full_name());
+            auto [new_file, _] = folder_info->get_by_path(path);
             REQUIRE(new_file);
-            CHECK(new_file.get() == file.get());
+            CHECK(new_file == file);
             CHECK(new_file->get_full_id() == file->get_full_id());
             REQUIRE(new_file->get_version().counters_size() == 1);
             auto v2 = proto::get_value(new_file->get_version().get_best());
@@ -92,7 +91,8 @@ TEST_CASE("new file diff", "[model]") {
         REQUIRE(builder.local_update(folder->get_id(), pr_file).apply());
 
         auto folder_info = folder->get_folder_info(*my_device);
-        auto file = folder_info->get_file_infos().by_name(proto::get_name(pr_file));
+        auto path = utils::path_t::make_generic(proto::get_name(pr_file));
+        auto [file, _] = folder_info->get_by_path(path);
         REQUIRE(file);
         REQUIRE(file->get_size() == 5);
         REQUIRE(file->get_name()->get_full_name() == "a.txt");
@@ -118,13 +118,14 @@ TEST_CASE("new file diff", "[model]") {
         REQUIRE(builder.local_update(folder->get_id(), pr_file).apply());
 
         auto folder_info = folder->get_folder_info(*my_device);
-        auto file = folder_info->get_file_infos().by_name(proto::get_name(pr_file));
+        auto path = utils::path_t::make_generic(proto::get_name(pr_file));
+        auto [file, _] = folder_info->get_by_path(path);
         REQUIRE(file->get_sequence() == 1);
         CHECK(file->is_locally_available());
 
         proto::set_sequence(pr_file, 2ul);
         REQUIRE(builder.local_update(folder->get_id(), pr_file).apply());
-        file = folder_info->get_file_infos().by_name(proto::get_name(pr_file));
+        file = folder_info->get_by_path(path).first;
         REQUIRE(file->get_sequence() == 2);
         CHECK(file->is_locally_available());
     }
@@ -141,13 +142,13 @@ TEST_CASE("new file diff", "[model]") {
         proto::set_hash(pr_block, hash);
 
         auto folder_info = folder->get_folder_info(*my_device);
-        auto &files = folder_info->get_file_infos();
         auto &blocks = cluster->get_blocks();
         REQUIRE(builder.local_update(folder->get_id(), pr_file).apply());
-        REQUIRE(files.size() == 1);
+        REQUIRE(folder_info->get_children().size() == 1);
         REQUIRE(blocks.size() == 1);
 
-        auto file = folder_info->get_file_infos().by_name(proto::get_name(pr_file));
+        auto path = utils::path_t::make_generic(proto::get_name(pr_file));
+        auto [file, _] = folder_info->get_by_path(path);
         auto sequence = file->get_sequence();
         auto version = file->get_version();
 
@@ -155,10 +156,10 @@ TEST_CASE("new file diff", "[model]") {
         proto::set_name(pr_updated, "a.txt");
         proto::set_deleted(pr_updated, true);
         REQUIRE(builder.local_update(folder->get_id(), pr_updated).apply());
-        REQUIRE(files.size() == 1);
+        REQUIRE(folder_info->get_children().size() == 1);
         CHECK(blocks.size() == 0);
 
-        file = file = folder_info->get_file_infos().by_name(proto::get_name(pr_file));
+        file= folder_info->get_by_path(path).first;
         CHECK(file->is_deleted());
         REQUIRE(file->iterate_blocks().get_total() == 0);
         CHECK(file->get_sequence() > sequence);

@@ -161,7 +161,7 @@ auto advance_t::apply_impl(apply_controller_t &controller, void *custom) const n
     auto name = proto::get_name(proto_local);
     auto path = utils::make_generic_view(name, allocator);
 
-    auto [prev_file,  parent] = local_folder->get_by_path(path);
+    auto [prev_file, parent] = local_folder->get_by_path(path);
     auto local_file_opt = file_info_t::create(uuid, proto_local, local_folder);
     if (!local_file_opt) {
         return local_file_opt.assume_error();
@@ -191,7 +191,9 @@ auto advance_t::apply_impl(apply_controller_t &controller, void *custom) const n
     auto sequence = local_folder->get_max_sequence() + 1;
     local_file_ptr->mark_local(true);
     local_file_ptr->set_sequence(sequence);
-    parent->add_child(local_file_ptr, path.get_filename());
+    if (!prev_file) {
+        parent->add_child(local_file_ptr, path.get_filename());
+    }
     local_folder->add_strict(local_file_ptr, true);
 
     LOG_TRACE(log, "advance_t ({}), file: '{}', size: {}, blocks: {}, seq.: {}", stringify(action), *local_file_ptr, size,
