@@ -72,6 +72,7 @@ TEST_CASE("file-info", "[model]") {
     auto cn = std::string(conflict_name.get_full_name());
     REQUIRE_THAT(cn, Matches("a/b.sync-conflict-202412(\\d){2}-(\\d){6}-KHQNO2S.txt"));
 }
+#endif
 
 TEST_CASE("file_info_t::local_file", "[model]") {
     auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
@@ -95,26 +96,27 @@ TEST_CASE("file_info_t::local_file", "[model]") {
 
     auto pr_file = proto::FileInfo();
     proto::set_name(pr_file, "a.txt");
+    auto path = utils::path_t::make_generic(proto::get_name(pr_file));
 
     auto &v = proto::get_version(pr_file);
     proto::add_counters(v, proto::Counter(1, 1));
 
     SECTION("no local file") {
         auto file_peer = file_info_t::create(sequencer->next_uuid(), pr_file, folder_peer).value();
-        CHECK(!folder_my->get_file_infos().by_name("a.txt"));
+        CHECK(!folder_my->get_by_path(path).first);
         CHECK(file_peer->is_locally_available());
     }
 
     SECTION("there is identical local file") {
         proto::set_sequence(pr_file, folder_my->get_max_sequence() + 1);
         auto file_my = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
-        REQUIRE(folder_my->add_strict(file_my));
+        REQUIRE(folder_my->add_strict(file_my.get(), false));
 
         proto::set_sequence(pr_file, folder_peer->get_max_sequence() + 1);
         auto file_peer = file_info_t::create(sequencer->next_uuid(), pr_file, folder_peer).value();
-        REQUIRE(folder_peer->add_strict(file_peer));
+        REQUIRE(folder_peer->add_strict(file_peer.get(), false));
 
-        auto lf = folder_my->get_file_infos().by_name(file_peer->get_name()->get_full_name());
+        auto lf = folder_my->get_by_path(*file_peer->get_name()).first;
         REQUIRE(lf);
         REQUIRE(lf == file_my);
     }
@@ -153,7 +155,8 @@ TEST_CASE("file_info_t::check_consistency", "[model]") {
     REQUIRE(bbb);
 
     REQUIRE(builder.local_update(folder->get_id(), pr_file).apply());
-    auto file_my = folder_my->get_file_infos().by_name(proto::get_name(pr_file));
+    auto path = utils::path_t::make_generic(proto::get_name(pr_file));
+    auto [file_my, _] = folder_my->get_by_path(path);
     CHECK(file_my->get_size() == 5);
 }
 
@@ -253,7 +256,6 @@ TEST_CASE("file_info_t::get_size", "[model]") {
         CHECK(local_file->get_size() == 10);
     }
 }
-#endif
 
 TEST_CASE("file_info_t::update", "[model]") {
     auto local_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
@@ -339,7 +341,6 @@ TEST_CASE("file_info_t::update", "[model]") {
     }
 }
 
-#if 0
 TEST_CASE("file_info_t::make_conflicting_name for wstrings", "[model]") {
     auto buffer = std::array<std::byte, 1024 * 32>();
     auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
@@ -376,4 +377,3 @@ TEST_CASE("file_info_t::make_conflicting_name for wstrings", "[model]") {
     auto cn = std::string(conflict_name.get_full_name());
     REQUIRE_THAT(cn, Matches(boost::nowide::narrow(L"папка/файл.sync-conflict-(\\d){8}-(\\d){6}-KHQNO2S.1ц")));
 }
-#endif

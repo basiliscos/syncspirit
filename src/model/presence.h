@@ -3,7 +3,6 @@
 
 #pragma once
 
-#include "misc/proxy.h"
 #include "misc/stats.h"
 #include "device.h"
 #include "syncspirit-export.h"
@@ -27,18 +26,23 @@ struct SYNCSPIRIT_API presence_t : model::augmentable_t {
 
     // clang-format off
     enum features_t: std::uint32_t {
-        folder          = 1 << 0,
-        file            = 1 << 1,
-        directory       = 1 << 2,
-        missing         = 1 << 3,
-        cluster         = 1 << 4,
-        peer            = 1 << 5,
-        local           = 1 << 6,
-        deleted         = 1 << 7,
-        ignored         = 1 << 8,
-        symblink        = 1 << 9,
+        file            = 1 << 0,
+        directory       = 1 << 1,
+        symblink        = 1 << 2,
+        folder          = 1 << 3,
+        missing         = 1 << 4,
+        cluster         = 1 << 5,
+        peer            = 1 << 6,
+        local           = 1 << 7,
+        deleted         = 1 << 8,
+        ignored         = 1 << 9,
         unreachable     = 1 << 10,
+        invalid         = 1 << 11,
+        no_perms        = 1 << 12,
+        synchronizing   = 1 << 13,
+        available       = 1 << 14,
     };
+
     static constexpr std::uint32_t mask = 0xFFFFFFFF;
     // clang-format ON
 

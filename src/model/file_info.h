@@ -39,20 +39,6 @@ struct path_guard_t;
 
 struct SYNCSPIRIT_API file_info_t: presence_t {
 
-    // clang-format off
-    enum flags_t: std::uint16_t {
-        f_type_file        = 1 << 0,
-        f_type_dir         = 1 << 1,
-        f_type_link        = 1 << 2,
-        f_deleted          = 1 << 3,
-        f_invalid          = 1 << 4,
-        f_no_permissions   = 1 << 5,
-        f_synchronizing    = 1 << 6,
-        f_unreachable      = 1 << 7,
-        f_local            = 1 << 8,
-        f_available        = 1 << 9,
-    };
-    // clang-format on
     static constexpr std::uintptr_t LOCAL_MASK = 1 << 0;
     static constexpr std::uintptr_t PTR_MASK = ~LOCAL_MASK;
 
@@ -109,14 +95,15 @@ struct SYNCSPIRIT_API file_info_t: presence_t {
     static decomposed_key_t decompose_key(utils::bytes_view_t key);
 
     static inline std::uint16_t as_flags(proto::FileInfoType type) noexcept {
-        return type == proto::FileInfoType::DIRECTORY ? f_type_dir
-               : type == proto::FileInfoType::SYMLINK ? f_type_link
-                                                      : f_type_file;
+        return type == proto::FileInfoType::DIRECTORY ? features_t::directory
+               : type == proto::FileInfoType::SYMLINK ? features_t::symblink
+                                                      : features_t::file;
     }
 
     static inline proto::FileInfoType as_type(std::uint16_t flags) noexcept {
         using T = proto::FileInfoType;
-        return flags & file_info_t::f_type_dir ? T::DIRECTORY : flags & file_info_t::f_type_link ? T::SYMLINK : T::FILE;
+        using F = features_t;
+        return flags & F::directory ? T::DIRECTORY : flags & F::symblink ? T::SYMLINK : T::FILE;
     }
 
     ~file_info_t();
@@ -147,19 +134,19 @@ struct SYNCSPIRIT_API file_info_t: presence_t {
     void remove_blocks() noexcept;
     void assign_block(model::block_info_t *block, size_t index) noexcept;
 
-    inline std::uint16_t get_type() const noexcept { return flags & 0b111; }
-    inline bool is_file() const noexcept { return flags & f_type_file; }
-    inline bool is_dir() const noexcept { return flags & f_type_dir; }
-    inline bool is_link() const noexcept { return flags & f_type_link; }
-    inline bool is_deleted() const noexcept { return flags & f_deleted; }
-    inline bool is_invalid() const noexcept { return flags & f_invalid; }
-    inline bool is_unreachable() const noexcept { return flags & f_unreachable; }
-    inline bool is_local() const noexcept { return flags & f_local; }
+    inline std::uint16_t get_type() const noexcept { return features & 0b111; }
+    inline bool is_file() const noexcept { return features & features_t::file; }
+    inline bool is_dir() const noexcept { return features & features_t::directory; }
+    inline bool is_link() const noexcept { return features & features_t::symblink; }
+    inline bool is_deleted() const noexcept { return features & features_t::deleted; }
+    inline bool is_invalid() const noexcept { return features & features_t::invalid; }
+    inline bool is_unreachable() const noexcept { return features & features_t::unreachable; }
+    inline bool is_local() const noexcept { return features & features_t::local; }
 
     std::int64_t get_size() const noexcept;
 
     std::int32_t get_block_size() const noexcept {
-        auto has_blocks = (flags & f_type_file && !content.file.blocks.empty());
+        auto has_blocks = (is_file() && !content.file.blocks.empty());
         if (has_blocks) {
             auto &blocks = content.file.blocks;
             auto ptr = reinterpret_cast<std::uintptr_t>(blocks.front());
@@ -177,7 +164,7 @@ struct SYNCSPIRIT_API file_info_t: presence_t {
     bool is_locally_available() const noexcept;
 
     std::string_view get_link_target() const noexcept {
-        if (flags & f_type_link) {
+        if (is_link()) {
             auto &container = content.non_file.symlink_target;
             return {container.data(), container.size()};
         }
@@ -266,7 +253,6 @@ struct SYNCSPIRIT_API file_info_t: presence_t {
 
     content_t content;
     version_t version;
-    std::uint16_t flags = 0;
     // mutable std::uint16_t counter = 0;
 
     friend struct blocks_iterator_t;

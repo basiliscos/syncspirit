@@ -65,7 +65,6 @@ template <typename F> struct my_cluster_update_visitor_t : diff::cluster_visitor
     }
 };
 
-#if 0
 TEST_CASE("cluster update, new folder", "[model]") {
     auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
     auto my_device = device_t::create(my_id, "my-device").value();
@@ -324,7 +323,6 @@ TEST_CASE("cluster update, new folder", "[model]") {
         }
     }
 }
-#endif
 
 TEST_CASE("cluster update, reset folder", "[model]") {
     auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
@@ -485,7 +483,6 @@ TEST_CASE("cluster update, reset folder", "[model]") {
     CHECK(visitor.updated_folders == 1);
 }
 
-#if 0
 TEST_CASE("cluster update for a folder, which was not shared", "[model]") {
     auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
     auto my_device = device_t::create(my_id, "my-device").value();
@@ -619,7 +616,7 @@ TEST_CASE("cluster update nothing shared", "[model]") {
 
     proto::FileInfo pr_fi_peer = [&]() {
         auto f = proto::FileInfo();
-        proto::set_name(f, "a/c.txt");
+        proto::set_name(f, "c.txt");
         proto::set_size(f, 5ul);
         proto::set_block_size(f, 5ul);
         proto::set_sequence(f, 5);
@@ -640,8 +637,8 @@ TEST_CASE("cluster update nothing shared", "[model]") {
     auto folder_2 = cluster->get_folders().by_id(folder_2_id);
     auto folder_1_peer = folder_1->get_folder_info(*peer_device);
     auto folder_2_peer = folder_2->get_folder_info(*peer_device);
-    REQUIRE(folder_1_peer->get_file_infos().size() == 1);
-    REQUIRE(folder_2_peer->get_file_infos().size() == 1);
+    REQUIRE(folder_1_peer->get_children().size() == 1);
+    REQUIRE(folder_2_peer->get_children().size() == 1);
 
     auto cc = std::make_unique<proto::ClusterConfig>();
     auto diff_opt = diff::peer::cluster_update_t::create({}, *cluster, *sequencer, *peer_device, *cc);
@@ -651,9 +648,9 @@ TEST_CASE("cluster update nothing shared", "[model]") {
 
     CHECK(blocks_map.size() == 0);
     CHECK(folder_1->is_shared_with(*peer_device));
-    CHECK(folder_1->is_shared_with(*peer_device)->get_file_infos().size() == 0);
+    CHECK(folder_1->is_shared_with(*peer_device)->get_children().size() == 0);
     CHECK(folder_2->is_shared_with(*peer_device));
-    CHECK(folder_2->is_shared_with(*peer_device)->get_file_infos().size() == 0);
+    CHECK(folder_2->is_shared_with(*peer_device)->get_children().size() == 0);
 }
 
 TEST_CASE("non-shared pending folder", "[model]") {
@@ -1182,7 +1179,6 @@ TEST_CASE("peer2 sharing unknown folder with us and peer1 => NOOP", "[model]") {
     REQUIRE(r);
     CHECK(cluster->get_folders().size() == 0);
 }
-#endif
 
 int _init() {
     test::init_logging();

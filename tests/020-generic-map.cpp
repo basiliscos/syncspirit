@@ -2,7 +2,6 @@
 // SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "test-utils.h"
-#include "access.h"
 #include "model/device.h"
 #include "model/misc/lru_cache.hpp"
 

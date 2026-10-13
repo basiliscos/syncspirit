@@ -5,7 +5,6 @@
 
 #include <rotor/actor_base.h>
 #include "model/folder_data.h"
-#include "model/file_info.h"
 
 namespace syncspirit::test {
 namespace {
@@ -15,14 +14,12 @@ struct ignore_delete {};
 struct ignore_permissions {};
 struct pull_order {};
 struct folder_type {};
-struct flags {};
 } // namespace to
 } // namespace
 } // namespace syncspirit::test
 
 namespace syncspirit::model {
 
-template <> inline auto &file_info_t::access<test::to::flags>() noexcept { return flags; }
 template <> inline auto &folder_data_t::access<test::to::ignore_delete>() noexcept { return ignore_delete; }
 template <> inline auto &folder_data_t::access<test::to::ignore_permissions>() noexcept { return ignore_permissions; }
 template <> inline auto &folder_data_t::access<test::to::pull_order>() noexcept { return pull_order; }

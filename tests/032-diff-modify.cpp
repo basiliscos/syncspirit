@@ -110,12 +110,12 @@ TEST_CASE("cluster modifications from ui", "[model]") {
             blocks.put(bi_2);
 
             auto file_peer = file_info_t::create(sequencer->next_uuid(), pr_file_1, fi_peer).value();
-            fi_peer->add_strict(file_peer);
+            fi_peer->add_strict(file_peer.get(), false);
             file_peer->assign_block(bi_1.get(), 0);
             file_peer->assign_block(bi_2.get(), 1);
 
             auto file_my = file_info_t::create(sequencer->next_uuid(), pr_file_1, fi_my).value();
-            fi_my->add_strict(file_my);
+            fi_my->add_strict(file_my.get(), false);
             file_my->assign_block(bi_2.get(), 1);
 
             REQUIRE(builder.unshare_folder(*fi_peer).apply());
