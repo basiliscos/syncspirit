@@ -89,7 +89,7 @@ TEST_CASE("folder update (Index), ignore blocks on non-files", "[model]") {
     auto &folders = cluster->get_folders();
     auto folder = folders.by_id("1234-5678");
     auto folder_peer = folder->get_folder_info(*peer_device);
-    CHECK(folder_peer->get_file_infos().size() == 1);
+    CHECK(folder_peer->get_children().size() == 1);
 };
 
 TEST_CASE("update folder-2 (via Index)", "[model]") {
@@ -168,14 +168,14 @@ TEST_CASE("update folder-2 (via Index)", "[model]") {
         SECTION("valid cases") {
             REQUIRE(builder.make_index(sha256, "1234-5678").add(pr_file, peer_device).finish().apply());
 
-            auto &peer_files = peer_folder_info->get_file_infos();
-            REQUIRE(peer_files.size() == 1);
-            auto f = peer_files.by_name("a.txt");
+            auto path = utils::path_t::make_generic("a.txt");
+            REQUIRE(peer_folder_info->get_children().size() == 1);
+            auto [f, _] = peer_folder_info->get_by_path(path);
             REQUIRE(f);
 
             SECTION("exactly the same file is added, and it's duplicate is ignored") {
                 REQUIRE(builder.make_index(sha256, "1234-5678").add(pr_file, peer_device).finish().apply());
-                REQUIRE(peer_files.size() == 1);
+                REQUIRE(peer_folder_info->get_children().size() == 1);
             }
 
             SECTION("when a file with existing name is added, key & instance are kept") {
@@ -183,9 +183,9 @@ TEST_CASE("update folder-2 (via Index)", "[model]") {
                 proto::set_modified_s(pr_file, 2);
                 REQUIRE(builder.make_index(sha256, "1234-5678").add(pr_file, peer_device).finish().apply());
 
-                REQUIRE(peer_files.size() == 1);
-                auto same_f = peer_files.by_name(proto::get_name(pr_file));
-                CHECK(same_f.get() == f.get());
+                REQUIRE(peer_folder_info->get_children().size() == 1);
+                auto [same_f, _] = peer_folder_info->get_by_path(path);
+                CHECK(same_f == f);
                 CHECK(same_f->get_full_id() == f->get_full_id());
             }
 
@@ -197,7 +197,7 @@ TEST_CASE("update folder-2 (via Index)", "[model]") {
                 proto::set_hash(b, b2_hash);
                 REQUIRE(builder.make_index(sha256, "1234-5678").add(pr_file, peer_device).finish().apply());
 
-                REQUIRE(peer_files.size() == 1);
+                REQUIRE(peer_folder_info->get_children().size() == 1);
                 REQUIRE(blocks_map.size() == 1);
                 auto new_block = *blocks_map.begin();
                 CHECK(new_block != prev_block);
@@ -253,10 +253,10 @@ TEST_CASE("update folder-2 (via Index)", "[model]") {
         REQUIRE(builder.make_index(sha256, "1234-5678").add(pr_file, peer_device).finish().apply());
 
         auto peer_folder = folder->get_folder_info(*peer_device);
-        auto &peer_files = peer_folder->get_file_infos();
-        REQUIRE(peer_files.size() == 1);
+        REQUIRE(peer_folder->get_children().size() == 1);
 
-        auto file = peer_files.by_name("a.txt");
+        auto path = utils::path_t::make_generic("a.txt");
+        auto [file, _] = peer_folder->get_by_path(path);
         REQUIRE(file);
         CHECK(file->get_size() == 0);
     }
@@ -319,6 +319,7 @@ TEST_CASE("move block", "[model]") {
                 .apply());
     CHECK(cluster->get_blocks().size() == 2);
 }
+
 
 TEST_CASE("duplicate blocks", "[model]") {
     auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
@@ -439,7 +440,7 @@ TEST_CASE("update folder-3: duplicate files", "[model]") {
 
         CHECK(blocks_map.size() == 2);
         CHECK(folder_peer->get_max_sequence() == 11ul);
-        CHECK(folder_peer->get_file_infos().size() == 1);
+        CHECK(folder_peer->get_children().size() == 1);
     }
     SECTION("2 diffs with the exacly same file") {
         blocks_map.clear();
@@ -455,7 +456,7 @@ TEST_CASE("update folder-3: duplicate files", "[model]") {
 
         CHECK(blocks_map.size() == 1);
         CHECK(folder_peer->get_max_sequence() == 10ul);
-        CHECK(folder_peer->get_file_infos().size() == 1);
+        CHECK(folder_peer->get_children().size() == 1);
     }
 }
 
