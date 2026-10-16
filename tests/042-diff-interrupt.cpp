@@ -59,39 +59,41 @@ TEST_CASE("diff interrupt", "[model]") {
     builder.local_update("1234-5678", pr_file).interrupt();
 
     auto folder = cluster->get_folders().by_id("1234-5678");
-    auto folder_my = folder->get_folder_info(*my_device);
-    auto &files = folder_my->get_file_infos();
+    auto folder_local = folder->get_folder_info(*my_device);
 
     auto ctx = apply_context_t(builder.extract());
     auto controller = apply_controler_t(cluster);
 
+    auto path_a = utils::path_t::make_generic("a.bin");
+    auto path_b = utils::path_t::make_generic("b.bin");
+    auto path_c = utils::path_t::make_generic("c.bin");
+
     SECTION("generic applicator") {
         auto controller = make_apply_controller(cluster);
         REQUIRE(ctx.next->apply(*controller, {}));
-        REQUIRE(files.size() == 3);
-        REQUIRE(files.by_name("a.bin"));
-        REQUIRE(files.by_name("b.bin"));
-        REQUIRE(files.by_name("c.bin"));
+        REQUIRE(folder_local->get_children().size() == 3);
+        REQUIRE(folder_local->get_by_path(path_a).first);
+        REQUIRE(folder_local->get_by_path(path_b).first);
+        REQUIRE(folder_local->get_by_path(path_c).first);
     }
 
     SECTION("custom applicator") {
-
         REQUIRE(ctx.next);
-        REQUIRE(files.size() == 0);
+        REQUIRE(folder_local->get_children().size() == 0);
 
         REQUIRE(ctx.next->apply(controller, &ctx));
-        REQUIRE(files.size() == 1);
-        REQUIRE(files.by_name("a.bin"));
-        REQUIRE(ctx.next);
-
-        REQUIRE(ctx.next->apply(controller, &ctx));
-        REQUIRE(files.size() == 2);
-        REQUIRE(files.by_name("b.bin"));
+        REQUIRE(folder_local->get_children().size() == 1);
+        REQUIRE(folder_local->get_by_path(path_a).first);
         REQUIRE(ctx.next);
 
         REQUIRE(ctx.next->apply(controller, &ctx));
-        REQUIRE(files.size() == 3);
-        REQUIRE(files.by_name("c.bin"));
+        REQUIRE(folder_local->get_children().size() == 2);
+        REQUIRE(folder_local->get_by_path(path_b).first);
+        REQUIRE(ctx.next);
+
+        REQUIRE(ctx.next->apply(controller, &ctx));
+        REQUIRE(folder_local->get_children().size() == 3);
+        REQUIRE(folder_local->get_by_path(path_c).first);
         REQUIRE(!ctx.next);
     }
 }
