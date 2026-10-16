@@ -28,9 +28,11 @@ TEST_CASE("remove folder", "[model]") {
     devices.put(my_device);
     devices.put(peer_device);
 
+    auto path = utils::path_t::make_generic("a.txt");
     proto::FileInfo pr_fi;
     proto::set_name(pr_fi, "a.txt");
     proto::set_size(pr_fi, 5);
+    proto::set_sequence(pr_fi, 5);
     auto &v = proto::get_version(pr_fi);
     proto::add_counters(v, proto::Counter(peer_device->device_id().get_uint(), 5));
     auto &b_1 = proto::add_blocks(pr_fi);
@@ -53,11 +55,10 @@ TEST_CASE("remove folder", "[model]") {
 
     auto folder = cluster->get_folders().by_id("f1");
     auto folder_peer = folder->get_folder_info(*peer_device);
-    auto folder_my = folder->get_folder_info(*my_device);
-    auto &files_my = folder_my->get_file_infos();
+    auto folder_local = folder->get_folder_info(*my_device);
     auto file_peer = file_info_t::create(sequencer->next_uuid(), pr_fi, folder_peer).value();
     file_peer->assign_block(bi_1.get(), 0);
-    folder_peer->add_relaxed(file_peer);
+    folder_peer->add_strict(file_peer.get(), false);
 
     SECTION("local update") {
         SECTION("content changes") {
@@ -66,26 +67,26 @@ TEST_CASE("remove folder", "[model]") {
                 proto::clear_blocks(pr_local);
                 proto::add_blocks(pr_local) = b_2;
                 REQUIRE(builder.local_update(folder->get_id(), pr_local).apply());
-                REQUIRE(files_my.size() == 1);
-                auto &f_my = *files_my.begin();
-                CHECK(f_my->iterate_blocks(0).next() == bi_2);
-                CHECK(f_my->get_version().as_proto() != file_peer->get_version().as_proto());
+                REQUIRE(folder_local->get_children().size() == 1);
+                auto [f_local, _] = folder_local->get_by_path(path);
+                CHECK(f_local->iterate_blocks(0).next() == bi_2);
+                CHECK(f_local->get_version().as_proto() != file_peer->get_version().as_proto());
             }
             SECTION("identical content (aka importing)") {
                 REQUIRE(builder.local_update(folder->get_id(), pr_local).apply());
-                REQUIRE(files_my.size() == 1);
-                auto &f_my = *files_my.begin();
-                CHECK(f_my->iterate_blocks(0).next() == bi_1);
-                CHECK(f_my->get_version().as_proto() == file_peer->get_version().as_proto());
+                REQUIRE(folder_local->get_children().size() == 1);
+                auto [f_local, _] = folder_local->get_by_path(path);
+                CHECK(f_local->iterate_blocks(0).next() == bi_1);
+                CHECK(f_local->get_version().as_proto() == file_peer->get_version().as_proto());
             }
             SECTION("after suspending") {
                 REQUIRE(builder.suspend(*folder).local_update(folder->get_id(), pr_local).apply());
-                REQUIRE(files_my.size() == 0);
+                REQUIRE(folder_local->get_children().size() == 0);
             }
             SECTION("after removing") {
-                auto folder_local = model::folder_info_ptr_t(folder_my);
+                auto fl = model::folder_info_ptr_t(folder_local);
                 REQUIRE(builder.remove_folder(*folder).local_update(folder->get_id(), pr_local).apply());
-                REQUIRE(folder_local->get_file_infos().size() == 0);
+                REQUIRE(fl->get_children().size() == 0);
             }
         }
     }
@@ -93,20 +94,20 @@ TEST_CASE("remove folder", "[model]") {
     SECTION("remote copy") {
         SECTION("all ok") {
             REQUIRE(builder.remote_copy(*file_peer, *folder_peer).apply());
-            REQUIRE(files_my.size() == 1);
+            REQUIRE(folder_local->get_children().size() == 1);
         }
         SECTION("after unsharing") {
             REQUIRE(builder.unshare_folder(*folder_peer).remote_copy(*file_peer, *folder_peer).apply());
-            REQUIRE(files_my.size() == 0);
+            REQUIRE(folder_local->get_children().size() == 0);
         }
         SECTION("after suspending") {
             REQUIRE(builder.suspend(*folder).remote_copy(*file_peer, *folder_peer).apply());
-            REQUIRE(files_my.size() == 0);
+            REQUIRE(folder_local->get_children().size() == 0);
         }
         SECTION("after removing") {
-            auto folder_local = model::folder_info_ptr_t(folder_my);
+            auto fl = model::folder_info_ptr_t(folder_local);
             REQUIRE(builder.remove_folder(*folder).remote_copy(*file_peer, *folder_peer).apply());
-            REQUIRE(folder_local->get_file_infos().size() == 0);
+            REQUIRE(fl->get_children().size() == 0);
         }
     }
 
@@ -118,20 +119,20 @@ TEST_CASE("remove folder", "[model]") {
 
         SECTION("all ok") {
             REQUIRE(builder.advance(*file_peer, *folder_peer).apply());
-            REQUIRE(files_my.size() == 1);
+            REQUIRE(folder_local->get_children().size() == 1);
         }
         SECTION("after unsharing") {
             REQUIRE(builder.unshare_folder(*folder_peer).advance(*file_peer, *folder_peer).apply());
-            REQUIRE(files_my.size() == 0);
+            REQUIRE(folder_local->get_children().size() == 0);
         }
         SECTION("after suspending") {
             REQUIRE(builder.suspend(*folder).advance(*file_peer, *folder_peer).apply());
-            REQUIRE(files_my.size() == 0);
+            REQUIRE(folder_local->get_children().size() == 0);
         }
         SECTION("after removing") {
-            auto folder_local = model::folder_info_ptr_t(folder_my);
-            REQUIRE(builder.remove_folder(*folder).advance(*file_peer, *folder_peer).apply());
-            REQUIRE(folder_local->get_file_infos().size() == 0);
+            auto fl = model::folder_info_ptr_t(folder_local);
+            REQUIRE(builder.remove_folder(*folder).remote_copy(*file_peer, *folder_peer).apply());
+            REQUIRE(fl->get_children().size() == 0);
         }
     }
 }
