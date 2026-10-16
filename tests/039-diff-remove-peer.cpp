@@ -46,6 +46,7 @@ TEST_CASE("remove peer", "[model]") {
         proto::set_name(pr_fi, "a.txt");
         proto::set_block_size(pr_fi, 5ul);
         proto::set_size(pr_fi, 5ul);
+        proto::set_sequence(pr_fi, 15ul);
         auto &v = proto::get_version(pr_fi);
         proto::add_counters(v, proto::Counter(peer_device->device_id().get_uint(), 0));
 
@@ -56,18 +57,17 @@ TEST_CASE("remove peer", "[model]") {
 
         auto fi = file_info_t::create(sequencer->next_uuid(), pr_fi, folder_info).value();
         fi->assign_block(block.get(), 0);
-        folder_info->get_file_infos().put(fi);
+        REQUIRE(folder_info->add_strict(fi.get(), false));
 
-        REQUIRE(cluster->get_blocks().size() == 1);
+        REQUIRE(blocks_map.size() == 1);
         REQUIRE(cluster->get_devices().size() == 2);
 
         REQUIRE(builder.remove_peer(*peer_device).apply());
-        CHECK(cluster->get_blocks().size() == 0);
+        CHECK(blocks_map.size() == 0);
         CHECK(cluster->get_devices().size() == 1);
         CHECK(!folder->is_shared_with(*peer_device));
         CHECK(devices.size() == 1);
     }
-
     SECTION("3 files, 2 shared files, 2 shared folders, 3 block, 2 shared blocks") {
         REQUIRE(builder.upsert_folder("1234", "some-2/path-2", "my-label-2").apply());
         REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234").apply());
@@ -110,6 +110,7 @@ TEST_CASE("remove peer", "[model]") {
             proto::set_name(pr_fi, "a.txt");
             proto::set_block_size(pr_fi, 5ul);
             proto::set_size(pr_fi, 5ul);
+            proto::set_sequence(pr_fi, 15ul);
             auto &v = proto::get_version(pr_fi);
             proto::add_counters(v, proto::Counter(peer_device->device_id().get_uint(), 0));
 
@@ -120,7 +121,7 @@ TEST_CASE("remove peer", "[model]") {
 
             auto fi = file_info_t::create(sequencer->next_uuid(), pr_fi, fi_1).value();
             fi->assign_block(b1.get(), 0);
-            fi_1->get_file_infos().put(fi);
+            REQUIRE(fi_1->add_strict(fi.get(), false));
             return fi;
         }();
 
@@ -129,6 +130,7 @@ TEST_CASE("remove peer", "[model]") {
             proto::set_name(pr_fi, "b.txt");
             proto::set_block_size(pr_fi, 5ul);
             proto::set_size(pr_fi, 10ul);
+            proto::set_sequence(pr_fi, 15ul);
             auto &v = proto::get_version(pr_fi);
             proto::add_counters(v, proto::Counter(peer_device->device_id().get_uint(), 0));
 
@@ -147,7 +149,7 @@ TEST_CASE("remove peer", "[model]") {
             auto fi = file_info_t::create(sequencer->next_uuid(), pr_fi, fi_2).value();
             fi->assign_block(b2.get(), 0);
             fi->assign_block(b1.get(), 1);
-            fi_2->get_file_infos().put(fi);
+            REQUIRE(fi_2->add_strict(fi.get(), false));
             return fi;
         }();
 
@@ -161,7 +163,6 @@ TEST_CASE("remove peer", "[model]") {
         CHECK(!f2->is_shared_with(*peer_device));
         CHECK(devices.size() == 1);
     }
-
     SECTION("unknown folders are removed") {
         db::PendingFolder db_pf;
         auto &db_f = db::get_folder(db_pf);
