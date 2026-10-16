@@ -40,8 +40,7 @@ auto scan_start_t::apply_impl(apply_controller_t &controller, void *custom) cons
         if (p->get_features() & F::cluster) {
             auto &local_file = *static_cast<model::file_info_t*>(p);
             if (local_file.is_local()) {
-                auto name = local_file.get_name()->get_full_name();
-                if (path.contains(*local_file.get_name())) {
+                if (path.empty() || path.contains(*local_file.get_name())) {
                     local_file.mark_local(false);
                     local_file.notify_update();
                     updated = true;

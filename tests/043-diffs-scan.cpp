@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
-#include "model/diff/load/interrupt.h"
 #include "test-utils.h"
 #include "diff-builder.h"
 
@@ -27,7 +26,7 @@ TEST_CASE("scan_start, full", "[model]") {
     REQUIRE(builder.upsert_folder("f1", "some/path-1", "my-label-1").apply());
 
     auto folder = cluster->get_folders().by_id("f1");
-    auto folder_my = folder->get_folder_info(*my_device);
+    auto folder_local = folder->get_folder_info(*my_device);
 
     proto::FileInfo pr_fi_1;
     proto::set_name(pr_fi_1, "a.bin");
@@ -42,9 +41,10 @@ TEST_CASE("scan_start, full", "[model]") {
 
     REQUIRE(builder.local_update("f1", pr_fi_1).local_update("f1", pr_fi_2).apply());
 
-    auto &file_infos = folder_my->get_file_infos();
-    auto f1 = file_infos.by_name("a.bin");
-    auto f2 = file_infos.by_name("b.bin");
+    auto path_1 = utils::path_t::make_generic("a.bin");
+    auto path_2 = utils::path_t::make_generic("b.bin");
+    auto f1 = folder_local->get_by_path(path_1).first;
+    auto f2 = folder_local->get_by_path(path_2).first;
 
     REQUIRE(f1->is_local());
     REQUIRE(f2->is_local());
@@ -65,8 +65,7 @@ TEST_CASE("scan_start, partial", "[model]") {
     REQUIRE(builder.upsert_folder("f1", "some/path-1", "my-label-1").apply());
 
     auto folder = cluster->get_folders().by_id("f1");
-    auto folder_my = folder->get_folder_info(*my_device);
-    auto &file_infos = folder_my->get_file_infos();
+    auto folder_local = folder->get_folder_info(*my_device);
 
     auto names = {"dir", "dir_x", "dir/sub_dir"};
     for (auto &name : names) {
@@ -76,15 +75,19 @@ TEST_CASE("scan_start, partial", "[model]") {
         auto &v_1 = proto::get_version(pr_fi);
         proto::add_counters(v_1, proto::Counter(my_id.get_uint(), 0));
         REQUIRE(builder.local_update("f1", pr_fi).apply());
-        auto f = file_infos.by_name(name);
+        auto path = utils::path_t::make_generic(name);
+        auto [f, _] = folder_local->get_by_path(path);
         REQUIRE(f);
         REQUIRE(f->is_local());
     }
 
-    REQUIRE(builder.scan_start("f1", "dir").apply());
-    CHECK(!file_infos.by_name("dir")->is_local());
-    CHECK(!file_infos.by_name("dir/sub_dir")->is_local());
-    CHECK(file_infos.by_name("dir_x")->is_local());
+    auto path_dir = utils::path_t::make_generic("dir");
+    auto path_subdir = utils::path_t::make_generic("dir/sub_dir");
+    auto path_dir_x = utils::path_t::make_generic("dir_x");
+    REQUIRE(builder.scan_start("f1", path_dir.clone()).apply());
+    CHECK(!folder_local->get_by_path(path_dir).first->is_local());
+    CHECK(!folder_local->get_by_path(path_subdir).first->is_local());
+    CHECK(folder_local->get_by_path(path_dir_x).first->is_local());
 }
 
 int _init() {
