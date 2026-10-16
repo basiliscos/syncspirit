@@ -70,6 +70,7 @@ TEST_CASE("remove folder", "[model]") {
         proto::set_name(pr_fi, "a.txt");
         proto::set_block_size(pr_fi, 5ul);
         proto::set_size(pr_fi, 5ul);
+        proto::set_sequence(pr_fi, 15ul);
         auto &v = proto::get_version(pr_fi);
         proto::add_counters(v, proto::Counter(peer_device->device_id().get_uint(), 0));
 
@@ -80,7 +81,7 @@ TEST_CASE("remove folder", "[model]") {
 
         auto fi = file_info_t::create(sequencer->next_uuid(), pr_fi, fi_1_peer).value();
         fi->assign_block(b1.get(), 0);
-        fi_1_peer->get_file_infos().put(fi);
+        REQUIRE(fi_1_peer->add_strict(fi.get(), false));
         return fi;
     }();
 
@@ -90,6 +91,7 @@ TEST_CASE("remove folder", "[model]") {
         proto::set_block_size(pr_fi, 5ul);
         proto::set_size(pr_fi, 5ul);
         auto &v = proto::get_version(pr_fi);
+        proto::set_sequence(pr_fi, 15ul);
         proto::add_counters(v, proto::Counter(peer_device->device_id().get_uint(), 0));
 
         auto b_hash = utils::sha256_digest(as_bytes("2")).value();
@@ -99,7 +101,7 @@ TEST_CASE("remove folder", "[model]") {
 
         auto fi = file_info_t::create(sequencer->next_uuid(), pr_fi, fi_1_mine).value();
         fi->assign_block(b2.get(), 0);
-        fi_1_mine->get_file_infos().put(fi);
+        REQUIRE(fi_1_mine->add_strict(fi.get(), false));
         return fi;
     }();
 
@@ -108,6 +110,7 @@ TEST_CASE("remove folder", "[model]") {
         proto::set_name(pr_fi, "c.txt");
         proto::set_block_size(pr_fi, 5ul);
         proto::set_size(pr_fi, 5ul);
+        proto::set_sequence(pr_fi, 15ul);
         auto &v = proto::get_version(pr_fi);
         proto::add_counters(v, proto::Counter(peer_device->device_id().get_uint(), 0));
 
@@ -118,7 +121,7 @@ TEST_CASE("remove folder", "[model]") {
 
         auto fi = file_info_t::create(sequencer->next_uuid(), pr_fi, fi_2_mine).value();
         fi->assign_block(b3.get(), 0);
-        fi_2_mine->get_file_infos().put(fi);
+        REQUIRE(fi_2_mine->add_strict(fi.get(), false));
         return fi;
     }();
 
@@ -135,7 +138,7 @@ TEST_CASE("remove folder", "[model]") {
 
     SECTION("peer has seen the folder (index != 0)") {
         fi_1_peer->set_index(123);
-        fi_1_peer->get_file_infos().put(file_1);
+        REQUIRE(fi_1_peer->add_strict(file_1.get(), false));
         REQUIRE(builder.remove_folder(*f1).remove_folder(*f2).apply());
         CHECK(cluster->get_pending_folders().size() == 1);
         CHECK(cluster->get_blocks().size() == 0);
