@@ -559,6 +559,30 @@ TEST_CASE("update folder-3: out-of-order files", "[model]") {
         CHECK(folder_peer->get_seen_dirs().empty());
     }
 
+    SECTION("restore ooo file") {
+        auto file_1 = mk_file("path/content.bin");
+        REQUIRE(builder.make_index(sha256, "1234-5678")
+                    .add(file_1, peer_device)
+                    .finish()
+                    .apply());
+        CHECK(folder_peer->get_children().size() == 0);
+        CHECK(folder_peer->get_seen_dirs().empty());
+        CHECK(folder_peer->get_orphaned_files().container.size() == 1);
+
+        auto file_2 = mk_file("path");
+        REQUIRE(builder.make_index(sha256, "1234-5678")
+                    .add(file_2, peer_device)
+                    .finish()
+                    .apply());
+
+        auto path_1 = utils::path_t::make_generic("path");
+        auto path_2 = utils::path_t::make_generic("path/content.bin");
+        CHECK(folder_peer->get_by_path(path_1).first);
+        CHECK(folder_peer->get_by_path(path_2).first);
+        CHECK(folder_peer->get_seen_dirs().empty());
+        CHECK(folder_peer->get_orphaned_files().container.empty());
+    }
+
 }
 
 int _init() {
