@@ -16,7 +16,7 @@ struct SYNCSPIRIT_API update_folder_t final : cluster_diff_t {
     using uuids_t = std::vector<bu::uuid>;
     using blocks_t = std::vector<proto::BlockInfo>;
 
-    static outcome::result<cluster_diff_ptr_t> create(const cluster_t &cluster, sequencer_t &sequencer,
+    static outcome::result<cluster_diff_ptr_t> create(cluster_t &cluster, sequencer_t &sequencer,
                                                       const model::device_t &source,
                                                       const proto::IndexBase &message) noexcept;
 

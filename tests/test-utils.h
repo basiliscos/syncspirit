@@ -42,6 +42,10 @@ inline poly_path_view_t operator/(const poly_path_view_t &path, const wchar_t *n
 
 namespace syncspirit::test {
 
+extern SYNCSPIRIT_TEST_API std::string_view device_id_local;
+extern SYNCSPIRIT_TEST_API std::string_view device_id_peer_1;
+extern SYNCSPIRIT_TEST_API std::string_view device_id_peer_2;
+
 namespace sys = boost::system;
 
 struct test_apply_controller_t final : model::arc_base_t<test_apply_controller_t>, model::diff::apply_controller_t {

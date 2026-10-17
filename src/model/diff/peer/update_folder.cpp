@@ -13,6 +13,7 @@
 #include "proto/proto-helpers-bep.h"
 #include "utils/format.hpp"
 #include "utils/path_view.hpp"
+#include "utils/string_comparator.hpp"
 
 #include <memory_resource>
 #include <set>
@@ -81,7 +82,7 @@ auto update_folder_t::apply_impl(apply_controller_t &controller, void *custom) c
                 file->assign_block(block.get(), (size_t)i);
             }
         }
-        auto [prev_file, _] = folder_info->get_by_path(*file->get_name());
+        auto [prev_file, parent] = folder_info->get_by_path(*file->get_name());
         if (prev_file) {
             auto prev_seq = prev_file->get_sequence();
             auto new_seq = file->get_sequence();
@@ -94,7 +95,11 @@ auto update_folder_t::apply_impl(apply_controller_t &controller, void *custom) c
             }
         }
 
-        folder_info->add_strict(file.get(), prev_file);
+        assert(parent);
+        if (!prev_file) {
+            parent->add_child(file.get(), file->get_name()->get_filename());
+        }
+        folder_info->update_max_sequnece(*file);
     }
 
     LOG_TRACE(log, "update_folder_t, apply(); max seq: {} -> {}", max_seq, folder_info->get_max_sequence());
@@ -165,11 +170,13 @@ static auto construct(sequencer_t &sequencer, folder_info_t *folder_info, syncsp
     return outcome::success(std::move(diff));
 }
 
-static auto instantiate(const cluster_t &cluster, sequencer_t &sequencer, const device_t &source,
+static auto instantiate(cluster_t &cluster, sequencer_t &sequencer, const device_t &source,
                         const syncspirit::proto::IndexBase &message) noexcept -> outcome::result<diff_t> {
     using skipped_file_indices_t = std::pmr::set<size_t>;
-    using seen_file_names_t = std::pmr::unordered_set<std::string_view>;
-    using unique_blocks_t = std::pmr::unordered_set<std::pmr::string>;
+    using string_t = std::pmr::string;
+    using string_views_t = std::pmr::unordered_set<std::string_view>;
+    using strings_t = std::pmr::unordered_set<string_t, utils::string_hash_t>;
+    using unique_blocks_t = std::pmr::unordered_set<string_t>;
     auto buffer = std::array<std::byte, 10 * 1024>();
     auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
     auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
@@ -195,15 +202,17 @@ static auto instantiate(const cluster_t &cluster, sequencer_t &sequencer, const 
     auto files_count = proto::get_files_size(message);
     files.reserve(files_count);
 
-    auto seen_file_names = seen_file_names_t();
-    auto skipp_file_indices = skipped_file_indices_t();
+    auto seen_file_names = string_views_t(allocator);
+    auto seen_dirs = strings_t(allocator);
+    auto skipped_file_indices = skipped_file_indices_t(allocator);
+    auto orphaned_files = model::orphaned_files_t();
 
     // pass 1: skip "outdated" files and pick only recent ones
     for (int i = files_count - 1; i >= 0; --i) {
         auto &f = proto::get_files(message, i);
         auto name = proto::get_name(f);
         if (seen_file_names.count(name)) {
-            skipp_file_indices.insert(i);
+            skipped_file_indices.insert(i);
         } else {
             seen_file_names.insert(name);
         }
@@ -214,25 +223,27 @@ static auto instantiate(const cluster_t &cluster, sequencer_t &sequencer, const 
         auto &f = proto::get_files(message, i);
         auto name = proto::get_name(f);
         auto path = utils::make_generic_view(name, allocator);
+        auto parent_name = string_t(name, allocator);
 
-        if (skipp_file_indices.count(i)) {
+        if (skipped_file_indices.count(i)) {
             LOG_DEBUG(log, "skipping outdated {}-th file '{}'", i, name);
             continue;
         }
 
+        auto type = proto::get_type(f);
         auto is_deleted = proto::get_deleted(f);
         auto is_invalid = proto::get_invalid(f);
         auto blocks_count = proto::get_blocks_size(f);
-        auto is_file = proto::get_type(f) == proto::FileInfoType::FILE;
+        auto is_file = type == proto::FileInfoType::FILE;
         auto is_downloadable = !is_deleted && !is_invalid && is_file;
         if (!is_downloadable && blocks_count) {
             LOG_WARN(log, "file {} should not have blocks, but it has {}", name, blocks_count);
         }
         auto sequence = proto::get_sequence(f);
+        auto [prev_file, parent_dir] = fi->get_by_path(path);
         if (sequence <= prev_sequence) {
             LOG_DEBUG(log, "file '{}' has sequence {}, it is already known {}, try to ignore", name, sequence,
                       prev_sequence);
-            auto [prev_file, _] = fi->get_by_path(path);
             if (!prev_file) {
                 LOG_WARN(log, "no file '{}' has been previously seen, corrupted sequence?", name);
                 return make_error_code(error_code_t::invalid_sequence);
@@ -276,13 +287,52 @@ static auto instantiate(const cluster_t &cluster, sequencer_t &sequencer, const 
             return make_error_code(error_code_t::missing_version);
         }
 
-        files.emplace_back(f);
+        auto enqueue_file = false;
+        if (parent_dir || path.get_components() == 0) {
+            enqueue_file = true;
+        } else {
+            if (seen_dirs.count(parent_name)) {
+                enqueue_file = true;
+            }
+        }
+
+        if (enqueue_file) {
+            files.emplace_back(f);
+            auto is_dir = type == proto::FileInfoType::DIRECTORY;
+            if (is_dir) {
+                seen_dirs.emplace(name);
+            }
+        } else {
+          orphaned_files.record(path, cluster.get_path_cache(), std::move(f));
+        }
+    }
+
+    // pass 3: try to handle temporally orphaned files
+    {
+        auto& c = orphaned_files.container;
+        for (auto it = c.begin(); it != c.end();) {
+            auto& [parent_path, children] = *it;
+            auto parent_name = string_t(parent_path->get_full_name(), allocator);
+            if (seen_dirs.count(parent_name)) {
+                for (auto& f: children) {
+                    auto is_dir = proto::get_type(f) == proto::FileInfoType::DIRECTORY;
+                    if (is_dir) {
+                        auto name = string_t(proto::get_name(f), allocator);
+                        seen_dirs.insert(std::move(name));
+                    }
+                    files.emplace_back(f);
+                }
+                it = c.erase(it);
+            } else {
+                ++it;
+            }
+        }
     }
 
     return construct(sequencer, fi, device_id, std::move(files), std::move(new_blocks));
 }
 
-auto update_folder_t::create(const cluster_t &cluster, sequencer_t &sequencer, const model::device_t &source,
+auto update_folder_t::create(cluster_t &cluster, sequencer_t &sequencer, const model::device_t &source,
                              const proto::IndexBase &message) noexcept -> outcome::result<cluster_diff_ptr_t> {
     return instantiate(cluster, sequencer, source, message);
 }

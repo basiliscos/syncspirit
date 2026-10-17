@@ -27,6 +27,10 @@ int main(int argc, char *argv[]) { return Catch::Session().run(argc, argv); }
 
 namespace syncspirit::test {
 
+std::string_view device_id_local = "KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD";
+std::string_view device_id_peer_1 = "VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ";
+std::string_view device_id_peer_2 = "LYXKCHX-VI3NYZR-ALCJBHF-WMZYSPK-QG6QJA3-MPFYMSO-U56GTUK-NA2MIAW";
+
 path_guard_t::path_guard_t() {}
 path_guard_t::path_guard_t(utils::path_t path) : utils::path_t(std::move(path)) {
     auto buffer = std::array<std::byte, 1024 * 32>();

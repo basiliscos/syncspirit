@@ -88,7 +88,7 @@ struct SYNCSPIRIT_API path_t : path_base_t, model::arc_base_t<path_t> {
     template <typename Allocator> friend struct path_view_t;
 };
 
-bool operator<(const path_base_t &parent, const path_base_t &child) noexcept;
+bool SYNCSPIRIT_API operator<(const path_base_t &l, const path_base_t &r) noexcept;
 
 using path_ptr_t = model::intrusive_ptr_t<path_t>;
 
@@ -142,5 +142,15 @@ using file_type_t = proto::FileInfoType;
 } // namespace syncspirit::utils
 
 namespace std {
+
 template <> struct hash<syncspirit::utils::path_t> : syncspirit::utils::path_hash_t {};
+template <> struct hash<syncspirit::utils::path_ptr_t> {
+    using item_t = syncspirit::utils::path_ptr_t;
+    using hash_t = std::hash<syncspirit::utils::path_t>;
+    size_t operator()(const item_t &item) const noexcept {
+        return hash_t()(*item);
+    }
+};
+
+
 } // namespace std

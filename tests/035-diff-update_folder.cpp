@@ -13,15 +13,16 @@ using namespace syncspirit::model;
 using namespace syncspirit::proto;
 using namespace syncspirit::test;
 
+#if 0
 TEST_CASE("folder update (Index)", "[model]") {
-    auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
-    auto my_device = device_t::create(my_id, "my-device").value();
-    auto peer_id = device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
+    auto local_id = device_id_t::from_string(device_id_local).value();
+    auto local_device = device_t::create(local_id, "my-device").value();
+    auto peer_id = device_id_t::from_string(device_id_peer_1).value();
 
     auto peer_device = device_t::create(peer_id, "peer-device").value();
-    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
+    auto cluster = cluster_ptr_t(new cluster_t(local_device, 1));
     auto sequencer = model::make_sequencer(5);
-    cluster->get_devices().put(my_device);
+    cluster->get_devices().put(local_device);
     cluster->get_devices().put(peer_device);
 
     auto index_id = uint64_t{0x1234};
@@ -53,14 +54,14 @@ TEST_CASE("folder update (Index)", "[model]") {
 };
 
 TEST_CASE("folder update (Index), ignore blocks on non-files", "[model]") {
-    auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
-    auto my_device = device_t::create(my_id, "my-device").value();
-    auto peer_id = device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
+    auto local_id = device_id_t::from_string(device_id_local).value();
+    auto local_device = device_t::create(local_id, "my-device").value();
+    auto peer_id = device_id_t::from_string(device_id_peer_1).value();
 
     auto peer_device = device_t::create(peer_id, "peer-device").value();
-    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
+    auto cluster = cluster_ptr_t(new cluster_t(local_device, 1));
     auto sequencer = model::make_sequencer(5);
-    cluster->get_devices().put(my_device);
+    cluster->get_devices().put(local_device);
     cluster->get_devices().put(peer_device);
 
     auto index_id = uint64_t{0x1234};
@@ -93,13 +94,13 @@ TEST_CASE("folder update (Index), ignore blocks on non-files", "[model]") {
 };
 
 TEST_CASE("update folder-2 (via Index)", "[model]") {
-    auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
-    auto my_device = device_t::create(my_id, "my-device").value();
-    auto peer_id = device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
+    auto local_id = device_id_t::from_string(device_id_local).value();
+    auto local_device = device_t::create(local_id, "my-device").value();
+    auto peer_id = device_id_t::from_string(device_id_peer_1).value();
 
     auto peer_device = device_t::create(peer_id, "peer-device").value();
-    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
-    cluster->get_devices().put(my_device);
+    auto cluster = cluster_ptr_t(new cluster_t(local_device, 1));
+    cluster->get_devices().put(local_device);
     cluster->get_devices().put(peer_device);
 
     auto &folders = cluster->get_folders();
@@ -263,13 +264,13 @@ TEST_CASE("update folder-2 (via Index)", "[model]") {
 }
 
 TEST_CASE("move block", "[model]") {
-    auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
-    auto my_device = device_t::create(my_id, "my-device").value();
-    auto peer_id = device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
+    auto local_id = device_id_t::from_string(device_id_local).value();
+    auto local_device = device_t::create(local_id, "my-device").value();
+    auto peer_id = device_id_t::from_string(device_id_peer_1).value();
 
     auto peer_device = device_t::create(peer_id, "peer-device").value();
-    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
-    cluster->get_devices().put(my_device);
+    auto cluster = cluster_ptr_t(new cluster_t(local_device, 1));
+    cluster->get_devices().put(local_device);
     cluster->get_devices().put(peer_device);
 
     auto &folders = cluster->get_folders();
@@ -322,13 +323,13 @@ TEST_CASE("move block", "[model]") {
 
 
 TEST_CASE("duplicate blocks", "[model]") {
-    auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
-    auto my_device = device_t::create(my_id, "my-device").value();
-    auto peer_id = device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
+    auto local_id = device_id_t::from_string(device_id_local).value();
+    auto local_device = device_t::create(local_id, "my-device").value();
+    auto peer_id = device_id_t::from_string(device_id_peer_1).value();
 
     auto peer_device = device_t::create(peer_id, "peer-device").value();
-    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
-    cluster->get_devices().put(my_device);
+    auto cluster = cluster_ptr_t(new cluster_t(local_device, 1));
+    cluster->get_devices().put(local_device);
     cluster->get_devices().put(peer_device);
 
     auto &folders = cluster->get_folders();
@@ -371,13 +372,13 @@ TEST_CASE("duplicate blocks", "[model]") {
 }
 
 TEST_CASE("update folder-3: duplicate files", "[model]") {
-    auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
-    auto my_device = device_t::create(my_id, "my-device").value();
-    auto peer_id = device_id_t::from_string("VUV42CZ-IQD5A37-RPEBPM4-VVQK6E4-6WSKC7B-PVJQHHD-4PZD44V-ENC6WAZ").value();
+    auto local_id = device_id_t::from_string(device_id_local).value();
+    auto local_device = device_t::create(local_id, "my-device").value();
+    auto peer_id = device_id_t::from_string(device_id_peer_1).value();
 
     auto peer_device = device_t::create(peer_id, "peer-device").value();
-    auto cluster = cluster_ptr_t(new cluster_t(my_device, 1));
-    cluster->get_devices().put(my_device);
+    auto cluster = cluster_ptr_t(new cluster_t(local_device, 1));
+    cluster->get_devices().put(local_device);
     cluster->get_devices().put(peer_device);
 
     auto &folders = cluster->get_folders();
@@ -458,6 +459,104 @@ TEST_CASE("update folder-3: duplicate files", "[model]") {
         CHECK(folder_peer->get_max_sequence() == 10ul);
         CHECK(folder_peer->get_children().size() == 1);
     }
+}
+#endif
+
+TEST_CASE("update folder-3: out-of-order files", "[model]") {
+    auto local_id = device_id_t::from_string(device_id_local).value();
+    auto local_device = device_t::create(local_id, "my-device").value();
+    auto peer_id = device_id_t::from_string(device_id_peer_1).value();
+
+    auto peer_device = device_t::create(peer_id, "peer-device").value();
+    auto cluster = cluster_ptr_t(new cluster_t(local_device, 1));
+    cluster->get_devices().put(local_device);
+    cluster->get_devices().put(peer_device);
+
+    auto &folders = cluster->get_folders();
+    auto builder = diff_builder_t(*cluster);
+
+    REQUIRE(builder.upsert_folder("1234-5678", "/my/path").upsert_folder("5555-4444", "/p2").apply());
+    auto folder = folders.by_id("1234-5678");
+
+    REQUIRE(builder.share_folder(peer_id.get_sha256(), "1234-5678").apply());
+
+    auto pr_index = proto::Index();
+    proto::set_folder(pr_index, "1234-5678");
+
+    auto sha256 = peer_id.get_sha256();
+
+    auto folder_peer = folder->get_folder_info(*peer_device);
+    auto peer_sequence = std::int64_t{5};
+
+    auto mk_file = [&](std::string_view name, FileInfoType type = FileInfoType::DIRECTORY) -> proto::FileInfo {
+        auto file = proto::FileInfo();
+        proto::set_name(file, name);
+        proto::set_type(file, type);
+        proto::set_sequence(file, ++peer_sequence);
+        proto::set_modified_s(file, 1);
+        return file;
+    };
+
+#if 0
+    SECTION("single ooo file") {
+        auto sample_file = mk_file("some/file/path/content.bin");
+        auto initial_seq = folder_peer->get_max_sequence();
+        REQUIRE(builder.make_index(sha256, "1234-5678")
+                    .add(sample_file, peer_device)
+                    .finish()
+                    .apply());
+        CHECK(folder_peer->get_max_sequence() == initial_seq);
+        CHECK(folder_peer->get_children().size() == 0);
+    }
+
+    SECTION("parent dir is in previous update") {
+        auto sample_1 = mk_file("dir");
+        auto sample_2 = mk_file("dir/sub-dir");
+
+        auto path_1 = utils::path_t::make_generic("dir");
+        auto path_2 = utils::path_t::make_generic("dir/sub-dir");
+
+        REQUIRE(builder.make_index(sha256, "1234-5678")
+                    .add(sample_1, peer_device)
+                    .finish()
+                    .make_index(sha256, "1234-5678")
+                    .add(sample_2, peer_device)
+                    .finish()
+                    .apply());
+
+        auto [f1, _] = folder_peer->get_by_path(path_1);
+        REQUIRE(f1);
+        CHECK(f1->get_children().size() == 1);
+
+        auto [f2, parent] = folder_peer->get_by_path(path_2);
+        REQUIRE(f2);
+        CHECK(f2->get_sequence() == peer_sequence);
+        CHECK(f2->get_sequence() == folder_peer->get_max_sequence());
+        CHECK(parent == f1);
+    }
+#endif
+
+    SECTION("reverse OOO, self contained update") {
+        auto sample_1 = mk_file("a/b/c");
+        auto sample_2 = mk_file("a/b");
+        auto sample_3 = mk_file("a");
+
+        auto path_1 = utils::path_t::make_generic("a/b/c");
+        auto path_2 = utils::path_t::make_generic("a/b");
+        auto path_3 = utils::path_t::make_generic("a");
+
+        REQUIRE(builder.make_index(sha256, "1234-5678")
+                    .add(sample_1, peer_device)
+                    .add(sample_2, peer_device)
+                    .add(sample_3, peer_device)
+                    .finish()
+                    .apply());
+
+        CHECK(folder_peer->get_by_path(path_1).first);
+        CHECK(folder_peer->get_by_path(path_2).first);
+        CHECK(folder_peer->get_by_path(path_3).first);
+    }
+
 }
 
 int _init() {

@@ -235,6 +235,10 @@ auto path_base_t::begin() const noexcept -> iterator_t { return iterator_t(this)
 
 auto path_base_t::end() const noexcept -> iterator_t { return iterator_t(); }
 
+bool syncspirit::utils::operator<(const path_base_t &l, const path_base_t &r) noexcept {
+    return l.get_full_name() < r.get_full_name();
+}
+
 size_t path_hash_t::operator()(const path_base_t &item) const noexcept {
     return std::hash<std::string_view>()(item.get_full_name());
 }

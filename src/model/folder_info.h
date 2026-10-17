@@ -4,13 +4,13 @@
 #pragma once
 
 #include <cstdint>
-#include "misc/augmentation.h"
 #include "presence.h"
 #include "device.h"
 #include "file_info.h"
 #include "proto/proto-fwd.hpp"
 #include "syncspirit-export.h"
 #include "utils/bytes.h"
+#include "misc/orphaned_files.h"
 #include <boost/outcome.hpp>
 
 namespace syncspirit::model {
@@ -60,6 +60,7 @@ struct SYNCSPIRIT_API folder_info_t final : presence_t {
 
     void add_relaxed(file_info_t* file_info) noexcept;
     bool add_strict(file_info_t* file_info, bool already_added) noexcept;
+    void update_max_sequnece(const file_info_t& file_info) noexcept;
 
     void serialize(db::FolderInfo &storage) const noexcept;
     utils::bytes_t serialize() const noexcept;
@@ -74,13 +75,10 @@ struct SYNCSPIRIT_API folder_info_t final : presence_t {
     location_t get_by_path(const utils::path_base_t& path) const noexcept;
     void clear() noexcept;
 
-#if 0
-    inline file_infos_map_t &get_file_infos() noexcept { return file_infos; }
-    inline const file_infos_map_t &get_file_infos() const noexcept { return file_infos; }
-#endif
-
     bool is_introduced_by(const model::device_id_t &device) const noexcept;
     utils::bytes_view_t get_introducer_device_key() const noexcept;
+
+    orphaned_files_t& get_orphaned_files() noexcept { return orphaned_files; }
 
   private:
     folder_info_t(utils::bytes_view_t key, const device_ptr_t &device_, const folder_ptr_t &folder_) noexcept;
@@ -95,9 +93,7 @@ struct SYNCSPIRIT_API folder_info_t final : presence_t {
     std::uint64_t index;
     std::int64_t max_sequence;
     utils::bytes_t introducer_device_key;
-#if 0
-    file_infos_map_t file_infos;
-#endif
+    orphaned_files_t orphaned_files;
 };
 
 using folder_info_ptr_t = intrusive_ptr_t<folder_info_t>;
