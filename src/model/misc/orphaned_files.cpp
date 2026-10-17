@@ -16,4 +16,23 @@ void orphaned_files_t::record(const utils::poly_path_view_t& path, utils::path_c
     it->second.emplace_back(std::move(file));
 }
 
+orphaned_files_t& orphaned_files_t::operator +=(orphaned_files_t files) noexcept {
+    auto& c = files.container;
+    auto it_new = c.begin();
+    for (auto it_new = c.begin(); it_new != c.end(); it_new = c.erase(it_new)) {
+        auto& [path, path_files] = *it_new;
+        auto it_prev = container.find(path);
+        if (it_prev == container.end()) {
+            it_prev = container.emplace(std::move(path), files_t{}).first;
+        }
+        auto& dest = it_prev->second;
+        dest.reserve(dest.size() + path_files.size());
+        for (auto& f: path_files) {
+            dest.push_back(std::move(f));
+        }
+    }
+    return *this;
+}
+
+
 }

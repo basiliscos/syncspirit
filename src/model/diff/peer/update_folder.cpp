@@ -313,25 +313,33 @@ static auto instantiate(cluster_t &cluster, sequencer_t &sequencer, const device
 
     // pass 3: try to handle temporally orphaned files
     {
+        using orphans_container_t = std::pmr::vector<orphaned_files_t::container_t*>;
+        auto orphans_container = orphans_container_t(allocator);
+        orphans_container.reserve(2);
+        orphans_container.push_back(&orphaned_files.container);
+        orphans_container.push_back(&fi->get_orphaned_files().container);
         auto& c = orphaned_files.container;
-        for (auto it = c.begin(); it != c.end();) {
-            auto& [parent_path, children] = *it;
-            auto parent_name = string_t(parent_path->get_full_name(), allocator);
-            if (seen_dirs.count(parent_name)) {
-                for (auto& f: children) {
-                    auto is_dir = proto::get_type(f) == proto::FileInfoType::DIRECTORY;
-                    if (is_dir) {
-                        auto name = path_cache.get_path(proto::get_name(f));
-                        seen_dirs.insert(std::move(name));
+        for (auto c: orphans_container) {
+            for (auto it = c->begin(); it != c->end();) {
+                auto& [parent_path, children] = *it;
+                auto parent_name = string_t(parent_path->get_full_name(), allocator);
+                if (seen_dirs.count(parent_name)) {
+                    for (auto& f: children) {
+                        auto is_dir = proto::get_type(f) == proto::FileInfoType::DIRECTORY;
+                        if (is_dir) {
+                            auto name = path_cache.get_path(proto::get_name(f));
+                            seen_dirs.insert(std::move(name));
+                        }
+                        files.emplace_back(f);
                     }
-                    files.emplace_back(f);
+                    it = c->erase(it);
+                } else {
+                    ++it;
                 }
-                it = c.erase(it);
-            } else {
-                ++it;
             }
         }
     }
+    fi->get_orphaned_files() += std::move(orphaned_files);
 
     return construct(sequencer, fi, device_id, std::move(files), std::move(new_blocks));
 }

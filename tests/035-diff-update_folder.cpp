@@ -497,7 +497,6 @@ TEST_CASE("update folder-3: out-of-order files", "[model]") {
         return file;
     };
 
-
     SECTION("single ooo file") {
         auto sample_file = mk_file("some/file/path/content.bin");
         auto initial_seq = folder_peer->get_max_sequence();
@@ -508,6 +507,7 @@ TEST_CASE("update folder-3: out-of-order files", "[model]") {
         CHECK(folder_peer->get_max_sequence() == initial_seq);
         CHECK(folder_peer->get_children().size() == 0);
         CHECK(folder_peer->get_seen_dirs().empty());
+        CHECK(folder_peer->get_orphaned_files().container.size() == 1);
     }
 
     SECTION("parent dir is in previous update") {
