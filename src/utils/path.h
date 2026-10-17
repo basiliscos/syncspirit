@@ -101,8 +101,13 @@ struct SYNCSPIRIT_API path_eq_t {
 
     bool operator()(const path_base_t &lhs, const path_base_t &rhs) const;
     bool operator()(const path_base_t &lhs, std::string_view rhs) const;
+    bool operator()(const path_base_t &lhs, const path_ptr_t& rhs) const;
     bool operator()(const std::string_view lhs, const path_base_t &rhs) const;
     bool operator()(const std::string_view lhs, const std::string_view rhs) const;
+    bool operator()(const std::string_view lhs, const path_ptr_t &rhs) const;
+    bool operator()(const path_ptr_t &lhs, const path_ptr_t &rhs) const;
+    bool operator()(const path_ptr_t &lhs, const path_base_t &rhs) const;
+    bool operator()(const path_ptr_t &lhs, std::string_view rhs) const;
 
     template <typename T>
         requires std::is_constructible_v<std::string_view, const T &>
@@ -128,6 +133,7 @@ struct SYNCSPIRIT_API path_hash_t {
     using is_transparent = void;
 
     size_t operator()(const path_base_t &item) const noexcept;
+    size_t operator()(const path_ptr_t &item) const noexcept;
     size_t operator()(std::string_view item) const noexcept;
 
     template <typename T>

@@ -497,7 +497,7 @@ TEST_CASE("update folder-3: out-of-order files", "[model]") {
         return file;
     };
 
-#if 0
+
     SECTION("single ooo file") {
         auto sample_file = mk_file("some/file/path/content.bin");
         auto initial_seq = folder_peer->get_max_sequence();
@@ -507,6 +507,7 @@ TEST_CASE("update folder-3: out-of-order files", "[model]") {
                     .apply());
         CHECK(folder_peer->get_max_sequence() == initial_seq);
         CHECK(folder_peer->get_children().size() == 0);
+        CHECK(folder_peer->get_seen_dirs().empty());
     }
 
     SECTION("parent dir is in previous update") {
@@ -533,8 +534,8 @@ TEST_CASE("update folder-3: out-of-order files", "[model]") {
         CHECK(f2->get_sequence() == peer_sequence);
         CHECK(f2->get_sequence() == folder_peer->get_max_sequence());
         CHECK(parent == f1);
+        CHECK(folder_peer->get_seen_dirs().empty());
     }
-#endif
 
     SECTION("reverse OOO, self contained update") {
         auto sample_1 = mk_file("a/b/c");
@@ -555,6 +556,7 @@ TEST_CASE("update folder-3: out-of-order files", "[model]") {
         CHECK(folder_peer->get_by_path(path_1).first);
         CHECK(folder_peer->get_by_path(path_2).first);
         CHECK(folder_peer->get_by_path(path_3).first);
+        CHECK(folder_peer->get_seen_dirs().empty());
     }
 
 }

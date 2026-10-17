@@ -243,6 +243,14 @@ size_t path_hash_t::operator()(const path_base_t &item) const noexcept {
     return std::hash<std::string_view>()(item.get_full_name());
 }
 
+size_t path_hash_t::operator()(const path_ptr_t &item) const noexcept {
+    auto ptr = item.get();
+    if (!ptr) {
+        return 0;
+    }
+    return std::hash<std::string_view>()(item->get_full_name());
+}
+
 size_t path_hash_t::operator()(std::string_view item) const noexcept { return std::hash<std::string_view>()(item); }
 
 bool path_eq_t::operator()(const path_base_t &lhs, const path_base_t &rhs) const { return lhs == rhs; }
@@ -250,12 +258,45 @@ bool path_eq_t::operator()(const path_base_t &lhs, const path_base_t &rhs) const
 bool path_eq_t::operator()(const path_base_t &lhs, const std::string_view rhs) const {
     return lhs.get_full_name() == rhs;
 }
+bool path_eq_t::operator()(const path_base_t &lhs, const path_ptr_t &rhs) const {
+    return rhs.get() ?  lhs == *rhs: false;
+}
 
 bool path_eq_t::operator()(const std::string_view lhs, const path_base_t &rhs) const {
     return lhs == rhs.get_full_name();
 }
 
 bool path_eq_t::operator()(const std::string_view lhs, const std::string_view rhs) const { return lhs == rhs; }
+
+bool path_eq_t::operator()(const std::string_view lhs, const path_ptr_t &rhs) const {
+    return rhs ? lhs == rhs->get_full_name() : false;
+}
+
+bool path_eq_t::operator()(const path_ptr_t &lhs, const path_ptr_t &rhs) const {
+    auto l = lhs.get();
+    auto r = rhs.get();
+    if (l == r) {
+        return true;
+    }
+    if (!l || !r) {
+        return false;
+    }
+    return *l == *r;
+}
+
+bool path_eq_t::operator()(const path_ptr_t &lhs, const path_base_t &rhs) const {
+    if (!lhs.get()) {
+        return false;
+    }
+    return *lhs == rhs;
+}
+
+bool path_eq_t::operator()(const path_ptr_t &lhs, std::string_view rhs) const {
+    if (!lhs.get()) {
+        return false;
+    }
+    return lhs->get_full_name() == rhs;
+}
 
 I::iterator_t() noexcept : component{-1}, path{nullptr} {}
 

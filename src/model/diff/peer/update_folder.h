@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #pragma once
 
@@ -25,11 +25,13 @@ struct SYNCSPIRIT_API update_folder_t final : cluster_diff_t {
     outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;
 
     update_folder_t(std::string_view folder_id, utils::bytes_view_t peer_id, files_t files, uuids_t uuids,
-                    blocks_t new_blocks, orphaned_blocks_t::set_t removed_blocks) noexcept;
+                    blocks_t new_blocks, orphaned_blocks_t::set_t removed_blocks,
+                    const model::folder_info_t* cache_folder) noexcept;
 
     std::string folder_id;
     utils::bytes_t peer_id;
     files_t files;
+    const void* cache_folder{nullptr};
 
   private:
     uuids_t uuids;

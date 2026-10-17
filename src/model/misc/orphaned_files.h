@@ -5,6 +5,7 @@
 
 #include "utils/path.h"
 #include "utils/path_cache.h"
+#include "utils/path_comparator.hpp"
 #include "proto/proto-fwd.hpp"
 #include <map>
 #include <vector>
@@ -12,23 +13,10 @@
 namespace syncspirit::model {
 
 struct SYNCSPIRIT_API orphaned_files_t {
-    struct comparator_t {
-        using is_transparent = void;
-
-        bool operator()(const utils::path_ptr_t& l, const utils::path_ptr_t& r) const {
-            return *l < *r;
-        }
-        bool operator()(const utils::path_base_t& l, const utils::path_ptr_t& r) const {
-            return l < *r;
-        }
-        bool operator()(const utils::path_ptr_t& l, const utils::path_base_t& r) const {
-            return *l < r;
-        }
-    };
 
     using file_t = proto::FileInfo;
     using files_t = std::vector<file_t>;
-    using container_t = std::map<utils::path_ptr_t, files_t, comparator_t>;
+    using container_t = std::map<utils::path_ptr_t, files_t, utils::path_comparator_t>;
 
     orphaned_files_t() noexcept = default;
     orphaned_files_t(const orphaned_files_t&) = delete;

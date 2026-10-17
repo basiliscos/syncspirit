@@ -23,9 +23,10 @@ using namespace syncspirit::model;
 using namespace syncspirit::model::diff::peer;
 
 update_folder_t::update_folder_t(std::string_view folder_id_, utils::bytes_view_t peer_id_, files_t files_,
-                                 uuids_t uuids, blocks_t blocks, orphaned_blocks_t::set_t removed_blocks) noexcept
+                                 uuids_t uuids, blocks_t blocks, orphaned_blocks_t::set_t removed_blocks,
+                                 const folder_info_t *cache_folder_) noexcept
     : folder_id{std::string(folder_id_)}, peer_id{peer_id_.begin(), peer_id_.end()}, files(std::move(files_)),
-      uuids{std::move(uuids)} {
+      uuids{std::move(uuids)}, cache_folder{cache_folder_} {
     LOG_DEBUG(log, "update_folder_t, folder = {}, files: {}, blocks = {}", folder_id, files.size(), blocks.size());
     auto assember = model::diff::diff_assember_t(constants::diffs_batch);
 
@@ -100,6 +101,9 @@ auto update_folder_t::apply_impl(apply_controller_t &controller, void *custom) c
             parent->add_child(file.get(), file->get_name()->get_filename());
         }
         folder_info->update_max_sequnece(*file);
+        if (folder_info == cache_folder && file->is_dir()) {
+            folder_info->get_seen_dirs().erase(file->get_name());
+        }
     }
 
     LOG_TRACE(log, "update_folder_t, apply(); max seq: {} -> {}", max_seq, folder_info->get_max_sequence());
@@ -166,7 +170,7 @@ static auto construct(sequencer_t &sequencer, folder_info_t *folder_info, syncsp
     }
 
     auto diff = diff_t(new update_folder_t(folder->get_id(), peer_id, std::move(files), std::move(uuids),
-                                           std::move(new_blocks), std::move(orphaned_blocks)));
+                                           std::move(new_blocks), std::move(orphaned_blocks), folder_info));
     return outcome::success(std::move(diff));
 }
 
@@ -203,9 +207,10 @@ static auto instantiate(cluster_t &cluster, sequencer_t &sequencer, const device
     files.reserve(files_count);
 
     auto seen_file_names = string_views_t(allocator);
-    auto seen_dirs = strings_t(allocator);
     auto skipped_file_indices = skipped_file_indices_t(allocator);
     auto orphaned_files = model::orphaned_files_t();
+    auto& seen_dirs  = fi->get_seen_dirs();
+    auto& path_cache = cluster.get_path_cache();
 
     // pass 1: skip "outdated" files and pick only recent ones
     for (int i = files_count - 1; i >= 0; --i) {
@@ -223,7 +228,6 @@ static auto instantiate(cluster_t &cluster, sequencer_t &sequencer, const device
         auto &f = proto::get_files(message, i);
         auto name = proto::get_name(f);
         auto path = utils::make_generic_view(name, allocator);
-        auto parent_name = string_t(name, allocator);
 
         if (skipped_file_indices.count(i)) {
             LOG_DEBUG(log, "skipping outdated {}-th file '{}'", i, name);
@@ -291,7 +295,7 @@ static auto instantiate(cluster_t &cluster, sequencer_t &sequencer, const device
         if (parent_dir || path.get_components() == 0) {
             enqueue_file = true;
         } else {
-            if (seen_dirs.count(parent_name)) {
+            if (seen_dirs.count(path.get_parent())) {
                 enqueue_file = true;
             }
         }
@@ -300,10 +304,10 @@ static auto instantiate(cluster_t &cluster, sequencer_t &sequencer, const device
             files.emplace_back(f);
             auto is_dir = type == proto::FileInfoType::DIRECTORY;
             if (is_dir) {
-                seen_dirs.emplace(name);
+                seen_dirs.emplace(path_cache.get_path(name));
             }
         } else {
-          orphaned_files.record(path, cluster.get_path_cache(), std::move(f));
+          orphaned_files.record(path, path_cache, std::move(f));
         }
     }
 
@@ -317,7 +321,7 @@ static auto instantiate(cluster_t &cluster, sequencer_t &sequencer, const device
                 for (auto& f: children) {
                     auto is_dir = proto::get_type(f) == proto::FileInfoType::DIRECTORY;
                     if (is_dir) {
-                        auto name = string_t(proto::get_name(f), allocator);
+                        auto name = path_cache.get_path(proto::get_name(f));
                         seen_dirs.insert(std::move(name));
                     }
                     files.emplace_back(f);

@@ -45,6 +45,7 @@ struct SYNCSPIRIT_API folder_info_t final : presence_t {
         unsigned char folder_key_raw[folder_data_length];
     };
     using location_t = std::pair<file_info_t *, presence_t *>;
+    using seen_dirs_t = std::unordered_set<utils::path_ptr_t, utils::path_hash_t, utils::path_eq_t>;
 
     static decomposed_key_t decompose_key(utils::bytes_view_t key);
 
@@ -79,6 +80,7 @@ struct SYNCSPIRIT_API folder_info_t final : presence_t {
     utils::bytes_view_t get_introducer_device_key() const noexcept;
 
     orphaned_files_t& get_orphaned_files() noexcept { return orphaned_files; }
+    seen_dirs_t& get_seen_dirs() noexcept { return seen_dirs; }
 
   private:
     folder_info_t(utils::bytes_view_t key, const device_ptr_t &device_, const folder_ptr_t &folder_) noexcept;
@@ -94,6 +96,7 @@ struct SYNCSPIRIT_API folder_info_t final : presence_t {
     std::int64_t max_sequence;
     utils::bytes_t introducer_device_key;
     orphaned_files_t orphaned_files;
+    seen_dirs_t seen_dirs;;
 };
 
 using folder_info_ptr_t = intrusive_ptr_t<folder_info_t>;
