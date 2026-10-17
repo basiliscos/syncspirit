@@ -13,7 +13,6 @@ using namespace syncspirit::model;
 using namespace syncspirit::proto;
 using namespace syncspirit::test;
 
-#if 0
 TEST_CASE("folder update (Index)", "[model]") {
     auto local_id = device_id_t::from_string(device_id_local).value();
     auto local_device = device_t::create(local_id, "my-device").value();
@@ -460,7 +459,6 @@ TEST_CASE("update folder-3: duplicate files", "[model]") {
         CHECK(folder_peer->get_children().size() == 1);
     }
 }
-#endif
 
 TEST_CASE("update folder-3: out-of-order files", "[model]") {
     auto local_id = device_id_t::from_string(device_id_local).value();
