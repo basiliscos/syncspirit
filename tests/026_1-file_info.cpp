@@ -16,7 +16,6 @@ using namespace syncspirit::test;
 
 using Catch::Matchers::Matches;
 
-#if 0
 TEST_CASE("file-info", "[model]") {
     auto buffer = std::array<std::byte, 1024 * 32>();
     auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
@@ -50,6 +49,7 @@ TEST_CASE("file-info", "[model]") {
     proto::add_counters(proto::get_version(pr_fi), proto::Counter(my_device->device_id().get_uint(), 0));
 
     auto fi = file_info_t::create(sequencer->next_uuid(), pr_fi, folder_info).value();
+#if 0
     auto map = file_infos_map_t{};
 
     map.put(fi);
@@ -67,12 +67,12 @@ TEST_CASE("file-info", "[model]") {
     CHECK(map.by_name(proto::get_name(pr_fi)) == fi);
     CHECK(map.by_sequence(10) == fi);
     CHECK(!map.by_sequence(proto::get_sequence(pr_fi)));
+#endif
 
     auto conflict_name = fi->make_conflicting_name(allocator);
     auto cn = std::string(conflict_name.get_full_name());
     REQUIRE_THAT(cn, Matches("a/b.sync-conflict-202412(\\d){2}-(\\d){6}-KHQNO2S.txt"));
 }
-#endif
 
 TEST_CASE("file_info_t::local_file", "[model]") {
     auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
