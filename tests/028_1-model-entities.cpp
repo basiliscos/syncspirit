@@ -110,8 +110,19 @@ TEST_CASE("entities & presences", "[model]") {
     }
 
     SECTION("iteration") {
+        using strings_t = std::vector<std::string>;
+        auto iterate = [&]() -> strings_t {
+            auto r = strings_t();
+            auto it = folder_info->iterate();
+            for (auto n = it->next(); n; n = it->next()) {
+                auto str = std::string(n->get_entity()->get_path()->get_full_name());
+               r.push_back(str);
+            }
+            return r;
+        };
         SECTION("no files") {
             auto it = folder_info->iterate();
+            CHECK(iterate() == strings_t{});
             CHECK(it->next() == nullptr);
             CHECK(it->next() == nullptr);
         }
@@ -122,6 +133,7 @@ TEST_CASE("entities & presences", "[model]") {
             CHECK(it->next() == f);
             CHECK(it->next() == nullptr);
             CHECK(it->get_seen_sequnece() == sequence);
+            CHECK(iterate() == strings_t{"a"});
         }
         SECTION("3 flat files") {
             auto f_1 = mk_file("a", FT::DIRECTORY);
@@ -137,6 +149,7 @@ TEST_CASE("entities & presences", "[model]") {
             CHECK(it->next() == f_3);
             CHECK(it->next() == nullptr);
             CHECK(it->get_seen_sequnece() == sequence);
+            CHECK(iterate() == strings_t{"a", "b", "c"});
         }
         SECTION("simple hierarchy (1)") {
             auto f_1 = mk_file("a", FT::DIRECTORY);
@@ -155,6 +168,7 @@ TEST_CASE("entities & presences", "[model]") {
             CHECK(it->next() == f_2);
             CHECK(it->next() == nullptr);
             CHECK(it->get_seen_sequnece() == sequence);
+            CHECK(iterate() == strings_t{"a", "a/a0", "a/a1", "b"});
         }
         SECTION("simple hierarchy (2)") {
             auto f_1 = mk_file("a", FT::DIRECTORY);
@@ -173,6 +187,7 @@ TEST_CASE("entities & presences", "[model]") {
             CHECK(it->next() == f_4);
             CHECK(it->next() == nullptr);
             CHECK(it->get_seen_sequnece() == sequence);
+            CHECK(iterate() == strings_t{"a", "b", "b/b0", "b/b1"});
         }
     }
 
