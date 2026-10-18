@@ -26,21 +26,22 @@ struct SYNCSPIRIT_API presence_t : model::augmentable_t {
 
     // clang-format off
     enum features_t: std::uint32_t {
-        file            = 1 << 0,
-        directory       = 1 << 1,
-        symblink        = 1 << 2,
-        folder          = 1 << 3,
-        missing         = 1 << 4,
-        cluster         = 1 << 5,
-        peer            = 1 << 6,
-        local           = 1 << 7,
-        deleted         = 1 << 8,
-        ignored         = 1 << 9,
-        unreachable     = 1 << 10,
-        invalid         = 1 << 11,
-        no_perms        = 1 << 12,
-        synchronizing   = 1 << 13,
-        available       = 1 << 14,
+        file             = 1 << 0,
+        directory        = 1 << 1,
+        symblink         = 1 << 2,
+        folder           = 1 << 3,
+        missing          = 1 << 4,
+        cluster          = 1 << 5,
+        peer             = 1 << 6,
+        local            = 1 << 7,
+        deleted          = 1 << 8,
+        ignored          = 1 << 9,
+        unreachable      = 1 << 10,
+        invalid          = 1 << 11,
+        no_perms         = 1 << 12,
+        synchronizing    = 1 << 13,
+        available        = 1 << 14,
+        normalized       = 1 << 15,
     };
 
     static constexpr std::uint32_t mask = 0xFFFFFFFF;
@@ -81,6 +82,7 @@ struct SYNCSPIRIT_API presence_t : model::augmentable_t {
     friend struct file_entity_t;
 
     void forget_entity() noexcept;
+    void normalize() noexcept;
 
     template<typename Augmentable>
     void link(Augmentable *augmentable) noexcept { augmentable->set_augmentation(this); }
@@ -88,8 +90,9 @@ struct SYNCSPIRIT_API presence_t : model::augmentable_t {
 
     entity_t *entity;
     presence_t *parent;
+    presence_t *next{nullptr};
     model::device_t* device;
-    children_t children;
+    children_t children_;
     mutable std::uint32_t features = 0;
     mutable std::uint32_t entity_generation = 0;
     mutable presence_stats_t statistics;

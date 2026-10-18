@@ -190,8 +190,8 @@ auto folder_info_t::get_by_path(const utils::path_base_t& path) const noexcept  
 }
 
 void folder_info_t::clear() noexcept {
-    while(children.size()) {
-        children.back()->forget_presence();
+    while(children_.size()) {
+        children_.back()->forget_presence();
     }
 }
 

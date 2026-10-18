@@ -7,10 +7,13 @@
 #include "cluster_file_presence.h"
 #endif
 #include <spdlog/spdlog.h>
+#include <algorithm>
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32) || defined(__APPLE__)
 #include <uni_algo/case.h>
 #endif
+
+#define NORMALIZE_IF_NEEDED() if (!(features & F::normalized)) { normalize(); }
 
 namespace syncspirit::model {
 
@@ -107,14 +110,27 @@ auto presence_t::get_children() noexcept -> children_t & {
         }
         std::sort(children.begin(), children.end(), child_comparator_t{});
     }
+    if (features & F::normalized) {
+        return;
+    }
 #endif
-    return children;
+    NORMALIZE_IF_NEEDED();
+    return children_;
+}
+
+void presence_t::normalize() noexcept {
+    if (features & F::normalized) {
+        return;
+    }
+    features |= F::normalized;
+    std::sort(children_.begin(), children_.end(), child_comparator_t{});
 }
 
 presence_t *presence_t::get_child(std::string_view name, bool is_dir) noexcept {
+    NORMALIZE_IF_NEEDED();
     auto comparator = child_comparator_t{};
     auto presence_like = presence_t::presence_like_t{name, is_dir};
-    auto &chilren = get_children();
+    auto &children = get_children();
     auto it = std::lower_bound(children.begin(), children.end(), presence_like, comparator);
     if (it != children.end()) {
         auto &p = *it;
@@ -133,7 +149,7 @@ presence_t *presence_t::get_child(std::string_view name, bool is_dir) noexcept {
 void presence_t::forget_entity() noexcept { entity = nullptr; }
 
 void presence_t::forget_presence() noexcept {
-    for (auto& c: children) {
+    for (auto& c: children_) {
         c->forget_presence();
     }
     if (parent) {
@@ -176,15 +192,23 @@ presence_t* presence_t::set_parent(entity_t *entity_, presence_t *parent_) noexc
 void presence_t::add_child(presence_t* child, std::string_view name) noexcept {
     auto child_entity = entity->get_or_create_child(name);
     child->set_parent(child_entity, this);
-    children.push_back(std::move(child));
-    // TODO: sort children
+    bool reset_normalization = false;
+    if (children_.size() > 0) {
+        auto comparator = child_comparator_t{};
+        reset_normalization = comparator(children_.back(), child);
+    }
+    children_.push_back(std::move(child));
+    if (reset_normalization) {
+        features = features & ~F::normalized;
+    }
 }
 
 void presence_t::remove_child(const presence_t & child) noexcept {
-    // TODO: sort children
-    for (auto it = children.rbegin(); it != children.rend(); ++it) {
+    // TODO: bisect?
+    for (auto it = children_.rbegin(); it != children_.rend(); ++it) {
         if (*it == &child) {
-            children.erase(std::next(it).base());
+            children_.erase(std::next(it).base());
+            break;
         }
     }
 }
