@@ -214,6 +214,7 @@ add_library(syncspirit_core
     src/model/misc/file_block.cpp
     src/model/misc/file_iterator.cpp
     src/model/misc/file_matcher.cpp
+    src/model/misc/folder_info_iterator.cpp
     src/model/misc/orphaned_files.cpp
     src/model/misc/orphaned_blocks.cpp
     src/model/misc/postponed_files.cpp

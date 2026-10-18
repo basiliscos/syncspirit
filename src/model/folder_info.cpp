@@ -6,6 +6,7 @@
 #include "proto/proto-helpers-db.h"
 #include "db/prefix.h"
 #include "misc/error_code.h"
+#include "model/misc/folder_info_iterator.h"
 #include "utils/format.hpp"
 #include <spdlog/spdlog.h>
 #include <algorithm>
@@ -193,6 +194,11 @@ void folder_info_t::clear() noexcept {
     while(children_.size()) {
         children_.back()->forget_presence();
     }
+}
+
+folder_info_iterator_ptr_t folder_info_t::iterate() noexcept {
+    normalize();
+    return new folder_info_iterator_t(this);
 }
 
 } // namespace syncspirit::model

@@ -23,6 +23,9 @@ using folder_ptr_t = intrusive_ptr_t<folder_t>;
 struct folder_info_t;
 using folder_info_ptr_t = intrusive_ptr_t<folder_info_t>;
 
+struct folder_info_iterator_t;
+using folder_info_iterator_ptr_t = model::intrusive_ptr_t<folder_info_iterator_t>;
+
 struct SYNCSPIRIT_API folder_info_t final : presence_t {
 
     struct decomposed_key_t {
@@ -81,6 +84,8 @@ struct SYNCSPIRIT_API folder_info_t final : presence_t {
 
     orphaned_files_t& get_orphaned_files() noexcept { return orphaned_files; }
     seen_dirs_t& get_seen_dirs() noexcept { return seen_dirs; }
+
+    folder_info_iterator_ptr_t iterate() noexcept;
 
   private:
     folder_info_t(utils::bytes_view_t key, const device_ptr_t &device_, const folder_ptr_t &folder_) noexcept;

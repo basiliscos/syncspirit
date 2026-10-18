@@ -123,7 +123,27 @@ void presence_t::normalize() noexcept {
         return;
     }
     features |= F::normalized;
-    std::sort(children_.begin(), children_.end(), child_comparator_t{});
+    if (!children_.empty()) {
+        auto outer_next = children_.back()->next;
+        auto prev_last = children_.back();
+        std::sort(children_.begin(), children_.end(), child_comparator_t{});
+        next = children_.front();
+        for (std::size_t i = 0; i + 1 < children_.size(); ++i) {
+            children_[i]->update_next(children_[i + 1]);
+        }
+        if (prev_last != children_.back()) {
+            children_.back()->update_next(outer_next);
+        }
+    }
+}
+
+void presence_t::update_next(presence_t* new_next) noexcept {
+    if (children_.empty()) {
+        next = new_next;
+    } else {
+        auto last = children_.back();
+        last->update_next(new_next);
+    }
 }
 
 presence_t *presence_t::get_child(std::string_view name, bool is_dir) noexcept {
@@ -192,7 +212,8 @@ presence_t* presence_t::set_parent(entity_t *entity_, presence_t *parent_) noexc
 void presence_t::add_child(presence_t* child, std::string_view name) noexcept {
     auto child_entity = entity->get_or_create_child(name);
     child->set_parent(child_entity, this);
-    bool reset_normalization = false;
+    auto reset_normalization = false;
+    auto normalized = features & F::normalized;
     if (children_.size() > 0) {
         auto comparator = child_comparator_t{};
         reset_normalization = comparator(children_.back(), child);
@@ -200,11 +221,21 @@ void presence_t::add_child(presence_t* child, std::string_view name) noexcept {
     children_.push_back(std::move(child));
     if (reset_normalization) {
         features = features & ~F::normalized;
+    } else {
+        if (children_.size() == 1) {
+            child->update_next(next);
+            next = child;
+        } else {
+            auto& prev = children_[children_.size() - 2];
+            auto outer_next = prev->next;
+            prev->update_next(child);
+            child->update_next(outer_next);
+        }
     }
 }
 
 void presence_t::remove_child(const presence_t & child) noexcept {
-    // TODO: bisect?
+    // no need to bisect, as children are remove from tail
     for (auto it = children_.rbegin(); it != children_.rend(); ++it) {
         if (*it == &child) {
             children_.erase(std::next(it).base());

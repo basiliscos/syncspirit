@@ -19,6 +19,8 @@ using presence_ptr_t = model::intrusive_ptr_t<presence_t>;
 struct file_entity_t;
 struct cluster_file_presence_t;
 
+struct folder_info_iterator_t;
+
 presence_t *get_child(presence_t *parent, std::string_view name, bool is_dir) noexcept;
 
 struct SYNCSPIRIT_API presence_t : model::augmentable_t {
@@ -80,9 +82,11 @@ struct SYNCSPIRIT_API presence_t : model::augmentable_t {
     friend struct entity_t;
     friend struct cluster_file_presence_t;
     friend struct file_entity_t;
+    friend struct folder_info_iterator_t;
 
     void forget_entity() noexcept;
     void normalize() noexcept;
+    void update_next(presence_t* ) noexcept;
 
     template<typename Augmentable>
     void link(Augmentable *augmentable) noexcept { augmentable->set_augmentation(this); }

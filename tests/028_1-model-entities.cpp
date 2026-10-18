@@ -1,16 +1,18 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2025-2026 Ivan Baidakou
 
 #include <catch2/catch_all.hpp>
 #include "test-utils.h"
 #include "model/file_info.h"
 #include "model/misc/sequencer.h"
+#include "model/misc/folder_info_iterator.h"
 
 using namespace syncspirit;
 using namespace syncspirit::model;
 using namespace syncspirit::test;
 
 using F = model::presence_t::features_t;
+using FT = proto::FileInfoType;
 
 using Catch::Matchers::Matches;
 
@@ -85,7 +87,6 @@ TEST_CASE("entities & presences", "[model]") {
             CHECK(children[2] == f_3.get());
         }
         SECTION("dirs are first") {
-            using FT = proto::FileInfoType;
             auto f_1 = mk_file("a", FT::FILE);
             auto f_2 = mk_file("b", FT::DIRECTORY);
             auto f_3 = mk_file("c", FT::FILE);
@@ -105,6 +106,73 @@ TEST_CASE("entities & presences", "[model]") {
             CHECK(children[0] == f_2.get());
             CHECK(children[1] == f_1.get());
             CHECK(children[2] == f_3.get());
+        }
+    }
+
+    SECTION("iteration") {
+        SECTION("no files") {
+            auto it = folder_info->iterate();
+            CHECK(it->next() == nullptr);
+            CHECK(it->next() == nullptr);
+        }
+        SECTION("single file") {
+            auto f = mk_file("a", FT::FILE);
+            folder_info->add_relaxed(f.get());
+            auto it = folder_info->iterate();
+            CHECK(it->next() == f);
+            CHECK(it->next() == nullptr);
+            CHECK(it->get_seen_sequnece() == sequence);
+        }
+        SECTION("3 flat files") {
+            auto f_1 = mk_file("a", FT::DIRECTORY);
+            auto f_2 = mk_file("b", FT::DIRECTORY);
+            auto f_3 = mk_file("c", FT::DIRECTORY);
+            folder_info->add_relaxed(f_3.get());
+            folder_info->add_relaxed(f_2.get());
+            folder_info->add_relaxed(f_1.get());
+
+            auto it = folder_info->iterate();
+            CHECK(it->next() == f_1);
+            CHECK(it->next() == f_2);
+            CHECK(it->next() == f_3);
+            CHECK(it->next() == nullptr);
+            CHECK(it->get_seen_sequnece() == sequence);
+        }
+        SECTION("simple hierarchy (1)") {
+            auto f_1 = mk_file("a", FT::DIRECTORY);
+            auto f_2 = mk_file("b", FT::DIRECTORY);
+            auto f_3 = mk_file("a/a0", FT::DIRECTORY);
+            auto f_4 = mk_file("a/a1", FT::DIRECTORY);
+            folder_info->add_relaxed(f_1.get());
+            folder_info->add_relaxed(f_2.get());
+            folder_info->add_relaxed(f_3.get());
+            folder_info->add_relaxed(f_4.get());
+
+            auto it = folder_info->iterate();
+            CHECK(it->next() == f_1);
+            CHECK(it->next() == f_3);
+            CHECK(it->next() == f_4);
+            CHECK(it->next() == f_2);
+            CHECK(it->next() == nullptr);
+            CHECK(it->get_seen_sequnece() == sequence);
+        }
+        SECTION("simple hierarchy (2)") {
+            auto f_1 = mk_file("a", FT::DIRECTORY);
+            auto f_2 = mk_file("b", FT::DIRECTORY);
+            auto f_3 = mk_file("b/b0", FT::DIRECTORY);
+            auto f_4 = mk_file("b/b1", FT::DIRECTORY);
+            folder_info->add_relaxed(f_1.get());
+            folder_info->add_relaxed(f_2.get());
+            folder_info->add_relaxed(f_4.get());
+            folder_info->add_relaxed(f_3.get());
+
+            auto it = folder_info->iterate();
+            CHECK(it->next() == f_1);
+            CHECK(it->next() == f_2);
+            CHECK(it->next() == f_3);
+            CHECK(it->next() == f_4);
+            CHECK(it->next() == nullptr);
+            CHECK(it->get_seen_sequnece() == sequence);
         }
     }
 
