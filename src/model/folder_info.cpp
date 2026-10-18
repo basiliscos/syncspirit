@@ -121,7 +121,9 @@ void folder_info_t::add_relaxed(file_info_t* file_info) noexcept {
 }
 
 void folder_info_t::update_max_sequnece(const file_info_t& file_info) noexcept {
-    max_sequence = std::max(max_sequence, file_info.get_sequence());
+    if (auto seq = file_info.get_sequence(); seq > max_sequence) {
+        max_sequence = seq;
+    }
 }
 
 bool folder_info_t::add_strict(file_info_t* file_info, bool already_added) noexcept {
