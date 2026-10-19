@@ -124,28 +124,9 @@ void presence_t::normalize() noexcept {
     }
     features |= F::normalized;
     if (!children_.empty()) {
-        auto outer_next = children_.back()->next;
-        auto prev_last = children_.back();
         std::sort(children_.begin(), children_.end(), child_comparator_t{});
-        next = children_.front();
-        for (std::size_t i = 0; i + 1 < children_.size(); ++i) {
-            children_[i]->update_next(children_[i + 1]);
-        }
-        if (prev_last != children_.back()) {
-            children_.back()->update_next(outer_next);
-        }
     }
 }
-
-void presence_t::update_next(presence_t* new_next) noexcept {
-    if (children_.empty()) {
-        next = new_next;
-    } else {
-        auto last = children_.back();
-        last->update_next(new_next);
-    }
-}
-
 presence_t *presence_t::get_child(std::string_view name, bool is_dir) noexcept {
     NORMALIZE_IF_NEEDED();
     auto comparator = child_comparator_t{};
@@ -221,16 +202,6 @@ void presence_t::add_child(presence_t* child, std::string_view name) noexcept {
     children_.push_back(std::move(child));
     if (reset_normalization) {
         features = features & ~F::normalized;
-    } else {
-        if (children_.size() == 1) {
-            child->update_next(next);
-            next = child;
-        } else {
-            auto& prev = children_[children_.size() - 2];
-            auto outer_next = prev->next;
-            prev->update_next(child);
-            child->update_next(outer_next);
-        }
     }
 }
 

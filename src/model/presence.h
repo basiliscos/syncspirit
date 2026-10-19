@@ -86,7 +86,6 @@ struct SYNCSPIRIT_API presence_t : model::augmentable_t {
 
     void forget_entity() noexcept;
     void normalize() noexcept;
-    void update_next(presence_t* ) noexcept;
 
     template<typename Augmentable>
     void link(Augmentable *augmentable) noexcept { augmentable->set_augmentation(this); }
@@ -94,7 +93,6 @@ struct SYNCSPIRIT_API presence_t : model::augmentable_t {
 
     entity_t *entity;
     presence_t *parent;
-    presence_t *next{nullptr};
     model::device_t* device;
     children_t children_;
     mutable std::uint32_t features = 0;
